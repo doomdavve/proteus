@@ -1131,6 +1131,7 @@ uint64_t boat_net_content_digest(void)
     for (size_t i = 0; i < sizeof(storm) / sizeof(*storm); ++i)
         digest_float(&d, storm[i]);
     digest_u64(&d, 3); // Local storm recipe revision (CPU and production GLSL).
+    digest_u64(&d, 2); // Ferry recipe revision: centred crest and tapered three-wave packet.
     cached = d.value;
     ready = true;
     return cached;

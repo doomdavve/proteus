@@ -31,7 +31,7 @@ static const BoatRaceCourse RIVER = {
         .lifetime = 40,
         .wavelength = 8,
         .spread = 3,
-        .half_width = 28 },
+        .half_width = 14 },
 };
 
 // Recovery candidates behind an anchor gate (ahead of it after a finish), in lateral order.

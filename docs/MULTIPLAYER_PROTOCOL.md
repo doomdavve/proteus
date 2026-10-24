@@ -116,7 +116,8 @@ hashes the river race course: gate count; the start and every gate's centre, dir
 half-width; the four grid points; and the ferry source's origin, direction, start offset,
 speed, height, duration, lifetime, wavelength, spread and half-width. The local-storm extension
 also hashes storm centre X/Z at GO, radius, height, start offset, velocity X/Z (floats), then
-the storm recipe revision (u64, currently 3: irregular directional crests). This changes
+the storm recipe revision (u64, currently 3: irregular directional crests), then the ferry
+recipe revision (u64, currently 2: centred crest with a tapered three-wave packet). This changes
 compatibility without changing v4 message bytes;
 rebuild server and clients together. Storm settings are compiled course data; GO anchors their
 clock in both the authority and prediction. Cloud, rain, lightning and rough water move

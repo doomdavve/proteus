@@ -222,9 +222,12 @@ throttle) and releases them together at GO. Pass between the tall buoy markers a
 six 32–40 m skill gates; the middle pair forms a chicane. Between gates 4 and 5, a local
 storm travels down-course at 8 m/s, meeting racers around the chicane and adding steep
 irregular directional waves beneath a high dark cloud, with gusting, varied rain and
-periodic lightning. Yellow marks your next
+periodic lightning. Storm and ferry waves now keep their blue-green faces, with pale foam
+confined to narrow crests. The ferry now leaves three crests per side, with a larger middle
+wave and smaller outer waves; the [shorter wake](docs/RACE_PLAN.md#three-crest-ferry-wake--2026-10-24)
+was user-approved on 2026-10-24. Yellow marks your next
 gate, orange ones come later, and teal ones are cleared. The chequered line is the finish.
-The current stronger layout takes bots about 65–76 s; play tuning is still in progress.
+The current stronger layout takes bots about 63–71 s; play tuning is still in progress.
 The HUD shows your time,
 position and gate; capsized boats are put back behind their last gate after 2 s (`R` after
 0.5 s). Finishers coast for 2 s and are parked beside the river. Racing closes 15 s after the

@@ -82,8 +82,9 @@ vec4 vesselWake(vec2 world)
     float pi = 3.14159265359, k = 2.0 * pi / vesselShape.y;
     float width2 = vesselShape.w * vesselShape.w;
     float edge = 1.0 - q*q / width2;
-    float f = sin(k*q) * edge*edge*edge;
-    float df = k*cos(k*q) * edge*edge*edge - sin(k*q)*6.0*q/width2*edge*edge;
+    // Largest crest at the packet centre, smaller crests on either side.
+    float f = cos(k*q) * edge*edge*edge;
+    float df = -k*sin(k*q) * edge*edge*edge - cos(k*q)*6.0*q/width2*edge*edge;
     float window = pow(sin(pi*emitted/vesselMotion.z), 2.0);
     float envelope = pow(sin(pi*age/vesselMotion.w), 2.0);
     float dw = pi/vesselMotion.z * sin(2.0*pi*emitted/vesselMotion.z);
