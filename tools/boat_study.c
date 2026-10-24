@@ -490,6 +490,14 @@ static int study(int argc, char **argv)
             goto cleanup;
         net = &net_study;
         networked = true;
+        location = session.world.definition;
+        waves = net_study.client.accept.waves;
+        camera_default.distance = location->camera_distance;
+        camera_default.height = location->camera_height;
+        if (!camera_distance_set)
+            camera_settings.distance = camera_default.distance;
+        if (!camera_height_set)
+            camera_settings.height = camera_default.height;
     }
 #endif
     if (wake_field) {

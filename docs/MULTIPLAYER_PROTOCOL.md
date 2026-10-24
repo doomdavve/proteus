@@ -1,4 +1,4 @@
-# Multiplayer protocol v2
+# Multiplayer protocol v3
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -7,10 +7,11 @@ and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
 [`src/boat_net_protocol.[ch]`](../src/boat_net_protocol.h) and its fixtures are in
 [`tools/validate_boat_net.c`](../tools/validate_boat_net.c).
 
-v2 is a diagnostic protocol for one basin room of up to four players. M4 client prediction
-uses only the fields listed here; v1's layouts are unchanged apart from the version number and
-Accept's former reserved byte. There is no encryption or authentication: a room token is a
-shared word, not a secret.
+v3 (2026-10-24) adds the authority-selected basin/Eriksberg/river location to Accept, widens
+position validation to cover the mapped world, and fingerprints the complete compiled map
+bundle for compatibility. A room hosts one fixed location and up to four players. M4 client
+prediction uses only the fields listed here. There is no encryption or authentication: a room
+token is a shared word, not a secret. Rebuild both server and clients; v1/v2 are incompatible.
 
 ## Conventions
 
@@ -56,11 +57,16 @@ traffic from an earlier session never reaches a room.
 | 0 control | reliable, ordered | Hello, Accept, Reject, Roster, Ready, SpawnRequest, ResyncRequest, Disconnect, MatchState, MatchEvent |
 | 1 state | unreliable, sequenced | InputBatch (up), Snapshot (down), Ping, Pong |
 | 2 births | unreliable, sequenced | WakeBirths |
-| 3 registry | unreliable, unsequenced | Reserved for wake registry pages (M4/M5); unused in v2 |
+| 3 registry | unreliable, unsequenced | Reserved for wake registry pages (M4/M5); unused in v3 |
 | 4 bootstrap | reliable, ordered | WorldBegin, WorldPage, WorldEnd |
 
 A message on the wrong channel is discarded. Reliable bootstrap traffic cannot hold up new
 snapshots, because they travel on a different channel.
+
+Reliable ordering is per channel: WorldBegin/WorldPage/WorldEnd can arrive before Accept.
+The client holds at most one maximum-sized checkpoint's wire messages (16 pages plus begin
+and end) while awaiting Accept, then processes them using the accepted epoch. Other epochs
+are discarded. This receiver buffering does not change the wire layout or channels.
 
 ## Messages
 
@@ -92,10 +98,14 @@ snapshots, because they travel on a different channel.
 Hello: `u32` handling revision (`BOAT_PHYSICS_REVISION`, currently 7), `u64` content digest,
 then the name (≤16), room token (≤32) and build label (≤32) strings.
 
-The content digest is FNV-1a 64 over the location's identity, mapped flag, basin half-extents,
-spawn, current centre and crossing offset, plus the fleet and wake contract constants: tick
-rate, slots, solver passes, spawn retry, emitter slots, emission cadence, maximum lifetime,
-mass and restitution. `boat_net_content_digest()` defines the exact order.
+The content digest is FNV-1a 64 over every compiled location in ID order: identity, mapped
+flag, basin half-extents, single-player spawn, multiplayer start centre, current centre and
+crossing offset; for each mapped location,
+the crop's triangle count, then every triangle's three vertex indices and referenced XYZ
+coordinates. It then hashes the fleet/wake contract: tick rate, slots, solver passes, spawn
+retry, emitter slots, emission cadence, maximum lifetime, mass and restitution.
+`boat_net_content_digest()` defines the exact order. Fingerprinting the whole bundle lets a
+client send Hello before it knows which location the server will select.
 
 The server checks, in order: version (from the header), handling revision, content digest,
 token, free slot. The first failure is answered with Reject and a disconnect, before any slot
@@ -104,7 +114,8 @@ or boat exists.
 Accept: `u8` slot (0–3), `u8` waves (0/1), `u8` snapshot interval (4), `u8` birth interval (12),
 `u8` input interval (2), `u8` commands per batch (12), `u8` future window (24), `u8` room mode
 (0 free, 1 deathmatch; v1 reserved),
-`u16` tick rate (must be 120), `u16` reserved, `u32` wake lifetime ticks (240–1920),
+`u16` tick rate (must be 120), `u8` location (0 basin, 1 Eriksberg, 2 river), `u8` reserved,
+`u32` wake lifetime ticks (240–1920),
 `f32` crest height (0.1–3). The header epoch is the room's epoch.
 
 Reject: `u8` reason, `u8` reserved, `u16` server protocol version, `u32` server handling
@@ -317,7 +328,8 @@ only as trustworthy as that machine.
 ## Safety envelope
 
 These are generous decode limits, not gameplay limits. Positions (boats, emitter starts, wake
-records) must be within the basin walls plus 100 m. Speeds are limited to ±1000 m/s, angular
+records) must be within ±8192 m on both horizontal axes. Shoreline and hull queries enforce
+the selected map during simulation. Speeds are limited to ±1000 m/s, angular
 rates to ±10000 rad/s, pitch, roll and heading to ±10⁶ rad, height to ±1000 m, and timers to
 0–10⁹ s. Throttle, engine response and wheel must be within −1..1, planing and wave spray
 within 0..1, and engine angle within ±π. Wake amplitude and emitter strength must be within
@@ -327,9 +339,9 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v2 rejects every other version, v1 included; there is no negotiation or
+  protocol version. v3 rejects every other version, v1/v2 included; there is no negotiation or
   migration.
-- A handling change increments `BOAT_PHYSICS_REVISION`; a change to the basin definition or the
+- A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry or the
   fleet/wake contract changes the content digest. Either is rejected at Hello.
 - Registry pages, prediction acknowledgements and remote-input history, if M5 needs them, will
   be a later version.
@@ -340,8 +352,8 @@ must not exceed their capacities, and expired ≤ emitted.
 
 - golden bytes of a Ping, an InputBatch, a Hello, a MatchState and a MatchEvent payload;
 - the snapshot size (752), slot field offsets and an FNV-1a 64 digest of a hand-built
-  snapshot's bytes (`c02fda7dbe1ffe1b`; with the version byte set back to 1 the v1 digest
-  `57447ded5b742cfe`, so v2 left the snapshot unchanged);
+  snapshot's bytes (`690c711d99578e10`; with the version byte set back to 1 the v1 digest
+  `57447ded5b742cfe`, so v3 leaves the snapshot payload unchanged);
 - round trips of all 18 types, rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode and the MatchState and
   MatchEvent consistency rules;

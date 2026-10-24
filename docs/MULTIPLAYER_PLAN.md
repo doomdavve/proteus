@@ -45,10 +45,11 @@ user played across two machines: a Mac hosted `boat_server` and one client, and 
 joined over the LAN ("Multiplayer architecture works great!"); profile F and the contact-gap
 measurement were not part of that session. LAN discovery (2026-10-24) lets the title find
 rooms on the local network; it is checked on one Mac only. See the
-[LAN discovery handoff](#lan-discovery-handoff--2026-10-24). Next: the rest of the M4 manual acceptance session (two humans, LAN and profile F) and the contact-gap
-measurement it calls for; M5–M8 are pending. The [capsize deathmatch](DEATHMATCH_PLAN.md)
+[LAN discovery handoff](#lan-discovery-handoff--2026-10-24). On 2026-10-24 the user explicitly chose to advance to M5 and defer the remaining M4
+manual acceptance, profile-F play and contact-gap measurement. These remain open checks,
+not completed acceptance. M5 is active; M6–M8 remain pending. The [capsize deathmatch](DEATHMATCH_PLAN.md)
 proceeds in parallel (D1 match core and D2 protocol v2 with the in-game HUD implemented
-2026-10-24; next: D2 play, then D3). The live protocol is now [v2](MULTIPLAYER_PROTOCOL.md).
+2026-10-24; next: D2 play, then D3). The live protocol is now [v3](MULTIPLAYER_PROTOCOL.md).
 Numerical budgets below are proposed gates, not measured multiplayer results.
 The final evidence section distinguishes checks performed for this document from future checks.
 
@@ -99,7 +100,7 @@ Only three product questions materially remain open; the plan proceeds with thes
 | --- | --- | --- |
 | Must browser players join the first multiplayer release? | No; native first, browser single-player retained | If yes, evaluate WebRTC before M3 instead of first integrating ENet |
 | Who operates the reachable friends server? | One friend maintains one small Linux server, or the group uses an existing private VPN | If nobody can, connectivity/managed relay work becomes release-critical |
-| Must the first friends release include the river? | Basin proves feel first; river/Eriksberg follow in M7 | Shipping basin alone is possible after M6 acceptance; map work does not block the first playable |
+| Must the first friends release include the river? | Basin proved the first slice; playable river/Eriksberg rooms pulled forward from M7 on 2026-10-24 | Fixed-map play is available now; full mapped qualification remains in M7 |
 
 ## Source assessment and corrections to older assumptions
 
@@ -714,9 +715,8 @@ browser, accounts, activities scoring or an elaborate lobby.
 
 Status, 2026-10-24: step 1 (checkpoint/input replay) implemented and automatically verified on
 macOS (2026-10-23); user-played beside `boat_bot`, including its wakes, on 2026-10-24; see the
-[M4 prediction handoff](#m4-step-1-client-prediction-handoff--2026-10-23). Next: step 2, wake
-births/repair and provisional-own reconciliation; then remote interpolation/proximity view,
-fleet rendering and the safe reset UI. Step 2 (wake reconciliation) implemented and automatically
+[M4 prediction handoff](#m4-step-1-client-prediction-handoff--2026-10-23). The subsequent steps
+are also implemented, as recorded below. Step 2 (wake reconciliation) implemented and automatically
 verified on 2026-10-24; see the
 [wake handoff](#m4-step-2-wake-reconciliation-handoff--2026-10-24). Step 3 (remote view)
 implemented and automatically verified on 2026-10-24; the user played both in the step-4a sessions without targeted checks ("I'm not sure what to look for but I didn't notice anything off"); see the
@@ -727,13 +727,15 @@ same day; see the
 implemented and automatically verified on 2026-10-24, not yet user-played; see the
 [reset UI handoff](#m4-step-4b-reset-ui-handoff--2026-10-24). User-played on two machines
 (Mac host with server and client, Windows client over LAN) on 2026-10-24: "works great". Next:
-the remaining manual acceptance checks (profile F)
-above and the contact-gap measurement; the user plans wider play once binaries can go to
-friends (M6).
+M5 four-player/session hardening, by explicit user direction on 2026-10-24. The remaining
+manual acceptance checks (profile F), targeted reset play and contact-gap measurement above
+are deferred, not passed; the user plans wider play once binaries can go to friends (M6).
 
 ### M5 — four-player/session and impairment hardening
 
-Depends on M4 feel gate. Likely network/prediction/world modules, `boat_profile`,
+Originally depended on the complete M4 feel gate; the user explicitly deferred its remaining
+checks on 2026-10-24 and authorized M5 to proceed. Deferred M4 checks remain tracked above.
+Likely network/prediction/world modules, `boat_profile`,
 `validate_boat_net`, a bounded multi-process bot harness and `docs/TESTING.md`. Enable four
 slots; implement all lifecycle, join-in-progress, old/new emitter generations, timeout, focus,
 rate-limit/overload and resync policies. Complete the matrix below, portable sanitizers/parser
@@ -747,6 +749,12 @@ help/alt-tab one client, disconnect/rejoin during wakes, concurrent R and blocke
 Acceptance: profiles L/F meet gates, harsh profiles degrade explicitly without authority
 divergence/crash or unbounded memory; CPU/memory/bandwidth targets met on named hardware.
 Non-goals: more players, changing wake strength to meet a budget, or claiming browser readiness.
+
+Status, 2026-10-24: M5 step 1 adds the four-player lifecycle validation and bounded real-ENet
+process harness described in the [handoff](#m5-step-1-four-player-lifecycle-handoff--2026-10-24).
+Next: extend four-player impairment coverage to J/H/A/B and shared egress/slow-peer limits,
+add resource counters, parser fuzzing/sanitizers and execute the long soak gates. Four-human
+play and deferred M4 acceptance remain open. M5 is not complete.
 
 ### M6 — friends over the internet and native packaging
 
@@ -772,10 +780,17 @@ non-goals. Internet delay remains part of the measured fun gate.
 
 ### M7 — mapped free boating and release qualification
 
-Depends on M6 and remaining mapped W1–W4/core boundaries. Likely `boat_location`, `boat_map`,
-`boat_water_mesh`, harbor/traffic query splits, `boat_world`, views and mapped validators.
-One fixed location per room; add river/Eriksberg with shared clock/settings, kinematic scenery
-and safe spawn candidates. No map streaming or interactive location transition during a room.
+The playable map slice was pulled forward on 2026-10-24 at the user's request: basin,
+Eriksberg and river rooms now select their map on the authority and negotiate it with clients
+(protocol v3), for free boating and deathmatch. See the [river hosting handoff](#river-hosting-handoff--2026-10-24).
+This delivers fixed-map play, not the full qualification milestone. The remaining work below
+still depends on M6 and mapped foundations; the legacy process-wide crop/cache model permits
+one map per process and has not become independently owned concurrent worlds.
+
+Remaining qualification touches `boat_location`, `boat_map`, `boat_water_mesh`, harbor/traffic
+query splits, `boat_world`, views and mapped validators. Verify shared clock/settings,
+kinematic scenery and safe spawn coverage for the implemented fixed-map rooms. No map streaming
+or interactive location transition during a room.
 
 Automated: mapped shore/bridge/berth/traffic height contacts, common-time actor poses, two
 world/cache isolation, mapped spawn coverage, four-player full-pool route costs and shader
@@ -891,7 +906,7 @@ For two players, alternate roles for five runs each: drive parallel and cross th
 at shallow and right angles; surf a crest; jump/land; deliberate head-on and glancing contact;
 pass above a boat; overturn and recover while the other moves nearby. Repeat under L and F,
 then briefly J. Finish with ten unstructured minutes. Four-player sessions add intersecting
-trails, a harmless pile-up, following one leader and a river trip when M7 exists. Have one
+trails, a harmless pile-up, following one leader and a river trip (fixed-map rooms are available; M7 qualification remains open). Have one
 player join late and one alt-tab/reconnect; swap who hosts so latency privilege is apparent.
 
 Ask each person to rate 1–5: control response, whether the visible wave explained the launch,
@@ -1534,6 +1549,136 @@ Not verified: discovery between two machines; Windows (the `SIO_GET_INTERFACE_LI
 not been compiled; Windows Firewall must allow `boat_server.exe` inbound and admit the unicast
 answer to `boat_study.exe`'s broadcast); Linux; interactive use of the LAN row; networks that
 drop broadcasts (guest Wi-Fi, client isolation, VPNs), where typing an address is still the way.
+
+## M5 step 1: four-player lifecycle handoff — 2026-10-24
+
+The user explicitly chose to proceed to M5, deferring the remaining M4 acceptance checks.
+This authorizes implementation progress; it does not establish acceptance of those checks.
+
+| Implemented | Automated verification | Manual observation | User acceptance |
+| --- | --- | --- | --- |
+| Four-player lifecycle fixture, bounded ENet process/churn harness, headless bot stress controls, early-bootstrap join fix | Seeded profile-F fixture and real-ENet lifecycle checks; final suite evidence below | Agent-run windowed client beside three resetting bots, 360 frames; no keyboard play | Authorized advancing to M5; no new gameplay acceptance |
+
+**Join fix.** The new fixture initially failed with a client stuck in bootstrap. Control and
+bootstrap are independently ordered reliable channels: the checkpoint could beat Accept and
+was discarded before the client knew its epoch. `BoatNetClient` now retains at most 18 wire
+messages (one maximum checkpoint: begin, 16 pages, end) while awaiting Accept, then processes
+these through the ordinary epoch checks. Overflow is counted as a bootstrap failure and stays
+bounded; the existing handshake deadline still applies. No protocol bytes/channels changed.
+Seed 51 explicitly requires early bootstrap traffic and a single successful initial baseline
+per client, so the regression fails if the buffer is removed.
+
+**Lifecycle coverage.** Four predicting clients run profile F both ways, including the initial
+handshake. A fourth joins while wakes are live; a fifth is refused. All four reset together,
+one sends inactive input, then one encounters a 1 s blackout and recovers, followed by a 6 s
+blackout and timeout. Its replacement reuses the slot with a newer life; stale-life commands
+are rejected. After a lossless tail every surviving mirror hashes identically to the authority
+at its snapshot tick. Replay depth, decode errors and authority backlog/faults are checked.
+This is a lifecycle test, not proof of the deferred M4 correction/contact-gap targets.
+
+**Real transport.** `boat_net_session` keeps three predicting `boat_bot` clients alive while
+cycling the fourth through graceful leave, late join, process kill, timeout and replacement.
+A fifth peer must be rejected while full. Bots request resets every 2 s and send inactive input
+for 1 s every 3 s. The harness checks continued snapshots, completed resets, four-slot roster
+visibility, wake/message/datagram/MTU bounds, timeout/rejection counts, every authority tick,
+no protocol/emission faults and release of every slot. All children have deadlines and are
+killed/reaped on failure; completed logs use temporary files and close their handles.
+`--seconds 1800`, `3600` or `7200` repeats churn for longer runs; commands and exact limits are
+in [Testing](TESTING.md#network-checks). These are opt-in drivers, not completed soak gates.
+
+**Verification (2026-10-24, Apple Silicon, macOS 26.6.2, Debug).** Configure and build passed
+without compiler warnings; CMake emitted its existing macOS OpenGL deprecation notice. All
+111 active CTests passed (`ctest --test-dir build -j 4 --output-on-failure`, 114.85 s), with GPU
+checks enabled, optimized validators enabled and retired wake-field experiments disabled.
+The first suite exposed the join race above; the full rerun passed after the fix.
+The standalone ENet lifecycle run passed (24 s clients, 36 s authority): six accepted/six left, one full rejection,
+one crash timeout, 4320 authority ticks and zero protocol/emission faults. The repeated-cycle
+run also passed (48 s clients, 60 s authority): two churn cycles, nine accepted/nine left, two
+full rejections, two crash timeouts, 7200 ticks and zero protocol/emission faults. This is short
+run evidence, not a long soak.
+
+The windowed GPU client joined a loopback room beside three predicting/resetting bots and
+exited after 360 frames. Server: 2160 ticks, four accepted/four left, zero timeouts, resyncs,
+late/future commands or protocol/emission faults. Client: 184 corrections, max replay 9 ticks,
+zero snaps/held ticks. This was an agent-run window check, without keyboard play or new visual
+acceptance; the windowed run used a healthy loopback link, not profile F.
+
+**Next and limitations.** Broaden four-player coverage to J/H/A/B, shared egress and one slow
+peer; add resource counters and portable sanitizer/fuzz lanes; execute measured 30-minute,
+one-hour and two-hour soaks. Memory plateau, full 128-wake overlap, CPU/bandwidth budgets,
+OS-level impairment/ENet retransmit behavior, other platforms and four-human play remain open.
+The remaining M4 profile-F human play, targeted R feedback and visible contact-gap checks stay
+deferred by user direction. M5 remains in progress.
+
+## River hosting handoff — 2026-10-24
+
+The user asked to host `boat_server --bind 0.0.0.0 --mode deathmatch --location river` rather
+than waiting for M7, then requested open-river spawn positions with more space. That playable
+slice is pulled forward; M5 continues and full M7 qualification remains open.
+
+| Implemented | Automated verification | Manual observation | User acceptance |
+| --- | --- | --- | --- |
+| River/Eriksberg free and deathmatch rooms, automatic client map selection, open-river fleet spawns, mapped coordinate validation and content compatibility | Four-client mapped fixtures; real-ENet river lifecycle and Eriksberg round synchronization; final suite evidence below | Agent-run river deathmatch window beside three hunting bots; connected frame inspected | Requested river hosting and more spacious spawns; new result not yet user-played |
+
+**Behavior and compatibility.** `--location basin|eriksberg|river` works for listening rooms
+and scripted authorities; basin remains the default. Clients join by address/title and receive
+the room's location in Accept; their mirror, prediction, scenery, water and camera use it.
+Mapped fleets use the existing shoreline, harbor, bridge and time-driven traffic queries;
+scenery does not consume player slots. The compiled shoreline cache now rebuilds when its
+selected crop changes. This still supports only one selected map per process, not independently
+owned concurrent mapped worlds or live room map switching.
+
+Protocol v3 uses one former reserved Accept byte for the location, permits positions up to
+±8192 m on each horizontal axis, and hashes all compiled definitions (including multiplayer
+start centres), mapped triangle/vertex geometry and fleet/wake constants into the shared
+content digest. The immutable bundle digest is cached so LAN compatibility rows do not hash
+geometry every frame. Old v1/v2 clients are rejected; all players need rebuilt clients, including
+Windows players using an older package. No protocol migration or new release publication is
+claimed. The [protocol](MULTIPLAYER_PROTOCOL.md) owns the byte layout.
+
+**Spawns.** Multiplayer Eriksberg and river start around simulation `(-50, -290)` in open
+river water. Eight river-aligned candidates form four lanes 60 m apart and an alternate row
+70 m across; boats face the start area's centre. Ordinary safe-spawn checks still reject land,
+occupied/approaching hulls and disturbed wake surfaces. The mapped fixture requires four starts
+more than 200 m from the old dock, more than 50 m apart after initial movement and at least
+35 m clear of shore. Single-player retains its authored dock spawn; basin spawn positions and
+headings retain their original recipe. Mapped scripted bots now route around the river start.
+
+**Loading pause.** A first window check exposed inflated RTT after renderer loading: an early
+Pong read after the local pause could push the clock/commands too far ahead. Clients now exclude
+Pong samples spanning a local service gap longer than 250 ms and wait for fresh samples.
+The mapped fixture pauses a client for 1.5 s before its first measured Pong and requires a
+healthy local RTT and no new future-command rejection on return.
+
+**Verification (2026-10-24, Apple Silicon/macOS 26.6.2, Debug).** Configure/build passed
+without compiler warnings (the existing CMake OpenGL deprecation notice remains). All 113 active
+CTests passed after the spawn refinement (`ctest --test-dir build -j 4 --output-on-failure`,
+136.20 s), with GPU checks/optimized validators enabled and retired wake-field experiments
+disabled. The loading-pause fixture was strengthened to inject an outstanding Ping, then
+`validate_boat_net` was rebuilt and passed again; that test-only refinement ran separately
+while the full suite completed its remaining checks. Both new real-ENet map tests passed in
+the full suite. `boat_net` joins four predicting clients in
+each mapped location, checks shoreline-safe starts, an active deathmatch round, snapshots
+outside the former basin envelope, reset, the loading pause and exact authoritative hashes
+at a birth-batch snapshot. The river ENet harness adds room-full rejection, concurrent resets,
+inactive controls, a killed client, timeout and replacement; Eriksberg compares completed-round
+scores and event counts against the authority.
+
+The final open-river window check used a GPU `boat_study --connect --frames 360` beside three
+hunting/predicting bots, with `boat_server --bind 0.0.0.0 --mode deathmatch --location river`
+(on a private port, LAN discovery disabled). Server: 2160 ticks, four accepted/four left, no
+protocol/emission faults, zero future-command rejects, two late commands and one credited wake
+capsize. Client: 132 corrections, max replay nine ticks, zero snaps/held ticks; remote poses
+99.7% interpolated. It still counted three visible wake removals and eleven incomplete
+corrections; this is not acceptance of wake reconciliation. The connected frame was inspected:
+open river, distant shoreline/bridge and fleet are visible. Temporary capture code was removed
+before the final build. No keyboard play or human gameplay acceptance was performed.
+
+**Next and limitations.** Play the river room on the rebuilt clients; human handling/collision,
+wake and reset feedback remain unaccepted. M5's broader impairment/resource/soak work continues.
+Full river/bridge/berth/traffic encounter coverage, 128-wake map costs, independent cache/world
+ownership and Windows/Linux qualification remain open. No new two-machine or cross-platform
+session was performed for this change. Deferred M4 acceptance stays deferred.
 
 ## Exact first implementation task
 

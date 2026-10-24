@@ -26,7 +26,7 @@ static void fail(NetStudy *net, const char *format, ...)
 static void attach(NetStudy *net, BoatSession *session)
 {
     // The session draws the predicted water; its objects pointer borrows that pool.
-    session->world.water = boat_fleet_world(boat_net_client_view(&net->client)).water;
+    session->world = boat_fleet_world(boat_net_client_view(&net->client));
 }
 
 bool net_study_connect(
@@ -73,12 +73,14 @@ bool net_study_connect(
         boat_net_enet_flush(net->enet);
         boat_net_enet_wait(net->enet, .01);
     }
-    fprintf(stdout, "Joined as slot %u at tick %llu (%s water).\n", net->client.slot,
+    fprintf(stdout, "Joined as slot %u at tick %llu (%s, %s water).\n", net->client.slot + 1,
         (unsigned long long)net->client.fleet.state.tick,
+        boat_location(net->client.accept.location)->name,
         net->client.accept.waves ? "wave" : "calm");
     net->presented_tick = boat_net_client_view(&net->client)->state.tick;
     net->correction = net->client.prediction.correction;
     attach(net, session);
+    boat_reset_location(&session->boat, session->world.definition);
     boat_presentation_reset(&session->presentation);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         boat_presentation_reset(&net->presentations[i]);

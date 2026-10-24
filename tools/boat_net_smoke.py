@@ -60,6 +60,7 @@ def deathmatch(args):
     server_seconds = bot_seconds + 4
     server = subprocess.Popen(
         [args.server, "--port", str(port), "--mode", "deathmatch", "--round-seconds", "10",
+         "--location", args.location,
          "--seconds", str(server_seconds)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     problems = []
@@ -115,6 +116,7 @@ def main():
     parser.add_argument("--bot", required=True)
     parser.add_argument("--seconds", type=int, default=4)
     parser.add_argument("--deathmatch", action="store_true")
+    parser.add_argument("--location", choices=("basin", "eriksberg", "river"), default="basin")
     args = parser.parse_args()
     if args.deathmatch:
         return deathmatch(args)
@@ -125,6 +127,7 @@ def main():
     started = time.monotonic()
     server = subprocess.Popen(
         [args.server, "--port", str(port), "--lan-port", str(lan_port), "--token", "smoke",
+         "--location", args.location,
          "--seconds", str(server_seconds)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     problems = []

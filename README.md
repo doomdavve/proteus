@@ -166,14 +166,25 @@ Any explicit option skips the title; `--title --screenshot FILE` captures it.
 
 ### Multiplayer diagnostic room
 
-Multiplayer M3 runs the basin as a separate headless authority, `boat_server`, which up to four
-native clients join over UDP:
+The headless authority, `boat_server`, hosts basin, Eriksberg or river rooms for up to four
+native clients over UDP (basin by default):
 
 ```sh
 ./build/boat_server                                   # loopback room on UDP port 24680
 ./build/boat_study --connect 127.0.0.1:24680 --name me
 ./build/boat_bot --connect 127.0.0.1:24680 --seconds 60   # optional scripted second boat
 ```
+
+For a river deathmatch on your LAN:
+
+```sh
+./build/boat_server --bind 0.0.0.0 --mode deathmatch --location river
+```
+
+Clients join through the title or `--connect HOST:24680` and automatically load the server's
+location, scenery and water. Multiplayer starts are out in the river, about 60 m apart, with
+shoreline/boat/wake checks for safe resets. `--location eriksberg` hosts the smaller crop. Protocol v3 requires
+rebuilt server and clients; older packages are rejected with a version mismatch.
 
 The server runs until Ctrl+C, `--seconds` or `--ticks`. `--waves` gives the room gentle waves,
 `--players 1-4` caps it, and `--token TEXT` requires the same `--token` from clients. To accept
@@ -194,7 +205,7 @@ rounds. The server log prints every capsize and each round's result. `boat_bot -
 at the nearest boat to give you something to play against. The new capsize mechanics are still
 to come; see the [deathmatch plan](docs/DEATHMATCH_PLAN.md).
 
-In `--connect` mode the room decides water, wakes and spawns. Your boat is predicted: it runs
+In `--connect` mode the room decides the location, water, wakes and spawns. Your boat is predicted: it runs
 ahead of the server with your own keys and is corrected when snapshots arrive, with small
 corrections blended over about a tenth of a second. Every other boat is drawn smoothly
 about 100 ms behind the server, and blends toward its predicted position when it comes within

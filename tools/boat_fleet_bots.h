@@ -18,7 +18,10 @@ static inline BoatInput boat_fleet_bot_input(
     static const Vector2 route[] = { { 60, -12 }, { 0, -55 }, { -60, -12 }, { 0, 45 } };
     const Boat *boat = &fleet->state.slots[slot].boat;
     unsigned lap = bots->waypoint[slot] % 4;
-    Vector2 delta = Vector2Subtract(route[slot % 2 ? 3 - lap : lap], boat->position);
+    Vector2 goal = route[slot % 2 ? 3 - lap : lap];
+    if (fleet->world.definition->mapped)
+        goal = Vector2Add(fleet->world.definition->fleet_spawn, Vector2Scale(goal, 1.5f));
+    Vector2 delta = Vector2Subtract(goal, boat->position);
     if (Vector2Length(delta) < 16)
         ++bots->waypoint[slot];
     float target = atan2f(delta.x, -delta.y);

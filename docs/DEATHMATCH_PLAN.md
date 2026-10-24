@@ -12,8 +12,11 @@ on 2026-10-24; see the [D1 handoff](#d1-match-core-handoff--2026-10-24). D2 (pro
 clock, kill feed, scoreboard, capsize notice, `boat_bot --hunt`) implemented and automatically
 verified on 2026-10-24, agent-run in a window against two hunting bots, not user-played; see the
 [D2 handoff](#d2-protocol-v2-and-hud-handoff--2026-10-24). Next: the D2 manual check (the user
-against `boat_bot --hunt`, then two humans), then D3, side-ram roll. D3–D6 are pending. The M4 manual acceptance session
-continues in parallel by the user's choice; the deathmatch does not wait for it.
+against `boat_bot --hunt`, then two humans), then D3, side-ram roll. D3–D6 are pending. Remaining M4 acceptance checks are deferred by user direction while M5 proceeds.
+River/Eriksberg hosting was pulled forward from M7 on 2026-10-24: launch
+`boat_server --bind 0.0.0.0 --mode deathmatch --location river` and join normally. The server
+selects the map; rebuilt protocol-v3 clients load it automatically. See the
+[river hosting handoff](MULTIPLAYER_PLAN.md#river-hosting-handoff--2026-10-24).
 
 ## Product decision
 

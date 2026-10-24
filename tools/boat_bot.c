@@ -17,12 +17,15 @@ static void usage(FILE *out)
 {
     fprintf(out,
         "usage: boat_bot --connect HOST:PORT [--name TEXT] [--token TEXT] [--seconds S]\n"
-        "                [--hunt] [--expect-reject]\n"
+        "                [--hunt] [--predict] [--reset-every S] [--inactive-every S]\n"
+        "                [--expect-reject]\n"
         "       boat_bot --discover [--lan-port N] [--seconds S]\n"
         "Join a boat_server room, drive one boat by script for S seconds (default 5), then\n"
         "leave and print a summary. --hunt drives at the nearest other boat to ram it or cross\n"
         "it with its wake (for deathmatch rooms). --expect-reject succeeds only when the room\n"
-        "refuses it.\n"
+        "refuses it. --predict exercises client prediction. --reset-every requests R every S\n"
+        "seconds; --inactive-every sends inactive controls for one second every S seconds\n"
+        "(S: integer 2-86400). These options exercise session lifecycle in headless tests.\n"
         "--discover: search the local network (and this machine) for rooms for S seconds\n"
         "(default 2) on UDP --lan-port (default %d) and print one line per room; exit 1 if\n"
         "none answered.\n"
@@ -74,8 +77,8 @@ static int discover(uint16_t lan_port, unsigned long seconds)
 int main(int argc, char **argv)
 {
     const char *endpoint = NULL, *name = "bot", *token = "";
-    unsigned long seconds = 5;
-    bool expect_reject = false, hunt = false, search = false, timed = false;
+    unsigned long seconds = 5, reset_every = 0, inactive_every = 0;
+    bool expect_reject = false, hunt = false, search = false, timed = false, predict = false;
     uint16_t lan_port = BOAT_NET_DISCOVERY_PORT;
     for (int i = 1; i < argc; ++i) {
         const char *value = i + 1 < argc ? argv[i + 1] : NULL;
@@ -99,6 +102,22 @@ int main(int argc, char **argv)
             }
             timed = true;
             ++i;
+        } else if ((strcmp(argv[i], "--reset-every") == 0
+                       || strcmp(argv[i], "--inactive-every") == 0)
+            && value) {
+            char *end;
+            unsigned long interval = strtoul(value, &end, 10);
+            if (!*value || *end || value[0] == '-' || interval < 2 || interval > 86400) {
+                usage(stderr);
+                return 2;
+            }
+            if (strcmp(argv[i], "--reset-every") == 0)
+                reset_every = interval;
+            else
+                inactive_every = interval;
+            ++i;
+        } else if (strcmp(argv[i], "--predict") == 0) {
+            predict = true;
         } else if (strcmp(argv[i], "--discover") == 0) {
             search = true;
         } else if (strcmp(argv[i], "--lan-port") == 0 && value
@@ -115,7 +134,7 @@ int main(int argc, char **argv)
         }
     }
     if (search) {
-        if (endpoint || hunt || expect_reject) {
+        if (endpoint || hunt || expect_reject || predict || reset_every || inactive_every) {
             fprintf(stderr, "boat_bot: --discover does not join a room.\n");
             return 2;
         }
@@ -139,7 +158,8 @@ int main(int argc, char **argv)
         return 1;
     }
     static BoatNetClient client;
-    BoatNetClientConfig config = { .name = name, .token = token, .build = "boat_bot D2" };
+    BoatNetClientConfig config
+        = { .name = name, .token = token, .build = "boat_bot M5", .predict = predict };
     boat_net_client_init(&client, boat_net_enet_transport(enet), &config, boat_net_clock());
     BoatFleetBots bots = { 0 };
     double started = 0, end = 0;
@@ -150,6 +170,8 @@ int main(int argc, char **argv)
     unsigned capsized = 0, resets = 0, mtu = 0;
     uint32_t reported_round = 0;
     bool joined = false, running = true;
+    double next_reset = 0, next_inactive = 0, inactive_until = 0;
+    unsigned inactive_periods = 0, max_players = 0, max_wakes = 0;
     while (running) {
         double now = boat_net_clock();
         BoatInput input = { 0 };
@@ -169,15 +191,38 @@ int main(int argc, char **argv)
                 capsized = 0;
             }
         }
-        running = boat_net_client_service(&client, now, input, false);
+        if (joined && reset_every && now >= next_reset) {
+            if (!client.resetting) {
+                boat_net_client_request_reset(&client);
+                ++resets;
+            }
+            next_reset = now + (double)reset_every;
+        }
+        if (joined && inactive_every && now >= next_inactive) {
+            inactive_until = now + 1;
+            next_inactive = now + (double)inactive_every;
+            ++inactive_periods;
+        }
+        running = boat_net_client_service(&client, now, input, now < inactive_until);
         boat_net_enet_flush(enet);
         if (!joined && client.phase == BOAT_NET_CLIENT_PLAYING) {
             joined = true;
             started = now;
             end = now + (double)seconds;
-            printf("boat_bot joined: slot=%u tick=%" PRIu64 " waves=%d\n", client.slot + 1,
-                client.fleet.state.tick, client.accept.waves);
+            next_reset = now + (double)reset_every;
+            next_inactive = now + (double)inactive_every;
+            printf("boat_bot joined: slot=%u tick=%" PRIu64 " waves=%d location=%s\n",
+                client.slot + 1, client.fleet.state.tick, client.accept.waves,
+                boat_location(client.accept.location)->name);
             fflush(stdout);
+        }
+        if (joined) {
+            unsigned players = 0;
+            for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+                players += client.roster.slots[i].state == BOAT_NET_ROSTER_PLAYING;
+            max_players = players > max_players ? players : max_players;
+            unsigned live = client.fleet.state.wakes.live;
+            max_wakes = live > max_wakes ? live : max_wakes;
         }
         if (joined && client.stats.snapshots != last_snapshots) {
             last_snapshots = client.stats.snapshots;
@@ -240,6 +285,10 @@ int main(int argc, char **argv)
            " live=%u\n",
         s->births_applied, s->births_duplicate, s->births_held, s->births_dropped,
         client.fleet.state.wakes.live);
+    printf("lifecycle: max_players=%u max_wakes=%u resets_completed=%" PRIu64
+           " resets_dropped=%" PRIu64 " inactive_periods=%u max_reset_ms=%.1f\n",
+        max_players, max_wakes, s->resets, s->resets_dropped, inactive_periods,
+        s->max_reset * 1000);
     printf("control: commands=%" PRIu64 " packets=%" PRIu64 " received_ratio=%.3f lead=%u "
            "rtt_ms=%.2f travelled_m=%.1f resets=%u decode_errors=%" PRIu64 "\n",
         s->commands, s->input_packets,

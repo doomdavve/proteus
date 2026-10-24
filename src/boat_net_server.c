@@ -3,8 +3,6 @@
 #include <math.h>
 #include <string.h>
 
-static const BoatWorldDefinition *basin(void) { return boat_location(BOAT_LOCATION_BASIN); }
-
 static uint8_t text_copy(char *storage, const char *text, size_t limit)
 {
     size_t length = 0;
@@ -19,7 +17,7 @@ static uint8_t text_copy(char *storage, const char *text, size_t limit)
 bool boat_net_server_init(
     BoatNetServer *server, BoatNetTransport transport, const BoatNetServerConfig *config)
 {
-    if (!config || !config->epoch || config->max_players < 1
+    if (!config || !boat_location(config->location) || !config->epoch || config->max_players < 1
         || config->max_players > BOAT_FLEET_SLOTS
         || (config->token && strlen(config->token) > BOAT_NET_TOKEN_BYTES))
         return false;
@@ -29,9 +27,10 @@ bool boat_net_server_init(
     *server = (BoatNetServer) { .transport = transport, .config = *config };
     text_copy(server->token, config->token, BOAT_NET_TOKEN_BYTES);
     server->config.token = server->token;
-    server->content_digest = boat_net_content_digest(basin());
-    if (!boat_fleet_init(&server->fleet, basin(),
-            boat_world_test_water(basin(), config->waves, false, false), BOAT_OBJECT_LIFE_TICKS,
+    server->content_digest = boat_net_content_digest();
+    const BoatWorldDefinition *definition = boat_location(config->location);
+    if (!boat_fleet_init(&server->fleet, definition,
+            boat_world_test_water(definition, config->waves, false, false), BOAT_OBJECT_LIFE_TICKS,
             BOAT_OBJECT_DEFAULT_HEIGHT))
         return false;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
@@ -220,6 +219,7 @@ static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h)
     BoatNetMessage m = { .header = { .type = BOAT_NET_ACCEPT, .tick = s->fleet.state.tick },
         .accept = { .slot = (uint8_t)slot,
             .waves = s->config.waves,
+            .location = (uint8_t)s->config.location,
             .snapshot_ticks = BOAT_NET_SNAPSHOT_TICKS,
             .birth_ticks = BOAT_NET_BIRTH_TICKS,
             .input_ticks = BOAT_NET_INPUT_TICKS,

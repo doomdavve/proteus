@@ -669,8 +669,7 @@ static int rejects(void)
     BoatFleet f;
     BoatWater trail = { .player_wake_enabled = true };
     CHECK(!boat_fleet_init(&f, basin(), trail, BOAT_OBJECT_LIFE_TICKS, 1.8f));
-    CHECK(!boat_fleet_init(
-        &f, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 }, 1920, 1.8f));
+
     CHECK(!boat_fleet_init(&f, basin(), (BoatWater) { 0 }, 4000, 1.8f));
     CHECK(fleet(&f, (BoatWater) { 0 }));
     CHECK(!boat_fleet_request_spawn(&f, BOAT_FLEET_SLOTS));

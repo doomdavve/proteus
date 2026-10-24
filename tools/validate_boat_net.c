@@ -7,6 +7,7 @@
  * from mid-flight and capsized checkpoints reproduce the authority bit for bit, and predicting
  * clients on virtual links report their correction sizes and replay cost. */
 #include "boat_fleet_bots.h"
+#include "boat_map.h"
 #include "boat_net_client.h"
 #include "boat_net_server.h"
 #include "boat_throttle.h"
@@ -91,7 +92,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e5400020d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e5400030d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -100,7 +101,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 56);
     CHECK(same_bytes(bytes, size,
-        "50424e54000209000000000900000000000000000000"
+        "50424e54000309000000000900000000000000000000"
         "00c80018000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f810000" // Steering +1, throttle -1.
@@ -169,8 +170,8 @@ static int golden(void)
     CHECK(bytes[32 + 32 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0xc02fda7dbe1ffe1b));
-    bytes[5] = 1; // The v1 bytes: v2 left the snapshot layout unchanged.
+    CHECK(digest == UINT64_C(0x690c711d99578e10));
+    bytes[5] = 1; // Snapshot payload unchanged since v1.
     CHECK(boat_net_bytes_digest(bytes, size) == UINT64_C(0x57447ded5b742cfe));
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
@@ -201,7 +202,8 @@ static unsigned samples(Sample *out)
     m[0] = (BoatNetMessage) { .header = { .type = BOAT_NET_HELLO },
         .hello = { BOAT_PHYSICS_REVISION, 42, "name", "token", "build" } };
     m[1] = (BoatNetMessage) { .header = { .type = BOAT_NET_ACCEPT, .epoch = 3 },
-        .accept = { 2, true, BOAT_NET_MODE_DEATHMATCH, 4, 12, 2, 12, 24, 120, 1920, 1.8f } };
+        .accept = { 2, true, BOAT_NET_MODE_DEATHMATCH, BOAT_LOCATION_RIVER, 4, 12, 2, 12, 24, 120,
+            1920, 1.8f } };
     m[2] = (BoatNetMessage) { .header = { .type = BOAT_NET_REJECT },
         .reject = { BOAT_NET_REJECT_TOKEN, 1, 6, 42 } };
     m[3] = (BoatNetMessage) { .header = { .type = BOAT_NET_ROSTER, .epoch = 3 } };
@@ -364,7 +366,8 @@ static int codec(void)
         { 4, 40, 7 }, { 2, 32, 0 }, { 2, 32, BOAT_NET_REJECT_LIMIT }, { 0, 44, 0x01 },
         { 0, 46, 0x7f }, { 0, 44, 17 }, { 1, 32, BOAT_FLEET_SLOTS }, { 1, 33, 2 }, { 1, 41, 0 },
         { 3, 32 + 19, 3 }, { 3, 32 + 20, 17 }, { 3, 32 + 21 + 15, 'x' }, { 14, 32, 3 },
-        { 15, 32, 0 }, { 6, 36, 1 }, { 1, 39, BOAT_NET_MODE_LIMIT },
+        { 15, 32, 0 }, { 6, 36, 1 }, { 1, 39, BOAT_NET_MODE_LIMIT }, { 1, 42, BOAT_LOCATION_COUNT },
+        { 1, 43, 1 },
         // Match state: phase, reserved, skip beyond respawn, warmup with an end tick, a bad
         // presence flag, more self-capsizes than capsizes and a score on an absent slot.
         { 16, 32, 3 }, { 16, 33, 1 }, { 16, 38, 0x7f }, { 16, 32, BOAT_MATCH_WARMUP },
@@ -704,7 +707,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c5100010002"));
+    CHECK(same_bytes(query, 8, "50424c5100010003"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -712,7 +715,7 @@ static int lan_discovery(void)
 
     BoatNetLanRoom room = { .version = BOAT_NET_VERSION,
         .physics_revision = BOAT_PHYSICS_REVISION,
-        .content_digest = boat_net_content_digest(basin()),
+        .content_digest = boat_net_content_digest(),
         .epoch = 0x01020304u,
         .address = 0xc0a80114u,
         .port = BOAT_NET_PORT,
@@ -805,11 +808,12 @@ static int rejections(void)
     static BoatNetMessage reply;
     uint8_t bytes[BOAT_NET_MAX_MESSAGE];
     BoatNetMessage hello = { .header = { .type = BOAT_NET_HELLO },
-        .hello = { BOAT_PHYSICS_REVISION, boat_net_content_digest(basin()), "x", "room", "" } };
+        .hello = { BOAT_PHYSICS_REVISION, boat_net_content_digest(), "x", "room", "" } };
     size_t size = boat_net_encode(&hello, bytes);
     bytes[5] = 1; // A v1 client meets a v2 room.
     CHECK(raw_hello(&room, bytes, size, &reply) == BOAT_NET_REJECT);
-    CHECK(reply.reject.reason == BOAT_NET_REJECT_VERSION && reply.reject.version == 2);
+    CHECK(
+        reply.reject.reason == BOAT_NET_REJECT_VERSION && reply.reject.version == BOAT_NET_VERSION);
     hello.hello.physics_revision = BOAT_PHYSICS_REVISION + 1;
     size = boat_net_encode(&hello, bytes);
     CHECK(raw_hello(&room, bytes, size, &reply) == BOAT_NET_REJECT);
@@ -1175,6 +1179,188 @@ static int impaired(void)
     CHECK(room.clients[b].phase == BOAT_NET_CLIENT_CLOSED);
     CHECK(room.clients[a].phase == BOAT_NET_CLIENT_PLAYING);
     printf("outages: 1 s blackout recovered; 6 s blackout timed out on both ends\n");
+    room_close(&room);
+    return 0;
+}
+
+static int mapped_rooms(void)
+{
+    static Room room;
+    for (int id = BOAT_LOCATION_ERIKSBERG; id <= BOAT_LOCATION_RIVER; ++id) {
+        BoatMatchRules rules = boat_match_default_rules();
+        CHECK(room_open(&room, 61 + (unsigned)id,
+            (BoatNetServerConfig) { .location = id, .deathmatch = true, .match = rules }));
+        room.predict = true;
+        for (unsigned i = 0; i < 4; ++i)
+            room_join(&room, "mapped", NULL, 0);
+        room_run(&room, .5);
+        CHECK(active_boats(&room.server) == 4);
+        for (unsigned i = 0; i < 4; ++i) {
+            const BoatNetClient *c = &room.clients[i];
+            CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->accept.location == id);
+            CHECK(c->fleet.world.definition->id == (BoatLocationId)id);
+            CHECK(c->prediction.fleet.world.definition->id == (BoatLocationId)id);
+            const BoatFleetSlot *own = boat_net_client_own(c);
+            CHECK(own && boat_hull_clear(&own->boat, &c->fleet.world, room.now));
+            CHECK(boat_map_water(own->boat.position, 35));
+            CHECK(Vector2Distance(own->boat.position, boat_location(id)->spawn) > 200);
+            for (unsigned j = 0; j < i; ++j)
+                CHECK(Vector2Distance(
+                          own->boat.position, boat_net_client_own(&room.clients[j])->boat.position)
+                    > 50);
+        }
+        CHECK(room.server.match.phase == BOAT_MATCH_PLAYING);
+        // A window/renderer loading pause must not become a huge first RTT/clock estimate.
+        room.clients[0].stats.pongs = 0;
+        room.clients[0].rtt = 0;
+        inject(&room, 0,
+            (BoatNetMessage) {
+                .header = { .type = BOAT_NET_PING }, .clock = (uint64_t)(room.now * 1e6) });
+        room.live[0] = false;
+        room_run(&room, 1.5);
+        room.live[0] = true;
+        uint64_t future = room.server.stats.future_commands;
+        room_run(&room, 1);
+        CHECK(room.clients[0].rtt < .05 && room.clients[0].stats.pongs > 0);
+        CHECK(room.server.stats.future_commands == future);
+        // Put a real hull in navigable mapped water beyond the old basin decode envelope.
+        Boat distant;
+        bool found = false;
+        for (int x = -1200; x <= 1200 && !found; x += 100)
+            for (int z = -900; z <= 900 && !found; z += 100) {
+                if (abs(x) < 300 && abs(z) < 300)
+                    continue;
+                boat_reset(&distant);
+                distant.position = (Vector2) { (float)x, (float)z };
+                if (boat_map_water(distant.position, 10)
+                    && boat_hull_clear(&distant, &room.server.fleet.world, room.now))
+                    found = true;
+            }
+        CHECK(found);
+        boat_fleet_place(&room.server.fleet, room.clients[0].slot, distant);
+        room_run(&room, .5);
+        CHECK(room.clients[0].stats.decode_errors == 0);
+        CHECK(
+            Vector2Distance(boat_net_client_own(&room.clients[0])->boat.position, distant.position)
+            < 10);
+        boat_net_client_request_reset(&room.clients[0]);
+        room_run(&room, 1);
+        CHECK(room.clients[0].stats.resets == 1);
+        // Exact wake reconstruction is guaranteed on birth-batch snapshots.
+        for (unsigned step = 0; step < 48
+            && (room.server.fleet.state.tick % BOAT_NET_BIRTH_TICKS != 0
+                || room.clients[0].fleet.state.tick != room.server.fleet.state.tick);
+            ++step)
+            room_step(&room, 1.0 / 240);
+        CHECK(room.clients[0].fleet.state.tick == room.server.fleet.state.tick);
+        CHECK(room.server.fleet.state.tick % BOAT_NET_BIRTH_TICKS == 0);
+        for (unsigned i = 0; i < 4; ++i) {
+            const BoatNetClient *c = &room.clients[i];
+            CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.decode_errors == 0);
+            CHECK(c->wake_consistent);
+            CHECK(boat_fleet_hash(&c->fleet.state)
+                == room.history_hash[c->fleet.state.tick % ROOM_HISTORY]);
+        }
+        CHECK(room.server.stats.output_faults == 0 && room.server.stats.emission_failures == 0);
+        printf("mapped %s: four predicted clients, shoreline-safe spawns, distant snapshot, "
+               "deathmatch round and reset; exact authoritative mirrors\n",
+            boat_location(id)->name);
+        room_close(&room);
+    }
+    return 0;
+}
+
+static int four_player_lifecycle(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 51, (BoatNetServerConfig) { .waves = true }));
+    room.predict = true;
+    BoatNetImpairment f = { .04, .01, .01, .002, .01, .02 };
+    for (unsigned i = 0; i < 3; ++i) {
+        unsigned k = room_join(&room, "fleet", NULL, 0);
+        boat_net_memory_impair(room.network, room.link[k], f, f);
+    }
+    room_run(&room, 8);
+    CHECK(room.server.fleet.state.wakes.live > 0);
+    unsigned fourth = room_join(&room, "late", NULL, 0);
+    boat_net_memory_impair(room.network, room.link[fourth], f, f);
+    room_run(&room, 4);
+    CHECK(active_boats(&room.server) == 4);
+    CHECK(room.clients[fourth].phase == BOAT_NET_CLIENT_PLAYING);
+    unsigned full = room_join(&room, "full", NULL, 0);
+    room_run(&room, 1);
+    CHECK(room.clients[full].phase == BOAT_NET_CLIENT_REJECTED);
+    CHECK(room.clients[full].reject.reason == BOAT_NET_REJECT_FULL);
+
+    uint32_t lives[BOAT_FLEET_SLOTS];
+    uint64_t early = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        CHECK(boat_net_client_own(&room.clients[i]));
+        CHECK(room.clients[i].stats.bootstraps == 1);
+        early += room.clients[i].stats.early_bootstrap;
+        lives[i] = boat_net_client_own(&room.clients[i])->life;
+        boat_net_client_request_reset(&room.clients[i]);
+    }
+    CHECK(early > 0); // This seed delivers bootstrap traffic before control-channel Accept.
+    room_run(&room, 3);
+    for (unsigned i = 0; i < 4; ++i) {
+        const BoatNetClient *c = &room.clients[i];
+        CHECK(boat_net_client_own(c));
+        CHECK(boat_net_client_own(c)->life == lives[i] + 1);
+        CHECK(c->stats.resets == 1 && !c->resetting);
+    }
+    room.inactive[1] = true;
+    room_run(&room, .5);
+    CHECK(room.server.inputs[room.clients[1].slot].state == BOAT_NET_INPUT_NEUTRAL);
+    CHECK(room.server.inputs[room.clients[0].slot].state == BOAT_NET_INPUT_RECEIVED);
+    room.inactive[1] = false;
+
+    // One slow peer must neither freeze the authority nor time out the other three.
+    boat_net_memory_blackout(room.network, room.link[fourth], true);
+    room_run(&room, 1);
+    boat_net_memory_blackout(room.network, room.link[fourth], false);
+    room_run(&room, 3);
+    CHECK(room.clients[fourth].phase == BOAT_NET_CLIENT_PLAYING);
+    CHECK(!boat_net_client_stale(&room.clients[fourth], room.now));
+    unsigned slot = room.clients[fourth].slot;
+    uint32_t old_life = room.server.fleet.state.slots[slot].life;
+    boat_net_memory_blackout(room.network, room.link[fourth], true);
+    room_run(&room, 6);
+    CHECK(room.server.stats.timeouts == 1 && active_boats(&room.server) == 3);
+    unsigned replacement = room_join(&room, "replacement", NULL, 0);
+    boat_net_memory_impair(room.network, room.link[replacement], f, f);
+    room_run(&room, 3);
+    BoatNetClient *c = &room.clients[replacement];
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->slot == slot);
+    CHECK(boat_net_client_own(c));
+    CHECK(boat_net_client_own(c)->life > old_life && active_boats(&room.server) == 4);
+    uint64_t stale = room.server.stats.stale_life_commands;
+    inject(&room, replacement,
+        (BoatNetMessage) {
+            .header = { .type = BOAT_NET_INPUT_BATCH, .tick = room.server.fleet.state.tick + 20 },
+            .input = { .life = old_life, .count = 1 } });
+    room_run(&room, 2);
+    CHECK(room.server.stats.stale_life_commands > stale);
+    // A lossless tail lets every live mirror demonstrate exact wake/checkpoint convergence.
+    for (unsigned i = 0; i < room.count; ++i)
+        boat_net_memory_impair(
+            room.network, room.link[i], (BoatNetImpairment) { 0 }, (BoatNetImpairment) { 0 });
+    room_run(&room, 2);
+    for (unsigned i = 0; i < room.count; ++i) {
+        if (i == fourth || i == full)
+            continue;
+        c = &room.clients[i];
+        CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.decode_errors == 0);
+        CHECK(c->wake_consistent && c->stats.resyncs <= 3);
+        uint64_t tick = c->fleet.state.tick;
+        CHECK(room.history_tick[tick % ROOM_HISTORY] == tick);
+        CHECK(boat_fleet_hash(&c->fleet.state) == room.history_hash[tick % ROOM_HISTORY]);
+        CHECK(c->prediction.stats.max_replay <= BOAT_PREDICTION_MAX_AHEAD);
+    }
+    CHECK(room.server.stats.accepted == 5 && room.server.stats.max_backlog <= 2);
+    CHECK(room.server.stats.output_faults == 0 && room.server.stats.emission_failures == 0);
+    printf("four-player F: late join, full rejection, simultaneous resets, inactive controls, "
+           "1 s recovery, 6 s timeout and slot reuse; all live mirrors converged exactly\n");
     room_close(&room);
     return 0;
 }
@@ -1615,6 +1801,8 @@ int main(void)
     RUN(authority_rules());
     RUN(wrap_and_flood());
     RUN(impaired());
+    RUN(mapped_rooms());
+    RUN(four_player_lifecycle());
     RUN(resync());
     RUN(prediction_replay());
     RUN(prediction_wakes());

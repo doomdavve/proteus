@@ -5,8 +5,6 @@
 #include <math.h>
 #include <string.h>
 
-static const BoatWorldDefinition *basin(void) { return boat_location(BOAT_LOCATION_BASIN); }
-
 static void copy_text(char *storage, const char *text, size_t limit)
 {
     size_t length = 0;
@@ -24,6 +22,8 @@ void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
         .first_sequence = config->first_sequence,
         .predict = config->predict,
         .started_at = now,
+        .serviced_at = now,
+        .pong_after = now,
         .mismatch_since = -1,
         .resync_at = -1e9,
         .ping_at = -1e9,
@@ -126,9 +126,10 @@ static void install(BoatNetClient *c, double now)
         && state.wakes.life_ticks == c->accept.wake_life_ticks
         && state.wakes.crest_height == c->accept.crest_height;
     BoatFleet fleet;
+    const BoatWorldDefinition *definition = boat_location(c->accept.location);
     if (complete)
-        complete = boat_fleet_init(&fleet, basin(),
-            boat_world_test_water(basin(), c->accept.waves, false, false),
+        complete = boat_fleet_init(&fleet, definition,
+            boat_world_test_water(definition, c->accept.waves, false, false),
             c->accept.wake_life_ticks, c->accept.crest_height);
     if (!complete) {
         ++c->stats.bootstrap_failures;
@@ -276,6 +277,14 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         ++c->stats.decode_errors;
         return;
     }
+    if (c->phase == BOAT_NET_CLIENT_HANDSHAKE && channel == BOAT_NET_BOOTSTRAP) {
+        if (c->early_bootstrap_count < BOAT_NET_EARLY_BOOTSTRAP) {
+            c->early_bootstrap[c->early_bootstrap_count++] = *event;
+            ++c->stats.early_bootstrap;
+        } else
+            ++c->stats.bootstrap_failures;
+        return;
+    }
     if (channel == BOAT_NET_STATE || channel == BOAT_NET_BIRTHS) {
         if (c->received_any[channel]
             && !boat_net_sequence_newer(m.header.sequence, c->received[channel])) {
@@ -288,6 +297,7 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     if (m.header.type == BOAT_NET_REJECT && c->phase == BOAT_NET_CLIENT_HANDSHAKE) {
         c->reject = m.reject;
         c->phase = BOAT_NET_CLIENT_REJECTED;
+        c->early_bootstrap_count = 0;
         return;
     }
     if (m.header.type == BOAT_NET_ACCEPT && c->phase == BOAT_NET_CLIENT_HANDSHAKE) {
@@ -295,6 +305,10 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         c->epoch = m.header.epoch;
         c->slot = m.accept.slot;
         c->phase = BOAT_NET_CLIENT_BOOTSTRAP;
+        unsigned count = c->early_bootstrap_count;
+        c->early_bootstrap_count = 0;
+        for (unsigned i = 0; i < count; ++i)
+            message(c, &c->early_bootstrap[i], now);
         return;
     }
     if (c->phase < BOAT_NET_CLIENT_BOOTSTRAP || m.header.epoch != c->epoch) {
@@ -327,7 +341,7 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         break;
     case BOAT_NET_PONG: {
         double sent = (double)m.clock * 1e-6;
-        if (sent <= now && now - sent < 10) {
+        if (sent >= c->pong_after && sent <= now && now - sent < 10) {
             // Falls at once, rises slowly: a pong read late after a local stall (a window
             // opening, a slow frame) must not throw the clock estimate and lead far ahead.
             double rtt = now - sent;
@@ -437,6 +451,9 @@ static void command(
 static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive,
     float thrust_target, float steering_target)
 {
+    if (now - c->serviced_at > .25)
+        c->pong_after = now; // Loading a mapped view is not network round-trip time.
+    c->serviced_at = now;
     uint32_t life_before
         = c->phase == BOAT_NET_CLIENT_PLAYING ? c->fleet.state.slots[c->slot].life : 0;
     BoatNetEvent event;
@@ -446,7 +463,7 @@ static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive
         if (event.kind == BOAT_NET_EVENT_CONNECT && c->phase == BOAT_NET_CLIENT_CONNECTING) {
             BoatNetMessage m = { .header = { .type = BOAT_NET_HELLO },
                 .hello = { .physics_revision = BOAT_PHYSICS_REVISION,
-                    .content_digest = boat_net_content_digest(basin()) } };
+                    .content_digest = boat_net_content_digest() } };
             copy_text(m.hello.name, c->name, BOAT_NET_NAME_BYTES);
             copy_text(m.hello.token, c->token, BOAT_NET_TOKEN_BYTES);
             copy_text(m.hello.build, c->build, BOAT_NET_BUILD_BYTES);

@@ -22,6 +22,7 @@ typedef struct {
     bool mapped; // Shoreline, harbor, traffic and gulls come from the compiled map crop.
     Vector2 half_extent; // Basin wall half-sizes in simulation X/Z; zero for mapped records.
     Vector2 spawn; // Free-boating start position in simulation X/Z.
+    Vector2 fleet_spawn; // Multiplayer start area; mapped fleets use open river water.
     // Authored current/crossing-source placement for opt-in water tests.
     float current_center;
     Vector2 wake_offset;
