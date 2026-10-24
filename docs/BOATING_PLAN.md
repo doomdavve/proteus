@@ -22,7 +22,8 @@ prediction; the first playable is M4. Shared free boating preceded the
 [deathmatch](DEATHMATCH_PLAN.md) implementation. The next requested mode is a
 [45–60 second river race](RACE_PLAN.md) with vessel-made jump wakes, a shared grid and
 finishing positions. Its [R0 ferry-wake fixture](RACE_PLAN.md#r0-prototype--2026-10-24) is
-implemented on a shortened route; multiplayer race rules/presentation remain planned.
+implemented on a shortened route, and its [R1 rules core](RACE_PLAN.md#r1-race-core--2026-10-24)
+is automatically verified; the network race mode and presentation remain planned.
 
 Current clock/replay compatibility is revision 6 after foundations C1; revision-5
 personal best files remain on disk and are not loaded into current play.

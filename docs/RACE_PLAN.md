@@ -1,17 +1,21 @@
 # River sprint: multiplayer race plan
 
-Prepared 2026-10-24. **R0 prototype implemented; multiplayer race mode is not implemented.**
+Prepared 2026-10-24. **R0 prototype and R1 race core implemented; the network race mode
+is not implemented.**
 This document owns race rules, course pacing, jump encounters and acceptance. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns transport and prediction; the
 [traffic guide](HARBOR_TRAFFIC.md) owns existing scenery vessels; the
 [physics](BOAT_PHYSICS_PLAN.md) and [wake](WAKE_REWRITE_PLAN.md) plans own handling.
 
 Status: R0's shortened route and physical wake fixture are implemented and automatically
-measured. Initial user feel review found the source unreadable/artificial; the missing GPU
-ferry and passing-boat wakes are now corrected. Next: review the revised encounter, then
-R1's authoritative race core. R1–R4 remain unimplemented. The full downtown start is outside the current map; no human race play,
-network race, complete course acceptance or user approval is claimed. See the
-[R0 implementation and evidence](#r0-prototype--2026-10-24).
+measured; the corrected visible-ferry encounter still awaits user feel review. R1's
+authoritative race core (`boat_race`) is implemented and automatically verified: phases,
+frozen roster, held grid, swept gates, places, recovery, DNF and deadlines on the R0 route,
+with a four-bot ferry race in the validator. Next: R2, the server race mode, protocol,
+prediction of the hold/ferry clock, HUD and results. Nothing in R1 is playable yet; no human
+race play, network race, complete course acceptance or user approval is claimed. The full
+downtown start is outside the current map. See the [R1 implementation](#r1-race-core--2026-10-24)
+and the [R0 evidence](#r0-prototype--2026-10-24).
 
 ## Direction
 
@@ -138,7 +142,7 @@ Proposed round loop: **WAITING → GRID → COUNTDOWN → RACING → RESULTS →
    time and player-wake overlap; count jumps, flight time, speed loss and capsizes. Inspect
    CPU/GPU frames and run a windowed trial. Deliver route choice and a playable encounter
    before building a complete course. User feel feedback remains a separate gate.
-2. **R1 — authoritative race core.** Add a small `boat_race.[ch]` in `proteus_boat_core` for
+2. **R1 — authoritative race core** ([implemented 2026-10-24](#r1-race-core--2026-10-24)). Add a small `boat_race.[ch]` in `proteus_boat_core` for
    phases, locked entrant identities, grid, swept gates, progress, finish order, recovery
    and DNF. Supply authored course/source data without I/O or rendering. Adapt the existing
    basin crossing approach where useful; keep the basin course and replay semantics intact.
@@ -302,10 +306,103 @@ GPU window run completed through the encounter. These are agent-run checks; no h
 the corrected version is claimed. All 281 local file/heading links in the seven affected
 documents resolve, and `git diff --check` passes. Other platforms remain unqualified.
 
-Next: review the corrected visible-source encounter with the user. R1–R4 and human
-acceptance remain open; the analytic ferry packet has not been replaced or declared natural.
+Next (superseded on 2026-10-24 by [R1](#r1-race-core--2026-10-24), which proceeded on the
+user's request): review the corrected visible-source encounter with the user. That feel review
+and human acceptance remain open; the analytic ferry packet has not been replaced or declared
+natural.
+
+## R1 race core — 2026-10-24
+
+Implemented [`boat_race.[ch]`](../src/boat_race.h) in `proteus_boat_core` and
+[`validate_boat_race`](../tools/validate_boat_race.c) (CTest `boat_race`). The race is an
+authority-side observer like the deathmatch `boat_match`, but it also owns race placements:
+it grids and holds entrants, recovers them and sets the course ferry's clock. A `BoatRace` is
+pointer-free; with a fleet checkpoint and `boat_race_bind`, it resumes identically.
+No server mode, protocol, client or HUD uses it yet.
+
+**Rules as implemented** (the plan's proposals; the user has not approved any value):
+
+- **WAITING → GRID → COUNTDOWN → RACING → RESULTS → GRID**, or back to WAITING when fewer
+  than two players remain. Waiting players boat freely from ordinary fleet spawns. Presence
+  means "ready" for now; there is no ready control.
+- GRID freezes the roster from the players present. Entrants are placed abreast 12 m behind
+  the start line, 14 m apart, facing down-course; grid places rotate by one each round.
+  GRID lasts 1 s and the countdown 3 s. Held boats keep plane position and heading with no
+  planar velocity, but throttle and engine response follow input. Waves still heave and
+  pitch the hull, and a held boat emits no wake. Every hold is released at the same GO tick.
+- Gates are lines across the river, ordered, with the last as the finish. Only a forward
+  swept crossing of the *next* gate within its lateral bounds counts; reversing or passing
+  outside gains nothing. One tick's segment can clear several gates in order. Crossings are
+  planar, so airborne boats count. A new fleet life (spawn, recovery, teleport) starts a fresh
+  segment, so placement never crosses a gate.
+- Live position: fixed places first, then running boats by gates cleared and metres along
+  the current segment, then DNF. Finish times are interpolated within the tick and stored in
+  1/1024-tick units after GO. Same-observation finishers are placed by time, and equal times
+  share a place. Places never change once awarded and survive a disconnect.
+- Recovery: 2 s after a capsize, or on R (R after a capsize waits 0.5 s), an entrant is
+  placed 25 or 45 m behind its last cleared gate (the start line before any). The first clear
+  lateral candidate is used, retrying every tick. Progress and the race clock carry on.
+  Finished boats recover 25/45 m past the finish. R is ignored while held; outside a round,
+  R and capsizes use ordinary fleet spawns.
+- Racing ends when no entrant is still running, 15 s after the first finish, or 90 s after
+  GO. Unfinished entrants are then DNF. RESULTS lasts 8 s.
+- A joiner after GRID stays unplaced until the next grid. Leaving during GRID, countdown or
+  racing marks a running entrant DNF and keeps its row. A replacement in the same slot gets a
+  new identity and inherits nothing. If every entrant leaves, the round is abandoned to
+  WAITING and waiting joiners spawn.
+- The course carries the R0 ferry with `started` relative to GO (12 s pre-roll). Gridding
+  writes it into the fleet's water on the round clock.
+
+**Course:** the R0 route with three lines centred across the mapped river: two checkpoints
+at the route's third and fourth vertices and a finish about 30 m short of the route's end,
+near the bridge. Each line reaches water at both ends and land 12 m beyond, so it cannot be
+bypassed. Straight lines between successive gate centres keep 12 m of mapped clearance.
+The start-to-finish centre line is 927.5 m. The first R0 bend is not a gate: its line would
+run along the ferry's track, and the river there is too straight to cut.
+
+**Fleet change:** `BoatFleetSlot.held` and `boat_fleet_hold`, plus
+`boat_fleet_spawn_clear`, which exposes the fleet's existing safe-spawn test for race
+recovery. The hold enters the fleet hash only while set. Unheld fleets keep their hashes,
+and every existing CTest, including byte-for-byte and hash checks, still passes. Protocol v3
+does not carry `held` or the race's ferry clock. Until R2 versions them, a race must not be
+hosted.
+
+**Measured four-bot race** (validator, 2026-10-24, Apple Silicon/macOS 26.6.2, Debug with
+optimized core). Bots aim at each gate centre in their own 14 m lane at full throttle:
+
+| Lane (slot) | Place | Finish | Jumps | Recoveries |
+| --- | --- | --- | --- | --- |
+| 1 | 4 | 51.66 s | 9 | 0 |
+| 2 | 3 | 46.85 s | 10 | 0 |
+| 3 | 2 | 46.10 s | 9 | 0 |
+| 4 | 1 | 45.81 s | 6 | 0 |
+
+All finish within the 45–60 s target (the validator accepts 40–60 s), each with at least one
+jump. A mid-race checkpoint restored 20 s after GO into a fresh fleet produces identical
+per-tick fleet hashes and the same places. The second round grids and reaches RACING. These
+are scripted bot lines, not human pacing or feel. Jump counts are whole-hull airborne
+transitions.
+
+**Verification:** see [verification and limitations](#verification-and-limitations).
+**Limitations and R2 inputs:** finished boats are not moved out of the corridor; they coast
+past the finish (a runout/spectator rule is still R2 work). Recovery candidates are checked
+against hulls, land and wake water, not against the ferry's moving hull, so R2/R3 should
+add a source-hull check. The ferry appears 8 s into its crossing when the grid forms, about
+200 m ahead. Its previous round's wake is replaced at the next grid (normally already
+expired). The scenery-traffic wake pool from the R0 fixture is not part of the race.
 
 ## Verification and limitations
+
+R1 race core, 2026-10-24, Apple Silicon/macOS 26.6.2: Debug build without project compiler
+warnings (raylib's own vendored-source warnings unchanged). The full
+`ctest --test-dir build -j 4 --output-on-failure` run passed all 116 active tests, including
+24 GPU checks and the new `boat_race`, in 135.93 s; 15 retired wake-field experiments stayed
+disabled. Existing fleet, server, net, prediction and hash checks pass unchanged with the new
+hold field. All 287 local file/heading links in the six changed documents resolve, and
+`git diff --check` passes. R1 adds no visuals or runtime behaviour to any playable program,
+so no captures or windowed run were made. No human play, network race or user acceptance is
+claimed.
+
 
 R0 implementation, 2026-10-24, Apple Silicon/macOS 26.6.2: Debug configure/build passed
 without project compiler warnings (CMake retains raylib's existing OpenGL deprecation notice).

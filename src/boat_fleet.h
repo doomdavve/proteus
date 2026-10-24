@@ -19,6 +19,8 @@ typedef struct {
     uint32_t request; // Queue order of the pending request; earlier requests spawn first.
     bool active; // Integrates, collides and emits wakes.
     bool pending; // Waiting for a safe spawn; an active boat stays physical meanwhile.
+    // Race grid hold: pose and position stay put while throttle and engine respond to input.
+    bool held;
 } BoatFleetSlot;
 
 // Complete future-affecting fleet state, free of pointers: assignment saves a checkpoint and
@@ -59,6 +61,11 @@ bool boat_fleet_init(BoatFleet *fleet, const BoatWorldDefinition *definition, Bo
 bool boat_fleet_request_spawn(BoatFleet *fleet, unsigned slot);
 // Place BOAT in SLOT now, bypassing the spawn rules (fixtures and adapters). Starts a new life.
 void boat_fleet_place(BoatFleet *fleet, unsigned slot, Boat boat);
+// Hold SLOT in place from the next tick (race grid and countdown), or release it.
+void boat_fleet_hold(BoatFleet *fleet, unsigned slot, bool held);
+// True when CANDIDATE could be placed in SLOT now: clear of land, of other hulls over the
+// spawn lookahead and of disturbed wake water. The fleet's own spawns use the same test.
+bool boat_fleet_spawn_clear(const BoatFleet *fleet, unsigned slot, const Boat *candidate);
 // Remove SLOT's hull now, between ticks; its live wakes continue and expire naturally.
 void boat_fleet_leave(BoatFleet *fleet, unsigned slot);
 // One authoritative tick n -> n+1 for every active slot, in the staged order documented in

@@ -22,7 +22,8 @@ The next planned multiplayer mode is a [45–60 second river race](docs/RACE_PLA
 with a shared starting grid, frequent ferry-wake jumps and confirmed finishing positions.
 A [playable R0 ferry-wake trial](docs/RACE_PLAN.md#r0-prototype--2026-10-24) now measures a
 shortened Eriksberg/bridge route (about 49 s at full throttle):
-`./build/boat_race_trial --play`. Shared grid, network race and finish positions remain planned.
+`./build/boat_race_trial --play`. The authoritative grid, gates and finishing-position rules
+now exist as a tested core, but there is no race room or race HUD to play yet.
 
 ## Generate the original sample pack and starter XM (archived sketch)
 

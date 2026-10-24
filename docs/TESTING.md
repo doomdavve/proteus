@@ -81,6 +81,11 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   The fixture also checks independent physical scenery emission/restore and visible trail
   bounds; `wake_objects_gpu` checks both object pools beyond slot 127, independent lifetimes,
   exact uploads and 4/8 KiB texture-resize round trips.
+- `boat_race` runs `validate_boat_race` ([race R1](RACE_PLAN.md#r1-race-core--2026-10-24)):
+  course lines spanning the mapped river, swept/reverse/lateral/multi-gate crossings, held grid
+  through a full-throttle countdown and a same-tick release, same-tick places and exact ties,
+  recovery behind the last cleared gate, joiners, leavers, abandonment, deadlines and grid
+  rotation. It ends with a four-bot ferry race with a mid-race checkpoint restore.
 - `boat_match` runs `validate_boat_match` ([deathmatch](DEATHMATCH_PLAN.md) credit window,
   self-capsize, grace, respawn, bailout, leavers, rounds and planted-wake capsizes), and
   `boat_server_scripted_deathmatch` runs a scripted 10 s round through its intermission.

@@ -52,9 +52,10 @@ proceeds in parallel (D1 match core and D2 protocol v2 with the in-game HUD impl
 2026-10-24; next: D2 play, then D3). The live protocol is now [v3](MULTIPLAYER_PROTOCOL.md).
 The next requested mode is a [river sprint race](RACE_PLAN.md), planned 2026-10-24:
 45–60 seconds, a shared grid, frequent vessel-wake jumps and confirmed finish positions.
-Race R0 now provides a measured shortened route and playable physical ferry-wake trial;
-[R0 evidence and next task](RACE_PLAN.md#r0-prototype--2026-10-24). R1–R4 and the network
-race mode remain unimplemented; the room protocol is unchanged by the local fixture.
+Race R0 provides a measured shortened route and playable physical ferry-wake trial, and the
+[R1 race core](RACE_PLAN.md#r1-race-core--2026-10-24) (`boat_race`) adds authoritative
+rules over the fleet, including a new fleet grid hold. R2–R4 and the network race mode remain
+unimplemented; protocol v3 carries neither the hold nor the race, so race rooms wait for R2.
 Numerical budgets below are proposed gates, not measured multiplayer results.
 The final evidence section distinguishes checks performed for this document from future checks.
 
@@ -94,7 +95,7 @@ Superseded in part on 2026-10-24: the user chose a timed capsize deathmatch, wit
 leaderboard and new capsize mechanics, as a server-selected room mode beside free boating,
 then requested a short, jump-heavy river race with a shared start and finish positions.
 The [deathmatch plan](DEATHMATCH_PLAN.md) and [race plan](RACE_PLAN.md) own those modes;
-the paragraph above is kept as the original planning default. Race is not implemented.
+the paragraph above is kept as the original planning default. Race has a rules core but no room mode yet.
 
 Assumptions: friends trust the host; a room uses one fixed map/settings revision; stable native
 machines can run 120 Hz; initial quality target is RTT <=80 ms with modest jitter/loss.
