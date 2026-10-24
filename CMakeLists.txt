@@ -796,6 +796,8 @@ endif()
 
 add_test(NAME boating_xm_is_valid
   COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm --background)
+add_test(NAME acid_xm_is_valid
+  COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm --acid)
 
 # W1 stays isolated from player water and shaders; Python uses only the standard library.
 find_package(Python3 COMPONENTS Interpreter)

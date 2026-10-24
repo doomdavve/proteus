@@ -4,6 +4,7 @@
 #include "boat_gpu.h"
 #include "boat_hud.h"
 #include "boat_map.h"
+#include "boat_music.h"
 #include "boat_profile.h"
 #include "boat_replay.h"
 #include "boat_session.h"
@@ -40,8 +41,9 @@ static void usage(void)
         "Usage: wake_velocity [--demo] [--frames COUNT] [--screenshot FILE [--time SECONDS]]\n"
         "--verbose: log graphics/window backend and resource initialization\n"
         "No options (or --title): Wake Velocity title with multiplayer and settings (name, boat,\n"
-        "  mouse steering)\n"
+        "  mouse steering, soundtrack)\n"
         "  Esc in a session returns to it | --title --screenshot FILE: capture the title\n"
+        "--soundtrack a-little-boat|acid-wake|off: local background music (default a-little-boat)\n"
         "Left/Right or A/D: adjust wheel | Up/Down or W/S: step thrust (4 forward / neutral / 2 "
         "reverse); hold to step every 0.5 s\n"
         "Scroll down/up: more/less thrust (also Up/Down or W/S)\n"
@@ -196,6 +198,7 @@ static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
     unsigned int skin = BOAT_SKIN_SWEDEN;
+    unsigned soundtrack = BOAT_MUSIC_LITTLE_BOAT;
     bool skin_set = false;
     const char *replay_path = NULL, *ghost_path = NULL, *data_dir = NULL, *export_path = NULL;
     float time = 0;
@@ -224,6 +227,9 @@ static int study(int argc, char **argv)
             return 0;
         } else if (strcmp(argv[i], "--verbose") == 0) {
             verbose = true;
+        } else if (strcmp(argv[i], "--soundtrack") == 0 && i + 1 < argc) {
+            if (!boat_music_parse(argv[++i], &soundtrack))
+                goto invalid;
         } else if (strcmp(argv[i], "--skin") == 0 && i + 1 < argc) {
             if (!boat_skin_parse(argv[++i], &skin))
                 goto invalid;
@@ -636,9 +642,10 @@ static int study(int argc, char **argv)
     SetTextureFilter(frame_target.texture, TEXTURE_FILTER_POINT);
     boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
     char music_path[4096];
-    if (!boat_asset_path(music_path, sizeof(music_path), "music/a-little-boat.xm"))
+    const BoatMusic *track = boat_music(soundtrack);
+    if (track->asset && !boat_asset_path(music_path, sizeof(music_path), track->asset))
         goto cleanup;
-    if (IsAudioDeviceReady()) {
+    if (IsAudioDeviceReady() && track->asset) {
         music = LoadMusicStream(music_path);
         music_ready = IsMusicValid(music);
         if (music_ready && !xm_music_start_at(&music, music_path, 0)) {
@@ -647,7 +654,7 @@ static int study(int argc, char **argv)
         }
         if (music_ready) {
             music.looping = true;
-            SetMusicVolume(music, .35f);
+            SetMusicVolume(music, track->volume);
             PlayMusicStream(music);
         } else {
             TraceLog(LOG_WARNING, "Boating background music could not be loaded");
@@ -1158,7 +1165,8 @@ static int title_single(const BoatTitleSettings *settings)
 {
     char *arguments[] = { "boat_study", "--current", "--crossing-wake", "--location", "river",
         "--waves", "--gpu-aa", "--camera-distance", "12", "--camera-height", "6", "--skin",
-        (char *)boat_skin_name(settings->skin),
+        (char *)boat_skin_name(settings->skin), "--soundtrack",
+        (char *)boat_music(settings->soundtrack)->id,
         settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
     int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
     return study(count, arguments);
@@ -1168,6 +1176,7 @@ static int title_single(const BoatTitleSettings *settings)
 static int title_join(BoatTitleSettings *settings)
 {
     char *arguments[] = { "boat_study", "--connect", settings->address, "--name", settings->name,
+        "--soundtrack", (char *)boat_music(settings->soundtrack)->id,
         settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
     int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
     net_study.failure[0] = 0;

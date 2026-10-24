@@ -21,12 +21,16 @@ not deploy; manual deployment is available from `main` or a `v*` tag. Native rel
 their existing behavior. The user confirmed local startup works after SDK activation.
 The user confirmed the deployed web game plays well on 2026-10-20.
 The compact launch page keeps the game screenshot, a PLAY button, a settings toggle, and
-OpenStreetMap attribution. Smooth edges and fullscreen default to on; location, waves,
+OpenStreetMap attribution. Smooth edges and fullscreen default to on; location, soundtrack, waves,
 and both presentation settings are available in the collapsed panel. All page UI hides
 during play. In-game `?` remains the sole controls guide; reload
 returns to location selection. A bundled game capture supplies the launch-page preview.
 The visible raylib license link is removed; its license file remains distributed. Map
 attribution stays on the launcher and in the mapped-location game help.
+Soundtrack selects A little boat (default), Acid Wake or Off before PLAY. Both XM assets
+are preloaded; Off keeps engine/water audio enabled. The soundtrack addition was verified
+natively on Fedora Wayland; browser compilation and playback of this addition remain
+unverified. See [boating music status](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 The landing footer now shows the packaged build version: the exact `v*` release tag,
 or a Git development description/hash (with `-dirty` for tracked local changes). The
 packager accepts `--version` for source archives; without Git or an override it shows

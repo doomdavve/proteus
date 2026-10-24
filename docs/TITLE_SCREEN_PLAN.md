@@ -4,13 +4,14 @@ Status: revised 2026-10-24. This document owns the title, menu, and promotion of
 playable boating program. The playtest title slice is integrated into `boat_study`
 (see [playtest integration](#playtest-integration-2026-10-24)): a no-argument launch shows
 the prototype's logo and river backdrop with SINGLE PLAYER, MULTIPLAYER (join by address),
-SETTINGS (NAME, BOAT, STEERING; added 2026-10-24) and EXIT. The standalone visual prototype remains at
+SETTINGS (NAME, BOAT, STEERING, SOUNDTRACK; added 2026-10-24) and EXIT. The standalone visual prototype remains at
 `.worktrees/title-screen-demo`. The user and his son chose
 **Wake Velocity** after considering GBG/Gothenburg names. The current bowed logo is the
 one to keep for now; genuine modeled 3D is deferred. Next task: user playtest of the
-title and join flow with distributed binaries; then merge the marine HUD branch
-(`boat-marine-hud`) once it is finished. Settings, location choice, pause menu, title music
-and the live boat-and-gulls scene stay deferred.
+title, soundtrack selection and join flow with distributed binaries. The marine HUD branch
+was merged on 2026-10-24. Location choice, display/volume settings, pause menu, title music
+and the live boat-and-gulls scene stay deferred. Boating music implementation and current
+verification are owned by the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
 ## Identity
 
@@ -93,9 +94,11 @@ the menu table above remains a later proposal.
 
 - `tools/boat_title.[ch]` owns the title: the prototype's bowed logo, footer and
   `assets/title/river-backdrop.png`, drawn at 320x200 and integer-scaled. Rows: SINGLE
-  PLAYER, MULTIPLAYER, SETTINGS, EXIT. SETTINGS opens NAME / BOAT / STEERING / BACK
+  PLAYER, MULTIPLAYER, SETTINGS, EXIT. SETTINGS opens NAME / BOAT / STEERING / SOUNDTRACK / BACK
   (2026-10-24; NAME and BOAT were main rows before). STEERING picks KEYBOARD or MOUSE for the
-  start of each session, passed as `--mouse-steering`. MULTIPLAYER opens LAN / ADDRESS / CONNECT / BACK.
+  start of each session, passed as `--mouse-steering`. SOUNDTRACK cycles A LITTLE BOAT /
+  ACID WAKE / OFF with Left/Right, Enter or a click, passed as `--soundtrack` to single
+  player and joined rooms. MULTIPLAYER opens LAN / ADDRESS / CONNECT / BACK.
   LAN (added 2026-10-24) lists rooms found by
   [LAN discovery](MULTIPLAYER_PROTOCOL.md#lan-discovery). The search runs while the panel is
   open; Left/Right pick among several rooms and Enter joins one, copying its address into
@@ -103,7 +106,8 @@ the menu table above remains a later proposal.
   has already moved it.
   Enter on a text row starts typing (printable ASCII; Enter keeps, Esc cancels, empty
   restores). Mouse hover/click works. Settings persist as `title.txt` in the
-  personal-best data directory (`name=`, `address=`, `skin=`, `mouse_steering=on|off`), saved
+  personal-best data directory (`name=`, `address=`, `skin=`, `mouse_steering=on|off`,
+  `soundtrack=a-little-boat|acid-wake|off`), saved
   when leaving SETTINGS, choosing a session or exiting. The default address is
   `127.0.0.1:24680` and the default name `player`.
 - `tools/boat_study.c`: the former `main` is `study(argc, argv)`; it reuses an open window and

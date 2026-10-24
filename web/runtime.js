@@ -52,9 +52,10 @@ playButton.addEventListener('click', () => {
   }
   const location = document.getElementById('location').value;
   const args = location === 'course' ? ['--course'] : ['--location', location];
+  args.push('--soundtrack', document.getElementById('soundtrack').value);
   if (document.getElementById('waves').checked) args.push('--waves');
   if (document.getElementById('aa').checked) args.push('--gpu-aa');
-  for (const id of ['location', 'waves', 'aa']) document.getElementById(id).disabled = true;
+  for (const id of ['location', 'soundtrack', 'waves', 'aa']) document.getElementById(id).disabled = true;
   canvas.focus();
   // Audio initialization and PlayMusicStream happen inside this user gesture.
   callMain(args);

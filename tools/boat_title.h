@@ -9,6 +9,7 @@ typedef struct {
     char address[64]; // HOST:PORT for MULTIPLAYER.
     unsigned skin; // Single-player livery; rooms colour boats by slot.
     bool mouse_steering; // Sessions start with captured mouse steering; M still toggles.
+    unsigned soundtrack; // Local music choice, including off; shared by single player and rooms.
     char message[160]; // Shown under the menu, e.g. why the last connection ended.
 } BoatTitleSettings;
 

@@ -48,11 +48,13 @@ int main(int argc, char **argv)
 {
     bool soundtrack = argc == 3 && strcmp(argv[2], "--soundtrack") == 0;
     bool background = argc == 3 && strcmp(argv[2], "--background") == 0;
-    if (argc != 2 && !soundtrack && !background) {
-        fprintf(stderr, "usage: %s module.xm [--soundtrack|--background]\n", argv[0]);
+    bool acid = argc == 3 && strcmp(argv[2], "--acid") == 0;
+    bool looping = background || acid;
+    if (argc != 2 && !soundtrack && !looping) {
+        fprintf(stderr, "usage: %s module.xm [--soundtrack|--background|--acid]\n", argv[0]);
         return 2;
     }
-    if ((soundtrack || background) && !check_loaded_start(argv[1]))
+    if ((soundtrack || looping) && !check_loaded_start(argv[1]))
         return 1;
     jar_xm_context_t *xm = NULL;
     int result = jar_xm_create_context_from_file(&xm, 48000, argv[1]);
@@ -98,7 +100,11 @@ int main(int argc, char **argv)
     float frames[48000 * 2];
     double energy = 0, loop_energy = 0;
     float peak = 0, ending_peak = 0;
-    for (int second = 0; second < (soundtrack ? 244 : (background ? 185 : 1)); ++second) {
+    for (int second = 0; second < (soundtrack ? 244
+                                 : acid       ? 235
+                                 : background ? 185
+                                              : 1);
+        ++second) {
         jar_xm_generate_samples(xm, frames, 48000);
         for (size_t i = 0; i < sizeof(frames) / sizeof(frames[0]); ++i) {
             if (!isfinite(frames[i]) || fabsf(frames[i]) > 1) {
@@ -107,20 +113,19 @@ int main(int argc, char **argv)
                 return 1;
             }
             energy += (double)frames[i] * frames[i];
-            if (background && second >= 92)
+            if (looping && second >= (acid ? 117 : 92))
                 loop_energy += (double)frames[i] * frames[i];
             peak = fmaxf(peak, fabsf(frames[i]));
             if (second >= 241)
                 ending_peak = fmaxf(ending_peak, fabsf(frames[i]));
         }
     }
-    if (background && jar_xm_get_loop_count(xm) != 2) {
+    if (looping && jar_xm_get_loop_count(xm) != 2) {
         fprintf(stderr, "Background music did not complete two loops\n");
         jar_xm_free_context(xm);
         return 1;
     }
-    if (energy <= 0 || (background && loop_energy <= .001)
-        || (soundtrack && ending_peak > .0001f)) {
+    if (energy <= 0 || (looping && loop_energy <= .001) || (soundtrack && ending_peak > .0001f)) {
         fprintf(stderr, "Empty audio or nonsilent ending hold: %.6f\n", ending_peak);
         jar_xm_free_context(xm);
         return 1;

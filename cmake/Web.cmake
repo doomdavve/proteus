@@ -39,6 +39,7 @@ foreach(texture IN LISTS WEB_TEXTURES)
   configure_file("${texture}" "${WEB_ASSETS}/textures/${name}" COPYONLY)
 endforeach()
 configure_file(assets/music/a-little-boat.xm "${WEB_ASSETS}/music/a-little-boat.xm" COPYONLY)
+configure_file(assets/music/acid-wake.xm "${WEB_ASSETS}/music/acid-wake.xm" COPYONLY)
 
 set_target_properties(boat_study PROPERTIES SUFFIX ".js")
 # Asyncify is raylib's supported way to yield from its existing synchronous loop.
@@ -59,6 +60,7 @@ target_link_options(boat_study PRIVATE
 set_property(TARGET boat_study APPEND PROPERTY LINK_DEPENDS
   ${WEB_SHADERS} ${WEB_TEXTURES}
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js")
 

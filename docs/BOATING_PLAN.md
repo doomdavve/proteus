@@ -4,7 +4,8 @@ Status: updated 2026-10-24. `boat_study` implements free boating in basin, Eriks
 and river locations, reverse/docking, planing, buoyancy, optional gentle waves, opt-in
 current/scripted-wake options in all locations, default bounded arcade wakes in free boating,
 and a timed S course with recordings, persistent personal bests, ghosts, and replay controls. The study
-has quiet engine/water audio and a repeating, gentle XM background piece. The
+has quiet engine/water audio and [selectable XM music](#selectable-soundtracks--2026-10-24):
+the gentle A little boat loop (default), Acid Wake techno, or Off. The
 [stern-wake motion pass](#stern-wake-motion--2026-10-18) and physics Phase D are implemented;
 the user has provisionally accepted Phase D handling and revised player-wake motion,
 with continued evaluation over time.
@@ -773,3 +774,46 @@ User acceptance, 2026-10-18: “It's joyful! Let's commit” accepts the backgro
 Next task: retain the accepted music and engine/water balance during further boating work.
 Known limitation: exhaustive focus/replay listening remains unverified; automated
 decoding cannot establish that.
+
+## Selectable soundtracks — 2026-10-24
+
+Implemented: native SETTINGS → SOUNDTRACK selects A LITTLE BOAT / ACID WAKE / OFF with
+Left/Right, Enter or a click. The choice is saved as `soundtrack=` in `title.txt` and
+passed to both single-player and joined-room sessions. Old or unknown settings keep the
+original default. Direct sessions accept `--soundtrack a-little-boat|acid-wake|off`;
+the browser launcher exposes the same choices before PLAY. Off keeps engine/water audio.
+
+Acid Wake is an original 132 BPM, 64-bar D-minor techno loop with TB-303-style resonant
+bass phrases, accents, slides, kick/clap/hats, a breakdown and return. The dedicated
+`tools/generate_acid_music.py` writes only `assets/music/acid-wake.xm`, leaving accepted
+music and starter outputs intact. Native and web bundles include it. The
+[music workflow](MUSIC.md#acid-wake-and-soundtrack-selection) owns regeneration and editing.
+
+Verification, 2026-10-24, Fedora 43 x86-64/GCC 15.3.1, Wayland-only builds:
+
+- Release and Debug full builds passed. Each CTest run passed 88 of 89 active tests
+  (29.07 s Release, 32.00 s Debug). The sole failure in both was the pre-existing
+  `cube_render_checksum`: `e4b24d56dac4a0b3` versus the Ubuntu/GCC reference
+  `a920a253d6c6aa0a`; no renderer or baseline changed. Thirteen retired field tests
+  were disabled; GPU CTests and the Node.js-dependent check were not included.
+- `acid_xm_is_valid` passed fresh-load start, a 48.58-second seek, 235 seconds of
+  finite unclipped audio and two loops; peak 0.540010. Regeneration was byte-identical.
+- An isolated scripted run through the real title menu selected Acid Wake and persisted
+  it. Default/unknown settings and save/load of all three choices passed. Captures of
+  the updated settings panel were inspected at 320x200. Harness/logs/captures remain
+  ignored build outputs under `build/`.
+- An agent-run 180-frame Acid Wake river session and a 120-frame Off session reported
+  native `GLFW - Wayland`, audio initialization and clean shutdown. The former loaded
+  the new XM; the latter created no music stream. Invalid soundtrack IDs were rejected
+  before window startup. A local decoded preview is `build/acid-wake-preview.wav`.
+
+After rebasing onto `main` at `1a79efcd359b`, the Release build and routine suite were
+rerun: the same 88/89 active tests passed in 28.92 s, with only the unchanged checksum
+failure. The native Wayland Acid Wake river check also passed again for 180 frames.
+
+Current task: implementation and local automated/runtime verification complete.
+Next task: listen to Acid Wake and play the selector in single player and a joined room,
+then qualify browser and packaged macOS/Windows playback. Human musical acceptance,
+physical menu input, connected audio and focus/replay listening are pending; successful
+decoding and scripted input do not establish these. The browser changes have not been
+compiled or played in this Fedora session (no Emscripten SDK installed).

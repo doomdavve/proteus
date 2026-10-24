@@ -148,16 +148,19 @@ is calm and clear of both boats. See the
 
 `./build/boat_study` without options (and the packaged macOS app and Windows `launch.bat`)
 opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT. Up/Down or
-W/S select and Enter/Space or a click activates. SETTINGS holds NAME, BOAT and STEERING: Enter on
+W/S select and Enter/Space or a click activates. SETTINGS holds NAME, BOAT, STEERING and SOUNDTRACK: Enter on
 NAME starts typing (Enter keeps, Esc cancels), Left/Right change BOAT, and Left/Right or Enter
-switch STEERING between KEYBOARD and MOUSE (how each session starts; M still switches in game). SINGLE PLAYER starts the river with current, crossing wake
+switch STEERING between KEYBOARD and MOUSE (how each session starts; M still switches in game).
+SOUNDTRACK cycles through A LITTLE BOAT, ACID WAKE and OFF with Left/Right, Enter or a click.
+The music choice applies locally in both single player and multiplayer.
+SINGLE PLAYER starts the river with current, crossing wake
 and waves in the chosen livery. MULTIPLAYER searches the local network for `boat_server`
 rooms. Its LAN row names the first one found (host machine and players) and selects it. With
 several rooms it shows LAN 1/2 and so on; Left/Right switch rooms, and Enter joins under NAME.
 The hint below the menu gives the room's mode and address, and says when a room needs a token or
 runs another game version. ADDRESS and CONNECT still join any `HOST:PORT` directly. Rooms colour
 boats by slot, so BOAT applies to single player only. Esc in a session returns to the title, and a failed or lost connection shows why there.
-NAME, BOAT, STEERING and the address are remembered in `title.txt` in the personal-best data
+NAME, BOAT, STEERING, SOUNDTRACK and the address are remembered in `title.txt` in the personal-best data
 directory.
 Any explicit option skips the title; `--title --screenshot FILE` captures it.
 
@@ -413,9 +416,13 @@ water follows hull speed and swells gently with live bow entry when using `--wav
 Wash continues while coasting and quiets as the boat stops. The default 750–4800 RPM acoustic
 voice is a sound-design setting; future craft can use higher-revving voices. Audio fades when
 the window loses focus or a replay pauses. Replays have speed-driven wash but lack recorded
-wave-contact swells. A quiet, joyful XM background piece, “A little boat”, plays independently of boat speed.
-Its soft keys, humming melody, and rounded bass repeat every 91.43 seconds at 84 BPM;
-there are no drums or dynamic arrangement changes. Music pauses on focus loss or replay pause.
+wave-contact swells. Background music plays independently of boat speed. The default,
+“A little boat”, has soft keys, humming melody and rounded bass, repeating every 91.43 seconds
+at 84 BPM without drums. “Acid Wake” adds an original 132 BPM acid techno loop with a
+TB-303-style resonant bass, slides and accents over kick, clap and hats; its 64 bars repeat
+after 116.36 seconds. Choose either track or Off under SETTINGS → SOUNDTRACK, or use
+`./build/boat_study --soundtrack acid-wake` (`a-little-boat` and `off` are also accepted).
+Music pauses on focus loss or replay pause. Off keeps engine and water sounds enabled.
 The shared overlay's music-analysis readings remain off/zero. See [music notes](docs/MUSIC.md)
 for regeneration and editing.
 
@@ -819,7 +826,7 @@ cache the previous HTML after a deployment.
 
 A desktop browser with WebAssembly, WebGL 2, and a keyboard is required. The canvas uses
 nearest-neighbour scaling in multiples of the 320x200 scene, with a 320x200 minimum.
-Press **PLAY** to start with sound. The compact **Settings** toggle holds location, waves,
+Press **PLAY** to start with sound. The compact **Settings** toggle holds location, soundtrack, waves,
 smooth edges, and fullscreen; smooth edges and fullscreen default to on. The launcher disappears during play; the game fills
 the browser using integer scaling. Press `?` for the built-in controls; Escape closes help
 or releases the mouse/leaves fullscreen. M enables captured mouse steering; scroll down/up

@@ -17,7 +17,7 @@ full-song decoding. Call the helper only while the audio stream is stopped.
 
 ## Boating background loop
 
-The separate `boat_study` plays [A little boat](../assets/music/a-little-boat.xm): an
+The separate `boat_study` defaults to [A little boat](../assets/music/a-little-boat.xm): an
 original, quiet C-major piece at 84 BPM / speed 6, 32 bars (91.43 seconds), repeating
 from the beginning. Soft rounded keys, a humming melody, and a sine-led bass use simple
 major/sixth/seventh harmony and sparse call-and-answer phrases. There are no drums,
@@ -31,6 +31,37 @@ without overwriting its samples or module. Edit the new module in FastTracker, o
 the dedicated generator (regeneration replaces tracker edits). CMake bundles it next
 to the other music and `boating_xm_is_valid` checks decoder loading/reset, seeking,
 finite unclipped samples, and continued sound across two loop boundaries.
+
+### Acid Wake and soundtrack selection
+
+Choose SETTINGS → SOUNDTRACK on the native title, or Soundtrack in the browser launcher's
+Settings before PLAY. The choices are A LITTLE BOAT, ACID WAKE and OFF. Native settings
+persist in `title.txt` and apply to both single player and multiplayer; the choice is local
+to each listener. Direct command-line sessions accept `--soundtrack a-little-boat|acid-wake|off`
+and default to A little boat. Off leaves the engine and water mix active.
+
+[Acid Wake](../assets/music/acid-wake.xm) is an original 64-bar D-minor acid techno piece
+at 132 BPM / speed 6, with a 116.36-second loop. A resonant saw/square bass uses sixteenth-note
+phrases, slides, accents and changing cutoff brightness, with a four-on-the-floor kick,
+clap, closed/open hats, a minor-ninth stab and a quiet dotted-eighth echo. Intro, groove,
+breakdown, build and return are authored into the arrangement. This is TB-303-inspired
+sound design using synthesized PCM, not a recording or a circuit-accurate emulator.
+
+```sh
+python3 tools/generate_acid_music.py
+cmake --build build -j
+./build/validate_xm assets/music/acid-wake.xm --acid
+./build/boat_study --soundtrack acid-wake
+```
+
+The generator writes only `acid-wake.xm`; existing accepted music and sample WAVs are
+untouched. Eight bar-long bass phrase samples preserve continuous slide/filter gestures;
+edit their notes and synthesis in the generator, or rearrange phrases, drums and levels in
+FastTracker. Regeneration replaces edits to this XM. `acid_xm_is_valid` checks fresh-load
+start, seeking, finite unclipped PCM and two loop boundaries over 235 seconds. Native
+packaging copies the asset directory; the browser build explicitly preloads both tracks.
+Implementation and verification status belong to the
+[boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
 ## Archived starter sketch
 
