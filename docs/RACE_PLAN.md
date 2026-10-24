@@ -1,7 +1,8 @@
 # River sprint: multiplayer race plan
 
 Prepared 2026-10-24. **R0 prototype and R1 race core implemented and approved by the user;
-R2 network race mode and R3 slalom/storm implemented; storm, crest shading and three-crest ferry wake user-accepted.**
+R2 network race mode and R3 slalom/storm implemented; storm, crest shading and three-crest ferry wake user-accepted; first two-human river race played
+2026-10-24 ("successful and fun").**
 This document owns race rules, course pacing, jump encounters and acceptance. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns transport and prediction; the
 [traffic guide](HARBOR_TRAFFIC.md) owns existing scenery vessels; the
@@ -11,8 +12,8 @@ Status: the user approved R0 (shortened route, visible-ferry encounter) and R1 (
 race core) on 2026-10-24. R2 is implemented and automatically verified: `boat_server --mode
 race`, protocol v4 (hold flag, race GO tick, RaceState/RaceEvent), client prediction of the
 grid hold and ferry clock, finisher parking, course markers, HUD, standings and results, a
-route-following `boat_bot` and LAN labels. Bots have raced over ENet; no human has played a
-race and the HUD is not yet seen on screen (no window could open in the agent's environment).
+route-following `boat_bot` and LAN labels. Bots have raced over ENet, and on 2026-10-24 two
+humans raced the river course ([first human race](#first-human-race--2026-10-24)).
 The first four-gate layout was user-played and rejected as too easy/boring on 2026-10-24.
 The current [R3 layout](#r3-skill-gate-layout--2026-10-24) has six 32–40 m openings alternating
 across the river, a committed middle chicane, and the user-selected local rough-water storm
@@ -21,9 +22,9 @@ The ferry wake and broad finish remain. The user accepted the final higher cloud
 waves/rain and independent movement on 2026-10-24 ("I like it. Commit."). A later
 [crest shading tweak](#crest-shading-tweak--2026-10-24) addresses tall waves whitening and
 was user-approved ("Much better"). The [three-crest ferry wake](#three-crest-ferry-wake--2026-10-24)
-is implemented and user-approved ("Looks great!"). Next: multiplayer
-play with bots and two people; assess pacing, missed-gate recovery and turn/wave overlap
-before extending the route. The current bot runs take
+is implemented and user-approved ("Looks great!"). Two humans then raced the river course and
+reported it a successful, fun race with things to improve. Next: record those improvements,
+then assess pacing, missed-gate recovery and turn/wave overlap before extending the route. The current bot runs take
 63–71 s, exceeding the original 45–60 s aim; this pacing tradeoff awaits feedback. Full
 downtown coverage remains outside the current map. See the [R2 implementation](#r2-network-race--2026-10-24),
 the [R1 core](#r1-race-core--2026-10-24) and the [R0 evidence](#r0-prototype--2026-10-24).
@@ -170,7 +171,7 @@ Proposed round loop: **WAITING → GRID → COUNTDOWN → RACING → RESULTS →
    Add enough source encounters for the jump rhythm and the selected downtown/Eriksberg/bridge route. Tune using clean runs and four-boat races, not
    top-speed arithmetic alone. Check source traffic against ordinary traffic and landings.
    Extend mapped assets only after R0 identifies the necessary bounds.
-5. **R4 — multiplayer acceptance.** Repeat complete rounds with bots, then two or more
+5. **R4 — multiplayer acceptance** ([first two-human race played](#first-human-race--2026-10-24)). Repeat complete rounds with bots, then two or more
    humans, including delayed/lossy clients, trailing racers, resets and reconnects. Record
    measured durations, completed jumps, unfair crashes, result agreement and replay of the
    round loop. Qualify shipping platforms separately.
@@ -700,12 +701,25 @@ warnings. A temporary bot build replacing its ENet wait with a 40 ms sleep repro
 failure before the fix (90 counted iterations for both bots), then passed after the fix
 (472 observed simulation ticks for both bots). Both runs logged the full 480-tick hold
 between GRID and GO. The temporary sources/binaries are review artifacts in `build/`.
-The full CTest run is in progress; its normal-cadence `boat_net_race` check has also passed.
+The normal-cadence `boat_net_race` check also passed. Full-suite follow-up, 2026-10-24, macOS
+Debug at `73e2c4f` (the `v0.0.16` commit): rebuild and all 118 active CTests passed, including
+the GPU checks; 15 retired wake-field checks stayed disabled.
 The user requested this fix for release v0.0.16; native release CI remains the next check.
 
 **Next / limitations:** rerun Windows release CI to qualify the original environment. No
 native Windows run, shipped-tag replacement or new human multiplayer acceptance is claimed.
 No audiovisual behavior changed; no new frame or listening review is needed for this fix.
+
+### First human race — 2026-10-24
+
+**Played:** two humans raced the river course in a race room and reported it a successful and
+fun race, with things to improve ("There are things to improve for sure, but still fun").
+This is the first human R2/R3 race play and the first two-human step of R4.
+
+**Not recorded:** the platforms, build revision, bot count, lap times, network conditions and
+the specific improvements were not reported. HUD, pacing (63–71 s bot runs) and missed-gate
+recovery are not separately accepted by this report. **Next:** collect the improvement list
+and turn it into the next R3/R4 tasks; delayed/lossy clients, resets and reconnects remain.
 
 ## Verification and limitations
 

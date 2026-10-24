@@ -4,6 +4,10 @@
 the default object wake to 1.2 m, adds object-world recovery and lets steering command
 air roll. Handling revision is now 7; user play/acceptance of this first candidate is pending.
 
+2026-10-24 next requested work: the user wants to work on boat physics, especially making
+landings more satisfying so the boat's weight against the water is felt. See the
+[landing weight request](#landing-weight-request--2026-10-24); nothing is implemented yet.
+
 2026-10-23: the user enjoys the current jumping, landing and capsizing. Preserve this
 arcade handling baseline in the [multiplayer plan](MULTIPLAYER_PLAN.md), which owns shared
 authority, prediction and fleet contact scheduling. A diagnostic network room exists since M3
@@ -69,6 +73,18 @@ source below supplies the physical test.
 
 Accepted direction: 2026-10-17. Parent design: [Boating playground](BOATING_PLAN.md).
 Public controls: [README](../README.md#boating-sketch). [All plans](README.md).
+
+## Landing weight request — 2026-10-24
+
+**Requested by the user:** work on the boat physics next, with the landing as the main focus:
+it should be more satisfying, and the weight of the boat against the water should be felt.
+Recorded as a direction only; no candidate, measurement or design exists yet.
+
+**Constraints carried forward:** keep the enjoyed jumping/capsizing baseline (2026-10-23) and
+the pending revision-7 stability candidate in view; physics changes must bump
+`BOAT_PHYSICS_REVISION`, keep prediction replays deterministic, and be judged by human play,
+not by automated checks alone. The [wake plan](WAKE_REWRITE_PLAN.md) owns crest shapes and
+the [race plan](RACE_PLAN.md) relies on current jump counts, so record any change to either.
 
 ## Experience to build toward
 

@@ -84,8 +84,11 @@ provided token. No personal access token or additional secret is needed.
 Current status, 2026-10-24: Wake Velocity native package naming and versioned
 archives, checksums and Actions artifacts are implemented. The macOS executable,
 bundle display name, Windows launcher/readme and CLI usage use the released name.
-Internal source/CMake names remain unchanged. Next: run the updated platform workflows
-and publish the next chosen version; download both packages for user review.
+Internal source/CMake names remain unchanged. Version tags `v0.0.1`–`v0.0.16` have since
+been pushed to `origin` (2026-10-17 to 2026-10-24; `v0.0.16` at `73e2c4f`, the race
+smoke-test timing fix). The workflow results and published GitHub release assets for those
+tags were not checked when this status was reconciled (2026-10-24). Next: confirm the
+`v0.0.16` platform and release runs, then download both packages for user review.
 
 Verification on Apple Silicon/macOS 26, 2026-10-24:
 
@@ -103,7 +106,8 @@ Verification on Apple Silicon/macOS 26, 2026-10-24:
   does not verify PowerShell packaging or Windows execution. Changed local documentation
   file links and `git diff --check` passed.
 
-No release was published. Updated CI, real Windows packaging/execution, browser-download
+No release was published during that local verification (later tags are listed in the
+current status above). Updated CI, real Windows packaging/execution, browser-download
 Gatekeeper behavior, human input/audio playback and user acceptance remain unverified.
 
 ### Earlier release automation evidence
