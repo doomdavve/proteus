@@ -129,8 +129,9 @@ vec4 vesselWake(vec2 world)
     float pi = 3.14159265359, k = 2.0 * pi / vesselShape.y;
     float width2 = vesselShape.w * vesselShape.w;
     float edge = 1.0 - q*q / width2;
-    float f = sin(k*q) * edge*edge*edge;
-    float df = k*cos(k*q) * edge*edge*edge - sin(k*q)*6.0*q/width2*edge*edge;
+    // Largest crest at the packet centre, smaller crests on either side.
+    float f = cos(k*q) * edge*edge*edge;
+    float df = -k*sin(k*q) * edge*edge*edge - cos(k*q)*6.0*q/width2*edge*edge;
     float window = pow(sin(pi*emitted/vesselMotion.z), 2.0);
     float envelope = pow(sin(pi*age/vesselMotion.w), 2.0);
     float dw = pi/vesselMotion.z * sin(2.0*pi*emitted/vesselMotion.z);
@@ -312,6 +313,17 @@ vec3 wakeFieldSample(vec2 world) {
 }
 
 // END NATIVE WAKE FIELD
+
+// Presentation-only crest proxy. For a sinusoid, kh/length(kh, gradient) is its
+// phase independent of amplitude: increasing height cannot widen the pale band.
+// The energy gate keeps gentle swells clear. Keep boat_water_mesh.c in sync.
+float waveCrestFoam(vec3 wave, float k)
+{
+    float kh = k * wave.x;
+    float energy = length(vec3(kh, wave.yz));
+    return smoothstep(0.90, 0.99, kh / max(energy, 0.0001))
+        * smoothstep(0.12, 0.50, energy);
+}
 void main()
 {
     float footprint = max(length(dFdx(fragWorldPosition.xz)),
@@ -323,13 +335,15 @@ void main()
     vec3 normal = normalize(fragWorldNormal);
     float exposed = exposure(fragWorldPosition.xz);
     vec3 wake = vec3(0.0);
+    vec3 vessel = vesselWake(fragWorldPosition.xz).xyz;
+    vec3 storm = stormWave(fragWorldPosition.xz).xyz;
     if (physicalWaves != 0) {
         vec3 ambient = ambientWaves(fragWorldPosition.xz, footprint);
         vec2 slope = ambient.yz;
         float surfaceHeight = ambient.x;
         wake = crossingWake(fragWorldPosition.xz, crossingWakeTime)
             + playerWake(fragWorldPosition.xz)
-            + wakeFieldSample(fragWorldPosition.xz) + vesselWake(fragWorldPosition.xz).xyz + stormWave(fragWorldPosition.xz).xyz;
+            + wakeFieldSample(fragWorldPosition.xz) + vessel + storm;
         slope += wake.yz;
         surfaceHeight += wake.x;
         if (waterPatchPass != 0 && wakeFieldEnabled == 0) {
@@ -391,16 +405,18 @@ void main()
         color += highlight * pow(max(dot(normal, halfVector), 0.0), 96.0);
     }
     if (wakeAmplitude > 0.0 || playerWakeCount > 0 || wakeFieldEnabled != 0 || vesselMotion.y > 0.0 || stormArea.w > 0.0) {
+        float wakeHeight = wake.x - vessel.x - storm.x;
         float crest = objectWakeEnabled != 0
-            ? clamp(objectCrestFoam, 0.0, 1.0) * clamp(wake.x / 0.3, 0.0, 1.0)
-            : clamp(wake.x / 0.38, 0.0, 1.0);
-        crest = max(crest, clamp(vesselWake(fragWorldPosition.xz).x / 0.8, 0.0, 1.0));
-        crest = max(crest, clamp(stormWave(fragWorldPosition.xz).x / 0.8, 0.0, 1.0));
+            ? clamp(objectCrestFoam, 0.0, 1.0) * clamp(wakeHeight / 0.3, 0.0, 1.0)
+            : clamp(wakeHeight / 0.38, 0.0, 1.0);
+        float foam = crest * 0.65;
+        foam = max(foam, 0.38 * waveCrestFoam(vessel, 6.2831853 / max(vesselShape.y, 0.001)));
+        foam = max(foam, 0.28 * waveCrestFoam(storm, 0.42));
         // The compact rain footprint darkens only the rough patch.
         vec2 stormDelta = (fragWorldPosition.xz-stormArea.xy)/max(stormArea.z,1.0);
         float stormShade = pow(max(0.0,1.0-dot(stormDelta,stormDelta)),2.0);
         if (stormArea.w > 0.0) color *= 1.0-0.32*stormShade;
-        color = mix(color, vec3(0.65, 0.78, 0.80), crest * 0.65);
+        color = mix(color, vec3(0.65, 0.78, 0.80), foam);
     }
     finalColor = vec4(color * waterShadow(), 1.0);
 }

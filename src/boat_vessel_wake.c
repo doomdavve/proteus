@@ -39,9 +39,11 @@ BoatVesselWakeSample boat_vessel_wake_query(BoatVesselWake w, Vector2 p, double 
         return sample;
     float k = 2 * PI / w.wavelength;
     float edge = 1 - q * q / (w.half_width * w.half_width);
-    float f = sinf(k * q) * edge * edge * edge;
-    float df = k * cosf(k * q) * edge * edge * edge
-        - sinf(k * q) * 6 * q / (w.half_width * w.half_width) * edge * edge;
+    // Centre the compact packet on its largest crest; the cubic envelope tapers
+    // the two outer crests for the authored 14 m half-width / 8 m wavelength.
+    float f = cosf(k * q) * edge * edge * edge;
+    float df = -k * sinf(k * q) * edge * edge * edge
+        - cosf(k * q) * 6 * q / (w.half_width * w.half_width) * edge * edge;
     float window = sinf(PI * emitted / w.duration);
     float envelope = sinf(PI * age / w.lifetime);
     float dw = PI / w.duration * sinf(2 * PI * emitted / w.duration);

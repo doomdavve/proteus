@@ -41,7 +41,7 @@ static BoatVesselWake ferry(void)
         .lifetime = 40,
         .wavelength = 8,
         .spread = 3,
-        .half_width = 28 };
+        .half_width = 14 };
 }
 
 static float heading_to(Vector2 a, Vector2 b) { return atan2f(b.x - a.x, a.y - b.y); }
@@ -84,10 +84,44 @@ static void advance_target(const Boat *boat, unsigned *next)
         ++*next;
 }
 
+// Count actual positive local maxima across one side of a fully developed packet.
+// This catches extra small crests as well as a reversed centre/outer height taper.
+static void crest_profile(BoatVesselWake w)
+{
+    Vector2 side = { -w.direction.y, w.direction.x };
+    float emitted = w.duration * .5f, age = w.lifetime * .5f;
+    double time = w.started + emitted + age;
+    float peaks[4] = { 0 }, previous = 0, before = 0;
+    unsigned count = 0;
+    for (int i = 0; i <= 4000; ++i) {
+        float q = -w.half_width - .1f + (2 * w.half_width + .2f) * i / 4000;
+        float radius = w.spread * age + q;
+        CHECK(radius > 2);
+        float across = sqrtf(radius * radius - 4);
+        Vector2 p = Vector2Add(w.origin,
+            Vector2Add(Vector2Scale(w.direction, w.speed * emitted), Vector2Scale(side, across)));
+        float height = boat_vessel_wake_query(w, p, time).height;
+        if (previous > 0 && previous > before && previous >= height) {
+            CHECK(count < 4);
+            peaks[count++] = previous;
+        }
+        before = previous;
+        previous = height;
+    }
+    CHECK(count == 3);
+    CHECK(peaks[1] > peaks[0] * 2 && peaks[1] > peaks[2] * 2);
+    CHECK(peaks[0] > peaks[1] * .15f && peaks[2] > peaks[1] * .15f);
+    CHECK(fabsf(peaks[0] - peaks[2]) < .001f);
+    printf("ferry_crest_profile count=%u heights=%.3f,%.3f,%.3f\n", count, peaks[0], peaks[1],
+        peaks[2]);
+}
+
 static void contracts(void)
 {
     BoatVesselWake w = ferry();
     CHECK(boat_vessel_wake_valid(w));
+    crest_profile(w);
+    crest_profile(boat_race_river_course()->source);
     CHECK(!boat_vessel_wake_valid((BoatVesselWake) { 0 }));
     BoatVesselWake invalid = w;
     invalid.direction.x = NAN;
@@ -508,6 +542,7 @@ int main(int argc, char **argv)
     bool skill = false;
     const char *output = NULL;
     double seconds = 12;
+    float wave_scale = 1;
     int frames = 0;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--check"))
@@ -520,7 +555,12 @@ int main(int argc, char **argv)
             play = true;
         else if (!strcmp(argv[i], "--no-source"))
             source = false;
-        else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
+        else if (!strcmp(argv[i], "--wave-scale") && i + 1 < argc) {
+            char *end;
+            wave_scale = strtof(argv[++i], &end);
+            if (*end || !isfinite(wave_scale) || wave_scale < 0 || wave_scale > 4)
+                return 2;
+        } else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
             const char *name = argv[++i];
             if (strcmp(name, "gpu") && strcmp(name, "cpu"))
                 return 2;
@@ -541,7 +581,8 @@ int main(int argc, char **argv)
         } else {
             fprintf(stderr,
                 "Usage: boat_race_trial [--check] [--play] [--skill-course] [--no-source] "
-                "[--renderer cpu|gpu] [--output FILE --time SECONDS] [--frames COUNT]\n");
+                "[--wave-scale 0..4] [--renderer cpu|gpu] [--output FILE --time SECONDS] [--frames "
+                "COUNT]\n");
             return 2;
         }
     }
@@ -562,6 +603,10 @@ int main(int argc, char **argv)
     BoatSession session;
     ObjectStudy objects;
     preview_start(&session, &objects, source, skill);
+    if (!output) {
+        session.world.water.storm.height *= wave_scale;
+        session.world.water.vessel.height *= wave_scale;
+    }
     unsigned next = 1;
     unsigned targets = skill ? boat_race_river_course()->gate_count : ROUTE_COUNT - 1;
     if (output)
@@ -572,11 +617,17 @@ int main(int argc, char **argv)
                 NULL, NULL, &objects);
             preview_advance(&session.boat, previous, &next, skill);
         }
+    // Captures keep the default driven path/camera so height comparisons share a view.
+    if (output) {
+        session.world.water.storm.height *= wave_scale;
+        session.world.water.vessel.height *= wave_scale;
+    }
     bool window = gpu_enabled || !output;
     if (window) {
         SetConfigFlags(output ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE);
         InitWindow(960, 600,
-            skill ? "River sprint - skill course" : "River sprint R0 - shortened route / ferry trial");
+            skill ? "River sprint - skill course"
+                  : "River sprint R0 - shortened route / ferry trial");
         CHECK(IsWindowReady());
         SetTargetFPS(60);
     }
@@ -600,6 +651,8 @@ int main(int argc, char **argv)
             if (IsKeyPressed(KEY_R)) {
                 boat_session_destroy(&session);
                 preview_start(&session, &objects, source, skill);
+                session.world.water.storm.height *= wave_scale;
+                session.world.water.vessel.height *= wave_scale;
                 next = 1;
                 target_thrust = 0;
                 thrust_step = BOAT_THROTTLE_NEUTRAL;
@@ -666,10 +719,10 @@ int main(int argc, char **argv)
             gpu_enabled ? (Rectangle) { 320, 200, -320, -200 } : (Rectangle) { 0, 0, 320, 200 },
             dest, (Vector2) { 0 }, 0, WHITE);
         DrawRectangle(0, 0, GetScreenWidth(), 58, (Color) { 0, 0, 0, 180 });
-        DrawText(TextFormat("%s  %.2f s   %u landings   %.1f m/s   target %u/%u",
-                     skill ? "SKILL COURSE" : "R0 PROTOTYPE", view.time, session.boat.landings,
-                     Vector2Length(session.boat.velocity), next <= targets ? next : targets,
-                     targets),
+        DrawText(
+            TextFormat("%s  %.2f s   %u landings   %.1f m/s   target %u/%u",
+                skill ? "SKILL COURSE" : "R0 PROTOTYPE", view.time, session.boat.landings,
+                Vector2Length(session.boat.velocity), next <= targets ? next : targets, targets),
             12, 8, 20, WHITE);
         DrawText(play ? "W/S thrust steps | A/D steer / air roll | R restart | Esc exit"
                       : "Scripted full-throttle route | R restart | Esc exit",

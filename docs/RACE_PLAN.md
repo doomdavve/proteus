@@ -1,7 +1,7 @@
 # River sprint: multiplayer race plan
 
 Prepared 2026-10-24. **R0 prototype and R1 race core implemented and approved by the user;
-R2 network race mode and R3 slalom/storm implemented; current storm presentation user-accepted.**
+R2 network race mode and R3 slalom/storm implemented; storm, crest shading and three-crest ferry wake user-accepted.**
 This document owns race rules, course pacing, jump encounters and acceptance. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns transport and prediction; the
 [traffic guide](HARBOR_TRAFFIC.md) owns existing scenery vessels; the
@@ -18,10 +18,13 @@ The current [R3 layout](#r3-skill-gate-layout--2026-10-24) has six 32–40 m ope
 across the river, a committed middle chicane, and the user-selected local rough-water storm
 with rain and lightning, now travelling down-course at 8 m/s on the shared race clock.
 The ferry wake and broad finish remain. The user accepted the final higher cloud, irregular
-waves/rain and independent movement on 2026-10-24 ("I like it. Commit."). Next: multiplayer
+waves/rain and independent movement on 2026-10-24 ("I like it. Commit."). A later
+[crest shading tweak](#crest-shading-tweak--2026-10-24) addresses tall waves whitening and
+was user-approved ("Much better"). The [three-crest ferry wake](#three-crest-ferry-wake--2026-10-24)
+is implemented and user-approved ("Looks great!"). Next: multiplayer
 play with bots and two people; assess pacing, missed-gate recovery and turn/wave overlap
 before extending the route. The current bot runs take
-65–76 s, exceeding the original 45–60 s aim; this pacing tradeoff awaits feedback. Full
+63–71 s, exceeding the original 45–60 s aim; this pacing tradeoff awaits feedback. Full
 downtown coverage remains outside the current map. See the [R2 implementation](#r2-network-race--2026-10-24),
 the [R1 core](#r1-race-core--2026-10-24) and the [R0 evidence](#r0-prototype--2026-10-24).
 
@@ -550,18 +553,87 @@ changes even when cutting gate edges; swept gate ordering, skipped-gate finish r
 recovery, ties and parking. Storm checks cover exact zero outside/disabled, analytic spatial
 and time derivatives against finite differences, a one-day clock translation and the shared
 GO clock, translating envelope velocity, 8 m/s speed and GO+45 s rendezvous. Four bots
-finish in 64.90–75.64 s, with 10–14 jumps and no recoveries.
+finish in 63.06–70.57 s, with 6–10 jumps and no recoveries after the three-crest ferry change.
 Checkpoint restore remains identical. Full-suite, shader and visual evidence is recorded
 below.
 
-**Acceptance / next / limitations:** the user accepted the combined storm/course presentation
-on 2026-10-24 ("I like it. Commit."). This records acceptance of the current appearance and
-independent movement; multiplayer handling, pacing and race-room acceptance remain open.
-Next, check speed/line choices and turn/wave overlap with multiple human racers. Human R2 HUD acceptance, missed-gate
+**Acceptance / next / limitations:** the user accepted the combined storm/course baseline
+on 2026-10-24 ("I like it. Commit."). The later crest shading tweak was also user-approved ("Much better"); the shorter ferry wake
+below was user-approved ("Looks great!"). Multiplayer handling, pacing and race-room acceptance
+remain open. Next, check speed/line choices and turn/wave overlap with multiple human racers. Human R2 HUD acceptance, missed-gate
 recovery, full downtown coverage, more wake sources, wind and weather audio remain pending.
 The course is currently longer/slower than the initial race-duration goal. Storm speed and
 its GO origin are authored in `boat_race.c`; changing speed requires retiming the origin if
 the same GO+45 s meeting point is desired.
+
+### Crest shading tweak — 2026-10-24
+
+Implemented a presentation-only revision after the user reported tall waves turning white.
+Storm and authored ferry foam previously saturated at 0.8 m of positive displacement,
+blending 65% toward pale grey across increasingly broad wave faces. CPU and GPU now use
+height together with the spatial gradient and a representative wave number to estimate
+crest phase. A narrow phase band selects the crest; a steepness gate suppresses gentle
+swells. Storm foam blends at most 28%, ferry foam 38%. The separate source heights are
+removed from the ordinary wake foam gate, preventing overlap from restoring the broad
+whitening. Water geometry, normals, physical wave recipes and network content are unchanged.
+
+This is a cheap crest-location approximation, not curvature evaluation or breaking-wave
+simulation. The four-component storm uses a representative wave number of 0.42 rad/m;
+interference and envelopes can alter the selected bands. Existing player/scenery arcade
+foam keeps its narrow broken ridge recipe. No new foam textures, history or simulation.
+
+The standalone preview accepts `--wave-scale 0..4` (default 1), multiplying storm and authored
+ferry heights. In windowed play it also changes the preview physics; with `--output` it
+scales only the captured water after driving the default route, preserving the camera for
+comparison. It never changes the race-room course. For example:
+
+```sh
+./build/boat_race_trial --skill-course --wave-scale 2 --output build/waves-high.png --time 45.05
+./build/boat_race_trial --skill-course --wave-scale 0.5 --output build/waves-low.png --time 45.05
+./build/boat_race_trial --skill-course --wave-scale 2 --play
+```
+
+Verification, 2026-10-24, macOS Debug: configure/build passed without project compiler
+warnings (CMake retains raylib's OpenGL deprecation notice). The required full CTest run
+passed all 117 active tests in 153.68 s, including 22 active GPU checks and ENet race;
+15 retired wake-field checks remained disabled. GPU captures at 0.5×, 1× and 2× storm scale
+(0.8/1.6/3.2 m authored height scale) at 45.05 s and the default ferry at 12 s were inspected,
+along with CPU storm captures. The larger waves retain dark faces and restrained crest
+bands. An 80-second/4,800-frame scripted windowed GPU preview exited 0 without diagnostics;
+this is a runtime smoke check, not human playback acceptance. Graphics/network checks used
+desktop/loopback access after sandboxed graphics startup stalled and was interrupted.
+Changed document file links/new anchor resolve and `git diff --check` passes. The user then
+accepted the shading ("Much better") and requested fewer ferry crests, tracked below. Human
+handling and other-platform visual checks remain pending.
+
+### Three-crest ferry wake — 2026-10-24
+
+Implemented after the user accepted the revised water shading and requested three or four
+ferry waves, larger in the middle and smaller outside. The authored race ferry and standalone
+trial now use a 14 m half-width instead of 28 m, keeping the 8 m wavelength. Centring the
+carrier on a crest produces three positive crests per side, with the existing cubic envelope
+making the middle crest largest and tapering both outer crests. Height scale (3 m), spreading
+speed, source route, timing and lifetime are retained. This changes physical water and visual
+geometry together; both production GLSL stages use the same carrier and analytic derivative
+as the CPU query. Existing player/scenery arcade wakes and the storm recipe are unchanged.
+
+The race content digest now includes ferry recipe revision 2 after storm recipe revision 3;
+rebuild server and clients together. Protocol v4 message bytes are unchanged.
+
+Verification, 2026-10-24, macOS Debug: configure/build passed without project compiler
+warnings (existing CMake OpenGL deprecation notice retained). Full CTest passed all 117
+active tests in 151.52 s, including 22 active GPU checks and ENet race; 15 retired wake-field
+checks remained disabled. The ferry fixture counts three actual positive maxima with peak heights
+1.005 / 3.000 / 1.005 m at full development for both authored sources. Its finite-difference,
+clock, checkpoint and encounter checks passed. Four race bots finish in 63.06–70.57 s with
+6–10 jumps and no recovery. CPU/GPU ferry captures at 12 s, GPU approach at 8 s and race
+encounter at 21 s were inspected. A 30-second/1,800-frame scripted windowed GPU preview
+exited 0 without diagnostics. Both production shader recipes match CPU height, gradients
+and vertical velocity with maximum absolute error 3.72e-5. Graphics/network checks used
+desktop/loopback access. Changed document file links/new anchors resolve and
+`git diff --check` passes. Next: multiplayer handling/pacing checks. The user accepted the
+shorter packet on 2026-10-24 ("Looks great!"). This records visual acceptance, not multiplayer
+handling or other-platform verification; those checks remain pending.
 
 **Superseded first layout / user feedback:** the initial four 60–70 m openings and gentle
 chicane had a 956.5 m centre line; four bots finished in 48.48–49.82 s with 8–9 jumps and no

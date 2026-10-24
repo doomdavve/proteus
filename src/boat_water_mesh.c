@@ -215,6 +215,16 @@ const Mesh3D *boat_water_patch_arcade(Vector2 center, bool eriksberg)
     return water_patch(center, eriksberg, true);
 }
 
+// Same presentation-only phase/energy proxy as waveCrestFoam in the water shader.
+static float wave_crest_foam(float height, Vector2 gradient, float k)
+{
+    float kh = k * height;
+    float energy = sqrtf(kh * kh + Vector2LengthSqr(gradient));
+    float phase = Clamp((kh / fmaxf(energy, .0001f) - .90f) / .09f, 0, 1);
+    float strength = Clamp((energy - .12f) / .38f, 0, 1);
+    return phase * phase * (3 - 2 * phase) * strength * strength * (3 - 2 * strength);
+}
+
 const Mesh3D *boat_water_surface(BoatWater water, double time, bool eriksberg)
 {
     Surface *s = &surfaces[eriksberg];
@@ -259,23 +269,28 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool eriksberg)
         // Restrained slope light; geometry and GPU reflections carry the wave shape.
         float light = Clamp(.95f + .55f * (-q.normal.x + q.normal.z), .85f, 1.05f);
         Color base = eriksberg ? (Color) { 45, 79, 104, 255 } : (Color) { 36, 107, 125, 255 };
+        Vector2 point = { -centre.x, centre.z };
+        BoatStormSample storm = boat_water_storm_query(water.storm, point, time);
+        BoatVesselWakeSample vessel = boat_vessel_wake_query(water.vessel, point, time);
+        float wake_height = q.height - storm.height - vessel.height;
         float crest = 0;
         if (water.objects || water.traffic_objects)
-            crest = .65f * Clamp(q.crest_foam, 0, 1) * Clamp(q.height / .3f, 0, 1);
+            crest = .65f * Clamp(q.crest_foam - Clamp(storm.height / .8f, 0, 1), 0, 1)
+                * Clamp(wake_height / .3f, 0, 1);
         else if (water.wake_amplitude > 0 || water.player_wake_enabled)
             crest = .65f
-                * Clamp((q.height
+                * Clamp((q.height - vessel.height
                             - boat_water_query_borrowed(
                                 &ambient, (Vector2) { -centre.x, centre.z }, time)
                                 .height)
                         / .38f,
                     0, 1);
-        if (water.vessel.height > 0) {
-            float vessel_height
-                = boat_vessel_wake_query(water.vessel, (Vector2) { -centre.x, centre.z }, time)
-                      .height;
-            crest = fmaxf(crest, .65f * Clamp(vessel_height / .8f, 0, 1));
-        }
+        crest = fmaxf(crest, .28f * wave_crest_foam(storm.height, storm.gradient, .42f));
+        if (water.vessel.wavelength > 0)
+            crest = fmaxf(crest,
+                .38f
+                    * wave_crest_foam(
+                        vessel.height, vessel.gradient, 2 * PI / water.vessel.wavelength));
         s->triangles[i].color = (Color) { (unsigned char)Lerp(base.r * light, 166, crest),
             (unsigned char)Lerp(base.g * light, 199, crest),
             (unsigned char)Lerp(base.b * light, 204, crest), 255 };
