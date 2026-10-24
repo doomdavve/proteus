@@ -60,6 +60,7 @@ void boat_fleet_place(BoatFleet *fleet, unsigned slot, Boat boat)
     s->boat = boat;
     s->active = true;
     s->pending = false;
+    s->held = false;
     ++s->life;
     // A new span without a seam across the teleport. The cursor stays, and the new span's own
     // sample window keeps births at least BOAT_OBJECT_EMIT_TICKS apart.
@@ -72,6 +73,13 @@ void boat_fleet_leave(BoatFleet *fleet, unsigned slot)
     assert(slot < BOAT_FLEET_SLOTS);
     fleet->state.slots[slot].active = false;
     fleet->state.slots[slot].pending = false;
+    fleet->state.slots[slot].held = false;
+}
+
+void boat_fleet_hold(BoatFleet *fleet, unsigned slot, bool held)
+{
+    assert(slot < BOAT_FLEET_SLOTS);
+    fleet->state.slots[slot].held = held;
 }
 
 BoatWorld boat_fleet_world(const BoatFleet *fleet)
@@ -113,7 +121,7 @@ static float approach(const Boat *other, Vector2 target)
     return Vector2Length(Vector2Add(offset, Vector2Scale(other->velocity, t)));
 }
 
-static bool safe_spawn(const BoatFleet *fleet, unsigned slot, const Boat *candidate)
+bool boat_fleet_spawn_clear(const BoatFleet *fleet, unsigned slot, const Boat *candidate)
 {
     const BoatFleetState *s = &fleet->state;
     for (unsigned other = 0; other < BOAT_FLEET_SLOTS; ++other)
@@ -169,7 +177,7 @@ static void spawn_pending(BoatFleet *fleet)
             boat.heading = fleet->world.definition->mapped
                 ? atan2f(centre.x - at.x, at.y - centre.y)
                 : atan2f(-at.x, at.y);
-            if (safe_spawn(fleet, slot, &boat)) {
+            if (boat_fleet_spawn_clear(fleet, slot, &boat)) {
                 boat_fleet_place(fleet, slot, boat);
                 placed = true;
             }
@@ -259,7 +267,8 @@ BoatFleetStats boat_fleet_solve(Boat boats[BOAT_FLEET_SLOTS], const bool active[
  *    reads this tick is frozen (the fleet's world never takes the D3 trail).
  * 3. Integrate each active boat from S[n] with its input and the same frozen world; no boat
  *    reads another's partial state. The results form the candidate fleet.
- * 4. Simultaneous pair contacts on the candidates (boat_fleet_solve).
+ * 4. Simultaneous pair contacts on the candidates (boat_fleet_solve), then held slots return
+ *    to their plane position and heading with no planar motion.
  * 5. Commit, sample every wet stern from the committed fleet and the pre-emission pool, then
  *    track each emitter once. Births at n+1 contribute nothing until n+2 (zero birth envelope).
  * Presentation, course progress and every file or device stay outside. */
@@ -292,6 +301,15 @@ bool boat_fleet_step(BoatFleet *fleet, const BoatInput inputs[BOAT_FLEET_SLOTS])
         boat_step(&boats[i], &fleet->world, now, input);
     }
     fleet->stats = boat_fleet_solve(boats, active, &fleet->world, now);
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        if (active[i] && s->slots[i].held) {
+            // Waves still heave and pitch the hull; the plane pose waits for the release.
+            const Boat *before = &s->slots[i].boat;
+            boats[i].position = before->position;
+            boats[i].heading = before->heading;
+            boats[i].velocity = (Vector2) { 0 };
+            boats[i].yaw_velocity = 0;
+        }
     fleet->stats.spawned = spawns.spawned;
     fleet->stats.spawn_blocked = spawns.spawn_blocked;
     BoatWakeStern sterns[BOAT_FLEET_SLOTS];
@@ -366,6 +384,8 @@ uint64_t boat_fleet_hash(const BoatFleetState *state)
         hash_u64(&hash, slot->request);
         hash_u64(&hash, slot->active);
         hash_u64(&hash, slot->pending);
+        if (slot->held) // Hashed only when set, so rooms that never hold keep their digests.
+            hash_u64(&hash, UINT64_C(0x686f6c64));
         if (slot->active)
             hash_boat(&hash, &slot->boat);
     }
