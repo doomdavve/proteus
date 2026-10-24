@@ -38,7 +38,13 @@ and lights appear in planar reflections; hulls cast shadows. Foam has no physica
 the player. [Physics D1/D2](BOAT_PHYSICS_PLAN.md#phase-d--currents-and-crossing-wakes)
 now supplies separate authored current/scripted-wake options in every free-boating
 location, alongside default physical player wakes; these fleet trails
-remain visual only.
+remain visual only. The [river race R0 fixture](RACE_PLAN.md#r0-prototype--2026-10-24)
+now uses a separate 40 m ferry with bounded physical jump wakes and a height-aware contact
+envelope. Its [feedback correction](RACE_PLAN.md#r0-feedback-correction--2026-10-24) also
+opts the four passing scenery boats into a separate bounded physical wake pool with clearer
+foam trails, including the slow runabout. Run `./build/boat_race_trial --play` to try it.
+These physical scenery wakes are local to the trial; ordinary free boating and rooms retain
+their existing visual trails.
 
 ## Player contacts
 

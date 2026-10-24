@@ -50,6 +50,7 @@ set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wped
 # harbor/traffic contacts and boat/city geometry data. It must not draw, read input, open
 # windows or audio, or touch files; boat_core_boundary checks its sources and symbols.
 set(PROTEUS_BOAT_CORE_SOURCES
+  src/boat_vessel_wake.c src/boat_vessel_wake.h
   src/boat.c src/boat.h src/boat_clock.h src/boat_course.c src/boat_course.h
   src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_location.c src/boat_location.h src/boat_map.c
   src/boat_map.h
@@ -95,6 +96,12 @@ add_executable(boat_study tools/boat_study.c tools/boat_title.c src/profiler.c s
   src/xm_audio.c)
 target_link_libraries(boat_study PRIVATE proteus_boat_drive proteus_gpu)
 target_compile_options(boat_study PRIVATE ${PROTEUS_WARNINGS})
+
+# Race R0: measured shortened river route, source contracts, captures and playable trial.
+add_executable(boat_race_trial tools/boat_race_trial.c tools/boat_vessel_wake_gpu.c)
+target_include_directories(boat_race_trial PRIVATE ${raylib_SOURCE_DIR}/src)
+target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu)
+target_compile_options(boat_race_trial PRIVATE ${PROTEUS_WARNINGS})
 
 # Multiplayer M3, native only: the protocol codec, the authority and client sessions and the
 # in-memory impairment transport obey the core boundary (no devices, files or sockets);
@@ -293,6 +300,16 @@ target_compile_options(validate_boat_audio PRIVATE
 add_test(NAME boat_audio_is_valid COMMAND validate_boat_audio)
 
 add_dependencies(boat_study proteus_assets)
+add_dependencies(boat_race_trial proteus_assets)
+add_test(NAME boat_race_trial COMMAND boat_race_trial --check)
+set_tests_properties(boat_race_trial PROPERTIES
+  PASS_REGULAR_EXPRESSION "boat_race_trial=ok" LABELS "core;cpu")
+set_tests_properties(boat_race_trial PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+if(PROTEUS_GPU_TESTS)
+  add_test(NAME boat_race_trial_gpu COMMAND boat_race_trial --gpu-check)
+  set_tests_properties(boat_race_trial_gpu PROPERTIES LABELS "gpu;render" RUN_SERIAL TRUE
+    PASS_REGULAR_EXPRESSION "ferry_visibility=ok" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 add_executable(wake_play_review tools/wake_play_review.c)
 target_include_directories(wake_play_review PRIVATE ${raylib_SOURCE_DIR}/src)
 target_link_libraries(wake_play_review PRIVATE proteus_boat_session proteus_gpu)

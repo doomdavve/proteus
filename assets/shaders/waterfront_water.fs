@@ -73,6 +73,40 @@ vec3 ambientWaves(vec2 world, float footprint)
     return result;
 }
 
+// BEGIN VESSEL RECIPE
+uniform vec4 vesselOrigin; // world X/Z, unit direction X/Z
+uniform vec4 vesselMotion; // speed, height, duration, lifetime
+uniform vec4 vesselShape; // bounded clock (-1 inactive), wavelength, spread, half width
+vec4 vesselWake(vec2 world)
+{
+    if (vesselShape.x < 0.0 || vesselMotion.y <= 0.0) return vec4(0.0);
+    vec2 p = world - vesselOrigin.xy;
+    vec2 side = vec2(-vesselOrigin.w, vesselOrigin.z);
+    float emitted = dot(p, vesselOrigin.zw) / vesselMotion.x;
+    float age = vesselShape.x - emitted;
+    if (emitted <= 0.0 || emitted >= vesselMotion.z || age <= 0.0 || age >= vesselMotion.w)
+        return vec4(0.0);
+    float transverse = dot(p, side);
+    float radius = sqrt(transverse * transverse + 4.0);
+    float q = radius - vesselShape.z * age;
+    if (abs(q) >= vesselShape.w) return vec4(0.0);
+    float pi = 3.14159265359, k = 2.0 * pi / vesselShape.y;
+    float width2 = vesselShape.w * vesselShape.w;
+    float edge = 1.0 - q*q / width2;
+    float f = sin(k*q) * edge*edge*edge;
+    float df = k*cos(k*q) * edge*edge*edge - sin(k*q)*6.0*q/width2*edge*edge;
+    float window = pow(sin(pi*emitted/vesselMotion.z), 2.0);
+    float envelope = pow(sin(pi*age/vesselMotion.w), 2.0);
+    float dw = pi/vesselMotion.z * sin(2.0*pi*emitted/vesselMotion.z);
+    float de = pi/vesselMotion.w * sin(2.0*pi*age/vesselMotion.w);
+    float along = ((dw*envelope-window*de)*f + window*envelope*df*vesselShape.z)
+        / vesselMotion.x;
+    float across = window*envelope*df*transverse/radius;
+    return vesselMotion.y * vec4(window*envelope*f,
+        vesselOrigin.zw*along + side*across, window*(de*f-envelope*df*vesselShape.z));
+}
+// END VESSEL RECIPE
+
 vec3 crossingWake(vec2 world, float clock)
 {
     world -= wakeOffset;
@@ -101,9 +135,11 @@ vec3 crossingWake(vec2 world, float clock)
 // BEGIN OBJECT RECIPE -- same signed ridge and derivatives as boat_wake_objects.c.
 uniform int objectWakeEnabled;
 uniform float objectWakeLife;
+uniform int objectWakePlayerCount;
+uniform float objectWakeTrafficLife;
 uniform sampler2D objectWakeData;
 float objectCrestFoam = 0.0;
-vec3 objectWakePiece(vec2 p, vec4 a, vec4 b)
+vec3 objectWakePiece(vec2 p, vec4 a, vec4 b, float life)
 {
     vec2 delta=p-a.xy, direction=a.zw;
     float u=dot(delta,direction);
@@ -121,13 +157,13 @@ vec3 objectWakePiece(vec2 p, vec4 a, vec4 b)
     float shapeSlope=-6.0*q*inverseWidth*inverseWidth*crestEdge*crestEdge
         +0.28*6.0*troughQ/6.25*troughEdge*troughEdge;
     float riseT=clamp(age/0.65,0.0,1.0);
-    float fallT=clamp((age-(0.75*objectWakeLife-b.x*b.w))/(0.25*objectWakeLife),0.0,1.0);
+    float fallT=clamp((age-(0.75*life-b.x*b.w))/(0.25*life),0.0,1.0);
     float rise=riseT*riseT*(3.0-2.0*riseT);
     float fall=1.0-fallT*fallT*(3.0-2.0*fallT);
     float birth=smoothstep(0.0,0.3,clock);
     float envelope=birth*rise*fall;
     float envelopeAge=birth*(6.0*riseT*(1.0-riseT)/0.65*fall
-        -rise*6.0*fallT*(1.0-fallT)/(0.25*objectWakeLife));
+        -rise*6.0*fallT*(1.0-fallT)/(0.25*life));
     float angle=3.14159265359*u/(2.0*b.x), c=cos(angle);
     float window=c*c, windowU=-3.14159265359/b.x*c*sin(angle);
     vec2 qG=normal*(v/radius)+direction*(2.4*b.w);
@@ -141,10 +177,11 @@ vec3 objectWakePiece(vec2 p, vec4 a, vec4 b)
 vec3 objectWake(vec2 p)
 {
     vec3 result=vec3(0.0);
-    for (int i=0; i<128; ++i) {
+    for (int i=0; i<256; ++i) {
         if (i>=playerWakeCount) break;
         result+=objectWakePiece(p,texelFetch(objectWakeData,ivec2(i,0),0),
-            texelFetch(objectWakeData,ivec2(i,1),0));
+            texelFetch(objectWakeData,ivec2(i,1),0),
+            i>=objectWakePlayerCount && objectWakeTrafficLife>0.0 ? objectWakeTrafficLife : objectWakeLife);
     }
     return result;
 }
@@ -256,7 +293,7 @@ void main()
         float surfaceHeight = ambient.x;
         wake = crossingWake(fragWorldPosition.xz, crossingWakeTime)
             + playerWake(fragWorldPosition.xz)
-            + wakeFieldSample(fragWorldPosition.xz);
+            + wakeFieldSample(fragWorldPosition.xz) + vesselWake(fragWorldPosition.xz).xyz;
         slope += wake.yz;
         surfaceHeight += wake.x;
         if (waterPatchPass != 0 && wakeFieldEnabled == 0) {
@@ -317,10 +354,11 @@ void main()
             : vec3(0.28, 0.25, 0.17);
         color += highlight * pow(max(dot(normal, halfVector), 0.0), 96.0);
     }
-    if (wakeAmplitude > 0.0 || playerWakeCount > 0 || wakeFieldEnabled != 0) {
+    if (wakeAmplitude > 0.0 || playerWakeCount > 0 || wakeFieldEnabled != 0 || vesselMotion.y > 0.0) {
         float crest = objectWakeEnabled != 0
             ? clamp(objectCrestFoam, 0.0, 1.0) * clamp(wake.x / 0.3, 0.0, 1.0)
             : clamp(wake.x / 0.38, 0.0, 1.0);
+        crest = max(crest, clamp(vesselWake(fragWorldPosition.xz).x / 0.8, 0.0, 1.0));
         color = mix(color, vec3(0.65, 0.78, 0.80), crest * 0.65);
     }
     finalColor = vec4(color * waterShadow(), 1.0);

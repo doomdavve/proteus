@@ -99,14 +99,51 @@ WaterfrontVesselMotion waterfront_traffic_motion(int index, double time)
     return out;
 }
 
-static Vector3 wake_point(int index, double time, float age, int side)
+static Vector3 wake_point(int index, double time, float age, int side, bool physical)
 {
     BoatModelSpec spec = waterfront_traffic_spec(index);
     WaterfrontVesselMotion motion = waterfront_traffic_motion(index, time - age);
     Vector3 forward = Vector3Normalize(motion.velocity);
     Vector3 right = { -forward.z, 0, forward.x };
     return Vector3Add(Vector3Subtract(motion.position, Vector3Scale(forward, spec.length * .54f)),
-        Vector3Scale(right, side * (spec.beam * .42f + age * .38f)));
+        Vector3Scale(right, side * (physical ? .9f + age * 2.4f : spec.beam * .42f + age * .38f)));
+}
+
+static bool track_wakes(BoatWakeObjects *wakes, double time)
+{
+    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
+        WaterfrontVesselMotion m = waterfront_traffic_motion(i, time);
+        BoatModelSpec spec = waterfront_traffic_spec(i);
+        float speed = Vector3Length(m.velocity);
+        Vector3 stern = Vector3Subtract(
+            m.position, Vector3Scale(Vector3Normalize(m.velocity), spec.length * .54f));
+        // Scenery displacement hulls leave gentle wakes below the player's planing threshold.
+        // This gain changes only emission strength; recorded geometry uses actual stern motion.
+        if (!boat_wake_objects_track(
+                wakes, (unsigned)i, (Vector2) { -stern.x, stern.z }, speed * 4, 1))
+            return false;
+    }
+    return true;
+}
+
+bool waterfront_traffic_wakes_init(BoatWakeObjects *wakes, double time)
+{
+    if (!boat_wake_objects_init(wakes, BOAT_OBJECT_LIFE_TICKS, .5f))
+        return false;
+    for (unsigned tick = 0; tick <= BOAT_OBJECT_LIFE_TICKS; ++tick) {
+        if (tick)
+            boat_wake_objects_advance(wakes);
+        double past = time + ((double)tick - BOAT_OBJECT_LIFE_TICKS) / 120;
+        if (!track_wakes(wakes, past))
+            return false;
+    }
+    return true;
+}
+
+bool waterfront_traffic_wakes_step(BoatWakeObjects *wakes, double time)
+{
+    boat_wake_objects_advance(wakes);
+    return track_wakes(wakes, time);
 }
 
 void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame)
@@ -124,24 +161,67 @@ void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTraffic
                 (Vector3) { light == 2 ? 0 : (light ? 1 : -1) * spec.beam * .42f,
                     spec.freeboard + .32f, light == 2 ? spec.length * .42f : -spec.length * .12f });
         for (int side = -1; side <= 1; side += 2)
-            for (int j = 0; j < WATERFRONT_TRAFFIC_WAKE_SEGMENTS; ++j) {
+            for (int j = 0; j < (water.traffic_objects ? 16 : WATERFRONT_TRAFFIC_WAKE_SEGMENTS);
+                ++j) {
                 float age = j * .7f;
-                Vector3 a = wake_point(i, time, age, side);
-                Vector3 b = wake_point(i, time, age + .7f, side);
+                Vector3 a = wake_point(i, time, age, side, water.traffic_objects != NULL);
+                Vector3 b = wake_point(i, time, age + .7f, side, water.traffic_objects != NULL);
                 Vector3 center = Vector3Scale(Vector3Add(a, b), .5f);
                 float length = Vector3Distance(a, b);
                 Vector3 direction = Vector3Subtract(b, a);
                 float yaw = atan2f(-direction.x, -direction.z);
-                float width = i == 3 ? .48f : .22f;
+                float width = water.traffic_objects ? .65f + .035f * age : i == 3 ? .48f : .22f;
                 Transform3D pose = boat_water_pose(water, time, center, yaw, length, width);
                 pose.position.y += .035f;
                 pose.scale = (Vector3) { width, 1, length };
+                if (water.traffic_objects) {
+                    float variation = sinf((float)remainder(time - age, 16) * 2.3f + i * 1.7f);
+                    pose.scale.x *= .65f + .35f * variation * variation;
+                    pose.scale.z *= .65f; // Broken patches instead of solid lines across the river.
+                }
                 float fade
-                    = (1 - (j + .5f) / WATERFRONT_TRAFFIC_WAKE_SEGMENTS) * (i == 2 ? .65f : 1);
+                    = (1
+                          - (j + .5f)
+                              / (water.traffic_objects ? 16 : WATERFRONT_TRAFFIC_WAKE_SEGMENTS))
+                    * (i == 2 ? .65f : 1);
                 frame->wakes[frame->wake_count++] = (WaterfrontTrafficWake) { .pose = pose,
                     .color
                     = { (unsigned char)Lerp(45, 188, fade), (unsigned char)Lerp(79, 207, fade),
                         (unsigned char)Lerp(104, 202, fade), 255 } };
+            }
+    }
+    if (water.vessel.height > 0) {
+        BoatVesselWake w = water.vessel;
+        Vector2 right = { -w.direction.y, w.direction.x };
+        for (int side = -1; side <= 1; side += 2)
+            for (int j = 0; j < 16; ++j) {
+                float age = j * .5f;
+                double emitted = time - age;
+                if (emitted < w.started || emitted > w.started + w.duration)
+                    continue;
+                Vector2 a, b;
+                if (!boat_vessel_wake_position(w, emitted, &a)
+                    || !boat_vessel_wake_position(w, emitted - .5, &b))
+                    continue;
+                a = Vector2Add(
+                    Vector2Subtract(a, Vector2Scale(w.direction, BOAT_VESSEL_LENGTH * .5f)),
+                    Vector2Scale(right, side * (BOAT_VESSEL_BEAM * .5f + age * w.spread)));
+                b = Vector2Add(
+                    Vector2Subtract(b, Vector2Scale(w.direction, BOAT_VESSEL_LENGTH * .5f)),
+                    Vector2Scale(right, side * (BOAT_VESSEL_BEAM * .5f + (age + .5f) * w.spread)));
+                Vector3 centre = { -(a.x + b.x) * .5f, 0, (a.y + b.y) * .5f };
+                float length = Vector2Distance(a, b);
+                float yaw = atan2f(b.x - a.x, a.y - b.y);
+                Transform3D pose = boat_water_pose(water, time, centre, yaw, length, 1);
+                pose.position.y += .045f;
+                float variation = sinf((float)remainder(emitted, 16) * 2.3f);
+                pose.scale = (Vector3) { (.8f + age * .06f) * (.65f + .35f * variation * variation),
+                    1, length * .7f };
+                float fade = (1 - (j + .5f) / 16) * .9f;
+                frame->wakes[frame->wake_count++] = (WaterfrontTrafficWake) { .pose = pose,
+                    .color
+                    = { (unsigned char)Lerp(45, 206, fade), (unsigned char)Lerp(79, 222, fade),
+                        (unsigned char)Lerp(104, 218, fade), 255 } };
             }
     }
 }
@@ -185,9 +265,30 @@ bool waterfront_traffic_contact_height(Vector2 position, float heading, float bo
     Vector2 forward = { sinf(heading), -cosf(heading) }, right = { cosf(heading), sinf(heading) };
     float mid = (bow - stern) * .5f;
     Vector2 center = Vector2Add(position, Vector2Scale(forward, mid));
-    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
+    for (int i = 0; i <= WATERFRONT_TRAFFIC_VESSELS; ++i) {
+        // The opt-in race trial has its own authored source, separate from scenery traffic.
+        // Its conservative box agrees with the shared CPU/GPU trial ferry presentation.
+        bool trial = i == WATERFRONT_TRAFFIC_VESSELS;
+        Vector2 source;
+        if (trial && !boat_vessel_wake_position(water.vessel, time, &source))
+            continue;
         BoatModelSpec spec = waterfront_traffic_spec(i);
         WaterfrontVesselMotion motion = waterfront_traffic_motion(i, time);
+        if (trial) {
+            spec = boat_model_preset(BOAT_MODEL_FERRY);
+            spec.length = BOAT_VESSEL_LENGTH;
+            spec.beam = BOAT_VESSEL_BEAM;
+            spec.draft = 1.2f;
+            spec.freeboard = 1.6f;
+            spec.cabin_height = 3.2f;
+            motion.position = (Vector3) { -source.x, 0, source.y };
+            motion.heading = atan2f(water.vessel.direction.x, -water.vessel.direction.y);
+            float speed
+                = time - water.vessel.started < water.vessel.duration ? water.vessel.speed : 0;
+            motion.velocity = (Vector3) { -water.vessel.direction.x * speed, 0,
+                water.vessel.direction.y * speed };
+            motion.yaw_rate = 0;
+        }
         Vector2 ship = { -motion.position.x, motion.position.z };
         Vector2 vf = { sinf(motion.heading), -cosf(motion.heading) };
         Vector2 vr = { cosf(motion.heading), sinf(motion.heading) };

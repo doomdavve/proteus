@@ -479,7 +479,8 @@ static int compare_time(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
-static void shader_checks(const BoatWakeObjects *w, float probe_z)
+static void shader_pool_checks(
+    const BoatWakeObjects *w, float probe_z, const BoatWakeObjects *traffic)
 {
     const char *paths[]
         = { "assets/shaders/waterfront_water.vs", "assets/shaders/waterfront_water.fs" };
@@ -495,13 +496,17 @@ static void shader_checks(const BoatWakeObjects *w, float probe_z)
     CHECK(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
-    float records[BOAT_OBJECT_CAPACITY * 8] = { 0 };
-    int count = boat_wake_objects_pack(w, records, records + BOAT_OBJECT_CAPACITY * 4);
+    float records[BOAT_OBJECT_CAPACITY * 16] = { 0 };
+    float *parameters = records + BOAT_OBJECT_CAPACITY * 8;
+    int players = boat_wake_objects_pack(w, records, parameters);
+    int count = players;
+    if (traffic)
+        count += boat_wake_objects_pack(traffic, records + players * 4, parameters + players * 4);
     glGenTextures(1, &records_texture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, records_texture);
     glTexImage2D(
-        GL_TEXTURE_2D, 0, GL_RGBA32F, BOAT_OBJECT_CAPACITY, 2, 0, GL_RGBA, GL_FLOAT, records);
+        GL_TEXTURE_2D, 0, GL_RGBA32F, BOAT_OBJECT_CAPACITY * 2, 2, 0, GL_RGBA, GL_FLOAT, records);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glActiveTexture(GL_TEXTURE0);
@@ -531,6 +536,9 @@ static void shader_checks(const BoatWakeObjects *w, float probe_z)
         glUseProgram(shader.id);
         glUniform1i(GetShaderLocation(shader, "playerWakeCount"), count);
         glUniform1f(GetShaderLocation(shader, "objectWakeLife"), w->life_ticks / 120.0f);
+        glUniform1i(GetShaderLocation(shader, "objectWakePlayerCount"), players);
+        glUniform1f(GetShaderLocation(shader, "objectWakeTrafficLife"),
+            traffic ? traffic->life_ticks / 120.0f : 0);
         glUniform1i(GetShaderLocation(shader, "objectWakeData"), 1);
         glUniform1i(GetShaderLocation(shader, "objectWakeEnabled"), 1);
         double error = 0, scale = 0, component_error[3] = { 0 }, component_scale[3] = { 0 };
@@ -538,6 +546,12 @@ static void shader_checks(const BoatWakeObjects *w, float probe_z)
             for (int x = -15; x <= 15; x += 2) {
                 Vector2 p = { x + .173f, z + .391f + probe_z };
                 BoatWakeObjectSample q = boat_wake_objects_query(w, p);
+                if (traffic) {
+                    BoatWakeObjectSample extra = boat_wake_objects_query(traffic, p);
+                    q.height += extra.height;
+                    q.gradient = Vector2Add(q.gradient, extra.gradient);
+                    q.crest_foam += extra.crest_foam;
+                }
                 glUniform2f(GetShaderLocation(shader, "probe"), -p.x, p.y);
                 glDrawArrays(GL_TRIANGLES, 0, 3);
                 float result[4];
@@ -567,6 +581,11 @@ static void shader_checks(const BoatWakeObjects *w, float probe_z)
     glDeleteFramebuffers(1, &fb);
     glDeleteTextures(1, &tex);
     glDeleteTextures(1, &records_texture);
+}
+
+static void shader_checks(const BoatWakeObjects *w, float probe_z)
+{
+    shader_pool_checks(w, probe_z, NULL);
 }
 
 static void runtime(bool graphics, bool visible)
@@ -654,11 +673,29 @@ static void runtime(bool graphics, bool visible)
         float expected[BOAT_OBJECT_CAPACITY * 8] = { 0 }, actual[BOAT_OBJECT_CAPACITY * 8];
         boat_wake_objects_pack(&w, expected, expected + BOAT_OBJECT_CAPACITY * 4);
         CHECK(gpu.scene.object_wakes.id != 0);
+        CHECK(gpu.scene.object_wakes.width == BOAT_OBJECT_CAPACITY);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, gpu.scene.object_wakes.id);
         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, actual);
         CHECK(memcmp(expected, actual, sizeof(expected)) == 0);
         puts("production object-record upload matches current CPU world");
+        BoatWakeObjects scenery = seed();
+        boat.world.water.traffic_objects = &scenery;
+        boat_gpu_draw(
+            &gpu, SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT);
+        CHECK(!gpu.failed && gpu.scene.object_wakes.width == BOAT_OBJECT_CAPACITY * 2);
+        float paired[BOAT_OBJECT_CAPACITY * 16] = { 0 }, uploaded[BOAT_OBJECT_CAPACITY * 16];
+        float *parameters = paired + BOAT_OBJECT_CAPACITY * 8;
+        int players = boat_wake_objects_pack(&w, paired, parameters);
+        boat_wake_objects_pack(&scenery, paired + players * 4, parameters + players * 4);
+        glBindTexture(GL_TEXTURE_2D, gpu.scene.object_wakes.id);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, uploaded);
+        CHECK(memcmp(paired, uploaded, sizeof(paired)) == 0);
+        boat.world.water.traffic_objects = NULL;
+        boat_gpu_draw(
+            &gpu, SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT);
+        CHECK(!gpu.failed && gpu.scene.object_wakes.width == BOAT_OBJECT_CAPACITY);
+        puts("independent scenery upload and texture resize round trip match CPU pools");
         Image image = LoadImageFromTexture(gpu.target.texture);
         ImageFlipVertical(&image);
         CHECK(ExportImage(image, "build/wake-objects-gpu.png"));
@@ -685,6 +722,9 @@ static void runtime(bool graphics, bool visible)
         probe.objects[BOAT_OBJECT_CAPACITY - 2] = first;
         probe.objects[BOAT_OBJECT_CAPACITY - 1] = rotated;
         shader_checks(&probe, 0); // Full record table, with local pieces in its final slots.
+        BoatWakeObjects traffic = seed();
+        traffic.life_ticks = 960;
+        shader_pool_checks(&probe, 0, &traffic); // Independent source in records beyond slot 127.
         curved_captures(&gpu, visible);
         boat_gpu_destroy(&gpu);
         CloseWindow();

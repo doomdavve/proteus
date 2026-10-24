@@ -992,8 +992,8 @@ static void set_atmosphere_uniforms(WaterfrontGpuScene *scene, Vector3 camera_po
 static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
 {
     BoatWater water = frame->player_water;
-    int objects = water.objects != NULL;
-    float object_life = objects ? water.objects->life_ticks / 120.0f : 16;
+    int objects = water.objects != NULL || water.traffic_objects != NULL;
+    float object_life = water.objects ? water.objects->life_ticks / 120.0f : 16;
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "objectWakeEnabled"),
         &objects, SHADER_UNIFORM_INT);
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "objectWakeLife"),
@@ -1018,6 +1018,14 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "physicalWaves"),
         &physical_waves, SHADER_UNIFORM_INT);
     float wake_amplitude = frame->player_active ? water.wake_amplitude : 0;
+    float vessel[12];
+    boat_vessel_wake_uniforms(
+        frame->player_active ? water.vessel : (BoatVesselWake) { 0 }, frame->time, vessel);
+    const char *vessel_uniforms[] = { "vesselOrigin", "vesselMotion", "vesselShape" };
+    for (int i = 0; i < 3; ++i)
+        SetShaderValue(scene->water_shader,
+            GetShaderLocation(scene->water_shader, vessel_uniforms[i]), vessel + 4 * i,
+            SHADER_UNIFORM_VEC4);
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeAmplitude"),
         &wake_amplitude, SHADER_UNIFORM_FLOAT);
     float wake_offset[] = { -water.wake_offset.x, water.wake_offset.y };
@@ -1028,12 +1036,28 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         ? boat_water_wake_uniforms(water, frame->time, wake_origins, wake_parameters)
         : 0;
     if (objects && frame->player_active) {
-        float records[BOAT_OBJECT_CAPACITY * 8] = { 0 };
-        wake_count
-            = boat_wake_objects_pack(water.objects, records, records + BOAT_OBJECT_CAPACITY * 4);
+        float records[BOAT_OBJECT_CAPACITY * 16] = { 0 };
+        int capacity = BOAT_OBJECT_CAPACITY * (water.traffic_objects ? 2 : 1);
+        float *parameters = records + capacity * 4;
+        int players
+            = water.objects ? boat_wake_objects_pack(water.objects, records, parameters) : 0;
+        wake_count = players;
+        if (water.traffic_objects)
+            wake_count += boat_wake_objects_pack(
+                water.traffic_objects, records + players * 4, parameters + players * 4);
+        float traffic_life = water.traffic_objects ? water.traffic_objects->life_ticks / 120.0f : 0;
+        SetShaderValue(scene->water_shader,
+            GetShaderLocation(scene->water_shader, "objectWakePlayerCount"), &players,
+            SHADER_UNIFORM_INT);
+        SetShaderValue(scene->water_shader,
+            GetShaderLocation(scene->water_shader, "objectWakeTrafficLife"), &traffic_life,
+            SHADER_UNIFORM_FLOAT);
+        if (scene->object_wakes.id && scene->object_wakes.width != capacity) {
+            UnloadTexture(scene->object_wakes);
+            scene->object_wakes = (Texture2D) { 0 };
+        }
         if (!scene->object_wakes.id) {
-            Image image
-                = { records, BOAT_OBJECT_CAPACITY, 2, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
+            Image image = { records, capacity, 2, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
             scene->object_wakes = LoadTextureFromImage(image);
             SetTextureFilter(scene->object_wakes, TEXTURE_FILTER_POINT);
         } else {
@@ -1215,10 +1239,19 @@ static void draw_boat(
     }
 }
 
+static void draw_scenery(
+    const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
+{
+    for (int i = 0; i < frame->scenery_count; ++i)
+        draw_colored_mesh(
+            scene->cube, material, frame->scenery[i].transform, frame->scenery[i].color, false);
+}
+
 static void draw_life(const WaterfrontGpuScene *scene, Material material,
     const WaterfrontSceneFrame *frame, bool emissive)
 {
     if (!frame->boating_basin) {
+        draw_scenery(scene, frame, material);
         draw_harbor(scene, material, frame);
         draw_traffic(scene, material, frame, emissive);
     }
@@ -1379,19 +1412,11 @@ static void draw_facades(const WaterfrontGpuScene *scene, Material material)
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
 }
 
-static void draw_basin(
-    const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
-{
-    for (int i = 0; i < frame->scenery_count; ++i)
-        draw_colored_mesh(
-            scene->cube, material, frame->scenery[i].transform, frame->scenery[i].color, false);
-}
-
 static void draw_reflected_scene(const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame,
     Material material, Material life)
 {
     if (frame->boating_basin) {
-        draw_basin(scene, frame, material);
+        draw_scenery(scene, frame, material);
         draw_life(scene, life, frame, false);
         return;
     }
@@ -1471,7 +1496,7 @@ static void draw_shadow_casters(
     const WaterfrontGpuScene *scene, Material material, const WaterfrontSceneFrame *frame)
 {
     if (frame->boating_basin) {
-        draw_basin(scene, frame, material);
+        draw_scenery(scene, frame, material);
         draw_life(scene, material, frame, false);
         return;
     }
@@ -1565,7 +1590,7 @@ void waterfront_gpu_scene_draw(
         (float)width / (float)height, frame->camera.near_plane, frame->camera.far_plane));
     rlEnableBackfaceCulling();
     if (frame->boating_basin) {
-        draw_basin(scene, frame, material);
+        draw_scenery(scene, frame, material);
         draw_water(scene, frame, width);
         rlDisableBackfaceCulling();
         draw_life(scene, life_material, frame, true);

@@ -245,6 +245,8 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool eriksberg)
     ambient.wake_amplitude = 0;
     ambient.player_wake_enabled = false;
     ambient.objects = NULL;
+    ambient.traffic_objects = NULL;
+    ambient.vessel.height = 0;
     for (size_t i = 0; i < s->count; ++i) {
         Vector3 centre = { 0 };
         for (int j = 0; j < 3; ++j) {
@@ -258,7 +260,7 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool eriksberg)
         float light = Clamp(.95f + .55f * (-q.normal.x + q.normal.z), .85f, 1.05f);
         Color base = eriksberg ? (Color) { 45, 79, 104, 255 } : (Color) { 36, 107, 125, 255 };
         float crest = 0;
-        if (water.objects)
+        if (water.objects || water.traffic_objects)
             crest = .65f * Clamp(q.crest_foam, 0, 1) * Clamp(q.height / .3f, 0, 1);
         else if (water.wake_amplitude > 0 || water.player_wake_enabled)
             crest = .65f
@@ -268,6 +270,12 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool eriksberg)
                                 .height)
                         / .38f,
                     0, 1);
+        if (water.vessel.height > 0) {
+            float vessel_height
+                = boat_vessel_wake_query(water.vessel, (Vector2) { -centre.x, centre.z }, time)
+                      .height;
+            crest = fmaxf(crest, .65f * Clamp(vessel_height / .8f, 0, 1));
+        }
         s->triangles[i].color = (Color) { (unsigned char)Lerp(base.r * light, 166, crest),
             (unsigned char)Lerp(base.g * light, 199, crest),
             (unsigned char)Lerp(base.b * light, 204, crest), 255 };

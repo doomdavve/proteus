@@ -174,7 +174,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
         if (!mesh->vaoId || !Vector2Equals(center, gpu->wave_center)
             || mapped != gpu->wave_mapped) {
             Vector2 world_center = { -boat->position.x, boat->position.y };
-            const Mesh3D *surface = world->water.objects
+            const Mesh3D *surface = (world->water.objects || world->water.traffic_objects)
                 ? boat_water_patch_arcade(world_center, mapped)
                 : boat_water_patch(world_center, mapped);
             if (!surface)
@@ -217,7 +217,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     waterfront_gpu_scene_draw(&gpu->scene, &frame, target.texture.width, target.texture.height);
     EndTextureMode();
 restore_water:
-    if (world->water.objects && !gpu->scene.object_wakes.id)
+    if ((world->water.objects || world->water.traffic_objects) && !gpu->scene.object_wakes.id)
         gpu->failed = true;
     if (world->wake_field
         && (!gpu->wake_texture.id || !gpu->wave_mesh.vaoId || !gpu->wave_mesh_extra.vaoId))
