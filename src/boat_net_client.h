@@ -10,6 +10,7 @@
 #define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of wake digest mismatch before a resync request.
 #define BOAT_NET_HOLD_INCOMPLETE 0.1 // Seconds a prediction correction waits for missing births.
 #define BOAT_NET_MATCH_FEED 6 // Recent deathmatch events kept for the kill feed.
+#define BOAT_NET_EARLY_BOOTSTRAP (BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES + 2)
 
 typedef struct {
     const char *name, *token, *build;
@@ -35,6 +36,7 @@ typedef enum {
 typedef struct {
     uint64_t snapshots, stale_snapshots, births_applied, births_duplicate, births_held;
     uint64_t births_dropped, bootstraps, bootstrap_failures, resyncs, decode_errors;
+    uint64_t early_bootstrap; // Bootstrap messages held until Accept on the control channel.
     uint64_t stale_packets, input_packets, commands, skipped_commands, pings, pongs;
     uint64_t consistent, inconsistent; // Snapshots whose wake digest matched on arrival.
     uint64_t repaired; // Mismatches later cleared by births.
@@ -64,6 +66,7 @@ typedef struct {
     bool predict, predict_dirty;
     BoatNetClientPhase phase;
     double started_at;
+    double serviced_at, pong_after; // Exclude RTT samples spanning a local loading stall.
     BoatNetReject reject; // Valid when REJECTED.
     uint8_t leave; // Server's leave reason when CLOSED, zero for a transport close.
     uint8_t timed_out; // 1: no handshake/world within 10 s, 2: no snapshot for 5 s.
@@ -91,6 +94,10 @@ typedef struct {
     unsigned pages_received;
     bool page_received[BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES];
     uint8_t assembly[BOAT_NET_MAX_CHECKPOINT];
+    // ENet orders each reliable channel independently. One complete checkpoint can arrive
+    // before Accept; keep its wire messages bounded until the session epoch is known.
+    BoatNetEvent early_bootstrap[BOAT_NET_EARLY_BOOTSTRAP];
+    unsigned early_bootstrap_count;
     BoatNetBirth pending[BOAT_NET_PENDING_BIRTHS];
     unsigned pending_count;
     // Sequencing.

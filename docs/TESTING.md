@@ -108,7 +108,8 @@ off has less coverage; report that omission.
 ## Network checks
 
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
-about two seconds. It covers:
+a few seconds. It covers:
+
 - golden bytes and pinned snapshot layout, all truncations, invalid fields, and checkpoint
   round trips that resume bit-identically;
 - seeded in-memory rooms: handshake rejections, the input-loss policy, command idempotence,
@@ -124,9 +125,13 @@ about two seconds. It covers:
   hysteresis, plus the drawn delay and position error against the authority in the rooms;
 - LAN discovery: query and answer bytes, truncations and invalid answers, and the search
   list's merge and expiry;
-- a deathmatch room (protocol v2): every client, including a mid-round joiner, holds the
+- a deathmatch room: every client, including a mid-round joiner, holds the
   authority's scoreboard through capsizes, a round end and a leaver, and names both boats of a
-  credited capsize in its kill feed.
+  credited capsize in its kill feed;
+- M5 four-player profile F (seed 51), impaired from the handshake onward: bootstrap arriving
+  before Accept, late join, room-full rejection, simultaneous resets, inactive input, 1 s
+  blackout recovery, 6 s timeout, slot reuse and stale-life rejection. A lossless tail requires
+  all surviving mirrors to match the authority at their snapshot ticks exactly.
 
 `boat_net_loopback` runs `tools/boat_net_smoke.py`, which starts real `boat_server` and
 `boat_bot` processes on a free 127.0.0.1 UDP port for about 10 s. Two bots drive and a
@@ -141,6 +146,41 @@ server has already run cannot be used; a fixed 90% ratio failed macOS CI at 0.74
 
 ```sh
 python3 tools/boat_net_smoke.py --server build/boat_server --bot build/boat_bot
+```
+
+`boat_net_session` runs `tools/boat_net_session.py` for about 36 s over real ENet/UDP loopback.
+Three predicting bots stay connected while a fourth leaves, joins in progress, crashes, times
+out and is replaced. A fifth peer must receive a room-full rejection. Bots request reset every
+2 s and send inactive controls for 1 s every 3 s; summaries require completed resets, all four
+roster slots, bounded wakes/messages/datagrams, continued snapshots and no decode errors.
+The server must run every scheduled tick, release every slot and report the expected timeout
+and rejection counts without protocol/emission faults. Child startup, exit and failure cleanup
+are bounded; output uses temporary files, with completed process logs printed by the harness.
+
+```sh
+ctest --test-dir build -R '^boat_net_session$' --output-on-failure
+python3 tools/boat_net_session.py --server build/boat_server --bot build/boat_bot --seconds 1800
+```
+
+`--seconds` accepts 24–7200 and repeats fourth-slot churn during longer runs while the other
+three bots stay. This provides an opt-in soak driver; it does not measure memory plateaus or
+CPU/bandwidth budgets, or apply OS-level impairment. The 30-minute, one-hour and two-hour M5
+gates still require recorded runs and resource measurements. `boat_bot --predict`,
+`--reset-every S` and `--inactive-every S` can also be used independently (integer S: 2–86400).
+
+`boat_net` also runs four predicted clients in both mapped locations: shoreline-safe spawns,
+a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
+a snapshot outside the former basin coordinate envelope, a local loading pause, reset and exact
+mirrors at a birth-batch snapshot. The protocol-v3 codec rejects invalid map IDs and reserved
+bytes; discovery uses the complete compiled-map bundle digest.
+
+`boat_net_river` runs the four-player lifecycle harness with `--location river --mode deathmatch`
+(about 36 s). `boat_net_eriksberg` runs the deathmatch smoke on the smaller mapped crop, checking
+round-end score/event agreement (about 20 s). The harnesses require clients to select the
+server's location without client-side map arguments. Run these map checks with:
+
+```sh
+ctest --test-dir build -R '^boat_net_(river|eriksberg)$' -j 2 --output-on-failure
 ```
 
 `boat_net_deathmatch` runs the same script with `--deathmatch`: a deathmatch room with a 10 s

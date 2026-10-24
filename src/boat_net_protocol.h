@@ -12,7 +12,7 @@
 // never copy structs, padding, bool or enum representations; decoders validate every field
 // and never write the destination on failure.
 #define BOAT_NET_MAGIC 0x50424e54u // "PBNT"
-#define BOAT_NET_VERSION 2
+#define BOAT_NET_VERSION 3
 #define BOAT_NET_HEADER_BYTES 32
 #define BOAT_NET_MAX_MESSAGE 1100 // Whole message; the transport MTU allows for its headers.
 #define BOAT_NET_MAX_PAYLOAD (BOAT_NET_MAX_MESSAGE - BOAT_NET_HEADER_BYTES)
@@ -33,8 +33,8 @@
 #define BOAT_NET_NAME_BYTES 16
 #define BOAT_NET_TOKEN_BYTES 32
 #define BOAT_NET_BUILD_BYTES 32
-// Broad safety envelope around the basin walls for decoded positions, not a gameplay limit.
-#define BOAT_NET_WORLD_MARGIN 100.0f
+// Covers both compiled map crops and the basin; gameplay uses the selected map's shoreline.
+#define BOAT_NET_WORLD_LIMIT 8192.0f
 
 // Delivery classes. ENet maps each to one channel; the in-memory adapter models the same rules.
 typedef enum {
@@ -143,6 +143,7 @@ typedef struct {
     uint8_t slot;
     bool waves;
     uint8_t mode; // BoatNetRoomMode.
+    uint8_t location; // BoatLocationId, selected by the authority.
     uint8_t snapshot_ticks, birth_ticks, input_ticks, max_commands, max_future;
     uint16_t tick_hz;
     uint32_t wake_life_ticks;
@@ -283,8 +284,8 @@ BoatInput boat_net_command_input(BoatNetCommand command);
 // The command an inactive or silent slot integrates: controls easing toward neutral.
 BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags);
 
-// Compatibility digest of the compiled definition and the fleet/wake contract constants.
-uint64_t boat_net_content_digest(const BoatWorldDefinition *definition);
+// Compatibility digest of all compiled locations/shore geometry and the fleet/wake contract.
+uint64_t boat_net_content_digest(void);
 // Canonical digest of the live record set (slot index and every field of live records).
 uint64_t boat_net_wake_digest(const BoatWakeObjects *wakes);
 uint64_t boat_net_bytes_digest(const void *data, size_t size);

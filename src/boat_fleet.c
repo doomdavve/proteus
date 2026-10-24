@@ -1,5 +1,6 @@
 #include "boat_fleet.h"
 #include "raymath.h"
+#include "waterfront_city.h"
 
 #include <assert.h>
 #include <math.h>
@@ -12,6 +13,10 @@ static_assert(sizeof(Boat) == 27 * sizeof(float), "boat_fleet_hash must list eve
 static const Vector2 SPAWNS[] = { { 0, 10 }, { -40, 30 }, { 40, -30 }, { 40, 30 }, { -40, -30 },
     { -80, 0 }, { 80, 0 }, { 0, -45 } };
 enum { SPAWN_COUNT = sizeof(SPAWNS) / sizeof(*SPAWNS) };
+// River-aligned local coordinates about the mapped start area: four lanes 60 m apart,
+// with an alternate row 70 m across the river when a candidate is occupied or disturbed.
+static const Vector2 RIVER_SPAWNS[SPAWN_COUNT] = { { -90, -35 }, { -90, 35 }, { -30, -35 },
+    { -30, 35 }, { 30, -35 }, { 30, 35 }, { 90, -35 }, { 90, 35 } };
 static const float SPAWN_CLEARANCE = 10; // Centre distance to every other hull.
 static const float SPAWN_LOOKAHEAD = .5f; // Seconds of straight-line approach to rule out.
 // Calm arcade-wake surface at the six supports, now and half a second ahead. Ambient waves are
@@ -23,8 +28,10 @@ static const float SPAWN_CALM_VERTICAL_SPEED = .5f;
 bool boat_fleet_init(BoatFleet *fleet, const BoatWorldDefinition *definition, BoatWater water,
     unsigned life_ticks, float crest_height)
 {
-    if (!definition || definition->mapped || water.player_wake_enabled)
+    if (!definition || water.player_wake_enabled)
         return false;
+    if (definition->mapped)
+        waterfront_city_select_river(definition->id == BOAT_LOCATION_RIVER);
     *fleet = (BoatFleet) { 0 };
     if (!boat_wake_objects_init(&fleet->state.wakes, life_ticks, crest_height))
         return false;
@@ -149,10 +156,19 @@ static void spawn_pending(BoatFleet *fleet)
         bool placed = false;
         for (unsigned k = 0; k < SPAWN_COUNT && !placed; ++k) {
             Vector2 at = SPAWNS[(2 * slot + k) % SPAWN_COUNT];
+            if (fleet->world.definition->mapped) {
+                Vector2 local = RIVER_SPAWNS[(2 * slot + k) % SPAWN_COUNT];
+                at = Vector2Add(fleet->world.definition->fleet_spawn,
+                    (Vector2) { -.8f * local.x + .6f * local.y, .6f * local.x + .8f * local.y });
+            }
             Boat boat;
             boat_reset(&boat);
             boat.position = at;
-            boat.heading = atan2f(-at.x, at.y);
+            Vector2 centre = fleet->world.definition->mapped ? fleet->world.definition->fleet_spawn
+                                                             : (Vector2) { 0 };
+            boat.heading = fleet->world.definition->mapped
+                ? atan2f(centre.x - at.x, at.y - centre.y)
+                : atan2f(-at.x, at.y);
             if (safe_spawn(fleet, slot, &boat)) {
                 boat_fleet_place(fleet, slot, boat);
                 placed = true;

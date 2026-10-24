@@ -19,14 +19,16 @@ static void usage(FILE *out)
 {
     fprintf(out,
         "usage: boat_server [--bind IPV4] [--port N] [--token TEXT] [--players 1-4] [--waves]\n"
-        "                   [--location basin] [--ticks N | --seconds S] [--report-every N]\n"
+        "                   [--location basin|eriksberg|river] [--ticks N | --seconds S] "
+        "[--report-every N]\n"
         "                   [--mode free|deathmatch] [--round-seconds S]\n"
         "                   [--lan-port N | --no-lan]\n"
-        "       boat_server --scripted [--ticks N] [--boats 1-4] [--location basin]\n"
+        "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
+        "basin|eriksberg|river]\n"
         "                   [--report-every N] [--mode free|deathmatch] [--round-seconds S]\n"
         "Room (default): listen on --bind (default 127.0.0.1; use a LAN address to accept other\n"
         "machines) and UDP --port (default %d) for up to four boat_study --connect or boat_bot\n"
-        "clients. Runs the 120 Hz basin authority until --ticks/--seconds or Ctrl+C. Clients\n"
+        "clients. Runs the 120 Hz authority until --ticks/--seconds or Ctrl+C. Clients\n"
         "must present the same --token (default empty). A diagnostic: no internet reachability,\n"
         "encryption or authentication.\n"
         "The room answers LAN searches (the title's MULTIPLAYER panel, boat_bot --discover) on\n"
@@ -102,8 +104,8 @@ static void print_event(
     fflush(stdout);
 }
 
-static int scripted(
-    unsigned long ticks, unsigned long boats, unsigned long report, const BoatMatchRules *rules)
+static int scripted(unsigned long ticks, unsigned long boats, unsigned long report,
+    const BoatMatchRules *rules, const BoatWorldDefinition *location)
 {
     static BoatMatch match;
     if (rules && !boat_match_init(&match, rules)) {
@@ -111,9 +113,9 @@ static int scripted(
         return 1;
     }
     static BoatFleet fleet;
-    if (!boat_fleet_init(&fleet, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 },
-            BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT)) {
-        fprintf(stderr, "boat_server: cannot create the basin fleet.\n");
+    if (!boat_fleet_init(&fleet, location, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS,
+            BOAT_OBJECT_DEFAULT_HEIGHT)) {
+        fprintf(stderr, "boat_server: cannot create the fleet.\n");
         return 1;
     }
     for (unsigned slot = 0; slot < boats; ++slot)
@@ -215,6 +217,7 @@ typedef struct {
     bool waves;
     unsigned long players, ticks, report;
     const BoatMatchRules *rules; // Deathmatch rules, or NULL for free play.
+    BoatLocationId location;
 } RoomOptions;
 
 static void print_roster(const BoatNetServer *server)
@@ -247,6 +250,7 @@ static int room(const RoomOptions *options)
         .waves = options->waves,
         .epoch = epoch ? epoch : 1,
         .max_players = (unsigned)options->players,
+        .location = options->location,
         .deathmatch = options->rules != NULL,
         .match = options->rules ? *options->rules : (BoatMatchRules) { 0 } };
     static BoatNetServer server;
@@ -280,11 +284,11 @@ static int room(const RoomOptions *options)
     boat_net_host_name(advert.name);
     signal(SIGINT, request_stop);
     signal(SIGTERM, request_stop);
-    printf("boat_server listening on %s:%u (basin, %s water, %s, protocol %d, handling %d, "
+    printf("boat_server listening on %s:%u (%s, %s water, %s, protocol %d, handling %d, "
            "epoch %08" PRIx32 ", up to %lu players, %s)\n",
-        options->bind, (unsigned)options->port, options->waves ? "wave" : "calm",
-        options->rules ? "deathmatch" : "free play", BOAT_NET_VERSION, BOAT_PHYSICS_REVISION,
-        config.epoch, options->players, lan_note);
+        options->bind, (unsigned)options->port, boat_location(options->location)->name,
+        options->waves ? "wave" : "calm", options->rules ? "deathmatch" : "free play",
+        BOAT_NET_VERSION, BOAT_PHYSICS_REVISION, config.epoch, options->players, lan_note);
     fflush(stdout);
     unsigned players = 0;
     unsigned max_mtu = 0;
@@ -444,10 +448,12 @@ int main(int argc, char **argv)
             && parse_count(value, 10, 60ul * 60, &round)) {
             ++i;
         } else if (strcmp(argv[i], "--location") == 0 && value) {
-            if (strcmp(value, "basin") != 0) {
-                fprintf(stderr, "boat_server: only the basin hosts a fleet before M7.\n");
+            const BoatWorldDefinition *location = boat_location_find(value);
+            if (!location) {
+                fprintf(stderr, "boat_server: unknown location '%s'.\n", value);
                 return 2;
             }
+            room_options.location = location->id;
             ++i;
         } else {
             fprintf(stderr, "boat_server: invalid argument: %s\n", argv[i]);
@@ -471,7 +477,8 @@ int main(int argc, char **argv)
                 "apply.\n");
             return 2;
         }
-        return scripted(ticks ? ticks : 7200, boats, report, deathmatch ? &rules : NULL);
+        return scripted(ticks ? ticks : 7200, boats, report, deathmatch ? &rules : NULL,
+            boat_location(room_options.location));
     }
     if (boats != BOAT_FLEET_SLOTS) {
         fprintf(stderr, "boat_server: --boats applies to --scripted; rooms use --players.\n");

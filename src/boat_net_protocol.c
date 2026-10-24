@@ -1,4 +1,5 @@
 #include "boat_net_protocol.h"
+#include "waterfront_city.h"
 
 #include <assert.h>
 #include <float.h>
@@ -246,8 +247,8 @@ static void put_boat(Writer *w, const Boat *b)
 
 static void get_boat(Reader *r, Boat *b)
 {
-    const float x = BOAT_BASIN_HALF_X + BOAT_NET_WORLD_MARGIN;
-    const float z = BOAT_BASIN_HALF_Z + BOAT_NET_WORLD_MARGIN;
+    const float x = BOAT_NET_WORLD_LIMIT;
+    const float z = BOAT_NET_WORLD_LIMIT;
     b->position.x = getf(r, -x, x);
     b->position.y = getf(r, -z, z);
     b->velocity.x = getf(r, -SPEED_LIMIT, SPEED_LIMIT);
@@ -307,8 +308,8 @@ static void put_slot(Writer *w, const BoatFleetSlot *slot, const BoatWakeObjectE
 static void get_slot(Reader *r, uint64_t tick, BoatFleetSlot *slot, BoatWakeObjectEmitter *e,
     BoatNetSlotInput *input)
 {
-    const float x = BOAT_BASIN_HALF_X + BOAT_NET_WORLD_MARGIN;
-    const float z = BOAT_BASIN_HALF_Z + BOAT_NET_WORLD_MARGIN;
+    const float x = BOAT_NET_WORLD_LIMIT;
+    const float z = BOAT_NET_WORLD_LIMIT;
     *slot = (BoatFleetSlot) { 0 };
     *e = (BoatWakeObjectEmitter) { 0 };
     *input = (BoatNetSlotInput) { 0 };
@@ -364,8 +365,8 @@ static void put_record(Writer *w, const BoatWakeObject *o)
 
 static void get_record(Reader *r, uint64_t tick, BoatWakeObject *o)
 {
-    const float x = BOAT_BASIN_HALF_X + BOAT_NET_WORLD_MARGIN;
-    const float z = BOAT_BASIN_HALF_Z + BOAT_NET_WORLD_MARGIN;
+    const float x = BOAT_NET_WORLD_LIMIT;
+    const float z = BOAT_NET_WORLD_LIMIT;
     o->position.x = getf(r, -x, x);
     o->position.y = getf(r, -z, z);
     o->direction.x = getf(r, -1.001f, 1.001f);
@@ -397,7 +398,8 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put8(w, m->accept.max_future);
         put8(w, m->accept.mode);
         put16(w, m->accept.tick_hz);
-        put16(w, 0);
+        put8(w, m->accept.location);
+        put8(w, 0);
         put32(w, m->accept.wake_life_ticks);
         putf(w, m->accept.crest_height);
         break;
@@ -627,7 +629,9 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, a->mode < BOAT_NET_MODE_LIMIT);
         a->tick_hz = get16(r);
         expect(r, a->tick_hz == BOAT_TICK_HZ);
-        reserved(r, 2);
+        a->location = get8(r);
+        expect(r, a->location < BOAT_LOCATION_COUNT);
+        reserved(r, 1);
         a->wake_life_ticks = get32(r);
         expect(r, a->wake_life_ticks >= 240 && a->wake_life_ticks <= BOAT_OBJECT_LIFE_TICKS);
         a->crest_height = getf(r, .1f, 3);
@@ -938,19 +942,42 @@ uint64_t boat_net_bytes_digest(const void *data, size_t size)
     return d.value;
 }
 
-uint64_t boat_net_content_digest(const BoatWorldDefinition *definition)
+uint64_t boat_net_content_digest(void)
 {
+    // Compiled geometry is immutable. LAN rows may ask for compatibility every frame.
+    static uint64_t cached;
+    static bool ready;
+    if (ready)
+        return cached;
     Digest d = { UINT64_C(14695981039346656037) };
     digest_bytes(&d, "proteus-boat-net", 16);
-    digest_u64(&d, (uint64_t)definition->id);
-    digest_u64(&d, definition->mapped);
-    digest_float(&d, definition->half_extent.x);
-    digest_float(&d, definition->half_extent.y);
-    digest_float(&d, definition->spawn.x);
-    digest_float(&d, definition->spawn.y);
-    digest_float(&d, definition->current_center);
-    digest_float(&d, definition->wake_offset.x);
-    digest_float(&d, definition->wake_offset.y);
+    for (int id = 0; id < BOAT_LOCATION_COUNT; ++id) {
+        const BoatWorldDefinition *definition = boat_location(id);
+        digest_u64(&d, (uint64_t)definition->id);
+        digest_u64(&d, definition->mapped);
+        digest_float(&d, definition->half_extent.x);
+        digest_float(&d, definition->half_extent.y);
+        digest_float(&d, definition->spawn.x);
+        digest_float(&d, definition->spawn.y);
+        digest_float(&d, definition->fleet_spawn.x);
+        digest_float(&d, definition->fleet_spawn.y);
+        digest_float(&d, definition->current_center);
+        digest_float(&d, definition->wake_offset.x);
+        digest_float(&d, definition->wake_offset.y);
+        if (!definition->mapped)
+            continue;
+        const Mesh3D *mesh = waterfront_city_mesh_crop(id == BOAT_LOCATION_RIVER);
+        digest_u64(&d, mesh->triangle_count);
+        for (size_t i = 0; i < mesh->triangle_count; ++i)
+            for (unsigned j = 0; j < 3; ++j) {
+                unsigned index = mesh->triangles[i].vertices[j];
+                Vector3 p = mesh->vertices[index];
+                digest_u64(&d, index);
+                digest_float(&d, p.x);
+                digest_float(&d, p.y);
+                digest_float(&d, p.z);
+            }
+    }
     const uint64_t contract[]
         = { BOAT_TICK_HZ, BOAT_FLEET_SLOTS, BOAT_FLEET_SOLVER_PASSES, BOAT_FLEET_SPAWN_RETRY_TICKS,
               BOAT_OBJECT_PER_BOAT, BOAT_OBJECT_EMIT_TICKS, BOAT_OBJECT_LIFE_TICKS };
@@ -958,7 +985,9 @@ uint64_t boat_net_content_digest(const BoatWorldDefinition *definition)
         digest_u64(&d, contract[i]);
     digest_float(&d, BOAT_FLEET_MASS);
     digest_float(&d, BOAT_CONTACT_RESTITUTION);
-    return d.value;
+    cached = d.value;
+    ready = true;
+    return cached;
 }
 
 uint64_t boat_net_wake_digest(const BoatWakeObjects *wakes)
@@ -1187,7 +1216,7 @@ bool boat_net_lan_room_decode(const uint8_t *data, size_t size, BoatNetLanRoom *
 bool boat_net_lan_room_compatible(const BoatNetLanRoom *room)
 {
     return room->version == BOAT_NET_VERSION && room->physics_revision == BOAT_PHYSICS_REVISION
-        && room->content_digest == boat_net_content_digest(boat_location(BOAT_LOCATION_BASIN));
+        && room->content_digest == boat_net_content_digest();
 }
 
 // Decimal digits of VALUE at TEXT; returns the end.

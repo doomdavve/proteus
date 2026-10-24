@@ -19,6 +19,7 @@ typedef struct {
     unsigned max_players; // 1..BOAT_FLEET_SLOTS.
     bool deathmatch; // Capsize deathmatch rounds (docs/DEATHMATCH_PLAN.md) instead of free play.
     BoatMatchRules match; // Deathmatch rules; ignored in free play.
+    BoatLocationId location; // Basin by default; one map per authority process.
 } BoatNetServerConfig;
 
 typedef enum {
@@ -87,7 +88,7 @@ typedef struct {
     BoatNetServerStats stats;
 } BoatNetServer;
 
-// A basin room at tick zero. False for an invalid configuration.
+// A room at tick zero in CONFIG's location. False for an invalid configuration.
 bool boat_net_server_init(
     BoatNetServer *server, BoatNetTransport transport, const BoatNetServerConfig *config);
 // Handle waiting messages, then run the ticks due at monotonic time NOW (seconds; the first

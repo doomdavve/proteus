@@ -9,6 +9,7 @@ typedef struct {
 } Edge;
 static Edge *shore;
 static size_t shore_count, water_count;
+static const Mesh3D *cached_mesh;
 
 static int compare_edge(const void *left, const void *right)
 {
@@ -20,9 +21,11 @@ static int compare_edge(const void *left, const void *right)
 
 static bool init(void)
 {
-    if (shore)
-        return true;
     const Mesh3D *mesh = waterfront_city_mesh();
+    if (shore && cached_mesh == mesh)
+        return true;
+    boat_map_destroy();
+    cached_mesh = mesh;
     // The importer emits the triangulated water surface first, followed by raised land.
     water_count = 0;
     while (water_count < mesh->triangle_count) {

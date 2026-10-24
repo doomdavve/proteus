@@ -481,6 +481,21 @@ add_test(NAME boat_net_deathmatch COMMAND ${Python3_EXECUTABLE}
   --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
 set_tests_properties(boat_net_deathmatch PROPERTIES
   PASS_REGULAR_EXPRESSION "boat_net_deathmatch=ok" TIMEOUT 60)
+add_test(NAME boat_net_session COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_session.py
+  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
+set_tests_properties(boat_net_session PROPERTIES
+  PASS_REGULAR_EXPRESSION "boat_net_session=ok" TIMEOUT 90)
+add_test(NAME boat_net_river COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_session.py --location river --mode deathmatch
+  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
+set_tests_properties(boat_net_river PROPERTIES
+  PASS_REGULAR_EXPRESSION "boat_net_session=ok" TIMEOUT 90)
+add_test(NAME boat_net_eriksberg COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_smoke.py --deathmatch --location eriksberg
+  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
+set_tests_properties(boat_net_eriksberg PROPERTIES
+  PASS_REGULAR_EXPRESSION "boat_net_deathmatch=ok" TIMEOUT 60)
 set(BOAT_CORE_BOUNDARY_NM)
 if(CMAKE_NM AND NOT MSVC)
   set(BOAT_CORE_BOUNDARY_NM --nm ${CMAKE_NM} --archive $<TARGET_FILE:proteus_boat_core>)
