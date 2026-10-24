@@ -515,7 +515,9 @@ panorama without physical altitude; the raised placement puts the storm in that 
 layer rather than just above the boat. Dense rain near the water is joined by a sparser
 upper curtain, and lightning spans down from the higher cloud every 9 seconds.
 Rain now uses independently cycling, jittered drops rather than aligned falling columns.
-Speeds vary from 18–40 m/s, with varied streak length/width/brightness and slant, gaps on
+Speeds vary from 18–40 m/s. Fine blue-white streaks are 3.5–8 cm wide and 0.9–3.1 m
+long near the water (2–4.2 m in the upper curtain), shrinking at either end of each fall.
+They retain varied brightness and slant, gaps on
 individual falls, and a travelling gust shape. Drops relocate at the top of each fall; all
 variation comes from the race clock and deterministic hashes, with no mutable random state.
 These cues advertise the area. Rain/cloud/lightning are cosmetic; lightning has no damage,
@@ -581,6 +583,32 @@ the independent course movement, requested the cloud closer to the background cl
 and described the regular wave pattern as unlike storm waves. This led to the higher cloud
 and directional irregular recipe above, followed by the user's request for irregular rain;
 the user subsequently accepted the combined appearance on 2026-10-24, as recorded above.
+
+### Closer camera and finer rain — 2026-10-24
+
+**Implemented:** the river follow camera now defaults to 12 m back / 6 m high, including
+multiplayer joins and C reset. Title single player uses that shared default. Basin and
+Eriksberg keep their handling-study views. The skill-course preview also uses the river
+camera default; older captures used its 40 m back / 14 m high overview.
+
+The user described the rain as falling concrete. The old opaque grey bars were 22–67 cm
+wide and 3–17 m long. They are now fine blue-white streaks, 3.5–8 cm wide and 0.9–3.1 m
+long near the water (2–4.2 m aloft), shrinking smoothly at the start and end of each fall.
+A 20×20 lower curtain follows the viewer on a storm-relative 5 m grid, keeping fine
+streaks visible nearby; cell-based hashes preserve existing drops as the view moves. The
+sparse upper curtain remains storm-wide. The bounded scene budget, deterministic clock,
+independently staggered falls and gusts remain.
+
+**Verification:** 2026-10-24, macOS Debug: configure/build passed without project compiler
+warnings; all 117 active CTests passed in 155.58 s, with 15 retired wake-field checks disabled.
+CPU/GPU captures at 45.55 s and a later GPU capture at 63.05 s were inspected. A final
+70-second/4,200-frame scripted windowed GPU storm preview exited 0 without diagnostics.
+Graphics/network checks used desktop/loopback access after sandboxed startup failed and
+was stopped. Changed documentation links resolve and `git diff --check` passes.
+
+**Acceptance / next / limitations:** user-approved on 2026-10-24 ("Looks good. Commit.").
+Next: multiplayer play and pacing assessment. Scripted previews do not establish human handling, audible
+playback or other-platform acceptance.
 
 ## Verification and limitations
 

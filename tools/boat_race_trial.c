@@ -628,6 +628,9 @@ int main(int argc, char **argv)
         if (skill)
             view.race.next_gate = (uint8_t)(next - 1);
         BoatCamera camera = { .distance = 40, .height = 14 };
+        if (skill)
+            camera = (BoatCamera) { .distance = session.world.definition->camera_distance,
+                .height = session.world.definition->camera_height };
         if (gpu_enabled) {
             boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
             CHECK(!gpu.failed);
