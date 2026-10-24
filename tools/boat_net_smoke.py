@@ -166,6 +166,7 @@ def race(args):
                 checks = {
                     "racing": state["round"] == "1" and state["phase"] == "3",
                     "same GO": grid is not None and state["go"] == grid.group(1),
+                    # Observed 120 Hz simulation ticks, independent of bot polling cadence.
                     "held on the grid": int(state["held_ticks"]) >= 150,
                     "events": int(state["events"]) >= events,
                     "no resyncs": int(summary["resyncs"]) == 0,

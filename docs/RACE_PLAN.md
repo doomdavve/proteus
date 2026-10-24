@@ -682,6 +682,31 @@ was stopped. Changed documentation links resolve and `git diff --check` passes.
 Next: multiplayer play and pacing assessment. Scripted previews do not establish human handling, audible
 playback or other-platform acceptance.
 
+### Race smoke-test timing — 2026-10-24
+
+**Implemented:** corrected `boat_bot`'s `held_ticks` diagnostic to accumulate advancing
+snapshot tick differences during consecutive active/held observations. Repeated polling of
+the same snapshot adds no ticks; release/inactivity breaks the interval. The 150-tick smoke
+gate remains, now measuring observed 120 Hz simulation time. Race rules, networking and
+player input are unchanged.
+
+Both v0.0.14 and v0.0.15 contain the old iteration counter and identical smoke check.
+A slower service loop could report fewer than 150 iterations during the correct four-second
+grid/countdown. This explains the reported failure without treating its low counter as
+evidence of an early release.
+
+**Verification:** 2026-10-24, macOS Debug: configure/build passed without project compiler
+warnings. A temporary bot build replacing its ENet wait with a 40 ms sleep reproduced the
+failure before the fix (90 counted iterations for both bots), then passed after the fix
+(472 observed simulation ticks for both bots). Both runs logged the full 480-tick hold
+between GRID and GO. The temporary sources/binaries are review artifacts in `build/`.
+The full CTest run is in progress; its normal-cadence `boat_net_race` check has also passed.
+The user requested this fix for release v0.0.16; native release CI remains the next check.
+
+**Next / limitations:** rerun Windows release CI to qualify the original environment. No
+native Windows run, shipped-tag replacement or new human multiplayer acceptance is claimed.
+No audiovisual behavior changed; no new frame or listening review is needed for this fix.
+
 ## Verification and limitations
 
 Higher cloud / irregular waves and rain, 2026-10-24, macOS, Debug: configure/build passed

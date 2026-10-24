@@ -62,6 +62,11 @@ does not authorize advancing every plan. Use the requested track's scope and acc
 
 ## Verification baseline
 
+Race smoke-test timing fix, 2026-10-24, macOS Debug: the bot now measures held simulation
+ticks instead of service-loop iterations. Both v0.0.14/v0.0.15 contain the faulty counter.
+Slow-polling reproduction fails before the fix and passes after it; the normal race check
+also passes. Full-suite verification is in progress; v0.0.16 is the requested CI release. [Evidence and next check](RACE_PLAN.md#race-smoke-test-timing--2026-10-24).
+
 Closer camera / finer rain, 2026-10-24, macOS Debug: build and all 117 active CTests
 passed; 15 retired wake-field checks stayed disabled. CPU/GPU storm captures inspected;
 a 4,200-frame scripted windowed preview exited 0. User-approved ("Looks good. Commit.").

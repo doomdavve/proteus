@@ -172,7 +172,9 @@ int main(int argc, char **argv)
     uint64_t received_inputs = 0, input_samples = 0, last_snapshots = 0;
     unsigned capsized = 0, resets = 0, mtu = 0;
     uint32_t reported_round = 0, reported_race = 0;
-    unsigned race_finishes = 0, race_dnf = 0, held_ticks = 0, feed_seen = 0;
+    unsigned race_finishes = 0, race_dnf = 0, feed_seen = 0;
+    uint64_t held_ticks = 0, last_held_tick = 0;
+    bool was_held = false;
     bool joined = false, running = true;
     double next_reset = 0, next_inactive = 0, inactive_until = 0;
     unsigned inactive_periods = 0, max_players = 0, max_wakes = 0;
@@ -232,7 +234,14 @@ int main(int argc, char **argv)
         }
         if (joined) {
             const BoatFleetSlot *slot = &client.fleet.state.slots[client.slot];
-            held_ticks += slot->active && slot->held;
+            // Measure observed simulation time, not service-loop iterations. OS timer
+            // granularity and load can change polling frequency without shortening the grid.
+            bool held = slot->active && slot->held;
+            uint64_t tick = client.fleet.state.tick;
+            if (held && was_held && tick > last_held_tick)
+                held_ticks += tick - last_held_tick;
+            last_held_tick = tick;
+            was_held = held;
             unsigned players = 0;
             for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
                 players += client.roster.slots[i].state == BOAT_NET_ROSTER_PLAYING;
@@ -333,7 +342,7 @@ int main(int argc, char **argv)
         client.rtt * 1000, travelled, resets, s->decode_errors);
     if (client.accept.mode == BOAT_NET_MODE_RACE)
         printf("race: events=%" PRIu64 " round=%" PRIu32 " phase=%u finishes=%u dnf=%u "
-               "results=%" PRIu32 " held_ticks=%u go=%" PRIu64 "\n",
+               "results=%" PRIu32 " held_ticks=%" PRIu64 " go=%" PRIu64 "\n",
             client.race_feed_count, client.race.round, (unsigned)client.race.phase, race_finishes,
             race_dnf, client.race_result.round, held_ticks, client.race_go);
     if (client.accept.mode == BOAT_NET_MODE_DEATHMATCH)

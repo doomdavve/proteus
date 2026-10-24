@@ -222,12 +222,17 @@ python3 tools/boat_net_smoke.py --deathmatch --server build/boat_server --bot bu
 
 `boat_net_race` (about 14 s) finds a `--mode race` room through LAN discovery and races two
 `boat_bot --predict` clients for 10 s over ENet. Each bot must see round 1 gridded and released
-(at least 150 held ticks, a GO tick), receive the server's logged race events, and finish
-without resyncs or decode faults. Run it alone with:
+(at least 150 observed 120 Hz simulation ticks held, a GO tick), receive the server's logged
+race events, and finish without resyncs or decode faults. Run it alone with:
 
 ```sh
 python3 tools/boat_net_smoke.py --race --server build/boat_server --bot build/boat_bot
 ```
+
+The bot accumulates snapshot tick differences while held; repeated polling of the same
+snapshot adds no time. Releases and inactive slots break the interval. Earlier versions,
+including v0.0.14 and v0.0.15, counted service-loop iterations instead, which could fail
+the held-time check on slower polling loops despite a correct four-second grid/countdown.
 
 None of these tests impairs a real network interface, and none replaces the
 [planned matrix](MULTIPLAYER_PLAN.md#verification-matrix-and-telemetry).
