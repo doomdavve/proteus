@@ -15,7 +15,7 @@ verified on 2026-10-24, agent-run in a window against two hunting bots, not user
 against `boat_bot --hunt`, then two humans), then D3, side-ram roll. D3–D6 are pending. Remaining M4 acceptance checks are deferred by user direction while M5 proceeds.
 River/Eriksberg hosting was pulled forward from M7 on 2026-10-24: launch
 `boat_server --bind 0.0.0.0 --mode deathmatch --location river` and join normally. The server
-selects the map; rebuilt protocol-v3 clients load it automatically. See the
+selects the map; rebuilt protocol-v4 clients load it automatically. See the
 [river hosting handoff](MULTIPLAYER_PLAN.md#river-hosting-handoff--2026-10-24).
 
 ## Product decision

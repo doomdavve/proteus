@@ -4,6 +4,7 @@
  * leavers, joiners, deadlines and grid rotation. Physical cases step a real fleet: the grid
  * hold through a full-throttle countdown, and a four-bot race through the ferry encounter
  * with a mid-race checkpoint restore. */
+#include "boat_fleet_bots.h"
 #include "boat_map.h"
 #include "boat_race.h"
 #include "boat_throttle.h"
@@ -74,17 +75,51 @@ static int geometry(void)
 {
     CHECK(fresh(boat_race_default_rules()));
     const BoatRaceCourse *c = &race.course;
-    // Every line spans the navigable river: water to both ends, land 12 m beyond them.
+    // Skill openings and the full-width finish stay on water, with safe approach lines.
     for (unsigned i = 0; i < c->gate_count; ++i) {
         const BoatRaceGate *g = gate(i);
         for (int side = -1; side <= 1; side += 2) {
             CHECK(boat_map_water(along(g, 0, side * g->half_width), 0));
-            CHECK(!boat_map_water(along(g, 0, side * (g->half_width + 12)), 0));
+            if (i + 1 == c->gate_count)
+                CHECK(!boat_map_water(along(g, 0, side * (g->half_width + 12)), 0));
+            else
+                CHECK(boat_map_water(along(g, 0, side * g->half_width), 8));
         }
         // Straight lines between anchors keep 12 m of mapped clearance.
         const BoatRaceGate *from = i ? gate(i - 1) : &c->start;
-        for (int k = 0; k <= 100; ++k)
+        for (int k = 0; k <= 100; ++k) {
             CHECK(boat_map_water(Vector2Lerp(from->centre, g->centre, k / 100.0f), 12));
+            // Include the outer racing lanes, not just the centre line.
+            for (int side = -1; side <= 1; side += 2)
+                CHECK(boat_map_water(Vector2Lerp(
+                    along(from, 0, (float)side * fminf(21, from->half_width - 4)),
+                    along(g, 0, (float)side * fminf(21, g->half_width - 4)), k / 100.0f), 12));
+        }
+    }
+    const BoatRaceGate *finish = gate(c->gate_count - 1);
+    unsigned missed = 0;
+    for (unsigned i = 0; i + 1 < c->gate_count; ++i)
+        missed += boat_race_cross(gate(i), c->start.centre, finish->centre) < 0;
+    CHECK(missed > 0);
+    // No straight line through any two outer openings can also clear the middle one.
+    // This guards the slalom's actual steering demand, including corner-cutting at edges.
+    for (unsigned i = 1; i + 2 < c->gate_count; ++i) {
+        const BoatRaceGate *g = gate(i), *from = gate(i - 1), *to = gate(i + 1);
+        Vector2 side = { -g->direction.y, g->direction.x };
+        float low = INFINITY, high = -INFINITY;
+        for (int a = -1; a <= 1; a += 2)
+            for (int b = -1; b <= 1; b += 2) {
+                Vector2 start = along(from, 0, (float)a * from->half_width);
+                Vector2 end = along(to, 0, (float)b * to->half_width);
+                float da = Vector2DotProduct(Vector2Subtract(start, g->centre), g->direction);
+                float db = Vector2DotProduct(Vector2Subtract(end, g->centre), g->direction);
+                CHECK(da < 0 && db > 0);
+                Vector2 at = Vector2Lerp(start, end, da / (da - db));
+                float offset = Vector2DotProduct(Vector2Subtract(at, g->centre), side);
+                low = fminf(low, offset);
+                high = fmaxf(high, offset);
+            }
+        CHECK(low > g->half_width + 10 || high < -g->half_width - 10);
     }
     // Grid places face the start, behind it, clear of land and of each other.
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
@@ -102,6 +137,53 @@ static int geometry(void)
     for (unsigned i = 0; i < c->gate_count; ++i)
         length += Vector2Distance(i ? gate(i - 1)->centre : c->start.centre, gate(i)->centre);
     printf("course gates=%u centre_line_m=%.1f\n", c->gate_count, length);
+    return 0;
+}
+
+static int storm_surface(void)
+{
+    BoatStorm storm = boat_race_river_course()->storm;
+    const float epsilon = .01f;
+    float peak = 0;
+    for (int z = -160; z <= 160; z += 17)
+        for (int x = -160; x <= 160; x += 19) {
+            double t = 12.345;
+            Vector2 centre = boat_water_storm_centre(storm, t);
+            Vector2 p = Vector2Add(centre, (Vector2) { (float)x, (float)z });
+            BoatStormSample q = boat_water_storm_query(storm, p, t);
+            peak = fmaxf(peak, fabsf(q.height));
+            if (Vector2Distance(p, centre) >= storm.radius) {
+                CHECK(q.height == 0 && q.vertical_velocity == 0);
+                CHECK(q.gradient.x == 0 && q.gradient.y == 0);
+            }
+            float dx = (boat_water_storm_query(storm, Vector2Add(p, (Vector2) { epsilon, 0 }), t).height
+                - boat_water_storm_query(storm, Vector2Add(p, (Vector2) { -epsilon, 0 }), t).height)
+                / (2 * epsilon);
+            float dz = (boat_water_storm_query(storm, Vector2Add(p, (Vector2) { 0, epsilon }), t).height
+                - boat_water_storm_query(storm, Vector2Add(p, (Vector2) { 0, -epsilon }), t).height)
+                / (2 * epsilon);
+            const double time_epsilon = .004;
+            float dt = (boat_water_storm_query(storm, p, t + time_epsilon).height
+                - boat_water_storm_query(storm, p, t - time_epsilon).height) / (2 * time_epsilon);
+            CHECK(fabsf(q.gradient.x - dx) < .002f && fabsf(q.gradient.y - dz) < .002f);
+            CHECK(fabsf(q.vertical_velocity - dt) < .003f);
+            storm.started = 86400;
+            BoatStormSample later = boat_water_storm_query(storm, p, t + 86400);
+            CHECK(later.height == q.height && later.gradient.x == q.gradient.x
+                && later.gradient.y == q.gradient.y && later.vertical_velocity == q.vertical_velocity);
+            storm.started = 0;
+        }
+    CHECK(peak > 1);
+    BoatWater water = { .storm = storm };
+    CHECK(boat_water_displaced(water));
+    Vector2 rendezvous = boat_water_storm_centre(storm, 45);
+    CHECK(Vector2Distance(rendezvous, (Vector2) { 345, -600 }) < .01f);
+    CHECK(fabsf(Vector2Length(storm.velocity) - 8) < .01f);
+    Vector2 outside = Vector2Add(boat_water_storm_centre(storm, 12.345),
+        (Vector2) { storm.radius + 1, 0 });
+    BoatWaterSample calm = boat_water_query(water, outside, 12.345);
+    CHECK(calm.height == 0 && calm.normal.y == 1 && calm.velocity.y == 0);
+    CHECK(boat_water_storm_query((BoatStorm) { 0 }, storm.centre, 1).height == 0);
     return 0;
 }
 
@@ -138,6 +220,8 @@ static int grid_to_go(unsigned players, uint64_t *go)
         CHECK(Vector2Equals(fleet.state.slots[i].boat.position, race.course.grid[i]));
     }
     CHECK(fleet.world.water.vessel.height > 0);
+    CHECK(fleet.world.water.storm.height > 0);
+    CHECK(fleet.world.water.storm.started == boat_tick_seconds(race.go_tick));
     CHECK(fabs(fleet.world.water.vessel.started - (boat_tick_seconds(race.go_tick) - 12)) < 1e-9);
     at(race.phase_end);
     CHECK(race.phase == BOAT_RACE_COUNTDOWN);
@@ -195,13 +279,26 @@ static int progress_and_places(void)
     at(++t);
     CHECK(race.entrants[2].gates == 0);
     // Same observation: slot 1 crosses the finish earlier in the tick than slot 0.
-    const BoatRaceGate *finish = gate(2);
+    // Clear the intervening skill gates before comparing finish fractions.
+    for (unsigned g = 2; g + 1 < race.course.gate_count; ++g) {
+        move(0, along(gate(g), -2, 0));
+        at(++t);
+        move(0, along(gate(g), 2, 0));
+        at(++t);
+    }
+    for (unsigned g = 1; g + 1 < race.course.gate_count; ++g) {
+        move(1, along(gate(g), -2, 0));
+        at(++t);
+        move(1, along(gate(g), 2, 0));
+        at(++t);
+    }
+    const BoatRaceGate *finish = gate(race.course.gate_count - 1);
     move(0, along(finish, -4, 0));
-    move(1, along(gate(1), -2, 30));
+    move(1, along(finish, -4, 30));
     at(++t);
     move(1, along(finish, -1, 30));
     at(++t);
-    CHECK(race.entrants[1].gates == 2);
+    CHECK(race.entrants[1].gates == race.course.gate_count - 1);
     move(0, along(finish, 4, 0)); // Fraction 0.5.
     move(1, along(finish, 3, 30)); // Fraction 0.25.
     at(++t);
@@ -212,6 +309,13 @@ static int progress_and_places(void)
         = (uint64_t)llround(((double)(t - 1 - race.go_tick) + .25) * BOAT_RACE_SUBTICKS);
     CHECK(race.entrants[1].finish == expected && race.entrants[0].finish > expected);
     CHECK(race.deadline == t + race.rules.after_winner_ticks);
+    // Crossing the finish after skipping skill gates cannot award a finish or progress.
+    move(2, along(finish, -2, 0));
+    at(++t);
+    move(2, along(finish, 2, 0));
+    at(++t);
+    CHECK(race.entrants[2].gates == 0 && race.entrants[2].status == BOAT_RACE_RUNNING
+        && count(BOAT_RACE_FINISH, 2) == 0);
     // Places are fixed: further motion past the line changes nothing.
     move(0, along(finish, -5, 0));
     at(++t);
@@ -251,15 +355,15 @@ static int ties(void)
     CHECK(grid_to_go(3, &t) == 0);
     for (unsigned i = 0; i < 3; ++i)
         for (unsigned g = 0; g + 1 < race.course.gate_count; ++g)
-            through(i, g, (float)i * 10, &t);
-    through(2, 2, 20, &t);
+            through(i, g, (float)i * 5, &t);
+    through(2, race.course.gate_count - 1, 10, &t);
     CHECK(race.entrants[2].place == 1);
     // Slots 0 and 1 cross the finish at exactly the same time.
     for (unsigned i = 0; i < 2; ++i)
-        move(i, along(gate(2), -2, (float)i * 10));
+        move(i, along(gate(race.course.gate_count - 1), -2, (float)i * 5));
     at(++t);
     for (unsigned i = 0; i < 2; ++i)
-        move(i, along(gate(2), 2, (float)i * 10));
+        move(i, along(gate(race.course.gate_count - 1), 2, (float)i * 5));
     at(++t);
     CHECK(race.entrants[0].place == 2 && race.entrants[1].place == 2);
     CHECK(race.entrants[0].finish == race.entrants[1].finish);
@@ -269,13 +373,60 @@ static int ties(void)
     return 0;
 }
 
+// Finishers coast for park_ticks, then wait held past the finish, facing back up-course, until
+// the next grid; R and capsizes park at once and are ignored once parked.
+static int parking(void)
+{
+    uint64_t t;
+    CHECK(grid_to_go(3, &t) == 0);
+    for (unsigned g = 0; g < race.course.gate_count; ++g)
+        through(0, g, 0, &t);
+    uint64_t finished = t;
+    for (unsigned g = 0; g < race.course.gate_count; ++g)
+        through(1, g, 10, &t);
+    CHECK(race.entrants[0].status == BOAT_RACE_FINISHED && race.placed == 2);
+    uint32_t life = fleet.state.slots[0].life;
+    at(finished + race.rules.park_ticks - 1);
+    CHECK(fleet.state.slots[0].life == life && !race.slots[0].parked);
+    boat_race_reset(&race, &fleet, 1); // R parks a finisher at once.
+    at(finished + race.rules.park_ticks);
+    CHECK(race.slots[0].parked && race.slots[1].parked);
+    CHECK(count(BOAT_RACE_PARK, 0) == 1 && count(BOAT_RACE_PARK, 1) == 1);
+    const BoatRaceGate *finish = gate(race.course.gate_count - 1);
+    for (unsigned i = 0; i < 2; ++i) {
+        const BoatFleetSlot *f = &fleet.state.slots[i];
+        Vector2 offset = Vector2Subtract(f->boat.position, finish->centre);
+        CHECK(f->held && f->life == life + 1); // Every slot started on life 1 at the grid.
+        CHECK(Vector2DotProduct(offset, finish->direction) >= 60);
+        CHECK(
+            Vector2Distance(fleet.state.slots[0].boat.position, fleet.state.slots[1].boat.position)
+            > 20);
+        // Facing back towards the line; no recovery is counted.
+        Vector2 forward = { sinf(f->boat.heading), -cosf(f->boat.heading) };
+        CHECK(Vector2DotProduct(forward, finish->direction) < -.99f);
+        CHECK(race.entrants[i].recoveries == 0 && race.entrants[i].place == i + 1);
+    }
+    boat_race_reset(&race, &fleet, 0);
+    at(finished + race.rules.park_ticks + 1);
+    CHECK(fleet.state.slots[0].life == life + 1 && !race.slots[0].reset_wanted);
+    // The last runner finishes; the parked boats stay held through the results.
+    for (unsigned g = 0; g < race.course.gate_count; ++g)
+        through(2, g, 10, &t);
+    CHECK(race.phase == BOAT_RACE_RESULTS && fleet.state.slots[0].held);
+    at(t + race.rules.park_ticks);
+    CHECK(race.slots[2].parked && fleet.state.slots[2].held);
+    at(race.phase_end);
+    CHECK(race.phase == BOAT_RACE_GRID && !race.slots[0].parked);
+    return 0;
+}
+
 static int recovery(void)
 {
     uint64_t t;
     CHECK(grid_to_go(2, &t) == 0);
     move(0, along(gate(0), -2, 0));
     at(++t);
-    move(0, along(gate(0), 40, 20));
+    move(0, along(gate(0), 40, 10));
     at(++t);
     CHECK(race.entrants[0].gates == 1);
     // A capsize recovers automatically behind the last cleared gate, keeping progress.
@@ -381,6 +532,12 @@ static int rejects(void)
     BoatRaceRules rules = boat_race_default_rules();
     BoatRaceCourse course = *boat_race_river_course();
     CHECK(boat_race_init(&race, &rules, &course));
+    course.storm.radius = NAN;
+    CHECK(!boat_race_init(&race, &rules, &course));
+    course = *boat_race_river_course();
+    course.storm.height = -1;
+    CHECK(!boat_race_init(&race, &rules, &course));
+    course = *boat_race_river_course();
     rules.countdown_ticks = 0;
     CHECK(!boat_race_init(&race, &rules, &course));
     rules = boat_race_default_rules();
@@ -398,20 +555,11 @@ static int rejects(void)
     return 0;
 }
 
-// Route bot: the next gate centre, offset to its own lane; full throttle until finished.
+// Route bot (shared with boat_bot --race).
 static BoatInput bot(const BoatFleet *f, const BoatRace *r, unsigned slot)
 {
-    const Boat *boat = &f->state.slots[slot].boat;
-    unsigned next = r->entrants[slot].gates;
-    if (next >= r->course.gate_count)
-        next = r->course.gate_count - 1;
-    Vector2 target = along(&r->course.gates[next], 0, ((float)slot - 1.5f) * 14);
-    float heading = atan2f(target.x - boat->position.x, boat->position.y - target.y);
-    float error = remainderf(heading - boat->heading, 2 * PI);
-    float wheel = Clamp(1.5f * error - .8f * boat->yaw_velocity, -.6f, .6f);
-    bool done = r->entrants[slot].status == BOAT_RACE_FINISHED;
-    return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        boat_throttle_rate(boat->throttle, done ? 0 : 1) };
+    return boat_fleet_bot_race_input(f, &r->course, r->entrants[slot].gates,
+        r->entrants[slot].status == BOAT_RACE_FINISHED, slot);
 }
 
 typedef struct {
@@ -528,7 +676,7 @@ static int full_race(void)
             for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
                 const BoatRaceEntrant *e = &race.entrants[i];
                 double seconds = (double)e->finish / BOAT_RACE_SUBTICKS / BOAT_TICK_HZ;
-                CHECK(e->status == BOAT_RACE_FINISHED && seconds >= 40 && seconds <= 60);
+                CHECK(e->status == BOAT_RACE_FINISHED && seconds >= 45 && seconds <= 85);
                 CHECK(tally.jumps[i] > 0);
             }
             CHECK(saved && race_copy.placed == BOAT_FLEET_SLOTS);
@@ -543,8 +691,8 @@ static int full_race(void)
 int main(void)
 {
     waterfront_city_select_river(true);
-    if (geometry() || crossing() || progress_and_places() || ties() || recovery() || leavers()
-        || rejects() || hold() || full_race())
+    if (geometry() || storm_surface() || crossing() || progress_and_places() || ties() || parking() || recovery()
+        || leavers() || rejects() || hold() || full_race())
         return 1;
     printf("boat_race=ok\n");
     return 0;

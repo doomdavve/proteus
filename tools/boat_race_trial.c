@@ -1,6 +1,7 @@
 // R0 fixture: a shortened river route and one independently owned physical ferry wake.
 #include "boat_gpu.h"
 #include "boat_map.h"
+#include "boat_race.h"
 #include "boat_study_drive.h"
 #include "boat_throttle.h"
 #include "boat_water_mesh.h"
@@ -20,6 +21,7 @@
         }                                                                                          \
     } while (0)
 void boat_vessel_wake_gpu_check(BoatVesselWake wake);
+void boat_water_storm_gpu_check(BoatStorm storm);
 bool boat_vessel_wake_shadow_read(Texture2D texture, float *pixels);
 
 static const Vector2 route[]
@@ -467,9 +469,43 @@ static void checks(void)
     puts("boat_race_trial=ok");
 }
 
+// Keep the historical R0 checks intact; opt into the current race layout for visual play.
+static void preview_start(BoatSession *session, ObjectStudy *objects, bool source, bool skill)
+{
+    start(session, objects, source, 0);
+    if (skill) {
+        objects->traffic_enabled = false;
+        session->world.water.traffic_objects = NULL;
+        session->world.water.vessel
+            = source ? boat_race_river_course()->source : (BoatVesselWake) { 0 };
+        session->world.water.storm = source ? boat_race_river_course()->storm : (BoatStorm) { 0 };
+    }
+}
+
+static Vector2 preview_target(unsigned next, bool skill)
+{
+    const BoatRaceCourse *course = boat_race_river_course();
+    if (skill)
+        return course->gates[next <= course->gate_count ? next - 1 : course->gate_count - 1].centre;
+    return route[next < ROUTE_COUNT ? next : ROUTE_COUNT - 1];
+}
+
+static void preview_advance(const Boat *boat, Vector2 previous, unsigned *next, bool skill)
+{
+    if (!skill) {
+        advance_target(boat, next);
+        return;
+    }
+    const BoatRaceCourse *course = boat_race_river_course();
+    while (*next <= course->gate_count
+        && boat_race_cross(&course->gates[*next - 1], previous, boat->position) >= 0)
+        ++*next;
+}
+
 int main(int argc, char **argv)
 {
     bool check = false, gpu_check = false, gpu_enabled = true, play = false, source = true;
+    bool skill = false;
     const char *output = NULL;
     double seconds = 12;
     int frames = 0;
@@ -478,6 +514,8 @@ int main(int argc, char **argv)
             check = true;
         else if (!strcmp(argv[i], "--gpu-check"))
             gpu_check = true;
+        else if (!strcmp(argv[i], "--skill-course"))
+            skill = true;
         else if (!strcmp(argv[i], "--play"))
             play = true;
         else if (!strcmp(argv[i], "--no-source"))
@@ -502,7 +540,7 @@ int main(int argc, char **argv)
             frames = (int)value;
         } else {
             fprintf(stderr,
-                "Usage: boat_race_trial [--check] [--play] [--no-source] "
+                "Usage: boat_race_trial [--check] [--play] [--skill-course] [--no-source] "
                 "[--renderer cpu|gpu] [--output FILE --time SECONDS] [--frames COUNT]\n");
             return 2;
         }
@@ -511,6 +549,7 @@ int main(int argc, char **argv)
     waterfront_city_select_river(true);
     if (gpu_check) {
         boat_vessel_wake_gpu_check(ferry());
+        boat_water_storm_gpu_check(boat_race_river_course()->storm);
         ferry_visibility();
         return 0;
     }
@@ -522,19 +561,22 @@ int main(int argc, char **argv)
         return 2;
     BoatSession session;
     ObjectStudy objects;
-    start(&session, &objects, source, 0);
+    preview_start(&session, &objects, source, skill);
     unsigned next = 1;
+    unsigned targets = skill ? boat_race_river_course()->gate_count : ROUTE_COUNT - 1;
     if (output)
         for (unsigned t = 0; t < (unsigned)llround(seconds * BOAT_TICK_HZ); ++t) {
+            Vector2 previous = session.boat.position;
             timed_boat_step(&session,
-                pilot(&session.boat, route[next < ROUTE_COUNT ? next : ROUTE_COUNT - 1], 1), NULL,
-                NULL, &objects);
-            advance_target(&session.boat, &next);
+                pilot(&session.boat, preview_target(next, skill), skill && next > targets ? 0 : 1),
+                NULL, NULL, &objects);
+            preview_advance(&session.boat, previous, &next, skill);
         }
     bool window = gpu_enabled || !output;
     if (window) {
         SetConfigFlags(output ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE);
-        InitWindow(960, 600, "River sprint R0 - shortened route / ferry trial");
+        InitWindow(960, 600,
+            skill ? "River sprint - skill course" : "River sprint R0 - shortened route / ferry trial");
         CHECK(IsWindowReady());
         SetTargetFPS(60);
     }
@@ -557,7 +599,7 @@ int main(int argc, char **argv)
         if (!output) {
             if (IsKeyPressed(KEY_R)) {
                 boat_session_destroy(&session);
-                start(&session, &objects, source, 0);
+                preview_start(&session, &objects, source, skill);
                 next = 1;
                 target_thrust = 0;
                 thrust_step = BOAT_THROTTLE_NEUTRAL;
@@ -574,14 +616,17 @@ int main(int argc, char **argv)
                     ? (BoatInput) { (float)(IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT))
                               - (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)),
                           boat_throttle_rate(session.boat.throttle, target_thrust) }
-                    : pilot(&session.boat, route[next < ROUTE_COUNT ? next : ROUTE_COUNT - 1],
-                          next < ROUTE_COUNT ? 1 : 0);
+                    : pilot(&session.boat, preview_target(next, skill), next <= targets ? 1 : 0);
+                Vector2 previous = session.boat.position;
                 timed_boat_step(&session, input, NULL, NULL, &objects);
-                advance_target(&session.boat, &next);
+                preview_advance(&session.boat, previous, &next, skill);
                 accumulator -= BOAT_TICK_SECONDS;
             }
         }
         BoatViewState view = boat_session_view(&session);
+        view.race.enabled = true; // The race room's start, checkpoint and finish lines.
+        if (skill)
+            view.race.next_gate = (uint8_t)(next - 1);
         BoatCamera camera = { .distance = 40, .height = 14 };
         if (gpu_enabled) {
             boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
@@ -618,9 +663,10 @@ int main(int argc, char **argv)
             gpu_enabled ? (Rectangle) { 320, 200, -320, -200 } : (Rectangle) { 0, 0, 320, 200 },
             dest, (Vector2) { 0 }, 0, WHITE);
         DrawRectangle(0, 0, GetScreenWidth(), 58, (Color) { 0, 0, 0, 180 });
-        DrawText(TextFormat("R0 PROTOTYPE  %.2f s   %u landings   %.1f m/s   target %u/%zu",
-                     view.time, session.boat.landings, Vector2Length(session.boat.velocity),
-                     next < ROUTE_COUNT ? next : (unsigned)ROUTE_COUNT - 1, ROUTE_COUNT - 1),
+        DrawText(TextFormat("%s  %.2f s   %u landings   %.1f m/s   target %u/%u",
+                     skill ? "SKILL COURSE" : "R0 PROTOTYPE", view.time, session.boat.landings,
+                     Vector2Length(session.boat.velocity), next <= targets ? next : targets,
+                     targets),
             12, 8, 20, WHITE);
         DrawText(play ? "W/S thrust steps | A/D steer / air roll | R restart | Esc exit"
                       : "Scripted full-throttle route | R restart | Esc exit",

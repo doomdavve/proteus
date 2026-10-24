@@ -129,7 +129,9 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
 {
     BoatNetClient *c = &net->client;
     double now = boat_net_clock();
-    if (reset && active)
+    // Held boats (grid, countdown, parked) cannot reset; do not ask.
+    const BoatFleetSlot *held = boat_net_client_own(c);
+    if (reset && active && !(held && held->held))
         boat_net_client_request_reset(c);
     if (!boat_net_client_service_targets(c, now, input, !active, thrust_target, steering_target)) {
         fail(net, "Disconnected: %s.", boat_net_client_failure(c));
@@ -247,13 +249,36 @@ static const char *capsize_notice(const NetStudy *net, const Boat *boat, uint32_
     return text;
 }
 
+// "CAPSIZED / RECOVERY 2 / R TO SKIP" while a race recovers the own boat by itself.
+static const char *race_capsize_notice(const NetStudy *net, const Boat *boat)
+{
+    static char text[64];
+    const BoatNetClient *c = &net->client;
+    if (boat->motion_state != BOAT_CAPSIZED)
+        return NULL;
+    double waited = boat_net_client_server_tick(c, boat_net_clock()) - (double)net->capsized_tick;
+    double left = ((double)c->race.recovery_ticks - waited) / BOAT_TICK_HZ;
+    snprintf(text, sizeof(text), "CAPSIZED / RECOVERY %.0f%s", ceil(fmax(0, left)),
+        waited >= c->race.skip_ticks ? " / R TO SKIP" : "");
+    return text;
+}
+
 const char *net_study_notice(const NetStudy *net)
 {
     static char text[80];
     double seconds;
     BoatNetResetState reset = boat_net_client_reset_state(&net->client, boat_net_clock(), &seconds);
+    if (!net->own_visible && net_study_race(net) && net->client.race.phase != BOAT_RACE_WAITING)
+        return "RACE IN PROGRESS / YOU JOIN THE NEXT GRID";
     if (!net->own_visible)
         return "WAITING FOR A SAFE SPAWN";
+    if (net_study_race(net)) {
+        const BoatFleetSlot *own
+            = &boat_net_client_view(&net->client)->state.slots[net->client.slot];
+        const char *capsized = race_capsize_notice(net, &own->boat);
+        if (capsized)
+            return capsized;
+    }
     if (net_study_deathmatch(net)) {
         const BoatFleetSlot *own
             = &boat_net_client_view(&net->client)->state.slots[net->client.slot];
@@ -435,6 +460,188 @@ void net_study_draw_match(const NetStudy *net, int width, int height, int feed_t
     draw_feed(c, width - 12, feed_top, now);
     if (scoreboard || m->phase == BOAT_MATCH_INTERMISSION)
         draw_scoreboard(c, width, height, server_tick);
+}
+
+bool net_study_race(const NetStudy *net)
+{
+    return net->client.accept.mode == BOAT_NET_MODE_RACE && net->client.race_valid;
+}
+
+void net_study_race_view(const NetStudy *net, BoatViewState *view)
+{
+    if (!net_study_race(net))
+        return;
+    const BoatNetRaceRow *row = &net->client.race.slots[net->client.slot];
+    view->race.enabled = true;
+    view->race.next_gate = row->current ? row->gates : 0;
+}
+
+static const char *ordinal(unsigned place)
+{
+    static const char *const names[] = { "-", "1ST", "2ND", "3RD", "4TH" };
+    return names[place <= BOAT_FLEET_SLOTS ? place : 0];
+}
+
+static const char *race_time(uint64_t subticks)
+{
+    long hundredths = lround((double)subticks / BOAT_RACE_SUBTICKS / BOAT_TICK_HZ * 100);
+    return TextFormat(
+        "%02ld:%02ld.%02ld", hundredths / 6000, hundredths / 100 % 60, hundredths % 100);
+}
+
+// The authority's rows as a local race over the drawn fleet, for provisional positions.
+static void local_race(const BoatNetClient *c, BoatRace *race, unsigned *entrants)
+{
+    *race = (BoatRace) { .course = *boat_race_river_course(),
+        .phase = (BoatRacePhase)c->race.phase,
+        .placed = c->race.placed };
+    *entrants = 0;
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+        const BoatNetRaceRow *row = &c->race.slots[i];
+        if (!row->entrant)
+            continue;
+        ++*entrants;
+        race->entrants[i] = (BoatRaceEntrant) { .identity = 1,
+            .finish = row->finish,
+            .recoveries = row->recoveries,
+            .status = row->status,
+            .place = row->place,
+            .gates = row->gates };
+    }
+}
+
+static void draw_race_feed(const BoatNetClient *c, int right, int top, double now)
+{
+    // Finishes, retirements and abandoned rounds of the last five seconds, oldest first.
+    uint64_t first
+        = c->race_feed_count > BOAT_NET_MATCH_FEED ? c->race_feed_count - BOAT_NET_MATCH_FEED : 0;
+    for (uint64_t n = first; n < c->race_feed_count; ++n) {
+        const BoatNetRaceFeedEntry *e = &c->race_feed[n % BOAT_NET_MATCH_FEED];
+        const BoatNetRaceEvent *v = &e->event;
+        const char *line = v->kind == BOAT_RACE_FINISH
+            ? TextFormat("%s FINISHED %s  %s", e->name, ordinal(v->value), race_time(v->time))
+            : v->kind == BOAT_RACE_OUT     ? TextFormat("%s DID NOT FINISH", e->name)
+            : v->kind == BOAT_RACE_ABANDON ? "RACE ABANDONED"
+                                           : NULL;
+        if (!line || now - e->at > 5)
+            continue;
+        Color color = v->slot == c->slot ? RAYWHITE : LIGHTGRAY;
+        int x = right - MeasureText(line, 12);
+        DrawRectangle(x - 4, top - 2, right - x + 8, 15, Fade(BLACK, .45f));
+        DrawText(line, x, top, 12, color);
+        top += 14;
+    }
+}
+
+static void draw_race_board(
+    const NetStudy *net, const BoatRace *race, int width, int height, double server_tick)
+{
+    const BoatNetClient *c = &net->client;
+    const BoatNetRaceState *s = &c->race;
+    const BoatFleet *fleet = boat_net_client_view(c);
+    unsigned order[BOAT_FLEET_SLOTS], positions[BOAT_FLEET_SLOTS], count = 0;
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        if (s->slots[i].entrant) {
+            positions[i] = boat_race_position(race, fleet, i);
+            order[count++] = i;
+        }
+    for (unsigned i = 1; i < count; ++i) // Position order; slot order breaks ties.
+        for (unsigned j = i; j > 0 && positions[order[j]] < positions[order[j - 1]]; --j) {
+            unsigned swap = order[j];
+            order[j] = order[j - 1];
+            order[j - 1] = swap;
+        }
+    static const int columns[] = { 0, 3, 21, 31 };
+    int font = width >= 40 * 20 && height >= 500 ? 20 : 10, line = font + font / 2;
+    int panel = 40 * font, x = (width - panel) / 2 + font;
+    int y = (height - (int)(count + 3) * line) / 2;
+    DrawRectangle(x - font, y - font, panel, (int)(count + 3) * line + font, Fade(BLACK, .7f));
+    const char *title = s->phase == BOAT_RACE_RESULTS
+        ? TextFormat("RACE %u RESULTS / NEXT IN %s", (unsigned)s->round,
+              clock_text(((double)s->phase_end - server_tick) / BOAT_TICK_HZ))
+        : TextFormat("RACE %u STANDINGS", (unsigned)s->round);
+    DrawText(title, x, y, font, RAYWHITE);
+    y += line + line / 2;
+    const char *headings[] = { "#", "PLAYER", "TIME", "STATUS" };
+    for (unsigned k = 0; k < 4; ++k)
+        DrawText(headings[k], x + columns[k] * font, y, font, GRAY);
+    y += line;
+    for (unsigned n = 0; n < count; ++n, y += line) {
+        unsigned i = order[n];
+        const BoatNetRaceRow *row = &s->slots[i];
+        Color color = i == c->slot ? RAYWHITE : LIGHTGRAY;
+        char cells[4][40];
+        snprintf(cells[0], sizeof(cells[0]), "%u", positions[i]);
+        snprintf(cells[1], sizeof(cells[1]), "%s%s%s", c->roster.slots[i].name,
+            i == c->slot ? " (YOU)" : "", row->current ? "" : " (LEFT)");
+        snprintf(cells[2], sizeof(cells[2]), "%s",
+            row->status == BOAT_RACE_FINISHED ? race_time(row->finish) : "--:--.--");
+        snprintf(cells[3], sizeof(cells[3]), "%s",
+            row->status == BOAT_RACE_FINISHED ? ordinal(row->place)
+                : row->status == BOAT_RACE_DNF
+                ? "DNF"
+                : TextFormat("%u/%u LINES", row->gates, race->course.gate_count));
+        for (unsigned k = 0; k < 4; ++k)
+            DrawText(cells[k], x + columns[k] * font, y, font, color);
+    }
+}
+
+void net_study_draw_race(const NetStudy *net, int width, int height, int feed_top, bool board)
+{
+    if (!net_study_race(net))
+        return;
+    const BoatNetClient *c = &net->client;
+    const BoatNetRaceState *s = &c->race;
+    const BoatNetRaceRow *own = &s->slots[c->slot];
+    double now = boat_net_clock();
+    double server_tick = boat_net_client_server_tick(c, now);
+    double to_go = ((double)s->go_tick - server_tick) / BOAT_TICK_HZ;
+    static BoatRace race; // Large; drawing is single-threaded.
+    unsigned entrants;
+    local_race(c, &race, &entrants);
+    const char *top;
+    Color color = RAYWHITE;
+    if (s->phase == BOAT_RACE_WAITING) {
+        top = "RACE / WAITING FOR ANOTHER PLAYER";
+    } else if (!own->current) {
+        top = s->phase == BOAT_RACE_RESULTS
+            ? TextFormat("RACE %u RESULTS", (unsigned)s->round)
+            : TextFormat("RACE %u IN PROGRESS / YOU JOIN THE NEXT GRID", (unsigned)s->round);
+    } else if (s->phase == BOAT_RACE_GRID || s->phase == BOAT_RACE_COUNTDOWN) {
+        top = TextFormat("RACE %u / %u BOATS / SET YOUR THROTTLE", (unsigned)s->round, entrants);
+    } else if (own->status == BOAT_RACE_FINISHED) {
+        top = TextFormat("FINISHED - %s / %s", ordinal(own->place), race_time(own->finish));
+        color = (Color) { 120, 220, 140, 255 };
+    } else if (own->status == BOAT_RACE_DNF) {
+        top = "DID NOT FINISH";
+        color = ORANGE;
+    } else {
+        unsigned position = boat_race_position(&race, boat_net_client_view(c), c->slot);
+        double elapsed = fmax(0, server_tick - (double)s->go_tick) / BOAT_TICK_HZ;
+        long hundredths = lround(elapsed * 100);
+        const char *next = own->gates + 1u == race.course.gate_count
+            ? "FINISH NEXT"
+            : TextFormat("GATE %u/%u", own->gates + 1u, race.course.gate_count - 1);
+        top = TextFormat("%02ld:%02ld.%02ld   POS %u/%u   %s", hundredths / 6000,
+            hundredths / 100 % 60, hundredths % 100, position, entrants, next);
+    }
+    // After the first finish the round closes at its deadline.
+    if (s->phase == BOAT_RACE_RACING && s->placed && own->status == BOAT_RACE_RUNNING) {
+        double left = ((double)s->deadline - server_tick) / BOAT_TICK_HZ;
+        top = TextFormat("%s   CLOSES IN %.0f", top, ceil(fmax(0, left)));
+        color = left < 5 ? ORANGE : color;
+    }
+    backed_text(top, (width - MeasureText(top, 20)) / 2, 12, 20, color);
+    // Countdown: 3, 2, 1 before GO, then GO! for a second.
+    if (own->current && s->phase != BOAT_RACE_WAITING && to_go > -1 && to_go <= 3) {
+        const char *big = to_go > 0 ? TextFormat("%.0f", ceil(to_go)) : "GO!";
+        int size = height / 5;
+        DrawText(big, (width - MeasureText(big, size)) / 2, height / 3 - size / 2, size,
+            to_go > 0 ? RAYWHITE : (Color) { 255, 216, 93, 255 });
+    }
+    draw_race_feed(c, width - 12, feed_top, now);
+    if (s->round && (board || s->phase == BOAT_RACE_RESULTS))
+        draw_race_board(net, &race, width, height, server_tick);
 }
 
 void net_study_close(NetStudy *net)

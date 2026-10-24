@@ -70,7 +70,8 @@ BoatWater boat_water_test(bool waves, bool current, bool wake)
 static bool displaced(const BoatWater *water)
 {
     return water->amplitude != 0 || water->wake_amplitude != 0 || water->player_wake_enabled
-        || water->objects || water->traffic_objects || water->vessel.height > 0;
+        || water->objects || water->traffic_objects || water->vessel.height > 0
+        || (water->storm.radius > 0 && water->storm.height > 0);
 }
 
 bool boat_water_displaced(BoatWater water) { return displaced(&water); }
@@ -266,6 +267,70 @@ static void player_wake(const BoatWater *water, Vector2 p, double time, float *h
     *vertical_speed += (sum_t - correction * weight_t) / divisor;
 }
 
+Vector2 boat_water_storm_centre(BoatStorm storm, double time)
+{
+    double age = time - storm.started;
+    return (Vector2) { storm.centre.x + (float)(storm.velocity.x * age),
+        storm.centre.y + (float)(storm.velocity.y * age) };
+}
+
+void boat_water_storm_uniforms(BoatStorm storm, double time, float parameters[12])
+{
+    Vector2 centre = boat_water_storm_centre(storm, time);
+    parameters[0] = -centre.x;
+    parameters[1] = centre.y;
+    parameters[2] = storm.radius;
+    parameters[3] = storm.height;
+    parameters[4] = boat_phase(3.2f, time - storm.started);
+    parameters[5] = boat_phase(3.75f, time - storm.started);
+    parameters[6] = boat_phase(2.45f, time - storm.started);
+    parameters[7] = boat_phase(4.15f, time - storm.started);
+    parameters[8] = -storm.velocity.x;
+    parameters[9] = storm.velocity.y;
+    parameters[10] = boat_phase(.37f, time - storm.started);
+    parameters[11] = 0;
+}
+
+BoatStormSample boat_water_storm_query(BoatStorm storm, Vector2 position, double time)
+{
+    BoatStormSample sample = { 0 };
+    if (storm.radius <= 0 || storm.height <= 0)
+        return sample;
+    Vector2 p = Vector2Subtract(position, boat_water_storm_centre(storm, time));
+    float r2 = Vector2LengthSqr(p) / (storm.radius * storm.radius);
+    if (r2 >= 1)
+        return sample;
+    float edge = 1 - r2, envelope = edge * edge * edge;
+    Vector2 envelope_gradient = Vector2Scale(p, -6 * edge * edge / (storm.radius * storm.radius));
+    // A directional, non-repeating mixture: nearby headings avoid an egg-carton crossing
+    // grid, while long phase bends and asymmetric crests break up parallel regular ridges.
+    // Keep the matching production shader recipe in sync.
+    const Vector2 wave[] = { { .27f, -.32f }, { .38f, -.26f },
+        { .16f, -.30f }, { .47f, -.18f } };
+    const float speed[] = { 3.2f, 3.75f, 2.45f, 4.15f };
+    const float amplitude[] = { .8f, .4f, .22f, .12f };
+    const float offset[] = { 0, 1.1f, 2.7f, 4.2f };
+    const Vector2 bend_wave = { .013f, .017f };
+    float bend_phase = Vector2DotProduct(p, bend_wave) - boat_phase(.37f, time - storm.started);
+    for (int i = 0; i < 4; ++i) {
+        float bend = bend_phase + offset[i] * .73f;
+        float bend_slope = .85f * cosf(bend);
+        float phase = Vector2DotProduct(p, wave[i]) + .85f * sinf(bend) + offset[i]
+            - boat_phase(speed[i], time - storm.started);
+        float h = storm.height * amplitude[i] * (sinf(phase) + .12f * sinf(2 * phase + .4f));
+        float slope = storm.height * amplitude[i] * (cosf(phase) + .24f * cosf(2 * phase + .4f));
+        Vector2 phase_gradient = Vector2Add(wave[i], Vector2Scale(bend_wave, bend_slope));
+        sample.height += envelope * h;
+        sample.gradient = Vector2Add(sample.gradient,
+            Vector2Add(Vector2Scale(envelope_gradient, h), Vector2Scale(phase_gradient, envelope * slope)));
+        sample.vertical_velocity -= envelope * slope * (speed[i] + .37f * bend_slope);
+    }
+    // Translating the compact envelope and its local crests also moves the surface at a
+    // fixed world point. Include that term in the physical vertical velocity.
+    sample.vertical_velocity -= Vector2DotProduct(sample.gradient, storm.velocity);
+    return sample;
+}
+
 static BoatWaterSample query(const BoatWater *water, Vector2 position, double time)
 {
     BoatWaterSample sample = { .normal = { 0, 1, 0 } };
@@ -291,6 +356,13 @@ static BoatWaterSample query(const BoatWater *water, Vector2 position, double ti
         gradient = Vector2Add(gradient, Vector2Scale(w.direction, slope));
         sample.velocity.y -= w.amplitude * w.angular_speed * cosf(phase);
     }
+    if (water->storm.radius > 0 && water->storm.height > 0) {
+        BoatStormSample storm = boat_water_storm_query(water->storm, position, time);
+        sample.height += storm.height;
+        gradient = Vector2Add(gradient, storm.gradient);
+        sample.velocity.y += storm.vertical_velocity;
+        sample.crest_foam = Clamp(storm.height / .8f, 0, 1);
+    }
     crossing_wake(water, position, time, &sample.height, &gradient, &sample.velocity.y);
     if (water->vessel.height > 0) {
         BoatVesselWakeSample q = boat_vessel_wake_query(water->vessel, position, time);
@@ -302,7 +374,7 @@ static BoatWaterSample query(const BoatWater *water, Vector2 position, double ti
     if (water->objects) {
         BoatWakeObjectSample q = boat_wake_objects_query(water->objects, position);
         sample.height += q.height;
-        sample.crest_foam = q.crest_foam;
+        sample.crest_foam += q.crest_foam;
         gradient = Vector2Add(gradient, q.gradient);
         sample.velocity.y += q.vertical_velocity;
     }

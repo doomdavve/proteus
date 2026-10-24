@@ -9,7 +9,7 @@
 #define BOAT_NET_STALE 0.25 // Seconds without a snapshot before the view is marked stale.
 #define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of wake digest mismatch before a resync request.
 #define BOAT_NET_HOLD_INCOMPLETE 0.1 // Seconds a prediction correction waits for missing births.
-#define BOAT_NET_MATCH_FEED 6 // Recent deathmatch events kept for the kill feed.
+#define BOAT_NET_MATCH_FEED 6 // Recent deathmatch or race events kept for the feed.
 #define BOAT_NET_EARLY_BOOTSTRAP (BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES + 2)
 
 typedef struct {
@@ -55,6 +55,14 @@ typedef struct {
     char victim[BOAT_NET_NAME_BYTES + 1], attacker[BOAT_NET_NAME_BYTES + 1];
 } BoatNetFeedEntry;
 
+// A race event as received, with the slot's roster name of that moment.
+typedef struct {
+    BoatNetRaceEvent event;
+    uint64_t tick;
+    double at; // Local receipt time.
+    char name[BOAT_NET_NAME_BYTES + 1];
+} BoatNetRaceFeedEntry;
+
 // The mirror fleet holds the newest authoritative snapshot, rebuilt from a complete checkpoint
 // plus births. With prediction, every snapshot or applied birth batch corrects the speculative
 // fleet, which each command advances to its target tick; the caller draws that instead.
@@ -80,6 +88,13 @@ typedef struct {
     BoatNetMatchState result; // The latest finished round's scoreboard, as first announced.
     BoatNetFeedEntry feed[BOAT_NET_MATCH_FEED];
     uint64_t feed_count; // Events ever received; the newest is (count - 1) % ring size.
+    // Race rooms: the authority's phase, clock and rows, and its events, never predicted.
+    bool race_valid;
+    BoatNetRaceState race;
+    BoatNetRaceState race_result; // The latest round's rows as its results phase began.
+    BoatNetRaceFeedEntry race_feed[BOAT_NET_MATCH_FEED];
+    uint64_t race_feed_count;
+    uint64_t race_go; // Of the newest snapshot: binds the course source and the hold release.
     // Authoritative mirror: valid once PLAYING.
     BoatFleet fleet;
     BoatNetSlotInput inputs[BOAT_FLEET_SLOTS];

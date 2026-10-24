@@ -2,12 +2,14 @@
 #include "boat_course_view.h"
 #include "boat_map.h"
 #include "boat_pose.h"
+#include "boat_race.h"
 #include "boat_water_mesh.h"
 #include "raymath.h"
 #include "waterfront.h"
 
 #include <assert.h>
 #include <math.h>
+#include <stdint.h>
 
 static const float CAMERA_BASE_FOV = 55 * DEG2RAD;
 static const float CAMERA_SPEED_FOV = 7 * DEG2RAD;
@@ -111,9 +113,155 @@ static void vessel_box(BoatCourseBoxDraw draw, void *context, Vector2 position, 
     draw(context, (Transform3D) { .position = p, .rotation = { 0, heading, 0 }, .scale = size }, color);
 }
 
+// Skill gates have tall endpoint markers and an open passage. Start/finish retain rows
+// across the water: white start, teal cleared, yellow next, orange later, chequered finish.
+static void race_visit(const BoatViewState *view, BoatCourseBoxDraw draw, void *context)
+{
+    const BoatRaceCourse *course = boat_race_river_course();
+    for (unsigned k = 0; k <= course->gate_count; ++k) {
+        const BoatRaceGate *gate = k ? &course->gates[k - 1] : &course->start;
+        Vector2 across = { -gate->direction.y, gate->direction.x };
+        Color color = k == 0                ? RAYWHITE
+            : k <= view->race.next_gate     ? (Color) { 86, 157, 150, 255 }
+            : k == view->race.next_gate + 1 ? (Color) { 255, 216, 93, 255 }
+                                            : ORANGE;
+        bool finish = k == course->gate_count;
+        if (k && !finish) {
+            for (int side = -1; side <= 1; side += 2) {
+                Vector2 p = Vector2Add(
+                    gate->centre, Vector2Scale(across, (float)side * gate->half_width));
+                if (Vector2Distance(p, view->boat.position) > 450)
+                    continue;
+                draw(context,
+                    (Transform3D) { .position = { -p.x, .8f, p.y }, .scale = { 3, 2.2f, 3 } },
+                    color);
+                draw(context,
+                    (Transform3D) { .position = { -p.x, 4.5f, p.y }, .scale = { .5f, 7, .5f } },
+                    RAYWHITE);
+                // Flags point into the opening, leaving the gate centre unobstructed.
+                float inward = (float)side * 1.5f;
+                draw(context,
+                    (Transform3D) { .position
+                        = { -p.x + across.x * inward, 7, p.y - across.y * inward },
+                        .rotation = { 0, atan2f(across.y, across.x), 0 },
+                        .scale = { 3, 1.8f, .25f } },
+                    color);
+            }
+            continue;
+        }
+        for (int n = -(int)(gate->half_width / 12); n <= (int)(gate->half_width / 12); ++n) {
+            Vector2 p = Vector2Add(gate->centre, Vector2Scale(across, 12.0f * (float)n));
+            if (Vector2Distance(p, view->boat.position) > 450 || !boat_map_water(p, 1))
+                continue;
+            Color buoy = finish ? (n % 2 ? DARKGRAY : RAYWHITE) : color;
+            draw(context,
+                (Transform3D) { .position = { -p.x, .5f, p.y }, .scale = { 1.6f, 1.4f, 1.6f } },
+                buoy);
+            if (n % 4)
+                continue;
+            draw(context,
+                (Transform3D) { .position = { -p.x, 2.8f, p.y }, .scale = { .3f, 4, .3f } },
+                RAYWHITE);
+            draw(context,
+                (Transform3D) { .position = { -p.x - .8f, 4.2f, p.y }, .scale = { 1.6f, 1, .15f } },
+                finish ? DARKGRAY : color);
+        }
+    }
+}
+
+static float storm_rain_hash(uint32_t seed)
+{
+    seed ^= seed >> 16;
+    seed *= UINT32_C(0x7feb352d);
+    seed ^= seed >> 15;
+    seed *= UINT32_C(0x846ca68b);
+    seed ^= seed >> 16;
+    return (float)(seed & UINT32_C(0x00ffffff)) / 16777216.0f;
+}
+
+// Independent drop cycles break up the placement grid and stagger speeds, gaps and streak
+// sizes. Reposition only at the top of a fall; seeking/replays need no particle state.
+static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double clock,
+    float top, float span, unsigned x, unsigned z, bool upper,
+    BoatCourseBoxDraw draw, void *context)
+{
+    uint32_t seed = x * UINT32_C(0x9e3779b9) ^ z * UINT32_C(0x85ebca6b)
+        ^ (upper ? UINT32_C(0xa511e9b3) : UINT32_C(0x63d83595));
+    float speed = 18 + 22 * storm_rain_hash(seed + 1);
+    double travel = clock * speed + storm_rain_hash(seed + 2) * span;
+    double cycle = floor(travel / span);
+    float fall = (float)(travel - cycle * span);
+    uint32_t drop = seed ^ (uint32_t)(int64_t)cycle * UINT32_C(0x27d4eb2d);
+    if (storm_rain_hash(drop + 3) < .20f)
+        return;
+    Vector2 p = { ((float)x - 11.5f + storm_rain_hash(drop + 4) - .5f) * storm.radius / 12,
+        ((float)z - 11.5f + storm_rain_hash(drop + 5) - .5f) * storm.radius / 12 };
+    if (Vector2Length(p) > storm.radius * .90f)
+        return;
+    float gust = sinf((float)fmod(clock * .7, 2 * PI) + p.x * .017f + p.y * .011f);
+    p.x += 4 * gust;
+    p = Vector2Add(storm.centre, p);
+    if (Vector2Distance(view->boat.position, p) > 210)
+        return;
+    float slant = .10f + .22f * storm_rain_hash(drop + 6) + .08f * gust;
+    float width = .22f + .45f * storm_rain_hash(drop + 7);
+    float length = (upper ? 8 : 3) + 9 * storm_rain_hash(drop + 8);
+    unsigned char brightness = (unsigned char)(135 + 45 * storm_rain_hash(drop + 9));
+    draw(context,
+        (Transform3D) { .position = { -p.x, top - fall, p.y },
+            .rotation = { .05f * gust, 0, -slant }, .scale = { width, length, width } },
+        (Color) { brightness, (unsigned char)(brightness + 15),
+            (unsigned char)(brightness + 25), 255 });
+}
+
+// A travelling world-space squall: its cloud, rain curtain and bolts advertise the physical
+// patch from outside it. All animation is a function of the shared race clock.
+static void storm_visit(const BoatViewState *view, const BoatWorld *world,
+    BoatCourseBoxDraw draw, void *context)
+{
+    BoatStorm storm = world->water.storm;
+    storm.centre = boat_water_storm_centre(storm, view->time);
+    if (storm.radius <= 0 || storm.height <= 0
+        || Vector2Distance(view->boat.position, storm.centre) > storm.radius + 350)
+        return;
+    double clock = view->time - storm.started;
+    bool flash = fmod(fmax(0, clock), 9.0) < .16 && clock > 1;
+    const float cloud_height = 180;
+    Color cloud = flash ? (Color) { 168, 182, 193, 255 } : (Color) { 48, 60, 73, 255 };
+    for (int z = -1; z <= 1; ++z)
+        for (int x = -1; x <= 1; ++x)
+            draw(context,
+                (Transform3D) { .position = { -storm.centre.x + (float)x * 52,
+                    cloud_height + (float)((x + z + 4) % 3) * 6, storm.centre.y + (float)z * 52 },
+                    .scale = { 68, 12, 68 } }, cloud);
+    // Jittered, independently cycling drops near the boat, plus a sparse upper curtain.
+    // Counts remain bounded below the shared scenery capacity even during lightning.
+    for (unsigned z = 0; z < 24; ++z)
+        for (unsigned x = 0; x < 24; ++x) {
+            storm_rain_drop(view, storm, clock, 32, 30, x, z, false, draw, context);
+            if (x % 2 == 0 && z % 2 == 0)
+                storm_rain_drop(view, storm, clock, cloud_height - 8, cloud_height - 44,
+                    x, z, true, draw, context);
+        }
+    if (flash) {
+        float x = -storm.centre.x - 42;
+        float segment = (cloud_height - 4) / 10;
+        for (int i = 0; i < 10; ++i)
+            draw(context,
+                (Transform3D) { .position = { x + (float)(i % 2) * 3,
+                    cloud_height - 4 - ((float)i + .5f) * segment, storm.centre.y + 25 },
+                    .rotation = { 0, 0, i % 2 ? -.18f : .18f },
+                    .scale = { 1.4f, segment + 2, 1.4f } },
+                (Color) { 235, 246, 255, 255 });
+    }
+}
+
 static void environment_visit(
     const BoatViewState *view, const BoatWorld *world, BoatCourseBoxDraw draw, void *context)
 {
+    if (view->race.enabled && world->definition->mapped)
+        race_visit(view, draw, context);
+    storm_visit(view, world, draw, context);
     const Boat *boat = &view->boat;
     double time = view->time;
     if (Vector2LengthSqr(world->water.current) > 0) {

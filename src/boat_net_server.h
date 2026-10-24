@@ -3,11 +3,12 @@
 
 #include "boat_match.h"
 #include "boat_net_transport.h"
+#include "boat_race.h"
 
 #define BOAT_NET_INPUT_RING 256 // Commands buffered per slot, indexed by target tick.
 #define BOAT_NET_REPEAT_TICKS 6 // Repeat a missing command this long (50 ms), then zero.
 #define BOAT_NET_NEUTRAL_TICKS 30 // 250 ms without a command: ease controls to neutral.
-#define BOAT_NET_MATCH_EVENTS 16 // Recent deathmatch events kept for the caller's log.
+#define BOAT_NET_MATCH_EVENTS 16 // Recent deathmatch or race events kept for the caller's log.
 #define BOAT_NET_CATCH_UP_TICKS 8 // Ticks per service call at most; never a larger step.
 #define BOAT_NET_MISBEHAVIOUR_LIMIT 16 // Malformed or forbidden messages before disconnecting.
 
@@ -19,6 +20,9 @@ typedef struct {
     unsigned max_players; // 1..BOAT_FLEET_SLOTS.
     bool deathmatch; // Capsize deathmatch rounds (docs/DEATHMATCH_PLAN.md) instead of free play.
     BoatMatchRules match; // Deathmatch rules; ignored in free play.
+    // River sprint rounds (docs/RACE_PLAN.md) instead of free play; needs the river location.
+    bool race;
+    BoatRaceRules race_rules; // Ignored outside race rooms.
     BoatLocationId location; // Basin by default; one map per authority process.
 } BoatNetServerConfig;
 
@@ -85,6 +89,10 @@ typedef struct {
     BoatNetMatchState match_sent; // The scoreboard clients last received.
     BoatMatchEvent events[BOAT_NET_MATCH_EVENTS]; // Recent match events, a ring.
     uint64_t event_count; // Match events ever recorded; the newest is (count - 1) % ring size.
+    BoatRace race; // Race state; untouched outside race rooms.
+    BoatNetRaceState race_sent; // The race state clients last received.
+    BoatRaceEvent race_events[BOAT_NET_MATCH_EVENTS]; // Recent race events, a ring.
+    uint64_t race_event_count;
     BoatNetServerStats stats;
 } BoatNetServer;
 

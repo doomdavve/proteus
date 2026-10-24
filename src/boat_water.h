@@ -12,6 +12,23 @@ typedef struct {
     Vector2 direction; // Unit vector along wave travel.
 } BoatWave;
 
+// Compact race obstacle. Zero radius/height disables it; STARTED anchors periodic waves
+// to the shared race clock, including on predicted clients.
+typedef struct {
+    Vector2 centre, velocity; // Centre at STARTED, travel in simulation metres/second.
+    float radius, height;
+    double started;
+} BoatStorm;
+
+typedef struct {
+    float height, vertical_velocity;
+    Vector2 gradient;
+} BoatStormSample;
+
+Vector2 boat_water_storm_centre(BoatStorm storm, double time);
+BoatStormSample boat_water_storm_query(BoatStorm storm, Vector2 position, double time);
+void boat_water_storm_uniforms(BoatStorm storm, double time, float parameters[12]);
+
 #define BOAT_WAKE_SEGMENTS 64
 #define BOAT_WAKE_LIFETIME 20.0f
 
@@ -34,6 +51,7 @@ typedef struct {
     int player_wake_count, player_wake_next;
     BoatWakeSegment player_wake[BOAT_WAKE_SEGMENTS]; // Owned history: copies never alias a boat.
     BoatWave crossing[2]; // Smaller components; all parameters are shared with the GPU.
+    BoatStorm storm; // Localised physical rough water; no player wake slots.
     BoatVesselWake vessel; // Opt-in race trial; independent bounded source, no player slot.
 } BoatWater;
 

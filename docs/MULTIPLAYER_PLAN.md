@@ -49,13 +49,17 @@ rooms on the local network; it is checked on one Mac only. See the
 manual acceptance, profile-F play and contact-gap measurement. These remain open checks,
 not completed acceptance. M5 is active; M6–M8 remain pending. The [capsize deathmatch](DEATHMATCH_PLAN.md)
 proceeds in parallel (D1 match core and D2 protocol v2 with the in-game HUD implemented
-2026-10-24; next: D2 play, then D3). The live protocol is now [v3](MULTIPLAYER_PROTOCOL.md).
+2026-10-24; next: D2 play, then D3). The live protocol is now [v4](MULTIPLAYER_PROTOCOL.md).
 The next requested mode is a [river sprint race](RACE_PLAN.md), planned 2026-10-24:
 45–60 seconds, a shared grid, frequent vessel-wake jumps and confirmed finish positions.
 Race R0 provides a measured shortened route and playable physical ferry-wake trial, and the
 [R1 race core](RACE_PLAN.md#r1-race-core--2026-10-24) (`boat_race`) adds authoritative
-rules over the fleet, including a new fleet grid hold. R2–R4 and the network race mode remain
-unimplemented; protocol v3 carries neither the hold nor the race, so race rooms wait for R2.
+rules over the fleet, including a new fleet grid hold. R0 and R1 are user-approved; the
+[R2 network race](RACE_PLAN.md#r2-network-race--2026-10-24) (`boat_server --mode race`,
+protocol v4 with the hold and the race GO tick, predicted hold/ferry, HUD and results) is
+implemented and automatically verified, awaiting human race-room play. R3's slalom and
+moving storm are implemented, with the storm presentation user-accepted; full-course/pacing
+work and R4 multiplayer acceptance remain in the [race plan](RACE_PLAN.md).
 Numerical budgets below are proposed gates, not measured multiplayer results.
 The final evidence section distinguishes checks performed for this document from future checks.
 
@@ -789,7 +793,7 @@ non-goals. Internet delay remains part of the measured fun gate.
 
 The playable map slice was pulled forward on 2026-10-24 at the user's request: basin,
 Eriksberg and river rooms now select their map on the authority and negotiate it with clients
-(protocol v3), for free boating and deathmatch. See the [river hosting handoff](#river-hosting-handoff--2026-10-24).
+(protocol v3; v4 adds race rooms on the river), for free boating, deathmatch and race. See the [river hosting handoff](#river-hosting-handoff--2026-10-24).
 This delivers fixed-map play, not the full qualification milestone. The remaining work below
 still depends on M6 and mapped foundations; the legacy process-wide crop/cache model permits
 one map per process and has not become independently owned concurrent worlds.
@@ -1641,7 +1645,8 @@ Protocol v3 uses one former reserved Accept byte for the location, permits posit
 start centres), mapped triangle/vertex geometry and fleet/wake constants into the shared
 content digest. The immutable bundle digest is cached so LAN compatibility rows do not hash
 geometry every frame. Old v1/v2 clients are rejected; all players need rebuilt clients, including
-Windows players using an older package. No protocol migration or new release publication is
+Windows players using an older package. (Protocol v4, for race R2, again requires rebuilt
+clients.) No protocol migration or new release publication is
 claimed. The [protocol](MULTIPLAYER_PROTOCOL.md) owns the byte layout.
 
 **Spawns.** Multiplayer Eriksberg and river start around simulation `(-50, -290)` in open

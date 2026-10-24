@@ -1018,6 +1018,15 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "physicalWaves"),
         &physical_waves, SHADER_UNIFORM_INT);
     float wake_amplitude = frame->player_active ? water.wake_amplitude : 0;
+    float storm[12];
+    boat_water_storm_uniforms(
+        frame->player_active ? water.storm : (BoatStorm) { 0 }, frame->time, storm);
+    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormArea"),
+        storm, SHADER_UNIFORM_VEC4);
+    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormPhase"),
+        storm + 4, SHADER_UNIFORM_VEC4);
+    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormMotion"),
+        storm + 8, SHADER_UNIFORM_VEC4);
     float vessel[12];
     boat_vessel_wake_uniforms(
         frame->player_active ? water.vessel : (BoatVesselWake) { 0 }, frame->time, vessel);

@@ -1,6 +1,8 @@
 #ifndef BOAT_FLEET_BOTS_H
 #define BOAT_FLEET_BOTS_H
 #include "boat_fleet.h"
+#include "boat_race.h"
+#include "boat_throttle.h"
 #include "raymath.h"
 
 // Scripted fleet drivers for validators and boat_server. Every slot laps the crossing rival's
@@ -59,6 +61,25 @@ static inline BoatInput boat_fleet_bot_hunt_input(
     float wheel = Clamp(2 * error - boat->yaw_velocity, -1, 1);
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
         Clamp((1 - boat->throttle) / (.5f * BOAT_STEP), -1, 1) };
+}
+
+// Race route bot (validate_boat_race, boat_bot --race): the next gate's centre, offset to the
+// slot's own lane, inset from the gate edges, at full throttle; idle once finished. GATES is
+// the entrant's cleared count.
+static inline BoatInput boat_fleet_bot_race_input(const BoatFleet *fleet,
+    const BoatRaceCourse *course, unsigned gates, bool finished, unsigned slot)
+{
+    const Boat *boat = &fleet->state.slots[slot].boat;
+    const BoatRaceGate *gate
+        = &course->gates[gates < course->gate_count ? gates : course->gate_count - 1];
+    Vector2 across = { -gate->direction.y, gate->direction.x };
+    float lane = fminf(14, (gate->half_width - 12) / 1.5f);
+    Vector2 target = Vector2Add(gate->centre, Vector2Scale(across, ((float)slot - 1.5f) * lane));
+    float heading = atan2f(target.x - boat->position.x, boat->position.y - target.y);
+    float error = remainderf(heading - boat->heading, 2 * PI);
+    float wheel = Clamp(1.5f * error - .8f * boat->yaw_velocity, -.6f, .6f);
+    return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
+        boat_throttle_rate(boat->throttle, finished ? 0 : 1) };
 }
 
 // Inputs for every slot, then recovery requests for boats capsized for two seconds.

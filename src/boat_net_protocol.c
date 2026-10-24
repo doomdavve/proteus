@@ -13,10 +13,11 @@ static_assert(BOAT_NET_MAX_CHECKPOINT <= (size_t)BOAT_NET_PAGE_BYTES * 65535, "p
 
 enum {
     SLOT_BYTES = 172,
-    SNAPSHOT_BYTES = 32 + BOAT_FLEET_SLOTS * SLOT_BYTES,
+    SNAPSHOT_BYTES = 40 + BOAT_FLEET_SLOTS * SLOT_BYTES,
     RECORD_BYTES = 36,
     BIRTH_BYTES = 4 + RECORD_BYTES,
-    CHECKPOINT_BYTES = 40 + BOAT_FLEET_SLOTS * SLOT_BYTES + BOAT_OBJECT_CAPACITY * RECORD_BYTES,
+    CHECKPOINT_BYTES = 48 + BOAT_FLEET_SLOTS * SLOT_BYTES + BOAT_OBJECT_CAPACITY * RECORD_BYTES,
+    RACE_ROW_BYTES = 16,
 };
 static_assert(BOAT_NET_HEADER_BYTES + SNAPSHOT_BYTES <= 800, "snapshot target is 800 bytes");
 static_assert(BOAT_NET_HEADER_BYTES + 4 + BOAT_NET_MAX_BIRTHS * BIRTH_BYTES <= BOAT_NET_MAX_MESSAGE,
@@ -280,7 +281,7 @@ static void get_boat(Reader *r, Boat *b)
 static void put_slot(Writer *w, const BoatFleetSlot *slot, const BoatWakeObjectEmitter *e,
     const BoatNetSlotInput *input)
 {
-    put8(w, (uint8_t)((slot->active ? 1 : 0) | (slot->pending ? 2 : 0)));
+    put8(w, (uint8_t)((slot->active ? 1 : 0) | (slot->pending ? 2 : 0) | (slot->held ? 4 : 0)));
     put8(w, (uint8_t)slot->boat.motion_state);
     put8(w, input->state);
     put8(w, 0);
@@ -314,9 +315,10 @@ static void get_slot(Reader *r, uint64_t tick, BoatFleetSlot *slot, BoatWakeObje
     *e = (BoatWakeObjectEmitter) { 0 };
     *input = (BoatNetSlotInput) { 0 };
     uint8_t flags = get8(r);
-    expect(r, flags <= 3);
+    expect(r, flags <= 7 && (flags & 5) != 4); // Only an active boat is held.
     slot->active = flags & 1;
     slot->pending = flags & 2;
+    slot->held = flags & 4;
     uint8_t motion = get8(r);
     expect(r, motion <= BOAT_CAPSIZED);
     input->state = get8(r);
@@ -459,6 +461,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put64(w, s->emitted);
         put64(w, s->expired);
         put64(w, s->wake_digest);
+        put64(w, s->race_go);
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
             put_slot(w, &s->slots[i], &s->emitters[i], &s->inputs[i]);
         break;
@@ -526,6 +529,42 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put16(w, 0);
         put32(w, e->victim_life);
         put32(w, e->round);
+        break;
+    }
+    case BOAT_NET_RACE_STATE: {
+        const BoatNetRaceState *rs = &m->race;
+        put8(w, rs->phase);
+        put8(w, rs->course);
+        put8(w, rs->placed);
+        put8(w, 0);
+        put16(w, rs->recovery_ticks);
+        put16(w, rs->skip_ticks);
+        put16(w, rs->park_ticks);
+        put16(w, 0);
+        put32(w, rs->round);
+        put64(w, rs->phase_end);
+        put64(w, rs->go_tick);
+        put64(w, rs->deadline);
+        for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+            put8(w,
+                (uint8_t)((rs->slots[i].present ? 1 : 0) | (rs->slots[i].entrant ? 2 : 0)
+                    | (rs->slots[i].current ? 4 : 0) | (rs->slots[i].parked ? 8 : 0)));
+            put8(w, rs->slots[i].status);
+            put8(w, rs->slots[i].place);
+            put8(w, rs->slots[i].gates);
+            put32(w, rs->slots[i].recoveries);
+            put64(w, rs->slots[i].finish);
+        }
+        break;
+    }
+    case BOAT_NET_RACE_EVENT: {
+        const BoatNetRaceEvent *e = &m->race_event;
+        put8(w, e->kind);
+        put8(w, e->slot);
+        put8(w, e->value);
+        put8(w, 0);
+        put32(w, e->round);
+        put64(w, e->time);
         break;
     }
     default:
@@ -631,6 +670,8 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, a->tick_hz == BOAT_TICK_HZ);
         a->location = get8(r);
         expect(r, a->location < BOAT_LOCATION_COUNT);
+        // The river sprint is the only race course.
+        expect(r, a->mode != BOAT_NET_MODE_RACE || a->location == BOAT_LOCATION_RIVER);
         reserved(r, 1);
         a->wake_life_ticks = get32(r);
         expect(r, a->wake_life_ticks >= 240 && a->wake_life_ticks <= BOAT_OBJECT_LIFE_TICKS);
@@ -714,6 +755,7 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         s->expired = get64(r);
         expect(r, s->expired <= s->emitted);
         s->wake_digest = get64(r);
+        s->race_go = get64(r);
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
             get_slot(r, tick, &s->slots[i], &s->emitters[i], &s->inputs[i]);
         break;
@@ -805,6 +847,81 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
             expect(r, e->victim == BOAT_MATCH_NOBODY && e->attacker == BOAT_MATCH_NOBODY);
             expect(r, e->cause == BOAT_MATCH_CAUSE_NONE && !e->bailout && !e->victim_life);
         }
+        break;
+    }
+    case BOAT_NET_RACE_STATE: {
+        BoatNetRaceState *rs = &m->race;
+        rs->phase = get8(r);
+        expect(r, rs->phase <= BOAT_RACE_RESULTS);
+        rs->course = get8(r);
+        expect(r, rs->course < BOAT_NET_COURSE_LIMIT);
+        rs->placed = get8(r);
+        expect(r, rs->placed <= BOAT_FLEET_SLOTS);
+        reserved(r, 1);
+        rs->recovery_ticks = get16(r);
+        rs->skip_ticks = get16(r);
+        expect(r, rs->skip_ticks <= rs->recovery_ticks);
+        rs->park_ticks = get16(r);
+        reserved(r, 2);
+        rs->round = get32(r);
+        rs->phase_end = get64(r);
+        rs->go_tick = get64(r);
+        rs->deadline = get64(r);
+        bool timed = rs->phase == BOAT_RACE_GRID || rs->phase == BOAT_RACE_COUNTDOWN
+            || rs->phase == BOAT_RACE_RESULTS;
+        expect(r, (rs->phase_end != 0) == timed);
+        expect(r, (rs->deadline != 0) == (rs->phase == BOAT_RACE_RACING));
+        expect(r, (rs->round == 0) == (rs->go_tick == 0));
+        expect(r, rs->phase == BOAT_RACE_WAITING || rs->round > 0);
+        unsigned finished = 0;
+        for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+            uint8_t flags = get8(r);
+            expect(r, flags <= 15);
+            rs->slots[i].present = flags & 1;
+            rs->slots[i].entrant = flags & 2;
+            rs->slots[i].current = flags & 4;
+            rs->slots[i].parked = flags & 8;
+            rs->slots[i].status = get8(r);
+            rs->slots[i].place = get8(r);
+            rs->slots[i].gates = get8(r);
+            rs->slots[i].recoveries = get32(r);
+            rs->slots[i].finish = get64(r);
+            bool done = rs->slots[i].status == BOAT_RACE_FINISHED;
+            finished += done;
+            expect(r, rs->slots[i].status <= BOAT_RACE_DNF);
+            expect(r, rs->slots[i].gates <= BOAT_RACE_GATES);
+            expect(r, (rs->slots[i].place != 0) == done && rs->slots[i].place <= rs->placed);
+            expect(r, done || !rs->slots[i].finish);
+            expect(r, !rs->slots[i].current || (rs->slots[i].present && rs->slots[i].entrant));
+            expect(r, !rs->slots[i].parked || (rs->slots[i].current && done));
+            expect(r,
+                rs->slots[i].entrant
+                    || (flags <= 1 && !rs->slots[i].status && !rs->slots[i].gates
+                        && !rs->slots[i].recoveries));
+        }
+        expect(r, finished == rs->placed);
+        break;
+    }
+    case BOAT_NET_RACE_EVENT: {
+        BoatNetRaceEvent *e = &m->race_event;
+        e->kind = get8(r);
+        e->slot = get8(r);
+        e->value = get8(r);
+        reserved(r, 1);
+        e->round = get32(r);
+        e->time = get64(r);
+        expect(r, e->round > 0 && e->kind <= BOAT_RACE_PARK);
+        bool nobody = e->kind == BOAT_RACE_PHASE || e->kind == BOAT_RACE_ABANDON;
+        expect(r, nobody ? e->slot == BOAT_RACE_NOBODY : e->slot < BOAT_FLEET_SLOTS);
+        expect(r, (e->time != 0) <= (e->kind == BOAT_RACE_FINISH));
+        if (e->kind == BOAT_RACE_PHASE)
+            expect(r, e->value <= BOAT_RACE_RESULTS);
+        else if (e->kind == BOAT_RACE_GATE)
+            expect(r, e->value < BOAT_RACE_GATES);
+        else if (e->kind == BOAT_RACE_FINISH)
+            expect(r, e->value >= 1 && e->value <= BOAT_FLEET_SLOTS);
+        else
+            expect(r, e->value == 0);
         break;
     }
     default:
@@ -985,6 +1102,35 @@ uint64_t boat_net_content_digest(void)
         digest_u64(&d, contract[i]);
     digest_float(&d, BOAT_FLEET_MASS);
     digest_float(&d, BOAT_CONTACT_RESTITUTION);
+    // Race courses: every client predicts the grid hold and the course source from this data.
+    const BoatRaceCourse *course = boat_race_river_course();
+    const BoatRaceGate *gates[1 + BOAT_RACE_GATES] = { &course->start };
+    for (unsigned i = 0; i < course->gate_count; ++i)
+        gates[1 + i] = &course->gates[i];
+    digest_u64(&d, course->gate_count);
+    for (unsigned i = 0; i <= course->gate_count; ++i) {
+        digest_float(&d, gates[i]->centre.x);
+        digest_float(&d, gates[i]->centre.y);
+        digest_float(&d, gates[i]->direction.x);
+        digest_float(&d, gates[i]->direction.y);
+        digest_float(&d, gates[i]->half_width);
+    }
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+        digest_float(&d, course->grid[i].x);
+        digest_float(&d, course->grid[i].y);
+    }
+    const BoatVesselWake *v = &course->source;
+    const float source[]
+        = { v->origin.x, v->origin.y, v->direction.x, v->direction.y, (float)v->started, v->speed,
+              v->height, v->duration, v->lifetime, v->wavelength, v->spread, v->half_width };
+    for (size_t i = 0; i < sizeof(source) / sizeof(*source); ++i)
+        digest_float(&d, source[i]);
+    const float storm[] = { course->storm.centre.x, course->storm.centre.y,
+        course->storm.radius, course->storm.height, (float)course->storm.started,
+        course->storm.velocity.x, course->storm.velocity.y };
+    for (size_t i = 0; i < sizeof(storm) / sizeof(*storm); ++i)
+        digest_float(&d, storm[i]);
+    digest_u64(&d, 3); // Local storm recipe revision (CPU and production GLSL).
     cached = d.value;
     ready = true;
     return cached;
@@ -1028,7 +1174,8 @@ void boat_net_snapshot_of(const BoatFleetState *state,
 }
 
 size_t boat_net_checkpoint_encode(const BoatFleetState *state,
-    const BoatNetSlotInput inputs[BOAT_FLEET_SLOTS], uint8_t *out, size_t capacity)
+    const BoatNetSlotInput inputs[BOAT_FLEET_SLOTS], uint64_t race_go, uint8_t *out,
+    size_t capacity)
 {
     const BoatWakeObjects *w = &state->wakes;
     Writer writer = { out, 0, capacity, false };
@@ -1040,6 +1187,7 @@ size_t boat_net_checkpoint_encode(const BoatFleetState *state,
     put16(&writer, (uint16_t)w->peak_live);
     put64(&writer, w->emitted);
     put64(&writer, w->expired);
+    put64(&writer, race_go);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         put_slot(&writer, &state->slots[i], &w->emitters[i], &inputs[i]);
     for (unsigned i = 0; i < BOAT_OBJECT_CAPACITY; ++i)
@@ -1051,7 +1199,7 @@ size_t boat_net_checkpoint_encode(const BoatFleetState *state,
 }
 
 BoatNetError boat_net_checkpoint_decode(const uint8_t *data, size_t size, BoatFleetState *state,
-    BoatNetSlotInput inputs[BOAT_FLEET_SLOTS])
+    BoatNetSlotInput inputs[BOAT_FLEET_SLOTS], uint64_t *race_go)
 {
     static BoatFleetState decoded;
     BoatNetSlotInput records[BOAT_FLEET_SLOTS];
@@ -1069,6 +1217,7 @@ BoatNetError boat_net_checkpoint_decode(const uint8_t *data, size_t size, BoatFl
     w->emitted = get64(&r);
     w->expired = get64(&r);
     expect(&r, w->expired <= w->emitted);
+    uint64_t go = get64(&r);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         get_slot(&r, decoded.tick, &decoded.slots[i], &w->emitters[i], &records[i]);
     unsigned live = 0;
@@ -1083,6 +1232,8 @@ BoatNetError boat_net_checkpoint_decode(const uint8_t *data, size_t size, BoatFl
         return r.error;
     *state = decoded;
     memcpy(inputs, records, sizeof(records));
+    if (race_go)
+        *race_go = go;
     return BOAT_NET_OK;
 }
 
@@ -1274,4 +1425,74 @@ void boat_net_lan_list_expire(BoatNetLanList *list, double now, double age)
             list->seen[kept++] = list->seen[i];
         }
     list->count = kept;
+}
+
+uint64_t boat_net_race_go(const BoatRace *race) { return race->round ? race->go_tick : 0; }
+
+void boat_net_race_bind(BoatFleet *fleet, uint8_t course, uint64_t go)
+{
+    (void)course; // BOAT_NET_COURSE_RIVER is the only course.
+    BoatRace race = { .round = go != 0, .go_tick = go, .course = *boat_race_river_course() };
+    boat_race_bind(&race, fleet);
+}
+
+void boat_net_race_state_of(const BoatRace *race, BoatNetRaceState *state)
+{
+    const BoatRaceRules *rules = &race->rules;
+    bool timed = race->phase == BOAT_RACE_GRID || race->phase == BOAT_RACE_COUNTDOWN
+        || race->phase == BOAT_RACE_RESULTS;
+    *state = (BoatNetRaceState) { .phase = (uint8_t)race->phase,
+        .course = BOAT_NET_COURSE_RIVER,
+        .placed = (uint8_t)race->placed,
+        .recovery_ticks
+        = (uint16_t)(rules->recovery_ticks < UINT16_MAX ? rules->recovery_ticks : UINT16_MAX),
+        .skip_ticks = (uint16_t)(rules->skip_ticks < UINT16_MAX ? rules->skip_ticks : UINT16_MAX),
+        .park_ticks = (uint16_t)(rules->park_ticks < UINT16_MAX ? rules->park_ticks : UINT16_MAX),
+        .round = race->round,
+        .phase_end = timed ? race->phase_end : 0,
+        .go_tick = boat_net_race_go(race),
+        .deadline = race->phase == BOAT_RACE_RACING ? race->deadline : 0 };
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+        const BoatRaceEntrant *e = &race->entrants[i];
+        state->slots[i].present = race->slots[i].identity != 0;
+        if (!e->identity)
+            continue;
+        state->slots[i].entrant = true;
+        state->slots[i].current = boat_race_entrant(race, i);
+        state->slots[i].parked = state->slots[i].current && race->slots[i].parked;
+        state->slots[i].status = e->status;
+        state->slots[i].place = e->place;
+        state->slots[i].gates = e->gates;
+        state->slots[i].recoveries = e->recoveries;
+        state->slots[i].finish = e->status == BOAT_RACE_FINISHED ? e->finish : 0;
+    }
+}
+
+BoatNetRaceEvent boat_net_race_event_of(const BoatRace *race, const BoatRaceEvent *event)
+{
+    return (BoatNetRaceEvent) { .kind = event->kind,
+        .slot = event->slot,
+        .value = event->kind == BOAT_RACE_PHASE || event->kind == BOAT_RACE_GATE
+                || event->kind == BOAT_RACE_FINISH
+            ? event->value
+            : 0,
+        .round = race->round,
+        .time = event->kind == BOAT_RACE_FINISH ? event->time : 0 };
+}
+
+bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState *b)
+{
+    if (a->phase != b->phase || a->course != b->course || a->placed != b->placed
+        || a->recovery_ticks != b->recovery_ticks || a->skip_ticks != b->skip_ticks
+        || a->park_ticks != b->park_ticks || a->round != b->round || a->phase_end != b->phase_end
+        || a->go_tick != b->go_tick || a->deadline != b->deadline)
+        return false;
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+        const BoatNetRaceRow *x = &a->slots[i], *y = &b->slots[i];
+        if (x->present != y->present || x->entrant != y->entrant || x->current != y->current
+            || x->parked != y->parked || x->status != y->status || x->place != y->place
+            || x->gates != y->gates || x->recoveries != y->recoveries || x->finish != y->finish)
+            return false;
+    }
+    return true;
 }

@@ -4,14 +4,21 @@
 
 #include <math.h>
 
-// The R0 route (-180,-250) -> (-40,-360) -> (220,-510) -> (454,-678) -> (600,-800), with the
-// checkpoints and finish centred across the mapped river so no line can pass around them.
+// Shortened river sprint: a committed slalom, with a close middle chicane. Gates alternate
+// across the river so their openings cannot be joined by a nearly straight racing line.
 static const BoatRaceCourse RIVER = {
     .start = { { -180, -250 }, { .786f, -.618f }, 40 },
-    .gates = { { { 208.9f, -527.2f }, { .840f, -.542f }, 218 },
-        { { 443.9f, -691.0f }, { .790f, -.613f }, 175 },
+    .gates = { { { -72.3f, -376.6f }, { .830f, -.558f }, 18 },
+        { { 99.7f, -371.8f }, { .830f, -.558f }, 18 },
+        { { 146.2f, -535.5f }, { .830f, -.558f }, 16 },
+        { { 315.3f, -516.9f }, { .830f, -.558f }, 16 },
+        { { 375.9f, -678.0f }, { .830f, -.558f }, 18 },
+        { { 520.1f, -678.5f }, { .830f, -.558f }, 20 },
         { { 588.5f, -767.2f }, { .767f, -.641f }, 158 } },
-    .gate_count = 3,
+    .gate_count = 7,
+    // 8 m/s down-course: passes (345,-600) at GO+45 s, meeting the pack after the chicane.
+    .storm = { .centre = { 46.2f, -399.12f }, .velocity = { 6.64f, -4.464f },
+        .radius = 140, .height = 1.6f },
     // 12 m behind the start line, 14 m apart across it.
     .grid
     = { { -202.4f, -259.1f }, { -193.8f, -248.1f }, { -185.1f, -237.1f }, { -176.5f, -226.1f } },
@@ -30,6 +37,9 @@ static const BoatRaceCourse RIVER = {
 // Recovery candidates behind an anchor gate (ahead of it after a finish), in lateral order.
 static const float RECOVERY_BACK[] = { 25, 45 };
 static const float RECOVERY_SIDE[] = { 0, -18, 18, -36, 36, -54, 54 };
+// Parking past the finish, facing back up-course: off the finish line's centre first.
+static const float PARK_AHEAD[] = { 70, 100 };
+static const float PARK_SIDE[] = { -40, 40, -80, 80, -120, 120, 0 };
 
 BoatRaceRules boat_race_default_rules(void)
 {
@@ -40,6 +50,7 @@ BoatRaceRules boat_race_default_rules(void)
         .cap_ticks = 90 * BOAT_TICK_HZ,
         .recovery_ticks = 2 * BOAT_TICK_HZ,
         .skip_ticks = BOAT_TICK_HZ / 2,
+        .park_ticks = 2 * BOAT_TICK_HZ,
         .min_players = 2 };
 }
 
@@ -61,6 +72,11 @@ bool boat_race_init(BoatRace *race, const BoatRaceRules *rules, const BoatRaceCo
         || rules->skip_ticks > rules->recovery_ticks || rules->min_players < 1
         || rules->min_players > BOAT_FLEET_SLOTS || course->gate_count < 1
         || course->gate_count > BOAT_RACE_GATES
+        || !isfinite(course->storm.centre.x) || !isfinite(course->storm.centre.y)
+        || !isfinite(course->storm.velocity.x) || !isfinite(course->storm.velocity.y)
+        || !isfinite(course->storm.radius) || course->storm.radius < 0
+        || !isfinite(course->storm.height) || course->storm.height < 0
+        || !isfinite(course->storm.started)
         || (course->source.height > 0 && !boat_vessel_wake_valid(course->source)))
         return false;
     *race = (BoatRace) { .rules = *rules, .course = *course };
@@ -185,8 +201,9 @@ static Boat facing(Vector2 position, Vector2 direction)
     return boat;
 }
 
-// Place an entrant at the first clear point behind its last cleared gate, or past the finish
-// once finished. Never beyond an uncleared gate; motion and crossing history start afresh.
+// Place an entrant at the first clear point behind its last cleared gate. Never beyond an
+// uncleared gate; motion and crossing history start afresh. A finisher is parked instead: held
+// past the finish, out of the corridor, facing back towards the line.
 static bool recover(
     BoatRace *r, BoatFleet *fleet, unsigned slot, uint64_t tick, BoatRaceOutput *out)
 {
@@ -194,23 +211,35 @@ static bool recover(
     bool finished = e->status == BOAT_RACE_FINISHED;
     const BoatRaceGate *g = anchor(r, e->gates);
     Vector2 side = { -g->direction.y, g->direction.x };
-    for (unsigned b = 0; b < sizeof(RECOVERY_BACK) / sizeof(*RECOVERY_BACK); ++b)
-        for (unsigned s = 0; s < sizeof(RECOVERY_SIDE) / sizeof(*RECOVERY_SIDE); ++s) {
-            if (fabsf(RECOVERY_SIDE[s]) > g->half_width)
+    const float *along = finished ? PARK_AHEAD : RECOVERY_BACK;
+    const float *across = finished ? PARK_SIDE : RECOVERY_SIDE;
+    unsigned rows = finished ? sizeof(PARK_AHEAD) / sizeof(*PARK_AHEAD)
+                             : sizeof(RECOVERY_BACK) / sizeof(*RECOVERY_BACK);
+    unsigned columns = finished ? sizeof(PARK_SIDE) / sizeof(*PARK_SIDE)
+                                : sizeof(RECOVERY_SIDE) / sizeof(*RECOVERY_SIDE);
+    for (unsigned b = 0; b < rows; ++b)
+        for (unsigned s = 0; s < columns; ++s) {
+            if (fabsf(across[s]) > g->half_width)
                 continue;
             Vector2 at = Vector2Add(g->centre,
-                Vector2Add(
-                    Vector2Scale(g->direction, finished ? RECOVERY_BACK[b] : -RECOVERY_BACK[b]),
-                    Vector2Scale(side, RECOVERY_SIDE[s])));
-            Boat boat = facing(at, g->direction);
+                Vector2Add(Vector2Scale(g->direction, finished ? along[b] : -along[b]),
+                    Vector2Scale(side, across[s])));
+            Boat boat = facing(at, finished ? Vector2Negate(g->direction) : g->direction);
             if (!boat_fleet_spawn_clear(fleet, slot, &boat))
                 continue;
             boat_fleet_place(fleet, slot, boat);
             r->slots[slot].recovering = false;
             r->slots[slot].reset_wanted = false;
-            ++r->entrants[slot].recoveries;
+            if (finished) {
+                boat_fleet_hold(fleet, slot, true);
+                r->slots[slot].parked = true;
+            } else {
+                ++r->entrants[slot].recoveries;
+            }
             emit(out,
-                (BoatRaceEvent) { .tick = tick, .kind = BOAT_RACE_RECOVER, .slot = (uint8_t)slot });
+                (BoatRaceEvent) { .tick = tick,
+                    .kind = finished ? BOAT_RACE_PARK : BOAT_RACE_RECOVER,
+                    .slot = (uint8_t)slot });
             return true;
         }
     return false; // Stays recovering and retries on the next observation.
@@ -232,8 +261,8 @@ static void request_recovery(
 void boat_race_reset(BoatRace *r, BoatFleet *fleet, unsigned slot)
 {
     if (slot >= BOAT_FLEET_SLOTS || !r->slots[slot].identity || held_phase(r)
-        || !fleet->state.slots[slot].active)
-        return; // Gridded boats stay put; unplaced joiners wait for the grid.
+        || !fleet->state.slots[slot].active || fleet->state.slots[slot].held)
+        return; // Gridded and parked boats stay put; unplaced joiners wait for the grid.
     r->slots[slot].reset_wanted = true; // Observe applies it, after skip_ticks if capsized.
 }
 
@@ -249,6 +278,11 @@ void boat_race_bind(const BoatRace *r, BoatFleet *fleet)
 {
     // The ferry runs on the round's clock with its fixed pre-roll before GO.
     fleet->world.water.vessel = (BoatVesselWake) { 0 };
+    fleet->world.water.storm = (BoatStorm) { 0 };
+    if (r->round) {
+        fleet->world.water.storm = r->course.storm;
+        fleet->world.water.storm.started += boat_tick_seconds(r->go_tick);
+    }
     if (r->round && r->course.source.height > 0) {
         fleet->world.water.vessel = r->course.source;
         fleet->world.water.vessel.started += boat_tick_seconds(r->go_tick);
@@ -273,7 +307,7 @@ static void start_grid(BoatRace *r, BoatFleet *fleet, uint64_t tick, BoatRaceOut
         unsigned place = (order++ + r->round - 1) % BOAT_FLEET_SLOTS;
         boat_fleet_place(fleet, i, facing(r->course.grid[place], r->course.start.direction));
         boat_fleet_hold(fleet, i, true);
-        s->recovering = s->reset_wanted = false;
+        s->recovering = s->reset_wanted = s->parked = false;
     }
     boat_race_bind(r, fleet);
     phase_event(r, tick, out);
@@ -303,7 +337,7 @@ static void start_waiting(BoatRace *r, BoatFleet *fleet, uint64_t tick, BoatRace
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
         if (fleet->state.slots[i].held)
             boat_fleet_hold(fleet, i, false);
-        r->slots[i].recovering = false;
+        r->slots[i].recovering = r->slots[i].parked = false;
         if (r->slots[i].identity && !fleet->state.slots[i].active)
             boat_fleet_request_spawn(fleet, i);
     }
@@ -467,8 +501,20 @@ void boat_race_observe(BoatRace *r, BoatFleet *fleet, BoatRaceOutput *out)
             s->capsized = true;
             s->capsized_at = tick;
         }
-        if (s->recovering) {
+        const BoatRaceEntrant *e = &r->entrants[i];
+        bool finisher = boat_race_entrant(r, i) && e->status == BOAT_RACE_FINISHED
+            && (r->phase == BOAT_RACE_RACING || r->phase == BOAT_RACE_RESULTS);
+        if (s->parked) {
+            continue;
+        } else if (s->recovering) {
             recover(r, fleet, i, tick, out);
+        } else if (finisher) {
+            // The finish observation's tick, from the stored time after GO.
+            uint64_t finished = r->go_tick + 1 + e->finish / BOAT_RACE_SUBTICKS;
+            if (tick >= finished + r->rules.park_ticks || s->capsized || s->reset_wanted) {
+                s->recovering = true;
+                recover(r, fleet, i, tick, out);
+            }
         } else if (!f->pending && !held_phase(r)) {
             uint64_t since = tick - s->capsized_at;
             if ((s->capsized && since >= r->rules.recovery_ticks)

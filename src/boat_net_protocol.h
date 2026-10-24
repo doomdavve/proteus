@@ -3,16 +3,18 @@
 
 #include "boat_fleet.h"
 #include "boat_match.h"
+#include "boat_race.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
-// Multiplayer protocol v2 (M3, deathmatch D2). docs/MULTIPLAYER_PROTOCOL.md owns the byte tables.
+// Multiplayer protocol v4 (M3, deathmatch D2, mapped rooms, race R2). docs/MULTIPLAYER_PROTOCOL.md
+// owns the byte tables.
 // Every multi-byte field is big-endian; floats travel as IEEE-754 binary32 bit patterns. Encoders
 // never copy structs, padding, bool or enum representations; decoders validate every field
 // and never write the destination on failure.
 #define BOAT_NET_MAGIC 0x50424e54u // "PBNT"
-#define BOAT_NET_VERSION 3
+#define BOAT_NET_VERSION 4
 #define BOAT_NET_HEADER_BYTES 32
 #define BOAT_NET_MAX_MESSAGE 1100 // Whole message; the transport MTU allows for its headers.
 #define BOAT_NET_MAX_PAYLOAD (BOAT_NET_MAX_MESSAGE - BOAT_NET_HEADER_BYTES)
@@ -38,7 +40,7 @@
 
 // Delivery classes. ENet maps each to one channel; the in-memory adapter models the same rules.
 typedef enum {
-    BOAT_NET_CONTROL, // Reliable, ordered: handshake, roster, spawn, resync, leave, match.
+    BOAT_NET_CONTROL, // Reliable, ordered: handshake, roster, spawn, resync, leave, match, race.
     BOAT_NET_STATE, // Unreliable, sequenced: commands up, snapshots down, ping/pong.
     BOAT_NET_BIRTHS, // Unreliable, sequenced: recent wake births.
     BOAT_NET_REGISTRY, // Unreliable, unsequenced: reserved for registry pages (M4/M5).
@@ -65,6 +67,8 @@ typedef enum {
     BOAT_NET_DISCONNECT = 16,
     BOAT_NET_MATCH_STATE = 17,
     BOAT_NET_MATCH_EVENT = 18,
+    BOAT_NET_RACE_STATE = 19,
+    BOAT_NET_RACE_EVENT = 20,
     BOAT_NET_TYPE_LIMIT
 } BoatNetType;
 
@@ -137,7 +141,15 @@ typedef struct {
     char build[BOAT_NET_BUILD_BYTES + 1];
 } BoatNetHello;
 
-typedef enum { BOAT_NET_MODE_FREE, BOAT_NET_MODE_DEATHMATCH, BOAT_NET_MODE_LIMIT } BoatNetRoomMode;
+typedef enum {
+    BOAT_NET_MODE_FREE,
+    BOAT_NET_MODE_DEATHMATCH,
+    BOAT_NET_MODE_RACE,
+    BOAT_NET_MODE_LIMIT
+} BoatNetRoomMode;
+
+// Courses a race room can run; the content digest covers their compiled data.
+typedef enum { BOAT_NET_COURSE_RIVER, BOAT_NET_COURSE_LIMIT } BoatNetRaceCourse;
 
 typedef struct {
     uint8_t slot;
@@ -196,6 +208,9 @@ typedef struct {
     uint32_t next_request;
     uint16_t live, peak_live;
     uint64_t emitted, expired, wake_digest;
+    // GO tick of the race room's latest round, zero for none: the course source's clock and the
+    // tick its grid holds release. Always zero outside race rooms.
+    uint64_t race_go;
     BoatFleetSlot slots[BOAT_FLEET_SLOTS];
     BoatWakeObjectEmitter emitters[BOAT_FLEET_SLOTS];
     BoatNetSlotInput inputs[BOAT_FLEET_SLOTS];
@@ -222,6 +237,38 @@ typedef struct {
     bool bailout;
     uint32_t victim_life, round;
 } BoatNetMatchEvent;
+
+typedef struct {
+    bool present; // A player occupies the slot.
+    bool entrant; // The row belongs to the latest round.
+    bool current; // The slot's present player is that entrant.
+    bool parked; // Finished and held past the finish.
+    uint8_t status, place, gates; // BoatRaceStatus; place 0 unplaced; gates cleared.
+    uint32_t recoveries;
+    uint64_t finish; // Subticks after GO, once finished.
+} BoatNetRaceRow;
+
+// Race phase, clock and every slot's row (docs/RACE_PLAN.md); race rooms only.
+typedef struct {
+    uint8_t phase; // BoatRacePhase.
+    uint8_t course; // BoatNetRaceCourse.
+    uint8_t placed; // Places awarded this round.
+    uint16_t recovery_ticks, skip_ticks, park_ticks;
+    uint32_t round; // Rounds gridded.
+    uint64_t phase_end; // Grid, countdown and results; zero otherwise.
+    uint64_t go_tick; // Of the latest round; zero before the first.
+    uint64_t deadline; // While racing; zero otherwise.
+    BoatNetRaceRow slots[BOAT_FLEET_SLOTS];
+} BoatNetRaceState;
+
+// A race event; the header tick is the event's tick.
+typedef struct {
+    uint8_t kind; // BoatRaceKind.
+    uint8_t slot; // BOAT_RACE_NOBODY for phase and abandon events.
+    uint8_t value; // The phase, the gate or the place.
+    uint32_t round;
+    uint64_t time; // Finish subticks after GO; zero for other kinds.
+} BoatNetRaceEvent;
 
 typedef struct {
     uint8_t slot; // Pool slot; slot / BOAT_OBJECT_PER_BOAT is the emitter.
@@ -257,6 +304,8 @@ typedef struct {
         uint8_t leave; // BoatNetLeaveReason.
         BoatNetMatchState match;
         BoatNetMatchEvent match_event;
+        BoatNetRaceState race;
+        BoatNetRaceEvent race_event;
     };
 } BoatNetMessage;
 
@@ -264,6 +313,15 @@ typedef struct {
 void boat_net_match_state_of(const BoatMatch *match, BoatNetMatchState *state);
 BoatNetMatchEvent boat_net_match_event_of(const BoatMatch *match, const BoatMatchEvent *event);
 bool boat_net_match_state_equal(const BoatNetMatchState *a, const BoatNetMatchState *b);
+// The wire race state of RACE, and the event for EVENT.
+void boat_net_race_state_of(const BoatRace *race, BoatNetRaceState *state);
+BoatNetRaceEvent boat_net_race_event_of(const BoatRace *race, const BoatRaceEvent *event);
+bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState *b);
+// The GO tick a snapshot or checkpoint carries for RACE: zero before its first round.
+uint64_t boat_net_race_go(const BoatRace *race);
+// Bind a race room's course source to FLEET's water for GO (zero removes it), as the authority's
+// race does: the client's mirror and prediction call this with each snapshot's race_go.
+void boat_net_race_bind(BoatFleet *fleet, uint8_t course, uint64_t go);
 
 // Encode MESSAGE (its header payload length is computed) into OUT. Returns the byte count, or
 // zero for a message that does not satisfy the decoder's own validation.
@@ -293,12 +351,13 @@ uint64_t boat_net_bytes_digest(const void *data, size_t size);
 // Snapshot of STATE after its latest tick, with each slot's input record.
 void boat_net_snapshot_of(const BoatFleetState *state,
     const BoatNetSlotInput inputs[BOAT_FLEET_SLOTS], BoatNetSnapshot *snapshot);
-// Complete checkpoint bytes: everything in a snapshot plus the wake pool's records and
-// settings. Returns the byte count (well below BOAT_NET_MAX_CHECKPOINT).
+// Complete checkpoint bytes: everything in a snapshot (RACE_GO included) plus the wake pool's
+// records and settings. Returns the byte count (well below BOAT_NET_MAX_CHECKPOINT).
 size_t boat_net_checkpoint_encode(const BoatFleetState *state,
-    const BoatNetSlotInput inputs[BOAT_FLEET_SLOTS], uint8_t *out, size_t capacity);
+    const BoatNetSlotInput inputs[BOAT_FLEET_SLOTS], uint64_t race_go, uint8_t *out,
+    size_t capacity);
 BoatNetError boat_net_checkpoint_decode(const uint8_t *data, size_t size, BoatFleetState *state,
-    BoatNetSlotInput inputs[BOAT_FLEET_SLOTS]);
+    BoatNetSlotInput inputs[BOAT_FLEET_SLOTS], uint64_t *race_go);
 
 // LAN discovery (docs/MULTIPLAYER_PROTOCOL.md#lan-discovery): plain UDP datagrams outside ENet
 // on their own port. A client broadcasts a query; every room that hears it answers the sender

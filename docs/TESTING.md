@@ -73,18 +73,24 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   `boat_race_trial_gpu` samples both production GLSL source recipes against CPU height,
   slopes and vertical velocity when GPU tests are enabled, then verifies the mapped ferry
   contributes pixels to the main, reflection and shadow passes with identical physical water.
+  It also samples both production storm recipes against CPU height, gradients and vertical velocity.
   The fixture also checks independent physical scenery emission/restore and visible trail
   bounds; `wake_objects_gpu` checks both object pools beyond slot 127, independent lifetimes,
   exact uploads and 4/8 KiB texture-resize round trips.
 - `boat_race` runs `validate_boat_race` ([race R1](RACE_PLAN.md#r1-race-core--2026-10-24)):
-  course lines spanning the mapped river, swept/reverse/lateral/multi-gate crossings, held grid
-  through a full-throttle countdown and a same-tick release, same-tick places and exact ties,
+  skill-gate endpoints and centre/outer-lane shoreline clearance, a full-width finish,
+  mandatory line changes through consecutive openings (including edge cuts), compact storm
+  support, analytic derivatives (including patch translation), clock translation and storm
+  rendezvous/speed, swept/reverse/lateral/multi-gate crossings, skipped-gate
+  finish rejection, held grid through a full-throttle countdown and a same-tick release,
+  same-tick places and exact ties,
   recovery behind the last cleared gate, joiners, leavers, abandonment, deadlines and grid
-  rotation. It ends with a four-bot ferry race with a mid-race checkpoint restore.
+  rotation, and finisher parking (R2). It ends with a four-bot ferry race with a mid-race
+  checkpoint restore.
 - `boat_match` runs `validate_boat_match` ([deathmatch](DEATHMATCH_PLAN.md) credit window,
   self-capsize, grace, respawn, bailout, leavers, rounds and planted-wake capsizes), and
   `boat_server_scripted_deathmatch` runs a scripted 10 s round through its intermission.
-- `boat_net`, `boat_net_loopback` and `boat_net_deathmatch` are the
+- `boat_net`, `boat_net_loopback`, `boat_net_deathmatch` and `boat_net_race` are the
   [network checks](#network-checks).
 - Nine argument checks expect a failure: `boat_server --scripted` with a room option, an invalid
   `--port` and an invalid `--bind`, `--round-seconds` without `--mode deathmatch`, `boat_bot`
@@ -185,8 +191,10 @@ gates still require recorded runs and resource measurements. `boat_bot --predict
 `boat_net` also runs four predicted clients in both mapped locations: shoreline-safe spawns,
 a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
 a snapshot outside the former basin coordinate envelope, a local loading pause, reset and exact
-mirrors at a birth-batch snapshot. The protocol-v3 codec rejects invalid map IDs and reserved
-bytes; discovery uses the complete compiled-map bundle digest.
+mirrors at a birth-batch snapshot. The protocol-v4 codec rejects invalid map IDs and reserved
+bytes and checks the RaceState/RaceEvent rules; a race room on the in-memory transport checks
+predicted holds released at GO, ferry-exact mirrors, a mid-race joiner and results, and a
+prediction replay through GO matches the authority; discovery uses the complete compiled-map bundle digest.
 
 `boat_net_river` runs the four-player lifecycle harness with `--location river --mode deathmatch`
 (about 36 s). `boat_net_eriksberg` runs the deathmatch smoke on the smaller mapped crop, checking
@@ -205,6 +213,15 @@ given run varies; the check is that clients agree with the authority. Run it alo
 
 ```sh
 python3 tools/boat_net_smoke.py --deathmatch --server build/boat_server --bot build/boat_bot
+```
+
+`boat_net_race` (about 14 s) finds a `--mode race` room through LAN discovery and races two
+`boat_bot --predict` clients for 10 s over ENet. Each bot must see round 1 gridded and released
+(at least 150 held ticks, a GO tick), receive the server's logged race events, and finish
+without resyncs or decode faults. Run it alone with:
+
+```sh
+python3 tools/boat_net_smoke.py --race --server build/boat_server --bot build/boat_bot
 ```
 
 None of these tests impairs a real network interface, and none replaces the

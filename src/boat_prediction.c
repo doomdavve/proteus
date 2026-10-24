@@ -40,6 +40,10 @@ static BoatInput own_input(const BoatPrediction *p, uint64_t tick)
 
 static void step(BoatPrediction *p)
 {
+    if (p->authority_tick < p->release_tick && p->fleet.state.tick >= p->release_tick)
+        for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+            if (p->fleet.state.slots[i].held)
+                boat_fleet_hold(&p->fleet, i, false);
     uint64_t tick = p->fleet.state.tick + 1;
     BoatInput inputs[BOAT_FLEET_SLOTS];
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
