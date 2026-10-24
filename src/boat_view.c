@@ -103,6 +103,14 @@ static Transform3D water_particle_pose(
 }
 
 // Shared authored current cues and scripted wake source for CPU/GPU views in all locations.
+static void vessel_box(BoatCourseBoxDraw draw, void *context, Vector2 position, float heading,
+    Vector3 local, Vector3 size, Color color)
+{
+    Vector3 p = Vector3Transform(local, MatrixRotateY(heading));
+    p = Vector3Add(p, (Vector3) { -position.x, 0, position.y });
+    draw(context, (Transform3D) { .position = p, .rotation = { 0, heading, 0 }, .scale = size }, color);
+}
+
 static void environment_visit(
     const BoatViewState *view, const BoatWorld *world, BoatCourseBoxDraw draw, void *context)
 {
@@ -131,6 +139,24 @@ static void environment_visit(
             }
     }
     Vector2 source;
+    if (boat_vessel_wake_position(world->water.vessel, time, &source)) {
+        float heading = atan2f(world->water.vessel.direction.x, -world->water.vessel.direction.y);
+        Color hull = { 41, 75, 99, 255 }, deck = { 221, 224, 209, 255 };
+        vessel_box(draw, context, source, heading, (Vector3) { 0, .2f, 0 },
+            (Vector3) { BOAT_VESSEL_BEAM, 2.8f, BOAT_VESSEL_LENGTH }, hull);
+        vessel_box(draw, context, source, heading, (Vector3) { 0, 2.6f, 0 },
+            (Vector3) { 9, 2, 28 }, deck);
+        vessel_box(draw, context, source, heading, (Vector3) { 0, 4.2f, -7 },
+            (Vector3) { 8, 1.2f, 12 }, deck);
+        vessel_box(draw, context, source, heading, (Vector3) { 0, 4.4f, -13.05f },
+            (Vector3) { 7, .6f, .1f }, hull);
+        vessel_box(draw, context, source, heading, (Vector3) { 0, 5.3f, 8 },
+            (Vector3) { 2, 3.5f, 3 }, (Color) { 202, 138, 49, 255 });
+        for (int side = -1; side <= 1; side += 2)
+            for (int z = -11; z <= 11; z += 3)
+                vessel_box(draw, context, source, heading, (Vector3) { side * 4.55f, 2.8f, z },
+                    (Vector3) { .1f, .8f, 1.6f }, hull);
+    }
     if (boat_water_wake_source(world->water, time, &source)) {
         float height = boat_water_query_field(world->water, world->wake_field, source, time).height;
         draw(context,

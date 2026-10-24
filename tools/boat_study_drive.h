@@ -5,6 +5,8 @@
 #include "boat_session.h"
 typedef struct {
     BoatWakeObjects wakes; // The single-boat arcade pool.
+    BoatWakeObjects traffic; // Opt-in race trial scenery; never takes a player slot.
+    bool traffic_enabled;
     // Crossing: the player (slot 0) and the scripted rival (slot 1) are two physical boats of
     // one multiplayer M2 fleet, which owns their shared pool instead of WAKES.
     BoatFleet fleet;

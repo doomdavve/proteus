@@ -50,6 +50,11 @@ manual acceptance, profile-F play and contact-gap measurement. These remain open
 not completed acceptance. M5 is active; M6–M8 remain pending. The [capsize deathmatch](DEATHMATCH_PLAN.md)
 proceeds in parallel (D1 match core and D2 protocol v2 with the in-game HUD implemented
 2026-10-24; next: D2 play, then D3). The live protocol is now [v3](MULTIPLAYER_PROTOCOL.md).
+The next requested mode is a [river sprint race](RACE_PLAN.md), planned 2026-10-24:
+45–60 seconds, a shared grid, frequent vessel-wake jumps and confirmed finish positions.
+Race R0 now provides a measured shortened route and playable physical ferry-wake trial;
+[R0 evidence and next task](RACE_PLAN.md#r0-prototype--2026-10-24). R1–R4 and the network
+race mode remain unimplemented; the room protocol is unchanged by the local fixture.
 Numerical budgets below are proposed gates, not measured multiplayer results.
 The final evidence section distinguishes checks performed for this document from future checks.
 
@@ -86,9 +91,10 @@ ranking, elaborate race rules, persistent progression, chat/voice and moderation
 this release. Friends can use their existing voice call.
 
 Superseded in part on 2026-10-24: the user chose a timed capsize deathmatch, with scoring,
-leaderboard and new capsize mechanics, as a server-selected room mode beside free boating. The
-[deathmatch plan](DEATHMATCH_PLAN.md) owns it; the paragraph above is kept as the original
-planning default.
+leaderboard and new capsize mechanics, as a server-selected room mode beside free boating,
+then requested a short, jump-heavy river race with a shared start and finish positions.
+The [deathmatch plan](DEATHMATCH_PLAN.md) and [race plan](RACE_PLAN.md) own those modes;
+the paragraph above is kept as the original planning default. Race is not implemented.
 
 Assumptions: friends trust the host; a room uses one fixed map/settings revision; stable native
 machines can run 120 Hz; initial quality target is RTT <=80 ms with modest jitter/loss.
@@ -798,7 +804,8 @@ parity. Manual: group river journey, passing ferry, shoreline side-swipe, jumpin
 recovery with traffic nearby, AA on/off and lower-end Windows machine. Acceptance: no boat
 separated through land, no dynamic-player slot consumed by scenery, profile F and resource
 gates still pass. Update public commands only after they work. Broader dynamic harbor fleet,
-watercraft variants and competitive modes are non-goals.
+watercraft variants are non-goals for M7. Competitive modes have separate owners in the
+[deathmatch](DEATHMATCH_PLAN.md) and [race](RACE_PLAN.md) plans.
 
 ### M8 — browser feasibility gate, then an optional browser milestone
 

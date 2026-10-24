@@ -1,6 +1,7 @@
 #ifndef PROTEUS_BOAT_WATER_H
 #define PROTEUS_BOAT_WATER_H
 
+#include "boat_vessel_wake.h"
 #include "boat_wake.h"
 #include "boat_wake_objects.h"
 #include "geometry3d.h"
@@ -23,6 +24,7 @@ typedef struct {
 typedef struct {
     float amplitude, wavelength, angular_speed;
     const BoatWakeObjects *objects; // Borrowed app-owned arcade world; copies do not own it.
+    const BoatWakeObjects *traffic_objects; // Optional independent scenery pool (race trial).
     Vector2 direction;
     Vector2 current; // Uniform flow, or a compact channel when current_width > 0.
     float current_center, current_width; // Simulation X centre and half-width.
@@ -32,6 +34,7 @@ typedef struct {
     int player_wake_count, player_wake_next;
     BoatWakeSegment player_wake[BOAT_WAKE_SEGMENTS]; // Owned history: copies never alias a boat.
     BoatWave crossing[2]; // Smaller components; all parameters are shared with the GPU.
+    BoatVesselWake vessel; // Opt-in race trial; independent bounded source, no player slot.
 } BoatWater;
 
 typedef struct {

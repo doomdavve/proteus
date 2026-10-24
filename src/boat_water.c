@@ -70,7 +70,7 @@ BoatWater boat_water_test(bool waves, bool current, bool wake)
 static bool displaced(const BoatWater *water)
 {
     return water->amplitude != 0 || water->wake_amplitude != 0 || water->player_wake_enabled
-        || water->objects;
+        || water->objects || water->traffic_objects || water->vessel.height > 0;
 }
 
 bool boat_water_displaced(BoatWater water) { return displaced(&water); }
@@ -292,11 +292,24 @@ static BoatWaterSample query(const BoatWater *water, Vector2 position, double ti
         sample.velocity.y -= w.amplitude * w.angular_speed * cosf(phase);
     }
     crossing_wake(water, position, time, &sample.height, &gradient, &sample.velocity.y);
+    if (water->vessel.height > 0) {
+        BoatVesselWakeSample q = boat_vessel_wake_query(water->vessel, position, time);
+        sample.height += q.height;
+        gradient = Vector2Add(gradient, q.gradient);
+        sample.velocity.y += q.vertical_velocity;
+    }
     player_wake(water, position, time, &sample.height, &gradient, &sample.velocity.y);
     if (water->objects) {
         BoatWakeObjectSample q = boat_wake_objects_query(water->objects, position);
         sample.height += q.height;
         sample.crest_foam = q.crest_foam;
+        gradient = Vector2Add(gradient, q.gradient);
+        sample.velocity.y += q.vertical_velocity;
+    }
+    if (water->traffic_objects) {
+        BoatWakeObjectSample q = boat_wake_objects_query(water->traffic_objects, position);
+        sample.height += q.height;
+        sample.crest_foam += q.crest_foam;
         gradient = Vector2Add(gradient, q.gradient);
         sample.velocity.y += q.vertical_velocity;
     }

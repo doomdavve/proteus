@@ -1,5 +1,6 @@
 #include "boat_study_drive.h"
 #include "raymath.h"
+#include "waterfront_traffic.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,6 +107,12 @@ void timed_boat_step(BoatSession *session, BoatInput input, BoatFrameMetrics *me
     } else {
         if (objects)
             boat_wake_objects_advance(&objects->wakes);
+        if (objects && objects->traffic_enabled
+            && !waterfront_traffic_wakes_step(
+                &objects->traffic, boat_session_time(session) + BOAT_TICK_SECONDS)) {
+            fprintf(stderr, "Traffic wake emission contract failed.\n");
+            exit(1);
+        }
         BoatWakeStern before = wake
             ? boat_wake_stern(boat, &session->world, boat_session_time(session))
             : (BoatWakeStern) { 0 };

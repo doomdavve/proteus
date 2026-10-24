@@ -65,13 +65,22 @@ CPU checks may run concurrently; fixture dependencies still govern capture/repla
 
 Every active test carries one of three labels: `cpu` (display-free), `render` (CPU
 captures and checksums) or `gpu` (graphics context). Skin geometry carries both `cpu` and
-`render` labels. The nineteen `core` checks are also
+`render` labels. The `core` checks are also
 `cpu`:
 - `boat_core` runs `validate_boat_core`, which links only the boating core library.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
   checkpoints), and `boat_server_scripted` runs the scripted authority for 2400 ticks.
+- `boat_race_trial` runs the [R0 ferry fixture](RACE_PLAN.md#r0-prototype--2026-10-24):
+  source derivatives, bounded support/clock translation, source hull clearance/contact,
+  four-emitter fleet restore, speed/angle/player-wake overlap and timed route/arrival sweeps.
+  `boat_race_trial_gpu` samples both production GLSL source recipes against CPU height,
+  slopes and vertical velocity when GPU tests are enabled, then verifies the mapped ferry
+  contributes pixels to the main, reflection and shadow passes with identical physical water.
+  The fixture also checks independent physical scenery emission/restore and visible trail
+  bounds; `wake_objects_gpu` checks both object pools beyond slot 127, independent lifetimes,
+  exact uploads and 4/8 KiB texture-resize round trips.
 - `boat_match` runs `validate_boat_match` ([deathmatch](DEATHMATCH_PLAN.md) credit window,
   self-capsize, grace, respawn, bailout, leavers, rounds and planted-wake capsizes), and
   `boat_server_scripted_deathmatch` runs a scripted 10 s round through its intermission.

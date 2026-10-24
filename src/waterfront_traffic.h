@@ -7,6 +7,7 @@
 #define WATERFRONT_TRAFFIC_VESSELS 4
 #define WATERFRONT_TRAFFIC_WAKE_SEGMENTS 8
 #define WATERFRONT_TRAFFIC_WAKES (WATERFRONT_TRAFFIC_VESSELS * WATERFRONT_TRAFFIC_WAKE_SEGMENTS * 2)
+#define WATERFRONT_TRAFFIC_WAKE_CAPACITY (WATERFRONT_TRAFFIC_VESSELS * 16 * 2 + 32)
 #define WATERFRONT_TRAFFIC_LIGHTS 3
 
 typedef struct {
@@ -29,7 +30,7 @@ typedef struct {
 typedef struct {
     WaterfrontVesselState vessels[WATERFRONT_TRAFFIC_VESSELS];
     int wake_count;
-    WaterfrontTrafficWake wakes[WATERFRONT_TRAFFIC_WAKES];
+    WaterfrontTrafficWake wakes[WATERFRONT_TRAFFIC_WAKE_CAPACITY];
 } WaterfrontTrafficFrame;
 
 typedef struct {
@@ -44,8 +45,13 @@ const Mesh3D *waterfront_traffic_mesh(int index);
 WaterfrontVesselMotion waterfront_traffic_motion(int index, double time);
 double waterfront_traffic_period(int index); // Exact route period in seconds.
 void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame);
+// Opt-in race fixture: an independent four-emitter pool seeded from 16 seconds of actual
+// scenery motion. Advance once per fixed tick before boat physics; ordinary traffic is unchanged.
+bool waterfront_traffic_wakes_init(BoatWakeObjects *wakes, double time);
+bool waterfront_traffic_wakes_step(BoatWakeObjects *wakes, double time);
 // Full rectangle SAT against moving, padded traffic hulls. Traffic follows its route;
-// only the player responds. No basin traffic, traffic AI, or physical crossing-wake source.
+// only the player responds. No basin traffic or traffic AI. The height-aware variant also
+// checks WATER's opt-in authored ferry hull.
 bool waterfront_traffic_contact(Vector2 position, float heading, float bow, float stern,
     float half_beam, double time, WaterfrontTrafficContact *contact);
 bool waterfront_traffic_contact_height(Vector2 position, float heading, float bow, float stern,
