@@ -194,7 +194,7 @@ unverified; user acceptance is pending.
 `--location river` extends the geographic area to Älvsborgsbron, using the same dock spawn
 and boat physics. A shared CPU/GPU blockout includes the deck, open towers, main cables,
 and hangers. The four tower-leg footprints obstruct navigation while the deck stays above
-the navigable water. Its default follow view is 32 m back / 6 m high; C restores that view.
+the navigable water. Its default follow view is 12 m back / 6 m high; C restores that view.
 The original Eriksberg crop and main demo remain the defaults for their existing modes.
 See the [bridge expansion record](eriksberg/bridge/README.md) for assumptions and route checks.
 
@@ -324,7 +324,7 @@ Only the first row is implemented and user-accepted in this pass. The remaining 
 | Priority | Experiment | Success criterion / guardrail |
 | --- | --- | --- |
 | 1 | Accepted quicker countersteering and small speed view; `--fixed-fov` for comparison | Catch the S turn with less correction delay; keep docking precision, readable boat and comfortable horizon. See physics H1/H2. |
-| 2 | Compare a closer, lower follow view using existing `--camera-distance 18 --camera-height 6` | Stronger nearby water/scenery motion and clearer hull attitude without hiding upcoming buoys. Test camera positioning before more FOV or camera shake. No new default selected yet. |
+| 2 | Compare a closer, lower follow view using existing `--camera-distance 18 --camera-height 6` | Stronger nearby water/scenery motion and clearer hull attitude without hiding upcoming buoys. Test camera positioning before more FOV or camera shake. River now defaults to 12 m back / 6 m high (2026-10-24); user-approved with the finer rain on 2026-10-24. |
 | 3 | A short course with a broad sweeper, one S, an exit straight and an optional tighter line | Meaningful throttle/line choices and rapid R retries; measure clean completion and voluntary retries, not just best time. Retain forgiving contacts; new gate layouts require a course revision. |
 | 4 | Superseded by the [marine HUD](BOAT_HUD.md) | Persistent thrust/neutral feedback is now implemented in the isolated HUD branch; visual review and multiplayer integration remain. |
 | 5 | Put an existing crossable wake where its approach and alternate line are visible | Choosing to ease off or cross at an angle is enjoyable and recoverable. Use current wave physics; avoid invisible impulses or required jumps. |

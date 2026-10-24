@@ -280,7 +280,7 @@ int main(int argc, char **argv)
         = { { water.amplitude, water.wavelength, water.angular_speed, water.direction },
               water.crossing[0], water.crossing[1] };
     printf("preset=%s cameras=%s resolution=320x200 gpu_aa=4x4\n", waves ? "waves" : "flat",
-        river ? "32/6,12/6" : "20/14,12/6");
+        river ? "12/6,12/6" : "20/14,12/6");
     for (int i = 0; i < 3; ++i)
         printf("wave[%d] amplitude=%.6f wavelength=%.6f angular_speed=%.6f direction=%.6f,%.6f\n",
             i, components[i].amplitude, components[i].wavelength, components[i].angular_speed,

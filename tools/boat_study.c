@@ -60,7 +60,7 @@ static void usage(void)
         "--player-wake: legacy D3 trail | --no-player-wake: visual-only player trail\n"
         "--current / --crossing-wake: opt-in authored tests in all locations; R restarts passage\n"
         "--skin sweden|finland|denmark|norway: cosmetic speedboat livery (default sweden)\n"
-        "--camera-distance UNITS: 8..48 (default 20; river 32)\n"
+        "--camera-distance UNITS: 8..48 (default 20; river 12)\n"
         "--camera-height UNITS: 4..36 (default 14; river 6)\n"
         "--fixed-fov: keep the 55-degree view instead of widening gently with speed\n"
         "--location basin|eriksberg|river (default basin; river extends to Alvsborgsbron)\n"
@@ -1179,9 +1179,8 @@ invalid:
 static int title_single(const BoatTitleSettings *settings)
 {
     char *arguments[] = { "boat_study", "--current", "--crossing-wake", "--location", "river",
-        "--waves", "--gpu-aa", "--camera-distance", "12", "--camera-height", "6", "--skin",
-        (char *)boat_skin_name(settings->skin), "--soundtrack",
-        (char *)boat_music(settings->soundtrack)->id,
+        "--waves", "--gpu-aa", "--skin", (char *)boat_skin_name(settings->skin),
+        "--soundtrack", (char *)boat_music(settings->soundtrack)->id,
         settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
     int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
     return study(count, arguments);

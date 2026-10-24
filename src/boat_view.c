@@ -185,7 +185,15 @@ static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double c
     float top, float span, unsigned x, unsigned z, bool upper,
     BoatCourseBoxDraw draw, void *context)
 {
-    uint32_t seed = x * UINT32_C(0x9e3779b9) ^ z * UINT32_C(0x85ebca6b)
+    // Concentrate the low curtain around the viewer on a storm-relative 5 m lattice.
+    // Hash actual cell coordinates so following the boat never relocates existing drops.
+    int cell_x = (int)x, cell_z = (int)z;
+    if (!upper) {
+        cell_x += (int)floorf((view->boat.position.x - storm.centre.x) / 5) - 10;
+        cell_z += (int)floorf((view->boat.position.y - storm.centre.y) / 5) - 10;
+    }
+    uint32_t seed = (uint32_t)cell_x * UINT32_C(0x9e3779b9)
+        ^ (uint32_t)cell_z * UINT32_C(0x85ebca6b)
         ^ (upper ? UINT32_C(0xa511e9b3) : UINT32_C(0x63d83595));
     float speed = 18 + 22 * storm_rain_hash(seed + 1);
     double travel = clock * speed + storm_rain_hash(seed + 2) * span;
@@ -196,6 +204,9 @@ static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double c
         return;
     Vector2 p = { ((float)x - 11.5f + storm_rain_hash(drop + 4) - .5f) * storm.radius / 12,
         ((float)z - 11.5f + storm_rain_hash(drop + 5) - .5f) * storm.radius / 12 };
+    if (!upper)
+        p = (Vector2) { ((float)cell_x + storm_rain_hash(drop + 4)) * 5,
+            ((float)cell_z + storm_rain_hash(drop + 5)) * 5 };
     if (Vector2Length(p) > storm.radius * .90f)
         return;
     float gust = sinf((float)fmod(clock * .7, 2 * PI) + p.x * .017f + p.y * .011f);
@@ -204,14 +215,21 @@ static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double c
     if (Vector2Distance(view->boat.position, p) > 210)
         return;
     float slant = .10f + .22f * storm_rain_hash(drop + 6) + .08f * gust;
-    float width = .22f + .45f * storm_rain_hash(drop + 7);
-    float length = (upper ? 8 : 3) + 9 * storm_rain_hash(drop + 8);
-    unsigned char brightness = (unsigned char)(135 + 45 * storm_rain_hash(drop + 9));
+    // Fine exposure streaks rather than metre-scale solid bars. Ease their ends into
+    // each fall so a new cycle does not pop a full-length streak into the cloud/water.
+    float life = fall / span;
+    float fade = Clamp(fminf(life, 1 - life) * 12, 0, 1);
+    float width = (.035f + .045f * storm_rain_hash(drop + 7)) * fade;
+    float length = ((upper ? 2.0f : .9f) + 2.2f * storm_rain_hash(drop + 8)) * fade;
+    unsigned char brightness = (unsigned char)(185 + 35 * storm_rain_hash(drop + 9));
+    if (fade < .05f)
+        return;
     draw(context,
         (Transform3D) { .position = { -p.x, top - fall, p.y },
-            .rotation = { .05f * gust, 0, -slant }, .scale = { width, length, width } },
-        (Color) { brightness, (unsigned char)(brightness + 15),
-            (unsigned char)(brightness + 25), 255 });
+            .rotation = { .05f * gust, 0, -slant },
+            .scale = { width, length, width } },
+        (Color) {
+            brightness, (unsigned char)(brightness + 17), (unsigned char)(brightness + 30), 255 });
 }
 
 // A travelling world-space squall: its cloud, rain curtain and bolts advertise the physical
@@ -238,7 +256,8 @@ static void storm_visit(const BoatViewState *view, const BoatWorld *world,
     // Counts remain bounded below the shared scenery capacity even during lightning.
     for (unsigned z = 0; z < 24; ++z)
         for (unsigned x = 0; x < 24; ++x) {
-            storm_rain_drop(view, storm, clock, 32, 30, x, z, false, draw, context);
+            if (x < 20 && z < 20)
+                storm_rain_drop(view, storm, clock, 32, 30, x, z, false, draw, context);
             if (x % 2 == 0 && z % 2 == 0)
                 storm_rain_drop(view, storm, clock, cloud_height - 8, cloud_height - 44,
                     x, z, true, draw, context);

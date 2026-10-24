@@ -390,8 +390,8 @@ blockout. Start in the same dock, leave the basin, and follow the river southwes
 the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy
 embankments, with concrete abutments connecting the deck to the land. The approaches follow mapped
 road alignments; their elevations are authored for the flat scene. The four mapped tower legs
-block the boat; the elevated deck remains passable underneath. The river location defaults to a lower follow view (32 m back,
-6 m high) so the bridge stays visible; C restores that view. The original Eriksberg location and
+block the boat; the elevated deck remains passable underneath. The river location defaults to a close follow view (12 m back,
+6 m high) for a stronger sense of speed; C restores that view. The original Eriksberg location and
 main demo keep their existing scenery and camera defaults. Both renderers support the extension;
 GPU is recommended for waves because the CPU reference tessellates the whole water footprint.
 Geometry and height assumptions are in the [river manifest](assets/geometry/river/manifest.json).
