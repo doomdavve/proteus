@@ -26,6 +26,42 @@ out vec3 fragWorldNormal;
 
 
 // Same bounded packet and derivatives as boat_water.c, in reflected world X/Z.
+// BEGIN STORM RECIPE
+uniform vec4 stormArea; // World centre X/Z, radius, height.
+uniform vec4 stormPhase; // CPU-reduced phases for the four directional wave trains.
+uniform vec4 stormMotion; // World velocity X/Z, CPU-reduced long-bend phase, reserved.
+vec4 stormWave(vec2 world)
+{
+    if (stormArea.z <= 0.0 || stormArea.w <= 0.0) return vec4(0.0);
+    vec2 p = world - stormArea.xy;
+    float r2 = dot(p,p)/(stormArea.z*stormArea.z);
+    if (r2 >= 1.0) return vec4(0.0);
+    float edge = 1.0-r2, envelope = edge*edge*edge;
+    vec2 envelopeGradient = -6.0*edge*edge*p/(stormArea.z*stormArea.z);
+    vec2 waves[4] = vec2[4](vec2(-0.27,-0.32),vec2(-0.38,-0.26),
+        vec2(-0.16,-0.30),vec2(-0.47,-0.18));
+    float speeds[4] = float[4](3.2,3.75,2.45,4.15);
+    float amplitudes[4] = float[4](0.8,0.4,0.22,0.12);
+    float offsets[4] = float[4](0.0,1.1,2.7,4.2);
+    vec2 bendWave = vec2(-0.013,0.017);
+    float bendPhase = dot(p,bendWave)-stormMotion.z;
+    vec4 result = vec4(0.0);
+    for (int i=0; i<4; ++i) {
+        float bend = bendPhase + offsets[i]*0.73;
+        float bendSlope = 0.85*cos(bend);
+        float phase = dot(p,waves[i])+0.85*sin(bend)+offsets[i]-stormPhase[i];
+        float a = stormArea.w*amplitudes[i];
+        float h = a*(sin(phase)+0.12*sin(2.0*phase+0.4));
+        float slope = a*(cos(phase)+0.24*cos(2.0*phase+0.4));
+        vec2 phaseGradient = waves[i]+bendWave*bendSlope;
+        result += vec4(envelope*h, envelopeGradient*h+phaseGradient*(envelope*slope),
+            -envelope*slope*(speeds[i]+0.37*bendSlope));
+    }
+    result.w -= dot(result.yz, stormMotion.xy);
+    return result;
+}
+// END STORM RECIPE
+
 // BEGIN VESSEL RECIPE
 uniform vec4 vesselOrigin; // world X/Z, unit direction X/Z
 uniform vec4 vesselMotion; // speed, height, duration, lifetime
@@ -243,7 +279,7 @@ void main()
             position.y += w.z * sin(dot(w.xy, position.xz) - w.w);
         }
         position.y += crossingWake(position.xz, crossingWakeTime).x + playerWake(position.xz).x
-            + wakeVertexHeight(position.xz) + vesselWake(position.xz).x;
+            + wakeVertexHeight(position.xz) + vesselWake(position.xz).x + stormWave(position.xz).x;
         if (waterPatchPass == 2 && wakeFieldEnabled == 0)
             position.y *= 1.0 - smoothstep(wavePatch.z, wavePatch.w,
                 length(position.xz - wavePatch.xy));

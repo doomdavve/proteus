@@ -113,15 +113,32 @@ static void check_wakes(BoatNetClient *c, double now)
     c->wake_consistent = consistent;
 }
 
+// Race rooms: the course source runs on the latest round's clock, in the mirror and in the
+// prediction, which also releases grid holds at GO.
+static void bind_race(BoatNetClient *c, uint64_t go)
+{
+    if (c->accept.mode != BOAT_NET_MODE_RACE)
+        return;
+    c->race_go = go;
+    boat_net_race_bind(&c->fleet, BOAT_NET_COURSE_RIVER, go);
+    if (c->predict) {
+        c->prediction.fleet.world.water.vessel = c->fleet.world.water.vessel;
+        c->prediction.fleet.world.water.storm = c->fleet.world.water.storm;
+        c->prediction.release_tick = go;
+    }
+}
+
 static void install(BoatNetClient *c, double now)
 {
     static BoatFleetState state;
     BoatNetSlotInput inputs[BOAT_FLEET_SLOTS];
+    uint64_t race_go = 0;
     const BoatNetWorldBegin *b = &c->begin;
     c->assembling = false;
     bool complete = c->pages_received == b->pages
         && boat_net_bytes_digest(c->assembly, b->bytes) == b->digest
-        && boat_net_checkpoint_decode(c->assembly, b->bytes, &state, inputs) == BOAT_NET_OK
+        && boat_net_checkpoint_decode(c->assembly, b->bytes, &state, inputs, &race_go)
+            == BOAT_NET_OK
         && boat_fleet_hash(&state) == b->fleet_hash
         && state.wakes.life_ticks == c->accept.wake_life_ticks
         && state.wakes.crest_height == c->accept.crest_height;
@@ -156,6 +173,7 @@ static void install(BoatNetClient *c, double now)
     check_wakes(c, now);
     if (c->predict && c->phase != BOAT_NET_CLIENT_PLAYING)
         boat_prediction_reset(&c->prediction, &c->fleet, c->inputs, c->slot);
+    bind_race(c, race_go);
     if (c->phase != BOAT_NET_CLIENT_PLAYING)
         boat_remote_history_reset(&c->remotes);
     boat_remote_history_push(&c->remotes, state.tick, state.slots);
@@ -195,6 +213,8 @@ static void snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
         c->inputs[i] = s->inputs[i];
     }
     c->wake_digest = s->wake_digest;
+    if (s->race_go != c->race_go)
+        bind_race(c, s->race_go);
     release_births(c);
     check_wakes(c, now);
     ++*(c->wake_consistent ? &c->stats.consistent : &c->stats.inconsistent);
@@ -263,6 +283,15 @@ static void match_event(BoatNetClient *c, const BoatNetMessage *m, double now)
         copy_text(entry->victim, c->roster.slots[e->victim].name, BOAT_NET_NAME_BYTES);
     if (e->attacker < BOAT_FLEET_SLOTS)
         copy_text(entry->attacker, c->roster.slots[e->attacker].name, BOAT_NET_NAME_BYTES);
+}
+
+static void race_event(BoatNetClient *c, const BoatNetMessage *m, double now)
+{
+    const BoatNetRaceEvent *e = &m->race_event;
+    BoatNetRaceFeedEntry *entry = &c->race_feed[c->race_feed_count++ % BOAT_NET_MATCH_FEED];
+    *entry = (BoatNetRaceFeedEntry) { .event = *e, .tick = m->header.tick, .at = now };
+    if (e->slot < BOAT_FLEET_SLOTS)
+        copy_text(entry->name, c->roster.slots[e->slot].name, BOAT_NET_NAME_BYTES);
 }
 
 static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
@@ -360,6 +389,16 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         break;
     case BOAT_NET_MATCH_EVENT:
         match_event(c, &m, now);
+        break;
+    case BOAT_NET_RACE_STATE:
+        c->race = m.race;
+        c->race_valid = true;
+        // Results grow until the round's last finisher; keep the latest rows of the round.
+        if (m.race.phase == BOAT_RACE_RESULTS)
+            c->race_result = m.race;
+        break;
+    case BOAT_NET_RACE_EVENT:
+        race_event(c, &m, now);
         break;
     case BOAT_NET_DISCONNECT:
         c->leave = m.leave;

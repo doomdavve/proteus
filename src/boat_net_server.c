@@ -24,6 +24,11 @@ bool boat_net_server_init(
     BoatMatch match = { 0 };
     if (config->deathmatch && !boat_match_init(&match, &config->match))
         return false;
+    BoatRace race = { 0 };
+    if (config->race
+        && (config->deathmatch || config->location != BOAT_LOCATION_RIVER
+            || !boat_race_init(&race, &config->race_rules, boat_race_river_course())))
+        return false;
     *server = (BoatNetServer) { .transport = transport, .config = *config };
     text_copy(server->token, config->token, BOAT_NET_TOKEN_BYTES);
     server->config.token = server->token;
@@ -40,6 +45,9 @@ bool boat_net_server_init(
     server->match = match;
     if (config->deathmatch)
         boat_net_match_state_of(&server->match, &server->match_sent);
+    server->race = race;
+    if (config->race)
+        boat_net_race_state_of(&server->race, &server->race_sent);
     return true;
 }
 
@@ -110,6 +118,30 @@ static void match_output(BoatNetServer *s, const BoatMatchOutput *out)
     }
 }
 
+static BoatNetMessage race_state(const BoatNetServer *s)
+{
+    BoatNetMessage m = { .header = { .type = BOAT_NET_RACE_STATE, .tick = s->fleet.state.tick } };
+    boat_net_race_state_of(&s->race, &m.race);
+    return m;
+}
+
+// Keep the race's events for the caller and tell the clients: events first, then the race
+// state whenever it changed (phases, gates, places, joins and leaves).
+static void race_output(BoatNetServer *s, const BoatRaceOutput *out)
+{
+    for (unsigned i = 0; i < out->count; ++i) {
+        s->race_events[s->race_event_count++ % BOAT_NET_MATCH_EVENTS] = out->events[i];
+        BoatNetMessage m = { .header = { .type = BOAT_NET_RACE_EVENT, .tick = out->events[i].tick },
+            .race_event = boat_net_race_event_of(&s->race, &out->events[i]) };
+        broadcast(s, &m);
+    }
+    BoatNetMessage m = race_state(s);
+    if (!boat_net_race_state_equal(&m.race, &s->race_sent)) {
+        s->race_sent = m.race;
+        broadcast(s, &m);
+    }
+}
+
 // Free PEER's slot between ticks; its live wakes stay and expire naturally.
 
 static void drop_peer(BoatNetServer *s, unsigned peer, bool disconnect)
@@ -119,7 +151,10 @@ static void drop_peer(BoatNetServer *s, unsigned peer, bool disconnect)
         return;
     bool owned = p->phase >= BOAT_NET_PEER_BOOTSTRAP;
     if (owned) {
-        boat_fleet_leave(&s->fleet, p->slot);
+        if (s->config.race)
+            boat_race_leave(&s->race, &s->fleet, p->slot); // A running entrant becomes DNF.
+        else
+            boat_fleet_leave(&s->fleet, p->slot);
         s->slot_peer[p->slot] = -1;
         s->inputs[p->slot] = (BoatNetSlotInput) { 0 };
         ++s->stats.left;
@@ -143,7 +178,8 @@ static void send_checkpoint(BoatNetServer *s, unsigned peer)
 {
     static uint8_t bytes[BOAT_NET_MAX_CHECKPOINT];
     const BoatFleetState *state = &s->fleet.state;
-    size_t size = boat_net_checkpoint_encode(state, s->inputs, bytes, sizeof(bytes));
+    size_t size = boat_net_checkpoint_encode(
+        state, s->inputs, boat_net_race_go(&s->race), bytes, sizeof(bytes));
     if (!size) {
         ++s->stats.output_faults;
         return;
@@ -226,13 +262,19 @@ static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h)
             .max_commands = BOAT_NET_MAX_COMMANDS,
             .max_future = BOAT_NET_MAX_FUTURE_TICKS,
             .tick_hz = BOAT_TICK_HZ,
-            .mode = s->config.deathmatch ? BOAT_NET_MODE_DEATHMATCH : BOAT_NET_MODE_FREE,
+            .mode = s->config.race     ? BOAT_NET_MODE_RACE
+                : s->config.deathmatch ? BOAT_NET_MODE_DEATHMATCH
+                                       : BOAT_NET_MODE_FREE,
             .wake_life_ticks = s->fleet.state.wakes.life_ticks,
             .crest_height = s->fleet.state.wakes.crest_height } };
     send_message(s, peer, &m);
     send_roster(s);
     if (s->config.deathmatch) {
         m = match_state(s); // Join in progress: the current round and scores.
+        send_message(s, peer, &m);
+    }
+    if (s->config.race) {
+        m = race_state(s); // Join in progress: the phase, clock and rows.
         send_message(s, peer, &m);
     }
     send_checkpoint(s, peer);
@@ -337,7 +379,9 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
     case BOAT_NET_READY:
         if (p->phase == BOAT_NET_PEER_BOOTSTRAP) {
             p->phase = BOAT_NET_PEER_READY;
-            boat_fleet_request_spawn(&s->fleet, p->slot);
+            // A race places joiners itself: free boating while waiting, else the next grid.
+            if (!s->config.race || !boat_race_join(&s->race, &s->fleet, p->slot))
+                boat_fleet_request_spawn(&s->fleet, p->slot);
             send_roster(s);
         }
         break;
@@ -358,8 +402,11 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
         if (!slot->active || slot->life == m.spawn.life) {
             ++s->stats.spawn_requests;
             BoatMatchOutput out = { 0 };
-            // A deathmatch may hold a fresh capsize back or score a bailout first.
-            if (!s->config.deathmatch || boat_match_reset(&s->match, &s->fleet, p->slot, &out))
+            // A deathmatch may hold a fresh capsize back or score a bailout first; a race
+            // recovers behind the last cleared gate on its next observation.
+            if (s->config.race)
+                boat_race_reset(&s->race, &s->fleet, p->slot);
+            else if (!s->config.deathmatch || boat_match_reset(&s->match, &s->fleet, p->slot, &out))
                 boat_fleet_request_spawn(&s->fleet, p->slot);
             if (s->config.deathmatch)
                 match_output(s, &out);
@@ -500,6 +547,7 @@ static void send_snapshots(BoatNetServer *s)
 {
     BoatNetMessage m = { .header = { .type = BOAT_NET_SNAPSHOT, .tick = s->fleet.state.tick } };
     boat_net_snapshot_of(&s->fleet.state, s->inputs, &m.snapshot);
+    m.snapshot.race_go = boat_net_race_go(&s->race);
     for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
         if (s->peers[peer].phase >= BOAT_NET_PEER_BOOTSTRAP)
             send_message(s, peer, &m);
@@ -518,6 +566,11 @@ static void tick(BoatNetServer *s)
         BoatMatchOutput out;
         boat_match_observe(&s->match, &s->fleet, &out);
         match_output(s, &out);
+    }
+    if (s->config.race) {
+        BoatRaceOutput out;
+        boat_race_observe(&s->race, &s->fleet, &out);
+        race_output(s, &out);
     }
     ++s->stats.ticks;
     // Births first, so a lossless link delivers them before the snapshot that counts them.

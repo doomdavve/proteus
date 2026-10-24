@@ -18,12 +18,16 @@ rendering are still diagnostic; it is not the finished multiplayer game. The Mac
 packages carry `boat_server` for [LAN rooms](#hosting-from-a-package); browser builds remain
 single-player.
 
-The next planned multiplayer mode is a [45–60 second river race](docs/RACE_PLAN.md),
+The [river race](docs/RACE_PLAN.md) is being tuned towards a 45–60 second sprint,
 with a shared starting grid, frequent ferry-wake jumps and confirmed finishing positions.
 A [playable R0 ferry-wake trial](docs/RACE_PLAN.md#r0-prototype--2026-10-24) now measures a
 shortened Eriksberg/bridge route (about 49 s at full throttle):
-`./build/boat_race_trial --play`. The authoritative grid, gates and finishing-position rules
-now exist as a tested core, but there is no race room or race HUD to play yet.
+`./build/boat_race_trial --play`. Race rooms (`./build/boat_server --mode race`) grid two to
+four players, hold them through a 3-2-1 countdown, pass six alternating skill gates and a
+moving rough-water storm with rain and lightning, and award places at the finish.
+Preview the current layout with
+`./build/boat_race_trial --skill-course --play`; see
+[race rooms](#multiplayer-diagnostic-room) below. Human race play is still to be checked.
 
 ## Generate the original sample pack and starter XM (archived sketch)
 
@@ -190,7 +194,7 @@ For a river deathmatch on your LAN:
 
 Clients join through the title or `--connect HOST:24680` and automatically load the server's
 location, scenery and water. Multiplayer starts are out in the river, about 60 m apart, with
-shoreline/boat/wake checks for safe resets. `--location eriksberg` hosts the smaller crop. Protocol v3 requires
+shoreline/boat/wake checks for safe resets. `--location eriksberg` hosts the smaller crop. Protocol v4 requires
 rebuilt server and clients; older packages are rejected with a version mismatch.
 
 The server runs until Ctrl+C, `--seconds` or `--ticks`. `--waves` gives the room gentle waves,
@@ -211,6 +215,22 @@ says who did it and when it respawns. Hold Tab for the scoreboard; it also stays
 rounds. The server log prints every capsize and each round's result. `boat_bot --hunt` drives
 at the nearest boat to give you something to play against. The new capsize mechanics are still
 to come; see the [deathmatch plan](docs/DEATHMATCH_PLAN.md).
+
+`--mode race` (2026-10-24) hosts the river sprint on the river. With two or more players the
+room lines everyone up behind the start, holds the boats through a 3-2-1 countdown (set your
+throttle) and releases them together at GO. Pass between the tall buoy markers at each of
+six 32–40 m skill gates; the middle pair forms a chicane. Between gates 4 and 5, a local
+storm travels down-course at 8 m/s, meeting racers around the chicane and adding steep
+irregular directional waves beneath a high dark cloud, with gusting, varied rain and
+periodic lightning. Yellow marks your next
+gate, orange ones come later, and teal ones are cleared. The chequered line is the finish.
+The current stronger layout takes bots about 65–76 s; play tuning is still in progress.
+The HUD shows your time,
+position and gate; capsized boats are put back behind their last gate after 2 s (`R` after
+0.5 s). Finishers coast for 2 s and are parked beside the river. Racing closes 15 s after the
+winner (90 s at most); results show for 8 s, then the next grid forms. Hold Tab for the
+standings. Late joiners wait for the next grid. `boat_bot` races the course in race rooms. See
+the [race plan](docs/RACE_PLAN.md#r2-network-race--2026-10-24).
 
 In `--connect` mode the room decides the location, water, wakes and spawns. Your boat is predicted: it runs
 ahead of the server with your own keys and is corrected when snapshots arrive, with small

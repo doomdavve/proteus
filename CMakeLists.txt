@@ -503,6 +503,11 @@ add_test(NAME boat_net_deathmatch COMMAND ${Python3_EXECUTABLE}
   --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
 set_tests_properties(boat_net_deathmatch PROPERTIES
   PASS_REGULAR_EXPRESSION "boat_net_deathmatch=ok" TIMEOUT 60)
+add_test(NAME boat_net_race COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_smoke.py --race
+  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
+set_tests_properties(boat_net_race PROPERTIES PASS_REGULAR_EXPRESSION "boat_net_race=ok"
+  TIMEOUT 60)
 add_test(NAME boat_net_session COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_session.py
   --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)

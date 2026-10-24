@@ -1,4 +1,4 @@
-# Multiplayer protocol v3
+# Multiplayer protocol v4
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -11,7 +11,13 @@ v3 (2026-10-24) adds the authority-selected basin/Eriksberg/river location to Ac
 position validation to cover the mapped world, and fingerprints the complete compiled map
 bundle for compatibility. A room hosts one fixed location and up to four players. M4 client
 prediction uses only the fields listed here. There is no encryption or authentication: a room
-token is a shared word, not a secret. Rebuild both server and clients; v1/v2 are incompatible.
+token is a shared word, not a secret.
+
+v4 (2026-10-24) adds the [river race](RACE_PLAN.md) room mode (race R2): room mode 2 in Accept,
+the grid hold as slot flag bit 2, the latest round's GO tick in every snapshot and checkpoint
+(it sets the course ferry's clock and the tick holds release in prediction), the RaceState and
+RaceEvent messages, and the race course in the content digest. Rebuild both server and clients;
+v1–v3 are incompatible.
 
 ## Conventions
 
@@ -35,8 +41,8 @@ token is a shared word, not a secret. Rebuild both server and clients; v1/v2 are
 | Offset | Type | Field | Rule |
 | ---: | --- | --- | --- |
 | 0 | u32 | magic | `0x50424e54` ("PBNT") |
-| 4 | u16 | version | 2. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
-| 6 | u8 | type | 1–18, below |
+| 4 | u16 | version | 4. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
+| 6 | u8 | type | 1–20, below |
 | 7 | u8 | flags | 0 |
 | 8 | u32 | epoch | Room session epoch from Accept; 0 in Hello |
 | 12 | u32 | sequence | Per sender and channel, starting anywhere, wrapping modulo 2³² |
@@ -54,10 +60,10 @@ traffic from an earlier session never reaches a room.
 
 | Channel | ENet delivery | Carries |
 | ---: | --- | --- |
-| 0 control | reliable, ordered | Hello, Accept, Reject, Roster, Ready, SpawnRequest, ResyncRequest, Disconnect, MatchState, MatchEvent |
+| 0 control | reliable, ordered | Hello, Accept, Reject, Roster, Ready, SpawnRequest, ResyncRequest, Disconnect, MatchState, MatchEvent, RaceState, RaceEvent |
 | 1 state | unreliable, sequenced | InputBatch (up), Snapshot (down), Ping, Pong |
 | 2 births | unreliable, sequenced | WakeBirths |
-| 3 registry | unreliable, unsequenced | Reserved for wake registry pages (M4/M5); unused in v3 |
+| 3 registry | unreliable, unsequenced | Reserved for wake registry pages (M4/M5); unused in v4 |
 | 4 bootstrap | reliable, ordered | WorldBegin, WorldPage, WorldEnd |
 
 A message on the wrong channel is discarded. Reliable bootstrap traffic cannot hold up new
@@ -83,7 +89,7 @@ are discarded. This receiver buffering does not change the wire layout or channe
 | 7 | WorldEnd | S→C | checkpoint tick | 8 |
 | 8 | Ready | C→S | checkpoint tick | 8 |
 | 9 | InputBatch | C→S | target tick of the newest command | 16 + 4 × count |
-| 10 | Snapshot | S→C | post-tick n | 720 |
+| 10 | Snapshot | S→C | post-tick n | 728 |
 | 11 | WakeBirths | S→C | room tick | 4 + 40 × count |
 | 12 | SpawnRequest | C→S | client's mirror tick | 8 |
 | 13 | Ping | C→S | client's mirror tick | 8 |
@@ -92,6 +98,8 @@ are discarded. This receiver buffering does not change the wire layout or channe
 | 16 | Disconnect | both | sender's tick | 4 |
 | 17 | MatchState | S→C | room tick | 104 |
 | 18 | MatchEvent | S→C | event tick | 16 |
+| 19 | RaceState | S→C | room tick | 104 |
+| 20 | RaceEvent | S→C | event tick | 16 |
 
 ### Hello, Accept, Reject
 
@@ -103,7 +111,16 @@ flag, basin half-extents, single-player spawn, multiplayer start centre, current
 crossing offset; for each mapped location,
 the crop's triangle count, then every triangle's three vertex indices and referenced XYZ
 coordinates. It then hashes the fleet/wake contract: tick rate, slots, solver passes, spawn
-retry, emitter slots, emission cadence, maximum lifetime, mass and restitution.
+retry, emitter slots, emission cadence, maximum lifetime, mass and restitution. Finally (v4) it
+hashes the river race course: gate count; the start and every gate's centre, direction and
+half-width; the four grid points; and the ferry source's origin, direction, start offset,
+speed, height, duration, lifetime, wavelength, spread and half-width. The local-storm extension
+also hashes storm centre X/Z at GO, radius, height, start offset, velocity X/Z (floats), then
+the storm recipe revision (u64, currently 3: irregular directional crests). This changes
+compatibility without changing v4 message bytes;
+rebuild server and clients together. Storm settings are compiled course data; GO anchors their
+clock in both the authority and prediction. Cloud, rain, lightning and rough water move
+from that shared origin at the authored velocity; no per-player weather position is sent.
 `boat_net_content_digest()` defines the exact order. Fingerprinting the whole bundle lets a
 client send Hello before it knows which location the server will select.
 
@@ -113,7 +130,7 @@ or boat exists.
 
 Accept: `u8` slot (0–3), `u8` waves (0/1), `u8` snapshot interval (4), `u8` birth interval (12),
 `u8` input interval (2), `u8` commands per batch (12), `u8` future window (24), `u8` room mode
-(0 free, 1 deathmatch; v1 reserved),
+(0 free, 1 deathmatch, 2 race; v1 reserved; a race room's location must be the river),
 `u16` tick rate (must be 120), `u8` location (0 basin, 1 Eriksberg, 2 river), `u8` reserved,
 `u32` wake lifetime ticks (240–1920),
 `f32` crest height (0.1–3). The header epoch is the room's epoch.
@@ -129,7 +146,7 @@ fixed-width name. It is sent whenever a slot changes.
 
 ### World checkpoint
 
-The bootstrap and resync checkpoint is a byte string of 5336 bytes, at most 16384, cut into
+The bootstrap and resync checkpoint is a byte string of 5344 bytes, at most 16384, cut into
 pages of 1024 bytes:
 
 | Offset | Type | Field |
@@ -142,8 +159,9 @@ pages of 1024 bytes:
 | 22 | u16 | peak live records |
 | 24 | u64 | births emitted |
 | 32 | u64 | records expired |
-| 40 | 4 × 172 | slot blocks (below) |
-| 728 | 128 × 36 | wake records (below), in pool order |
+| 40 | u64 | race GO tick (v4): the room's latest race round, 0 for none and in other modes |
+| 48 | 4 × 172 | slot blocks (below) |
+| 736 | 128 × 36 | wake records (below), in pool order |
 
 WorldBegin: `u32` checkpoint ID, `u32` byte count, `u16` page count (must equal
 `ceil(bytes / 1024)`), `u16` reserved, `u64` FNV-1a 64 of the checkpoint bytes, `u64`
@@ -160,7 +178,7 @@ Snapshots and checkpoints use the same block for each slot:
 
 | Offset | Type | Field |
 | ---: | --- | --- |
-| 0 | u8 | bit 0 active, bit 1 spawn pending; other bits 0 |
+| 0 | u8 | bit 0 active, bit 1 spawn pending, bit 2 held (v4: race grid or parked; only with bit 0); other bits 0 |
 | 1 | u8 | motion state: 0 waterborne, 1 airborne, 2 landing, 3 capsized |
 | 2 | u8 | input source on the latest tick: 0 none, 1 received, 2 repeated, 3 zero, 4 neutral |
 | 3 | u8 | reserved |
@@ -192,8 +210,8 @@ reflected X never travels.
 
 Post-tick authoritative state, sent every fourth tick (30 Hz) to every accepted client: `u32`
 next spawn-request number, `u16` live records, `u16` peak live, `u64` births emitted, `u64`
-records expired, `u64` wake digest, then four slot blocks: 752 bytes with the header (target
-≤800). The wake digest is FNV-1a 64 over each live record's pool index and fields, in pool
+records expired, `u64` wake digest, `u64` race GO tick (v4, as in the checkpoint), then four
+slot blocks: 760 bytes with the header (target ≤800). The wake digest is FNV-1a 64 over each live record's pool index and fields, in pool
 order (`boat_net_wake_digest()`). The client compares it with the records it rebuilt. Wake
 records themselves travel only in checkpoints and births.
 
@@ -257,6 +275,48 @@ either an attacker < 4 other than the victim with cause contact or wake, or atta
 self-capsize, −1) with cause none and no bailout flag. Round events carry 255 in both slots,
 cause none, no flags and life 0. Within a tick, events precede the MatchState that counts them.
 
+### RaceState and RaceEvent (race rooms)
+
+Only a room whose Accept says race sends these. The authority alone decides gates, places,
+recoveries and deadlines ([rules](RACE_PLAN.md#r1-race-core--2026-10-24)); clients display
+them and never predict them. Clients do predict the grid hold and the course ferry, from the
+slot flags and the race GO tick of snapshots and checkpoints: a replay from an authoritative
+state before the GO tick releases held slots when it reaches that tick, as the authority does.
+
+RaceState is the whole race phase, clock and every slot's row. The authority sends it to a
+joining peer right after Roster (before the checkpoint) and to every peer whenever any field
+changes: a phase, a gate, a place, a recovery, a parking, a join or a leave.
+
+| Offset | Type | Field |
+| ---: | --- | --- |
+| 0 | u8 | phase: 0 waiting, 1 grid, 2 countdown, 3 racing, 4 results |
+| 1 | u8 | course: 0 river sprint (the only one) |
+| 2 | u8 | places awarded (≤ 4; equals the finished rows) |
+| 3 | u8 | reserved |
+| 4 | u16 | automatic recovery delay after a capsize, ticks |
+| 6 | u16 | earliest R after a capsize, ticks (≤ recovery delay) |
+| 8 | u16 | finisher parking delay, ticks |
+| 10 | u16 | reserved |
+| 12 | u32 | rounds gridded (> 0 unless waiting before the first) |
+| 16 | u64 | tick the grid, countdown or results phase ends; 0 exactly in waiting and racing |
+| 24 | u64 | GO tick of the latest round; 0 exactly before the first round |
+| 32 | u64 | racing deadline (the cap, or 15 s after the first finish); 0 exactly outside racing |
+| 40 | 4 × 16 | rows in slot order (below) |
+
+Row: `u8` flags (bit 0 a player occupies the slot; bit 1 the row belongs to the latest round's
+entrant; bit 2 the present player is that entrant, which needs bits 0 and 1; bit 3 parked past
+the finish, which needs bit 2 and a finish), `u8` status (0 running, 1 finished, 2 did not
+finish), `u8` place (1–4 exactly when finished, ≤ places awarded; ties share a place), `u8`
+gates cleared (≤ 8, the finish included), `u32` recoveries, `u64` finish time in 1/1024-tick
+units after GO (0 unless finished). A row without bit 1 has no other fields. A leaver's row
+keeps bit 1 and its result with bits 0 and 2 clear.
+
+RaceEvent: `u8` kind (0 phase, 1 gate, 2 finish, 3 did not finish, 4 recovery, 5 abandoned,
+6 parked), `u8` slot (255 for phase and abandon events, else < 4), `u8` value (the new phase
+≤ 4, the gate index < 8, or the place 1–4; otherwise 0), `u8` reserved, `u32` round (> 0),
+`u64` finish time in 1/1024-tick units (finish events only; 0 otherwise). Within a tick, events
+precede the RaceState that counts them.
+
 ## LAN discovery
 
 Added 2026-10-24 so the title can list rooms on the local network. Discovery is plain UDP on
@@ -294,7 +354,7 @@ Answer (52 bytes):
 | 20 | u32 | epoch | Room session epoch; with port and name, identifies one room |
 | 24 | u32 | address | IPv4 `a.b.c.d` as `a << 24 \| b << 16 \| c << 8 \| d`; 0 means "the sender's address" (a room bound to 0.0.0.0) |
 | 28 | u16 | port | Game port, 1–65535 |
-| 30 | u8 | mode | Room mode as in Accept; not validated, since other versions may add modes |
+| 30 | u8 | mode | Room mode as in Accept (2 race since v4); not validated, since other versions may add modes |
 | 31 | u8 | players | Connected players, at most max players |
 | 32 | u8 | max players | `--players`, at least 1 |
 | 33 | u8 | flags | Bit 0: the room needs a token; other bits 0 |
@@ -339,7 +399,7 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v3 rejects every other version, v1/v2 included; there is no negotiation or
+  protocol version. v4 rejects every other version, v1–v3 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry or the
   fleet/wake contract changes the content digest. Either is rejected at Hello.
@@ -350,19 +410,23 @@ must not exceed their capacities, and expired ≤ emitted.
 
 `validate_boat_net` pins:
 
-- golden bytes of a Ping, an InputBatch, a Hello, a MatchState and a MatchEvent payload;
-- the snapshot size (752), slot field offsets and an FNV-1a 64 digest of a hand-built
-  snapshot's bytes (`690c711d99578e10`; with the version byte set back to 1 the v1 digest
-  `57447ded5b742cfe`, so v3 leaves the snapshot payload unchanged);
-- round trips of all 18 types, rejection of every truncation, and a declared extra byte;
-- header, field, non-finite and range faults, including the room mode and the MatchState and
-  MatchEvent consistency rules;
+- golden bytes of a Ping, an InputBatch, a Hello, a MatchState, a MatchEvent, a RaceState and
+  a RaceEvent payload;
+- the snapshot size (760), the race GO tick and held flag, slot field offsets and an FNV-1a 64
+  digest of a hand-built snapshot's bytes (`9f816f6333e7646f`; v3's was `690c711d99578e10`);
+- round trips of all 20 types, rejection of every truncation, and a declared extra byte;
+- header, field, non-finite and range faults, including the room mode, a race room away from
+  the river and the MatchState, MatchEvent, RaceState and RaceEvent consistency rules;
 - a deathmatch room on the in-memory transport whose clients, including a mid-round joiner,
   hold the authority's MatchState through capsizes, a round end and a leaver;
+- a race room on the in-memory transport: predicting entrants held through the countdown and
+  released at GO without a correction, every mirror and prediction running the ferry on the
+  authority's clock, a mid-race joiner gridded next round, results on every client; and a
+  prediction replay through GO from held states that matches the authority bit for bit;
 - LAN discovery: the query's first 8 bytes, the answer's magic and bytes 20–51, every
   truncation, a query offered as an answer, invalid player counts and port, an answer from
   another version that decodes but is incompatible, and the search list's merge and expiry;
-- checkpoints of busy four-boat fleets (calm and waves) that decode to the same fleet hash,
-  re-encode byte for byte and resume 600 ticks bit-identically.
+- checkpoints of busy four-boat fleets (calm and waves) that decode to the same fleet hash and
+  race GO tick, re-encode byte for byte and resume 600 ticks bit-identically.
 
 Any intentional layout change must update these fixtures, this document and the version.

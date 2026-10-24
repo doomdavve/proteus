@@ -53,6 +53,9 @@ typedef struct {
     BoatNetCommand remote[BOAT_FLEET_SLOTS]; // Rates the authority last integrated.
     BoatPredictionError error[BOAT_FLEET_SLOTS]; // Of the latest correction.
     uint32_t correction; // Serial of the latest correction.
+    // Race rooms: GO tick of the latest round. Grid holds in an authoritative state from before
+    // it are released when the replay reaches it, as the authority releases them.
+    uint64_t release_tick;
     BoatPredictionStats stats;
 } BoatPrediction;
 

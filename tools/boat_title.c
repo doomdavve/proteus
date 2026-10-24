@@ -240,7 +240,9 @@ static const char *lan_hint(const Title *t, char *out, size_t size)
     const BoatNetLanRoom *room = &t->found.rooms[t->shown];
     char endpoint[32];
     boat_net_lan_endpoint(room, endpoint, sizeof(endpoint));
-    const char *what = room->mode == BOAT_NET_MODE_DEATHMATCH ? "DEATHMATCH" : "FREE BOATING";
+    const char *what = room->mode == BOAT_NET_MODE_DEATHMATCH ? "DEATHMATCH"
+        : room->mode == BOAT_NET_MODE_RACE                    ? "RIVER RACE"
+                                                              : "FREE BOATING";
     if (!boat_net_lan_room_compatible(room))
         what = "OTHER GAME VERSION";
     else if (room->token)

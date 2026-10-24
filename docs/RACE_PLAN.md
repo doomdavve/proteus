@@ -1,21 +1,29 @@
 # River sprint: multiplayer race plan
 
-Prepared 2026-10-24. **R0 prototype and R1 race core implemented; the network race mode
-is not implemented.**
+Prepared 2026-10-24. **R0 prototype and R1 race core implemented and approved by the user;
+R2 network race mode and R3 slalom/storm implemented; current storm presentation user-accepted.**
 This document owns race rules, course pacing, jump encounters and acceptance. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns transport and prediction; the
 [traffic guide](HARBOR_TRAFFIC.md) owns existing scenery vessels; the
 [physics](BOAT_PHYSICS_PLAN.md) and [wake](WAKE_REWRITE_PLAN.md) plans own handling.
 
-Status: R0's shortened route and physical wake fixture are implemented and automatically
-measured; the corrected visible-ferry encounter still awaits user feel review. R1's
-authoritative race core (`boat_race`) is implemented and automatically verified: phases,
-frozen roster, held grid, swept gates, places, recovery, DNF and deadlines on the R0 route,
-with a four-bot ferry race in the validator. Next: R2, the server race mode, protocol,
-prediction of the hold/ferry clock, HUD and results. Nothing in R1 is playable yet; no human
-race play, network race, complete course acceptance or user approval is claimed. The full
-downtown start is outside the current map. See the [R1 implementation](#r1-race-core--2026-10-24)
-and the [R0 evidence](#r0-prototype--2026-10-24).
+Status: the user approved R0 (shortened route, visible-ferry encounter) and R1 (authoritative
+race core) on 2026-10-24. R2 is implemented and automatically verified: `boat_server --mode
+race`, protocol v4 (hold flag, race GO tick, RaceState/RaceEvent), client prediction of the
+grid hold and ferry clock, finisher parking, course markers, HUD, standings and results, a
+route-following `boat_bot` and LAN labels. Bots have raced over ENet; no human has played a
+race and the HUD is not yet seen on screen (no window could open in the agent's environment).
+The first four-gate layout was user-played and rejected as too easy/boring on 2026-10-24.
+The current [R3 layout](#r3-skill-gate-layout--2026-10-24) has six 32–40 m openings alternating
+across the river, a committed middle chicane, and the user-selected local rough-water storm
+with rain and lightning, now travelling down-course at 8 m/s on the shared race clock.
+The ferry wake and broad finish remain. The user accepted the final higher cloud, irregular
+waves/rain and independent movement on 2026-10-24 ("I like it. Commit."). Next: multiplayer
+play with bots and two people; assess pacing, missed-gate recovery and turn/wave overlap
+before extending the route. The current bot runs take
+65–76 s, exceeding the original 45–60 s aim; this pacing tradeoff awaits feedback. Full
+downtown coverage remains outside the current map. See the [R2 implementation](#r2-network-race--2026-10-24),
+the [R1 core](#r1-race-core--2026-10-24) and the [R0 evidence](#r0-prototype--2026-10-24).
 
 ## Direction
 
@@ -108,8 +116,8 @@ Proposed round loop: **WAITING → GRID → COUNTDOWN → RACING → RESULTS →
   between rounds. Hold position and clear launch motion through a 3–2–1 countdown; prepare
   throttle during countdown and release everyone on the same authority tick. The hold and
   release must also exist in client prediction, including wave forces and wake emission.
-- Use ordered, wide checkpoint gates and a visible finish spanning the navigable corridor.
-  Accept only forward swept crossings within a gate's lateral bounds, including an airborne
+- Use six ordered skill gates with 32–40 m openings alternating across the river, with a
+  middle chicane, and a visible finish spanning the navigable corridor. Accept only forward swept crossings within a gate's lateral bounds, including an airborne
   boat crossing over it. Missing or reversing through a gate cannot advance progress.
   Gate layout must allow different racing lines and prohibit shoreline shortcuts.
 - Show elapsed time, live position and the next gate. Rank unfinished boats by completed
@@ -125,7 +133,8 @@ Proposed round loop: **WAITING → GRID → COUNTDOWN → RACING → RESULTS →
   gate. Select a safe lateral position and retry if occupied; no reset shortcut or finish
   crossing caused by teleportation.
 - Finished boats must clear the racing corridor and stop interfering with unfinished racers;
-  choose a finish runout/spectator transition in R2. Their places remain fixed.
+  R2 parks them beside the river past the finish ([rule](#r2-network-race--2026-10-24)).
+  Their places remain fixed.
 - Allow 15 s after the winner for remaining boats to finish, with a 90 s absolute racing cap
   as a stalled-round fallback. Then mark unfinished entrants DNF. These are proposed limits;
   45–60 s is the intended clean-run duration, not a forced finish for every entrant.
@@ -147,15 +156,15 @@ Proposed round loop: **WAITING → GRID → COUNTDOWN → RACING → RESULTS →
    and DNF. Supply authored course/source data without I/O or rendering. Adapt the existing
    basin crossing approach where useful; keep the basin course and replay semantics intact.
    Add scripted fleet trials and a race validator.
-3. **R2 — network and presentation.** Add the server-selected race mode, versioned course
+3. **R2 — network and presentation** ([implemented 2026-10-24](#r2-network-race--2026-10-24)). Add the server-selected race mode, versioned course
    identity/source settings, reliable phase/results and recoverable progress state. Update
    the owning protocol byte tables and compatibility revision before changing codecs.
    Bootstrap/resync includes current phase, GO tick, entrant identities and confirmed
    finishes; deterministic source state also reaches prediction/checkpoints. Add room
    discovery labels, client start restrictions, finish runout, HUD and results, plus a
    route-following bot. Publish runnable commands only once implemented.
-4. **R3 — full course and pacing.** Add enough source encounters for the jump rhythm and the
-   selected downtown/Eriksberg/bridge route. Tune using clean runs and four-boat races, not
+4. **R3 — full course and pacing** ([first skill-gate layout implemented](#r3-skill-gate-layout--2026-10-24)).
+   Add enough source encounters for the jump rhythm and the selected downtown/Eriksberg/bridge route. Tune using clean runs and four-boat races, not
    top-speed arithmetic alone. Check source traffic against ordinary traffic and landings.
    Extend mapped assets only after R0 identifies the necessary bounds.
 5. **R4 — multiplayer acceptance.** Repeat complete rounds with bots, then two or more
@@ -353,7 +362,7 @@ No server mode, protocol, client or HUD uses it yet.
 - The course carries the R0 ferry with `started` relative to GO (12 s pre-roll). Gridding
   writes it into the fleet's water on the round clock.
 
-**Course:** the R0 route with three lines centred across the mapped river: two checkpoints
+**Historical R1 course (superseded by the [R3 skill gates](#r3-skill-gate-layout--2026-10-24)):** the R0 route with three lines centred across the mapped river: two checkpoints
 at the route's third and fourth vertices and a finish about 30 m short of the route's end,
 near the bridge. Each line reaches water at both ends and land 12 m beyond, so it cannot be
 bypassed. Straight lines between successive gate centres keep 12 m of mapped clearance.
@@ -384,14 +393,247 @@ are scripted bot lines, not human pacing or feel. Jump counts are whole-hull air
 transitions.
 
 **Verification:** see [verification and limitations](#verification-and-limitations).
-**Limitations and R2 inputs:** finished boats are not moved out of the corridor; they coast
-past the finish (a runout/spectator rule is still R2 work). Recovery candidates are checked
+**Limitations and R2 inputs (as of R1):** finished boats were not moved out of the corridor;
+they coasted past the finish (R2 now parks them). Recovery candidates are checked
 against hulls, land and wake water, not against the ferry's moving hull, so R2/R3 should
 add a source-hull check. The ferry appears 8 s into its crossing when the grid forms, about
 200 m ahead. Its previous round's wake is replaced at the next grid (normally already
 expired). The scenery-traffic wake pool from the R0 fixture is not part of the race.
 
+## R2 network race — 2026-10-24
+
+The user approved R0 and R1 and asked to continue. R2 hosts `boat_race` in network rooms.
+
+**Commands** (one machine; use `--bind 0.0.0.0` for a LAN room):
+
+```sh
+./build/boat_server --mode race                      # river is the default location here
+./build/boat_study --connect 127.0.0.1:24680 --name me
+./build/boat_bot --connect 127.0.0.1:24680 --seconds 120   # races the course
+```
+
+Two players start a round; the title screen's MULTIPLAYER panel and `boat_bot --discover`
+label the room "race". `--mode race` refuses another `--location` and `--scripted`.
+
+**Protocol v4** ([byte tables](MULTIPLAYER_PROTOCOL.md)): room mode 2; slot flag bit 2 carries
+the hold; snapshots and checkpoints carry the latest round's GO tick; RaceState (whole phase,
+clock and rows, sent on join and on every change) and RaceEvent (gate, finish, DNF, recovery,
+park, phase, abandon) are reliable control messages; the content digest covers the course.
+v3 builds cannot join v4 rooms; rebuild every package.
+
+**Prediction:** clients bind the course ferry to their mirror and prediction worlds from the
+GO tick, so the ferry and its wake run on the authority's clock. Held boats predict as held;
+a replay from an authoritative state before GO releases them at GO, as the authority does.
+Gates, places, recoveries and deadlines remain authority-only; the HUD displays them.
+
+**Finish runout (new rule, proposal):** a finisher coasts for 2 s, then is parked 70 or 100 m
+past the finish beside the course (lateral offsets 40, 80 and 120 m alternating sides, first
+clear spot), facing up-course and held until the next grid or waiting. R or a capsize after
+finishing parks at once. A parked boat ignores R and counts no recovery; a PARK event is sent.
+
+**Original R2 presentation** (intermediate markers superseded by the [R3 endpoint gates](#r3-skill-gate-layout--2026-10-24)) (`boat_study --connect`): course markers on mapped water — buoys every 12 m
+across each line with a pole every fourth, white start, yellow next gate, orange later gates,
+teal cleared and a chequered finish. HUD: waiting/next-grid notices, "SET YOUR THROTTLE" on
+the grid, a large 3-2-1-GO!, then elapsed time, live position and gate (or "FINISH NEXT"),
+"CLOSES IN n" after the first finish, `FINISHED - 2ND / 00:52.34` or DNF, a feed of finishes,
+DNFs and abandons, the standings board on Tab and the full results during RESULTS, and the
+race capsize notice (recovery countdown, "R TO SKIP"). R is not sent while held.
+`boat_race_trial` captures now draw the same markers.
+
+**Bot:** `boat_fleet_bot_race_input` (shared by the validator and `boat_bot`) aims at each next
+gate centre in its own 14 m lane at full throttle; held bots prepare throttle.
+
+**Verification** (2026-10-24, Apple Silicon/macOS 26.6.2, Debug): `validate_boat_race` adds
+parking (coast, R-park, hold until next grid) with the four-bot result unchanged.
+`validate_boat_net` checks v4 goldens, every race field fault, a race room on the in-memory
+transport (predicting entrants released at GO with 0.0000 m own-boat correction, 1837/1837
+mirror ticks identical to the authority including the ferry, a mid-race joiner gridded next
+round, results on every client) and a held-to-GO prediction replay. New CTest
+`boat_net_race` runs a real ENet race room with two predicting bots found through LAN
+discovery. A manual ENet room with three bots finished 46.23, 46.98 and 52.48 s, parked them,
+broadcast results and gridded round 2 with no decode faults; each bot's results matched the
+server log. CPU captures of `boat_race_trial` at 1, 21, 30 and 44 s show the start, next-gate
+and finish markers.
+
+**Not verified:** the HUD and markers in `boat_study` on screen, GPU captures and any windowed
+run (GLFW could not open a window here); human play; lossy-network races. **Limitations:**
+recovery and parking spots are not checked against the ferry's moving hull; a mid-race joiner
+has no spectator camera (it waits in place with a notice); a lone remaining entrant races on
+to the deadline; distant gate buoys are small at 320×200; the course is still R0's shortened
+route.
+
+## R3 skill-gate layout — 2026-10-24
+
+**Current implementation:** six required 32–40 m openings alternate across the shortened
+Eriksberg/bridge route. Four consecutive middle turns cannot be cut by any straight line
+through the surrounding gate openings, even at their edges. Gate spacing is about 144–173 m;
+the authored centre line is 1,106.9 m. The start/grid, ferry source, broad finish and deadlines
+remain from R2. Current four-bot runs take 64.90–75.64 s; improving the route's challenge has
+increased duration beyond the original 45–60 s aim, pending user feedback.
+
+| Gate | Centre (simulation X/Z, metres) | Opening |
+| --- | --- | --- |
+| 1 — left setup | −72.3, −376.6 | 36 m |
+| 2 — right sweep | 99.7, −371.8 | 36 m |
+| 3 — chicane entry | 146.2, −535.5 | 32 m |
+| 4 — chicane exit / storm meeting | 315.3, −516.9 | 32 m |
+| 5 — rough-water turn | 375.9, −678 | 36 m |
+| 6 — final switch | 520.1, −678.5 | 40 m |
+| Finish | 588.5, −767.2 | 316 m |
+
+Skill gates retain tall endpoint poles, buoy bases and inward-facing flags, with an open
+centre. Yellow marks the next gate, orange later gates, and teal cleared gates; start and
+finish keep their rows. Markers are visual, without physical buoy collisions. Forward swept
+crossings count in the air; skipping a gate cannot award a finish. Bots inset lane targets
+12 m from the edges, so the tighter openings also compress the fleet.
+
+### Local storm obstacle
+
+The user selected **rough-water storm patch with rain and lightning** on 2026-10-24.
+The race now carries a moving patch, radius 140 m and height scale 1.6 m. After seeing the
+static patch, the user requested movement along the course, then clarified that it should
+follow its own path rather than any particular boat. Its centre starts at `(46.2, -399.12)` at GO and
+travels at `(6.64, -4.464)` m/s (8 m/s down-course), passing `(345, -600)` at GO+45 s. It
+meets the pack around the chicane and continues towards the finish; faster boats can catch
+it and drive through, while trailing boats meet it later. It follows the common race clock
+and never tracks one player's position or changes speed for an entrant.
+
+A compact cubic radial envelope brings height and slope smoothly to zero at the moving
+boundary. Waves change physical support, slope and vertical surface velocity; the time
+derivative includes the translating envelope and crests, so the moving visuals and physical
+water agree. Outside the patch the river stays calm except for existing wakes. Unlike the
+static prototype, the rough-water encounter can continue into the finish approach.
+
+On 2026-10-24 the user also requested a higher cloud near the background cloud layer and
+more irregular waves instead of the recognisable crossing grid. The current recipe mixes
+four wave trains with nearby headings and different spacing/speeds, long curved phase bends
+and asymmetric crests. This replaces the two crossing trains while preserving compact
+support and analytic derivatives. The pattern is deterministic on the shared race clock.
+
+The dark storm cloud is now at 180–192 m (previously 33–39 m). Background clouds are a sky
+panorama without physical altitude; the raised placement puts the storm in that visual
+layer rather than just above the boat. Dense rain near the water is joined by a sparser
+upper curtain, and lightning spans down from the higher cloud every 9 seconds.
+Rain now uses independently cycling, jittered drops rather than aligned falling columns.
+Speeds vary from 18–40 m/s, with varied streak length/width/brightness and slant, gaps on
+individual falls, and a travelling gust shape. Drops relocate at the top of each fall; all
+variation comes from the race clock and deterministic hashes, with no mutable random state.
+These cues advertise the area. Rain/cloud/lightning are cosmetic; lightning has no damage,
+thunder or screen-wide flash, and no physical wind is implemented in this pass. The water darkens
+locally in the GPU renderer and its crests foam in both renderers. Weather boxes are bounded
+and use the shared scene path for CPU/GPU, reflections and shadows.
+
+Clouds, rain, lightning and physical water use the same moving centre. The storm clock is
+relative to GO, shared by the authority, mirrored client, prediction and
+checkpoint restore. Course geometry, storm parameters and recipe revision participate in
+the content digest; rebuild both server and clients. Network message bytes are unchanged.
+Storm physics lives in `boat_water`, with no rendering, file or network access in the core.
+
+For standalone practice, without the room countdown, results or race recovery:
+
+```sh
+./build/boat_race_trial --skill-course --play
+./build/boat_race_trial --skill-course --frames 4800
+./build/boat_race_trial --skill-course --renderer cpu --output build/storm.png --time 45
+./build/boat_race_trial --skill-course --no-source --play
+```
+
+`--no-source` removes both the ferry and storm for a calm comparison. The preview follows
+the current required gates and updates marker colours. It omits R0's extra scenery-traffic
+physical wakes. The original R0 route, default trial and `--check` remain the historical
+ferry fixture; `--gpu-check` now also samples both production storm shader recipes.
+
+**Automated evidence:** mapped endpoint and centre/outer-lane clearance; mandatory line
+changes even when cutting gate edges; swept gate ordering, skipped-gate finish rejection,
+recovery, ties and parking. Storm checks cover exact zero outside/disabled, analytic spatial
+and time derivatives against finite differences, a one-day clock translation and the shared
+GO clock, translating envelope velocity, 8 m/s speed and GO+45 s rendezvous. Four bots
+finish in 64.90–75.64 s, with 10–14 jumps and no recoveries.
+Checkpoint restore remains identical. Full-suite, shader and visual evidence is recorded
+below.
+
+**Acceptance / next / limitations:** the user accepted the combined storm/course presentation
+on 2026-10-24 ("I like it. Commit."). This records acceptance of the current appearance and
+independent movement; multiplayer handling, pacing and race-room acceptance remain open.
+Next, check speed/line choices and turn/wave overlap with multiple human racers. Human R2 HUD acceptance, missed-gate
+recovery, full downtown coverage, more wake sources, wind and weather audio remain pending.
+The course is currently longer/slower than the initial race-duration goal. Storm speed and
+its GO origin are authored in `boat_race.c`; changing speed requires retiming the origin if
+the same GO+45 s meeting point is desired.
+
+**Superseded first layout / user feedback:** the initial four 60–70 m openings and gentle
+chicane had a 956.5 m centre line; four bots finished in 48.48–49.82 s with 8–9 jumps and no
+recoveries. CPU/GPU captures and a 3,300-frame windowed run were checked. The user then
+played it and described it as too easy and boring. That layout is not the current course,
+and those successful checks did not establish user acceptance.
+
+**Superseded static storm trial:** with the same tighter gates, a fixed storm at `(345,-600)`
+produced 64.84–74.31 s runs, 10–16 jumps and no recoveries. Without a storm, the stronger
+course produced 63.94–73.32 s and 6–11 jumps. The static storm revision passed all 117 active
+CTests (22 active GPU checks) in 151.66 s and a 4,800-frame windowed preview; CPU/GPU storm
+captures were inspected. The user described the static storm as looking cool, then requested
+movement timed to meet the player along the course. That superseded the fixed patch; it does
+not establish acceptance of the moving revision.
+
+**Superseded first moving-wave recipe:** the two crossing wave trains with a low cloud
+produced 66.44–80.74 s runs, 15–20 jumps and one recovery across the fleet. The user approved
+the independent course movement, requested the cloud closer to the background cloud layer,
+and described the regular wave pattern as unlike storm waves. This led to the higher cloud
+and directional irregular recipe above, followed by the user's request for irregular rain;
+the user subsequently accepted the combined appearance on 2026-10-24, as recorded above.
+
 ## Verification and limitations
+
+Higher cloud / irregular waves and rain, 2026-10-24, macOS, Debug: configure/build passed
+without project compiler warnings. The final `ctest --test-dir build -j 4 --output-on-failure`
+passed all 117 active tests, including 22 active GPU checks, the production storm shader
+probes, both core/net boundary checks, race physics and ENet race; 15 retired wake-field
+tests stayed disabled. A preliminary suite for the wave/cloud change was interrupted when
+the rain request arrived; this final run covers the combined revision.
+
+GPU captures at 45.05, 45.55 and 63.05 s and CPU captures at 45.05 and 63.05 s were inspected;
+an 80-second (4,800-frame) scripted GPU preview exited 0 with no diagnostic output. The
+one-day clock and derivative checks still pass with the irregular recipe. Rain uses at most
+510 footprint-intersecting drop cells before gaps/distance culling, retaining room for cloud,
+lightning and markers within the 704-piece scene. Documentation links and new R3 anchors
+resolve, and `git diff --check` passes. Current bot results and next steps belong to the
+[R3 status](#r3-skill-gate-layout--2026-10-24). After these checks, the user accepted the
+current appearance and requested a commit. Multiplayer acceptance, network impairment play
+and other platforms remain pending.
+
+Historical first moving-wave recipe / stronger R3 course, 2026-10-24, macOS, Debug: configure/build passed without
+project compiler warnings. `ctest --test-dir build -j 4 --output-on-failure` passed all
+117 active tests, including 22 active GPU tests, the core/net boundary checks and ENet race;
+15 retired wake-field checks stayed disabled. Both production storm recipes match CPU
+height, spatial gradients and moving-surface vertical velocity with maximum absolute error
+2.25e-5 across the probe sweep. The motion/clock/derivative and four-bot results are detailed
+in the [current R3 status](#r3-skill-gate-layout--2026-10-24).
+
+GPU captures at 27.05, 45.05 and 63.05 s and CPU captures at 45.05 and 63.05 s were inspected.
+An 85-second (5,100-frame) scripted GPU windowed preview exited 0 with no diagnostic output.
+Graphics and ENet checks used desktop/loopback access. Documentation link paths and new R3
+anchors resolve; `git diff --check` passes. Human play/acceptance of this moving revision,
+network impairment play and other platforms remain unverified. The current 66–81 s bot
+pacing exceeds the original duration goal and is explicitly awaiting feedback.
+
+Historical first R3 layout (before the user's difficulty feedback), 2026-10-24, macOS,
+Debug: configure/build passed without project compiler warnings (the first build retained raylib's vendored CoreMIDI typedef warnings and CMake's
+OpenGL deprecation notice). `ctest --test-dir build -j 4 --output-on-failure` passed all
+117 active tests in 148.44 s, including 22 active GPU tests, `boat_race` and `boat_net_race`;
+15 retired wake-field tests stayed disabled. Graphics and ENet checks used desktop/loopback
+access after sandboxed window startup stalled and was interrupted. CPU/GPU captures and
+the complete scripted windowed run are recorded in the [R3 status](#r3-skill-gate-layout--2026-10-24).
+Changed local documentation link paths and the new R3 anchors resolve; `git diff --check`
+passes. Human race play, HUD acceptance and other-platform verification remain pending.
+
+R2 network race, 2026-10-24, Apple Silicon/macOS 26.6.2: Debug build without project compiler
+warnings. `ctest --test-dir build -j 4 --output-on-failure` ran 117 active tests in 110.05 s:
+all 95 non-GPU tests passed, including `boat_race`, `boat_net` and the new `boat_net_race`;
+22 of the 24 GPU tests failed because GLFW could not initialise a window platform in the
+agent's environment (also with the sandbox disabled), so GPU parity for R2 is unverified.
+R2 changes GPU-visible content only by the race markers in `boat_view`. All 313 local links in
+the eight changed documents resolve and `git diff --check` passes. See
+[R2](#r2-network-race--2026-10-24) for the scenario checks and what remains unverified.
 
 R1 race core, 2026-10-24, Apple Silicon/macOS 26.6.2: Debug build without project compiler
 warnings (raylib's own vendored-source warnings unchanged). The full

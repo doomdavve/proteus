@@ -91,7 +91,7 @@ static BoatWater study_water(
     return water;
 }
 
-static void draw_help(bool course, bool mapped, bool deathmatch)
+static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
 {
     int width = GetScreenWidth(), height = GetScreenHeight();
     const char *lines[] = {
@@ -106,7 +106,9 @@ static void draw_help(bool course, bool mapped, bool deathmatch)
         "Thrust: 4 forward / neutral / 2 reverse",
         "Tap: one step | hold: step each 0.5 s",
         "R: reset boat / restart demo",
-        deathmatch ? "Hold Tab: deathmatch scoreboard" : "",
+        deathmatch ? "Hold Tab: deathmatch scoreboard"
+            : race ? "Hold Tab: race standings"
+                   : "",
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
 #if defined(__EMSCRIPTEN__)
@@ -941,8 +943,10 @@ static int study(int argc, char **argv)
         }
         live_view.skin = skin;
 #ifdef PROTEUS_BOAT_NET
-        if (net)
+        if (net) {
             live_view.skin = net_study_skin(net->client.slot); // Every client agrees.
+            net_study_race_view(net, &live_view);
+        }
 #endif
         if (view == &playback)
             playback.skin = skin;
@@ -1083,6 +1087,8 @@ static int study(int argc, char **argv)
             int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, 12);
             net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
+            net_study_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
+                active && IsKeyDown(KEY_TAB));
 #endif
         } else if (!IsWindowFocused())
             DrawText("PAUSED", 12, 12, 20, RAYWHITE);
@@ -1091,11 +1097,12 @@ static int study(int argc, char **argv)
         if (profiler_visible)
             boat_profile_draw(&boat_snapshot, 12, 355);
         if (help_visible) {
-            bool deathmatch = false;
+            bool deathmatch = false, race = false;
 #ifdef PROTEUS_BOAT_NET
             deathmatch = networked && net_study_deathmatch(net);
+            race = networked && net_study_race(net);
 #endif
-            draw_help(course, location->mapped, deathmatch);
+            draw_help(course, location->mapped, deathmatch, race);
         }
         EndDrawing();
         metrics.present_ms = (float)((boat_profile_time(true) - present_started_at) * 1000.0);

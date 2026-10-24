@@ -52,9 +52,17 @@ const char *net_study_status(const NetStudy *net);
 int net_study_draw_roster(const NetStudy *net, int right, int top);
 // A deathmatch room (docs/DEATHMATCH_PLAN.md) has sent its scoreboard.
 bool net_study_deathmatch(const NetStudy *net);
+// A race room (docs/RACE_PLAN.md) has sent its state.
+bool net_study_race(const NetStudy *net);
+// Fill VIEW's race markers: the course lines and the own next gate.
+void net_study_race_view(const NetStudy *net, BoatViewState *view);
 // Deathmatch HUD at window resolution: round clock and own score at the top centre, a kill feed
 // below FEED_TOP at the right, and the scoreboard while SCOREBOARD is held or between rounds.
 void net_study_draw_match(
     const NetStudy *net, int width, int height, int feed_top, bool scoreboard);
+// Race HUD at window resolution: phase, clock, live position and next gate at the top centre,
+// a large countdown, finishes and retirements below FEED_TOP at the right, and the standings
+// while BOARD is held or during results.
+void net_study_draw_race(const NetStudy *net, int width, int height, int feed_top, bool board);
 void net_study_close(NetStudy *net);
 #endif

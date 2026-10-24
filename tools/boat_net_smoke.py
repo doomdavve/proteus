@@ -10,6 +10,10 @@ summaries, message/datagram/MTU bounds and that every process stops within a bou
 With --deathmatch (protocol v2): a deathmatch room with a 10 s round and two hunting bots that
 stay through the intermission. Each bot's received scoreboard for round 1 must equal the
 server log's, and each must have received every round event and capsize the server logged.
+
+With --race (protocol v4): a river race room found by LAN search as mode=race, and two racing
+bots through the grid, the countdown and GO. Each bot must have been held on the grid, hold the
+server's GO tick and race state, and have received every race event the server logged.
 """
 
 import argparse
@@ -110,16 +114,90 @@ def deathmatch(args):
     return 1 if problems else 0
 
 
+def race(args):
+    port = free_port()
+    lan_port = free_port()
+    endpoint = f"127.0.0.1:{port}"
+    bot_seconds = 10  # Grid within a second of the second join, GO 4 s later.
+    server_seconds = bot_seconds + 4
+    server = subprocess.Popen(
+        [args.server, "--port", str(port), "--lan-port", str(lan_port), "--mode", "race",
+         "--seconds", str(server_seconds)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    problems = []
+    try:
+        line = server.stdout.readline()
+        if "race" not in line or "river" not in line:
+            raise AssertionError(f"server did not start a river race room: {line!r}")
+        print(line.strip())
+        search = subprocess.run([args.bot, "--discover", "--lan-port", str(lan_port), "--seconds",
+            "1"], capture_output=True, text=True, timeout=10)
+        rooms = [l for l in search.stdout.splitlines() if l.startswith(f"lan room {endpoint} ")]
+        if len(rooms) != 1 or "mode=race" not in rooms[0] or "compatible=yes" not in rooms[0]:
+            problems.append(f"LAN search: {search.stdout}{search.stderr}")
+        else:
+            print(rooms[0])
+        bots = [subprocess.Popen([args.bot, "--connect", endpoint, "--name", name, "--predict",
+                    "--seconds", str(bot_seconds)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                for name in ("race-a", "race-b")]
+        outputs = []
+        for bot in bots:
+            out, err = bot.communicate(timeout=bot_seconds + 20)
+            print(out.strip())
+            if bot.returncode != 0:
+                problems.append(f"bot exit {bot.returncode}: {err}")
+            outputs.append(out)
+        out, err = server.communicate(timeout=server_seconds + 15)
+        print(out.strip())
+        if server.returncode != 0:
+            problems.append(f"server exit {server.returncode}: {err}")
+        if not problems:
+            grid = re.search(r"race 1 grid go=(\d+)", out)
+            # Events the bots stayed for: everything logged before the first leaver's DNF.
+            logged = out.split(" dnf ")[0]
+            events = len(re.findall(r"^tick \d+ (?:race|gate|finish|dnf|recover|park) ", logged,
+                re.MULTILINE))
+            if not grid or "race 1 racing" not in out:
+                problems.append("server never released race 1")
+            for text in outputs:
+                state = fields(text, "race:")
+                summary = fields(text, "boat_bot summary:")
+                checks = {
+                    "racing": state["round"] == "1" and state["phase"] == "3",
+                    "same GO": grid is not None and state["go"] == grid.group(1),
+                    "held on the grid": int(state["held_ticks"]) >= 150,
+                    "events": int(state["events"]) >= events,
+                    "no resyncs": int(summary["resyncs"]) == 0,
+                    "no decode errors": int(fields(text, "control:")["decode_errors"]) == 0,
+                    "boat moved": float(fields(text, "control:")["travelled_m"]) > 20,
+                }
+                problems += [f"bot check failed: {k}" for k, ok in checks.items() if not ok]
+            faults = fields(out, "faults:")
+            if not all(faults[k] == "0" for k in ("malformed", "forbidden", "output", "emission")):
+                problems.append(f"server faults: {faults}")
+    finally:
+        if server.poll() is None:
+            server.kill()
+    for problem in problems:
+        print(problem)
+    print("boat_net_race=" + ("fail" if problems else "ok"))
+    return 1 if problems else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--server", required=True)
     parser.add_argument("--bot", required=True)
     parser.add_argument("--seconds", type=int, default=4)
     parser.add_argument("--deathmatch", action="store_true")
+    parser.add_argument("--race", action="store_true")
     parser.add_argument("--location", choices=("basin", "eriksberg", "river"), default="basin")
     args = parser.parse_args()
     if args.deathmatch:
         return deathmatch(args)
+    if args.race:
+        return race(args)
     port = free_port()
     lan_port = free_port()
     endpoint = f"127.0.0.1:{port}"

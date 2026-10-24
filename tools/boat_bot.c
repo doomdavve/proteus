@@ -1,7 +1,9 @@
 /* Multiplayer M3 scripted client: joins a boat_server room over ENet, drives its server-owned
  * boat with the boat_fleet_bots route (or, with --hunt, at the nearest other boat) from the
  * authoritative mirror, and checks the mirror's wake reconstruction against each snapshot's
- * digest. In deathmatch rooms it prints each finished round's scoreboard as received.
+ * digest. In deathmatch rooms it prints each finished round's scoreboard as received. In race
+ * rooms it races: full throttle through the countdown, then each gate in its own lane, and it
+ * prints each round's results as received.
  * --discover lists the rooms that answer a LAN search instead. Headless; for process smoke tests.
  */
 #include "boat_fleet_bots.h"
@@ -22,7 +24,8 @@ static void usage(FILE *out)
         "       boat_bot --discover [--lan-port N] [--seconds S]\n"
         "Join a boat_server room, drive one boat by script for S seconds (default 5), then\n"
         "leave and print a summary. --hunt drives at the nearest other boat to ram it or cross\n"
-        "it with its wake (for deathmatch rooms). --expect-reject succeeds only when the room\n"
+        "it with its wake (for deathmatch rooms). In race rooms the bot races the course.\n"
+        "--expect-reject succeeds only when the room\n"
         "refuses it. --predict exercises client prediction. --reset-every requests R every S\n"
         "seconds; --inactive-every sends inactive controls for one second every S seconds\n"
         "(S: integer 2-86400). These options exercise session lifecycle in headless tests.\n"
@@ -46,7 +49,7 @@ static int discover(uint16_t lan_port, unsigned long seconds)
         boat_net_enet_cleanup();
         return 1;
     }
-    static const char *const modes[] = { "free", "deathmatch" };
+    static const char *const modes[] = { "free", "deathmatch", "race" };
     BoatNetLanList list = { 0 };
     double start = boat_net_clock(), queried = -1;
     for (double now = start; now - start < (double)seconds; now = boat_net_clock()) {
@@ -168,7 +171,8 @@ int main(int argc, char **argv)
     uint32_t last_life = 0;
     uint64_t received_inputs = 0, input_samples = 0, last_snapshots = 0;
     unsigned capsized = 0, resets = 0, mtu = 0;
-    uint32_t reported_round = 0;
+    uint32_t reported_round = 0, reported_race = 0;
+    unsigned race_finishes = 0, race_dnf = 0, held_ticks = 0, feed_seen = 0;
     bool joined = false, running = true;
     double next_reset = 0, next_inactive = 0, inactive_until = 0;
     unsigned inactive_periods = 0, max_players = 0, max_wakes = 0;
@@ -179,7 +183,17 @@ int main(int argc, char **argv)
         if (own) {
             input = hunt ? boat_fleet_bot_hunt_input(&bots, &client.fleet, client.slot)
                          : boat_fleet_bot_input(&bots, &client.fleet, client.slot);
-            // A deathmatch room respawns capsized boats itself.
+            const BoatNetRaceRow *row = &client.race.slots[client.slot];
+            if (client.accept.mode == BOAT_NET_MODE_RACE && client.race_valid && row->current) {
+                if (own->held) // Grid, countdown or parked: prepare full throttle on the grid.
+                    input = (BoatInput) { 0,
+                        boat_throttle_rate(own->boat.throttle, row->parked ? 0 : 1) };
+                else if (client.race.phase == BOAT_RACE_RACING
+                    || client.race.phase == BOAT_RACE_RESULTS)
+                    input = boat_fleet_bot_race_input(&client.fleet, boat_race_river_course(),
+                        row->gates, row->status != BOAT_RACE_RUNNING, client.slot);
+            }
+            // Deathmatch and race rooms recover capsized boats themselves.
             if (own->boat.motion_state == BOAT_CAPSIZED
                 && client.accept.mode == BOAT_NET_MODE_FREE) {
                 if (++capsized == 2 * 60) { // Two seconds of 60 Hz service.
@@ -217,6 +231,8 @@ int main(int argc, char **argv)
             fflush(stdout);
         }
         if (joined) {
+            const BoatFleetSlot *slot = &client.fleet.state.slots[client.slot];
+            held_ticks += slot->active && slot->held;
             unsigned players = 0;
             for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
                 players += client.roster.slots[i].state == BOAT_NET_ROSTER_PLAYING;
@@ -247,6 +263,27 @@ int main(int argc, char **argv)
             }
             printf(" (score/caused/capsized/self)\n");
             fflush(stdout);
+        }
+        if (client.race_result.round != reported_race) {
+            reported_race = client.race_result.round;
+            printf("boat_bot race %" PRIu32 " results:", reported_race);
+            for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+                const BoatNetRaceRow *row = &client.race_result.slots[i];
+                if (!row->entrant)
+                    continue;
+                if (row->status == BOAT_RACE_FINISHED)
+                    printf(" %u=P%u/%.3fs", i + 1, row->place,
+                        (double)row->finish / BOAT_RACE_SUBTICKS / BOAT_TICK_HZ);
+                else
+                    printf(" %u=DNF", i + 1);
+            }
+            printf("\n");
+            fflush(stdout);
+        }
+        for (; feed_seen < client.race_feed_count; ++feed_seen) {
+            const BoatNetRaceEvent *e = &client.race_feed[feed_seen % BOAT_NET_MATCH_FEED].event;
+            race_finishes += e->kind == BOAT_RACE_FINISH;
+            race_dnf += e->kind == BOAT_RACE_OUT;
         }
         unsigned peer_mtu = boat_net_enet_peer_mtu(enet, 0);
         mtu = peer_mtu > mtu ? peer_mtu : mtu;
@@ -294,6 +331,11 @@ int main(int argc, char **argv)
         s->commands, s->input_packets,
         input_samples ? (double)received_inputs / (double)input_samples : 0, client.lead,
         client.rtt * 1000, travelled, resets, s->decode_errors);
+    if (client.accept.mode == BOAT_NET_MODE_RACE)
+        printf("race: events=%" PRIu64 " round=%" PRIu32 " phase=%u finishes=%u dnf=%u "
+               "results=%" PRIu32 " held_ticks=%u go=%" PRIu64 "\n",
+            client.race_feed_count, client.race.round, (unsigned)client.race.phase, race_finishes,
+            race_dnf, client.race_result.round, held_ticks, client.race_go);
     if (client.accept.mode == BOAT_NET_MODE_DEATHMATCH)
         printf("match: events=%" PRIu64 " round=%" PRIu32 " phase=%u finished=%" PRIu32 "\n",
             client.feed_count, client.match.round, (unsigned)client.match.phase,
