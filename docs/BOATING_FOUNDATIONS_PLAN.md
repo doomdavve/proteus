@@ -114,8 +114,8 @@ The default P3 wake fixture is now arcade objects (128 total slots, 32 per emitt
 ### P2a — first multiplayer prerequisite task
 
 Add a **simulation-only** `tools/boat_benchmark.c` target and a small tools-only shared driver
-helper (proposed `tools/boat_study_drive.[ch]`). Read `demo_step`, `timed_boat_step`,
-`object_study_reset`/`object_track` in `tools/boat_study.c`, `boat_profile_time`, and
+helper (proposed `tools/wake_velocity_drive.[ch]`). Read `demo_step`, `timed_boat_step`,
+`object_study_reset`/`object_track` in `tools/wake_velocity.c`, `boat_profile_time`, and
 `tools/wake_objects_review.c` before editing. Share the actual default one-boat arcade
 input/step path; preserve advance → boat step → stern track, float clock arithmetic,
 expressions and emission sequence. Keep the rival and optional wake modes compiling with
@@ -193,7 +193,7 @@ define emission visibility between ticks; introducing `BoatWorld` alone does not
 
 ### P1 — frame/tick records and timing boundaries
 
-Read/edit: `src/profiler.[ch]`, `tools/boat_study.c`; add `src/boat_profile.[ch]` for boating-specific
+Read/edit: `src/profiler.[ch]`, `tools/wake_velocity.c`; add `src/boat_profile.[ch]` for boating-specific
 records/reporting so the main demo's existing profiler output remains compatible.
 
 1. Add a bounded metrics record. Store completed-frame wall time, simulation-loop total, physics
@@ -218,7 +218,7 @@ a test that merely duplicates timer calls.
 
 ### P2 — benchmark tool, counts, and report contract
 
-Read/edit: `tools/boat_water_review.c`, `tools/boat_study.c`, `src/boat_gpu.[ch]`,
+Read/edit: `tools/boat_water_review.c`, `tools/wake_velocity.c`, `src/boat_gpu.[ch]`,
 `src/renderer_gpu.[ch]`, `src/boat_replay.c`, CMake. Add `tools/boat_benchmark.c`.
 
 1. Share the existing scripted controls/routes in a small tools-only fixture helper. Preserve
@@ -305,7 +305,7 @@ Proposed commands, available only after P2 (not current repository commands):
 ### C1 — authoritative ticks, precise seconds, compatibility
 
 Read/edit: `src/boat.[ch]`, `src/boat_course.[ch]`, `src/boat_replay.[ch]`,
-`tools/boat_study.c`, fixture/validator callers. Add a small `src/boat_clock.h`.
+`tools/wake_velocity.c`, fixture/validator callers. Add a small `src/boat_clock.h`.
 
 1. Define `BOAT_TICK_HZ = 120`, retain float `BOAT_STEP` for the existing force integrator, and
    define exact double tick duration `1.0 / BOAT_TICK_HZ` for the accumulator/course timestamps.
@@ -512,7 +512,7 @@ do not claim different wall-clock keyboard sampling is automatically identical.
 ### S3 — session rules, replay views, and finish persistence
 
 Read/edit: `src/boat_session.[ch]`, `src/boat_course.[ch]`, `src/boat_replay.[ch]`,
-`src/boat_audio.[ch]`, `tools/boat_study.c` and benchmark fixtures.
+`src/boat_audio.[ch]`, `tools/wake_velocity.c` and benchmark fixtures.
 
 1. Move course state and run/replay orchestration into `BoatSession`; physics returns previous/
    current pose for swept gate checks and consumes only `BoatInput`, environment, and explicit
@@ -527,7 +527,7 @@ Read/edit: `src/boat_session.[ch]`, `src/boat_course.[ch]`, `src/boat_replay.[ch
    atomic replacement, export behavior, notices, and in-memory best on write failure. Keep this
    synchronous outside the tick loop; background I/O and replay compression remain out of scope.
 4. Keep device audio in the app adapter, reading the selected live/replay view. Input polling,
-   window focus/help, music updates, and presentation stay in `boat_study`; it delegates session
+   window focus/help, music updates, and presentation stay in `wake_velocity`; it delegates session
    stepping and view assembly. Preserve existing replay audio behavior, including its known
    approximations, rather than silently adding unrecorded state.
 
@@ -661,7 +661,7 @@ historical evidence, not a claim about this test attempt.
   `docs/README.md` were modified, while `docs/ARCHITECTURE_REVIEW.md` and this plan were
   untracked. The boating-plan edit and architecture review were preserved; only the index's
   foundations row and this plan's live status were updated for P1. No commit or push was made.
-- **Changed ownership/APIs and migrated callers:** `boat_study` now writes bounded 240-frame
+- **Changed ownership/APIs and migrated callers:** `wake_velocity` now writes bounded 240-frame
   `BoatFrameMetrics` records through `boat_profile.[ch]`. The existing main-demo `Profiler`
   remains compatible. `profile_time()` and display-free boating timing now use monotonic platform
   clocks; live boating uses raylib `GetTime()`. `validate_boat_profile` exercises records and a
@@ -685,7 +685,7 @@ historical evidence, not a claim about this test attempt.
   `boat-default-player-wake.png`, `boat-eriksberg.png`, and `boat-river.png`. The deterministic
   profile validator compared on/off physical state and CPU pixels in memory. No P3 performance
   baseline or GPU comparison exists yet.
-- **Manual playback / user acceptance:** A windowed `./build/boat_study --renderer cpu
+- **Manual playback / user acceptance:** A windowed `./build/wake_velocity --renderer cpu
   --profiler --frames 3` attempt did not reach frame completion in this environment and was
   stopped. The visual F3 overlay and interactive playback were not inspected; no user acceptance
   is inferred. The change does not alter motion, input, audio, or asset loading.
@@ -828,7 +828,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   before float trigonometry. No compatibility wrapper or main-demo branch was needed.
 - **Performance:** `boat_water.c` now queries through internal const pointers instead of
   copying the 2.7 KB `BoatWater` per call; public signatures are unchanged. A Release CPU
-  `boat_study --location eriksberg --waves --player-wake --time 60` screenshot run took
+  `wake_velocity --location eriksberg --waves --player-wake --time 60` screenshot run took
   1.29 s versus 1.48 s for `6500a65` (default basin 0.33 s versus 0.35 s), same machine.
 - **Automated verification:** Apple M1 Max/macOS 26.6.2, Debug, the common configure/build
   and `ctest --test-dir build -j 4 --output-on-failure` pass 85 active cases (20 GPU) in
@@ -851,7 +851,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   wave/player-wake demo and course runs exited normally.
 - **Manual playback:** On 2026-10-23 the user played the default basin build from
   `cmake -S . -B build/review -DCMAKE_BUILD_TYPE=RelWithDebInfo`,
-  `cmake --build build/review --target boat_study -j` and `./build/review/boat_study`, and
+  `cmake --build build/review --target wake_velocity -j` and `./build/review/wake_velocity`, and
   reported that it works great. Other locations and options were not reported as played.
 - **Limits:** GPU tolerances were measured on one Apple GPU; Windows/Linux/browser were not run.
   No simulated hour was run (C3). The benchmark trace CSV and profiler overlay still print
@@ -940,7 +940,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   removed; `boat_wake_stern`, `boat_update_flag`, scene/draw/GPU entry points and replay
   recording take explicit world/time. Assignment clones a world/session; nothing owned is
   shared. The arcade `BoatWakeObjects` stay app-owned and borrowed through `water.objects`.
-- **Reset / replay:** `boat_study` R re-initializes its session from the existing CLI water
+- **Reset / replay:** `wake_velocity` R re-initializes its session from the existing CLI water
   (clock to zero, wakes cleared), as before. `boat_session_respawn` moves the boat to the spawn
   without touching clock or water (soak recovery). Replay/ghost samples are drawn in their own
   `BoatWorld` built from `boat_replay_water(run)`, never written into the live session.
@@ -970,7 +970,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   outputs match the `e83f545` worktree and C3: the three P3a traces (hash
   `24d582aae45971b4`), both hour soaks (hashes `43dfc74ddac0055d`, `56e31ce5c3d7a7c4`)
   and their six frames, 17 validator/review outputs (only a timing line differs), and 19 CPU/GPU
-  `boat_study` captures, replay/ghost/wave-replay captures and C3 `cpu-t{9,11,20,60}` views,
+  `wake_velocity` captures, replay/ghost/wave-replay captures and C3 `cpu-t{9,11,20,60}` views,
   all byte for byte. Representative frames were inspected.
 - **Manual playback:** Windowed scripted runs (`--demo`, `--course`, Eriksberg waves with
   D3, crossing with waves for 180 frames; river current for 120) exited normally. On
@@ -1061,7 +1061,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   no longer touches course state. `boat_reset_course` became `boat_session_start_course`
   with `BOAT_COURSE_START`.
 - **Runs in the session:** `BoatReplayRuns` lives in `BoatSession.runs`. With `record_runs`
-  set (`boat_study` sets it for course mode after any screenshot stepping), each course tick
+  set (`wake_velocity` sets it for course mode after any screenshot stepping), each course tick
   records the before/after `boat_replay_pose(boat, presentation, time)`.
   `boat_replay_record`/`boat_replay_runs_step` now take poses, the course and the waves flag
   rather than a live boat and world. `boat_session_restart` (R) flushes, re-inits clock, water,
@@ -1070,7 +1070,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
 - **Finish persistence:** a finish only settles last/best in memory and sets one pending
   request (`save_best`, `export_last`, `report_finish`). `boat_replay_runs_flush`
   (`boat_session_flush`) writes the best (with directory creation) and the export, sets the
-  same failure notices as before and prints the notice. `boat_study` flushes after each frame's
+  same failure notices as before and prints the notice. `wake_velocity` flushes after each frame's
   catch-up tick loop and at shutdown, and reset flushes first. Only a reset replaces last/best,
   so a pending request cannot lose its run. Saves stay synchronous; no queue beyond one finish.
 - **View state:** `src/boat_view_state.h` holds `BoatViewState { Boat boat; double time;
@@ -1079,10 +1079,10 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
   `Boat.replay_view` are gone: physics/presentation have no view flag, and a sampled view
   is a distinct type. Replay interpolation is unchanged and continuous. The crossing boat is
   drawn as a view at session time. Tests use `SESSION_VIEW()` from `tools/boat_test_session.h`.
-- **Tools:** `boat_study_state_hash` takes the session time explicitly, in the position the
+- **Tools:** `wake_velocity_state_hash` takes the session time explicitly, in the position the
   cached field used, so traces and hashes are unchanged. The frozen P2a oracle had only its
   time sources ported; its float-narrowed crossing-boat recovery time is kept as a local.
-  Audio, input, focus/help, music and presentation stay in `boat_study`. Course recording time
+  Audio, input, focus/help, music and presentation stay in `wake_velocity`. Course recording time
   is now counted in the tick's physics timing instead of `course_replay_ms`. That metric also
   covers the flush.
 - **Automated verification:** Apple M1 Max/macOS 26.6.2, Debug common recipe: 88 active CTests
@@ -1132,7 +1132,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
     the waterfront scene/corner/drawing modules.
   - `proteus_gpu`: `boat_gpu` and `renderer_gpu`.
   - `proteus_boat_session`: `boat_session` and `boat_replay`.
-  - `proteus_boat_drive`: `tools/boat_study_drive.c`, `tools/boat_study_state.c` and
+  - `proteus_boat_drive`: `tools/wake_velocity_drive.c`, `tools/wake_velocity_state.c` and
     `boat_profile`.
   - Audio, music, profiler and asset paths stay as executable sources. `cmake/Web.cmake`
     applies its `-Os` and POSIX definition to the executable and each library.
@@ -1170,7 +1170,7 @@ world/session extraction. No cross-platform bit identity or user acceptance is i
     that core-only stepping on every tick for 2400 ticks.
 - **Labels and build:** active tests are labelled `cpu`, `render`, `gpu`, and the two core
   checks also `core`. The Debug `-O2` override now also covers the core/render/session/drive
-  libraries, so Debug `boat_study` runs optimized boat code unless
+  libraries, so Debug `wake_velocity` runs optimized boat code unless
   `PROTEUS_OPTIMIZE_TESTS=OFF`. After touching `boat_gpu.c` and `renderer_gpu.c`, the Debug
   build recompiled only those two objects.
 - **Automated verification:** Apple M1 Max/macOS 26.6.2, Debug common recipe with
@@ -1214,7 +1214,7 @@ and `clang-format` pass.
   rates clamped to -1..1 when applied. Zero steering lets the wheel spring back to centre, and
   zero throttle holds the setting. `boat_step(boat, world, now, input)`,
   `boat_session_step(session, input)` and the tools' `timed_boat_step(session, input, ...)`
-  take it in place of the two floats. `boat_study` builds one `BoatInput` per frame from the
+  take it in place of the two floats. `wake_velocity` builds one `BoatInput` per frame from the
   keyboard and applies it to every catch-up tick, as before.
 - **Callers:** every validator, review tool, the shared drive and the scripted crossing boat
   pass compound literals with the same expressions in the same order. The frozen P2a oracle

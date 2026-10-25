@@ -1,6 +1,6 @@
 /* Compare the frozen 2994e0d app driver against the extracted production helper. */
 #include "boat_drive_baseline.h"
-#include "boat_study_state.h"
+#include "wake_velocity_state.h"
 #include "boat_view.h"
 #include "raymath.h"
 #include <math.h>
@@ -30,9 +30,10 @@ int main(void)
     for (int tick = 0; tick < 3840; ++tick) {
         baseline_demo(&a, tick, NULL, NULL, &wa);
         demo_step(&b, tick, NULL, NULL, &wb);
-        CHECK(boat_study_state_hash(BOAT_STUDY_HASH_SEED, &a.boat, boat_session_time(&a), &wa.wakes)
-            == boat_study_state_hash(
-                BOAT_STUDY_HASH_SEED, &b.boat, boat_session_time(&b), object_study_wakes(&wb)));
+        CHECK(wake_velocity_state_hash(
+                  WAKE_VELOCITY_HASH_SEED, &a.boat, boat_session_time(&a), &wa.wakes)
+              == wake_velocity_state_hash(WAKE_VELOCITY_HASH_SEED, &b.boat, boat_session_time(&b),
+                  object_study_wakes(&wb)));
         if (tick == 1079 || tick == 2399) {
             BoatViewState va = boat_session_view(&a), vb = boat_session_view(&b);
             CHECK(

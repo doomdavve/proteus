@@ -115,9 +115,9 @@ Existing play flags are unchanged; the optimized executable includes the new beh
 
 ```sh
 cmake -S . -B build/review -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/review --target boat_study wake_objects_review -j
-./build/review/boat_study --wake-objects --location river --profiler
-./build/review/boat_study --wake-objects-crossing --profiler
+cmake --build build/review --target wake_velocity wake_objects_review -j
+./build/review/wake_velocity --wake-objects --location river --profiler
+./build/review/wake_velocity --wake-objects-crossing --profiler
 ./build/review/wake_objects_review
 ./build/review/wake_objects_review --gpu
 ./build/review/wake_objects_review --desktop

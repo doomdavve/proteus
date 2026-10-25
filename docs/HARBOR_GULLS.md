@@ -1,6 +1,6 @@
 # Harbor gulls
 
-Implemented 2026-10-18 for `boat_study` in the then Eriksberg and river locations; since
+Implemented 2026-10-18 for `wake_velocity` in the then Eriksberg and river locations; since
 2026-10-25 the river is the only mapped location. The basin/course has no gulls. The main demo's
 five-bird route was removed with the demo on 2026-10-25.
 
@@ -29,10 +29,10 @@ Run from the repository root:
 
 ```sh
 mkdir -p build/living-city/gulls
-./build/boat_study --location river --gpu-aa --demo --frames 360
-./build/boat_study --renderer cpu --location river --time 0 --screenshot build/living-city/gulls/dock-start.png
-./build/boat_study --location river --gpu-aa --time 0 --screenshot build/living-city/gulls/dock-gpu.png
-./build/boat_study --location river --camera-height 6
+./build/wake_velocity --location river --gpu-aa --demo --frames 360
+./build/wake_velocity --renderer cpu --location river --time 0 --screenshot build/living-city/gulls/dock-start.png
+./build/wake_velocity --location river --gpu-aa --time 0 --screenshot build/living-city/gulls/dock-gpu.png
+./build/wake_velocity --location river --camera-height 6
 ```
 
 The default opening view shows the nearest flock ahead of the boat. Lower the chase camera
@@ -41,6 +41,5 @@ under power to compare its reaction. GPU commands require a desktop graphics con
 
 The `harbor_traffic` CTest includes 120 seconds of gull continuity, flockmate spacing, finite
 poses, wing attachment, repeated/backward seek consistency, a moving-player crossing,
-player proximity/speed response, and boat-frame integration checks. The existing
-`waterfront_actors` test protects the five-bird demo's framing and timing. Verification evidence and remaining human review belong to the
+player proximity/speed response, and boat-frame integration checks. Verification evidence and remaining human review belong to the
 [living-city progress log](LIVING_CITY_PLAN.md#progress-log).

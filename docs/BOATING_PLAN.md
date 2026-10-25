@@ -1,6 +1,6 @@
 # Gothenburg boating playground
 
-Status: updated 2026-10-25. `boat_study` implements free boating in the basin and river
+Status: updated 2026-10-25. `wake_velocity` implements free boating in the basin and river
 locations ([Eriksberg location removed](#eriksberg-location-removed--2026-10-25)), reverse/docking, planing, buoyancy, optional gentle waves, opt-in
 current/scripted-wake options in all locations, default bounded arcade wakes in free boating,
 and a timed S course with recordings, persistent personal bests, ghosts, and replay controls. The study
@@ -17,7 +17,7 @@ The score-loop arcade mode and archipelago remain proposals.
 The user reports current jumping, landing and capsizing are fun. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns the multiplayer track: preserve that feel
 with an authoritative native-first world for four friends, beginning with a two-player basin
-slice. M3 added a diagnostic network room (`boat_server`, `boat_study --connect`) without
+slice. M3 added a diagnostic network room (`boat_server`, `wake_velocity --connect`) without
 prediction; the first playable is M4. Shared free boating preceded the
 [deathmatch](DEATHMATCH_PLAN.md) implementation. The next requested mode is a
 [45–60 second river race](RACE_PLAN.md) with vessel-made jump wakes, a shared grid and
@@ -251,7 +251,7 @@ The boat-level [water review](WATER_REVIEW.md) records a repeatable dock/river/q
 and the completed 04f surface and 04g selected waterline passes. Those visual changes
 preserve handling; the separately implemented river expansion adds playable geography.
 
-Run `./build/boat_study`. Left/right or A/D adjust the wheel, clamped from full
+Run `./build/wake_velocity`. Left/right or A/D adjust the wheel, clamped from full
 left to full right. Centre to either limit takes one second. Releasing keys lets an overdamped
 spring return the wheel smoothly to centre without overshooting; opposite input now unwinds
 full lock in about 0.33 seconds, then builds the new turn at the original rate. Return strength is set by `WHEEL_RETURN_RATE` in `src/boat.c` (initially 3/s,
@@ -360,10 +360,10 @@ camera placement and world motion provide enough sensation.
 Suggested comparison commands (GPU, optional AA):
 
 ```sh
-./build/boat_study --location river --gpu-aa
-./build/boat_study --location river --gpu-aa --fixed-fov
-./build/boat_study --location river --gpu-aa --camera-distance 18 --camera-height 6
-./build/boat_study --course --gpu-aa --data-dir build/handling-review/profile
+./build/wake_velocity --location river --gpu-aa
+./build/wake_velocity --location river --gpu-aa --fixed-fov
+./build/wake_velocity --location river --gpu-aa --camera-distance 18 --camera-height 6
+./build/wake_velocity --course --gpu-aa --data-dir build/handling-review/profile
 ```
 
 User acceptance, 2026-10-19: "Feels great!" Priority 1 is accepted. Next: preserve this baseline
@@ -417,7 +417,7 @@ even without a score. Tune movement before adding content if this does not hold.
 
 ## First timed course
 
-`./build/boat_study --course` selects a basin-only S course. The boat spawns south of a
+`./build/wake_velocity --course` selects a basin-only S course. The boat spawns south of a
 start line; a forward crossing between the posts starts the timer. Two ordered, offset buoy
 gates require broad turns before a chequered finish line stops the clock. Yellow marks the
 next gate, and a HUD route map shows progress. Gates use swept boat-centre crossings toward
@@ -538,7 +538,7 @@ Completed checks on macOS:
   the near-stern clusters change shape and position while the curved trail remains.
   Peak live particles: 268 flat / 273 waves, versus 256 / 263 in the baseline.
 - Repeated the CPU sequence from reset: all 160 exported frames were byte-identical.
-  A desktop `boat_study --location river --waves --gpu-aa --demo --frames 360` smoke
+  A desktop `wake_velocity --location river --waves --gpu-aa --demo --frames 360` smoke
   run exited successfully. This is scripted playback, not exhaustive manual driving.
 - `git diff --check` and changed documentation links passed.
 
@@ -589,7 +589,7 @@ These stages describe the design sequence; current implementation is recorded ex
 4. **First archipelago slice (proposed):** only after the core works, try a small island area
    and the camera needed to explore it. Evaluate the appeal of discovering routes and places.
 
-`boat_study` reuses the scene and rendering foundation. Its controls and launch options live in
+`wake_velocity` reuses the scene and rendering foundation. Its controls and launch options live in
 the [README](../README.md#boating-sketch).
 
 ## Later water-physics experiments
@@ -728,7 +728,7 @@ Generate a repeatable 12-second idle/cruise/wave-swell/coast preview without an 
 
 ```sh
 ./build/validate_boat_audio build/boat-peaceful-preview.wav
-./build/boat_study --waves
+./build/wake_velocity --waves
 ```
 
 Preview wave encounters use synthetic varying inputs every 20 ms to expose the swell envelopes;
@@ -778,7 +778,7 @@ offline validator during the suite run. `git diff --check` passed. No visual eff
 
 ## Joyful background music — 2026-10-18
 
-Implemented “A little boat” for `boat_study`: an original 32-bar, 84 BPM major-key
+Implemented “A little boat” for `wake_velocity`: an original 32-bar, 84 BPM major-key
 XM with rounded keys, a simple humming melody, warm bass, and no percussion.
 The fixed arrangement repeats after 91.43 seconds at low volume, independent of
 handling. Focus loss / replay pause pauses playback; unload precedes audio-device

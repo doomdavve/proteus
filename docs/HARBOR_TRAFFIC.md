@@ -59,7 +59,7 @@ course state, recordings, and replay revisions remain unchanged.
 ## Review
 
 ```sh
-./build/boat_study --location river --gpu-aa --waves
+./build/wake_velocity --location river --gpu-aa --waves
 ./build/harbor_review --view launch --waves
 ./build/harbor_review --view ferry --waves --time 40
 ./build/harbor_review --view traffic

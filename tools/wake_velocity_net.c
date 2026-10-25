@@ -1,4 +1,4 @@
-#include "boat_study_net.h"
+#include "wake_velocity_net.h"
 #include "boat_skin.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -50,7 +50,7 @@ bool net_study_connect(
         return false;
     }
     BoatNetClientConfig config
-        = { .name = name, .token = token, .build = "boat_study M4", .predict = true };
+        = { .name = name, .token = token, .build = "wake_velocity M4", .predict = true };
     boat_net_client_init(
         &net->client, boat_net_enet_transport(net->enet), &config, boat_net_clock());
     fprintf(stdout, "Connecting to %s:%u...\n", host, (unsigned)port);

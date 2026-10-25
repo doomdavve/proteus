@@ -50,7 +50,7 @@ Source audit at `7d5fd48`, with a clean starting worktree:
 | `src/boat_replay.[ch]` | Samples already store/interpolate roll. Playback samples poses, not resumable physics state. Physics revision currently 2. |
 | `tools/validate_boat.c` | Existing buoyancy/energy, countersteer, calm-reference, contact, planing and wave checks must be reconciled explicitly. |
 | `tools/validate_boat_environment.c`, `tools/validate_boat_replay.c`, `tools/validate_boat_profile.c` | Environment bounds, playback/storage, and instrumentation independence also consume the changed state. |
-| `tools/boat_study.c`, `tools/boat_water_review.c`, `CMakeLists.txt` | Existing preview, route-review and test registration patterns. Prefer a small dedicated banking validator/review fixture over expanding runtime UI. |
+| `tools/wake_velocity.c`, `tools/boat_water_review.c`, `CMakeLists.txt` | Existing preview, route-review and test registration patterns. Prefer a small dedicated banking validator/review fixture over expanding runtime UI. |
 
 Within T1–T5, use C17/raylib and the existing tick rate. Preserve steering response, propulsion, drag,
 grip, yaw inertia, camera settings, course rules, controls and audio. Do not introduce
@@ -498,11 +498,11 @@ Reproduce reports using the T1 commands with report names `t2.csv` and `t2-rerun
 Additional review commands actually run:
 
 ```sh
-./build/boat_study --renderer cpu --no-player-wake \
+./build/wake_velocity --renderer cpu --no-player-wake \
   --screenshot build/banking-review/t2-straight-cpu.png --time 2
-./build/boat_study --renderer cpu --no-player-wake --camera-distance 8 --camera-height 4 \
+./build/wake_velocity --renderer cpu --no-player-wake --camera-distance 8 --camera-height 4 \
   --screenshot build/banking-review/t2-turn-cpu.png --time 5
-./build/boat_study --renderer cpu --waves \
+./build/wake_velocity --renderer cpu --waves \
   --screenshot build/banking-review/t2-waves-cpu.png --time 8
 ```
 
@@ -523,10 +523,10 @@ T1's original 71/71 desktop evidence remains recorded above.
 Additional desktop commands completed successfully:
 
 ```sh
-./build/boat_study --renderer gpu --gpu-aa --no-player-wake \
+./build/wake_velocity --renderer gpu --gpu-aa --no-player-wake \
   --camera-distance 8 --camera-height 4 \
   --screenshot build/banking-review/t2-turn-gpu.png --time 5
-./build/boat_study --demo --location eriksberg --gpu-aa --frames 600
+./build/wake_velocity --demo --location eriksberg --gpu-aa --frames 600
 ```
 
 The native GPU frame was inspected alongside the CPU turn frame: rolled hull/cabin/outboard,
@@ -633,7 +633,7 @@ Reproduce from the repository root:
 ./build/validate_boat_banking --report build/banking-review/t3-rerun.csv \
   > build/banking-review/t3-rerun.txt
 cmp build/banking-review/t3.csv build/banking-review/t3-rerun.csv
-./build/boat_study --renderer cpu --waves --camera-distance 8 --camera-height 4 \
+./build/wake_velocity --renderer cpu --waves --camera-distance 8 --camera-height 4 \
   --screenshot build/banking-review/t3-waves-cpu.png --time 8
 ```
 
@@ -657,9 +657,9 @@ show coherent rolled hull/cabin/outboard and a level horizon. Detailed emitter, 
 reflection, ghost/replay and seek acceptance remains T4. Additional commands actually run:
 
 ```sh
-./build/boat_study --renderer gpu --gpu-aa --waves --camera-distance 8 --camera-height 4 \
+./build/wake_velocity --renderer gpu --gpu-aa --waves --camera-distance 8 --camera-height 4 \
   --screenshot build/banking-review/t3-waves-gpu.png --time 8
-./build/boat_study --demo --location eriksberg --gpu-aa --waves --frames 600
+./build/wake_velocity --demo --location eriksberg --gpu-aa --waves --frames 600
 ```
 
 Both desktop commands exited successfully with desktop graphics access. The latter is a
@@ -734,11 +734,11 @@ Reproduce from the repository root:
 ./build/validate_boat_banking --report build/banking-review/t4.csv \
   > build/banking-review/t4-measurements.txt
 cmp build/banking-review/t3.csv build/banking-review/t4.csv
-./build/boat_study --renderer cpu --replay build/replay-tests/banked.run --time 5 \
+./build/wake_velocity --renderer cpu --replay build/replay-tests/banked.run --time 5 \
   --camera-distance 8 --camera-height 4 --screenshot build/banking-review/t4-replay-cpu.png
-./build/boat_study --gpu-aa --replay build/replay-tests/banked.run --time 5 \
+./build/wake_velocity --gpu-aa --replay build/replay-tests/banked.run --time 5 \
   --camera-distance 8 --camera-height 4 --screenshot build/banking-review/t4-replay-gpu.png
-./build/boat_study --demo --location eriksberg --gpu-aa --waves --frames 600
+./build/wake_velocity --demo --location eriksberg --gpu-aa --waves --frames 600
 ```
 
 CPU/GPU output directories each contain 19 native 320x200 images: six fixtures in default,
@@ -883,10 +883,10 @@ Reproduce current measurements and review artifacts from the repository root:
 cmp build/banking-review/t5.csv build/banking-review/t5-rerun.csv
 ./build/boat_banking_review --output build/banking-review/t5-cpu
 ./build/boat_banking_review --gpu --output build/banking-review/t5-gpu
-./build/boat_study --demo --location basin --no-player-wake --gpu-aa --waves --frames 900
-./build/boat_study --demo --location eriksberg --no-player-wake --gpu-aa --waves --frames 900
-./build/boat_study --demo --location river --no-player-wake --gpu-aa --waves --frames 900
-./build/boat_study --replay build/replay-tests/banked.run --gpu-aa --frames 240
+./build/wake_velocity --demo --location basin --no-player-wake --gpu-aa --waves --frames 900
+./build/wake_velocity --demo --location eriksberg --no-player-wake --gpu-aa --waves --frames 900
+./build/wake_velocity --demo --location river --no-player-wake --gpu-aa --waves --frames 900
+./build/wake_velocity --replay build/replay-tests/banked.run --gpu-aa --frames 240
 ```
 
 The final 138,120-row report pair matches byte for byte. Baseline executable/report and

@@ -65,9 +65,8 @@ The Windows ZIP contains a folder with the same versioned stem. The Mac app is
 Both packages record the full version in `build.txt`; the Mac bundle version uses
 the numeric part of a semantic version tag. Branch/manual builds use `dev-<full-commit-sha>`
 for their Actions artifact names and packages. Local Mac packaging defaults to `dev`.
-The internal CMake target and source files retain `boat_study`; developer checkout
-commands in the guides still use that build target. This release naming change does
-not rename the browser build's internal files or promote the boating target to `proteus`.
+Since 2026-10-25 the CMake target, source files and developer commands also use
+`wake_velocity` (formerly `boat_study`), so the packaged and built executable names match.
 
 See [Mac first-launch instructions](MACOS_BUILD.md#download-and-open) and
 [Windows controls and startup](WINDOWS_BUILD.md#download-and-test). The Mac app

@@ -2,7 +2,7 @@
 #define BOAT_TITLE_H
 #include <stdbool.h>
 
-// Wake Velocity title screen for boat_study's no-argument launch. It draws into the already open
+// Wake Velocity title screen for wake_velocity's no-argument launch. It draws into the already open
 // window with its own presentation clock and never touches a boat session.
 typedef struct {
     char name[17]; // The multiplayer nick: BOAT_NET_NAME_BYTES.

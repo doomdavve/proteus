@@ -108,7 +108,7 @@ is 8, so revision-7 recordings, bests and peers do not mix.
 
 **Presentation (cosmetic, outside physics).** `BoatPresentation` notices a new landing and
 grades it 0..1 from the previous tick's fall speed (1.5 → 10.5 m/s). It throws spray sheets
-along both sides plus a spreading foam ring. `boat_study` passes the strength and a landing serial to
+along both sides plus a spreading foam ring. `wake_velocity` passes the strength and a landing serial to
 the engine audio, which adds a dull 90 ms hull slap (filtered noise, roughly 80–450 Hz, no
 tone) under a 350 ms splash wash. Replays reset presentation, so recorded playback shows no landing splash.
 
@@ -143,7 +143,7 @@ renderers. The camera dip (then part of L1) was subtle in stills, so its amplitu
 from 0.8 to 1.2 m before the GPU captures. `boat_benchmark` wake-loop now reports `physics_revision` 8, 18
 births and one landing (hash `82a88bf33eff247a`). Changed lines pass `git clang-format`.
 
-A 900-frame windowed `boat_study --location river --demo` run exited 0, but its scripted
+A 900-frame windowed `wake_velocity --location river --demo` run exited 0, but its scripted
 drive made no wake jumps, so it did not exercise a landing. The full suite was rerun on the
 final tuning (0.14/2.5 m/s scrub, 1.2 m dip) and passed.
 
@@ -210,7 +210,7 @@ Likely entry points (verify against the current tree):
 - `src/boat.c`, `src/boat.h`: fixed-step simulation, CPU boat rendering, shared GPU player snapshot.
 - `src/boat_map.c`: navigable water and shoreline boundaries.
 - `src/boat_gpu.c`, `src/renderer_gpu.c`, `src/waterfront_scene.h`: GPU integration.
-- `tools/boat_study.c`: input, HUD, deterministic preview and capture options.
+- `tools/wake_velocity.c`: input, HUD, deterministic preview and capture options.
 - `tools/validate_boat.c`: handling regression tests; `CMakeLists.txt`: test registration.
 - `README.md`: public controls and launch commands.
 
@@ -444,10 +444,10 @@ pale crests and the visible source provide approach cues. Source boxes are share
 renderers; they are a non-contact scripted cue, with no navigation or fluid coupling.
 
 ```sh
-./build/boat_study --current
-./build/boat_study --crossing-wake --gpu-aa
-./build/boat_study --current --crossing-wake --waves --gpu-aa --demo
-./build/boat_study --renderer cpu --crossing-wake --time 9 --screenshot build/wake-crossing.png
+./build/wake_velocity --current
+./build/wake_velocity --crossing-wake --gpu-aa
+./build/wake_velocity --current --crossing-wake --waves --gpu-aa --demo
+./build/wake_velocity --renderer cpu --crossing-wake --time 9 --screenshot build/wake-crossing.png
 ```
 
 Reset preserves the options and restarts time. With `--no-player-wake`, the test demo
@@ -493,10 +493,10 @@ without wave reflection, shoreline propagation barriers, or full wave/current tr
 Mapped water topology still clips visible geometry and existing hull contacts still apply.
 
 ```sh
-./build/boat_study --player-wake --gpu-aa
-./build/boat_study --player-wake --gpu-aa --demo
-./build/boat_study --player-wake --waves --current --gpu-aa --demo
-./build/boat_study --renderer cpu --player-wake --time 9 --screenshot build/player-wake.png
+./build/wake_velocity --player-wake --gpu-aa
+./build/wake_velocity --player-wake --gpu-aa --demo
+./build/wake_velocity --player-wake --waves --current --gpu-aa --demo
+./build/wake_velocity --renderer cpu --player-wake --time 9 --screenshot build/player-wake.png
 ```
 
 The player-wake demo accelerates into a loop starting at 3.5 s, then returns to neutral
@@ -771,7 +771,7 @@ notes are superseded by the C3 acceptance below. Test counts refer to those revi
   use it, so GPU reflection/shadow passes inherit the same pose. The camera stays independent.
   Planing blends wake spread/size/lifetime and adds symmetric spray; slip-driven turning spray
   remains. Foam stays on the water while spray originates at a hull attachment.
-  `tools/boat_study.c` now holds straight cruise before turning at 3s and lowering thrust at 4s;
+  `tools/wake_velocity.c` now holds straight cruise before turning at 3s and lowering thrust at 4s;
   README and boating notes document the visual approximation and revised preview.
   `tools/validate_boat.c` covers transition rise/cruise settling, smooth return to rest/reset,
   attachment alignment through 16 headings (including Euler singularities), planing spray,
@@ -917,10 +917,10 @@ mkdir -p build/turn-entry-review
 ./build/boat_banking_review --output build/turn-entry-review/h3-cpu
 ./build/boat_banking_review --gpu --output build/turn-entry-review/h3-gpu
 ./build/validate_boat_replay build/turn-entry-review/replays
-./build/boat_study --demo --location basin --no-player-wake --gpu-aa --waves --frames 900
-./build/boat_study --demo --location eriksberg --gpu-aa --waves --frames 900
-./build/boat_study --demo --location river --no-player-wake --gpu-aa --waves --frames 900
-./build/boat_study --replay build/turn-entry-review/replays/banked.run --gpu-aa --frames 240
+./build/wake_velocity --demo --location basin --no-player-wake --gpu-aa --waves --frames 900
+./build/wake_velocity --demo --location eriksberg --gpu-aa --waves --frames 900
+./build/wake_velocity --demo --location river --no-player-wake --gpu-aa --waves --frames 900
+./build/wake_velocity --replay build/turn-entry-review/replays/banked.run --gpu-aa --frames 240
 ```
 
 Each capture directory contains 57 native 320x200 images: the existing 43 banking/release

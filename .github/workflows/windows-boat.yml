@@ -30,7 +30,7 @@ jobs:
 
       - name: Build Wake Velocity, room server and validators
         run: |
-          $targets = 'boat_study', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net'
+          $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net'
           cmake --build build-win --config Release --target $targets --parallel 2>&1 |
             Tee-Object -FilePath build-win/build.log
           if ($LASTEXITCODE -ne 0) {
@@ -46,13 +46,13 @@ jobs:
       - name: Run boat CPU and multiplayer checks
         run: >-
           ctest --test-dir build-win -C Release --output-on-failure
-          -R '^(boat_handling|boat_screenshot|boat_river_screenshot|boat_server_scripted|boat_study_serve_scripted|boat_net|boat_net_loopback|boat_host)$'
+          -R '^(boat_handling|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_net|boat_net_loopback|boat_host)$'
 
       - name: Package portable Wake Velocity
         run: |
           $package = "build-win/package/wake_velocity-$env:PACKAGE_VERSION-windows-x64"
           New-Item -ItemType Directory -Force -Path "$package/assets" | Out-Null
-          Copy-Item build-win/Release/boat_study.exe "$package/wake_velocity.exe"
+          Copy-Item build-win/Release/wake_velocity.exe "$package/wake_velocity.exe"
           Copy-Item build-win/Release/assets/shaders "$package/assets" -Recurse
           Copy-Item build-win/Release/assets/textures "$package/assets" -Recurse
           Copy-Item build-win/Release/assets/title "$package/assets" -Recurse

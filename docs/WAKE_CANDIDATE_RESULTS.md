@@ -20,8 +20,8 @@ storage below and define the next large-water experiment. No simulation distance
 
 ```sh
 cmake -S . -B build/review -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/review --target boat_study -j
-./build/review/boat_study --wake-field --profiler
+cmake --build build/review --target wake_velocity -j
+./build/review/wake_velocity --wake-field --profiler
 ```
 
 Use the native GPU renderer without AA initially. The CPU renderer is a deterministic
@@ -303,8 +303,8 @@ python3 tools/wake_domain_review.py --executable build/review/wake_field_review 
 ./build/review/wake_play_review --gpu
 ./build/review/wake_play_review --gpu-aa
 ./build/review/wake_gpu_runtime_review
-./build/review/boat_study --wake-field --renderer cpu --time 9 --screenshot build/wake-field-cpu-9.png
-./build/review/boat_study --wake-field --time 18 --screenshot build/wake-field-gpu-18.png
+./build/review/wake_velocity --wake-field --renderer cpu --time 9 --screenshot build/wake-field-cpu-9.png
+./build/review/wake_velocity --wake-field --time 18 --screenshot build/wake-field-gpu-18.png
 ```
 
 The domain runs are deliberately separate from the CTest suite. GPU tools need a native

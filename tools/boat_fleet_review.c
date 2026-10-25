@@ -1,7 +1,7 @@
 /* Multiplayer M4 fleet rendering review: four fleet boats in formation in the basin, drawn from
  * slot 0's follow camera with slots 1-3 as rivals in their slot countries (Sweden, Finland,
  * Denmark, Norway), through the same boat_draw_scene / boat_gpu_draw_scene calls as
- * boat_study --connect. --check is the display-free CTest gate: every rival changes the CPU
+ * wake_velocity --connect. --check is the display-free CTest gate: every rival changes the CPU
  * image, a repeated render is identical and drawing leaves the fleet and presentations
  * untouched. */
 #include "boat_fleet.h"

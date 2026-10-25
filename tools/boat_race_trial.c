@@ -2,7 +2,7 @@
 #include "boat_gpu.h"
 #include "boat_map.h"
 #include "boat_race.h"
-#include "boat_study_drive.h"
+#include "wake_velocity_drive.h"
 #include "boat_throttle.h"
 #include "boat_water_mesh.h"
 #include "raymath.h"

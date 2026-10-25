@@ -3,7 +3,7 @@
 #endif
 /* Multiplayer authority process. Headless: no window, audio, asset or file access.
  * --scripted (M2) runs the local fleet with bots as fast as possible and exits.
- * Otherwise (M3) it listens for boat_study/boat_bot clients over ENet and runs the room at
+ * Otherwise (M3) it listens for wake_velocity/boat_bot clients over ENet and runs the room at
  * 120 Hz wall-clock time until --ticks/--seconds elapse or it is interrupted. The same entry
  * point is the game's `--serve` mode (boat_server.h). */
 #include "boat_server.h"
@@ -42,7 +42,7 @@ static void usage(FILE *out)
         "basin|river]\n"
         "                   [--report-every N] [--mode free|deathmatch] [--round-seconds S]\n"
         "Room (default): listen on --bind (default 127.0.0.1; use a LAN address to accept other\n"
-        "machines) and UDP --port (default %d) for up to four boat_study --connect or boat_bot\n"
+        "machines) and UDP --port (default %d) for up to four wake_velocity --connect or boat_bot\n"
         "clients. Runs the 120 Hz authority until --ticks/--seconds or Ctrl+C. Clients\n"
         "must present the same --token (default empty). A diagnostic: no internet reachability,\n"
         "encryption or authentication.\n"
@@ -50,7 +50,7 @@ static void usage(FILE *out)
         "UDP --lan-port (default %d): from this machine only with a loopback --bind, otherwise\n"
         "from the local network. --no-lan stays silent.\n"
         "--exit-with-stdin: close the room when standard input ends, so a game that hosts the\n"
-        "room through a pipe (boat_study --host) cannot leave it running after it exits.\n"
+        "room through a pipe (wake_velocity --host) cannot leave it running after it exits.\n"
         "--scripted: bots drive N ticks (default 7200, one minute at 120 Hz) as fast as\n"
         "possible, then print the fleet hash and per-tick cost; no socket.\n"
         "--mode deathmatch: timed rounds (--round-seconds, default 300) scoring +1 for capsizing\n"

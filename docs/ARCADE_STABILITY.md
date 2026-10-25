@@ -35,9 +35,9 @@ committed. No additional hands-on play session or platform acceptance was report
 Solo launch, from the repository root on main or in the study worktree:
 
 ```sh
-./build/boat_study --location river --mouse-steering --gpu-aa
-./build/boat_study --location basin --wake-objects-crossing --mouse-steering
-./build/boat_study --location basin --wake-height 1.8 --mouse-steering
+./build/wake_velocity --location river --mouse-steering --gpu-aa
+./build/wake_velocity --location basin --wake-objects-crossing --mouse-steering
+./build/wake_velocity --location basin --wake-height 1.8 --mouse-steering
 ```
 
 The new shared default also applies to `boat_server` and the fleet visual review. Its

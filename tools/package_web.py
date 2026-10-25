@@ -31,10 +31,10 @@ def main():
     site.mkdir(parents=True, exist_ok=True)
     files = {}
     for suffix in ("js", "wasm", "data"):
-        original = f"boat_study.{suffix}"
+        original = f"wake_velocity.{suffix}"
         content = (args.build_dir / original).read_bytes()
         digest = hashlib.sha256(content).hexdigest()[:16]
-        name = f"boat_study-{digest}.{suffix}"
+        name = f"wake_velocity-{digest}.{suffix}"
         (site / name).write_bytes(content)
         files[original] = name
     template = (root / "web/index.html").read_text()
@@ -46,7 +46,7 @@ def main():
     (site / ".nojekyll").touch()
     shutil.copyfile(args.raylib_license, site / "raylib-LICENSE.txt")
     # Remove outputs from earlier builds only, never unrelated files.
-    for pattern in ("boat_study-*.js", "boat_study-*.wasm", "boat_study-*.data"):
+    for pattern in ("wake_velocity-*.js", "wake_velocity-*.wasm", "wake_velocity-*.data"):
         for path in site.glob(pattern):
             if path.name not in files.values():
                 path.unlink()

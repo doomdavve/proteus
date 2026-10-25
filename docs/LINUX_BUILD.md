@@ -56,14 +56,14 @@ cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF \
   -DGLFW_BUILD_WAYLAND=ON -DGLFW_BUILD_X11=ON
 cmake --build build-linux --parallel 2
 ctest --test-dir build-linux -j 4 --output-on-failure
-./build-linux/boat_study
+./build-linux/wake_velocity
 ```
 
 Both backend options default to `ON` on fresh Linux configurations. Existing build directories
 retain their cache values; the explicit flags above also enable Wayland in an older X11-only
 build. For a Wayland-only build, set `-DGLFW_BUILD_X11=OFF`. For an X11-only build, set
 `-DGLFW_BUILD_WAYLAND=OFF`. On a desktop with XWayland available, launch with
-`XDG_SESSION_TYPE=x11 ./build-linux/boat_study` to select X11 without rebuilding.
+`XDG_SESSION_TYPE=x11 ./build-linux/wake_velocity` to select X11 without rebuilding.
 Add `--verbose` to show graphics/window initialization, including the selected backend
 as `GLFW - Wayland` or `GLFW - X11`.
 
@@ -73,7 +73,7 @@ Run from the repository root after building:
 
 ```sh
 bash tools/check_wayland.sh build-linux
-XDG_SESSION_TYPE=x11 xvfb-run -a timeout 60s ./build-linux/boat_study \
+XDG_SESSION_TYPE=x11 xvfb-run -a timeout 60s ./build-linux/wake_velocity \
   --verbose --location basin --mouse-steering --frames 120
 ```
 

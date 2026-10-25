@@ -42,7 +42,7 @@ if [[ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
     exit 1
 fi
 
-timeout 60s "$build_dir/boat_study" --verbose --location basin --mouse-steering --frames 120 \
+timeout 60s "$build_dir/wake_velocity" --verbose --location basin --mouse-steering --frames 120 \
     2>&1 | tee "$build_dir/wayland-smoke.log"
 grep -F 'PLATFORM: DESKTOP (GLFW - Wayland): Initialized successfully' \
     "$build_dir/wayland-smoke.log"

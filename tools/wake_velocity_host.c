@@ -1,7 +1,7 @@
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L // posix_spawn, pipes and poll under strict C17.
 #endif
-#include "boat_study_host.h"
+#include "wake_velocity_host.h"
 
 #ifdef _WIN32
 // Exclude the GDI/user names raylib also declares (headers below may include raylib.h).

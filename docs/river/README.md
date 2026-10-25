@@ -9,8 +9,8 @@ the river is now the only mapped location.
 [All plans](../README.md).
 
 ```sh
-./build/boat_study --location river --gpu-aa
-./build/boat_study --location river --gpu-aa --waves
+./build/wake_velocity --location river --gpu-aa
+./build/wake_velocity --location river --gpu-aa --waves
 ```
 
 Leave the dock and follow the river southwest to the bridge. The river view defaults

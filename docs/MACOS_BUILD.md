@@ -1,6 +1,6 @@
 # macOS Wake Velocity builds
 
-Multiplayer M3 (2026-10-23): native builds fetch the pinned ENet library, and `boat_study`
+Multiplayer M3 (2026-10-23): native builds fetch the pinned ENet library, and `wake_velocity`
 links it for the diagnostic `--connect` mode, so the app bundle now carries
 `enet-LICENSE.txt`. Since 2026-10-24 the bundle also carries the room authority at
 `Contents/MacOS/boat_server`, ad-hoc signed before the app, and CI runs it relocated with
@@ -43,14 +43,14 @@ the ZIP; it checks archive integrity, not publisher identity. Artifacts expire a
 30 days. `Contents/Resources/build.txt` records the source commit and whether the
 checkout had uncommitted changes when packaged.
 
-Double-clicking the app opens the Wake Velocity title (2026-10-24), as does `boat_study`
+Double-clicking the app opens the Wake Velocity title (2026-10-24), as does `wake_velocity`
 without options. Its SINGLE PLAYER starts the preferred river setup: current, crossing
 wake, gentle waves, GPU antialiasing, camera distance 12, and camera height 6, in the
 chosen BOAT livery. MULTIPLAYER hosts a room (HOST A ROOM), lists rooms found on the local
 network and joins one, or a typed HOST:PORT, with the chosen NAME. The single-player setup is equivalent to:
 
 ```sh
-./build/boat_study --current --crossing-wake --location river --waves --gpu-aa --camera-distance 12 --camera-height 6
+./build/wake_velocity --current --crossing-wake --location river --waves --gpu-aa --camera-distance 12 --camera-height 6
 ```
 
 See the [controls and replay guide](../README.md#boating-sketch). Supplying any
@@ -124,7 +124,7 @@ playback. Browser-download Gatekeeper behavior, user acceptance, macOS 13 execut
 Intel support, and notarization remain unverified or out of scope.
 
 Startup asset fix, 2026-10-24: the packaged app omitted `assets/title/`, so its no-argument
-launch exited when `boat_study` could not load `title/river-backdrop.png`. The macOS packager
+launch exited when `wake_velocity` could not load `title/river-backdrop.png`. The macOS packager
 now copies the title assets and its workflow checks that the backdrop is present in the
 relocated bundle. This fix has not yet been run through macOS packaging CI or an interactive
 launch. Next: verify the workflow artifact and launch it from Finder.

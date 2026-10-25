@@ -22,11 +22,11 @@ performance; the [wake plan](WAKE_REWRITE_PLAN.md) owns its recommended next ste
 
 ```sh
 cmake -S . -B build/review -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/review --target boat_study wake_objects_review -j
-./build/review/boat_study --wake-objects --profiler
-./build/review/boat_study --wake-objects-crossing --profiler
-./build/review/boat_study --wake-objects --wake-height 1.2 --wake-life-ticks 1440
-./build/review/boat_study --wake-objects --location river
+cmake --build build/review --target wake_velocity wake_objects_review -j
+./build/review/wake_velocity --wake-objects --profiler
+./build/review/wake_velocity --wake-objects-crossing --profiler
+./build/review/wake_velocity --wake-objects --wake-height 1.2 --wake-life-ticks 1440
+./build/review/wake_velocity --wake-objects --location river
 ```
 
 Normal steering/thrust controls apply. `R` resets the boat, the shared object world,
@@ -145,8 +145,8 @@ ctest --test-dir build --output-on-failure
 ./build/review/wake_objects_review
 ./build/review/wake_objects_review --gpu
 ./build/review/wake_objects_review --desktop
-./build/review/boat_study --wake-objects --renderer cpu --time 9 --screenshot build/wake-objects-cpu-9.png
-./build/review/boat_study --wake-objects-crossing --time 12 --screenshot build/wake-objects-crossing-gpu.png
+./build/review/wake_velocity --wake-objects --renderer cpu --time 9 --screenshot build/wake-objects-cpu-9.png
+./build/review/wake_velocity --wake-objects-crossing --time 12 --screenshot build/wake-objects-crossing-gpu.png
 ```
 
 2026-10-22 on the development Mac:

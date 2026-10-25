@@ -1,12 +1,12 @@
-#ifndef BOAT_STUDY_HOST_H
-#define BOAT_STUDY_HOST_H
+#ifndef WAKE_VELOCITY_HOST_H
+#define WAKE_VELOCITY_HOST_H
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-// Host from boat_study (docs/MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25): a second copy of
-// this executable runs the room as `--serve` (boat_server's command line, tools/boat_server.h) in a
-// child process, so the room's 120 Hz authority never waits for this window's frames, focus or
+// Host from wake_velocity (docs/MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25): a second copy
+// of this executable runs the room as `--serve` (boat_server's command line, tools/boat_server.h)
+// in a child process, so the room's 120 Hz authority never waits for this window's frames, focus or
 // audio, and shares none of this process's lazily built map and model caches. The child reads its
 // standard input from a pipe and closes the room when that pipe ends, including when this process
 // dies; its output comes back through a second pipe, is echoed here and keeps the last line for

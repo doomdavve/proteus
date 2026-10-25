@@ -86,7 +86,7 @@ player follow-camera occlusion near shore remains unresolved.
 Run from the repository root after building:
 
 ```sh
-./build/boat_study --location river --gpu-aa --waves
+./build/wake_velocity --location river --gpu-aa --waves
 ./build/harbor_review --view marina --waves
 ./build/harbor_review --view workboat --waves
 ./build/harbor_review --view overview

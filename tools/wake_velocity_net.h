@@ -1,11 +1,11 @@
-#ifndef BOAT_STUDY_NET_H
-#define BOAT_STUDY_NET_H
+#ifndef WAKE_VELOCITY_NET_H
+#define WAKE_VELOCITY_NET_H
 #include "boat_net_client.h"
 #include "boat_net_enet.h"
 #include "boat_session.h"
 #include "boat_view.h"
 
-// boat_study --connect (multiplayer M4 in progress): the session's boat, clock and water show
+// wake_velocity --connect (multiplayer M4 in progress): the session's boat, clock and water show
 // the client's predicted fleet, so the own boat answers the keys at once. Corrections move the
 // physical state immediately; the drawn poses blend small ones away over about 120 ms. Every
 // other boat is drawn from authoritative snapshots about 100 ms behind the estimated server

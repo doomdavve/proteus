@@ -7,13 +7,13 @@ cannot directly use raw UDP. GitHub Pages serves the client; multiplayer needs a
 reachable authority and, for that WebRTC path, signaling and potentially TURN. No new web
 network dependency, service or gameplay feature is implemented by this plan.
 Since M3 (2026-10-23) native builds fetch and link ENet; the Emscripten configure returns before
-those targets and compiles `boat_study` without `PROTEUS_BOAT_NET`, so `--connect` is refused
+those targets and compiles `wake_velocity` without `PROTEUS_BOAT_NET`, so `--connect` is refused
 as native-only. The HUD/controls worktree built with Emscripten 6.0.12 on 2026-10-24;
 see [control qualification](#mouse-and-scroll-qualification-2026-10-24).
 
 ## Current status
 
-Implemented on 2026-10-19: a CMake/Emscripten build of the released `boat_study` game,
+Implemented on 2026-10-19: a CMake/Emscripten build of the released `wake_velocity` game,
 WebGL 2 assets, click-to-start audio, IndexedDB best times, a small HTML launcher, local
 HTTP serving, and a separate GitHub Pages workflow. The workflow now builds and deploys on
 `v*` tag pushes, alongside the existing native release workflow. Ordinary branch pushes do

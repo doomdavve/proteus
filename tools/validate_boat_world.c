@@ -3,7 +3,7 @@
  * physical step is the core-only order validate_boat_core uses. W4 extends this file with
  * map/cache lifecycle checks. */
 #include "boat_map.h"
-#include "boat_study_state.h"
+#include "wake_velocity_state.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
 #include "boat_water_mesh.h"
@@ -194,9 +194,9 @@ static int presentation_toggle(void)
     for (int tick = 0; tick < 3840; ++tick) {
         demo_step(&on, tick, NULL, NULL, &objects_on);
         demo_step(&off, tick, NULL, NULL, &objects_off);
-        CHECK(boat_study_state_hash(BOAT_STUDY_HASH_SEED, &on.boat, boat_session_time(&on),
+        CHECK(wake_velocity_state_hash(WAKE_VELOCITY_HASH_SEED, &on.boat, boat_session_time(&on),
                   object_study_wakes(&objects_on))
-            == boat_study_state_hash(BOAT_STUDY_HASH_SEED, &off.boat, boat_session_time(&off),
+            == wake_velocity_state_hash(WAKE_VELOCITY_HASH_SEED, &off.boat, boat_session_time(&off),
                 object_study_wakes(&objects_off)));
         CHECK(
             memcmp(object_study_other(&objects_on), object_study_other(&objects_off), sizeof(Boat))

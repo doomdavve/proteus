@@ -1,4 +1,4 @@
-#include "boat_study_state.h"
+#include "wake_velocity_state.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -13,7 +13,8 @@ static void value(uint64_t *hash, const char *name, double number)
         *hash *= UINT64_C(1099511628211);
     }
 }
-uint64_t boat_study_state_hash(uint64_t hash, const Boat *b, double time, const BoatWakeObjects *w)
+uint64_t wake_velocity_state_hash(
+    uint64_t hash, const Boat *b, double time, const BoatWakeObjects *w)
 {
 #define B(f) value(&hash, #f, b->f)
     B(position.x);

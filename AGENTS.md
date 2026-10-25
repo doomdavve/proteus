@@ -3,13 +3,13 @@
 ## Project
 
 Proteus is a small C17/raylib playground with low-resolution, integer-scaled visuals and
-tracker music. Its main program is the boating game `boat_study` (released as Wake Velocity) in
+tracker music. Its main program is the boating game `wake_velocity` (released as Wake Velocity) in
 the basin and the Gothenburg river. Keep the code and project structure simple; this is a
 playground for iterating on effects, timing, audio, and presentation.
 
 ## Layout
 
-- `tools/boat_study.c`: the boating game's command line, title, application loop and presentation.
+- `tools/wake_velocity.c`: the boating game's command line, title, application loop and presentation.
 - `src/waterfront_scene.[ch]`, `src/waterfront.c`: river scenery, sky, gulls and street actors
   evaluated into a frame shared by the CPU (`renderer3d`) and GPU (`renderer_gpu`) renderers.
 - `src/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
@@ -53,17 +53,17 @@ unoptimized validator debugging. See `docs/TESTING.md` for timings and opt-in co
 Run the game from the repository root so its relative asset paths resolve:
 
 ```sh
-./build/boat_study
+./build/wake_velocity
 ```
 
 For deterministic CPU visual verification, render and inspect representative frames without opening
-a window. `boat_study` defaults to GPU and therefore needs a graphics context; select
+a window. `wake_velocity` defaults to GPU and therefore needs a graphics context; select
 `--renderer cpu` for display-free captures. `--time` is the simulated seconds of the scripted
 screenshot drive.
 
 ```sh
-./build/boat_study --renderer cpu --screenshot build/basin.png --time 3
-./build/boat_study --renderer cpu --location river --screenshot build/river.png --time 3
+./build/wake_velocity --renderer cpu --screenshot build/basin.png --time 3
+./build/wake_velocity --renderer cpu --location river --screenshot build/river.png --time 3
 ```
 
 On macOS, deeper CPU profiling can use Xcode's Instruments command-line tools when full Xcode is the
@@ -72,7 +72,7 @@ river drive:
 
 ```sh
 xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
-  --launch -- ./build/boat_study --location river --demo --frames 3600
+  --launch -- ./build/wake_velocity --location river --demo --frames 3600
 ```
 
 ## Conventions

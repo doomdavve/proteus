@@ -3,7 +3,7 @@
 #include "boat_map.h"
 #include "boat_replay.h"
 #include "boat_session.h"
-#include "boat_study_state.h"
+#include "wake_velocity_state.h"
 #include "boat_view.h"
 #include "raymath.h"
 
@@ -66,7 +66,7 @@ static int reduction_checks(void)
 
 static uint64_t physical_hash(const Boat *boat, const ObjectStudy *study)
 {
-    return boat_study_state_hash(BOAT_STUDY_HASH_SEED, boat, 0, object_study_wakes(study));
+    return wake_velocity_state_hash(WAKE_VELOCITY_HASH_SEED, boat, 0, object_study_wakes(study));
 }
 
 // Calm-water handling and arcade wakes depend only on relative ticks: starting the fixed
@@ -230,7 +230,7 @@ static int soak(double seconds, const char *directory, bool waves)
     Renderer3D renderer = { 0 };
     Color *pixels = malloc(320 * 200 * sizeof(*pixels));
     CHECK(pixels);
-    uint64_t hash = BOAT_STUDY_HASH_SEED, recoveries = 0, stuck_ticks = 0, landings = 0;
+    uint64_t hash = WAKE_VELOCITY_HASH_SEED, recoveries = 0, stuck_ticks = 0, landings = 0;
     unsigned waypoint = 0;
     float max_speed = 0, max_height = 0;
     clock_t started = clock();
@@ -268,7 +268,7 @@ static int soak(double seconds, const char *directory, bool waves)
         max_speed = fmaxf(max_speed, Vector2Length(boat->velocity));
         max_height = fmaxf(max_height, fabsf(boat->height));
         if ((tick + 1) % 2 == 0)
-            hash = boat_study_state_hash(hash, boat, boat_session_time(&session), pool);
+            hash = wake_velocity_state_hash(hash, boat, boat_session_time(&session), pool);
         if ((tick + 1) % (600 * 120) == 0)
             printf("soak minute=%" PRIu64 " emitted=%" PRIu64 " live=%u peak=%u landings=%" PRIu64
                    " "

@@ -86,7 +86,7 @@ whether newly emitted wakes affect the next tick so vessel iteration order canno
 [`boat.c`](../src/boat.c) contains forces, contacts, particles, camera, scene construction, and
 CPU drawing. `Boat` contains course progress and presentation state alongside physics.
 [`boat_course.c`](../src/boat_course.c) mixes timing with HUD rendering; physics validators
-therefore pull in scenery and drawing implementations. [`tools/boat_study.c`](../tools/boat_study.c)
+therefore pull in scenery and drawing implementations. [`tools/wake_velocity.c`](../tools/wake_velocity.c)
 is now the actual game application, with input, pause, replay transport, audio, saving, and
 rendering coordinated in one loop.
 

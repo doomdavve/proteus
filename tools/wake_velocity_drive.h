@@ -1,5 +1,5 @@
-#ifndef BOAT_STUDY_DRIVE_H
-#define BOAT_STUDY_DRIVE_H
+#ifndef WAKE_VELOCITY_DRIVE_H
+#define WAKE_VELOCITY_DRIVE_H
 #include "boat_fleet.h"
 #include "boat_profile.h"
 #include "boat_session.h"

@@ -12,7 +12,7 @@ helper only while the audio stream is stopped.
 
 ## Boating background loop
 
-`boat_study` defaults to [A little boat](../assets/music/a-little-boat.xm): an
+`wake_velocity` defaults to [A little boat](../assets/music/a-little-boat.xm): an
 original, quiet C-major piece at 84 BPM / speed 6, 32 bars (91.43 seconds), repeating
 from the beginning. Soft rounded keys, a humming melody, and a sine-led bass use simple
 major/sixth/seventh harmony and sparse call-and-answer phrases. There are no drums,
@@ -46,7 +46,7 @@ sound design using synthesized PCM, not a recording or a circuit-accurate emulat
 python3 tools/generate_acid_music.py
 cmake --build build -j
 ./build/validate_xm assets/music/acid-wake.xm --acid
-./build/boat_study --soundtrack acid-wake
+./build/wake_velocity --soundtrack acid-wake
 ```
 
 The generator writes only `acid-wake.xm`; existing accepted music and sample WAVs are

@@ -20,7 +20,7 @@ git cherry-pick boat-speedboat-skins
 Do not replace the destination's multiplayer files or documentation wholesale. The main
 checkout also has unrelated uncommitted documentation work, which this branch does not
 contain. Inspect/preserve that work in its own checkout. No `boat_net_*`, `boat_prediction*`,
-`boat_remote_view*`, `boat_study_net.*`, protocol bytes or physics constants were changed here.
+`boat_remote_view*`, `wake_velocity_net.*`, protocol bytes or physics constants were changed here.
 
 Files edited by both this branch and main since the branch base are `CMakeLists.txt`,
 `README.md`, `docs/README.md` and `docs/TESTING.md`. Preserve main's M4 code, targets, test
@@ -67,8 +67,8 @@ The legacy `boat_flag_mesh` returns only Sweden; new fleet drawing must use the 
 1. For the requested four-country lineup, map stable fleet slots 0–3 to the presentation IDs
    above on every client. Current main exposes the local slot as `net->client.slot` and the
    nearest remote slot as `net->other_slot`. Assign the local and remote view IDs at their
-   construction sites in `tools/boat_study.c`, without changing the interpolation in
-   `boat_study_net.c`. An agreed slot mapping needs no new wire field. In connected mode,
+   construction sites in `tools/wake_velocity.c`, without changing the interpolation in
+   `wake_velocity_net.c`. An agreed slot mapping needs no new wire field. In connected mode,
    use that shared mapping instead of a private CLI override so observers agree.
 2. If players should choose a country independently of their slot, add validated player/room
    cosmetic metadata through the multiplayer owner's protocol/version workflow. Do not put
@@ -101,7 +101,7 @@ Before merging the combined implementation, run its own full checks:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=ON
 cmake --build build -j
 ctest --test-dir build -j 4 --output-on-failure
-./build/boat_study --skin sweden --location river --waves --gpu-aa
+./build/wake_velocity --skin sweden --location river --waves --gpu-aa
 ./build/boat_flag_review --skin norway --renderer gpu --scenario turn --frames 180
 ```
 

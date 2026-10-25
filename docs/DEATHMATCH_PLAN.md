@@ -85,7 +85,7 @@ pending credit to them is dropped. Ties share first place.
   for join-in-progress) and `MATCH_EVENT` (tick, kind, victim, victim life, attacker, cause),
   with golden, round-trip, truncation and invalid-field fixtures.
 - `src/boat_net_client.[ch]`: latest match state and a six-entry event ring.
-- `tools/boat_study.c`, `src/boat_hud.c`: in deathmatch only, round timer and own score, a
+- `tools/wake_velocity.c`, `src/boat_hud.c`: in deathmatch only, round timer and own score, a
   four-line kill feed (5 s per entry, roster names), a Tab-held scoreboard also shown during
   intermission, and `CAPSIZED BY <name> / RESPAWN n`. Free mode HUD unchanged.
 - `tools/boat_server.c`: `--mode free|deathmatch`, `--round-seconds`, logged match events and a
@@ -95,7 +95,7 @@ pending credit to them is dropped. Ties share first place.
 ## Phases
 
 Every phase ends with a warning-free build, the full active CTest suite and an unchanged
-offline `boat_study`.
+offline `wake_velocity`.
 
 1. **D1 — match core.** `boat_match`, the impulse diagnostic, the per-emitter query, server
    mode, automatic respawn, bailout and scripted server output. New
@@ -187,7 +187,7 @@ Verification, 2026-10-24, M1 Max/macOS 26.6.2, Debug:
   when the second bot joined, a wake capsize was credited, round 1 ended with its scoreboard and
   round 2 was abandoned as the bots left.
 
-Not verified: no human play, no `boat_study --connect` session against a deathmatch room, no
+Not verified: no human play, no `wake_velocity --connect` session against a deathmatch room, no
 Windows/Linux build. That bots' capsizes are all credited suggests the wake threshold may be
 generous; credit fairness needs human play (D2).
 
@@ -204,7 +204,7 @@ Implemented:
   changed; a joining peer gets MatchState right after Roster, before the checkpoint.
 - `boat_net_client`: `match`, `result` (the finished round's scoreboard as first announced) and a
   six-entry feed that keeps the roster names of the moment, so a leaver's name survives.
-- `boat_study --connect` in deathmatch rooms (`tools/boat_study_net.c`): round clock, own score
+- `wake_velocity --connect` in deathmatch rooms (`tools/wake_velocity_net.c`): round clock, own score
   and place at the top centre (orange under 30 s), a four-line kill feed under the player list
   (5 s per entry; orange when you were capsized, green when you scored), `CAPSIZED BY <name> /
   RESPAWN n` (or `/ -1` for a self-capsize, and `/ R TO SKIP` once R may skip the wait), a
@@ -218,7 +218,7 @@ Deviations and choices:
 
 - The room mode lives in Accept, not MatchState; free rooms send no match messages at all.
 - The HUD is drawn at window resolution beside the roster and network line in
-  `tools/boat_study_net.c`, not in the 320×200 `boat_hud.c` panel, so it has no display-free
+  `tools/wake_velocity_net.c`, not in the 320×200 `boat_hud.c` panel, so it has no display-free
   CPU/GPU capture; it was inspected in screen captures of a windowed run instead.
 - The capsize countdown uses the event's tick, or for an unscored capsize (warmup, intermission)
   the mirror tick the client first saw it capsized.
@@ -238,7 +238,7 @@ Verification, 2026-10-24, M1 Max/macOS 26.6.2, Debug:
 - New `boat_net_deathmatch` (ENet loopback, 10 s round, two hunting bots): both bots' round-1
   scoreboards equal the server log's. Agent runs on 2026-10-24 credited one or two wake capsizes
   per round.
-- Agent-run windowed `boat_study --connect` (GPU renderer, 960×600) beside two `boat_bot --hunt`
+- Agent-run windowed `wake_velocity --connect` (GPU renderer, 960×600) beside two `boat_bot --hunt`
   clients and a 20 s round, inspected in screen captures: round clock and place, a two-entry
   kill feed with both wake capsizes, the intermission scoreboard matching the server log, and
   the capsize notice. The first run showed scoreboard cells overwritten by raylib's

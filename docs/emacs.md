@@ -158,7 +158,7 @@ To build and immediately run the demo, use `C-x p c`, edit the command in the
 minibuffer to the following, and press `RET`:
 
 ```sh
-cmake --build build -j 8 && ./build/boat_study
+cmake --build build -j 8 && ./build/wake_velocity
 ```
 
 Because the demo opens a native window, stop it with `Esc`, not by killing its
@@ -276,7 +276,7 @@ cmake --build build -j 8
 Then run:
 
 ```text
-M-x lldb RET build/boat_study RET
+M-x lldb RET build/wake_velocity RET
 ```
 
 Useful GUD keys are:

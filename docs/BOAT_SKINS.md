@@ -24,8 +24,8 @@ The 2026-10-20 cabin refinement proposal is superseded by this speedboat directi
 From the worktree root:
 
 ```sh
-./build/boat_study --skin finland --location river --waves --gpu-aa
-./build/boat_study --skin denmark --renderer cpu --screenshot build/skin-follow.png --time 5
+./build/wake_velocity --skin finland --location river --waves --gpu-aa
+./build/wake_velocity --skin denmark --renderer cpu --screenshot build/skin-follow.png --time 5
 ./build/boat_flag_review --skin sweden --angle front --screenshot build/skin-front.png
 ./build/boat_flag_review --skin norway --angle side --low-resolution --screenshot build/skin-side.png
 ./build/boat_flag_review --skin finland --renderer gpu --scenario turn --frames 180
@@ -64,7 +64,7 @@ The hull shape suggests speed without changing speed or introducing another game
 class. The outboard keeps its steering transform, and the flag keeps its world-space
 attachment and simulation. Harbor/traffic boat recipes are unchanged.
 
-In multiplayer (`boat_study --connect`) every client draws room slot 1 as Sweden, 2 Finland,
+In multiplayer (`wake_velocity --connect`) every client draws room slot 1 as Sweden, 2 Finland,
 3 Denmark and 4 Norway, through the fleet renderer (`BoatRivals`, `boat_draw_scene`,
 `boat_gpu_draw_scene`); `--skin` is refused there. Choosing a country independently of the
 slot and persistent loadouts would need room metadata and are not implemented. See the

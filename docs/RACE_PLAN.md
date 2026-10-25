@@ -414,7 +414,7 @@ The user approved R0 and R1 and asked to continue. R2 hosts `boat_race` in netwo
 
 ```sh
 ./build/boat_server --mode race                      # river is the default location here
-./build/boat_study --connect 127.0.0.1:24680 --name me
+./build/wake_velocity --connect 127.0.0.1:24680 --name me
 ./build/boat_bot --connect 127.0.0.1:24680 --seconds 120   # races the course
 ```
 
@@ -437,7 +437,7 @@ past the finish beside the course (lateral offsets 40, 80 and 120 m alternating 
 clear spot), facing up-course and held until the next grid or waiting. R or a capsize after
 finishing parks at once. A parked boat ignores R and counts no recovery; a PARK event is sent.
 
-**Original R2 presentation** (intermediate markers superseded by the [R3 endpoint gates](#r3-skill-gate-layout--2026-10-24)) (`boat_study --connect`): course markers on mapped water — buoys every 12 m
+**Original R2 presentation** (intermediate markers superseded by the [R3 endpoint gates](#r3-skill-gate-layout--2026-10-24)) (`wake_velocity --connect`): course markers on mapped water — buoys every 12 m
 across each line with a pole every fourth, white start, yellow next gate, orange later gates,
 teal cleared and a chequered finish. HUD: waiting/next-grid notices, "SET YOUR THROTTLE" on
 the grid, a large 3-2-1-GO!, then elapsed time, live position and gate (or "FINISH NEXT"),
@@ -461,7 +461,7 @@ broadcast results and gridded round 2 with no decode faults; each bot's results 
 server log. CPU captures of `boat_race_trial` at 1, 21, 30 and 44 s show the start, next-gate
 and finish markers.
 
-**Not verified:** the HUD and markers in `boat_study` on screen, GPU captures and any windowed
+**Not verified:** the HUD and markers in `wake_velocity` on screen, GPU captures and any windowed
 run (GLFW could not open a window here); human play; lossy-network races. **Limitations:**
 recovery and parking spots are not checked against the ferry's moving hull; a mid-race joiner
 has no spectator camera (it waits in place with a notice); a lone remaining entrant races on

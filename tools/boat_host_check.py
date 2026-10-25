@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Hosting from the game: `boat_study --serve` is boat_server's room, and --exit-with-stdin closes
-it when the hosting game's pipe ends (as when boat_study --host leaves or is killed).
+"""Hosting from the game: `wake_velocity --serve` is boat_server's room, and --exit-with-stdin closes
+it when the hosting game's pipe ends (as when wake_velocity --host leaves or is killed).
 
-Starts the room through boat_study with private ports, lets a boat_bot drive in it, closes the
+Starts the room through wake_velocity with private ports, lets a boat_bot drive in it, closes the
 room's standard input and checks that the room says goodbye and exits within two seconds.
 """
 

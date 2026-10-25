@@ -9,13 +9,13 @@
 #include "boat_replay.h"
 #include "boat_session.h"
 #include "boat_steering.h"
-#include "boat_study_drive.h"
-#include "boat_study_menu.h"
+#include "wake_velocity_drive.h"
+#include "wake_velocity_menu.h"
 #include "boat_throttle.h"
 #ifdef PROTEUS_BOAT_NET
 #include "boat_server.h"
-#include "boat_study_host.h"
-#include "boat_study_net.h"
+#include "wake_velocity_host.h"
+#include "wake_velocity_net.h"
 #endif
 #include "boat_title.h"
 #include "boat_water_mesh.h"
@@ -494,7 +494,7 @@ static int study(int argc, char **argv)
 #ifndef NDEBUG
         fprintf(stderr,
             "Wake field: this is a slow Debug build. For play review, build RelWithDebInfo "
-            "in build/review and run ./build/review/boat_study --wake-field --profiler.\n");
+            "in build/review and run ./build/review/wake_velocity --wake-field --profiler.\n");
 #endif
         if (gpu_aa)
             fprintf(stderr,
@@ -670,7 +670,7 @@ static int study(int argc, char **argv)
 #else
         SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE);
 #endif
-        InitWindow(WIDTH * 3, HEIGHT * 3, "Proteus / boating sketch");
+        InitWindow(WIDTH * 3, HEIGHT * 3, "Wake Velocity");
         if (!IsWindowReady())
             goto cleanup;
         window_owned = true;
@@ -1284,7 +1284,7 @@ invalid:
 // Single player from the title: free boating on the river, as the macOS app used to start.
 static int title_single(const BoatTitleSettings *settings)
 {
-    char *arguments[] = { "boat_study", "--current", "--crossing-wake", "--location", "river",
+    char *arguments[] = { "wake_velocity", "--current", "--crossing-wake", "--location", "river",
         "--waves", "--gpu-aa", "--skin", (char *)boat_skin_name(settings->skin), "--soundtrack",
         (char *)boat_music(settings->soundtrack)->id,
         settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
@@ -1297,7 +1297,7 @@ static int title_single(const BoatTitleSettings *settings)
 // Join the address, or (HOST) start a room with the title's host settings and join that.
 static int title_join(BoatTitleSettings *settings, bool host)
 {
-    char *arguments[16] = { "boat_study", "--name", settings->name, "--soundtrack",
+    char *arguments[16] = { "wake_velocity", "--name", settings->name, "--soundtrack",
         (char *)boat_music(settings->soundtrack)->id };
     int count = 5;
     if (host) {

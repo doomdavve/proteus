@@ -1,4 +1,4 @@
-# The same boat_study libraries and raylib target are used by native and web builds.
+# The same wake_velocity libraries and raylib target are used by native and web builds.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # raylib's EM_ASM calls require GNU extensions; the game itself remains strict C17.
 set_target_properties(raylib PROPERTIES C_EXTENSIONS ON)
@@ -41,23 +41,23 @@ endforeach()
 configure_file(assets/music/a-little-boat.xm "${WEB_ASSETS}/music/a-little-boat.xm" COPYONLY)
 configure_file(assets/music/acid-wake.xm "${WEB_ASSETS}/music/acid-wake.xm" COPYONLY)
 
-set_target_properties(boat_study PROPERTIES SUFFIX ".js")
+set_target_properties(wake_velocity PROPERTIES SUFFIX ".js")
 # Asyncify is raylib's supported way to yield from its existing synchronous loop.
 # Keep optimization enabled for Asyncify even in a development build.
-foreach(target boat_study proteus_boat_core proteus_render proteus_gpu proteus_boat_session
+foreach(target wake_velocity proteus_boat_core proteus_render proteus_gpu proteus_boat_session
     proteus_boat_drive)
   target_compile_options(${target} PRIVATE -Os)
   target_compile_definitions(${target} PRIVATE _POSIX_C_SOURCE=200809L)
 endforeach()
 target_compile_options(raylib PRIVATE -Os)
-target_link_options(boat_study PRIVATE
+target_link_options(wake_velocity PRIVATE
   -Os -sASYNCIFY -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=1048576
   -sASYNCIFY_STACK_SIZE=65536 -sENVIRONMENT=web -sEXIT_RUNTIME=1
   -lidbfs.js
   "SHELL:--preload-file \"${WEB_ASSETS}@/assets\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js\"")
-set_property(TARGET boat_study APPEND PROPERTY LINK_DEPENDS
+set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   ${WEB_SHADERS} ${WEB_TEXTURES}
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
@@ -69,7 +69,7 @@ add_custom_target(web ALL
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/package_web.py
     --build-dir ${CMAKE_CURRENT_BINARY_DIR}
     --raylib-license ${raylib_SOURCE_DIR}/LICENSE
-  DEPENDS boat_study
+  DEPENDS wake_velocity
   VERBATIM)
 add_custom_target(web-serve
   COMMAND ${Python3_EXECUTABLE} -m http.server 8000 --bind 127.0.0.1

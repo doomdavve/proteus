@@ -30,7 +30,7 @@ jobs:
       - name: Check mouse capture startup and clean exit under X11
         run: |
           set -o pipefail
-          XDG_SESSION_TYPE=x11 xvfb-run -a timeout 60s ./build-linux/boat_study --verbose --location basin --mouse-steering --frames 120 2>&1 | tee build-linux/x11-smoke.log
+          XDG_SESSION_TYPE=x11 xvfb-run -a timeout 60s ./build-linux/wake_velocity --verbose --location basin --mouse-steering --frames 120 2>&1 | tee build-linux/x11-smoke.log
           grep -F 'PLATFORM: DESKTOP (GLFW - X11): Initialized successfully' build-linux/x11-smoke.log
       - name: Upload desktop smoke logs
         if: always()

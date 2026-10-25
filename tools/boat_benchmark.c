@@ -1,5 +1,5 @@
 /* Finite scripted wake-return workload; no window, audio, replay or timed I/O. */
-#include "boat_study_state.h"
+#include "wake_velocity_state.h"
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
     object_study_reset(&objects, &session, false, BOAT_OBJECT_LIFE_TICKS, 1.8f);
     session.presentation_enabled = presentation;
     unsigned tick = 0;
-    uint64_t hash = BOAT_STUDY_HASH_SEED;
+    uint64_t hash = WAKE_VELOCITY_HASH_SEED;
     for (unsigned f = 0; f < warmup + frames; ++f) {
         double start = boat_profile_time(false);
         for (unsigned j = 0; j < 2; ++j)
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
         double elapsed = (boat_profile_time(false) - start) * 1000;
         /* Trace serialization is deliberately outside the measured simulation interval. */
         double now = boat_session_time(&session);
-        hash = boat_study_state_hash(hash, boat, now, object_study_wakes(&objects));
+        hash = wake_velocity_state_hash(hash, boat, now, object_study_wakes(&objects));
         trace[f]
             = (StateTrace) { hash, objects.wakes.emitted, now, boat->position.x, boat->position.y,
                   boat->velocity.x, boat->velocity.y, boat->height, boat->vertical_velocity,

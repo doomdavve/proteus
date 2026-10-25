@@ -76,7 +76,7 @@ physics and wire layouts retain their signed rate semantics. The multiplayer cli
 optional target service, generating ordinary rates from its predicted boat each tick; callers
 using the original rate service retain their behavior.
 
-`tools/boat_study.c` owns a 320x200 `frame_target`, including allocation validation,
+`tools/wake_velocity.c` owns a 320x200 `frame_target`, including allocation validation,
 nearest filtering and cleanup. Each frame, it draws the scene texture into this target
 with the existing CPU/GPU orientation normalization, then calls `boat_hud_draw` with the
 displayed local player's velocity magnitude, throttle and wheel. It presents the combined
@@ -115,7 +115,7 @@ Manual keyboard play, connected native sessions and user acceptance remain pendi
 
 Completed task (user request): holding Up/W or Down/S repeats one thrust detent every 0.5 s
 (`boat_throttle_hold` in `src/boat_throttle.h`), with each new press stepping at once and
-restarting the wait. Scroll direction is flipped in `tools/boat_study.c` for native and browser
+restarting the wait. Scroll direction is flipped in `tools/wake_velocity.c` for native and browser
 input alike: scrolling down opens the throttle. The title's new SETTINGS panel (NAME, BOAT,
 STEERING, BACK) holds a persistent `mouse_steering=on|off` in `title.txt`; title sessions pass
 `--mouse-steering` when it is on. NAME and BOAT moved from the main menu into that panel.
@@ -226,16 +226,16 @@ current commands and verification limits; the preceding platform-check record is
 From the worktree root, build normally, then run the boating view:
 
 ```sh
-./build/boat_study --location river --gpu-aa
-./build/boat_study --location river --gpu-aa --mouse-steering
-./build/boat_study --location river --gpu-aa --demo --frames 180
+./build/wake_velocity --location river --gpu-aa
+./build/wake_velocity --location river --gpu-aa --mouse-steering
+./build/wake_velocity --location river --gpu-aa --demo --frames 180
 ```
 
-`boat_study --screenshot` remains scene-only. The review tool composites deterministic
+`wake_velocity --screenshot` remains scene-only. The review tool composites deterministic
 telemetry onto a background at 320x200, then nearest-scales the combined frame:
 
 ```sh
-./build/boat_study --renderer cpu --location river --time 3 --screenshot build/hud-river-background.png
+./build/wake_velocity --renderer cpu --location river --time 3 --screenshot build/hud-river-background.png
 ./build/boat_hud_review --background build/hud-river-background.png --case cruise --screenshot build/hud-cruise.png
 ./build/boat_hud_review --background build/hud-river-background.png --case neutral --compact --screenshot build/hud-neutral-compact.png
 ./build/boat_hud_review --background build/hud-river-background.png --case reverse --screenshot build/hud-reverse.png

@@ -16,7 +16,7 @@ P3 workload matrix remain pending.
 
 ## Shared driver extraction — 2026-10-23
 
-`tools/boat_study_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
+`tools/wake_velocity_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
 It preserves advance → boat step → stern track, float time arithmetic, optional D3/field
 paths and the rival's existing route/contact/reset sequence. There is no fleet scheduler.
 `tools/boat_drive_baseline.h` freezes the original driver from `2994e0d` for regression checks.
@@ -24,7 +24,7 @@ paths and the rival's existing route/contact/reset sequence. There is no fleet s
 Apple Silicon/macOS, Debug: `boat_drive_extraction` matches named physical/wake hashes at
 all 3840 ticks against that driver and matches CPU pixels at ticks 1080 and 2400.
 App captures `build/bench/before9.png`/`after9.png` and `before20.png`/`after20.png`
-match byte for byte and were inspected. A desktop `boat_study --demo --frames 180` run
+match byte for byte and were inspected. A desktop `wake_velocity --demo --frames 180` run
 completed (378 physics ticks). This is scripted playback evidence, not human handling or
 audio acceptance. The extraction changes no controls or intended simulation behavior.
 
@@ -63,7 +63,7 @@ existing shared tick wrapper. `render_cpu_ms` and `gpu_ms` are null because they
 The report is written and samples sorted after all ticks; timing excludes hashing and file I/O.
 
 `state_hash` folds FNV-1a over named numerical `%a` values after every nominal frame, including
-warmup. `boat_study_state.c` lists its contract: physical pose, velocities, controls, motion state,
+warmup. `wake_velocity_state.c` lists its contract: physical pose, velocities, controls, motion state,
 motion timers/landing counter, physical wake bookkeeping, world tick/emission/expiry counters,
 all object records and all emitter fields. It excludes raw structs, padding, pointers and cosmetic
 particles/flag/camera state. This is same-build deterministic evidence, not a collision-proof state
@@ -120,7 +120,7 @@ measurement from the repository root after other test/build jobs finish:
 ```sh
 cmake -S . -B build/p3a-release -DCMAKE_BUILD_TYPE=Release \
   -DFETCHCONTENT_SOURCE_DIR_RAYLIB="$PWD/build/_deps/raylib-src"
-cmake --build build/p3a-release --target boat_benchmark boat_study -j
+cmake --build build/p3a-release --target boat_benchmark wake_velocity -j
 python3 tools/boat_benchmark_baseline.py build/p3a-release/boat_benchmark build/bench/p3a
 ```
 
@@ -169,7 +169,7 @@ Representative Release captures were inspected at 320x200:
 CPU and GPU use different water/presentation paths, so these images are representative views,
 not pixel-equality baselines. The capsize and long settled portion are observed fixture behavior;
 there is no new visual or handling acceptance claim. A scripted Release
-`./build/p3a-release/boat_study --demo --frames 180` desktop run completed 376 ticks. No
+`./build/p3a-release/wake_velocity --demo --frames 180` desktop run completed 376 ticks. No
 independent human control/audio review was performed.
 
 Debug `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug` and `cmake --build build -j` pass.
@@ -192,7 +192,7 @@ replacement performance baseline after the remaining time consumers migrate.
 ```sh
 cmake -S . -B build/p3a-release -DCMAKE_BUILD_TYPE=Release \
   -DFETCHCONTENT_SOURCE_DIR_RAYLIB="$PWD/build/_deps/raylib-src"
-cmake --build build/p3a-release --target boat_benchmark boat_study -j
+cmake --build build/p3a-release --target boat_benchmark wake_velocity -j
 mkdir -p build/bench/c1
 ./build/p3a-release/boat_benchmark --scenario wake-loop --mode simulation --renderer none \
   --warmup 120 --frames 7200 --output build/bench/c1/wake-loop
@@ -219,7 +219,7 @@ C2 carries double world time into water, traffic, scene actors and shader payloa
 was run three times after building the changed sources:
 
 ```sh
-cmake --build build/p3a-release --target boat_benchmark boat_study harbor_review -j
+cmake --build build/p3a-release --target boat_benchmark wake_velocity harbor_review -j
 mkdir -p build/bench/c2
 for run in 1 2 3; do
   ./build/p3a-release/boat_benchmark --scenario wake-loop --mode simulation --renderer none \
@@ -234,7 +234,7 @@ ambient waves or D3 trail. Simulation p50 is 0.064 ms in each run; p95/p99/max a
 0.133/0.147/0.199, 0.129/0.146/0.255 and 0.131/0.147/0.228 ms. These are diagnostic
 same-machine observations, not the C3 replacement baseline.
 
-Release `boat_study --renderer cpu|gpu --time 9|11|20 --screenshot ...` captures in
+Release `wake_velocity --renderer cpu|gpu --time 9|11|20 --screenshot ...` captures in
 `build/bench/c2/` match C1 byte for byte, except `gpu-t11.png`: two pixels differ by one
 level. The basin's ambient amplitudes are zero there; the difference is GPU rounding from the
 restructured shader expression, not a time change. Traffic captures from
@@ -243,7 +243,7 @@ T = 40, 86400.5 and 2591999.5 s (`build/bench/c2/{cpu,gpu}-traffic-*.png`) were 
 vessels, trails, waves and reflections remain coherent at 24 hours and 30 days.
 
 The water path no longer copies `BoatWater` for every internal query. On the same M1 Max, a
-Release CPU `boat_study --location eriksberg --waves --player-wake --time 60` screenshot
+Release CPU `wake_velocity --location eriksberg --waves --player-wake --time 60` screenshot
 run took 1.29 s versus 1.48 s for `6500a65`; the default basin run took 0.33 s versus
 0.35 s. These are wall-clock observations that include startup and one render.
 
@@ -257,7 +257,7 @@ AppleClang 21.0.0.21000101; configure-time identifier `ce3b53d/Release` (clean t
 ```sh
 cmake -S . -B build/p3a-release -DCMAKE_BUILD_TYPE=Release \
   -DFETCHCONTENT_SOURCE_DIR_RAYLIB="$PWD/build/_deps/raylib-src"
-cmake --build build/p3a-release --target boat_benchmark boat_study validate_boat_clock -j
+cmake --build build/p3a-release --target boat_benchmark wake_velocity validate_boat_clock -j
 python3 tools/boat_benchmark_baseline.py build/p3a-release/boat_benchmark build/bench/c3/baseline
 mkdir -p build/bench/c3
 ./build/p3a-release/validate_boat_clock --soak 3600 build/bench/c3
@@ -317,7 +317,7 @@ python3 tools/boat_benchmark_baseline.py build/w3-release/boat_benchmark build/b
 | P3a traces, three runs | Byte-identical to `build/bench/c3/baseline/run-{1,2,3}.state.csv`; hash `24d582aae45971b4`; p50 0.064/0.063/0.064 ms (C3 0.063) |
 | Hour soaks, calm/waves | Identical to `e83f545` and C3: hashes `43dfc74ddac0055d` / `56e31ce5c3d7a7c4`, same births, landings, recoveries; all six frames byte-identical |
 | Validators/review tools | 17 outputs (handling, banking, turn entry, environment, replay, profile, drive, clock, harbor, traffic, banking review, four water routes, object wakes, flag) identical except one object-wake timing line |
-| `boat_study` captures | 19 CPU/GPU frames (basin, waves, crossing+waves, D3, current/crossing, Eriksberg waves+D3 and current, river waves, course, CPU wake field) byte-identical |
+| `wake_velocity` captures | 19 CPU/GPU frames (basin, waves, crossing+waves, D3, current/crossing, Eriksberg waves+D3 and current, river waves, course, CPU wake field) byte-identical |
 | Replay views | Calm banked replay at 3/8 s, ghost and wave replay, CPU and GPU, byte-identical |
 | C3 views | `cpu-t{9,11,20,60}` byte-identical |
 

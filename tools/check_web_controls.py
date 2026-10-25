@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Opt-in Playwright check against a built/served boat_study WebAssembly game."""
+"""Opt-in Playwright check against a built/served wake_velocity WebAssembly game."""
 import argparse
 import json
 from pathlib import Path

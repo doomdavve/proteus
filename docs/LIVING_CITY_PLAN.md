@@ -709,7 +709,7 @@ turn small details into distracting pixel noise.
 - Use the same evaluated transforms in colour, shadow, and reflection passes. Measure
   the added work in all passes; collect a baseline before expanding scene complexity.
 - At each implemented stage, build and run CTest. Capture CPU and GPU river frames from the
-  water (`boat_study --screenshot`), the fixed `gpu_fixture --city` street view and
+  water (`wake_velocity --screenshot`), the fixed `gpu_fixture --city` street view and
   event-specific frames, and inspect a windowed river drive in motion. GPU checks need a
   working graphics context.
 - Compare fresh direct seeks with sequential playback and backward/forward seeks. Check

@@ -1,7 +1,7 @@
 # Boating game title screen and main-program plan
 
 Status: revised 2026-10-24. This document owns the title, menu, and promotion of the
-playable boating program. The playtest title slice is integrated into `boat_study`
+playable boating program. The playtest title slice is integrated into `wake_velocity`
 (see [playtest integration](#playtest-integration-2026-10-24)): a no-argument launch shows
 the prototype's logo and river backdrop with SINGLE PLAYER, MULTIPLAYER (join by address),
 SETTINGS (NAME, BOAT, STEERING, SOUNDTRACK; added 2026-10-24) and EXIT. The standalone visual prototype remains at
@@ -90,8 +90,8 @@ the native and web flows have been reviewed together.
 
 ## In-game Escape menu, 2026-10-25
 
-Completed task: Escape during a `boat_study` session no longer switches mouse steering back to
-the keyboard or leaves. It opens a menu in the scene's 320x200 grid (`tools/boat_study_menu.[ch]`,
+Completed task: Escape during a `wake_velocity` session no longer switches mouse steering back to
+the keyboard or leaves. It opens a menu in the scene's 320x200 grid (`tools/wake_velocity_menu.[ch]`,
 styled like the title) with RESUME, STEERING `< MOUSE / KEYBOARD >`, CONTROLS (the `?` guide over
 the menu; Esc returns) and a leave row: BACK TO TITLE from the title, LEAVE ROOM in a room, QUIT
 for explicit-option launches, absent in browsers. Esc or RESUME closes it; the frame that closes
@@ -144,7 +144,7 @@ the menu table above remains a later proposal.
   `soundtrack=a-little-boat|acid-wake|off`), saved
   when leaving SETTINGS, choosing a session or exiting. The default address is
   `127.0.0.1:24680` and the default name `player`.
-- `tools/boat_study.c`: the former `main` is `study(argc, argv)`; it reuses an open window and
+- `tools/wake_velocity.c`: the former `main` is `study(argc, argv)`; it reuses an open window and
   leaves it open. The new `main` shows the title only for no arguments or `--title`, runs
   SINGLE PLAYER as the former macOS app arguments plus `--skin`, and MULTIPLAYER as
   `--connect ADDRESS --name NAME`. Escape in a session returns to the title; the title
@@ -161,27 +161,27 @@ the menu table above remains a later proposal.
 
 Verification, 2026-10-24, macOS / Apple M1 Max, Debug: build warning-free and all 104
 active CTests passed (retired wake-field cases disabled); the title
-capture (`boat_study --title --screenshot`) inspected at 1x/3x. A temporary scripted
+capture (`wake_velocity --title --screenshot`) inspected at 1x/3x. A temporary scripted
 build of `main` (reverted, not committed) ran single player twice in the shared window,
 joined a local `boat_server` as `tester` (server roster confirmed, graceful leave),
 then failed against an unused port with the message returned to the title.
-`boat_study --connect` beside `boat_bot` showed the roster ("kalle SWEDEN", "davve
+`wake_velocity --connect` beside `boat_bot` showed the roster ("kalle SWEDEN", "davve
 FINLAND (YOU)"). `boat_server --bind 0.0.0.0` accepted a bot. Not verified: interactive
 keyboard/mouse use of the title (synthetic key events did not reach the window),
 packaged macOS/Windows launches, Windows/Linux builds, two-machine play, and user
-acceptance. The marine HUD branch is not merged; it also edits `tools/boat_study.c`
-and `tools/boat_study_net.[ch]` (input/draw paths), so expect small textual conflicts.
+acceptance. The marine HUD branch is not merged; it also edits `tools/wake_velocity.c`
+and `tools/wake_velocity_net.[ch]` (input/draw paths), so expect small textual conflicts.
 
 Release naming, 2026-10-24: native packages now present **Wake Velocity** with
 `wake_velocity` executables and versioned archive/Actions artifact names. This ships
-package naming independently of promotion step 3 below; the internal `boat_study`
-target and developer commands remain. [Releases](RELEASES.md) owns verification and
+package naming independently of promotion step 3 below. On 2026-10-25 the CMake target,
+sources and developer commands were renamed from `boat_study` to `wake_velocity` as well. [Releases](RELEASES.md) owns verification and
 the next packaging checks. Main-program promotion remains deferred.
 
 ## Promotion sequence and ownership
 
 1. **Title slice:** Put menu input, screen state, and rendering behind a small interface
-   used by `tools/boat_study.c`. Keep the 3D letter shapes and animation data owned by
+   used by `tools/wake_velocity.c`. Keep the 3D letter shapes and animation data owned by
    the title module. Reuse the existing 320×200 render target and integer scaling.
    Use the worktree prototype and its real river sample as the review baseline. Capture
    idle and selected frames and inspect them at native size and 3× scale.
@@ -190,10 +190,9 @@ the next packaging checks. Main-program promotion remains deferred.
    returning to a fresh session after a capsize. Wire Multiplayer to the network agent's
    public entry point once it exists; until then keep its unavailable state honest.
 3. **Make boating the main program:** After multiplayer changes settle, make the boating
-   game the default build/run and package entry. Prefer `proteus` as the stable project
-   target for the game (the four-minute audiovisual demo that held that name was removed on
-   2026-10-25), while retaining a temporary `boat_study` alias or compatibility command for existing tests
-   and scripts. Name the window and application **Wake Velocity — Proteus**. Update CMake,
+   game the default build/run and package entry. The game target is now `wake_velocity`
+   (renamed from `boat_study` on 2026-10-25, without a compatibility alias); the four-minute
+   audiovisual demo that held the `proteus` name was removed the same day. The window and application are named **Wake Velocity** (both launch paths since 2026-10-25). Update CMake,
    CTest commands, README launch instructions, web packager,
    macOS/Windows workflows, release artifacts, and asset paths in one reviewable change.
    Check for name assumptions with `rg` before renaming. Do not rework the multiplayer
@@ -216,9 +215,9 @@ time and has no effect on deterministic sessions or replay compatibility.
   smoke the packaged macOS/Windows/web launch paths when the executable promotion lands.
 
 Initial planning verification, 2026-10-23, macOS, before the prototype: inspected `CMakeLists.txt`,
-`tools/boat_study.c`, `cmake/Web.cmake`, the project README, and the multiplayer and
+`tools/wake_velocity.c`, `cmake/Web.cmake`, the project README, and the multiplayer and
 foundations plans. The existing app has a direct gameplay loop, Escape closes its native
-window, CLI modes enter gameplay, and web packaging targets `boat_study`. No art, audio,
+window, CLI modes enter gameplay, and web packaging targets `wake_velocity`. No art, audio,
 runtime, or user acceptance check is claimed for this proposal. The document links and
 `git diff --check` passed. Debug configure passed; the full build failed at link time while
 another agent's in-progress pose/presentation extraction had new source files absent from

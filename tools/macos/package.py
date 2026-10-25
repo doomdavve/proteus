@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package a native boat_study build as a versioned Wake Velocity macOS app ZIP."""
+"""Package a native wake_velocity build as a versioned Wake Velocity macOS app ZIP."""
 
 import argparse
 from pathlib import Path
@@ -31,7 +31,7 @@ def main():
     app = output / "Wake Velocity.app"
     if app.exists():
         raise SystemExit(f"Refusing to overwrite existing app: {app}")
-    executable = build / "boat_study"
+    executable = build / "wake_velocity"
     architectures = run("lipo", "-archs", str(executable))
     if architectures != "arm64":
         raise SystemExit(f"Expected Apple Silicon build, got: {architectures}")
@@ -61,7 +61,7 @@ def main():
     shutil.copy2(root / "assets/geometry/river/manifest.json", assets / "geometry/river")
     shutil.copy2(raylib / "LICENSE", resources / "raylib-LICENSE.txt")
     shutil.copy2(raylib / "src/external/glfw/LICENSE.md", resources / "glfw-LICENSE.md")
-    # boat_study links ENet for --connect (multiplayer M3).
+    # wake_velocity links ENet for --connect (multiplayer M3).
     shutil.copy2(build / "_deps/enet-src/LICENSE", resources / "enet-LICENSE.txt")
     (resources / "build.txt").write_text(
         f"Version: {args.version}\nCommit: {commit}\n"

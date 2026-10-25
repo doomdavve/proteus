@@ -1,5 +1,5 @@
-#ifndef BOAT_STUDY_MENU_H
-#define BOAT_STUDY_MENU_H
+#ifndef WAKE_VELOCITY_MENU_H
+#define WAKE_VELOCITY_MENU_H
 #include "raylib.h"
 
 #include <stdbool.h>

@@ -157,7 +157,7 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 
 cmake -S . -B build/review -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/review --target wake_candidate_review wake_play_review boat_study -j
+cmake --build build/review --target wake_candidate_review wake_play_review wake_velocity -j
 ./build/review/wake_candidate_review
 ./build/review/wake_candidate_review --costs
 ./build/review/wake_play_review --gpu

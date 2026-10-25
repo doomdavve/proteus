@@ -22,7 +22,7 @@ scripted `boat_server`) is implemented and automatically verified. The user play
 rival on 2026-10-23 ("seems to work great"). See the
 [M2 handoff](#m2-local-authority-handoff--2026-10-23). M3 (protocol v1, transport boundary,
 in-memory impairment adapter, ENet adapter, authority/client sessions, `boat_server` rooms,
-`boat_bot` and `boat_study --connect`) is implemented and automatically verified on macOS. It
+`boat_bot` and `wake_velocity --connect`) is implemented and automatically verified on macOS. It
 is not yet user-played; see the [M3 handoff](#m3-protocol-and-transport-handoff--2026-10-23)
 and the [protocol](MULTIPLAYER_PROTOCOL.md). M4 step 1, checkpoint/input replay (client
 prediction, `boat_prediction`), is implemented and automatically verified on macOS; the user
@@ -61,9 +61,9 @@ implemented and automatically verified, awaiting human race-room play. R3's slal
 moving storm are implemented, with the storm presentation user-accepted; full-course/pacing
 work and R4 multiplayer acceptance remain in the [race plan](RACE_PLAN.md).
 On 2026-10-25 the game gained [hosting from the title](#host-from-the-game--2026-10-25)
-(MULTIPLAYER > HOST A ROOM, `boat_study --host`): the game runs a second copy of itself as
+(MULTIPLAYER > HOST A ROOM, `wake_velocity --host`): the game runs a second copy of itself as
 `--serve` and joins it, so packages ship one executable. User-played 2026-10-25 ("Works
-great!"); Windows compilation unverified. The same section plans the executable rename to `wake_velocity`.
+great!"); Windows compilation unverified. The game executable was renamed from `boat_study` to `wake_velocity` on 2026-10-25.
 Numerical budgets below are proposed gates, not measured multiplayer results.
 The final evidence section distinguishes checks performed for this document from future checks.
 
@@ -123,7 +123,7 @@ Only three product questions materially remain open; the plan proceeds with thes
 
 | Source / symbols inspected | Reuse and consequence |
 | --- | --- |
-| `src/main.c` (the demo, removed 2026-10-25): `main`, `run_screenshot`, `run_profile`; [`tools/boat_study.c`](../tools/boat_study.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `boat_study`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
+| `src/main.c` (the demo, removed 2026-10-25): `main`, `run_screenshot`, `run_profile`; [`tools/wake_velocity.c`](../tools/wake_velocity.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `wake_velocity`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
 | [`src/boat.h`](../src/boat.h): `Boat`, `BOAT_STEP`; [`src/boat.c`](../src/boat.c): `boat_step`, `buoyancy_step`, `motion_step`, `boat_wake_stern` | Reuse the 120 Hz force recipe, steering/throttle **rates**, engine response, six support points, air yaw, landing and inversion timers. `Boat` also owns flag, particles, camera, course, location, water copies and borrowed wake pointers. It is not a packet or prediction checkpoint. |
 | `boat_collide_pair`, `hull_vertical_bounds`, `resolve_hull_contact`, `resolve_traffic` in `boat.c` | Reuse OBB/SAT geometry, mutual planar/yaw impulses and mass-weighted separation. Vertical intervals reject clear jumps. This is not a full 3D solver: no vertical boat-on-boat impulse or deck landing, and pair response does not itself perform a final shoreline check. Sequential pair mutation is insufficient as the fleet scheduler. M2 (2026-10-23): `boat_collide_pair` now composes pure `boat_pair_contact`/`_speed`/`_impulse`/`_apply` helpers with unchanged arithmetic; `boat_fleet_solve` uses them simultaneously and holds separations at the shore. |
 | [`src/boat_water.c`](../src/boat_water.c): `boat_water_query`, `boat_water_query_field`, `boat_water_resistance` | Arcade contributions add signed height, gradient and vertical surface velocity; current contributes slope-relative vertical motion before normal construction. Preserve this common physical surface and the CPU/GPU recipe. |
@@ -133,7 +133,7 @@ Only three product questions materially remain open; the plan proceeds with thes
 | [`src/boat_map.c`](../src/boat_map.c): `shore`, `init`; [`src/waterfront_scene.c`](../src/waterfront_scene.c): `river_enabled`, `waterfront_scene_select_river`; `boat_water.c`: `surfaces`, `patches` | Map selection and caches are still global. Separate immutable map/query data from render resources through foundations work. Basin first avoids making mapped-world extraction a hidden first-slice prerequisite. S4 basin slice (2026-10-23): the selector is now `waterfront_city_select_river` in `waterfront_city.c` and the surface/patch caches are in `boat_water_mesh.c`, both still global. |
 | [`src/waterfront_harbor.c`](../src/waterfront_harbor.c): `waterfront_harbor_contact_height`; [`src/waterfront_traffic.c`](../src/waterfront_traffic.c): `waterfront_traffic_motion`, `waterfront_traffic_contact_height` | Shared posed contact envelopes are useful. Ordinary traffic remains on authored routes, with one-way collision response and visual trails; it does not emit into the four-player arcade pool. Evaluate authoritative routes/obstacle poses at a common tick. |
 | [`src/boat_gpu.c`](../src/boat_gpu.c): `boat_gpu_draw_with_ghost`; [`src/waterfront_scene.h`](../src/waterfront_scene.h): `WaterfrontSceneFrame`; [`src/renderer_gpu.c`](../src/renderer_gpu.c): `draw_ghost` | One player plus one special ghost is not a fleet renderer. Ghosts omit shadows/reflections. Add bounded ordinary vessel views; keep race ghosts separate. The frame's “owned/no mutable pointers” comment is no longer literally true: copied `BoatWater` contains a borrowed `objects` pointer. Freeze/copy the render wake records before passes. |
-| [`CMakeLists.txt`](../CMakeLists.txt), [`cmake/Web.cmake`](../cmake/Web.cmake) | C17 and pinned raylib 6.0; common source lists are repeatedly compiled, simulation validators pull presentation. Emscripten builds `boat_study` then returns before native targets/tests. A headless core/server target and optional native transport dependency must respect this split. S4 basin slice (2026-10-23): static libraries replace the repeated lists, and `proteus_boat_core` has a display-free validator and boundary check; most simulation validators still link session and presentation. |
+| [`CMakeLists.txt`](../CMakeLists.txt), [`cmake/Web.cmake`](../cmake/Web.cmake) | C17 and pinned raylib 6.0; common source lists are repeatedly compiled, simulation validators pull presentation. Emscripten builds `wake_velocity` then returns before native targets/tests. A headless core/server target and optional native transport dependency must respect this split. S4 basin slice (2026-10-23): static libraries replace the repeated lists, and `proteus_boat_core` has a display-free validator and boundary check; most simulation validators still link session and presentation. |
 | [`tools/validate_boat.c`](../tools/validate_boat.c): `validate_flight_outcomes`, `validate_dynamic_pair`; environment, banking, replay, traffic and object validators | Preserve ballistic/dry control, capsize, vertical clearance, momentum/energy, banked handling, wake derivatives, expiry and shader parity checks. Extend with network histories/authority tests; do not replace physical checks with screenshots. |
 
 The [2026-10-19 architecture review](ARCHITECTURE_REVIEW.md) is a dated baseline: its
@@ -691,7 +691,7 @@ Depends on M2. Likely new `src/boat_net_protocol.[ch]`, `boat_net_transport.[ch]
 warnings. Implement handshake/version rejection, bounded queues, input/snapshot/control codec,
 initial world/wake checkpoint and in-memory delivery impairment before real sockets.
 Proposed diagnostic commands: `boat_server --bind 127.0.0.1 --port 24680 --location basin`
-and `boat_study --connect 127.0.0.1:24680`; precise help/argument validation ships with them.
+and `wake_velocity --connect 127.0.0.1:24680`; precise help/argument validation ships with them.
 
 Automated: codec golden bytes/round trips, all truncation points, invalid counts/floats/versions,
 duplicate/reset/sequence-wrap behavior, ENet packet MTU capture, localhost scripted client/server
@@ -710,7 +710,7 @@ layout is in [MULTIPLAYER_PROTOCOL.md](MULTIPLAYER_PROTOCOL.md).
 ### M4 — first playable: two people collide and jump each other's wakes
 
 Depends on M3. Likely `boat_net_client`, new `boat_prediction.[ch]`, `boat_world`,
-`boat_wake_objects`, `tools/boat_study.c`, `boat_view`, `boat_gpu`, `waterfront_scene.h`,
+`boat_wake_objects`, `tools/wake_velocity.c`, `boat_view`, `boat_gpu`, `waterfront_scene.h`,
 `renderer_gpu.c` and corresponding CPU path. Deliver in small steps: checkpoint/input replay;
 wake births/repair and provisional-own reconciliation; remote interpolation/proximity view;
 ordinary fleet rendering and safe reset UI. Use two player colors, ordinary opaque hulls with
@@ -1022,7 +1022,7 @@ ticks, and its wakes expire naturally.
 - "No allocation per tick" holds by construction (fixed arrays), not by instrumentation.
 - Recent remote inputs for prediction are not in the checkpoint yet (M4).
 
-**`boat_study`.** `--wake-objects-crossing` now steps the player (slot 0) and the scripted rival
+**`wake_velocity`.** `--wake-objects-crossing` now steps the player (slot 0) and the scripted rival
 (slot 1) through one fleet. Single-boat modes keep their existing path. Behavior changes in
 crossing mode only:
 - equal masses (previously 1/1.6);
@@ -1089,7 +1089,7 @@ part of this change.
 
 | Implemented | Automated verification | Manual observation | User acceptance |
 | --- | --- | --- | --- |
-| Protocol v1 codec, transport boundary, in-memory impairment and ENet adapters, authority and client sessions, `boat_server` rooms, `boat_bot`, `boat_study --connect` | `boat_net`, `boat_net_loopback`, `boat_net_boundary`, six CLI checks, the full suite, and 8/8 identical single-player captures against `803a901` | Agent-run windowed `boat_study --connect` with a bot (GPU renderer) and its error paths; no keyboard play | None yet |
+| Protocol v1 codec, transport boundary, in-memory impairment and ENet adapters, authority and client sessions, `boat_server` rooms, `boat_bot`, `wake_velocity --connect` | `boat_net`, `boat_net_loopback`, `boat_net_boundary`, six CLI checks, the full suite, and 8/8 identical single-player captures against `803a901` | Agent-run windowed `wake_velocity --connect` with a bot (GPU renderer) and its error paths; no keyboard play | None yet |
 
 **Modules.** The new `proteus_boat_net` library holds the codec (`boat_net_protocol.[ch]`), the
 transport boundary and in-memory adapter (`boat_net_transport.h`, `boat_net_memory.c`), the
@@ -1099,7 +1099,7 @@ sockets. `proteus_boat_net_enet` (`boat_net_enet.[ch]`) is the only code that se
 operating system: sockets, the monotonic clock and sleeping. ENet v1.3.18 is fetched at commit
 `2662c0de09e36f2a2030ccc2c528a3e4c9e8138a` (MIT, `LICENSE` in its source tree). It is compiled
 as `proteus_enet` with its own configure checks and warnings off, and only for native targets:
-the web build returns before these targets and compiles `boat_study` without
+the web build returns before these targets and compiles `wake_velocity` without
 `PROTEUS_BOAT_NET`.
 
 **Authority.** `boat_net_server_service(server, now)` handles at most 128 messages, applies
@@ -1117,7 +1117,7 @@ snapshot replaces the boats, emitters and counters and expires old records; birt
 pool. Each snapshot's wake digest checks the rebuilt records, and a mismatch lasting over a
 second requests a fresh checkpoint. Commands are generated at 120 Hz for the estimated server
 tick plus a lead of half the round trip plus four ticks (4–16), and sent 12 at a time at 60 Hz.
-There is **no prediction**: `boat_study --connect` interpolates the mirror's two newest snapshots,
+There is **no prediction**: `wake_velocity --connect` interpolates the mirror's two newest snapshots,
 so the view runs about one snapshot plus one round trip behind the keys. It draws the nearest
 other boat through the existing ghost path and prints a network status line. R requests a new
 life.
@@ -1126,7 +1126,7 @@ life.
 
 ```sh
 ./build/boat_server [--bind 127.0.0.1] [--port 24680] [--token TEXT] [--players 1-4] [--waves]
-./build/boat_study --connect 127.0.0.1:24680 [--name TEXT] [--token TEXT]
+./build/wake_velocity --connect 127.0.0.1:24680 [--name TEXT] [--token TEXT]
 ./build/boat_bot --connect 127.0.0.1:24680 [--seconds 5]
 ```
 
@@ -1195,7 +1195,7 @@ time with no faults, at 0.077–0.087 ms of service per tick (Debug, two clients
 Single-player CPU captures (default, crossing with and without waves, waves, environment,
 course, river, Eriksberg) are byte-identical to a `803a901` build.
 
-**Manual observation (agent).** A windowed `boat_study --connect` (GPU renderer, 900 frames)
+**Manual observation (agent).** A windowed `wake_velocity --connect` (GPU renderer, 900 frames)
 joined a `--waves` room beside a bot and exited cleanly. It showed its own boat, the bot's
 boat and wakes, and the status line. The server reported 2 accepted, 2 left, no faults and no
 future or late commands. Window focus was elsewhere for part of the run, so 75 ticks were
@@ -1205,7 +1205,7 @@ driving, no two-window or two-machine session and no listening.
 
 **Limits.**
 - macOS only; the Windows (winsock) and Linux paths of the ENet adapter were not compiled, and
-  the Emscripten build was not run. A native compile of `boat_study.c` without
+  the Emscripten build was not run. A native compile of `wake_velocity.c` without
   `PROTEUS_BOAT_NET` passed.
 - Loopback only: no LAN, firewall or OS-level impairment lane; profile F ran on the in-memory
   adapter, which models ENet's sequencing but not its retransmission or aggregation.
@@ -1220,7 +1220,7 @@ Started from `c547f92` (M3 committed). The untracked `docs/TITLE_SCREEN_PLAN.md`
 
 | Implemented | Automated verification | Manual observation | User acceptance |
 | --- | --- | --- | --- |
-| `boat_prediction` speculative fleet with own-command history, correction and replay; predicting `BoatNetClient`; `boat_study --connect` draws the predicted fleet with blended corrections | `boat_net` (replay exactness, three predicting rooms), the full suite | Agent-run windowed `boat_study --connect` beside a bot; no keyboard play | 2026-10-24: the user drove `boat_study --connect` beside `boat_bot`, interacting with its wakes: "Works really well!" |
+| `boat_prediction` speculative fleet with own-command history, correction and replay; predicting `BoatNetClient`; `wake_velocity --connect` draws the predicted fleet with blended corrections | `boat_net` (replay exactness, three predicting rooms), the full suite | Agent-run windowed `wake_velocity --connect` beside a bot; no keyboard play | 2026-10-24: the user drove `wake_velocity --connect` beside `boat_bot`, interacting with its wakes: "Works really well!" |
 
 **Module.** `src/boat_prediction.[ch]` is in `proteus_boat_net` and obeys the core boundary. A
 `BoatPrediction` holds a speculative `BoatFleet` (its tick is the predicted tick), the own
@@ -1236,10 +1236,10 @@ authoritative state, then use zero rates (which hold the throttle). The predicti
 more than 32 ticks past the authority, so a replay is at most 32 ticks; past that it holds and
 counts held ticks. No protocol change: v1 already carries every field this needs.
 
-**Client and view.** `BoatNetClientConfig.predict` turns it on (`boat_study` on, `boat_bot`
+**Client and view.** `BoatNetClientConfig.predict` turns it on (`wake_velocity` on, `boat_bot`
 off). A snapshot, a birth batch that changed the pool, or a resync marks the prediction for one
 correction before the next commands; each command then advances it. `boat_net_client_view()`
-returns the fleet to draw. `boat_study --connect` shows the own boat, the nearest other boat and
+returns the fleet to draw. `wake_velocity --connect` shows the own boat, the nearest other boat and
 the water at the predicted tick. Corrections move the physical state at once; the drawn pose
 adds the accumulated error (position, heading, height, pitch, roll), decaying with a 40 ms time
 constant (about 95% gone in 120 ms). Errors over 2 m or 30 degrees, a new life, or a correction
@@ -1280,7 +1280,7 @@ GPU), with 15 retired cases disabled; `validate_boat_net` now takes about 2 s. I
   processor time).
 
 **Manual observation (agent).** `boat_server --waves`, one `boat_bot` and a windowed
-`boat_study --connect --frames 1200` (GPU) on loopback: 2922 server ticks, 0 late and 0 future
+`wake_velocity --connect --frames 1200` (GPU) on loopback: 2922 server ticks, 0 late and 0 future
 commands, 5408 of 5524 integrated ticks used received commands (79 neutralized while the window
 lacked focus), no faults, clean exit. The view itself was not inspected and there was no
 keyboard driving.
@@ -1300,7 +1300,7 @@ Started from `c85bf66`. The title-screen row in `docs/README.md` and the untrack
 
 | Implemented | Automated verification | Manual observation | User acceptance |
 | --- | --- | --- | --- |
-| Wake-change metrics, digest-confirmed carry of provisional records, held corrections, early births by identity | `boat_net` (`prediction_wakes` fixture, gated predicting rooms), the full suite | Three agent-run windowed `boat_study --connect` runs beside a bot; no keyboard play | Not targeted; 2026-10-24 the user played it during step-4a sessions: "I'm not sure what to look for but I didn't notice anything off" |
+| Wake-change metrics, digest-confirmed carry of provisional records, held corrections, early births by identity | `boat_net` (`prediction_wakes` fixture, gated predicting rooms), the full suite | Three agent-run windowed `wake_velocity --connect` runs beside a bot; no keyboard play | Not targeted; 2026-10-24 the user played it during step-4a sessions: "I'm not sure what to look for but I didn't notice anything off" |
 
 **Problem measured first.** Snapshots arrive at 30 Hz and births at 10 Hz, so a snapshot often
 counts a birth whose batch is still on the way. The step-1 replay then started from a mirror
@@ -1322,7 +1322,7 @@ about 80–100, also all young: remote boats' speculative births replaced by the
 - Births that arrive before their snapshot (held by the client) replace the replay's own record
   of the same pool slot and birth tick when the replay reaches that tick. They never replace a
   nearby record or fill an empty slot, so the speculative emitter cursor stays consistent.
-- `boat_study --connect` adds the wake counts to its exit summary. No protocol change: a
+- `wake_velocity --connect` adds the wake counts to its exit summary. No protocol change: a
   snapshot carrying recent births (protocol v2) was considered and not needed by these numbers.
 
 **Decision, for review.** Remote speculative boats still emit provisional births into the
@@ -1347,7 +1347,7 @@ retired cases disabled.
   batch phase there, so this case does not exercise the fix.
 
 **Manual observation (agent).** Three runs of `boat_server --waves`, one `boat_bot` and a
-windowed `boat_study --connect --frames 1200` (GPU, loopback), plus a 200-frame run. All exited
+windowed `wake_velocity --connect --frames 1200` (GPU, loopback), plus a 200-frame run. All exited
 cleanly with no vanished wakes and no snaps. One 1200-frame run carried 80 records and
 reported **310 held ticks** (the prediction reached its 32-tick limit past the authority and
 paused); the other runs held none. Neither validator stalls of 0.1–0.6 s nor the profile F rooms
@@ -1363,7 +1363,7 @@ Started from `55c1ce1`. The title-screen row in `docs/README.md` and the untrack
 
 | Implemented | Automated verification | Manual observation | User acceptance |
 | --- | --- | --- | --- |
-| `boat_remote_view` snapshot history, interpolation/extrapolation and proximity blend; `boat_study --connect` draws the other boat with it | `boat_net` (`remote_view` fixture, gated predicting rooms), the full suite | Agent-run windowed `boat_study --connect` beside a bot; no keyboard play | Not targeted; 2026-10-24 the user played it during step-4a sessions: "I'm not sure what to look for but I didn't notice anything off" |
+| `boat_remote_view` snapshot history, interpolation/extrapolation and proximity blend; `wake_velocity --connect` draws the other boat with it | `boat_net` (`remote_view` fixture, gated predicting rooms), the full suite | Agent-run windowed `wake_velocity --connect` beside a bot; no keyboard play | Not targeted; 2026-10-24 the user played it during step-4a sessions: "I'm not sure what to look for but I didn't notice anything off" |
 
 **Module.** `src/boat_remote_view.[ch]` is in `proteus_boat_net` (core boundary). The client keeps
 the last 16 authoritative snapshots' slots (`BoatNetClient.remotes`, about 0.5 s) and exposes
@@ -1379,7 +1379,7 @@ moves over 100 ms, and a new life starts outside. These poses are display only.
 **View.** The other boat is drawn at the estimated server tick minus 12 ticks (100 ms), blended
 by the proximity weight toward its predicted pose (with the step-1 visual correction), which is
 the pose the prediction collides with. The own boat and the water stay at the predicted tick.
-On exit `boat_study` prints the share of frames interpolated, extrapolated, held and in
+On exit `wake_velocity` prints the share of frames interpolated, extrapolated, held and in
 proximity mode.
 
 **Deviations, for review.** The delay is fixed at 12 ticks, not adaptive between 67 and 150 ms.
@@ -1402,7 +1402,7 @@ retired cases disabled.
   of 90–125 ms and some proximity time.
 
 **Manual observation (agent).** `boat_server --waves`, one `boat_bot` and a windowed
-`boat_study --connect --frames 1200` (GPU, loopback): 99.9% interpolated, 0.1% held, no proximity
+`wake_velocity --connect --frames 1200` (GPU, loopback): 99.9% interpolated, 0.1% held, no proximity
 mode (the own boat idled while the bot lapped), no faults, clean exit. The view was not
 inspected.
 
@@ -1433,7 +1433,7 @@ meshes, flags and spray. The GPU scene frame in `boat_gpu_draw_scene` is now sta
 a large stack object. The ghost stays a dithered colour-pass overlay for race replays and the
 single-player crossing rival.
 
-**Connected view.** `boat_study --connect` draws every other active slot (not only the nearest)
+**Connected view.** `wake_velocity --connect` draws every other active slot (not only the nearest)
 with the step-3 interpolation and proximity blend. Each slot keeps its own presentation, reset
 on a new life. Slots map to skins on every client: 1 Sweden, 2 Finland, 3 Denmark, 4 Norway
 (`net_study_skin`), so no wire field is needed. `--skin` with `--connect` is refused with that
@@ -1453,7 +1453,7 @@ to a `38d76c6` build.
 **Visual review (agent).** `boat_fleet_review` CPU and GPU captures, calm and waves, show four
 distinct boats (Sweden own, Finland, Denmark, Norway) with spray and wake trails; on GPU the
 rivals sit in the lit water like the own boat. At 320x200 from the follow camera the far flags
-are a few pixels. A windowed `boat_study --connect --frames 1200` beside two bots drew both
+are a few pixels. A windowed `wake_velocity --connect --frames 1200` beside two bots drew both
 remote boats every frame (99.9% interpolated, 18.7% of boat-frames in proximity mode), with no
 server faults. The connected view itself was not inspected.
 
@@ -1469,7 +1469,7 @@ Started from `4d36ecf`. The title-screen row in `docs/README.md` and the untrack
 
 | Implemented | Automated verification | Manual observation | User acceptance |
 | --- | --- | --- | --- |
-| Client reset progress, `boat_study --connect` reset notices and fade | `boat_net` (`authority` reset cases), the full suite | Agent-run windowed `--connect` beside a bot (join fade only; R not pressed) | None yet |
+| Client reset progress, `wake_velocity --connect` reset notices and fade | `boat_net` (`authority` reset cases), the full suite | Agent-run windowed `--connect` beside a bot (join fade only; R not pressed) | None yet |
 
 **Client.** `boat_net_client_reset_state()` reports the latest reset: `SENT` once the request
 leaves, `WAITING` while the authority's snapshot shows the slot queued (`pending`), and `NONE`
@@ -1477,7 +1477,7 @@ when a snapshot shows the own slot in a new life. A request the authority never 
 two-per-second spawn rate limit, or loss) is given up after one second. Stats count completed
 resets, the longest request-to-new-life time and dropped requests.
 
-**HUD.** While a reset is in progress `boat_study --connect` shows `RESETTING` in place of the
+**HUD.** While a reset is in progress `wake_velocity --connect` shows `RESETTING` in place of the
 capsize or airborne notice; after half a second still queued it adds `WAITING FOR A CLEAR SPOT`
 and the seconds waited (the authority retries the authored spawns at 10 Hz until one is clear
 of hulls and wakes). Without a boat it still shows `WAITING FOR A SAFE SPAWN`. Each new own
@@ -1491,7 +1491,7 @@ right after the request, ends with the new life within 0.3 s on the ideal virtua
 that a rate-limited request reads `SENT` then expires after a second without a new life.
 
 **Manual observation (agent).** `boat_server`, one `boat_bot` and a windowed
-`boat_study --connect --frames 900` (GPU, loopback): joined, drew the bot, no faults, clean exit.
+`wake_velocity --connect --frames 900` (GPU, loopback): joined, drew the bot, no faults, clean exit.
 R could not be pressed and the notices and fade were not inspected.
 
 **Limits.** The `WAITING` notice has no automated case with every spawn blocked. Try R in open
@@ -1567,7 +1567,7 @@ reverted.
 
 Not verified: discovery between two machines; Windows (the `SIO_GET_INTERFACE_LIST` path has
 not been compiled; Windows Firewall must allow `boat_server.exe` inbound and admit the unicast
-answer to `boat_study.exe`'s broadcast); Linux; interactive use of the LAN row; networks that
+answer to `wake_velocity.exe`'s broadcast); Linux; interactive use of the LAN row; networks that
 drop broadcasts (guest Wi-Fi, client isolation, VPNs), where typing an address is still the way.
 
 ## M5 step 1: four-player lifecycle handoff — 2026-10-24
@@ -1685,7 +1685,7 @@ at a birth-batch snapshot. The river ENet harness adds room-full rejection, conc
 inactive controls, a killed client, timeout and replacement; Eriksberg compares completed-round
 scores and event counts against the authority.
 
-The final open-river window check used a GPU `boat_study --connect --frames 360` beside three
+The final open-river window check used a GPU `wake_velocity --connect --frames 360` beside three
 hunting/predicting bots, with `boat_server --bind 0.0.0.0 --mode deathmatch --location river`
 (on a private port, LAN discovery disabled). Server: 2160 ticks, four accepted/four left, no
 protocol/emission faults, zero future-command rejects, two late commands and one credited wake
@@ -1709,7 +1709,7 @@ executable should be planned.
 
 | Implemented | Automated verification | Manual observation | User acceptance |
 | --- | --- | --- | --- |
-| Title MULTIPLAYER > HOST A ROOM panel; `boat_study --host`, `--serve`, `--port`; `boat_server --exit-with-stdin`; single-executable Mac/Windows packages | New CTests below; full suite; Mac package built and run relocated | Agent-run windowed host sessions, a bot in a hosted room, the game killed mid-room, a busy port; title panels captured and inspected | User played it on macOS, 2026-10-25: "Works great!" (setup not recorded: whether a second machine joined is unknown) |
+| Title MULTIPLAYER > HOST A ROOM panel; `wake_velocity --host`, `--serve`, `--port`; `boat_server --exit-with-stdin`; single-executable Mac/Windows packages | New CTests below; full suite; Mac package built and run relocated | Agent-run windowed host sessions, a bot in a hosted room, the game killed mid-room, a busy port; title panels captured and inspected | User played it on macOS, 2026-10-25: "Works great!" (setup not recorded: whether a second machine joined is unknown) |
 
 **Decision: a child process of the game's own executable.** Options weighed with the user:
 (A) launch the separate `boat_server` binary as a child, as this plan proposed; (B) an
@@ -1727,13 +1727,13 @@ over the in-memory transport) is wanted later. C was rejected: a stalled host lo
 
 **Behaviour.**
 - `boat_server.c`'s entry point is now `boat_server_main` (`tools/boat_server.h`).
-  `boat_server` is a two-line wrapper (`tools/boat_server_main.c`). `boat_study --serve ARGS`
+  `boat_server` is a two-line wrapper (`tools/boat_server_main.c`). `wake_velocity --serve ARGS`
   runs the same command line before any window, audio or asset work.
 - `boat_server --exit-with-stdin` closes the room gracefully once its standard input ends.
   POSIX polls `poll`/`read` on stdin. Windows uses `PeekNamedPipe`, which fails once the
   writer has gone. The hosting game holds the only write end, so the room closes when the game
   leaves or dies.
-- `tools/boat_study_host.[ch]` starts `<own executable> --serve --bind 0.0.0.0 --port N --mode M
+- `tools/wake_velocity_host.[ch]` starts `<own executable> --serve --bind 0.0.0.0 --port N --mode M
   [--location L] [--waves] --exit-with-stdin`. POSIX uses `posix_spawn` and finds its own path
   through `_NSGetExecutablePath` or `/proc/self/exe`. Windows uses `CreateProcess` with
   `CREATE_NO_WINDOW` and `GetModuleFileName`. The room's merged stdout/stderr come back
@@ -1741,7 +1741,7 @@ over the in-memory transport) is wanted later. C was rejected: a stalled host lo
   for the `boat_server listening on` line. While playing, it drains the pipe every frame and
   ends the session with the room's last line if the child exits. On leaving, the client
   disconnects first, then the game closes the room's input. It waits 2 s, then kills the child.
-- `boat_study --host free|deathmatch|race [--location L] [--waves] [--port N] [--name TEXT]`
+- `wake_velocity --host free|deathmatch|race [--location L] [--waves] [--port N] [--name TEXT]`
   hosts and joins `127.0.0.1:N` (default 24680). `--host race` requires the river. `--host`
   rejects `--connect`/`--token`, and `--port` requires `--host`. The Escape menu's last row
   reads CLOSE ROOM, with the hint "YOU HOST: CLOSING ENDS THE ROOM".
@@ -1755,18 +1755,18 @@ over the in-memory transport) is wanted later. C was rejected: a stalled host lo
   with that reason.
 - The Mac app no longer carries `boat_server`, and the Windows ZIP drops `boat_server.exe`.
   `host.bat` runs `wake_velocity.exe --serve --bind 0.0.0.0`. CI's relocated checks run
-  `--serve --scripted --ticks 240`, and Windows CTest adds `boat_study_serve_scripted` and
+  `--serve --scripted --ticks 240`, and Windows CTest adds `wake_velocity_serve_scripted` and
   `boat_host`. The `boat_server` target remains for development, the network harnesses and a
   future Linux server package.
 
 **Verification (2026-10-25, M1 Max/macOS 26.6.2, Debug).** The build is warning-free. New
 CTests:
-- `boat_study_serve_scripted`.
+- `wake_velocity_serve_scripted`.
 - Three argument rejections: `--host race --location basin`, `--host` with `--connect`, and
   `--port` without `--host`.
-- `boat_host` (`tools/boat_host_check.py`): `boat_study --serve` on private ports, a 1 s
+- `boat_host` (`tools/boat_host_check.py`): `wake_velocity --serve` on private ports, a 1 s
   `boat_bot` session, then closing stdin. The room must exit cleanly within 2 s.
-- GPU-labelled `boat_study_host_gpu`: a windowed 120-frame river deathmatch host on port 24779.
+- GPU-labelled `wake_velocity_host_gpu`: a windowed 120-frame river deathmatch host on port 24779.
 
 The full-suite result is recorded in the [documentation index](README.md). Agent-run checks:
 - A windowed `--host deathmatch --location river` session joined as slot 1. It left with
@@ -1789,23 +1789,21 @@ Not checked:
 - A second machine joining a hosted room.
 - Keyboard/title navigation by a human.
 
-**Executable rename plan (not started).** The packages already present `boat_study` as
-`wake_velocity` (Mac `Contents/MacOS/wake_velocity`, Windows `wake_velocity.exe`). Its usage
-text says `wake_velocity`, and saved data lives in a `Proteus` directory, so no user data
-moves. Proposed single change:
-1. Rename the CMake target to `wake_velocity`, along with the `boat_study_*` source files the
-   game owns, or keep the file names and rename only the target. In CMake that touches 68
-   references, including CTest names and commands.
-2. Update `tools/macos/package.py`, the Windows/Linux/web workflows, `cmake/Web.cmake`,
-   `tools/package_web.py`, `web/index.html`, `tools/check_wayland.sh` and
-   `tools/check_web_controls.py`. The packaging copies become plain copies.
-3. Keep `boat_server` as the dedicated-server name (Linux headless package, M6).
-4. Update the 35 documents that name `./build/boat_study` in one sweep. Dated handoffs keep
-   their historical commands, with a note.
-5. Optionally keep a `boat_study` build alias for a while (a copy or symlink post-build step)
-   so local scripts survive.
+**Executable renamed to `wake_velocity` — 2026-10-25.** The game target, its
+`tools/boat_study*.{c,h}` sources (now `tools/wake_velocity*.{c,h}`), the `BOAT_STUDY_*`
+macros, CTest names and commands, `tools/macos/package.py`, the Windows/Linux workflows,
+`cmake/Web.cmake`, `tools/package_web.py`, `web/index.html`, `tools/check_wayland.sh`,
+`tools/check_web_controls.py` and every document now use `wake_velocity`; package copies
+no longer rename the executable. `boat_server` keeps its name. There is no `boat_study`
+alias, and dated records were updated to the new command rather than kept verbatim. Internal
+identifiers such as `NetStudy`, `ObjectStudy` and the `boat_net_study_*` tests were not
+renamed. Direct command-line sessions now title their window "Wake Velocity" (formerly
+"Proteus / boating sketch"), matching the title-screen path. Saved data stays in the `Proteus` directory.
 
-Do it as its own commit between feature steps, when no other branch touches the build.
+Verified 2026-10-25 on macOS (Apple silicon, Debug, `PROTEUS_GPU_TESTS=ON`): warning-free
+build producing `build/wake_velocity`; all 110 active CTests passed (15 retired wake-field
+tests disabled); a CPU river screenshot and a 120-frame windowed `--demo` ran. Not run:
+packaging, the web build, Linux/Windows builds and CI.
 
 **Next.** The user played HOST A ROOM on 2026-10-25 ("Works great!"). Still open: a second
 machine joining a hosted room through LAN, and CI on Windows and macOS. Show the host's LAN address in game (the title only advertises
@@ -1822,7 +1820,7 @@ P2. It freezes the current feel and supplies honest cost/state evidence before c
 Coding-agent brief:
 
 > Implement only foundations P2a. Read AGENTS.md, the P2a contract and the current
-> `tools/boat_study.c` step/demo code. Add `boat_benchmark` simulation-only, sharing the
+> `tools/wake_velocity.c` step/demo code. Add `boat_benchmark` simulation-only, sharing the
 > existing arcade one-boat driver without changing update order or float time. Emit bounded
 > JSON/CSV and named-field state evidence. Keep existing app behavior and every current
 > mode compiling. Add the small CTest contracts described there, build and run CTest,

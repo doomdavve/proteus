@@ -99,10 +99,10 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   [network checks](#network-checks).
 - Twelve argument checks expect a failure: `boat_server --scripted` with a room option, an invalid
   `--port` and an invalid `--bind`, `--round-seconds` without `--mode deathmatch`, `boat_bot`
-  without a port, `boat_bot --discover` with `--connect`, `boat_study --connect` combined with `--waves` or `--skin`, `--name`
-  without `--connect`, `boat_study --host race --location basin`, `--host` with `--connect`, and
+  without a port, `boat_bot --discover` with `--connect`, `wake_velocity --connect` combined with `--waves` or `--skin`, `--name`
+  without `--connect`, `wake_velocity --host race --location basin`, `--host` with `--connect`, and
   `--port` without `--host`.
-- `boat_study_serve_scripted` runs the scripted authority through `boat_study --serve`, the
+- `wake_velocity_serve_scripted` runs the scripted authority through `wake_velocity --serve`, the
   game's own room mode.
 Select a group with `-L`, for example `ctest --test-dir build -L core`; CTest adds fixture
 setup tests that a selected test requires, whatever their label.
@@ -116,7 +116,7 @@ validators are boat handling, banking, turn entry, environment, replay, clock, w
 core, fleet, scripted server, network library and validator, water routes and object-wake
 review. Debug symbols and assertions remain enabled; there
 is no fast-math, reduced simulation duration or sampled-down scenario coverage. Because
-validators and applications link one copy of each library, Debug `boat_study` also runs this
+validators and applications link one copy of each library, Debug `wake_velocity` also runs this
 optimized boat code; the GPU library and application sources keep the selected build type. For
 stepping through these validators or library code:
 
@@ -173,10 +173,10 @@ server has already run cannot be used; a fixed 90% ratio failed macOS CI at 0.74
 python3 tools/boat_net_smoke.py --server build/boat_server --bot build/boat_bot
 ```
 
-`boat_host` runs `tools/boat_host_check.py` (about 1 s): `boat_study --serve --exit-with-stdin`
+`boat_host` runs `tools/boat_host_check.py` (about 1 s): `wake_velocity --serve --exit-with-stdin`
 on free ports, one `boat_bot` session, then closing the room's standard input, as the hosting
 game does when it leaves or dies. The room must report it, keep `accepted=1 left=1` and exit 0
-within 2 s. With GPU tests enabled, `boat_study_host_gpu` hosts a windowed river deathmatch with
+within 2 s. With GPU tests enabled, `wake_velocity_host_gpu` hosts a windowed river deathmatch with
 `--host` on port 24779 for 120 frames and requires the room to close after the session.
 
 `boat_net_session` runs `tools/boat_net_session.py` for about 36 s over real ENet/UDP loopback.
@@ -258,7 +258,7 @@ python3 tools/check_core_boundary.py --self-test
 ```
 
 Add a new core source and its header to `PROTEUS_BOAT_CORE_SOURCES` in `CMakeLists.txt`.
-Presentation, GPU, session/replay and the boat_study drive/profile code live in the
+Presentation, GPU, session/replay and the wake_velocity drive/profile code live in the
 `proteus_render`, `proteus_gpu`, `proteus_boat_session` and `proteus_boat_drive` libraries.
 Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_SOURCES` and
 obey the same rules (`boat_net_boundary`); only `src/boat_net_enet.c` may use ENet and sockets.

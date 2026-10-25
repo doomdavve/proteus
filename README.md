@@ -1,7 +1,7 @@
 # Proteus
 
 A small C/raylib playground with deliberately low-resolution output and tracker music.
-Its main program is a boating game, Wake Velocity (`boat_study`), in a basin and on the
+Its main program is a boating game, Wake Velocity (`wake_velocity`), in a basin and on the
 Gothenburg river towards Älvsborgsbron.
 
 [Play Proteus Boating in your browser](https://doomdavve.github.io/proteus/).
@@ -50,7 +50,7 @@ See [Linux setup and verification](docs/LINUX_BUILD.md) for dependencies and bac
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ctest --test-dir build -j 4 --output-on-failure
-./build/boat_study
+./build/wake_velocity
 ```
 
 The normal suite keeps arcade wakes and gameplay checks enabled. Retired physical wake-field
@@ -74,15 +74,15 @@ see [automated releases](docs/RELEASES.md).
 Explore the bundled river with the same boat and controls:
 
 ```sh
-./build/boat_study --location river
-./build/boat_study --location river --gpu --gpu-aa
-./build/boat_study --location basin
-./build/boat_study --renderer cpu --location river --screenshot build/river-boat.png --time 3
+./build/wake_velocity --location river
+./build/wake_velocity --location river --gpu --gpu-aa
+./build/wake_velocity --location basin
+./build/wake_velocity --renderer cpu --location river --screenshot build/river-boat.png --time 3
 ```
 
 The player craft is a simple speedboat with a pointed bow and low swept windscreen.
 Choose a cosmetic livery with `--skin sweden|finland|denmark|norway` (default `sweden`), for example
-`./build/boat_study --skin finland --location river`. Every livery has identical geometry and
+`./build/wake_velocity --skin finland --location river`. Every livery has identical geometry and
 handling. The choice is local; multiplayer skin synchronization remains pending.
 See [player skins](docs/BOAT_SKINS.md) for palette customization and close review commands.
 
@@ -113,7 +113,7 @@ is calm and clear of both boats. See the
 
 ### Title screen
 
-`./build/boat_study` without options (and the packaged macOS app and Windows `launch.bat`)
+`./build/wake_velocity` without options (and the packaged macOS app and Windows `launch.bat`)
 opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT. Up/Down or
 W/S select and Enter/Space or a click activates. SETTINGS holds NAME, BOAT, STEERING and SOUNDTRACK: Enter on
 NAME starts typing (Enter keeps, Esc cancels), Left/Right change BOAT, and Left/Right or Enter
@@ -143,7 +143,7 @@ native clients over UDP (basin by default):
 
 ```sh
 ./build/boat_server                                   # loopback room on UDP port 24680
-./build/boat_study --connect 127.0.0.1:24680 --name me
+./build/wake_velocity --connect 127.0.0.1:24680 --name me
 ./build/boat_bot --connect 127.0.0.1:24680 --seconds 60   # optional scripted second boat
 ```
 
@@ -151,11 +151,11 @@ For a river deathmatch on your LAN, either host it from the game and play in it,
 only the room:
 
 ```sh
-./build/boat_study --host deathmatch --location river --name me   # room + your boat
+./build/wake_velocity --host deathmatch --location river --name me   # room + your boat
 ./build/boat_server --bind 0.0.0.0 --mode deathmatch --location river
 ```
 
-`boat_study --serve` accepts every `boat_server` option, so a package needs only the game.
+`wake_velocity --serve` accepts every `boat_server` option, so a package needs only the game.
 
 Clients join through the title or `--connect HOST:24680` and automatically load the server's
 location, scenery and water. Multiplayer starts are out in the river, about 60 m apart, with
@@ -174,7 +174,7 @@ hosting, NAT traversal, encryption and authentication are not provided. The room
 in: capsizing another boat with your wake or a hit within the last 5 s scores +1, capsizing
 yourself −1, and resetting with `R` right after a hit still counts for the hitter. Capsized boats
 respawn after 3 s (`R` after 1 s). `--round-seconds S` (default 300) sets the round, followed by
-a 10 s intermission. In `boat_study --connect` the top of the screen shows the round clock, your
+a 10 s intermission. In `wake_velocity --connect` the top of the screen shows the round clock, your
 score and place, a kill feed under the player list names who capsized whom, and a capsized boat
 says who did it and when it respawns. Hold Tab for the scoreboard; it also stays up between
 rounds. The server log prints every capsize and each round's result. `boat_bot --hunt` drives
@@ -224,7 +224,7 @@ then START ROOM. The game starts a second copy of itself in the background as th
 (`--serve`), open to the local network on UDP port 24680, and joins it. Allow Wake Velocity
 through the firewall when asked. The Esc menu's CLOSE ROOM ends the room for everyone; it also
 closes if the game quits or crashes. From a terminal, the same is
-`boat_study --host free|deathmatch|race [--location L] [--waves] [--port N]`.
+`wake_velocity --host free|deathmatch|race [--location L] [--waves] [--port N]`.
 
 To run a room without playing in it, double-click `host.bat` on Windows (it runs
 `wake_velocity.exe --serve --bind 0.0.0.0` and passes extra options through) or, on a Mac:
@@ -259,10 +259,10 @@ Running without options performs the headless attachment/spray/horizon checks.
 `./build/validate_boat_banking --straightening` prints the focused recovery measurements;
 `./build/validate_boat_turn_entry --report build/entry.csv` records the engine-led entry.
 The replay validator also writes a physically driven banked S-course under its test directory;
-`./build/boat_study --replay build/replay-tests/banked.run` plays it after CTest
+`./build/wake_velocity --replay build/replay-tests/banked.run` plays it after CTest
 (use the configured replay test directory if different).
 
-Run `./build/boat_study --course` for the first timed S course in the basin. Cross the
+Run `./build/wake_velocity --course` for the first timed S course in the basin. Cross the
 start line northbound to start the clock, pass the two offset buoy gates in order, then cross
 the chequered finish line to freeze the time. Yellow marks the next gate; the small route map
 shows the boat and gate order. Cross between the posts in the course direction; missed gates
@@ -301,10 +301,10 @@ memory. Recording is limited to ten minutes per attempt; longer attempts can sti
 cannot replace your recorded best.
 
 ```sh
-./build/boat_study --course --save-run build/my-run.run
-./build/boat_study --replay build/my-run.run
-./build/boat_study --course --ghost build/my-run.run
-./build/boat_study --renderer cpu --replay build/my-run.run --time 5 --screenshot build/replay.png
+./build/wake_velocity --course --save-run build/my-run.run
+./build/wake_velocity --replay build/my-run.run
+./build/wake_velocity --course --ghost build/my-run.run
+./build/wake_velocity --renderer cpu --replay build/my-run.run --time 5 --screenshot build/replay.png
 ```
 
 `--save-run FILE` exports each completed attempt, including slower runs, to that path.
@@ -374,7 +374,7 @@ repeatable CPU/GPU captures.
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), ODbL 1.0.
 See the bundled [source manifest](assets/geometry/river/manifest.json) for provenance.
 
-Run `./build/boat_study --location basin` for the first handling prototype: a small craft in a simple basin,
+Run `./build/wake_velocity --location basin` for the first handling prototype: a small craft in a simple basin,
 viewed by a third-person camera following behind and above the boat. The basin is 240x160 world
 units (four times wider and deeper than the original). The camera follows position immediately,
 smooths heading changes, and looks ahead along the course. Hold left/right (or A/D) to turn the
@@ -439,7 +439,7 @@ wave-contact swells. Background music plays independently of boat speed. The def
 at 84 BPM without drums. “Acid Wake” adds an original 132 BPM acid techno loop with a
 TB-303-style resonant bass, slides and accents over kick, clap and hats; its 64 bars repeat
 after 116.36 seconds. Choose either track or Off under SETTINGS → SOUNDTRACK, or use
-`./build/boat_study --soundtrack acid-wake` (`a-little-boat` and `off` are also accepted).
+`./build/wake_velocity --soundtrack acid-wake` (`a-little-boat` and `off` are also accepted).
 Music pauses on focus loss or replay pause. Off keeps engine and water sounds enabled.
 The shared overlay's music-analysis readings remain off/zero. See [music notes](docs/MUSIC.md)
 for regeneration and editing.
@@ -456,7 +456,7 @@ to 4..36. Settings last for the current run; reuse a preferred view with command
 which also work for screenshots:
 
 ```sh
-./build/boat_study --camera-distance 24 --camera-height 18
+./build/wake_velocity --camera-distance 24 --camera-height 18
 ```
 
 Steering angles the outboard at the stern. Its off-centre thrust pushes the stern sideways and
@@ -485,10 +485,10 @@ according to sideways slip. Reset clears both effects. The default basin has no 
 Bounded arcade wake objects are the default in basin and river free boating:
 
 ```sh
-./build/boat_study --location river --profiler
-./build/boat_study --demo
-./build/boat_study --no-player-wake
-./build/boat_study --player-wake
+./build/wake_velocity --location river --profiler
+./build/wake_velocity --demo
+./build/wake_velocity --no-player-wake
+./build/wake_velocity --player-wake
 ```
 
 Tall crests travel outward, live for sixteen seconds and add together at crossings.
@@ -507,8 +507,8 @@ slower):
 
 ```sh
 cmake -S . -B build/review -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build/review --target boat_study -j
-./build/review/boat_study --wake-field --profiler
+cmake --build build/review --target wake_velocity -j
+./build/review/wake_velocity --wake-field --profiler
 ```
 
 Drive a straight run, turn back across the trail after 10–30 seconds, then try tight loops,
@@ -526,9 +526,9 @@ The field candidate remains opt-in.
 The default **arcade wake objects** build tall, rideable jump waves:
 
 ```sh
-./build/review/boat_study --wake-objects --profiler
-./build/review/boat_study --wake-objects-crossing --profiler
-./build/review/boat_study --wake-objects --wake-height 1.2 --wake-life-ticks 1440
+./build/review/wake_velocity --wake-objects --profiler
+./build/review/wake_velocity --wake-objects-crossing --profiler
+./build/review/wake_velocity --wake-objects --wake-height 1.2 --wake-life-ticks 1440
 ```
 
 The default crest scale is 1.2 m and pieces live for 1920 ticks (16 seconds). Use
@@ -548,9 +548,9 @@ the continuity revision; occasional waves appearing stuck remain an open issue.
 Currents and the separate scripted crossing wake remain opt-in in **both locations**:
 
 ```sh
-./build/boat_study --current
-./build/boat_study --location river --current --crossing-wake --waves --gpu-aa
-./build/boat_study --no-player-wake --current --crossing-wake --demo
+./build/wake_velocity --current
+./build/wake_velocity --location river --current --crossing-wake --waves --gpu-aa
+./build/wake_velocity --no-player-wake --current --crossing-wake --demo
 ```
 
 `--current` adds an authored smooth channel with drifting surface streaks. Water-relative
@@ -579,8 +579,8 @@ expose gaps beneath the architecture. CPU water uses simple, subdued slope shadi
 For a closer view of the motion:
 
 ```sh
-./build/boat_study --waves --camera-distance 12 --camera-height 6
-./build/boat_study --waves --location river --gpu-aa
+./build/wake_velocity --waves --camera-distance 12 --camera-height 6
+./build/wake_velocity --waves --location river --gpu-aa
 ```
 
 With waves enabled, the six hull supports resist motion into and out of the local water surface.
@@ -601,13 +601,13 @@ The [boating plan](docs/BOATING_PLAN.md) tracks the next steps toward Gothenburg
 For display-free captures of scripted acceleration, planing, and a right turn, or a windowed check:
 
 ```sh
-./build/boat_study --screenshot build/boat-start.png
-./build/boat_study --screenshot build/boat-transition.png --time 1.8
-./build/boat_study --screenshot build/boat-cruise.png --time 2.9
-./build/boat_study --screenshot build/boat-turn.png --time 4
-./build/boat_study --frames 180
-./build/boat_study --demo --frames 720
-./build/boat_study --location river --gpu --gpu-aa --demo
+./build/wake_velocity --screenshot build/boat-start.png
+./build/wake_velocity --screenshot build/boat-transition.png --time 1.8
+./build/wake_velocity --screenshot build/boat-cruise.png --time 2.9
+./build/wake_velocity --screenshot build/boat-turn.png --time 4
+./build/wake_velocity --frames 180
+./build/wake_velocity --demo --frames 720
+./build/wake_velocity --location river --gpu --gpu-aa --demo
 ```
 
 `--demo` previews the same scripted run as screenshots: raise thrust for two seconds, hold it to
@@ -659,7 +659,7 @@ flat cloud banks built from square tiles and a warm sun. The sun direction also 
 and water highlights. CPU and GPU share a fixed world panorama, so the sky follows camera rotation
 naturally; GPU water reflections use the same sky through the mirrored camera.
 
-The `boat_study` profiler (`F3`) keeps a rolling 240-frame history (about four seconds at 60 FPS)
+The `wake_velocity` profiler (`F3`) keeps a rolling 240-frame history (about four seconds at 60 FPS)
 and graphs total frame wall time, scene rendering plus texture upload, and presentation time
 (including any vertical-sync wait). It reports rolling min/average/95th-percentile/max timing,
 display dimensions and framebuffer traffic. Samples and the graph update every frame, while the
@@ -671,7 +671,7 @@ Profiler trace of a windowed scripted drive:
 
 ```sh
 xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
-  --launch -- ./build/boat_study --location river --demo --frames 3600
+  --launch -- ./build/wake_velocity --location river --demo --frames 3600
 ```
 
 ## Music
@@ -687,7 +687,7 @@ clangd, formatting, compilation, navigation, and LLDB debugging.
 
 ## Browser build and GitHub Pages
 
-The [live browser game](https://doomdavve.github.io/proteus/) is the playable `boat_study`
+The [live browser game](https://doomdavve.github.io/proteus/) is the playable `wake_velocity`
 distributed in the native ZIPs. The landing page shows its build version (release tag or
 Git development description). It includes
 River, Basin, and the basin time trial with ghosts/replays and saved bests.

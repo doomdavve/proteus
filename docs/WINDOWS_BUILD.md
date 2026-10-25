@@ -1,6 +1,6 @@
 # Windows Wake Velocity builds
 
-Multiplayer M3 (2026-10-23): `boat_study` now links the pinned ENet library (winsock,
+Multiplayer M3 (2026-10-23): `wake_velocity` now links the pinned ENet library (winsock,
 `ws2_32`/`winmm`) for the diagnostic `--connect` mode, and the package step copies
 `enet-LICENSE.txt`. MSVC first compiled ENet and `src/boat_net_enet.c` on 2026-10-24 (below).
 [M6](MULTIPLAYER_PLAN.md) still owns MSVC
@@ -16,7 +16,7 @@ Host from the game (2026-10-25): the ZIP no longer carries `boat_server.exe`. `w
 --serve` is the room (`host.bat` runs it with `--bind 0.0.0.0`), and the title's HOST A ROOM
 starts it as a hidden child process (`CreateProcess`, `CREATE_NO_WINDOW`) that closes when the
 game's pipe ends. The relocated check runs `wake_velocity.exe --serve --scripted --ticks 240`, and
-CTest adds `boat_study_serve_scripted` and `boat_host`. The Windows process and pipe code has not
+CTest adds `wake_velocity_serve_scripted` and `boat_host`. The Windows process and pipe code has not
 been compiled yet; the next CI run is its first check. See
 [host from the game](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25).
 
@@ -27,9 +27,9 @@ failed compiling `src/boat_net_enet.c`: ENet's headers include `windows.h` after
 `profiler.c` hit on 2026-10-20. `boat_net_enet.c` now defines `WIN32_LEAN_AND_MEAN`, `NOGDI` and
 `NOUSER` before `enet/enet.h`; its clock and sleep use only kernel32. MSVC is unavailable here,
 so the fix was first compiled by CI: [run 40083439355](https://github.com/doomdavve/proteus/actions/runs/40083439355)
-at `29d1afb` passed every step: the build of `boat_study`, `boat_server`, `boat_bot` and the
+at `29d1afb` passed every step: the build of `wake_velocity`, `boat_server`, `boat_bot` and the
 validators, the selected CPU and multiplayer tests (step result only; per-test log lines were not
-read), packaging and the relocated `boat_study`/`boat_server` checks. The HUD/control merge below
+read), packaging and the relocated `wake_velocity`/`boat_server` checks. The HUD/control merge below
 has not yet been through Windows CI. Human Windows play and `host.bat` remain unverified.
 
 The Windows Wake Velocity GitHub Actions workflow builds a Release x64 executable

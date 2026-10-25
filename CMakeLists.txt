@@ -85,17 +85,17 @@ add_library(proteus_boat_session STATIC src/boat_replay.c src/boat_session.c)
 target_link_libraries(proteus_boat_session PUBLIC proteus_render)
 target_compile_options(proteus_boat_session PRIVATE ${PROTEUS_WARNINGS})
 
-# Shared boat_study drive, state hashing and profile records for the study, benchmark and
+# Shared wake_velocity drive, state hashing and profile records for the study, benchmark and
 # validators; executable-specific audio, music and asset paths stay with their consumers.
 add_library(proteus_boat_drive STATIC
-  tools/boat_study_drive.c tools/boat_study_state.c src/boat_profile.c)
+  tools/wake_velocity_drive.c tools/wake_velocity_state.c src/boat_profile.c)
 target_link_libraries(proteus_boat_drive PUBLIC proteus_boat_session)
 target_compile_options(proteus_boat_drive PRIVATE ${PROTEUS_WARNINGS})
 
-add_executable(boat_study tools/boat_study.c tools/boat_study_menu.c tools/boat_title.c src/profiler.c
+add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/boat_title.c src/profiler.c
   src/boat_audio.c src/xm_audio.c)
-target_link_libraries(boat_study PRIVATE proteus_boat_drive proteus_gpu)
-target_compile_options(boat_study PRIVATE ${PROTEUS_WARNINGS})
+target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu)
+target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
 
 # Race R0: measured shortened river route, source contracts, captures and playable trial.
 add_executable(boat_race_trial tools/boat_race_trial.c tools/boat_vessel_wake_gpu.c)
@@ -160,11 +160,11 @@ if(NOT EMSCRIPTEN)
   add_library(proteus_boat_net_enet STATIC src/boat_net_enet.c src/boat_net_enet.h)
   target_link_libraries(proteus_boat_net_enet PUBLIC proteus_boat_net PRIVATE proteus_enet)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
-  target_link_libraries(boat_study PRIVATE proteus_boat_net_enet)
-  target_compile_definitions(boat_study PRIVATE PROTEUS_BOAT_NET=1)
+  target_link_libraries(wake_velocity PRIVATE proteus_boat_net_enet)
+  target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
   # The game hosts a room by running itself as `--serve`, boat_server's command line.
-  target_sources(boat_study PRIVATE tools/boat_study_net.c tools/boat_study_net.h
-    tools/boat_study_host.c tools/boat_study_host.h tools/boat_server.c tools/boat_server.h)
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_net.c tools/wake_velocity_net.h
+    tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h)
 endif()
 
 if(EMSCRIPTEN)
@@ -175,7 +175,7 @@ endif()
 add_custom_target(proteus_assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_CURRENT_SOURCE_DIR}/assets
-          $<TARGET_FILE_DIR:boat_study>/assets
+          $<TARGET_FILE_DIR:wake_velocity>/assets
 )
 
 add_executable(gpu_fixture tools/gpu_fixture.c)
@@ -248,7 +248,7 @@ endif()
 add_test(NAME wake_candidate_backend_queries COMMAND wake_candidate_review)
 add_test(NAME wake_candidate_moving_source COMMAND wake_candidate_review --source)
 set_tests_properties(wake_candidate_moving_source PROPERTIES TIMEOUT 600)
-# Isolated desktop GL 3.3 experiment. It is deliberately not linked into boat_study.
+# Isolated desktop GL 3.3 experiment. It is deliberately not linked into wake_velocity.
 add_executable(wake_gpu_runtime_review tools/wake_gpu_runtime_review.c)
 target_link_libraries(wake_gpu_runtime_review PRIVATE proteus_boat_core)
 target_compile_options(wake_gpu_runtime_review PRIVATE
@@ -269,7 +269,7 @@ target_compile_options(validate_boat_audio PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME boat_audio_is_valid COMMAND validate_boat_audio)
 
-add_dependencies(boat_study proteus_assets)
+add_dependencies(wake_velocity proteus_assets)
 add_dependencies(boat_race_trial proteus_assets)
 add_test(NAME boat_race_trial COMMAND boat_race_trial --check)
 set_tests_properties(boat_race_trial PROPERTIES
@@ -335,9 +335,9 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(wake_objects_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 120)
 endif()
-add_test(NAME wake_objects_course_rejected COMMAND boat_study --wake-objects --course)
-add_test(NAME wake_objects_mixed_rejected COMMAND boat_study --wake-objects --wake-field)
-add_test(NAME wake_objects_lifetime_rejected COMMAND boat_study --wake-objects --wake-life-ticks 1921)
+add_test(NAME wake_objects_course_rejected COMMAND wake_velocity --wake-objects --course)
+add_test(NAME wake_objects_mixed_rejected COMMAND wake_velocity --wake-objects --wake-field)
+add_test(NAME wake_objects_lifetime_rejected COMMAND wake_velocity --wake-objects --wake-life-ticks 1921)
 set_tests_properties(wake_objects_course_rejected wake_objects_mixed_rejected
   wake_objects_lifetime_rejected PROPERTIES WILL_FAIL TRUE)
 add_test(NAME wake_candidate_boat COMMAND wake_play_review)
@@ -349,9 +349,9 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(wake_candidate_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 180)
 endif()
-add_test(NAME wake_candidate_course_rejected COMMAND boat_study --wake-field --course)
-add_test(NAME wake_candidate_map_rejected COMMAND boat_study --wake-field --location river)
-add_test(NAME wake_candidate_current_rejected COMMAND boat_study --wake-field --current)
+add_test(NAME wake_candidate_course_rejected COMMAND wake_velocity --wake-field --course)
+add_test(NAME wake_candidate_map_rejected COMMAND wake_velocity --wake-field --location river)
+add_test(NAME wake_candidate_current_rejected COMMAND wake_velocity --wake-field --current)
 set_tests_properties(wake_candidate_course_rejected wake_candidate_map_rejected
   wake_candidate_current_rejected PROPERTIES WILL_FAIL TRUE)
 add_executable(validate_boat tools/validate_boat.c)
@@ -453,35 +453,35 @@ add_test(NAME boat_server_bind_rejected COMMAND boat_server --bind not-an-addres
 add_test(NAME boat_bot_endpoint_rejected COMMAND boat_bot --connect 127.0.0.1)
 add_test(NAME boat_bot_discover_join_rejected
   COMMAND boat_bot --discover --connect 127.0.0.1:24680)
-add_test(NAME boat_net_study_mode_rejected COMMAND boat_study --connect 127.0.0.1:24680 --waves)
-add_test(NAME boat_net_study_name_rejected COMMAND boat_study --name lonely)
+add_test(NAME boat_net_study_mode_rejected COMMAND wake_velocity --connect 127.0.0.1:24680 --waves)
+add_test(NAME boat_net_study_name_rejected COMMAND wake_velocity --name lonely)
 add_test(NAME boat_net_study_skin_rejected
-  COMMAND boat_study --connect 127.0.0.1:24680 --skin norway)
-# Hosting from the game: boat_study --serve is the room, --host starts it as a child and joins.
-add_test(NAME boat_study_serve_scripted COMMAND boat_study --serve --scripted --ticks 240)
-set_tests_properties(boat_study_serve_scripted PROPERTIES
+  COMMAND wake_velocity --connect 127.0.0.1:24680 --skin norway)
+# Hosting from the game: wake_velocity --serve is the room, --host starts it as a child and joins.
+add_test(NAME wake_velocity_serve_scripted COMMAND wake_velocity --serve --scripted --ticks 240)
+set_tests_properties(wake_velocity_serve_scripted PROPERTIES
   PASS_REGULAR_EXPRESSION "boat_server scripted: boats=4 ticks=240")
-add_test(NAME boat_study_host_race_location_rejected
-  COMMAND boat_study --host race --location basin)
-add_test(NAME boat_study_host_connect_rejected
-  COMMAND boat_study --host free --connect 127.0.0.1:24680)
-add_test(NAME boat_study_port_without_host_rejected COMMAND boat_study --port 24680)
+add_test(NAME wake_velocity_host_race_location_rejected
+  COMMAND wake_velocity --host race --location basin)
+add_test(NAME wake_velocity_host_connect_rejected
+  COMMAND wake_velocity --host free --connect 127.0.0.1:24680)
+add_test(NAME wake_velocity_port_without_host_rejected COMMAND wake_velocity --port 24680)
 add_test(NAME boat_host COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_host_check.py --study $<TARGET_FILE:boat_study>
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_host_check.py --study $<TARGET_FILE:wake_velocity>
   --bot $<TARGET_FILE:boat_bot>)
 set_tests_properties(boat_host PROPERTIES PASS_REGULAR_EXPRESSION "boat_host=ok" TIMEOUT 30)
 if(PROTEUS_GPU_TESTS)
   # A windowed host session on a private port: start the room, join it, leave, close it.
-  add_test(NAME boat_study_host_gpu
-    COMMAND boat_study --host deathmatch --location river --port 24779 --frames 120)
-  set_tests_properties(boat_study_host_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 60
+  add_test(NAME wake_velocity_host_gpu
+    COMMAND wake_velocity --host deathmatch --location river --port 24779 --frames 120)
+  set_tests_properties(wake_velocity_host_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 60
     PASS_REGULAR_EXPRESSION "standard input closed; closing the room")
 endif()
 set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_rejected
   boat_server_bind_rejected boat_server_round_without_deathmatch_rejected boat_bot_endpoint_rejected
   boat_bot_discover_join_rejected boat_net_study_mode_rejected
-  boat_net_study_name_rejected boat_net_study_skin_rejected boat_study_host_race_location_rejected
-  boat_study_host_connect_rejected boat_study_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
+  boat_net_study_name_rejected boat_net_study_skin_rejected wake_velocity_host_race_location_rejected
+  wake_velocity_host_connect_rejected wake_velocity_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
 add_test(NAME boat_net COMMAND validate_boat_net)
 set_tests_properties(boat_net PROPERTIES PASS_REGULAR_EXPRESSION "boat_net=ok")
 add_test(NAME boat_net_loopback COMMAND ${Python3_EXECUTABLE}
@@ -537,24 +537,24 @@ set_tests_properties(boat_flag_cpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_
 add_test(NAME boat_profile_records COMMAND validate_boat_profile)
 add_test(NAME boat_environment COMMAND validate_boat_environment)
 add_test(NAME boat_world_isolation COMMAND validate_boat_world)
-add_test(NAME boat_player_wake_screenshot COMMAND boat_study --renderer cpu --player-wake --time 9
+add_test(NAME boat_player_wake_screenshot COMMAND wake_velocity --renderer cpu --player-wake --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake.png)
-add_test(NAME boat_player_wake_course_rejected COMMAND boat_study --player-wake --course)
+add_test(NAME boat_player_wake_course_rejected COMMAND wake_velocity --player-wake --course)
 set_tests_properties(boat_player_wake_course_rejected PROPERTIES WILL_FAIL TRUE)
-add_test(NAME boat_current_screenshot COMMAND boat_study --renderer cpu --current --time 5
+add_test(NAME boat_current_screenshot COMMAND wake_velocity --renderer cpu --current --time 5
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-current.png)
-add_test(NAME boat_crossing_wake_screenshot COMMAND boat_study --renderer cpu --crossing-wake --time 9
+add_test(NAME boat_crossing_wake_screenshot COMMAND wake_velocity --renderer cpu --crossing-wake --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-crossing-wake.png)
-add_test(NAME boat_environment_screenshot COMMAND boat_study --renderer cpu --current --crossing-wake
+add_test(NAME boat_environment_screenshot COMMAND wake_velocity --renderer cpu --current --crossing-wake
   --waves --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-environment.png)
-add_test(NAME boat_environment_course_rejected COMMAND boat_study --current --course)
-add_test(NAME boat_environment_river_screenshot COMMAND boat_study --renderer cpu
+add_test(NAME boat_environment_course_rejected COMMAND wake_velocity --current --course)
+add_test(NAME boat_environment_river_screenshot COMMAND wake_velocity --renderer cpu
   --location river --current --crossing-wake --time 3
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-river-environment.png)
 set_tests_properties(boat_environment_course_rejected PROPERTIES WILL_FAIL TRUE)
-add_test(NAME boat_default_player_wake_screenshot COMMAND boat_study --renderer cpu --time 9
+add_test(NAME boat_default_player_wake_screenshot COMMAND wake_velocity --renderer cpu --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-default-player-wake.png)
-add_test(NAME boat_object_wake_screenshot COMMAND boat_study --renderer cpu --wake-objects --time 9
+add_test(NAME boat_object_wake_screenshot COMMAND wake_velocity --renderer cpu --wake-objects --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-object-wake.png)
 set_tests_properties(boat_object_wake_screenshot PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(boat_default_player_wake_screenshot boat_object_wake_screenshot
@@ -568,36 +568,36 @@ add_test(NAME boat_river_wave_route COMMAND boat_water_review --check --waves)
 set(BOAT_REPLAY_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/replay-tests")
 add_test(NAME boat_replay COMMAND validate_boat_replay ${BOAT_REPLAY_TEST_DIR})
 set_tests_properties(boat_replay PROPERTIES FIXTURES_SETUP boat_recording)
-add_test(NAME boat_replay_screenshot COMMAND boat_study --renderer cpu
+add_test(NAME boat_replay_screenshot COMMAND wake_velocity --renderer cpu
   --replay ${BOAT_REPLAY_TEST_DIR}/replay-fixture.run --time 5
   --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-replay.png)
-add_test(NAME boat_ghost_screenshot COMMAND boat_study --renderer cpu
+add_test(NAME boat_ghost_screenshot COMMAND wake_velocity --renderer cpu
   --ghost ${BOAT_REPLAY_TEST_DIR}/replay-fixture.run --time 0
   --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-ghost.png)
-add_test(NAME boat_saved_best_screenshot COMMAND boat_study --renderer cpu --course --time 0
+add_test(NAME boat_saved_best_screenshot COMMAND wake_velocity --renderer cpu --course --time 0
   --data-dir ${BOAT_REPLAY_TEST_DIR}
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-saved-best.png)
-add_test(NAME boat_ghost_wrong_water COMMAND boat_study --renderer cpu --waves
+add_test(NAME boat_ghost_wrong_water COMMAND wake_velocity --renderer cpu --waves
   --ghost ${BOAT_REPLAY_TEST_DIR}/replay-fixture.run --time 0
   --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-ghost-invalid.png)
 set_tests_properties(boat_ghost_wrong_water PROPERTIES WILL_FAIL TRUE)
 set_tests_properties(boat_replay_screenshot boat_ghost_screenshot boat_saved_best_screenshot boat_ghost_wrong_water
   PROPERTIES FIXTURES_REQUIRED boat_recording)
-add_test(NAME boat_course_screenshot COMMAND boat_study --renderer cpu --course --time 0
+add_test(NAME boat_course_screenshot COMMAND wake_velocity --renderer cpu --course --time 0
   --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-course.png)
-add_test(NAME boat_wave_screenshot COMMAND boat_study --renderer cpu --waves --time 1.8
+add_test(NAME boat_wave_screenshot COMMAND wake_velocity --renderer cpu --waves --time 1.8
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-wave.png)
-add_test(NAME boat_screenshot COMMAND boat_study --renderer cpu --time 3
+add_test(NAME boat_screenshot COMMAND wake_velocity --renderer cpu --time 3
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-screenshot.png)
-add_test(NAME boat_cpu_aa_option COMMAND boat_study --renderer cpu --gpu-aa --time 0
+add_test(NAME boat_cpu_aa_option COMMAND wake_velocity --renderer cpu --gpu-aa --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option.png)
-add_test(NAME boat_cpu_aa_option_reversed COMMAND boat_study --gpu-aa --renderer cpu --time 0
+add_test(NAME boat_cpu_aa_option_reversed COMMAND wake_velocity --gpu-aa --renderer cpu --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option-reversed.png)
-add_test(NAME boat_river_screenshot COMMAND boat_study --renderer cpu --location river --time 0
+add_test(NAME boat_river_screenshot COMMAND wake_velocity --renderer cpu --location river --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-river.png)
 
 add_executable(dance_study tools/dance_study.c src/dance.c src/choreography.c src/xm_audio.c)
@@ -682,13 +682,13 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME harbor_gpu_screenshot COMMAND harbor_review --renderer gpu --view marina
     --waves --time 2 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/harbor-marina-gpu.png)
   set_tests_properties(harbor_gpu_screenshot PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
-  add_test(NAME boat_player_wake_gpu_screenshot COMMAND boat_study --player-wake --time 9
+  add_test(NAME boat_player_wake_gpu_screenshot COMMAND wake_velocity --player-wake --time 9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake-gpu.png)
-  add_test(NAME boat_player_wake_gpu_aa_screenshot COMMAND boat_study --player-wake --current --waves
+  add_test(NAME boat_player_wake_gpu_aa_screenshot COMMAND wake_velocity --player-wake --current --waves
     --gpu-aa --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake-gpu-aa.png)
   set_tests_properties(boat_player_wake_gpu_screenshot boat_player_wake_gpu_aa_screenshot
     PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
-  add_test(NAME boat_environment_gpu_screenshot COMMAND boat_study --current --crossing-wake
+  add_test(NAME boat_environment_gpu_screenshot COMMAND wake_velocity --current --crossing-wake
     --waves --gpu-aa --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-environment-gpu.png)
   set_tests_properties(boat_environment_gpu_screenshot PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME boat_environment_gpu COMMAND validate_boat_environment --gpu)
@@ -702,31 +702,31 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(boat_banking_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME gpu_water_surface COMMAND boat_water_review --check-gpu)
   set_tests_properties(gpu_water_surface PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
-  add_test(NAME boat_ghost_gpu_screenshot COMMAND boat_study --gpu-aa
+  add_test(NAME boat_ghost_gpu_screenshot COMMAND wake_velocity --gpu-aa
     --ghost ${BOAT_REPLAY_TEST_DIR}/replay-fixture.run --time 0
     --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-ghost-gpu.png)
-  add_test(NAME boat_replay_gpu_screenshot COMMAND boat_study --gpu-aa
+  add_test(NAME boat_replay_gpu_screenshot COMMAND wake_velocity --gpu-aa
     --replay ${BOAT_REPLAY_TEST_DIR}/replay-fixture.run --time 5
     --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-replay-gpu.png)
   set_tests_properties(boat_ghost_gpu_screenshot boat_replay_gpu_screenshot
     PROPERTIES FIXTURES_REQUIRED boat_recording LABELS "gpu" RUN_SERIAL TRUE)
-  add_test(NAME boat_gpu_screenshot COMMAND boat_study --location river --gpu --time 3
+  add_test(NAME boat_gpu_screenshot COMMAND wake_velocity --location river --gpu --time 3
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-gpu.png)
-  add_test(NAME boat_gpu_aa_screenshot COMMAND boat_study --location river --gpu --gpu-aa --time 3
+  add_test(NAME boat_gpu_aa_screenshot COMMAND wake_velocity --location river --gpu --gpu-aa --time 3
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-gpu-aa.png)
-  add_test(NAME boat_wave_gpu_screenshot COMMAND boat_study --location river --gpu-aa --waves
+  add_test(NAME boat_wave_gpu_screenshot COMMAND wake_velocity --location river --gpu-aa --waves
     --camera-distance 12 --camera-height 6 --time 2.9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-wave-gpu.png)
-  add_test(NAME boat_basin_gpu_screenshot COMMAND boat_study --time 0
+  add_test(NAME boat_basin_gpu_screenshot COMMAND wake_velocity --time 0
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-basin-gpu.png)
-  add_test(NAME boat_basin_gpu_aa_screenshot COMMAND boat_study --gpu-aa --time 0
+  add_test(NAME boat_basin_gpu_aa_screenshot COMMAND wake_velocity --gpu-aa --time 0
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-basin-gpu-aa.png)
-  add_test(NAME boat_course_gpu_screenshot COMMAND boat_study --course --gpu-aa --time 0
+  add_test(NAME boat_course_gpu_screenshot COMMAND wake_velocity --course --gpu-aa --time 0
     --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-course-gpu.png)
-  add_test(NAME boat_basin_wave_gpu_screenshot COMMAND boat_study --waves --gpu-aa --time 1.8
+  add_test(NAME boat_basin_wave_gpu_screenshot COMMAND wake_velocity --waves --gpu-aa --time 1.8
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-basin-wave-gpu.png)
   set_tests_properties(boat_basin_wave_gpu_screenshot PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   set_tests_properties(boat_basin_gpu_screenshot boat_basin_gpu_aa_screenshot boat_course_gpu_screenshot
@@ -786,7 +786,7 @@ endforeach()
 # Long deterministic physics runs need optimization even in the development build.
 # This does not define NDEBUG or enable fast-math; all assertions/scenarios remain.
 # The shared boating libraries are compiled once for validators and applications alike, so
-# Debug boat_study also runs optimized boat code. Turn this off for instruction-by-instruction
+# Debug wake_velocity also runs optimized boat code. Turn this off for instruction-by-instruction
 # debugging of these executables and libraries.
 if(PROTEUS_OPTIMIZE_TESTS)
   foreach(target proteus_boat_core proteus_render proteus_boat_session proteus_boat_drive
