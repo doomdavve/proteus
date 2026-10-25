@@ -146,17 +146,23 @@ int main(int argc, char **argv)
     Color *pixels = NULL;
     Renderer3D cpu = { 0 };
     BoatWaterMeshCache water_mesh = { 0 };
+    WaterfrontScenery scenery = { 0 };
     WaterfrontGpuScene scene = { 0 };
     RenderTexture2D target = { 0 }, resolved = { 0 };
     Shader downsample = { 0 };
     Texture2D texture = { 0 };
     Mesh near = { 0 };
     BoatWater water = waves ? boat_water_gentle() : (BoatWater) { 0 };
+    if (!waterfront_scenery_init(&scenery, &waterfront_city_river_map)) {
+        result = 1;
+        goto cleanup;
+    }
     if (gpu) {
         char path[1024];
         int n = snprintf(
             path, sizeof(path), "%sassets/shaders/waterfront_city.fs", GetApplicationDirectory());
-        if (n < 0 || (size_t)n >= sizeof(path) || !waterfront_gpu_scene_init(&scene, path)) {
+        if (n < 0 || (size_t)n >= sizeof(path) || !waterfront_gpu_scene_init(&scene, path)
+            || !waterfront_gpu_scene_bind(&scene, &scenery)) {
             result = 1;
             goto cleanup;
         }
@@ -225,7 +231,8 @@ int main(int argc, char **argv)
             EndShaderMode();
             EndTextureMode();
         } else {
-            if (!waterfront_draw_boating(&cpu, pixels, 320, height, frame.camera, waves)) {
+            if (!waterfront_draw_boating(
+                    &cpu, &scenery, pixels, 320, height, frame.camera, waves)) {
                 result = 1;
                 break;
             }
@@ -297,6 +304,7 @@ cleanup:
     renderer3d_destroy(&cpu);
     free(pixels);
     boat_water_mesh_cache_destroy(&water_mesh);
+    waterfront_scenery_destroy(&scenery);
     if (window)
         CloseWindow();
     return result;

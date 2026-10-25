@@ -85,13 +85,13 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
         r, (Transform3D) { .position = position, .scale = scale }, &material);
 }
 
-static void windows(Renderer3D *r)
+static void windows(Renderer3D *r, const BoatMapDescription *map)
 {
     // Each imported wall starts with a triangle a,c,b (two ground vertices).
     // Derive inset windows from that edge, preserving arbitrary facade orientation.
-    const Mesh3D *city = waterfront_city_mesh();
+    const Mesh3D *city = map->mesh;
     for (size_t i = 0; i < city->triangle_count; ++i) {
-        if (waterfront_city_is_bridge_triangle(i))
+        if (boat_map_is_bridge_triangle(map, i))
             continue;
         const Triangle3D *t = &city->triangles[i];
         Vector3 a = city->vertices[t->vertices[0]];
@@ -124,10 +124,10 @@ static void windows(Renderer3D *r)
     }
 }
 
-static void waterline_details(Renderer3D *r)
+static void waterline_details(Renderer3D *r, const WaterfrontScenery *scenery)
 {
-    size_t count;
-    const WaterfrontCornerBox *boxes = waterfront_corner_boxes(&count);
+    size_t count = scenery->count;
+    const WaterfrontCornerBox *boxes = scenery->boxes;
     const unsigned int faces[][3]
         = { { 0, 2, 1 }, { 0, 3, 2 }, { 5, 7, 4 }, { 5, 6, 7 }, { 4, 3, 0 }, { 4, 7, 3 },
               { 1, 6, 5 }, { 1, 2, 6 }, { 3, 6, 2 }, { 3, 7, 6 }, { 4, 1, 5 }, { 4, 0, 1 } };
@@ -174,13 +174,15 @@ void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
         renderer3d_draw_box(r, frame->lines[i], (Color) { 169, 153, 113, 255 });
 }
 
-bool waterfront_draw_boating(
-    Renderer3D *r, Color *pixels, int width, int height, View3D camera, bool omit_water)
+bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Color *pixels,
+    int width, int height, View3D camera, bool omit_water)
 {
+    if (!scenery->ready || !scenery->map)
+        return false;
     waterfront_sky_draw(pixels, width, height, camera);
     if (!renderer3d_begin(r, pixels, width, height, camera, waterfront_sun_direction()))
         return false;
-    Mesh3D city = *waterfront_city_mesh();
+    Mesh3D city = *scenery->map->mesh;
     if (omit_water) {
         while (city.triangle_count) {
             const Triangle3D *t = city.triangles;
@@ -192,11 +194,14 @@ bool waterfront_draw_boating(
         }
     }
     renderer3d_draw_mesh(r, &city, (Transform3D) { .scale = { 1, 1, 1 } });
-    WaterfrontSceneFrame frame;
-    waterfront_scene_evaluate(0, (BoatWater) { 0 }, &frame);
-    renderer3d_draw_box(r, frame.bridge, frame.bridge_color);
-    waterline_details(r);
-    windows(r);
-    crane(r);
+    if (scenery->river) {
+        WaterfrontSceneFrame frame;
+        waterfront_scene_evaluate(0, (BoatWater) { 0 }, &frame);
+        renderer3d_draw_box(r, frame.bridge, frame.bridge_color);
+    }
+    waterline_details(r, scenery);
+    windows(r, scenery->map);
+    if (scenery->river)
+        crane(r);
     return true;
 }

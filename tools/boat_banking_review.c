@@ -99,8 +99,8 @@ static int pose_check(const BoatSession *session)
     return 0;
 }
 
-static int capture(BoatGpu *gpu, Renderer3D *cpu, BoatWaterMeshCache *cpu_water,
-    const BoatSession *session, bool use_gpu, BoatCamera camera, const char *path, bool ghost)
+static int capture(BoatGpu *gpu, Renderer3D *cpu, BoatCpuView *cpu_view, const BoatSession *session,
+    bool use_gpu, BoatCamera camera, const char *path, bool ghost)
 {
     const Boat *b = &session->boat;
     Color pixels[320 * 200];
@@ -123,7 +123,7 @@ static int capture(BoatGpu *gpu, Renderer3D *cpu, BoatWaterMeshCache *cpu_water,
         ImageFlipVertical(&image);
         ImageFlipHorizontal(&image);
     } else {
-        CHECK(boat_draw_with_ghost(cpu, cpu_water, pixels, 320, 200, &view, &session->presentation,
+        CHECK(boat_draw_with_ghost(cpu, cpu_view, pixels, 320, 200, &view, &session->presentation,
             &session->world, camera, ghost ? &opponent : NULL, &cloth, .6f));
         image = (Image) { pixels, 320, 200, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
     }
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
         CHECK(DirectoryExists(output) || MakeDirectory(output) == 0);
     BoatGpu gpu = { 0 };
     Renderer3D cpu = { 0 };
-    BoatWaterMeshCache cpu_water = { 0 };
+    BoatCpuView cpu_view = { 0 };
     if (gpu_enabled) {
         SetConfigFlags(FLAG_WINDOW_HIDDEN);
         InitWindow(320, 200, "Banking presentation review");
@@ -209,11 +209,11 @@ int main(int argc, char **argv)
                                           : "side")
                     < (int)sizeof(path));
                 CHECK(
-                    capture(&gpu, &cpu, &cpu_water, &shown, gpu_enabled, camera, path, false) == 0);
+                    capture(&gpu, &cpu, &cpu_view, &shown, gpu_enabled, camera, path, false) == 0);
                 if (fixture == 2 && view == 1) {
                     CHECK(snprintf(path, sizeof(path), "%s/banked-ghost.png", output)
                         < (int)sizeof(path));
-                    CHECK(capture(&gpu, &cpu, &cpu_water, &shown, gpu_enabled, camera, path, true)
+                    CHECK(capture(&gpu, &cpu, &cpu_view, &shown, gpu_enabled, camera, path, true)
                         == 0);
                 }
             }
@@ -264,7 +264,7 @@ int main(int argc, char **argv)
                           tick * 1000 / 120, view ? "side" : "default")
                     < (int)sizeof(path));
                 CHECK(
-                    capture(&gpu, &cpu, &cpu_water, &shown, gpu_enabled, camera, path, false) == 0);
+                    capture(&gpu, &cpu, &cpu_view, &shown, gpu_enabled, camera, path, false) == 0);
             }
         if (tick < 240)
             boat_turn_entry_step(&entry, tick, 1);
@@ -287,11 +287,11 @@ int main(int argc, char **argv)
                     < (int)sizeof(path));
                 BoatCamera camera
                     = view ? (BoatCamera) { .distance = 8, .height = 4 } : BOAT_CAMERA_DEFAULT;
-                CHECK(capture(&gpu, &cpu, &cpu_water, &b, gpu_enabled, camera, path, false) == 0);
+                CHECK(capture(&gpu, &cpu, &cpu_view, &b, gpu_enabled, camera, path, false) == 0);
             }
         }
     }
-    boat_water_mesh_cache_destroy(&cpu_water);
+    boat_cpu_view_destroy(&cpu_view);
     renderer3d_destroy(&cpu);
     if (gpu_enabled) {
         boat_gpu_destroy(&gpu);

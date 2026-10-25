@@ -31,6 +31,9 @@ A1.3 moved the water-mesh caches into view-owned `BoatWaterMeshCache`s bound to 
 description. Each holds one map at a time and rebinds on a location change, rather than
 W2's one cache per definition; see the
 [A1.3 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a13-result-2026-10-25).
+A1.4 gave each CPU/GPU view its own `WaterfrontScenery` (map-derived dressing) and bound
+both renderers to it explicitly; see the
+[A1.4 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a14-result-2026-10-25).
 The original geometry/timing comparisons remain historical evidence, not current commands.
 The [Sol first-steps handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) details the mapped A1
 execution slices. Its resource contract adapts original W3 item 1: an explicit external owner

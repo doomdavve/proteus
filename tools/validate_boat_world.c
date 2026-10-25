@@ -4,6 +4,7 @@
  * map/cache lifecycle checks. */
 #include "boat_map.h"
 #include "wake_velocity_state.h"
+#include "boat_test_maps.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
 #include "raymath.h"
@@ -135,17 +136,17 @@ static int views(void)
     before = session;
     static WaterfrontSceneFrame frame;
     Renderer3D renderer = { 0 };
-    BoatWaterMeshCache water_mesh = { 0 };
+    BoatCpuView cpu_view = { 0 };
     Color *pixels = malloc(320 * 200 * sizeof(*pixels));
     Color *again = malloc(320 * 200 * sizeof(*again));
     CHECK(pixels && again);
     boat_scene_frame(
         SESSION_VIEW(&session), &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
-    CHECK(boat_draw(&renderer, &water_mesh, pixels, 320, 200, SESSION_VIEW(&session),
+    CHECK(boat_draw(&renderer, &cpu_view, pixels, 320, 200, SESSION_VIEW(&session),
         &session.presentation, &session.world, BOAT_CAMERA_DEFAULT));
     boat_scene_frame(
         SESSION_VIEW(&session), &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
-    CHECK(boat_draw(&renderer, &water_mesh, again, 320, 200, SESSION_VIEW(&session),
+    CHECK(boat_draw(&renderer, &cpu_view, again, 320, 200, SESSION_VIEW(&session),
         &session.presentation, &session.world, BOAT_CAMERA_DEFAULT));
     CHECK(same(&session, &before));
     CHECK(memcmp(pixels, again, 320 * 200 * sizeof(*pixels)) == 0);
@@ -156,7 +157,7 @@ static int views(void)
     CHECK(memcmp(&session.world.water, &before.world.water, sizeof(session.world.water)) == 0);
     CHECK(Vector2Equals(session.boat.position, session.world.definition->spawn));
     CHECK(memcmp(&session.presentation, &rest, sizeof(rest)) == 0);
-    boat_water_mesh_cache_destroy(&water_mesh);
+    boat_cpu_view_destroy(&cpu_view);
     renderer3d_destroy(&renderer);
     free(pixels);
     free(again);
@@ -251,7 +252,7 @@ static int render_rates(void)
     for (int tick = 0; tick < TICKS; ++tick)
         drive(&reference, tick);
     Renderer3D renderer = { 0 };
-    BoatWaterMeshCache water_mesh = { 0 };
+    BoatCpuView cpu_view = { 0 };
     Color *pixels = malloc(320 * 200 * sizeof(*pixels));
     CHECK(pixels);
     const int rates[] = { 30, 60, 144 };
@@ -268,15 +269,72 @@ static int render_rates(void)
             boat_scene_frame(SESSION_VIEW(&shown), &shown.presentation, &shown.world,
                 BOAT_CAMERA_DEFAULT, &frame);
             if (frames++ % rates[r] == 0)
-                CHECK(boat_draw(&renderer, &water_mesh, pixels, 320, 200, SESSION_VIEW(&shown),
+                CHECK(boat_draw(&renderer, &cpu_view, pixels, 320, 200, SESSION_VIEW(&shown),
                     &shown.presentation, &shown.world, BOAT_CAMERA_DEFAULT));
         }
         CHECK(same(&shown, &reference));
         printf("render_rate=%dHz frames=%d ok\n", rates[r], frames);
     }
-    boat_water_mesh_cache_destroy(&water_mesh);
+    boat_cpu_view_destroy(&cpu_view);
     renderer3d_destroy(&renderer);
     free(pixels);
+    return 0;
+}
+
+// A1.4: each CPU view binds its own scenery to the map it draws. Two river views and a view of
+// the synthetic harbor draw interleaved; destroying one leaves the others' frames unchanged.
+static int view_binding(void)
+{
+    const BoatWorldDefinition definition
+        = test_harbor_definition(boat_location(BOAT_LOCATION_RIVER));
+    BoatWorldResources harbor;
+    CHECK(boat_world_resources_init(&harbor, &definition));
+    BoatSession river, other;
+    boat_session_init(&river, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    boat_session_init(&other, &harbor, (BoatWater) { 0 });
+    Renderer3D ra = { 0 }, rb = { 0 }, rc = { 0 };
+    BoatCpuView a = { 0 }, b = { 0 }, c = { 0 };
+    size_t size = 320 * 200 * sizeof(Color);
+    Color *first = malloc(size), *pixels = malloc(size), *harbor_pixels = malloc(size);
+    CHECK(first && pixels && harbor_pixels);
+    BoatCamera camera = BOAT_CAMERA_DEFAULT;
+    CHECK(boat_draw(
+        &ra, &a, first, 320, 200, SESSION_VIEW(&river), &river.presentation, &river.world, camera));
+    CHECK(a.scenery.map == &waterfront_city_river_map && a.scenery.river);
+    CHECK(boat_draw(&rc, &c, harbor_pixels, 320, 200, SESSION_VIEW(&other), &other.presentation,
+        &other.world, camera));
+    CHECK(c.scenery.map == &test_harbor_map && !c.scenery.river);
+    CHECK(c.scenery.count > 0 && c.scenery.count < a.scenery.count);
+    CHECK(memcmp(first, harbor_pixels, size) != 0);
+    CHECK(boat_draw(&rb, &b, pixels, 320, 200, SESSION_VIEW(&river), &river.presentation,
+        &river.world, camera));
+    CHECK(memcmp(first, pixels, size) == 0 && b.scenery.boxes != a.scenery.boxes);
+    boat_cpu_view_destroy(&b);
+    boat_cpu_view_destroy(&b);
+    CHECK(!b.scenery.ready && !b.scenery.boxes);
+    CHECK(boat_draw(&ra, &a, pixels, 320, 200, SESSION_VIEW(&river), &river.presentation,
+        &river.world, camera));
+    CHECK(memcmp(first, pixels, size) == 0);
+    // The harbor view rebinds to the river and back, reproducing both frames.
+    CHECK(boat_draw(&rc, &c, pixels, 320, 200, SESSION_VIEW(&river), &river.presentation,
+        &river.world, camera));
+    CHECK(memcmp(first, pixels, size) == 0 && c.scenery.river);
+    CHECK(boat_draw(&rc, &c, pixels, 320, 200, SESSION_VIEW(&other), &other.presentation,
+        &other.world, camera));
+    CHECK(memcmp(harbor_pixels, pixels, size) == 0 && !c.scenery.river);
+    printf(
+        "cpu_view_binding=ok harbor_boxes=%zu river_boxes=%zu\n", c.scenery.count, a.scenery.count);
+    boat_cpu_view_destroy(&a);
+    boat_cpu_view_destroy(&c);
+    renderer3d_destroy(&ra);
+    renderer3d_destroy(&rb);
+    renderer3d_destroy(&rc);
+    free(first);
+    free(pixels);
+    free(harbor_pixels);
+    boat_session_destroy(&river);
+    boat_session_destroy(&other);
+    boat_world_resources_destroy(&harbor);
     return 0;
 }
 
@@ -293,6 +351,7 @@ int main(void)
     CHECK(presentation_toggle() == 0);
     CHECK(render_rates() == 0);
     CHECK(core_order() == 0);
+    CHECK(view_binding() == 0);
     puts("boat_world=ok");
     test_worlds_close();
     return 0;

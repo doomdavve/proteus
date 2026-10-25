@@ -26,6 +26,12 @@ together, one is destroyed and rebuilt, and a cache rebinds between the river an
 pond map. Every mesh must match its reference built alone, and the 5.99/6.01 m snap-boundary
 pair must not disturb another cache's borrowed meshes.
 
+`boat_world_isolation` (`validate_boat_world`) also checks CPU view binding (adventure A1.4):
+two river views and a view of a synthetic harbor map draw interleaved, and destroying one view
+or rebinding another reproduces every frame exactly. `gpu_view_binding`
+(`boat_water_review --check-gpu-views`, `gpu`, serial) does the same with two GPU views,
+including destroy and recreate with the context alive.
+
 The HUD/control worktree also checks all 49 transitions between the seven thrust detents
 through the real integrator in `boat_handling`, and forward/reverse target settling on both
 the authority and predicted client in `boat_net`. Mouse steering adds 49 wheel transitions

@@ -14,6 +14,7 @@ typedef struct {
     Vector2 wave_center;
     const BoatMapDescription *wave_map; // Map whose patch wave_mesh holds (NULL: basin).
     BoatWaterMeshCache water_mesh; // This view's own patches; never shared with CPU views.
+    WaterfrontScenery scenery; // Scenery the scene's map meshes were built from.
     int wave_capacity, wave_peak_triangles, wave_rebuilds;
     Texture2D wake_texture;
     float *wake_upload;
@@ -23,6 +24,7 @@ typedef struct {
 
 } BoatGpu;
 
+// Map meshes are built on the first draw of a mapped world and rebuilt when its map changes.
 bool boat_gpu_init(BoatGpu *gpu, bool aa);
 void boat_gpu_draw(BoatGpu *gpu, const BoatViewState *view, const BoatPresentation *presentation,
     const BoatWorld *world, BoatCamera camera);

@@ -726,6 +726,8 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(boat_banking_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME gpu_water_surface COMMAND boat_water_review --check-gpu)
   set_tests_properties(gpu_water_surface PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  add_test(NAME gpu_view_binding COMMAND boat_water_review --check-gpu-views)
+  set_tests_properties(gpu_view_binding PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_water_benchmark.py
     $<TARGET_FILE:boat_water_review>)

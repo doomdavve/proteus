@@ -155,6 +155,31 @@ static Mesh builder_finish(MeshBuilder *builder)
     return mesh;
 }
 
+// A map without some surface class (no roofs, say) leaves that mesh empty and undrawn.
+static bool builder_finish_optional(MeshBuilder *builder, Mesh *mesh)
+{
+    if (!builder->count) {
+        builder_destroy(builder);
+        *mesh = (Mesh) { 0 };
+        return true;
+    }
+    *mesh = builder_finish(builder);
+    return mesh->vaoId != 0;
+}
+
+static void unload_mesh(Mesh *mesh)
+{
+    if (mesh->vaoId != 0)
+        UnloadMesh(*mesh);
+    *mesh = (Mesh) { 0 };
+}
+
+static void draw_map_mesh(Mesh mesh, Material material)
+{
+    if (mesh.vaoId != 0)
+        DrawMesh(mesh, material, MatrixIdentity());
+}
+
 static bool build_source_mesh(Mesh *mesh, const Mesh3D *source)
 {
     MeshBuilder builder = { 0 };
@@ -217,12 +242,11 @@ static bool builder_ground_triangle(MeshBuilder *builder, Vector3 a, Vector3 b, 
     return true;
 }
 
-static bool build_corner(Mesh *opaque, Mesh *emissive, MeshBuilder *ground)
+static bool build_corner(
+    const WaterfrontScenery *scenery, Mesh *opaque, Mesh *emissive, MeshBuilder *ground)
 {
-    size_t count;
-    const WaterfrontCornerBox *boxes = waterfront_corner_boxes(&count);
-    if (!boxes)
-        return false;
+    size_t count = scenery->count;
+    const WaterfrontCornerBox *boxes = scenery->boxes;
     static const unsigned char faces[][3]
         = { { 0, 2, 1 }, { 0, 3, 2 }, { 5, 7, 4 }, { 5, 6, 7 }, { 4, 3, 0 }, { 4, 7, 3 },
               { 1, 6, 5 }, { 1, 2, 6 }, { 3, 6, 2 }, { 3, 7, 6 }, { 4, 1, 5 }, { 4, 0, 1 } };
@@ -253,9 +277,8 @@ static bool build_corner(Mesh *opaque, Mesh *emissive, MeshBuilder *ground)
                 return false;
             }
         }
-    *opaque = builder_finish(&builders[0]);
-    *emissive = builder_finish(&builders[1]);
-    return opaque->vaoId != 0 && emissive->vaoId != 0;
+    bool opaque_ok = builder_finish_optional(&builders[0], opaque);
+    return builder_finish_optional(&builders[1], emissive) && opaque_ok;
 }
 
 static CitySurface city_surface(Vector3 a, Vector3 b, Vector3 c)
@@ -306,10 +329,10 @@ static bool builder_facade_triangle(
     return true;
 }
 
-static bool build_city(Mesh *city_mesh, Mesh *facades, Mesh *roofs, Mesh *quay, Mesh *water,
-    Mesh *corner, Mesh *corner_emissive)
+static bool build_city(const WaterfrontScenery *scenery, Mesh *city_mesh, Mesh *facades,
+    Mesh *roofs, Mesh *quay, Mesh *water, Mesh *corner, Mesh *corner_emissive)
 {
-    const Mesh3D *city = waterfront_city_mesh();
+    const Mesh3D *city = scenery->map->mesh;
     MeshBuilder builders[] = { { 0 }, { 0 }, { 0 }, { 0 } };
     MeshBuilder water_builder = { 0 };
     for (size_t i = 0; i < city->triangle_count; ++i) {
@@ -325,7 +348,7 @@ static bool build_city(Mesh *city_mesh, Mesh *facades, Mesh *roofs, Mesh *quay, 
         bool planting = (triangle->color.r == 72 && triangle->color.g == 105)
             || (triangle->color.r == 61 && triangle->color.g == 91);
         // Authored bridge beams retain their flat steel/concrete colors.
-        bool bridge = waterfront_city_is_bridge_triangle(i);
+        bool bridge = boat_map_is_bridge_triangle(scenery->map, i);
         CitySurface surface = planting || bridge ? CITY_SURFACE_FLAT : city_surface(a, b, c);
         Vector3 normal
             = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
@@ -346,19 +369,21 @@ static bool build_city(Mesh *city_mesh, Mesh *facades, Mesh *roofs, Mesh *quay, 
         if (!ok)
             goto failed;
     }
-    if (builders[CITY_SURFACE_FLAT].count == 0 || builders[CITY_SURFACE_FACADE].count == 0
-        || builders[CITY_SURFACE_ROOF].count == 0 || builders[CITY_SURFACE_QUAY].count == 0
-        || water_builder.count == 0)
+    // The compiled river has every surface class; another map needs only its water.
+    if (water_builder.count == 0
+        || (scenery->river
+            && (builders[CITY_SURFACE_FLAT].count == 0 || builders[CITY_SURFACE_FACADE].count == 0
+                || builders[CITY_SURFACE_ROOF].count == 0
+                || builders[CITY_SURFACE_QUAY].count == 0)))
         goto failed;
-    if (!build_corner(corner, corner_emissive, &builders[CITY_SURFACE_QUAY]))
+    if (!build_corner(scenery, corner, corner_emissive, &builders[CITY_SURFACE_QUAY]))
         goto failed;
-    *city_mesh = builder_finish(&builders[CITY_SURFACE_FLAT]);
-    *facades = builder_finish(&builders[CITY_SURFACE_FACADE]);
-    *roofs = builder_finish(&builders[CITY_SURFACE_ROOF]);
-    *quay = builder_finish(&builders[CITY_SURFACE_QUAY]);
+    bool ok = builder_finish_optional(&builders[CITY_SURFACE_FLAT], city_mesh);
+    ok = builder_finish_optional(&builders[CITY_SURFACE_FACADE], facades) && ok;
+    ok = builder_finish_optional(&builders[CITY_SURFACE_ROOF], roofs) && ok;
+    ok = builder_finish_optional(&builders[CITY_SURFACE_QUAY], quay) && ok;
     *water = builder_finish(&water_builder);
-    return city_mesh->vaoId != 0 && facades->vaoId != 0 && roofs->vaoId != 0 && quay->vaoId != 0
-        && water->vaoId != 0;
+    return ok && water->vaoId != 0;
 failed:
     for (size_t i = 0; i < sizeof(builders) / sizeof(builders[0]); ++i)
         builder_destroy(&builders[i]);
@@ -366,12 +391,12 @@ failed:
     return false;
 }
 
-static bool build_windows(Mesh *mesh)
+static bool build_windows(const BoatMapDescription *map, Mesh *mesh)
 {
-    const Mesh3D *city = waterfront_city_mesh();
+    const Mesh3D *city = map->mesh;
     MeshBuilder builder = { 0 };
     for (size_t i = 0; i < city->triangle_count; ++i) {
-        if (waterfront_city_is_bridge_triangle(i))
+        if (boat_map_is_bridge_triangle(map, i))
             continue;
         const Triangle3D *triangle = &city->triangles[i];
         Vector3 a = city->vertices[triangle->vertices[0]];
@@ -402,8 +427,7 @@ static bool build_windows(Mesh *mesh)
             }
         }
     }
-    *mesh = builder_finish(&builder);
-    return mesh->vaoId != 0;
+    return builder_finish_optional(&builder, mesh);
 }
 
 static Vector3 crane_point(float x, float y, float z)
@@ -597,6 +621,40 @@ static bool create_shadow_map(RenderTexture2D *target, int size)
     return true;
 }
 
+static void unbind_map(WaterfrontGpuScene *scene)
+{
+    unload_mesh(&scene->city);
+    unload_mesh(&scene->facades);
+    unload_mesh(&scene->roofs);
+    unload_mesh(&scene->quay);
+    unload_mesh(&scene->water);
+    unload_mesh(&scene->windows);
+    unload_mesh(&scene->corner);
+    unload_mesh(&scene->corner_emissive);
+    unload_mesh(&scene->crane);
+    scene->map = NULL;
+    scene->river = false;
+}
+
+bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScenery *scenery)
+{
+    unbind_map(scene);
+    if (!scenery->ready)
+        return false;
+    if (!scenery->map)
+        return true;
+    if (!build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
+            &scene->water, &scene->corner, &scene->corner_emissive)
+        || !build_windows(scenery->map, &scene->windows)
+        || (scenery->river && !build_crane(&scene->crane))) {
+        unbind_map(scene);
+        return false;
+    }
+    scene->map = scenery->map;
+    scene->river = scenery->river;
+    return true;
+}
+
 bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_shader_path)
 {
     *scene = (WaterfrontGpuScene) { 0 };
@@ -626,10 +684,6 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     scene->water_material.shader = scene->water_shader;
     if (!load_detail_texture(&scene->roof_texture, fragment_shader_path, "roof.png")
         || !init_detail_material(&scene->roof_material, scene->shader, scene->roof_texture))
-        goto failed;
-    if (!build_city(&scene->city, &scene->facades, &scene->roofs, &scene->quay, &scene->water,
-            &scene->corner, &scene->corner_emissive)
-        || !build_windows(&scene->windows) || !build_crane(&scene->crane))
         goto failed;
     for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
         if (!build_source_mesh(&scene->gull[part], waterfront_gull_mesh(part)))
@@ -790,42 +844,45 @@ static void select_local_lights(WaterfrontGpuScene *scene, const WaterfrontScene
     }
     LightCandidate candidates[72];
     int candidate_count = 0;
-    add_light_candidate(candidates, &candidate_count, 40,
-        (WaterfrontGpuLight) { .position = waterfront_corner_position(-2.8f, 3.1f, -6),
-            .direction = { 0, -1, 0 },
-            .color = { 255, 197, 119, 255 },
-            .radius = 12,
-            .intensity = 1.5f,
-            .inner_cone_cos = -1,
-            .outer_cone_cos = -1 },
-        LIGHT_SHOP);
-    add_light_candidate(candidates, &candidate_count, 10,
-        (WaterfrontGpuLight) { .position = crane_point(-42, 75, -5),
-            .direction = Vector3Normalize(crane_point(.2f, -1, .3f)),
-            .color = { 255, 92, 48, 255 },
-            .radius = 34,
-            .intensity = 1.45f,
-            .inner_cone_cos = .78f,
-            .outer_cone_cos = .48f },
-        LIGHT_CRANE);
-    add_light_candidate(candidates, &candidate_count, 11,
-        (WaterfrontGpuLight) { .position = crane_point(5, 75, -5),
-            .direction = Vector3Normalize(crane_point(0, -1, .15f)),
-            .color = { 106, 135, 255, 255 },
-            .radius = 26,
-            .intensity = 1.35f,
-            .inner_cone_cos = .82f,
-            .outer_cone_cos = .55f },
-        LIGHT_CRANE);
-    add_light_candidate(candidates, &candidate_count, 12,
-        (WaterfrontGpuLight) { .position = crane_point(40, 75, -5),
-            .direction = Vector3Normalize(crane_point(-.2f, -1, .3f)),
-            .color = { 255, 78, 40, 255 },
-            .radius = 31,
-            .intensity = 1.3f,
-            .inner_cone_cos = .78f,
-            .outer_cone_cos = .48f },
-        LIGHT_CRANE);
+    // The cafe and crane fixtures are authored for the river crop.
+    if (scene->river) {
+        add_light_candidate(candidates, &candidate_count, 40,
+            (WaterfrontGpuLight) { .position = waterfront_corner_position(-2.8f, 3.1f, -6),
+                .direction = { 0, -1, 0 },
+                .color = { 255, 197, 119, 255 },
+                .radius = 12,
+                .intensity = 1.5f,
+                .inner_cone_cos = -1,
+                .outer_cone_cos = -1 },
+            LIGHT_SHOP);
+        add_light_candidate(candidates, &candidate_count, 10,
+            (WaterfrontGpuLight) { .position = crane_point(-42, 75, -5),
+                .direction = Vector3Normalize(crane_point(.2f, -1, .3f)),
+                .color = { 255, 92, 48, 255 },
+                .radius = 34,
+                .intensity = 1.45f,
+                .inner_cone_cos = .78f,
+                .outer_cone_cos = .48f },
+            LIGHT_CRANE);
+        add_light_candidate(candidates, &candidate_count, 11,
+            (WaterfrontGpuLight) { .position = crane_point(5, 75, -5),
+                .direction = Vector3Normalize(crane_point(0, -1, .15f)),
+                .color = { 106, 135, 255, 255 },
+                .radius = 26,
+                .intensity = 1.35f,
+                .inner_cone_cos = .82f,
+                .outer_cone_cos = .55f },
+            LIGHT_CRANE);
+        add_light_candidate(candidates, &candidate_count, 12,
+            (WaterfrontGpuLight) { .position = crane_point(40, 75, -5),
+                .direction = Vector3Normalize(crane_point(-.2f, -1, .3f)),
+                .color = { 255, 78, 40, 255 },
+                .radius = 31,
+                .intensity = 1.3f,
+                .inner_cone_cos = .78f,
+                .outer_cone_cos = .48f },
+            LIGHT_CRANE);
+    }
     for (int street_index = 0; street_index < 2; ++street_index) {
         for (int i = 0; i < frame->lamp_count; ++i) {
             const WaterfrontLampState *lamp = &frame->lamps[i];
@@ -1406,7 +1463,7 @@ static void draw_ground(const WaterfrontGpuScene *scene, Material material)
     int location = GetShaderLocation(scene->shader, "groundPass");
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
-    DrawMesh(scene->quay, material, MatrixIdentity());
+    draw_map_mesh(scene->quay, material);
     enabled = 0;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
 }
@@ -1416,7 +1473,7 @@ static void draw_facades(const WaterfrontGpuScene *scene, Material material)
     int location = GetShaderLocation(scene->shader, "facadePass");
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
-    DrawMesh(scene->facades, material, MatrixIdentity());
+    draw_map_mesh(scene->facades, material);
     enabled = 0;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
 }
@@ -1431,20 +1488,21 @@ static void draw_reflected_scene(const WaterfrontGpuScene *scene, const Waterfro
     }
     set_object_color(scene->shader, WHITE);
     set_emissive(scene->shader, false);
-    DrawMesh(scene->city, material, MatrixIdentity());
+    draw_map_mesh(scene->city, material);
     draw_facades(scene, material);
-    DrawMesh(scene->roofs, scene->roof_material, MatrixIdentity());
+    draw_map_mesh(scene->roofs, scene->roof_material);
     draw_ground(scene, material);
-    DrawMesh(scene->corner, material, MatrixIdentity());
+    draw_map_mesh(scene->corner, material);
     set_emissive(scene->shader, true);
-    DrawMesh(scene->windows, material, MatrixIdentity());
-    DrawMesh(scene->corner_emissive, material, MatrixIdentity());
-    draw_colored_mesh(scene->bridge, life, frame->bridge, frame->bridge_color, false);
+    draw_map_mesh(scene->windows, material);
+    draw_map_mesh(scene->corner_emissive, material);
+    if (scene->river)
+        draw_colored_mesh(scene->bridge, life, frame->bridge, frame->bridge_color, false);
     // The reflection source deliberately excludes the water mesh and its wake, preventing a
     // feedback surface while retaining vehicles, boat hull, lamp poles, and the city silhouette.
     draw_life(scene, life, frame, false);
     set_emissive(scene->shader, false);
-    DrawMesh(scene->crane, material, MatrixIdentity());
+    draw_map_mesh(scene->crane, material);
 }
 
 static void render_reflection(
@@ -1512,17 +1570,18 @@ static void draw_shadow_casters(
     set_object_color(scene->shadow_shader, WHITE);
     set_emissive(scene->shadow_shader, false);
     rlEnableBackfaceCulling();
-    DrawMesh(scene->city, material, MatrixIdentity());
-    DrawMesh(scene->facades, material, MatrixIdentity());
-    DrawMesh(scene->roofs, material, MatrixIdentity());
-    DrawMesh(scene->quay, material, MatrixIdentity());
-    DrawMesh(scene->corner, material, MatrixIdentity());
-    draw_colored_mesh(scene->bridge, material, frame->bridge, frame->bridge_color, false);
+    draw_map_mesh(scene->city, material);
+    draw_map_mesh(scene->facades, material);
+    draw_map_mesh(scene->roofs, material);
+    draw_map_mesh(scene->quay, material);
+    draw_map_mesh(scene->corner, material);
+    if (scene->river)
+        draw_colored_mesh(scene->bridge, material, frame->bridge, frame->bridge_color, false);
     // Cars, boats, and lamp poles matter to the road shadow, but their lenses and wake do not.
     rlDisableBackfaceCulling();
     draw_life(scene, material, frame, false);
     rlEnableBackfaceCulling();
-    DrawMesh(scene->crane, material, MatrixIdentity());
+    draw_map_mesh(scene->crane, material);
 }
 
 static void render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
@@ -1556,7 +1615,7 @@ static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *fr
     int pass = scene->near_water.vaoId ? 1 : 0;
     int location = GetShaderLocation(scene->water_shader, "waterPatchPass");
     SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);
-    DrawMesh(scene->water, scene->water_material, MatrixIdentity());
+    draw_map_mesh(scene->water, scene->water_material);
     if (pass) {
         pass = 2;
         set_object_color(scene->water_shader, WHITE);
@@ -1570,6 +1629,10 @@ static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *fr
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
 {
+    if (!frame->boating_basin && !scene->map) {
+        TraceLog(LOG_WARNING, "GPU waterfront frame drawn without a bound map");
+        return;
+    }
     if (frame->player_active)
         update_flag_mesh(&scene->player_flag, &frame->player.flag, frame->player.skin);
     if (frame->ghost_opacity > 0)
@@ -1609,16 +1672,17 @@ void waterfront_gpu_scene_draw(
     }
     set_object_color(scene->shader, WHITE);
     set_emissive(scene->shader, false);
-    DrawMesh(scene->city, material, MatrixIdentity());
+    draw_map_mesh(scene->city, material);
     draw_facades(scene, material);
-    DrawMesh(scene->roofs, scene->roof_material, MatrixIdentity());
+    draw_map_mesh(scene->roofs, scene->roof_material);
     draw_ground(scene, material);
-    DrawMesh(scene->corner, material, MatrixIdentity());
+    draw_map_mesh(scene->corner, material);
     draw_water(scene, frame, width);
     set_emissive(scene->shader, true);
-    DrawMesh(scene->windows, material, MatrixIdentity());
-    DrawMesh(scene->corner_emissive, material, MatrixIdentity());
-    draw_colored_mesh(scene->bridge, life_material, frame->bridge, frame->bridge_color, false);
+    draw_map_mesh(scene->windows, material);
+    draw_map_mesh(scene->corner_emissive, material);
+    if (scene->river)
+        draw_colored_mesh(scene->bridge, life_material, frame->bridge, frame->bridge_color, false);
     // These small closed meshes use reusable, non-indexed buffers. Keep them two-sided while
     // retaining depth testing, so their visibility does not depend on backend cull-state defaults.
     rlDisableBackfaceCulling();
@@ -1626,9 +1690,10 @@ void waterfront_gpu_scene_draw(
     rlEnableBackfaceCulling();
     set_object_color(scene->shader, WHITE);
     set_emissive(scene->shader, false);
-    DrawMesh(scene->crane, material, MatrixIdentity());
+    draw_map_mesh(scene->crane, material);
     rlDisableBackfaceCulling();
-    draw_crane_lights(scene, life_material);
+    if (scene->river)
+        draw_crane_lights(scene, life_material);
     rlEnableBackfaceCulling();
     EndMode3D();
 }
@@ -1676,24 +1741,7 @@ Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene)
 
 void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
 {
-    if (scene->city.vaoId != 0)
-        UnloadMesh(scene->city);
-    if (scene->facades.vaoId != 0)
-        UnloadMesh(scene->facades);
-    if (scene->roofs.vaoId != 0)
-        UnloadMesh(scene->roofs);
-    if (scene->quay.vaoId != 0)
-        UnloadMesh(scene->quay);
-    if (scene->water.vaoId != 0)
-        UnloadMesh(scene->water);
-    if (scene->windows.vaoId != 0)
-        UnloadMesh(scene->windows);
-    if (scene->corner.vaoId != 0)
-        UnloadMesh(scene->corner);
-    if (scene->corner_emissive.vaoId != 0)
-        UnloadMesh(scene->corner_emissive);
-    if (scene->crane.vaoId != 0)
-        UnloadMesh(scene->crane);
+    unbind_map(scene);
     if (scene->bridge.vaoId != 0)
         UnloadMesh(scene->bridge);
     for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)

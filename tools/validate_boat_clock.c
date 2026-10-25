@@ -228,7 +228,7 @@ static int soak(double seconds, const char *directory, bool waves)
     uint64_t total = (uint64_t)llround(seconds * BOAT_TICK_HZ);
     const uint64_t samples[] = { 120 * 60, total / 2, total };
     Renderer3D renderer = { 0 };
-    BoatWaterMeshCache water_mesh = { 0 };
+    BoatCpuView cpu_view = { 0 };
     Color *pixels = malloc(320 * 200 * sizeof(*pixels));
     CHECK(pixels);
     uint64_t hash = WAKE_VELOCITY_HASH_SEED, recoveries = 0, stuck_ticks = 0, landings = 0;
@@ -284,7 +284,7 @@ static int soak(double seconds, const char *directory, bool waves)
                     < (int)sizeof(path));
                 BoatViewState view = boat_session_view(&session);
                 BoatViewState other = { .boat = *other_boat, .time = view.time };
-                CHECK(boat_draw_with_ghost(&renderer, &water_mesh, pixels, 320, 200, &view,
+                CHECK(boat_draw_with_ghost(&renderer, &cpu_view, pixels, 320, 200, &view,
                     &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &other,
                     &study.other_presentation.flag, 1));
                 Image image = { pixels, 320, 200, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
@@ -299,7 +299,7 @@ static int soak(double seconds, const char *directory, bool waves)
         seconds, waves, session.tick, boat_session_time(&session), pool->emitted, pool->expired,
         pool->peak_live, BOAT_OBJECT_CAPACITY, landings + boat->landings, recoveries, max_speed,
         max_height, hash, cpu);
-    boat_water_mesh_cache_destroy(&water_mesh);
+    boat_cpu_view_destroy(&cpu_view);
     renderer3d_destroy(&renderer);
     free(pixels);
     return 0;

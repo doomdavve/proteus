@@ -500,6 +500,15 @@ static bool draw_city(RenderTexture2D target, WaterfrontGpuScene *scene, Fixture
         fprintf(stderr, "GPU fixture: waterfront city resources failed: %s\n", shader_path);
         return false;
     }
+    // The scene keeps only its uploaded meshes; the scenery is needed for the bind alone.
+    WaterfrontScenery scenery = { 0 };
+    bool bound = waterfront_scenery_init(&scenery, &waterfront_city_river_map)
+        && waterfront_gpu_scene_bind(scene, &scenery);
+    waterfront_scenery_destroy(&scenery);
+    if (!bound) {
+        fprintf(stderr, "GPU fixture: river scenery could not be bound\n");
+        return false;
+    }
     if (options.check
         && (!verify_surface_materials(scene, false) || !verify_surface_materials(scene, true)
             || !verify_sky_targets(scene)))

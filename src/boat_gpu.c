@@ -21,6 +21,7 @@ void boat_gpu_destroy(BoatGpu *gpu)
         UnloadMesh(gpu->wave_mesh_extra);
     boat_water_mesh_cache_destroy(&gpu->water_mesh);
     waterfront_gpu_scene_destroy(&gpu->scene);
+    waterfront_scenery_destroy(&gpu->scenery);
     if (gpu->downsample.id)
         UnloadShader(gpu->downsample);
     if (gpu->supersampled.id)
@@ -114,6 +115,12 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     gpu->failed = false;
     bool mapped = world->definition->mapped;
     const BoatMapDescription *map = world->definition->map;
+    if (mapped && gpu->scene.map != map
+        && (!waterfront_scenery_bind(&gpu->scenery, map)
+            || !waterfront_gpu_scene_bind(&gpu->scene, &gpu->scenery))) {
+        gpu->failed = true;
+        return;
+    }
     static WaterfrontSceneFrame frame; // Large; drawing is single-threaded.
     boat_scene_frame(view, presentation, world, camera, &frame);
     boat_scene_rivals(rivals, world, view->time, &frame);

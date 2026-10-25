@@ -1,6 +1,7 @@
 #ifndef PROTEUS_RENDERER_GPU_H
 #define PROTEUS_RENDERER_GPU_H
 
+#include "waterfront_corner.h"
 #include "waterfront_scene.h"
 
 #include "raylib.h"
@@ -41,9 +42,13 @@ typedef struct {
     float outer_cone_cos;
 } WaterfrontGpuLight;
 
-// GPU-owned, static waterfront resources for the diagnostic fixture.  They must be
-// created and destroyed while a raylib/OpenGL context is alive.
+// GPU-owned waterfront resources. They must be created, bound and destroyed while a
+// raylib/OpenGL context is alive. Init builds the map-independent shared resources (shaders,
+// sky, unit, boat, gull and harbor/traffic meshes); waterfront_gpu_scene_bind builds the
+// map-derived meshes below from one scenery owner.
 typedef struct {
+    const BoatMapDescription *map; // Bound map; NULL: unbound, which draws only basin frames.
+    bool river; // The bound map carries the authored river crane, bridge deck and fixtures.
     Mesh city;
     Mesh facades;
     Mesh roofs;
@@ -95,6 +100,10 @@ typedef struct {
 } WaterfrontGpuScene;
 
 bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_shader_path);
+// Replace the map-derived meshes with those of SCENERY (borrowed only during the call). A basin
+// scenery unbinds. Fails, leaving the scene unbound, for an unready scenery or upload failure.
+// A non-basin frame drawn on an unbound scene is refused with a warning.
+bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScenery *scenery);
 void waterfront_gpu_scene_set_lighting_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_shadows_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_atmosphere_enabled(WaterfrontGpuScene *scene, bool enabled);

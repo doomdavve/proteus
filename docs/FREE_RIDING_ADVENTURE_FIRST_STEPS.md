@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers) and [A1.3](#a13-result-2026-10-25) completed 2026-10-25; A1.4 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25) and [A1.4](#a14-result-2026-10-25) completed 2026-10-25; A1.5 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -42,8 +42,8 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Complete 2026-10-25; [result](#a11--explicit-map-data-and-collision-cache-construction) |
 | A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Complete 2026-10-25; [result](#a12-result-2026-10-25) |
 | A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Complete 2026-10-25; [result](#a13-result-2026-10-25) |
-| A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Pending; next |
-| A1.5 | A1.4 | Reload/isolation/failure gate, parity evidence and A2 handoff | Pending |
+| A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Complete 2026-10-25; [result](#a14-result-2026-10-25) |
+| A1.5 | A1.4 | Reload/isolation/failure gate, parity evidence and A2 handoff | Pending; next |
 
 A0.2/A0.3 and A0.4 have independent inputs after A0.1, but controlled performance runs must
 run alone. If terrain credentials are unavailable, document that result and continue the OSM
@@ -683,6 +683,98 @@ Started from a clean `2ea4755`.
 **Done when:** two scene/view owners can initialize, render and destroy independently, and
 the old river's inspected CPU/GPU frames match the reference. Investigate differences rather
 than loosening visual/geometry expectations as part of an ownership change.
+
+### A1.4 result, 2026-10-25
+
+Started from a clean `d73688a`.
+
+- **Scenery owner:** `WaterfrontScenery` (`src/waterfront_corner.h`) replaces the corner
+  dressing's 16,384-box static arrays, bounds, counters and `initialized` flag. It is built
+  from one borrowed `BoatMapDescription`, and the construction scratch (local frame, ground
+  surfaces, counters) lives in a builder that does not outlive `waterfront_scenery_init()`.
+  - Box storage grows up to the same 16,384-box cap; overflow or allocation failure fails the
+    init and leaves the owner zeroed.
+  - A NULL map (the basin) is ready, empty and allocates nothing.
+  - `waterfront_scenery_bind()` keeps a ready owner of the same map or rebuilds it.
+  - `waterfront_scenery_clear()` replaces `waterfront_corner_clear()`.
+- **Map-derived versus authored content:** frontages, quays and forecourts derive from
+  whichever map is bound. The cafe, the street furniture, the crane, the bridge deck box, and
+  the cafe and crane lights are authored for the compiled river crop. They appear only when
+  the owner's map is `waterfront_city_river_map` (its `river` flag). A synthetic map therefore
+  gets its own derived dressing and none of the river's.
+- **CPU binding:** `BoatCpuView` (`src/boat_view.h`) holds a view's water-mesh cache and
+  scenery, and replaces the bare cache in `boat_draw()`, `boat_draw_with_ghost()` and
+  `boat_draw_scene()`. A mapped draw binds the scenery to the world's map.
+  `waterfront_draw_boating()` takes the scenery and draws its map's mesh, windows and
+  waterline fittings, plus the crane and bridge deck when it is the river.
+- **GPU binding:** `waterfront_gpu_scene_init()` now builds only map-independent resources.
+  The new `waterfront_gpu_scene_bind()` builds the city, facades, roofs, ground, water,
+  windows, dressing and (for the river) crane meshes from a scenery owner, replacing any
+  previous binding; the scene records the bound map.
+  - The main, reflection and shadow passes draw the same bound meshes, skip empty surface
+    classes, and gate the bridge deck, crane lights and authored light candidates on the
+    binding.
+  - A non-basin frame drawn on an unbound scene is refused with a warning.
+  - `BoatGpu` owns its own `WaterfrontScenery` and binds on the first draw of a mapped world
+    or on a map change. `harbor_review` and `gpu_fixture` bind the river explicitly.
+- **Removed:** `waterfront_corner_boxes()`, `waterfront_corner_clear()`,
+  `waterfront_city_mesh()`, `waterfront_city_is_bridge_triangle()` and
+  `waterfront_city_map()`. The compiled river is reached only as `waterfront_city_river_map`,
+  through its location definition, a scenery/water binding, or by name in river-only review
+  tools and validators.
+- **Shared immutable resources (unchanged, identified):**
+  - the compiled river description itself;
+  - harbor and traffic boat models, the pontoon and quay models (lazily generated once from
+    fixed recipes);
+  - the sky panorama, gull and skin meshes, and the authored street/bridge/actor recipes in
+    `waterfront_scene.c`.
+
+  None of these depends on the bound map. Per-call static scratch frames in `boat_view.c` and
+  `boat_gpu.c` are single-threaded drawing scratch, not caches.
+- **Cost:** a river scenery build takes about 1.26 s in this Debug build (three runs) and
+  holds 7,944 boxes in about 1.0 MB. The old global was built once per process, at GPU init
+  or the first CPU draw. Each view now builds its own, on its first mapped draw or a map
+  change. A GPU `wake_velocity` session builds one.
+- **Tests:**
+  - `city_dressing` builds explicit owners. The river owner matches the box and
+    clearance-grid digests recorded from the old global (`8a15797b4f84d3f3`,
+    `081bde4a44942f73`; 7,944 boxes).
+  - The same test checks a second river owner alive together (equal content, separate
+    storage), the basin owner, and the synthetic harbor (`tools/boat_test_maps.h`): 139
+    derived boxes, 24 of them waterline, none outside the harbor.
+  - It also checks failed init, double destroy, and rebinding harbor → river → harbor →
+    basin with the survivor unchanged.
+  - `boat_world_isolation` adds CPU view binding: two river views and a harbor view draw
+    interleaved; destroying one and rebinding another reproduce every frame exactly.
+  - The new serial GPU test `gpu_view_binding` (`boat_water_review --check-gpu-views`) does
+    the same with two `BoatGpu`s, including destroy and recreate with the context alive.
+    The harbor scene has no crane and 4,890 dressing vertices against the river's 266,094.
+- **Verification (M1 Max, macOS 26 / Darwin 25.6, Apple clang 21, Debug, mains power):**
+  - The build is warning-clean. Desktop CTest passed 115/115 active tests in 175.70 s
+    (15 retired tests disabled). The log is `build/adventure/a1-4/ctest.log`.
+  - The 18 CPU, 18 flat-GPU and 18 wave-GPU review PNGs are byte-identical to
+    `build/adventure/a0-original/`. The `--check` and `--check --waves` logs are identical
+    to A1.3, and the capture logs differ only in timing lines.
+  - The CPU `wake_velocity` basin and river screenshots match A1.3.
+  - Eight more captures are byte-identical to the same tools built from `d73688a`:
+    `harbor_review` marina (CPU and GPU) and ferry (GPU), `gpu_fixture --city` and its shadow
+    map, and GPU `wake_velocity` basin, river and river waves with 4×4 AA. They are under
+    `build/adventure/a1-4/extra-{old,new}/`.
+  - `validate_city_dressing` and `validate_boat_world`, with the scenery and view sources
+    compiled with `-fsanitize=address,undefined`, passed with no reports.
+  - Synthetic-harbor CPU and GPU frames (scratch tool) showed its quay rail, cleats,
+    frontage and forecourts, and no cafe, crane or bridge deck.
+  - A windowed `wake_velocity --location river --waves --demo --frames 900` ran to
+    completion. That is agent playback only; no human playback or acceptance was performed.
+- **Limitations:**
+  - Street cars and lamps, harbor boats, traffic and gulls are authored river actors. They
+    are still selected by the definition's `mapped` flag, so a synthetic mapped world draws
+    them. Per-location actor recipes are outside A1.4.
+  - The CPU river surface and the scenery are each held once per view.
+  - There is no allocation-failure injection.
+  - GPU lifecycle coverage is the two-view test above; the full reload matrix is A1.5.
+
+**Next: A1.5.**
 
 ## A1.5 — prove lifecycle parity and hand off to tiling
 

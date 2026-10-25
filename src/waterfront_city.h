@@ -7,13 +7,9 @@
 #include <stdbool.h>
 
 // Compiled river map crop: water triangles first, then land, buildings and the bridge.
-// Static geometry shared by shoreline queries, water meshes and both renderers.
+// Immutable process-lifetime data, borrowed by the river location's definition. Shoreline
+// queries, water meshes and both renderers reach it only through an explicit owner or binding;
+// its authored bridge/approach triangles use flat materials and have no facade windows.
 extern const BoatMapDescription waterfront_city_river_map;
-
-const BoatMapDescription *waterfront_city_map(void);
-// A1.1 compatibility accessors for the river description; A1.4 binds renderers explicitly.
-const Mesh3D *waterfront_city_mesh(void);
-// Authored bridge/approach triangles use flat materials and have no facade windows.
-bool waterfront_city_is_bridge_triangle(size_t index);
 
 #endif

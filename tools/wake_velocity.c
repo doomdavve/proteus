@@ -533,7 +533,7 @@ static int study(int argc, char **argv)
             return 1;
         }
     Renderer3D renderer = { 0 };
-    BoatWaterMeshCache water_mesh = { 0 }; // The CPU view's; the GPU view owns its own.
+    BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     BoatGpu gpu = { 0 };
     Texture2D texture = { 0 };
     RenderTexture2D frame_target = { 0 };
@@ -673,7 +673,7 @@ static int study(int argc, char **argv)
         ghost_opacity = .5f;
     }
     if (!gpu_enabled
-        && !boat_draw_with_ghost(&renderer, &water_mesh, pixels, WIDTH, HEIGHT, view,
+        && !boat_draw_with_ghost(&renderer, &cpu_view, pixels, WIDTH, HEIGHT, view,
             view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
             ghost_opacity))
         goto cleanup;
@@ -1141,7 +1141,7 @@ static int study(int argc, char **argv)
                 result = 1;
                 break;
             }
-        } else if (!boat_draw_scene(&renderer, &water_mesh, pixels, WIDTH, HEIGHT, view,
+        } else if (!boat_draw_scene(&renderer, &cpu_view, pixels, WIDTH, HEIGHT, view,
                        view_presentation, view_world, camera_settings, &rivals, ghost_view,
                        ghost_view_flag, ghost_opacity)) {
             result = 1;
@@ -1300,7 +1300,7 @@ cleanup:
         if (window_owned)
             CloseWindow();
     }
-    boat_water_mesh_cache_destroy(&water_mesh);
+    boat_cpu_view_destroy(&cpu_view);
     for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
         boat_world_resources_destroy(&worlds[i]);
     renderer3d_destroy(&renderer);
