@@ -5,6 +5,9 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#endif
 
 static const char *phase_text(BoatNetClientPhase phase)
 {
@@ -32,9 +35,18 @@ static void attach(NetStudy *net, BoatSession *session)
 bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, const char *token,
     const BoatWorldResources *worlds, BoatSession *session)
 {
-    char host[256], error[160];
-    uint16_t port;
+    char error[160];
     *net = (NetStudy) { 0 };
+    BoatNetTransport transport;
+#if defined(__EMSCRIPTEN__)
+    if (!boat_net_web_connect(endpoint, error, sizeof(error))) {
+        fail(net, "Cannot connect: %s", error);
+        return false;
+    }
+    transport = boat_net_web_transport();
+#else
+    char host[256];
+    uint16_t port;
     if (!boat_net_parse_endpoint(endpoint, host, sizeof(host), &port)) {
         fail(net, "The address needs HOST:PORT, for example 127.0.0.1:%d", BOAT_NET_PORT);
         return false;
@@ -44,37 +56,45 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
         return false;
     }
     net->enet = boat_net_enet_connect(host, port, error, sizeof(error));
-    if (!net->enet) {
+    if (!net->transport_open) {
         fail(net, "Cannot connect: %s", error);
         boat_net_enet_cleanup();
         return false;
     }
+    transport = boat_net_enet_transport(net->enet);
+#endif
+    net->transport_open = true;
     BoatNetClientConfig config = { .name = name,
         .token = token,
         .build = "wake_velocity M4",
         .predict = true,
         .resources = worlds };
-    boat_net_client_init(
-        &net->client, boat_net_enet_transport(net->enet), &config, boat_net_clock());
-    fprintf(stdout, "Connecting to %s:%u...\n", host, (unsigned)port);
+    boat_net_client_init(&net->client, transport, &config, boat_net_clock());
+    fprintf(stdout, "Connecting to %s...\n", endpoint);
     fflush(stdout);
     while (net->client.phase < BOAT_NET_CLIENT_PLAYING) {
         if (!boat_net_client_service(&net->client, boat_net_clock(), (BoatInput) { 0 }, true)) {
             if (net->client.phase == BOAT_NET_CLIENT_REJECTED)
-                fail(net,
-                    "Rejected by %s:%u: %s (server protocol %u, revision %u; this build %d, %d)",
-                    host, (unsigned)port, boat_net_client_failure(&net->client),
+                fail(net, "Rejected by %s: %s (server protocol %u, revision %u; this build %d, %d)",
+                    endpoint, boat_net_client_failure(&net->client),
                     (unsigned)net->client.reject.version,
                     (unsigned)net->client.reject.physics_revision, BOAT_NET_VERSION,
                     BOAT_PHYSICS_REVISION);
             else
-                fail(net, "Cannot join %s:%u: %s", host, (unsigned)port,
-                    boat_net_client_failure(&net->client));
+                fail(net, "Cannot join %s: %s", endpoint, boat_net_client_failure(&net->client));
+#if defined(__EMSCRIPTEN__)
+            if (boat_net_web_failure()[0])
+                fail(net, "%s", boat_net_web_failure());
+#endif
             net_study_close(net);
             return false;
         }
+#if defined(__EMSCRIPTEN__)
+        emscripten_sleep(10); // Let signaling and DataChannel events run during the handshake.
+#else
         boat_net_enet_flush(net->enet);
         boat_net_enet_wait(net->enet, .01);
+#endif
     }
     fprintf(stdout, "Joined as slot %u at tick %llu (%s, %s water).\n", net->client.slot + 1,
         (unsigned long long)net->client.fleet.state.tick,
@@ -140,7 +160,9 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
         fail(net, "Disconnected: %s.", boat_net_client_failure(c));
         return false;
     }
+#if !defined(__EMSCRIPTEN__)
     boat_net_enet_flush(net->enet);
+#endif
     attach(net, session);
     blend_corrections(net, fminf(GetFrameTime(), .1f));
     const BoatFleet *view = boat_net_client_view(c);
@@ -649,7 +671,7 @@ void net_study_draw_race(const NetStudy *net, int width, int height, int feed_to
 
 void net_study_close(NetStudy *net)
 {
-    if (!net->enet)
+    if (!net->transport_open)
         return;
     const BoatPredictionStats *p = &net->client.prediction.stats;
     if (p->corrections)
@@ -678,7 +700,12 @@ void net_study_close(NetStudy *net)
             (unsigned long long)n->resets, n->max_reset * 1000,
             (unsigned long long)n->resets_dropped);
     boat_net_client_leave(&net->client);
+#if defined(__EMSCRIPTEN__)
+    boat_net_web_close();
+#else
     boat_net_enet_close(net->enet, 1);
     net->enet = NULL;
     boat_net_enet_cleanup();
+#endif
+    net->transport_open = false;
 }

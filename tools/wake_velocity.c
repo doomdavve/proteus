@@ -13,7 +13,9 @@
 #include "wake_velocity_menu.h"
 #ifdef PROTEUS_BOAT_NET
 #include "boat_server.h"
+#if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_host.h"
+#endif
 #include "wake_velocity_net.h"
 #endif
 #include "boat_title.h"
@@ -120,7 +122,7 @@ static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
 #if defined(__EMSCRIPTEN__)
-        "Esc: leave fullscreen | Reload page: new game",
+        "Esc: menu / leave fullscreen | Back to title: setup",
 #endif
         course ? "G: ghost | P/B: replay last/best" : "",
         course ? "Replay: Space pause | Enter restart" : "",
@@ -198,7 +200,9 @@ static void course_runs_hud(
 
 #ifdef PROTEUS_BOAT_NET
 static NetStudy net_study; // Outlives a session so the title can show why it ended.
+#if !defined(__EMSCRIPTEN__)
 static NetHost net_host; // The room this session started with --host, if any.
+#endif
 #endif
 
 // The steering mode a session ended in, so the title remembers changes made in game.
@@ -380,12 +384,12 @@ static int study(int argc, char **argv)
     }
     if ((time_set && !screenshot) || (screenshot && frame_limit) || (!replay_path && time > 60))
         goto invalid;
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     NetHostOptions host_options = { 0 };
     char host_endpoint[32];
 #endif
     if (host_mode) {
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
         if (connect_to || net_token[0]) {
             fprintf(stderr, "--host joins its own room; it cannot take --connect or --token.\n");
             goto invalid;
@@ -488,6 +492,8 @@ static int study(int argc, char **argv)
         goto invalid;
     }
 #if defined(__EMSCRIPTEN__)
+    (void)vsync;
+    (void)location_set;
     if (wake_field) {
         fprintf(stderr, "--wake-field is a native desktop review candidate.\n");
         goto invalid;
@@ -558,12 +564,14 @@ static int study(int argc, char **argv)
     int result = 1;
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };
 #ifdef PROTEUS_BOAT_NET
+#if !defined(__EMSCRIPTEN__)
     if (host_mode
         && !net_host_start(
             &net_host, &host_options, net_study.failure, sizeof(net_study.failure))) {
         fprintf(stderr, "%s\n", net_study.failure);
         goto cleanup;
     }
+#endif
     if (connect_to) {
         if (!net_study_connect(&net_study, connect_to, net_name, net_token, worlds, &session))
             goto cleanup;
@@ -768,7 +776,7 @@ static int study(int argc, char **argv)
                                  : "BACK TO TITLE",
         .room_hint = host_mode ? "YOU HOST: CLOSING ENDS THE ROOM" : NULL };
 #if defined(__EMSCRIPTEN__)
-    menu.can_leave = false;
+    menu.can_leave = !window_owned;
 #endif
     float mouse_wheel = session.boat.wheel;
 #if defined(__EMSCRIPTEN__)
@@ -997,11 +1005,13 @@ static int study(int argc, char **argv)
                 result = 1;
                 break;
             }
+#if !defined(__EMSCRIPTEN__)
             if (net_host.running && !net_host_poll(&net_host, net->failure, sizeof(net->failure))) {
                 fprintf(stderr, "%s\n", net->failure);
                 result = 1;
                 break;
             }
+#endif
             if (net->own_life != previous_life) {
                 thrust_step = BOAT_THROTTLE_NEUTRAL;
                 throttle_scroll = 0;
@@ -1280,7 +1290,9 @@ cleanup:
 #ifdef PROTEUS_BOAT_NET
     if (net)
         net_study_close(net);
+#if !defined(__EMSCRIPTEN__)
     net_host_stop(&net_host); // After leaving, so the room says goodbye to the others only.
+#endif
 #endif
     boat_session_flush(&session);
     boat_session_destroy(&session);
@@ -1314,11 +1326,25 @@ invalid:
 // Single player from the title: free boating on the river, as the macOS app used to start.
 static int title_single(const BoatTitleSettings *settings)
 {
-    char *arguments[] = { "wake_velocity", "--current", "--crossing-wake", "--location", "river",
-        "--waves", "--gpu-aa", "--skin", (char *)boat_skin_name(settings->skin), "--soundtrack",
-        (char *)boat_music(settings->soundtrack)->id,
-        settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
-    int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
+    char *arguments[20] = { "wake_velocity", "--current", "--crossing-wake" };
+    int count = 3;
+    if (settings->location == BOAT_LOCATION_COUNT)
+        arguments[count++] = "--course";
+    else {
+        arguments[count++] = "--location";
+        arguments[count++] = (char *)boat_location(settings->location)->name;
+    }
+    if (settings->waves)
+        arguments[count++] = "--waves";
+    if (settings->smooth_edges)
+        arguments[count++] = "--gpu-aa";
+    arguments[count++] = "--skin";
+    arguments[count++] = (char *)boat_skin_name(settings->skin);
+    arguments[count++] = "--soundtrack";
+    arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
+    if (settings->mouse_steering)
+        arguments[count++] = "--mouse-steering";
+    arguments[count] = NULL;
     study_mouse_steering = settings->mouse_steering;
     return study(count, arguments);
 }
@@ -1361,10 +1387,7 @@ static int title_join(BoatTitleSettings *settings, bool host)
 // session. Explicit options enter their session directly, keeping scripted checks unchanged.
 int main(int argc, char **argv)
 {
-#if defined(__EMSCRIPTEN__)
-    return study(argc, argv);
-#else
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     if (argc > 1 && !strcmp(argv[1], "--serve"))
         return boat_server_main(argc - 1, argv + 1); // A hosted room: no window, audio or assets.
 #endif
@@ -1374,7 +1397,11 @@ int main(int argc, char **argv)
     BoatTitleSettings settings;
     boat_title_load(&settings);
     SetTraceLogLevel(LOG_WARNING);
+#if defined(__EMSCRIPTEN__)
+    SetConfigFlags(0);
+#else
     SetConfigFlags(capture ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+#endif
     InitWindow(320 * 3, 200 * 3, "Wake Velocity");
     if (!IsWindowReady())
         return 1;
@@ -1383,6 +1410,10 @@ int main(int argc, char **argv)
         CloseWindow();
         return ok ? 0 : 1;
     }
+#if defined(__EMSCRIPTEN__)
+    SetTargetFPS(60);
+    InitAudioDevice(); // Start inside the page's Play gesture, before the title yields.
+#endif
     SetWindowMinSize(320, 200);
     SetExitKey(KEY_NULL);
     for (BoatTitleChoice choice; (choice = boat_title_run(&settings)) != BOAT_TITLE_EXIT;) {
@@ -1401,7 +1432,9 @@ int main(int argc, char **argv)
             break;
     }
     boat_title_save(&settings); // Also keep settings changed just before Exit.
+#if defined(__EMSCRIPTEN__)
+    CloseAudioDevice();
+#endif
     CloseWindow();
     return 0;
-#endif
 }

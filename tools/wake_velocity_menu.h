@@ -19,7 +19,7 @@ typedef struct {
     bool open;
     int selected;
     double time;
-    bool can_leave; // Browsers have nowhere to leave to.
+    bool can_leave; // A shared title window lets a browser session return too.
     const char *leave_label; // QUIT, BACK TO TITLE, LEAVE ROOM or CLOSE ROOM.
     const char *room_hint; // Replaces the networked hint (a hosted room), if set.
 } BoatMenu;

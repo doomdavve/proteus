@@ -197,6 +197,12 @@ Suspending the host machine cannot be hidden by a background process.
 
 ### Browser decision
 
+Update, 2026-10-25: the optional WebRTC endpoint and browser gameplay integration are now
+implemented in `web-parity`, after the local protocol-byte echo gate passed. The original
+native-first rationale below is retained; current commands, evidence and hosting limitations
+are owned by [browser boating](WEB_BUILD.md#webrtc-rooms). No public service or deployment
+has been created. Native ENet remains the default.
+
 Keep browser single-player compiling throughout. Ordinary browser code has no direct UDP;
 Emscripten documents WebRTC as an alternative and socket-over-WebSocket proxying as principally
 debugging infrastructure. Do not claim that recompiling ENet or deploying Pages creates a game
@@ -828,6 +834,21 @@ watercraft variants are non-goals for M7. Competitive modes have separate owners
 [deathmatch](DEATHMATCH_PLAN.md) and [race](RACE_PLAN.md) plans.
 
 ### M8 — browser feasibility gate, then an optional browser milestone
+
+Current implementation, 2026-10-25: optional native libdatachannel v0.24.1 C endpoint,
+complete-SDP WebSocket signaling, browser WebRTC/Wasm bridge and ENet/WebRTC multiplexing into
+the existing authority. The byte echo gate passed before gameplay integration. Mixed native
+bot/browser free, deathmatch and race checks passed locally, including reset/leave/rejoin.
+A local capacity check with two browser clients and two native bots also passed, rejecting
+a fifth client; three simultaneous software-rendered browser canvases remain unqualified.
+Shared browser title, saved settings and return-to-title are implemented and browser-checked.
+See [setup, verification and limits](WEB_BUILD.md#webrtc-rooms).
+
+Next: real impairment, bounded resource measurements, tab suspension, Firefox/Safari,
+sustained four-player browser load, cross-machine and secure public WSS/STUN/TURN qualification.
+This is an implemented local slice; M8's broader acceptance gates below remain unmet.
+
+Original proposed gate (retained as the qualification checklist):
 
 Depends on native proof; can move before M3 only if browser-first becomes mandatory. First
 build a tiny browser↔headless libdatachannel echo/impairment experiment, with protocol bytes

@@ -7,7 +7,7 @@
 #include "boat_skin.h"
 #include "frame_pacer.h"
 #include "raylib.h"
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
 #include "boat_net_enet.h"
 #endif
 
@@ -19,10 +19,22 @@
 enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
 
 typedef enum { ROW_SINGLE, ROW_MULTI, ROW_SETTINGS, ROW_EXIT, MAIN_ROWS } MainRow;
+#if defined(__EMSCRIPTEN__)
+typedef enum { ROW_ADDRESS, ROW_CONNECT, ROW_BACK, JOIN_ROWS, ROW_HOST_ROOM, ROW_LAN } JoinRow;
+#else
 typedef enum { ROW_HOST_ROOM, ROW_LAN, ROW_ADDRESS, ROW_CONNECT, ROW_BACK, JOIN_ROWS } JoinRow;
+#endif
 typedef enum { ROW_MODE, ROW_PLACE, ROW_WATER, ROW_START, ROW_HOST_BACK, HOST_ROWS } HostRow;
 typedef enum { ROW_NAME, ROW_BOAT, ROW_MOUSE, ROW_MUSIC, ROW_DONE, SETTINGS_ROWS } SettingsRow;
-typedef enum { PANEL_MAIN, PANEL_JOIN, PANEL_HOST, PANEL_SETTINGS } Panel;
+typedef enum {
+    ROW_SOLO_PLACE,
+    ROW_SOLO_WATER,
+    ROW_SOLO_EDGES,
+    ROW_SOLO_START,
+    ROW_SOLO_BACK,
+    SOLO_ROWS
+} SoloRow;
+typedef enum { PANEL_MAIN, PANEL_SINGLE, PANEL_JOIN, PANEL_HOST, PANEL_SETTINGS } Panel;
 
 static const char *const host_modes[BOAT_TITLE_HOST_MODES] = { "free", "deathmatch", "race" };
 
@@ -46,7 +58,7 @@ typedef struct {
     char before[64]; // Its value when editing started, restored by Escape.
     double time;
     // LAN search while the multiplayer panel is open (native builds).
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     BoatNetLan *lan;
 #endif
     bool searching, moved; // MOVED: the player has picked a row since opening the panel.
@@ -58,7 +70,7 @@ typedef struct {
 
 static void stop_search(Title *t)
 {
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     if (t->searching) {
         boat_net_lan_close(t->lan);
         boat_net_enet_cleanup();
@@ -74,7 +86,7 @@ static void start_search(Title *t)
     t->found.count = t->shown = 0;
     t->moved = false;
     t->queried = -1;
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     char error[160];
     if (!t->searching && boat_net_enet_startup()) {
         t->lan = boat_net_lan_search(error, sizeof(error));
@@ -88,7 +100,7 @@ static void start_search(Title *t)
 // Query about once a second and forget rooms silent for three.
 static void search(Title *t)
 {
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     if (!t->searching)
         return;
     if (t->queried < 0 || t->time - t->queried >= 1) {
@@ -158,7 +170,8 @@ static void draw_logo(double time)
 
 static int row_count(const Title *t)
 {
-    return t->panel == PANEL_JOIN    ? JOIN_ROWS
+    return t->panel == PANEL_SINGLE  ? SOLO_ROWS
+        : t->panel == PANEL_JOIN     ? JOIN_ROWS
         : t->panel == PANEL_HOST     ? HOST_ROWS
         : t->panel == PANEL_SETTINGS ? SETTINGS_ROWS
                                      : MAIN_ROWS;
@@ -191,6 +204,20 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
 {
     *label = "";
     value[0] = 0;
+    if (t->panel == PANEL_SINGLE) {
+        static const char *labels[SOLO_ROWS] = { "PLACE", "WAVES", "SMOOTHING", "START", "BACK" };
+        *label = labels[row];
+        if (row == ROW_SOLO_PLACE)
+            snprintf(value, size, "< %s >",
+                s->location == BOAT_LOCATION_COUNT       ? "BASIN TRIAL"
+                    : s->location == BOAT_LOCATION_RIVER ? "RIVER"
+                                                         : "BASIN");
+        else if (row == ROW_SOLO_WATER)
+            snprintf(value, size, "< %s >", s->waves ? "ON" : "OFF");
+        else if (row == ROW_SOLO_EDGES)
+            snprintf(value, size, "< %s >", s->smooth_edges ? "ON" : "OFF");
+        return;
+    }
     if (t->panel == PANEL_SETTINGS) {
         static const char *labels[SETTINGS_ROWS]
             = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "BACK" };
@@ -224,7 +251,11 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     }
     if (t->panel == PANEL_JOIN) {
         static const char *labels[JOIN_ROWS]
+#if defined(__EMSCRIPTEN__)
+            = { "URL", "CONNECT", "BACK" };
+#else
             = { "HOST A ROOM", "LAN", "ADDRESS", "CONNECT", "BACK" };
+#endif
         *label = labels[row];
         if (row == ROW_ADDRESS)
             snprintf(value, size, "%s", s->address);
@@ -236,7 +267,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             int dots = (int)fmod(t->time * 2, 4);
             snprintf(value, size, "SEARCHING%.*s", dots, "...");
         }
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
         else {
             const BoatNetLanRoom *room = &t->found.rooms[t->shown];
             char host[32];
@@ -257,16 +288,24 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     }
     static const char *labels[MAIN_ROWS] = { "SINGLE PLAYER", "MULTIPLAYER", "SETTINGS", "EXIT" };
     *label = labels[row];
+#if defined(__EMSCRIPTEN__)
+    if (row == ROW_EXIT)
+        *label = "BACK TO LAUNCHER";
+#endif
 }
 
 // What the LAN row's room is, or how to make one appear.
 static const char *lan_hint(const Title *t, char *out, size_t size)
 {
     if (!t->searching)
+#if defined(__EMSCRIPTEN__)
+        return "JOIN A WEBRTC ROOM: WS:// OR WSS://";
+#else
         return "NO LAN SEARCH: TYPE AN ADDRESS BELOW";
+#endif
     if (!t->found.count)
         return "NO ROOMS FOUND ON THIS NETWORK YET";
-#ifndef PROTEUS_BOAT_NET
+#if !defined(PROTEUS_BOAT_NET) || defined(__EMSCRIPTEN__)
     (void)out;
     (void)size;
     return NULL;
@@ -307,7 +346,9 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         row_text(t, s, i, &label, value, sizeof(value));
         DrawText(label, 72, (int)row.y + 2, 10, ink);
         if (value[0]) {
-            int value_x = t->panel == PANEL_SETTINGS && i == ROW_MUSIC ? 154 : 142;
+            int value_x = t->panel == PANEL_JOIN && i == ROW_ADDRESS ? 122
+                : t->panel == PANEL_SETTINGS && i == ROW_MUSIC       ? 154
+                                                                     : 142;
             const char *shown = fit(value, 268 - value_x);
             DrawText(shown, value_x, (int)row.y + 2, 10, ink);
             bool typing = t->editing && active;
@@ -326,6 +367,10 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         hint = "REMEMBERED; ESC MENU OR M SWITCHES IN GAME";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
+#if defined(__EMSCRIPTEN__)
+    if (!hint && t->panel == PANEL_JOIN)
+        hint = "JOIN A WEBRTC ROOM: WS:// OR WSS://";
+#endif
     char lan[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_LAN)
         hint = lan_hint(t, lan, sizeof(lan));
@@ -519,6 +564,18 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
             t.shown = (unsigned)((int)(t.shown + t.found.count) + turn) % t.found.count;
         }
+        if (t.panel == PANEL_SINGLE && t.selected <= ROW_SOLO_EDGES) {
+            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
+                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+            if (t.selected == ROW_SOLO_PLACE)
+                s->location
+                    = (s->location + BOAT_LOCATION_COUNT + 1 + turn) % (BOAT_LOCATION_COUNT + 1);
+            else if (t.selected == ROW_SOLO_WATER && turn)
+                s->waves = !s->waves;
+            else if (turn)
+                s->smooth_edges = !s->smooth_edges;
+            activate = false;
+        }
         if (t.panel == PANEL_HOST && t.selected <= ROW_WATER) {
             int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
                 - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
@@ -552,6 +609,12 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     begin_edit(&t, s->name);
                 else
                     back = true;
+            } else if (t.panel == PANEL_SINGLE) {
+                if (t.selected == ROW_SOLO_START) {
+                    choice = BOAT_TITLE_SINGLE;
+                    chosen = true;
+                } else
+                    back = true;
             } else if (t.panel == PANEL_HOST) {
                 if (t.selected == ROW_START) {
                     choice = BOAT_TITLE_HOST;
@@ -563,7 +626,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     t.panel = PANEL_HOST;
                     t.selected = ROW_START;
                 } else if (t.selected == ROW_LAN) {
-#ifdef PROTEUS_BOAT_NET
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
                     if (t.found.count) {
                         boat_net_lan_endpoint(
                             &t.found.rooms[t.shown], s->address, sizeof(s->address));
@@ -579,8 +642,8 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 } else
                     back = true;
             } else if (t.selected == ROW_SINGLE) {
-                choice = BOAT_TITLE_SINGLE;
-                chosen = true;
+                t.panel = PANEL_SINGLE;
+                t.selected = ROW_SOLO_START;
             } else if (t.selected == ROW_MULTI) {
                 t.panel = PANEL_JOIN;
                 t.selected = ROW_CONNECT;
@@ -591,7 +654,11 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             } else if (t.selected == ROW_EXIT)
                 chosen = true;
         }
-        if (back && t.panel == PANEL_HOST) {
+        if (back && t.panel == PANEL_SINGLE) {
+            boat_title_save(s);
+            t.panel = PANEL_MAIN;
+            t.selected = ROW_SINGLE;
+        } else if (back && t.panel == PANEL_HOST) {
             boat_title_save(s);
             t.panel = PANEL_JOIN;
             t.selected = ROW_HOST_ROOM;
@@ -643,10 +710,17 @@ static bool settings_path(char *path, size_t size)
 
 void boat_title_load(BoatTitleSettings *s)
 {
-    *s = (BoatTitleSettings) {
-        .name = "player", .skin = BOAT_SKIN_SWEDEN, .host_location = BOAT_LOCATION_RIVER
-    };
+    *s = (BoatTitleSettings) { .name = "player",
+        .skin = BOAT_SKIN_SWEDEN,
+        .host_location = BOAT_LOCATION_RIVER,
+        .location = BOAT_LOCATION_RIVER,
+        .waves = true,
+        .smooth_edges = true };
+#if defined(__EMSCRIPTEN__)
+    snprintf(s->address, sizeof(s->address), "ws://127.0.0.1:24682");
+#else
     snprintf(s->address, sizeof(s->address), "127.0.0.1:%d", BOAT_NET_PORT);
+#endif
     char path[4096], line[160];
     FILE *file = settings_path(path, sizeof(path)) ? fopen(path, "r") : NULL;
     if (!file)
@@ -667,6 +741,16 @@ void boat_title_load(BoatTitleSettings *s)
             s->mouse_steering = !strcmp(value, "on");
         else if (!strcmp(line, "soundtrack"))
             boat_music_parse(value, &s->soundtrack);
+        else if (!strcmp(line, "location")) {
+            const BoatWorldDefinition *location = boat_location_find(value);
+            if (!strcmp(value, "course"))
+                s->location = BOAT_LOCATION_COUNT;
+            else if (location)
+                s->location = location->id;
+        } else if (!strcmp(line, "waves"))
+            s->waves = !strcmp(value, "on");
+        else if (!strcmp(line, "smooth_edges"))
+            s->smooth_edges = !strcmp(value, "on");
         else if (!strcmp(line, "host_mode")) {
             for (unsigned i = 0; i < BOAT_TITLE_HOST_MODES; ++i)
                 if (!strcmp(value, host_modes[i]))
@@ -693,6 +777,9 @@ void boat_title_save(const BoatTitleSettings *s)
     fprintf(file, "name=%s\naddress=%s\nskin=%s\nmouse_steering=%s\nsoundtrack=%s\n", s->name,
         s->address, boat_skin_name(s->skin), s->mouse_steering ? "on" : "off",
         boat_music(s->soundtrack)->id);
+    fprintf(file, "location=%s\nwaves=%s\nsmooth_edges=%s\n",
+        s->location == BOAT_LOCATION_COUNT ? "course" : boat_location(s->location)->name,
+        s->waves ? "on" : "off", s->smooth_edges ? "on" : "off");
     fprintf(file, "host_mode=%s\nhost_location=%s\nhost_waves=%s\n",
         boat_title_host_mode(s->host_mode), boat_location(s->host_location)->name,
         s->host_waves ? "on" : "off");

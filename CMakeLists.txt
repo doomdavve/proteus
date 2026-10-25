@@ -6,6 +6,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(PROTEUS_WEBRTC "Build the optional native browser multiplayer endpoint" OFF)
+
 option(PROTEUS_GPU_TESTS "Enable GPU-context CTest cases" OFF)
 option(PROTEUS_WAKE_FIELD_TESTS "Enable retired physical wake-field and prototype experiments" OFF)
 option(PROTEUS_OPTIMIZE_TESTS "Optimize numerical validators in Debug, retaining assertions" ON)
@@ -113,18 +115,19 @@ target_include_directories(boat_race_trial PRIVATE ${raylib_SOURCE_DIR}/src)
 target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu)
 target_compile_options(boat_race_trial PRIVATE ${PROTEUS_WARNINGS})
 
-# Multiplayer M3, native only: the protocol codec, the authority and client sessions and the
-# in-memory impairment transport obey the core boundary (no devices, files or sockets);
-# boat_net_enet.c is the only file that sees ENet or the operating system's sockets.
-if(NOT EMSCRIPTEN)
-  set(PROTEUS_BOAT_NET_SOURCES
-    src/boat_net_client.c src/boat_net_client.h src/boat_net_memory.c src/boat_net_protocol.c
-    src/boat_net_protocol.h src/boat_net_server.c src/boat_net_server.h src/boat_net_transport.h
-    src/boat_prediction.c src/boat_prediction.h src/boat_remote_view.c src/boat_remote_view.h)
-  add_library(proteus_boat_net STATIC ${PROTEUS_BOAT_NET_SOURCES})
-  target_link_libraries(proteus_boat_net PUBLIC proteus_boat_core)
-  target_compile_options(proteus_boat_net PRIVATE ${PROTEUS_WARNINGS})
+# Shared multiplayer codec, authority/client sessions, prediction and memory/multiplexed
+# transports obey the core boundary. Native ENet, optional native WebRTC and the browser
+# bridge own platform networking separately.
+set(PROTEUS_BOAT_NET_SOURCES
+  src/boat_net_mux.c src/boat_net_mux.h
+  src/boat_net_client.c src/boat_net_client.h src/boat_net_memory.c src/boat_net_protocol.c
+  src/boat_net_protocol.h src/boat_net_server.c src/boat_net_server.h src/boat_net_transport.h
+  src/boat_prediction.c src/boat_prediction.h src/boat_remote_view.c src/boat_remote_view.h)
+add_library(proteus_boat_net STATIC ${PROTEUS_BOAT_NET_SOURCES})
+target_link_libraries(proteus_boat_net PUBLIC proteus_boat_core)
+target_compile_options(proteus_boat_net PRIVATE ${PROTEUS_WARNINGS})
 
+if(NOT EMSCRIPTEN)
   # ENet v1.3.18 (MIT, LICENSE in its source tree), pinned to the tag's commit. Its sources are
   # compiled here as a static library with its own configure checks and no project warnings.
   FetchContent_Declare(
@@ -178,6 +181,9 @@ if(NOT EMSCRIPTEN)
 endif()
 
 if(EMSCRIPTEN)
+  target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
+  target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
+  target_sources(wake_velocity PRIVATE src/boat_net_web.c tools/wake_velocity_net.c)
   include(cmake/Web.cmake)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
@@ -389,6 +395,10 @@ set_tests_properties(boat_fleet_render PROPERTIES LABELS "render;cpu"
   PASS_REGULAR_EXPRESSION "boat_fleet_render=ok")
 find_program(PROTEUS_NODE_EXECUTABLE node)
 if(PROTEUS_NODE_EXECUTABLE)
+  add_test(NAME web_rtc_transport COMMAND ${PROTEUS_NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_rtc_transport.cjs)
+  set_tests_properties(web_rtc_transport PROPERTIES LABELS "cpu"
+    PASS_REGULAR_EXPRESSION "web_rtc_transport=ok")
   add_test(NAME web_mouse_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mouse_controls.cjs)
   set_tests_properties(web_mouse_controls PROPERTIES LABELS "cpu"
@@ -453,6 +463,14 @@ add_executable(boat_bot tools/boat_bot.c)
 foreach(target boat_server boat_bot)
   target_link_libraries(${target} PRIVATE proteus_boat_net_enet)
 endforeach()
+if(PROTEUS_WEBRTC)
+  include(cmake/WebRTC.cmake)
+endif()
+add_executable(validate_boat_net_mux tools/validate_boat_net_mux.c)
+target_link_libraries(validate_boat_net_mux PRIVATE proteus_boat_net)
+target_compile_options(validate_boat_net_mux PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
+set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
 add_executable(validate_boat_net tools/validate_boat_net.c)
 target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
 foreach(target validate_boat_fleet validate_boat_match validate_boat_race boat_server boat_bot validate_boat_net)

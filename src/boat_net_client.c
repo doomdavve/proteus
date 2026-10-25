@@ -635,8 +635,7 @@ const char *boat_net_client_failure(const BoatNetClient *c)
     if (c->phase == BOAT_NET_CLIENT_REJECTED)
         return boat_net_reject_text(c->reject.reason);
     if (c->timed_out == 1)
-        return "no answer within 10 s (is boat_server running there, and is its UDP port "
-               "reachable?)";
+        return "no answer within 10 s (is the room running and its network endpoint reachable?)";
     if (c->timed_out == 2)
         return "no snapshot for 5 s";
     switch (c->leave) {

@@ -45,7 +45,8 @@ void boat_audio_reset(BoatAudio *audio, BoatEngineVoice voice)
 void boat_audio_init(BoatAudio *audio, BoatEngineVoice voice)
 {
     boat_audio_reset(audio, voice);
-    InitAudioDevice();
+    if (!IsAudioDeviceReady())
+        InitAudioDevice();
     if (!IsAudioDeviceReady())
         return;
     SetAudioStreamBufferSizeDefault(ENGINE_BUFFER);
@@ -157,7 +158,9 @@ void boat_audio_destroy(BoatAudio *audio)
         StopAudioStream(audio->stream);
         UnloadAudioStream(audio->stream);
     }
+#if !defined(__EMSCRIPTEN__)
     if (IsAudioDeviceReady())
         CloseAudioDevice();
+#endif
     *audio = (BoatAudio) { 0 };
 }

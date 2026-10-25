@@ -38,6 +38,7 @@ foreach(texture IN LISTS WEB_TEXTURES)
   get_filename_component(name "${texture}" NAME)
   configure_file("${texture}" "${WEB_ASSETS}/textures/${name}" COPYONLY)
 endforeach()
+configure_file(assets/title/river-backdrop.png "${WEB_ASSETS}/title/river-backdrop.png" COPYONLY)
 configure_file(assets/music/a-little-boat.xm "${WEB_ASSETS}/music/a-little-boat.xm" COPYONLY)
 configure_file(assets/music/acid-wake.xm "${WEB_ASSETS}/music/acid-wake.xm" COPYONLY)
 
@@ -45,7 +46,7 @@ set_target_properties(wake_velocity PROPERTIES SUFFIX ".js")
 # Asyncify is raylib's supported way to yield from its existing synchronous loop.
 # Keep optimization enabled for Asyncify even in a development build.
 foreach(target wake_velocity proteus_boat_core proteus_render proteus_gpu proteus_boat_session
-    proteus_boat_drive)
+    proteus_boat_drive proteus_boat_net)
   target_compile_options(${target} PRIVATE -Os)
   target_compile_definitions(${target} PRIVATE _POSIX_C_SOURCE=200809L)
 endforeach()
@@ -55,12 +56,15 @@ target_link_options(wake_velocity PRIVATE
   -sASYNCIFY_STACK_SIZE=65536 -sENVIRONMENT=web -sEXIT_RUNTIME=1
   -lidbfs.js
   "SHELL:--preload-file \"${WEB_ASSETS}@/assets\""
+  "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js\"")
 set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   ${WEB_SHADERS} ${WEB_TEXTURES}
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/title/river-backdrop.png"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
+  "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js")
 

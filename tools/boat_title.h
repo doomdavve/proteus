@@ -7,6 +7,8 @@
 typedef struct {
     char name[17]; // The multiplayer nick: BOAT_NET_NAME_BYTES.
     char address[64]; // HOST:PORT for MULTIPLAYER.
+    unsigned location; // Single-player location; BOAT_LOCATION_COUNT selects the basin trial.
+    bool waves, smooth_edges;
     unsigned skin; // Single-player livery; rooms colour boats by slot.
     bool mouse_steering; // Sessions start with captured mouse steering; in-game changes return.
     unsigned soundtrack; // Local music choice, including off; shared by single player and rooms.

@@ -12,8 +12,23 @@ title, soundtrack selection and join flow with distributed binaries. The marine 
 was merged on 2026-10-24. A first [in-game Escape menu](#in-game-escape-menu-2026-10-25)
 (RESUME, STEERING, CONTROLS, BACK TO TITLE / LEAVE ROOM) was implemented 2026-10-25 and has its
 BACK TO TITLE path user-checked; rooms, STEERING and resume recapture await play. Location
-choice, display/volume settings, title music and the live boat-and-gulls scene stay deferred. Boating music implementation and current
+choice and smoothing/waves setup are now shared with the browser (2026-10-25); volume settings, title music and the live boat-and-gulls scene stay deferred. Boating music implementation and current
 verification are owned by the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## Browser parity, 2026-10-25
+
+Implemented in `web-parity`: browser PLAY enters this shared title; browser EXIT becomes
+BACK TO LAUNCHER, flushing saves before reload. SINGLE PLAYER now opens a five-row setup
+(PLACE, WAVES, SMOOTHING, START, BACK) on both platforms, preserving the browser launcher's
+River/Basin/Basin trial choices. Settings and setup persist through native `title.txt` /
+browser IndexedDB. Browser sessions reuse the title window and retain the gesture-started audio
+device, so BACK TO TITLE and repeated sessions work without reloading. The browser multiplayer
+panel offers URL/CONNECT/BACK, using the existing join flow with WebRTC; no host/LAN rows.
+
+Verification: Chrome/SwiftShader automated title/settings/solo navigation, repeated sessions,
+Escape/return, save/reload and audio-context checks pass; captures inspected. Native and
+multiplayer verification, next tasks and limits are owned by
+[browser boating](WEB_BUILD.md#webrtc-rooms). Hand play/listening acceptance remains outstanding.
 
 ## Identity
 
@@ -67,7 +82,7 @@ tracker phrase may play on the title; gameplay music starts or resumes on enteri
 
 | Entry | First implementation | Later integration |
 | --- | --- | --- |
-| Single Player | Opens a small location choice (Basin, River; Eriksberg removed 2026-10-25), then starts the existing free-boating session. Preserve the direct `--course` path. | Add course selection here if the mode becomes a regular game mode. |
+| Single Player | Opens River, Basin or Basin trial plus waves/smoothing setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
 | Multiplayer | Visible from day one. Until the network flow is ready, show a clear “Coming soon” message and return to selection. | Hand off to the multiplayer agent's Host/Join flow; do not invent a separate networking state machine in this menu. |
 | Settings | Music and effects volume, fullscreen on native, and a small controls page. Keep defaults and saved values clear. | Add display options only after checking native and browser support. |
 | Exit | Close the native program. | On the web, replace with “Back to launcher” if the page launcher remains; browser tabs cannot be closed reliably by game code. |
@@ -149,7 +164,7 @@ the menu table above remains a later proposal.
   SINGLE PLAYER as the former macOS app arguments plus `--skin`, and MULTIPLAYER as
   `--connect ADDRESS --name NAME`. Escape in a session returns to the title; the title
   ignores the just-pressed Escape event on its first frame so it cannot immediately close
-  the app. Explicit options behave exactly as before. The web build bypasses the title.
+  the app. Explicit options behave exactly as before. The web build originally bypassed the title; the browser parity update below supersedes that path.
 - Skins: protocol v1 (and v2) has no livery field and every client colours slots 1–4 Sweden,
   Finland, Denmark, Norway, so BOAT applies to single player only and the title says so.
   A per-player livery would need a protocol revision; not done.

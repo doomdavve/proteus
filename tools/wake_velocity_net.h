@@ -1,7 +1,11 @@
 #ifndef WAKE_VELOCITY_NET_H
 #define WAKE_VELOCITY_NET_H
 #include "boat_net_client.h"
+#if defined(__EMSCRIPTEN__)
+#include "boat_net_web.h"
+#else
 #include "boat_net_enet.h"
+#endif
 #include "boat_session.h"
 #include "boat_view.h"
 
@@ -13,7 +17,10 @@
 // keeps its own presentation (spray, cloth) and its skin: slots 0-3 are Sweden, Finland,
 // Denmark and Norway on every client.
 typedef struct {
+#if !defined(__EMSCRIPTEN__)
     BoatNetEnet *enet;
+#endif
+    bool transport_open;
     BoatNetClient client;
     BoatPresentation presentations[BOAT_FLEET_SLOTS]; // Other slots; the own one is the session's.
     Boat shown[BOAT_FLEET_SLOTS]; // Drawn poses of the other boats.

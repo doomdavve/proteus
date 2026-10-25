@@ -61,6 +61,10 @@ covers the 0.5 s repeat, re-press and limits. See [the HUD guide](BOAT_HUD.md) f
 settings, visual fixtures and the remaining manual checks. When Node.js is installed,
 `web_mouse_controls` runs the browser event-contract tests without a browser. Real Wasm
 checks use the opt-in [Playwright command](WEB_BUILD.md#mouse-and-scroll-qualification-2026-10-24).
+`web_rtc_transport` checks browser network bounds and reconnect callbacks; `boat_net_mux`
+checks colliding peer IDs, routing and disconnect isolation across two transports. Browser
+title/persistence and mixed WebRTC/ENet gameplay use the opt-in
+[title and multiplayer checks](WEB_BUILD.md#webrtc-rooms), with the optional native endpoint.
 
 ## Routine checks
 

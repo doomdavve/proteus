@@ -33,12 +33,15 @@ def main():
         page.goto(args.url)
         page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
         page.locator('#settings').evaluate('(element) => element.open = true')
-        page.select_option('#location', 'basin')
-        page.uncheck('#waves')
-        page.uncheck('#aa')
         page.uncheck('#fullscreen')
         page.click('#play')
         page.wait_for_function("Module['boatMouse'] && document.activeElement === Module.canvas")
+        # Shared title -> single-player setup -> start (default river).
+        page.wait_for_timeout(500)
+        page.keyboard.press('Enter', delay=100)
+        page.wait_for_timeout(200)
+        page.keyboard.press('Enter', delay=100)
+        page.wait_for_timeout(1000)
         # Observe the actual C bridge consuming input without changing the returned values.
         page.evaluate('''() => {
           window.controlAudit = { movement: [], scroll: [], wanted: 0 };
@@ -109,7 +112,10 @@ def main():
         page.wait_for_function('controlAudit.wanted === 0')
         page.wait_for_timeout(200)
         assert page.evaluate('document.pointerLockElement === null')
-        page.keyboard.press('m', delay=150)
+        # External unlock opens the Escape menu and preserves mouse steering.
+        page.keyboard.press('Enter', delay=150)
+        page.wait_for_timeout(200)
+        page.locator('#canvas').click()
         page.wait_for_function('document.pointerLockElement === Module.canvas')
         page.keyboard.press('Escape', delay=150)
         page.wait_for_function('document.pointerLockElement === null')
@@ -117,7 +123,9 @@ def main():
         # Unsupported/denied capture must fall back to working keyboard mode.
         page.evaluate('''() => { Module.canvas.requestPointerLock = () => {
           throw new Error('test denial'); }; }''')
-        page.keyboard.press('m', delay=150)
+        page.keyboard.press('Enter', delay=150)
+        page.wait_for_timeout(200)
+        page.locator('#canvas').click()
         page.wait_for_function('controlAudit.wanted === 0')
         page.keyboard.press('w')
         page.keyboard.press('r')

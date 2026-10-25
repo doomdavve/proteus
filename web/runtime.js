@@ -5,7 +5,15 @@ const storageLine = document.getElementById('storage');
 const canvas = Module['canvas'];
 const stage = document.getElementById('stage');
 let started = false;
+const fullscreenOption = document.getElementById('fullscreen');
+try {
+  fullscreenOption.checked = localStorage.getItem('wake-velocity-fullscreen') !== 'off';
+} catch (_) {}
+fullscreenOption.addEventListener('change', () => {
+  try { localStorage.setItem('wake-velocity-fullscreen', fullscreenOption.checked ? 'on' : 'off'); } catch (_) {}
+});
 installBoatMouseControls(Module, canvas, document, window);
+installBoatRtcTransport(Module);
 document.getElementById('fullscreen').disabled = !stage.requestFullscreen;
 
 Module['preRun'] = Module['preRun'] || [];
@@ -50,15 +58,9 @@ playButton.addEventListener('click', () => {
   if (document.getElementById('fullscreen').checked && stage.requestFullscreen) {
     stage.requestFullscreen().catch(() => canvas.focus());
   }
-  const location = document.getElementById('location').value;
-  const args = location === 'course' ? ['--course'] : ['--location', location];
-  args.push('--soundtrack', document.getElementById('soundtrack').value);
-  if (document.getElementById('waves').checked) args.push('--waves');
-  if (document.getElementById('aa').checked) args.push('--gpu-aa');
-  for (const id of ['location', 'soundtrack', 'waves', 'aa']) document.getElementById(id).disabled = true;
   canvas.focus();
   // Audio initialization and PlayMusicStream happen inside this user gesture.
-  callMain(args);
+  callMain([]);
   fitCanvas();
 });
 
@@ -74,6 +76,7 @@ Module['onExit'] = code => {
   document.body.classList.remove('playing');
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   statusLine.textContent = code ? 'The game could not start. Check WebGL 2 support and reload.'
-    : 'Game closed. Reload the page to play again.';
+    : 'Reload to open the launcher again.';
+  if (!code) FS.syncfs(false, () => window.location.reload());
 };
 fitCanvas();

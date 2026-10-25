@@ -10,8 +10,10 @@ and acceptance stay in the [multiplayer plan](MULTIPLAYER_PLAN.md); the codec is
 v3 (2026-10-24) adds the authority-selected basin/Eriksberg/river location to Accept, widens
 position validation to cover the mapped world, and fingerprints the complete compiled map
 bundle for compatibility. A room hosts one fixed location and up to four players. M4 client
-prediction uses only the fields listed here. There is no encryption or authentication: a room
-token is a shared word, not a secret.
+prediction uses only the fields listed here. The application protocol provides no encryption
+or player authentication: a room token is a shared admission word. Native ENet sends these
+bytes without encryption; the optional [WebRTC adapter](WEB_BUILD.md#webrtc-rooms) encrypts its
+transport while retaining the same bytes and delivery classes. No protocol revision is needed.
 
 v4 (2026-10-24) adds the [river race](RACE_PLAN.md) room mode (race R2): room mode 2 in Accept,
 the grid hold as slot flag bit 2, the latest round's GO tick in every snapshot and checkpoint

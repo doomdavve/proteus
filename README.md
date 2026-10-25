@@ -15,7 +15,8 @@ builds can now join a [diagnostic room](#multiplayer-diagnostic-room) on one mac
 Your boat is now predicted and answers the keys at once, but the other boat, wakes and
 rendering are still diagnostic; it is not the finished multiplayer game. The title's
 MULTIPLAYER > HOST A ROOM starts a room on your machine and joins it
-([hosting](#hosting-from-the-game)); browser builds remain single-player.
+([hosting](#hosting-from-the-game)). Browser builds can join an
+[optional WebRTC-enabled authority](docs/WEB_BUILD.md#webrtc-rooms); no public service is bundled.
 
 The [river race](docs/RACE_PLAN.md) is being tuned towards a 45–60 second sprint,
 with a shared starting grid, frequent ferry-wake jumps and confirmed finishing positions.
@@ -748,12 +749,15 @@ cache the previous HTML after a deployment.
 
 A desktop browser with WebAssembly, WebGL 2, and a keyboard is required. The canvas uses
 nearest-neighbour scaling in multiples of the 320x200 scene, with a 320x200 minimum.
-Press **PLAY** to start with sound. The compact **Settings** toggle holds location, soundtrack, waves,
-smooth edges, and fullscreen; smooth edges and fullscreen default to on. The launcher disappears during play; the game fills
-the browser using integer scaling. Press `?` for the built-in controls; Escape closes help
-or releases the mouse/leaves fullscreen. M enables captured mouse steering; scroll down/up
-adds/removes thrust steps. After help, click the canvas to recapture. If capture is unavailable,
-keyboard steering stays available. Reload the page to choose another location. Browser throttling
+Press **PLAY** to start audio and open the shared Wake Velocity title. The page's small
+**Settings** toggle remembers fullscreen; in-game SETTINGS remembers name, livery, steering
+and soundtrack. SINGLE PLAYER selects River, Basin or Basin trial, waves and smoothing.
+The launcher disappears during play; the game uses integer scaling. Press `?` for controls
+and Escape for the in-game menu (the browser may also leave fullscreen). BACK TO TITLE
+returns to setup without reloading. M enables captured mouse steering; scroll down/up
+adds/removes thrust steps. After help or RESUME, click the canvas to recapture. If capture
+is unavailable, keyboard steering stays available. MULTIPLAYER joins an operator-provided
+WebRTC room URL; browser hosting and LAN discovery are unavailable. Browser throttling
 can affect animation/audio in background tabs. Bests are local to this browser and site,
 can be lost when storage is cleared or unavailable, and do not sync with native saves.
 Local recording import/export and native screenshot/profiling commands are not exposed by

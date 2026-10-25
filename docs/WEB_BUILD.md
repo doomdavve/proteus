@@ -1,43 +1,33 @@
 # Browser boating build
 
-Multiplayer planning, 2026-10-23: current browser builds remain single-player. The
-[multiplayer plan](MULTIPLAYER_PLAN.md#browser-decision) recommends native ENet multiplayer
-first and a later WebRTC DataChannel experiment sharing the protocol/physics. Browser code
-cannot directly use raw UDP. GitHub Pages serves the client; multiplayer needs a separately
-reachable authority and, for that WebRTC path, signaling and potentially TURN. No new web
-network dependency, service or gameplay feature is implemented by this plan.
-Since M3 (2026-10-23) native builds fetch and link ENet; the Emscripten configure returns before
-those targets and compiles `wake_velocity` without `PROTEUS_BOAT_NET`, so `--connect` is refused
-as native-only. The HUD/controls worktree built with Emscripten 6.0.12 on 2026-10-24;
-see [control qualification](#mouse-and-scroll-qualification-2026-10-24).
-
 ## Current status
 
-Implemented on 2026-10-19: a CMake/Emscripten build of the released `wake_velocity` game,
-WebGL 2 assets, click-to-start audio, IndexedDB best times, a small HTML launcher, local
-HTTP serving, and a separate GitHub Pages workflow. The workflow now builds and deploys on
-`v*` tag pushes, alongside the existing native release workflow. Ordinary branch pushes do
-not deploy; manual deployment is available from `main` or a `v*` tag. Native releases keep
-their existing behavior. The user confirmed local startup works after SDK activation.
-The user confirmed the deployed web game plays well on 2026-10-20.
-The compact launch page keeps the game screenshot, a PLAY button, a settings toggle, and
-OpenStreetMap attribution. Smooth edges and fullscreen default to on; location, soundtrack, waves,
-and both presentation settings are available in the collapsed panel. All page UI hides
-during play. In-game `?` remains the sole controls guide; reload
-returns to location selection. A bundled game capture supplies the launch-page preview.
-The visible raylib license link is removed; its license file remains distributed. Map
-attribution stays on the launcher and in the mapped-location game help.
-Soundtrack selects A little boat (default), Acid Wake or Off before PLAY. Both XM assets
-are preloaded; Off keeps engine/water audio enabled. The soundtrack addition was verified
-natively on Fedora Wayland; browser compilation and playback of this addition remain
-unverified. See [boating music status](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
-The landing footer now shows the packaged build version: the exact `v*` release tag,
-or a Git development description/hash (with `-dirty` for tracked local changes). The
-packager accepts `--version` for source archives; without Git or an override it shows
-`unknown`. The [live page](https://doomdavve.github.io/proteus/) is linked from the README.
-Next: review the version footer in the deployed build. Chrome/Firefox controls are covered by
-[automated checks below](#mouse-and-scroll-qualification-2026-10-24); Safari itself, physical GPU
-performance, and human audio review remain outstanding.
+Implemented in the isolated `web-parity` worktree, 2026-10-25: the browser enters the shared
+Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER opens PLACE (River, Basin,
+Basin trial), WAVES, SMOOTHING and START. SETTINGS remembers name, single-player boat livery,
+steering and soundtrack. Escape opens the shared in-game menu; BACK TO TITLE returns to setup
+without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The small HTML launcher
+retains fullscreen selection, remembered separately in browser storage. Gameplay/title settings
+use the native `title.txt` format through the existing IndexedDB mount; older saves get the new
+river/waves/smoothing defaults. IndexedDB denial still permits play without durable settings.
+
+Browser multiplayer now uses a JavaScript WebRTC transport and the existing C protocol,
+client prediction, wake reconciliation and remote rendering. The optional native endpoint accepts
+browser players alongside ENet clients in the same four-player authority. MULTIPLAYER offers a
+room signaling URL, CONNECT and BACK; browser hosting and UDP LAN discovery are unavailable.
+See [WebRTC setup and limits](#webrtc-rooms). Normal native/release builds remain ENet-only.
+The GitHub Pages build includes the browser client; Pages does not provide a game server.
+No deployment or public service was created by this change.
+
+The existing Emscripten/WebGL 2 build, click-to-start audio, IndexedDB bests, content-hashed
+packaging and `v*` Pages deployment workflow remain in use. Both music tracks and the shared
+title backdrop are bundled. One browser audio device starts during PLAY and remains alive
+across title/session transitions; Off disables the soundtrack, retaining engine/water sound.
+
+Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/latency and tab
+suspension, measure memory/runtime budgets, and establish secure public signaling/ICE/TURN
+hosting before internet-play acceptance. User play/listening acceptance remains outstanding.
+The earlier launcher and browser qualification records below are dated history.
 
 ## Build and deployment
 
@@ -91,14 +81,15 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
 - **Window:** the browser keeps a fixed 960x600 drawing buffer, containing the 320x200 scene,
   and scales it to whole scene-pixel multiples. This avoids raylib's web resize handler,
   which otherwise takes over canvas sizing. The launcher hides before the game starts;
-  the canvas then fits the full viewport. Fullscreen is selected before launch. Escape does
-  not terminate the browser game. All other simulation/input/audio paths remain shared.
-- **Assets:** preload only `a-little-boat.xm`, textures, and the used shaders into `/assets`.
+  the canvas then fits the full viewport. Fullscreen is selected before launch. Escape opens
+  the in-game menu (and may leave fullscreen); title and sessions share the window.
+- **Assets:** preload both game XM tracks, the title backdrop, textures and used shaders into `/assets`.
   `boat_asset_path()` already resolves that path under Wasm. Geometry is compiled from C
   headers; geometry manifests, editor samples, dance files, and unrelated music are not
   runtime dependencies. The engine/water sounds are synthesized by the existing C audio code.
 - **Audio:** preload before enabling Play; invoke C `main` synchronously from its click
-  handler so raylib/miniaudio creates and starts audio during a user gesture. The same XM
+  handler so raylib/miniaudio starts audio during a user gesture, before the title yields.
+  Session cleanup unloads streams while retaining that device until the title exits. The same XM
   decoder and streaming music code are used as on desktop.
 - **Storage:** mount IDBFS at `/saves` with `autoPersist`, set `XDG_DATA_HOME=/saves`, and
   restore IndexedDB before enabling Play. The existing POSIX path, temporary-file/rename
@@ -110,6 +101,87 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
   bytes and writes the URL mapping into `index.html`. Relative URLs work under a repository
   Pages subpath. There is no service worker or preload cache. Only the generated `site/`
   directory is published; raylib's license is included. SDK/build/cache files stay local.
+
+## WebRTC rooms
+
+The transport feasibility check first echoed C-codec PING bytes unchanged over all five
+negotiated browser/native DataChannels. Gameplay then reused that adapter. Channel IDs 0 and 4
+(control/bootstrap) are reliable and ordered; 1, 2 and 3 are unordered with no retransmissions.
+Existing application sequence numbers discard stale state/births. Protocol v5 bytes are unchanged.
+`boat_net_mux` assigns distinct authority peer IDs to colliding ENet/WebRTC local peer IDs.
+
+Build an optional native endpoint (C++ compiler and OpenSSL development files required;
+C application sources remain C17). The first configure fetches pinned libdatachannel v0.24.1
+and its pinned submodules. No new dependency enters default native or Wasm builds:
+
+```sh
+cmake -S . -B build-rtc -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_WEBRTC=ON
+cmake --build build-rtc --target boat_server boat_bot boat_rtc_echo --parallel
+./build-rtc/boat_server --bind 127.0.0.1 --port 24680 --rtc-port 24682 --location river
+```
+
+Serve the browser build over local HTTP with the normal `web-serve` command. In its title,
+choose MULTIPLAYER and enter `ws://127.0.0.1:24682`. A native client joins the same authority
+at `127.0.0.1:24680`. Free boating, deathmatch and race use the normal server `--mode` flag.
+`wake_velocity --serve` also accepts `--rtc-port` in an enabled native build; the ordinary
+HOST A ROOM button still starts its usual ENet room without a browser listener.
+
+For a LAN experiment, use the server machine's LAN address with `--bind`, enter that address
+in the browser URL, and permit the signaling TCP port and WebRTC ICE UDP traffic. Only same-machine
+connectivity has been verified here. The listener provides plain WebSocket signaling, exchanging
+one complete SDP offer/answer after ICE gathering. Secure-page deployment needs a separately
+operated WSS/TLS endpoint (for example, a reverse proxy to this signaling listener), a reachable
+authority and a tested ICE route. `--ice-server URL` configures the native endpoint; the
+`boatIceServers` array in [index.html](../web/index.html) configures browser STUN/TURN servers
+using standard `RTCIceServer` objects. There is no bundled public server, TURN credential
+service, automatic port forwarding or internet-connectivity guarantee.
+
+WebRTC encrypts its DataChannel transport, but this application has no player identity or
+account authentication. The existing room token remains a shared room admission word. The
+optional dependency is MPL-2.0, with its own dependency licenses; default release packaging
+has not been extended to distribute this optional endpoint. Do not treat a local optional
+build as a qualified relocatable release package.
+
+The JS receive queue holds at most 256 events; disposable overflow drops updates and reliable
+overflow disconnects. Both adapters bound application sends at 64 KiB per channel and refuse
+messages over the protocol's 1100-byte limit. Native polling rejects excess pending accepts,
+oversize signaling/messages and excessive receive backlog. Library/kernel allocations and
+on-wire bandwidth still require measurement against the multiplayer plan's budgets.
+
+Opt-in Playwright checks need Playwright plus Chrome (or `--executable` with a compatible
+Chromium binary). The title check covers saves/reload, audio startup and repeated solo sessions;
+the multiplayer check starts and cleans up its own native room and bot:
+
+```sh
+python3 tools/check_web_rtc_echo.py --url http://127.0.0.1:8000/ --build-dir build-rtc --output build-web/rtc-echo
+python3 tools/check_web_title.py --url http://127.0.0.1:8000/ --output build-web/title-review
+python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --output build-web/net-free
+python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --four-players --output build-web/net-four
+python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --mode deathmatch --output build-web/net-deathmatch
+python3 tools/check_web_multiplayer.py --url http://127.0.0.1:8000/ --build-dir build-rtc --mode race --output build-web/net-race
+```
+
+`boat_rtc_echo [PORT]` is the standalone 120-second protocol-byte echo gate;
+`boat_rtc_echo --fixture FILE` writes its C-codec PING fixture. The Node contract test
+`node tools/test_web_rtc_transport.cjs` checks reliability options, queue/backpressure bounds,
+oversize messages and stale callbacks after reconnect; it also runs in native CTest when Node
+is present and before the Wasm build in Pages CI. `boat_net_mux` tests cross-transport peer-ID collisions, routing across all delivery
+classes, disconnect isolation and aggregate statistics without sockets.
+
+### Verification, 2026-10-25
+
+Apple Silicon macOS, Emscripten 6.0.12 MinSizeRel, Chrome headless/SwiftShader: shared title,
+settings/solo panels, two solo sessions, Escape/return, persisted title settings after reload,
+remembered fullscreen preference, launcher return and running audio context passed automation.
+Title, setup, settings, game and Escape-menu captures were inspected. Audio-context state is
+an automated startup check, not human listening acceptance.
+
+The browser/native WebRTC echo passed all five channels with byte-identical C protocol fixtures.
+Mixed ENet bot + browser gameplay passed in free, deathmatch and river race rooms, including
+reset, leave and rejoin; the free-room run reported zero malformed, output or emission faults.
+Browser gameplay/menu captures were inspected. This is local automated play, not human acceptance,
+physical GPU performance, WAN loss/jitter, TURN, sustained four-player browser load or suspension qualification.
+Native regression and final browser input results are recorded at handoff below.
 
 ## Mouse and scroll qualification, 2026-10-24
 
@@ -312,3 +384,28 @@ checks and Chrome desktop/390px footer visibility/no-horizontal-overflow checks 
 fifteen retired field cases stay disabled. Logs: `/tmp/proteus-web-version-*.log`.
 Changed documentation link targets and `git diff --check` pass.
 Next: confirm the version on the next deployed build; deployment is not performed here.
+
+## Final regression evidence, 2026-10-25
+
+In `web-parity` on Apple Silicon macOS: native Debug configure/build and all **93 active
+CTests passed** in 72.67 s (13 retired cases disabled, GPU tests off). This includes the new
+multiplexer and browser transport contract cases and the existing socket-based native room
+checks. The first sandboxed suite could not bind localhost sockets; the complete rerun with
+local socket access passed. The application sources compiled without warnings; the optional
+third-party build retained an upstream stb_vorbis warning.
+
+The final Emscripten 6.0.12 MinSizeRel `web` build, Chrome title/save/reload check and browser
+input integration passed. Native title capture inspected; native GPU river demo (`--demo
+--frames 120`) completed without logged errors. These are agent-run checks, not human audio
+review or user acceptance. The repeatable `check_web_rtc_echo.py` also passed all channels and
+32 messages in order on each reliable channel. Changed documentation links and workflow YAML
+syntax were checked; no CI run or deployment was performed.
+
+The final local capacity check passed with **two browser clients plus two native bots**,
+rejected a fifth native client as full, and passed browser reset/leave/rejoin afterward. The
+authority reported zero malformed, output and emission faults; an abruptly closed browser
+was removed by the existing timeout path. Its four-player capture was inspected. Attempts
+to run three browser canvases together under headless SwiftShader first lost rapid scripted
+URL edits, then stalled a third-canvas Play click; that software-renderer configuration is
+not qualified. No result is claimed for three/four browser clients or physical multi-browser
+performance. This does not replace WAN impairment, suspension or long-soak qualification.

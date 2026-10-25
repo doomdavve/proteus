@@ -11,6 +11,10 @@
 #include "boat_fleet_bots.h"
 #include "boat_match.h"
 #include "boat_net_enet.h"
+#ifdef PROTEUS_WEBRTC
+#include "boat_net_mux.h"
+#include "boat_net_rtc.h"
+#endif
 #include "boat_net_server.h"
 
 #include <inttypes.h>
@@ -38,6 +42,7 @@ static void usage(FILE *out)
         "[--report-every N]\n"
         "                   [--mode free|deathmatch|race] [--round-seconds S]\n"
         "                   [--lan-port N | --no-lan] [--exit-with-stdin]\n"
+        "                   [--rtc-port N] [--ice-server URL] (optional WebRTC build)\n"
         "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
         "basin|river]\n"
         "                   [--report-every N] [--mode free|deathmatch] [--round-seconds S]\n"
@@ -310,6 +315,8 @@ static void request_stop(int signal_number)
 
 typedef struct {
     const char *bind, *token;
+    uint16_t rtc_port;
+    const char *ice_server;
     uint16_t port, lan_port; // LAN discovery off when zero.
     bool waves;
     unsigned long players, ticks, report;
@@ -351,6 +358,26 @@ static int room(const RoomOptions *options)
         boat_net_enet_cleanup();
         return 1;
     }
+    BoatNetTransport transport = boat_net_enet_transport(enet);
+#ifdef PROTEUS_WEBRTC
+    BoatNetRtc *rtc = NULL;
+    BoatNetMux mux;
+    if (options->rtc_port) {
+        rtc = boat_net_rtc_listen(
+            options->bind, options->rtc_port, options->ice_server, error, sizeof(error));
+        if (!rtc) {
+            fprintf(stderr, "boat_server: %s\n", error);
+            boat_net_enet_close(enet, 0);
+            boat_net_enet_cleanup();
+            return 1;
+        }
+        boat_net_mux_init(&mux, transport, boat_net_rtc_transport(rtc));
+        transport = boat_net_mux_transport(&mux);
+        printf("WebRTC signaling: ws://%s:%u (ENet still on UDP %u)\n", options->bind,
+            options->rtc_port, options->port);
+        fflush(stdout);
+    }
+#endif
     // Through u64: a double above 2^32 saturates (on arm64) when converted to u32 directly.
     uint32_t epoch = (uint32_t)time(NULL) ^ (uint32_t)(uint64_t)(boat_net_clock() * 1e6);
     BoatNetServerConfig config = { .token = options->token,
@@ -363,8 +390,11 @@ static int room(const RoomOptions *options)
         .race = options->race,
         .race_rules = boat_race_default_rules() };
     static BoatNetServer server;
-    if (!boat_net_server_init(&server, boat_net_enet_transport(enet), &config)) {
+    if (!boat_net_server_init(&server, transport, &config)) {
         fprintf(stderr, "boat_server: invalid room configuration.\n");
+#ifdef PROTEUS_WEBRTC
+        boat_net_rtc_close(rtc);
+#endif
         boat_net_enet_close(enet, 0);
         boat_net_enet_cleanup();
         return 1;
@@ -431,6 +461,10 @@ static int room(const RoomOptions *options)
         busy += boat_net_clock() - now;
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
             int peer = server.slot_peer[i];
+#ifdef PROTEUS_WEBRTC
+            if (rtc && peer >= 0)
+                peer = mux.owner[peer] == 0 ? (int)mux.local[peer] : -1;
+#endif
             unsigned mtu = peer < 0 ? 0 : boat_net_enet_peer_mtu(enet, (unsigned)peer);
             max_mtu = mtu > max_mtu ? mtu : max_mtu;
         }
@@ -452,7 +486,10 @@ static int room(const RoomOptions *options)
     }
     boat_net_server_shutdown(&server);
     boat_net_enet_flush(enet);
-    BoatNetTransportStats net = boat_net_enet_transport(enet).stats(enet);
+    BoatNetTransportStats net = transport.stats(transport.context);
+#ifdef PROTEUS_WEBRTC
+    boat_net_rtc_close(rtc);
+#endif
     boat_net_enet_close(enet, 1);
     boat_net_lan_close(lan);
     boat_net_enet_cleanup();
@@ -534,6 +571,20 @@ int boat_server_main(int argc, char **argv)
             }
             room_option = true;
             ++i;
+        } else if (strcmp(argv[i], "--rtc-port") == 0 && value) {
+#ifdef PROTEUS_WEBRTC
+            if (!boat_net_parse_port(value, &room_options.rtc_port))
+                return 2;
+            room_option = true;
+            ++i;
+#else
+            fprintf(stderr, "boat_server: --rtc-port requires a PROTEUS_WEBRTC=ON build.\n");
+            return 2;
+#endif
+        } else if (strcmp(argv[i], "--ice-server") == 0 && value) {
+            room_options.ice_server = value;
+            room_option = true;
+            ++i;
         } else if (strcmp(argv[i], "--lan-port") == 0 && value) {
             if (!boat_net_parse_port(value, &room_options.lan_port)) {
                 fprintf(
@@ -587,6 +638,10 @@ int boat_server_main(int argc, char **argv)
             usage(stderr);
             return 2;
         }
+    }
+    if (room_options.ice_server && !room_options.rtc_port) {
+        fprintf(stderr, "boat_server: --ice-server needs --rtc-port.\n");
+        return 2;
     }
     if (round && !deathmatch) {
         fprintf(stderr, "boat_server: --round-seconds needs --mode deathmatch.\n");
