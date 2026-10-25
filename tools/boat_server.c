@@ -1,7 +1,12 @@
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L // poll and read for --exit-with-stdin under strict C17.
+#endif
 /* Multiplayer authority process. Headless: no window, audio, asset or file access.
  * --scripted (M2) runs the local fleet with bots as fast as possible and exits.
  * Otherwise (M3) it listens for boat_study/boat_bot clients over ENet and runs the room at
- * 120 Hz wall-clock time until --ticks/--seconds elapse or it is interrupted. */
+ * 120 Hz wall-clock time until --ticks/--seconds elapse or it is interrupted. The same entry
+ * point is the game's `--serve` mode (boat_server.h). */
+#include "boat_server.h"
 #include "boat_fleet.h"
 #include "boat_fleet_bots.h"
 #include "boat_match.h"
@@ -14,6 +19,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+// Exclude the GDI/user names raylib also declares (headers below may include raylib.h).
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
+#include <windows.h>
+#else
+#include <poll.h>
+#include <unistd.h>
+#endif
 
 static void usage(FILE *out)
 {
@@ -22,7 +37,7 @@ static void usage(FILE *out)
         "                   [--location basin|eriksberg|river] [--ticks N | --seconds S] "
         "[--report-every N]\n"
         "                   [--mode free|deathmatch|race] [--round-seconds S]\n"
-        "                   [--lan-port N | --no-lan]\n"
+        "                   [--lan-port N | --no-lan] [--exit-with-stdin]\n"
         "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
         "basin|eriksberg|river]\n"
         "                   [--report-every N] [--mode free|deathmatch] [--round-seconds S]\n"
@@ -34,6 +49,8 @@ static void usage(FILE *out)
         "The room answers LAN searches (the title's MULTIPLAYER panel, boat_bot --discover) on\n"
         "UDP --lan-port (default %d): from this machine only with a loopback --bind, otherwise\n"
         "from the local network. --no-lan stays silent.\n"
+        "--exit-with-stdin: close the room when standard input ends, so a game that hosts the\n"
+        "room through a pipe (boat_study --host) cannot leave it running after it exits.\n"
         "--scripted: bots drive N ticks (default 7200, one minute at 120 Hz) as fast as\n"
         "possible, then print the fleet hash and per-tick cost; no socket.\n"
         "--mode deathmatch: timed rounds (--round-seconds, default 300) scoring +1 for capsizing\n"
@@ -255,6 +272,36 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
 
 static volatile sig_atomic_t stop_requested;
 
+// Standard input has ended: the hosting game closed its end of the pipe or exited.
+static bool stdin_closed(void)
+{
+#ifdef _WIN32
+    HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD waiting = 0;
+    if (in == NULL || in == INVALID_HANDLE_VALUE)
+        return true;
+    if (!PeekNamedPipe(in, NULL, 0, NULL, &waiting, NULL))
+        return true; // ERROR_BROKEN_PIPE once the writer is gone.
+    char discard[256];
+    DWORD read = 0;
+    if (waiting
+        && !ReadFile(
+            in, discard, waiting < sizeof(discard) ? waiting : sizeof(discard), &read, NULL))
+        return true;
+    return false;
+#else
+    struct pollfd in = { .fd = STDIN_FILENO, .events = POLLIN };
+    while (poll(&in, 1, 0) > 0) {
+        if (in.revents & (POLLERR | POLLNVAL))
+            return true;
+        char discard[256];
+        if (read(STDIN_FILENO, discard, sizeof(discard)) <= 0)
+            return true; // End of file: every writer has closed.
+    }
+    return false;
+#endif
+}
+
 static void request_stop(int signal_number)
 {
     (void)signal_number;
@@ -267,7 +314,7 @@ typedef struct {
     bool waves;
     unsigned long players, ticks, report;
     const BoatMatchRules *rules; // Deathmatch rules, or NULL for free play.
-    bool race;
+    bool race, exit_with_stdin;
     BoatLocationId location;
 } RoomOptions;
 
@@ -354,6 +401,10 @@ static int room(const RoomOptions *options)
     double busy = 0, started = boat_net_clock();
     int result = 0;
     while (!stop_requested && (!options->ticks || server.fleet.state.tick < options->ticks)) {
+        if (options->exit_with_stdin && stdin_closed()) {
+            printf("boat_server: standard input closed; closing the room.\n");
+            break;
+        }
         double now = boat_net_clock();
         uint64_t before = server.fleet.state.tick;
         if (!boat_net_server_service(&server, now)) {
@@ -433,7 +484,7 @@ static int room(const RoomOptions *options)
     return result;
 }
 
-int main(int argc, char **argv)
+int boat_server_main(int argc, char **argv)
 {
     unsigned long ticks = 0, boats = BOAT_FLEET_SLOTS, report = 0, seconds = 0, round = 0;
     bool deathmatch = false, race = false, location_given = false;
@@ -481,6 +532,9 @@ int main(int argc, char **argv)
             }
             room_option = true;
             ++i;
+        } else if (strcmp(argv[i], "--exit-with-stdin") == 0) {
+            room_options.exit_with_stdin = true;
+            room_option = true;
         } else if (strcmp(argv[i], "--no-lan") == 0) {
             room_options.lan_port = 0;
             room_option = true;
@@ -547,7 +601,8 @@ int main(int argc, char **argv)
         if (room_option || seconds) {
             fprintf(stderr,
                 "boat_server: --scripted runs without a socket; room options "
-                "(--bind, --port, --lan-port, --no-lan, --token, --players, --waves, "
+                "(--bind, --port, --lan-port, --no-lan, --exit-with-stdin, --token, --players, "
+                "--waves, "
                 "--seconds) do not "
                 "apply.\n");
             return 2;

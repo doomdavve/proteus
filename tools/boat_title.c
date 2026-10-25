@@ -1,5 +1,6 @@
 #include "boat_title.h"
 #include "boat_assets.h"
+#include "boat_location.h"
 #include "boat_music.h"
 #include "boat_net_protocol.h"
 #include "boat_replay.h"
@@ -17,9 +18,23 @@
 enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
 
 typedef enum { ROW_SINGLE, ROW_MULTI, ROW_SETTINGS, ROW_EXIT, MAIN_ROWS } MainRow;
-typedef enum { ROW_LAN, ROW_ADDRESS, ROW_CONNECT, ROW_BACK, JOIN_ROWS } JoinRow;
+typedef enum { ROW_HOST_ROOM, ROW_LAN, ROW_ADDRESS, ROW_CONNECT, ROW_BACK, JOIN_ROWS } JoinRow;
+typedef enum { ROW_MODE, ROW_PLACE, ROW_WATER, ROW_START, ROW_HOST_BACK, HOST_ROWS } HostRow;
 typedef enum { ROW_NAME, ROW_BOAT, ROW_MOUSE, ROW_MUSIC, ROW_DONE, SETTINGS_ROWS } SettingsRow;
-typedef enum { PANEL_MAIN, PANEL_JOIN, PANEL_SETTINGS } Panel;
+typedef enum { PANEL_MAIN, PANEL_JOIN, PANEL_HOST, PANEL_SETTINGS } Panel;
+
+static const char *const host_modes[BOAT_TITLE_HOST_MODES] = { "free", "deathmatch", "race" };
+
+const char *boat_title_host_mode(unsigned mode)
+{
+    return host_modes[mode < BOAT_TITLE_HOST_MODES ? mode : 0];
+}
+
+// Race rooms are always on the river.
+static unsigned host_location(const BoatTitleSettings *s)
+{
+    return s->host_mode == BOAT_TITLE_HOST_RACE ? BOAT_LOCATION_RIVER : s->host_location;
+}
 
 typedef struct {
     Texture2D backdrop;
@@ -142,6 +157,7 @@ static void draw_logo(double time)
 static int row_count(const Title *t)
 {
     return t->panel == PANEL_JOIN    ? JOIN_ROWS
+        : t->panel == PANEL_HOST     ? HOST_ROWS
         : t->panel == PANEL_SETTINGS ? SETTINGS_ROWS
                                      : MAIN_ROWS;
 }
@@ -189,8 +205,24 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             snprintf(value, size, "%s", boat_music(s->soundtrack)->label);
         return;
     }
+    if (t->panel == PANEL_HOST) {
+        static const char *labels[HOST_ROWS] = { "MODE", "PLACE", "WATER", "START ROOM", "BACK" };
+        static const char *modes[BOAT_TITLE_HOST_MODES]
+            = { "FREE BOATING", "DEATHMATCH", "RIVER RACE" };
+        *label = labels[row];
+        char place[32];
+        upper(place, sizeof(place), boat_location(host_location(s))->name);
+        if (row == ROW_MODE)
+            snprintf(value, size, "< %s >", modes[s->host_mode]);
+        else if (row == ROW_PLACE)
+            snprintf(value, size, s->host_mode == BOAT_TITLE_HOST_RACE ? "%s" : "< %s >", place);
+        else if (row == ROW_WATER)
+            snprintf(value, size, "< %s >", s->host_waves ? "WAVES" : "CALM");
+        return;
+    }
     if (t->panel == PANEL_JOIN) {
-        static const char *labels[JOIN_ROWS] = { "LAN", "ADDRESS", "CONNECT", "BACK" };
+        static const char *labels[JOIN_ROWS]
+            = { "HOST A ROOM", "LAN", "ADDRESS", "CONNECT", "BACK" };
         *label = labels[row];
         if (row == ROW_ADDRESS)
             snprintf(value, size, "%s", s->address);
@@ -295,6 +327,21 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     char lan[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_LAN)
         hint = lan_hint(t, lan, sizeof(lan));
+    if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_HOST_ROOM)
+        hint = "RUN A ROOM ON THIS COMPUTER AND JOIN IT";
+    if (!hint && t->panel == PANEL_HOST) {
+        static const char *modes[BOAT_TITLE_HOST_MODES] = { "SHARED FREE BOATING, NO SCORES",
+            "TIMED ROUNDS: CAPSIZE THE OTHERS", "SPRINT DOWN THE RIVER FROM A GRID" };
+        if (t->selected == ROW_MODE)
+            hint = modes[s->host_mode];
+        else if (t->selected == ROW_PLACE && s->host_mode == BOAT_TITLE_HOST_RACE)
+            hint = "RIVER RACES ALWAYS RUN ON THE RIVER";
+        else if (t->selected == ROW_START) {
+            snprintf(
+                lan, sizeof(lan), "OPEN TO YOUR LAN ON UDP %d; LEAVING CLOSES IT", BOAT_NET_PORT);
+            hint = lan;
+        }
+    }
     if (hint) {
         const char *shown = fit(hint, WIDTH - 12);
         int x = (WIDTH - MeasureText(shown, 10)) / 2, y = top + height + 3;
@@ -468,6 +515,19 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
             t.shown = (unsigned)((int)(t.shown + t.found.count) + turn) % t.found.count;
         }
+        if (t.panel == PANEL_HOST && t.selected <= ROW_WATER) {
+            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
+                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+            if (t.selected == ROW_MODE)
+                s->host_mode
+                    = (s->host_mode + BOAT_TITLE_HOST_MODES + turn) % BOAT_TITLE_HOST_MODES;
+            else if (t.selected == ROW_PLACE && s->host_mode != BOAT_TITLE_HOST_RACE)
+                s->host_location
+                    = (s->host_location + BOAT_LOCATION_COUNT + turn) % BOAT_LOCATION_COUNT;
+            else if (t.selected == ROW_WATER && turn)
+                s->host_waves = !s->host_waves;
+            activate = false;
+        }
         bool settings = t.panel == PANEL_SETTINGS && !t.editing;
         if (settings
             && (t.selected == ROW_BOAT || t.selected == ROW_MOUSE || t.selected == ROW_MUSIC)) {
@@ -488,8 +548,17 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     begin_edit(&t, s->name);
                 else
                     back = true;
+            } else if (t.panel == PANEL_HOST) {
+                if (t.selected == ROW_START) {
+                    choice = BOAT_TITLE_HOST;
+                    chosen = true;
+                } else
+                    back = true;
             } else if (t.panel == PANEL_JOIN) {
-                if (t.selected == ROW_LAN) {
+                if (t.selected == ROW_HOST_ROOM) {
+                    t.panel = PANEL_HOST;
+                    t.selected = ROW_START;
+                } else if (t.selected == ROW_LAN) {
 #ifdef PROTEUS_BOAT_NET
                     if (t.found.count) {
                         boat_net_lan_endpoint(
@@ -518,7 +587,11 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             } else if (t.selected == ROW_EXIT)
                 chosen = true;
         }
-        if (back && t.panel == PANEL_JOIN) {
+        if (back && t.panel == PANEL_HOST) {
+            boat_title_save(s);
+            t.panel = PANEL_JOIN;
+            t.selected = ROW_HOST_ROOM;
+        } else if (back && t.panel == PANEL_JOIN) {
             stop_search(&t);
             t.panel = PANEL_MAIN;
             t.selected = ROW_MULTI;
@@ -530,7 +603,9 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             chosen = true;
         char status[128];
         snprintf(status, sizeof(status), "CONNECTING TO %s ...", s->address);
-        draw_screen(&t, s, choice == BOAT_TITLE_JOIN ? status : NULL);
+        if (choice == BOAT_TITLE_HOST)
+            snprintf(status, sizeof(status), "STARTING THE ROOM ...");
+        draw_screen(&t, s, choice == BOAT_TITLE_JOIN || choice == BOAT_TITLE_HOST ? status : NULL);
         present(&t);
     }
     close_title(&t);
@@ -564,7 +639,9 @@ static bool settings_path(char *path, size_t size)
 
 void boat_title_load(BoatTitleSettings *s)
 {
-    *s = (BoatTitleSettings) { .name = "player", .skin = BOAT_SKIN_SWEDEN };
+    *s = (BoatTitleSettings) {
+        .name = "player", .skin = BOAT_SKIN_SWEDEN, .host_location = BOAT_LOCATION_RIVER
+    };
     snprintf(s->address, sizeof(s->address), "127.0.0.1:%d", BOAT_NET_PORT);
     char path[4096], line[160];
     FILE *file = settings_path(path, sizeof(path)) ? fopen(path, "r") : NULL;
@@ -586,6 +663,16 @@ void boat_title_load(BoatTitleSettings *s)
             s->mouse_steering = !strcmp(value, "on");
         else if (!strcmp(line, "soundtrack"))
             boat_music_parse(value, &s->soundtrack);
+        else if (!strcmp(line, "host_mode")) {
+            for (unsigned i = 0; i < BOAT_TITLE_HOST_MODES; ++i)
+                if (!strcmp(value, host_modes[i]))
+                    s->host_mode = i;
+        } else if (!strcmp(line, "host_location")) {
+            const BoatWorldDefinition *location = boat_location_find(value);
+            if (location)
+                s->host_location = location->id;
+        } else if (!strcmp(line, "host_waves"))
+            s->host_waves = !strcmp(value, "on");
     }
     fclose(file);
 }
@@ -602,5 +689,8 @@ void boat_title_save(const BoatTitleSettings *s)
     fprintf(file, "name=%s\naddress=%s\nskin=%s\nmouse_steering=%s\nsoundtrack=%s\n", s->name,
         s->address, boat_skin_name(s->skin), s->mouse_steering ? "on" : "off",
         boat_music(s->soundtrack)->id);
+    fprintf(file, "host_mode=%s\nhost_location=%s\nhost_waves=%s\n",
+        boat_title_host_mode(s->host_mode), boat_location(s->host_location)->name,
+        s->host_waves ? "on" : "off");
     fclose(file);
 }

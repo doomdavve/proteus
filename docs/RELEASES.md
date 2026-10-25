@@ -2,8 +2,9 @@
 
 The [multiplayer plan](MULTIPLAYER_PLAN.md) proposes native multiplayer before browser support;
 release packages link ENet for `wake_velocity --connect` and the title's MULTIPLAYER entry
-(2026-10-23/24) and include `enet-LICENSE.txt`. Since 2026-10-24 both also carry `boat_server`
-for LAN rooms (Windows: `host.bat`; Mac: inside the app bundle). M6 will add protocol/content
+(2026-10-23/24) and include `enet-LICENSE.txt`. From 2026-10-24 both also carried `boat_server`
+for LAN rooms; since 2026-10-25 the game serves rooms itself (`wake_velocity --serve`, the
+title's HOST A ROOM, Windows `host.bat`), so packages carry one executable. M6 will add protocol/content
 identity, native cross-platform checks and a separate Linux headless-server distribution to
 release documentation. A future native multiplayer release need not imply browser multiplayer parity.
 

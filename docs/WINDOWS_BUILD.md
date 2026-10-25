@@ -12,6 +12,14 @@ Packaged LAN server (2026-10-24): the workflow also builds `boat_server`, `boat_
 test, and packages `boat_server.exe` with `host.bat` (a room on `--bind 0.0.0.0`). The relocated
 check runs `boat_server.exe --scripted --ticks 240`.
 
+Host from the game (2026-10-25): the ZIP no longer carries `boat_server.exe`. `wake_velocity.exe
+--serve` is the room (`host.bat` runs it with `--bind 0.0.0.0`), and the title's HOST A ROOM
+starts it as a hidden child process (`CreateProcess`, `CREATE_NO_WINDOW`) that closes when the
+game's pipe ends. The relocated check runs `wake_velocity.exe --serve --scripted --ticks 240`, and
+CTest adds `boat_study_serve_scripted` and `boat_host`. The Windows process and pipe code has not
+been compiled yet; the next CI run is its first check. See
+[host from the game](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25).
+
 2026-10-24: the first MSVC build of the M3+ code,
 [run 40082682785](https://github.com/doomdavve/proteus/actions/runs/40082682785/job/120839290770),
 failed compiling `src/boat_net_enet.c`: ENet's headers include `windows.h` after raylib, so

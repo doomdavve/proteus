@@ -2,14 +2,17 @@ Wake Velocity - Windows x64
 
 Extract the entire ZIP, then double-click launch.bat (or wake_velocity.exe) to open
 the Wake Velocity title. Pick NAME, BOAT and STEERING under SETTINGS, then SINGLE PLAYER for the river, or
-MULTIPLAYER to type a room's HOST:PORT address and connect. Esc in a session
-opens a menu; BACK TO TITLE (or LEAVE ROOM) returns to the title. Keep assets beside wake_velocity.exe.
+MULTIPLAYER to join a room found on the network (LAN) or type its HOST:PORT address.
+Esc in a session opens a menu; BACK TO TITLE (or LEAVE ROOM) returns to the title.
+Keep assets beside wake_velocity.exe.
 
-To host a room for friends on the same network, double-click host.bat and allow
-boat_server.exe through Windows Firewall when asked. Friends choose MULTIPLAYER
-and type this PC's local address with port 24680 (for example 192.168.1.20:24680;
-run ipconfig to find it). Up to four boats. host.bat passes options through, for
-example: host.bat --waves
+To host a room for friends on the same network, choose MULTIPLAYER > HOST A ROOM,
+pick the mode, place and water, then START ROOM, and allow wake_velocity.exe through
+Windows Firewall when asked. You join it at once; CLOSE ROOM in the Esc menu ends it
+for everyone. Friends see the room in the LAN row, or type this PC's local address with
+port 24680 (for example 192.168.1.20:24680; run ipconfig to find it). Up to four boats.
+For a room without playing in it, double-click host.bat instead; it passes options
+through, for example: host.bat --waves
 Hosting over the internet needs UDP port forwarding or a VPN; rooms have no
 encryption or accounts.
 

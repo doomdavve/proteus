@@ -4,7 +4,10 @@ Multiplayer M3 (2026-10-23): native builds fetch the pinned ENet library, and `b
 links it for the diagnostic `--connect` mode, so the app bundle now carries
 `enet-LICENSE.txt`. Since 2026-10-24 the bundle also carries the room authority at
 `Contents/MacOS/boat_server`, ad-hoc signed before the app, and CI runs it relocated with
-`--scripted`; see [hosting from a package](../README.md#hosting-from-a-package). There is no
+`--scripted`. Since 2026-10-25 that copy is gone: the game serves rooms itself
+(`Contents/MacOS/wake_velocity --serve`, and the title's HOST A ROOM), so the bundle holds one
+executable and CI runs `wake_velocity --serve --scripted --ticks 240`; see
+[hosting from the game](../README.md#hosting-from-the-game). The 2026-10-24 notes follow. There is no
 `boat_bot` and no Host control. Since 2026-10-24 the title's MULTIPLAYER entry joins a room by address (not yet
 re-run through the packaged app or CI). The plan's M6 owns server packaging, firewall guidance and a child-process Host
 option. The package script change was run locally on a Debug build; the CI workflow has not
@@ -43,8 +46,8 @@ checkout had uncommitted changes when packaged.
 Double-clicking the app opens the Wake Velocity title (2026-10-24), as does `boat_study`
 without options. Its SINGLE PLAYER starts the preferred river setup: current, crossing
 wake, gentle waves, GPU antialiasing, camera distance 12, and camera height 6, in the
-chosen BOAT livery. MULTIPLAYER lists `boat_server` rooms found on the local network and
-joins one, or a typed HOST:PORT, with the chosen NAME. The single-player setup is equivalent to:
+chosen BOAT livery. MULTIPLAYER hosts a room (HOST A ROOM), lists rooms found on the local
+network and joins one, or a typed HOST:PORT, with the chosen NAME. The single-player setup is equivalent to:
 
 ```sh
 ./build/boat_study --current --crossing-wake --location river --waves --gpu-aa --camera-distance 12 --camera-height 6

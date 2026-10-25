@@ -60,6 +60,10 @@ protocol v4 with the hold and the race GO tick, predicted hold/ferry, HUD and re
 implemented and automatically verified, awaiting human race-room play. R3's slalom and
 moving storm are implemented, with the storm presentation user-accepted; full-course/pacing
 work and R4 multiplayer acceptance remain in the [race plan](RACE_PLAN.md).
+On 2026-10-25 the game gained [hosting from the title](#host-from-the-game--2026-10-25)
+(MULTIPLAYER > HOST A ROOM, `boat_study --host`): the game runs a second copy of itself as
+`--serve` and joins it, so packages ship one executable. User-played 2026-10-25 ("Works
+great!"); Windows compilation unverified. The same section plans the executable rename to `wake_velocity`.
 Numerical budgets below are proposed gates, not measured multiplayer results.
 The final evidence section distinguishes checks performed for this document from future checks.
 
@@ -84,7 +88,9 @@ or a reachable server. Two-process first proof: one server, one rendered client 
 client; the human proof uses one server and two rendered clients. A later Host action starts
 the same server as a child process and connects locally. This provides player-hosted play
 without tying authority to a window's focus, render stalls or audio loop. No in-process listen
-server variant or host migration is needed. The local host still has a latency advantage;
+server variant or host migration is needed. (2026-10-25: the child is the game's own
+executable in `--serve` mode rather than a separate binary; see
+[host from the game](#host-from-the-game--2026-10-25).) The local host still has a latency advantage;
 a remotely hosted server is the preferred fairness/connectivity option for regular sessions.
 
 First release: shared free boating, collision/wake play, visible player colors/names, quick
@@ -775,7 +781,9 @@ Deliver direct host/port plus room token, graceful exit/disconnect, child-proces
 firewall/NAT help and a minimal dedicated service/run guide. Prefer a standalone server package
 for Linux; existing macOS/Windows player package paths remain stable. (Since 2026-10-24 those
 packages already carry the diagnostic `boat_server`; see the
-[packaged server handoff](#packaged-lan-server-handoff--2026-10-24).) Include ENet license and
+[packaged server handoff](#packaged-lan-server-handoff--2026-10-24). Since 2026-10-25 the
+child-process Host is implemented and the packages carry the game alone, which serves rooms
+with `--serve`; see [host from the game](#host-from-the-game--2026-10-25).) Include ENet license and
 protocol/content IDs in build metadata. Do not publish/deploy as part of implementation tests.
 
 Automated: macOS/Windows core+codec/loopback CI, Linux server build/run without display/audio
@@ -1692,6 +1700,116 @@ wake and reset feedback remain unaccepted. M5's broader impairment/resource/soak
 Full river/bridge/berth/traffic encounter coverage, 128-wake map costs, independent cache/world
 ownership and Windows/Linux qualification remain open. No new two-machine or cross-platform
 session was performed for this change. Deferred M4 acceptance stays deferred.
+
+## Host from the game — 2026-10-25
+
+The user asked for multiplayer to be "dead simple to get started": the game itself should
+start a server and join it, with the room's settings in a menu, and a later rename of the
+executable should be planned.
+
+| Implemented | Automated verification | Manual observation | User acceptance |
+| --- | --- | --- | --- |
+| Title MULTIPLAYER > HOST A ROOM panel; `boat_study --host`, `--serve`, `--port`; `boat_server --exit-with-stdin`; single-executable Mac/Windows packages | New CTests below; full suite; Mac package built and run relocated | Agent-run windowed host sessions, a bot in a hosted room, the game killed mid-room, a busy port; title panels captured and inspected | User played it on macOS, 2026-10-25: "Works great!" (setup not recorded: whether a second machine joined is unknown) |
+
+**Decision: a child process of the game's own executable.** Options weighed with the user:
+(A) launch the separate `boat_server` binary as a child, as this plan proposed; (B) an
+in-process server thread, the integrated-server design Minecraft has used since 1.3; (C) an
+in-process server ticked from the frame loop, Quake's listen server; (D) the game relaunching
+itself as the server. The user chose D. It keeps A's isolation (the room's 120 Hz clock never
+waits for the host's frames, focus, window drags or audio) and adds one executable to sign,
+package and allow through firewalls, which also suits the rename below. B was set aside for
+now because the core still holds process-wide lazily built state that a second simulation
+thread would race on: `boat_map.c`'s shoreline cache, `waterfront_city.c`'s river crop switch
+and the `initialized` model sets in `waterfront_harbor.c` and `waterfront_traffic.c`. Moving
+that state into the world is the prerequisite if an in-process host (or the host's own client
+over the in-memory transport) is wanted later. C was rejected: a stalled host loop
+(a Windows title-bar drag blocks it) would freeze and then burst-correct every player.
+
+**Behaviour.**
+- `boat_server.c`'s entry point is now `boat_server_main` (`tools/boat_server.h`).
+  `boat_server` is a two-line wrapper (`tools/boat_server_main.c`). `boat_study --serve ARGS`
+  runs the same command line before any window, audio or asset work.
+- `boat_server --exit-with-stdin` closes the room gracefully once its standard input ends.
+  POSIX polls `poll`/`read` on stdin. Windows uses `PeekNamedPipe`, which fails once the
+  writer has gone. The hosting game holds the only write end, so the room closes when the game
+  leaves or dies.
+- `tools/boat_study_host.[ch]` starts `<own executable> --serve --bind 0.0.0.0 --port N --mode M
+  [--location L] [--waves] --exit-with-stdin`. POSIX uses `posix_spawn` and finds its own path
+  through `_NSGetExecutablePath` or `/proc/self/exe`. Windows uses `CreateProcess` with
+  `CREATE_NO_WINDOW` and `GetModuleFileName`. The room's merged stdout/stderr come back
+  through a non-blocking pipe and are echoed with a `[room]` prefix. The game waits up to 5 s
+  for the `boat_server listening on` line. While playing, it drains the pipe every frame and
+  ends the session with the room's last line if the child exits. On leaving, the client
+  disconnects first, then the game closes the room's input. It waits 2 s, then kills the child.
+- `boat_study --host free|deathmatch|race [--location L] [--waves] [--port N] [--name TEXT]`
+  hosts and joins `127.0.0.1:N` (default 24680). `--host race` requires the river. `--host`
+  rejects `--connect`/`--token`, and `--port` requires `--host`. The Escape menu's last row
+  reads CLOSE ROOM, with the hint "YOU HOST: CLOSING ENDS THE ROOM".
+- On the title, MULTIPLAYER gains a first row, HOST A ROOM. It opens MODE (FREE BOATING,
+  DEATHMATCH, RIVER RACE), PLACE (BASIN, ERIKSBERG, RIVER; fixed to RIVER for races), WATER
+  (CALM, WAVES), START ROOM and BACK. The choices are saved in `title.txt` as `host_mode`,
+  `host_location` and `host_waves`; the defaults are free boating on a calm river. Rooms are
+  always open to the LAN, answer LAN searches, and have no token. A failed start (for example
+  "cannot listen on 0.0.0.0:24680 (address in use or not available)") returns to the title
+  with that reason.
+- The Mac app no longer carries `boat_server`, and the Windows ZIP drops `boat_server.exe`.
+  `host.bat` runs `wake_velocity.exe --serve --bind 0.0.0.0`. CI's relocated checks run
+  `--serve --scripted --ticks 240`, and Windows CTest adds `boat_study_serve_scripted` and
+  `boat_host`. The `boat_server` target remains for development, the network harnesses and a
+  future Linux server package.
+
+**Verification (2026-10-25, M1 Max/macOS 26.6.2, Debug).** The build is warning-free. New
+CTests:
+- `boat_study_serve_scripted`.
+- Three argument rejections: `--host race --location basin`, `--host` with `--connect`, and
+  `--port` without `--host`.
+- `boat_host` (`tools/boat_host_check.py`): `boat_study --serve` on private ports, a 1 s
+  `boat_bot` session, then closing stdin. The room must exit cleanly within 2 s.
+- GPU-labelled `boat_study_host_gpu`: a windowed 120-frame river deathmatch host on port 24779.
+
+The full-suite result is recorded in the [documentation index](README.md). Agent-run checks:
+- A windowed `--host deathmatch --location river` session joined as slot 1. It left with
+  `accepted=1 left=1` and no faults, and no `--serve` process remained.
+- A `boat_bot` joined a hosted free room. Then the game was killed with `SIGKILL`; the room
+  exited by itself within a second.
+- `--host` against a port held by a running `boat_server` reported the listen failure and
+  exited 1.
+- The title's multiplayer and host panels were captured through temporary capture code
+  (removed afterwards) and inspected.
+- `tools/macos/package.py` built and verified the app. The extracted app outside the checkout
+  contains only `wake_velocity`, and it ran `--serve --scripted` and a windowed `--host` session.
+
+Not checked:
+- The Windows code paths (`CreateProcess`, pipes, `PeekNamedPipe`) are uncompiled. CI has not
+  run any of this.
+- Whether macOS shows a second Dock icon for the room process. It never opens a window, so
+  none is expected.
+- The macOS and Windows firewall prompts, which now name the game.
+- A second machine joining a hosted room.
+- Keyboard/title navigation by a human.
+
+**Executable rename plan (not started).** The packages already present `boat_study` as
+`wake_velocity` (Mac `Contents/MacOS/wake_velocity`, Windows `wake_velocity.exe`). Its usage
+text says `wake_velocity`, and saved data lives in a `Proteus` directory, so no user data
+moves. Proposed single change:
+1. Rename the CMake target to `wake_velocity`, along with the `boat_study_*` source files the
+   game owns, or keep the file names and rename only the target. In CMake that touches 68
+   references, including CTest names and commands.
+2. Update `tools/macos/package.py`, the Windows/Linux/web workflows, `cmake/Web.cmake`,
+   `tools/package_web.py`, `web/index.html`, `tools/check_wayland.sh` and
+   `tools/check_web_controls.py`. The packaging copies become plain copies.
+3. Keep `boat_server` as the dedicated-server name (Linux headless package, M6).
+4. Update the 35 documents that name `./build/boat_study` in one sweep. Dated handoffs keep
+   their historical commands, with a note.
+5. Optionally keep a `boat_study` build alias for a while (a copy or symlink post-build step)
+   so local scripts survive.
+
+Do it as its own commit between feature steps, when no other branch touches the build.
+
+**Next.** The user played HOST A ROOM on 2026-10-25 ("Works great!"). Still open: a second
+machine joining a hosted room through LAN, and CI on Windows and macOS. Show the host's LAN address in game (the title only advertises
+the room through LAN search), and consider a port fallback when 24680 is taken. M5 and the
+deathmatch/race plans continue.
 
 ## Exact first implementation task
 

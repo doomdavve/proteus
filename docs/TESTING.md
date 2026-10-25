@@ -97,10 +97,13 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   `boat_server_scripted_deathmatch` runs a scripted 10 s round through its intermission.
 - `boat_net`, `boat_net_loopback`, `boat_net_deathmatch` and `boat_net_race` are the
   [network checks](#network-checks).
-- Nine argument checks expect a failure: `boat_server --scripted` with a room option, an invalid
+- Twelve argument checks expect a failure: `boat_server --scripted` with a room option, an invalid
   `--port` and an invalid `--bind`, `--round-seconds` without `--mode deathmatch`, `boat_bot`
-  without a port, `boat_bot --discover` with `--connect`, `boat_study --connect` combined with `--waves` or `--skin`, and `--name`
-  without `--connect`.
+  without a port, `boat_bot --discover` with `--connect`, `boat_study --connect` combined with `--waves` or `--skin`, `--name`
+  without `--connect`, `boat_study --host race --location basin`, `--host` with `--connect`, and
+  `--port` without `--host`.
+- `boat_study_serve_scripted` runs the scripted authority through `boat_study --serve`, the
+  game's own room mode.
 Select a group with `-L`, for example `ctest --test-dir build -L core`; CTest adds fixture
 setup tests that a selected test requires, whatever their label.
 
@@ -172,6 +175,12 @@ server has already run cannot be used; a fixed 90% ratio failed macOS CI at 0.74
 ```sh
 python3 tools/boat_net_smoke.py --server build/boat_server --bot build/boat_bot
 ```
+
+`boat_host` runs `tools/boat_host_check.py` (about 1 s): `boat_study --serve --exit-with-stdin`
+on free ports, one `boat_bot` session, then closing the room's standard input, as the hosting
+game does when it leaves or dies. The room must report it, keep `accepted=1 left=1` and exit 0
+within 2 s. With GPU tests enabled, `boat_study_host_gpu` hosts a windowed river deathmatch with
+`--host` on port 24779 for 120 frames and requires the room to close after the session.
 
 `boat_net_session` runs `tools/boat_net_session.py` for about 36 s over real ENet/UDP loopback.
 Three predicting bots stay connected while a fourth leaves, joins in progress, crashes, times

@@ -14,9 +14,9 @@ next tasks, and the [Gothenburg boating design](docs/BOATING_PLAN.md).
 boating world, starting with two players colliding and jumping each other's wakes. Native
 builds can now join a [diagnostic room](#multiplayer-diagnostic-room) on one machine or a LAN.
 Your boat is now predicted and answers the keys at once, but the other boat, wakes and
-rendering are still diagnostic; it is not the finished multiplayer game. The Mac and Windows
-packages carry `boat_server` for [LAN rooms](#hosting-from-a-package); browser builds remain
-single-player.
+rendering are still diagnostic; it is not the finished multiplayer game. The title's
+MULTIPLAYER > HOST A ROOM starts a room on your machine and joins it
+([hosting](#hosting-from-the-game)); browser builds remain single-player.
 
 The [river race](docs/RACE_PLAN.md) is being tuned towards a 45–60 second sprint,
 with a shared starting grid, frequent ferry-wake jumps and confirmed finishing positions.
@@ -166,15 +166,17 @@ or the Esc menu) is remembered when the session returns to the title.
 SOUNDTRACK cycles through A LITTLE BOAT, ACID WAKE and OFF with Left/Right, Enter or a click.
 The music choice applies locally in both single player and multiplayer.
 SINGLE PLAYER starts the river with current, crossing wake
-and waves in the chosen livery. MULTIPLAYER searches the local network for `boat_server`
-rooms. Its LAN row names the first one found (host machine and players) and selects it. With
+and waves in the chosen livery. MULTIPLAYER's first row, HOST A ROOM, opens MODE (free
+boating, deathmatch or river race), PLACE, WATER and START ROOM; START ROOM runs a room open
+to the local network and joins it (see [hosting](#hosting-from-the-game)). Below it,
+MULTIPLAYER searches the local network for rooms. Its LAN row names the first one found (host machine and players) and selects it. With
 several rooms it shows LAN 1/2 and so on; Left/Right switch rooms, and Enter joins under NAME.
 The hint below the menu gives the room's mode and address, and says when a room needs a token or
 runs another game version. ADDRESS and CONNECT still join any `HOST:PORT` directly. Rooms colour
 boats by slot, so BOAT applies to single player only. Esc in a session opens a menu (RESUME,
-STEERING, CONTROLS, BACK TO TITLE or LEAVE ROOM), and a failed or lost connection shows why
-back on the title.
-NAME, BOAT, STEERING, SOUNDTRACK and the address are remembered in `title.txt` in the personal-best data
+STEERING, CONTROLS, BACK TO TITLE, LEAVE ROOM or, when hosting, CLOSE ROOM), and a failed or
+lost connection shows why back on the title.
+NAME, BOAT, STEERING, SOUNDTRACK, the address and the host choices are remembered in `title.txt` in the personal-best data
 directory.
 Any explicit option skips the title; `--title --screenshot FILE` captures it.
 
@@ -189,11 +191,15 @@ native clients over UDP (basin by default):
 ./build/boat_bot --connect 127.0.0.1:24680 --seconds 60   # optional scripted second boat
 ```
 
-For a river deathmatch on your LAN:
+For a river deathmatch on your LAN, either host it from the game and play in it, or run
+only the room:
 
 ```sh
+./build/boat_study --host deathmatch --location river --name me   # room + your boat
 ./build/boat_server --bind 0.0.0.0 --mode deathmatch --location river
 ```
+
+`boat_study --serve` accepts every `boat_server` option, so a package needs only the game.
 
 Clients join through the title or `--connect HOST:24680` and automatically load the server's
 location, scenery and water. Multiplayer starts are out in the river, about 60 m apart, with
@@ -255,14 +261,20 @@ handling mismatches and full rooms are refused with a message. The
 [M4 prediction](docs/MULTIPLAYER_PLAN.md#m4-step-1-client-prediction-handoff--2026-10-23)
 handoffs describe the details and limits.
 
-#### Hosting from a package
+#### Hosting from the game
 
-Since 2026-10-24 the Mac app and the Windows ZIP include `boat_server`. On Windows, double-click
-`host.bat`, which opens a room on every interface (`--bind 0.0.0.0`) and passes extra options
-through, and allow it through Windows Firewall. On a Mac, run it from Terminal:
+Since 2026-10-25, choose MULTIPLAYER > HOST A ROOM on the title, pick MODE, PLACE and WATER,
+then START ROOM. The game starts a second copy of itself in the background as the room
+(`--serve`), open to the local network on UDP port 24680, and joins it. Allow Wake Velocity
+through the firewall when asked. The Esc menu's CLOSE ROOM ends the room for everyone; it also
+closes if the game quits or crashes. From a terminal, the same is
+`boat_study --host free|deathmatch|race [--location L] [--waves] [--port N]`.
+
+To run a room without playing in it, double-click `host.bat` on Windows (it runs
+`wake_velocity.exe --serve --bind 0.0.0.0` and passes extra options through) or, on a Mac:
 
 ```sh
-"/Applications/Wake Velocity.app/Contents/MacOS/boat_server" --bind 0.0.0.0
+"/Applications/Wake Velocity.app/Contents/MacOS/wake_velocity" --serve --bind 0.0.0.0
 ```
 
 Friends on the same network choose MULTIPLAYER on the title. The room appears in its LAN row,
@@ -270,7 +282,7 @@ named after the host machine; Enter joins. If it does not appear (a firewall, a 
 network or a VPN), enter the host's LAN address with port 24680 under ADDRESS. The title has no
 token field, so leave `--token` off rooms meant for it. Internet play needs UDP port
 forwarding or a VPN; [M6](docs/MULTIPLAYER_PLAN.md#m6--friends-over-the-internet-and-native-packaging)
-owns that guidance, a Host button and a standalone Linux server.
+owns that guidance and a standalone Linux server.
 
 T5 tuning lets the bank ease out sooner as turning load fades. Deterministic presentation/
 replay fixtures cover banked poses, straightening and paused seeking. The

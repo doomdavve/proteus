@@ -82,6 +82,7 @@ void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, 
             DrawText(mouse_steering ? "< MOUSE >" : "< KEYBOARD >", 162, (int)row.y + 2, 10, ink);
     }
     const char *hint = menu->selected == ROW_STEERING ? "LEFT / RIGHT OR CLICK; M IN GAME"
+        : networked && menu->room_hint                ? menu->room_hint
         : networked                                   ? "THE ROOM KEEPS RUNNING; YOUR BOAT IDLES"
                                                       : "ESC: RESUME";
     int x = (WIDTH - MeasureText(hint, 10)) / 2, y = top + height + 3;

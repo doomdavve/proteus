@@ -20,7 +20,8 @@ typedef struct {
     int selected;
     double time;
     bool can_leave; // Browsers have nowhere to leave to.
-    const char *leave_label; // QUIT, BACK TO TITLE or LEAVE ROOM.
+    const char *leave_label; // QUIT, BACK TO TITLE, LEAVE ROOM or CLOSE ROOM.
+    const char *room_hint; // Replaces the networked hint (a hosted room), if set.
 } BoatMenu;
 
 void boat_menu_open(BoatMenu *menu);

@@ -162,7 +162,9 @@ if(NOT EMSCRIPTEN)
   target_compile_options(proteus_boat_net_enet PRIVATE ${PROTEUS_WARNINGS})
   target_link_libraries(boat_study PRIVATE proteus_boat_net_enet)
   target_compile_definitions(boat_study PRIVATE PROTEUS_BOAT_NET=1)
-  target_sources(boat_study PRIVATE tools/boat_study_net.c tools/boat_study_net.h)
+  # The game hosts a room by running itself as `--serve`, boat_server's command line.
+  target_sources(boat_study PRIVATE tools/boat_study_net.c tools/boat_study_net.h
+    tools/boat_study_host.c tools/boat_study_host.h tools/boat_server.c tools/boat_server.h)
 endif()
 
 if(EMSCRIPTEN)
@@ -451,7 +453,7 @@ add_executable(validate_boat_race tools/validate_boat_race.c)
 target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
-add_executable(boat_server tools/boat_server.c)
+add_executable(boat_server tools/boat_server_main.c tools/boat_server.c)
 add_executable(boat_bot tools/boat_bot.c)
 foreach(target boat_server boat_bot)
   target_link_libraries(${target} PRIVATE proteus_boat_net_enet)
@@ -487,10 +489,31 @@ add_test(NAME boat_net_study_mode_rejected COMMAND boat_study --connect 127.0.0.
 add_test(NAME boat_net_study_name_rejected COMMAND boat_study --name lonely)
 add_test(NAME boat_net_study_skin_rejected
   COMMAND boat_study --connect 127.0.0.1:24680 --skin norway)
+# Hosting from the game: boat_study --serve is the room, --host starts it as a child and joins.
+add_test(NAME boat_study_serve_scripted COMMAND boat_study --serve --scripted --ticks 240)
+set_tests_properties(boat_study_serve_scripted PROPERTIES
+  PASS_REGULAR_EXPRESSION "boat_server scripted: boats=4 ticks=240")
+add_test(NAME boat_study_host_race_location_rejected
+  COMMAND boat_study --host race --location basin)
+add_test(NAME boat_study_host_connect_rejected
+  COMMAND boat_study --host free --connect 127.0.0.1:24680)
+add_test(NAME boat_study_port_without_host_rejected COMMAND boat_study --port 24680)
+add_test(NAME boat_host COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_host_check.py --study $<TARGET_FILE:boat_study>
+  --bot $<TARGET_FILE:boat_bot>)
+set_tests_properties(boat_host PROPERTIES PASS_REGULAR_EXPRESSION "boat_host=ok" TIMEOUT 30)
+if(PROTEUS_GPU_TESTS)
+  # A windowed host session on a private port: start the room, join it, leave, close it.
+  add_test(NAME boat_study_host_gpu
+    COMMAND boat_study --host deathmatch --location river --port 24779 --frames 120)
+  set_tests_properties(boat_study_host_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "standard input closed; closing the room")
+endif()
 set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_rejected
   boat_server_bind_rejected boat_server_round_without_deathmatch_rejected boat_bot_endpoint_rejected
   boat_bot_discover_join_rejected boat_net_study_mode_rejected
-  boat_net_study_name_rejected boat_net_study_skin_rejected PROPERTIES WILL_FAIL TRUE)
+  boat_net_study_name_rejected boat_net_study_skin_rejected boat_study_host_race_location_rejected
+  boat_study_host_connect_rejected boat_study_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
 add_test(NAME boat_net COMMAND validate_boat_net)
 set_tests_properties(boat_net PROPERTIES PASS_REGULAR_EXPRESSION "boat_net=ok")
 add_test(NAME boat_net_loopback COMMAND ${Python3_EXECUTABLE}

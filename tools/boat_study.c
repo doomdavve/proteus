@@ -13,6 +13,8 @@
 #include "boat_study_menu.h"
 #include "boat_throttle.h"
 #ifdef PROTEUS_BOAT_NET
+#include "boat_server.h"
+#include "boat_study_host.h"
 #include "boat_study_net.h"
 #endif
 #include "boat_title.h"
@@ -81,7 +83,11 @@ static void usage(void)
         "--connect HOST:PORT: join a boat_server room (native multiplayer, in progress: the own\n"
         "  boat is predicted and answers at once; R asks for a new life; every boat is drawn in\n"
         "  its slot's country: 1 Sweden, 2 Finland, 3 Denmark, 4 Norway) | --name TEXT |\n"
-        "  --token TEXT");
+        "  --token TEXT\n"
+        "--host free|deathmatch|race: start a room open to the local network (a second copy of\n"
+        "  this program in --serve mode) and join it; --location and --waves set its water,\n"
+        "  --port its UDP port (default 24680). The room closes when you leave it.\n"
+        "--serve [boat_server options]: run only a room, as boat_server does (--serve --help)");
 }
 
 static BoatWater study_water(
@@ -191,6 +197,7 @@ static void course_runs_hud(
 
 #ifdef PROTEUS_BOAT_NET
 static NetStudy net_study; // Outlives a session so the title can show why it ended.
+static NetHost net_host; // The room this session started with --host, if any.
 #endif
 
 // The steering mode a session ended in, so the title remembers changes made in game.
@@ -222,6 +229,9 @@ static int study(int argc, char **argv)
     int frame_limit = 0;
     const char *connect_to = NULL, *net_name = "player", *net_token = "";
     bool networked = false; // Joined a room with --connect (native builds only).
+    const char *host_mode = NULL; // --host: the room this session starts and joins.
+    bool location_set = false;
+    long host_port = 0; // --port: the hosted room's UDP port.
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
 #endif
@@ -242,6 +252,7 @@ static int study(int argc, char **argv)
             location = boat_location_find(argv[++i]);
             if (!location)
                 goto invalid;
+            location_set = true;
         } else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
             const char *name = argv[++i];
             if (strcmp(name, "gpu") == 0)
@@ -337,6 +348,17 @@ static int study(int argc, char **argv)
             }
         } else if (strcmp(argv[i], "--connect") == 0 && i + 1 < argc) {
             connect_to = argv[++i];
+        } else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
+            char *end;
+            const char *value = argv[++i];
+            host_port = strtol(value, &end, 10);
+            if (end == value || *end || host_port < 1 || host_port > 65535)
+                goto invalid;
+        } else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) {
+            host_mode = argv[++i];
+            if (strcmp(host_mode, "free") != 0 && strcmp(host_mode, "deathmatch") != 0
+                && strcmp(host_mode, "race") != 0)
+                goto invalid;
         } else if (strcmp(argv[i], "--name") == 0 && i + 1 < argc) {
             net_name = argv[++i];
         } else if (strcmp(argv[i], "--token") == 0 && i + 1 < argc) {
@@ -354,8 +376,40 @@ static int study(int argc, char **argv)
     }
     if ((time_set && !screenshot) || (screenshot && frame_limit) || (!replay_path && time > 60))
         goto invalid;
+#ifdef PROTEUS_BOAT_NET
+    NetHostOptions host_options = { 0 };
+    char host_endpoint[32];
+#endif
+    if (host_mode) {
+#ifdef PROTEUS_BOAT_NET
+        if (connect_to || net_token[0]) {
+            fprintf(stderr, "--host joins its own room; it cannot take --connect or --token.\n");
+            goto invalid;
+        }
+        if (!strcmp(host_mode, "race") && location_set && location->id != BOAT_LOCATION_RIVER) {
+            fprintf(stderr, "--host race runs on the river location.\n");
+            goto invalid;
+        }
+        // The room's water: what follows joins it like --connect.
+        host_options = (NetHostOptions) { .mode = host_mode,
+            .location = location->name,
+            .waves = waves,
+            .port = (uint16_t)(host_port ? host_port : BOAT_NET_PORT) };
+        snprintf(host_endpoint, sizeof(host_endpoint), "127.0.0.1:%u", (unsigned)host_options.port);
+        connect_to = host_endpoint;
+        location = boat_location(BOAT_LOCATION_BASIN);
+        waves = false;
+#else
+        fprintf(stderr, "--host is only available in native builds.\n");
+        goto invalid;
+#endif
+    }
+    if (host_port && !host_mode) {
+        fprintf(stderr, "--port sets the room --host starts.\n");
+        goto invalid;
+    }
     if (!connect_to && (strcmp(net_name, "player") != 0 || net_token[0])) {
-        fprintf(stderr, "--name and --token require --connect.\n");
+        fprintf(stderr, "--name and --token require --connect or --host.\n");
         goto invalid;
     }
     if (connect_to) {
@@ -489,6 +543,12 @@ static int study(int argc, char **argv)
     int result = 1;
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };
 #ifdef PROTEUS_BOAT_NET
+    if (host_mode
+        && !net_host_start(
+            &net_host, &host_options, net_study.failure, sizeof(net_study.failure))) {
+        fprintf(stderr, "%s\n", net_study.failure);
+        goto cleanup;
+    }
     if (connect_to) {
         if (!net_study_connect(&net_study, connect_to, net_name, net_token, &session))
             goto cleanup;
@@ -677,9 +737,11 @@ static int study(int argc, char **argv)
     bool replay_dragging = false;
     bool help_visible = false;
     BoatMenu menu = { .can_leave = true,
-        .leave_label = networked ? "LEAVE ROOM"
+        .leave_label = host_mode ? "CLOSE ROOM"
+            : networked          ? "LEAVE ROOM"
             : window_owned       ? "QUIT"
-                                 : "BACK TO TITLE" };
+                                 : "BACK TO TITLE",
+        .room_hint = host_mode ? "YOU HOST: CLOSING ENDS THE ROOM" : NULL };
 #if defined(__EMSCRIPTEN__)
     menu.can_leave = false;
 #endif
@@ -907,6 +969,11 @@ static int study(int argc, char **argv)
             }
             if (!net_study_frame(net, &session, input, boat_throttle_setting(thrust_step),
                     steering_target, active, active && IsKeyPressed(KEY_R))) {
+                result = 1;
+                break;
+            }
+            if (net_host.running && !net_host_poll(&net_host, net->failure, sizeof(net->failure))) {
+                fprintf(stderr, "%s\n", net->failure);
                 result = 1;
                 break;
             }
@@ -1187,6 +1254,7 @@ cleanup:
 #ifdef PROTEUS_BOAT_NET
     if (net)
         net_study_close(net);
+    net_host_stop(&net_host); // After leaving, so the room says goodbye to the others only.
 #endif
     boat_session_flush(&session);
     boat_session_destroy(&session);
@@ -1220,8 +1288,8 @@ invalid:
 static int title_single(const BoatTitleSettings *settings)
 {
     char *arguments[] = { "boat_study", "--current", "--crossing-wake", "--location", "river",
-        "--waves", "--gpu-aa", "--skin", (char *)boat_skin_name(settings->skin),
-        "--soundtrack", (char *)boat_music(settings->soundtrack)->id,
+        "--waves", "--gpu-aa", "--skin", (char *)boat_skin_name(settings->skin), "--soundtrack",
+        (char *)boat_music(settings->soundtrack)->id,
         settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
     int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
     study_mouse_steering = settings->mouse_steering;
@@ -1229,19 +1297,35 @@ static int title_single(const BoatTitleSettings *settings)
 }
 
 #ifdef PROTEUS_BOAT_NET
-static int title_join(BoatTitleSettings *settings)
+// Join the address, or (HOST) start a room with the title's host settings and join that.
+static int title_join(BoatTitleSettings *settings, bool host)
 {
-    char *arguments[] = { "boat_study", "--connect", settings->address, "--name", settings->name,
-        "--soundtrack", (char *)boat_music(settings->soundtrack)->id,
-        settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
-    int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
+    char *arguments[16] = { "boat_study", "--name", settings->name, "--soundtrack",
+        (char *)boat_music(settings->soundtrack)->id };
+    int count = 5;
+    if (host) {
+        arguments[count++] = "--host";
+        arguments[count++] = (char *)boat_title_host_mode(settings->host_mode);
+        if (settings->host_mode != BOAT_TITLE_HOST_RACE) {
+            arguments[count++] = "--location";
+            arguments[count++] = (char *)boat_location(settings->host_location)->name;
+        }
+        if (settings->host_waves)
+            arguments[count++] = "--waves";
+    } else {
+        arguments[count++] = "--connect";
+        arguments[count++] = settings->address;
+    }
+    if (settings->mouse_steering)
+        arguments[count++] = "--mouse-steering";
     net_study.failure[0] = 0;
     study_mouse_steering = settings->mouse_steering;
     int result = study(count, arguments);
     if (net_study.failure[0])
         snprintf(settings->message, sizeof(settings->message), "%s", net_study.failure);
     else if (result)
-        snprintf(settings->message, sizeof(settings->message), "Could not join that address.");
+        snprintf(settings->message, sizeof(settings->message),
+            host ? "Could not host a room." : "Could not join that address.");
     return result;
 }
 #endif
@@ -1253,6 +1337,10 @@ int main(int argc, char **argv)
 #if defined(__EMSCRIPTEN__)
     return study(argc, argv);
 #else
+#ifdef PROTEUS_BOAT_NET
+    if (argc > 1 && !strcmp(argv[1], "--serve"))
+        return boat_server_main(argc - 1, argv + 1); // A hosted room: no window, audio or assets.
+#endif
     bool capture = argc == 4 && !strcmp(argv[1], "--title") && !strcmp(argv[2], "--screenshot");
     if (argc != 1 && !(argc == 2 && !strcmp(argv[1], "--title")) && !capture)
         return study(argc, argv);
@@ -1276,10 +1364,10 @@ int main(int argc, char **argv)
         if (choice == BOAT_TITLE_SINGLE && title_single(&settings))
             snprintf(settings.message, sizeof(settings.message), "Single player stopped.");
 #ifdef PROTEUS_BOAT_NET
-        if (choice == BOAT_TITLE_JOIN)
-            title_join(&settings);
+        if (choice == BOAT_TITLE_JOIN || choice == BOAT_TITLE_HOST)
+            title_join(&settings, choice == BOAT_TITLE_HOST);
 #else
-        if (choice == BOAT_TITLE_JOIN)
+        if (choice == BOAT_TITLE_JOIN || choice == BOAT_TITLE_HOST)
             snprintf(settings.message, sizeof(settings.message), "No multiplayer in this build.");
 #endif
         settings.mouse_steering = study_mouse_steering; // Esc menu or M changes are remembered.
