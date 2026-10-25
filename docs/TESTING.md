@@ -91,7 +91,7 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   same-tick places and exact ties,
   recovery behind the last cleared gate, joiners, leavers, abandonment, deadlines and grid
   rotation, and finisher parking (R2). It ends with a four-bot ferry race with a mid-race
-  checkpoint restore.
+  checkpoint restore; finishers must take 45–85 s, and one bot may DNF (see below).
 - `boat_match` runs `validate_boat_match` ([deathmatch](DEATHMATCH_PLAN.md) credit window,
   self-capsize, grace, respawn, bailout, leavers, rounds and planted-wake capsizes), and
   `boat_server_scripted_deathmatch` runs a scripted 10 s round through its intermission.

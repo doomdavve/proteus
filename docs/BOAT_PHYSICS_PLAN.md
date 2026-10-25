@@ -124,8 +124,15 @@ revision 7 ≈ 16.2 m/s in every case):**
 
 The first trial (no free entry speed, gain 0.14, then 0.08) scrubbed 18%/11% at 4 m and
 slowed the race bots to 67.5–78 s with 11–18 jumps; it was replaced by the thresholded form.
-On the race course (`validate_boat_race`), four bots now finish in 63.96–75.65 s with 7–12
-jumps and no recoveries, against 63.06–70.57 s with 6–10 jumps at revision 7. The skill-course
+On the race course (`validate_boat_race`), four bots finish in 63.96–75.65 s with 7–12
+jumps and no recoveries in a Debug build, against 63.06–70.57 s with 6–10 jumps at revision 7.
+
+**Release race margin, 2026-10-25:** macOS CI (Release, arm64) failed `boat_race` after this
+change; a local Release build reproduces it. Racer 2 meets the moving storm near 63 s, one
+landing cuts it from 20.3 to 9.5 m/s, and it hops at 6–9 m/s for about 12 s, missing the
+15 s after-winner window (DNF, 14 jumps). Debug float results differ slightly and finish it
+at 75.65 s. At the user's choice the validator now accepts one DNF; finishers must still take
+45–85 s and every bot must jump. Landing scrub and the bot are unchanged. The skill-course
 preview's six landings grade 0.32–0.80. The hardest landing's audio peaks at 0.24
 (engine alone 0.085; first 200 ms RMS 0.070 against 0.025) beneath the 0.75 soft limiter.
 
