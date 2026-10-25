@@ -1,6 +1,5 @@
 #include "boat_fleet.h"
 #include "raymath.h"
-#include "waterfront_city.h"
 
 #include <assert.h>
 #include <math.h>
@@ -30,8 +29,6 @@ bool boat_fleet_init(BoatFleet *fleet, const BoatWorldDefinition *definition, Bo
 {
     if (!definition || water.player_wake_enabled)
         return false;
-    if (definition->mapped)
-        waterfront_city_select_river(definition->id == BOAT_LOCATION_RIVER);
     *fleet = (BoatFleet) { 0 };
     if (!boat_wake_objects_init(&fleet->state.wakes, life_ticks, crest_height))
         return false;

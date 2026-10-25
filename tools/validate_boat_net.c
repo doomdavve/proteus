@@ -92,7 +92,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e5400040d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e5400050d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -101,7 +101,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 56);
     CHECK(same_bytes(bytes, size,
-        "50424e54000409000000000900000000000000000000"
+        "50424e54000509000000000900000000000000000000"
         "00c80018000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f810000" // Steering +1, throttle -1.
@@ -205,7 +205,7 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0x9f816f6333e7646f));
+    CHECK(digest == UINT64_C(0x4de7f51f1c0586cc));
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
         BoatInput back = boat_net_command_input(boat_net_command((BoatInput) { value, value }, 0));
@@ -789,7 +789,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c5100010004"));
+    CHECK(same_bytes(query, 8, "50424c5100010005"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -1419,87 +1419,85 @@ static int impaired(void)
 static int mapped_rooms(void)
 {
     static Room room;
-    for (int id = BOAT_LOCATION_ERIKSBERG; id <= BOAT_LOCATION_RIVER; ++id) {
-        BoatMatchRules rules = boat_match_default_rules();
-        CHECK(room_open(&room, 61 + (unsigned)id,
-            (BoatNetServerConfig) { .location = id, .deathmatch = true, .match = rules }));
-        room.predict = true;
-        for (unsigned i = 0; i < 4; ++i)
-            room_join(&room, "mapped", NULL, 0);
-        room_run(&room, .5);
-        CHECK(active_boats(&room.server) == 4);
-        for (unsigned i = 0; i < 4; ++i) {
-            const BoatNetClient *c = &room.clients[i];
-            CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->accept.location == id);
-            CHECK(c->fleet.world.definition->id == (BoatLocationId)id);
-            CHECK(c->prediction.fleet.world.definition->id == (BoatLocationId)id);
-            const BoatFleetSlot *own = boat_net_client_own(c);
-            CHECK(own && boat_hull_clear(&own->boat, &c->fleet.world, room.now));
-            CHECK(boat_map_water(own->boat.position, 35));
-            CHECK(Vector2Distance(own->boat.position, boat_location(id)->spawn) > 200);
-            for (unsigned j = 0; j < i; ++j)
-                CHECK(Vector2Distance(
-                          own->boat.position, boat_net_client_own(&room.clients[j])->boat.position)
-                    > 50);
-        }
-        CHECK(room.server.match.phase == BOAT_MATCH_PLAYING);
-        // A window/renderer loading pause must not become a huge first RTT/clock estimate.
-        room.clients[0].stats.pongs = 0;
-        room.clients[0].rtt = 0;
-        inject(&room, 0,
-            (BoatNetMessage) {
-                .header = { .type = BOAT_NET_PING }, .clock = (uint64_t)(room.now * 1e6) });
-        room.live[0] = false;
-        room_run(&room, 1.5);
-        room.live[0] = true;
-        uint64_t future = room.server.stats.future_commands;
-        room_run(&room, 1);
-        CHECK(room.clients[0].rtt < .05 && room.clients[0].stats.pongs > 0);
-        CHECK(room.server.stats.future_commands == future);
-        // Put a real hull in navigable mapped water beyond the old basin decode envelope.
-        Boat distant;
-        bool found = false;
-        for (int x = -1200; x <= 1200 && !found; x += 100)
-            for (int z = -900; z <= 900 && !found; z += 100) {
-                if (abs(x) < 300 && abs(z) < 300)
-                    continue;
-                boat_reset(&distant);
-                distant.position = (Vector2) { (float)x, (float)z };
-                if (boat_map_water(distant.position, 10)
-                    && boat_hull_clear(&distant, &room.server.fleet.world, room.now))
-                    found = true;
-            }
-        CHECK(found);
-        boat_fleet_place(&room.server.fleet, room.clients[0].slot, distant);
-        room_run(&room, .5);
-        CHECK(room.clients[0].stats.decode_errors == 0);
-        CHECK(
-            Vector2Distance(boat_net_client_own(&room.clients[0])->boat.position, distant.position)
-            < 10);
-        boat_net_client_request_reset(&room.clients[0]);
-        room_run(&room, 1);
-        CHECK(room.clients[0].stats.resets == 1);
-        // Exact wake reconstruction is guaranteed on birth-batch snapshots.
-        for (unsigned step = 0; step < 48
-            && (room.server.fleet.state.tick % BOAT_NET_BIRTH_TICKS != 0
-                || room.clients[0].fleet.state.tick != room.server.fleet.state.tick);
-            ++step)
-            room_step(&room, 1.0 / 240);
-        CHECK(room.clients[0].fleet.state.tick == room.server.fleet.state.tick);
-        CHECK(room.server.fleet.state.tick % BOAT_NET_BIRTH_TICKS == 0);
-        for (unsigned i = 0; i < 4; ++i) {
-            const BoatNetClient *c = &room.clients[i];
-            CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.decode_errors == 0);
-            CHECK(c->wake_consistent);
-            CHECK(boat_fleet_hash(&c->fleet.state)
-                == room.history_hash[c->fleet.state.tick % ROOM_HISTORY]);
-        }
-        CHECK(room.server.stats.output_faults == 0 && room.server.stats.emission_failures == 0);
-        printf("mapped %s: four predicted clients, shoreline-safe spawns, distant snapshot, "
-               "deathmatch round and reset; exact authoritative mirrors\n",
-            boat_location(id)->name);
-        room_close(&room);
+    const int id = BOAT_LOCATION_RIVER;
+    BoatMatchRules rules = boat_match_default_rules();
+    CHECK(room_open(
+        &room, 63, (BoatNetServerConfig) { .location = id, .deathmatch = true, .match = rules }));
+    room.predict = true;
+    for (unsigned i = 0; i < 4; ++i)
+        room_join(&room, "mapped", NULL, 0);
+    room_run(&room, .5);
+    CHECK(active_boats(&room.server) == 4);
+    for (unsigned i = 0; i < 4; ++i) {
+        const BoatNetClient *c = &room.clients[i];
+        CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->accept.location == id);
+        CHECK(c->fleet.world.definition->id == (BoatLocationId)id);
+        CHECK(c->prediction.fleet.world.definition->id == (BoatLocationId)id);
+        const BoatFleetSlot *own = boat_net_client_own(c);
+        CHECK(own && boat_hull_clear(&own->boat, &c->fleet.world, room.now));
+        CHECK(boat_map_water(own->boat.position, 35));
+        CHECK(Vector2Distance(own->boat.position, boat_location(id)->spawn) > 200);
+        for (unsigned j = 0; j < i; ++j)
+            CHECK(Vector2Distance(
+                      own->boat.position, boat_net_client_own(&room.clients[j])->boat.position)
+                > 50);
     }
+    CHECK(room.server.match.phase == BOAT_MATCH_PLAYING);
+    // A window/renderer loading pause must not become a huge first RTT/clock estimate.
+    room.clients[0].stats.pongs = 0;
+    room.clients[0].rtt = 0;
+    inject(&room, 0,
+        (BoatNetMessage) {
+            .header = { .type = BOAT_NET_PING }, .clock = (uint64_t)(room.now * 1e6) });
+    room.live[0] = false;
+    room_run(&room, 1.5);
+    room.live[0] = true;
+    uint64_t future = room.server.stats.future_commands;
+    room_run(&room, 1);
+    CHECK(room.clients[0].rtt < .05 && room.clients[0].stats.pongs > 0);
+    CHECK(room.server.stats.future_commands == future);
+    // Put a real hull in navigable mapped water beyond the old basin decode envelope.
+    Boat distant;
+    bool found = false;
+    for (int x = -1200; x <= 1200 && !found; x += 100)
+        for (int z = -900; z <= 900 && !found; z += 100) {
+            if (abs(x) < 300 && abs(z) < 300)
+                continue;
+            boat_reset(&distant);
+            distant.position = (Vector2) { (float)x, (float)z };
+            if (boat_map_water(distant.position, 10)
+                && boat_hull_clear(&distant, &room.server.fleet.world, room.now))
+                found = true;
+        }
+    CHECK(found);
+    boat_fleet_place(&room.server.fleet, room.clients[0].slot, distant);
+    room_run(&room, .5);
+    CHECK(room.clients[0].stats.decode_errors == 0);
+    CHECK(Vector2Distance(boat_net_client_own(&room.clients[0])->boat.position, distant.position)
+        < 10);
+    boat_net_client_request_reset(&room.clients[0]);
+    room_run(&room, 1);
+    CHECK(room.clients[0].stats.resets == 1);
+    // Exact wake reconstruction is guaranteed on birth-batch snapshots.
+    for (unsigned step = 0; step < 48
+        && (room.server.fleet.state.tick % BOAT_NET_BIRTH_TICKS != 0
+            || room.clients[0].fleet.state.tick != room.server.fleet.state.tick);
+        ++step)
+        room_step(&room, 1.0 / 240);
+    CHECK(room.clients[0].fleet.state.tick == room.server.fleet.state.tick);
+    CHECK(room.server.fleet.state.tick % BOAT_NET_BIRTH_TICKS == 0);
+    for (unsigned i = 0; i < 4; ++i) {
+        const BoatNetClient *c = &room.clients[i];
+        CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.decode_errors == 0);
+        CHECK(c->wake_consistent);
+        CHECK(boat_fleet_hash(&c->fleet.state)
+            == room.history_hash[c->fleet.state.tick % ROOM_HISTORY]);
+    }
+    CHECK(room.server.stats.output_faults == 0 && room.server.stats.emission_failures == 0);
+    printf("mapped %s: four predicted clients, shoreline-safe spawns, distant snapshot, "
+           "deathmatch round and reset; exact authoritative mirrors\n",
+        boat_location(id)->name);
+    room_close(&room);
     return 0;
 }
 

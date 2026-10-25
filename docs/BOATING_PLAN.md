@@ -1,7 +1,7 @@
 # Gothenburg boating playground
 
-Status: updated 2026-10-24. `boat_study` implements free boating in basin, Eriksberg,
-and river locations, reverse/docking, planing, buoyancy, optional gentle waves, opt-in
+Status: updated 2026-10-25. `boat_study` implements free boating in the basin and river
+locations ([Eriksberg location removed](#eriksberg-location-removed--2026-10-25)), reverse/docking, planing, buoyancy, optional gentle waves, opt-in
 current/scripted-wake options in all locations, default bounded arcade wakes in free boating,
 and a timed S course with recordings, persistent personal bests, ghosts, and replay controls. The study
 has quiet engine/water audio and [selectable XM music](#selectable-soundtracks--2026-10-24):
@@ -31,7 +31,7 @@ personal best files remain on disk and are not loaded into current play.
 
 This document owns gameplay direction. Detailed next tasks belong to the
 [physics plan](BOAT_PHYSICS_PLAN.md), [living-city plan](LIVING_CITY_PLAN.md), and
-[river expansion record](eriksberg/bridge/README.md). See the [plan index](README.md)
+[river expansion record](river/README.md). See the [plan index](README.md)
 for status across tracks. Revise the design as we discover what is enjoyable to play.
 
 The [2026-10-19 architecture review](ARCHITECTURE_REVIEW.md) records growth risks and a proposed
@@ -60,6 +60,30 @@ hull grip while keeping the outboard as the force source. The user accepted the 
 banking/carving feel on 2026-10-20: "This is way better. I think we're good here." No further
 tuning is queued. The exhaustive hands-on location/controls/replay/focus checklist remains
 unverified; acceptance does not establish that each check occurred.
+
+## Eriksberg location removed — 2026-10-25
+
+At the user's request the separate `eriksberg` location, a subset of the river crop, was removed
+together with the four-minute `proteus` demo that used its smaller crop. The river (the Gothenburg
+area, to be expanded) is the only mapped location; basin remains the default. Old material stays in
+the git history.
+
+- Code: `BOAT_LOCATION_ERIKSBERG`, the Eriksberg crop/assets/survey (`docs/eriksberg/`), the demo
+  (`src/main.c`, `src/scenes.*`, `src/audio_spectrum.*`), `waterfront_storyboard`, the timeline
+  and flock camera, `gpu_review.py`, `living_city_review.py`, `boat_water_review.py` and the
+  “Below the surface” soundtrack. `waterfront_city` has a single crop and no selector;
+  `waterfront_scene_evaluate(time, water, frame)` fills scenery and actors for every caller.
+  The river survey moved to [`docs/river/`](river/README.md). `boat_water_review` drives only
+  the river route. Protocol v5 renumbers river to location 1; v1–v4 peers are rejected.
+- Tests: Eriksberg-specific CTests (`boat_net_eriksberg`, `boat_eriksberg_screenshot`,
+  `boat_environment_eriksberg_screenshot`, `boat_water_route`, `boat_water_wave_route`) and the
+  demo's `cube_*`, `gpu_review`, `audio_spectrum_is_valid` and `soundtrack_xm_is_valid` were
+  removed; validators that used the Eriksberg definition now use the river.
+- Verification, M1 Max/macOS 26.6.2, Debug, GPU tests on: warning-free build; all 110 active
+  CTests passed (15 retired wake-field checks disabled). CPU and GPU+AA river captures and the
+  fixed `gpu_fixture --city` view inspected; a 300-frame windowed river `--demo` with the
+  profiler overlay exited 0 and its overlay was inspected. Not run: `prepare_waterfront.py` and
+  `docs/river/survey.py` (pyproj is not installed), Windows/Linux/web builds and CI, and human play.
 
 ## Swedish ensign — 2026-10-20
 
@@ -191,19 +215,16 @@ unverified; user acceptance is pending.
 
 ## Current prototype
 
-`--location river` extends the geographic area to Älvsborgsbron, using the same dock spawn
-and boat physics. A shared CPU/GPU blockout includes the deck, open towers, main cables,
-and hangers. The four tower-leg footprints obstruct navigation while the deck stays above
-the navigable water. Its default follow view is 12 m back / 6 m high; C restores that view.
-The original Eriksberg crop and main demo remain the defaults for their existing modes.
-See the [bridge expansion record](eriksberg/bridge/README.md) for assumptions and route checks.
-
-`--location eriksberg` selects the bundled geographic waterfront; `--location basin` selects the
-physics test area (the default). The Eriksberg spawn is in the dock basin facing the crane and river.
-Buildings, shore, bridge, crane and sky reuse the bundled offline scene. The held controls, follow
+`--location river` selects the bundled geographic waterfront, from the Eriksberg dock to
+Älvsborgsbron; `--location basin` selects the physics test area (the default). The river spawn
+is in the dock basin facing the crane and river. A shared CPU/GPU blockout includes the bridge
+deck, open towers, main cables, and hangers. The four tower-leg footprints obstruct navigation
+while the deck stays above the navigable water. Its default follow view is 12 m back / 6 m high;
+C restores that view. See the [bridge expansion record](river/README.md) for assumptions and
+route checks. Buildings, shore, Dockbron, crane and sky come from the bundled offline scene. The held controls, follow
 camera, wake, and spray work in either location; R returns to the selected location's spawn.
 Water-triangle boundary edges constrain an oriented bow, stern, and beam footprint at the shoreline
-and map crop. Glancing impacts scrub speed, turn the craft away, and rebound gently. Eriksberg
+and map crop. Glancing impacts scrub speed, turn the craft away, and rebound gently. The river
 supports `--gpu --gpu-aa`: the player hull, engine and airborne
 spray participate in depth, reflection and shadow passes; surface foam is depth-tested and receives
 shadows without casting solid shadows. Optional AA uses 4×4 supersampling before integer scaling.
@@ -215,7 +236,7 @@ occlusion handling near buildings. It does not include the
 rest of Gothenburg or the archipelago. Source attribution is retained in the help modal and README.
 
 The [generated boat and berth foundation](HARBOR_BOATS.md) adds six leisure boats at a
-west-bank pontoon and a working east-bank berth in Eriksberg and river locations. Moored
+west-bank pontoon and a working east-bank berth in the river location. Moored
 hulls, pontoon fingers, and gangway have forgiving static contacts. The visual generator
 covers skiff through speedboat and passenger-ferry recipes; it does not change the player craft or implement
 speed tiers, unlocks, prices, or progression saves. Those remain future design work.
@@ -282,7 +303,7 @@ It is four times wider and deeper than the original basin. The camera follows th
 simulation ticks, including angle wraparound. `-`/`+` adjust distance (8..48), PageUp/PageDown adjust
 height (4..36), and `C` restores the default view. `R` resets the boat
 without changing them. Settings are per-run; `--camera-distance` and `--camera-height` also configure
-interactive runs and screenshots. Eriksberg geographical scenery is implemented;
+interactive runs and screenshots. River geographical scenery is implemented;
 collision splashes belong to later stages. Player evaluation of handling is the
 next design input: especially steering responsiveness, the amount of slide, and coasting into a turn.
 
@@ -568,9 +589,8 @@ These stages describe the design sequence; current implementation is recorded ex
 4. **First archipelago slice (proposed):** only after the core works, try a small island area
    and the camera needed to explore it. Evaluate the appeal of discovering routes and places.
 
-The separate `boat_study` executable reuses the scene and rendering foundation. Its controls
-and launch options live in the [README](../README.md#boating-sketch). Preserve the main demo
-and its soundtrack timeline while developing this experimental direction.
+`boat_study` reuses the scene and rendering foundation. Its controls and launch options live in
+the [README](../README.md#boating-sketch).
 
 ## Later water-physics experiments
 

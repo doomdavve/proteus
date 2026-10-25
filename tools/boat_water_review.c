@@ -16,15 +16,10 @@ typedef struct {
     const char *name;
     Vector2 position; // Simulation X (west positive), Z (north positive).
 } Stop;
-static const Stop eriksberg_stops[] = { { "mouth", { -12, -125 } }, { "crossing", { -170, -250 } },
-    { "south-bank", { -160, -335 } }, { "exposed", { 80, -455 } },
-    { "quay-approach", { 170, -280 } }, { "quay-alongside", { 60, -175 } },
-    { "return", { -12, -125 } } };
-static const Stop river_stops[] = { { "mouth", { -24, -70 } }, { "river", { -15, -180 } },
+static const Stop stops[] = { { "mouth", { -24, -70 } }, { "river", { -15, -180 } },
     { "bridge-approach", { 250, -500 } }, { "under-bridge", { 454, -678 } },
     { "past-bridge", { 650, -850 } }, { "beyond", { 1100, -950 } } };
-static const Stop *stops = eriksberg_stops;
-static size_t stop_count = sizeof(eriksberg_stops) / sizeof(*eriksberg_stops);
+static const size_t stop_count = sizeof(stops) / sizeof(*stops);
 #define MAX_TICKS (240 * 120)
 #define SAMPLE_TICKS 12 // 10 Hz capture sequence; simulation remains 120 Hz.
 
@@ -161,7 +156,7 @@ static int check_gpu_water(void)
         goto cleanup;
     // In the real waterfront, the authored field must vary the surface even with
     // reflections/shadows disabled, and cross the mouth without an abrupt colour step.
-    session.world.definition = boat_location(BOAT_LOCATION_ERIKSBERG);
+    session.world.definition = boat_location(BOAT_LOCATION_RIVER);
     boat->position.x = -12;
     Color first = { 0 }, previous = { 0 }, last = { 0 };
     for (int z = 60; z >= -260; z -= 10) {
@@ -206,13 +201,9 @@ int main(int argc, char **argv)
     const char *output = NULL;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool gpu_check = false;
-    bool default_view = false;
-    bool river = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
             output = argv[++i];
-        else if (strcmp(argv[i], "--river") == 0)
-            river = true;
         else if (strcmp(argv[i], "--waves") == 0)
             waves = true;
         else if (strcmp(argv[i], "--check-gpu") == 0)
@@ -223,17 +214,15 @@ int main(int argc, char **argv)
             sequence = true;
         else if (strcmp(argv[i], "--visible") == 0)
             visible = true;
-        else if (strcmp(argv[i], "--default-view") == 0)
-            default_view = true;
         else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
             const char *name = argv[++i];
             if (strcmp(name, "cpu") != 0 && strcmp(name, "gpu") != 0)
                 return 2;
             use_gpu = strcmp(name, "gpu") == 0;
         } else {
-            puts("Usage: boat_water_review --check [--waves] [--river] | --check-gpu\n"
+            puts("Usage: boat_water_review --check [--waves] | --check-gpu\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
-                 "                         [--sequence] [--visible] [--default-view] [--river]\n"
+                 "                         [--sequence] [--visible]\n"
                  "GPU uses existing 4x AA. GPU sequence: 10 Hz; CPU samples: five seconds.\n"
                  "Visible GPU playback uses 60 Hz; simulation remains 120 Hz.\n"
                  "Named captures use both default and close follow cameras.\n"
@@ -241,8 +230,6 @@ int main(int argc, char **argv)
             return strcmp(argv[i], "--help") == 0 ? 0 : 2;
         }
     }
-    if (gpu_check && river)
-        return 2;
     if (gpu_check) {
         SetTraceLogLevel(LOG_WARNING);
         return check_gpu_water();
@@ -250,24 +237,17 @@ int main(int argc, char **argv)
     if (!check && !output)
         return 2;
     SetTraceLogLevel(LOG_WARNING);
-    waterfront_city_select_river(river);
-    if (river) {
-        stops = river_stops;
-        stop_count = sizeof(river_stops) / sizeof(*river_stops);
-        // These samples distinguish navigable space under the deck from solid legs.
-        if (!boat_map_water((Vector2) { 454, -678 }, 8)
-            || !boat_map_water((Vector2) { 1100, -950 }, 8)
-            || boat_map_water((Vector2) { 517.2f, -536.8f }, 0)
-            || boat_map_water((Vector2) { 486.7f, -527.6f }, 0)
-            || boat_map_water((Vector2) { 381.5f, -949.2f }, 0)
-            || boat_map_water((Vector2) { 349.1f, -938.7f }, 0)
-            || boat_map_water((Vector2) { 2000, -950 }, 0)) {
-            fprintf(stderr, "River support/water/crop checks failed.\n");
-            return 1;
-        }
+    // These samples distinguish navigable space under the deck from solid legs.
+    if (!boat_map_water((Vector2) { 454, -678 }, 8) || !boat_map_water((Vector2) { 1100, -950 }, 8)
+        || boat_map_water((Vector2) { 517.2f, -536.8f }, 0)
+        || boat_map_water((Vector2) { 486.7f, -527.6f }, 0)
+        || boat_map_water((Vector2) { 381.5f, -949.2f }, 0)
+        || boat_map_water((Vector2) { 349.1f, -938.7f }, 0)
+        || boat_map_water((Vector2) { 2000, -950 }, 0)) {
+        fprintf(stderr, "River support/water/crop checks failed.\n");
+        return 1;
     }
-    const BoatWorldDefinition *location
-        = boat_location(river ? BOAT_LOCATION_RIVER : BOAT_LOCATION_ERIKSBERG);
+    const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
     boat_session_init(&session, location, waves ? boat_water_gentle() : (BoatWater) { 0 });
     const BoatWorld *world = &session.world;
@@ -280,7 +260,7 @@ int main(int argc, char **argv)
         = { { water.amplitude, water.wavelength, water.angular_speed, water.direction },
               water.crossing[0], water.crossing[1] };
     printf("preset=%s cameras=%s resolution=320x200 gpu_aa=4x4\n", waves ? "waves" : "flat",
-        river ? "12/6,12/6" : "20/14,12/6");
+        "12/6,12/6");
     for (int i = 0; i < 3; ++i)
         printf("wave[%d] amplitude=%.6f wavelength=%.6f angular_speed=%.6f direction=%.6f,%.6f\n",
             i, components[i].amplitude, components[i].wavelength, components[i].angular_speed,
@@ -312,8 +292,7 @@ int main(int argc, char **argv)
     size_t destination = 0, captured_destination = 0;
     const BoatCamera default_camera
         = { .distance = location->camera_distance, .height = location->camera_height };
-    const BoatCamera review_camera
-        = default_view || river ? default_camera : (BoatCamera) { .distance = 12, .height = 6 };
+    const BoatCamera review_camera = default_camera;
     printf("sequence_camera=%.1f/%.1f\n", review_camera.distance, review_camera.height);
     int frames = 0, ticks = 0, timing_count = 0;
     double timings[MAX_TICKS / 2 + 1], total = 0;
@@ -327,7 +306,7 @@ int main(int argc, char **argv)
         bool finished = destination == stop_count - 1
             && Vector2Distance(boat->position, stops[destination].position) < 12;
         const char *name = ticks == 0 ? "dock"
-            : finished                ? (river ? "beyond" : "return")
+            : finished                ? "beyond"
             : arrival                 ? stops[destination - 1].name
                                       : NULL;
         if (name) {
@@ -343,7 +322,7 @@ int main(int argc, char **argv)
                             cameras[view], use_gpu, path))
                         goto cleanup;
                 }
-                if (river && finished) {
+                if (finished) {
                     shown = *presentation;
                     shown.camera_heading += PI;
                     snprintf(path, sizeof(path), "%s/beyond-lookback.png", output);

@@ -121,15 +121,11 @@ static int wake_checks(void)
         CHECK(Vector3Distance(a.normal, b.normal) < .00001f);
         CHECK(Vector3Distance(a.velocity, b.velocity) < .00001f);
     }
-    for (int river = 0; river < 2; ++river) {
-        waterfront_city_select_river(river != 0);
-        for (int tick = 0; tick <= 120; ++tick) {
-            CHECK(boat_water_wake_source(shifted, tick * .1f, &source));
-            CHECK(boat_map_water(source, 3));
-        }
-        boat_map_destroy();
+    for (int tick = 0; tick <= 120; ++tick) {
+        CHECK(boat_water_wake_source(shifted, tick * .1f, &source));
+        CHECK(boat_map_water(source, 3));
     }
-    waterfront_city_select_river(false);
+    boat_map_destroy();
     // Repeated crossings at different speeds and angles must settle without stored energy.
     const float speeds[] = { 0, 3, 9 };
     float encounter = 0;

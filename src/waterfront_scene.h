@@ -11,8 +11,6 @@
 
 // Renderer-independent authored data and time evaluation for the waterfront.
 // The returned mesh refers to scene-owned, static generated geometry.
-#define WATERFRONT_DEMO_DURATION 240.0f
-#define WATERFRONT_GULL_COUNT 5
 #define WATERFRONT_GULL_PARTS 3
 #define WATERFRONT_HARBOR_GULLS 32
 #define WATERFRONT_CAR_COUNT 20
@@ -76,7 +74,7 @@ typedef struct {
         Transform3D transform;
         Color color;
     } scenery[704];
-    BoatWater player_water; // Zero for timeline scenes; shared analytic boating parameters.
+    BoatWater player_water; // Shared analytic boating parameters.
     WaterfrontPlayerState player;
     int rival_count;
     WaterfrontRivalState rivals[WATERFRONT_RIVALS];
@@ -101,8 +99,6 @@ typedef struct {
     int point_count;
 } WaterfrontStreet;
 
-// Four-minute soundtrack route. Deterministic flock and chase camera; holds at the ending.
-void waterfront_demo_evaluate(float time, WaterfrontSceneFrame *frame);
 // Reevaluate scene-owned actors at explicit time/water, preserving the caller's camera/player.
 void waterfront_scene_evaluate_actors(double time, BoatWater water, WaterfrontSceneFrame *frame);
 // Boat-study flocks: explicit-time social cues, feeding passes, and vessel avoidance.
@@ -114,8 +110,8 @@ const Mesh3D *waterfront_player_hull_mesh(void);
 const Mesh3D *waterfront_player_cabin_mesh(void);
 const Mesh3D *waterfront_player_engine_mesh(void);
 
-float waterfront_scene_duration(bool short_route);
-void waterfront_scene_evaluate(float time, bool short_route, WaterfrontSceneFrame *frame);
+// Static scenery and actors at an explicit time; the caller supplies the camera.
+void waterfront_scene_evaluate(double time, BoatWater water, WaterfrontSceneFrame *frame);
 WaterfrontStreet waterfront_scene_street(int index);
 Vector3 waterfront_scene_street_position(
     WaterfrontStreet street, float distance, Vector3 *direction);

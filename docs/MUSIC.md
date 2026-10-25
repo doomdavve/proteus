@@ -1,29 +1,24 @@
 # Working on the music
 
-The demo now plays the working [Below the surface XM](../soundtrack/alternate/fasttracker/v01/below-the-surface.xm)
-at 120 BPM, speed 6. See its [tracker guide](../soundtrack/alternate/fasttracker/README.md).
-Rebuild after editing it to refresh the bundled runtime copy. If a tracker revision uses
-a new filename, update CMakeLists.txt's `proteus_assets` source path too; the runtime copy
-keeps the name `below-the-surface.xm`. The four-minute waterfront
-and flock camera hold at 4:00; the XM has a silent end hold. If the arrangement length or
-section cues change, update `WATERFRONT_DEMO_DURATION` and the flock route cue times in
-`src/waterfront_scene.c` / `src/waterfront_scene.h` alongside the audio.
+The boating game plays the XM modules in `assets/music/`; CMake copies the directory into the
+build on every build, so rebuild after editing one. The four-minute demo and its “Below the
+surface” soundtrack were removed on 2026-10-25 and remain in the git history.
 
-The playback helper reconstructs the XM decoder from its source before starting or
-seeking. Raylib's duration scan leaves a pending jump to the silent ending which its
-partial decoder reset does not clear; reusing that state would play only the first
-sound. The XM validation covers that loader sequence and backward seeking as well as
-full-song decoding. Call the helper only while the audio stream is stopped.
+The playback helper (`src/xm_audio.c`) reconstructs the XM decoder from its source before
+starting or seeking. Raylib's duration scan can leave a pending jump which its partial decoder
+reset does not clear; reusing that state would play only the first sound. The XM validation
+covers that loader sequence and backward seeking as well as full-song decoding. Call the
+helper only while the audio stream is stopped.
 
 ## Boating background loop
 
-The separate `boat_study` defaults to [A little boat](../assets/music/a-little-boat.xm): an
+`boat_study` defaults to [A little boat](../assets/music/a-little-boat.xm): an
 original, quiet C-major piece at 84 BPM / speed 6, 32 bars (91.43 seconds), repeating
 from the beginning. Soft rounded keys, a humming melody, and a sine-led bass use simple
 major/sixth/seventh harmony and sparse call-and-answer phrases. There are no drums,
 intensity layers, or boat-dependent changes. Playback volume is 0.35; engine/water
 remain independently mixed. Focus loss and paused replays pause the music.
-The main demo's timed soundtrack and the dance study's starter remain separate.
+The dance study's starter remains separate.
 
 Regenerate only this asset with `python3 tools/generate_boating_music.py`, then rebuild
 to refresh the bundled copy. This reuses the starter generator's XM encoding helpers
@@ -66,9 +61,6 @@ Implementation and verification status belong to the
 ## Archived starter sketch
 
 The notes below describe the original starter XM, retained for the separate dance study.
-
-For the new composition's brief, milestones, and listening criteria, see the
-[alternate soundtrack plan](SOUNDTRACK_PLAN.md).
 
 `starter.xm` is a sketch, not precious source material. It is meant to give us
 something audible and synchronized on day one.
@@ -114,7 +106,6 @@ The generator is deterministic. Running it again overwrites `starter.xm` and the
 five generated WAV files, so keep the evolving composition under another name,
 for example `proteus-theme.xm`. To select it for the dance study, update that tool's
 `starter.xm` load/seek paths in `tools/dance_study.c` and ensure CMake bundles the file.
-The main demo's separate working soundtrack is selected by the CMake copy described above.
 
 ## Making new samples without a sample library
 
@@ -164,7 +155,7 @@ instruments now use 44.1 kHz/16-bit PCM. Instrument slots, patterns, volumes, an
 
 Audition `assets/samples/kick.wav`, `snare.wav`, and `hat.wav` individually, then
 open `assets/music/starter.xm` in FastTracker and listen from 7.68 seconds for the
-drums with bass and the later full arrangement. The main demo plays a different XM.
+drums with bass and the later full arrangement.
 To compare revisions, keep a copy of the previous XM before regenerating, and solo
 channels 1–3 in FastTracker II Clone.
 

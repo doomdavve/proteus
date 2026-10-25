@@ -1,7 +1,7 @@
 """Recreate the bridge expansion survey offline.
 
 Requires pyproj 3.8.0, shapely 2.1.2, matplotlib 3.10.8.
-Run from any directory: python docs/eriksberg/bridge/survey.py
+Run from any directory: python docs/river/survey.py
 This produces planning artifacts; it does not modify runtime geometry.
 """
 import gzip
@@ -20,9 +20,11 @@ from shapely import make_valid
 from shapely.geometry import LineString, Polygon, box
 
 BASE = Path(__file__).resolve().parent
-ROOT = BASE.parents[2]
+ROOT = BASE.parents[1]
 SOURCE_HASH = "688c7cf277af904c44ce820c941b83cd23f383b9d5a492040edcf46cfcb6778a"
 PROPOSED = (-1500, -1600, 950, 800)
+# The original Eriksberg crop, retired 2026-10-25; drawn as the survey's "current" crop.
+FORMER = (-700, -600, 950, 800)
 
 
 def main():
@@ -31,11 +33,11 @@ def main():
     data = json.loads(raw)
     elements = data["elements"]
     by_id = {(e["type"], e["id"]): e for e in elements}
-    # Use the runtime importer's chain joining, projection, and current crop.
+    # Use the runtime importer's chain joining.
     spec = importlib.util.spec_from_file_location("prepare", ROOT / "tools/prepare_waterfront.py")
     prepare = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(prepare)
-    current = prepare.CROP
+    current = box(*FORMER)
     crop = box(*PROPOSED)
     transform = Transformer.from_crs(4326, 3007, always_xy=True)
     inverse = Transformer.from_crs(3007, 4326, always_xy=True)

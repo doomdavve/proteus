@@ -129,13 +129,12 @@ static bool boat_finite(const Boat *b)
 }
 
 // Time-driven water, traffic and moored boats at one day and thirty days: cheap direct
-// starts with powered turns through gentle waves in all three locations.
+// starts with powered turns through gentle waves in every location.
 static int large_time_locations(void)
 {
     const uint64_t starts[] = { DAY_TICKS, 30 * DAY_TICKS };
-    for (int location = 0; location < 3; ++location) {
+    for (int location = 0; location < BOAT_LOCATION_COUNT; ++location) {
         const BoatWorldDefinition *definition = boat_location((BoatLocationId)location);
-        waterfront_city_select_river(definition->id == BOAT_LOCATION_RIVER);
         for (int s = 0; s < 2; ++s) {
             BoatSession session;
             BoatWater water = boat_water_gentle();
@@ -169,8 +168,7 @@ static int large_time_locations(void)
         }
         boat_map_destroy();
     }
-    waterfront_city_select_river(false);
-    puts("large_time_locations=ok basin,eriksberg,river starts=1d,30d waves+d3");
+    puts("large_time_locations=ok basin,river starts=1d,30d waves+d3");
     return 0;
 }
 

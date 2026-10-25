@@ -938,7 +938,7 @@ static int validate_gentle_encounters(void)
     // Wave forces cannot bypass the existing hull/shore containment.
     for (int angle = 0; angle < 4; ++angle) {
         BoatSession boat;
-        boat_session_init(&boat, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 });
+        boat_session_init(&boat, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         boat.world.water = boat_water_gentle();
         boat.boat.heading = angle * PI / 2;
         boat.boat.throttle = 1;
@@ -1316,16 +1316,16 @@ int main(void)
     boat_scene_frame(
         SESSION_VIEW(&player), &player.presentation, &player.world, BOAT_CAMERA_DEFAULT, &frame);
     CHECK(frame.time == 0 && frame.player.particle_count == 0);
-    waterfront_scene_evaluate(0, true, &frame);
+    waterfront_scene_evaluate(0, (BoatWater) { 0 }, &frame);
     CHECK(!frame.player_active);
     BoatSession mapped;
-    boat_session_init(&mapped, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 });
+    boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
     CHECK(mapped.world.definition->mapped && boat_map_water(mapped.boat.position, .3f));
     CHECK(!boat_map_water((Vector2) { 10000, 0 }, 0));
     CHECK(!boat_map_water((Vector2) { -100, 60 }, 0));
     // Drive into both dock quays. Hull clearance must remain in water and impacts rebound.
     for (int side = -1; side <= 1; side += 2) {
-        boat_session_init(&mapped, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 });
+        boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         mapped.boat.heading = mapped.presentation.camera_heading = side * 1.5707963f;
         mapped.boat.throttle = 1;
         bool bumped = false;
@@ -1343,7 +1343,7 @@ int main(void)
     const float heading_offsets[] = { 0, -.00001f, .00001f };
     for (size_t i = 0; i < sizeof(heading_offsets) / sizeof(*heading_offsets); ++i)
         for (int side = -1; side <= 1; side += 2) {
-            boat_session_init(&mapped, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 });
+            boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
             mapped.boat.heading = mapped.presentation.camera_heading
                 = side * PI / 2 + heading_offsets[i];
             mapped.boat.throttle = 1;
@@ -1367,7 +1367,7 @@ int main(void)
             CHECK(reverse_travel > 3);
         }
     // The channel remains navigable through the crane towards the river.
-    boat_session_init(&mapped, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 });
+    boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
     mapped.boat.throttle = 1;
     for (int tick = 0; tick < 1200; ++tick) {
         boat_session_step(&mapped, (BoatInput) { 0 });

@@ -1,13 +1,12 @@
 # Proteus
 
-A small C/raylib demo playground with deliberately low-resolution output
-and tracker music. The demo is now a single four-minute Eriksberg waterfront journey,
-following five gulls to the 120 BPM “Below the surface” soundtrack.
+A small C/raylib playground with deliberately low-resolution output and tracker music.
+Its main program is a boating game, Wake Velocity (`boat_study`), in a basin and on the
+Gothenburg river towards Älvsborgsbron.
 
 [Play Proteus Boating in your browser](https://doomdavve.github.io/proteus/).
 
-The separate boating playground provides free exploration, a timed basin course, ghosts,
-and replays. See the [documentation and current plans](docs/README.md) for project status,
+The game provides free exploration, a timed basin course, ghosts, replays and multiplayer rooms. See the [documentation and current plans](docs/README.md) for project status,
 next tasks, and the [Gothenburg boating design](docs/BOATING_PLAN.md).
 
 [Multiplayer is in progress](docs/MULTIPLAYER_PLAN.md): a native-first, four-player shared
@@ -21,7 +20,7 @@ MULTIPLAYER > HOST A ROOM starts a room on your machine and joins it
 The [river race](docs/RACE_PLAN.md) is being tuned towards a 45–60 second sprint,
 with a shared starting grid, frequent ferry-wake jumps and confirmed finishing positions.
 A [playable R0 ferry-wake trial](docs/RACE_PLAN.md#r0-prototype--2026-10-24) now measures a
-shortened Eriksberg/bridge route (about 49 s at full throttle):
+shortened Eriksberg-to-bridge stretch of the river (about 49 s at full throttle):
 `./build/boat_race_trial --play`. Race rooms (`./build/boat_server --mode race`) grid two to
 four players, hold them through a 3-2-1 countdown, pass six alternating skill gates and a
 moving rough-water storm with rain and lightning, and award places at the finish.
@@ -51,7 +50,7 @@ See [Linux setup and verification](docs/LINUX_BUILD.md) for dependencies and bac
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ctest --test-dir build -j 4 --output-on-failure
-./build/proteus
+./build/boat_study
 ```
 
 The normal suite keeps arcade wakes and gameplay checks enabled. Retired physical wake-field
@@ -59,48 +58,6 @@ experiments are disabled until that work resumes; re-enable with
 `-DPROTEUS_WAKE_FIELD_TESTS=ON`. Numerical validators use `-O2` in Clang/GCC Debug
 builds while retaining assertions; use `-DPROTEUS_OPTIMIZE_TESTS=OFF` for source stepping.
 See [test workflow and timings](docs/TESTING.md) for the fast suite and optional field checks.
-
-Start at a global timeline position, or select a scene and use a scene-local time:
-
-```sh
-./build/proteus --time 30
-./build/proteus --scene cube --time 2.5
-```
-
-The music seeks with the visuals so their timing remains synchronized. These options have the same
-meaning in interactive and screenshot modes.
-
-The sole scene, `cube`, uses the GPU renderer by default.
-`--renderer cpu` selects the deterministic software reference; `--renderer gpu` is available for
-explicit GPU comparison. GPU waterfront screenshots and profiles create a raylib/OpenGL context,
-while CPU screenshots remain display-free.
-
-Add `--gpu-aa` to enable supersampling for the GPU waterfront (off by default):
-
-```sh
-./build/proteus --scene cube --gpu-aa
-./build/proteus --scene cube --time 2.5 --gpu-aa --screenshot build/cube-aa.png
-```
-
-The city renders at 4× width and height (1280x800 at the default 320x200), then averages
-each 4x4 block into one virtual pixel. This shades 16 times as many main-pass pixels;
-shadow and reflection map sizes stay fixed. The final image still uses nearest-neighbour,
-integer-scaled presentation. The flag applies to playback, screenshots, and `--profile cube`,
-including resolution changes; the CPU renderer is unaffected. GPU profiles report `gpu_aa` and
-the internal render dimensions, with the downsampling pass included in submission timing.
-
-Controls:
-
-- `1`: 320x180
-- `2`: 320x200
-- `3`: 320x240
-- `F2`: save the current virtual frame as `proteus-SCENE-MILLISECONDS.png`
-- `F3`: toggle the debug profiler overlay
-- `F11`: toggle fullscreen
-- `Esc`: quit
-
-The image is always scaled by a whole number with nearest-neighbour filtering.
-Unused screen space is letterboxed.
 
 ## Boating sketch
 
@@ -114,14 +71,13 @@ For an Apple Silicon Mac app ZIP built on GitHub Actions, see
 Version tags and published releases automatically build and attach both app ZIPs;
 see [automated releases](docs/RELEASES.md).
 
-Explore the bundled Eriksberg waterfront with the same boat and controls:
+Explore the bundled river with the same boat and controls:
 
 ```sh
-./build/boat_study --location eriksberg
-./build/boat_study --location eriksberg --gpu --gpu-aa
-./build/boat_study --location river --gpu-aa
+./build/boat_study --location river
+./build/boat_study --location river --gpu --gpu-aa
 ./build/boat_study --location basin
-./build/boat_study --renderer cpu --location eriksberg --screenshot build/eriksberg-boat.png --time 3
+./build/boat_study --renderer cpu --location river --screenshot build/river-boat.png --time 3
 ```
 
 The player craft is a simple speedboat with a pointed bow and low swept windscreen.
@@ -182,7 +138,7 @@ Any explicit option skips the title; `--title --screenshot FILE` captures it.
 
 ### Multiplayer diagnostic room
 
-The headless authority, `boat_server`, hosts basin, Eriksberg or river rooms for up to four
+The headless authority, `boat_server`, hosts basin or river rooms for up to four
 native clients over UDP (basin by default):
 
 ```sh
@@ -203,8 +159,8 @@ only the room:
 
 Clients join through the title or `--connect HOST:24680` and automatically load the server's
 location, scenery and water. Multiplayer starts are out in the river, about 60 m apart, with
-shoreline/boat/wake checks for safe resets. `--location eriksberg` hosts the smaller crop. Protocol v4 requires
-rebuilt server and clients; older packages are rejected with a version mismatch.
+shoreline/boat/wake checks for safe resets. Protocol v5 requires rebuilt server and clients;
+older packages are rejected with a version mismatch.
 
 The server runs until Ctrl+C, `--seconds` or `--ticks`. `--waves` gives the room gentle waves,
 `--players 1-4` caps it, and `--token TEXT` requires the same `--token` from clients. To accept
@@ -365,8 +321,9 @@ and the course revision in `src/boat_replay.c` when changing gates.
 Screenshot `--time` accepts up to 600 seconds with `--replay` and clamps to the recorded finish;
 other screenshot modes retain the 60 second limit.
 
-`basin` remains the default. Eriksberg spawns in the dock facing the crane and river; R returns
-there. The map, buildings, Dockbron, crane, and daytime sky reuse the existing offline scene.
+`basin` remains the default. The river spawns in the Eriksberg dock facing the crane and river;
+R returns there. The map, buildings, Dockbron, crane, and daytime sky come from the bundled offline
+river crop.
 Two authored berths now give the dock an inhabited edge: six generated leisure boats on a
 floating pontoon along the west bank, and a workboat with quay equipment on the east bank.
 Their hulls, fenders, cabin shapes, masts, and engines come from shared parameterized recipes.
@@ -382,7 +339,7 @@ circuits. They have visual wakes, navigation lights, reflections, shadows, and f
 hull contacts. Inspect `./build/harbor_review --view ferry --waves` or `--view launch`;
 see [harbor traffic](docs/HARBOR_TRAFFIC.md) for routes and limits.
 
-Eriksberg and river boating also have 32 gulls in four small flocks. They circle, dip toward
+River boating also has 32 gulls in four small flocks. They circle, dip toward
 imagined food, follow the cruiser's disturbed water, and spread out with staggered alarm climbs.
 They bank into turns, alternate individual wingbeats with gliding, and climb away from passing
 vessels and your boat; faster approaches provoke a wider reaction. The basin stays clear for
@@ -401,23 +358,21 @@ the 320×200 integer-scaled presentation. It does not select a renderer or locat
 alias for `--renderer gpu`. GPU screenshots require a desktop graphics context; use
 `--renderer cpu` for window-free captures. Buildings and quays remain static; overhead
 structures have no collision. Follow-camera occlusion near buildings is not resolved.
-These locations cover a local waterfront area, not all of Gothenburg.
+The river covers a local waterfront area, not all of Gothenburg.
 
-`--location river` opts into the larger 2,450 × 2,400 m waterfront and an Älvsborgsbron
-blockout. Start in the same dock, leave the basin, and follow the river southwest to sail under
-the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy
+`--location river` is a 2,450 × 2,400 m waterfront with an Älvsborgsbron blockout. Start in the
+dock, leave it, and follow the river southwest to sail under the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy
 embankments, with concrete abutments connecting the deck to the land. The approaches follow mapped
 road alignments; their elevations are authored for the flat scene. The four mapped tower legs
 block the boat; the elevated deck remains passable underneath. The river location defaults to a close follow view (12 m back,
-6 m high) for a stronger sense of speed; C restores that view. The original Eriksberg location and
-main demo keep their existing scenery and camera defaults. Both renderers support the extension;
+6 m high) for a stronger sense of speed; C restores that view. Both renderers support it;
 GPU is recommended for waves because the CPU reference tessellates the whole water footprint.
 Geometry and height assumptions are in the [river manifest](assets/geometry/river/manifest.json).
-See the [bridge survey and blockout notes](docs/eriksberg/bridge/README.md) for the route and
+See the [bridge survey and blockout notes](docs/river/README.md) for the route and
 repeatable CPU/GPU captures.
 
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), ODbL 1.0.
-See the bundled [source manifest](assets/geometry/eriksberg/manifest.json) for provenance.
+See the bundled [source manifest](assets/geometry/river/manifest.json) for provenance.
 
 Run `./build/boat_study --location basin` for the first handling prototype: a small craft in a simple basin,
 viewed by a third-person camera following behind and above the boat. The basin is 240x160 world
@@ -467,7 +422,7 @@ all HUD pixels share the scene's 320x200 grid and integer scaling. Press `?` for
 modal keyboard guide; `?` or Esc dismisses it. Boating and audio pause while help is open or the
 window loses focus. The view remains 320x200 with integer scaling and letterboxing as needed.
 Press `F3` to toggle the debug profiler overlay, or pass `--profiler` to show it on startup.
-Alongside the main demo's rolling frame graph, boating rows show simulation, physics tick
+Alongside the rolling frame graph, boating rows show simulation, physics tick
 total/max and count, course/replay, audio, rendering/upload, present/wait, and active time
 discarded by the 0.1-second catch-up clamp. Paused help or focus-loss frames show no discarded
 time. Frame wall includes all sections; simulation includes physics and in-loop course work, so
@@ -525,9 +480,9 @@ level horizon and does not follow the hull’s bobbing.
 The basin walls bounce the craft back gently; the two orange markers are visual turning references
 and have no collision yet. Varied foam traces your path and fades; short-lived stern wash
 separates and erodes as it travels aft. Hard turns throw spray
-according to sideways slip. Reset clears both effects. The default basin has no geographic scenery; `--course` adds timed gates, and Eriksberg and river provide mapped scenery.
+according to sideways slip. Reset clears both effects. The default basin has no geographic scenery; `--course` adds timed gates, and the river provides mapped scenery.
 
-Bounded arcade wake objects are the default in basin, Eriksberg, and river free boating:
+Bounded arcade wake objects are the default in basin and river free boating:
 
 ```sh
 ./build/boat_study --location river --profiler
@@ -584,16 +539,16 @@ is retained. `--wake-height` accepts
 .1–3 m; `--wake-life-ticks` accepts 240–1920. `R` clears the shared wake world and
 restarts the optional crossing boat. The extra craft follows a basin loop and shares
 the same water/contact queries; it does not add hard hull collision with the player.
-Ordinary object mode also supports Eriksberg/river, waves and current. Course/replay/ghost,
+Ordinary object mode also supports the river, waves and current. Course/replay/ghost,
 field mode and explicit D3 `--player-wake` combinations are rejected. The HUD identifies
 object mode. [Object-mode results](docs/WAKE_OBJECT_RESULTS.md) own behavior, performance,
 verification and remaining issues. The user selected this as the default after enjoying
 the continuity revision; occasional waves appearing stuck remain an open issue.
 
-Currents and the separate scripted crossing wake remain opt-in in **all three locations**:
+Currents and the separate scripted crossing wake remain opt-in in **both locations**:
 
 ```sh
-./build/boat_study --location eriksberg --current
+./build/boat_study --current
 ./build/boat_study --location river --current --crossing-wake --waves --gpu-aa
 ./build/boat_study --no-player-wake --current --crossing-wake --demo
 ```
@@ -625,7 +580,7 @@ For a closer view of the motion:
 
 ```sh
 ./build/boat_study --waves --camera-distance 12 --camera-height 6
-./build/boat_study --waves --location eriksberg --gpu-aa --camera-distance 12 --camera-height 6
+./build/boat_study --waves --location river --gpu-aa
 ```
 
 With waves enabled, the six hull supports resist motion into and out of the local water surface.
@@ -652,7 +607,7 @@ For display-free captures of scripted acceleration, planing, and a right turn, o
 ./build/boat_study --screenshot build/boat-turn.png --time 4
 ./build/boat_study --frames 180
 ./build/boat_study --demo --frames 720
-./build/boat_study --location eriksberg --gpu --gpu-aa --demo
+./build/boat_study --location river --gpu --gpu-aa --demo
 ```
 
 `--demo` previews the same scripted run as screenshots: raise thrust for two seconds, hold it to
@@ -670,163 +625,60 @@ relaxed version with `--choreography assets/dance/house-groove.dance`, or use `-
 for the earlier cross-and-reach study. See the
 [dance study notes](docs/DANCE_STUDY.md) for the language, controls and screenshots.
 
-## Capture a screenshot
-
-Render a PNG without opening a window from the CPU-side framebuffer:
-
-```sh
-./build/proteus --renderer cpu --screenshot build/proteus.png --time 48
-```
-
-By default, `--time` addresses the complete visual timeline. Add `--scene` to select a scene and
-interpret the time relative to its start:
-
-```sh
-./build/proteus --screenshot build/cube.png --scene cube --time 2.5
-```
-
-Screenshot mode also accepts `--resolution` and defaults to 320x200.
-
-The default GPU `cube` screenshot needs a desktop graphics context. Use `--renderer cpu` for a
-display-free waterfront reference capture:
-
-```sh
-./build/proteus --renderer cpu --screenshot build/cube-cpu.png --scene cube --time 2.5
-./build/proteus --renderer gpu --screenshot build/cube-gpu.png --scene cube --time 2.5
-```
-
-## GPU visual review
+## GPU checks
 
 GPU checks are deliberately opt-in because they need a desktop graphics context. Configure them on
-a machine that can create a raylib/OpenGL window, then run either the labelled CTest case or the
-review target:
+a machine that can create a raylib/OpenGL window, then run the labelled CTest cases:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=ON
 cmake --build build -j
 ctest --test-dir build -L gpu --output-on-failure
-# or: cmake --build build --target gpu_review
 ```
 
-The review command captures the `cube` scene at local times 0, 1.7, 2.7, 5, 7.5, 10, and 15 seconds
-with both renderers. It writes `build/gpu-review/contact-sheet.png` (CPU | GPU | amplified visual
-diff), all source captures, and `manifest.json` with the build and OpenGL renderer details. It checks
-dimensions, city coverage, exposed daytime sky, and broad lit moving-object regions with
-tolerances; it never compares CPU/GPU image hashes. The GPU fixture in the same command checks
-render target dimensions, orientation, depth, winding, normal submission, and shader rejection.
+If no graphics context is available in an automated session, these tests fail. Ordinary CTest
+does not include them and remains display-free. `gpu_fixture` checks render target dimensions,
+orientation, depth, winding, normal submission, shader rejection and, with `--city --check`,
+sky coverage and sampling against the CPU panorama at native and supersampled sizes, with a
+resized window and shadows/reflections toggled independently.
 
-If no graphics context is available in an automated session, the GPU test fails and records the
-context error in the manifest. Ordinary CTest does not include this test and remains display-free.
-
-The GPU waterfront enables its directional shadow map by default. Use `--gpu-shadows off` for a
-same-time comparison. The focused fixture can compare its supported shadow resolutions and export
-the light-frustum depth map for review:
+The GPU waterfront enables its directional shadow map, distance atmosphere and a 160x120
+reflected water pass by default. The focused fixture renders the city from a fixed dock view and
+can switch each off, compare shadow resolutions and export the light-frustum depth map:
 
 ```sh
 ./build/gpu_fixture --city --time 5 --shadow-resolution 512 --screenshot build/shadow-512.png
 ./build/gpu_fixture --city --time 5 --shadow-resolution 1024 --screenshot build/shadow-1024.png
 ./build/gpu_fixture --city --time 5 --shadow-map --screenshot build/shadow-depth.png
+./build/gpu_fixture --city --time 10 --reflections off --screenshot build/reflection-off.png
+./build/gpu_fixture --city --time 10 --atmosphere off --screenshot build/atmosphere-off.png
 ```
 
 The sunny morning sky fades from clear blue to a pale cyan horizon, with cream-white
 flat cloud banks built from square tiles and a warm sun. The sun direction also drives city shadows
 and water highlights. CPU and GPU share a fixed world panorama, so the sky follows camera rotation
-naturally; GPU water reflections use the same sky through the mirrored camera. Cloud tiles form a
-shallow horizontal deck, with pale undersides, blue rims, and smaller patches toward the horizon.
-`gpu_fixture --city --check` checks sky coverage and sampling against the CPU panorama at native
-and supersampled sizes, with a resized window and shadows/reflections toggled independently.
+naturally; GPU water reflections use the same sky through the mirrored camera.
 
-Distance atmosphere is also enabled by default. Compare its light blue daytime haze at the same scene time
-with `--gpu-atmosphere off` in the demo or `--atmosphere off` in the fixture.
+The `boat_study` profiler (`F3`) keeps a rolling 240-frame history (about four seconds at 60 FPS)
+and graphs total frame wall time, scene rendering plus texture upload, and presentation time
+(including any vertical-sync wait). It reports rolling min/average/95th-percentile/max timing,
+display dimensions and framebuffer traffic. Samples and the graph update every frame, while the
+numeric readout refreshes four times per second so it remains readable. For repeatable headless
+measurements, see the [boating performance guide](docs/BOATING_PERFORMANCE.md).
 
-The GPU water plane uses a 160x120 reflected scene pass by default. Compare it with
-`--gpu-reflections off` in the demo or `--reflections off` in the fixture:
-
-```sh
-./build/gpu_fixture --city --time 10 --reflections on --screenshot build/reflection-on.png
-./build/gpu_fixture --city --time 10 --reflections off --screenshot build/reflection-off.png
-```
-
-The profiler keeps a rolling 240-frame history (about four seconds at 60 FPS) and
-graphs total frame wall time, CPU scene generation plus texture upload, and
-presentation time (including any vertical-sync wait). It also reports rolling
-min/average/95th-percentile/max timing, the active scene, display dimensions,
-framebuffer traffic, and audio position. Samples and the graph update every frame,
-while the numeric readout refreshes four times per second so it remains readable. The profiler also
-shows smoothed sub-bass, bass, low-mid, mid, presence, and high-frequency levels, plus overall level
-and onset strength from the live XM output.
-
-## Repeatable scene profiling
-
-Run one scene against a deterministic 60 FPS timeline and print a machine-readable
-key/value report:
+With full Xcode selected as the active developer directory, Instruments can record a Time
+Profiler trace of a windowed scripted drive:
 
 ```sh
-./build/proteus --renderer cpu --profile cube
+xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
+  --launch -- ./build/boat_study --location river --demo --frames 3600
 ```
 
-The default CPU run is headless and measures 600 frames after 60 warm-up frames. Use
-`--frames`, `--warmup`, and `--resolution` to change the workload. For example:
+## Music
 
-```sh
-./build/proteus --renderer cpu --profile cube --frames 1200 --warmup 120 --resolution 320x240
-```
-
-Add `--visible` to create a graphics context and include texture-upload and presentation
-timings. Without it, those report fields are zero and the run isolates CPU scene generation.
-The report includes its build type and a final-framebuffer checksum so automated comparisons
-can reject mismatched builds or unintended visual changes. Run `./build/proteus --help` for
-the complete interface.
-
-`--profile cube` uses the GPU waterfront by default and reports CPU submission timing for the
-shadow, reflection, and city passes; it does not report GPU timestamp-query timing. Select
-`--renderer cpu --profile cube` for the original software checksum/profile route.
-
-For function-level CPU sampling on macOS, the built-in `sample` command can attach to a
-longer headless run. Start the sampler in one terminal, then the workload in another:
-
-```sh
-sample -wait proteus 10 1 -file build/cube.sample.txt
-./build/proteus --renderer cpu --profile cube --frames 100000
-```
-
-With full Xcode selected as the active developer directory, Instruments can instead record
-a Time Profiler trace directly:
-
-```sh
-xcrun xctrace record --template 'Time Profiler' --output build/cube.trace \
-  --launch -- ./build/proteus --renderer cpu --profile cube --frames 100000
-```
-
-## Editing the music
-
-The runtime uses [below-the-surface.xm](soundtrack/alternate/fasttracker/v01/below-the-surface.xm).
-CMake copies that working XM into the build's `assets/music/` directory on every build;
-rebuild after saving tracker edits. Playback uses the bundled asset path, so it also works
-when launched outside the repository root. See the [tracker guide](soundtrack/alternate/fasttracker/README.md)
-for its instruments, channels, and section cues. The starter XM remains an archived sketch
-and is still used by the separate dance study.
-
-The waterfront runs from 0:00 through the four-minute ending at 120 BPM, speed 6.
-Both `--time` and `--scene cube --time` now address the same timeline; times beyond
-240 seconds hold the final shot. The song plays once and retains its silent ending.
-There is no scene switching. Close and relaunch to replay.
-
-Five low-poly gulls glide in a loose formation with staggered wingbeats and gentle banking.
-The camera trails the flock with a stable horizon, following a broad circuit over the street,
-river, and dock. Turns follow the soundtrack's section cues. Bird, camera, and actor positions
-are deterministic functions of time, so direct seeks match continuous playback. The flock is
-shared by CPU and GPU rendering, including GPU reflections and shadows. The original short/long
-camera routes remain available in the standalone `waterfront_storyboard` diagnostic.
-
-The virtual framebuffer defaults to 320x200 with integer scaling; try all three shapes while
-it runs. The `cube` name is retained for screenshots and profiling. The city uses bundled
-geographic geometry and an authored crane. See [the 3D renderer notes](docs/3D.md) and
-[the living city plan](docs/LIVING_CITY_PLAN.md).
-
-Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright),
-[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). The retained snapshot and
-height assumptions are recorded in `assets/geometry/eriksberg/manifest.json`.
+The boating game plays the XM modules in `assets/music/`; see the
+[music workflow](docs/MUSIC.md). The starter XM remains an archived sketch and is still used by
+the separate dance study.
 
 ## Editor setup
 
@@ -838,8 +690,8 @@ clangd, formatting, compilation, navigation, and LLDB debugging.
 The [live browser game](https://doomdavve.github.io/proteus/) is the playable `boat_study`
 distributed in the native ZIPs. The landing page shows its build version (release tag or
 Git development description). It includes
-River, Eriksberg, Basin, and the basin time trial with ghosts/replays and saved bests.
-The separate four-minute `proteus` demo and development tools remain native targets.
+River, Basin, and the basin time trial with ghosts/replays and saved bests.
+Development tools remain native targets.
 
 Install CMake 3.24+, Python 3, and the [official Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html).
 Use the SDK version pinned in `web/emsdk-version` (currently 6.0.12), then activate it in

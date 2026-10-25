@@ -4,8 +4,9 @@ Status, 2026-10-18: opt-in river location implemented, with a shared CPU/GPU bri
 blockout and grounded road approaches. Both deterministic river traversal presets pass.
 Bridge/shoreline/building detail and a human handling/camera playthrough remain open;
 see [implementation status](#implementation-status-and-remaining-work).
-The default Eriksberg location and main demo retain their existing geometry.
-[All plans](../../README.md).
+The separate Eriksberg location, its smaller crop and the main demo were removed on 2026-10-25;
+the river is now the only mapped location.
+[All plans](../README.md).
 
 ```sh
 ./build/boat_study --location river --gpu-aa
@@ -22,7 +23,7 @@ are elevated scenery; overhead structure collisions are not implemented.
 [Vector map](coverage.svg) · [Machine-readable findings](summary.json)
 
 The retained survey map and JSON use the original “current”/“proposed” labels.
-They mean the default Eriksberg crop and the now-implemented river crop respectively.
+They mean the former Eriksberg crop (retired 2026-10-25) and the river crop respectively.
 
 ## Implemented coverage and original survey
 
@@ -31,13 +32,13 @@ boat simulation X points west, so negate it when converting to map coordinates.
 
 | Coverage | West, south, east, north relative to crane | Size |
 | --- | --- | --- |
-| Default Eriksberg crop | −700, −600, +950, +800 m | 1,650 × 1,400 m |
-| Opt-in river crop | −1,500, −1,600, +950, +800 m | 2,450 × 2,400 m |
+| Former Eriksberg crop (retired) | −700, −600, +950, +800 m | 1,650 × 1,400 m |
+| River crop | −1,500, −1,600, +950, +800 m | 2,450 × 2,400 m |
 | Download envelope | Approximately −1,900, −2,200, +1,250, +1,100 m | Source margin around proposal |
 
-The river crop extends 800 m west and 1,000 m south of the default Eriksberg crop.
+The river crop extends 800 m west and 1,000 m south of the former Eriksberg crop.
 The mapped bridge outline occupies approximately east −592…−255 m, north −1,191…−297 m.
-The default Eriksberg boundary cuts through that area; the river location contains the
+The former Eriksberg boundary cut through that area; the river location contains the
 entire mapped deck and space to sail beyond it.
 
 The route drawn on the map starts at the existing dock spawn and travels about
@@ -54,7 +55,8 @@ Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright
 
 `osm-survey.json.gz` is a separate planning extract retrieved on 2026-10-17 from the
 [OSM map API](https://api.openstreetmap.org/api/0.6/map.json?bbox=11.8770534,57.6776116,11.8946856,57.6875018).
-It does not replace the original Eriksberg snapshot or its pinned hash. The source
+It replaced the original Eriksberg snapshot, removed with that crop on 2026-10-25, and is now
+the source `tools/prepare_waterfront.py` pins. The source
 envelope is longitude 11.8770534…11.9299499, latitude 57.6776116…57.7072822.
 
 The envelope was divided into a 3 × 3 grid at longitude 11.8946856, 11.9123177
@@ -75,10 +77,10 @@ Recreate all survey artifacts offline using Python with pyproj 3.8.0, shapely 2.
 and matplotlib 3.10.8:
 
 ```sh
-python docs/eriksberg/bridge/survey.py
+python docs/river/survey.py
 ```
 
-The script reads the default Eriksberg crop from `tools/prepare_waterfront.py`, checks the source
+The script draws the former Eriksberg crop for comparison, checks the source
 hash, assembles the two main outer banks of river relation 3329487, and verifies:
 
 - Artificial closing edges and omitted bank fragments lie outside the proposed crop.
@@ -123,17 +125,17 @@ marked so abutments and ramps receive no generated apartment windows or roof tex
 
 ## Repeatable route verification
 
-The existing boat water review now accepts `--river`, driving the real 120 Hz boat
+The boat water review drives the real 120 Hz boat
 simulation from the dock, through the bridge, and beyond it. It checks the enclosing
 hull rectangle stays in water throughout the voyage, the four leg centres are blocked,
 water below the deck is open, and the outer crop remains closed.
 
 ```sh
-./build/boat_water_review --check --river
-./build/boat_water_review --check --river --waves
-./build/boat_water_review --river --renderer cpu --output build/river-cpu
-./build/boat_water_review --river --renderer gpu --output build/river-gpu
-./build/boat_water_review --river --renderer gpu --waves --output build/river-wave-gpu
+./build/boat_water_review --check
+./build/boat_water_review --check --waves
+./build/boat_water_review --renderer cpu --output build/river-cpu
+./build/boat_water_review --renderer gpu --output build/river-gpu
+./build/boat_water_review --renderer gpu --waves --output build/river-wave-gpu
 ```
 
 GPU checks require desktop graphics access. Each capture run exports named dock,
@@ -171,8 +173,8 @@ bridge's structural height. Path `ele=50` is not a deck profile or clearance sur
 
 ## Implementation status and remaining work
 
-1. Implemented: separately pinned source/crop, with the existing Eriksberg output preserved
-   as the default and the larger boat scene opt-in.
+1. Implemented: separately pinned source/crop, at first beside the Eriksberg output as an opt-in
+   scene. Since 2026-10-25 it is the only mapped crop and the generator's only output.
 2. Implemented: water/land and coarse buildings preserve the water-first triangle ordering
    required by `src/boat_map.c`. Incomplete building relations are explicitly omitted.
 3. Implemented: shared CPU/GPU bridge blockout with open towers and separate solid leg footprints.

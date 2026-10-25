@@ -123,7 +123,7 @@ Only three product questions materially remain open; the plan proceeds with thes
 
 | Source / symbols inspected | Reuse and consequence |
 | --- | --- |
-| [`src/main.c`](../src/main.c): `main`, `run_screenshot`, `run_profile`; [`tools/boat_study.c`](../tools/boat_study.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `boat_study`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
+| `src/main.c` (the demo, removed 2026-10-25): `main`, `run_screenshot`, `run_profile`; [`tools/boat_study.c`](../tools/boat_study.c): `timed_boat_step`, `demo_step`, `ObjectStudy` | The game loop is in `boat_study`, not `src/main.c`. Keep the four-minute demo/music clock separate. The study is the integration point for joining, input and rendering. |
 | [`src/boat.h`](../src/boat.h): `Boat`, `BOAT_STEP`; [`src/boat.c`](../src/boat.c): `boat_step`, `buoyancy_step`, `motion_step`, `boat_wake_stern` | Reuse the 120 Hz force recipe, steering/throttle **rates**, engine response, six support points, air yaw, landing and inversion timers. `Boat` also owns flag, particles, camera, course, location, water copies and borrowed wake pointers. It is not a packet or prediction checkpoint. |
 | `boat_collide_pair`, `hull_vertical_bounds`, `resolve_hull_contact`, `resolve_traffic` in `boat.c` | Reuse OBB/SAT geometry, mutual planar/yaw impulses and mass-weighted separation. Vertical intervals reject clear jumps. This is not a full 3D solver: no vertical boat-on-boat impulse or deck landing, and pair response does not itself perform a final shoreline check. Sequential pair mutation is insufficient as the fleet scheduler. M2 (2026-10-23): `boat_collide_pair` now composes pure `boat_pair_contact`/`_speed`/`_impulse`/`_apply` helpers with unchanged arithmetic; `boat_fleet_solve` uses them simultaneously and holds separations at the shore. |
 | [`src/boat_water.c`](../src/boat_water.c): `boat_water_query`, `boat_water_query_field`, `boat_water_resistance` | Arcade contributions add signed height, gradient and vertical surface velocity; current contributes slope-relative vertical motion before normal construction. Preserve this common physical surface and the CPU/GPU recipe. |
@@ -1746,7 +1746,8 @@ over the in-memory transport) is wanted later. C was rejected: a stalled host lo
   rejects `--connect`/`--token`, and `--port` requires `--host`. The Escape menu's last row
   reads CLOSE ROOM, with the hint "YOU HOST: CLOSING ENDS THE ROOM".
 - On the title, MULTIPLAYER gains a first row, HOST A ROOM. It opens MODE (FREE BOATING,
-  DEATHMATCH, RIVER RACE), PLACE (BASIN, ERIKSBERG, RIVER; fixed to RIVER for races), WATER
+  DEATHMATCH, RIVER RACE), PLACE (BASIN, RIVER; ERIKSBERG too until its removal later on 2026-10-25;
+  fixed to RIVER for races), WATER
   (CALM, WAVES), START ROOM and BACK. The choices are saved in `title.txt` as `host_mode`,
   `host_location` and `host_waves`; the defaults are free boating on a calm river. Rooms are
   always open to the LAN, answer LAN searches, and have no token. A failed start (for example

@@ -1083,7 +1083,7 @@ uint64_t boat_net_content_digest(void)
         digest_float(&d, definition->wake_offset.y);
         if (!definition->mapped)
             continue;
-        const Mesh3D *mesh = waterfront_city_mesh_crop(id == BOAT_LOCATION_RIVER);
+        const Mesh3D *mesh = waterfront_city_mesh();
         digest_u64(&d, mesh->triangle_count);
         for (size_t i = 0; i < mesh->triangle_count; ++i)
             for (unsigned j = 0; j < 3; ++j) {

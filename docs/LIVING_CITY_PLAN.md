@@ -1,4 +1,4 @@
-# Living Eriksberg city plan
+# Living river city plan
 
 Status, reconciled 2026-10-18: execution steps 01–04 and follow-ups 04b–04d complete
 (2026-09-19); boat-view audit 04e, surface pass 04f, and selected waterline pass 04g
@@ -9,7 +9,10 @@ passenger ferry brought forward from 09. See [harbor traffic](HARBOR_TRAFFIC.md)
 People/cyclists 06 are the next numbered city task.
 Flying gulls from step 11 were brought forward for the four-minute demo; the boat study
 now adds 32 reactive harbor gulls in four groups (see [harbor gulls](HARBOR_GULLS.md)).
-Perched birds remain pending. The [river expansion](eriksberg/bridge/README.md) is a separate scenery
+On 2026-10-25 the demo, its storyboard routes, the Eriksberg boating location and the baseline
+audit were removed; this plan now serves the river boating scene. Entries below that mention
+them are history.
+Perched birds remain pending. The [river expansion](river/README.md) is a separate scenery
 track, not completion of actor/ferry steps. [All plans](README.md).
 
 ## Direction
@@ -453,7 +456,7 @@ above owns the current execution order.
   Near facades now have stronger enclosure and stepped roofs; background continuity and
   large undressed quay surfaces remain visibly sparse. Step 03 addresses the background.
 
-- Step 01: [coverage audit and verification](LIVING_CITY_AUDIT.md) records exact missing
+- Step 01: coverage audit and verification (`docs/LIVING_CITY_AUDIT.md`, removed 2026-10-25) records exact missing
   building parts, priority areas, baseline captures, and profiling. Added GPU storyboard
   playback/capture for both routes and a repeatable comparison script. Corrected the
   GPU review's stale sky-band assumption. Build and all 13 tests passed, including GPU.
@@ -687,10 +690,8 @@ turn small details into distracting pixel noise.
 
 ## Technical boundaries and checks
 
-- Keep the current four-minute main demo and its soundtrack/flock cues. The legacy
-  15.36-second and 30.72-second storyboard routes remain diagnostic references. City activity
-  runs at plausible independent speeds; compose key moments against musical phrases.
-  Do not make every window, walk cycle, or lamp pulse with the beat.
+- City activity runs at plausible independent speeds. Do not make every window, walk cycle,
+  or lamp pulse with the music.
 - Keep authored paths, stable IDs, schedules, and evaluated object states in the shared
   scene layer. `waterfront_scene_evaluate_actors` now consolidates cars, lamps, berths,
   and travelling vessels; extend that explicit-time snapshot when adding actors.
@@ -707,11 +708,12 @@ turn small details into distracting pixel noise.
   emissive surfaces; select only the nearby lights that need to illuminate other objects.
 - Use the same evaluated transforms in colour, shadow, and reflection passes. Measure
   the added work in all passes; collect a baseline before expanding scene complexity.
-- At each implemented stage, build and run CTest. Capture times 0, 2.5, 5, 10, and 15 at
-  320x200 and 320x240, plus a 320x180 framing check and event-specific frames. Inspect the
-  full short and long routes in motion. GPU checks need a working graphics context.
+- At each implemented stage, build and run CTest. Capture CPU and GPU river frames from the
+  water (`boat_study --screenshot`), the fixed `gpu_fixture --city` street view and
+  event-specific frames, and inspect a windowed river drive in motion. GPU checks need a
+  working graphics context.
 - Compare fresh direct seeks with sequential playback and backward/forward seeks. Check
-  route transitions, light selection, shadow/reflection coherence, and camera clearance.
+  light selection and shadow/reflection coherence.
   Report CPU submission and GPU timing separately where available, plus draw counts and
   memory growth; establish a performance target from measurements on the target machine.
 
@@ -720,7 +722,7 @@ actor foundation. The user brought travelling boats and a compact passenger ferr
 forward; the original large Stena ferry is a deferred alternative, not the current
 vessel. Keep physical currents/crossing wakes on the separate D1/D2 track.
 
-## Soundtrack and flock follow pass (2026-10-11)
+## Soundtrack and flock follow pass (2026-10-11, historical; removed 2026-10-25)
 
 The demo now consists solely of `cube`, using the working Below the surface XM
 (120 BPM, speed 6, four minutes). Five gulls provide a subject for a new camera

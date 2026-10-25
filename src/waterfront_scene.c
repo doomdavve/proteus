@@ -125,20 +125,8 @@ void waterfront_sky_draw(Color *pixels, int width, int height, View3D camera)
     }
 }
 
-typedef struct {
-    Vector3 position;
-    Vector3 target;
-} CameraKey;
-
-static const CameraKey keys[] = {
-    { { -85, 17.5f, 170 }, { -78, 5, 100 } },
-    { { -78, 21.5f, 90 }, { -70, 5, 10 } },
-    { { -70, 28.5f, 0 }, { -15, 5, 90 } },
-    { { -30, 35.5f, -130 }, { 30, 8, 130 } },
-    { { 120, 41.5f, -200 }, { 20, 8, 140 } },
-};
-static const float key_distances[] = { 0, 80.306f, 170.661f, 306.676f, 472.205f };
-
+// Authored traffic follows retained Monsungatan and Ostindiefararen centreline vertices.
+// Speeds, lane offsets, lamps and occupancy are artistic, not geographic source data.
 static const Vector3 west_street[] = { { -99.4f, 3.56f, 308.7f }, { -86.9f, 3.56f, 186.7f },
     { -80.6f, 3.56f, 116.5f }, { -73.9f, 3.56f, 53.6f }, { -68.8f, 3.56f, -5.7f },
     { -64.8f, 3.56f, -35.8f }, { -61.5f, 3.56f, -69.6f } };
@@ -221,51 +209,14 @@ void waterfront_scene_evaluate_actors(double time, BoatWater water, WaterfrontSc
     waterfront_traffic_evaluate(water, time, &frame->traffic);
 }
 
-float waterfront_scene_duration(bool short_route) { return short_route ? 15.36f : 30.72f; }
-
-static Vector3 tangent(int index, bool target)
-{
-    int before = index > 0 ? index - 1 : index;
-    int after = index < 4 ? index + 1 : index;
-    Vector3 a = target ? keys[before].target : keys[before].position;
-    Vector3 b = target ? keys[after].target : keys[after].position;
-    return Vector3Scale(Vector3Subtract(b, a), 1 / (key_distances[after] - key_distances[before]));
-}
-
-static Vector3 interpolate(int index, float u, bool target)
-{
-    float span = key_distances[index + 1] - key_distances[index];
-    Vector3 a = target ? keys[index].target : keys[index].position;
-    Vector3 b = target ? keys[index + 1].target : keys[index + 1].position;
-    float u2 = u * u, u3 = u2 * u;
-    return Vector3Add(
-        Vector3Add(Vector3Scale(a, 2 * u3 - 3 * u2 + 1), Vector3Scale(b, -2 * u3 + 3 * u2)),
-        Vector3Add(Vector3Scale(tangent(index, target), (u3 - 2 * u2 + u) * span),
-            Vector3Scale(tangent(index + 1, target), (u3 - u2) * span)));
-}
-
-void waterfront_scene_evaluate(float time, bool short_route, WaterfrontSceneFrame *frame)
+void waterfront_scene_evaluate(double time, BoatWater water, WaterfrontSceneFrame *frame)
 {
     *frame = (WaterfrontSceneFrame) { 0 };
-    time = Clamp(time, 0, waterfront_scene_duration(short_route));
-    frame->time = time;
-    float progress = Clamp(time / waterfront_scene_duration(short_route), 0, 1);
-    float distance = short_route ? Lerp(0, 340, progress) : progress * key_distances[4];
-    int index = 0;
-    while (index < 3 && distance > key_distances[index + 1])
-        ++index;
-    float u = (distance - key_distances[index]) / (key_distances[index + 1] - key_distances[index]);
-    frame->camera = (View3D) { .position = interpolate(index, u, false),
-        .target = interpolate(index, u, true),
-        .up = { 0, 1, 0 },
-        .vertical_fov = 62 * DEG2RAD,
-        .near_plane = .25f,
-        .far_plane = 1400 };
     frame->bridge = (Transform3D) {
         .position = { 11, 7, 126 }, .rotation = { 0, -.08f, 0 }, .scale = { 68, 1, 3 }
     };
     frame->bridge_color = (Color) { 119, 128, 145, 255 };
-    waterfront_scene_evaluate_actors(time, (BoatWater) { 0 }, frame);
+    waterfront_scene_evaluate_actors(time, water, frame);
 }
 
 WaterfrontStreet waterfront_scene_street(int index)
@@ -433,82 +384,6 @@ void waterfront_boating_gulls(
             frame->gulls[i][part] = (Transform3D) { .position = p,
                 .rotation = { bank + wing, yaw, pitch },
                 .scale = { size, size, size } };
-        }
-    }
-}
-
-// Broad circuit above the street, out over the river, and back across the dock.
-// Cue times follow Below the surface's arrangement; Hermite tangents keep turns smooth.
-static const Vector3 flock_keys[]
-    = { { -85, 62, 170 }, { -78, 69, 30 }, { -85, 95, -170 }, { 150, 100, -190 }, { 195, 100, 20 },
-          { 175, 100, 245 }, { 80, 100, 335 }, { -90, 85, 290 }, { -130, 75, 110 } };
-static const float flock_times[] = { 0, 24, 56, 88, 116, 148, 176, 216, 240 };
-
-static Vector3 flock_tangent(int index)
-{
-    int before = index > 0 ? index - 1 : index;
-    int after = index < 8 ? index + 1 : index;
-    return Vector3Scale(Vector3Subtract(flock_keys[after], flock_keys[before]),
-        1 / (flock_times[after] - flock_times[before]));
-}
-
-static Vector3 flock_position(float time)
-{
-    // Linear end extensions make the trailing camera and heading well-defined at either end.
-    if (time < 0)
-        return Vector3Add(flock_keys[0], Vector3Scale(flock_tangent(0), time));
-    if (time > WATERFRONT_DEMO_DURATION)
-        return Vector3Add(
-            flock_keys[8], Vector3Scale(flock_tangent(8), time - WATERFRONT_DEMO_DURATION));
-    int i = 0;
-    while (i < 7 && time > flock_times[i + 1])
-        ++i;
-    float span = flock_times[i + 1] - flock_times[i];
-    float u = (time - flock_times[i]) / span;
-    float u2 = u * u, u3 = u2 * u;
-    return Vector3Add(Vector3Add(Vector3Scale(flock_keys[i], 2 * u3 - 3 * u2 + 1),
-                          Vector3Scale(flock_keys[i + 1], -2 * u3 + 3 * u2)),
-        Vector3Add(Vector3Scale(flock_tangent(i), (u3 - 2 * u2 + u) * span),
-            Vector3Scale(flock_tangent(i + 1), (u3 - u2) * span)));
-}
-
-void waterfront_demo_evaluate(float time, WaterfrontSceneFrame *frame)
-{
-    time = Clamp(time, 0, WATERFRONT_DEMO_DURATION);
-    waterfront_scene_evaluate(0, true, frame);
-    frame->time = time;
-    waterfront_scene_evaluate_actors(time, (BoatWater) { 0 }, frame);
-    Vector3 center = flock_position(time);
-    Vector3 forward = Vector3Normalize(
-        Vector3Subtract(flock_position(time + .25f), flock_position(time - .25f)));
-    Vector3 side = Vector3Normalize(Vector3CrossProduct(forward, (Vector3) { 0, 1, 0 }));
-    // Follow the route's recent history, with a stable horizon and a gentle look ahead.
-    // This is stateless: direct seeks give exactly the same shot as continuous playback.
-    Vector3 behind = Vector3Normalize(Vector3Subtract(center, flock_position(time - 3)));
-    frame->camera.position
-        = Vector3Add(center, Vector3Add(Vector3Scale(behind, -22), (Vector3) { 0, 2, 0 }));
-    frame->camera.target = Vector3Add(center, Vector3Scale(forward, 10));
-    frame->camera.vertical_fov = 58 * DEG2RAD;
-    frame->gull_count = WATERFRONT_GULL_COUNT;
-    static const Vector3 offsets[]
-        = { { 0, 0, 2 }, { -3.5f, 1, -2 }, { 3, -.6f, -1 }, { -6.5f, -.3f, -5 }, { 6, 1.4f, -4 } };
-    float yaw = atan2f(-forward.z, forward.x);
-    Vector3 next = Vector3Normalize(Vector3Subtract(flock_position(time + 1), center));
-    float bank = Clamp(Vector3CrossProduct(forward, next).y * -6, -.45f, .45f);
-    for (int i = 0; i < WATERFRONT_GULL_COUNT; ++i) {
-        float phase = time + i * 1.37f;
-        Vector3 p = Vector3Add(center,
-            Vector3Add(Vector3Scale(side, offsets[i].x + .35f * sinf(phase * .6f)),
-                Vector3Scale(forward, offsets[i].z + .5f * sinf(phase * .37f))));
-        p.y += offsets[i].y + .3f * sinf(phase * .8f);
-        // A two-second flapping burst followed by six seconds of gliding, staggered by bird.
-        float burst = fmodf(phase, 8);
-        float flap = burst < 2 ? .6f * sinf(burst * PI * 3) * sinf(burst * PI / 2) : 0;
-        for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part) {
-            float wing = part == 1 ? -.12f - flap : part == 2 ? .12f + flap : 0;
-            frame->gulls[i][part] = (Transform3D) {
-                .position = p, .rotation = { bank + wing, yaw, 0 }, .scale = { 1, 1, 1 }
-            };
         }
     }
 }

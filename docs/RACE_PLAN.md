@@ -48,7 +48,7 @@ following counts, timings and recovery rules are working proposals, not user-app
 Use one point-to-point course for the existing four-player room. Aim for a roughly
 50–55 second clean run, measured from GO to the finish; countdown and results are additional.
 
-The current [river crop](eriksberg/bridge/README.md#implemented-coverage-and-original-survey)
+The current [river crop](river/README.md#implemented-coverage-and-original-survey)
 contains Eriksberg and the bridge. It does not establish a downtown start or a complete
 downtown-to-bridge race. Survey the desired start, navigable centreline, shoreline clearance,
 bridge approach and landing areas before choosing coordinates or extending the map.

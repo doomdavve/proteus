@@ -52,7 +52,7 @@ static void start(BoatSession *session, int index)
     else if (index == 1)
         boat_session_init(session, basin, waves);
     else
-        boat_session_init(session, boat_location(BOAT_LOCATION_ERIKSBERG), mapped);
+        boat_session_init(session, boat_location(BOAT_LOCATION_RIVER), mapped);
 }
 
 static bool same_physics(const BoatSession *a, const BoatSession *b)
@@ -97,7 +97,7 @@ static int interleaved(void)
     CHECK(live[0].world.water.player_wake_count > 0 && live[1].world.water.player_wake_count > 0);
     CHECK(Vector2Distance(live[0].boat.position, live[1].boat.position) > 1);
     CHECK(live[2].world.definition->mapped && !live[0].world.definition->mapped);
-    printf("interleaved=ok sessions=basin-calm-d3,basin-waves-current-d3,eriksberg-waves "
+    printf("interleaved=ok sessions=basin-calm-d3,basin-waves-current-d3,river-waves "
            "ticks=%d d3=%d,%d\n",
         TICKS, live[0].world.water.player_wake_count, live[1].world.water.player_wake_count);
     return 0;

@@ -46,7 +46,7 @@ jobs:
           app="$RUNNER_TEMP/relocated/Wake Velocity.app"
           codesign --verify --deep --strict --verbose=2 "$app"
           cd "$RUNNER_TEMP"
-          "$app/Contents/MacOS/wake_velocity" --renderer cpu --location eriksberg --time 3 --screenshot relocated.png
+          "$app/Contents/MacOS/wake_velocity" --renderer cpu --location river --time 3 --screenshot relocated.png
           test -s relocated.png
           "$app/Contents/MacOS/wake_velocity" --serve --scripted --ticks 240
           test -s "$app/Contents/Resources/assets/music/a-little-boat.xm"

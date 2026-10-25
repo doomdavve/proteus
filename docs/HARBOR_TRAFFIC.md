@@ -1,8 +1,9 @@
 # Travelling harbor boats
 
 Implemented 2026-10-18 at the user's request: a yellow launch in the dock, a river cruiser,
-a motoring sailboat, and a compact passenger ferry. They appear in the main demo, retained
-storyboards, and both Eriksberg/river boating locations. The basin course remains traffic-free.
+a motoring sailboat, and a compact passenger ferry. They appear in the river boating location
+(and appeared in the demo, storyboards and Eriksberg location removed on 2026-10-25). The basin
+course remains traffic-free.
 These are invented vessels and authored routes, not surveyed ferry services or timetables.
 The compact ferry replaces the original large Stena vessel proposal for this pass.
 
@@ -58,7 +59,7 @@ course state, recordings, and replay revisions remain unchanged.
 ## Review
 
 ```sh
-./build/boat_study --location eriksberg --gpu-aa --waves
+./build/boat_study --location river --gpu-aa --waves
 ./build/harbor_review --view launch --waves
 ./build/harbor_review --view ferry --waves --time 40
 ./build/harbor_review --view traffic

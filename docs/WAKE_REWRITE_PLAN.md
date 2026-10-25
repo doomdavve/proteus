@@ -29,7 +29,7 @@ with `--player-wake`; `--wake-field` remains the separate native basin compariso
 Completed: caller-owned four-emitter world with thirty-two slots per boat; actual wetted
 stern-span emission; independent travelling crest/trough objects; smooth birth/expiry;
 shared height/gradient/vertical-motion contact queries; matching CPU/GPU rendering;
-configurable crest/lifetime; reset; basin/Eriksberg/river free boating; optional scripted
+configurable crest/lifetime; reset; basin/river free boating; optional scripted
 second boat sharing the same wakes. The user enjoys the huge-wave mode; the new
 continuity revision emits every half-second, smooths source strength and aligns
 growth/fading along each span. No map-sized state or per-tick allocation is used.

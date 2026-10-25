@@ -6,16 +6,10 @@
 #define BOAT_BASIN_HALF_X 120.0f
 #define BOAT_BASIN_HALF_Z 80.0f
 
-typedef enum {
-    BOAT_LOCATION_BASIN,
-    BOAT_LOCATION_ERIKSBERG,
-    BOAT_LOCATION_RIVER,
-    BOAT_LOCATION_COUNT
-} BoatLocationId;
+typedef enum { BOAT_LOCATION_BASIN, BOAT_LOCATION_RIVER, BOAT_LOCATION_COUNT } BoatLocationId;
 
 // Immutable, process-lifetime location record. Worlds borrow it; nothing stores an active one.
-// Mapped records still share the compiled crop chosen by waterfront_city_select_river() and
-// the boat_map/boat_water_mesh caches until mapped W1/W2 give them owned map data.
+// The mapped record uses the compiled river crop and the boat_map/boat_water_mesh caches.
 typedef struct {
     BoatLocationId id;
     const char *name; // Command-line spelling.

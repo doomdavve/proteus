@@ -102,7 +102,7 @@ static int validate_core(void)
     boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(boat.boat.turn_roll_load == 0 && boat.boat.roll == 0 && boat.boat.roll_velocity == 0);
     boat.boat.turn_roll_load = 3;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 });
+    boat_session_init(&boat, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
     CHECK(boat.boat.turn_roll_load == 0);
     boat.boat.turn_roll_load = 3;
     boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
@@ -742,7 +742,7 @@ static int validate_contacts(void)
     for (int trial = 0; trial < 8; ++trial) {
         BoatSession boat;
         boat_session_init(&boat,
-            boat_location(trial >= 2 ? BOAT_LOCATION_ERIKSBERG : BOAT_LOCATION_BASIN),
+            boat_location(trial >= 2 ? BOAT_LOCATION_RIVER : BOAT_LOCATION_BASIN),
             (BoatWater) { 0 });
         if (trial < 2) {
             boat.boat.position = (Vector2) { 116, trial == 0 ? 0 : 76 };

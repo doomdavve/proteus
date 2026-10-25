@@ -100,31 +100,26 @@ int main(void)
     CHECK(valid_mesh(waterfront_harbor_pontoon_mesh()));
     CHECK(valid_mesh(waterfront_harbor_quay_mesh()));
     const WaterfrontBerth *berths = waterfront_harbor_berths();
-    for (int river = 0; river < 2; ++river) {
-        boat_map_destroy();
-        waterfront_city_select_river(river != 0);
-        for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
-            const Mesh3D *mesh = waterfront_harbor_boat_mesh(i);
-            CHECK(valid_mesh(mesh));
-            Transform3D pose = { .position = berths[i].position,
-                .rotation = { 0, berths[i].heading, 0 },
-                .scale = { 1, 1, 1 } };
-            for (size_t t = 0; t < mesh->triangle_count; ++t)
-                for (int j = 0; j < 3; ++j) {
-                    Vector3 p = waterfront_harbor_attachment(
-                        pose, mesh->vertices[mesh->triangles[t].vertices[j]]);
-                    CHECK(boat_map_water((Vector2) { -p.x, p.z }, .3f));
-                }
-            CHECK(waterfront_harbor_contact(
-                (Vector2) { -pose.position.x, pose.position.z }, 0, NULL));
-        }
-        for (int z = -100; z <= 275; z += 5) {
-            CHECK(boat_map_water((Vector2) { -12, z }, 3));
-            CHECK(!waterfront_harbor_contact((Vector2) { -12, z }, 3, NULL));
-        }
+    boat_map_destroy();
+    for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
+        const Mesh3D *mesh = waterfront_harbor_boat_mesh(i);
+        CHECK(valid_mesh(mesh));
+        Transform3D pose = { .position = berths[i].position,
+            .rotation = { 0, berths[i].heading, 0 },
+            .scale = { 1, 1, 1 } };
+        for (size_t t = 0; t < mesh->triangle_count; ++t)
+            for (int j = 0; j < 3; ++j) {
+                Vector3 p = waterfront_harbor_attachment(
+                    pose, mesh->vertices[mesh->triangles[t].vertices[j]]);
+                CHECK(boat_map_water((Vector2) { -p.x, p.z }, .3f));
+            }
+        CHECK(waterfront_harbor_contact((Vector2) { -pose.position.x, pose.position.z }, 0, NULL));
+    }
+    for (int z = -100; z <= 275; z += 5) {
+        CHECK(boat_map_water((Vector2) { -12, z }, 3));
+        CHECK(!waterfront_harbor_contact((Vector2) { -12, z }, 3, NULL));
     }
     boat_map_destroy();
-    waterfront_city_select_river(false);
     WaterfrontHarborFrame flat, waves, again;
     waterfront_harbor_evaluate((BoatWater) { 0 }, 0, &flat);
     waterfront_harbor_evaluate((BoatWater) { 0 }, 87, &again);
@@ -172,7 +167,7 @@ int main(void)
     const float headings[] = { -PI / 2, PI / 2 };
     for (int test = 0; test < 2; ++test) {
         BoatSession boat;
-        boat_session_init(&boat, boat_location(BOAT_LOCATION_ERIKSBERG), (BoatWater) { 0 });
+        boat_session_init(&boat, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         boat.boat.position = starts[test];
         boat.boat.heading = boat.presentation.camera_heading = headings[test];
         boat.boat.velocity

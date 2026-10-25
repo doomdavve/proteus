@@ -29,7 +29,7 @@ uniform sampler2D shadowMap;
 uniform mat4 lightViewProjection;
 uniform int waterPatchPass;
 uniform vec4 wavePatch;
-uniform int waterfrontWater; // Only playable Eriksberg; leave timeline/basin materials alone.
+uniform int waterfrontWater; // Only playable mapped water; leave basin materials alone.
 uniform float surfacePixelScale;
 
 out vec4 finalColor;

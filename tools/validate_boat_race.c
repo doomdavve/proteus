@@ -690,7 +690,6 @@ static int full_race(void)
 
 int main(void)
 {
-    waterfront_city_select_river(true);
     if (geometry() || storm_surface() || crossing() || progress_and_places() || ties() || parking() || recovery()
         || leavers() || rejects() || hold() || full_race())
         return 1;

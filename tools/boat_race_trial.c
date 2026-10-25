@@ -587,7 +587,6 @@ int main(int argc, char **argv)
         }
     }
     SetTraceLogLevel(LOG_WARNING);
-    waterfront_city_select_river(true);
     if (gpu_check) {
         boat_vessel_wake_gpu_check(ferry());
         boat_water_storm_gpu_check(boat_race_river_course()->storm);

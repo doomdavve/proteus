@@ -46,7 +46,7 @@ jobs:
       - name: Run boat CPU and multiplayer checks
         run: >-
           ctest --test-dir build-win -C Release --output-on-failure
-          -R '^(boat_handling|boat_screenshot|boat_eriksberg_screenshot|boat_server_scripted|boat_study_serve_scripted|boat_net|boat_net_loopback|boat_host)$'
+          -R '^(boat_handling|boat_screenshot|boat_river_screenshot|boat_server_scripted|boat_study_serve_scripted|boat_net|boat_net_loopback|boat_host)$'
 
       - name: Package portable Wake Velocity
         run: |
@@ -58,8 +58,8 @@ jobs:
           Copy-Item build-win/Release/assets/title "$package/assets" -Recurse
           New-Item -ItemType Directory -Force -Path "$package/assets/music" | Out-Null
           Copy-Item build-win/Release/assets/music/a-little-boat.xm "$package/assets/music"
-          New-Item -ItemType Directory -Force -Path "$package/assets/geometry/eriksberg" | Out-Null
-          Copy-Item assets/geometry/eriksberg/manifest.json "$package/assets/geometry/eriksberg"
+          New-Item -ItemType Directory -Force -Path "$package/assets/geometry/river" | Out-Null
+          Copy-Item assets/geometry/river/manifest.json "$package/assets/geometry/river"
           Copy-Item tools/windows/launch.bat $package
           Copy-Item tools/windows/host.bat $package
           Copy-Item tools/windows/README.txt $package
@@ -73,7 +73,7 @@ jobs:
           $exe = (Resolve-Path "build-win/package/wake_velocity-$env:PACKAGE_VERSION-windows-x64/wake_velocity.exe").Path
           Push-Location $env:RUNNER_TEMP
           try {
-            & $exe --renderer cpu --location eriksberg --time 3 --screenshot boat-portable.png
+            & $exe --renderer cpu --location river --time 3 --screenshot boat-portable.png
             if ($LASTEXITCODE -ne 0) { throw "Relocated Wake Velocity failed: $LASTEXITCODE" }
             & $exe --serve --scripted --ticks 240
             if ($LASTEXITCODE -ne 0) { throw "Relocated boat server failed: $LASTEXITCODE" }

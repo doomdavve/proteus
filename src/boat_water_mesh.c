@@ -170,9 +170,9 @@ static bool patch_triangle(Surface *s, Vector3 a, Vector3 b, Vector3 c, Vector2 
     return true;
 }
 
-static const Mesh3D *water_patch(Vector2 world_center, bool eriksberg, bool fine)
+static const Mesh3D *water_patch(Vector2 world_center, bool mapped, bool fine)
 {
-    int index = eriksberg + 2 * fine;
+    int index = mapped + 2 * fine;
     Surface *s = &patches[index];
     Vector2 center = { roundf(world_center.x / 12) * 12, roundf(world_center.y / 12) * 12 };
     if (s->count && Vector2Equals(center, patch_centers[index]))
@@ -180,7 +180,7 @@ static const Mesh3D *water_patch(Vector2 world_center, bool eriksberg, bool fine
     s->count = 0;
     Vector2 origin = { center.x - 96, center.y - 96 };
     bool ok = true;
-    if (eriksberg) {
+    if (mapped) {
         const Mesh3D *city = waterfront_city_mesh();
         for (size_t i = 0; ok && i < city->triangle_count; ++i) {
             Triangle3D t = city->triangles[i];
@@ -205,14 +205,14 @@ static const Mesh3D *water_patch(Vector2 world_center, bool eriksberg, bool fine
     return &s->mesh;
 }
 
-const Mesh3D *boat_water_patch(Vector2 center, bool eriksberg)
+const Mesh3D *boat_water_patch(Vector2 center, bool mapped)
 {
-    return water_patch(center, eriksberg, false);
+    return water_patch(center, mapped, false);
 }
 
-const Mesh3D *boat_water_patch_arcade(Vector2 center, bool eriksberg)
+const Mesh3D *boat_water_patch_arcade(Vector2 center, bool mapped)
 {
-    return water_patch(center, eriksberg, true);
+    return water_patch(center, mapped, true);
 }
 
 // Same presentation-only phase/energy proxy as waveCrestFoam in the water shader.
@@ -225,12 +225,12 @@ static float wave_crest_foam(float height, Vector2 gradient, float k)
     return phase * phase * (3 - 2 * phase) * strength * strength * (3 - 2 * strength);
 }
 
-const Mesh3D *boat_water_surface(BoatWater water, double time, bool eriksberg)
+const Mesh3D *boat_water_surface(BoatWater water, double time, bool mapped)
 {
-    Surface *s = &surfaces[eriksberg];
+    Surface *s = &surfaces[mapped];
     if (!s->count) {
         bool ok = true;
-        if (eriksberg) {
+        if (mapped) {
             const Mesh3D *city = waterfront_city_mesh();
             for (size_t i = 0; ok && i < city->triangle_count; ++i) {
                 Triangle3D t = city->triangles[i];
@@ -268,7 +268,7 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool eriksberg)
             = boat_water_query_borrowed(&water, (Vector2) { -centre.x, centre.z }, time);
         // Restrained slope light; geometry and GPU reflections carry the wave shape.
         float light = Clamp(.95f + .55f * (-q.normal.x + q.normal.z), .85f, 1.05f);
-        Color base = eriksberg ? (Color) { 45, 79, 104, 255 } : (Color) { 36, 107, 125, 255 };
+        Color base = mapped ? (Color) { 45, 79, 104, 255 } : (Color) { 36, 107, 125, 255 };
         Vector2 point = { -centre.x, centre.z };
         BoatStormSample storm = boat_water_storm_query(water.storm, point, time);
         BoatVesselWakeSample vessel = boat_vessel_wake_query(water.vessel, point, time);

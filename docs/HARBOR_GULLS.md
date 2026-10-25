@@ -1,7 +1,8 @@
 # Harbor gulls
 
-Implemented 2026-10-18 for `boat_study` in Eriksberg and river locations. The basin/course
-has no gulls. The main demo retains its five-bird soundtrack route and camera.
+Implemented 2026-10-18 for `boat_study` in the then Eriksberg and river locations; since
+2026-10-25 the river is the only mapped location. The basin/course has no gulls. The main demo's
+five-bird route was removed with the demo on 2026-10-25.
 
 Four groups of eight birds occupy the inner dock, dock mouth, and river. One follows behind
 the travelling cruiser. Shared circling paths provide cohesion and alignment; soft personal
@@ -19,8 +20,7 @@ The routes are authored for the waterfront; arbitrary building/bridge clearance 
 
 `waterfront_boating_gulls` in `src/waterfront_scene.c` writes renderer-independent transforms
 into `WaterfrontSceneFrame`. CPU boating draws the same poses as GPU color, reflection, and
-shadow passes. The snapshot has room for 32 gulls; `WATERFRONT_GULL_COUNT` still means the
-five birds in the main demo. Explicit time and player pose fully determine the result, including
+shadow passes. The snapshot has room for 32 gulls. Explicit time and player pose fully determine the result, including
 backward seeks. The social paths are authored cues rather than an integrated boids simulation.
 
 ## Review
@@ -29,11 +29,10 @@ Run from the repository root:
 
 ```sh
 mkdir -p build/living-city/gulls
-./build/boat_study --location eriksberg --gpu-aa --demo --frames 360
 ./build/boat_study --location river --gpu-aa --demo --frames 360
-./build/boat_study --renderer cpu --location eriksberg --time 0 --screenshot build/living-city/gulls/dock-start.png
-./build/boat_study --location eriksberg --gpu-aa --time 0 --screenshot build/living-city/gulls/dock-gpu.png
-./build/boat_study --location eriksberg --camera-height 6
+./build/boat_study --renderer cpu --location river --time 0 --screenshot build/living-city/gulls/dock-start.png
+./build/boat_study --location river --gpu-aa --time 0 --screenshot build/living-city/gulls/dock-gpu.png
+./build/boat_study --location river --camera-height 6
 ```
 
 The default opening view shows the nearest flock ahead of the boat. Lower the chase camera

@@ -1,18 +1,7 @@
-#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
-#define _POSIX_C_SOURCE 200809L // clock_gettime under strict C17 (glibc).
-#endif
 #include "profiler.h"
 
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOGDI
-#define NOUSER
-#include <windows.h>
-#endif
 
 static int compare_floats(const void *left, const void *right)
 {
@@ -55,20 +44,16 @@ void profiler_add(Profiler *profiler, float frame_ms, float scene_ms, float pres
         ++profiler->count;
 }
 
-ProfilerSnapshot profiler_snapshot(const Profiler *profiler, SceneFrame scene, float timeline_time,
-    VirtualSize size, Rectangle destination, bool music_ready, Music music, AudioSpectrum spectrum)
+ProfilerSnapshot profiler_snapshot(
+    const Profiler *profiler, float scene_time, VirtualSize size, Rectangle destination)
 {
     ProfilerSnapshot snapshot = {
         .frame = profile_stats(profiler->frame_ms, profiler->next, profiler->count),
         .scene_cost = profile_stats(profiler->scene_ms, profiler->next, profiler->count),
         .present = profile_stats(profiler->present_ms, profiler->next, profiler->count),
-        .spectrum = spectrum,
-        .scene = scene,
+        .scene_time = scene_time,
         .renderer_label = "CPU",
         .texture_upload_kib = size.width * size.height * (int)sizeof(Color) / 1024,
-        .timeline_time = timeline_time,
-        .music_played = music_ready ? GetMusicTimePlayed(music) : 0.0f,
-        .music_length = music_ready ? GetMusicTimeLength(music) : 0.0f,
         .raylib_fps = GetFPS(),
         .monitor_refresh_rate = GetMonitorRefreshRate(GetCurrentMonitor()),
         .sample_count = profiler->count,
@@ -78,7 +63,6 @@ ProfilerSnapshot profiler_snapshot(const Profiler *profiler, SceneFrame scene, f
         .render_height = GetRenderHeight(),
         .scale = size.width > 0 ? (int)destination.width / size.width : 0,
         .framebuffer_kib = size.width * size.height * (int)sizeof(Color) / 1024,
-        .music_playing = music_ready && IsMusicStreamPlaying(music),
     };
     snapshot.observed_fps = snapshot.frame.average > 0.0f ? 1000.0f / snapshot.frame.average : 0.0f;
     return snapshot;
@@ -146,19 +130,13 @@ void profiler_draw(const Profiler *profiler, const ProfilerSnapshot *snapshot, V
     const int x = 12;
     const int y = 12;
     const int width = 680;
-    const int height = 337;
+    const int height = 318;
     DrawRectangle(x, y, width, height, (Color) { 2, 5, 10, 225 });
     DrawRectangleLines(x, y, width, height, (Color) { 150, 175, 195, 255 });
     DrawText("PROFILER [F3]", x + 10, y + 8, 18, RAYWHITE);
-    if (snapshot->scene_duration > 0.0f)
-        DrawText(TextFormat("scene %-10s  %5.1f / %5.1f s  (%3.0f%%)   timeline %.1f s",
-                     snapshot->scene_label, snapshot->scene.time, snapshot->scene_duration,
-                     snapshot->scene.progress * 100.0f, snapshot->timeline_time),
-            x + 10, y + 31, 14, RAYWHITE);
-    else
-        DrawText(TextFormat("scene %s  simulation %.1f s  renderer %s", snapshot->scene_label,
-                     snapshot->scene.time, snapshot->renderer_label),
-            x + 10, y + 31, 14, RAYWHITE);
+    DrawText(TextFormat("scene %s  simulation %.1f s  renderer %s", snapshot->scene_label,
+                 snapshot->scene_time, snapshot->renderer_label),
+        x + 10, y + 31, 14, RAYWHITE);
     DrawText(TextFormat("frame ms    now %6.1f  avg %6.1f  p95 %6.1f  min %6.1f  max %6.1f",
                  snapshot->frame.latest, snapshot->frame.average, snapshot->frame.percentile_95,
                  snapshot->frame.minimum, snapshot->frame.maximum),
@@ -181,79 +159,13 @@ void profiler_draw(const Profiler *profiler, const ProfilerSnapshot *snapshot, V
                  size.height, snapshot->window_width, snapshot->window_height,
                  snapshot->render_width, snapshot->render_height, snapshot->scale),
         x + 10, y + 128, 14, RAYWHITE);
-    DrawText(TextFormat("framebuffer %d KiB  texture upload %d KiB/frame  audio %s %.1f/%.1f s",
-                 snapshot->framebuffer_kib, snapshot->texture_upload_kib,
-                 snapshot->music_playing ? "playing" : "off", snapshot->music_played,
-                 snapshot->music_length),
+    DrawText(TextFormat("framebuffer %d KiB  texture upload %d KiB/frame",
+                 snapshot->framebuffer_kib, snapshot->texture_upload_kib),
         x + 10, y + 147, 14, RAYWHITE);
-    DrawText(TextFormat("bands sub %.2f  bass %.2f  low %.2f  mid %.2f  pres %.2f  high %.2f  "
-                        "level %.2f  onset %.2f",
-                 snapshot->spectrum.bands[AUDIO_SPECTRUM_SUB_BASS],
-                 snapshot->spectrum.bands[AUDIO_SPECTRUM_BASS],
-                 snapshot->spectrum.bands[AUDIO_SPECTRUM_LOW_MID],
-                 snapshot->spectrum.bands[AUDIO_SPECTRUM_MID],
-                 snapshot->spectrum.bands[AUDIO_SPECTRUM_PRESENCE],
-                 snapshot->spectrum.bands[AUDIO_SPECTRUM_HIGH], snapshot->spectrum.overall,
-                 snapshot->spectrum.onset),
-        x + 10, y + 166, 14, (Color) { 220, 150, 255, 255 });
     DrawText("rolling 240 frames:  frame wall     scene submit+upload  present/wait", x + 10,
-        y + 187, 13, LIGHTGRAY);
-    DrawRectangle(x + 111, y + 191, 12, 2, (Color) { 255, 210, 70, 255 });
-    DrawRectangle(x + 241, y + 191, 12, 2, (Color) { 80, 245, 135, 255 });
-    DrawRectangle(x + 392, y + 191, 12, 2, (Color) { 80, 190, 255, 255 });
-    draw_profiler_graph(profiler, (Rectangle) { x + 10, y + 206, width - 20, 120 });
-}
-
-ProfileStats profile_stats_linear(float *samples, int count)
-{
-    if (!samples || count <= 0)
-        return (ProfileStats) { 0 };
-    ProfileStats stats = {
-        .latest = samples[count - 1],
-        .minimum = samples[0],
-        .maximum = samples[0],
-    };
-    for (int i = 0; i < count; ++i) {
-        stats.minimum = fminf(stats.minimum, samples[i]);
-        stats.maximum = fmaxf(stats.maximum, samples[i]);
-        stats.average += samples[i];
-    }
-    stats.average /= (float)count;
-    qsort(samples, (size_t)count, sizeof(samples[0]), compare_floats);
-    stats.percentile_95 = samples[(count - 1) * 95 / 100];
-    return stats;
-}
-
-void profile_stats_print(const char *name, ProfileStats stats)
-{
-    printf("%s_ms_latest=%.6f\n", name, stats.latest);
-    printf("%s_ms_min=%.6f\n", name, stats.minimum);
-    printf("%s_ms_average=%.6f\n", name, stats.average);
-    printf("%s_ms_p95=%.6f\n", name, stats.percentile_95);
-    printf("%s_ms_max=%.6f\n", name, stats.maximum);
-}
-
-double profile_time(void)
-{
-#ifdef _WIN32
-    LARGE_INTEGER frequency, counter;
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&counter);
-    return (double)counter.QuadPart / (double)frequency.QuadPart;
-#else
-    struct timespec stamp;
-    clock_gettime(CLOCK_MONOTONIC, &stamp);
-    return (double)stamp.tv_sec + (double)stamp.tv_nsec / 1000000000.0;
-#endif
-}
-
-uint64_t framebuffer_checksum(const Color *pixels, size_t pixel_count)
-{
-    const uint8_t *bytes = (const uint8_t *)pixels;
-    uint64_t checksum = UINT64_C(14695981039346656037);
-    for (size_t i = 0; i < pixel_count * sizeof(*pixels); ++i) {
-        checksum ^= bytes[i];
-        checksum *= UINT64_C(1099511628211);
-    }
-    return checksum;
+        y + 168, 13, LIGHTGRAY);
+    DrawRectangle(x + 111, y + 172, 12, 2, (Color) { 255, 210, 70, 255 });
+    DrawRectangle(x + 241, y + 172, 12, 2, (Color) { 80, 245, 135, 255 });
+    DrawRectangle(x + 392, y + 172, 12, 2, (Color) { 80, 190, 255, 255 });
+    draw_profiler_graph(profiler, (Rectangle) { x + 10, y + 187, width - 20, 120 });
 }

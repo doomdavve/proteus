@@ -67,7 +67,7 @@ tracker phrase may play on the title; gameplay music starts or resumes on enteri
 
 | Entry | First implementation | Later integration |
 | --- | --- | --- |
-| Single Player | Opens a small location choice (Basin, Eriksberg, River), then starts the existing free-boating session. Preserve the direct `--course` path. | Add course selection here if the mode becomes a regular game mode. |
+| Single Player | Opens a small location choice (Basin, River; Eriksberg removed 2026-10-25), then starts the existing free-boating session. Preserve the direct `--course` path. | Add course selection here if the mode becomes a regular game mode. |
 | Multiplayer | Visible from day one. Until the network flow is ready, show a clear “Coming soon” message and return to selection. | Hand off to the multiplayer agent's Host/Join flow; do not invent a separate networking state machine in this menu. |
 | Settings | Music and effects volume, fullscreen on native, and a small controls page. Keep defaults and saved values clear. | Add display options only after checking native and browser support. |
 | Exit | Close the native program. | On the web, replace with “Back to launcher” if the page launcher remains; browser tabs cannot be closed reliably by game code. |
@@ -191,16 +191,15 @@ the next packaging checks. Main-program promotion remains deferred.
    public entry point once it exists; until then keep its unavailable state honest.
 3. **Make boating the main program:** After multiplayer changes settle, make the boating
    game the default build/run and package entry. Prefer `proteus` as the stable project
-   target for the game and `proteus_demo` for the four-minute audiovisual piece, while
-   retaining a temporary `boat_study` alias or compatibility command for existing tests
+   target for the game (the four-minute audiovisual demo that held that name was removed on
+   2026-10-25), while retaining a temporary `boat_study` alias or compatibility command for existing tests
    and scripts. Name the window and application **Wake Velocity — Proteus**. Update CMake,
    CTest commands, README launch instructions, web packager,
    macOS/Windows workflows, release artifacts, and asset paths in one reviewable change.
    Check for name assumptions with `rg` before renaming. Do not rework the multiplayer
    agent's files while it is actively changing the boating loop or build graph.
 
-The current `proteus` demo remains available as a separate executable. Its 120 BPM
-four-minute timeline and soundtrack are independent of the game menu. The game keeps
+The separate `proteus` demo was removed on 2026-10-25 (it remains in the git history). The game keeps
 its 120 Hz physics and existing gameplay defaults. Any title animation uses presentation
 time and has no effect on deterministic sessions or replay compatibility.
 

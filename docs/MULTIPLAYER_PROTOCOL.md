@@ -1,4 +1,4 @@
-# Multiplayer protocol v4
+# Multiplayer protocol v5
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -18,6 +18,10 @@ the grid hold as slot flag bit 2, the latest round's GO tick in every snapshot a
 (it sets the course ferry's clock and the tick holds release in prediction), the RaceState and
 RaceEvent messages, and the race course in the content digest. Rebuild both server and clients;
 v1–v3 are incompatible.
+
+v5 (2026-10-25) removes the Eriksberg location: Accept's location byte is now 0 basin or
+1 river (v3/v4 sent river as 2), and the content digest covers only those two locations and
+the single river crop. Message layouts are otherwise unchanged; v1–v4 are incompatible.
 
 ## Conventions
 
@@ -63,7 +67,7 @@ traffic from an earlier session never reaches a room.
 | 0 control | reliable, ordered | Hello, Accept, Reject, Roster, Ready, SpawnRequest, ResyncRequest, Disconnect, MatchState, MatchEvent, RaceState, RaceEvent |
 | 1 state | unreliable, sequenced | InputBatch (up), Snapshot (down), Ping, Pong |
 | 2 births | unreliable, sequenced | WakeBirths |
-| 3 registry | unreliable, unsequenced | Reserved for wake registry pages (M4/M5); unused in v4 |
+| 3 registry | unreliable, unsequenced | Reserved for wake registry pages (M4/M5); unused in v5 |
 | 4 bootstrap | reliable, ordered | WorldBegin, WorldPage, WorldEnd |
 
 A message on the wrong channel is discarded. Reliable bootstrap traffic cannot hold up new
@@ -118,7 +122,7 @@ speed, height, duration, lifetime, wavelength, spread and half-width. The local-
 also hashes storm centre X/Z at GO, radius, height, start offset, velocity X/Z (floats), then
 the storm recipe revision (u64, currently 3: irregular directional crests), then the ferry
 recipe revision (u64, currently 2: centred crest with a tapered three-wave packet). This changes
-compatibility without changing v4 message bytes;
+compatibility without changing message bytes;
 rebuild server and clients together. Storm settings are compiled course data; GO anchors their
 clock in both the authority and prediction. Cloud, rain, lightning and rough water move
 from that shared origin at the authored velocity; no per-player weather position is sent.
@@ -132,7 +136,7 @@ or boat exists.
 Accept: `u8` slot (0–3), `u8` waves (0/1), `u8` snapshot interval (4), `u8` birth interval (12),
 `u8` input interval (2), `u8` commands per batch (12), `u8` future window (24), `u8` room mode
 (0 free, 1 deathmatch, 2 race; v1 reserved; a race room's location must be the river),
-`u16` tick rate (must be 120), `u8` location (0 basin, 1 Eriksberg, 2 river), `u8` reserved,
+`u16` tick rate (must be 120), `u8` location (0 basin, 1 river; v5), `u8` reserved,
 `u32` wake lifetime ticks (240–1920),
 `f32` crest height (0.1–3). The header epoch is the room's epoch.
 
@@ -400,7 +404,7 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v4 rejects every other version, v1–v3 included; there is no negotiation or
+  protocol version. v5 rejects every other version, v1–v4 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry or the
   fleet/wake contract changes the content digest. Either is rejected at Hello.
@@ -414,7 +418,8 @@ must not exceed their capacities, and expired ≤ emitted.
 - golden bytes of a Ping, an InputBatch, a Hello, a MatchState, a MatchEvent, a RaceState and
   a RaceEvent payload;
 - the snapshot size (760), the race GO tick and held flag, slot field offsets and an FNV-1a 64
-  digest of a hand-built snapshot's bytes (`9f816f6333e7646f`; v3's was `690c711d99578e10`);
+  digest of a hand-built snapshot's bytes (`4de7f51f1c0586cc`; v4's was `9f816f6333e7646f`, v3's
+  `690c711d99578e10`);
 - round trips of all 20 types, rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode, a race room away from
   the river and the MatchState, MatchEvent, RaceState and RaceEvent consistency rules;

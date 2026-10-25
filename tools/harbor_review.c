@@ -190,9 +190,8 @@ int main(int argc, char **argv)
     double sum = 0, peak = 0;
     do {
         WaterfrontSceneFrame frame;
-        waterfront_scene_evaluate(0, true, &frame);
         double local_time = time + count / 60.0;
-        waterfront_scene_evaluate_actors(local_time, water, &frame);
+        waterfront_scene_evaluate(local_time, water, &frame);
         frame.camera = follow_vessel(camera, view, local_time);
         frame.player_active = true;
         frame.player_water = water;

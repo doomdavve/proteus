@@ -59,7 +59,7 @@ static void print_usage(const char *program)
     printf("  --screenshot FILE       export the virtual target as a PNG\n");
     printf("  --invalid-shader        verify a shader error fails without a fallback\n");
     printf("  --city                  render the static waterfront GPU scene\n");
-    printf("  --time SECONDS          scene-local city time (default: 0)\n");
+    printf("  --time SECONDS          city actor time, fixed dock view (default: 0)\n");
     printf("  --lights on|off         city local-light diagnostic switch (default: on)\n");
     printf("  --shadows on|off        city directional-shadow diagnostic switch (default: on)\n");
     printf("  --atmosphere on|off     city distance-atmosphere diagnostic switch (default: on)\n");
@@ -431,7 +431,7 @@ static bool verify_sky_targets(WaterfrontGpuScene *scene)
             break;
         }
         WaterfrontSceneFrame frame;
-        waterfront_scene_evaluate(0, true, &frame);
+        waterfront_scene_evaluate(0, (BoatWater) { 0 }, &frame);
         frame.camera = (View3D) { .position = { 0, 2000, 0 },
             .target = { 80, 2100, -100 },
             .up = { 0, 1, 0 },
@@ -514,7 +514,14 @@ static bool draw_city(RenderTexture2D target, WaterfrontGpuScene *scene, Fixture
         return false;
     }
     WaterfrontSceneFrame frame;
-    waterfront_scene_evaluate(options.time, true, &frame);
+    waterfront_scene_evaluate(options.time, (BoatWater) { 0 }, &frame);
+    // Over the dock towards the crane, the old storyboard's opening view.
+    frame.camera = (View3D) { .position = { -85, 17.5f, 170 },
+        .target = { -78, 5, 100 },
+        .up = { 0, 1, 0 },
+        .vertical_fov = 62 * DEG2RAD,
+        .near_plane = .25f,
+        .far_plane = 1400 };
     BeginTextureMode(target);
     waterfront_gpu_scene_draw(scene, &frame, target.texture.width, target.texture.height);
     EndTextureMode();

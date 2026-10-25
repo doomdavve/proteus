@@ -14,7 +14,7 @@ release. The second half uses a stronger groove and more expansive gestures.
 The starter XM supplies the 125 BPM clock.
 This is a simplified procedural interpretation, not a reconstruction of the reference video
 or an authoritative implementation of house dance technique. This study uses the original
-starter track independently of the main demo's “Below the surface” soundtrack.
+starter track.
 
 Compare the previous relaxed shuffle with
 `--choreography assets/dance/house-groove.dance`. The cross-and-reach study remains available

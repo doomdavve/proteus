@@ -186,9 +186,10 @@ static uint64_t snapshot_hash(const WaterfrontSceneFrame *f)
     return hash;
 }
 
-static bool check_route(bool short_route)
+// Sweep the old 30.72 s storyboard span: legacy motion plus forward, backward and direct seeks.
+static bool check_seeks(void)
 {
-    float duration = waterfront_scene_duration(short_route);
+    const float duration = 30.72f;
     int steps = (int)ceilf(duration * 120);
     uint64_t *hashes = calloc((size_t)steps + 1, sizeof(*hashes));
     if (!hashes)
@@ -197,10 +198,9 @@ static bool check_route(bool short_route)
     WaterfrontSceneFrame frame, other;
     for (int i = 0; i <= steps; ++i) {
         float time = duration * (float)i / (float)steps;
-        waterfront_scene_evaluate(time, short_route, &frame);
+        waterfront_scene_evaluate(time, (BoatWater) { 0 }, &frame);
         if (!legacy_matches(&frame)) {
-            fprintf(stderr, "Legacy actor mismatch at %.9g (%s)\n", time,
-                short_route ? "short" : "long");
+            fprintf(stderr, "Legacy actor mismatch at %.9g\n", time);
             ok = false;
             break;
         }
@@ -208,70 +208,26 @@ static bool check_route(bool short_route)
     }
     for (int i = steps; ok && i >= 0; --i) {
         float time = duration * (float)i / (float)steps;
-        waterfront_scene_evaluate(time, short_route, &frame);
-        // Interleave another route and a distant seek; the retained snapshot must not mutate.
-        waterfront_scene_evaluate(duration - time, !short_route, &other);
+        waterfront_scene_evaluate(time, (BoatWater) { 0 }, &frame);
+        // Interleave a distant seek; the retained snapshot must not mutate.
+        waterfront_scene_evaluate(duration - time, (BoatWater) { 0 }, &other);
         if (snapshot_hash(&frame) != hashes[i])
             ok = false;
-        waterfront_scene_evaluate(time, short_route, &other);
+        waterfront_scene_evaluate(time, (BoatWater) { 0 }, &other);
         if (snapshot_hash(&other) != hashes[i])
             ok = false;
     }
-    waterfront_scene_evaluate(-1, short_route, &frame);
-    waterfront_scene_evaluate(duration + 100, short_route, &other);
-    ok = ok && snapshot_hash(&frame) == hashes[0] && snapshot_hash(&other) == hashes[steps];
     // Probe immediately around discontinuities as well as the regular sweep.
     for (int i = 0; i < 40 && ok; ++i) {
         float time = i * .7f;
         for (int side = -1; side <= 1; ++side) {
-            waterfront_scene_evaluate(time + side * .0001f, short_route, &frame);
+            waterfront_scene_evaluate(time + side * .0001f, (BoatWater) { 0 }, &frame);
             if (!legacy_matches(&frame))
                 ok = false;
         }
     }
     free(hashes);
     return ok;
-}
-
-static bool check_flock(void)
-{
-    WaterfrontSceneFrame frame, previous, sought;
-    waterfront_demo_evaluate(0, &previous);
-    for (int sample = 0; sample <= (int)(WATERFRONT_DEMO_DURATION * 60); ++sample) {
-        float time = sample / 60.0f;
-        waterfront_demo_evaluate(time, &frame);
-        if (frame.gull_count != WATERFRONT_GULL_COUNT || !legacy_matches(&frame))
-            return false;
-        Vector3 forward
-            = Vector3Normalize(Vector3Subtract(frame.camera.target, frame.camera.position));
-        Vector3 right = Vector3Normalize(Vector3CrossProduct(frame.camera.up, forward));
-        Vector3 up = Vector3CrossProduct(forward, right);
-        for (int i = 0; i < frame.gull_count; ++i) {
-            Vector3 p = frame.gulls[i][0].position;
-            Vector3 relative = Vector3Subtract(p, frame.camera.position);
-            float depth = Vector3DotProduct(relative, forward);
-            float half_height = depth * tanf(frame.camera.vertical_fov * .5f);
-            if (!isfinite(depth) || depth < 8 || depth > 40
-                || fabsf(Vector3DotProduct(relative, right)) > half_height * 1.25f
-                || fabsf(Vector3DotProduct(relative, up)) > half_height * .8f
-                || Vector3Distance(p, previous.gulls[i][0].position) > .3f)
-                return false;
-            for (int j = 0; j < i; ++j)
-                if (Vector3Distance(p, frame.gulls[j][0].position) < 3)
-                    return false;
-        }
-        if (Vector3Distance(frame.camera.position, previous.camera.position) > .3f
-            || Vector3Distance(frame.camera.target, previous.camera.target) > .3f)
-            return false;
-        // Exercise backward/direct seeks, including across all cue boundaries.
-        waterfront_demo_evaluate(WATERFRONT_DEMO_DURATION - time, &sought);
-        waterfront_demo_evaluate(time, &sought);
-        if (snapshot_hash(&frame) != snapshot_hash(&sought))
-            return false;
-        previous = frame;
-    }
-    waterfront_demo_evaluate(300, &sought);
-    return snapshot_hash(&previous) == snapshot_hash(&sought);
 }
 
 // Day-long boating sessions keep the lane equations and smooth per-tick car travel.
@@ -306,14 +262,12 @@ static bool check_long_session(void)
 
 int main(void)
 {
-    if (!check_route(true) || !check_route(false) || !check_flock() || !check_long_session()) {
-        fputs("Actor motion, flock framing/continuity, or seek regression failed\n", stderr);
+    if (!check_seeks() || !check_long_session()) {
+        fputs("Actor motion or seek regression failed\n", stderr);
         return 1;
     }
-    puts(
-        "Five-gull framing, spacing, camera continuity, and direct seeks pass across 240 seconds.");
     puts("Car lanes match the reduced-time equations at 1 hour, 24 hours, and 30 days.");
-    printf("Actor snapshots match legacy motion and forward/backward/direct seeks on both routes.\n"
+    printf("Actor snapshots match legacy motion and forward/backward/direct seeks.\n"
            "%d cars, 25 lamps, %d travelling vessels, %d wake patches; snapshot=%zu bytes.\n",
         WATERFRONT_CAR_COUNT, WATERFRONT_TRAFFIC_VESSELS, WATERFRONT_TRAFFIC_WAKES,
         sizeof(WaterfrontSceneFrame));

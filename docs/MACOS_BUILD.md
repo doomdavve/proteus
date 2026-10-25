@@ -59,7 +59,7 @@ without current/crossing wake/waves/antialiasing), then applies those arguments.
 For example:
 
 ```sh
-"/Applications/Wake Velocity.app/Contents/MacOS/wake_velocity" --location eriksberg --gpu-aa
+"/Applications/Wake Velocity.app/Contents/MacOS/wake_velocity" --location river --gpu-aa
 ```
 
 Music, shaders, textures, the title river backdrop, map attribution, and dependency licenses

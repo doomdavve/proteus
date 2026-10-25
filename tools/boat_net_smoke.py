@@ -193,7 +193,7 @@ def main():
     parser.add_argument("--seconds", type=int, default=4)
     parser.add_argument("--deathmatch", action="store_true")
     parser.add_argument("--race", action="store_true")
-    parser.add_argument("--location", choices=("basin", "eriksberg", "river"), default="basin")
+    parser.add_argument("--location", choices=("basin", "river"), default="basin")
     args = parser.parse_args()
     if args.deathmatch:
         return deathmatch(args)

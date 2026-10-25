@@ -44,7 +44,7 @@ At this initial checkpoint it did not add hard hull-to-hull collision with the p
 - `--wake-life-ticks`: 240–1920, default **1920 ticks / 16 s** at 120 Hz.
   Pieces grow over .65 s of local age with a .3 s birth gate, then fade along the
   span during the final quarter, finishing before hard expiry.
-- Object mode supports basin/Eriksberg/river free boating, plus ambient waves and
+- Object mode supports basin/river free boating, plus ambient waves and
   authored current/scripted-wave options. The extra crossing craft is basin-only.
 - Field mode, explicit D3 `--player-wake`, course, replay and ghost combinations are
   rejected. `--no-player-wake` disables the default physical wake; when combined with

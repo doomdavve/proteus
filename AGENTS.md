@@ -2,18 +2,20 @@
 
 ## Project
 
-Proteus is a small C17/raylib demo with low-resolution, integer-scaled visuals and
-tracker music. Keep the code and project structure simple; this is a playground for
-iterating on effects, timing, audio, and presentation.
+Proteus is a small C17/raylib playground with low-resolution, integer-scaled visuals and
+tracker music. Its main program is the boating game `boat_study` (released as Wake Velocity) in
+the basin and the Gothenburg river. Keep the code and project structure simple; this is a
+playground for iterating on effects, timing, audio, and presentation.
 
 ## Layout
 
-- `src/main.c`: command-line modes, application loop, virtual framebuffer, and presentation.
-- `src/scenes.c`: single-scene timing and software-rendered waterfront entry point.
+- `tools/boat_study.c`: the boating game's command line, title, application loop and presentation.
+- `src/waterfront_scene.[ch]`, `src/waterfront.c`: river scenery, sky, gulls and street actors
+  evaluated into a frame shared by the CPU (`renderer3d`) and GPU (`renderer_gpu`) renderers.
 - `src/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
 - `src/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
 - `src/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
-- `src/waterfront_city.[ch]`: compiled Eriksberg/river map crops shared by shoreline queries and renderers.
+- `src/waterfront_city.[ch]`: the compiled river map crop shared by shoreline queries and renderers.
 - Boating code builds as static libraries in `CMakeLists.txt`. `proteus_boat_core` (physics, water
   queries, wakes, course crossing, contacts and geometry data) must not draw, read input, open
   windows or audio, or touch files; `tools/check_core_boundary.py` enforces this in CTest. See
@@ -23,10 +25,9 @@ iterating on effects, timing, audio, and presentation.
   `proteus_boat_net` obeys the core boundary (`boat_net_boundary`); only `boat_net_enet.c` uses
   ENet and sockets. `tools/boat_server.c` and `tools/boat_bot.c` are the server and scripted
   client; `docs/MULTIPLAYER_PROTOCOL.md` owns the byte layout.
-- `src/profiler.c`: runtime profiling statistics, reports, and overlay.
-- `src/audio_spectrum.c`: PCM capture, FFT analysis, and smoothed frequency-band levels.
+- `src/profiler.c`: rolling frame statistics and the F3 overlay.
 - `src/xm_audio.c`: XM-specific playback helpers layered over raylib's bundled decoder.
-- `assets/music/`: XM music played by the demo.
+- `assets/music/`: XM music for the boating game and the dance study.
 - `assets/samples/`: source WAV samples for tracker editing.
 - `tools/generate_audio.py`: deterministic generator for the starter samples and XM.
 - `tools/validate_xm.c`: XM parser/render smoke test used by CTest.
@@ -49,30 +50,29 @@ Arcade-wake and gameplay checks remain active. Numerical validators retain asser
 with optimization in Clang/GCC Debug builds; `PROTEUS_OPTIMIZE_TESTS=OFF` restores
 unoptimized validator debugging. See `docs/TESTING.md` for timings and opt-in commands.
 
-Run the demo from the repository root so its relative asset paths resolve:
+Run the game from the repository root so its relative asset paths resolve:
 
 ```sh
-./build/proteus
+./build/boat_study
 ```
 
 For deterministic CPU visual verification, render and inspect representative frames without opening
-a window. The `cube` scene defaults to GPU and therefore needs a graphics context; select
-`--renderer cpu` for display-free captures. Without `--scene`, `--time` addresses the complete
-timeline; with `--scene`, it is local to that scene. `--resolution` is optional and defaults to
-320x200.
+a window. `boat_study` defaults to GPU and therefore needs a graphics context; select
+`--renderer cpu` for display-free captures. `--time` is the simulated seconds of the scripted
+screenshot drive.
 
 ```sh
-./build/proteus --renderer cpu --screenshot build/timeline.png --time 48
-./build/proteus --renderer cpu --screenshot build/cube.png --scene cube --time 2.5 --resolution 320x240
+./build/boat_study --renderer cpu --screenshot build/basin.png --time 3
+./build/boat_study --renderer cpu --location river --screenshot build/river.png --time 3
 ```
 
 On macOS, deeper CPU profiling can use Xcode's Instruments command-line tools when full Xcode is the
-active developer directory. For example, record a Time Profiler trace against a long deterministic
-scene run:
+active developer directory. For example, record a Time Profiler trace against a windowed scripted
+river drive:
 
 ```sh
-xcrun xctrace record --template 'Time Profiler' --output build/cube.trace \
-  --launch -- ./build/proteus --renderer cpu --profile cube --frames 100000
+xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
+  --launch -- ./build/boat_study --location river --demo --frames 3600
 ```
 
 ## Conventions
@@ -80,9 +80,7 @@ xcrun xctrace record --template 'Time Profiler' --output build/cube.trace \
 - Format C with the checked-in `.clang-format`; use four spaces and keep lines near 100 columns.
 - Keep the project warning-clean under the compiler flags in `CMakeLists.txt`.
 - Preserve nearest-neighbour, integer-scaled rendering unless a change explicitly targets it.
-- Keep the main demo synchronized with Below the surface’s 120 BPM, speed-6, four-minute timeline
-  when changing the arrangement or flock camera cues. The separate dance study uses the original
-  125 BPM starter XM.
+- The separate dance study uses the original 125 BPM starter XM.
 - Treat `assets/music/starter.xm` and the sample WAVs as generated outputs. Running
   `python3 tools/generate_audio.py` overwrites them; do so only when the generated audio is meant to
   change, and validate the resulting XM.

@@ -3,8 +3,8 @@
 Implemented 2026-10-20 for the player boat in `boat_study`, including course playback
 and its ghost. The [boating plan](BOATING_PLAN.md#swedish-ensign--2026-10-20) owns task
 status and acceptance for the original Swedish ensign. The [speedboat skin record](BOATING_PLAN.md#speedboat-skins--2026-10-24)
-owns the 2026-10-24 addition of Finnish, Danish and Norwegian artwork. Harbor/traffic recipes and the
-main demo's gull journey retain their existing models.
+owns the 2026-10-24 addition of Finnish, Danish and Norwegian artwork. Harbor/traffic recipes
+retain their existing models.
 
 ## Wind and cloth
 
@@ -65,7 +65,7 @@ or exactly match continuous playback. Identical fresh seeks are repeatable.
 Run these commands from the repository root after building:
 
 ```sh
-./build/boat_study --location eriksberg --gpu-aa --waves --demo --frames 300
+./build/boat_study --location river --gpu-aa --waves --demo --frames 300
 ./build/boat_flag_review --renderer gpu --scenario cruise --time 3 --frames 300
 ./build/boat_flag_review --scenario idle --time 5 --screenshot build/flag-idle.png
 ./build/boat_flag_review --scenario reverse --time 5 --screenshot build/flag-reverse.png

@@ -66,7 +66,7 @@ static void usage(void)
         "--camera-distance UNITS: 8..48 (default 20; river 12)\n"
         "--camera-height UNITS: 4..36 (default 14; river 6)\n"
         "--fixed-fov: keep the 55-degree view instead of widening gently with speed\n"
-        "--location basin|eriksberg|river (default basin; river extends to Alvsborgsbron)\n"
+        "--location basin|river (default basin; river extends to Alvsborgsbron)\n"
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | R: retry\n"
         "G: ghost on/off | P/B: replay last/best | Space: pause replay | Enter: restart replay\n"
@@ -512,8 +512,6 @@ static int study(int argc, char **argv)
         camera_settings.height = camera_default.height;
 
     SetTraceLogLevel(verbose ? LOG_INFO : LOG_WARNING);
-    // Legacy mapped-crop selector; mapped W1 passes the definition to map/scene queries.
-    waterfront_city_select_river(location->id == BOAT_LOCATION_RIVER);
     enum { WIDTH = 320, HEIGHT = 200 };
     Color *pixels = malloc(WIDTH * HEIGHT * sizeof(*pixels));
     if (!pixels)
@@ -608,7 +606,7 @@ static int study(int argc, char **argv)
             boat_replay_play(&session.runs, &session.runs.last);
     }
     if (location->mapped && !boat_map_water(session.boat.position, 2.5f)) {
-        fprintf(stderr, "Eriksberg spawn is not navigable.\n");
+        fprintf(stderr, "River spawn is not navigable.\n");
         goto cleanup;
     }
     // A replay is viewed in its own recorded water, never by writing into the live session.
@@ -1125,8 +1123,7 @@ static int study(int argc, char **argv)
             UpdateTexture(texture, pixels);
         metrics.snapshot_render_ms = (float)((boat_profile_time(true) - scene_started_at) * 1000.0);
         if (profiler_visible && current_frame_started_at >= next_snapshot_time) {
-            snapshot = profiler_snapshot(&profiler, (SceneFrame) { .time = live_view.time },
-                live_view.time, size, destination, false, (Music) { 0 }, (AudioSpectrum) { 0 });
+            snapshot = profiler_snapshot(&profiler, (float)live_view.time, size, destination);
             boat_snapshot = boat_profile_snapshot(&boat_profile);
             snapshot.scene_label = location->name;
             snapshot.renderer_label = gpu_enabled ? (gpu_aa ? "GPU 4x SSAA" : "GPU") : "CPU";

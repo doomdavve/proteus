@@ -153,7 +153,7 @@ def main():
     parser.add_argument("--server", required=True)
     parser.add_argument("--bot", required=True)
     parser.add_argument("--seconds", type=int, default=24)
-    parser.add_argument("--location", choices=("basin", "eriksberg", "river"), default="basin")
+    parser.add_argument("--location", choices=("basin", "river"), default="basin")
     parser.add_argument("--mode", choices=("free", "deathmatch"), default="free")
     args = parser.parse_args()
     if not 24 <= args.seconds <= 7200:

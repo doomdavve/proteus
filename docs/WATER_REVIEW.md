@@ -6,8 +6,11 @@ Status, reconciled 2026-10-18: audit 04e, surface pass 04f, and selected waterli
 geometry costs, crop limits, and implementation brief below are historical baseline evidence;
 the 04f/04g records later in this document describe the changes that followed.
 
-This review uses the original Eriksberg location. The opt-in river crop, bridge route,
-and its verification are documented separately in the [river expansion record](eriksberg/bridge/README.md).
+This review used the original Eriksberg location. On 2026-10-25 that location, its route
+and capture assembler (`tools/boat_water_review.py`) and the `--river`/`--default-view` flags
+were removed; `boat_water_review` now drives only the river route, documented in the
+[river expansion record](river/README.md). The commands and results below are a historical
+record of the Eriksberg route; read the removed tooling in the git history.
 See [the living-city plan](LIVING_CITY_PLAN.md) for the next visual task, step 05.
 
 ## Review route and reproduction

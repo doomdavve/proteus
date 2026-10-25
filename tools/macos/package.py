@@ -57,8 +57,8 @@ def main():
         shutil.copytree(build / "assets" / directory, assets / directory)
     (assets / "music").mkdir()
     shutil.copy2(build / "assets/music/a-little-boat.xm", assets / "music")
-    (assets / "geometry/eriksberg").mkdir(parents=True)
-    shutil.copy2(root / "assets/geometry/eriksberg/manifest.json", assets / "geometry/eriksberg")
+    (assets / "geometry/river").mkdir(parents=True)
+    shutil.copy2(root / "assets/geometry/river/manifest.json", assets / "geometry/river")
     shutil.copy2(raylib / "LICENSE", resources / "raylib-LICENSE.txt")
     shutil.copy2(raylib / "src/external/glfw/LICENSE.md", resources / "glfw-LICENSE.md")
     # boat_study links ENet for --connect (multiplayer M3).

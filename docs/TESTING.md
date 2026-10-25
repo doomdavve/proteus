@@ -107,11 +107,8 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
 Select a group with `-L`, for example `ctest --test-dir build -L core`; CTest adds fixture
 setup tests that a selected test requires, whatever their label.
 
-`cube_render_checksum` checks the opening CPU frame against an exact platform baseline:
-`80d44611b75ac3fb` by default, and `a920a253d6c6aa0a` for Linux/GCC on x86-64, recorded
-by Ubuntu 24.04 CI on 2026-10-24. Floating-point rendering is not a cross-platform byte
-identity contract. Each configuration accepts only its selected hash; the Linux value has
-not yet received visual review. See [Linux verification status](LINUX_BUILD.md).
+The former demo's `cube_render_checksum` (an exact opening-frame CPU baseline) was removed
+with the demo on 2026-10-25; no test now pins a rendered image hash.
 
 `PROTEUS_OPTIMIZE_TESTS=ON` compiles the long numerical validators and the shared boating
 libraries (core, render, session and drive) at `-O2` even in Clang/GCC Debug builds. The
@@ -202,21 +199,20 @@ CPU/bandwidth budgets, or apply OS-level impairment. The 30-minute, one-hour and
 gates still require recorded runs and resource measurements. `boat_bot --predict`,
 `--reset-every S` and `--inactive-every S` can also be used independently (integer S: 2–86400).
 
-`boat_net` also runs four predicted clients in both mapped locations: shoreline-safe spawns,
+`boat_net` also runs four predicted clients in the mapped river: shoreline-safe spawns,
 a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
 a snapshot outside the former basin coordinate envelope, a local loading pause, reset and exact
-mirrors at a birth-batch snapshot. The protocol-v4 codec rejects invalid map IDs and reserved
+mirrors at a birth-batch snapshot. The protocol-v5 codec rejects invalid map IDs and reserved
 bytes and checks the RaceState/RaceEvent rules; a race room on the in-memory transport checks
 predicted holds released at GO, ferry-exact mirrors, a mid-race joiner and results, and a
 prediction replay through GO matches the authority; discovery uses the complete compiled-map bundle digest.
 
 `boat_net_river` runs the four-player lifecycle harness with `--location river --mode deathmatch`
-(about 36 s). `boat_net_eriksberg` runs the deathmatch smoke on the smaller mapped crop, checking
-round-end score/event agreement (about 20 s). The harnesses require clients to select the
-server's location without client-side map arguments. Run these map checks with:
+(about 36 s). The harness requires clients to select the server's location without
+client-side map arguments. Run this map check with:
 
 ```sh
-ctest --test-dir build -R '^boat_net_(river|eriksberg)$' -j 2 --output-on-failure
+ctest --test-dir build -R '^boat_net_river$' --output-on-failure
 ```
 
 `boat_net_deathmatch` runs the same script with `--deathmatch`: a deathmatch room with a 10 s

@@ -34,12 +34,12 @@ static void usage(FILE *out)
 {
     fprintf(out,
         "usage: boat_server [--bind IPV4] [--port N] [--token TEXT] [--players 1-4] [--waves]\n"
-        "                   [--location basin|eriksberg|river] [--ticks N | --seconds S] "
+        "                   [--location basin|river] [--ticks N | --seconds S] "
         "[--report-every N]\n"
         "                   [--mode free|deathmatch|race] [--round-seconds S]\n"
         "                   [--lan-port N | --no-lan] [--exit-with-stdin]\n"
         "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
-        "basin|eriksberg|river]\n"
+        "basin|river]\n"
         "                   [--report-every N] [--mode free|deathmatch] [--round-seconds S]\n"
         "Room (default): listen on --bind (default 127.0.0.1; use a LAN address to accept other\n"
         "machines) and UDP --port (default %d) for up to four boat_study --connect or boat_bot\n"

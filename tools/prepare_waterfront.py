@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a flat-shaded storyboard from the retained OSM snapshot, entirely offline.
+"""Prepare the flat-shaded river crop from the retained OSM snapshot, entirely offline.
 
 Requires pyproj 3.8.0 and shapely 2.1.2. Normal C builds use the checked-in output.
 This deliberately uses an assumed flat quay at 3.5 m; it is not a surveyed city model.
@@ -18,12 +18,12 @@ from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "docs/eriksberg/osm-survey.json.gz"
-EXPECTED_HASH = "9349d7014692dba93203e03d842b9b1402a481f77503514cb68f38902eb23b54"
+SOURCE = ROOT / "docs/river/osm-survey.json.gz"
+EXPECTED_HASH = "688c7cf277af904c44ce820c941b83cd23f383b9d5a492040edcf46cfcb6778a"
 GROUND = 3.5
-# Extend beyond the old 950x900 m crop using the same retained snapshot. The river
-# closing-edge checks below remain authoritative; extending past them invents coastline.
-CROP = box(-700, -600, 950, 800)
+# The river closing-edge checks below remain authoritative; extending past them invents
+# coastline.
+CROP = box(-1500, -1600, 950, 800)
 
 
 def join_chains(chains):
@@ -405,11 +405,6 @@ def prepare(output, expanded=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--area", choices=["eriksberg", "river"], default="eriksberg")
     args = parser.parse_args()
-    if args.area == "river":
-        SOURCE = ROOT / "docs/eriksberg/bridge/osm-survey.json.gz"
-        EXPECTED_HASH = "688c7cf277af904c44ce820c941b83cd23f383b9d5a492040edcf46cfcb6778a"
-        CROP = box(-1500, -1600, 950, 800)
     self_test()
-    prepare(args.output or ROOT / "assets/geometry" / args.area, args.area == "river")
+    prepare(args.output or ROOT / "assets/geometry/river", True)

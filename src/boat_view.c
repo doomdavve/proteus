@@ -422,9 +422,8 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     const Boat *boat = &view->boat;
     double time = view->time;
     _Static_assert(BOAT_WATER_PARTICLES <= WATERFRONT_PLAYER_PARTICLES, "Player particle capacity");
-    waterfront_scene_evaluate(0, true, frame);
+    waterfront_scene_evaluate(time, world->water, frame);
     frame->camera = boat_camera(boat, presentation, world->definition, camera);
-    waterfront_scene_evaluate_actors(time, world->water, frame);
     frame->player_active = true;
     if (!world->definition->mapped)
         basin_scenery(view, world, frame);

@@ -60,7 +60,7 @@ deployments), as described in GitHub's
 libraries for both platforms. Emscripten selects raylib 6.0's `PLATFORM=Web`, OpenGL ES 3.0,
 and a static library, then [cmake/Web.cmake](../cmake/Web.cmake) configures the web-only
 output and applies its size optimization to the executable and each boating library. Native
-validators, studies, and the four-minute demo are excluded from web configuration.
+validators and studies are excluded from web configuration.
 No CTest executables are run as web programs.
 
 The first configure needs network access to fetch raylib; SDK installation also needs network.

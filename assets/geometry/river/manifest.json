@@ -1,5 +1,5 @@
 {
-  "source": "docs/eriksberg/bridge/osm-survey.json.gz",
+  "source": "docs/river/osm-survey.json.gz",
   "source_sha256": "688c7cf277af904c44ce820c941b83cd23f383b9d5a492040edcf46cfcb6778a",
   "snapshot": "2026-10-17",
   "origin_epsg3007": [

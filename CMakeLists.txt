@@ -6,7 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(PROTEUS_GPU_TESTS "Enable GPU-context CTest cases and the GPU review target" OFF)
+option(PROTEUS_GPU_TESTS "Enable GPU-context CTest cases" OFF)
 option(PROTEUS_WAKE_FIELD_TESTS "Enable retired physical wake-field and prototype experiments" OFF)
 option(PROTEUS_OPTIMIZE_TESTS "Optimize numerical validators in Debug, retaining assertions" ON)
 
@@ -169,34 +169,14 @@ endif()
 
 if(EMSCRIPTEN)
   include(cmake/Web.cmake)
-  return() # Desktop demo, studies, and CTest tools remain native targets.
+  return() # Desktop studies and CTest tools remain native targets.
 endif()
-
-add_executable(proteus
-  src/audio_spectrum.c
-  src/main.c
-  src/profiler.c
-  src/scenes.c
-  src/xm_audio.c
-)
-target_link_libraries(proteus PRIVATE proteus_gpu)
-target_compile_definitions(proteus PRIVATE
-  PROTEUS_BUILD_TYPE="$<CONFIG>"
-  PROTEUS_ASSET_DIR="$<TARGET_FILE_DIR:proteus>/assets"
-)
-target_compile_options(proteus PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
-)
 
 add_custom_target(proteus_assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_CURRENT_SOURCE_DIR}/assets
-          $<TARGET_FILE_DIR:proteus>/assets
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          ${CMAKE_CURRENT_SOURCE_DIR}/soundtrack/alternate/fasttracker/v01/below-the-surface.xm
-          $<TARGET_FILE_DIR:proteus>/assets/music/below-the-surface.xm
+          $<TARGET_FILE_DIR:boat_study>/assets
 )
-add_dependencies(proteus proteus_assets)
 
 add_executable(gpu_fixture tools/gpu_fixture.c)
 target_include_directories(gpu_fixture PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -221,18 +201,6 @@ target_include_directories(validate_xm PRIVATE
 if(NOT MSVC)
   target_link_libraries(validate_xm PRIVATE m)
 endif()
-
-add_executable(validate_audio_spectrum
-  tools/validate_audio_spectrum.c
-  src/audio_spectrum.c
-)
-target_include_directories(validate_audio_spectrum PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-target_link_libraries(validate_audio_spectrum PRIVATE raylib)
-target_compile_options(validate_audio_spectrum PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
-)
 
 enable_testing()
 add_executable(validate_boat_wake tools/validate_boat_wake.c)
@@ -541,11 +509,6 @@ add_test(NAME boat_net_river COMMAND ${Python3_EXECUTABLE}
   --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
 set_tests_properties(boat_net_river PROPERTIES
   PASS_REGULAR_EXPRESSION "boat_net_session=ok" TIMEOUT 90)
-add_test(NAME boat_net_eriksberg COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_smoke.py --deathmatch --location eriksberg
-  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
-set_tests_properties(boat_net_eriksberg PROPERTIES
-  PASS_REGULAR_EXPRESSION "boat_net_deathmatch=ok" TIMEOUT 60)
 set(BOAT_CORE_BOUNDARY_NM)
 if(CMAKE_NM AND NOT MSVC)
   set(BOAT_CORE_BOUNDARY_NM --nm ${CMAKE_NM} --archive $<TARGET_FILE:proteus_boat_core>)
@@ -585,9 +548,6 @@ add_test(NAME boat_crossing_wake_screenshot COMMAND boat_study --renderer cpu --
 add_test(NAME boat_environment_screenshot COMMAND boat_study --renderer cpu --current --crossing-wake
   --waves --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-environment.png)
 add_test(NAME boat_environment_course_rejected COMMAND boat_study --current --course)
-add_test(NAME boat_environment_eriksberg_screenshot COMMAND boat_study --renderer cpu
-  --location eriksberg --current --crossing-wake --time 3
-  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-eriksberg-environment.png)
 add_test(NAME boat_environment_river_screenshot COMMAND boat_study --renderer cpu
   --location river --current --crossing-wake --time 3
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-river-environment.png)
@@ -603,10 +563,8 @@ add_test(NAME boat_default_wake_matches_explicit COMMAND ${CMAKE_COMMAND} -E com
   ${CMAKE_CURRENT_BINARY_DIR}/boat-default-player-wake.png
   ${CMAKE_CURRENT_BINARY_DIR}/boat-object-wake.png)
 set_tests_properties(boat_default_wake_matches_explicit PROPERTIES FIXTURES_REQUIRED player_wake_defaults)
-add_test(NAME boat_water_route COMMAND boat_water_review --check)
-add_test(NAME boat_water_wave_route COMMAND boat_water_review --check --waves)
-add_test(NAME boat_river_route COMMAND boat_water_review --check --river)
-add_test(NAME boat_river_wave_route COMMAND boat_water_review --check --river --waves)
+add_test(NAME boat_river_route COMMAND boat_water_review --check)
+add_test(NAME boat_river_wave_route COMMAND boat_water_review --check --waves)
 set(BOAT_REPLAY_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/replay-tests")
 add_test(NAME boat_replay COMMAND validate_boat_replay ${BOAT_REPLAY_TEST_DIR})
 set_tests_properties(boat_replay PROPERTIES FIXTURES_SETUP boat_recording)
@@ -639,8 +597,6 @@ add_test(NAME boat_cpu_aa_option COMMAND boat_study --renderer cpu --gpu-aa --ti
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option.png)
 add_test(NAME boat_cpu_aa_option_reversed COMMAND boat_study --gpu-aa --renderer cpu --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option-reversed.png)
-add_test(NAME boat_eriksberg_screenshot COMMAND boat_study --renderer cpu --location eriksberg --time 3
-  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-eriksberg.png)
 add_test(NAME boat_river_screenshot COMMAND boat_study --renderer cpu --location river --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-river.png)
 
@@ -688,16 +644,6 @@ target_compile_options(validate_city_dressing PRIVATE
 )
 add_test(NAME city_dressing COMMAND validate_city_dressing)
 
-add_executable(waterfront_storyboard tools/waterfront_storyboard.c)
-target_compile_definitions(waterfront_storyboard PRIVATE
-  PROTEUS_ASSET_DIR="$<TARGET_FILE_DIR:waterfront_storyboard>/assets"
-)
-add_dependencies(waterfront_storyboard proteus_assets)
-target_link_libraries(waterfront_storyboard PRIVATE proteus_gpu)
-target_compile_options(waterfront_storyboard PRIVATE
-  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>
-)
-add_test(NAME waterfront_storyboard_is_valid COMMAND waterfront_storyboard --check)
 add_executable(validate_harbor tools/validate_harbor.c)
 target_link_libraries(validate_harbor PRIVATE proteus_boat_session)
 target_compile_options(validate_harbor PRIVATE
@@ -729,57 +675,6 @@ add_test(NAME renderer3d_is_valid COMMAND validate_renderer3d)
 add_test(NAME starter_xm_is_valid
   COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/starter.xm
 )
-add_test(NAME soundtrack_xm_is_valid
-  COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/soundtrack/alternate/fasttracker/v01/below-the-surface.xm --soundtrack
-)
-add_test(NAME audio_spectrum_is_valid
-  COMMAND validate_audio_spectrum
-)
-add_test(NAME cube_profile_report
-  COMMAND proteus --renderer cpu --profile cube --frames 10 --warmup 2
-)
-set_tests_properties(cube_profile_report PROPERTIES
-  PASS_REGULAR_EXPRESSION "proteus_profile_end=1"
-)
-add_test(NAME cube_screenshot
-  COMMAND proteus --renderer cpu --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cube-screenshot.png
-          --scene cube --time 1.5
-)
-set_tests_properties(cube_screenshot PROPERTIES
-  PASS_REGULAR_EXPRESSION "timeline_time=1.500"
-)
-
-add_test(NAME interactive_timeline_options
-  COMMAND proteus --renderer cpu --scene cube --time 2.5 --help
-)
-set_tests_properties(interactive_timeline_options PROPERTIES
-  PASS_REGULAR_EXPRESSION "Usage:"
-)
-
-# Daytime CPU reference with harbor vessels in the opening five-gull follow shot.
-# Exact floating-point rasterization is toolchain/platform specific. Keep the macOS/Windows
-# reference and the Ubuntu 24.04 x86-64 GCC CI reference separate; do not accept either hash
-# indiscriminately on every platform. Linux reference: Actions run 40087174088.
-set(PROTEUS_CUBE_CHECKSUM "80d44611b75ac3fb")
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
-  set(PROTEUS_CUBE_CHECKSUM "a920a253d6c6aa0a")
-endif()
-add_test(NAME cube_render_checksum
-  COMMAND proteus --renderer cpu --profile cube --frames 1 --warmup 0
-)
-set_tests_properties(cube_render_checksum PROPERTIES
-  PASS_REGULAR_EXPRESSION "final_framebuffer_checksum=${PROTEUS_CUBE_CHECKSUM}"
-)
-
-add_test(NAME cube_start_screenshot
-  COMMAND proteus --renderer cpu --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cube-start.png
-          --scene cube --time 0
-)
-set_tests_properties(cube_start_screenshot PROPERTIES
-  PASS_REGULAR_EXPRESSION "scene=cube"
-)
-
 if(PROTEUS_GPU_TESTS)
   add_test(NAME ferry_gpu_screenshot COMMAND harbor_review --renderer gpu --view ferry
     --waves --time 40 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/ferry-gpu.png)
@@ -817,11 +712,11 @@ if(PROTEUS_GPU_TESTS)
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-replay-gpu.png)
   set_tests_properties(boat_ghost_gpu_screenshot boat_replay_gpu_screenshot
     PROPERTIES FIXTURES_REQUIRED boat_recording LABELS "gpu" RUN_SERIAL TRUE)
-  add_test(NAME boat_gpu_screenshot COMMAND boat_study --location eriksberg --gpu --time 3
+  add_test(NAME boat_gpu_screenshot COMMAND boat_study --location river --gpu --time 3
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-gpu.png)
-  add_test(NAME boat_gpu_aa_screenshot COMMAND boat_study --location eriksberg --gpu --gpu-aa --time 3
+  add_test(NAME boat_gpu_aa_screenshot COMMAND boat_study --location river --gpu --gpu-aa --time 3
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-gpu-aa.png)
-  add_test(NAME boat_wave_gpu_screenshot COMMAND boat_study --location eriksberg --gpu-aa --waves
+  add_test(NAME boat_wave_gpu_screenshot COMMAND boat_study --location river --gpu-aa --waves
     --camera-distance 12 --camera-height 6 --time 2.9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-wave-gpu.png)
   add_test(NAME boat_basin_gpu_screenshot COMMAND boat_study --time 0
@@ -838,23 +733,6 @@ if(PROTEUS_GPU_TESTS)
     PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   set_tests_properties(boat_gpu_screenshot boat_gpu_aa_screenshot boat_wave_gpu_screenshot
     PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
-  set(PROTEUS_GPU_REVIEW_DIR "${CMAKE_CURRENT_BINARY_DIR}/gpu-review")
-  set(PROTEUS_GPU_REVIEW_COMMAND
-    ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gpu_review.py
-    --proteus $<TARGET_FILE:proteus>
-    --gpu-fixture $<TARGET_FILE:gpu_fixture>
-    --output ${PROTEUS_GPU_REVIEW_DIR}
-    --build-directory ${CMAKE_CURRENT_BINARY_DIR}
-  )
-  add_custom_target(gpu_review
-    COMMAND ${PROTEUS_GPU_REVIEW_COMMAND}
-    DEPENDS proteus gpu_fixture
-    USES_TERMINAL
-    COMMENT "Capturing CPU/GPU waterfront review artifacts"
-  )
-  add_test(NAME gpu_review COMMAND ${PROTEUS_GPU_REVIEW_COMMAND})
-  set_tests_properties(gpu_review PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME gpu_surface_materials COMMAND gpu_fixture --city --check)
   set_tests_properties(gpu_surface_materials PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
 endif()

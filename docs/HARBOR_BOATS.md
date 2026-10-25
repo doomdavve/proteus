@@ -3,8 +3,8 @@
 Status, 2026-10-18: living-city step 04h adds a parameterized boat model and two authored
 berths. The generator now also supplies [travelling craft and a ferry](HARBOR_TRAFFIC.md).
 Six leisure boats share a floating pontoon along the west dock bank; a workboat
-lies beside equipment on the east quay. They appear in the main demo, both storyboard
-routes, and the Eriksberg and river boating locations. The basin course is unchanged.
+lies beside equipment on the east quay. They appear in the river boating location (and appeared
+in the demo, storyboards and Eriksberg location removed on 2026-10-25). The basin course is unchanged.
 Placements and vessel designs are artistic additions, not surveyed marina facilities.
 
 ## Boat recipes
@@ -86,7 +86,7 @@ player follow-camera occlusion near shore remains unresolved.
 Run from the repository root after building:
 
 ```sh
-./build/boat_study --location eriksberg --gpu-aa --waves
+./build/boat_study --location river --gpu-aa --waves
 ./build/harbor_review --view marina --waves
 ./build/harbor_review --view workboat --waves
 ./build/harbor_review --view overview

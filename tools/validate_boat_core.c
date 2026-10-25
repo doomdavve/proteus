@@ -52,8 +52,7 @@ static void drive(CoreRun *run, int tick)
 static void start(CoreRun *run, int index)
 {
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
-    const BoatWorldDefinition *definition
-        = index == 2 ? boat_location(BOAT_LOCATION_ERIKSBERG) : basin;
+    const BoatWorldDefinition *definition = index == 2 ? boat_location(BOAT_LOCATION_RIVER) : basin;
     BoatWater water = { .player_wake_enabled = true };
     if (index == 1) {
         water = boat_world_test_water(basin, true, true, false);
@@ -92,8 +91,8 @@ static int interleaved(void)
     CHECK(live[0].world.water.player_wake_count > 0 && live[1].world.water.player_wake_count > 0);
     CHECK(Vector2Distance(live[0].boat.position, live[1].boat.position) > 1);
     CHECK(live[2].world.definition->mapped && !live[0].world.definition->mapped);
-    printf("interleaved=ok worlds=basin-calm-d3,basin-waves-current-d3,eriksberg-waves ticks=%d\n",
-        TICKS);
+    printf(
+        "interleaved=ok worlds=basin-calm-d3,basin-waves-current-d3,river-waves ticks=%d\n", TICKS);
     return 0;
 }
 
@@ -146,23 +145,18 @@ static int water(void)
     return 0;
 }
 
-// Mapped spawns are open water in their own compiled crop, far points are not, and harbor
+// The mapped spawn is open water in the compiled crop, far points are not, and harbor
 // envelopes block berths.
 static int shoreline(void)
 {
-    for (int id = BOAT_LOCATION_ERIKSBERG; id <= BOAT_LOCATION_RIVER; ++id) {
-        const BoatWorldDefinition *definition = boat_location(id);
-        waterfront_city_select_river(id == BOAT_LOCATION_RIVER);
-        boat_map_destroy();
-        Vector2 normal = { 0 };
-        CHECK(definition->mapped && boat_map_water(definition->spawn, 2));
-        CHECK(!boat_map_water_contact((Vector2) { 5000, 5000 }, 2, &normal));
-        CHECK(fabsf(Vector2Length(normal) - 1) < 1e-4f);
-    }
-    waterfront_city_select_river(false);
+    const BoatWorldDefinition *definition = boat_location(BOAT_LOCATION_RIVER);
+    boat_map_destroy();
+    Vector2 normal = { 0 };
+    CHECK(definition->mapped && boat_map_water(definition->spawn, 2));
+    CHECK(!boat_map_water_contact((Vector2) { 5000, 5000 }, 2, &normal));
+    CHECK(fabsf(Vector2Length(normal) - 1) < 1e-4f);
     boat_map_destroy();
     WaterfrontBerth berth = waterfront_harbor_berths()[0];
-    Vector2 normal;
     CHECK(waterfront_harbor_contact((Vector2) { -berth.position.x, berth.position.z }, 1, &normal));
     puts("shoreline=ok");
     return 0;
