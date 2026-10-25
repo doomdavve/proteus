@@ -1,4 +1,4 @@
-# Linux boat study checks
+# Linux Wake Velocity checks
 
 Status, 2026-10-24: native Wayland is enabled by default in Linux builds, alongside X11.
 The pinned GLFW selects Wayland in a Wayland session and X11 in an X11 session, using
