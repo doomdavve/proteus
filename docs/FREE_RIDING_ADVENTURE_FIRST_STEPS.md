@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters), completed 2026-10-25; [A2.2](#a22--tile-catalogue-and-indexed-collision) is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25; [A2.3](#a23--per-tile-land-culling) is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -985,8 +985,8 @@ harness throughout.
 | Task | Depends on | Deliverable | Status |
 | --- | --- | --- | --- |
 | A2.1 | A1 complete | Application submission and triangle counters on both renderers; counter baseline of the untiled river | Complete 2026-10-25; [result](#a21-result-2026-10-25) |
-| A2.2 | A2.1 | In-memory tile catalogue of the river map (512 m, 1 km comparison) and an indexed collision query with exhaustive parity | Next |
-| A2.3 | A2.2 | Per-tile land culling in the GPU shadow, reflection and main passes and the CPU reference; 512 m vs 1 km judged by submissions, triangles and time | Planned |
+| A2.2 | A2.1 | In-memory tile catalogue of the river map (512 m, 1 km comparison) and an indexed collision query with exhaustive parity | Complete 2026-10-25; [result](#a22-result-2026-10-25) |
+| A2.3 | A2.2 | Per-tile land culling in the GPU shadow, reflection and main passes and the CPU reference; 512 m vs 1 km judged by submissions, triangles and time | Next; [task](#a23--per-tile-land-culling) |
 | A2.4 | A2.3 | Water coverage bounded by intersecting tiles: GPU patch rebuilds and the CPU reference surface, crack-free across seams | Planned |
 | A2.5 | A2.4 | Same-view scaling against enlarged synthetic catalogues (up to a ≈25 km corridor), lifecycle and performance gates, A3 handoff | Planned |
 
@@ -1094,14 +1094,141 @@ counts. Keep everything in `proteus_boat_core`: no drawing or file I/O.
 **Done when:** indexed queries equal the exhaustive reference everywhere tested, the
 catalogue is enumerated for both tile sizes, and the river is otherwise unchanged.
 
-## A2.3–A2.5 — outline
+### A2.2 result, 2026-10-25
+
+Started from a clean `0fc2517`.
+
+- **Collision index:** `BoatMap` now also holds a `BoatMapGrid`. This is a uniform grid of
+  16 m cells (`BOAT_MAP_CELL_SIZE`) aligned to multiples of the cell size, so cells nest in
+  zero-origin tiles. Each cell lists, in ascending order, the water triangles and shore edges
+  within 0.5 m (`BOAT_MAP_MARGIN`) of it. Registration uses a separating-axis test, not
+  bounding boxes, because the river's long, thin water triangles span up to 683 m.
+  `boat_map_init()` builds the grid; `boat_map_init_cell()` takes another cell size for
+  comparison. A failed build, including allocation failure, leaves the map zeroed.
+- **Queries:** `boat_map_water()` and `boat_map_water_contact()` now answer from the grid:
+  - **Containment** tests only the triangles listed in the point's cell.
+  - **Clearance:** when the point is in water, only the edges within the clearance square
+    (plus 5 cm of slack) are compared with the clearance.
+  - **Normal:** only when one is needed, a window grows by one cell at a time until the best
+    edge is provably nearer than any unvisited edge. Ties keep the lower shore index, as
+    the scan did.
+  - **Fallback:** positions beyond 10⁶ m, or not finite, take the exhaustive answer. These
+    are never boat positions; the guard stops the window from growing forever.
+
+  `boat_map_water_contact_reference()` keeps the previous exhaustive scan for tests and
+  review, and `boat_map_water_contact_cost()` also reports the candidates a query inspected.
+- **Tile catalogue:** the new `src/boat_map_tiles.[ch]` (core) builds `BoatMapTiles` from
+  a prepared map at a chosen tile size, with the origin on a tile multiple.
+  - **Water triangles and shore edges** are listed in every tile within the margin.
+  - **Land** differs from the plan: each land triangle, bridge included, belongs to exactly
+    one tile, the one holding its centroid, so that A2.3 can draw every tile without
+    drawing anything twice. Each tile records the 3-D bounds of its land, which may cross
+    the seam.
+
+  Seams add no shore edges. The source, geometry header and bake format are unchanged.
+- **Catalogue** (the river crop, 2,450 × 2,400 m, 78,612 triangles):
+
+  | Tile size | Grid | Non-empty | Most land / water / shore per tile | Listed water / shore / land | Bytes |
+  | --- | --- | --- | --- | --- | --- |
+  | 512 m | 5 × 6 | 30 of 30 | 6,817 / 96 / 83 | 731 / 568 / 78,065 | 319,388 |
+  | 1 km | 3 × 3 | 9 of 9 | 16,715 / 185 / 165 | 654 / 557 / 78,065 | 317,692 |
+
+  No crop tile is empty: A0.3's 40% empty route tiles belong to the outer corridor. Seams
+  duplicate 34% of water triangles and 4% of shore edges at 512 m (20% and 2% at 1 km).
+- **Index sizes** (whole map allocation, shore pairs included):
+
+  | Cell | Grid | Water / shore entries | Bytes |
+  | --- | --- | --- | --- |
+  | 8 m | 307 × 246 | 33,217 / 2,290 | 759,348 |
+  | **16 m (default)** | 154 × 124 | 11,629 / 1,378 | **217,940** |
+  | 32 m | 77 × 63 | 4,766 / 959 | 74,852 |
+
+  At A1 the map allocated 13,128 B. 16 m keeps candidate counts small at a fifth of the
+  8 m grid's memory.
+- **Candidates per query** (16 m cells, normal requested, 3 m clearance), against the scan's
+  547 triangles and 545 edges every time:
+  - **Open water** (83,899 points): 5.2 edges on average (p95 20, max 38) and 2.5 triangles
+    (p95 7, max 24).
+  - **Land points**, where the nearest-edge window must reach the shore (215,203 points):
+    64.6 edges (p95 194, max 431).
+
+  Release timing on the M1 Max, 200,000 open-water points at the hull clearance (0.35 m)
+  with a normal: **0.035 µs indexed against 3.43 µs** for the scan (a scratch tool, not
+  checked in). Six hull samples per tick drop from about 21 to 0.2 µs. That is small for
+  today's crop, but it no longer grows with the map.
+- **Parity test:** the new `boat_map_index` CTest (`tools/validate_boat_map_index.c`,
+  labels `core;cpu`, about 14 s in Debug) compares 8, 16 and 32 m grids with the exhaustive
+  scan. At clearances 0, 0.5, 3 and 12 m it compares the boolean, the clearance-only result
+  and the normal bit for bit, on these point sets:
+  - an 8 m lattice over the crop plus 40 m, so points sit exactly on every cell seam;
+  - nine points along every shore edge (crop edges and bridge-leg holes included), offset
+    0, ±0.01, ±0.49/0.51, ±2.99/3.01, ±11.99/12.01 and ±30 m;
+  - every 512 m and 1 km tile seam every 2 m, at the seam and one float either side;
+  - a 0.25 m patch around every tile corner;
+  - 50,000 seeded random points over the crop plus 100 m;
+  - far points out to 250 km, and the >10⁶ m fallback.
+
+  **3,589,224 comparisons, no mismatches.** A first run with denser sets (4 m lattice,
+  1 m seams, 100,000 random points: 8,490,276 comparisons) also had none; it took 44 s and
+  was thinned for routine use. The test also checks every tile list against a recomputed
+  overlap, that each land triangle has exactly one owner and lies within its tile's bounds,
+  tile lookup, and failure on an unready map or a non-positive size (no tile is created).
+  `boat_map` additionally checks that a failed or destroyed map has a zeroed grid.
+  The test prints the catalogue, index and candidate reports above, so the review tool
+  needed no new mode.
+- **Unchanged river (Debug):**
+  - The river query digest is still `63225c36181d381d` (20,356 water answers). The
+    `--check` and `--check --waves` logs equal A1.5's.
+  - All 54 CPU, flat-GPU and wave-GPU review PNGs are byte-identical to
+    `build/adventure/a0-original/`. The review logs equal A2.1's apart from timings.
+  - `boat_world_isolation`, `gpu_view_lifecycle` and the benchmark contract pass in the full
+    run below. Evidence: `build/adventure/a2-2/`.
+- **Verification (M1 Max, macOS 26 / Darwin 25.6, Apple clang 21, Debug):** the build
+  is warning-clean. Desktop CTest passed 117/117 active tests in 191.65 s, including the new
+  `boat_map_index` (13.8 s) and both boundary checks with the new core source (15 retired
+  tests disabled; log `build/adventure/a2-2/ctest.log`). 217 local links in the changed
+  documents resolve, and `git diff --check` passed.
+- **Limitations:**
+  - Allocation failure is still code-inspected, not injected.
+  - Exactness rests on the tested point sets and the margin argument, not on a proof
+    over every float. The margin and slack exceed float rounding at these coordinates
+    many times over.
+  - The catalogue is not yet used by any renderer. No visual or manual check was needed:
+    rendering is unchanged and captures are identical.
+
+**Next: A2.3.**
+
+## A2.3 — per-tile land culling
+
+**Edit:** `src/renderer_gpu.[ch]`, `src/boat_gpu.c`, the CPU drawing of the map in
+`src/waterfront.c`/`src/boat_view.c`, the scenery owner if it holds the catalogue, the review
+tool and the benchmark guide. The core catalogue stays as A2.2 built it.
+
+1. Build the GPU map meshes per tile from one catalogue that the view owns. These are city,
+   facades, roofs, ground and windows; the authored corner, crane and bridge stay single
+   objects. Keep each class's triangle order within its tile, and skip empty
+   class-and-tile pairs.
+2. Cull tiles against each pass's volume using the tile's land bounds: the shadow pass's
+   orthographic box (96 m while boating), the reflection camera's widened frustum and the
+   main frustum with its far plane. Use the same culling in the CPU reference.
+3. Build both 512 m and 1 km and compare them with the A2.1 counters over the benchmark
+   route: map submissions and triangles per pass, total submissions, CPU submission and
+   GPU p95. Pick the default from that evidence, using the controlled three-trial matrix
+   for the final pair. Objects remain about 915 submissions; report them, but leave object
+   culling to a later task unless the tiled map's added submissions decide the result.
+4. Captures should stay byte-identical: culling removes only out-of-volume triangles, and
+   order within a class is kept. If a capture changes (for example a depth tie between
+   tiles now drawn in a different order), inspect it and explain each difference before
+   accepting it. `gpu_view_lifecycle`, `boat_world_isolation` and the matrix must pass.
+
+**Done when:** every pass draws only tiles in its volume on both renderers, the chosen tile
+size is justified by measured submissions, triangles and time, and captures are unchanged or
+explained.
+
+## A2.4–A2.5 — outline
 
 These are written in detail at the previous task's handoff, from its evidence.
 
-- **A2.3:** draw only tiles intersecting each pass's frustum: the shadow map's 96 m
-  orthographic box, the reflection camera and the main view, with matching CPU culling.
-  Choose the tile size from submissions, triangles, CPU submission time and GPU time.
-  Captures must be identical, or differ only where justified and inspected.
 - **A2.4:** rebuild GPU wave patches from intersecting tiles' water only, and bound the
   CPU reference's subdivided surface to the view. Check seams with captures at tile joins
   and corners.

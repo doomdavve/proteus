@@ -116,6 +116,12 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   recorded before the ownership change. `BoatWorldResources` lifecycle and validation are
   covered too. Worlds on separate owners step interleaved with bit-identical results, and
   fleet copies and checkpoint restores keep borrowing their owner.
+- `boat_map_index` runs `validate_boat_map_index` (adventure A2.2, about 14 s in Debug). It
+  compares the indexed collision queries at 8, 16 and 32 m cells with the exhaustive scan,
+  bit for bit, on about 3.6 million queries. These cover a cell-seam lattice, shore offsets,
+  tile seams one float either side, tile corners, random and far points. It checks the 512 m
+  and 1 km tile catalogues' lists, land ownership and bounds, and reports index, tile and
+  candidate counts.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and

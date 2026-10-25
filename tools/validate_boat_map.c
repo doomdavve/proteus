@@ -81,7 +81,9 @@ static uint64_t river_digest(const BoatMap *map, int *water)
 
 static bool zeroed(const BoatMap *map)
 {
-    return !map->description && !map->shore && !map->shore_count && !map->water_count;
+    return !map->description && !map->shore && !map->shore_count && !map->water_count
+        && !map->grid.water_start && !map->grid.shore_start && !map->grid.water && !map->grid.shore
+        && !map->grid.columns;
 }
 
 static int definitions(void)
@@ -110,7 +112,7 @@ static int failures(void)
     const BoatMapDescription *invalid[] = { NULL, &missing_mesh, &empty, &land };
     for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
         // A stale prior value must not survive a failed preparation.
-        map = (BoatMap) { &square, NULL, 9, 9 };
+        map = (BoatMap) { &square, NULL, 9, 9, { 0 } };
         CHECK(!boat_map_init(&map, invalid[i]));
         CHECK(zeroed(&map));
         CHECK(!boat_map_water_contact(&map, (Vector2) { -5, 5 }, 0, &normal));
@@ -200,7 +202,7 @@ static int resources(void)
     land_river.map = &land;
     const BoatWorldDefinition *invalid[] = { NULL, &unmapped_river, &mapped_basin, &land_river };
     for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
-        r = (BoatWorldResources) { river, { &square, NULL, 9, 9 } };
+        r = (BoatWorldResources) { river, { &square, NULL, 9, 9, { 0 } } };
         CHECK(!boat_world_resources_init(&r, invalid[i]));
         CHECK(zeroed_resources(&r) && !boat_world_resources_ready(&r));
         boat_world_resources_destroy(&r);

@@ -53,7 +53,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_vessel_wake.c src/boat_vessel_wake.h
   src/boat.c src/boat.h src/boat_clock.h src/boat_course.c src/boat_course.h
   src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_race.c src/boat_race.h src/boat_location.c src/boat_location.h src/boat_map.c
-  src/boat_map.h
+  src/boat_map.h src/boat_map_tiles.c src/boat_map_tiles.h
   src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
   src/boat_input.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
   src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
@@ -431,6 +431,12 @@ target_link_libraries(validate_boat_map PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_map PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_map COMMAND validate_boat_map)
 set_tests_properties(boat_map PROPERTIES PASS_REGULAR_EXPRESSION "boat_map=ok")
+# Adventure A2.2: in-memory tile catalogue and indexed collision, exact against the full scan.
+add_executable(validate_boat_map_index tools/validate_boat_map_index.c)
+target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_map_index PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_map_index COMMAND validate_boat_map_index)
+set_tests_properties(boat_map_index PROPERTIES PASS_REGULAR_EXPRESSION "boat_map_index=ok")
 # Multiplayer M2: the local four-boat authority and its scripted server, also core-only.
 add_executable(validate_boat_fleet tools/validate_boat_fleet.c)
 target_link_libraries(validate_boat_fleet PRIVATE proteus_boat_core)
@@ -806,7 +812,7 @@ endforeach()
 get_property(PROTEUS_TESTS DIRECTORY PROPERTY TESTS)
 foreach(test IN LISTS PROTEUS_TESTS)
   get_test_property(${test} LABELS labels)
-  if(test MATCHES "^boat_core|^boat_map$|^boat_fleet|^boat_match|^boat_race$|^boat_server|^boat_net|^boat_bot")
+  if(test MATCHES "^boat_core|^boat_map$|^boat_map_index$|^boat_fleet|^boat_match|^boat_race$|^boat_server|^boat_net|^boat_bot")
     set_property(TEST ${test} APPEND PROPERTY LABELS core cpu)
   elseif(labels MATCHES "gpu")
   elseif(test MATCHES "screenshot|checksum|_cpu$")
@@ -825,7 +831,8 @@ if(PROTEUS_OPTIMIZE_TESTS)
   foreach(target proteus_boat_core proteus_render proteus_boat_session proteus_boat_drive
       validate_boat validate_boat_banking validate_boat_turn_entry
       validate_boat_environment validate_boat_replay boat_water_review wake_objects_review
-      validate_boat_clock validate_boat_world validate_boat_core validate_boat_map validate_boat_fleet
+      validate_boat_clock validate_boat_world validate_boat_core validate_boat_map
+      validate_boat_map_index validate_boat_fleet
       boat_server
       proteus_boat_net validate_boat_net)
     target_compile_options(${target} PRIVATE
