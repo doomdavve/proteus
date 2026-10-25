@@ -194,15 +194,7 @@ bool boat_map_init_cell(BoatMap *map, const BoatMapDescription *description, flo
     if (!description || !description->mesh || !(cell_size > 0))
         return false;
     const Mesh3D *mesh = description->mesh;
-    // The importer emits the triangulated water surface first, followed by raised land.
-    size_t water_count = 0;
-    while (water_count < mesh->triangle_count) {
-        const Triangle3D *t = &mesh->triangles[water_count];
-        if (mesh->vertices[t->vertices[0]].y != 0 || mesh->vertices[t->vertices[1]].y != 0
-            || mesh->vertices[t->vertices[2]].y != 0)
-            break;
-        ++water_count;
-    }
+    size_t water_count = boat_map_leading_water(mesh);
     if (!water_count)
         return false;
     BoatMapEdge *shore = malloc(water_count * 3 * sizeof(*shore));
@@ -233,6 +225,20 @@ bool boat_map_init_cell(BoatMap *map, const BoatMapDescription *description, flo
         return false;
     }
     return true;
+}
+
+size_t boat_map_leading_water(const Mesh3D *mesh)
+{
+    // The importer emits the triangulated water surface first, followed by raised land.
+    size_t count = 0;
+    while (count < mesh->triangle_count) {
+        const Triangle3D *t = &mesh->triangles[count];
+        if (mesh->vertices[t->vertices[0]].y != 0 || mesh->vertices[t->vertices[1]].y != 0
+            || mesh->vertices[t->vertices[2]].y != 0)
+            break;
+        ++count;
+    }
+    return count;
 }
 
 bool boat_map_init(BoatMap *map, const BoatMapDescription *description)

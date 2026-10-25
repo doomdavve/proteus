@@ -248,8 +248,10 @@ static int check_gpu_views(void)
     EXPECT(a.scene.map == &waterfront_city_river_map && a.scene.river && a.scene.crane.vaoId);
     EXPECT(gpu_frame(&b, &other, &harbor_frame));
     EXPECT(b.scene.map == &test_harbor_map && !b.scene.river && !b.scene.crane.vaoId);
-    EXPECT(b.scene.water.vaoId && b.scene.corner.vertexCount < a.scene.corner.vertexCount);
-    harbor_vertices = b.scene.corner.vertexCount;
+    EXPECT(b.scene.water.vaoId
+        && waterfront_gpu_tiled_vertices(&b.scene.corner)
+            < waterfront_gpu_tiled_vertices(&a.scene.corner));
+    harbor_vertices = waterfront_gpu_tiled_vertices(&b.scene.corner);
     EXPECT(!same_image(first, harbor_frame));
     // B rebinds to the river and back: both frames repeat exactly.
     EXPECT(gpu_frame(&b, &river, &frame) && same_image(first, frame));
@@ -267,7 +269,7 @@ static int check_gpu_views(void)
     frame = (Image) { 0 };
 #undef EXPECT
     printf("gpu_view_binding=ok harbor_corner_vertices=%d river_corner_vertices=%d\n",
-        harbor_vertices, a.scene.corner.vertexCount);
+        harbor_vertices, waterfront_gpu_tiled_vertices(&a.scene.corner));
     result = 0;
 cleanup:
     if (frame.data)
@@ -283,6 +285,89 @@ cleanup:
     boat_gpu_destroy(&a);
     boat_gpu_destroy(&b);
     boat_world_resources_destroy(&harbor);
+    CloseWindow();
+    return result;
+}
+
+static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size);
+
+// A2.3: per-tile culling removes only geometry outside each pass's volume. At every route stop,
+// in four headings and three cameras, both tile sizes draw the same GPU (with waves) and CPU
+// (flat water, whose full-map wave surface would dominate the run) pixels with culling on and
+// off, and each pass culls some tiles somewhere.
+static int check_culling(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Tile culling probe");
+    if (!IsWindowReady())
+        return 1;
+    const float sizes[] = { 512, 1024 };
+    const BoatCamera cameras[] = { BOAT_CAMERA_DEFAULT, { .distance = 12, .height = 6 },
+        { .distance = 1100, .height = 300 } };
+    BoatSession session, flat;
+    boat_session_init(&session, test_world(BOAT_LOCATION_RIVER), boat_water_gentle());
+    boat_session_init(&flat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    int result = 1, poses = 0;
+    unsigned int culled[WATERFRONT_GPU_PASS_COUNT] = { 0 };
+    size_t cpu_culled = 0;
+    static Color culled_pixels[320 * 200], full_pixels[320 * 200];
+    for (size_t s = 0; s < sizeof(sizes) / sizeof(*sizes); ++s) {
+        BoatGpu gpu = { 0 };
+        Renderer3D cpu = { 0 };
+        BoatCpuView cpu_view = { 0 };
+        bool ok = boat_gpu_init(&gpu, false) && prepare_tiles(&gpu.scenery, sizes[s])
+            && prepare_tiles(&cpu_view.scenery, sizes[s]);
+        for (size_t stop = 0; ok && stop < stop_count; ++stop)
+            for (int heading = 0; ok && heading < 4; ++heading)
+                for (size_t c = 0; ok && c < sizeof(cameras) / sizeof(*cameras); ++c) {
+                    BoatViewState view = { .boat = session.boat, .time = 12 };
+                    view.boat.position = stops[stop].position;
+                    view.boat.heading = heading * PI / 2;
+                    BoatPresentation presentation = session.presentation;
+                    presentation.camera_heading = view.boat.heading;
+                    Image images[2] = { 0 };
+                    for (int pass = 0; pass < 2; ++pass) {
+                        waterfront_gpu_scene_set_culling_enabled(&gpu.scene, pass == 0);
+                        boat_gpu_draw(&gpu, &view, &presentation, &session.world, cameras[c]);
+                        images[pass]
+                            = gpu.failed ? (Image) { 0 } : LoadImageFromTexture(gpu.target.texture);
+                        if (pass == 0)
+                            for (int p = 0; p < WATERFRONT_GPU_PASS_COUNT; ++p)
+                                culled[p] += gpu.scene.stats.tiles_culled[p];
+                        cpu.culling_disabled = pass == 1;
+                        ok = ok
+                            && boat_draw(&cpu, &cpu_view, pass ? full_pixels : culled_pixels, 320,
+                                200, &view, &presentation, &flat.world, cameras[c]);
+                        if (pass == 0)
+                            cpu_culled += cpu.stats.boxes_culled;
+                    }
+                    ok = ok && images[0].data && images[1].data && same_image(images[0], images[1])
+                        && memcmp(culled_pixels, full_pixels, sizeof(full_pixels)) == 0;
+                    if (!ok)
+                        fprintf(stderr, "culling changed tile=%g stop=%s heading=%d camera=%zu\n",
+                            (double)sizes[s], stops[stop].name, heading, c);
+                    for (int i = 0; i < 2; ++i)
+                        if (images[i].data)
+                            UnloadImage(images[i]);
+                    ++poses;
+                }
+        boat_cpu_view_destroy(&cpu_view);
+        renderer3d_destroy(&cpu);
+        boat_gpu_destroy(&gpu);
+        if (!ok)
+            goto cleanup;
+    }
+    for (int p = 0; p < WATERFRONT_GPU_PASS_COUNT; ++p)
+        if (!culled[p])
+            goto cleanup;
+    if (!cpu_culled)
+        goto cleanup;
+    printf("tile_culling=ok poses=%d gpu_culled shadow=%u reflection=%u main=%u cpu_culled=%zu\n",
+        poses, culled[0], culled[1], culled[2], cpu_culled);
+    result = 0;
+cleanup:
+    boat_session_destroy(&session);
+    boat_session_destroy(&flat);
     CloseWindow();
     return result;
 }
@@ -407,6 +492,7 @@ typedef struct {
     float simulation_ms, render_ms, present_ms, frame_ms, interval_ms, gpu_ms;
     bool has_interval, has_gpu;
     WaterfrontGpuCount total, pass[WATERFRONT_GPU_PASS_COUNT], group[WATERFRONT_GPU_GROUP_COUNT];
+    unsigned int culled[WATERFRONT_GPU_PASS_COUNT];
 } BenchFrame;
 
 // Asynchronous GL_TIME_ELAPSED samples. A busy slot skips that frame instead of waiting.
@@ -516,6 +602,8 @@ static void bench_count(BenchFrame *frame, const WaterfrontGpuStats *stats)
 {
     frame->total = waterfront_gpu_stats_total(stats);
     for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
+        frame->culled[pass] = stats->tiles_culled[pass];
+    for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
         for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group) {
             WaterfrontGpuCount count = stats->mesh[pass][group];
             frame->pass[pass].submissions += count.submissions;
@@ -535,7 +623,17 @@ static int bench_fail(const char *message)
 // submission and presentation; route checks, GPU polling and report writing are outside it.
 // Visible pacing: "cap" is raylib's SetTargetFPS(60) (the A0.4 baseline), "deadline" the game's
 // 60 Hz pacer without vsync and "vsync" the game default (vsync with the pacer as a backstop).
-static int benchmark(const char *prefix, bool waves, bool aa, bool visible, const char *pacing)
+// Prepares a view's scenery at TILE_SIZE before its first draw; drawing keeps a ready scenery
+// of the same map. Zero keeps the default size.
+static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size)
+{
+    return !(tile_size > 0)
+        || waterfront_scenery_init_tiled(
+            scenery, boat_location(BOAT_LOCATION_RIVER)->map, tile_size);
+}
+
+static int benchmark(
+    const char *prefix, bool waves, bool aa, bool visible, const char *pacing, float tile_size)
 {
     char csv_path[4096], json_path[4096], state[512];
     snprintf(csv_path, sizeof(csv_path), "%s.csv", prefix);
@@ -574,7 +672,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     }
     SetConfigFlags(!visible ? FLAG_WINDOW_HIDDEN : vsync ? FLAG_VSYNC_HINT : 0);
     InitWindow(960, 600, "Proteus / boat water benchmark");
-    if (!IsWindowReady() || !boat_gpu_init(&gpu, aa)) {
+    if (!IsWindowReady() || !boat_gpu_init(&gpu, aa) || !prepare_tiles(&gpu.scenery, tile_size)) {
         error = "graphics initialization failed";
         goto cleanup;
     }
@@ -670,7 +768,8 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
           "wave_patch_rebuilds,wake_uploads,app_submissions,scene_triangles,"
           "shadow_submissions,shadow_triangles,reflection_submissions,reflection_triangles,"
           "main_submissions,main_triangles,map_submissions,map_triangles,"
-          "water_submissions,water_triangles,object_submissions,object_triangles\n",
+          "water_submissions,water_triangles,object_submissions,object_triangles,"
+          "shadow_tiles_culled,reflection_tiles_culled,main_tiles_culled\n",
         csv);
     for (int i = 0; i < count; ++i) {
         const BenchFrame *f = &frames[i];
@@ -689,11 +788,13 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
             fprintf(csv, ",%u,%zu", f->pass[pass].submissions, f->pass[pass].triangles);
         for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group)
             fprintf(csv, ",%u,%zu", f->group[group].submissions, f->group[group].triangles);
+        for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
+            fprintf(csv, ",%u", f->culled[pass]);
         fputc('\n', csv);
     }
     format_final_state(state, sizeof(state), boat, tick);
     fprintf(json,
-        "{\n  \"schema_revision\":2,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
+        "{\n  \"schema_revision\":3,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
         "  \"route\":\"river-review\",\"route_revision\":1,\"physics_revision\":%d,\n"
         "  \"build\":\"%s\",\"platform\":\"%s\",\n  \"gl_renderer\":",
         BOAT_PHYSICS_REVISION, BOAT_BENCH_BUILD, BOAT_BENCH_PLATFORM);
@@ -701,12 +802,14 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     fputs(",\"gl_version\":", json);
     json_string(json, gl_version);
     fprintf(json,
-        ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\",\n"
+        ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\","
+        "\"tile_size\":%.9g,\n"
         "  \"window_size\":[960,600],\"framebuffer_size\":[%d,%d],"
         "\"virtual_resolution\":[320,200],\"internal_resolution\":[%d,%d],\n"
         "  \"pacing\":\"%s\",\"vsync_hint\":%s,\"monitor_refresh_hz\":",
-        aa ? "4x4" : "off", waves ? "waves" : "flat", visible ? "visible" : "hidden", render_width,
-        render_height, aa ? 1280 : 320, aa ? 800 : 200, pacing_name, vsync ? "true" : "false");
+        aa ? "4x4" : "off", waves ? "waves" : "flat", visible ? "visible" : "hidden",
+        (double)gpu.scenery.tile_size, render_width, render_height, aa ? 1280 : 320, aa ? 800 : 200,
+        pacing_name, vsync ? "true" : "false");
     if (refresh > 0)
         fprintf(json, "%d", refresh);
     else
@@ -771,8 +874,10 @@ int main(int argc, char **argv)
 {
     test_worlds_open();
     const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
+    float tile_size = 0;
+    bool no_cull = false;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
-    bool gpu_check = false, gpu_views = false, gpu_lifecycle = false;
+    bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
             output = argv[++i];
@@ -788,6 +893,8 @@ int main(int argc, char **argv)
             gpu_views = true;
         else if (strcmp(argv[i], "--check-gpu-lifecycle") == 0)
             gpu_lifecycle = true;
+        else if (strcmp(argv[i], "--check-culling") == 0)
+            culling = true;
         else if (strcmp(argv[i], "--check") == 0)
             check = true;
         else if (strcmp(argv[i], "--sequence") == 0)
@@ -796,18 +903,27 @@ int main(int argc, char **argv)
             visible = true;
         else if (strcmp(argv[i], "--pacing") == 0 && i + 1 < argc)
             pacing = argv[++i];
-        else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
+        else if (strcmp(argv[i], "--no-cull") == 0)
+            no_cull = true;
+        else if (strcmp(argv[i], "--tile-size") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            tile_size = strtof(argv[++i], &end);
+            if (!*argv[i] || *end || !(tile_size >= 64 && tile_size <= 65536))
+                return 2;
+        } else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
             const char *name = argv[++i];
             if (strcmp(name, "cpu") != 0 && strcmp(name, "gpu") != 0)
                 return 2;
             use_gpu = strcmp(name, "gpu") == 0;
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
-                 "       boat_water_review --check-gpu-lifecycle\n"
+                 "       boat_water_review --check-gpu-lifecycle | --check-culling\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
-                 "                         [--sequence] [--visible]\n"
+                 "                         [--sequence] [--visible] [--tile-size M] [--no-cull]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--waves] [--visible [--pacing cap|deadline|vsync]]\n"
+                 "                         [--tile-size M]\n"
+                 "--tile-size: render tile edge, 64..65536 m (default 1024).\n"
                  "Visible benchmark pacing: cap = SetTargetFPS(60) (default), deadline = 60 Hz\n"
                  "deadline chain, vsync = the game's vsync with a backstop above the refresh.\n"
                  "Benchmark writes PREFIX.json and PREFIX.csv: two ticks per frame, 120 warmup.\n"
@@ -837,11 +953,12 @@ int main(int argc, char **argv)
             return 2;
         }
     }
-    if (gpu_check || gpu_views || gpu_lifecycle) {
+    if (gpu_check || gpu_views || gpu_lifecycle || culling) {
         SetTraceLogLevel(LOG_WARNING);
-        return gpu_lifecycle ? check_gpu_lifecycle()
-            : gpu_views      ? check_gpu_views()
-                             : check_gpu_water();
+        return culling      ? check_culling()
+            : gpu_lifecycle ? check_gpu_lifecycle()
+            : gpu_views     ? check_gpu_views()
+                            : check_gpu_water();
     }
     if (!check && !output && !bench)
         return 2;
@@ -859,7 +976,7 @@ int main(int argc, char **argv)
     }
     if (bench)
         return benchmark(
-            bench, waves, strcmp(aa_name, "4x4") == 0, visible, pacing ? pacing : "cap");
+            bench, waves, strcmp(aa_name, "4x4") == 0, visible, pacing ? pacing : "cap", tile_size);
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
     boat_session_init(
@@ -898,12 +1015,17 @@ int main(int argc, char **argv)
         if (use_gpu) {
             SetConfigFlags(visible ? 0 : FLAG_WINDOW_HIDDEN);
             InitWindow(960, 600, "Proteus / boat water review");
-            if (!IsWindowReady() || !boat_gpu_init(&gpu, true))
+            if (!IsWindowReady() || !boat_gpu_init(&gpu, true)
+                || !prepare_tiles(&gpu.scenery, tile_size))
                 goto cleanup;
+            waterfront_gpu_scene_set_culling_enabled(&gpu.scene, !no_cull);
             if (visible)
                 SetTargetFPS(60);
         }
     }
+    if (!use_gpu && !prepare_tiles(&cpu_view.scenery, tile_size))
+        goto cleanup;
+    cpu.culling_disabled = no_cull;
     size_t destination = 0, captured_destination = 0;
     const BoatCamera default_camera
         = { .distance = location->camera_distance, .height = location->camera_height };

@@ -606,11 +606,22 @@ static void build_quays(Builder *k, const Mesh3D *city)
 
 bool waterfront_scenery_init(WaterfrontScenery *scenery, const BoatMapDescription *map)
 {
-    *scenery = (WaterfrontScenery) { .map = map, .ready = !map };
+    return waterfront_scenery_init_tiled(scenery, map, WATERFRONT_TILE_SIZE);
+}
+
+bool waterfront_scenery_init_tiled(
+    WaterfrontScenery *scenery, const BoatMapDescription *map, float tile_size)
+{
+    *scenery = (WaterfrontScenery) { .map = map, .ready = !map, .tile_size = tile_size };
+    if (!(tile_size > 0)) {
+        *scenery = (WaterfrontScenery) { 0 };
+        return false;
+    }
     if (!map)
         return true; // The basin: no map-derived or authored river scenery.
     const Mesh3D *city = map->mesh;
-    if (!city || !city->triangle_count) {
+    if (!city || !city->triangle_count
+        || !boat_map_tiles_init_land(&scenery->tiles, map, tile_size)) {
         *scenery = (WaterfrontScenery) { 0 };
         return false;
     }
@@ -674,6 +685,7 @@ void waterfront_scenery_destroy(WaterfrontScenery *scenery)
 {
     free(scenery->boxes);
     free(scenery->bounds);
+    boat_map_tiles_destroy(&scenery->tiles);
     *scenery = (WaterfrontScenery) { 0 };
 }
 
@@ -681,8 +693,9 @@ bool waterfront_scenery_bind(WaterfrontScenery *scenery, const BoatMapDescriptio
 {
     if (scenery->ready && scenery->map == map)
         return true;
+    float tile_size = scenery->tile_size > 0 ? scenery->tile_size : WATERFRONT_TILE_SIZE;
     waterfront_scenery_destroy(scenery);
-    return waterfront_scenery_init(scenery, map);
+    return waterfront_scenery_init_tiled(scenery, map, tile_size);
 }
 
 bool waterfront_scenery_clear(const WaterfrontScenery *scenery, Vector3 position, float clearance)

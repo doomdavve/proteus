@@ -214,9 +214,9 @@ static bool parse_options(int argc, char **argv, FixtureOptions *options)
     return true;
 }
 
-static bool verify_facade_mapping(const Mesh *mesh)
+// Checks one tile's facade mesh, adding its triangles per material family to FAMILIES.
+static bool verify_facade_mapping(const Mesh *mesh, int *families)
 {
-    int families[WATERFRONT_FACADE_COUNT] = { 0 };
     if (mesh->vertexCount % 6 != 0)
         return false;
     for (int i = 0; i < mesh->vertexCount; i += 3) {
@@ -250,11 +250,6 @@ static bool verify_facade_mapping(const Mesh *mesh)
                 return false;
         }
     }
-    for (int i = 1; i < WATERFRONT_FACADE_COUNT; ++i) {
-        printf("facade_family=%d triangles=%d\n", i, families[i]);
-        if (families[i] < 20)
-            return false;
-    }
     return true;
 }
 
@@ -287,21 +282,34 @@ static Mesh material_probe_plane(void)
 static bool verify_surface_materials(WaterfrontGpuScene *scene, bool facade)
 {
     int triangles[WATERFRONT_GROUND_COUNT] = { 0 };
-    for (int i = 0; i < scene->quay.vertexCount; i += 3) {
-        float encoded = scene->quay.texcoords[i * 2];
-        if (!isfinite(encoded) || encoded < 1 || encoded >= WATERFRONT_GROUND_COUNT
-            || encoded != floorf(encoded))
-            return false;
-        ++triangles[(int)encoded];
-        for (int v = i; v < i + 3; ++v)
-            if (scene->quay.texcoords[v * 2] != encoded || scene->quay.normals[v * 3 + 1] < .95f)
+    for (int t = 0; t < scene->quay.count; ++t) {
+        const Mesh *quay = &scene->quay.meshes[t];
+        for (int i = 0; i < quay->vertexCount; i += 3) {
+            float encoded = quay->texcoords[i * 2];
+            if (!isfinite(encoded) || encoded < 1 || encoded >= WATERFRONT_GROUND_COUNT
+                || encoded != floorf(encoded))
                 return false;
+            ++triangles[(int)encoded];
+            for (int v = i; v < i + 3; ++v)
+                if (quay->texcoords[v * 2] != encoded || quay->normals[v * 3 + 1] < .95f)
+                    return false;
+        }
     }
     for (int i = 1; i < WATERFRONT_GROUND_COUNT; ++i)
         if (triangles[i] < 20)
             return false;
-    if (facade && !verify_facade_mapping(&scene->facades))
-        return false;
+    // Each tile's facade mesh keeps its wall pairs together.
+    if (facade) {
+        int families[WATERFRONT_FACADE_COUNT] = { 0 };
+        for (int t = 0; t < scene->facades.count; ++t)
+            if (!verify_facade_mapping(&scene->facades.meshes[t], families))
+                return false;
+        for (int i = 1; i < WATERFRONT_FACADE_COUNT; ++i) {
+            printf("facade_family=%d triangles=%d\n", i, families[i]);
+            if (families[i] < 20)
+                return false;
+        }
+    }
     int pass_location = GetShaderLocation(scene->shader, facade ? "facadePass" : "groundPass");
     if (pass_location < 0)
         return false;

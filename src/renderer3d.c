@@ -195,14 +195,15 @@ static void rasterize(Renderer3D *r, Vector3 va, Vector3 vb, Vector3 vc, Color c
     }
 }
 
-static void draw_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3D transform,
-    const Material3D *material, bool emissive)
+// LIST (may be NULL: every triangle in order) selects COUNT of MESH's triangles.
+static void draw_mesh_list(Renderer3D *r, const Mesh3D *mesh, const unsigned int *list,
+    size_t count, Transform3D transform, const Material3D *material, bool emissive)
 {
     Matrix rotation = MatrixRotateXYZ(transform.rotation);
     ++r->stats.meshes;
-    r->stats.triangles += mesh->triangle_count;
-    for (size_t i = 0; i < mesh->triangle_count; ++i) {
-        const Triangle3D *triangle = &mesh->triangles[i];
+    r->stats.triangles += count;
+    for (size_t i = 0; i < count; ++i) {
+        const Triangle3D *triangle = &mesh->triangles[list ? list[i] : i];
         Vector3 world[3];
         for (int j = 0; j < 3; ++j) {
             Vector3 scaled
@@ -234,6 +235,39 @@ static void draw_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3D transform,
             rasterize(r, buffers[source][0], buffers[source][j], buffers[source][j + 1], color,
                 material, normal);
     }
+}
+
+static void draw_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3D transform,
+    const Material3D *material, bool emissive)
+{
+    draw_mesh_list(r, mesh, NULL, mesh->triangle_count, transform, material, emissive);
+}
+
+void renderer3d_draw_mesh_triangles(
+    Renderer3D *r, const Mesh3D *mesh, const unsigned int *triangles, size_t count)
+{
+    draw_mesh_list(r, mesh, triangles, count, (Transform3D) { .scale = { 1, 1, 1 } }, NULL, false);
+}
+
+bool renderer3d_box_visible(Renderer3D *r, Vector3 min, Vector3 max)
+{
+    if (r->culling_disabled)
+        return true;
+    // Planes are linear in view space, so a triangle inside the box lies outside a plane that
+    // all eight corners are outside of. The margin covers rounding against its own vertices.
+    int outside[6] = { 0 };
+    for (int i = 0; i < 8; ++i) {
+        Vector3 v = world_to_view(
+            r, (Vector3) { i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z });
+        for (int plane = 0; plane < 6; ++plane)
+            outside[plane] += plane_distance(r, v, plane) < -.01f;
+    }
+    for (int plane = 0; plane < 6; ++plane)
+        if (outside[plane] == 8) {
+            ++r->stats.boxes_culled;
+            return false;
+        }
+    return true;
 }
 
 void renderer3d_draw_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3D transform)

@@ -85,12 +85,15 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
         r, (Transform3D) { .position = position, .scale = scale }, &material);
 }
 
-static void windows(Renderer3D *r, const BoatMapDescription *map)
+// Windows of the land triangles of one tile, in index order.
+static void windows(
+    Renderer3D *r, const BoatMapDescription *map, const unsigned int *triangles, size_t count)
 {
     // Each imported wall starts with a triangle a,c,b (two ground vertices).
     // Derive inset windows from that edge, preserving arbitrary facade orientation.
     const Mesh3D *city = map->mesh;
-    for (size_t i = 0; i < city->triangle_count; ++i) {
+    for (size_t k = 0; k < count; ++k) {
+        size_t i = triangles[k];
         if (boat_map_is_bridge_triangle(map, i))
             continue;
         const Triangle3D *t = &city->triangles[i];
@@ -182,25 +185,39 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
     waterfront_sky_draw(pixels, width, height, camera);
     if (!renderer3d_begin(r, pixels, width, height, camera, waterfront_sun_direction()))
         return false;
-    Mesh3D city = *scenery->map->mesh;
-    if (omit_water) {
-        while (city.triangle_count) {
-            const Triangle3D *t = city.triangles;
-            if (city.vertices[t->vertices[0]].y != 0 || city.vertices[t->vertices[1]].y != 0
-                || city.vertices[t->vertices[2]].y != 0)
-                break;
-            ++city.triangles;
-            --city.triangle_count;
-        }
+    // Flat water first, then the land of each tile in view; land triangles keep their index
+    // order within a tile. Windows below follow the same tiles. Window quads stand 3.5 cm
+    // off their wall, so the test grows each tile's box by more than that.
+    const BoatMapTiles *tiles = &scenery->tiles;
+    const Mesh3D *city = scenery->map->mesh;
+    if (!omit_water) {
+        Mesh3D water = *city;
+        water.triangle_count = tiles->water_count;
+        renderer3d_draw_mesh(r, &water, (Transform3D) { .scale = { 1, 1, 1 } });
     }
-    renderer3d_draw_mesh(r, &city, (Transform3D) { .scale = { 1, 1, 1 } });
+    const Vector3 grow = { .1f, .1f, .1f };
+    size_t count = boat_map_tiles_count(tiles);
+    for (size_t t = 0; t < count; ++t) {
+        const BoatMapTile *tile = &tiles->tiles[t];
+        if (tile->land_count
+            && renderer3d_box_visible(
+                r, Vector3Subtract(tile->land_min, grow), Vector3Add(tile->land_max, grow)))
+            renderer3d_draw_mesh_triangles(
+                r, city, &tiles->land[tile->land_first], tile->land_count);
+    }
     if (scenery->river) {
         WaterfrontSceneFrame frame;
         waterfront_scene_evaluate(0, (BoatWater) { 0 }, &frame);
         renderer3d_draw_box(r, frame.bridge, frame.bridge_color);
     }
     waterline_details(r, scenery);
-    windows(r, scenery->map);
+    for (size_t t = 0; t < count; ++t) {
+        const BoatMapTile *tile = &tiles->tiles[t];
+        if (tile->land_count
+            && renderer3d_box_visible(
+                r, Vector3Subtract(tile->land_min, grow), Vector3Add(tile->land_max, grow)))
+            windows(r, scenery->map, &tiles->land[tile->land_first], tile->land_count);
+    }
     if (scenery->river)
         crane(r);
     return true;

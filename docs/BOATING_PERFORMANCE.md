@@ -128,7 +128,13 @@ version, AA, preset, window/pacing, framebuffer and internal resolution, monitor
 wave-patch capacity/peak triangles, route completion and the final physical state. It adds
 statistics for `app_submissions`, `scene_triangles`, `map_submissions` and `map_triangles`.
 `driver_draw_calls` stays `null`: the driver's own count is not read. Schema 1 (A0.4, A1.5)
-reported all three as `null`. The voyage checks hull clearance at each frame pose. `--check` covers every
+reported all three as `null`. Since
+[A2.3](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a23-result-2026-10-25) (`schema_revision` 3) the
+JSON records `tile_size` and the CSV adds `shadow_tiles_culled`, `reflection_tiles_culled` and
+`main_tiles_culled`, the tile meshes each pass skipped. `--tile-size M` (64–65,536 m, default
+1,024) sets the render tile edge for the benchmark and for `--output` captures, and
+`--no-cull` (captures only) draws every tile in the same order, for isolating culling
+from draw order. The voyage checks hull clearance at each frame pose. `--check` covers every
 tick, and the matching final state shows the benchmark followed the same trajectory.
 
 This is a fixed two-tick **render workload**. It does not exercise the app's real-time
@@ -141,6 +147,9 @@ identical, frame p95 medians 2–8% below A0.4, submission and GPU p95 within ab
 A2.1 added the counters; the first counts (about 940 submissions and 0.89–0.92 M triangles per
 frame, the whole map drawn in all three passes) are in the
 [A2.1 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a21-result-2026-10-25).
+A2.3 culls land per tile: at the 1 km default the median map triangles per frame fell from
+0.86 M to 0.14 M and GPU p50 by about 14%. The 512 m vs 1 km matrix is in the
+[A2.3 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a23-result-2026-10-25).
 
 ## Frame pacing — 2026-10-25
 

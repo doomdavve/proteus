@@ -46,6 +46,10 @@ a fleet on a surviving owner continues like one restored onto a fresh owner, and
 private river owners (one with an arcade world, so both patch caches build), the harbor and the
 basin. Shared views must reproduce the fresh-view references interleaved, after the first
 owner and its view are destroyed, and over three view recreate cycles with the context alive.
+`tile_culling` (`boat_water_review --check-culling`, `gpu`, serial, about 9 s; adventure A2.3)
+renders 144 river poses (512 m and 1 km tiles, six route stops, four headings, default, close
+and overview cameras) culled and unculled, on the GPU with waves and on the CPU on flat water.
+The pixels must be identical, and every pass must cull at least one tile.
 
 The HUD/control worktree also checks all 49 transitions between the seven thrust detents
 through the real integrator in `boat_handling`, and forward/reverse target settling on both
@@ -97,7 +101,9 @@ about 32 s in Debug on an M1 Max) runs a hidden `--waves --aa off` voyage. It ch
 counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, finite values,
 route completion and exact final-state parity with `--check --waves`. Since A2.1 (schema 2)
 it also checks that the per-pass and per-group submission/triangle columns partition the
-totals, apart from the two sky quads. It asserts no timing thresholds. See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25).
+totals, apart from the two sky quads. Since A2.3 (schema 3) it also checks the 1,024 m
+default `tile_size`, the per-pass `*_tiles_culled` columns and that the shadow pass culls
+tiles on every row. It asserts no timing thresholds. See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25).
 
 `frame_pacer` checks the window frame pacer's deadline chain on synthetic clocks: exact
 period boundaries despite oversleep, repayment of a late frame, restart after a stall, and no
@@ -121,7 +127,8 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   bit for bit, on about 3.6 million queries. These cover a cell-seam lattice, shore offsets,
   tile seams one float either side, tile corners, random and far points. It checks the 512 m
   and 1 km tile catalogues' lists, land ownership and bounds, and reports index, tile and
-  candidate counts.
+  candidate counts. Since A2.3 it also checks that the renderers' land-only catalogue equals
+  the full one, and that land-only construction rejects bad input.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and

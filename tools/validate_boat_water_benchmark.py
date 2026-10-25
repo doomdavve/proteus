@@ -74,7 +74,8 @@ with tempfile.TemporaryDirectory() as directory:
     with prefix.with_suffix('.csv').open() as stream:
         rows = list(csv.DictReader(stream))
 
-    assert report['schema_revision'] == 2 and report['mode'] == 'benchmark'
+    assert report['schema_revision'] == 3 and report['mode'] == 'benchmark'
+    assert report['tile_size'] == 1024
     assert report['renderer'] == 'gpu' and report['aa'] == 'off'
     assert report['preset'] == 'waves' and report['window'] == 'hidden'
     assert report['pacing'] == 'unpaced' and report['vsync_hint'] is False
@@ -120,6 +121,10 @@ with tempfile.TemporaryDirectory() as directory:
         for p in PASSES:
             assert int(row[f'{p}_submissions']) > 0 and int(row[f'{p}_triangles']) > 0, (i, p)
         assert int(row['map_triangles']) > 0 and int(row['water_triangles']) > 0, i
+        for p in PASSES:
+            assert int(row[f'{p}_tiles_culled']) >= 0, (i, p)
+    # The 96 m shadow box never needs the whole map.
+    assert all(int(row['shadow_tiles_culled']) > 0 for row in rows)
     assert previous_end == report['total_ticks'] == int(expected_state.split()[0][5:])
     assert report['warmup_end_tick'] == int(rows[WARMUP - 1]['end_tick'])
 

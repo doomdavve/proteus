@@ -245,6 +245,15 @@ static int tiles(void)
     BoatMap unready = { 0 };
     CHECK(!boat_map_tiles_init(&catalogue, &unready, 512) && !catalogue.tiles);
     CHECK(!boat_map_tiles_init(&catalogue, &map, 0) && !catalogue.tiles);
+    const Mesh3D empty_mesh = { mesh->vertices, mesh->triangles, 0 };
+    const Mesh3D land_mesh = { mesh->vertices, mesh->triangles + map.water_count, 1 };
+    const BoatMapDescription empty = { &empty_mesh, 0 }, land_only = { &land_mesh, 1 },
+                             missing = { NULL, 0 };
+    CHECK(!boat_map_tiles_init_land(&catalogue, NULL, 512) && !catalogue.tiles);
+    CHECK(!boat_map_tiles_init_land(&catalogue, &missing, 512) && !catalogue.tiles);
+    CHECK(!boat_map_tiles_init_land(&catalogue, &empty, 512) && !catalogue.tiles);
+    CHECK(!boat_map_tiles_init_land(&catalogue, &land_only, 512) && !catalogue.tiles);
+    CHECK(!boat_map_tiles_init_land(&catalogue, river, -1) && !catalogue.tiles);
     for (size_t s = 0; s < sizeof(tile_sizes) / sizeof(*tile_sizes); ++s) {
         float size = tile_sizes[s];
         CHECK(boat_map_tiles_init(&catalogue, &map, size));
@@ -313,6 +322,21 @@ static int tiles(void)
             (double)size, catalogue.columns, catalogue.rows, n - empty, empty, land_tiles, land_max,
             water_max, shore_max, catalogue.water_entries, catalogue.shore_entries,
             catalogue.land_entries, boat_map_tiles_bytes(&catalogue));
+        // The renderers' land-only catalogue owns land exactly like the full one.
+        BoatMapTiles land = { 0 };
+        CHECK(boat_map_tiles_init_land(&land, river, size));
+        CHECK(!land.map && land.description == river && land.water_count == map.water_count);
+        CHECK(land.columns == catalogue.columns && land.rows == catalogue.rows);
+        CHECK(!land.water_entries && !land.shore_entries);
+        CHECK(land.land_entries == catalogue.land_entries
+            && memcmp(land.land, catalogue.land, land.land_entries * sizeof(*land.land)) == 0);
+        for (size_t t = 0; t < n; ++t) {
+            const BoatMapTile *a = &land.tiles[t], *b = &catalogue.tiles[t];
+            CHECK(a->land_first == b->land_first && a->land_count == b->land_count);
+            CHECK(memcmp(&a->land_min, &b->land_min, sizeof(a->land_min)) == 0
+                && memcmp(&a->land_max, &b->land_max, sizeof(a->land_max)) == 0);
+        }
+        boat_map_tiles_destroy(&land);
         boat_map_tiles_destroy(&catalogue);
         boat_map_tiles_destroy(&catalogue);
         CHECK(!catalogue.tiles && !catalogue.map);

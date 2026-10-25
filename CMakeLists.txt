@@ -734,6 +734,10 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(gpu_water_surface PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME gpu_view_binding COMMAND boat_water_review --check-gpu-views)
   set_tests_properties(gpu_view_binding PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  # Adventure A2.3: per-tile culling draws the same GPU and CPU pixels as drawing every tile.
+  add_test(NAME tile_culling COMMAND boat_water_review --check-culling)
+  set_tests_properties(tile_culling PROPERTIES LABELS "gpu" RUN_SERIAL TRUE
+    PASS_REGULAR_EXPRESSION "tile_culling=ok")
   add_test(NAME gpu_view_lifecycle COMMAND boat_water_review --check-gpu-lifecycle)
   set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}

@@ -46,6 +46,8 @@ typedef struct {
     unsigned int cells, triangles, edges;
 } BoatMapQueryCost;
 
+// The importer's leading water triangles: those before the first with a vertex off y = 0.
+size_t boat_map_leading_water(const Mesh3D *mesh);
 // Fails without allocation for a missing description or mesh, or a mesh without leading water.
 // On failure, including allocation failure, the map is left zeroed, which is safe to destroy.
 bool boat_map_init(BoatMap *map, const BoatMapDescription *description);

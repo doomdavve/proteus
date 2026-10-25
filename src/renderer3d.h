@@ -39,6 +39,7 @@ typedef struct {
     size_t triangles; // Submitted triangles.
     size_t front_triangles; // Triangles facing the camera, before frustum clipping.
     size_t rasterized; // Clipped triangles handed to the rasterizer.
+    size_t boxes_culled; // renderer3d_box_visible rejections.
 } Renderer3DStats;
 
 // Zero-initialize before first use. Owns only its depth buffer; pixels belong to the caller.
@@ -57,6 +58,7 @@ typedef struct {
     float ghost_opacity; // Zero normally; 0..1 draws cyan screen-door coverage.
     PointLight3D point_light; // Disabled by begin; set before drawing the frame.
     Renderer3DStats stats; // Reset by begin.
+    bool culling_disabled; // Review only: renderer3d_box_visible always answers true.
 } Renderer3D;
 
 // Starts a frame and clears depth, preserving the caller's background pixels.
@@ -66,6 +68,12 @@ bool renderer3d_begin(Renderer3D *renderer, Color *pixels, int width, int height
 void renderer3d_draw_mesh(Renderer3D *renderer, const Mesh3D *mesh, Transform3D transform);
 // Unlit vertex colors, with the same clipping, culling and depth as ordinary meshes.
 void renderer3d_draw_emissive_mesh(Renderer3D *renderer, const Mesh3D *mesh, Transform3D transform);
+// Draws only MESH's triangles listed in TRIANGLES, in that order, untransformed.
+void renderer3d_draw_mesh_triangles(
+    Renderer3D *renderer, const Mesh3D *mesh, const unsigned int *triangles, size_t count);
+// False only when the world-space box lies entirely outside one clip plane of the frame, so
+// none of its triangles could draw.
+bool renderer3d_box_visible(Renderer3D *renderer, Vector3 min, Vector3 max);
 void renderer3d_destroy(Renderer3D *renderer);
 
 // Shared unit box centered at the origin, spanning [-0.5, 0.5] on each axis.
