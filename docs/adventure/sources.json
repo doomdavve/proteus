@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "note": "acquisition holds hand-recorded retrieval metadata; derived is rewritten by tools/prepare_adventure_sources.py from local files only.",
+  "envelope": {
+    "wsen_epsg4326": [
+      11.5702598,
+      57.6141283,
+      11.9585149,
+      57.7225589
+    ],
+    "origin_epsg4326": [
+      11.9089495,
+      57.6973921
+    ],
+    "origin_crs": "EPSG:3007 (crane origin used by tools/prepare_waterfront.py)",
+    "derivation": "Union of the river crop (east -1500..+950 m, north -1600..+800 m from the crane origin) and SMHI Vinga A (57.6322 N, 11.6048 E; about east -18179, north -7195 m), expanded by 2 km in EPSG:3007, converted to a longitude/latitude box. Recomputation with pyproj 3.8.0 agrees within about 0.5 m on the west/south edges.",
+    "status": "Initial source envelope, not a playable boundary; A0.3 may expand it."
+  },
+  "acquisition": {
+    "osm_sweden": {
+      "status": "acquired",
+      "product": "Geofabrik OpenStreetMap extract, Sweden, dated file",
+      "url": "https://download.geofabrik.de/europe/sweden-261024.osm.pbf",
+      "local_path": "build/adventure/downloads/sweden-261024.osm.pbf",
+      "retrieved_utc": "2026-10-25T12:15Z (download completion, from file mtime)",
+      "snapshot_utc": "2026-10-24T20:20:51Z (PBF header osmosis_replication_timestamp, sequence 4950)",
+      "bytes": 939946699,
+      "md5": "108913ce9dac7b8b4eb894b0cb3209bd",
+      "md5_verified_against": "https://download.geofabrik.de/europe/sweden-261024.osm.pbf.md5 (rechecked 2026-10-25T12:20Z)",
+      "sha256": "b46acb4f256471164a1c89dbcf3c39b6adea7eb30c5579b81e8ee779e06a1b25",
+      "crs": "EPSG:4326",
+      "licence": "ODbL 1.0; © OpenStreetMap contributors",
+      "licence_url": "https://www.openstreetmap.org/copyright"
+    },
+    "osm_corridor": {
+      "status": "derived locally",
+      "local_path": "build/adventure/downloads/gothenburg-vinga-261024.osm.pbf",
+      "command": "osmium extract --bbox 11.5702598,57.6141283,11.9585149,57.7225589 --strategy smart -S types=multipolygon --set-bounds build/adventure/downloads/sweden-261024.osm.pbf -o build/adventure/downloads/gothenburg-vinga-261024.osm.pbf",
+      "tool": "osmium-tool 1.19.1 (Homebrew)",
+      "bytes": 11423789,
+      "sha256": "2a2b68ffa733ca8c1a8b6655994e892e5d8fa0afa145e38b997d4d72478a3b38",
+      "reproduced": "2026-10-25: a second extraction produced identical bytes",
+      "contents": "1,488,406 nodes, 234,289 ways, 3,866 relations; smart strategy completes multipolygon relations, so data extends beyond the box (10.14..12.81 E, 54.32..58.94 N)"
+    },
+    "land_polygons": {
+      "status": "acquired",
+      "product": "osmdata.openstreetmap.de processed land polygons, split, WGS84",
+      "url": "https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip",
+      "local_path": "build/adventure/downloads/land-polygons-split-4326.zip",
+      "retrieved_utc": "2026-10-25T12:18Z (download completion, from file mtime)",
+      "http_last_modified": "Sun, 25 Oct 2026 03:43:12 GMT",
+      "snapshot_utc": "2026-10-25T00:00:00Z (package README: date of the data used)",
+      "bytes": 928538219,
+      "sha256": "5911e273096f9585425a17c30a8a98785cc33ed2718ff88987768933b8a327f7",
+      "crs": "EPSG:4326",
+      "licence": "ODbL 1.0; © OpenStreetMap contributors",
+      "snapshot_note": "About 3.7 hours newer than the Geofabrik snapshot; differences are logged in derived.coastline_conflicts, not overlaid."
+    },
+    "terrain_lantmateriet": {
+      "status": "not_acquired",
+      "product": "Lantmäteriet Markhöjdmodell Nedladdning (1 m grid)",
+      "url": "https://geotorget.lantmateriet.se/dokument/projects/markhoejdmodell-nedladdning/released/1/",
+      "reason": "Download requires an authenticated Geotorget STAC account; no credentials were available for this task and none were created.",
+      "access_dependency": "A Geotorget user account and product access for the STAC download service.",
+      "fallback": "Author simplified island relief by hand from OSM coastline/rock/peak features and photographs until a terrain sample is obtained.",
+      "licence_when_acquired": "CC BY 4.0 product terms with product/source credit and processing statement"
+    },
+    "smhi_vinga_a": {
+      "status": "acquired",
+      "product": "SMHI meteorological observations, station 71380 Vinga A, period latest-months, CSV",
+      "url_template": "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/{parameter}/station/71380/period/latest-months/data.csv",
+      "parameters": {
+        "3": "wind direction, 10 min mean, hourly (degrees)",
+        "4": "wind speed, 10 min mean, hourly (m/s)",
+        "21": "gust, hourly maximum (m/s)",
+        "25": "maximum 10 min mean over 3 h, hourly (m/s)"
+      },
+      "retrieved_utc": "2026-10-25T12:15Z (from file mtimes)",
+      "valid_period_utc": "2026-06-17T01:00Z..2026-10-25T11:00Z (parameter 25 to 12:00Z)",
+      "files_sha256": {
+        "smhi-vinga-a-3-latest-months.csv": "f60a13145e3dfc99088b52e59f72c1f8a92fcd7b67f601e68593c9c2b5d06c81",
+        "smhi-vinga-a-4-latest-months.csv": "99d227e455fecd46b800c6bd3e036f923bc4a4d97ae8a61a76234c8f112299a6",
+        "smhi-vinga-a-21-latest-months.csv": "a2324e02bbec27eafe33d75f26284d155018048b94dc79dd9539db82d2e06a5d",
+        "smhi-vinga-a-25-latest-months.csv": "d58488ff8848ba9b16930f8aa478fd17260d9871651d438f25902f8a34fabc1b"
+      },
+      "licence": "CC BY 4.0 (SMHI open data); credit SMHI and state modifications",
+      "licence_url": "https://www.smhi.se/data/om-smhis-data/villkor-for-anvandning"
+    },
+    "smhi_waves": {
+      "status": "acquired",
+      "product": "SMHI oceanographic observations, period latest-day, JSON",
+      "discovery": "https://opendata-download-ocobs.smhi.se/api/version/latest.json and parameter/1.json station list; nearest stations to Vinga A ranked by distance",
+      "url_template": "https://opendata-download-ocobs.smhi.se/api/version/latest/parameter/{parameter}/station/{station}/period/latest-day/data.json",
+      "stations": {
+        "33033": "Brofjorden Vågboj, 58.2513 N 11.2229 E, owner Sjöfartsverket",
+        "33015": "Väderöarna 3 Vågboj, 58.4833 N 10.9333 E, owner SMHI"
+      },
+      "parameters": {
+        "1": "significant wave height",
+        "11": "maximum wave height",
+        "9": "peak period",
+        "8": "direction at peak"
+      },
+      "unavailable": [
+        "Parameter 7 (mean wave direction) returned 404 for both stations.",
+        "latest-months is not offered for wave stations; only latest-day and corrected-archive.",
+        "33040 Vinga Bottensystem lists 2019-05-22..2019-11-21 only; 35070 Trubaduren Boj ended 2003."
+      ],
+      "retrieved_utc": "2026-10-25T12:24Z",
+      "files_sha256": {
+        "wave-33033-p1-latest-day.json": "ff196f82d5745ceb1adb296318da1ab2be609ef831a6aa33b5532a772f59fa55",
+        "wave-33033-p11-latest-day.json": "1678aa0756a3a49912fddd710368f22170abbaa84595bce13a5acbb410ce9d6d",
+        "wave-33033-p9-latest-day.json": "a55b8a83b03e31f2929920029cfe653c885278550ac5b736f6c73ac72e9a880a",
+        "wave-33033-p8-latest-day.json": "3fa2a2eb3d1540b90a84ab4a983b773be27773d08cf6860a929b42244e488b6c",
+        "wave-33015-p1-latest-day.json": "da1fdd6519d54b60bd0df44c2314304fd0f57e637743c62c60ae215ae7c40dbd",
+        "wave-33015-p11-latest-day.json": "3dc1661b3036931cd3dd2449fb7d41317ac1ad5a936575d08766779d6bbaa212",
+        "wave-33015-p9-latest-day.json": "7a4c9fd40238c0673ceb1906074b03367d589cee49483a6e8d68749b1ab2b961",
+        "wave-33015-p8-latest-day.json": "83c181eb0f9ee647aa401576a2b44dc3ea2c0476e6ae6d868f58e12aba03f8c5"
+      },
+      "licence": "CC BY 4.0 (SMHI open data); credit SMHI and state modifications",
+      "licence_url": "https://www.smhi.se/data/om-smhis-data/villkor-for-anvandning"
+    },
+    "bathymetry_emodnet": {
+      "status": "not_acquired",
+      "reason": "Optional for A0.2; not needed by the A0.3 coverage survey."
+    }
+  },
+  "derived": {
+    "tool_versions": {
+      "python": "3.14.2",
+      "pyosmium": "4.2.0",
+      "libosmium": "2.22.0",
+      "shapely": "2.1.2",
+      "geos": "3.13.1",
+      "pyproj": "3.8.0",
+      "proj": "9.8.1"
+    },
+    "inputs": {
+      "gothenburg-vinga-261024.osm.pbf": "2a2b68ffa733ca8c1a8b6655994e892e5d8fa0afa145e38b997d4d72478a3b38",
+      "land-polygons-split-4326.zip": "5911e273096f9585425a17c30a8a98785cc33ed2718ff88987768933b8a327f7"
+    },
+    "outputs": {
+      "osm-corridor.json.gz": {
+        "content_sha256": "ae52e40e644b41196051bb013c5ad819a3bb2f03fa36c9b4ce05aed5f8d273c5",
+        "content_bytes": 30504145,
+        "gzip_sha256": "9f7f988350b12a408b637f64ee7414c9044b8fc99cf7a04b0d61c5845b7064fb"
+      },
+      "land-polygons.json.gz": {
+        "content_sha256": "ecd08139d0228739e28208e37ca62fc4b352c4412dec11228706408357cbb495",
+        "content_bytes": 1983958,
+        "gzip_sha256": "740f7de86f187c1a6067e2c132ab3314ed542dc8851476090799a99372de6ffb"
+      },
+      "weather-2026-10-25.json": {
+        "content_sha256": "428b4ea46aa42a878716a397ddcd1dd3fde9650641aeb9da3f28130e5f96ec06",
+        "content_bytes": 25908
+      }
+    },
+    "osm": {
+      "ways": 88932,
+      "points": 2454,
+      "relations": 1854,
+      "coastline_ways": 2396,
+      "water_ways": 577,
+      "building_ways": 54223,
+      "bridge_ways": 553,
+      "road_ways": 24648,
+      "seamark_points": 1586,
+      "incomplete_members": 150,
+      "incomplete_relations": [
+        945627,
+        3177973,
+        3177974,
+        8927408,
+        9560280,
+        9638589,
+        10745542,
+        10747018,
+        16200737,
+        18700379
+      ],
+      "ways_extending_beyond_envelope": 1025
+    },
+    "land": {
+      "polygons": 1495,
+      "holes": 0,
+      "vertices": 83187
+    },
+    "coastline_conflicts": {
+      "method": "max distance of each OSM coastline vertex (25 m inside the clip box) to the clipped land boundary, EPSG:3007 metres",
+      "coastline_ways_compared": 2396,
+      "ways_over_1m": 0,
+      "ways_over_10m": 0,
+      "max_deviation_m": 0.0,
+      "largest": []
+    }
+  }
+}

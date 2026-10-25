@@ -15,8 +15,9 @@ A [Swedish ensign](#swedish-ensign--2026-10-20) now responds to a light breeze a
 The score-loop arcade mode remains proposed. The [free-riding adventure plan](FREE_RIDING_ADVENTURE_PLAN.md)
 now owns the proposed staged world expansion toward Vinga, inspired by the Boelo storm report
 on 2026-10-25. Its [execution handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) records
-the completed A0.1 [current-map reference](adventure/baseline.md); A0.2 coastal-source
-acquisition is next. No expanded world is implemented.
+the completed A0.1 [current-map reference](adventure/baseline.md) and A0.2
+[pinned coastal sources](adventure/README.md#coastal-sources-a02-2026-10-25); the A0.3 route
+survey is next. No expanded world is implemented.
 
 The user reports current jumping, landing and capsizing are fun. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns the multiplayer track: preserve that feel

@@ -1,8 +1,9 @@
 # Free-riding adventure: Gothenburg to Vinga
 
 Status, 2026-10-25: [A0.1 original-river inventory and reference](adventure/baseline.md)
+and the [A0.2 pinned coastal sources](adventure/README.md#coastal-sources-a02-2026-10-25)
 completed; no expanded geography, streaming, adventure rules or new weather implemented.
-**Next: A0.2, the pinned coastal-source sample in the
+**Next: A0.3, the offline route/coverage survey in the
 [execution handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md).**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks; those later tasks remain pending. The proposed first playable is a short
@@ -213,8 +214,10 @@ and browser performance are separate qualification goals, not assumed outcomes.
 
 Use the user's 2026-10-25 report of 27 m/s gusts as inspiration for a named, dated preset.
 It is neither a sustained wind value nor a measured wave height. A faithful historical
-reconstruction needs observations with matching time/quality and local wave evidence; no
-complete event dataset has been acquired for this plan.
+reconstruction needs observations with matching time/quality and local wave evidence. A0.2
+retained Vinga A's hourly wind/gust/direction for 2026-10-24/25 (29.7 m/s peak gust at 07:00Z)
+and two distant regional wave buoys; no local wave observations exist, so the event dataset
+remains incomplete ([sources](adventure/README.md#findings-and-gaps)).
 
 Define a compact weather recipe: mean wind vector, gust envelope/seed, a few wave components
 with amplitude/period/direction, visibility, rain, cloud and optional water-level offset.
@@ -252,7 +255,7 @@ remain later tasks.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |
-| **A0 — survey and baseline (active; A0.2 next)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
+| **A0 — survey and baseline (active; A0.3 next)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
 | **A1 — world ownership** | Complete the necessary mapped W1/W2/W3/W4 foundations work on current river data | Two independent map/view owners, repeat init/destroy, partial-failure cleanup and unchanged existing river behaviour; use two river instances now that Eriksberg is retired |
 | **A2 — tiled current river** | Bake tiles and indexed collision; cull land in main/reflection/shadow passes; bound CPU/GPU water coverage | Match current shoreline/bridge queries against exhaustive reference; no seams or false tile-edge contacts; measured same-view scaling; all small-slice assets may remain resident |
 | **A3 — first outer-river adventure** | New connected geography, one destination/shelter, local weather transition, checkpoint recovery; bounded detailed-asset loading | Playable 5–10 minute outing, cold-load/rapid-turn/recovery tests, clear/storm performance and memory targets; human feedback on travel and exposure |

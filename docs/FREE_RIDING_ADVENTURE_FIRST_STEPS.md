@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0.1 completed 2026-10-25; A0.2 is next.**
+**Status: A0.1 and A0.2 completed 2026-10-25; A0.3 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -36,8 +36,8 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | Task | Depends on | Deliverable | Status |
 | --- | --- | --- | --- |
 | A0.1 | — | Current implementation inventory, compatibility references and original river captures | Complete 2026-10-25; [evidence](adventure/baseline.md) |
-| A0.2 | A0.1 | Pinned coastal source extract and acquisition manifest; terrain/weather access findings | Pending; next |
-| A0.3 | A0.2 | Offline coverage map, candidate route, first-slice polygon and tile/cost inventory | Pending |
+| A0.2 | A0.1 | Pinned coastal source extract and acquisition manifest; terrain/weather access findings | Complete 2026-10-25; [sources](adventure/README.md#coastal-sources-a02-2026-10-25) |
+| A0.3 | A0.2 | Offline coverage map, candidate route, first-slice polygon and tile/cost inventory | Pending; next |
 | A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Pending |
 | A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Pending |
 | A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Pending |
@@ -158,6 +158,28 @@ with attribution and reproducible extraction instructions.
 run yields the same content hash; source gaps are listed. A small fixture catches missing
 relation members and rejects malformed coordinates. Normal build/test still needs no geodata
 network requests. Update `docs/adventure/README.md` with exact installed tool versions/commands.
+
+**A0.2 result, 2026-10-25:** Started from `0f45971`, with the previous session's
+uncommitted `tools/prepare_adventure_sources.py` draft and an untrimmed 9.6 MB sample. Both
+were replaced. [`sources.json`](adventure/sources.json) pins the Geofabrik Sweden
+`sweden-261024` PBF (MD5 rechecked against Geofabrik; snapshot 2026-10-24T20:20:51Z), the
+`osmium extract` corridor and the 2026-10-25 processed land polygons. Each source records
+its URL, retrieval time, hashes and licence. The [source guide](adventure/README.md#coastal-sources-a02-2026-10-25)
+holds exact acquisition/offline commands and tool versions. The checked-in OSM corridor,
+clipped land polygons and Vinga A/wave-buoy storm slice regenerate offline; a second
+extraction gave an identical PBF; two normalizations gave byte-identical outputs; `--check`
+passed. Fixtures cover missing relation members, malformed coordinates and the land-shapefile
+reader/seam union. OSM coastline and land polygons agree (0.000 m maximum deviation).
+Ten relations crossing the box or Denmark remain incomplete and are listed. Terrain was not
+acquired (authenticated Geotorget STAC account required); the authored-relief fallback is
+recorded. Vinga A's quality-G observations peak at a 29.7 m/s gust at 07:00Z. The nearest
+current wave buoys are 72–103 km north and give regional references only; mean wave
+direction and Vinga-area waves are unavailable. EMODnet was not acquired. The OSM sample is
+6.3 MB compressed, which A0.3 may narrow. No runtime code or compiled geometry changed.
+Debug build passed; all 89 non-GPU CTests passed. The 21 GPU tests could not create a
+window in this session (no display, also with graphics access) and remain unverified; see
+the [verification record](adventure/README.md#a02-verification-2026-10-25).
+A0.3 is next; A0.4 remains independent.
 
 ## A0.3 — survey the route and choose the first slice
 
