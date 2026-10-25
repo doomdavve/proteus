@@ -78,6 +78,16 @@ static void flags(void)
 int main(void)
 {
     flags();
+    // Hull color is invariant; accent stripes retain a distinct livery color.
+    const Color white_hull = { 239, 243, 245, 255 };
+    for (unsigned int skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
+        BoatSkinPalette palette = boat_skin_palette(skin);
+        assert(memcmp(&palette.hull, &white_hull, sizeof(Color)) == 0);
+        for (unsigned int other = 0; other < skin; ++other) {
+            BoatSkinPalette previous = boat_skin_palette(other);
+            assert(memcmp(&palette.accent, &previous.accent, sizeof(Color)) != 0);
+        }
+    }
     // Every livery has identical vertices/topology. The broad color panels must differ.
     for (int part = BOAT_SKIN_HULL; part <= BOAT_SKIN_ENGINE; ++part) {
         const Mesh3D *base = boat_skin_mesh(0, part);

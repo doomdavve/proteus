@@ -16,7 +16,7 @@ typedef enum {
 typedef enum { BOAT_SKIN_HULL, BOAT_SKIN_COCKPIT, BOAT_SKIN_ENGINE } BoatSkinPart;
 
 typedef struct {
-    Color hull, deck, accent, upholstery;
+    Color hull, deck, accent, upholstery; // Hull color is shared; accent is the livery stripe.
 } BoatSkinPalette;
 
 unsigned int boat_skin_index(unsigned int skin);

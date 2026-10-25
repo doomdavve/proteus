@@ -23,7 +23,7 @@ static View3D camera_for(const Boat *boat, const char *angle)
     Vector3 target = { -boat->position.x, boat->height + 1.15f, boat->position.y + .4f };
     Vector3 eye = strcmp(angle, "front") == 0 ? (Vector3) { 4.5f, 2.5f, -5.5f }
         : strcmp(angle, "side") == 0          ? (Vector3) { 6.5f, 1.3f, 0 }
-                                              : (Vector3) { 4.5f, 2.2f, 4.5f };
+                                              : (Vector3) { 4.5f, 5.5f, 4.5f };
     Vector3 offset = Vector3Transform(eye, MatrixRotateY(boat->heading));
     return (View3D) { .position = Vector3Add(target, offset),
         .target = target,

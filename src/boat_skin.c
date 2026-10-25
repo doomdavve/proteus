@@ -5,12 +5,13 @@
 #include <string.h>
 
 static const char *names[] = { "sweden", "finland", "denmark", "norway" };
+static const Color white_hull = { 239, 243, 245, 255 };
 static const BoatSkinPalette palettes[] = {
     // Hull, deck, stripe/seat accent, upholstery. One shape and gameplay class for all four.
-    { { 0, 106, 167, 255 }, { 0, 106, 167, 255 }, { 255, 205, 0, 255 }, { 26, 48, 65, 255 } },
-    { { 239, 243, 245, 255 }, { 239, 243, 245, 255 }, { 0, 53, 128, 255 }, { 29, 48, 71, 255 } },
-    { { 198, 12, 48, 255 }, { 198, 12, 48, 255 }, { 250, 246, 237, 255 }, { 63, 36, 43, 255 } },
-    { { 186, 12, 47, 255 }, { 242, 240, 231, 255 }, { 0, 32, 91, 255 }, { 29, 40, 62, 255 } }
+    { white_hull, { 0, 106, 167, 255 }, { 255, 205, 0, 255 }, { 26, 48, 65, 255 } },
+    { white_hull, { 239, 243, 245, 255 }, { 0, 53, 128, 255 }, { 29, 48, 71, 255 } },
+    { white_hull, { 198, 12, 48, 255 }, { 250, 246, 237, 255 }, { 63, 36, 43, 255 } },
+    { white_hull, { 186, 12, 47, 255 }, { 0, 32, 91, 255 }, { 29, 40, 62, 255 } }
 };
 static const Color rubber = { 27, 39, 47, 255 };
 static const Color glass = { 43, 85, 106, 255 };
@@ -71,11 +72,11 @@ static void pane(BoatModel *m, const Vector3 *front, int count)
 static void hull(BoatModel *m, BoatSkinPalette p)
 {
     // Five stations: a fine entry, flared shoulders, straight aft chines, compact transom.
-    const float z[] = { -2.31f, -1.65f, -.65f, .55f, 1.26f };
-    const float w[] = { .025f, .57f, .95f, 1.02f, .90f };
-    const float y[] = { .65f, .79f, .78f, .72f, .72f };
-    Vector3 ring[5][7];
-    for (int i = 0; i < 5; ++i) {
+    const float z[] = { -2.31f, -1.65f, -.65f, .55f, .90f, 1.26f };
+    const float w[] = { .025f, .57f, .95f, 1.02f, .96f, .90f };
+    const float y[] = { .65f, .79f, .78f, .72f, .72f, .72f };
+    Vector3 ring[6][7];
+    for (int i = 0; i < 6; ++i) {
         ring[i][0] = (Vector3) { -w[i], y[i], z[i] };
         ring[i][1] = (Vector3) { -w[i], y[i] - .055f, z[i] };
         ring[i][2] = (Vector3) { -w[i] * .82f, i == 0 ? .53f : .08f, z[i] };
@@ -84,23 +85,33 @@ static void hull(BoatModel *m, BoatSkinPalette p)
         ring[i][5] = (Vector3) { w[i], y[i] - .055f, z[i] };
         ring[i][6] = (Vector3) { w[i], y[i], z[i] };
     }
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 5; ++i) {
         for (int j = 0; j < 6; ++j)
             quad(m, ring[i][j + 1], ring[i + 1][j + 1], ring[i + 1][j], ring[i][j],
                 j == 0 || j == 5 ? rubber : p.hull);
-        // Broad foredeck and aft deck; the center accent narrows with the bow.
         Vector3 l0 = ring[i][0], r0 = ring[i][6];
         Vector3 l1 = ring[i + 1][0], r1 = ring[i + 1][6];
-        Vector3 a = { -w[i] * .19f, y[i], z[i] }, b = { w[i] * .19f, y[i], z[i] };
-        Vector3 c = { -w[i + 1] * .19f, y[i + 1], z[i + 1] };
-        Vector3 d = { w[i + 1] * .19f, y[i + 1], z[i + 1] };
-        quad(m, l1, c, a, l0, p.deck);
-        quad(m, c, d, b, a, p.accent);
-        quad(m, d, r1, r0, b, p.deck);
+        if (i == 2 || i == 3) {
+            // Leave a full cockpit well between the foredeck and aft deck.
+            const float half = .72f;
+            Vector3 inner_l0 = { -half, y[i], z[i] }, inner_r0 = { half, y[i], z[i] };
+            Vector3 inner_l1 = { -half, y[i + 1], z[i + 1] };
+            Vector3 inner_r1 = { half, y[i + 1], z[i + 1] };
+            quad(m, l1, inner_l1, inner_l0, l0, p.deck);
+            quad(m, inner_r1, r1, r0, inner_r0, p.deck);
+        } else {
+            // Broad foredeck and aft deck; the center accent narrows with the bow.
+            Vector3 a = { -w[i] * .19f, y[i], z[i] }, b = { w[i] * .19f, y[i], z[i] };
+            Vector3 c = { -w[i + 1] * .19f, y[i + 1], z[i + 1] };
+            Vector3 d = { w[i + 1] * .19f, y[i + 1], z[i + 1] };
+            quad(m, l1, c, a, l0, p.deck);
+            quad(m, c, d, b, a, p.accent);
+            quad(m, d, r1, r0, b, p.deck);
+        }
     }
     for (int j = 1; j < 6; ++j) {
         triangle(m, ring[0][0], ring[0][j + 1], ring[0][j], p.hull);
-        triangle(m, ring[4][0], ring[4][j], ring[4][j + 1], p.hull);
+        triangle(m, ring[5][0], ring[5][j], ring[5][j + 1], p.hull);
     }
     // Retain the accepted staff's position, height and aft rake exactly.
     float top = BOAT_FLAG_STAFF_BASE_Y + BOAT_FLAG_STAFF_HEIGHT;
@@ -122,14 +133,15 @@ static void cockpit(BoatModel *m, BoatSkinPalette p)
     boat_model_beam(m, d, c, .035f, p.deck);
     boat_model_beam(m, d, l, .035f, p.deck);
     boat_model_beam(m, c, r, .035f, p.deck);
-    boat_model_box(m, (Vector3) { 0, .79f, .40f }, (Vector3) { 1.38f, .04f, 1.23f }, rubber);
+    // The open cockpit pan sits well below the foredeck; the seats follow its floor.
+    boat_model_box(m, (Vector3) { 0, .44f, .12f }, (Vector3) { 1.34f, .04f, 1.50f }, rubber);
     for (int side = -1; side <= 1; side += 2) {
         boat_model_box(
-            m, (Vector3) { side * .34f, .86f, .31f }, (Vector3) { .43f, .12f, .45f }, p.upholstery);
-        boat_model_box(m, (Vector3) { side * .34f, 1.00f, .55f }, (Vector3) { .43f, .37f, .13f },
+            m, (Vector3) { side * .34f, .51f, .51f }, (Vector3) { .43f, .12f, .45f }, p.upholstery);
+        boat_model_box(m, (Vector3) { side * .34f, .68f, .75f }, (Vector3) { .43f, .37f, .13f },
             p.upholstery);
         boat_model_box(
-            m, (Vector3) { side * .34f, 1.19f, .55f }, (Vector3) { .38f, .025f, .14f }, p.accent);
+            m, (Vector3) { side * .34f, .87f, .75f }, (Vector3) { .38f, .025f, .14f }, p.accent);
     }
     boat_model_box(m, (Vector3) { 0, .85f, 1.10f }, (Vector3) { 1.35f, .15f, .29f }, p.deck);
 }

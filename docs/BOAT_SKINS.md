@@ -2,7 +2,7 @@
 
 Implemented 2026-10-24 in the isolated `boat-speedboat-skins` worktree. The player craft
 has a fine pointed bow, simple faceted V hull, flared shoulders, a dark rub rail, a broad
-foredeck stripe, low swept windscreen, open two-seat cockpit and compact outboard.
+foredeck stripe, low swept windscreen, an open cockpit cutout with a lowered two-seat well and compact outboard.
 The user accepted the speedboat look and requested Sweden, Finland, Denmark and Norway.
 Each livery now has its matching Nordic-cross flag; the accepted staff and cloth simulation
 remain in place.
@@ -16,10 +16,10 @@ The 2026-10-20 cabin refinement proposal is superseded by this speedboat directi
 
 | Boat / local ID | Selection | Boat colors | Flag |
 | --- | --- | --- | --- |
-| 1 / 0 (default) | `sweden` | Blue hull/deck, yellow stripe | Yellow cross on blue |
+| 1 / 0 (default) | `sweden` | White hull, blue deck, yellow stripe | Yellow cross on blue |
 | 2 / 1 | `finland` | White hull/deck, blue stripe | Blue cross on white |
-| 3 / 2 | `denmark` | Red hull/deck, white stripe | White cross on red |
-| 4 / 3 | `norway` | Red hull, white deck, navy stripe | White-bordered navy cross on red |
+| 3 / 2 | `denmark` | White hull, red deck, white stripe | White cross on red |
+| 4 / 3 | `norway` | White hull, red deck, navy stripe | White-bordered navy cross on red |
 
 From the worktree root:
 
