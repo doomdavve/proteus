@@ -125,7 +125,53 @@ self-collision or hull/cabin collision; seek cloth reconstructs bounded history.
 
 ## Speedboat skins — 2026-10-24
 
-Status: the user accepted the speedboat look on 2026-10-24 ("I like the look!") and then
+Current integration preparation — 2026-10-25: the user accepted the sleeker speed profile
+("Much nicer!") and twin motors ("Great!") and requested preparation for main. The `boat-white-hulls` worktree now adds twin outboards to that
+accepted profile, following the white hulls and deep cockpit (`4010f37`). The profile uses a
+finer seven-station bow, graduated forefoot, lighter rub rail, gently crowned foredeck,
+lower swept windscreen, tapered aft fairing and bevelled outboard cowl. All four accepted
+liveries, the cockpit cutout and lowered seats remain; there is no helm. The earlier upper-bow
+rake experiment was rejected and reverted. The twin-motor extension changes presentation only;
+it does not establish improved hydrodynamic performance or alter the simulation.
+
+Next: combine the accepted work with main's A1.4/A1.5 in the separate
+`boat-white-hulls-integration` worktree, run the combined checks, then fold that branch into
+main. [The integration handoff](BOAT_SKINS_HANDOFF.md) owns the branch/base, commands and
+combined verification status. The main checkout is not edited during preparation.
+
+The single/twin-outboard comparisons for all four boats are at
+`build/boat-color-review/seat-depth/comparison.html` and
+`build/boat-color-review/twin-outboards/comparison.html` in the source worktree. The earlier
+accepted-profile comparison remains under `build/boat-color-review/speed-profile/`.
+These are local review artifacts, not committed assets. Each render pass draws both motors
+with fixed hull-relative mounts and the existing steering rotation. Thrust, mass, handling,
+wakes and network data are unchanged. A pose check covers both mounts under pitch, roll,
+heading and three steering angles. Source-worktree verification follows; combined-main
+verification is recorded in the handoff.
+
+Verification of the accepted speed profile on macOS, 2026-10-25: the full Debug build passed without
+compiler warnings; the skin validator passed shared-geometry, finite/nondegenerate mesh,
+palette and footprint checks. All 91 enabled CTests passed in 67.33 seconds with localhost
+access; 13 retired experiments remained disabled. Representative CPU side/bow/raised-stern
+captures across the four liveries and Sweden river/Norway basin follow captures were inspected.
+The gallery contains 24 matched before/after captures; its local image links resolve.
+Formatting and `git diff --check` passed. Logs and captures are under
+`build/boat-color-review/speed-profile/`. No manual playback was performed for this geometry-only
+proposal; GPU, Windows and browser visual review remain unverified.
+
+Twin-outboard verification on macOS, 2026-10-25: warning-clean full Debug build; all 91
+enabled CTests passed in 66.69 seconds with localhost access (13 retired experiments disabled).
+The skin validator now checks fixed, separate mounts under heading, pitch, roll and steering.
+CPU side/bow/raised-stern captures were produced for all four liveries, with the accepted
+single-motor profile as the matched baseline; representative views and a CPU turn capture
+were inspected. A 180-frame Sweden GPU turning demo completed, and a Norway GPU turning
+capture plus Sweden river/Norway basin CPU follow captures were inspected. These are scripted
+smoke checks, not manual driving or listening. The updated gallery's 56 local image links
+resolve. Formatting of the changed skin/validator code and `git diff --check` passed. Evidence
+is under `build/boat-color-review/twin-outboards/`. The user subsequently accepted the twin-motor look. Windows and browser review remain
+pending.
+
+Accepted baseline: the user accepted the speedboat look on 2026-10-24 ("I like the look!") and then
 requested four Nordic countries. The isolated `boat-speedboat-skins` worktree now implements
 Sweden, Finland, Denmark and Norway in that order, with matching liveries and animated flags.
 The user accepted the Nordic versions ("Great!") and requested integration handoff.

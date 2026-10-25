@@ -2,8 +2,11 @@
 
 Implemented 2026-10-24 in the isolated `boat-speedboat-skins` worktree. The player craft
 has a fine pointed bow, simple faceted V hull, flared shoulders, a dark rub rail, a broad
-foredeck stripe, low swept windscreen, an open cockpit cutout with a lowered two-seat well and compact outboard.
-The user accepted the speedboat look and requested Sweden, Finland, Denmark and Norway.
+foredeck stripe, low swept windscreen, an open cockpit cutout with a lowered two-seat well and twin compact outboards.
+The accepted baseline uses Sweden, Finland, Denmark and Norway. The user accepted the 2026-10-25 speed
+profile in `boat-white-hulls`, refining the bow taper, forefoot, windscreen and stern/cowl
+shapes. The user also accepted the twin outboards; the package is being prepared for main integration. The [owning plan](BOATING_PLAN.md#speedboat-skins--2026-10-24)
+records the current review, before/after gallery and verification evidence.
 Each livery now has its matching Nordic-cross flag; the accepted staff and cloth simulation
 remain in place.
 CPU and GPU use the same meshes, including reflections, shadows, replay and ghost views.
@@ -61,7 +64,8 @@ without changing the 54 simulation particles, forces or staff attachment.
 All presets have identical vertices and topology. No skin enters `Boat`, physics,
 contacts, thrust, wake generation, audio tuning, course rules or network serialization.
 The hull shape suggests speed without changing speed or introducing another gameplay
-class. The outboard keeps its steering transform, and the flag keeps its world-space
+class. The two outboards share the original steering rotation at separate hull-relative mounts;
+they do not add simulated thrust or mass. The flag keeps its world-space
 attachment and simulation. Harbor/traffic boat recipes are unchanged.
 
 In multiplayer (`wake_velocity --connect`) every client draws room slot 1 as Sweden, 2 Finland,
@@ -73,12 +77,14 @@ slot and persistent loadouts would need room metadata and are not implemented. S
 ## Verification
 
 `validate_boat_skin` checks matching geometry across all four palettes, nondegenerate and
-finite triangles, the existing footprint, arbitrary palette generation, name parsing and
+finite triangles, the existing footprint, separate twin mounts through steering and hull
+rotation, arbitrary palette generation, name parsing and
 invalid-ID fallback. Flag checks additionally probe the field and cross colors, all four
 sides of Norway's white border, matching topology, independent storage and unchanged source cloth. The normal core-boundary gates still enforce the simulation/rendering
 separation. See the owning plan for the dated build, full-suite and visual review results.
 
-The speedboat shape and Nordic color/flag pass are user-accepted. The
-[multiplayer handoff](BOAT_SKINS_HANDOFF.md) records the completed package and remaining
-integration work. Hands-on driving, Windows and browser review remain unverified.
+The baseline speedboat shape and Nordic color/flag pass are user-accepted; the current
+speed profile and twin-outboard extension are also user-accepted. The
+[integration handoff](BOAT_SKINS_HANDOFF.md) records the accepted package and preparation
+for the current main branch. Hands-on driving, Windows and browser review remain unverified.
 Scripted desktop playback is a smoke check, not a manual driving or audio assessment.

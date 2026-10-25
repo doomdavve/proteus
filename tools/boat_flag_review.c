@@ -128,7 +128,9 @@ int main(int argc, char **argv)
                 return 1;
             renderer3d_draw_mesh(&cpu, boat_skin_mesh(skin, BOAT_SKIN_HULL), player.hull);
             renderer3d_draw_mesh(&cpu, boat_skin_mesh(skin, BOAT_SKIN_COCKPIT), player.cabin);
-            renderer3d_draw_mesh(&cpu, boat_skin_mesh(skin, BOAT_SKIN_ENGINE), player.engine);
+            for (int side = -1; side <= 1; side += 2)
+                renderer3d_draw_mesh(&cpu, boat_skin_mesh(skin, BOAT_SKIN_ENGINE),
+                    boat_skin_outboard_pose(player.hull, player.engine, side));
             BoatFlagMesh flag_storage;
             Mesh3D flag = boat_flag_skin_mesh(&player.flag, skin, &flag_storage);
             renderer3d_draw_mesh(&cpu, &flag, (Transform3D) { .scale = { 1, 1, 1 } });

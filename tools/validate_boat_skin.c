@@ -75,8 +75,27 @@ static void flags(void)
     assert(memcmp(&sweden_storage, &other_storage, sizeof(other_storage)) == 0);
 }
 
+static void twin_outboards(void)
+{
+    Boat boat
+        = { .position = { 17, -8 }, .height = .3f, .heading = .7f, .roll = .12f, .pitch = -.2f };
+    for (int steering = -1; steering <= 1; ++steering) {
+        boat.engine_angle = steering * .6f;
+        BoatPoseParts pose = boat_pose_parts(&boat);
+        for (int side = -1; side <= 1; side += 2) {
+            Transform3D motor = boat_skin_outboard_pose(pose.hull, pose.engine, side);
+            Vector3 expected
+                = boat_pose_attachment(&boat, (Vector3) { side * .36f, .4f, BOAT_ENGINE_ARM });
+            assert(Vector3Distance(motor.position, expected) < .00001f);
+            assert(Vector3Distance(motor.rotation, pose.engine.rotation) < .00001f);
+            assert(Vector3Distance(motor.scale, pose.engine.scale) < .00001f);
+        }
+    }
+}
+
 int main(void)
 {
+    twin_outboards();
     flags();
     // Hull color is invariant; accent stripes retain a distinct livery color.
     const Color white_hull = { 239, 243, 245, 255 };
