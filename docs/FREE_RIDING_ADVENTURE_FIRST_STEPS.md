@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction) completed 2026-10-25; A1.2 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction) and [A1.2](#a12--wire-physical-map-ownership-through-all-callers) completed 2026-10-25; A1.3 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -40,8 +40,8 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | A0.3 | A0.2 | Offline coverage map, candidate route, first-slice polygon and tile/cost inventory | Complete 2026-10-25; [survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25) |
 | A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Complete 2026-10-25; [baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25), [decision](#a0-decision-record--2026-10-25) |
 | A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Complete 2026-10-25; [result](#a11--explicit-map-data-and-collision-cache-construction) |
-| A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Pending; next |
-| A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Pending |
+| A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Complete 2026-10-25; [result](#a12-result-2026-10-25) |
+| A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Pending; next |
 | A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Pending |
 | A1.5 | A1.4 | Reload/isolation/failure gate, parity evidence and A2 handoff | Pending |
 
@@ -410,7 +410,7 @@ river behavior is unchanged, and the temporary compatibility surface is fully en
   no water. Queries take `const BoatMap *` and do not allocate. The exhaustive point-in-triangle
   and nearest-edge algorithms, tie order, X reflection and normals are the previous code moved
   over unchanged.
-- **Compatibility surface (A1.2 removes all of it):** `boat_map_legacy_water()`,
+- **Compatibility surface (removed by A1.2, kept here as history):** `boat_map_legacy_water()`,
   `boat_map_legacy_water_contact()` and `boat_map_legacy_destroy()`. They lazily prepare one
   process-global `BoatMap` of the river through the same functions. Callers by file (call count):
   - Runtime: `src/boat.c` (1, hull contact) and `src/boat_view.c` (4, particle/spray
@@ -483,6 +483,82 @@ Use A0.1's caller inventory; these are entry points, not an exhaustive filename 
 **Done when:** all physical map queries have explicit ownership; two worlds can step interleaved;
 copy/reset/prediction/restore, core boundaries and loopback checks pass. No resource leaks or
 double frees, and unavailable lifecycle checks are identified.
+
+### A1.2 result, 2026-10-25
+
+Started from a clean `ef2be24`.
+
+- **Owner:** `BoatWorldResources` (`src/boat_world.h`) pairs a definition with its prepared
+  `BoatMap`. `boat_world_resources_init()` fails, leaving the owner zeroed, for a missing
+  definition, a `mapped` flag that disagrees with `map`, or a map that cannot be prepared.
+  The basin is a valid owner with an empty map and no allocation. Destroy is idempotent.
+- **Borrowing:** `BoatWorld` keeps `definition` and gains `resources`. Shoreline queries use
+  `&world->resources->map`. `boat_world_init()`, `boat_session_init()` and
+  `boat_fleet_init()` take the owner. World init asserts that it is ready; fleet init returns
+  false instead. `boat_world_restart()` gives `boat_session_restart()` new water and keeps
+  the borrowed owner. Value copies of worlds, sessions and fleets, prediction copies and
+  checkpoint restores copy only the pointer. Nothing in them frees it, and `BoatFleetState`,
+  physical hashes and the wire format still hold no pointer.
+- **Networking:** `BoatNetServerConfig.resources` replaces `location`; the accepted location
+  is the owner's definition ID. `BoatNetClientConfig.resources` is a table of
+  `BOAT_LOCATION_COUNT` owners indexed by location. A bootstrap for an unready or mismatched
+  entry takes the existing bootstrap-failure path. `boat_net_content_digest()` walks
+  `definition->map->mesh` in the same order, and its value is unchanged at
+  `f557546865c93b69`. That was checked by linking `ef2be24`'s `boat_net_protocol.c`
+  against the new core and printing both. No protocol or physics revision changed.
+- **Callers:** `boat.c` (hull contact) and `boat_view.c` (race buoys, current markers,
+  particles) query their world's map. `wake_velocity` owns one resource per location for its
+  lifetime and passes the table to `net_study_connect()`. Its spawn check and replay playback
+  worlds use the session's owner. `boat_server` owns the room location's resources.
+  `boat_bot` owns all locations, because the room picks one, and releases them after the
+  session loop. Validators and review tools open per-location owners in `main` through
+  `tools/boat_test_world.h`. Fixed river-geometry checks use its river map
+  (`test_river_water`), and session/fleet checks use the world's own map.
+- **Removed:** `boat_map_legacy_water()`, `boat_map_legacy_water_contact()`,
+  `boat_map_legacy_destroy()`, and the process-global cache behind them. No physical caller
+  queries a map without an owner. The description accessors `waterfront_city_mesh()` and
+  `waterfront_city_is_bridge_triangle()` remain for the water mesh (A1.3), scenery and GPU
+  (A1.4), and review/validator tools.
+- **Test:** `validate_boat_map` (`boat_map`, core) no longer exercises the wrapper. It adds:
+  - Resource-owner lifecycle: zeroed, basin, repeated destroy, and four invalid definitions
+    (NULL, unmapped river, mapped basin, land-only map) that fail with stale fields cleared.
+  - A ready check that rejects a foreign description, and the recorded 103,684-query digest
+    through an owner.
+  - Two river owners, a shared owner, a value copy and a synthetic 10 m pond world, stepped
+    interleaved. All river runs match a run made alone bit for bit. The drive ends held at
+    the east bank 25 m from its start, so the map shapes the trace. The pond hull is held by
+    its own shore.
+  - A fleet checkpoint restored into a fleet on a second owner, plus a value copy. After
+    1200 more ticks both have the original's hash and still borrow their own owners.
+
+  `validate_boat_net`'s mapped room also checks that mirror, prediction and authority borrow
+  the same owner.
+- **Verification (M1 Max, macOS 26 / Darwin 25.6, Apple clang 21, Debug):**
+  - The build is warning-clean. CTest passed 114/114 active tests in 190.77 s (15 retired
+    tests disabled), including `boat_core_boundary`, `boat_net_boundary` and
+    `boat_net_loopback`. No fixture hash or expected value was changed.
+  - The `boat_water_review --check` and `--check --waves` logs match A0.1 apart from the
+    `final_state` line. That line is bit-identical to A1.1 in the CPU review log.
+  - All 18 CPU, 18 flat-GPU and 18 wave-GPU review PNGs (`build/adventure/a1-2/`) are
+    byte-identical to `build/adventure/a0-original/`.
+  - `wake_velocity --renderer cpu --screenshot` (basin and river, `--time 3`) completed.
+  - A real ENet room, `boat_server --location river`, served one predicting `boat_bot` and
+    one resetting `boat_bot`. Both joined `location=river`, ended `final=consistent`, and
+    the reset completed. The server reported no faults.
+- **Limitations:**
+  - No sanitizer run for A1.2. A standalone ASan/UBSan build of `validate_boat_map`,
+    `validate_boat_net` and `validate_boat_fleet` was prepared but not run. Leak and
+    double-free freedom rests on code inspection and the destroy paths.
+  - There is still no allocation-failure injection.
+  - Validators and review tools exit through `CHECK` without closing their owners.
+  - `boat_bot` keeps a dangling owner pointer in its static client after releasing the
+    owners. Nothing reads it.
+  - Harbor/traffic queries, the water mesh, scenery and GPU still read the compiled river
+    through process-lifetime data or caches (A1.3/A1.4).
+  - No windowed or manual playback check: input, motion, windowing and audio were unchanged,
+    and the review captures are identical.
+
+**Next: A1.3.**
 
 ## A1.3 — make water-mesh caches belong to views
 

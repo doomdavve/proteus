@@ -91,7 +91,7 @@ static bool hulls_clear(const Boat *boat, double time)
                 (Vector2) { m.position.x, m.position.z }, m.heading, s.length, s.beam))
             return false;
     }
-    return boat_map_legacy_water(boat->position, .5f);
+    return test_river_water(boat->position, .5f);
 }
 
 // Exercise the boating snapshot as well as the authored paths: both renderers must
@@ -128,7 +128,7 @@ static int check_long_session(void)
             CHECK(contact.vessel == i);
         }
         for (int j = 0; j < frame.wake_count; ++j)
-            CHECK(boat_map_legacy_water(
+            CHECK(test_river_water(
                 (Vector2) { -frame.wakes[j].pose.position.x, frame.wakes[j].pose.position.z },
                 .5f));
         waterfront_boating_gulls(time, far, (Vector3) { 0 }, &gulls);
@@ -190,14 +190,14 @@ static int check_gulls(void)
     waterfront_boating_gulls(3, stimulus, (Vector3) { 8, 0, 0 }, &sought);
     CHECK(sought.gulls[0][0].position.y > idle_height + 1);
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
     boat_scene_frame(
         SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT, &frame);
     waterfront_boating_gulls(boat_session_time(&boat), frame.player.hull.position,
         (Vector3) { -boat.boat.velocity.x, 0, boat.boat.velocity.y }, &sought);
     CHECK(frame.gull_count == WATERFRONT_HARBOR_GULLS);
     CHECK(!memcmp(frame.gulls, sought.gulls, sizeof(frame.gulls)));
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_scene_frame(
         SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT, &frame);
     CHECK(frame.gull_count == 0);
@@ -207,10 +207,10 @@ static int check_gulls(void)
 
 int main(void)
 {
+    test_worlds_open();
     CHECK(check_vertical_contacts() == 0);
     if (check_gulls() || check_long_session())
         return 1;
-    boat_map_legacy_destroy();
     for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
         BoatModelSpec spec = waterfront_traffic_spec(i);
         const Mesh3D *mesh = waterfront_traffic_mesh(i);
@@ -227,12 +227,11 @@ int main(void)
                 Vector3 p = boat_model_point(pose,
                     (Vector3) { (corner & 1 ? 1 : -1) * (spec.beam * .5f + 1.5f), 0,
                         (corner & 2 ? 1 : -1) * (spec.length * .5f + 1.5f) });
-                CHECK(boat_map_legacy_water((Vector2) { -p.x, p.z }, .5f));
+                CHECK(test_river_water((Vector2) { -p.x, p.z }, .5f));
                 CHECK(!waterfront_harbor_contact((Vector2) { -p.x, p.z }, .5f, NULL));
             }
         }
     }
-    boat_map_legacy_destroy();
     for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
         float period = waterfront_traffic_period(i);
         WaterfrontVesselMotion start = waterfront_traffic_motion(i, 0);
@@ -285,8 +284,8 @@ int main(void)
             const WaterfrontTrafficWake *wake = &waves.wakes[j];
             CHECK(isfinite(wake->pose.rotation.x) && isfinite(wake->pose.rotation.z));
             CHECK(wake->pose.scale.z > 0 && wake->pose.scale.z < 5);
-            CHECK(boat_map_legacy_water(
-                (Vector2) { -wake->pose.position.x, wake->pose.position.z }, .5f));
+            CHECK(
+                test_river_water((Vector2) { -wake->pose.position.x, wake->pose.position.z }, .5f));
             CHECK(wake->color.a == 255);
         }
     }
@@ -295,7 +294,7 @@ int main(void)
         WaterfrontVesselMotion ship = waterfront_traffic_motion(i, 60);
         BoatModelSpec spec = waterfront_traffic_spec(i);
         BoatSession boat;
-        boat_session_init(&boat, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         boat_session_set_tick(&boat, 7200);
         boat.boat.heading = boat.presentation.camera_heading = ship.heading;
         Vector3 p = Vector3Add(
@@ -316,7 +315,7 @@ int main(void)
         // A deliberate beam-on crossing checks the full SAT hull and moving contact torque.
         ship = waterfront_traffic_motion(i, 40);
         Vector2 right = { cosf(ship.heading), sinf(ship.heading) };
-        boat_session_init(&boat, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         boat_session_set_tick(&boat, 4800);
         boat.boat.position = Vector2Add((Vector2) { -ship.position.x, ship.position.z },
             Vector2Scale(right, spec.beam * .5f + 3));
@@ -332,8 +331,8 @@ int main(void)
     }
     CHECK(waterfront_traffic_mesh(-1) == NULL);
     CHECK(waterfront_traffic_period(-1) == 0);
-    boat_map_legacy_destroy();
     puts("harbor_traffic=ok routes=4 pairwise_schedule=4160s visual_wakes=64 moving_contacts=ok "
          "long_session=30d");
+    test_worlds_close();
     return 0;
 }

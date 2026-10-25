@@ -65,7 +65,7 @@ static int check_records(void)
 
 static int check_drive(void)
 {
-    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    const BoatWorldResources *basin = test_world(BOAT_LOCATION_BASIN);
     BoatSession plain_session, measured_session;
     boat_session_init(&plain_session, basin, (BoatWater) { 0 });
     boat_session_init(&measured_session, basin, (BoatWater) { 0 });
@@ -113,8 +113,10 @@ static int check_drive(void)
 
 int main(void)
 {
+    test_worlds_open();
     if (check_records() || check_drive())
         return 1;
     puts("boating profile records and deterministic drive passed");
+    test_worlds_close();
     return 0;
 }

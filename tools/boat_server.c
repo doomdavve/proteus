@@ -172,7 +172,7 @@ static void print_race_event(const BoatNetServer *server, const BoatRaceEvent *e
 }
 
 static int scripted(unsigned long ticks, unsigned long boats, unsigned long report,
-    const BoatMatchRules *rules, const BoatWorldDefinition *location)
+    const BoatMatchRules *rules, const BoatWorldResources *world)
 {
     static BoatMatch match;
     if (rules && !boat_match_init(&match, rules)) {
@@ -180,8 +180,8 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
         return 1;
     }
     static BoatFleet fleet;
-    if (!boat_fleet_init(&fleet, location, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS,
-            BOAT_OBJECT_DEFAULT_HEIGHT)) {
+    if (!boat_fleet_init(
+            &fleet, world, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT)) {
         fprintf(stderr, "boat_server: cannot create the fleet.\n");
         return 1;
     }
@@ -316,6 +316,7 @@ typedef struct {
     const BoatMatchRules *rules; // Deathmatch rules, or NULL for free play.
     bool race, exit_with_stdin;
     BoatLocationId location;
+    const BoatWorldResources *world; // The location's resources, owned by main.
 } RoomOptions;
 
 static void print_roster(const BoatNetServer *server)
@@ -327,6 +328,14 @@ static void print_roster(const BoatNetServer *server)
     }
     printf("]\n");
     fflush(stdout);
+}
+
+static bool open_world(BoatWorldResources *world, BoatLocationId location)
+{
+    if (boat_world_resources_init(world, boat_location(location)))
+        return true;
+    fprintf(stderr, "boat_server: cannot prepare the %s world.\n", boat_location(location)->name);
+    return false;
 }
 
 static int room(const RoomOptions *options)
@@ -348,7 +357,7 @@ static int room(const RoomOptions *options)
         .waves = options->waves,
         .epoch = epoch ? epoch : 1,
         .max_players = (unsigned)options->players,
-        .location = options->location,
+        .resources = options->world,
         .deathmatch = options->rules != NULL,
         .match = options->rules ? *options->rules : (BoatMatchRules) { 0 },
         .race = options->race,
@@ -489,6 +498,7 @@ int boat_server_main(int argc, char **argv)
     unsigned long ticks = 0, boats = BOAT_FLEET_SLOTS, report = 0, seconds = 0, round = 0;
     bool deathmatch = false, race = false, location_given = false;
     bool scripted_mode = false, room_option = false;
+    static BoatWorldResources world;
     RoomOptions room_options = { .bind = "127.0.0.1",
         .token = "",
         .port = BOAT_NET_PORT,
@@ -607,8 +617,12 @@ int boat_server_main(int argc, char **argv)
                 "apply.\n");
             return 2;
         }
-        return scripted(ticks ? ticks : 7200, boats, report, deathmatch ? &rules : NULL,
-            boat_location(room_options.location));
+        if (!open_world(&world, room_options.location))
+            return 1;
+        int status
+            = scripted(ticks ? ticks : 7200, boats, report, deathmatch ? &rules : NULL, &world);
+        boat_world_resources_destroy(&world);
+        return status;
     }
     if (boats != BOAT_FLEET_SLOTS) {
         fprintf(stderr, "boat_server: --boats applies to --scripted; rooms use --players.\n");
@@ -622,5 +636,10 @@ int boat_server_main(int argc, char **argv)
     room_options.report = report;
     room_options.rules = deathmatch ? &rules : NULL;
     room_options.race = race;
-    return room(&room_options);
+    if (!open_world(&world, room_options.location))
+        return 1;
+    room_options.world = &world;
+    int status = room(&room_options);
+    boat_world_resources_destroy(&world);
+    return status;
 }

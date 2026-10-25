@@ -115,7 +115,8 @@ static void vessel_box(BoatCourseBoxDraw draw, void *context, Vector2 position, 
 
 // Skill gates have tall endpoint markers and an open passage. Start/finish retain rows
 // across the water: white start, teal cleared, yellow next, orange later, chequered finish.
-static void race_visit(const BoatViewState *view, BoatCourseBoxDraw draw, void *context)
+static void race_visit(
+    const BoatViewState *view, const BoatMap *map, BoatCourseBoxDraw draw, void *context)
 {
     const BoatRaceCourse *course = boat_race_river_course();
     for (unsigned k = 0; k <= course->gate_count; ++k) {
@@ -151,7 +152,7 @@ static void race_visit(const BoatViewState *view, BoatCourseBoxDraw draw, void *
         }
         for (int n = -(int)(gate->half_width / 12); n <= (int)(gate->half_width / 12); ++n) {
             Vector2 p = Vector2Add(gate->centre, Vector2Scale(across, 12.0f * (float)n));
-            if (Vector2Distance(p, view->boat.position) > 450 || !boat_map_legacy_water(p, 1))
+            if (Vector2Distance(p, view->boat.position) > 450 || !boat_map_water(map, p, 1))
                 continue;
             Color buoy = finish ? (n % 2 ? DARKGRAY : RAYWHITE) : color;
             draw(context,
@@ -279,7 +280,7 @@ static void environment_visit(
     const BoatViewState *view, const BoatWorld *world, BoatCourseBoxDraw draw, void *context)
 {
     if (view->race.enabled && world->definition->mapped)
-        race_visit(view, draw, context);
+        race_visit(view, &world->resources->map, draw, context);
     storm_visit(view, world, draw, context);
     const Boat *boat = &view->boat;
     double time = view->time;
@@ -294,7 +295,7 @@ static void environment_visit(
                 if (Vector2LengthSqr(flow) < .01f || fade < .02f)
                     continue;
                 p = Vector2Add(p, Vector2Scale(flow, phase));
-                if (world->definition->mapped && !boat_map_legacy_water(p, .2f))
+                if (world->definition->mapped && !boat_map_water(&world->resources->map, p, .2f))
                     continue;
                 float height
                     = boat_water_query_field(world->water, world->wake_field, p, time).height;
@@ -395,7 +396,8 @@ static int pose_particles(const BoatPresentation *presentation, const BoatWorld 
     for (int i = 0; i < BOAT_WATER_PARTICLES && count < capacity; ++i) {
         const BoatWaterParticle *water = &presentation->water[i];
         if (water->lifetime <= 0
-            || (world->definition->mapped && !boat_map_legacy_water(water->position, 0)))
+            || (world->definition->mapped
+                && !boat_map_water(&world->resources->map, water->position, 0)))
             continue;
         float size = water_particle_size(water);
         out[count++] = (WaterfrontPlayerParticle) { .transform
@@ -541,7 +543,7 @@ bool boat_draw_scene(Renderer3D *renderer, Color *pixels, int width, int height,
         const BoatWaterParticle *p = &presentation->water[i];
         if (p->lifetime <= 0)
             continue;
-        if (world->definition->mapped && !boat_map_legacy_water(p->position, 0))
+        if (world->definition->mapped && !boat_map_water(&world->resources->map, p->position, 0))
             continue;
         renderer3d_draw_box(renderer, water_particle_pose(time, world, p, water_particle_size(p)),
             water_particle_color(world->definition, p));

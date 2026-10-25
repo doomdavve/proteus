@@ -137,6 +137,7 @@ static int capture(BoatGpu *gpu, Renderer3D *cpu, const BoatSession *session, bo
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     bool gpu_enabled = false;
     const char *output = NULL;
     for (int i = 1; i < argc; ++i) {
@@ -220,7 +221,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < 5; ++i)
         for (int sign = -1; sign <= 1; sign += 2) {
             BoatSession b;
-            boat_session_init(&b, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            boat_session_init(&b, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
             b.boat.heading = headings[i];
             b.boat.roll = sign * 29 * DEG2RAD;
             b.boat.pitch = .2f;
@@ -233,7 +234,7 @@ int main(int argc, char **argv)
         const float offsets[] = { 0, -.000001f, .000001f, -.002f, .002f };
         for (int i = 0; i < 5; ++i) {
             BoatSession b;
-            boat_session_init(&b, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            boat_session_init(&b, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
             b.boat.heading = sign * (PI / 2 + offsets[i]);
             b.boat.roll = .287961f;
             b.boat.pitch = i < 3 ? 0 : .00121496f;
@@ -293,5 +294,6 @@ int main(int argc, char **argv)
         CloseWindow();
     }
     boat_water_mesh_destroy();
+    test_worlds_close();
     return 0;
 }

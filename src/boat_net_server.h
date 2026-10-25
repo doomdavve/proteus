@@ -23,7 +23,8 @@ typedef struct {
     // River sprint rounds (docs/RACE_PLAN.md) instead of free play; needs the river location.
     bool race;
     BoatRaceRules race_rules; // Ignored outside race rooms.
-    BoatLocationId location; // Basin by default; one map per authority process.
+    // The room's location, borrowed for the server's lifetime; must be ready.
+    const BoatWorldResources *resources;
 } BoatNetServerConfig;
 
 typedef enum {

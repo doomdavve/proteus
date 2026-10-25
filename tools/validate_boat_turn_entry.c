@@ -88,7 +88,7 @@ static int validate(FILE *report)
     // partial/full plane and both signs of side flow; resistance must remain passive.
     for (int trial = 0; trial < 3; ++trial)
         for (int sign = -1; sign <= 1; sign += 2) {
-            boat_session_init(&a, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
             a.boat.position = (Vector2) { 0 };
             a.boat.velocity = (Vector2) { sign * 3, -12 };
             a.boat.yaw_velocity = sign * .7f;
@@ -106,6 +106,7 @@ static int validate(FILE *report)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     FILE *report = NULL;
     if (argc == 3 && !strcmp(argv[1], "--report")) {
         report = fopen(argv[2], "w");
@@ -127,5 +128,6 @@ int main(int argc, char **argv)
             result = 1;
     }
     boat_water_mesh_destroy();
+    test_worlds_close();
     return result;
 }

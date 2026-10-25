@@ -3,7 +3,6 @@
 #include "boat_course_view.h"
 #include "boat_gpu.h"
 #include "boat_hud.h"
-#include "boat_map.h"
 #include "boat_music.h"
 #include "boat_profile.h"
 #include "boat_replay.h"
@@ -522,6 +521,18 @@ static int study(int argc, char **argv)
     Color *pixels = malloc(WIDTH * HEIGHT * sizeof(*pixels));
     if (!pixels)
         return 1;
+    // Every location's physical resources: a joined room picks its own. Sessions, fleets and
+    // replay views borrow them until shutdown.
+    static BoatWorldResources worlds[BOAT_LOCATION_COUNT];
+    for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
+        if (!boat_world_resources_init(&worlds[i], boat_location((BoatLocationId)i))) {
+            fprintf(
+                stderr, "Cannot prepare the %s world.\n", boat_location((BoatLocationId)i)->name);
+            while (i--)
+                boat_world_resources_destroy(&worlds[i]);
+            free(pixels);
+            return 1;
+        }
     Renderer3D renderer = { 0 };
     BoatGpu gpu = { 0 };
     Texture2D texture = { 0 };
@@ -533,8 +544,8 @@ static int study(int argc, char **argv)
     int thrust_step = BOAT_THROTTLE_NEUTRAL;
     float throttle_scroll = 0, throttle_held = 0;
     BoatSession session;
-    boat_session_init(
-        &session, location, study_water(location, waves, current, crossing_wake, player_wake));
+    boat_session_init(&session, &worlds[location->id],
+        study_water(location, waves, current, crossing_wake, player_wake));
     if (course)
         boat_session_start_course(&session);
     session.runs.ghost_visible = true;
@@ -554,7 +565,7 @@ static int study(int argc, char **argv)
         goto cleanup;
     }
     if (connect_to) {
-        if (!net_study_connect(&net_study, connect_to, net_name, net_token, &session))
+        if (!net_study_connect(&net_study, connect_to, net_name, net_token, worlds, &session))
             goto cleanup;
         net = &net_study;
         networked = true;
@@ -611,7 +622,8 @@ static int study(int argc, char **argv)
         if (replay_path)
             boat_replay_play(&session.runs, &session.runs.last);
     }
-    if (location->mapped && !boat_map_legacy_water(session.boat.position, 2.5f)) {
+    if (location->mapped
+        && !boat_map_water(&session.world.resources->map, session.boat.position, 2.5f)) {
         fprintf(stderr, "River spawn is not navigable.\n");
         goto cleanup;
     }
@@ -626,7 +638,8 @@ static int study(int argc, char **argv)
         boat_replay_sample(session.runs.playing, time, &playback, &playback_presentation);
         boat_replay_animate_flag(
             session.runs.playing, &playback, &playback_flag, &playback_presentation.flag);
-        boat_world_init(&playback_world, location, boat_replay_water(session.runs.playing));
+        boat_world_init(
+            &playback_world, session.world.resources, boat_replay_water(session.runs.playing));
         view = &playback;
         view_presentation = &playback_presentation;
         view_world = &playback_world;
@@ -1055,7 +1068,8 @@ static int study(int argc, char **argv)
                 &playback_presentation)) {
             boat_replay_animate_flag(
                 session.runs.playing, &playback, &playback_flag, &playback_presentation.flag);
-            boat_world_init(&playback_world, location, boat_replay_water(session.runs.playing));
+            boat_world_init(
+                &playback_world, session.world.resources, boat_replay_water(session.runs.playing));
             view = &playback;
             view_presentation = &playback_presentation;
             view_world = &playback_world;
@@ -1286,7 +1300,8 @@ cleanup:
             CloseWindow();
     }
     boat_water_mesh_destroy();
-    boat_map_legacy_destroy();
+    for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
+        boat_world_resources_destroy(&worlds[i]);
     renderer3d_destroy(&renderer);
     free(pixels);
     return result;

@@ -1,6 +1,5 @@
 #include "boat_map.h"
 #include "raymath.h"
-#include "waterfront_city.h"
 
 #include <stdlib.h>
 
@@ -126,19 +125,3 @@ bool boat_map_water(const BoatMap *map, Vector2 position, float clearance)
 {
     return boat_map_water_contact(map, position, clearance, NULL);
 }
-
-static BoatMap legacy;
-
-bool boat_map_legacy_water_contact(Vector2 position, float clearance, Vector2 *water_normal)
-{
-    if (!boat_map_ready(&legacy) && !boat_map_init(&legacy, waterfront_city_map()))
-        return false;
-    return boat_map_water_contact(&legacy, position, clearance, water_normal);
-}
-
-bool boat_map_legacy_water(Vector2 position, float clearance)
-{
-    return boat_map_legacy_water_contact(position, clearance, NULL);
-}
-
-void boat_map_legacy_destroy(void) { boat_map_destroy(&legacy); }

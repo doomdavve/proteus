@@ -29,8 +29,8 @@ static void attach(NetStudy *net, BoatSession *session)
     session->world = boat_fleet_world(boat_net_client_view(&net->client));
 }
 
-bool net_study_connect(
-    NetStudy *net, const char *endpoint, const char *name, const char *token, BoatSession *session)
+bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, const char *token,
+    const BoatWorldResources *worlds, BoatSession *session)
 {
     char host[256], error[160];
     uint16_t port;
@@ -49,8 +49,11 @@ bool net_study_connect(
         boat_net_enet_cleanup();
         return false;
     }
-    BoatNetClientConfig config
-        = { .name = name, .token = token, .build = "wake_velocity M4", .predict = true };
+    BoatNetClientConfig config = { .name = name,
+        .token = token,
+        .build = "wake_velocity M4",
+        .predict = true,
+        .resources = worlds };
     boat_net_client_init(
         &net->client, boat_net_enet_transport(net->enet), &config, boat_net_clock());
     fprintf(stdout, "Connecting to %s:%u...\n", host, (unsigned)port);

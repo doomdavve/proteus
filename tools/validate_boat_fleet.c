@@ -5,6 +5,7 @@
  * invariants and tolerances, never by bitwise identity across platforms. */
 #include "boat_fleet.h"
 #include "boat_fleet_bots.h"
+#include "boat_test_world.h"
 #include "raymath.h"
 
 #include <math.h>
@@ -21,7 +22,7 @@
 
 #define YAW_INERTIA 2.2f // boat.c's normalized yaw inertia, for the energy check.
 
-static const BoatWorldDefinition *basin(void) { return boat_location(BOAT_LOCATION_BASIN); }
+static const BoatWorldResources *basin(void) { return test_world(BOAT_LOCATION_BASIN); }
 
 static bool fleet(BoatFleet *f, BoatWater water)
 {
@@ -97,12 +98,13 @@ static bool same_wakes(const BoatWakeObjects *a, const BoatWakeObjects *b)
 
 static int one_boat_equivalence(void)
 {
-    const BoatWater waters[] = { { 0 }, boat_world_test_water(basin(), true, true, false) };
+    const BoatWater waters[]
+        = { { 0 }, boat_world_test_water(basin()->definition, true, true, false) };
     for (unsigned w = 0; w < 2; ++w) {
         BoatFleet f;
         Reference r;
         Boat start;
-        boat_reset_location(&start, basin());
+        boat_reset_location(&start, basin()->definition);
         CHECK(fleet(&f, waters[w]));
         CHECK(reference_init(&r, waters[w], &start, 1));
         boat_fleet_place(&f, 0, start);
@@ -689,10 +691,12 @@ static int rejects(void)
 
 int main(void)
 {
+    test_worlds_open();
     if (one_boat_equivalence() || pair_equivalence() || permutations() || tunneling()
         || solver_invariants() || checkpoints() || churn() || full_pool() || spawn_rules()
         || rejects())
         return 1;
     printf("boat_fleet=ok\n");
+    test_worlds_close();
     return 0;
 }

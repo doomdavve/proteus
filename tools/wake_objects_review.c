@@ -196,7 +196,7 @@ static void jumps(void)
     BoatWakeObjects world = seed(), flat;
     CHECK(boat_wake_objects_init(&flat, BOAT_OBJECT_LIFE_TICKS, 1.8f));
     BoatSession receiver;
-    boat_session_init(&receiver, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&receiver, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     receiver.boat.position = (Vector2) { 0, 14 };
     receiver.boat.velocity = (Vector2) { 0, -16 };
     receiver.boat.throttle = receiver.boat.engine_response = .7f;
@@ -239,7 +239,7 @@ static float diagonal_jump(bool crossing)
         world.live = 2;
     }
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.boat.position = (Vector2) { 12, 12 };
     boat.boat.heading = -PI / 4;
     boat.boat.velocity = (Vector2) { -11.3137f, -11.3137f };
@@ -267,7 +267,7 @@ static void local_fleet(void)
     BoatSession fleet[4];
     unsigned contacts = 0, flights = 0;
     for (unsigned i = 0; i < 4; ++i) {
-        boat_session_init(&fleet[i], boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        boat_session_init(&fleet[i], test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
         fleet[i].boat.position = (Vector2) { (i % 2 ? 1 : -1) * 12, (i / 2 ? 1 : -1) * 12 };
         fleet[i].boat.heading = i * PI / 2;
         fleet[i].world.water.objects = &world;
@@ -325,7 +325,7 @@ static unsigned gameplay_envelope(float crest_height)
                     }
                     world.live = sources;
                     BoatSession boat;
-                    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+                    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
                     float radius = .9f + 2.4f * ages[age] * BOAT_STEP + 8;
                     boat.boat.position
                         = (Vector2) { sinf(angles[angle]) * radius, cosf(angles[angle]) * radius };
@@ -366,7 +366,7 @@ static void air_roll_control(void)
     BoatWakeObjects water;
     CHECK(boat_wake_objects_init(&water, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     BoatSession left, right, recover;
-    boat_session_init(&right, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&right, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     right.world.water.objects = &water;
     right.boat.height = 200; // Isolate several seconds of dry controls from landing forces.
     right.boat.wheel = 1;
@@ -393,7 +393,7 @@ static void air_roll_control(void)
     CHECK(fabsf(right.boat.roll_velocity) < .3f);
 
     BoatSession inverted;
-    boat_session_init(&inverted, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&inverted, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     inverted.world.water.objects = &water;
     inverted.boat.roll = PI;
     for (unsigned tick = 0; tick < 120; ++tick)
@@ -444,7 +444,7 @@ static void curved_captures(BoatGpu *gpu, bool visible)
 {
     BoatWakeObjects world = curved_world();
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.boat.position = (Vector2) { 0 };
     boat.world.water.objects = &world;
     BoatCamera camera = { .distance = 40, .height = 32, .fixed_fov = true };
@@ -593,7 +593,7 @@ static void runtime(bool graphics, bool visible)
     BoatWakeObjects w;
     CHECK(boat_wake_objects_init(&w, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.world.water.objects = &w;
     BoatGpu gpu = { 0 };
     double cold_draw_ms = 0;
@@ -733,6 +733,7 @@ static void runtime(bool graphics, bool visible)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     SetTraceLogLevel(LOG_WARNING);
     contracts();
     continuity();
@@ -751,5 +752,6 @@ int main(int argc, char **argv)
     bool visible = argc == 2 && strcmp(argv[1], "--desktop") == 0;
     runtime(visible || (argc == 2 && strcmp(argv[1], "--gpu") == 0), visible);
     boat_water_mesh_destroy();
+    test_worlds_close();
     return 0;
 }

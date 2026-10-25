@@ -35,6 +35,7 @@ static View3D camera_for(const Boat *boat, const char *angle)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     const char *scenario = "idle", *screenshot = NULL;
     bool gpu = false;
     unsigned int skin = BOAT_SKIN_SWEDEN;
@@ -79,7 +80,7 @@ int main(int argc, char **argv)
         return 2;
     SetTraceLogLevel(LOG_WARNING);
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     for (int tick = 0; tick < (int)roundf(time / BOAT_STEP); ++tick)
         advance(&boat, scenario, tick);
     Renderer3D cpu = { 0 };
@@ -169,5 +170,6 @@ int main(int argc, char **argv)
         CloseWindow();
     renderer3d_destroy(&cpu);
     free(pixels);
+    test_worlds_close();
     return 0;
 }

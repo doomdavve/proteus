@@ -1,7 +1,10 @@
-/* A1.1: explicit map descriptions and caller-owned collision caches. Independent owners
- * initialize, query and destroy without sharing state, and the river answers exactly as the
- * process-global cache did before ownership moved. */
-#include "boat_location.h"
+/* A1.1/A1.2: explicit map descriptions, caller-owned collision caches and the world resources
+ * that bind them. Independent owners initialize, query and destroy without sharing state, the
+ * river answers exactly as the process-global cache did before ownership moved, and worlds,
+ * fleets and their copies only borrow their owner. */
+#include "boat.h"
+#include "boat_fleet.h"
+#include "boat_fleet_bots.h"
 #include "boat_map.h"
 #include "waterfront_city.h"
 
@@ -68,8 +71,7 @@ static uint64_t river_digest(const BoatMap *map, int *water)
                 Vector2 p = { lo_x - 40 + (hi_x - lo_x + 80) * (float)ix / 160.0f,
                     lo_z - 40 + (hi_z - lo_z + 80) * (float)iz / 160.0f };
                 Vector2 normal = { 7, 7 };
-                bool inside = map ? boat_map_water_contact(map, p, clearances[c], &normal)
-                                  : boat_map_legacy_water_contact(p, clearances[c], &normal);
+                bool inside = boat_map_water_contact(map, p, clearances[c], &normal);
                 mix(&hash, &inside, sizeof(inside));
                 mix(&hash, &normal, sizeof(normal));
                 *water += inside;
@@ -173,28 +175,175 @@ static int owners(void)
     return 0;
 }
 
-static int legacy(void)
+static bool zeroed_resources(const BoatWorldResources *r)
 {
+    return !r->definition && zeroed(&r->map);
+}
+
+static int resources(void)
+{
+    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    BoatWorldResources r = { 0 };
+    boat_world_resources_destroy(&r);
+    CHECK(zeroed_resources(&r) && !boat_world_resources_ready(&r));
+    CHECK(!boat_world_resources_ready(NULL));
+    // The basin is a valid empty-map resource.
+    CHECK(boat_world_resources_init(&r, basin) && boat_world_resources_ready(&r));
+    CHECK(r.definition == basin && zeroed(&r.map));
+    boat_world_resources_destroy(&r);
+    boat_world_resources_destroy(&r);
+    CHECK(zeroed_resources(&r));
+    // A mapped flag that disagrees with the description, or a map that cannot be prepared,
+    // fails at initialization and leaves no stale fields.
+    BoatWorldDefinition unmapped_river = *river, mapped_basin = *basin, land_river = *river;
+    unmapped_river.mapped = false;
+    mapped_basin.mapped = true;
+    land_river.map = &land;
+    const BoatWorldDefinition *invalid[] = { NULL, &unmapped_river, &mapped_basin, &land_river };
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        r = (BoatWorldResources) { river, { &square, NULL, 9, 9 } };
+        CHECK(!boat_world_resources_init(&r, invalid[i]));
+        CHECK(zeroed_resources(&r) && !boat_world_resources_ready(&r));
+        boat_world_resources_destroy(&r);
+    }
+    // A mapped owner is ready only with its own description prepared.
+    CHECK(boat_world_resources_init(&r, river) && boat_world_resources_ready(&r));
+    CHECK(r.map.description == river->map);
     int water = 0;
-    uint64_t digest = river_digest(NULL, &water);
+    uint64_t digest = river_digest(&r.map, &water);
     printf("river_query_digest=%016" PRIx64 " water=%d\n", digest, water);
     CHECK(digest == RIVER_QUERY_DIGEST && water == RIVER_QUERY_WATER);
-    // The compatibility cache is independent of explicit owners and can be rebuilt.
-    BoatMap s;
-    CHECK(boat_map_init(&s, &square));
-    boat_map_legacy_destroy();
-    CHECK(boat_map_legacy_water(boat_location(BOAT_LOCATION_RIVER)->spawn, 2));
-    if (synthetic(&s))
-        return 1;
-    boat_map_destroy(&s);
-    boat_map_legacy_destroy();
-    boat_map_legacy_destroy();
+    BoatWorldResources stale = r;
+    stale.map.description = &square;
+    CHECK(!boat_world_resources_ready(&stale));
+    boat_world_resources_destroy(&r);
+    CHECK(zeroed_resources(&r));
+    return 0;
+}
+
+typedef struct {
+    BoatWorld world;
+    Boat boat;
+} Run;
+
+// Full throttle at POSITION, heading east (simulation +X), weaving gently.
+static void run_start(Run *run, const BoatWorldResources *resources, Vector2 position)
+{
+    *run = (Run) { 0 };
+    boat_world_init(&run->world, resources, (BoatWater) { 0 });
+    boat_reset_location(&run->boat, resources->definition);
+    run->boat.position = position;
+    run->boat.heading = PI / 2;
+}
+
+static void run_step(Run *run, uint64_t tick)
+{
+    double now = boat_tick_seconds(tick + 1);
+    boat_step(&run->boat, &run->world, now, (BoatInput) { tick % 240 < 120 ? .3f : -.3f, 1 });
+}
+
+static uint64_t boat_digest(const Boat *boat)
+{
+    uint64_t hash = UINT64_C(1469598103934665603);
+    mix(&hash, boat, sizeof(*boat));
+    return hash;
+}
+
+// Two river owners and a synthetic one step interleaved: each world answers from its own
+// borrowed map, and the river runs match a run made alone, bit for bit.
+static int worlds(void)
+{
+    enum { TICKS = 3600 };
+    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    BoatWorldDefinition pond_definition = *river;
+    pond_definition.map = &square;
+    pond_definition.spawn = (Vector2) { -5, 5 };
+    BoatWorldResources first, second, pond;
+    CHECK(boat_world_resources_init(&first, river));
+    CHECK(boat_world_resources_init(&second, river));
+    CHECK(boat_world_resources_init(&pond, &pond_definition));
+    CHECK(first.map.shore != second.map.shore);
+
+    // Start 25 m short of the east bank from the spawn.
+    Vector2 start = river->spawn;
+    while (boat_map_water(&first.map, (Vector2) { start.x + 25, start.y }, 0))
+        start.x += 1;
+    Run alone;
+    run_start(&alone, &first, start);
+    for (uint64_t t = 0; t < TICKS; ++t)
+        run_step(&alone, t);
+    // 30 s at full throttle ends held at the bank, so the map shapes the trace.
+    CHECK(alone.boat.position.x < start.x + 25);
+
+    Run a, b, shared, small;
+    run_start(&a, &first, start);
+    run_start(&b, &second, start);
+    run_start(&shared, &first, start);
+    run_start(&small, &pond, pond_definition.spawn);
+    CHECK(a.world.resources == &first && b.world.resources == &second);
+    Run copy = { 0 };
+    for (uint64_t t = 0; t < TICKS; ++t) {
+        run_step(&small, t);
+        run_step(&b, t);
+        run_step(&a, t);
+        run_step(&shared, t);
+        if (t == TICKS / 2)
+            copy = a; // A value copy borrows the same owner.
+        if (t > TICKS / 2)
+            run_step(&copy, t);
+    }
+    CHECK(copy.world.resources == &first);
+    uint64_t expected = boat_digest(&alone.boat);
+    CHECK(boat_digest(&a.boat) == expected && boat_digest(&b.boat) == expected);
+    CHECK(boat_digest(&shared.boat) == expected && boat_digest(&copy.boat) == expected);
+    // The pond's own 10 m shore holds its hull.
+    CHECK(fabsf(small.boat.position.x) < 20 && fabsf(small.boat.position.y) < 20);
+    printf("interleaved_worlds=ok river_end=%.3f,%.3f pond_end=%.3f,%.3f\n", alone.boat.position.x,
+        alone.boat.position.y, small.boat.position.x, small.boat.position.y);
+
+    // Fleets: a checkpoint restored into a fleet on another owner continues identically, and
+    // neither the copy nor the restore touches either owner.
+    static BoatFleet fleet, other, copied;
+    static BoatFleetState checkpoint;
+    CHECK(boat_fleet_init(&fleet, &first, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f));
+    CHECK(boat_fleet_init(&other, &second, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f));
+    CHECK(!boat_fleet_init(&copied, NULL, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f));
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        CHECK(boat_fleet_request_spawn(&fleet, i));
+    BoatFleetBots bots = { 0 }, other_bots, copied_bots;
+    BoatInput inputs[BOAT_FLEET_SLOTS];
+    for (int t = 0; t < 1200; ++t) {
+        boat_fleet_bots_drive(&bots, &fleet, inputs);
+        CHECK(boat_fleet_step(&fleet, inputs));
+    }
+    boat_fleet_save(&fleet, &checkpoint);
+    boat_fleet_restore(&other, &checkpoint);
+    copied = fleet;
+    other_bots = copied_bots = bots;
+    for (int t = 0; t < 1200; ++t) {
+        boat_fleet_bots_drive(&bots, &fleet, inputs);
+        CHECK(boat_fleet_step(&fleet, inputs));
+        boat_fleet_bots_drive(&other_bots, &other, inputs);
+        CHECK(boat_fleet_step(&other, inputs));
+        boat_fleet_bots_drive(&copied_bots, &copied, inputs);
+        CHECK(boat_fleet_step(&copied, inputs));
+    }
+    CHECK(other.world.resources == &second && copied.world.resources == &first);
+    uint64_t fleet_hash = boat_fleet_hash(&fleet.state);
+    CHECK(boat_fleet_hash(&other.state) == fleet_hash);
+    CHECK(boat_fleet_hash(&copied.state) == fleet_hash);
+    CHECK(boat_world_resources_ready(&first) && boat_world_resources_ready(&second));
+
+    boat_world_resources_destroy(&pond);
+    boat_world_resources_destroy(&first);
+    boat_world_resources_destroy(&second);
     return 0;
 }
 
 int main(void)
 {
-    if (definitions() || failures() || owners() || legacy())
+    if (definitions() || failures() || owners() || resources() || worlds())
         return 1;
     puts("boat_map=ok");
     return 0;

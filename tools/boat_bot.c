@@ -160,9 +160,23 @@ int main(int argc, char **argv)
         boat_net_enet_cleanup();
         return 1;
     }
+    // The room picks the location, so prepare every one; the bot never queries them after the
+    // session loop.
+    static BoatWorldResources worlds[BOAT_LOCATION_COUNT];
+    for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
+        if (!boat_world_resources_init(&worlds[i], boat_location((BoatLocationId)i))) {
+            fprintf(stderr, "boat_bot: cannot prepare the %s world.\n",
+                boat_location((BoatLocationId)i)->name);
+            boat_net_enet_close(enet, 0);
+            boat_net_enet_cleanup();
+            return 1;
+        }
     static BoatNetClient client;
-    BoatNetClientConfig config
-        = { .name = name, .token = token, .build = "boat_bot M5", .predict = predict };
+    BoatNetClientConfig config = { .name = name,
+        .token = token,
+        .build = "boat_bot M5",
+        .predict = predict,
+        .resources = worlds };
     boat_net_client_init(&client, boat_net_enet_transport(enet), &config, boat_net_clock());
     BoatFleetBots bots = { 0 };
     double started = 0, end = 0;
@@ -307,6 +321,8 @@ int main(int argc, char **argv)
         boat_net_client_leave(&client);
     boat_net_enet_close(enet, 1);
     boat_net_enet_cleanup();
+    for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
+        boat_world_resources_destroy(&worlds[i]);
     if (phase == BOAT_NET_CLIENT_REJECTED) {
         printf("boat_bot rejected: %s (server protocol %u, handling %" PRIu32 ")\n", failure,
             (unsigned)client.reject.version, client.reject.physics_revision);

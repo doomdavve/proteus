@@ -1,6 +1,7 @@
 #ifndef BOAT_TEST_SESSION_H
 #define BOAT_TEST_SESSION_H
 #include "boat_session.h"
+#include "boat_test_world.h"
 
 // The live view of *SESSION for one draw or scene call (block-scoped compound literal).
 #define SESSION_VIEW(session)                                                                      \
@@ -12,7 +13,7 @@
 static inline BoatSession basin_session(Boat boat)
 {
     BoatSession session;
-    boat_session_init(&session, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     session.boat = boat;
     return session;
 }

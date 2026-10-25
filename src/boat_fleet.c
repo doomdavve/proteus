@@ -24,16 +24,16 @@ static const float SPAWN_CALM_HEIGHT = .25f;
 static const float SPAWN_CALM_GRADIENT = .2f;
 static const float SPAWN_CALM_VERTICAL_SPEED = .5f;
 
-bool boat_fleet_init(BoatFleet *fleet, const BoatWorldDefinition *definition, BoatWater water,
+bool boat_fleet_init(BoatFleet *fleet, const BoatWorldResources *resources, BoatWater water,
     unsigned life_ticks, float crest_height)
 {
-    if (!definition || water.player_wake_enabled)
+    if (!boat_world_resources_ready(resources) || water.player_wake_enabled)
         return false;
     *fleet = (BoatFleet) { 0 };
     if (!boat_wake_objects_init(&fleet->state.wakes, life_ticks, crest_height))
         return false;
     water.objects = &fleet->state.wakes;
-    boat_world_init(&fleet->world, definition, water);
+    boat_world_init(&fleet->world, resources, water);
     return true;
 }
 

@@ -10,6 +10,7 @@
 #include "boat_map.h"
 #include "boat_net_client.h"
 #include "boat_net_server.h"
+#include "boat_test_world.h"
 #include "boat_throttle.h"
 #include "raymath.h"
 
@@ -34,7 +35,7 @@
             return 1;                                                                              \
     } while (0)
 
-static const BoatWorldDefinition *basin(void) { return boat_location(BOAT_LOCATION_BASIN); }
+static const BoatWorldResources *basin(void) { return test_world(BOAT_LOCATION_BASIN); }
 
 static size_t encode(BoatNetMessage m, uint8_t out[BOAT_NET_MAX_MESSAGE])
 {
@@ -69,7 +70,7 @@ static void putf(uint8_t *at, float value)
 // A fleet with every slot used, wakes and a pending reset, after TICKS bot ticks.
 static void busy_fleet(BoatFleet *fleet, unsigned ticks, bool waves)
 {
-    boat_fleet_init(fleet, basin(), boat_world_test_water(basin(), waves, false, false),
+    boat_fleet_init(fleet, basin(), boat_world_test_water(basin()->definition, waves, false, false),
         BOAT_OBJECT_LIFE_TICKS, 1.8f);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         boat_fleet_request_spawn(fleet, i);
@@ -484,8 +485,9 @@ static int checkpoints(void)
         CHECK(decoded[0].tick == 2399 && decoded[0].used.steering == 127);
         CHECK(boat_net_checkpoint_encode(&state, decoded, go, again, sizeof(again)) == size);
         CHECK(memcmp(bytes, again, size) == 0);
-        boat_fleet_init(&copy, basin(), boat_world_test_water(basin(), waves, false, false),
-            BOAT_OBJECT_LIFE_TICKS, 1.8f);
+        boat_fleet_init(&copy, basin(),
+            boat_world_test_water(basin()->definition, waves, false, false), BOAT_OBJECT_LIFE_TICKS,
+            1.8f);
         boat_fleet_restore(&copy, &state);
         BoatFleetBots a = { 0 }, b = { 0 };
         for (unsigned t = 0; t < 600; ++t) {
@@ -550,6 +552,8 @@ static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
         config.max_players = BOAT_FLEET_SLOTS;
     if (!config.token)
         config.token = "room";
+    if (!config.resources)
+        config.resources = basin();
     return room->network
         && boat_net_server_init(&room->server, boat_net_memory_server(room->network), &config);
 }
@@ -562,7 +566,7 @@ static unsigned room_join(Room *room, const char *name, const char *token, uint3
     BoatNetTransport transport;
     boat_net_memory_client(room->network, &room->link[i], &transport);
     BoatNetClientConfig config
-        = { name, token ? token : "room", "validate", sequence, room->predict };
+        = { name, token ? token : "room", "validate", sequence, room->predict, test_worlds };
     boat_net_client_init(&room->clients[i], transport, &config, room->now);
     room->live[i] = true;
     return i;
@@ -1043,7 +1047,7 @@ static int race_room(void)
 {
     static Room room;
     CHECK(room_open(&room, 71,
-        (BoatNetServerConfig) { .location = BOAT_LOCATION_RIVER,
+        (BoatNetServerConfig) { .resources = test_world(BOAT_LOCATION_RIVER),
             .race = true,
             .race_rules = boat_race_default_rules() }));
     BoatNetServer *s = &room.server;
@@ -1133,9 +1137,10 @@ static int prediction_release(void)
 {
     static BoatFleet authority, before;
     static BoatPrediction p, stuck;
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
-    CHECK(boat_fleet_init(&authority, river, boat_world_test_water(river, false, false, false),
-        BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
+    const BoatWorldResources *river = test_world(BOAT_LOCATION_RIVER);
+    CHECK(boat_fleet_init(&authority, river,
+        boat_world_test_water(river->definition, false, false, false), BOAT_OBJECT_LIFE_TICKS,
+        BOAT_OBJECT_DEFAULT_HEIGHT));
     const BoatRaceCourse *course = boat_race_river_course();
     for (unsigned i = 0; i < 2; ++i) {
         Boat boat;
@@ -1421,8 +1426,8 @@ static int mapped_rooms(void)
     static Room room;
     const int id = BOAT_LOCATION_RIVER;
     BoatMatchRules rules = boat_match_default_rules();
-    CHECK(room_open(
-        &room, 63, (BoatNetServerConfig) { .location = id, .deathmatch = true, .match = rules }));
+    CHECK(room_open(&room, 63,
+        (BoatNetServerConfig) { .resources = test_world(id), .deathmatch = true, .match = rules }));
     room.predict = true;
     for (unsigned i = 0; i < 4; ++i)
         room_join(&room, "mapped", NULL, 0);
@@ -1433,9 +1438,13 @@ static int mapped_rooms(void)
         CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->accept.location == id);
         CHECK(c->fleet.world.definition->id == (BoatLocationId)id);
         CHECK(c->prediction.fleet.world.definition->id == (BoatLocationId)id);
+        // Mirror, prediction and authority borrow the same owner; none cloned it.
+        CHECK(c->fleet.world.resources == test_world(id)
+            && c->prediction.fleet.world.resources == test_world(id)
+            && room.server.fleet.world.resources == test_world(id));
         const BoatFleetSlot *own = boat_net_client_own(c);
         CHECK(own && boat_hull_clear(&own->boat, &c->fleet.world, room.now));
-        CHECK(boat_map_legacy_water(own->boat.position, 35));
+        CHECK(boat_map_water(&c->fleet.world.resources->map, own->boat.position, 35));
         CHECK(Vector2Distance(own->boat.position, boat_location(id)->spawn) > 200);
         for (unsigned j = 0; j < i; ++j)
             CHECK(Vector2Distance(
@@ -1465,7 +1474,7 @@ static int mapped_rooms(void)
                 continue;
             boat_reset(&distant);
             distant.position = (Vector2) { (float)x, (float)z };
-            if (boat_map_legacy_water(distant.position, 10)
+            if (boat_map_water(&room.server.fleet.world.resources->map, distant.position, 10)
                 && boat_hull_clear(&distant, &room.server.fleet.world, room.now))
                 found = true;
         }
@@ -1634,7 +1643,7 @@ static int prediction_replay(void)
     static BoatFleetState at8, at16;
     static BoatPrediction p;
     const unsigned own = 1;
-    boat_fleet_init(&fleet, basin(), boat_world_test_water(basin(), true, false, false),
+    boat_fleet_init(&fleet, basin(), boat_world_test_water(basin()->definition, true, false, false),
         BOAT_OBJECT_LIFE_TICKS, 1.8f);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         boat_fleet_request_spawn(&fleet, i);
@@ -1726,8 +1735,9 @@ static int prediction_wakes(void)
     static BoatFleetState base, before_birth, at_n, history[WAKE_TICKS];
     static BoatNetCommand commands[WAKE_TICKS];
     static BoatPrediction p;
-    boat_fleet_init(&fleet, basin(), boat_world_test_water(basin(), false, false, false),
-        BOAT_OBJECT_LIFE_TICKS, 1.8f);
+    boat_fleet_init(&fleet, basin(),
+        boat_world_test_water(basin()->definition, false, false, false), BOAT_OBJECT_LIFE_TICKS,
+        1.8f);
     boat_fleet_request_spawn(&fleet, 0);
     BoatFleetBots bots = { 0 };
     BoatNetSlotInput used[BOAT_FLEET_SLOTS] = { 0 };
@@ -2020,6 +2030,7 @@ static int throttle_detents(void)
 
 int main(void)
 {
+    test_worlds_open();
     RUN(throttle_detents());
     RUN(golden());
     RUN(codec());
@@ -2042,5 +2053,6 @@ int main(void)
     RUN(remote_view());
     RUN(prediction_network());
     printf("boat_net=ok\n");
+    test_worlds_close();
     return 0;
 }

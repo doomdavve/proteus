@@ -31,8 +31,8 @@ static int current_checks(void)
     }
     // Galilean equivalence in a uniform flow, including steering and the local stern station.
     BoatSession still, moving;
-    boat_session_init(&still, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&moving, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&still, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&moving, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     Vector2 flow = { .7f, -.3f };
     moving.world.water.current = flow;
     moving.boat.velocity = flow;
@@ -49,7 +49,7 @@ static int current_checks(void)
     Vector2 offset = Vector2Scale(flow, 240 * BOAT_STEP);
     CHECK(Vector2Distance(moving.boat.position, Vector2Add(still.boat.position, offset)) < .0001f);
     BoatSession drift;
-    boat_session_init(&drift, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&drift, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     drift.world.water = channel;
     for (int tick = 0; tick < 1200; tick++)
         boat_session_step(&drift, (BoatInput) { 0 });
@@ -123,16 +123,15 @@ static int wake_checks(void)
     }
     for (int tick = 0; tick <= 120; ++tick) {
         CHECK(boat_water_wake_source(shifted, tick * .1f, &source));
-        CHECK(boat_map_legacy_water(source, 3));
+        CHECK(test_river_water(source, 3));
     }
-    boat_map_legacy_destroy();
     // Repeated crossings at different speeds and angles must settle without stored energy.
     const float speeds[] = { 0, 3, 9 };
     float encounter = 0;
     for (int si = 0; si < 3; si++)
         for (int ai = 0; ai < 3; ai++) {
             BoatSession a, b;
-            boat_session_init(&a, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
             a.boat.position = (Vector2) { 0, 1.6f };
             a.boat.heading = ai * PI / 4;
             a.presentation.camera_heading = a.boat.heading;
@@ -212,7 +211,7 @@ static int player_wake_checks(void)
         CHECK(fabsf(boat_water_query(copy, (Vector2) { -4, z }, 8).height) <= .65f);
     CHECK(boat_water_query(copy, (Vector2) { -4, 6 }, 25).height == 0);
     BoatSession drifting;
-    boat_session_init(&drifting, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&drifting, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     drifting.world.water = (BoatWater) { .player_wake_enabled = true, .current = { 1, 0 } };
     drifting.boat.velocity = (Vector2) { 1, 0 };
     for (int tick = 0; tick < 480; ++tick)
@@ -220,8 +219,8 @@ static int player_wake_checks(void)
     CHECK(drifting.world.water.player_wake_count == 0);
     // Drive a loop back through the emitted wake, then coast and settle after it passes.
     BoatSession a, b;
-    boat_session_init(&a, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&b, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&b, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     a.world.water.player_wake_enabled = b.world.water.player_wake_enabled = true;
     float encounter = 0, max_height = 0;
     for (int tick = 0; tick < 6000; ++tick) {
@@ -250,7 +249,7 @@ static int player_wake_checks(void)
     CHECK(
         fabsf(a.boat.height) < .003f && fabsf(a.boat.pitch) < .003f && fabsf(a.boat.roll) < .003f);
     CHECK(Vector2Length(a.boat.velocity) < .01f);
-    boat_session_init(&a, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(a.world.water.player_wake_count == 0 && a.boat.physical_wake_time == 0);
     printf("player_wake=ok encounter=%g max_hull_height=%g\n", encounter, max_height);
     return 0;
@@ -627,6 +626,7 @@ static int clock_checks(void)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     if (argc == 2 && strcmp(argv[1], "--gpu") == 0)
         return gpu_checks();
     CHECK(argc == 1);
@@ -635,5 +635,6 @@ int main(int argc, char **argv)
     CHECK(player_wake_checks() == 0);
     CHECK(clock_checks() == 0);
     puts("boat_environment=ok");
+    test_worlds_close();
     return 0;
 }

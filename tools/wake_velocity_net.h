@@ -32,8 +32,10 @@ typedef struct {
 
 // Connect, handshake and install the world (blocking, at most ten seconds). On failure print
 // the reason and return false.
-bool net_study_connect(
-    NetStudy *net, const char *endpoint, const char *name, const char *token, BoatSession *session);
+// WORLDS holds BOAT_LOCATION_COUNT owners indexed by location; the room picks one, which
+// SESSION and the client borrow until net_study_close().
+bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, const char *token,
+    const BoatWorldResources *worlds, BoatSession *session);
 // One displayed frame: service the network with this frame's controls and update the view.
 // False when the connection ended (the reason was printed).
 bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float thrust_target,

@@ -22,15 +22,16 @@ typedef struct {
 } BoatSession;
 
 // Tick zero, the boat at the definition's spawn, a reset enabled presentation, no course or
-// runs, and WATER as the world's initial state.
-void boat_session_init(
-    BoatSession *session, const BoatWorldDefinition *definition, BoatWater water);
+// runs, and WATER as the world's initial state. The world borrows RESOURCES, which must be
+// ready and outlive the session and every copy of it.
+void boat_session_init(BoatSession *session, const BoatWorldResources *resources, BoatWater water);
 // Flush first to keep a pending finish.
 void boat_session_destroy(BoatSession *session);
 // Enable the course and put a reset boat and presentation at its start.
 void boat_session_start_course(BoatSession *session);
 // A new attempt in the same location: flush, reinitialize clock, WATER, boat and presentation
-// (at the course start when the course is enabled) and pin the course opponent. Runs survive.
+// (at the course start when the course is enabled) and pin the course opponent. Runs and the
+// borrowed resources survive.
 void boat_session_restart(BoatSession *session, BoatWater water);
 // Write a pending course finish. Never called from a tick.
 void boat_session_flush(BoatSession *session);

@@ -2,13 +2,14 @@
 #define PROTEUS_BOAT_BANKING_FIXTURE_H
 
 #include "boat_session.h"
+#include "boat_test_world.h"
 #include "raymath.h"
 
 // Shared free-drive inputs for numerical measurements and presentation captures. Each
 // fixture session owns a calm basin world and starts its clock at zero.
 static inline void banking_fixture_reset(BoatSession *session, int scenario)
 {
-    boat_session_init(session, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     Boat *boat = &session->boat;
     boat->position.y = scenario == 5 ? -40 : scenario == 3 ? 0 : 40;
     if (scenario == 4 || scenario == 6)
@@ -39,7 +40,7 @@ static inline float banking_fixture_input(Boat *boat, int scenario, int tick)
 #define BANKING_EXIT_TICKS (BANKING_EXIT_HOLD_TICKS + 360)
 static inline void banking_exit_reset(BoatSession *session)
 {
-    boat_session_init(session, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     Boat *boat = &session->boat;
     boat->position = (Vector2) { 0 };
     boat->velocity.y = -12;
@@ -69,7 +70,7 @@ static inline void banking_exit_step(BoatSession *session, float wheel, int tick
 #define BOAT_TURN_ENTRY_TICKS 480
 static inline void boat_turn_entry_reset(BoatSession *session)
 {
-    boat_session_init(session, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     Boat *boat = &session->boat;
     boat->position = (Vector2) { 0 };
     boat->velocity.y = -12;

@@ -39,10 +39,4 @@ bool boat_map_water(const BoatMap *map, Vector2 position, float clearance);
 bool boat_map_water_contact(
     const BoatMap *map, Vector2 position, float clearance, Vector2 *water_normal);
 
-// A1.1 compatibility surface: a lazily prepared process-global map of the compiled river,
-// backed by the functions above. A1.2 removes it once every caller borrows an explicit map.
-bool boat_map_legacy_water(Vector2 position, float clearance);
-bool boat_map_legacy_water_contact(Vector2 position, float clearance, Vector2 *water_normal);
-void boat_map_legacy_destroy(void);
-
 #endif

@@ -48,11 +48,11 @@ static void start(BoatSession *session, int index)
     waves.player_wake_enabled = true;
     BoatWater mapped = boat_water_gentle();
     if (index == 0)
-        boat_session_init(session, basin, calm);
+        boat_session_init(session, test_world(BOAT_LOCATION_BASIN), calm);
     else if (index == 1)
-        boat_session_init(session, basin, waves);
+        boat_session_init(session, test_world(BOAT_LOCATION_BASIN), waves);
     else
-        boat_session_init(session, boat_location(BOAT_LOCATION_RIVER), mapped);
+        boat_session_init(session, test_world(BOAT_LOCATION_RIVER), mapped);
 }
 
 static bool same_physics(const BoatSession *a, const BoatSession *b)
@@ -184,7 +184,7 @@ static int presentation_toggle(void)
         CHECK(memcmp(&off.presentation, &rest, sizeof(rest)) == 0);
     }
     // The default arcade wake loop with the scripted crossing boat and its own cloth.
-    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    const BoatWorldResources *basin = test_world(BOAT_LOCATION_BASIN);
     static ObjectStudy objects_on, objects_off;
     boat_session_init(&on, basin, boat_water_test(false, false, false));
     boat_session_init(&off, basin, boat_water_test(false, false, false));
@@ -279,6 +279,7 @@ static int render_rates(void)
 
 int main(void)
 {
+    test_worlds_open();
     SetTraceLogLevel(LOG_WARNING);
     CHECK(boat_location(BOAT_LOCATION_COUNT) == NULL && !boat_location_find("harbour"));
     for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
@@ -290,7 +291,7 @@ int main(void)
     CHECK(render_rates() == 0);
     CHECK(core_order() == 0);
     boat_water_mesh_destroy();
-    boat_map_legacy_destroy();
     puts("boat_world=ok");
+    test_worlds_close();
     return 0;
 }

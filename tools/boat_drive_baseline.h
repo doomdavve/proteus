@@ -1,5 +1,6 @@
-#include "wake_velocity_drive.h"
+#include "boat_test_world.h"
 #include "raymath.h"
+#include "wake_velocity_drive.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +26,7 @@ static void baseline_reset(
     boat_reset(&study->other);
     study->other.position = (Vector2) { -65, -12 };
     study->other.heading = PI / 2;
-    boat_world_init(&study->other_world, boat_location(BOAT_LOCATION_BASIN),
+    boat_world_init(&study->other_world, test_world(BOAT_LOCATION_BASIN),
         (BoatWater) { .objects = &study->wakes });
 }
 

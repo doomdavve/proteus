@@ -7,9 +7,12 @@ and the [A0.4 controlled river baseline](adventure/baseline.md#a04-controlled-ri
 completed, closing A0 with its [decision record](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a0-decision-record--2026-10-25).
 [A1.1](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a11--explicit-map-data-and-collision-cache-construction)
 (explicit map description and caller-owned collision cache, with river queries and captures
-unchanged) completed the same day; a temporary global wrapper still serves physical callers.
+unchanged) completed the same day. [A1.2](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a12-result-2026-10-25)
+then threaded caller-owned `BoatWorldResources` through worlds, sessions, fleets and
+networking and removed the global wrapper, with traces, captures and the content digest
+unchanged.
 No expanded geography, streaming, adventure rules or new weather is implemented.
-**Next: A1.2, borrowed map resources through worlds, sessions, fleets and networking, in the
+**Next: A1.3, view-owned water-mesh caches, in the
 [execution handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md).**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks; those later tasks remain pending. The proposed first playable is a short
@@ -265,13 +268,13 @@ need their own budget test.
 The [first-steps handoff for Sol](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) owns the detailed
 A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance checks.
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
-(a review-tool benchmark only). Runtime map ownership changes began with A1.1, completed
-2026-10-25; A1.2 is next.
+(a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1.1 and A1.2
+completed 2026-10-25; A1.3 is next.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |
 | **A0 — survey and baseline (complete 2026-10-25)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
-| **A1 — world ownership (A1.1 complete; next: A1.2)** | Complete the necessary mapped W1/W2/W3/W4 foundations work on current river data | Two independent map/view owners, repeat init/destroy, partial-failure cleanup and unchanged existing river behaviour; use two river instances now that Eriksberg is retired |
+| **A1 — world ownership (A1.1–A1.2 complete; next: A1.3)** | Complete the necessary mapped W1/W2/W3/W4 foundations work on current river data | Two independent map/view owners, repeat init/destroy, partial-failure cleanup and unchanged existing river behaviour; use two river instances now that Eriksberg is retired |
 | **A2 — tiled current river** | Bake tiles and indexed collision; cull land in main/reflection/shadow passes; bound CPU/GPU water coverage | Match current shoreline/bridge queries against exhaustive reference; no seams or false tile-edge contacts; measured same-view scaling; all small-slice assets may remain resident |
 | **A3 — first outer-river adventure** | New connected geography, one destination/shelter, local weather transition, checkpoint recovery; bounded detailed-asset loading | Playable 5–10 minute outing, cold-load/rapid-turn/recovery tests, clear/storm performance and memory targets; human feedback on travel and exposure |
 | **A4 — islands and Vinga** | Terrain silhouettes, selected harbour/landmark detail, continuous full voyage and nearby start | Actual route/time measurements, long out-and-back cache test, storm tuning, readable lighthouse/arrival and user playtest |

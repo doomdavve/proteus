@@ -1,15 +1,20 @@
 #include "boat_session.h"
 
-void boat_session_init(BoatSession *session, const BoatWorldDefinition *definition, BoatWater water)
+static void reset(BoatSession *session)
 {
-    boat_world_init(&session->world, definition, water);
-    boat_reset_location(&session->boat, definition);
+    boat_reset_location(&session->boat, session->world.definition);
     boat_presentation_reset(&session->presentation);
     session->presentation_enabled = true;
     session->tick = 0;
     session->course = (BoatCourse) { 0 };
     session->runs = (BoatReplayRuns) { 0 };
     session->record_runs = false;
+}
+
+void boat_session_init(BoatSession *session, const BoatWorldResources *resources, BoatWater water)
+{
+    boat_world_init(&session->world, resources, water);
+    reset(session);
 }
 
 void boat_session_destroy(BoatSession *session) { boat_replay_runs_destroy(&session->runs); }
@@ -28,7 +33,8 @@ void boat_session_restart(BoatSession *session, BoatWater water)
     BoatReplayRuns runs = session->runs;
     bool presentation_enabled = session->presentation_enabled;
     bool record_runs = session->record_runs, course = session->course.enabled;
-    boat_session_init(session, session->world.definition, water);
+    boat_world_restart(&session->world, water);
+    reset(session);
     session->presentation_enabled = presentation_enabled;
     session->runs = runs;
     session->record_runs = record_runs;

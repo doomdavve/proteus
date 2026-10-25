@@ -2,10 +2,44 @@
 
 #include <assert.h>
 
-void boat_world_init(BoatWorld *world, const BoatWorldDefinition *definition, BoatWater water)
+bool boat_world_resources_init(BoatWorldResources *resources, const BoatWorldDefinition *definition)
 {
-    assert(definition);
-    *world = (BoatWorld) { .definition = definition, .water = water };
+    *resources = (BoatWorldResources) { 0 };
+    if (!definition || definition->mapped != (definition->map != NULL))
+        return false;
+    if (definition->mapped && !boat_map_init(&resources->map, definition->map))
+        return false;
+    resources->definition = definition;
+    return true;
+}
+
+void boat_world_resources_destroy(BoatWorldResources *resources)
+{
+    boat_map_destroy(&resources->map);
+    *resources = (BoatWorldResources) { 0 };
+}
+
+bool boat_world_resources_ready(const BoatWorldResources *resources)
+{
+    if (!resources || !resources->definition)
+        return false;
+    if (!resources->definition->mapped)
+        return !resources->map.shore;
+    return boat_map_ready(&resources->map)
+        && resources->map.description == resources->definition->map;
+}
+
+void boat_world_init(BoatWorld *world, const BoatWorldResources *resources, BoatWater water)
+{
+    assert(boat_world_resources_ready(resources));
+    *world = (BoatWorld) {
+        .definition = resources->definition, .resources = resources, .water = water
+    };
+}
+
+void boat_world_restart(BoatWorld *world, BoatWater water)
+{
+    boat_world_init(world, world->resources, water);
 }
 
 bool boat_world_displaced(const BoatWorld *world)

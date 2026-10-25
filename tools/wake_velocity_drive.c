@@ -13,7 +13,7 @@ void object_study_reset(
     if (!crossing)
         return;
     if (!boat_fleet_init(
-            &study->fleet, session->world.definition, session->world.water, life, height)) {
+            &study->fleet, session->world.resources, session->world.water, life, height)) {
         fprintf(stderr, "The crossing boat requires a basin fleet.\n");
         exit(1);
     }

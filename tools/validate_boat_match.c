@@ -3,6 +3,7 @@
  * capsize latches) for the credit window, self-capsize, grace, respawn, bailout, leavers and
  * rounds; physical cases step a real fleet in which a planted wake record capsizes a boat. */
 #include "boat_match.h"
+#include "boat_test_world.h"
 
 #include <stdio.h>
 
@@ -36,8 +37,8 @@ static Boat boat_at(float x)
 // A fleet of COUNT placed boats at tick 1 and a match that has observed it once.
 static int start(unsigned count, BoatMatchRules r)
 {
-    CHECK(boat_fleet_init(&fleet, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 },
-        BOAT_OBJECT_LIFE_TICKS, 1.8f));
+    CHECK(boat_fleet_init(
+        &fleet, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f));
     CHECK(boat_match_init(&match, &r));
     for (unsigned i = 0; i < count; ++i)
         boat_fleet_place(&fleet, i, boat_at(-30 + 20 * (float)i));
@@ -315,9 +316,11 @@ static int rejects(void)
 
 int main(void)
 {
+    test_worlds_open();
     if (warmup_and_rounds() || credit() || respawns() || bailout_and_leavers() || wakes()
         || rejects())
         return 1;
     printf("boat_match=ok\n");
+    test_worlds_close();
     return 0;
 }

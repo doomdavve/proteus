@@ -1,8 +1,9 @@
 /* Compare the frozen 2994e0d app driver against the extracted production helper. */
 #include "boat_drive_baseline.h"
-#include "wake_velocity_state.h"
+#include "boat_test_world.h"
 #include "boat_view.h"
 #include "raymath.h"
+#include "wake_velocity_state.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +18,8 @@
     } while (0)
 int main(void)
 {
-    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    test_worlds_open();
+    const BoatWorldResources *basin = test_world(BOAT_LOCATION_BASIN);
     BoatSession a, b;
     BaselineStudy wa;
     ObjectStudy wb;
@@ -46,5 +48,6 @@ int main(void)
     renderer3d_destroy(&ra);
     renderer3d_destroy(&rb);
     puts("3840 tick physical/wake hashes and 1080/2400 tick CPU pixels match old driver");
+    test_worlds_close();
     return 0;
 }

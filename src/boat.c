@@ -119,7 +119,8 @@ static bool hull_contact(
         Vector2 normal = { 0 };
         bool water;
         if (world->definition->mapped) {
-            water = boat_map_legacy_water_contact(point, HULL_SHORE_CLEARANCE, &normal);
+            water = boat_map_water_contact(
+                &world->resources->map, point, HULL_SHORE_CLEARANCE, &normal);
             if (water
                 && waterfront_harbor_contact_height(
                     point, HULL_SHORE_CLEARANCE, bottom, top, world->water, time, &normal))

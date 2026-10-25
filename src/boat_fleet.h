@@ -51,10 +51,11 @@ typedef struct {
     BoatFleetStats stats;
 } BoatFleet;
 
-// An empty fleet at tick zero. Mapped fleets select the compiled crop (one map per process).
-// WATER may not enable the legacy D3 trail, whose history is not checkpointed; its borrowed
-// objects pointer is replaced by the fleet's own pool. False for unsupported water/wake recipes.
-bool boat_fleet_init(BoatFleet *fleet, const BoatWorldDefinition *definition, BoatWater water,
+// An empty fleet at tick zero whose world borrows RESOURCES; they must outlive the fleet, its
+// copies and checkpoint restores, none of which clone or free them. WATER may not enable the
+// legacy D3 trail, whose history is not checkpointed; its borrowed objects pointer is replaced
+// by the fleet's own pool. False for unready resources or unsupported water/wake recipes.
+bool boat_fleet_init(BoatFleet *fleet, const BoatWorldResources *resources, BoatWater water,
     unsigned life_ticks, float crest_height);
 // Queue a join or a reset of SLOT. It is placed at an authored safe candidate at a later tick
 // boundary, in request order; repeated requests while pending keep their place.

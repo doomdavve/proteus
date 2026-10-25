@@ -1,5 +1,4 @@
 #include "boat_net_protocol.h"
-#include "waterfront_city.h"
 
 #include <assert.h>
 #include <float.h>
@@ -1083,7 +1082,8 @@ uint64_t boat_net_content_digest(void)
         digest_float(&d, definition->wake_offset.y);
         if (!definition->mapped)
             continue;
-        const Mesh3D *mesh = waterfront_city_mesh();
+        // The definition-bound description, in its canonical triangle order.
+        const Mesh3D *mesh = definition->map->mesh;
         digest_u64(&d, mesh->triangle_count);
         for (size_t i = 0; i < mesh->triangle_count; ++i)
             for (unsigned j = 0; j < 3; ++j) {

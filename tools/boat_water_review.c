@@ -60,7 +60,7 @@ static bool hull_clear(const Boat *boat)
         for (int side = -1; side <= 1; side += 2) {
             Vector2 p = Vector2Add(boat->position,
                 Vector2Add(Vector2Scale(forward, end * 2.5f), Vector2Scale(right, side * 1.2f)));
-            if (!boat_map_legacy_water(p, .5f))
+            if (!test_river_water(p, .5f))
                 return false;
         }
     return true;
@@ -77,7 +77,7 @@ static float shore_distance(Vector2 position)
     float low = 0, high = 1000;
     for (int i = 0; i < 14; ++i) {
         float mid = (low + high) * .5f;
-        if (boat_map_legacy_water(position, mid))
+        if (test_river_water(position, mid))
             low = mid;
         else
             high = mid;
@@ -128,7 +128,7 @@ static int check_gpu_water(void)
     water.amplitude = 1e-8f;
     water.crossing[0].amplitude = water.crossing[1].amplitude = 0;
     BoatSession session;
-    boat_session_init(&session, boat_location(BOAT_LOCATION_BASIN), water);
+    boat_session_init(&session, test_world(BOAT_LOCATION_BASIN), water);
     Boat *boat = &session.boat;
     boat->position = (Vector2) { 0, 0 };
     const BoatCamera view = { .distance = 48, .height = 36 };
@@ -160,7 +160,8 @@ static int check_gpu_water(void)
         goto cleanup;
     // In the real waterfront, the authored field must vary the surface even with
     // reflections/shadows disabled, and cross the mouth without an abrupt colour step.
-    session.world.definition = boat_location(BOAT_LOCATION_RIVER);
+    session.world.resources = test_world(BOAT_LOCATION_RIVER);
+    session.world.definition = session.world.resources->definition;
     boat->position.x = -12;
     Color first = { 0 }, previous = { 0 }, last = { 0 };
     for (int z = 60; z >= -260; z -= 10) {
@@ -358,7 +359,8 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     float *scratch = calloc(BENCH_FRAMES, sizeof(*scratch));
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
-    boat_session_init(&session, location, waves ? boat_water_gentle() : (BoatWater) { 0 });
+    boat_session_init(
+        &session, test_world(BOAT_LOCATION_RIVER), waves ? boat_water_gentle() : (BoatWater) { 0 });
     const Boat *boat = &session.boat;
     const BoatCamera camera
         = { .distance = location->camera_distance, .height = location->camera_height };
@@ -552,7 +554,6 @@ cleanup:
         CloseWindow();
     }
     boat_water_mesh_destroy();
-    boat_map_legacy_destroy();
     free(frames);
     free(scratch);
     return ok ? 0 : bench_fail(error ? error : "cannot write report");
@@ -560,6 +561,7 @@ cleanup:
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool gpu_check = false;
@@ -630,13 +632,13 @@ int main(int argc, char **argv)
         return 2;
     SetTraceLogLevel(LOG_WARNING);
     // These samples distinguish navigable space under the deck from solid legs.
-    if (!boat_map_legacy_water((Vector2) { 454, -678 }, 8)
-        || !boat_map_legacy_water((Vector2) { 1100, -950 }, 8)
-        || boat_map_legacy_water((Vector2) { 517.2f, -536.8f }, 0)
-        || boat_map_legacy_water((Vector2) { 486.7f, -527.6f }, 0)
-        || boat_map_legacy_water((Vector2) { 381.5f, -949.2f }, 0)
-        || boat_map_legacy_water((Vector2) { 349.1f, -938.7f }, 0)
-        || boat_map_legacy_water((Vector2) { 2000, -950 }, 0)) {
+    if (!test_river_water((Vector2) { 454, -678 }, 8)
+        || !test_river_water((Vector2) { 1100, -950 }, 8)
+        || test_river_water((Vector2) { 517.2f, -536.8f }, 0)
+        || test_river_water((Vector2) { 486.7f, -527.6f }, 0)
+        || test_river_water((Vector2) { 381.5f, -949.2f }, 0)
+        || test_river_water((Vector2) { 349.1f, -938.7f }, 0)
+        || test_river_water((Vector2) { 2000, -950 }, 0)) {
         fprintf(stderr, "River support/water/crop checks failed.\n");
         return 1;
     }
@@ -645,7 +647,8 @@ int main(int argc, char **argv)
             bench, waves, strcmp(aa_name, "4x4") == 0, visible, pacing ? pacing : "cap");
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
-    boat_session_init(&session, location, waves ? boat_water_gentle() : (BoatWater) { 0 });
+    boat_session_init(
+        &session, test_world(BOAT_LOCATION_RIVER), waves ? boat_water_gentle() : (BoatWater) { 0 });
     const BoatWorld *world = &session.world;
     Boat *boat = &session.boat;
     const BoatPresentation *presentation = &session.presentation;
@@ -844,6 +847,6 @@ cleanup:
         CloseWindow();
     }
     boat_water_mesh_destroy();
-    boat_map_legacy_destroy();
+    test_worlds_close();
     return result;
 }

@@ -25,7 +25,7 @@ static int validate_flight_outcomes(void)
     // Both axes can invert in flight without magical righting or immediate failure.
     for (int axis = 0; axis < 2; ++axis) {
         BoatSession boat;
-        boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
         boat.boat.height = 20;
         if (axis == 0)
             boat.boat.pitch = PI;
@@ -39,7 +39,7 @@ static int validate_flight_outcomes(void)
         CHECK(boat.boat.inverted_contact_time == 0);
     }
     BoatSession flying;
-    boat_session_init(&flying, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&flying, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     flying.boat.height = 20;
     flying.boat.velocity = (Vector2) { 3, -7 };
     flying.boat.throttle = flying.boat.engine_response = flying.boat.wheel = 1;
@@ -53,7 +53,7 @@ static int validate_flight_outcomes(void)
     for (int axis = 0; axis < 2; ++axis) {
         for (int turns = -3; turns <= 3; ++turns) {
             BoatSession boat;
-            boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
             float angle = turns * PI;
             if (axis == 0)
                 boat.boat.pitch = angle;
@@ -64,14 +64,14 @@ static int validate_flight_outcomes(void)
             CHECK((boat.boat.motion_state == BOAT_CAPSIZED) == (abs(turns) % 2 == 1));
             if (boat.boat.motion_state == BOAT_CAPSIZED) {
                 CHECK(boat.boat.throttle == 0 && boat.boat.engine_response == 0);
-                boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+                boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
                 CHECK(boat.boat.motion_state == BOAT_WATERBORNE);
                 CHECK(boat.boat.inverted_contact_time == 0 && boat.boat.landings == 0);
             }
         }
     }
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.boat.height = 2;
     bool landing = false;
     for (int tick = 0; tick < 600; ++tick) {
@@ -86,8 +86,8 @@ static int validate_flight_outcomes(void)
 static int validate_dynamic_pair(void)
 {
     BoatSession a, b;
-    boat_session_init(&a, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&b, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&b, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     a.boat.position = (Vector2) { -.7f, 0 };
     b.boat.position = (Vector2) { .7f, 0 };
     a.boat.velocity.x = 6;
@@ -128,8 +128,8 @@ static int particles(const BoatPresentation *view, bool spray)
 static int validate_wake_independence(void)
 {
     BoatSession a, b;
-    boat_session_init(&a, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&b, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&b, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     b.presentation.wake_emission = 931;
     for (int tick = 0; tick < 720; ++tick) {
         a.boat.throttle = b.boat.throttle = tick < 480 ? 1 : -1;
@@ -157,7 +157,7 @@ static int validate_wake_independence(void)
         }
     }
     // Even a saturated pool must not let a foam birth overwrite live airborne spray.
-    boat_session_init(&a, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     a.boat.throttle = a.boat.engine_response = 1;
     a.presentation.propeller_time = .075f;
     for (int i = 0; i < BOAT_WATER_PARTICLES; ++i)
@@ -230,7 +230,7 @@ static int validate_countersteering(void)
 static int validate_speed_view(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     WaterfrontSceneFrame frame;
     float previous = 55 * DEG2RAD;
     for (int step = 0; step <= 240; ++step) {
@@ -261,7 +261,7 @@ static int validate_speed_view(void)
     boat_scene_frame(
         SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT, &frame);
     CHECK(frame.camera.vertical_fov == 55 * DEG2RAD);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.world.water.current = (Vector2) { 0, -20 };
     boat_scene_frame(
         SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT, &frame);
@@ -323,8 +323,8 @@ static int validate_coasting(void)
 static int validate_signed_propulsion(void)
 {
     BoatSession forward, reverse, forward_turn, reverse_turn;
-    boat_session_init(&forward, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&reverse, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&forward, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&reverse, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     forward.boat.throttle = 1;
     reverse.boat.throttle = -1;
     for (int i = 0; i < 240; ++i) {
@@ -334,8 +334,8 @@ static int validate_signed_propulsion(void)
     CHECK(forward.boat.engine_response > .99f && reverse.boat.engine_response < -.99f);
     CHECK(forward.boat.velocity.y < -1 && reverse.boat.velocity.y > 1);
 
-    boat_session_init(&forward_turn, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&reverse_turn, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&forward_turn, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&reverse_turn, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     forward_turn.boat.throttle = 1;
     reverse_turn.boat.throttle = -1;
     forward_turn.boat.wheel = reverse_turn.boat.wheel = .6f;
@@ -374,7 +374,7 @@ static int validate_signed_propulsion(void)
 static int validate_signed_throttle(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     for (int i = 0; i < 120; ++i)
         boat_session_step(&boat, (BoatInput) { 0, 1 });
     CHECK(boat.boat.throttle > .49f);
@@ -387,7 +387,7 @@ static int validate_signed_throttle(void)
     for (int i = 0; i < 1200; ++i)
         boat_session_step(&boat, (BoatInput) { 0, 1 });
     CHECK(boat.boat.throttle == 1);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(fabsf(boat.boat.throttle) < .001f);
     return 0;
 }
@@ -395,7 +395,7 @@ static int validate_signed_throttle(void)
 static int validate_planing(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.boat.velocity.y = -7;
     boat.boat.throttle = 1;
     boat.boat.engine_response = 1;
@@ -425,7 +425,7 @@ static int validate_planing(void)
     }
     CHECK(boat.boat.planing < .01f);
 
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.boat.velocity.y = 9;
     boat.boat.throttle = -1;
     for (int i = 0; i < 480; ++i) {
@@ -438,7 +438,7 @@ static int validate_planing(void)
 static int validate_planing_attitude(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.boat.throttle = 1;
     float peak = 0;
     for (int tick = 0; tick < 360; ++tick) {
@@ -500,7 +500,7 @@ static int validate_planing_attitude(void)
         CHECK(fabsf(boat.boat.pitch - previous) < .008f);
     }
     CHECK(boat.boat.pitch < .0001f && boat.boat.planing == 0);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(boat.boat.pitch == 0);
     return 0;
 }
@@ -516,7 +516,7 @@ static bool footprint_in_water(const BoatSession *session)
             boat->position.y
                 + (-cosf(boat->heading) * samples[i].y + sinf(boat->heading) * samples[i].x) };
         if (session->world.definition->mapped
-                ? !boat_map_legacy_water(p, .35f)
+                ? !test_river_water(p, .35f)
                 : fabsf(p.x) > BOAT_BASIN_HALF_X - .35f || fabsf(p.y) > BOAT_BASIN_HALF_Z - .35f)
             return false;
     }
@@ -629,7 +629,7 @@ static int validate_hull_contacts(void)
 static int validate_course(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_session_start_course(&boat);
     CHECK(boat.course.enabled && boat.course.next_gate == 0);
     CHECK(boat.boat.position.x == 0 && boat.boat.position.y > boat_course_gates[0].centre.y);
@@ -662,7 +662,7 @@ static int validate_course(void)
     double finished = course->elapsed;
     boat_course_step(course, (Vector2) { 0, 50 }, (Vector2) { 0, -60 }, 10);
     CHECK(course->elapsed == finished);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_session_start_course(&boat);
     CHECK(course->elapsed == 0 && course->next_gate == 0);
     // Integration: powered movement starts the timer on the fixed simulation ticks.
@@ -670,7 +670,7 @@ static int validate_course(void)
     for (int i = 0; i < 360; ++i)
         boat_session_step(&boat, (BoatInput) { 0 });
     CHECK(course->next_gate == 1 && course->elapsed > 0);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(!course->enabled && course->elapsed == 0);
     return 0;
 }
@@ -696,14 +696,14 @@ static float floating_energy(const Boat *boat)
 static int validate_buoyancy(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     for (int tick = 0; tick < 1200; ++tick)
         boat_session_step(&boat, (BoatInput) { 0 });
     CHECK(fabsf(boat.boat.height) < .000001f && fabsf(boat.boat.vertical_velocity) < .000001f);
     CHECK(fabsf(boat.boat.pitch) < .000001f && fabsf(boat.boat.roll) < .000001f);
     // Drop, push under water, and disturb both angular modes with and without initial velocity.
     for (int trial = 0; trial < 4; ++trial) {
-        boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
         boat.boat.height = trial == 0 ? 1.2f : trial == 1 ? -.35f : .1f;
         boat.boat.pitch = trial % 2 ? -.16f : .12f;
         boat.boat.roll = trial % 2 ? .14f : -.1f;
@@ -721,7 +721,7 @@ static int validate_buoyancy(void)
         CHECK(fabsf(boat.boat.roll) < .0001f && floating_energy(&boat.boat) < .00001f);
     }
     // A static sloping wave must lift the correct bow and side (simulation X is mirrored).
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.boat.position = (Vector2) { 0 };
     boat.world.water = boat_water_gentle();
     boat.world.water.angular_speed = 0;
@@ -762,7 +762,7 @@ static int validate_buoyancy(void)
     // Repeatable rest, head-on, beam and following sampling at low and cruising speeds.
     for (int encounter = 0; encounter < 4; ++encounter) {
         for (int speed = 0; speed <= 10; speed += 5) {
-            boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
             boat.boat.position = (Vector2) { 0 };
             boat.world.water = boat_water_gentle();
             boat.boat.heading = atan2f(.6f, .8f) + encounter * PI / 2;
@@ -795,7 +795,7 @@ static int validate_buoyancy(void)
         }
     }
     // Longer powered/reversing run, then remove the forcing and recover in calm water.
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.world.water = boat_water_gentle();
     float combined_peak_roll = 0;
     int peak_tick = 0;
@@ -822,7 +822,7 @@ static int validate_buoyancy(void)
         boat_session_step(&boat, (BoatInput) { 0 });
     CHECK(fabsf(boat.boat.height) < .0001f && fabsf(boat.boat.pitch) < .0001f);
     CHECK(fabsf(boat.boat.roll) < .0001f);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(boat.boat.height == 0 && boat.boat.vertical_velocity == 0);
     CHECK(boat.boat.pitch == 0 && boat.boat.pitch_velocity == 0 && boat.boat.roll == 0
         && boat.boat.roll_velocity == 0 && boat.boat.turn_roll_load == 0);
@@ -867,7 +867,7 @@ typedef struct {
 static Encounter wave_encounter(float heading, float speed)
 {
     Encounter result = { 0 };
-    boat_session_init(&result.final, boat_location(BOAT_LOCATION_BASIN), boat_water_gentle());
+    boat_session_init(&result.final, test_world(BOAT_LOCATION_BASIN), boat_water_gentle());
     Boat *boat = &result.final.boat;
     boat->position = (Vector2) { 0 };
     for (int tick = 0; tick < 960; ++tick) {
@@ -938,19 +938,19 @@ static int validate_gentle_encounters(void)
     // Wave forces cannot bypass the existing hull/shore containment.
     for (int angle = 0; angle < 4; ++angle) {
         BoatSession boat;
-        boat_session_init(&boat, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         boat.world.water = boat_water_gentle();
         boat.boat.heading = angle * PI / 2;
         boat.boat.throttle = 1;
         for (int tick = 0; tick < 1200; ++tick) {
             boat_session_step(&boat, (BoatInput) { 0 });
-            CHECK(boat_map_legacy_water(boat.boat.position, .3f));
+            CHECK(test_river_water(boat.boat.position, .3f));
             CHECK(isfinite(boat.boat.heading) && fabsf(boat.boat.yaw_velocity) < 4);
         }
     }
     // Unpowered waves may transfer energy, but must not create a runaway neutral drift or turn.
     BoatSession neutral;
-    boat_session_init(&neutral, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&neutral, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     neutral.world.water = boat_water_gentle();
     for (int tick = 0; tick < 14400; ++tick) {
         boat_session_step(&neutral, (BoatInput) { 0 });
@@ -976,7 +976,7 @@ static int validate_calm_reference(void)
             .0500000007f, .053120777f, .211947575f, 1 },
         { 39.4533844f, -33.0364151f, 9.76989174f, -13.2869892f, -2.50756764f, 0, 0, 0, 0, 0 } };
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     int sample = 0;
     for (int tick = 0; tick < 1800; ++tick) {
         float wheel = tick >= 360 && tick < 900 ? .35f : 0;
@@ -1067,7 +1067,7 @@ static int shared_water(void)
         }
     }
     BoatSession flat, waves;
-    boat_session_init(&flat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&flat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     waves = flat;
     waves.world.water = water;
     for (int i = 0; i < 2400; ++i) {
@@ -1078,7 +1078,7 @@ static int shared_water(void)
     CHECK(Vector2Distance(flat.boat.velocity, waves.boat.velocity) > .001f);
     CHECK(fabsf(flat.boat.pitch - waves.boat.pitch) + fabsf(flat.boat.height - waves.boat.height)
         > .001f);
-    boat_session_init(&waves, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&waves, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(waves.world.water.amplitude == 0 && boat_session_time(&waves) == 0);
     boat_water_mesh_destroy();
     return 0;
@@ -1166,7 +1166,7 @@ static int validate_water_patch(void)
                         if (x * x + z * z > 78 * 78)
                             continue;
                         Vector2 p = { center.x + x + .17f, center.y + z + .23f };
-                        bool expected = location ? boat_map_legacy_water((Vector2) { -p.x, p.y }, 0)
+                        bool expected = location ? test_river_water((Vector2) { -p.x, p.y }, 0)
                                                  : fabsf(p.x) <= 120 && fabsf(p.y) <= 80;
                         CHECK(patch_contains(mesh, p) == expected);
                     }
@@ -1283,6 +1283,7 @@ static int validate_mouse_steering(void)
 
 int main(void)
 {
+    test_worlds_open();
     CHECK(validate_throttle_detents() == 0);
     CHECK(validate_mouse_steering() == 0);
     CHECK(validate_flight_outcomes() == 0);
@@ -1312,20 +1313,20 @@ int main(void)
     CHECK(!frame.player.particles[0].spray && frame.player.particles[1].spray);
     CHECK(frame.player.particles[0].transform.position.x == -2);
     CHECK(frame.player.particles[1].transform.position.y == 1);
-    boat_session_init(&player, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&player, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_scene_frame(
         SESSION_VIEW(&player), &player.presentation, &player.world, BOAT_CAMERA_DEFAULT, &frame);
     CHECK(frame.time == 0 && frame.player.particle_count == 0);
     waterfront_scene_evaluate(0, (BoatWater) { 0 }, &frame);
     CHECK(!frame.player_active);
     BoatSession mapped;
-    boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
-    CHECK(mapped.world.definition->mapped && boat_map_legacy_water(mapped.boat.position, .3f));
-    CHECK(!boat_map_legacy_water((Vector2) { 10000, 0 }, 0));
-    CHECK(!boat_map_legacy_water((Vector2) { -100, 60 }, 0));
+    boat_session_init(&mapped, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    CHECK(mapped.world.definition->mapped && test_river_water(mapped.boat.position, .3f));
+    CHECK(!test_river_water((Vector2) { 10000, 0 }, 0));
+    CHECK(!test_river_water((Vector2) { -100, 60 }, 0));
     // Drive into both dock quays. Hull clearance must remain in water and impacts rebound.
     for (int side = -1; side <= 1; side += 2) {
-        boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&mapped, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         mapped.boat.heading = mapped.presentation.camera_heading = side * 1.5707963f;
         mapped.boat.throttle = 1;
         bool bumped = false;
@@ -1343,7 +1344,7 @@ int main(void)
     const float heading_offsets[] = { 0, -.00001f, .00001f };
     for (size_t i = 0; i < sizeof(heading_offsets) / sizeof(*heading_offsets); ++i)
         for (int side = -1; side <= 1; side += 2) {
-            boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+            boat_session_init(&mapped, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
             mapped.boat.heading = mapped.presentation.camera_heading
                 = side * PI / 2 + heading_offsets[i];
             mapped.boat.throttle = 1;
@@ -1367,16 +1368,15 @@ int main(void)
             CHECK(reverse_travel > 3);
         }
     // The channel remains navigable through the crane towards the river.
-    boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    boat_session_init(&mapped, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
     mapped.boat.throttle = 1;
     for (int tick = 0; tick < 1200; ++tick) {
         boat_session_step(&mapped, (BoatInput) { 0 });
-        CHECK(boat_map_legacy_water(mapped.boat.position, .3f));
+        CHECK(test_river_water(mapped.boat.position, .3f));
     }
     CHECK(mapped.boat.position.y < -50);
-    boat_session_init(&mapped, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&mapped, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(!mapped.world.definition->mapped && mapped.boat.position.y == 10);
-    boat_map_legacy_destroy();
     CHECK(validate_course() == 0);
     CHECK(validate_coasting() == 0);
     CHECK(validate_countersteering() == 0);
@@ -1388,14 +1388,14 @@ int main(void)
     CHECK(validate_planing_attitude() == 0);
     CHECK(validate_hull_contacts() == 0);
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     // Follow the short arc across the +/-pi boundary, without a full camera orbit.
     boat.boat.heading = -3.13f;
     boat.presentation.camera_heading = 3.13f;
     boat_session_step(&boat, (BoatInput) { 0 });
     float camera_turn = remainderf(boat.presentation.camera_heading - 3.13f, 6.2831853f);
     CHECK(camera_turn > 0 && camera_turn < 0.01f);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(boat.presentation.camera_heading == 0);
     // Wheel adjustments are bounded and reversible; release springs back symmetrically.
     for (int i = 0; i < 60; ++i)
@@ -1427,7 +1427,7 @@ int main(void)
     for (int i = 0; i < 40; ++i)
         boat_session_step(&boat, (BoatInput) { 1, 0 });
     CHECK(fabsf(boat.boat.wheel) < 0.001f);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(boat.boat.wheel == 0 && boat.boat.engine_angle == 0);
     // Turning the engine at idle cannot rotate a stationary boat.
     for (int i = 0; i < 120; ++i)
@@ -1460,7 +1460,7 @@ int main(void)
         boat_session_step(&boat, (BoatInput) { 0 });
     CHECK(boat.boat.wheel == 0 && boat.boat.engine_angle == 0
         && fabsf(boat.boat.yaw_velocity) < 0.001f);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     for (int i = 0; i < 120; ++i)
         boat_session_step(&boat, (BoatInput) { 0, 1 });
     CHECK(fabsf(boat.boat.throttle - 0.5f) < 0.001f);
@@ -1475,7 +1475,7 @@ int main(void)
         boat_session_step(&boat, (BoatInput) { 0, -1 });
     CHECK(fabsf(boat.boat.throttle) < .001f);
     boat.boat.throttle = 0.75f;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(boat.boat.throttle == 0);
     boat.boat.throttle = 1;
     for (int i = 0; i < 120; ++i)
@@ -1495,8 +1495,8 @@ int main(void)
     CHECK(hypotf(boat.boat.velocity.x, boat.boat.velocity.y) > speed * 0.4f);
 
     BoatSession left, right;
-    boat_session_init(&left, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&right, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&left, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&right, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     left.boat.throttle = right.boat.throttle = 1;
     left.boat.wheel = -0.5f;
     right.boat.wheel = 0.5f;
@@ -1523,7 +1523,7 @@ int main(void)
     CHECK(validate_basin_stress(-.00001f) == 0);
     CHECK(validate_basin_stress(0) == 0);
     CHECK(validate_basin_stress(.00001f) == 0);
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(boat.boat.position.x == 0 && boat.boat.position.y == 10);
     CHECK(boat.boat.heading == 0 && boat.boat.velocity.x == 0 && boat.boat.velocity.y == 0);
     CHECK(boat.boat.wheel == 0 && boat.boat.engine_angle == 0 && boat.boat.yaw_velocity == 0);
@@ -1531,5 +1531,6 @@ int main(void)
     CHECK(boat.boat.planing == 0);
     CHECK(particles(&boat.presentation, false) == 0 && particles(&boat.presentation, true) == 0);
     puts("boat_handling=ok");
+    test_worlds_close();
     return 0;
 }

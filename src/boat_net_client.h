@@ -16,6 +16,9 @@ typedef struct {
     const char *name, *token, *build;
     uint32_t first_sequence; // First outgoing sequence on every channel (wrap tests).
     bool predict; // Run a speculative fleet ahead of the mirror with the own commands.
+    // BOAT_LOCATION_COUNT owners indexed by location ID, borrowed for the client's lifetime.
+    // The room picks the location; an unready entry fails its bootstrap.
+    const BoatWorldResources *resources;
 } BoatNetClientConfig;
 
 typedef enum {
@@ -71,6 +74,7 @@ typedef struct {
     char name[BOAT_NET_NAME_BYTES + 1], token[BOAT_NET_TOKEN_BYTES + 1];
     char build[BOAT_NET_BUILD_BYTES + 1];
     uint32_t first_sequence;
+    const BoatWorldResources *resources; // Borrowed per-location owners (see the config).
     bool predict, predict_dirty;
     BoatNetClientPhase phase;
     double started_at;

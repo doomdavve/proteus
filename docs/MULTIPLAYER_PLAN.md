@@ -803,8 +803,11 @@ The playable map slice was pulled forward on 2026-10-24 at the user's request: b
 Eriksberg and river rooms now select their map on the authority and negotiate it with clients
 (protocol v3; v4 adds race rooms on the river), for free boating, deathmatch and race. See the [river hosting handoff](#river-hosting-handoff--2026-10-24).
 This delivers fixed-map play, not the full qualification milestone. The remaining work below
-still depends on M6 and mapped foundations; the legacy process-wide crop/cache model permits
-one map per process and has not become independently owned concurrent worlds.
+still depends on M6 and mapped foundations; the legacy process-wide crop/cache model permitted
+one map per process. Since adventure A1.2 (2026-10-25) authorities, clients and their
+prediction borrow a caller-owned collision map
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a12-result-2026-10-25)), but water-mesh,
+scenery and GPU caches remain process-global until A1.3/A1.4.
 
 Remaining qualification touches `boat_location`, `boat_map`, `boat_water_mesh`, harbor/traffic
 query splits, `boat_world`, views and mapped validators. Verify shared clock/settings,

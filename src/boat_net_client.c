@@ -20,6 +20,7 @@ void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
 {
     *client = (BoatNetClient) { .transport = transport,
         .first_sequence = config->first_sequence,
+        .resources = config->resources,
         .predict = config->predict,
         .started_at = now,
         .serviced_at = now,
@@ -143,10 +144,14 @@ static void install(BoatNetClient *c, double now)
         && state.wakes.life_ticks == c->accept.wake_life_ticks
         && state.wakes.crest_height == c->accept.crest_height;
     BoatFleet fleet;
-    const BoatWorldDefinition *definition = boat_location(c->accept.location);
+    const BoatWorldResources *resources = c->resources && c->accept.location < BOAT_LOCATION_COUNT
+        ? &c->resources[c->accept.location]
+        : NULL;
+    complete = complete && boat_world_resources_ready(resources)
+        && resources->definition->id == c->accept.location;
     if (complete)
-        complete = boat_fleet_init(&fleet, definition,
-            boat_world_test_water(definition, c->accept.waves, false, false),
+        complete = boat_fleet_init(&fleet, resources,
+            boat_world_test_water(resources->definition, c->accept.waves, false, false),
             c->accept.wake_life_ticks, c->accept.crest_height);
     if (!complete) {
         ++c->stats.bootstrap_failures;

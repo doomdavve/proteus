@@ -5,6 +5,7 @@
 #include "boat.h"
 #include "boat_course.h"
 #include "boat_map.h"
+#include "boat_test_world.h"
 #include "raymath.h"
 #include "waterfront_city.h"
 #include "waterfront_harbor.h"
@@ -61,7 +62,7 @@ static void start(CoreRun *run, int index)
         water = boat_water_gentle();
     }
     *run = (CoreRun) { 0 };
-    boat_world_init(&run->world, definition, water);
+    boat_world_init(&run->world, test_world(definition->id), water);
     boat_reset_location(&run->boat, definition);
 }
 
@@ -150,12 +151,13 @@ static int water(void)
 static int shoreline(void)
 {
     const BoatWorldDefinition *definition = boat_location(BOAT_LOCATION_RIVER);
-    boat_map_legacy_destroy();
+    BoatWorldResources river;
+    CHECK(boat_world_resources_init(&river, definition));
     Vector2 normal = { 0 };
-    CHECK(definition->mapped && boat_map_legacy_water(definition->spawn, 2));
-    CHECK(!boat_map_legacy_water_contact((Vector2) { 5000, 5000 }, 2, &normal));
+    CHECK(definition->mapped && boat_map_water(&river.map, definition->spawn, 2));
+    CHECK(!boat_map_water_contact(&river.map, (Vector2) { 5000, 5000 }, 2, &normal));
     CHECK(fabsf(Vector2Length(normal) - 1) < 1e-4f);
-    boat_map_legacy_destroy();
+    boat_world_resources_destroy(&river);
     WaterfrontBerth berth = waterfront_harbor_berths()[0];
     CHECK(waterfront_harbor_contact((Vector2) { -berth.position.x, berth.position.z }, 1, &normal));
     puts("shoreline=ok");
@@ -164,6 +166,7 @@ static int shoreline(void)
 
 int main(void)
 {
+    test_worlds_open();
     CHECK(interleaved() == 0);
     CHECK(course() == 0);
     CHECK(water() == 0);

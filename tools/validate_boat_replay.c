@@ -35,7 +35,7 @@ static bool same_samples(const BoatReplaySample *a, const BoatReplaySample *b, s
 static int clock_contracts(void)
 {
     const uint64_t ticks[] = { 0, 1, 28800, 72000, 432000 };
-    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    const BoatWorldResources *basin = test_world(BOAT_LOCATION_BASIN);
     BoatSession session;
     boat_session_init(&session, basin, (BoatWater) { 0 });
     for (size_t i = 0; i < sizeof(ticks) / sizeof(ticks[0]); ++i) {
@@ -122,8 +122,8 @@ static int route(BoatReplay *recording, BoatReplayRuns *runs, int ticks, bool wa
 {
     const Vector2 points[] = { { 0, 37 }, { 22, 7 }, { -22, -23 }, { 0, -55 } };
     BoatSession session;
-    boat_session_init(&session, boat_location(BOAT_LOCATION_BASIN),
-        waves ? boat_water_gentle() : (BoatWater) { 0 });
+    boat_session_init(
+        &session, test_world(BOAT_LOCATION_BASIN), waves ? boat_water_gentle() : (BoatWater) { 0 });
     Boat *boat = &session.boat;
     boat_session_start_course(&session);
     boat->position = points[0];
@@ -176,7 +176,7 @@ static int ghost_rendering(void)
     BoatViewState boat = { .course = { .enabled = true } }, ghost;
     static const BoatPresentation view;
     BoatWorld world;
-    boat_world_init(&world, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_world_init(&world, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_reset(&boat.boat);
     boat.boat.position = BOAT_COURSE_START;
     ghost = boat;
@@ -290,7 +290,7 @@ static int playback_controls(const BoatReplay *run)
 static int banked_course(const char *directory)
 {
     BoatSession session;
-    boat_session_init(&session, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_session_start_course(&session);
     // The session also records its own runs; its finish must wait for the flush.
     session.record_runs = true;
@@ -411,6 +411,7 @@ static int banked_course(const char *directory)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     CHECK(clock_contracts() == 0);
     CHECK(flag_playback() == 0);
     CHECK(argc == 2);
@@ -625,5 +626,6 @@ int main(int argc, char **argv)
     remove(best_path);
     remove(invalid);
     puts("Boat recording, playback and personal-best checks passed");
+    test_worlds_close();
     return 0;
 }

@@ -6,6 +6,7 @@
  * untouched. */
 #include "boat_fleet.h"
 #include "boat_gpu.h"
+#include "boat_test_world.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -29,8 +30,9 @@ typedef struct {
 static void formation(Formation *f, bool waves, float seconds)
 {
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
-    boat_fleet_init(&f->fleet, basin, boat_world_test_water(basin, waves, false, false),
-        BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT);
+    boat_fleet_init(&f->fleet, test_world(BOAT_LOCATION_BASIN),
+        boat_world_test_water(basin, waves, false, false), BOAT_OBJECT_LIFE_TICKS,
+        BOAT_OBJECT_DEFAULT_HEIGHT);
     static const Vector2 start[BOAT_FLEET_SLOTS] = { { 0, 50 }, { -5, 40 }, { 5, 36 }, { 0, 29 } };
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
         boat_fleet_place(&f->fleet, i, (Boat) { .position = start[i], .throttle = .55f });
@@ -99,6 +101,7 @@ static int check(void)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     const char *screenshot = NULL;
     bool gpu = false, waves = false;
     float time = 3;
@@ -156,5 +159,6 @@ int main(int argc, char **argv)
     UnloadImage(image);
     boat_gpu_destroy(&graphics);
     CloseWindow();
+    test_worlds_close();
     return saved ? 0 : 1;
 }

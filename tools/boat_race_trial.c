@@ -2,10 +2,11 @@
 #include "boat_gpu.h"
 #include "boat_map.h"
 #include "boat_race.h"
-#include "wake_velocity_drive.h"
+#include "boat_test_world.h"
 #include "boat_throttle.h"
 #include "boat_water_mesh.h"
 #include "raymath.h"
+#include "wake_velocity_drive.h"
 #include "waterfront_traffic.h"
 #include <math.h>
 #include <stdio.h>
@@ -51,7 +52,7 @@ static void start(BoatSession *session, ObjectStudy *objects, bool source, doubl
     BoatWater water = { 0 };
     if (source)
         water.vessel = ferry();
-    boat_session_init(session, boat_location(BOAT_LOCATION_RIVER), water);
+    boat_session_init(session, test_world(BOAT_LOCATION_RIVER), water);
     session->boat.position = route[0];
     session->boat.heading = heading_to(route[0], route[1]);
     boat_session_set_tick(session, (uint64_t)llround(delay * BOAT_TICK_HZ));
@@ -158,7 +159,7 @@ static void contracts(void)
     CHECK(nonzero > 100);
     // Restore the real fleet across the encounter, including all four ordinary player wakes.
     BoatFleet a, b;
-    CHECK(boat_fleet_init(&a, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { .vessel = w },
+    CHECK(boat_fleet_init(&a, test_world(BOAT_LOCATION_RIVER), (BoatWater) { .vessel = w },
         BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
         Boat boat;
@@ -176,7 +177,7 @@ static void contracts(void)
     }
     boat_fleet_save(&a, &checkpoint);
     CHECK(boat_fleet_init(
-        &b, a.world.definition, a.world.water, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
+        &b, a.world.resources, a.world.water, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     boat_fleet_restore(&b, &checkpoint);
     for (int t = 0; t < 900; ++t) {
         BoatInput inputs[BOAT_FLEET_SLOTS];
@@ -394,7 +395,7 @@ static void approaches(void)
                 }
                 if (overlap)
                     water.objects = &objects;
-                boat_session_init(&session, boat_location(BOAT_LOCATION_RIVER), water);
+                boat_session_init(&session, test_world(BOAT_LOCATION_RIVER), water);
                 session.presentation_enabled = false;
                 boat_session_set_tick(&session, 600);
                 Vector2 direction = Vector2Rotate(forward, angle * DEG2RAD);
@@ -446,12 +447,12 @@ static void source_bounds(void)
                 Vector2 p = Vector2Add(centre,
                     Vector2Add(Vector2Scale(w.direction, end * BOAT_VESSEL_LENGTH * .5f),
                         Vector2Scale(side, edge * BOAT_VESSEL_BEAM * .5f)));
-                CHECK(boat_map_legacy_water(p, 1));
+                CHECK(test_river_water(p, 1));
             }
         float lo = 0, hi = 200;
         for (int i = 0; i < 12; ++i) {
             float mid = (lo + hi) * .5f;
-            if (boat_map_legacy_water(centre, mid))
+            if (test_river_water(centre, mid))
                 lo = mid;
             else
                 hi = mid;
@@ -479,7 +480,7 @@ static void checks(void)
         length += Vector2Distance(route[i - 1], route[i]);
         for (int j = 0; j <= 100; ++j) {
             Vector2 p = Vector2Lerp(route[i - 1], route[i], j / 100.0f);
-            CHECK(boat_map_legacy_water(p, 12));
+            CHECK(test_river_water(p, 12));
         }
     }
     printf("prototype_polyline_m=%.2f required_average_55s=%.2f\n", length, length / 55);
@@ -538,6 +539,7 @@ static void preview_advance(const Boat *boat, Vector2 previous, unsigned *next, 
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     bool check = false, gpu_check = false, gpu_enabled = true, play = false, source = true;
     bool skill = false;
     const char *output = NULL;
@@ -737,8 +739,8 @@ int main(int argc, char **argv)
     renderer3d_destroy(&cpu);
     boat_session_destroy(&session);
     boat_water_mesh_destroy();
-    boat_map_legacy_destroy();
     if (window)
         CloseWindow();
+    test_worlds_close();
     return 0;
 }

@@ -29,7 +29,7 @@ static void crossing(void)
     BoatWakePlayer *world = boat_wake_player_create(1.0 / 120);
     CHECK(world);
     BoatSession emitter;
-    boat_session_init(&emitter, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&emitter, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     emitter.world.wake_field = boat_wake_player_field(world);
     emitter.boat.position = (Vector2) { -95, 0 };
     emitter.boat.heading = 1.57079632679f;
@@ -199,6 +199,7 @@ static void shader_queries(const BoatSession *session, const BoatGpu *gpu)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     if (argc > 1 && strcmp(argv[1], "--crossing") == 0) {
         crossing();
         return 0;
@@ -216,7 +217,7 @@ int main(int argc, char **argv)
     BoatWakePlayer *world = boat_wake_player_create(1.0 / 120);
     CHECK(world);
     BoatSession boat;
-    boat_session_init(&boat, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat.world.wake_field = boat_wake_player_field(world);
     BoatSession dry = boat;
     dry.boat.height = 10;
@@ -339,5 +340,6 @@ int main(int argc, char **argv)
     CHECK(boat_wake_player_report(world).energy.retired == retained);
     boat_wake_player_destroy(world);
     boat_water_mesh_destroy();
+    test_worlds_close();
     return 0;
 }

@@ -3,9 +3,10 @@
 #include "boat_map.h"
 #include "boat_replay.h"
 #include "boat_session.h"
-#include "wake_velocity_state.h"
+#include "boat_test_world.h"
 #include "boat_view.h"
 #include "raymath.h"
+#include "wake_velocity_state.h"
 
 #include <inttypes.h>
 #include <math.h>
@@ -74,11 +75,10 @@ static uint64_t physical_hash(const Boat *boat, const ObjectStudy *study)
 static int calm_independence(void)
 {
     const uint64_t starts[] = { 0, DAY_TICKS, 30 * DAY_TICKS };
-    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
     static BoatSession sessions[3];
     static ObjectStudy studies[3];
     for (int i = 0; i < 3; ++i) {
-        boat_session_init(&sessions[i], basin, (BoatWater) { 0 });
+        boat_session_init(&sessions[i], test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
         object_study_reset(&studies[i], &sessions[i], false, BOAT_OBJECT_LIFE_TICKS, 1.8f);
         boat_session_set_tick(&sessions[i], starts[i]);
     }
@@ -97,7 +97,8 @@ static int calm_independence(void)
         (unsigned long long)studies[0].wakes.emitted, sessions[0].boat.landings);
     // The legacy D3 trail stores double births; equal relative histories match closely.
     for (int i = 0; i < 3; ++i) {
-        boat_session_init(&sessions[i], basin, (BoatWater) { .player_wake_enabled = true });
+        boat_session_init(&sessions[i], test_world(BOAT_LOCATION_BASIN),
+            (BoatWater) { .player_wake_enabled = true });
         boat_session_set_tick(&sessions[i], starts[i]);
     }
     float divergence = 0;
@@ -139,7 +140,7 @@ static int large_time_locations(void)
             BoatSession session;
             BoatWater water = boat_water_gentle();
             water.player_wake_enabled = true;
-            boat_session_init(&session, definition, water);
+            boat_session_init(&session, test_world(definition->id), water);
             boat_session_set_tick(&session, starts[s]);
             const Boat *boat = &session.boat;
             float peak = 0;
@@ -153,7 +154,7 @@ static int large_time_locations(void)
                 CHECK(boat_session_time(&session)
                     == boat_tick_seconds(starts[s] + (uint64_t)tick + 1));
                 if (location)
-                    CHECK(boat_map_legacy_water(boat->position, 0));
+                    CHECK(test_river_water(boat->position, 0));
                 else
                     CHECK(fabsf(boat->position.x) < BOAT_BASIN_HALF_X
                         && fabsf(boat->position.y) < BOAT_BASIN_HALF_Z);
@@ -166,7 +167,6 @@ static int large_time_locations(void)
                 &view, &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
             CHECK(frame.time == boat_session_time(&session));
         }
-        boat_map_legacy_destroy();
     }
     puts("large_time_locations=ok basin,river starts=1d,30d waves+d3");
     return 0;
@@ -176,7 +176,7 @@ static int large_time_locations(void)
 static int replay_world_time(const char *path)
 {
     BoatSession session;
-    boat_session_init(&session, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_init(&session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_session_start_course(&session);
     boat_session_set_tick(&session, 30 * DAY_TICKS + 17);
     Boat *boat = &session.boat;
@@ -219,8 +219,8 @@ static int soak(double seconds, const char *directory, bool waves)
     static BoatSession session;
     static ObjectStudy study;
     // Since M2 the crossing boat shares the player's fleet world, waves included.
-    boat_session_init(&session, boat_location(BOAT_LOCATION_BASIN),
-        waves ? boat_water_gentle() : (BoatWater) { 0 });
+    boat_session_init(
+        &session, test_world(BOAT_LOCATION_BASIN), waves ? boat_water_gentle() : (BoatWater) { 0 });
     object_study_reset(&study, &session, true, BOAT_OBJECT_LIFE_TICKS, 1.8f);
     const BoatWakeObjects *pool = object_study_wakes(&study);
     const Boat *other_boat = object_study_other(&study);
@@ -305,6 +305,7 @@ static int soak(double seconds, const char *directory, bool waves)
 
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     SetTraceLogLevel(LOG_WARNING);
     if (argc >= 4 && strcmp(argv[1], "--soak") == 0) {
         char *end;
@@ -328,5 +329,6 @@ int main(int argc, char **argv)
     CHECK(large_time_locations() == 0);
     CHECK(replay_world_time(path) == 0);
     puts("boat_clock=ok");
+    test_worlds_close();
     return 0;
 }

@@ -1,4 +1,5 @@
 /* Finite scripted wake-return workload; no window, audio, replay or timed I/O. */
+#include "boat_test_world.h"
 #include "wake_velocity_state.h"
 #include <errno.h>
 #include <inttypes.h>
@@ -36,6 +37,7 @@ static bool count(const char *s, unsigned *out)
 }
 int main(int argc, char **argv)
 {
+    test_worlds_open();
     unsigned warmup = 120, frames = 1800;
     const char *output = NULL;
     bool presentation = true; // Cosmetics on by default, as in the P3a baseline.
@@ -83,7 +85,7 @@ int main(int argc, char **argv)
     BoatSession session;
     ObjectStudy objects;
     boat_session_init(
-        &session, boat_location(BOAT_LOCATION_BASIN), boat_water_test(false, false, false));
+        &session, test_world(BOAT_LOCATION_BASIN), boat_water_test(false, false, false));
     const Boat *const boat = &session.boat;
     // Retain the established 1.8 m stress workload; gameplay defaults are tuned separately.
     object_study_reset(&objects, &session, false, BOAT_OBJECT_LIFE_TICKS, 1.8f);
@@ -177,5 +179,6 @@ int main(int argc, char **argv)
     free(samples);
     free(sorted);
     free(trace);
+    test_worlds_close();
     return ok ? 0 : fail("cannot write report (parent directory must exist)");
 }
