@@ -516,7 +516,7 @@ static bool footprint_in_water(const BoatSession *session)
             boat->position.y
                 + (-cosf(boat->heading) * samples[i].y + sinf(boat->heading) * samples[i].x) };
         if (session->world.definition->mapped
-                ? !boat_map_water(p, .35f)
+                ? !boat_map_legacy_water(p, .35f)
                 : fabsf(p.x) > BOAT_BASIN_HALF_X - .35f || fabsf(p.y) > BOAT_BASIN_HALF_Z - .35f)
             return false;
     }
@@ -944,7 +944,7 @@ static int validate_gentle_encounters(void)
         boat.boat.throttle = 1;
         for (int tick = 0; tick < 1200; ++tick) {
             boat_session_step(&boat, (BoatInput) { 0 });
-            CHECK(boat_map_water(boat.boat.position, .3f));
+            CHECK(boat_map_legacy_water(boat.boat.position, .3f));
             CHECK(isfinite(boat.boat.heading) && fabsf(boat.boat.yaw_velocity) < 4);
         }
     }
@@ -1166,7 +1166,7 @@ static int validate_water_patch(void)
                         if (x * x + z * z > 78 * 78)
                             continue;
                         Vector2 p = { center.x + x + .17f, center.y + z + .23f };
-                        bool expected = location ? boat_map_water((Vector2) { -p.x, p.y }, 0)
+                        bool expected = location ? boat_map_legacy_water((Vector2) { -p.x, p.y }, 0)
                                                  : fabsf(p.x) <= 120 && fabsf(p.y) <= 80;
                         CHECK(patch_contains(mesh, p) == expected);
                     }
@@ -1320,9 +1320,9 @@ int main(void)
     CHECK(!frame.player_active);
     BoatSession mapped;
     boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
-    CHECK(mapped.world.definition->mapped && boat_map_water(mapped.boat.position, .3f));
-    CHECK(!boat_map_water((Vector2) { 10000, 0 }, 0));
-    CHECK(!boat_map_water((Vector2) { -100, 60 }, 0));
+    CHECK(mapped.world.definition->mapped && boat_map_legacy_water(mapped.boat.position, .3f));
+    CHECK(!boat_map_legacy_water((Vector2) { 10000, 0 }, 0));
+    CHECK(!boat_map_legacy_water((Vector2) { -100, 60 }, 0));
     // Drive into both dock quays. Hull clearance must remain in water and impacts rebound.
     for (int side = -1; side <= 1; side += 2) {
         boat_session_init(&mapped, boat_location(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
@@ -1371,12 +1371,12 @@ int main(void)
     mapped.boat.throttle = 1;
     for (int tick = 0; tick < 1200; ++tick) {
         boat_session_step(&mapped, (BoatInput) { 0 });
-        CHECK(boat_map_water(mapped.boat.position, .3f));
+        CHECK(boat_map_legacy_water(mapped.boat.position, .3f));
     }
     CHECK(mapped.boat.position.y < -50);
     boat_session_init(&mapped, boat_location(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(!mapped.world.definition->mapped && mapped.boat.position.y == 10);
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     CHECK(validate_course() == 0);
     CHECK(validate_coasting() == 0);
     CHECK(validate_countersteering() == 0);

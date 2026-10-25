@@ -4,30 +4,22 @@
 
 #include <stdlib.h>
 
-typedef struct {
-    unsigned int a, b;
-} Edge;
-static Edge *shore;
-static size_t shore_count, water_count;
-static const Mesh3D *cached_mesh;
-
 static int compare_edge(const void *left, const void *right)
 {
-    const Edge *a = left, *b = right;
+    const BoatMapEdge *a = left, *b = right;
     if (a->a != b->a)
         return a->a < b->a ? -1 : 1;
     return a->b < b->b ? -1 : a->b > b->b;
 }
 
-static bool init(void)
+bool boat_map_init(BoatMap *map, const BoatMapDescription *description)
 {
-    const Mesh3D *mesh = waterfront_city_mesh();
-    if (shore && cached_mesh == mesh)
-        return true;
-    boat_map_destroy();
-    cached_mesh = mesh;
+    *map = (BoatMap) { 0 };
+    if (!description || !description->mesh)
+        return false;
+    const Mesh3D *mesh = description->mesh;
     // The importer emits the triangulated water surface first, followed by raised land.
-    water_count = 0;
+    size_t water_count = 0;
     while (water_count < mesh->triangle_count) {
         const Triangle3D *t = &mesh->triangles[water_count];
         if (mesh->vertices[t->vertices[0]].y != 0 || mesh->vertices[t->vertices[1]].y != 0
@@ -37,7 +29,7 @@ static bool init(void)
     }
     if (!water_count)
         return false;
-    shore = malloc(water_count * 3 * sizeof(*shore));
+    BoatMapEdge *shore = malloc(water_count * 3 * sizeof(*shore));
     if (!shore)
         return false;
     size_t count = 0;
@@ -45,11 +37,11 @@ static bool init(void)
         for (int j = 0; j < 3; ++j) {
             unsigned int a = mesh->triangles[i].vertices[j];
             unsigned int b = mesh->triangles[i].vertices[(j + 1) % 3];
-            shore[count++] = a < b ? (Edge) { a, b } : (Edge) { b, a };
+            shore[count++] = a < b ? (BoatMapEdge) { a, b } : (BoatMapEdge) { b, a };
         }
     }
     qsort(shore, count, sizeof(*shore), compare_edge);
-    shore_count = 0;
+    size_t shore_count = 0;
     for (size_t i = 0; i < count;) {
         size_t end = i + 1;
         while (end < count && compare_edge(&shore[i], &shore[end]) == 0)
@@ -59,7 +51,21 @@ static bool init(void)
             shore[shore_count++] = shore[i];
         i = end;
     }
+    *map = (BoatMap) { description, shore, shore_count, water_count };
     return true;
+}
+
+void boat_map_destroy(BoatMap *map)
+{
+    free(map->shore);
+    *map = (BoatMap) { 0 };
+}
+
+bool boat_map_ready(const BoatMap *map) { return map && map->description && map->shore; }
+
+bool boat_map_is_bridge_triangle(const BoatMapDescription *description, size_t index)
+{
+    return index >= description->bridge_first_triangle;
 }
 
 static Vector2 point(Vector3 p) { return (Vector2) { p.x, p.z }; }
@@ -68,14 +74,15 @@ static float cross(Vector2 a, Vector2 b, Vector2 p)
     return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
 }
 
-bool boat_map_water_contact(Vector2 position, float clearance, Vector2 *water_normal)
+bool boat_map_water_contact(
+    const BoatMap *map, Vector2 position, float clearance, Vector2 *water_normal)
 {
-    if (!init())
+    if (!boat_map_ready(map))
         return false;
     Vector2 p = { -position.x, position.y };
-    const Mesh3D *mesh = waterfront_city_mesh();
+    const Mesh3D *mesh = map->description->mesh;
     bool inside = false;
-    for (size_t i = 0; i < water_count; ++i) {
+    for (size_t i = 0; i < map->water_count; ++i) {
         const Triangle3D *t = &mesh->triangles[i];
         Vector2 a = point(mesh->vertices[t->vertices[0]]);
         Vector2 b = point(mesh->vertices[t->vertices[1]]);
@@ -88,8 +95,9 @@ bool boat_map_water_contact(Vector2 position, float clearance, Vector2 *water_no
     }
     Vector2 nearest = { 0 };
     float nearest_distance = INFINITY;
-    for (size_t i = 0; i < shore_count; ++i) {
-        Vector2 a = point(mesh->vertices[shore[i].a]), b = point(mesh->vertices[shore[i].b]);
+    for (size_t i = 0; i < map->shore_count; ++i) {
+        const BoatMapEdge *edge = &map->shore[i];
+        Vector2 a = point(mesh->vertices[edge->a]), b = point(mesh->vertices[edge->b]);
         Vector2 ab = Vector2Subtract(b, a);
         float length = Vector2LengthSqr(ab);
         float t
@@ -114,14 +122,23 @@ bool boat_map_water_contact(Vector2 position, float clearance, Vector2 *water_no
     return false;
 }
 
-bool boat_map_water(Vector2 position, float clearance)
+bool boat_map_water(const BoatMap *map, Vector2 position, float clearance)
 {
-    return boat_map_water_contact(position, clearance, NULL);
+    return boat_map_water_contact(map, position, clearance, NULL);
 }
 
-void boat_map_destroy(void)
+static BoatMap legacy;
+
+bool boat_map_legacy_water_contact(Vector2 position, float clearance, Vector2 *water_normal)
 {
-    free(shore);
-    shore = NULL;
-    shore_count = water_count = 0;
+    if (!boat_map_ready(&legacy) && !boat_map_init(&legacy, waterfront_city_map()))
+        return false;
+    return boat_map_water_contact(&legacy, position, clearance, water_normal);
 }
+
+bool boat_map_legacy_water(Vector2 position, float clearance)
+{
+    return boat_map_legacy_water_contact(position, clearance, NULL);
+}
+
+void boat_map_legacy_destroy(void) { boat_map_destroy(&legacy); }

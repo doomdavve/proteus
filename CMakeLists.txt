@@ -425,6 +425,12 @@ add_executable(validate_boat_core tools/validate_boat_core.c)
 target_link_libraries(validate_boat_core PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_core PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_core COMMAND validate_boat_core)
+# Adventure A1.1: explicit map descriptions and independently owned collision caches.
+add_executable(validate_boat_map tools/validate_boat_map.c)
+target_link_libraries(validate_boat_map PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_map PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_map COMMAND validate_boat_map)
+set_tests_properties(boat_map PROPERTIES PASS_REGULAR_EXPRESSION "boat_map=ok")
 # Multiplayer M2: the local four-boat authority and its scripted server, also core-only.
 add_executable(validate_boat_fleet tools/validate_boat_fleet.c)
 target_link_libraries(validate_boat_fleet PRIVATE proteus_boat_core)
@@ -796,7 +802,7 @@ endforeach()
 get_property(PROTEUS_TESTS DIRECTORY PROPERTY TESTS)
 foreach(test IN LISTS PROTEUS_TESTS)
   get_test_property(${test} LABELS labels)
-  if(test MATCHES "^boat_core|^boat_fleet|^boat_match|^boat_race$|^boat_server|^boat_net|^boat_bot")
+  if(test MATCHES "^boat_core|^boat_map$|^boat_fleet|^boat_match|^boat_race$|^boat_server|^boat_net|^boat_bot")
     set_property(TEST ${test} APPEND PROPERTY LABELS core cpu)
   elseif(labels MATCHES "gpu")
   elseif(test MATCHES "screenshot|checksum|_cpu$")
@@ -815,7 +821,8 @@ if(PROTEUS_OPTIMIZE_TESTS)
   foreach(target proteus_boat_core proteus_render proteus_boat_session proteus_boat_drive
       validate_boat validate_boat_banking validate_boat_turn_entry
       validate_boat_environment validate_boat_replay boat_water_review wake_objects_review
-      validate_boat_clock validate_boat_world validate_boat_core validate_boat_fleet boat_server
+      validate_boat_clock validate_boat_world validate_boat_core validate_boat_map validate_boat_fleet
+      boat_server
       proteus_boat_net validate_boat_net)
     target_compile_options(${target} PRIVATE
       $<$<AND:$<CONFIG:Debug>,$<C_COMPILER_ID:AppleClang,Clang,GNU>>:-O2>)

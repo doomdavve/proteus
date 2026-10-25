@@ -290,7 +290,7 @@ int main(void)
     CHECK(render_rates() == 0);
     CHECK(core_order() == 0);
     boat_water_mesh_destroy();
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     puts("boat_world=ok");
     return 0;
 }

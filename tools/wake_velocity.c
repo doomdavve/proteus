@@ -611,7 +611,7 @@ static int study(int argc, char **argv)
         if (replay_path)
             boat_replay_play(&session.runs, &session.runs.last);
     }
-    if (location->mapped && !boat_map_water(session.boat.position, 2.5f)) {
+    if (location->mapped && !boat_map_legacy_water(session.boat.position, 2.5f)) {
         fprintf(stderr, "River spawn is not navigable.\n");
         goto cleanup;
     }
@@ -1286,7 +1286,7 @@ cleanup:
             CloseWindow();
     }
     boat_water_mesh_destroy();
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     renderer3d_destroy(&renderer);
     free(pixels);
     return result;

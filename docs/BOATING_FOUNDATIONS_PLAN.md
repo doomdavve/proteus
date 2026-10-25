@@ -22,6 +22,10 @@ uses the remaining mapped W1/W2/W3/W4 work before tiled scenery and indexed coll
 Those optimizations are owned by the adventure plan, after ownership parity is established.
 Eriksberg and the main demo were retired on 2026-10-25; for this dependency, adapt the original
 mapped isolation/lifecycle recipes below to basin and two independently owned river instances.
+Adventure A1.1 (2026-10-25) moved the shoreline cache into a caller-owned `BoatMap`
+prepared from an explicit `BoatMapDescription`. The global `boat_map_legacy_*` wrapper
+remains until A1.2; see the
+[A1.1 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a11--explicit-map-data-and-collision-cache-construction).
 The original geometry/timing comparisons remain historical evidence, not current commands.
 The [Sol first-steps handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) details the mapped A1
 execution slices. Its resource contract adapts original W3 item 1: an explicit external owner

@@ -123,9 +123,9 @@ static int wake_checks(void)
     }
     for (int tick = 0; tick <= 120; ++tick) {
         CHECK(boat_water_wake_source(shifted, tick * .1f, &source));
-        CHECK(boat_map_water(source, 3));
+        CHECK(boat_map_legacy_water(source, 3));
     }
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     // Repeated crossings at different speeds and angles must settle without stored energy.
     const float speeds[] = { 0, 3, 9 };
     float encounter = 0;

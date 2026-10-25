@@ -79,21 +79,22 @@ static int geometry(void)
     for (unsigned i = 0; i < c->gate_count; ++i) {
         const BoatRaceGate *g = gate(i);
         for (int side = -1; side <= 1; side += 2) {
-            CHECK(boat_map_water(along(g, 0, side * g->half_width), 0));
+            CHECK(boat_map_legacy_water(along(g, 0, side * g->half_width), 0));
             if (i + 1 == c->gate_count)
-                CHECK(!boat_map_water(along(g, 0, side * (g->half_width + 12)), 0));
+                CHECK(!boat_map_legacy_water(along(g, 0, side * (g->half_width + 12)), 0));
             else
-                CHECK(boat_map_water(along(g, 0, side * g->half_width), 8));
+                CHECK(boat_map_legacy_water(along(g, 0, side * g->half_width), 8));
         }
         // Straight lines between anchors keep 12 m of mapped clearance.
         const BoatRaceGate *from = i ? gate(i - 1) : &c->start;
         for (int k = 0; k <= 100; ++k) {
-            CHECK(boat_map_water(Vector2Lerp(from->centre, g->centre, k / 100.0f), 12));
+            CHECK(boat_map_legacy_water(Vector2Lerp(from->centre, g->centre, k / 100.0f), 12));
             // Include the outer racing lanes, not just the centre line.
             for (int side = -1; side <= 1; side += 2)
-                CHECK(boat_map_water(Vector2Lerp(
-                    along(from, 0, (float)side * fminf(21, from->half_width - 4)),
-                    along(g, 0, (float)side * fminf(21, g->half_width - 4)), k / 100.0f), 12));
+                CHECK(boat_map_legacy_water(
+                    Vector2Lerp(along(from, 0, (float)side * fminf(21, from->half_width - 4)),
+                        along(g, 0, (float)side * fminf(21, g->half_width - 4)), k / 100.0f),
+                    12));
         }
     }
     const BoatRaceGate *finish = gate(c->gate_count - 1);

@@ -91,7 +91,7 @@ static bool hulls_clear(const Boat *boat, double time)
                 (Vector2) { m.position.x, m.position.z }, m.heading, s.length, s.beam))
             return false;
     }
-    return boat_map_water(boat->position, .5f);
+    return boat_map_legacy_water(boat->position, .5f);
 }
 
 // Exercise the boating snapshot as well as the authored paths: both renderers must
@@ -128,7 +128,7 @@ static int check_long_session(void)
             CHECK(contact.vessel == i);
         }
         for (int j = 0; j < frame.wake_count; ++j)
-            CHECK(boat_map_water(
+            CHECK(boat_map_legacy_water(
                 (Vector2) { -frame.wakes[j].pose.position.x, frame.wakes[j].pose.position.z },
                 .5f));
         waterfront_boating_gulls(time, far, (Vector3) { 0 }, &gulls);
@@ -210,7 +210,7 @@ int main(void)
     CHECK(check_vertical_contacts() == 0);
     if (check_gulls() || check_long_session())
         return 1;
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
         BoatModelSpec spec = waterfront_traffic_spec(i);
         const Mesh3D *mesh = waterfront_traffic_mesh(i);
@@ -227,12 +227,12 @@ int main(void)
                 Vector3 p = boat_model_point(pose,
                     (Vector3) { (corner & 1 ? 1 : -1) * (spec.beam * .5f + 1.5f), 0,
                         (corner & 2 ? 1 : -1) * (spec.length * .5f + 1.5f) });
-                CHECK(boat_map_water((Vector2) { -p.x, p.z }, .5f));
+                CHECK(boat_map_legacy_water((Vector2) { -p.x, p.z }, .5f));
                 CHECK(!waterfront_harbor_contact((Vector2) { -p.x, p.z }, .5f, NULL));
             }
         }
     }
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
         float period = waterfront_traffic_period(i);
         WaterfrontVesselMotion start = waterfront_traffic_motion(i, 0);
@@ -285,7 +285,8 @@ int main(void)
             const WaterfrontTrafficWake *wake = &waves.wakes[j];
             CHECK(isfinite(wake->pose.rotation.x) && isfinite(wake->pose.rotation.z));
             CHECK(wake->pose.scale.z > 0 && wake->pose.scale.z < 5);
-            CHECK(boat_map_water((Vector2) { -wake->pose.position.x, wake->pose.position.z }, .5f));
+            CHECK(boat_map_legacy_water(
+                (Vector2) { -wake->pose.position.x, wake->pose.position.z }, .5f));
             CHECK(wake->color.a == 255);
         }
     }
@@ -331,7 +332,7 @@ int main(void)
     }
     CHECK(waterfront_traffic_mesh(-1) == NULL);
     CHECK(waterfront_traffic_period(-1) == 0);
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     puts("harbor_traffic=ok routes=4 pairwise_schedule=4160s visual_wakes=64 moving_contacts=ok "
          "long_session=30d");
     return 0;

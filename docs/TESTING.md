@@ -82,6 +82,10 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
 `render` labels. The `core` checks are also
 `cpu`:
 - `boat_core` runs `validate_boat_core`, which links only the boating core library.
+- `boat_map` runs `validate_boat_map` (adventure A1.1). It checks explicit map descriptions,
+  caller-owned collision caches, failed/zeroed preparation, two river owners and a synthetic map
+  alive together, and destroy/recreate. It also matches a river query digest recorded before
+  the ownership change.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and

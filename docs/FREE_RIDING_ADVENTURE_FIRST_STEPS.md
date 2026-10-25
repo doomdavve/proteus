@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; A1.1 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction) completed 2026-10-25; A1.2 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -39,8 +39,8 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | A0.2 | A0.1 | Pinned coastal source extract and acquisition manifest; terrain/weather access findings | Complete 2026-10-25; [sources](adventure/README.md#coastal-sources-a02-2026-10-25) |
 | A0.3 | A0.2 | Offline coverage map, candidate route, first-slice polygon and tile/cost inventory | Complete 2026-10-25; [survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25) |
 | A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Complete 2026-10-25; [baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25), [decision](#a0-decision-record--2026-10-25) |
-| A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Pending; next |
-| A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Pending |
+| A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Complete 2026-10-25; [result](#a11--explicit-map-data-and-collision-cache-construction) |
+| A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Pending; next |
 | A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Pending |
 | A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Pending |
 | A1.5 | A1.4 | Reload/isolation/failure gate, parity evidence and A2 handoff | Pending |
@@ -396,6 +396,68 @@ safe to destroy and must report failure before the first mapped simulation tick.
 
 **Done when:** explicit map construction/query/destruction works independently, existing
 river behavior is unchanged, and the temporary compatibility surface is fully enumerated.
+
+**A1.1 result, 2026-10-25:** Started from a clean `413460d`.
+
+- **Description:** `BoatMapDescription` (`src/boat_map.h`) holds the mesh and
+  `bridge_first_triangle`. The compiled river crop is `waterfront_city_river_map`, with
+  unchanged arrays, ordering, colours and water-first inference. `BoatWorldDefinition.map`
+  points to it for the river and is NULL for the basin. The `mapped` flag remains; A1.2
+  validates that the two agree.
+- **Cache:** `BoatMap` is caller-owned and holds the borrowed description, sorted shore edges
+  and counts. `boat_map_init()` returns false for a missing description or mesh, or no leading
+  water, and leaves a zeroed map. `boat_map_destroy()` is idempotent, and an unready map has
+  no water. Queries take `const BoatMap *` and do not allocate. The exhaustive point-in-triangle
+  and nearest-edge algorithms, tie order, X reflection and normals are the previous code moved
+  over unchanged.
+- **Compatibility surface (A1.2 removes all of it):** `boat_map_legacy_water()`,
+  `boat_map_legacy_water_contact()` and `boat_map_legacy_destroy()`. They lazily prepare one
+  process-global `BoatMap` of the river through the same functions. Callers by file (call count):
+  - Runtime: `src/boat.c` (1, hull contact) and `src/boat_view.c` (4, particle/spray
+    filtering). Also `tools/wake_velocity.c` (2: spawn check and shutdown) and
+    `tools/boat_water_review.c` (11).
+  - Validators: `validate_boat` (8), `validate_traffic` (7), `validate_harbor` (5),
+    `validate_boat_race` (5), `boat_race_trial` (4), `validate_boat_core` (4),
+    `validate_boat_clock` (2), `validate_boat_banking` (2), `validate_boat_environment` (2),
+    `validate_boat_net` (2) and `validate_boat_world` (1). `validate_boat_map` exercises
+    the wrapper deliberately.
+
+  The description accessors `waterfront_city_mesh()` and
+  `waterfront_city_is_bridge_triangle()` also remain. They are used by `boat_net_protocol.c`
+  (content digest, A1.2), `boat_water_mesh.c` (A1.3), and `waterfront.c`,
+  `waterfront_corner.c` and `renderer_gpu.c` (A1.4). Review/validator tools also use them.
+- **Test:** the new `boat_map` CTest (`tools/validate_boat_map.c`, labels `core;cpu`, core
+  library only) does the following:
+  - Checks definition binding and bridge metadata.
+  - Covers zeroed, NULL, mesh-less, empty and land-only preparation, which must fail cleanly
+    and overwrite stale fields.
+  - Uses a synthetic 10 m square map with exact shore count, clearance and normals.
+  - Keeps two river owners and the square alive together, destroys and recreates one, and
+    queries the survivors.
+  - Rebuilds the legacy cache while an explicit owner is alive.
+
+  Both the explicit and legacy paths reproduce a 103,684-query river digest
+  (`63225c36181d381d`, 20,356 water answers). That grid covers clearances 0/0.5/3/12 m over
+  the crop plus a 40 m margin, and was recorded from the pre-change code at `413460d`.
+- **Verification (M1 Max, macOS 26 / Darwin 25.6, Apple clang 21, Debug):**
+  - The build is warning-clean, and CTest passed 114/114 active tests in 197.84 s
+    (15 retired tests disabled).
+  - The `boat_water_review --check` and `--check --waves` logs are identical to A0.1 apart
+    from the `final_state` line, which A0.1 did not yet print. The routes end at tick 12125
+    at (1088.337, −947.588) and (1088.350, −947.653).
+  - All 18 CPU and 18 GPU review PNGs (`build/adventure/a1-1/`) are byte-identical to
+    `build/adventure/a0-original/`.
+  - `validate_boat_map` built standalone with `-fsanitize=address,undefined` passed. macOS
+    ASan has no leak detection, so leak freedom is shown by the destroy paths, not a tool.
+- **Limitations:**
+  - No allocation-failure injection exists, so `malloc` failure is code-inspected
+    (it returns false with the map zeroed), not tested.
+  - Physical callers still share the one global cache, so two worlds cannot use different
+    maps yet. Nothing in sessions, fleets, prediction or the content digest changed.
+  - No visual or manual playback check was needed: rendering code was not touched and the
+    captures are identical.
+
+**Next: A1.2.**
 
 ## A1.2 — wire physical map ownership through all callers
 

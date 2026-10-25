@@ -1,4 +1,5 @@
 #include "boat_location.h"
+#include "waterfront_city.h"
 
 #include <string.h>
 
@@ -14,6 +15,7 @@ static const BoatWorldDefinition locations[BOAT_LOCATION_COUNT] = {
     [BOAT_LOCATION_RIVER] = { .id = BOAT_LOCATION_RIVER,
         .name = "river",
         .mapped = true,
+        .map = &waterfront_city_river_map,
         .spawn = { -12, 60 },
         .fleet_spawn = { -50, -290 },
         .current_center = -12,

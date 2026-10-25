@@ -60,7 +60,7 @@ static bool hull_clear(const Boat *boat)
         for (int side = -1; side <= 1; side += 2) {
             Vector2 p = Vector2Add(boat->position,
                 Vector2Add(Vector2Scale(forward, end * 2.5f), Vector2Scale(right, side * 1.2f)));
-            if (!boat_map_water(p, .5f))
+            if (!boat_map_legacy_water(p, .5f))
                 return false;
         }
     return true;
@@ -77,7 +77,7 @@ static float shore_distance(Vector2 position)
     float low = 0, high = 1000;
     for (int i = 0; i < 14; ++i) {
         float mid = (low + high) * .5f;
-        if (boat_map_water(position, mid))
+        if (boat_map_legacy_water(position, mid))
             low = mid;
         else
             high = mid;
@@ -552,7 +552,7 @@ cleanup:
         CloseWindow();
     }
     boat_water_mesh_destroy();
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     free(frames);
     free(scratch);
     return ok ? 0 : bench_fail(error ? error : "cannot write report");
@@ -630,12 +630,13 @@ int main(int argc, char **argv)
         return 2;
     SetTraceLogLevel(LOG_WARNING);
     // These samples distinguish navigable space under the deck from solid legs.
-    if (!boat_map_water((Vector2) { 454, -678 }, 8) || !boat_map_water((Vector2) { 1100, -950 }, 8)
-        || boat_map_water((Vector2) { 517.2f, -536.8f }, 0)
-        || boat_map_water((Vector2) { 486.7f, -527.6f }, 0)
-        || boat_map_water((Vector2) { 381.5f, -949.2f }, 0)
-        || boat_map_water((Vector2) { 349.1f, -938.7f }, 0)
-        || boat_map_water((Vector2) { 2000, -950 }, 0)) {
+    if (!boat_map_legacy_water((Vector2) { 454, -678 }, 8)
+        || !boat_map_legacy_water((Vector2) { 1100, -950 }, 8)
+        || boat_map_legacy_water((Vector2) { 517.2f, -536.8f }, 0)
+        || boat_map_legacy_water((Vector2) { 486.7f, -527.6f }, 0)
+        || boat_map_legacy_water((Vector2) { 381.5f, -949.2f }, 0)
+        || boat_map_legacy_water((Vector2) { 349.1f, -938.7f }, 0)
+        || boat_map_legacy_water((Vector2) { 2000, -950 }, 0)) {
         fprintf(stderr, "River support/water/crop checks failed.\n");
         return 1;
     }
@@ -843,6 +844,6 @@ cleanup:
         CloseWindow();
     }
     boat_water_mesh_destroy();
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     return result;
 }

@@ -150,12 +150,12 @@ static int water(void)
 static int shoreline(void)
 {
     const BoatWorldDefinition *definition = boat_location(BOAT_LOCATION_RIVER);
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     Vector2 normal = { 0 };
-    CHECK(definition->mapped && boat_map_water(definition->spawn, 2));
-    CHECK(!boat_map_water_contact((Vector2) { 5000, 5000 }, 2, &normal));
+    CHECK(definition->mapped && boat_map_legacy_water(definition->spawn, 2));
+    CHECK(!boat_map_legacy_water_contact((Vector2) { 5000, 5000 }, 2, &normal));
     CHECK(fabsf(Vector2Length(normal) - 1) < 1e-4f);
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     WaterfrontBerth berth = waterfront_harbor_berths()[0];
     CHECK(waterfront_harbor_contact((Vector2) { -berth.position.x, berth.position.z }, 1, &normal));
     puts("shoreline=ok");

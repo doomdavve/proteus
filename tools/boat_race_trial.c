@@ -446,12 +446,12 @@ static void source_bounds(void)
                 Vector2 p = Vector2Add(centre,
                     Vector2Add(Vector2Scale(w.direction, end * BOAT_VESSEL_LENGTH * .5f),
                         Vector2Scale(side, edge * BOAT_VESSEL_BEAM * .5f)));
-                CHECK(boat_map_water(p, 1));
+                CHECK(boat_map_legacy_water(p, 1));
             }
         float lo = 0, hi = 200;
         for (int i = 0; i < 12; ++i) {
             float mid = (lo + hi) * .5f;
-            if (boat_map_water(centre, mid))
+            if (boat_map_legacy_water(centre, mid))
                 lo = mid;
             else
                 hi = mid;
@@ -479,7 +479,7 @@ static void checks(void)
         length += Vector2Distance(route[i - 1], route[i]);
         for (int j = 0; j <= 100; ++j) {
             Vector2 p = Vector2Lerp(route[i - 1], route[i], j / 100.0f);
-            CHECK(boat_map_water(p, 12));
+            CHECK(boat_map_legacy_water(p, 12));
         }
     }
     printf("prototype_polyline_m=%.2f required_average_55s=%.2f\n", length, length / 55);
@@ -737,7 +737,7 @@ int main(int argc, char **argv)
     renderer3d_destroy(&cpu);
     boat_session_destroy(&session);
     boat_water_mesh_destroy();
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     if (window)
         CloseWindow();
     return 0;

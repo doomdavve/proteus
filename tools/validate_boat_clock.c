@@ -153,7 +153,7 @@ static int large_time_locations(void)
                 CHECK(boat_session_time(&session)
                     == boat_tick_seconds(starts[s] + (uint64_t)tick + 1));
                 if (location)
-                    CHECK(boat_map_water(boat->position, 0));
+                    CHECK(boat_map_legacy_water(boat->position, 0));
                 else
                     CHECK(fabsf(boat->position.x) < BOAT_BASIN_HALF_X
                         && fabsf(boat->position.y) < BOAT_BASIN_HALF_Z);
@@ -166,7 +166,7 @@ static int large_time_locations(void)
                 &view, &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
             CHECK(frame.time == boat_session_time(&session));
         }
-        boat_map_destroy();
+        boat_map_legacy_destroy();
     }
     puts("large_time_locations=ok basin,river starts=1d,30d waves+d3");
     return 0;

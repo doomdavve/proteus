@@ -1435,7 +1435,7 @@ static int mapped_rooms(void)
         CHECK(c->prediction.fleet.world.definition->id == (BoatLocationId)id);
         const BoatFleetSlot *own = boat_net_client_own(c);
         CHECK(own && boat_hull_clear(&own->boat, &c->fleet.world, room.now));
-        CHECK(boat_map_water(own->boat.position, 35));
+        CHECK(boat_map_legacy_water(own->boat.position, 35));
         CHECK(Vector2Distance(own->boat.position, boat_location(id)->spawn) > 200);
         for (unsigned j = 0; j < i; ++j)
             CHECK(Vector2Distance(
@@ -1465,7 +1465,7 @@ static int mapped_rooms(void)
                 continue;
             boat_reset(&distant);
             distant.position = (Vector2) { (float)x, (float)z };
-            if (boat_map_water(distant.position, 10)
+            if (boat_map_legacy_water(distant.position, 10)
                 && boat_hull_clear(&distant, &room.server.fleet.world, room.now))
                 found = true;
         }

@@ -704,7 +704,7 @@ static bool footprint_clear(const BoatSession *session)
             Vector2Add(Vector2Scale(right(boat->heading), samples[i].x),
                 Vector2Scale(forward(boat->heading), samples[i].y)));
         if (mapped) {
-            if (!boat_map_water(p, .35f) || waterfront_harbor_contact(p, .35f, NULL))
+            if (!boat_map_legacy_water(p, .35f) || waterfront_harbor_contact(p, .35f, NULL))
                 return false;
         } else if (fabsf(p.x) > BOAT_BASIN_HALF_X - .35f || fabsf(p.y) > BOAT_BASIN_HALF_Z - .35f)
             return false;
@@ -788,7 +788,7 @@ static int validate_contacts(void)
         printf("contact=%d impact_ticks=%d peak_roll_deg=%.6f max_filter_error=%.9g\n", trial,
             impacts, peak * RAD2DEG, max_load_error);
     }
-    boat_map_destroy();
+    boat_map_legacy_destroy();
     return 0;
 }
 
