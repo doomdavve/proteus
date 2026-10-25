@@ -1,0 +1,1692 @@
+{
+ "schema": 1,
+ "generator": "docs/adventure/survey.py",
+ "crs": "EPSG:3007 offsets from the crane origin",
+ "units": "metres",
+ "coordinate_order": "east,north",
+ "origin_epsg4326": [
+  11.9,
+  57.7
+ ],
+ "polygon_east_north": [
+  [
+   -1300,
+   -300
+  ],
+  [
+   -3000,
+   -300
+  ],
+  [
+   -4800,
+   -700
+  ],
+  [
+   -5300,
+   -1600
+  ],
+  [
+   -5300,
+   -3000
+  ],
+  [
+   -4300,
+   -3900
+  ],
+  [
+   -3300,
+   -3900
+  ],
+  [
+   -2600,
+   -3000
+  ],
+  [
+   -1300,
+   -1800
+  ]
+ ],
+ "polygon_lonlat_epsg4326": [
+  [
+   11.9,
+   57.7
+  ],
+  [
+   11.9,
+   57.7
+  ],
+  [
+   11.8,
+   57.7
+  ],
+  [
+   11.8,
+   57.7
+  ],
+  [
+   11.8,
+   57.7
+  ],
+  [
+   11.8,
+   57.7
+  ],
+  [
+   11.9,
+   57.7
+  ],
+  [
+   11.9,
+   57.7
+  ],
+  [
+   11.9,
+   57.7
+  ]
+ ],
+ "tiles_512m": [
+  [
+   -10,
+   -8
+  ],
+  [
+   -9,
+   -8
+  ],
+  [
+   -8,
+   -8
+  ],
+  [
+   -7,
+   -8
+  ],
+  [
+   -6,
+   -8
+  ],
+  [
+   -11,
+   -7
+  ],
+  [
+   -10,
+   -7
+  ],
+  [
+   -9,
+   -7
+  ],
+  [
+   -8,
+   -7
+  ],
+  [
+   -7,
+   -7
+  ],
+  [
+   -6,
+   -7
+  ],
+  [
+   -11,
+   -6
+  ],
+  [
+   -10,
+   -6
+  ],
+  [
+   -9,
+   -6
+  ],
+  [
+   -8,
+   -6
+  ],
+  [
+   -7,
+   -6
+  ],
+  [
+   -6,
+   -6
+  ],
+  [
+   -5,
+   -6
+  ],
+  [
+   -11,
+   -5
+  ],
+  [
+   -10,
+   -5
+  ],
+  [
+   -9,
+   -5
+  ],
+  [
+   -8,
+   -5
+  ],
+  [
+   -7,
+   -5
+  ],
+  [
+   -6,
+   -5
+  ],
+  [
+   -5,
+   -5
+  ],
+  [
+   -4,
+   -5
+  ],
+  [
+   -11,
+   -4
+  ],
+  [
+   -10,
+   -4
+  ],
+  [
+   -9,
+   -4
+  ],
+  [
+   -8,
+   -4
+  ],
+  [
+   -7,
+   -4
+  ],
+  [
+   -6,
+   -4
+  ],
+  [
+   -5,
+   -4
+  ],
+  [
+   -4,
+   -4
+  ],
+  [
+   -3,
+   -4
+  ],
+  [
+   -11,
+   -3
+  ],
+  [
+   -10,
+   -3
+  ],
+  [
+   -9,
+   -3
+  ],
+  [
+   -8,
+   -3
+  ],
+  [
+   -7,
+   -3
+  ],
+  [
+   -6,
+   -3
+  ],
+  [
+   -5,
+   -3
+  ],
+  [
+   -4,
+   -3
+  ],
+  [
+   -3,
+   -3
+  ],
+  [
+   -10,
+   -2
+  ],
+  [
+   -9,
+   -2
+  ],
+  [
+   -8,
+   -2
+  ],
+  [
+   -7,
+   -2
+  ],
+  [
+   -6,
+   -2
+  ],
+  [
+   -5,
+   -2
+  ],
+  [
+   -4,
+   -2
+  ],
+  [
+   -3,
+   -2
+  ],
+  [
+   -8,
+   -1
+  ],
+  [
+   -7,
+   -1
+  ],
+  [
+   -6,
+   -1
+  ],
+  [
+   -5,
+   -1
+  ],
+  [
+   -4,
+   -1
+  ],
+  [
+   -3,
+   -1
+  ]
+ ],
+ "tiles_1024m": [
+  [
+   -6,
+   -4
+  ],
+  [
+   -5,
+   -4
+  ],
+  [
+   -4,
+   -4
+  ],
+  [
+   -3,
+   -4
+  ],
+  [
+   -6,
+   -3
+  ],
+  [
+   -5,
+   -3
+  ],
+  [
+   -4,
+   -3
+  ],
+  [
+   -3,
+   -3
+  ],
+  [
+   -2,
+   -3
+  ],
+  [
+   -6,
+   -2
+  ],
+  [
+   -5,
+   -2
+  ],
+  [
+   -4,
+   -2
+  ],
+  [
+   -3,
+   -2
+  ],
+  [
+   -2,
+   -2
+  ],
+  [
+   -5,
+   -1
+  ],
+  [
+   -4,
+   -1
+  ],
+  [
+   -3,
+   -1
+  ],
+  [
+   -2,
+   -1
+  ]
+ ],
+ "tile_records_512m": [
+  {
+   "tile": [
+    -10,
+    -8
+   ],
+   "class": "shore",
+   "water_m2": 248475,
+   "land_m2": 13669,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 855.9,
+   "shoreline_edges": 86,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 7648,
+   "coarse_bytes_est": 2544
+  },
+  {
+   "tile": [
+    -9,
+    -8
+   ],
+   "class": "shore",
+   "water_m2": 259419,
+   "land_m2": 2725,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 231.7,
+   "shoreline_edges": 47,
+   "buildings": 1,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 4472,
+   "coarse_bytes_est": 864
+  },
+  {
+   "tile": [
+    -8,
+    -8
+   ],
+   "class": "urban",
+   "water_m2": 71288,
+   "land_m2": 190856,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2705.2,
+   "shoreline_edges": 516,
+   "buildings": 126,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 91280,
+   "coarse_bytes_est": 38056
+  },
+  {
+   "tile": [
+    -7,
+    -8
+   ],
+   "class": "urban",
+   "water_m2": 134141,
+   "land_m2": 128003,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1495.3,
+   "shoreline_edges": 232,
+   "buildings": 81,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 49728,
+   "coarse_bytes_est": 23368
+  },
+  {
+   "tile": [
+    -6,
+    -8
+   ],
+   "class": "urban",
+   "water_m2": 24534,
+   "land_m2": 237610,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 316.0,
+   "shoreline_edges": 17,
+   "buildings": 141,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 47680,
+   "coarse_bytes_est": 36528
+  },
+  {
+   "tile": [
+    -11,
+    -7
+   ],
+   "class": "shore",
+   "water_m2": 250519,
+   "land_m2": 11625,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 838.8,
+   "shoreline_edges": 215,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 19000,
+   "coarse_bytes_est": 1752
+  },
+  {
+   "tile": [
+    -10,
+    -7
+   ],
+   "class": "shore",
+   "water_m2": 252883,
+   "land_m2": 9261,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 790.2,
+   "shoreline_edges": 255,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 22520,
+   "coarse_bytes_est": 2192
+  },
+  {
+   "tile": [
+    -9,
+    -7
+   ],
+   "class": "shore",
+   "water_m2": 258460,
+   "land_m2": 3684,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 513.7,
+   "shoreline_edges": 234,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 20672,
+   "coarse_bytes_est": 1664
+  },
+  {
+   "tile": [
+    -8,
+    -7
+   ],
+   "class": "urban",
+   "water_m2": 215064,
+   "land_m2": 47080,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1159.3,
+   "shoreline_edges": 216,
+   "buildings": 39,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 34472,
+   "coarse_bytes_est": 12528
+  },
+  {
+   "tile": [
+    -7,
+    -7
+   ],
+   "class": "urban",
+   "water_m2": 60133,
+   "land_m2": 202011,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 885.1,
+   "shoreline_edges": 88,
+   "buildings": 146,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 62336,
+   "coarse_bytes_est": 38864
+  },
+  {
+   "tile": [
+    -6,
+    -7
+   ],
+   "class": "urban",
+   "water_m2": 7315,
+   "land_m2": 254829,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 296.8,
+   "shoreline_edges": 26,
+   "buildings": 347,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 114168,
+   "coarse_bytes_est": 89264
+  },
+  {
+   "tile": [
+    -11,
+    -6
+   ],
+   "class": "shore",
+   "water_m2": 217943,
+   "land_m2": 44201,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2481.8,
+   "shoreline_edges": 644,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 56752,
+   "coarse_bytes_est": 7296
+  },
+  {
+   "tile": [
+    -10,
+    -6
+   ],
+   "class": "shore",
+   "water_m2": 237593,
+   "land_m2": 24551,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1132.2,
+   "shoreline_edges": 218,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 19264,
+   "coarse_bytes_est": 3512
+  },
+  {
+   "tile": [
+    -9,
+    -6
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -8,
+    -6
+   ],
+   "class": "shore",
+   "water_m2": 262119,
+   "land_m2": 25,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 18.5,
+   "shoreline_edges": 6,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 608,
+   "coarse_bytes_est": 256
+  },
+  {
+   "tile": [
+    -7,
+    -6
+   ],
+   "class": "urban",
+   "water_m2": 55174,
+   "land_m2": 206970,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1585.4,
+   "shoreline_edges": 404,
+   "buildings": 198,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 112816,
+   "coarse_bytes_est": 54552
+  },
+  {
+   "tile": [
+    -6,
+    -6
+   ],
+   "class": "urban",
+   "water_m2": 1068,
+   "land_m2": 261076,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 205.3,
+   "shoreline_edges": 66,
+   "buildings": 355,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 126144,
+   "coarse_bytes_est": 91664
+  },
+  {
+   "tile": [
+    -5,
+    -6
+   ],
+   "class": "urban",
+   "water_m2": 0,
+   "land_m2": 262144,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 221,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80272,
+   "coarse_bytes_est": 56656
+  },
+  {
+   "tile": [
+    -11,
+    -5
+   ],
+   "class": "shore",
+   "water_m2": 257106,
+   "land_m2": 5038,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 437.4,
+   "shoreline_edges": 115,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 10200,
+   "coarse_bytes_est": 1400
+  },
+  {
+   "tile": [
+    -10,
+    -5
+   ],
+   "class": "shore",
+   "water_m2": 228776,
+   "land_m2": 33368,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1970.8,
+   "shoreline_edges": 264,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 23312,
+   "coarse_bytes_est": 4656
+  },
+  {
+   "tile": [
+    -9,
+    -5
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -8,
+    -5
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -7,
+    -5
+   ],
+   "class": "urban",
+   "water_m2": 94544,
+   "land_m2": 167600,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1329.0,
+   "shoreline_edges": 194,
+   "buildings": 28,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 25112,
+   "coarse_bytes_est": 9976
+  },
+  {
+   "tile": [
+    -6,
+    -5
+   ],
+   "class": "urban",
+   "water_m2": 0,
+   "land_m2": 262144,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 51,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 16304,
+   "coarse_bytes_est": 13136
+  },
+  {
+   "tile": [
+    -5,
+    -5
+   ],
+   "class": "urban",
+   "water_m2": 1439,
+   "land_m2": 260705,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 108.0,
+   "shoreline_edges": 15,
+   "buildings": 227,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 82696,
+   "coarse_bytes_est": 58456
+  },
+  {
+   "tile": [
+    -4,
+    -5
+   ],
+   "class": "urban",
+   "water_m2": 1081,
+   "land_m2": 261063,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 143.0,
+   "shoreline_edges": 34,
+   "buildings": 353,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 118280,
+   "coarse_bytes_est": 91152
+  },
+  {
+   "tile": [
+    -11,
+    -4
+   ],
+   "class": "shore",
+   "water_m2": 238406,
+   "land_m2": 23738,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 790.2,
+   "shoreline_edges": 114,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 10112,
+   "coarse_bytes_est": 1928
+  },
+  {
+   "tile": [
+    -10,
+    -4
+   ],
+   "class": "shore",
+   "water_m2": 261276,
+   "land_m2": 868,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 230.8,
+   "shoreline_edges": 27,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 2456,
+   "coarse_bytes_est": 960
+  },
+  {
+   "tile": [
+    -9,
+    -4
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -8,
+    -4
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -7,
+    -4
+   ],
+   "class": "shore",
+   "water_m2": 256002,
+   "land_m2": 6142,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 168.4,
+   "shoreline_edges": 15,
+   "buildings": 2,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 1912,
+   "coarse_bytes_est": 680
+  },
+  {
+   "tile": [
+    -6,
+    -4
+   ],
+   "class": "shore",
+   "water_m2": 217278,
+   "land_m2": 44866,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 581.6,
+   "shoreline_edges": 24,
+   "buildings": 8,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 5680,
+   "coarse_bytes_est": 2392
+  },
+  {
+   "tile": [
+    -5,
+    -4
+   ],
+   "class": "urban",
+   "water_m2": 179970,
+   "land_m2": 82174,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1038.9,
+   "shoreline_edges": 58,
+   "buildings": 52,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 20368,
+   "coarse_bytes_est": 14624
+  },
+  {
+   "tile": [
+    -4,
+    -4
+   ],
+   "class": "urban",
+   "water_m2": 30222,
+   "land_m2": 231922,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 783.9,
+   "shoreline_edges": 142,
+   "buildings": 164,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 61256,
+   "coarse_bytes_est": 43824
+  },
+  {
+   "tile": [
+    -3,
+    -4
+   ],
+   "class": "urban",
+   "water_m2": 362,
+   "land_m2": 261782,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 109.3,
+   "shoreline_edges": 27,
+   "buildings": 185,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 69472,
+   "coarse_bytes_est": 47880
+  },
+  {
+   "tile": [
+    -11,
+    -3
+   ],
+   "class": "shore",
+   "water_m2": 249031,
+   "land_m2": 13113,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 834.7,
+   "shoreline_edges": 143,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 12664,
+   "coarse_bytes_est": 2456
+  },
+  {
+   "tile": [
+    -10,
+    -3
+   ],
+   "class": "shore",
+   "water_m2": 245559,
+   "land_m2": 16585,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 343.3,
+   "shoreline_edges": 23,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 2104,
+   "coarse_bytes_est": 872
+  },
+  {
+   "tile": [
+    -9,
+    -3
+   ],
+   "class": "shore",
+   "water_m2": 208998,
+   "land_m2": 53146,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1471.5,
+   "shoreline_edges": 115,
+   "buildings": 8,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 12824,
+   "coarse_bytes_est": 5296
+  },
+  {
+   "tile": [
+    -8,
+    -3
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -7,
+    -3
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -6,
+    -3
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -5,
+    -3
+   ],
+   "class": "sea",
+   "water_m2": 262144,
+   "land_m2": 0,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 80,
+   "coarse_bytes_est": 80
+  },
+  {
+   "tile": [
+    -4,
+    -3
+   ],
+   "class": "shore",
+   "water_m2": 208311,
+   "land_m2": 53833,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 623.0,
+   "shoreline_edges": 87,
+   "buildings": 12,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 14696,
+   "coarse_bytes_est": 4296
+  },
+  {
+   "tile": [
+    -3,
+    -3
+   ],
+   "class": "urban",
+   "water_m2": 154425,
+   "land_m2": 107719,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 657.4,
+   "shoreline_edges": 52,
+   "buildings": 36,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 19128,
+   "coarse_bytes_est": 10088
+  },
+  {
+   "tile": [
+    -10,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 94814,
+   "land_m2": 167330,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1532.0,
+   "shoreline_edges": 193,
+   "buildings": 2,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 17576,
+   "coarse_bytes_est": 3672
+  },
+  {
+   "tile": [
+    -9,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 120610,
+   "land_m2": 141534,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 654.4,
+   "shoreline_edges": 12,
+   "buildings": 3,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 3416,
+   "coarse_bytes_est": 1288
+  },
+  {
+   "tile": [
+    -8,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 141984,
+   "land_m2": 120160,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1175.4,
+   "shoreline_edges": 8,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 784,
+   "coarse_bytes_est": 784
+  },
+  {
+   "tile": [
+    -7,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 17321,
+   "land_m2": 244823,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 512.0,
+   "shoreline_edges": 1,
+   "buildings": 1,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 424,
+   "coarse_bytes_est": 424
+  },
+  {
+   "tile": [
+    -6,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 16617,
+   "land_m2": 245527,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 657.7,
+   "shoreline_edges": 9,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 872,
+   "coarse_bytes_est": 520
+  },
+  {
+   "tile": [
+    -5,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 198755,
+   "land_m2": 63389,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1640.6,
+   "shoreline_edges": 94,
+   "buildings": 4,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 10384,
+   "coarse_bytes_est": 3216
+  },
+  {
+   "tile": [
+    -4,
+    -2
+   ],
+   "class": "urban",
+   "water_m2": 175620,
+   "land_m2": 86524,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 625.1,
+   "shoreline_edges": 33,
+   "buildings": 36,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 29768,
+   "coarse_bytes_est": 10000
+  },
+  {
+   "tile": [
+    -3,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 150223,
+   "land_m2": 111921,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 897.2,
+   "shoreline_edges": 86,
+   "buildings": 5,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 17928,
+   "coarse_bytes_est": 2592
+  },
+  {
+   "tile": [
+    -8,
+    -1
+   ],
+   "class": "shore",
+   "water_m2": 26458,
+   "land_m2": 235686,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 524.2,
+   "shoreline_edges": 23,
+   "buildings": 6,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 3712,
+   "coarse_bytes_est": 2320
+  },
+  {
+   "tile": [
+    -7,
+    -1
+   ],
+   "class": "land",
+   "water_m2": 0,
+   "land_m2": 262144,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 21,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 10928,
+   "coarse_bytes_est": 5456
+  },
+  {
+   "tile": [
+    -6,
+    -1
+   ],
+   "class": "land",
+   "water_m2": 0,
+   "land_m2": 262144,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 11,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 9088,
+   "coarse_bytes_est": 2896
+  },
+  {
+   "tile": [
+    -5,
+    -1
+   ],
+   "class": "urban",
+   "water_m2": 64,
+   "land_m2": 262080,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 22.0,
+   "shoreline_edges": 6,
+   "buildings": 41,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 56104,
+   "coarse_bytes_est": 10752
+  },
+  {
+   "tile": [
+    -4,
+    -1
+   ],
+   "class": "urban",
+   "water_m2": 0,
+   "land_m2": 262144,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 115,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 120456,
+   "coarse_bytes_est": 29520
+  },
+  {
+   "tile": [
+    -3,
+    -1
+   ],
+   "class": "land",
+   "water_m2": 0,
+   "land_m2": 262144,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 0.0,
+   "shoreline_edges": 0,
+   "buildings": 7,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 4680,
+   "coarse_bytes_est": 1872
+  }
+ ],
+ "tile_records_1024m": [
+  {
+   "tile": [
+    -6,
+    -4
+   ],
+   "class": "shore",
+   "water_m2": 1018058,
+   "land_m2": 30518,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2578.0,
+   "shoreline_edges": 528,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 46544,
+   "coarse_bytes_est": 7032
+  },
+  {
+   "tile": [
+    -5,
+    -4
+   ],
+   "class": "shore",
+   "water_m2": 1019236,
+   "land_m2": 29340,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2391.5,
+   "shoreline_edges": 622,
+   "buildings": 1,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 55072,
+   "coarse_bytes_est": 7024
+  },
+  {
+   "tile": [
+    -4,
+    -4
+   ],
+   "class": "urban",
+   "water_m2": 480625,
+   "land_m2": 567951,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 6244.9,
+   "shoreline_edges": 1043,
+   "buildings": 392,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 236784,
+   "coarse_bytes_est": 112136
+  },
+  {
+   "tile": [
+    -3,
+    -4
+   ],
+   "class": "urban",
+   "water_m2": 31849,
+   "land_m2": 1016727,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 612.8,
+   "shoreline_edges": 42,
+   "buildings": 1088,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 344440,
+   "coarse_bytes_est": 279224
+  },
+  {
+   "tile": [
+    -6,
+    -3
+   ],
+   "class": "shore",
+   "water_m2": 999336,
+   "land_m2": 49240,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2919.2,
+   "shoreline_edges": 759,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 66872,
+   "coarse_bytes_est": 8616
+  },
+  {
+   "tile": [
+    -5,
+    -3
+   ],
+   "class": "shore",
+   "water_m2": 990657,
+   "land_m2": 57919,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 3103.0,
+   "shoreline_edges": 482,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 42496,
+   "coarse_bytes_est": 8088
+  },
+  {
+   "tile": [
+    -4,
+    -3
+   ],
+   "class": "urban",
+   "water_m2": 673981,
+   "land_m2": 374595,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2932.9,
+   "shoreline_edges": 592,
+   "buildings": 226,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 137320,
+   "coarse_bytes_est": 64096
+  },
+  {
+   "tile": [
+    -3,
+    -3
+   ],
+   "class": "urban",
+   "water_m2": 2507,
+   "land_m2": 1046069,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 313.3,
+   "shoreline_edges": 81,
+   "buildings": 854,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 305176,
+   "coarse_bytes_est": 219672
+  },
+  {
+   "tile": [
+    -2,
+    -3
+   ],
+   "class": "urban",
+   "water_m2": 1081,
+   "land_m2": 1047495,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 143.0,
+   "shoreline_edges": 34,
+   "buildings": 1396,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 438856,
+   "coarse_bytes_est": 358160
+  },
+  {
+   "tile": [
+    -6,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 996357,
+   "land_m2": 52219,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 3274.0,
+   "shoreline_edges": 519,
+   "buildings": 0,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 45752,
+   "coarse_bytes_est": 9144
+  },
+  {
+   "tile": [
+    -5,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 977977,
+   "land_m2": 70599,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2045.5,
+   "shoreline_edges": 164,
+   "buildings": 8,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 17136,
+   "coarse_bytes_est": 7144
+  },
+  {
+   "tile": [
+    -4,
+    -2
+   ],
+   "class": "shore",
+   "water_m2": 1042434,
+   "land_m2": 6142,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 168.4,
+   "shoreline_edges": 15,
+   "buildings": 2,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 1912,
+   "coarse_bytes_est": 680
+  },
+  {
+   "tile": [
+    -3,
+    -2
+   ],
+   "class": "urban",
+   "water_m2": 921536,
+   "land_m2": 127040,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1620.5,
+   "shoreline_edges": 81,
+   "buildings": 60,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 25880,
+   "coarse_bytes_est": 16936
+  },
+  {
+   "tile": [
+    -2,
+    -2
+   ],
+   "class": "urban",
+   "water_m2": 393319,
+   "land_m2": 655257,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2173.6,
+   "shoreline_edges": 306,
+   "buildings": 397,
+   "landmarks": 1,
+   "metadata_bytes_est": 88,
+   "detail_bytes_est": 164136,
+   "coarse_bytes_est": 105672
+  },
+  {
+   "tile": [
+    -5,
+    -1
+   ],
+   "class": "shore",
+   "water_m2": 217794,
+   "land_m2": 830782,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2440.4,
+   "shoreline_edges": 242,
+   "buildings": 14,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 27984,
+   "coarse_bytes_est": 7712
+  },
+  {
+   "tile": [
+    -4,
+    -1
+   ],
+   "class": "urban",
+   "water_m2": 185763,
+   "land_m2": 862813,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2211.6,
+   "shoreline_edges": 29,
+   "buildings": 28,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 15344,
+   "coarse_bytes_est": 8480
+  },
+  {
+   "tile": [
+    -3,
+    -1
+   ],
+   "class": "urban",
+   "water_m2": 215435,
+   "land_m2": 833141,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 2320.3,
+   "shoreline_edges": 104,
+   "buildings": 56,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 75768,
+   "coarse_bytes_est": 17056
+  },
+  {
+   "tile": [
+    -2,
+    -1
+   ],
+   "class": "urban",
+   "water_m2": 325843,
+   "land_m2": 722733,
+   "unsurveyed_m2": 0,
+   "shoreline_m": 1522.4,
+   "shoreline_edges": 118,
+   "buildings": 163,
+   "landmarks": 0,
+   "metadata_bytes_est": 64,
+   "detail_bytes_est": 172504,
+   "coarse_bytes_est": 43568
+  }
+ ],
+ "justification": "Joins the river crop's west and south edges, adds Älvsborgsfjorden past Nya Älvsborg to the Långedrag old harbour shelter, and keeps the open water toward Rivöfjorden as the exposed view. One connected water body; no source edge."
+}

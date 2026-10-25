@@ -1,0 +1,19 @@
+# Offline adventure survey tooling (docs/adventure/survey.py, tools/prepare_adventure_sources.py).
+# Installed and used on 2026-10-25 with Python 3.14.2 (macOS arm64). Not a runtime dependency.
+# shapely and pyproj match tools/prepare_waterfront.py; matplotlib is newer than the 3.10.8 named
+# by the historical docs/river/survey.py, whose artifacts are not regenerated here.
+matplotlib==3.11.1
+numpy==2.5.3
+osmium==4.2.0
+pyproj==3.8.0
+shapely==2.1.2
+# matplotlib dependencies, pinned because they affect the rendered coverage files
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.64.0
+kiwisolver==1.5.1
+packaging==26.3
+pillow==12.3.0
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+six==1.17.0

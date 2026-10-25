@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0.1 and A0.2 completed 2026-10-25; A0.3 is next.**
+**Status: A0.1–A0.3 completed 2026-10-25; A0.4 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -37,8 +37,8 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | --- | --- | --- | --- |
 | A0.1 | — | Current implementation inventory, compatibility references and original river captures | Complete 2026-10-25; [evidence](adventure/baseline.md) |
 | A0.2 | A0.1 | Pinned coastal source extract and acquisition manifest; terrain/weather access findings | Complete 2026-10-25; [sources](adventure/README.md#coastal-sources-a02-2026-10-25) |
-| A0.3 | A0.2 | Offline coverage map, candidate route, first-slice polygon and tile/cost inventory | Pending; next |
-| A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Pending |
+| A0.3 | A0.2 | Offline coverage map, candidate route, first-slice polygon and tile/cost inventory | Complete 2026-10-25; [survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25) |
+| A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Pending; next |
 | A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Pending |
 | A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Pending |
 | A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Pending |
@@ -220,6 +220,30 @@ JSON/SVG content; inspect the map visually rather than accepting only geometry a
 **Done when:** there is a measured route, justified first-slice polygon, source-gap map and
 tile/cost table. `summary.json` identifies all inputs and its CRS/origin. The report chooses
 512 m or 1 km as the initial experiment, with a reason, without committing to a runtime format.
+
+**A0.3 result, 2026-10-25:** Started from a clean `66ccfc6`. Added
+[`survey.py`](adventure/survey.py), pinned [`requirements.txt`](adventure/requirements.txt)
+and the generated [coverage map](adventure/coverage.png) (with SVG),
+[`summary.json`](adventure/summary.json), [`route.json`](adventure/route.json) and
+[`first-slice.json`](adventure/first-slice.json). Water is assembled from the land polygons
+plus OSM inland water, because the land polygons treat the river as land. It keeps islands,
+holes and 15 in-water bridge supports. Source-box edges are classified separately from the
+583 km of mapped shoreline. No water topology was unresolved. The candidate route runs from
+the dock under Älvsborgsbron through Rivöfjorden to Vinga gästhamn: 19.63 km, minimum 27.6 m
+mapped shore clearance under the 8 m envelope, 16.4 min at 20 m/s. A Långedrag old-harbour
+shelter detour measures 2.09 km. The optional Saltholmen start reaches Vinga in 14.95 km.
+The 10.9 km² first slice joins the crop and runs past Nya Älvsborg to Långedrag. Its
+dock-to-shelter route is 6.02 km (5.0–10.0 min at 20–10 m/s). These travel times are not
+play-time estimates. **512 m tiles** are the initial experiment, not a runtime format. Reason:
+a smaller largest tile (123 vs 429 KiB modelled detail) and 40% geometry-free sea tiles along
+the route (14% at 1 km). Terrain, depth and overhead clearance remain gaps. The cost model
+gives 0.40× the compiled river arrays, so its bytes are estimates only. Outputs were
+byte-identical across normal, network-denied and fresh-venv runs. The coverage PNG was
+inspected (agent review). Debug configure/build passed, and
+`ctest --test-dir build -j 4 --output-on-failure` passed all 110 active tests in 142.37 s,
+including the 24 GPU-labelled ones (15 retired tests disabled; log
+`build/adventure/a0.3-ctest.log`). See the
+[A0.3 verification](adventure/README.md#a03-verification-2026-10-25). No runtime code, compiled geometry or assets changed. A0.4 is next; A1 remains pending.
 
 ## A0.4 — measure the real river workload
 

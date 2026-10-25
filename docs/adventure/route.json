@@ -1,0 +1,233 @@
+{
+ "schema": 1,
+ "generator": "docs/adventure/survey.py",
+ "crs": "EPSG:3007 offsets from the crane origin",
+ "units": "metres",
+ "coordinate_order": "east,north",
+ "origin_epsg4326": [
+  11.9,
+  57.7
+ ],
+ "clearance_envelope_m": 8.0,
+ "status": "Survey candidate; not a runtime route, chart or swept-hull check.",
+ "routes": {
+  "main": {
+   "east_north": [
+    [
+     12.0,
+     60.0
+    ],
+    [
+     24,
+     -70
+    ],
+    [
+     15,
+     -180
+    ],
+    [
+     -250,
+     -500
+    ],
+    [
+     -650,
+     -850
+    ],
+    [
+     -1100,
+     -960
+    ],
+    [
+     -3300,
+     -1550
+    ],
+    [
+     -7440,
+     -2660
+    ],
+    [
+     -8340,
+     -3220
+    ],
+    [
+     -11480,
+     -4820
+    ],
+    [
+     -17500,
+     -7240
+    ],
+    [
+     -17760,
+     -7225
+    ],
+    [
+     -17830,
+     -7262
+    ]
+   ],
+   "length_m": 19627.1,
+   "min_shore_clearance_m": 27.6,
+   "min_source_boundary_distance_m": 1941.9,
+   "minutes_at": {
+    "10_mps": 32.7,
+    "15_mps": 21.8,
+    "20_mps": 16.4
+   },
+   "mapped_hazards_within_50m": 1,
+   "mapped_hazard_ids_within_50m": [
+    "n/4316664404"
+   ],
+   "overhead_crossings": {
+    "Älvsborgsbron": [
+     "w/27141545",
+     "w/387711139",
+     "w/4303422",
+     "w/4303437",
+     "w/43048089"
+    ]
+   }
+  },
+  "detour": {
+   "east_north": [
+    [
+     -3300,
+     -1550
+    ],
+    [
+     -3850,
+     -2400
+    ],
+    [
+     -3850,
+     -3150
+    ],
+    [
+     -3700,
+     -3310
+    ],
+    [
+     -3620,
+     -3380
+    ]
+   ],
+   "length_m": 2088.0,
+   "min_shore_clearance_m": 36.8,
+   "min_source_boundary_distance_m": 4371.7,
+   "minutes_at": {
+    "10_mps": 3.5,
+    "15_mps": 2.3,
+    "20_mps": 1.7
+   },
+   "mapped_hazards_within_50m": 0,
+   "mapped_hazard_ids_within_50m": [],
+   "overhead_crossings": {}
+  },
+  "first_slice": {
+   "east_north": [
+    [
+     12.0,
+     60.0
+    ],
+    [
+     24,
+     -70
+    ],
+    [
+     15,
+     -180
+    ],
+    [
+     -250,
+     -500
+    ],
+    [
+     -650,
+     -850
+    ],
+    [
+     -1100,
+     -960
+    ],
+    [
+     -3300,
+     -1550
+    ],
+    [
+     -3850,
+     -2400
+    ],
+    [
+     -3850,
+     -3150
+    ],
+    [
+     -3700,
+     -3310
+    ],
+    [
+     -3620,
+     -3380
+    ]
+   ],
+   "length_m": 6016.9,
+   "min_shore_clearance_m": 27.6,
+   "min_source_boundary_distance_m": 2750.2,
+   "minutes_at": {
+    "10_mps": 10.0,
+    "15_mps": 6.7,
+    "20_mps": 5.0
+   },
+   "mapped_hazards_within_50m": 0,
+   "mapped_hazard_ids_within_50m": [],
+   "overhead_crossings": {
+    "Älvsborgsbron": [
+     "w/27141545",
+     "w/387711139",
+     "w/4303422",
+     "w/4303437",
+     "w/43048089"
+    ]
+   }
+  },
+  "short_start": {
+   "east_north": [
+    [
+     -3820,
+     -3920
+    ],
+    [
+     -3880,
+     -3960
+    ],
+    [
+     -8340,
+     -3220
+    ]
+   ],
+   "length_m": 4593.1,
+   "min_shore_clearance_m": 15.4,
+   "min_source_boundary_distance_m": 5292.4,
+   "minutes_at": {
+    "10_mps": 7.7,
+    "15_mps": 5.1,
+    "20_mps": 3.8
+   },
+   "mapped_hazards_within_50m": 5,
+   "mapped_hazard_ids_within_50m": [
+    "n/3547906943",
+    "n/3547906946",
+    "n/3547906947",
+    "n/3566644541",
+    "n/4315087586"
+   ],
+   "overhead_crossings": {},
+   "to_vinga_length_m": 14945.0,
+   "to_vinga_minutes_at": {
+    "10_mps": 24.9,
+    "15_mps": 16.6,
+    "20_mps": 12.5
+   }
+  }
+ }
+}

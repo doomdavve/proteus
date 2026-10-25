@@ -1,0 +1,509 @@
+{
+ "schema": 1,
+ "generator": "docs/adventure/survey.py",
+ "inputs": {
+  "osm-corridor.json.gz": {
+   "content_sha256": "ae52e40e644b41196051bb013c5ad819a3bb2f03fa36c9b4ce05aed5f8d273c5"
+  },
+  "land-polygons.json.gz": {
+   "content_sha256": "ecd08139d0228739e28208e37ca62fc4b352c4412dec11228706408357cbb495"
+  },
+  "sources_manifest": "docs/adventure/sources.json",
+  "river_manifest": {
+   "path": "assets/geometry/river/manifest.json",
+   "sha256": "5932e28abd3ad041b1db30f1689da1ae907911954e256bec35ab070ccc7490f1"
+  },
+  "osm_snapshot_utc": "2026-10-24T20:20:51Z (PBF header osmosis_replication_timestamp, sequence 4950)",
+  "land_snapshot_utc": "2026-10-25T00:00:00Z (package README: date of the data used)"
+ },
+ "frame": {
+  "crs": "EPSG:3007",
+  "origin_epsg4326": [
+   11.9,
+   57.7
+  ],
+  "origin_epsg3007": [
+   144570.6,
+   6397583.4
+  ],
+  "axes": "metres east, north of the origin; simulation X points west (X = -east)",
+  "tile_ids": "floor(east / size), floor(north / size), anchored at the origin"
+ },
+ "topology": {
+  "method": "Sea = source box minus processed land polygons; OSM natural=water/riverbank multipolygons and closed ways are added (the land polygons treat the river and lakes as land); bridge:support areas are solid. Assembled in lon/lat before any clipping, then projected.",
+  "water_components": 373,
+  "navigable_component_km2": 155.2,
+  "water_km2": 158.2,
+  "land_km2": 121.6,
+  "shoreline_km": 583.2,
+  "source_boundary_km": 36.3,
+  "bridge_supports_in_water": 15,
+  "unresolved_water_relations": [],
+  "incomplete_source_relations": [
+   945627,
+   3177973,
+   3177974,
+   8927408,
+   9560280,
+   9638589,
+   10745542,
+   10747018,
+   16200737,
+   18700379
+  ]
+ },
+ "routes": {
+  "main": {
+   "length_m": 19627.1,
+   "min_shore_clearance_m": 27.6,
+   "min_source_boundary_distance_m": 1941.9,
+   "minutes_at": {
+    "10_mps": 32.7,
+    "15_mps": 21.8,
+    "20_mps": 16.4
+   },
+   "mapped_hazards_within_50m": 1,
+   "mapped_hazard_ids_within_50m": [
+    "n/4316664404"
+   ],
+   "overhead_crossings": {
+    "Älvsborgsbron": [
+     "w/27141545",
+     "w/387711139",
+     "w/4303422",
+     "w/4303437",
+     "w/43048089"
+    ]
+   }
+  },
+  "detour": {
+   "length_m": 2088.0,
+   "min_shore_clearance_m": 36.8,
+   "min_source_boundary_distance_m": 4371.7,
+   "minutes_at": {
+    "10_mps": 3.5,
+    "15_mps": 2.3,
+    "20_mps": 1.7
+   },
+   "mapped_hazards_within_50m": 0,
+   "mapped_hazard_ids_within_50m": [],
+   "overhead_crossings": {}
+  },
+  "first_slice": {
+   "length_m": 6016.9,
+   "min_shore_clearance_m": 27.6,
+   "min_source_boundary_distance_m": 2750.2,
+   "minutes_at": {
+    "10_mps": 10.0,
+    "15_mps": 6.7,
+    "20_mps": 5.0
+   },
+   "mapped_hazards_within_50m": 0,
+   "mapped_hazard_ids_within_50m": [],
+   "overhead_crossings": {
+    "Älvsborgsbron": [
+     "w/27141545",
+     "w/387711139",
+     "w/4303422",
+     "w/4303437",
+     "w/43048089"
+    ]
+   }
+  },
+  "short_start": {
+   "length_m": 4593.1,
+   "min_shore_clearance_m": 15.4,
+   "min_source_boundary_distance_m": 5292.4,
+   "minutes_at": {
+    "10_mps": 7.7,
+    "15_mps": 5.1,
+    "20_mps": 3.8
+   },
+   "mapped_hazards_within_50m": 5,
+   "mapped_hazard_ids_within_50m": [
+    "n/3547906943",
+    "n/3547906946",
+    "n/3547906947",
+    "n/3566644541",
+    "n/4315087586"
+   ],
+   "overhead_crossings": {},
+   "to_vinga_length_m": 14945.0,
+   "to_vinga_minutes_at": {
+    "10_mps": 24.9,
+    "15_mps": 16.6,
+    "20_mps": 12.5
+   }
+  }
+ },
+ "first_slice": {
+  "area_km2": 10.9,
+  "water_km2": 6.8,
+  "shoreline_km": 26.2,
+  "overlap_with_river_crop_km2": 0.3,
+  "farthest_point_from_bridge_m": 5364,
+  "shelter": "Långedrag old harbour",
+  "route_length_m": 6016.9,
+  "experience_target": "5–10 minutes including exploration (adventure plan); not inferred from distance"
+ },
+ "landmarks": [
+  {
+   "label": "Eriksberg crane origin",
+   "osm": null,
+   "role": "origin",
+   "east_north": [
+    0.0,
+    0.0
+   ],
+   "name": null
+  },
+  {
+   "label": "Älvsborgsbron",
+   "osm": "w/387711139",
+   "role": "bridge",
+   "east_north": [
+    -425.3,
+    -762.0
+   ],
+   "name": "Älvsborgsbron"
+  },
+  {
+   "label": "Nya Varvet",
+   "osm": "n/2439395466",
+   "role": "shelter",
+   "east_north": [
+    -1079.4,
+    -1299.4
+   ],
+   "name": "Nya Varvet"
+  },
+  {
+   "label": "Nya Älvsborg",
+   "osm": "n/1770252341",
+   "role": "landmark",
+   "east_north": [
+    -4201.3,
+    -1324.9
+   ],
+   "name": "Nya Älvsborgs fästning"
+  },
+  {
+   "label": "Långedrag old harbour",
+   "osm": "n/4946285197",
+   "role": "shelter",
+   "east_north": [
+    -3523.4,
+    -2969.3
+   ],
+   "name": "Långedrags gamla hamn och slip"
+  },
+  {
+   "label": "Saltholmen",
+   "osm": "n/313760549",
+   "role": "start",
+   "east_north": [
+    -3978.7,
+    -3987.2
+   ],
+   "name": "Saltholmens Brygga"
+  },
+  {
+   "label": "Rivö fyr",
+   "osm": "n/1149696893",
+   "role": "landmark",
+   "east_north": [
+    -6237.8,
+    -4211.9
+   ],
+   "name": "Rivö fyr"
+  },
+  {
+   "label": "Vinga fyr",
+   "osm": "w/426743093",
+   "role": "landmark",
+   "east_north": [
+    -18387.4,
+    -7209.2
+   ],
+   "name": "Vinga fyr"
+  },
+  {
+   "label": "Vinga gästhamn",
+   "osm": "n/1484095980",
+   "role": "shelter",
+   "east_north": [
+    -17950.8,
+    -7287.3
+   ],
+   "name": "Vinga gästhamn"
+  },
+  {
+   "label": "Hönö Klåva",
+   "osm": "n/1673918294",
+   "role": "shelter",
+   "east_north": [
+    -15568.8,
+    -1762.9
+   ],
+   "name": "Hönö Klåva hamn"
+  }
+ ],
+ "tiles": {
+  "river_crop": {
+   "512m": {
+    "tile_size_m": 512,
+    "tiles": 30,
+    "classes": {
+     "land": 2,
+     "shore": 5,
+     "urban": 23
+    },
+    "totals": {
+     "water_m2": 1356618,
+     "land_m2": 6507702,
+     "shoreline_edges": 760,
+     "buildings": 2671,
+     "metadata_bytes_est": 1968,
+     "detail_bytes_est": 1225880,
+     "coarse_bytes_est": 699200
+    },
+    "detail_bytes_est_median": 31488,
+    "detail_bytes_est_max": 120904
+   },
+   "1024m": {
+    "tile_size_m": 1024,
+    "tiles": 9,
+    "classes": {
+     "urban": 9
+    },
+    "totals": {
+     "water_m2": 1771007,
+     "land_m2": 7666177,
+     "shoreline_edges": 1019,
+     "buildings": 3065,
+     "metadata_bytes_est": 624,
+     "detail_bytes_est": 1512880,
+     "coarse_bytes_est": 801200
+    },
+    "detail_bytes_est_median": 164136,
+    "detail_bytes_est_max": 334000
+   }
+  },
+  "first_slice": {
+   "512m": {
+    "tile_size_m": 512,
+    "tiles": 58,
+    "classes": {
+     "land": 3,
+     "sea": 9,
+     "shore": 26,
+     "urban": 20
+    },
+    "totals": {
+     "water_m2": 8690676,
+     "land_m2": 6513676,
+     "shoreline_edges": 5184,
+     "buildings": 3033,
+     "metadata_bytes_est": 3808,
+     "detail_bytes_est": 1665248,
+     "coarse_bytes_est": 851664
+    },
+    "detail_bytes_est_median": 14696,
+    "detail_bytes_est_max": 126144
+   },
+   "1024m": {
+    "tile_size_m": 1024,
+    "tiles": 18,
+    "classes": {
+     "shore": 8,
+     "urban": 10
+    },
+    "totals": {
+     "water_m2": 10493788,
+     "land_m2": 8380580,
+     "shoreline_edges": 5761,
+     "buildings": 4685,
+     "metadata_bytes_est": 1248,
+     "detail_bytes_est": 2219976,
+     "coarse_bytes_est": 1280440
+    },
+    "detail_bytes_est_median": 66872,
+    "detail_bytes_est_max": 438856
+   }
+  },
+  "resident_crop_and_slice": {
+   "512m": {
+    "tile_size_m": 512,
+    "tiles": 84,
+    "classes": {
+     "land": 4,
+     "sea": 9,
+     "shore": 30,
+     "urban": 41
+    },
+    "totals": {
+     "water_m2": 9742284,
+     "land_m2": 12277812,
+     "shoreline_edges": 5779,
+     "buildings": 5471,
+     "metadata_bytes_est": 5496,
+     "detail_bytes_est": 2779920,
+     "coarse_bytes_est": 1488432
+    },
+    "detail_bytes_est_median": 20368,
+    "detail_bytes_est_max": 126144
+   },
+   "1024m": {
+    "tile_size_m": 1024,
+    "tiles": 25,
+    "classes": {
+     "shore": 8,
+     "urban": 17
+    },
+    "totals": {
+     "water_m2": 11545633,
+     "land_m2": 14668767,
+     "shoreline_edges": 6356,
+     "buildings": 7190,
+     "metadata_bytes_est": 1720,
+     "detail_bytes_est": 3396216,
+     "coarse_bytes_est": 1932400
+    },
+    "detail_bytes_est_median": 132416,
+    "detail_bytes_est_max": 438856
+   }
+  },
+  "route_corridor_1km": {
+   "512m": {
+    "tile_size_m": 512,
+    "tiles": 219,
+    "classes": {
+     "land": 4,
+     "sea": 87,
+     "shore": 94,
+     "urban": 34
+    },
+    "totals": {
+     "water_m2": 45067739,
+     "land_m2": 12341797,
+     "shoreline_edges": 14815,
+     "buildings": 4801,
+     "metadata_bytes_est": 14160,
+     "detail_bytes_est": 3280304,
+     "coarse_bytes_est": 1438240
+    },
+    "detail_bytes_est_median": 2720,
+    "detail_bytes_est_max": 134560
+   },
+   "1024m": {
+    "tile_size_m": 1024,
+    "tiles": 73,
+    "classes": {
+     "sea": 10,
+     "shore": 44,
+     "urban": 19
+    },
+    "totals": {
+     "water_m2": 57732460,
+     "land_m2": 18800682,
+     "shoreline_edges": 19994,
+     "buildings": 7110,
+     "metadata_bytes_est": 4816,
+     "detail_bytes_est": 4648264,
+     "coarse_bytes_est": 2087976
+    },
+    "detail_bytes_est_median": 34720,
+    "detail_bytes_est_max": 438856
+   }
+  },
+  "source_envelope": {
+   "512m": {
+    "tile_size_m": 512,
+    "tiles": 1139,
+    "classes": {
+     "land": 53,
+     "sea": 296,
+     "shore": 413,
+     "urban": 377
+    },
+    "totals": {
+     "water_m2": 158239120,
+     "land_m2": 121584870,
+     "shoreline_edges": 100264,
+     "buildings": 54213,
+     "metadata_bytes_est": 73112,
+     "detail_bytes_est": 28960400,
+     "coarse_bytes_est": 15316928
+    },
+    "detail_bytes_est_median": 12888,
+    "detail_bytes_est_max": 220432
+   },
+   "1024m": {
+    "tile_size_m": 1024,
+    "tiles": 294,
+    "classes": {
+     "land": 2,
+     "sea": 43,
+     "shore": 112,
+     "urban": 137
+    },
+    "totals": {
+     "water_m2": 158241752,
+     "land_m2": 121584884,
+     "shoreline_edges": 99547,
+     "buildings": 54213,
+     "metadata_bytes_est": 19032,
+     "detail_bytes_est": 28829704,
+     "coarse_bytes_est": 15219760
+    },
+    "detail_bytes_est_median": 60752,
+    "detail_bytes_est_max": 523000
+   }
+  }
+ },
+ "river_calibration": {
+  "compiled_vertices": 63035,
+  "compiled_triangles": 78612,
+  "compiled_array_bytes": 2014212,
+  "model_estimate_bytes": 814136,
+  "model_over_compiled": 0.4,
+  "note": "Compiled arrays come from the 2026-10-17 river snapshot and include the authored bridge, quays, landscape and building parts; the estimate uses the 2026-10-24 source and the generic model above."
+ },
+ "resident_crop_and_slice_estimate": {
+  "512m": {
+   "model_detail_bytes": 2779920,
+   "scaled_to_river_bake_bytes": 6877657,
+   "model_coarse_bytes": 1488432,
+   "metadata_bytes": 5496
+  },
+  "1024m": {
+   "model_detail_bytes": 3396216,
+   "scaled_to_river_bake_bytes": 8402403,
+   "model_coarse_bytes": 1932400,
+   "metadata_bytes": 1720
+  }
+ },
+ "decision": {
+  "initial_experiment_tile_m": 512,
+  "reason": "Record overhead is small at either size: the river crop plus first slice is 84 tiles at 512 m (5496 B estimated metadata) versus 25 at 1 km. 512 m bounds the largest first-slice tile at about 123 KiB of estimated detail instead of 429 KiB, and 40% of the route corridor's 512 m tiles are geometry-free open sea versus 14% at 1 km. Compare 1 km once A0.4/A2 measure real submission and draw costs.",
+  "runtime_format": "Not chosen; this is a survey parameter, not a bake format."
+ },
+ "gaps": {
+  "terrain": "not acquired — A Geotorget user account and product access for the STAC download service; authored-relief fallback",
+  "depth": "No bathymetry; EMODnet not acquired. Mapped rocks/reefs are counted near routes but are not a depth survey.",
+  "overhead": "Älvsborgsbron OSM maxheight:marine=45 m is an unverified tag. No other mapped bridge crosses the routes.",
+  "outside_envelope": "No source data beyond the A0.2 box; it is drawn hatched.",
+  "route": "2D clearance from mapped shoreline only; not swept-hull verification and not navigation certification."
+ },
+ "cost_model": {
+  "vertex_bytes": 12,
+  "triangle_bytes": 16,
+  "building": "2n vertices and 3n-2 triangles for an n-vertex footprint",
+  "shoreline_edge": "2 vertices and 4 triangles (quay wall plus fills)",
+  "coarse": "buildings as 8-vertex/10-triangle boxes; shoreline simplified 8 m",
+  "metadata": "64 B per tile plus 24 B per landmark",
+  "urban_tile": "at least 25 building outline centroids",
+  "status": "Estimates only; actual bake sizes depend on the A2 format."
+ },
+ "attribution": "© OpenStreetMap contributors, ODbL 1.0; land polygons processed by osmdata.openstreetmap.de"
+}

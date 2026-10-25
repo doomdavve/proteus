@@ -166,5 +166,6 @@ permission failures and a stalled GPU check. The subsequent complete
 target/anchor checks passed. No runtime, input, audio or asset-loading code changed, so
 no new manual gameplay/audio check was performed. CPU/GPU visual inspection here is
 agent review, not user acceptance. GPU completion timing, physical monitor settings and
-whole-voyage performance remain unverified. The next task at the time was A0.2; it has since been
-completed ([coastal sources](README.md#coastal-sources-a02-2026-10-25)) and A0.3 is next.
+whole-voyage performance remain unverified. The next task at the time was A0.2; it and A0.3
+have since been completed ([coastal sources](README.md#coastal-sources-a02-2026-10-25),
+[route survey](README.md#route-and-coverage-survey-a03-2026-10-25)) and A0.4 is next.

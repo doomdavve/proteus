@@ -1,9 +1,10 @@
 # Free-riding adventure: Gothenburg to Vinga
 
-Status, 2026-10-25: [A0.1 original-river inventory and reference](adventure/baseline.md)
-and the [A0.2 pinned coastal sources](adventure/README.md#coastal-sources-a02-2026-10-25)
+Status, 2026-10-25: [A0.1 original-river inventory and reference](adventure/baseline.md),
+the [A0.2 pinned coastal sources](adventure/README.md#coastal-sources-a02-2026-10-25) and the
+[A0.3 route/coverage survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25)
 completed; no expanded geography, streaming, adventure rules or new weather implemented.
-**Next: A0.3, the offline route/coverage survey in the
+**Next: A0.4, the controlled river frame baseline and A0 decision record in the
 [execution handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md).**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks; those later tasks remain pending. The proposed first playable is a short
@@ -45,9 +46,12 @@ Proposed progression, subject to the A0 map survey:
 
 The current crop is 2,450 × 2,400 m. A spherical distance calculation from the generator's
 crane origin (57.6973921 N, 11.9089495 E) to SMHI's Vinga A station (57.6322 N, 11.6048 E)
-is approximately **19.5 km straight-line**. The navigable route is still unmeasured. For pacing,
-20–25 km at an assumed average 20 m/s takes 17–21 minutes before stops; rough water and route
-choices increase this. These are planning estimates, not observed play times.
+is approximately **19.5 km straight-line**. For pacing, 20–25 km at an assumed average 20 m/s
+takes 17–21 minutes before stops; rough water and route choices increase this. These are
+planning estimates, not observed play times. The A0.3 survey measured one candidate water route
+from the dock to Vinga gästhamn at **19.63 km** (16.4 min at a constant 20 m/s), with a 2D 8 m
+clearance check only. It proposes a 10.9 km² first slice to Långedrag's old harbour, about 6 km
+from the dock ([survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25)).
 [SMHI station listing](https://www.smhi.se/data/hitta-data-for-en-plats/ladda-ner-vaderobservationer/maxMeanWindSpeed).
 
 Keep metre-scale geography initially. Build a route corridor with enough surrounding islands
@@ -255,7 +259,7 @@ remain later tasks.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |
-| **A0 — survey and baseline (active; A0.3 next)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
+| **A0 — survey and baseline (active; A0.4 next)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
 | **A1 — world ownership** | Complete the necessary mapped W1/W2/W3/W4 foundations work on current river data | Two independent map/view owners, repeat init/destroy, partial-failure cleanup and unchanged existing river behaviour; use two river instances now that Eriksberg is retired |
 | **A2 — tiled current river** | Bake tiles and indexed collision; cull land in main/reflection/shadow passes; bound CPU/GPU water coverage | Match current shoreline/bridge queries against exhaustive reference; no seams or false tile-edge contacts; measured same-view scaling; all small-slice assets may remain resident |
 | **A3 — first outer-river adventure** | New connected geography, one destination/shelter, local weather transition, checkpoint recovery; bounded detailed-asset loading | Playable 5–10 minute outing, cold-load/rapid-turn/recovery tests, clear/storm performance and memory targets; human feedback on travel and exposure |
