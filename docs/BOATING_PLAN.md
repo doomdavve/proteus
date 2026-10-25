@@ -12,7 +12,11 @@ with continued evaluation over time.
 The [handling and speed review](#handling-and-speed-review--2026-10-19) adds quicker
 countersteering and a modest speed view, accepted by the user on 2026-10-19.
 A [Swedish ensign](#swedish-ensign--2026-10-20) now responds to a light breeze and boat-relative air flow.
-The score-loop arcade mode and archipelago remain proposals.
+The score-loop arcade mode remains proposed. The [free-riding adventure plan](FREE_RIDING_ADVENTURE_PLAN.md)
+now owns the proposed staged world expansion toward Vinga, inspired by the Boelo storm report
+on 2026-10-25. Its [execution handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) records
+the completed A0.1 [current-map reference](adventure/baseline.md); A0.2 coastal-source
+acquisition is next. No expanded world is implemented.
 
 The user reports current jumping, landing and capsizing are fun. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns the multiplayer track: preserve that feel
@@ -395,9 +399,10 @@ Prefer a small, recognisable interpretation over exhaustive geographic accuracy.
 real-world fidelity remains open. Do not make map imports or modelling the entire archipelago a
 prerequisite for playing.
 
-If the first area works, explore a small island area next: rocky shores, narrow channels, sheltered
-water, and a few distinctive landmarks. Decide later whether areas connect continuously or are
-selected separately. An enjoyable harbour and one island route would already be a meaningful game.
+The [2026-10-25 adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) proposes a continuous expansion
+from the existing river through sheltered approaches toward Vinga, with rocky shores, channels
+and a few distinctive landmarks. Build independently playable slices and offer nearby starts
+for shorter outings. An enjoyable harbour and one island route remain a meaningful first result.
 
 ## First playable baseline
 
@@ -586,8 +591,9 @@ These stages describe the design sequence; current implementation is recorded ex
 3. **Timed challenge (S time trial implemented):** ordered gates, timer, fast restart, persistent
    bests, ghosts, and replay. The original minute-long score-loop remains deferred.
    Evaluate whether another attempt is appealing without adding progression rewards.
-4. **First archipelago slice (proposed):** only after the core works, try a small island area
-   and the camera needed to explore it. Evaluate the appeal of discovering routes and places.
+4. **Free-riding adventure (planned 2026-10-25):** extend beyond the bridge, prove tiled world
+   costs with a short sheltered/exposed outing, then expand through the approaches to Vinga.
+   The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns data, technical stages and acceptance.
 
 `wake_velocity` reuses the scene and rendering foundation. Its controls and launch options live in
 the [README](../README.md#boating-sketch).
@@ -628,7 +634,9 @@ help reveal movement through water as these models evolve.
 The first complete game can be one arena, one craft, one course, one music track, free driving, and
 one score mode. The archipelago is the direction for expansion, not a requirement to build a vast map.
 
-Defer upgrades, unlocks, economy, building systems, missions, procedural terrain,
+The [free-riding adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) adds a proposed optional
+destination/shelter objective and recovery checkpoints. A general mission system remains deferred.
+Defer upgrades, unlocks, economy, building systems, procedural terrain,
 a level editor, full fluid simulation, and broader progression saves. Course personal bests
 and portable run files already persist. Incremental boat physics follows the
 separate physics plan rather than being a prerequisite for a complete game. Arcade wake jumps,

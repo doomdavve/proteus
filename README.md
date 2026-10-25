@@ -596,7 +596,10 @@ supply energy; resistance dissipates energy relative to their local velocity. GP
 still use a planar source, and the two-unit surface mesh approximates analytic heights between
 vertices. `--demo` adds the scripted acceleration/turn/reverse sequence; reset restarts wave time.
 
-The [boating plan](docs/BOATING_PLAN.md) tracks the next steps toward Gothenburg and the archipelago.
+The [boating plan](docs/BOATING_PLAN.md) tracks gameplay direction. The
+[free-riding adventure plan](docs/FREE_RIDING_ADVENTURE_PLAN.md) proposes staged world expansion
+from the river toward Vinga, with data sources, tiled scenery and performance gates; that
+expanded geography is not implemented yet.
 
 For display-free captures of scripted acceleration, planing, and a right turn, or a windowed check:
 

@@ -6,6 +6,12 @@ Bridge/shoreline/building detail and a human handling/camera playthrough remain 
 see [implementation status](#implementation-status-and-remaining-work).
 The separate Eriksberg location, its smaller crop and the main demo were removed on 2026-10-25;
 the river is now the only mapped location.
+Further expansion toward the river mouth and Vinga is proposed in the
+[free-riding adventure plan](../FREE_RIDING_ADVENTURE_PLAN.md); this record continues to describe
+the implemented crop. The [Sol first-steps handoff](../FREE_RIDING_ADVENTURE_FIRST_STEPS.md)
+starts with current-map reference evidence before the offline route/data survey and baseline.
+The A0.1 [dated reference](../adventure/baseline.md) now records the crop's cache/copy
+inventory, physical route, CPU/GPU captures and checksums.
 [All plans](../README.md).
 
 ```sh

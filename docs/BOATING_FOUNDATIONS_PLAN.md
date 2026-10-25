@@ -17,6 +17,18 @@ At preparation, the user requested a plan only. Implementation began with P1 on 
 execute later requested tasks using the protocol below. No additional approval gates are created
 by this plan. Verification of the original planning work is recorded at the end.
 
+Expansion dependency, 2026-10-25: the [free-riding adventure plan](FREE_RIDING_ADVENTURE_PLAN.md)
+uses the remaining mapped W1/W2/W3/W4 work before tiled scenery and indexed collision.
+Those optimizations are owned by the adventure plan, after ownership parity is established.
+Eriksberg and the main demo were retired on 2026-10-25; for this dependency, adapt the original
+mapped isolation/lifecycle recipes below to basin and two independently owned river instances.
+The original geometry/timing comparisons remain historical evidence, not current commands.
+The [Sol first-steps handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) details the mapped A1
+execution slices. Its resource contract adapts original W3 item 1: an explicit external owner
+holds the immutable collision cache and copyable `BoatWorld` values borrow it, preserving
+the subsequently implemented session/fleet/prediction copy contracts. Mutable render caches
+belong to views. No mapped ownership implementation is claimed by this planning update.
+
 ## Outcome and scope
 
 Implement, in order:
