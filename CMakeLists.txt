@@ -92,9 +92,19 @@ add_library(proteus_boat_drive STATIC
 target_link_libraries(proteus_boat_drive PUBLIC proteus_boat_session)
 target_compile_options(proteus_boat_drive PRIVATE ${PROTEUS_WARNINGS})
 
+# Absolute-deadline frame pacing with a vsync backstop for windowed loops (sleeps; not core).
+add_library(proteus_frame_pacer STATIC src/frame_pacer.c src/frame_pacer.h)
+target_include_directories(proteus_frame_pacer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(proteus_frame_pacer PUBLIC raylib)
+target_compile_options(proteus_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
+add_executable(validate_frame_pacer tools/validate_frame_pacer.c)
+target_link_libraries(validate_frame_pacer PRIVATE proteus_frame_pacer)
+target_compile_options(validate_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME frame_pacer COMMAND validate_frame_pacer)
+
 add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/boat_title.c src/profiler.c
   src/boat_audio.c src/xm_audio.c)
-target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu)
+target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
 
 # Race R0: measured shortened river route, source contracts, captures and playable trial.
@@ -404,7 +414,7 @@ foreach(target boat_banking_review boat_flag_review boat_fleet_review)
   target_link_libraries(${target} PRIVATE proteus_boat_session proteus_gpu)
 endforeach()
 # The drive library adds boat_profile statistics to the session.
-target_link_libraries(boat_water_review PRIVATE proteus_boat_drive proteus_gpu)
+target_link_libraries(boat_water_review PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer)
 foreach(target validate_boat validate_boat_banking validate_boat_turn_entry validate_boat_profile
     validate_boat_environment validate_boat_replay validate_boat_world wake_baseline
     boat_water_review boat_banking_review boat_flag_review boat_fleet_review)

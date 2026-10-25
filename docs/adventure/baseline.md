@@ -239,6 +239,8 @@ included other windows.
 - **Active work meets the provisional targets on this route:** hidden frame p95 is at most
   5.7 ms and p99 at most 6.9 ms, against ≤12 / ≤16.67 ms. This is the current river crop
   only. **60 FPS is not solved**: the paced cadence is 58.6 Hz.
+  (Later on 2026-10-25 the [frame pacer](../BOATING_PERFORMANCE.md#frame-pacing--2026-10-25)
+  measured 60.00 Hz on this route; this A0.4 finding stays as recorded.)
 - CPU submission (3.7–3.9 ms p95) costs more than completed GPU scene work (2.6–3.6 ms p95)
   or simulation (≈0.2 ms). AA 4×4 adds at most 0.12 ms of submission p95 and 0.6–0.8 ms of
   GPU p95. Waves add about 0.2 ms of submission and 0.2–0.4 ms of GPU p95. Reducing

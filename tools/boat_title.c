@@ -5,6 +5,7 @@
 #include "boat_net_protocol.h"
 #include "boat_replay.h"
 #include "boat_skin.h"
+#include "frame_pacer.h"
 #include "raylib.h"
 #ifdef PROTEUS_BOAT_NET
 #include "boat_net_enet.h"
@@ -52,6 +53,7 @@ typedef struct {
     BoatNetLanList found;
     unsigned shown; // The found room the LAN row offers.
     double queried;
+    FramePacer pacer;
 } Title;
 
 static void stop_search(Title *t)
@@ -375,7 +377,7 @@ static int scale(void)
     return x < y ? (x < 1 ? 1 : x) : (y < 1 ? 1 : y);
 }
 
-static void present(const Title *t)
+static void present(Title *t)
 {
     int k = scale();
     Rectangle destination = { (float)((GetScreenWidth() - WIDTH * k) / 2),
@@ -384,6 +386,7 @@ static void present(const Title *t)
     ClearBackground(rgb(10, 38, 57));
     DrawTexturePro(t->target.texture, (Rectangle) { 0, 0, WIDTH, -HEIGHT }, destination,
         (Vector2) { 0 }, 0, WHITE);
+    frame_pacer_wait(&t->pacer);
     EndDrawing();
 }
 
@@ -460,6 +463,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         return BOAT_TITLE_EXIT;
     }
     SetWindowTitle("Wake Velocity");
+    frame_pacer_init_window(&t.pacer);
     BoatTitleChoice choice = BOAT_TITLE_EXIT;
     bool chosen = false;
     bool settled = false;

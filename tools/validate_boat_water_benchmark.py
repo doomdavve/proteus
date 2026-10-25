@@ -45,6 +45,9 @@ with tempfile.TemporaryDirectory() as directory:
         ['--benchmark', f'{root}/', '--aa', 'off'],
         ['--benchmark', 'x' * 4001, '--aa', 'off'],
         ['--aa', 'off', '--benchmark'],
+        ['--visible', '--pacing', 'vsync'],
+        ['--benchmark', root / 'x', '--aa', 'off', '--pacing', 'vsync'],
+        ['--benchmark', root / 'x', '--aa', 'off', '--visible', '--pacing', 'fast'],
     ]
     for args in rejected:
         result = run(*args)

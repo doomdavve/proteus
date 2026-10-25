@@ -94,7 +94,10 @@ now prints a `final_state` line of exact `%a` values.
 Frame 0 draws the initial pose. Each later frame steps two ticks, or one when the route ends
 on an odd tick, and then draws. The first 120 frames are warmup on the continuous route; the
 voyage ends at the existing destination or the 240 s timeout. The hidden window is unpaced.
-`--visible` uses the review's existing `SetTargetFPS(60)`. Neither requests VSync. Both draw
+`--visible` paces by `--pacing`: `cap` (default, the A0.4 baseline) is raylib's
+`SetTargetFPS(60)`; `deadline` is the game's 60 Hz absolute-deadline pacer without VSync; `vsync`
+is the game default, VSync with the pacer as a backstop just above the monitor refresh. Only
+`vsync` requests VSync, and the JSON `pacing` field names the mode and rate. All modes draw
 the 320 × 200 target to the 960 × 600 window and call `EndDrawing()`.
 
 Each CSV row has the tick range, route destination, pose and these durations, measured with
@@ -124,6 +127,46 @@ This is a fixed two-tick **render workload**. It does not exercise the app's rea
 accumulator, dropped ticks, audio, HUD or course logic. The
 [A0.4 baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25) holds the
 first controlled results.
+
+## Frame pacing — 2026-10-25
+
+A0.4 found the paced display at 58.6 Hz. The cause is raylib's `SetTargetFPS()`: `EndDrawing()`
+waits for the target measured from the end of the previous frame, sleeping 95% with `usleep()`
+and spinning the rest. macOS `usleep()` usually oversleeps by more than that 5% reserve. A
+standalone probe on this machine exceeded it in 179–199 of 200 sleeps. Each oversleep is lost
+because the next wait starts from the late frame end, so the cadence settles below 60 Hz.
+
+`src/frame_pacer.[ch]` replaces the cap in `wake_velocity` (session and title) with a chain of
+absolute deadlines. `frame_pacer_wait()` runs just before `EndDrawing()` with
+`SetTargetFPS(0)`, so input is still polled right after the swap. It sleeps to 1 ms before the
+deadline and spins the rest. A late frame is repaid by the next one, and a stall of more than one
+period restarts the chain. `GetFrameTime()` still spans the whole loop, so the accumulator and
+menus are unchanged. The game requests VSync (`FLAG_VSYNC_HINT`). Its pacer then backs up the swap
+at 1.1 × the current monitor's refresh rate (60 Hz assumed when unknown), capping hidden or
+occluded windows whose swaps stop blocking. `--no-vsync` paces to exactly 60 Hz. Web builds keep
+raylib's `SetTargetFPS(60)`. CTest `frame_pacer` checks the deadline chain on synthetic clocks.
+
+Measured on an M1 Max, macOS 26 (Darwin 25.6), 120 Hz display, Release
+(`build/adventure-release`), `boat_water_review --benchmark … --aa 4x4 --waves --visible
+--pacing MODE`, 5,944 measured frames each, identical final states:
+
+| `--pacing` | Interval p50/p95/p99/max (ms) | Mean | > 17.5 ms / > 20 ms |
+|---|---|---|---|
+| `cap` (`SetTargetFPS(60)`) | 17.116/17.257/17.323/21.102 | 17.082 ms, **58.54 Hz** | 11 / 1 |
+| `deadline` (60 Hz) | 16.669/16.848/16.965/25.307 | 16.666 ms, **60.00 Hz** | 17 / 4 |
+| `vsync` (backstop 132 Hz) | 7.766/14.419/14.671/15.039 | 8.333 ms, **120.01 Hz** | 0 / 0 |
+
+With VSync the mean holds the display rate, but CPU frame starts spread from about 4 to 15 ms.
+macOS lets a swap return at once while the compositor has a free buffer and blocks only when
+it has none. These are CPU intervals; scan-out timing was not measured. The app's 120 Hz
+accumulator follows those CPU intervals. A displayed frame can therefore carry zero, one or two
+ticks even when presentation is even. Locking ticks to the display period is not attempted.
+
+Main app, `wake_velocity --location river --renderer gpu --waves --demo --frames 1200`: the
+VSync default ran 1,218 ticks (≈1 per frame at 120 Hz, 12.1 s wall including startup), and
+`--no-vsync` 2,412 ticks (2.01 per frame, 21.7 s). Before the change, 600 frames took 1,244
+ticks (2.07). On 2026-10-25 the user judged the VSync default smooth on macOS ("It looks
+smooth on mac os X."). No 60 Hz display, Linux or Windows run has been reviewed.
 
 ## P2a completion evidence — 2026-10-23
 

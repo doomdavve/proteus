@@ -421,6 +421,10 @@ without numbers or units. Its slightly translucent case sits at the bottom of th
 all HUD pixels share the scene's 320x200 grid and integer scaling. Press `?` for a
 modal keyboard guide; `?` or Esc dismisses it. Boating and audio pause while help is open or the
 window loses focus. The view remains 320x200 with integer scaling and letterboxing as needed.
+Frames follow the display: vsync paces presentation, and an absolute-deadline cap just above
+the monitor's refresh rate holds hidden or occluded windows whose swaps stop blocking. The
+120 Hz simulation therefore takes one tick per frame on a 120 Hz display and two at 60 Hz.
+`--no-vsync` paces to exactly 60 Hz instead; the title screen always uses vsync.
 Press `F3` to toggle the debug profiler overlay, or pass `--profiler` to show it on startup.
 Alongside the rolling frame graph, boating rows show simulation, physics tick
 total/max and count, course/replay, audio, rendering/upload, present/wait, and active time
@@ -662,7 +666,7 @@ flat cloud banks built from square tiles and a warm sun. The sun direction also 
 and water highlights. CPU and GPU share a fixed world panorama, so the sky follows camera rotation
 naturally; GPU water reflections use the same sky through the mirrored camera.
 
-The `wake_velocity` profiler (`F3`) keeps a rolling 240-frame history (about four seconds at 60 FPS)
+The `wake_velocity` profiler (`F3`) keeps a rolling 240-frame history (four seconds at 60 FPS, two at 120)
 and graphs total frame wall time, scene rendering plus texture upload, and presentation time
 (including any vertical-sync wait). It reports rolling min/average/95th-percentile/max timing,
 display dimensions and framebuffer traffic. Samples and the graph update every frame, while the

@@ -6,6 +6,7 @@
 #include "boat_profile.h"
 #include "boat_test_session.h"
 #include "boat_water_mesh.h"
+#include "frame_pacer.h"
 #include "raymath.h"
 #include "rlgl.h"
 
@@ -337,7 +338,9 @@ static int bench_fail(const char *message)
 
 // Continuous river route at two ticks per rendered frame. Timed work is simulation, scene
 // submission and presentation; route checks, GPU polling and report writing are outside it.
-static int benchmark(const char *prefix, bool waves, bool aa, bool visible)
+// Visible pacing: "cap" is raylib's SetTargetFPS(60) (the A0.4 baseline), "deadline" the game's
+// 60 Hz pacer without vsync and "vsync" the game default (vsync with the pacer as a backstop).
+static int benchmark(const char *prefix, bool waves, bool aa, bool visible, const char *pacing)
 {
     char csv_path[4096], json_path[4096], state[512];
     snprintf(csv_path, sizeof(csv_path), "%s.csv", prefix);
@@ -365,19 +368,28 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible)
     int count = 0, tick = 0, refresh = 0, render_width = 0, render_height = 0;
     size_t destination = 0;
     bool finished = false, ok = true;
-    char renderer_name[256] = "", gl_version[256] = "";
+    char renderer_name[256] = "", gl_version[256] = "", pacing_name[64] = "unpaced";
+    bool vsync = visible && strcmp(pacing, "vsync") == 0;
+    FramePacer pacer;
+    frame_pacer_init(&pacer, 0);
     if (!frames || !scratch) {
         error = "allocation failed";
         goto cleanup;
     }
-    SetConfigFlags(visible ? 0 : FLAG_WINDOW_HIDDEN);
+    SetConfigFlags(!visible ? FLAG_WINDOW_HIDDEN : vsync ? FLAG_VSYNC_HINT : 0);
     InitWindow(960, 600, "Proteus / boat water benchmark");
     if (!IsWindowReady() || !boat_gpu_init(&gpu, aa)) {
         error = "graphics initialization failed";
         goto cleanup;
     }
-    if (visible)
+    if (visible && strcmp(pacing, "cap") == 0) {
         SetTargetFPS(60);
+        snprintf(pacing_name, sizeof(pacing_name), "SetTargetFPS(60)");
+    } else if (visible) {
+        double hz = frame_pacer_init_window(&pacer);
+        snprintf(pacing_name, sizeof(pacing_name), "%s %.6g Hz",
+            vsync ? "vsync, deadline backstop" : "deadline", hz);
+    }
     refresh = GetMonitorRefreshRate(GetCurrentMonitor());
     render_width = GetRenderWidth();
     render_height = GetRenderHeight();
@@ -408,6 +420,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible)
         ClearBackground(BLACK);
         DrawTexturePro(gpu.target.texture, (Rectangle) { 0, 0, -320, -200 },
             (Rectangle) { 0, 0, 960, 600 }, (Vector2) { 0 }, 0, WHITE);
+        frame_pacer_wait(&pacer);
         EndDrawing();
         double presented = boat_profile_time(false);
         frame->end_tick = tick;
@@ -485,9 +498,9 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible)
         ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\",\n"
         "  \"window_size\":[960,600],\"framebuffer_size\":[%d,%d],"
         "\"virtual_resolution\":[320,200],\"internal_resolution\":[%d,%d],\n"
-        "  \"pacing\":\"%s\",\"vsync_hint\":false,\"monitor_refresh_hz\":",
+        "  \"pacing\":\"%s\",\"vsync_hint\":%s,\"monitor_refresh_hz\":",
         aa ? "4x4" : "off", waves ? "waves" : "flat", visible ? "visible" : "hidden", render_width,
-        render_height, aa ? 1280 : 320, aa ? 800 : 200, visible ? "SetTargetFPS(60)" : "unpaced");
+        render_height, aa ? 1280 : 320, aa ? 800 : 200, pacing_name, vsync ? "true" : "false");
     if (refresh > 0)
         fprintf(json, "%d", refresh);
     else
@@ -547,7 +560,7 @@ cleanup:
 
 int main(int argc, char **argv)
 {
-    const char *output = NULL, *bench = NULL, *aa_name = NULL;
+    const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool gpu_check = false;
     for (int i = 1; i < argc; ++i) {
@@ -567,6 +580,8 @@ int main(int argc, char **argv)
             sequence = true;
         else if (strcmp(argv[i], "--visible") == 0)
             visible = true;
+        else if (strcmp(argv[i], "--pacing") == 0 && i + 1 < argc)
+            pacing = argv[++i];
         else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
             const char *name = argv[++i];
             if (strcmp(name, "cpu") != 0 && strcmp(name, "gpu") != 0)
@@ -577,7 +592,9 @@ int main(int argc, char **argv)
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--visible]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
-                 "                         [--waves] [--visible]\n"
+                 "                         [--waves] [--visible [--pacing cap|deadline|vsync]]\n"
+                 "Visible benchmark pacing: cap = SetTargetFPS(60) (default), deadline = 60 Hz\n"
+                 "deadline chain, vsync = the game's vsync with a backstop above the refresh.\n"
                  "Benchmark writes PREFIX.json and PREFIX.csv: two ticks per frame, 120 warmup.\n"
                  "GPU uses existing 4x AA. GPU sequence: 10 Hz; CPU samples: five seconds.\n"
                  "Visible GPU playback uses 60 Hz; simulation remains 120 Hz.\n"
@@ -586,15 +603,19 @@ int main(int argc, char **argv)
             return strcmp(argv[i], "--help") == 0 ? 0 : 2;
         }
     }
-    if (bench || aa_name) {
-        const char *problem = !bench                           ? "--aa requires --benchmark"
-            : !aa_name                                         ? "--benchmark requires --aa off|4x4"
+    if (bench || aa_name || pacing) {
+        const char *problem = !bench ? "--aa and --pacing require --benchmark"
+            : !aa_name               ? "--benchmark requires --aa off|4x4"
             : strcmp(aa_name, "off") && strcmp(aa_name, "4x4") ? "--aa must be off or 4x4"
             : check || gpu_check || output || sequence
             ? "--benchmark excludes --check, --check-gpu, --output and --sequence"
             : !use_gpu ? "--benchmark supports only --renderer gpu"
             : !*bench || strlen(bench) > 4000 || bench[strlen(bench) - 1] == '/'
             ? "--benchmark needs a file prefix of 1..4000 bytes"
+            : pacing && !visible ? "--pacing requires --visible"
+            : pacing && strcmp(pacing, "cap") && strcmp(pacing, "deadline")
+                && strcmp(pacing, "vsync")
+            ? "--pacing must be cap, deadline or vsync"
             : NULL;
         if (problem) {
             fprintf(stderr, "boat_water_review: %s\n", problem);
@@ -619,7 +640,8 @@ int main(int argc, char **argv)
         return 1;
     }
     if (bench)
-        return benchmark(bench, waves, strcmp(aa_name, "4x4") == 0, visible);
+        return benchmark(
+            bench, waves, strcmp(aa_name, "4x4") == 0, visible, pacing ? pacing : "cap");
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
     boat_session_init(&session, location, waves ? boat_water_gentle() : (BoatWater) { 0 });

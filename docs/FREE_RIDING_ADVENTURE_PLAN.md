@@ -193,8 +193,11 @@ physics cadence, collisions and the existing nearest-neighbour presentation cons
 Clear weather must pass too; storm fog is atmosphere, not the only culling mechanism.
 
 Initial **engineering targets**, to qualify against named hardware in A0. A0.4 qualified the
-current river on an M1 Max: active-work p95 is at most 5.7 ms, but paced display runs at
-58.6 Hz ([baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25)).
+current river on an M1 Max: active-work p95 is at most 5.7 ms, but paced display ran at
+58.6 Hz ([baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25)). The
+[frame pacer](BOATING_PERFORMANCE.md#frame-pacing--2026-10-25) since holds 60.00 Hz without
+VSync and the display rate with it; the user judged it smooth on macOS. Scan-out timing
+and other platforms remain unmeasured.
 
 - Native GPU: 60 displayed frames/s, 16.67 ms frame deadline. Aim for active work p95 ≤12 ms
   and p99 ≤16.67 ms, and separately report presented-frame intervals, missed deadlines and

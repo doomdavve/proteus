@@ -71,6 +71,12 @@ counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, 
 route completion and exact final-state parity with `--check --waves`. It asserts no timing
 thresholds. See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25).
 
+`frame_pacer` checks the window frame pacer's deadline chain on synthetic clocks: exact
+period boundaries despite oversleep, repayment of a late frame, restart after a stall, and no
+waiting under a VSync-rate backstop. Option checks also reject a stray or unknown
+`--pacing`. Real cadence needs a visible run; see
+[frame pacing](BOATING_PERFORMANCE.md#frame-pacing--2026-10-25).
+
 Every active test carries one of three labels: `cpu` (display-free), `render` (CPU
 captures and checksums) or `gpu` (graphics context). Skin geometry carries both `cpu` and
 `render` labels. The `core` checks are also

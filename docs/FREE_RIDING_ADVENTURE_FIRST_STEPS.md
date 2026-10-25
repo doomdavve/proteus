@@ -323,7 +323,8 @@ CPU submission, at 3.7–3.9 ms p95, is the largest cost.
 
 The visible paced voyage and the app profiler both run at **58.4–58.6 Hz**, not 60 Hz,
 because the 60 FPS cap overshoots. The app's accumulator uses periodic three-tick frames.
-This is recorded as a gap, not fixed. Debug CTest passed 112/112 active tests in 175.96 s.
+A0.4 recorded this as a gap without fixing it; the
+[frame pacer](BOATING_PERFORMANCE.md#frame-pacing--2026-10-25) addressed it afterwards. Debug CTest passed 112/112 active tests in 175.96 s.
 Remaining gaps: draw-call/triangle counters, scan-out timing, other hardware and human
 acceptance. Full evidence is in the
 [A0.4 baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25).
@@ -348,7 +349,8 @@ acceptance. Full evidence is in the
   the river bake, that is about 6.9 MB of resident detail. These are survey estimates, not
   bake or process sizes.
 - **Budget on this machine:** the current river uses under half of the provisional ≤12 ms
-  p95 active-work target. Display pacing misses 60 Hz before any map growth. A1.5 repeats this
+  p95 active-work target. Display pacing missed 60 Hz before any map growth (fixed after A0
+  by the [frame pacer](BOATING_PERFORMANCE.md#frame-pacing--2026-10-25)). A1.5 repeats this
   matrix and uses >10% p95 growth as its investigation trigger.
 - **Next task: A1.1**, an explicit immutable map description and an independently
   constructible collision cache. Ownership changes begin there; nothing in A0 changed

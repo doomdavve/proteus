@@ -9,9 +9,9 @@
 #include "boat_replay.h"
 #include "boat_session.h"
 #include "boat_steering.h"
+#include "boat_throttle.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
-#include "boat_throttle.h"
 #ifdef PROTEUS_BOAT_NET
 #include "boat_server.h"
 #include "wake_velocity_host.h"
@@ -19,6 +19,7 @@
 #endif
 #include "boat_title.h"
 #include "boat_water_mesh.h"
+#include "frame_pacer.h"
 #include "profiler.h"
 #include "raymath.h"
 #include "xm_audio.h"
@@ -77,6 +78,8 @@ static void usage(void)
         "--data-dir DIR: override personal-best storage directory\n"
         "--renderer gpu|cpu (default gpu) | --gpu: select GPU | --gpu-aa: 4x supersampling\n"
         "F3: toggle debug profiler | --profiler: show it on startup\n"
+        "Frames follow the display with vsync (capped just above its refresh rate) |\n"
+        "  --no-vsync: pace to exactly 60 Hz instead\n"
         "CPU screenshots need no window; GPU screenshots require a graphics context.\n"
         "--time is screenshot-only (0..60, or 0..600 with --replay); --frames limits a smoke run.\n"
         "--demo drives the screenshot example in a window; R restarts it.\n"
@@ -225,6 +228,7 @@ static int study(int argc, char **argv)
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
     bool gpu_enabled = true, gpu_aa = false;
     bool profiler_visible = false;
+    bool vsync = true;
     bool verbose = false;
     int frame_limit = 0;
     const char *connect_to = NULL, *net_name = "player", *net_token = "";
@@ -267,6 +271,8 @@ static int study(int argc, char **argv)
             gpu_aa = true;
         } else if (strcmp(argv[i], "--profiler") == 0) {
             profiler_visible = true;
+        } else if (strcmp(argv[i], "--no-vsync") == 0) {
+            vsync = false;
         } else if (strcmp(argv[i], "--wake-field") == 0) {
             wake_field = true;
         } else if (strcmp(argv[i], "--wake-objects") == 0) {
@@ -668,7 +674,7 @@ static int study(int argc, char **argv)
         // The page scales a fixed 8:5 canvas; raylib's web resize fills the entire viewport.
         SetConfigFlags(0);
 #else
-        SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE);
+        SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 #endif
         InitWindow(WIDTH * 3, HEIGHT * 3, "Wake Velocity");
         if (!IsWindowReady())
@@ -677,7 +683,14 @@ static int study(int argc, char **argv)
         SetWindowMinSize(WIDTH, HEIGHT);
     }
     window_ready = true;
+#if defined(__EMSCRIPTEN__)
     SetTargetFPS(60);
+#else
+    if (!vsync)
+        ClearWindowState(FLAG_VSYNC_HINT);
+#endif
+    FramePacer pacer;
+    frame_pacer_init_window(&pacer);
     if (gpu_enabled) {
         if (!boat_gpu_init(&gpu, gpu_aa)) {
             fprintf(stderr, "Could not initialize GPU boating resources.\n");
@@ -1208,6 +1221,7 @@ static int study(int argc, char **argv)
 #endif
             draw_help(course, location->mapped, deathmatch, race);
         }
+        frame_pacer_wait(&pacer);
         EndDrawing();
         metrics.present_ms = (float)((boat_profile_time(true) - present_started_at) * 1000.0);
         metrics.frame_ms = (float)((boat_profile_time(true) - frame_started_at) * 1000.0);
@@ -1344,7 +1358,7 @@ int main(int argc, char **argv)
     BoatTitleSettings settings;
     boat_title_load(&settings);
     SetTraceLogLevel(LOG_WARNING);
-    SetConfigFlags(capture ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(capture ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(320 * 3, 200 * 3, "Wake Velocity");
     if (!IsWindowReady())
         return 1;
@@ -1354,7 +1368,6 @@ int main(int argc, char **argv)
         return ok ? 0 : 1;
     }
     SetWindowMinSize(320, 200);
-    SetTargetFPS(60);
     SetExitKey(KEY_NULL);
     for (BoatTitleChoice choice; (choice = boat_title_run(&settings)) != BOAT_TITLE_EXIT;) {
         boat_title_save(&settings);
