@@ -10,6 +10,7 @@
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_study_drive.h"
+#include "boat_study_menu.h"
 #include "boat_throttle.h"
 #ifdef PROTEUS_BOAT_NET
 #include "boat_study_net.h"
@@ -42,15 +43,15 @@ static void usage(void)
         "--verbose: log graphics/window backend and resource initialization\n"
         "No options (or --title): Wake Velocity title with multiplayer and settings (name, boat,\n"
         "  mouse steering, soundtrack)\n"
-        "  Esc in a session returns to it | --title --screenshot FILE: capture the title\n"
+        "  Esc > BACK TO TITLE returns to it | --title --screenshot FILE: capture the title\n"
         "--soundtrack a-little-boat|acid-wake|off: local background music (default a-little-boat)\n"
         "Left/Right or A/D: adjust wheel | Up/Down or W/S: step thrust (4 forward / neutral / 2 "
         "reverse); hold to step every 0.5 s\n"
         "Scroll down/up: more/less thrust (also Up/Down or W/S)\n"
         "M: capture/release mouse steering (move to turn; stop to hold) | --mouse-steering\n"
         "Arcade jumps: steering rolls in the air; centre the wheel to stabilize for landing\n"
-        "Keyboard wheel springs to centre; mouse wheel and thrust hold. R: reset | Esc: release "
-        "mouse, then leave\n"
+        "Keyboard wheel springs to centre; mouse wheel and thrust hold. R: reset | Esc: menu "
+        "(steering, controls, leave; solo pauses, rooms keep running)\n"
         "+/-: closer/farther | PageUp/PageDown: raise/lower camera | C: reset view\n"
         "--wake-field: opt-in coherent CPU field, native basin only\n"
         "--wake-objects: bounded arcade jump wakes (default in free boating)\n"
@@ -100,7 +101,7 @@ static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
         "M: toggle mouse / keyboard steering",
         "Mouse: move to turn; stop to hold wheel",
         "In air: steer to roll; centre to stabilize",
-        "Esc: release mouse / return to keyboard",
+        "Esc: menu (steering, controls, leave)",
         "W/S or scroll down/up: step thrust",
         "Release keyboard steering: centre wheel",
         "Thrust: 4 forward / neutral / 2 reverse",
@@ -113,8 +114,6 @@ static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
         "C: reset camera | F3: profiler",
 #if defined(__EMSCRIPTEN__)
         "Esc: leave fullscreen | Reload page: new game",
-#else
-        "Esc: close window",
 #endif
         course ? "G: ghost | P/B: replay last/best" : "",
         course ? "Replay: Space pause | Enter restart" : "",
@@ -194,8 +193,11 @@ static void course_runs_hud(
 static NetStudy net_study; // Outlives a session so the title can show why it ended.
 #endif
 
+// The steering mode a session ended in, so the title remembers changes made in game.
+static bool study_mouse_steering;
+
 // One session with explicit options. Uses the title's window when one is open and then leaves it
-// open; Escape ends the session.
+// open; the Escape menu's last row ends the session.
 static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
@@ -674,6 +676,13 @@ static int study(int argc, char **argv)
     int frames = 0, demo_tick = 0;
     bool replay_dragging = false;
     bool help_visible = false;
+    BoatMenu menu = { .can_leave = true,
+        .leave_label = networked ? "LEAVE ROOM"
+            : window_owned       ? "QUIT"
+                                 : "BACK TO TITLE" };
+#if defined(__EMSCRIPTEN__)
+    menu.can_leave = false;
+#endif
     float mouse_wheel = session.boat.wheel;
 #if defined(__EMSCRIPTEN__)
     bool mouse_unavailable = false;
@@ -697,17 +706,43 @@ static int study(int argc, char **argv)
             help_pressed |= character == '?';
         if (help_pressed)
             help_visible = !help_visible;
+        // Escape never changes the steering mode: it opens the menu, which releases capture.
+        bool menu_was_open = menu.open;
         if (IsKeyPressed(KEY_ESCAPE)) {
             if (help_visible)
                 help_visible = false;
-            else if (mouse_steering)
-                mouse_steering = false;
-#if !defined(__EMSCRIPTEN__)
+            else if (menu.open)
+                menu.open = false;
             else
-                break;
-#endif
+                boat_menu_open(&menu);
         }
-        bool active = IsWindowFocused() && !help_visible;
+        int scale = GetScreenWidth() / WIDTH < GetScreenHeight() / HEIGHT
+            ? GetScreenWidth() / WIDTH
+            : GetScreenHeight() / HEIGHT;
+        if (scale < 1)
+            scale = 1;
+        Rectangle destination = { (GetScreenWidth() - WIDTH * scale) / 2,
+            (GetScreenHeight() - HEIGHT * scale) / 2, WIDTH * scale, HEIGHT * scale };
+        Camera2D menu_camera = { .offset = { destination.x, destination.y }, .zoom = scale };
+        if (menu.open && menu_was_open && !help_visible) {
+            BoatMenuChoice choice = boat_menu_update(&menu, menu_camera, GetFrameTime());
+            if (choice == BOAT_MENU_RESUME)
+                menu.open = false;
+            else if (choice == BOAT_MENU_CONTROLS)
+                help_visible = true;
+            else if (choice == BOAT_MENU_LEAVE)
+                break;
+            else if (choice == BOAT_MENU_STEERING) {
+#if defined(__EMSCRIPTEN__)
+                mouse_unavailable = false;
+#endif
+                mouse_steering = !mouse_steering;
+                if (mouse_steering)
+                    mouse_wheel = session.boat.wheel;
+            }
+        }
+        // A click that resumes play is not also a replay-timeline click.
+        bool active = IsWindowFocused() && !help_visible && !menu.open && !menu_was_open;
 #if defined(__EMSCRIPTEN__)
         bool mouse_toggle_pressed = boat_web_mouse_toggle() != 0;
 #else
@@ -726,12 +761,18 @@ static int study(int argc, char **argv)
 #if defined(__EMSCRIPTEN__)
         int browser_mouse = boat_web_mouse_state(
             active && mouse_driving, active && !demo && !session.runs.playing);
-        if (browser_mouse & 4)
+        if (browser_mouse & 4) {
+            // Denied or missing capture falls back to the keyboard.
             mouse_unavailable = true;
-        if (browser_mouse & 2) {
             mouse_steering = mouse_driving = false;
-            browser_mouse = boat_web_mouse_state(0, active && !demo && !session.runs.playing);
+        } else if (browser_mouse & 2) {
+            // The browser's own Escape (or focus loss) unlocked: open the menu, keep mouse mode.
+            if (!menu.open)
+                boat_menu_open(&menu);
+            active = false;
         }
+        if (browser_mouse & 6)
+            browser_mouse = boat_web_mouse_state(0, active && !demo && !session.runs.playing);
         bool capture_mouse = (browser_mouse & 1) != 0;
         bool capture_changed = capture_mouse != mouse_captured;
         mouse_captured = capture_mouse;
@@ -1016,13 +1057,6 @@ static int study(int argc, char **argv)
         if (!gpu_enabled)
             UpdateTexture(texture, pixels);
         metrics.snapshot_render_ms = (float)((boat_profile_time(true) - scene_started_at) * 1000.0);
-        int scale_x = GetScreenWidth() / WIDTH;
-        int scale_y = GetScreenHeight() / HEIGHT;
-        int scale = scale_x < scale_y ? scale_x : scale_y;
-        if (scale < 1)
-            scale = 1;
-        Rectangle destination = { (GetScreenWidth() - WIDTH * scale) / 2,
-            (GetScreenHeight() - HEIGHT * scale) / 2, WIDTH * scale, HEIGHT * scale };
         if (profiler_visible && current_frame_started_at >= next_snapshot_time) {
             snapshot = profiler_snapshot(&profiler, (SceneFrame) { .time = live_view.time },
                 live_view.time, size, destination, false, (Music) { 0 }, (AudioSpectrum) { 0 });
@@ -1046,8 +1080,8 @@ static int study(int argc, char **argv)
                 .thrust = view->boat.throttle,
                 .steering = view->boat.wheel },
             WIDTH, HEIGHT);
-        if (mouse_driving)
-            DrawText(mouse_captured ? "MOUSE / ESC: RELEASE" : "MOUSE / CLICK TO CAPTURE", 4, 4, 10,
+        if (mouse_driving && !menu.open)
+            DrawText(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4, 4, 10,
                 (Color) { 218, 223, 202, 255 });
 #if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
@@ -1092,12 +1126,16 @@ static int study(int argc, char **argv)
             net_study_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
 #endif
-        } else if (!IsWindowFocused())
+        } else if (!IsWindowFocused() && !menu.open)
             DrawText("PAUSED", 12, 12, 20, RAYWHITE);
         if (profiler_visible)
             profiler_draw(&profiler, &snapshot, size);
         if (profiler_visible)
             boat_profile_draw(&boat_snapshot, 12, 355);
+        if (menu.open) {
+            DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color) { 8, 15, 22, 120 });
+            boat_menu_draw(&menu, menu_camera, mouse_steering, networked);
+        }
         if (help_visible) {
             bool deathmatch = false, race = false;
 #ifdef PROTEUS_BOAT_NET
@@ -1114,6 +1152,7 @@ static int study(int argc, char **argv)
         ++frames;
     }
 cleanup:
+    study_mouse_steering = mouse_steering;
     if (objects) {
         const BoatWakeObjects *pool = object_study_wakes(objects);
         fprintf(stdout,
@@ -1185,6 +1224,7 @@ static int title_single(const BoatTitleSettings *settings)
         "--soundtrack", (char *)boat_music(settings->soundtrack)->id,
         settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
     int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
+    study_mouse_steering = settings->mouse_steering;
     return study(count, arguments);
 }
 
@@ -1196,6 +1236,7 @@ static int title_join(BoatTitleSettings *settings)
         settings->mouse_steering ? "--mouse-steering" : NULL, NULL };
     int count = (int)(sizeof(arguments) / sizeof(arguments[0])) - 1 - !settings->mouse_steering;
     net_study.failure[0] = 0;
+    study_mouse_steering = settings->mouse_steering;
     int result = study(count, arguments);
     if (net_study.failure[0])
         snprintf(settings->message, sizeof(settings->message), "%s", net_study.failure);
@@ -1241,6 +1282,7 @@ int main(int argc, char **argv)
         if (choice == BOAT_TITLE_JOIN)
             snprintf(settings.message, sizeof(settings.message), "No multiplayer in this build.");
 #endif
+        settings.mouse_steering = study_mouse_steering; // Esc menu or M changes are remembered.
         if (WindowShouldClose())
             break;
     }

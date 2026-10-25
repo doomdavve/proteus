@@ -92,8 +92,8 @@ add_library(proteus_boat_drive STATIC
 target_link_libraries(proteus_boat_drive PUBLIC proteus_boat_session)
 target_compile_options(proteus_boat_drive PRIVATE ${PROTEUS_WARNINGS})
 
-add_executable(boat_study tools/boat_study.c tools/boat_title.c src/profiler.c src/boat_audio.c
-  src/xm_audio.c)
+add_executable(boat_study tools/boat_study.c tools/boat_study_menu.c tools/boat_title.c src/profiler.c
+  src/boat_audio.c src/xm_audio.c)
 target_link_libraries(boat_study PRIVATE proteus_boat_drive proteus_gpu)
 target_compile_options(boat_study PRIVATE ${PROTEUS_WARNINGS})
 

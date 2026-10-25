@@ -161,7 +161,8 @@ is calm and clear of both boats. See the
 opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT. Up/Down or
 W/S select and Enter/Space or a click activates. SETTINGS holds NAME, BOAT, STEERING and SOUNDTRACK: Enter on
 NAME starts typing (Enter keeps, Esc cancels), Left/Right change BOAT, and Left/Right or Enter
-switch STEERING between KEYBOARD and MOUSE (how each session starts; M still switches in game).
+switch STEERING between KEYBOARD and MOUSE. Sessions start in that mode; switching in game (M
+or the Esc menu) is remembered when the session returns to the title.
 SOUNDTRACK cycles through A LITTLE BOAT, ACID WAKE and OFF with Left/Right, Enter or a click.
 The music choice applies locally in both single player and multiplayer.
 SINGLE PLAYER starts the river with current, crossing wake
@@ -170,7 +171,9 @@ rooms. Its LAN row names the first one found (host machine and players) and sele
 several rooms it shows LAN 1/2 and so on; Left/Right switch rooms, and Enter joins under NAME.
 The hint below the menu gives the room's mode and address, and says when a room needs a token or
 runs another game version. ADDRESS and CONNECT still join any `HOST:PORT` directly. Rooms colour
-boats by slot, so BOAT applies to single player only. Esc in a session returns to the title, and a failed or lost connection shows why there.
+boats by slot, so BOAT applies to single player only. Esc in a session opens a menu (RESUME,
+STEERING, CONTROLS, BACK TO TITLE or LEAVE ROOM), and a failed or lost connection shows why
+back on the title.
 NAME, BOAT, STEERING, SOUNDTRACK and the address are remembered in `title.txt` in the personal-best data
 directory.
 Any explicit option skips the title; `--title --screenshot FILE` captures it.
@@ -422,10 +425,15 @@ is hidden and horizontal movement accumulates wheel angle: move right/left to tu
 then stop moving to hold that setting. About 300 mouse pixels moves the requested wheel from
 centre to full lock, independently of window size. Move back to straighten it; R resets both
 wheel and thrust. The steering needle shows the actual wheel as it follows the target smoothly.
-M or Esc releases the pointer and returns to keyboard steering; another Esc returns to the title
-(or closes the window when started with explicit options).
-Help and focus loss release capture. Desktop builds resume capture on return; browsers may
-need a canvas click or M to capture again. Browsers that deny or lack capture show a keyboard
+M switches between mouse and keyboard steering. Esc never changes the steering mode: it opens
+a menu and releases the pointer. Single player pauses while the menu is open; in a room the
+match keeps running and your boat idles (neutral thrust, centred wheel), as with help or focus
+loss. The menu offers RESUME, STEERING (mouse/keyboard), CONTROLS (the `?` guide) and BACK TO
+TITLE / LEAVE ROOM (QUIT when started with explicit options; no leave row in browsers).
+Esc or RESUME returns to play and recaptures the pointer in mouse mode.
+Help and focus loss release capture. Desktop builds resume capture on return. Browsers
+consume Escape themselves to unlock the pointer, so an unlock the game did not ask for (Escape
+or focus loss) opens the menu; after resuming, click the canvas to capture again. Browsers that deny or lack capture show a keyboard
 fallback message. Mouse mode is inactive during scripted demos and replay playback.
 
 In arcade object-wake jumps, steering also rolls the boat in the air. Small wheel angles

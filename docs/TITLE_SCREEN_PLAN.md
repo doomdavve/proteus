@@ -9,8 +9,10 @@ SETTINGS (NAME, BOAT, STEERING, SOUNDTRACK; added 2026-10-24) and EXIT. The stan
 **Wake Velocity** after considering GBG/Gothenburg names. The current bowed logo is the
 one to keep for now; genuine modeled 3D is deferred. Next task: user playtest of the
 title, soundtrack selection and join flow with distributed binaries. The marine HUD branch
-was merged on 2026-10-24. Location choice, display/volume settings, pause menu, title music
-and the live boat-and-gulls scene stay deferred. Boating music implementation and current
+was merged on 2026-10-24. A first [in-game Escape menu](#in-game-escape-menu-2026-10-25)
+(RESUME, STEERING, CONTROLS, BACK TO TITLE / LEAVE ROOM) was implemented 2026-10-25 and has its
+BACK TO TITLE path user-checked; rooms, STEERING and resume recapture await play. Location
+choice, display/volume settings, title music and the live boat-and-gulls scene stay deferred. Boating music implementation and current
 verification are owned by the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
 ## Identity
@@ -72,7 +74,7 @@ tracker phrase may play on the title; gameplay music starts or resumes on enteri
 
 Up/Down or W/S moves one row; Enter/Space activates; mouse hover/click also works.
 Escape goes back one menu level. In play, Escape should open a pause menu with Resume,
-Settings, Return to Title, and Exit on native. This replaces the current immediate
+Settings, Return to Title, and Exit on native (first slice below, 2026-10-25). This replaces the current immediate
 Escape-to-close behavior only for ordinary interactive play. Focus loss continues to
 pause the simulation. Do not let the title, settings, or pause menu advance the player's
 120 Hz boat session or emit gameplay wakes. A later title-only scene may animate its own
@@ -85,6 +87,38 @@ Add a dedicated `--screen title --screenshot ...` capture path for title review 
 than changing the meaning of existing screenshot commands. Browser startup may use the
 title immediately after the current page launcher; remove duplicate controls only after
 the native and web flows have been reviewed together.
+
+## In-game Escape menu, 2026-10-25
+
+Completed task: Escape during a `boat_study` session no longer switches mouse steering back to
+the keyboard or leaves. It opens a menu in the scene's 320x200 grid (`tools/boat_study_menu.[ch]`,
+styled like the title) with RESUME, STEERING `< MOUSE / KEYBOARD >`, CONTROLS (the `?` guide over
+the menu; Esc returns) and a leave row: BACK TO TITLE from the title, LEAVE ROOM in a room, QUIT
+for explicit-option launches, absent in browsers. Esc or RESUME closes it; the frame that closes
+it ignores gameplay clicks. While open, capture is released and the session is inactive: single
+player and its audio pause; a room keeps running and the authority sees neutral controls (thrust
+to neutral, wheel target centred), the same as help or focus loss. M still toggles in play. The
+steering mode a session ends in is written back to the title's STEERING setting and `title.txt`.
+In browsers, an unlock the game did not request (Escape, focus loss) opens the menu rather than
+dropping to keyboard; denied capture still falls back to keyboard.
+
+Decision: multiplayer has no pause; the menu says THE ROOM KEEPS RUNNING; YOUR BOAT IDLES.
+
+Fix, 2026-10-25 (user report): BACK TO TITLE by Enter/Space or click re-entered single player,
+because the activating press was still pressed in the title's first frame and activated its
+default row. The title now takes no input on its first frame (it already ignored Escape there).
+Build and all 118 active CTests pass. The user then played BACK TO TITLE in single player on
+2026-10-25: "Works!"
+
+Verification, 2026-10-25, macOS (Apple Silicon), Debug: build warning-clean; all 118 active
+CTests passed. A temporary, reverted instrumentation opened the menu at start and saved GPU
+window captures of solo (mouse and keyboard rows) and a local `boat_server` room (LEAVE ROOM
+selected); they were inspected, and the solo run reported 0 simulation ticks while open. Not
+done: hand play of Esc/M/resume recapture, the browser build, Windows/Linux. The title hint and
+help text changed but no new title capture was reviewed.
+
+Next task: user plays the Escape menu solo and in a room (mouse mode, Esc, STEERING, RESUME,
+leave), then decide whether SOUNDTRACK or other settings belong in it.
 
 ## Playtest integration, 2026-10-24
 

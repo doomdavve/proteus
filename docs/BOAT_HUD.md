@@ -2,8 +2,8 @@
 
 Status, 2026-10-24: implemented in branch `boat-marine-hud`, then cherry-picked onto `main` after
 `29d1afb` (title screen, M4 reset feedback, packaged `boat_server`). In the merge the HUD draws into
-the 320x200 frame and the reset fade, notices and room roster stay in screen space; Esc releases
-the mouse first, then leaves the session for the title. Native macOS checks after the merge: Debug
+the 320x200 frame and the reset fade, notices and room roster stay in screen space. (At the
+merge Esc released the mouse and then left; since 2026-10-25 it opens the in-game menu instead.) Native macOS checks after the merge: Debug
 build and all 105 active CTests; the merged controls were not hand-played. The bottom-anchored translucent instrument panel now accompanies
 stepped keyboard/scroll thrust and captured, stateful mouse steering. The initial absolute
 pointer prototype is superseded following user feedback. The user accepted captured/stateful
@@ -38,12 +38,17 @@ no numeric readouts or units:
   and accumulates horizontal movement into a held wheel target (300 mouse pixels from centre
   to lock, independent of window size/frame time). Stopping movement holds the target;
   opposite movement unwinds it. Clamp the stored target at lock so excess movement does not
-  cause windup. The existing turn-in/countersteering limits still apply. M or Esc releases
-  capture and returns to keyboard steering; a subsequent Esc closes the native window.
+  cause windup. The existing turn-in/countersteering limits still apply. M switches
+  mouse/keyboard steering. Esc opens the in-game menu (owned by the
+  [title plan](TITLE_SCREEN_PLAN.md#in-game-escape-menu-2026-10-25)) and releases capture
+  without changing the mode; its STEERING row also switches it. Resuming recaptures.
   Help/focus loss releases capture; returning resumes it with capture-frame motion discarded.
   Solo pause retains the target; multiplayer inactivity neutralizes it. R/new life resets
   the target to centre. Keyboard mode retains spring return. Demo/replay release capture and
-  retain their existing controls. The scene-pixel label shows `MOUSE / ESC: RELEASE`.
+  retain their existing controls. The scene-pixel label shows `MOUSE / ESC: MENU`
+  (hidden while the menu is open). A browser unlock the game did not request (Escape,
+  focus loss) opens the menu instead of switching to keyboard; denied capture still
+  falls back to keyboard with `MOUSE UNAVAILABLE / USE A/D`.
   In object-wake flight the same wheel also commands roll, progressively up to a barrel
   roll at full steering. Centre it to brake and assist an upright landing; stopping the
   mouse holds the roll command. The [stability study](ARCADE_STABILITY.md) owns the first tuning.

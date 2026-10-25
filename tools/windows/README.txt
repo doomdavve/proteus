@@ -3,7 +3,7 @@ Wake Velocity - Windows x64
 Extract the entire ZIP, then double-click launch.bat (or wake_velocity.exe) to open
 the Wake Velocity title. Pick NAME, BOAT and STEERING under SETTINGS, then SINGLE PLAYER for the river, or
 MULTIPLAYER to type a room's HOST:PORT address and connect. Esc in a session
-returns to the title. Keep assets beside wake_velocity.exe.
+opens a menu; BACK TO TITLE (or LEAVE ROOM) returns to the title. Keep assets beside wake_velocity.exe.
 
 To host a room for friends on the same network, double-click host.bat and allow
 boat_server.exe through Windows Firewall when asked. Friends choose MULTIPLAYER
@@ -19,13 +19,14 @@ and the static MSVC runtime.
 A/D or Left/Right: steer (the wheel springs back to centre when released)
 W/S, Up/Down or the scroll wheel (down: more): step thrust (4 forward / neutral / 2 reverse);
 hold W/S to step every half second
-M: capture the mouse for steering (move to turn, stop to hold); M or Esc releases
+M: switch between mouse steering (move to turn, stop to hold) and keyboard steering
 R: reset boat
 +/-: camera distance
 PageUp/PageDown: camera height
 C: reset camera
 F3: toggle profiler overlay
-Esc: release the mouse, then back to the title (Esc again on the title quits)
+Esc: menu (resume, steering, controls, back to title); single player pauses, rooms
+  keep running with your boat idle. Esc on the title quits.
 
 Explicit options skip the title. Eriksberg with 4x4 supersampling, from PowerShell:
   .\wake_velocity.exe --location eriksberg --gpu --gpu-aa

@@ -289,7 +289,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_BOAT)
         hint = "SINGLE PLAYER; ROOMS COLOUR BOATS BY SLOT";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MOUSE)
-        hint = "HOW SESSIONS START; M SWITCHES IN GAME";
+        hint = "REMEMBERED; ESC MENU OR M SWITCHES IN GAME";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
     char lan[96];
@@ -415,10 +415,17 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
     SetWindowTitle("Wake Velocity");
     BoatTitleChoice choice = BOAT_TITLE_EXIT;
     bool chosen = false;
-    bool accept_escape = false;
+    bool settled = false;
     while (!chosen && !WindowShouldClose()) {
         t.time += GetFrameTime();
-        bool activate = false, back = accept_escape && IsKeyPressed(KEY_ESCAPE);
+        if (!settled) {
+            // The key or click that ended a session still reads as pressed in this frame.
+            draw_screen(&t, s, NULL);
+            present(&t);
+            settled = true;
+            continue;
+        }
+        bool activate = false, back = IsKeyPressed(KEY_ESCAPE);
         int step = 0;
         if (t.editing) {
             bool name = t.editing == s->name;
@@ -525,7 +532,6 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         snprintf(status, sizeof(status), "CONNECTING TO %s ...", s->address);
         draw_screen(&t, s, choice == BOAT_TITLE_JOIN ? status : NULL);
         present(&t);
-        accept_escape = true;
     }
     close_title(&t);
     return choice;
