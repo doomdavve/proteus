@@ -806,8 +806,9 @@ This delivers fixed-map play, not the full qualification milestone. The remainin
 still depends on M6 and mapped foundations; the legacy process-wide crop/cache model permitted
 one map per process. Since adventure A1.2 (2026-10-25) authorities, clients and their
 prediction borrow a caller-owned collision map
-([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a12-result-2026-10-25)), but water-mesh,
-scenery and GPU caches remain process-global until A1.3/A1.4.
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a12-result-2026-10-25)), and since A1.3 each
+CPU/GPU view owns its water-mesh cache. Scenery and GPU city data remain process-global
+until A1.4.
 
 Remaining qualification touches `boat_location`, `boat_map`, `boat_water_mesh`, harbor/traffic
 query splits, `boat_world`, views and mapped validators. Verify shared clock/settings,

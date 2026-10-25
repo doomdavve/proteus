@@ -3,7 +3,6 @@
 #include "boat_test_session.h"
 #include "boat_throttle.h"
 #include "boat_view.h"
-#include "boat_water_mesh.h"
 #include "raymath.h"
 
 #include <math.h>
@@ -1049,8 +1048,9 @@ static int shared_water(void)
             CHECK(fabsf(sz + q.normal.z / q.normal.y) < .001f);
         }
     }
+    BoatWaterMeshCache cache = { 0 };
     for (int location = 0; location < 2; ++location) {
-        const Mesh3D *mesh = boat_water_surface(water, .7f, location);
+        const Mesh3D *mesh = boat_water_surface(&cache, boat_location(location)->map, water, .7f);
         CHECK(mesh && mesh->triangle_count > 100);
         for (size_t i = 0; i < mesh->triangle_count; ++i) {
             Vector3 centre = { 0 };
@@ -1080,7 +1080,7 @@ static int shared_water(void)
         > .001f);
     boat_session_init(&waves, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     CHECK(waves.world.water.amplitude == 0 && boat_session_time(&waves) == 0);
-    boat_water_mesh_destroy();
+    boat_water_mesh_cache_destroy(&cache);
     return 0;
 }
 
@@ -1126,6 +1126,7 @@ static uint64_t patch_overlap(const Mesh3D *mesh)
 static int validate_water_patch(void)
 {
     BoatWater water = boat_water_gentle();
+    BoatWaterMeshCache cache = { 0 };
     const Vector2 centers[]
         = { { 12, 60 }, { 12, -125 }, { 170, -250 }, { -80, -455 }, { -60, -175 }, { 940, 100 } };
     for (int detail = 0; detail < 2; ++detail)
@@ -1134,8 +1135,9 @@ static int validate_water_patch(void)
                 if (!location && k > 1)
                     break;
                 Vector2 center = location ? centers[k] : (Vector2) { k ? 100 : 0, 0 };
-                const Mesh3D *mesh = detail ? boat_water_patch_arcade(center, location)
-                                            : boat_water_patch(center, location);
+                const BoatMapDescription *map = boat_location(location)->map;
+                const Mesh3D *mesh = detail ? boat_water_patch_arcade(&cache, map, center)
+                                            : boat_water_patch(&cache, map, center);
                 CHECK(mesh && mesh->triangle_count > 0
                     && mesh->triangle_count < (detail ? 80000 : 50000));
                 for (size_t i = 0; i < mesh->triangle_count; ++i) {
@@ -1171,13 +1173,120 @@ static int validate_water_patch(void)
                         CHECK(patch_contains(mesh, p) == expected);
                     }
             }
-    const Mesh3D *mesh = boat_water_patch((Vector2) { 5.99f, -250 }, true);
+    const BoatMapDescription *river = boat_location(BOAT_LOCATION_RIVER)->map;
+    const Mesh3D *mesh = boat_water_patch(&cache, river, (Vector2) { 5.99f, -250 });
     CHECK(mesh);
     uint64_t before = patch_overlap(mesh);
-    mesh = boat_water_patch((Vector2) { 6.01f, -250 }, true);
+    mesh = boat_water_patch(&cache, river, (Vector2) { 6.01f, -250 });
     CHECK(mesh && before == patch_overlap(mesh));
     // Recentring changes only cells beyond the rendered disk, not overlapping world geometry.
-    boat_water_mesh_destroy();
+    boat_water_mesh_cache_destroy(&cache);
+    return 0;
+}
+
+static uint64_t mesh_digest(const Mesh3D *mesh)
+{
+    uint64_t hash = UINT64_C(14695981039346656037);
+    for (size_t i = 0; i < mesh->triangle_count; ++i) {
+        unsigned char bytes[3 * sizeof(Vector3) + sizeof(Color)];
+        for (int j = 0; j < 3; ++j)
+            memcpy(bytes + j * sizeof(Vector3), &mesh->vertices[mesh->triangles[i].vertices[j]],
+                sizeof(Vector3));
+        memcpy(bytes + 3 * sizeof(Vector3), &mesh->triangles[i].color, sizeof(Color));
+        for (size_t j = 0; j < sizeof(bytes); ++j)
+            hash = (hash ^ bytes[j]) * UINT64_C(1099511628211);
+    }
+    return hash ^ mesh->triangle_count;
+}
+
+// Synthetic 10 m pond in map east/Z, followed by one raised land triangle.
+static const Vector3 pond_vertices[]
+    = { { 0, 0, 0 }, { 10, 0, 0 }, { 10, 0, 10 }, { 0, 0, 10 }, { 20, 2, 0 } };
+static const Triangle3D pond_triangles[]
+    = { { { 0, 2, 1 }, WHITE }, { { 0, 3, 2 }, WHITE }, { { 1, 2, 4 }, GREEN } };
+static const Mesh3D pond_mesh = { pond_vertices, pond_triangles, 3 };
+static const BoatMapDescription pond = { &pond_mesh, 3 };
+
+// Patch digest built alone in a fresh cache: the reference for interleaved caches.
+static uint64_t patch_alone(const BoatMapDescription *map, Vector2 center, bool fine)
+{
+    BoatWaterMeshCache cache = { 0 };
+    const Mesh3D *mesh = fine ? boat_water_patch_arcade(&cache, map, center)
+                              : boat_water_patch(&cache, map, center);
+    uint64_t digest = mesh ? mesh_digest(mesh) : 0;
+    boat_water_mesh_cache_destroy(&cache);
+    return digest;
+}
+
+static int validate_water_mesh_caches(void)
+{
+    const BoatMapDescription *river = boat_location(BOAT_LOCATION_RIVER)->map;
+    const Vector2 a_center = { 12, -125 }, b_center = { 170, -250 }, basin_center = { 100, 0 };
+    uint64_t a_ref = patch_alone(river, a_center, false);
+    uint64_t b_ref = patch_alone(river, b_center, true);
+    uint64_t basin_ref = patch_alone(NULL, basin_center, false);
+    uint64_t pond_ref = patch_alone(&pond, (Vector2) { 5, 5 }, false);
+    CHECK(a_ref && b_ref && basin_ref && pond_ref && a_ref != b_ref);
+
+    // Two river views at different centres and a basin view hold their meshes together.
+    BoatWaterMeshCache a = { 0 }, b = { 0 }, basin = { 0 };
+    const Mesh3D *a_mesh = boat_water_patch(&a, river, a_center);
+    const Mesh3D *b_mesh = boat_water_patch_arcade(&b, river, b_center);
+    const Mesh3D *basin_mesh = boat_water_patch(&basin, NULL, basin_center);
+    CHECK(a_mesh && b_mesh && basin_mesh && a.map == river && b.map == river && !basin.map);
+    CHECK(mesh_digest(a_mesh) == a_ref && mesh_digest(b_mesh) == b_ref);
+    CHECK(mesh_digest(basin_mesh) == basin_ref);
+    // The snap-boundary pair through B leaves A's and the basin's borrowed meshes intact.
+    const Mesh3D *snap = boat_water_patch(&b, river, (Vector2) { 5.99f, -250 });
+    CHECK(snap);
+    uint64_t overlap = patch_overlap(snap);
+    snap = boat_water_patch(&b, river, (Vector2) { 6.01f, -250 });
+    CHECK(snap && patch_overlap(snap) == overlap);
+    CHECK(mesh_digest(a_mesh) == a_ref && mesh_digest(basin_mesh) == basin_ref);
+
+    // Destroy and rebuild B; the survivors keep their storage and values.
+    const Vector3 *a_vertices = a_mesh->vertices;
+    boat_water_mesh_cache_destroy(&b);
+    CHECK(!b.map && !b.patches[0].vertices && !b.patches[1].vertices && !b.surface.vertices);
+    boat_water_mesh_cache_destroy(&b); // Idempotent.
+    CHECK(mesh_digest(a_mesh) == a_ref && a_mesh->vertices == a_vertices);
+    CHECK(mesh_digest(basin_mesh) == basin_ref);
+    b_mesh = boat_water_patch_arcade(&b, river, b_center);
+    CHECK(b_mesh && mesh_digest(b_mesh) == b_ref && mesh_digest(a_mesh) == a_ref);
+
+    // A cache rebinds to whichever description it is asked for; nothing leaks between maps.
+    BoatWaterMeshCache c = { 0 };
+    const Mesh3D *mesh = boat_water_patch(&c, &pond, (Vector2) { 5, 5 });
+    CHECK(mesh && c.map == &pond && mesh_digest(mesh) == pond_ref);
+    for (size_t i = 0; i < mesh->triangle_count; ++i)
+        for (int j = 0; j < 3; ++j) {
+            Vector3 v = mesh->vertices[mesh->triangles[i].vertices[j]];
+            CHECK(v.y == 0 && v.x >= 0 && v.x <= 10 && v.z >= 0 && v.z <= 10);
+        }
+    mesh = boat_water_patch(&c, river, a_center);
+    CHECK(mesh && c.map == river && mesh_digest(mesh) == a_ref);
+    mesh = boat_water_patch(&c, &pond, (Vector2) { 5, 5 });
+    CHECK(mesh && mesh_digest(mesh) == pond_ref);
+
+    // CPU surfaces: per-cache and per-map, unaffected by other caches' rebuilds.
+    BoatWater water = boat_water_gentle();
+    const Mesh3D *pond_surface = boat_water_surface(&c, &pond, water, .7);
+    const Mesh3D *basin_surface = boat_water_surface(&basin, NULL, water, .7);
+    CHECK(pond_surface && basin_surface && pond_surface->triangle_count > 2);
+    CHECK(pond_surface->triangle_count < basin_surface->triangle_count);
+    uint64_t pond_surface_ref = mesh_digest(pond_surface);
+    uint64_t basin_surface_ref = mesh_digest(basin_surface);
+    boat_water_mesh_cache_destroy(&a);
+    mesh = boat_water_surface(&a, NULL, water, .7);
+    CHECK(mesh && mesh_digest(mesh) == basin_surface_ref);
+    CHECK(mesh_digest(pond_surface) == pond_surface_ref);
+    CHECK(mesh_digest(basin_surface) == basin_surface_ref);
+    CHECK(mesh_digest(basin_mesh) == basin_ref && mesh_digest(b_mesh) == b_ref);
+
+    boat_water_mesh_cache_destroy(&a);
+    boat_water_mesh_cache_destroy(&b);
+    boat_water_mesh_cache_destroy(&c);
+    boat_water_mesh_cache_destroy(&basin);
     return 0;
 }
 
@@ -1289,6 +1398,7 @@ int main(void)
     CHECK(validate_flight_outcomes() == 0);
     CHECK(validate_dynamic_pair() == 0);
     CHECK(validate_water_patch() == 0);
+    CHECK(validate_water_mesh_caches() == 0);
     CHECK(shared_water() == 0);
     CHECK(validate_buoyancy() == 0);
     CHECK(validate_wave_resistance() == 0);

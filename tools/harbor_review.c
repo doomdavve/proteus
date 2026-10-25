@@ -2,6 +2,7 @@
 #include "boat_water_mesh.h"
 #include "renderer_gpu.h"
 #include "waterfront.h"
+#include "waterfront_city.h"
 
 #include "raymath.h"
 #include "rlgl.h"
@@ -29,9 +30,10 @@ static bool number(const char *text, double *value)
     return end != text && !*end && isfinite(*value) && *value >= 0 && *value <= 2592000;
 }
 
-static Mesh patch(Vector3 center)
+static Mesh patch(BoatWaterMeshCache *water_mesh, Vector3 center)
 {
-    const Mesh3D *source = boat_water_patch((Vector2) { center.x, center.z }, true);
+    const Mesh3D *source = boat_water_patch(
+        water_mesh, &waterfront_city_river_map, (Vector2) { center.x, center.z });
     Mesh mesh = { 0 };
     if (!source)
         return mesh;
@@ -143,6 +145,7 @@ int main(int argc, char **argv)
     int result = 0, count = 0;
     Color *pixels = NULL;
     Renderer3D cpu = { 0 };
+    BoatWaterMeshCache water_mesh = { 0 };
     WaterfrontGpuScene scene = { 0 };
     RenderTexture2D target = { 0 }, resolved = { 0 };
     Shader downsample = { 0 };
@@ -173,7 +176,7 @@ int main(int argc, char **argv)
         }
         SetTextureFilter(resolved.texture, TEXTURE_FILTER_POINT);
         if (waves) {
-            near = patch(camera.target);
+            near = patch(&water_mesh, camera.target);
             if (!near.vaoId) {
                 result = 1;
                 goto cleanup;
@@ -203,7 +206,7 @@ int main(int argc, char **argv)
         if (gpu) {
             if (waves && Vector3Distance(frame.camera.target, patch_center) > 12) {
                 UnloadMesh(near);
-                near = patch(frame.camera.target);
+                near = patch(&water_mesh, frame.camera.target);
                 if (!near.vaoId) {
                     result = 1;
                     break;
@@ -227,7 +230,8 @@ int main(int argc, char **argv)
                 break;
             }
             if (waves) {
-                const Mesh3D *surface = boat_water_surface(water, frame.time, true);
+                const Mesh3D *surface = boat_water_surface(
+                    &water_mesh, &waterfront_city_river_map, water, frame.time);
                 if (!surface) {
                     result = 1;
                     break;
@@ -292,7 +296,7 @@ cleanup:
         UnloadShader(downsample);
     renderer3d_destroy(&cpu);
     free(pixels);
-    boat_water_mesh_destroy();
+    boat_water_mesh_cache_destroy(&water_mesh);
     if (window)
         CloseWindow();
     return result;

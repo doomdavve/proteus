@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction) and [A1.2](#a12--wire-physical-map-ownership-through-all-callers) completed 2026-10-25; A1.3 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers) and [A1.3](#a13-result-2026-10-25) completed 2026-10-25; A1.4 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -41,8 +41,8 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Complete 2026-10-25; [baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25), [decision](#a0-decision-record--2026-10-25) |
 | A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Complete 2026-10-25; [result](#a11--explicit-map-data-and-collision-cache-construction) |
 | A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Complete 2026-10-25; [result](#a12-result-2026-10-25) |
-| A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Pending; next |
-| A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Pending |
+| A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Complete 2026-10-25; [result](#a13-result-2026-10-25) |
+| A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Pending; next |
 | A1.5 | A1.4 | Reload/isolation/failure gate, parity evidence and A2 handoff | Pending |
 
 A0.2/A0.3 and A0.4 have independent inputs after A0.1, but controlled performance runs must
@@ -579,6 +579,88 @@ their CPU/GPU callers and water/world validators.
 
 **Done when:** no mutable process-global water cache remains; CPU/GPU rendering retains the
 current appearance and rebuild behavior. Indexing and bounded outer water rings remain A2 work.
+
+### A1.3 result, 2026-10-25
+
+Started from a clean `2ea4755`.
+
+- **Cache:** `BoatWaterMeshCache` (`src/boat_water_mesh.h`) holds what used to be four static
+  arrays: the CPU reference surface, the basin field grid, the ordinary and arcade GPU rest
+  patches, and their snapped centres. It starts zeroed and is bound to the
+  `BoatMapDescription` it last built from; NULL means the 240 × 160 m basin. That pointer
+  replaces the basin/mapped boolean as the cache's identity. Map triangles come from
+  `map->mesh`, so `boat_water_mesh.c` no longer includes `waterfront_city.h`.
+  `boat_water_mesh_cache_destroy()` frees only its own storage, leaves the cache zeroed and
+  is idempotent. `boat_water_mesh_destroy()` and the statics are gone, and no mutable
+  process-global water-mesh state remains.
+- **Rebinding:** a call for a different description rebinds the cache. Its map-dependent
+  surface and patches rebuild on that call and reuse their storage; the field grid is
+  map-independent and kept. Foundations W2 item 2 says one cache per definition. This is
+  looser: one map at a time, because a single `wake_velocity` view outlives location changes.
+- **Views and lifetimes:** a returned mesh is borrowed from its cache until the next call on
+  that cache or its destruction. Other caches never invalidate it.
+  - `BoatGpu` embeds its own cache, which `boat_gpu_destroy()` releases (including after a
+    failed init). `wave_mapped` became `wave_map`, the description whose patch is uploaded.
+  - CPU `boat_draw()`, `boat_draw_with_ghost()` and `boat_draw_scene()` take the view's
+    cache after the renderer. `wake_velocity` owns one CPU cache next to its renderer, so a
+    CPU screenshot cannot invalidate the GPU view's patch.
+  - Validators and review tools own one cache per renderer and destroy it with the renderer.
+    `harbor_review` passes `waterfront_city_river_map` explicitly (scenery binding is A1.4).
+  - The header says never to copy an initialized cache, because its meshes point into its
+    own storage. Neither `BoatGpu` nor any cache is copied.
+- **Unchanged:** tessellation, the 0.75/1.5 m grids, the 12 m snap, colours and patch layout.
+  The physical tick never touches a cache.
+- **Behaviour differences:**
+  - The old globals kept basin and river slots side by side. A view that changes location now
+    rebuilds that location's surface or patch once, at the change (settings, title or network
+    join), never per frame. The GPU view already re-uploaded its patch on a map change.
+  - A failed surface allocation frees that surface only, where the old code freed every
+    cache. A failed patch or field build resets its count and retries, as before.
+- **Test:** `boat_handling` (`validate_boat`) runs the existing surface and patch checks
+  through explicit caches. Its new `validate_water_mesh_caches()`:
+  - builds each reference alone in a fresh cache;
+  - holds two river caches together (ordinary at (12, −125), arcade at (170, −250)) with a
+    basin cache, and checks all three against their references;
+  - drives the 5.99/6.01 m snap-boundary pair through the second river cache while the
+    others' borrowed meshes stay byte-identical;
+  - destroys that cache twice and rebuilds it, checking that the survivors' storage pointers
+    and values do not change;
+  - clips a patch to a synthetic 10 m pond map and rebinds pond → river → pond, reproducing
+    each reference;
+  - builds pond and basin CPU surfaces in separate caches, which survive another cache's
+    destroy and rebuild.
+- **Topology parity:** a scratch digest tool (not checked in) hashed the vertex bytes,
+  triangle order and colours of 55 products, built once against `2ea4755`'s
+  `proteus_render` and once against the new one. The output was identical. The products:
+  - basin and river CPU surfaces (river 2,237,423 triangles) for three water recipes at two
+    times;
+  - ordinary and arcade patches at ten centres on both maps, including 5.99/6.01;
+  - basin ↔ river surface alternation.
+- **Verification (M1 Max, macOS 26 / Darwin 25.6, Apple clang 21, Debug):**
+  - The build is warning-clean. Desktop CTest passed 114/114 active tests in 183.06 s
+    (15 retired tests disabled). The log is `build/adventure/a1-3-ctest.log`. No fixture
+    hash or expected value changed.
+  - The `boat_water_review --check` and `--check --waves` logs are identical to A1.2.
+  - All 18 CPU, 18 flat-GPU and 18 wave-GPU review PNGs (`build/adventure/a1-3/`) are
+    byte-identical to `build/adventure/a0-original/`. Their logs differ from A1.2 only in
+    timing lines.
+  - `wake_velocity --renderer cpu --screenshot` (basin and river, `--time 3`) is
+    byte-identical to A1.2.
+  - `validate_boat` and the digest tool, built standalone with `-fsanitize=address,undefined`,
+    passed with no reports. macOS ASan has no leak detection.
+- **Environment note:** earlier runs this session, with the display asleep and on battery,
+  could not create a GPU context and starved the real-time `boat_net_*` tests until they
+  timed out. Those runs are not evidence. The 114/114 run above was made with the display
+  awake and on mains power.
+- **Limitations:**
+  - There is still no allocation-failure injection.
+  - No windowed or manual playback check: input, motion, windowing and audio were
+    unchanged, and every capture is identical.
+  - The CPU river surface is about 2.2 M triangles per cache. Two CPU river views would each
+    hold one; bounded outer water rings remain A2 work.
+  - Scenery, harbor/traffic and GPU city builders still read the compiled river (A1.4).
+
+**Next: A1.4.**
 
 ## A1.4 — bind scenery and both renderers to explicit map data
 

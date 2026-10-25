@@ -6,7 +6,6 @@
 #include "wake_velocity_state.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
-#include "boat_water_mesh.h"
 #include "raymath.h"
 
 #include <math.h>
@@ -136,17 +135,18 @@ static int views(void)
     before = session;
     static WaterfrontSceneFrame frame;
     Renderer3D renderer = { 0 };
+    BoatWaterMeshCache water_mesh = { 0 };
     Color *pixels = malloc(320 * 200 * sizeof(*pixels));
     Color *again = malloc(320 * 200 * sizeof(*again));
     CHECK(pixels && again);
     boat_scene_frame(
         SESSION_VIEW(&session), &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
-    CHECK(boat_draw(&renderer, pixels, 320, 200, SESSION_VIEW(&session), &session.presentation,
-        &session.world, BOAT_CAMERA_DEFAULT));
+    CHECK(boat_draw(&renderer, &water_mesh, pixels, 320, 200, SESSION_VIEW(&session),
+        &session.presentation, &session.world, BOAT_CAMERA_DEFAULT));
     boat_scene_frame(
         SESSION_VIEW(&session), &session.presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
-    CHECK(boat_draw(&renderer, again, 320, 200, SESSION_VIEW(&session), &session.presentation,
-        &session.world, BOAT_CAMERA_DEFAULT));
+    CHECK(boat_draw(&renderer, &water_mesh, again, 320, 200, SESSION_VIEW(&session),
+        &session.presentation, &session.world, BOAT_CAMERA_DEFAULT));
     CHECK(same(&session, &before));
     CHECK(memcmp(pixels, again, 320 * 200 * sizeof(*pixels)) == 0);
     CHECK(frame.time == boat_session_time(&session));
@@ -156,6 +156,7 @@ static int views(void)
     CHECK(memcmp(&session.world.water, &before.world.water, sizeof(session.world.water)) == 0);
     CHECK(Vector2Equals(session.boat.position, session.world.definition->spawn));
     CHECK(memcmp(&session.presentation, &rest, sizeof(rest)) == 0);
+    boat_water_mesh_cache_destroy(&water_mesh);
     renderer3d_destroy(&renderer);
     free(pixels);
     free(again);
@@ -250,6 +251,7 @@ static int render_rates(void)
     for (int tick = 0; tick < TICKS; ++tick)
         drive(&reference, tick);
     Renderer3D renderer = { 0 };
+    BoatWaterMeshCache water_mesh = { 0 };
     Color *pixels = malloc(320 * 200 * sizeof(*pixels));
     CHECK(pixels);
     const int rates[] = { 30, 60, 144 };
@@ -266,12 +268,13 @@ static int render_rates(void)
             boat_scene_frame(SESSION_VIEW(&shown), &shown.presentation, &shown.world,
                 BOAT_CAMERA_DEFAULT, &frame);
             if (frames++ % rates[r] == 0)
-                CHECK(boat_draw(&renderer, pixels, 320, 200, SESSION_VIEW(&shown),
+                CHECK(boat_draw(&renderer, &water_mesh, pixels, 320, 200, SESSION_VIEW(&shown),
                     &shown.presentation, &shown.world, BOAT_CAMERA_DEFAULT));
         }
         CHECK(same(&shown, &reference));
         printf("render_rate=%dHz frames=%d ok\n", rates[r], frames);
     }
+    boat_water_mesh_cache_destroy(&water_mesh);
     renderer3d_destroy(&renderer);
     free(pixels);
     return 0;
@@ -290,7 +293,6 @@ int main(void)
     CHECK(presentation_toggle() == 0);
     CHECK(render_rates() == 0);
     CHECK(core_order() == 0);
-    boat_water_mesh_destroy();
     puts("boat_world=ok");
     test_worlds_close();
     return 0;

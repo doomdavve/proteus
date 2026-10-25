@@ -1,6 +1,5 @@
 #include "boat_gpu.h"
 #include "boat_assets.h"
-#include "boat_water_mesh.h"
 #include "raymath.h"
 #include "rlgl.h"
 
@@ -20,6 +19,7 @@ void boat_gpu_destroy(BoatGpu *gpu)
         UnloadMesh(gpu->wave_mesh);
     if (gpu->wave_mesh_extra.vaoId)
         UnloadMesh(gpu->wave_mesh_extra);
+    boat_water_mesh_cache_destroy(&gpu->water_mesh);
     waterfront_gpu_scene_destroy(&gpu->scene);
     if (gpu->downsample.id)
         UnloadShader(gpu->downsample);
@@ -113,6 +113,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     const Boat *boat = &view->boat;
     gpu->failed = false;
     bool mapped = world->definition->mapped;
+    const BoatMapDescription *map = world->definition->map;
     static WaterfrontSceneFrame frame; // Large; drawing is single-threaded.
     boat_scene_frame(view, presentation, world, camera, &frame);
     boat_scene_rivals(rivals, world, view->time, &frame);
@@ -171,12 +172,11 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
         Vector2 center
             = { roundf(-boat->position.x / 12) * 12, roundf(boat->position.y / 12) * 12 };
         Mesh *mesh = &gpu->wave_mesh;
-        if (!mesh->vaoId || !Vector2Equals(center, gpu->wave_center)
-            || mapped != gpu->wave_mapped) {
+        if (!mesh->vaoId || !Vector2Equals(center, gpu->wave_center) || map != gpu->wave_map) {
             Vector2 world_center = { -boat->position.x, boat->position.y };
             const Mesh3D *surface = (world->water.objects || world->water.traffic_objects)
-                ? boat_water_patch_arcade(world_center, mapped)
-                : boat_water_patch(world_center, mapped);
+                ? boat_water_patch_arcade(&gpu->water_mesh, map, world_center)
+                : boat_water_patch(&gpu->water_mesh, map, world_center);
             if (!surface)
                 goto restore_water;
             int count = (int)surface->triangle_count * 3;
@@ -206,7 +206,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
             mesh->vertexCount = count;
             mesh->triangleCount = count / 3;
             gpu->wave_center = center;
-            gpu->wave_mapped = mapped;
+            gpu->wave_map = map;
             gpu->wave_peak_triangles
                 = count / 3 > gpu->wave_peak_triangles ? count / 3 : gpu->wave_peak_triangles;
             ++gpu->wave_rebuilds;

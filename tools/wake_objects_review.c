@@ -1,7 +1,6 @@
 /* Arcade wake contracts, actual hull jumps, bounded stress and complete GPU timing. */
 #include "boat_gpu.h"
 #include "boat_test_session.h"
-#include "boat_water_mesh.h"
 #include "external/glad.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -751,7 +750,6 @@ int main(int argc, char **argv)
     (void)curved_world();
     bool visible = argc == 2 && strcmp(argv[1], "--desktop") == 0;
     runtime(visible || (argc == 2 && strcmp(argv[1], "--gpu") == 0), visible);
-    boat_water_mesh_destroy();
     test_worlds_close();
     return 0;
 }

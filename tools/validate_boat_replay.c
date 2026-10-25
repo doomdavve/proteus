@@ -173,6 +173,7 @@ static int ghost_rendering(void)
     Color *pixels = malloc(WIDTH * HEIGHT * sizeof(*pixels));
     CHECK(plain && pixels);
     Renderer3D renderer = { 0 };
+    BoatWaterMeshCache water_mesh = { 0 };
     BoatViewState boat = { .course = { .enabled = true } }, ghost;
     static const BoatPresentation view;
     BoatWorld world;
@@ -180,22 +181,24 @@ static int ghost_rendering(void)
     boat_reset(&boat.boat);
     boat.boat.position = BOAT_COURSE_START;
     ghost = boat;
-    CHECK(boat_draw(&renderer, plain, WIDTH, HEIGHT, &boat, &view, &world, BOAT_CAMERA_DEFAULT));
-    CHECK(boat_draw_with_ghost(&renderer, pixels, WIDTH, HEIGHT, &boat, &view, &world,
+    CHECK(boat_draw(
+        &renderer, &water_mesh, plain, WIDTH, HEIGHT, &boat, &view, &world, BOAT_CAMERA_DEFAULT));
+    CHECK(boat_draw_with_ghost(&renderer, &water_mesh, pixels, WIDTH, HEIGHT, &boat, &view, &world,
         BOAT_CAMERA_DEFAULT, &ghost, NULL, .5f));
     // Coincident ghost surfaces cannot overwrite the player's hull.
     CHECK(memcmp(plain, pixels, WIDTH * HEIGHT * sizeof(*plain)) == 0);
     ghost.boat.position.y -= 10;
-    CHECK(boat_draw_with_ghost(&renderer, pixels, WIDTH, HEIGHT, &boat, &view, &world,
+    CHECK(boat_draw_with_ghost(&renderer, &water_mesh, pixels, WIDTH, HEIGHT, &boat, &view, &world,
         BOAT_CAMERA_DEFAULT, &ghost, NULL, .5f));
     int cyan = 0;
     for (int i = 0; i < WIDTH * HEIGHT; ++i)
         cyan += pixels[i].r == 90 && pixels[i].g == 240 && pixels[i].b == 255;
     CHECK(cyan > 10);
-    CHECK(boat_draw_with_ghost(&renderer, pixels, WIDTH, HEIGHT, &boat, &view, &world,
+    CHECK(boat_draw_with_ghost(&renderer, &water_mesh, pixels, WIDTH, HEIGHT, &boat, &view, &world,
         BOAT_CAMERA_DEFAULT, &ghost, NULL, 0));
     CHECK(memcmp(plain, pixels, WIDTH * HEIGHT * sizeof(*plain)) == 0);
     CHECK(renderer.ghost_opacity == 0);
+    boat_water_mesh_cache_destroy(&water_mesh);
     renderer3d_destroy(&renderer);
     free(plain);
     free(pixels);

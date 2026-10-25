@@ -1,20 +1,10 @@
 #include "boat_water_mesh.h"
 #include "raymath.h"
-#include "waterfront_city.h"
 
 #include <math.h>
 #include <stdlib.h>
 
-typedef struct {
-    Vector3 *vertices;
-    Triangle3D *triangles;
-    size_t count, capacity;
-    Mesh3D mesh;
-} Surface;
-static Surface surfaces[2];
-static Surface candidate_surface;
-static Surface patches[4];
-static Vector2 patch_centers[4];
+typedef BoatWaterMeshSurface Surface;
 
 static bool surface_triangle(Surface *s, Vector3 a, Vector3 b, Vector3 c)
 {
@@ -54,22 +44,30 @@ static bool subdivide(Surface *s, Vector3 a, Vector3 b, Vector3 c, int depth)
     return surface_triangle(s, a, b, c);
 }
 
-void boat_water_mesh_destroy(void)
+static void surface_destroy(Surface *s)
 {
-    free(candidate_surface.vertices);
-    free(candidate_surface.triangles);
-    candidate_surface = (Surface) { 0 };
-    for (int i = 0; i < 2; ++i) {
-        free(surfaces[i].vertices);
-        free(surfaces[i].triangles);
-        surfaces[i] = (Surface) { 0 };
-        free(patches[i].vertices);
-        free(patches[i].triangles);
-        patches[i] = (Surface) { 0 };
-        free(patches[i + 2].vertices);
-        free(patches[i + 2].triangles);
-        patches[i + 2] = (Surface) { 0 };
-    }
+    free(s->vertices);
+    free(s->triangles);
+    *s = (Surface) { 0 };
+}
+
+void boat_water_mesh_cache_destroy(BoatWaterMeshCache *cache)
+{
+    surface_destroy(&cache->surface);
+    surface_destroy(&cache->field);
+    for (int i = 0; i < 2; ++i)
+        surface_destroy(&cache->patches[i]);
+    *cache = (BoatWaterMeshCache) { 0 };
+}
+
+// Map-dependent surfaces rebuild after a rebind; their storage is reused.
+static void cache_bind(BoatWaterMeshCache *cache, const BoatMapDescription *map)
+{
+    if (cache->map == map)
+        return;
+    cache->map = map;
+    cache->surface.count = 0;
+    cache->patches[0].count = cache->patches[1].count = 0;
 }
 
 // Clip a convex polygon against one axis-aligned cell edge, retaining input winding.
@@ -170,18 +168,19 @@ static bool patch_triangle(Surface *s, Vector3 a, Vector3 b, Vector3 c, Vector2 
     return true;
 }
 
-static const Mesh3D *water_patch(Vector2 world_center, bool mapped, bool fine)
+static const Mesh3D *water_patch(
+    BoatWaterMeshCache *cache, const BoatMapDescription *map, Vector2 world_center, bool fine)
 {
-    int index = mapped + 2 * fine;
-    Surface *s = &patches[index];
+    cache_bind(cache, map);
+    Surface *s = &cache->patches[fine];
     Vector2 center = { roundf(world_center.x / 12) * 12, roundf(world_center.y / 12) * 12 };
-    if (s->count && Vector2Equals(center, patch_centers[index]))
+    if (s->count && Vector2Equals(center, cache->patch_centers[fine]))
         return &s->mesh;
     s->count = 0;
     Vector2 origin = { center.x - 96, center.y - 96 };
     bool ok = true;
-    if (mapped) {
-        const Mesh3D *city = waterfront_city_mesh();
+    if (map) {
+        const Mesh3D *city = map->mesh;
         for (size_t i = 0; ok && i < city->triangle_count; ++i) {
             Triangle3D t = city->triangles[i];
             Vector3 a = city->vertices[t.vertices[0]], b = city->vertices[t.vertices[1]];
@@ -200,19 +199,21 @@ static const Mesh3D *water_patch(Vector2 world_center, bool mapped, bool fine)
         s->count = 0;
         return NULL;
     }
-    patch_centers[index] = center;
+    cache->patch_centers[fine] = center;
     s->mesh = (Mesh3D) { s->vertices, s->triangles, s->count };
     return &s->mesh;
 }
 
-const Mesh3D *boat_water_patch(Vector2 center, bool mapped)
+const Mesh3D *boat_water_patch(
+    BoatWaterMeshCache *cache, const BoatMapDescription *map, Vector2 center)
 {
-    return water_patch(center, mapped, false);
+    return water_patch(cache, map, center, false);
 }
 
-const Mesh3D *boat_water_patch_arcade(Vector2 center, bool mapped)
+const Mesh3D *boat_water_patch_arcade(
+    BoatWaterMeshCache *cache, const BoatMapDescription *map, Vector2 center)
 {
-    return water_patch(center, mapped, true);
+    return water_patch(cache, map, center, true);
 }
 
 // Same presentation-only phase/energy proxy as waveCrestFoam in the water shader.
@@ -225,13 +226,15 @@ static float wave_crest_foam(float height, Vector2 gradient, float k)
     return phase * phase * (3 - 2 * phase) * strength * strength * (3 - 2 * strength);
 }
 
-const Mesh3D *boat_water_surface(BoatWater water, double time, bool mapped)
+const Mesh3D *boat_water_surface(
+    BoatWaterMeshCache *cache, const BoatMapDescription *map, BoatWater water, double time)
 {
-    Surface *s = &surfaces[mapped];
+    cache_bind(cache, map);
+    Surface *s = &cache->surface;
     if (!s->count) {
         bool ok = true;
-        if (mapped) {
-            const Mesh3D *city = waterfront_city_mesh();
+        if (map) {
+            const Mesh3D *city = map->mesh;
             for (size_t i = 0; ok && i < city->triangle_count; ++i) {
                 Triangle3D t = city->triangles[i];
                 Vector3 a = city->vertices[t.vertices[0]], b = city->vertices[t.vertices[1]];
@@ -247,7 +250,7 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool mapped)
                     (Vector3) { 120, 0, -80 }, 0);
         }
         if (!ok) {
-            boat_water_mesh_destroy();
+            surface_destroy(s);
             return NULL;
         }
     }
@@ -268,7 +271,7 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool mapped)
             = boat_water_query_borrowed(&water, (Vector2) { -centre.x, centre.z }, time);
         // Restrained slope light; geometry and GPU reflections carry the wave shape.
         float light = Clamp(.95f + .55f * (-q.normal.x + q.normal.z), .85f, 1.05f);
-        Color base = mapped ? (Color) { 45, 79, 104, 255 } : (Color) { 36, 107, 125, 255 };
+        Color base = map ? (Color) { 45, 79, 104, 255 } : (Color) { 36, 107, 125, 255 };
         Vector2 point = { -centre.x, centre.z };
         BoatStormSample storm = boat_water_storm_query(water.storm, point, time);
         BoatVesselWakeSample vessel = boat_vessel_wake_query(water.vessel, point, time);
@@ -299,9 +302,10 @@ const Mesh3D *boat_water_surface(BoatWater water, double time, bool mapped)
     return &s->mesh;
 }
 
-const Mesh3D *boat_water_surface_field(BoatWater water, const BoatWake *field, double time)
+const Mesh3D *boat_water_surface_field(
+    BoatWaterMeshCache *cache, BoatWater water, const BoatWake *field, double time)
 {
-    Surface *s = &candidate_surface;
+    Surface *s = &cache->field;
     if (!s->count) {
         for (int z = 0; z < 215; ++z)
             for (int x = 0; x < 321; ++x) {

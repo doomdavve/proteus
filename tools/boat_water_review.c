@@ -5,7 +5,6 @@
 #include "boat_map.h"
 #include "boat_profile.h"
 #include "boat_test_session.h"
-#include "boat_water_mesh.h"
 #include "frame_pacer.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -86,9 +85,9 @@ static float shore_distance(Vector2 position)
 }
 
 // Draws BOAT as a free-boating view at world TIME.
-static bool capture(BoatGpu *gpu, Renderer3D *cpu, const Boat *boat, double time,
-    const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera, bool use_gpu,
-    const char *path)
+static bool capture(BoatGpu *gpu, Renderer3D *cpu, BoatWaterMeshCache *cpu_water, const Boat *boat,
+    double time, const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera,
+    bool use_gpu, const char *path)
 {
     Image image;
     Color pixels[320 * 200];
@@ -101,7 +100,7 @@ static bool capture(BoatGpu *gpu, Renderer3D *cpu, const Boat *boat, double time
         ImageFlipVertical(&image);
         ImageFlipHorizontal(&image);
     } else {
-        if (!boat_draw(cpu, pixels, 320, 200, &view, presentation, world, camera))
+        if (!boat_draw(cpu, cpu_water, pixels, 320, 200, &view, presentation, world, camera))
             return false;
         image = (Image) { pixels, 320, 200, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
     }
@@ -197,7 +196,6 @@ static int check_gpu_water(void)
 cleanup:
     boat_gpu_destroy(&gpu);
     CloseWindow();
-    boat_water_mesh_destroy();
     return result;
 }
 
@@ -553,7 +551,6 @@ cleanup:
         boat_gpu_destroy(&gpu);
         CloseWindow();
     }
-    boat_water_mesh_destroy();
     free(frames);
     free(scratch);
     return ok ? 0 : bench_fail(error ? error : "cannot write report");
@@ -666,6 +663,7 @@ int main(int argc, char **argv)
             components[i].direction.x, components[i].direction.y);
     BoatGpu gpu = { 0 };
     Renderer3D cpu = { 0 };
+    BoatWaterMeshCache cpu_water = { 0 };
     FILE *csv = NULL;
     char path[2048];
     int result = 1;
@@ -716,16 +714,16 @@ int main(int argc, char **argv)
                 for (int view = 0; view < 2; ++view) {
                     snprintf(path, sizeof(path), "%s/%s-%s.png", output, name,
                         view ? "close" : "default");
-                    if (!capture(&gpu, &cpu, boat, boat_session_time(&session), presentation, world,
-                            cameras[view], use_gpu, path))
+                    if (!capture(&gpu, &cpu, &cpu_water, boat, boat_session_time(&session),
+                            presentation, world, cameras[view], use_gpu, path))
                         goto cleanup;
                 }
                 if (finished) {
                     shown = *presentation;
                     shown.camera_heading += PI;
                     snprintf(path, sizeof(path), "%s/beyond-lookback.png", output);
-                    if (!capture(&gpu, &cpu, boat, boat_session_time(&session), &shown, world,
-                            default_camera, use_gpu, path))
+                    if (!capture(&gpu, &cpu, &cpu_water, boat, boat_session_time(&session), &shown,
+                            world, default_camera, use_gpu, path))
                         goto cleanup;
                     // Fixed inspection views of both landfalls, separate from route poses.
                     const Stop landfalls[] = { { "north-landfall", { 750, -850 } },
@@ -741,8 +739,9 @@ int main(int argc, char **argv)
                         if (!hull_clear(&inspection))
                             goto cleanup;
                         snprintf(path, sizeof(path), "%s/%s.png", output, landfalls[bank].name);
-                        if (!capture(&gpu, &cpu, &inspection, boat_session_time(&session), &shown,
-                                world, default_camera, use_gpu, path))
+                        if (!capture(&gpu, &cpu, &cpu_water, &inspection,
+                                boat_session_time(&session), &shown, world, default_camera, use_gpu,
+                                path))
                             goto cleanup;
                     }
                     Boat overview = *boat;
@@ -751,8 +750,9 @@ int main(int argc, char **argv)
                     shown.flag.initialized = false;
                     shown.camera_heading = overview.heading = -PI / 2;
                     snprintf(path, sizeof(path), "%s/connections-overview.png", output);
-                    if (!capture(&gpu, &cpu, &overview, boat_session_time(&session), &shown, world,
-                            (BoatCamera) { .distance = 1100, .height = 300 }, use_gpu, path))
+                    if (!capture(&gpu, &cpu, &cpu_water, &overview, boat_session_time(&session),
+                            &shown, world, (BoatCamera) { .distance = 1100, .height = 300 },
+                            use_gpu, path))
                         goto cleanup;
                 }
             }
@@ -771,8 +771,8 @@ int main(int argc, char **argv)
                 rlDrawRenderBatchActive();
             } else {
                 Color pixels[320 * 200];
-                if (!boat_draw(&cpu, pixels, 320, 200, SESSION_VIEW(&session), presentation, world,
-                        review_camera))
+                if (!boat_draw(&cpu, &cpu_water, pixels, 320, 200, SESSION_VIEW(&session),
+                        presentation, world, review_camera))
                     goto cleanup;
             }
             double ms = (now() - start) * 1000;
@@ -783,8 +783,8 @@ int main(int argc, char **argv)
             }
             if (sequence) {
                 snprintf(path, sizeof(path), "%s/frame-%05d.png", output, frames);
-                if (!capture(&gpu, &cpu, boat, boat_session_time(&session), presentation, world,
-                        review_camera, use_gpu, path))
+                if (!capture(&gpu, &cpu, &cpu_water, boat, boat_session_time(&session),
+                        presentation, world, review_camera, use_gpu, path))
                     goto cleanup;
             }
             if (visible && use_gpu) {
@@ -817,7 +817,9 @@ int main(int argc, char **argv)
             use_gpu ? 120 : 2, timing_count ? total / timing_count : 0,
             timing_count ? timings[(timing_count - 1) * 95 / 100] : 0,
             timing_count ? timings[timing_count - 1] : 0);
-        const Mesh3D *surface = use_gpu ? NULL : boat_water_surface((BoatWater) { 0 }, 0, true);
+        const Mesh3D *surface = use_gpu
+            ? NULL
+            : boat_water_surface(&cpu_water, world->definition->map, (BoatWater) { 0 }, 0);
         const Mesh3D *city = waterfront_city_mesh();
         size_t water_count = 0;
         while (water_count < city->triangle_count) {
@@ -841,12 +843,12 @@ int main(int argc, char **argv)
 cleanup:
     if (csv)
         fclose(csv);
+    boat_water_mesh_cache_destroy(&cpu_water);
     renderer3d_destroy(&cpu);
     if (!check && use_gpu && IsWindowReady()) {
         boat_gpu_destroy(&gpu);
         CloseWindow();
     }
-    boat_water_mesh_destroy();
     test_worlds_close();
     return result;
 }

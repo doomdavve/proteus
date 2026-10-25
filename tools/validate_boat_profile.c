@@ -101,11 +101,16 @@ static int check_drive(void)
     Color *right = calloc(320 * 200, sizeof(Color));
     CHECK(left && right);
     Renderer3D renderer_left = { 0 }, renderer_right = { 0 };
-    CHECK(boat_draw(&renderer_left, left, 320, 200, SESSION_VIEW(&plain_session),
+    BoatWaterMeshCache water_left = { 0 }, water_right = { 0 };
+    CHECK(boat_draw(&renderer_left, &water_left, left, 320, 200, SESSION_VIEW(&plain_session),
         &plain_session.presentation, &plain_session.world, BOAT_CAMERA_DEFAULT));
-    CHECK(boat_draw(&renderer_right, right, 320, 200, SESSION_VIEW(&measured_session),
+    CHECK(boat_draw(&renderer_right, &water_right, right, 320, 200, SESSION_VIEW(&measured_session),
         &measured_session.presentation, &measured_session.world, BOAT_CAMERA_DEFAULT));
     CHECK(memcmp(left, right, 320 * 200 * sizeof(Color)) == 0);
+    boat_water_mesh_cache_destroy(&water_left);
+    boat_water_mesh_cache_destroy(&water_right);
+    renderer3d_destroy(&renderer_left);
+    renderer3d_destroy(&renderer_right);
     free(left);
     free(right);
     return 0;

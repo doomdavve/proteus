@@ -3,7 +3,6 @@
 #include "boat_map.h"
 #include "boat_pose.h"
 #include "boat_race.h"
-#include "boat_water_mesh.h"
 #include "raymath.h"
 #include "waterfront.h"
 
@@ -469,27 +468,27 @@ void boat_scene_rivals(
     frame->rival_count = pose_rivals(rivals, world, time, frame->rivals);
 }
 
-bool boat_draw(Renderer3D *renderer, Color *pixels, int width, int height,
-    const BoatViewState *view, const BoatPresentation *presentation, const BoatWorld *world,
-    BoatCamera camera_settings)
+bool boat_draw(Renderer3D *renderer, BoatWaterMeshCache *water_mesh, Color *pixels, int width,
+    int height, const BoatViewState *view, const BoatPresentation *presentation,
+    const BoatWorld *world, BoatCamera camera_settings)
 {
-    return boat_draw_with_ghost(
-        renderer, pixels, width, height, view, presentation, world, camera_settings, NULL, NULL, 0);
+    return boat_draw_with_ghost(renderer, water_mesh, pixels, width, height, view, presentation,
+        world, camera_settings, NULL, NULL, 0);
 }
 
-bool boat_draw_with_ghost(Renderer3D *renderer, Color *pixels, int width, int height,
-    const BoatViewState *view, const BoatPresentation *presentation, const BoatWorld *world,
-    BoatCamera camera_settings, const BoatViewState *ghost, const BoatFlag *ghost_flag,
-    float opacity)
+bool boat_draw_with_ghost(Renderer3D *renderer, BoatWaterMeshCache *water_mesh, Color *pixels,
+    int width, int height, const BoatViewState *view, const BoatPresentation *presentation,
+    const BoatWorld *world, BoatCamera camera_settings, const BoatViewState *ghost,
+    const BoatFlag *ghost_flag, float opacity)
 {
-    return boat_draw_scene(renderer, pixels, width, height, view, presentation, world,
+    return boat_draw_scene(renderer, water_mesh, pixels, width, height, view, presentation, world,
         camera_settings, NULL, ghost, ghost_flag, opacity);
 }
 
-bool boat_draw_scene(Renderer3D *renderer, Color *pixels, int width, int height,
-    const BoatViewState *view, const BoatPresentation *presentation, const BoatWorld *world,
-    BoatCamera camera_settings, const BoatRivals *rivals, const BoatViewState *ghost,
-    const BoatFlag *ghost_flag, float opacity)
+bool boat_draw_scene(Renderer3D *renderer, BoatWaterMeshCache *water_mesh, Color *pixels, int width,
+    int height, const BoatViewState *view, const BoatPresentation *presentation,
+    const BoatWorld *world, BoatCamera camera_settings, const BoatRivals *rivals,
+    const BoatViewState *ghost, const BoatFlag *ghost_flag, float opacity)
 {
     const Boat *boat = &view->boat;
     double time = view->time;
@@ -517,8 +516,8 @@ bool boat_draw_scene(Renderer3D *renderer, Color *pixels, int width, int height,
     }
     if (boat_world_displaced(world)) {
         const Mesh3D *surface = world->wake_field
-            ? boat_water_surface_field(world->water, world->wake_field, time)
-            : boat_water_surface(world->water, time, world->definition->mapped);
+            ? boat_water_surface_field(water_mesh, world->water, world->wake_field, time)
+            : boat_water_surface(water_mesh, world->definition->map, world->water, time);
         if (!surface)
             return false;
         renderer3d_draw_emissive_mesh(renderer, surface, (Transform3D) { .scale = { 1, 1, 1 } });

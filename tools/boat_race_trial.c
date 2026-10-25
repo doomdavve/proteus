@@ -4,7 +4,6 @@
 #include "boat_race.h"
 #include "boat_test_world.h"
 #include "boat_throttle.h"
-#include "boat_water_mesh.h"
 #include "raymath.h"
 #include "wake_velocity_drive.h"
 #include "waterfront_traffic.h"
@@ -634,6 +633,7 @@ int main(int argc, char **argv)
     }
     BoatGpu gpu = { 0 };
     Renderer3D cpu = { 0 };
+    BoatWaterMeshCache cpu_water = { 0 };
     Color pixels[320 * 200];
     Texture2D texture = { 0 };
     if (gpu_enabled)
@@ -689,8 +689,8 @@ int main(int argc, char **argv)
             boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
             CHECK(!gpu.failed);
         } else
-            CHECK(boat_draw(
-                &cpu, pixels, 320, 200, &view, &session.presentation, &session.world, camera));
+            CHECK(boat_draw(&cpu, &cpu_water, pixels, 320, 200, &view, &session.presentation,
+                &session.world, camera));
         if (output) {
             Image image = gpu_enabled
                 ? LoadImageFromTexture(gpu.target.texture)
@@ -736,9 +736,9 @@ int main(int argc, char **argv)
         boat_gpu_destroy(&gpu);
     if (texture.id)
         UnloadTexture(texture);
+    boat_water_mesh_cache_destroy(&cpu_water);
     renderer3d_destroy(&cpu);
     boat_session_destroy(&session);
-    boat_water_mesh_destroy();
     if (window)
         CloseWindow();
     test_worlds_close();

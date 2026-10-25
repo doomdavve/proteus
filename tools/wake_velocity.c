@@ -17,7 +17,6 @@
 #include "wake_velocity_net.h"
 #endif
 #include "boat_title.h"
-#include "boat_water_mesh.h"
 #include "frame_pacer.h"
 #include "profiler.h"
 #include "raymath.h"
@@ -534,6 +533,7 @@ static int study(int argc, char **argv)
             return 1;
         }
     Renderer3D renderer = { 0 };
+    BoatWaterMeshCache water_mesh = { 0 }; // The CPU view's; the GPU view owns its own.
     BoatGpu gpu = { 0 };
     Texture2D texture = { 0 };
     RenderTexture2D frame_target = { 0 };
@@ -673,8 +673,9 @@ static int study(int argc, char **argv)
         ghost_opacity = .5f;
     }
     if (!gpu_enabled
-        && !boat_draw_with_ghost(&renderer, pixels, WIDTH, HEIGHT, view, view_presentation,
-            view_world, camera_settings, ghost_view, ghost_view_flag, ghost_opacity))
+        && !boat_draw_with_ghost(&renderer, &water_mesh, pixels, WIDTH, HEIGHT, view,
+            view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
+            ghost_opacity))
         goto cleanup;
     Image image = { pixels, WIDTH, HEIGHT, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
     if (screenshot && !gpu_enabled) {
@@ -1140,9 +1141,9 @@ static int study(int argc, char **argv)
                 result = 1;
                 break;
             }
-        } else if (!boat_draw_scene(&renderer, pixels, WIDTH, HEIGHT, view, view_presentation,
-                       view_world, camera_settings, &rivals, ghost_view, ghost_view_flag,
-                       ghost_opacity)) {
+        } else if (!boat_draw_scene(&renderer, &water_mesh, pixels, WIDTH, HEIGHT, view,
+                       view_presentation, view_world, camera_settings, &rivals, ghost_view,
+                       ghost_view_flag, ghost_opacity)) {
             result = 1;
             break;
         }
@@ -1299,7 +1300,7 @@ cleanup:
         if (window_owned)
             CloseWindow();
     }
-    boat_water_mesh_destroy();
+    boat_water_mesh_cache_destroy(&water_mesh);
     for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
         boat_world_resources_destroy(&worlds[i]);
     renderer3d_destroy(&renderer);

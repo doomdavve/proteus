@@ -63,14 +63,15 @@ static void views(const Formation *f, unsigned skip, BoatViewState *own, BoatRiv
     }
 }
 
-static bool draw_cpu(Renderer3D *renderer, Color *pixels, const Formation *f, unsigned skip)
+static bool draw_cpu(Renderer3D *renderer, BoatWaterMeshCache *water_mesh, Color *pixels,
+    const Formation *f, unsigned skip)
 {
     BoatViewState own;
     BoatRivals rivals;
     views(f, skip, &own, &rivals);
     BoatWorld world = boat_fleet_world(&f->fleet);
-    return boat_draw_scene(renderer, pixels, 320, 200, &own, &f->presentations[0], &world,
-        BOAT_CAMERA_DEFAULT, &rivals, NULL, NULL, 0);
+    return boat_draw_scene(renderer, water_mesh, pixels, 320, 200, &own, &f->presentations[0],
+        &world, BOAT_CAMERA_DEFAULT, &rivals, NULL, NULL, 0);
 }
 
 static int check(void)
@@ -80,18 +81,20 @@ static int check(void)
     formation(&f, true, 3);
     copy = f;
     Renderer3D renderer = { 0 };
-    CHECK(draw_cpu(&renderer, all, &f, 0));
-    CHECK(draw_cpu(&renderer, again, &f, 0));
+    BoatWaterMeshCache water_mesh = { 0 };
+    CHECK(draw_cpu(&renderer, &water_mesh, all, &f, 0));
+    CHECK(draw_cpu(&renderer, &water_mesh, again, &f, 0));
     CHECK(memcmp(all, again, sizeof(all)) == 0);
     CHECK(boat_fleet_hash(&f.fleet.state) == boat_fleet_hash(&copy.fleet.state));
     CHECK(memcmp(f.presentations, copy.presentations, sizeof(f.presentations)) == 0);
     unsigned changed[BOAT_FLEET_SLOTS] = { 0 };
     for (unsigned skip = 1; skip < BOAT_FLEET_SLOTS; ++skip) {
-        CHECK(draw_cpu(&renderer, without, &f, skip));
+        CHECK(draw_cpu(&renderer, &water_mesh, without, &f, skip));
         for (int p = 0; p < 320 * 200; ++p)
             changed[skip] += memcmp(&all[p], &without[p], sizeof(Color)) != 0;
         CHECK(changed[skip] > 40);
     }
+    boat_water_mesh_cache_destroy(&water_mesh);
     renderer3d_destroy(&renderer);
     printf("fleet render: three rivals each drew %u/%u/%u pixels; repeat identical; fleet and "
            "presentations unchanged\nboat_fleet_render=ok\n",
@@ -136,8 +139,10 @@ int main(int argc, char **argv)
     if (!gpu) {
         static Color pixels[320 * 200];
         Renderer3D renderer = { 0 };
-        bool drawn = boat_draw_scene(&renderer, pixels, 320, 200, &own, &f.presentations[0], &world,
-            BOAT_CAMERA_DEFAULT, &rivals, NULL, NULL, 0);
+        BoatWaterMeshCache water_mesh = { 0 };
+        bool drawn = boat_draw_scene(&renderer, &water_mesh, pixels, 320, 200, &own,
+            &f.presentations[0], &world, BOAT_CAMERA_DEFAULT, &rivals, NULL, NULL, 0);
+        boat_water_mesh_cache_destroy(&water_mesh);
         renderer3d_destroy(&renderer);
         return drawn
                 && ExportImage(

@@ -1,6 +1,7 @@
 #ifndef PROTEUS_BOAT_GPU_H
 #define PROTEUS_BOAT_GPU_H
 #include "boat_view.h"
+#include "boat_water_mesh.h"
 #include "renderer_gpu.h"
 
 typedef struct {
@@ -11,7 +12,8 @@ typedef struct {
     Mesh wave_mesh_extra; // Second indexed basin strip (16-bit vertex indices).
     Mesh basin_water;
     Vector2 wave_center;
-    bool wave_mapped; // Patch topology belongs to a mapped crop (W2 binds it to a world).
+    const BoatMapDescription *wave_map; // Map whose patch wave_mesh holds (NULL: basin).
+    BoatWaterMeshCache water_mesh; // This view's own patches; never shared with CPU views.
     int wave_capacity, wave_peak_triangles, wave_rebuilds;
     Texture2D wake_texture;
     float *wake_upload;

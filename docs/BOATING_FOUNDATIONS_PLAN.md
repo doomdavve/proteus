@@ -27,6 +27,10 @@ prepared from an explicit `BoatMapDescription`. A1.2 bound it to worlds, session
 and networking through the caller-owned `BoatWorldResources` and removed the global wrapper;
 see the [A1.1](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a11--explicit-map-data-and-collision-cache-construction)
 and [A1.2](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a12-result-2026-10-25) results.
+A1.3 moved the water-mesh caches into view-owned `BoatWaterMeshCache`s bound to a map
+description. Each holds one map at a time and rebinds on a location change, rather than
+W2's one cache per definition; see the
+[A1.3 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a13-result-2026-10-25).
 The original geometry/timing comparisons remain historical evidence, not current commands.
 The [Sol first-steps handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) details the mapped A1
 execution slices. Its resource contract adapts original W3 item 1: an explicit external owner
@@ -90,7 +94,7 @@ All rows start **pending**. Replace the evidence column with actual dated result
 | C2 | Precise CPU/GPU time consumers | C1 | Implemented 2026-10-23; [C2 handoff below](#c2-handoff--2026-10-23); 85 active CTests pass |
 | C3 | Long-session/compatibility gate and new baseline | C2 | Implemented 2026-10-23; automated gate, replacement baseline and user manual playback of all modes; [C3 handoff below](#c3-handoff--2026-10-23) |
 | W1 | Explicit immutable location definitions | C3 | Basin slice implemented 2026-10-23 (definitions; no stored active location in boats); mapped selector/map-query migration pending; [handoff](#w1w3-basin-slice-handoff--2026-10-23) |
-| W2 | Caller-owned collision and water-mesh caches | W1 | Pending |
+| W2 | Caller-owned collision and water-mesh caches | W1 | Mapped slice implemented 2026-10-25 by adventure A1.1 (`BoatMap`) and A1.3 (`BoatWaterMeshCache`); A1.5 lifecycle gate pending; [A1.3 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a13-result-2026-10-25) |
 | W3 | World/session owners and water migration | W2 | Basin slice implemented 2026-10-23 ahead of W2 (explicit world, session clock, isolation gate); mapped caches/resources pending; [handoff](#w1w3-basin-slice-handoff--2026-10-23) |
 | W4 | Reload/isolation/resource-lifetime gate | W3 | Pending |
 | S1 | Extract pose, camera, scenery, and drawing | W4 | Basin slice implemented 2026-10-23 ahead of W4 (shared `boat_pose`, `boat_view`, `boat_course_view`); one shared CPU/GPU scene frame pending; [handoff](#s1s2-basin-slice-handoff--2026-10-23) |

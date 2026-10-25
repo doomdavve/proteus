@@ -20,6 +20,12 @@ three rivals through the shared scene call; each rival must change the CPU image
 be identical and drawing must not change the fleet or presentations. For a look, run
 `./build/boat_fleet_review --renderer gpu --waves --time 4 --screenshot build/fleet.png`.
 
+`boat_handling` (`validate_boat`, `cpu`) also checks view-owned water-mesh caches
+(adventure A1.3). Two river caches at different patch centres and a basin cache are held
+together, one is destroyed and rebuilt, and a cache rebinds between the river and a synthetic
+pond map. Every mesh must match its reference built alone, and the 5.99/6.01 m snap-boundary
+pair must not disturb another cache's borrowed meshes.
+
 The HUD/control worktree also checks all 49 transitions between the seven thrust detents
 through the real integrator in `boat_handling`, and forward/reverse target settling on both
 the authority and predicted client in `boat_net`. Mouse steering adds 49 wheel transitions
