@@ -5,8 +5,9 @@ Prepared 2026-10-19 against `f60ede8`, following the
 [BOATING_PLAN.md](BOATING_PLAN.md) continues to own gameplay direction.
 
 Status: P1, P2a, P3a, phase C (C1–C3), the basin W1/W3, S1/S2, S3 and S4 slices and the S3
-`BoatInput` type implemented; full P2/P3, mapped W1/W3, W2, W4, the remaining S1 frame
-consolidation, full S4 validator splitting and S5 remain pending. The minimum core
+`BoatInput` type implemented, and mapped W2/W3 and W4 implemented through adventure A1
+(2026-10-25); full P2/P3, mapped W1, the remaining S1 frame consolidation, full S4 validator
+splitting and S5 remain pending. The minimum core
 [multiplayer prerequisites](MULTIPLAYER_PLAN.md) are complete, and multiplayer M2 (the local
 fleet authority) and M3 (protocol, transport and server process) are implemented in that plan's
 [M2](MULTIPLAYER_PLAN.md#m2-local-authority-handoff--2026-10-23) and
@@ -34,6 +35,10 @@ W2's one cache per definition; see the
 A1.4 gave each CPU/GPU view its own `WaterfrontScenery` (map-derived dressing) and bound
 both renderers to it explicitly; see the
 [A1.4 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a14-result-2026-10-25).
+A1.5 is the mapped W4 gate: reload, isolation, owner release, failed init and repeat GPU
+view recreation, with basin, two river owners and a synthetic harbor in place of Eriksberg
+([A1.5 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a15-result-2026-10-25)). No interactive
+location switching was added.
 The original geometry/timing comparisons remain historical evidence, not current commands.
 The [Sol first-steps handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) details the mapped A1
 execution slices. Its resource contract adapts original W3 item 1: an explicit external owner
@@ -97,9 +102,9 @@ All rows start **pending**. Replace the evidence column with actual dated result
 | C2 | Precise CPU/GPU time consumers | C1 | Implemented 2026-10-23; [C2 handoff below](#c2-handoff--2026-10-23); 85 active CTests pass |
 | C3 | Long-session/compatibility gate and new baseline | C2 | Implemented 2026-10-23; automated gate, replacement baseline and user manual playback of all modes; [C3 handoff below](#c3-handoff--2026-10-23) |
 | W1 | Explicit immutable location definitions | C3 | Basin slice implemented 2026-10-23 (definitions; no stored active location in boats); mapped selector/map-query migration pending; [handoff](#w1w3-basin-slice-handoff--2026-10-23) |
-| W2 | Caller-owned collision and water-mesh caches | W1 | Mapped slice implemented 2026-10-25 by adventure A1.1 (`BoatMap`) and A1.3 (`BoatWaterMeshCache`); A1.5 lifecycle gate pending; [A1.3 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a13-result-2026-10-25) |
-| W3 | World/session owners and water migration | W2 | Basin slice implemented 2026-10-23 ahead of W2 (explicit world, session clock, isolation gate); mapped caches/resources pending; [handoff](#w1w3-basin-slice-handoff--2026-10-23) |
-| W4 | Reload/isolation/resource-lifetime gate | W3 | Pending |
+| W2 | Caller-owned collision and water-mesh caches | W1 | Mapped slice implemented 2026-10-25 by adventure A1.1 (`BoatMap`) and A1.3 (`BoatWaterMeshCache`), lifecycle-gated by A1.5; [A1.3 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a13-result-2026-10-25) |
+| W3 | World/session owners and water migration | W2 | Basin slice implemented 2026-10-23 ahead of W2 (explicit world, session clock, isolation gate); mapped resources implemented 2026-10-25 by adventure A1.2 (`BoatWorldResources`); [handoff](#w1w3-basin-slice-handoff--2026-10-23), [A1.2 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a12-result-2026-10-25) |
+| W4 | Reload/isolation/resource-lifetime gate | W3 | Implemented 2026-10-25 by adventure A1.5, with basin, two river owners and a synthetic harbor in place of the retired Eriksberg; [A1.5 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a15-result-2026-10-25) |
 | S1 | Extract pose, camera, scenery, and drawing | W4 | Basin slice implemented 2026-10-23 ahead of W4 (shared `boat_pose`, `boat_view`, `boat_course_view`); one shared CPU/GPU scene frame pending; [handoff](#s1s2-basin-slice-handoff--2026-10-23) |
 | S2 | Separate cosmetic state from boat simulation | S1 | Basin slice implemented 2026-10-23 (`BoatPresentation`, presentation on/off and 30/60/144 Hz gates); [handoff](#s1s2-basin-slice-handoff--2026-10-23) |
 | S3 | Session-owned course/replay orchestration and finish I/O | S2 | Basin slice implemented 2026-10-23 (course and runs in `BoatSession`, `BoatViewState`, finish saves flushed after the tick loop); [handoff](#s3-basin-slice-handoff--2026-10-23). `BoatInput` type implemented 2026-10-23; [handoff](#s3-boatinput-handoff--2026-10-23) |

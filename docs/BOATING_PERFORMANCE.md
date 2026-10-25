@@ -85,9 +85,9 @@ mkdir -p build/adventure/a0-performance
 
 `--benchmark PREFIX` writes `PREFIX.json` and `PREFIX.csv`. The parent directory must exist;
 the tool opens both files before the voyage and removes them if the run fails. `--aa off|4x4`
-is required. `--renderer` may only be `gpu` (the default), and `--check`, `--check-gpu`,
-`--output` and `--sequence` are rejected. An empty prefix, one over 4000 bytes or one ending
-in `/` is rejected. Any of these, a route failure or a truncated write returns nonzero.
+is required. `--renderer` may only be `gpu` (the default), and `--check`, the `--check-gpu*`
+modes, `--output` and `--sequence` are rejected. An empty prefix, one over 4000 bytes or one
+ending in `/` is rejected. Any of these, a route failure or a truncated write returns nonzero.
 The existing `--check`, `--output` and `--sequence` modes are unchanged. Every route mode
 now prints a `final_state` line of exact `%a` values.
 
@@ -127,6 +127,9 @@ This is a fixed two-tick **render workload**. It does not exercise the app's rea
 accumulator, dropped ticks, audio, HUD or course logic. The
 [A0.4 baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25) holds the
 first controlled results.
+Adventure A1.5 repeated the matrix after the ownership changes (2026-10-25): final states
+identical, frame p95 medians 2–8% below A0.4, submission and GPU p95 within about 1%; see the
+[A1.5 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a15-result-2026-10-25).
 
 ## Frame pacing — 2026-10-25
 

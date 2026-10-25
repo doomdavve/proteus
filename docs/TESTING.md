@@ -32,6 +32,21 @@ or rebinding another reproduces every frame exactly. `gpu_view_binding`
 (`boat_water_review --check-gpu-views`, `gpu`, serial) does the same with two GPU views,
 including destroy and recreate with the context alive.
 
+Adventure A1.5 adds the lifecycle gate. `boat_world_isolation` runs five scripted owners
+(basin, two river owners with different water, camera and steering, the synthetic harbor and a
+second basin), each with its own world resources, session, CPU view and recorded run. Each runs
+drive, respawn, restart (the basins start the course first) and a replay viewed from a playback
+world on the same owner, with the live boat as its ghost. Every phase's physics and frame
+hashes must match the owner's solo reference while one slot reloads basin → river A → basin,
+river B and the harbor run alongside, and A is released mid-run. A failed init over a stale
+owner and double destroys are checked too. `boat_map` releases a fleet's owner and checks that
+a fleet on a surviving owner continues like one restored onto a fresh owner, and `boat_net`'s
+`prediction_owners` releases one room's owner while the other prediction replays exactly.
+`gpu_view_lifecycle` (`boat_water_review --check-gpu-lifecycle`, `gpu`, serial) renders two
+private river owners (one with an arcade world, so both patch caches build), the harbor and the
+basin. Shared views must reproduce the fresh-view references interleaved, after the first
+owner and its view are destroyed, and over three view recreate cycles with the context alive.
+
 The HUD/control worktree also checks all 49 transitions between the seven thrust detents
 through the real integrator in `boat_handling`, and forward/reverse target settling on both
 the authority and predicted client in `boat_net`. Mouse steering adds 49 wheel transitions

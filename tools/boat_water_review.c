@@ -287,6 +287,96 @@ cleanup:
     return result;
 }
 
+// A1.5: GPU views with private owners and waves, so both patch caches build. Two river owners,
+// the harbor and the basin render in fresh views as references; then shared views reproduce
+// them interleaved, after the first owner and its view are destroyed, and across repeated
+// view recreation with the context alive.
+static int check_gpu_lifecycle(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "View lifecycle probe");
+    if (!IsWindowReady())
+        return 1;
+    enum { VIEWS = 4, CYCLES = 3 };
+    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition harbor = test_harbor_definition(river);
+    const BoatWorldDefinition *definitions[VIEWS]
+        = { river, river, &harbor, boat_location(BOAT_LOCATION_BASIN) };
+    static BoatWorldResources owners[VIEWS];
+    static BoatSession sessions[VIEWS];
+    static BoatWakeObjects arcade;
+    BoatGpu a = { 0 }, b = { 0 };
+    Image reference[VIEWS] = { 0 }, frame = { 0 };
+    int result = 1, ready = 0, arcade_patch = 0, patch = 0;
+#define EXPECT(test)                                                                               \
+    do {                                                                                           \
+        if (!(test)) {                                                                             \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #test);                             \
+            goto cleanup;                                                                          \
+        }                                                                                          \
+    } while (0)
+#define MATCHES(gpu, i)                                                                            \
+    (gpu_frame(gpu, &sessions[i], &frame) && same_image(reference[i], frame)                       \
+        && (UnloadImage(frame), frame = (Image) { 0 }, true))
+    EXPECT(boat_wake_objects_init(&arcade, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
+    for (; ready < VIEWS; ++ready) {
+        EXPECT(boat_world_resources_init(&owners[ready], definitions[ready]));
+        boat_session_init(&sessions[ready], &owners[ready], boat_water_gentle());
+    }
+    // Owner B's water carries an (empty) arcade world, so its views use the fine patch.
+    sessions[1].world.water.objects = &arcade;
+    for (int i = 0; i < VIEWS; ++i)
+        for (int t = 0; t < 240 * (i + 1); ++t)
+            boat_session_step(&sessions[i], (BoatInput) { i % 2 ? -.3f : .3f, 1 });
+    for (int i = 0; i < VIEWS; ++i) {
+        BoatGpu own = { 0 };
+        bool drawn = boat_gpu_init(&own, false) && gpu_frame(&own, &sessions[i], &reference[i]);
+        boat_gpu_destroy(&own);
+        EXPECT(drawn);
+        for (int j = 0; j < i; ++j)
+            EXPECT(!same_image(reference[i], reference[j]));
+    }
+    EXPECT(boat_gpu_init(&a, false) && boat_gpu_init(&b, false));
+    EXPECT(MATCHES(&a, 0) && MATCHES(&b, 1) && MATCHES(&b, 2) && MATCHES(&a, 1));
+    EXPECT(a.water_mesh.patches[0].count && a.water_mesh.patches[1].count);
+    patch = (int)a.water_mesh.patches[0].count;
+    arcade_patch = (int)a.water_mesh.patches[1].count;
+    EXPECT(MATCHES(&b, 3) && MATCHES(&a, 0));
+    // Release owner A with the view that last drew it; B's owner keeps rendering.
+    boat_gpu_destroy(&a);
+    boat_session_destroy(&sessions[0]);
+    boat_world_resources_destroy(&owners[0]);
+    EXPECT(MATCHES(&b, 1) && MATCHES(&b, 2) && MATCHES(&b, 1));
+    for (int cycle = 0; cycle < CYCLES; ++cycle) {
+        EXPECT(boat_gpu_init(&a, false));
+        EXPECT(MATCHES(&a, 3) && MATCHES(&a, 1) && MATCHES(&b, 3) && MATCHES(&a, 2));
+        boat_gpu_destroy(&a);
+        boat_gpu_destroy(&a);
+        EXPECT(!a.scene.map && !a.scenery.ready && !a.water_mesh.patches[0].count);
+    }
+    EXPECT(MATCHES(&b, 1));
+#undef MATCHES
+#undef EXPECT
+    printf("gpu_lifecycle=ok views=river-a,river-b-arcade,harbor,basin cycles=%d "
+           "patch_triangles=%d arcade_triangles=%d\n",
+        CYCLES, patch, arcade_patch);
+    result = 0;
+cleanup:
+    if (frame.data)
+        UnloadImage(frame);
+    for (int i = 0; i < VIEWS; ++i)
+        if (reference[i].data)
+            UnloadImage(reference[i]);
+    boat_gpu_destroy(&a);
+    boat_gpu_destroy(&b);
+    for (int i = 0; i < ready; ++i) {
+        boat_session_destroy(&sessions[i]);
+        boat_world_resources_destroy(&owners[i]);
+    }
+    CloseWindow();
+    return result;
+}
+
 static bool route_finished(const Boat *boat, size_t destination)
 {
     return destination == stop_count - 1
@@ -649,7 +739,7 @@ int main(int argc, char **argv)
     test_worlds_open();
     const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
-    bool gpu_check = false, gpu_views = false;
+    bool gpu_check = false, gpu_views = false, gpu_lifecycle = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
             output = argv[++i];
@@ -663,6 +753,8 @@ int main(int argc, char **argv)
             gpu_check = true;
         else if (strcmp(argv[i], "--check-gpu-views") == 0)
             gpu_views = true;
+        else if (strcmp(argv[i], "--check-gpu-lifecycle") == 0)
+            gpu_lifecycle = true;
         else if (strcmp(argv[i], "--check") == 0)
             check = true;
         else if (strcmp(argv[i], "--sequence") == 0)
@@ -678,6 +770,7 @@ int main(int argc, char **argv)
             use_gpu = strcmp(name, "gpu") == 0;
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
+                 "       boat_water_review --check-gpu-lifecycle\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--visible]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
@@ -696,8 +789,8 @@ int main(int argc, char **argv)
         const char *problem = !bench ? "--aa and --pacing require --benchmark"
             : !aa_name               ? "--benchmark requires --aa off|4x4"
             : strcmp(aa_name, "off") && strcmp(aa_name, "4x4") ? "--aa must be off or 4x4"
-            : check || gpu_check || gpu_views || output || sequence
-            ? "--benchmark excludes --check, --check-gpu[-views], --output and --sequence"
+            : check || gpu_check || gpu_views || gpu_lifecycle || output || sequence
+            ? "--benchmark excludes --check, --check-gpu*, --output and --sequence"
             : !use_gpu ? "--benchmark supports only --renderer gpu"
             : !*bench || strlen(bench) > 4000 || bench[strlen(bench) - 1] == '/'
             ? "--benchmark needs a file prefix of 1..4000 bytes"
@@ -711,9 +804,11 @@ int main(int argc, char **argv)
             return 2;
         }
     }
-    if (gpu_check || gpu_views) {
+    if (gpu_check || gpu_views || gpu_lifecycle) {
         SetTraceLogLevel(LOG_WARNING);
-        return gpu_views ? check_gpu_views() : check_gpu_water();
+        return gpu_lifecycle ? check_gpu_lifecycle()
+            : gpu_views      ? check_gpu_views()
+                             : check_gpu_water();
     }
     if (!check && !output && !bench)
         return 2;

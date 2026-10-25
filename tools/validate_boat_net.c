@@ -596,6 +596,8 @@ static void room_view_remote(Room *room, unsigned i, uint64_t tick, double dt)
     room->near_steps[i] += boat_remote_proximity_update(&room->proximity[i], &own->boat,
                                &remote->boat, remote->life, room->now, (float)dt)
         > 0;
+    if (shown < 0) // No history precedes the first remote delay.
+        return;
     uint64_t a = (uint64_t)floor(shown);
     // Across a respawn the view shows the new life up to one snapshot early, by design.
     if (sample != BOAT_REMOTE_INTERPOLATED || room->history_tick[a % ROOM_HISTORY] != a
@@ -1182,6 +1184,56 @@ static int prediction_release(void)
     CHECK(p.stats.max_replay == 22 && p.error[0].position.x == 0 && !p.error[0].snap);
     CHECK(boat_fleet_hash(&p.fleet.state) == boat_fleet_hash(&authority.state));
     printf("prediction release: held launches at GO replay bit-identically from before GO\n");
+    return 0;
+}
+
+// A1.5: a prediction borrows its authority's owner. Releasing another room's owner (and its
+// authority and prediction) mid-run leaves the surviving prediction replaying bit-identically.
+static int prediction_owners(void)
+{
+    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    static BoatWorldResources kept, released;
+    static BoatFleet authority[2], before;
+    static BoatPrediction p[2];
+    CHECK(boat_world_resources_init(&kept, river) && boat_world_resources_init(&released, river));
+    const BoatWorldResources *owners[2] = { &kept, &released };
+    const BoatRaceCourse *course = boat_race_river_course();
+    BoatNetSlotInput inputs[BOAT_FLEET_SLOTS] = { 0 };
+    for (int r = 0; r < 2; ++r) {
+        CHECK(boat_fleet_init(&authority[r], owners[r], boat_water_gentle(), BOAT_OBJECT_LIFE_TICKS,
+            BOAT_OBJECT_DEFAULT_HEIGHT));
+        for (unsigned i = 0; i < 2; ++i) {
+            Boat boat;
+            boat_reset(&boat);
+            boat.position = course->grid[i];
+            boat.heading = atan2f(course->start.direction.x, -course->start.direction.y);
+            boat_fleet_place(&authority[r], i, boat);
+        }
+        boat_prediction_reset(&p[r], &authority[r], inputs, 0);
+        CHECK(p[r].fleet.world.resources == owners[r]);
+    }
+    uint64_t start = authority[0].state.tick;
+    for (uint64_t t = start + 1; t <= start + 30; ++t) {
+        BoatNetCommand command = boat_net_command((BoatInput) { t % 20 < 10 ? .4f : -.4f, 1 }, 0);
+        BoatInput steps[BOAT_FLEET_SLOTS] = { boat_net_command_input(command) };
+        for (int r = 0; r < (t <= start + 15 ? 2 : 1); ++r) {
+            boat_prediction_record(&p[r], t, authority[r].state.slots[0].life, command);
+            boat_fleet_step(&authority[r], steps);
+        }
+        if (t == start + 15)
+            boat_world_resources_destroy(&released);
+        if (t == start + 20) {
+            before = authority[0];
+            before.world.water.objects = &before.state.wakes;
+        }
+    }
+    CHECK(boat_prediction_advance(&p[0], start + 30) == 30);
+    CHECK(boat_fleet_hash(&p[0].fleet.state) == boat_fleet_hash(&authority[0].state));
+    CHECK(boat_prediction_correct(&p[0], &before, inputs, NULL));
+    CHECK(p[0].stats.max_replay == 10 && p[0].fleet.world.resources == &kept);
+    CHECK(boat_fleet_hash(&p[0].fleet.state) == boat_fleet_hash(&authority[0].state));
+    boat_world_resources_destroy(&kept);
+    puts("prediction owners: the surviving owner's prediction replays bit-identically");
     return 0;
 }
 
@@ -2038,6 +2090,7 @@ int main(void)
     RUN(lossless());
     RUN(deathmatch());
     RUN(prediction_release());
+    RUN(prediction_owners());
     RUN(race_room());
     RUN(lan_discovery());
     RUN(tick_limit());

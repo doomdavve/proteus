@@ -9,6 +9,7 @@
 #include "boat_view.h"
 #include "raymath.h"
 
+#include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -338,6 +339,203 @@ static int view_binding(void)
     return 0;
 }
 
+// A1.5 lifecycle: each participant owns its world resources, session, CPU view and course
+// replay; a fixed script of phases yields one physics and one frame hash per phase.
+typedef struct {
+    const BoatWorldDefinition *definition;
+    BoatWater water, restart_water;
+    BoatCamera camera;
+    float steer; // Mirrors the loop so the view centres differ.
+    bool course;
+} Script;
+
+typedef struct {
+    const Script *script;
+    BoatWorldResources resources;
+    BoatSession session;
+    BoatCpuView view;
+    BoatReplay replay; // Poses recorded here, viewed in a playback world on the same owner.
+    int tick;
+    uint64_t hashes[8];
+    int count;
+} Participant;
+
+enum { PHASES = 4, PHASE_TICKS = 240 };
+
+static void hash_bytes(uint64_t *hash, const void *data, size_t size)
+{
+    const unsigned char *bytes = data;
+    for (size_t i = 0; i < size; ++i)
+        *hash = (*hash ^ bytes[i]) * UINT64_C(1099511628211);
+}
+
+static void participant_drive(Participant *p, int ticks)
+{
+    for (int i = 0; i < ticks; ++i, ++p->tick) {
+        float wheel, throttle;
+        loop_inputs(&p->session.boat, p->tick % 1800, &wheel, &throttle);
+        boat_session_step(&p->session, (BoatInput) { wheel * p->script->steer, throttle });
+        if (p->replay.count < p->replay.capacity) {
+            BoatReplaySample sample = boat_replay_pose(
+                &p->session.boat, &p->session.presentation, boat_session_time(&p->session));
+            sample.at = p->replay.count * BOAT_TICK_SECONDS;
+            p->replay.samples[p->replay.count++] = sample;
+        }
+    }
+}
+
+// Physics and frame hashes of one phase, drawn through the participant's own view.
+static bool participant_record(Participant *p, Renderer3D *renderer, Color *pixels,
+    const BoatViewState *view, const BoatPresentation *presentation, const BoatWorld *world,
+    const BoatViewState *ghost)
+{
+    if (!boat_draw_with_ghost(renderer, &p->view, pixels, 320, 200, view, presentation, world,
+            p->script->camera, ghost, NULL, .5f))
+        return false;
+    uint64_t physics = UINT64_C(1469598103934665603), frame = physics;
+    const BoatSession *s = &p->session;
+    hash_bytes(&physics, &s->tick, sizeof(s->tick));
+    hash_bytes(&physics, &s->boat, sizeof(s->boat));
+    hash_bytes(&physics, &s->world.water, sizeof(s->world.water));
+    hash_bytes(&physics, &s->presentation, sizeof(s->presentation));
+    hash_bytes(&physics, &s->course, sizeof(s->course));
+    hash_bytes(&frame, pixels, 320 * 200 * sizeof(*pixels));
+    p->hashes[p->count++] = physics;
+    p->hashes[p->count++] = frame;
+    return true;
+}
+
+static bool participant_start(Participant *p, const Script *script)
+{
+    p->script = script;
+    p->tick = p->count = 0;
+    if (!boat_world_resources_init(&p->resources, script->definition))
+        return false;
+    boat_session_init(&p->session, &p->resources, script->water);
+    p->replay = (BoatReplay) { .samples = malloc(PHASE_TICKS * sizeof(BoatReplaySample)),
+        .capacity = PHASE_TICKS,
+        .waves = script->water.amplitude != 0 };
+    return p->replay.samples;
+}
+
+// Phase 0 drives; 1 respawns and drives; 2 restarts (the basin's course too) and drives;
+// 3 views the recorded run from a playback world on the same owner, with the live boat as
+// its ghost.
+static bool participant_phase(Participant *p, int phase, Renderer3D *renderer, Color *pixels)
+{
+    BoatSession *s = &p->session;
+    if (phase == 1)
+        boat_session_respawn(s);
+    if (phase == 2 && p->script->course)
+        boat_session_start_course(s);
+    if (phase == 2)
+        boat_session_restart(s, p->script->restart_water);
+    if (phase < 3) {
+        participant_drive(p, PHASE_TICKS);
+        return participant_record(
+            p, renderer, pixels, SESSION_VIEW(s), &s->presentation, &s->world, NULL);
+    }
+    BoatViewState playback, live = boat_session_view(s);
+    BoatPresentation presentation;
+    BoatWorld world;
+    if (!boat_replay_sample(
+            &p->replay, PHASE_TICKS * BOAT_TICK_SECONDS / 2, &playback, &presentation))
+        return false;
+    boat_world_init(&world, s->world.resources, boat_replay_water(&p->replay));
+    return world.resources == &p->resources
+        && participant_record(p, renderer, pixels, &playback, &presentation, &world, &live);
+}
+
+static void participant_end(Participant *p)
+{
+    boat_session_destroy(&p->session);
+    boat_cpu_view_destroy(&p->view);
+    boat_replay_destroy(&p->replay);
+    boat_world_resources_destroy(&p->resources);
+}
+
+static int lifecycle(void)
+{
+    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition harbor = test_harbor_definition(river);
+    BoatWater waves = boat_world_test_water(basin, true, true, false), gentle = boat_water_gentle();
+    waves.player_wake_enabled = gentle.player_wake_enabled = true;
+    const Script scripts[] = {
+        { basin, waves, { 0 }, BOAT_CAMERA_DEFAULT, 1, true },
+        { river, gentle, { .player_wake_enabled = true }, BOAT_CAMERA_DEFAULT, 1, false },
+        { river, { .player_wake_enabled = true }, gentle, { 30, 22, true }, -1, false },
+        { &harbor, gentle, gentle, { 12, 6, false }, .5f, false },
+        { basin, { 0 }, waves, { 40, 30, true }, -.5f, true },
+    };
+    enum { SCRIPTS = sizeof(scripts) / sizeof(scripts[0]) };
+    static Participant solo, slots[3];
+    uint64_t reference[SCRIPTS][8];
+    Renderer3D renderer = { 0 };
+    Color *pixels = malloc(320 * 200 * sizeof(*pixels));
+    CHECK(pixels);
+    for (int i = 0; i < SCRIPTS; ++i) {
+        Renderer3D own = { 0 };
+        CHECK(participant_start(&solo, &scripts[i]));
+        for (int phase = 0; phase < PHASES; ++phase)
+            CHECK(participant_phase(&solo, phase, &own, pixels));
+        memcpy(reference[i], solo.hashes, sizeof(reference[i]));
+        participant_end(&solo);
+        renderer3d_destroy(&own);
+    }
+    // The scripts really differ, and the replay frame is not the live one.
+    for (int i = 0; i < SCRIPTS; ++i)
+        for (int j = i + 1; j < SCRIPTS; ++j)
+            CHECK(reference[i][1] != reference[j][1] && reference[i][0] != reference[j][0]);
+    CHECK(reference[1][7] != reference[1][5]);
+
+    // A zeroed or failed owner and view release nothing; a failure over a stale slot zeroes it.
+    Participant *a = &slots[0], *b = &slots[1], *h = &slots[2];
+    participant_end(a);
+    participant_end(a);
+    BoatWorldDefinition unmapped_river = *river;
+    unmapped_river.mapped = false;
+    a->resources = (BoatWorldResources) { river, { 0 } };
+    CHECK(!boat_world_resources_init(&a->resources, &unmapped_river));
+    CHECK(!boat_world_resources_ready(&a->resources) && !a->resources.definition);
+
+    // One renderer throughout. Slot 0 reloads basin -> river A -> (A and B alive with the
+    // harbor) -> A released while B and the harbor continue -> basin.
+    CHECK(participant_start(a, &scripts[0]));
+    CHECK(participant_phase(a, 0, &renderer, pixels) && participant_phase(a, 1, &renderer, pixels));
+    CHECK(participant_phase(a, 2, &renderer, pixels) && participant_phase(a, 3, &renderer, pixels));
+    CHECK(memcmp(a->hashes, reference[0], sizeof(reference[0])) == 0);
+    participant_end(a);
+    CHECK(participant_start(a, &scripts[1]));
+    CHECK(participant_phase(a, 0, &renderer, pixels));
+    CHECK(participant_start(b, &scripts[2]) && participant_start(h, &scripts[3]));
+    CHECK(participant_phase(h, 0, &renderer, pixels) && participant_phase(b, 0, &renderer, pixels));
+    CHECK(participant_phase(a, 1, &renderer, pixels) && participant_phase(b, 1, &renderer, pixels));
+    CHECK(participant_phase(h, 1, &renderer, pixels) && participant_phase(a, 2, &renderer, pixels));
+    CHECK(a->view.scenery.boxes != b->view.scenery.boxes
+        && a->resources.map.shore != b->resources.map.shore);
+    CHECK(participant_phase(a, 3, &renderer, pixels));
+    CHECK(memcmp(a->hashes, reference[1], sizeof(reference[1])) == 0);
+    participant_end(a);
+    CHECK(participant_phase(b, 2, &renderer, pixels) && participant_phase(h, 2, &renderer, pixels));
+    CHECK(participant_phase(b, 3, &renderer, pixels) && participant_phase(h, 3, &renderer, pixels));
+    CHECK(memcmp(b->hashes, reference[2], sizeof(reference[2])) == 0);
+    CHECK(memcmp(h->hashes, reference[3], sizeof(reference[3])) == 0);
+    participant_end(h);
+    participant_end(b);
+    CHECK(participant_start(a, &scripts[4]));
+    for (int phase = 0; phase < PHASES; ++phase)
+        CHECK(participant_phase(a, phase, &renderer, pixels));
+    CHECK(memcmp(a->hashes, reference[4], sizeof(reference[4])) == 0);
+    participant_end(a);
+    printf("lifecycle=ok scripts=basin,river-a,river-b,harbor,basin phases=%d "
+           "river_a_frame=%016" PRIx64 "\n",
+        PHASES, reference[1][1]);
+    renderer3d_destroy(&renderer);
+    free(pixels);
+    return 0;
+}
+
 int main(void)
 {
     test_worlds_open();
@@ -352,6 +550,7 @@ int main(void)
     CHECK(render_rates() == 0);
     CHECK(core_order() == 0);
     CHECK(view_binding() == 0);
+    CHECK(lifecycle() == 0);
     puts("boat_world=ok");
     test_worlds_close();
     return 0;

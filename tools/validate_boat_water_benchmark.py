@@ -38,6 +38,7 @@ with tempfile.TemporaryDirectory() as directory:
         ['--benchmark', root / 'x', '--aa', '2x2'],
         ['--benchmark', root / 'x', '--aa', 'off', '--check'],
         ['--benchmark', root / 'x', '--aa', 'off', '--check-gpu'],
+        ['--benchmark', root / 'x', '--aa', 'off', '--check-gpu-lifecycle'],
         ['--benchmark', root / 'x', '--aa', 'off', '--output', root / 'out'],
         ['--benchmark', root / 'x', '--aa', 'off', '--sequence'],
         ['--benchmark', root / 'x', '--aa', 'off', '--renderer', 'cpu'],

@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25) and [A1.4](#a14-result-2026-10-25) completed 2026-10-25; A1.5 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25); [A2](#a2-handoff) is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -43,7 +43,7 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Complete 2026-10-25; [result](#a12-result-2026-10-25) |
 | A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Complete 2026-10-25; [result](#a13-result-2026-10-25) |
 | A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Complete 2026-10-25; [result](#a14-result-2026-10-25) |
-| A1.5 | A1.4 | Reload/isolation/failure gate, parity evidence and A2 handoff | Pending; next |
+| A1.5 | A1.4 | Reload/isolation/failure gate, parity evidence and A2 handoff | Complete 2026-10-25; [result](#a15-result-2026-10-25), [A2 handoff](#a2-handoff) |
 
 A0.2/A0.3 and A0.4 have independent inputs after A0.1, but controlled performance runs must
 run alone. If terrain credentials are unavailable, document that result and continue the OSM
@@ -772,7 +772,8 @@ Started from a clean `d73688a`.
     them. Per-location actor recipes are outside A1.4.
   - The CPU river surface and the scenery are each held once per view.
   - There is no allocation-failure injection.
-  - GPU lifecycle coverage is the two-view test above; the full reload matrix is A1.5.
+  - GPU lifecycle coverage is the two-view test above; the full reload matrix is A1.5
+    ([result](#a15-result-2026-10-25)).
 
 **Next: A1.5.**
 
@@ -803,6 +804,172 @@ behavior and compatibility evidence. Summarize resource bytes and remaining proc
 assets. A2 starts by partitioning the **unchanged current river** into in-memory tiles and
 checking exhaustive collision parity; source expansion and streaming remain subsequent tasks.
 Write A2's exact interfaces after A0/A1 evidence instead of prebuilding a general asset system.
+
+### A1.5 result, 2026-10-25
+
+Started from a clean `853f25d`. A1.5 changes only validators, a review mode and
+documentation; runtime code is unchanged.
+
+- **CPU lifecycle (`boat_world_isolation`):** five scripted owners each hold their own
+  `BoatWorldResources`, session, `BoatCpuView` and recorded run:
+  - basin with waves and current;
+  - river A with gentle waves;
+  - river B, calm, with a different camera and mirrored steering;
+  - the synthetic harbor;
+  - a second calm basin.
+
+  Each owner runs four phases: drive; respawn and drive; restart (the basins start the
+  course first) and drive; and view its recorded run from a playback world built on the
+  same owner with `boat_replay_water()`, with the live boat as the ghost. Each phase hashes
+  the physics (tick, boat, water, presentation, course) and the 320 × 200 frame.
+
+  The solo references run each owner alone with a fresh renderer. The interleaved run uses
+  one renderer, with three slots:
+  - Slot 0 reloads basin → river A → basin.
+  - River B and the harbor run alongside A.
+  - A is released (session, view, run and owner) before B and the harbor finish.
+
+  All 40 hashes match. All five scripts differ, and the replay frame differs from the live
+  one. A zeroed owner and view destroy twice safely, and a failed init over a stale owner
+  leaves it zeroed. The test adds about 13 s.
+- **Fleets (`boat_map`):** after the existing cross-owner checkpoint test, the first owner
+  is released while fleets still name it. A fleet on the surviving owner and a fleet
+  restored onto a fresh third owner then step 1,200 ticks to equal hashes.
+- **Prediction (`boat_net` `prediction_owners`):** two rooms on private river owners run
+  authority plus prediction. One owner is released mid-run. The surviving prediction
+  matches its authority after 30 ticks, and a correction from tick 20 replays 10 ticks to the
+  same hash, still borrowing its own owner.
+- **GPU lifecycle:** new serial GPU test `gpu_view_lifecycle`
+  (`boat_water_review --check-gpu-lifecycle`).
+  - Four private owners (river A, river B with an arcade world, the harbor, the basin) all
+    have gentle waves, so both patch kinds build. Each renders once in a fresh `BoatGpu`
+    as its reference.
+  - Two shared views reproduce every reference interleaved; one view holds both patch
+    kinds (14,771 and 29,260 triangles).
+  - River A's owner, session and last view are destroyed. The survivor keeps reproducing
+    river B and the harbor.
+  - Three cycles recreate a view with the context alive, draw basin, river B and harbor
+    against the survivor, and destroy twice.
+- **Harness fix:** UBSan found `room_step` in `validate_boat_net.c` (from `6f26862`, M4)
+  converting a negative remote-view tick to `uint64_t` before the history lookup. It now
+  returns first; the counters are unchanged, because such a lookup could never match.
+- **Sanitizers:** separate tree `build/adventure-asan` (Debug, `-fsanitize=address,undefined
+  -fno-sanitize-recover=undefined`, reusing `build/_deps` sources), kept apart from the
+  performance runs.
+  - Clean with no reports, logs under `build/adventure/a1-5/sanitizers/`:
+    `validate_boat_world`, `validate_boat_map`, `validate_boat_net` (after the harness fix),
+    `validate_city_dressing`, `validate_boat`, and `boat_water_review --check-gpu-views`
+    and `--check-gpu-lifecycle`.
+  - macOS ASan has no leak detection, so leak freedom rests on the destroy paths and the
+    zeroed-owner checks.
+- **Performance:** the A0.4 matrix was repeated with the same script, options and Release
+  tree, on the same machine and mains power, 20:25–20:31 UTC.
+  - The build reported `853f25d-dirty`: only tests were dirty, and the benchmark path is
+    unchanged.
+  - Before the matrix started, the script waited for another session's CTest run in a
+    separate worktree to finish. A watcher logged no other test or game process during it.
+  - **Trace parity first:** all 12 final states equal A0.4's. Waves rebuilt 177 patches
+    with a 37,404-triangle peak, as before.
+  - Frame p95, A1.5 median against A0.4:
+
+    | Preset / AA | A1.5 frame p95 (ms) | A0.4 (ms) | Change |
+    | --- | --- | --- | --- |
+    | flat / off | 5.068 | 5.178 | −2.1% |
+    | flat / 4x4 | 5.245 | 5.668 | −7.5% |
+    | waves / off | 5.220 | 5.600 | −6.8% |
+    | waves / 4x4 | 5.392 | 5.691 | −5.3% |
+
+  - Submission p95 is 3.633, 3.766, 3.825 and 3.919 ms (A0.4: 3.686–3.875), and GPU p95 is
+    within 0.04 ms.
+  - The lower frame p95 is mostly present time: present p95 is 1.46–1.51 ms against
+    1.60–1.95 ms. That is not attributed to ownership; the commit before A1.1 (`413460d`,
+    the frame pacer) and machine state are untested candidates.
+  - No measured frame missed 16.67 ms. Maxima were 7.1–9.5 ms. Nothing reached the 10%
+    trigger. Raw data is in `build/adventure/a1-5/performance/`.
+- **Captures:**
+  - The 18 CPU, 18 flat-GPU and 18 wave-GPU review PNGs are byte-identical to
+    `build/adventure/a0-original/`.
+  - The `--check` and `--check --waves` logs are identical to A1.4. The CPU basin and
+    river screenshots match A1.4.
+  - The eight A1.4 extra captures (harbor, ferry, fixture city and shadow, and GPU
+    basin/river/river waves) are byte-identical.
+  - I inspected `river-waves/beyond-default.png` and the CPU river screenshot.
+- **Agent playback (no human playback or acceptance):**
+  - A windowed river waves demo ran 900 frames.
+  - A windowed basin course with the replay fixture as its ghost ran 900 frames, using a
+    scratch `--data-dir`.
+  - A windowed `--replay` of the fixture ran 600 frames.
+  - A river room ran: `boat_server --location river --waves`, a windowed
+    `wake_velocity --connect` (1,200 frames: 269 corrections, own error 0 m, no snaps) and
+    `boat_bot --predict --reset-every 6`.
+    - The bot completed three resets, with no resyncs or dropped packets, and ended
+      consistent.
+    - Server service cost was 0.169 ms per tick.
+  - Pause and reset need key input. The agent did not drive them; they remain for human
+    playback.
+- **Verification (M1 Max, macOS 26 / Darwin 25.6, Apple clang 21, Debug, mains power):**
+  the build is warning-clean. Desktop CTest passed 116/116 active tests in 183.51 s (15
+  retired tests disabled); the log is `build/adventure/a1-5/ctest.log`. 354 local links in
+  the changed documents resolve, and `git diff --check` passed.
+- **Limitations:**
+  - Course and pause/reset playback by a human is pending, and so is human acceptance.
+  - The CPU lifecycle replay is a test-built recording sampled mid-run, not a recorded
+    course finish. Course finishes and file round-trips stay in `boat_replay`.
+  - There is no allocation-failure injection.
+  - The GPU test compares pixels within one process and context.
+
+### A1 completion — 2026-10-25
+
+A1 is complete. The physical map, collision cache, water meshes, scenery and both renderers
+take explicit, caller-owned resources. Two independent owners per map are proven by
+reload, release and failure tests, and the existing river is unchanged in traces, digests,
+captures and controlled frame time.
+
+**Resource bytes per owner**, measured in this Debug build with a scratch tool (not checked
+in) after one draw at spawn:
+
+| Owner | River | Synthetic harbor | Basin |
+| --- | --- | --- | --- |
+| `BoatWorldResources` collision cache | 13,128 B allocated (545 shore edges used) | 48 B | 0 |
+| `WaterfrontScenery` (per CPU or GPU view) | 1,016,832 B (7,944 boxes) | 17,792 B (139) | 0 |
+| CPU water-mesh cache, waves | 218 MB allocated (2,237,423-triangle surface) | 106 KB | 3.4 MB |
+| GPU wave patch, ordinary / arcade | 0.85 / 1.70 MB | 53 KB | 1.70 MB ordinary |
+| GPU map meshes | 1,040,430 vertices, 37.5 MB of buffers | 5,076 vertices, 183 KB | 0 |
+
+- Raylib keeps a CPU copy of each uploaded map mesh, so a GPU view holds about the same
+  again in RAM.
+- Flat CPU water allocates no surface.
+- Struct sizes: `BoatWorldResources` 40 B, `BoatCpuView` 288 B, `BoatGpu` 8,608 B,
+  `BoatSession` 23,664 B.
+
+**Remaining process-lifetime assets** are immutable and map-independent:
+- the compiled river description;
+- the lazily generated harbor/traffic boat, pontoon and quay models;
+- the sky panorama, gull and skin meshes;
+- the authored street, bridge and actor recipes.
+
+Per-call static drawing scratch is not a cache. Authored river actors (cars, lamps, harbor,
+traffic, gulls) still follow the definition's `mapped` flag.
+
+### A2 handoff
+
+**Next: A2**, starting by partitioning the **unchanged current river** into in-memory tiles and
+proving exhaustive collision parity. Start from A0's 512 m tile experiment, with 1 km as the
+comparison.
+
+- Add application submission and triangle counters before judging tile size, since A0.4
+  and A1.5 could report submission time only.
+- Build tiles from `waterfront_city_river_map` in memory. Do not change the source,
+  geometry header or bake format yet.
+- Add the indexed collision query and compare it with the current `BoatMap` scan:
+  - every `boat_map_water()` and `boat_map_water_contact()` result and normal, on a dense
+    grid including bridge legs, crop edges and tile seams;
+  - the river query digest;
+  - the `--check` traces.
+- The owners and lifecycle tests above are the harness. A tiled map must pass
+  `boat_world_isolation`, `gpu_view_lifecycle` and the matrix unchanged.
+- Write A2's exact interfaces from this evidence. Do not prebuild a general asset system.
+  Source expansion and streaming remain later tasks.
 
 ## Verification and handoff template
 

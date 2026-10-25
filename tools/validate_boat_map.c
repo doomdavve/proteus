@@ -333,9 +333,29 @@ static int worlds(void)
     CHECK(boat_fleet_hash(&copied.state) == fleet_hash);
     CHECK(boat_world_resources_ready(&first) && boat_world_resources_ready(&second));
 
-    boat_world_resources_destroy(&pond);
+    // Releasing the first owner (with the fleets borrowing it) leaves a fleet on the second
+    // continuing exactly like one restored onto a fresh owner.
+    BoatWorldResources third;
+    CHECK(boat_world_resources_init(&third, river));
+    static BoatFleet fresh;
+    CHECK(boat_fleet_init(&fresh, &third, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f));
+    boat_fleet_save(&other, &checkpoint);
+    boat_fleet_restore(&fresh, &checkpoint);
+    BoatFleetBots fresh_bots = other_bots;
     boat_world_resources_destroy(&first);
+    for (int t = 0; t < 1200; ++t) {
+        boat_fleet_bots_drive(&other_bots, &other, inputs);
+        CHECK(boat_fleet_step(&other, inputs));
+        boat_fleet_bots_drive(&fresh_bots, &fresh, inputs);
+        CHECK(boat_fleet_step(&fresh, inputs));
+    }
+    CHECK(boat_fleet_hash(&other.state) == boat_fleet_hash(&fresh.state));
+    CHECK(boat_fleet_hash(&other.state) != fleet_hash);
+    puts("fleet_owner_release=ok");
+
+    boat_world_resources_destroy(&pond);
     boat_world_resources_destroy(&second);
+    boat_world_resources_destroy(&third);
     return 0;
 }
 

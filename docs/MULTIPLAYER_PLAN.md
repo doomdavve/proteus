@@ -808,7 +808,10 @@ one map per process. Since adventure A1.2 (2026-10-25) authorities, clients and 
 prediction borrow a caller-owned collision map
 ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a12-result-2026-10-25)). Since A1.3/A1.4
 each CPU/GPU view owns its water-mesh cache and the scenery its renderer is bound to; only
-immutable, map-independent assets remain shared.
+immutable, map-independent assets remain shared. The A1.5 lifecycle gate
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a15-result-2026-10-25)) adds a prediction
+that keeps replaying exactly after another room's owner is released, and an agent-run river
+room (server, windowed client, predicting bot).
 
 Remaining qualification touches `boat_location`, `boat_map`, `boat_water_mesh`, harbor/traffic
 query splits, `boat_world`, views and mapped validators. Verify shared clock/settings,
