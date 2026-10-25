@@ -1,9 +1,9 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25); [A2](#a2-handoff) is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters), completed 2026-10-25; [A2.2](#a22--tile-catalogue-and-indexed-collision) is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
-this document owns the detailed A0/A1 task ledger. The
+this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
 world/cache contracts which A1 completes for mapped locations. [All plans](README.md).
 
@@ -970,6 +970,145 @@ comparison.
   `boat_world_isolation`, `gpu_view_lifecycle` and the matrix unchanged.
 - Write A2's exact interfaces from this evidence. Do not prebuild a general asset system.
   Source expansion and streaming remain later tasks.
+
+The [A2 ledger](#a2--tiled-current-river) below splits this into A2.1–A2.5.
+
+## A2 — tiled current river
+
+A2 splits the **unchanged current river** into in-memory tiles, makes collision queries
+inspect nearby candidates only, and bounds per-frame land and water work by visibility. It
+keeps the source, `assets/geometry/river/geometry.h`, the bake format, 120 Hz handling,
+replay and network formats and nearest-neighbour presentation. All tiles stay resident;
+streaming and source expansion are A3 work. The A1 owners and lifecycle tests are the
+harness throughout.
+
+| Task | Depends on | Deliverable | Status |
+| --- | --- | --- | --- |
+| A2.1 | A1 complete | Application submission and triangle counters on both renderers; counter baseline of the untiled river | Complete 2026-10-25; [result](#a21-result-2026-10-25) |
+| A2.2 | A2.1 | In-memory tile catalogue of the river map (512 m, 1 km comparison) and an indexed collision query with exhaustive parity | Next |
+| A2.3 | A2.2 | Per-tile land culling in the GPU shadow, reflection and main passes and the CPU reference; 512 m vs 1 km judged by submissions, triangles and time | Planned |
+| A2.4 | A2.3 | Water coverage bounded by intersecting tiles: GPU patch rebuilds and the CPU reference surface, crack-free across seams | Planned |
+| A2.5 | A2.4 | Same-view scaling against enlarged synthetic catalogues (up to a ≈25 km corridor), lifecycle and performance gates, A3 handoff | Planned |
+
+## A2.1 — application submission and triangle counters
+
+**Edit:** `src/renderer3d.[ch]`, `src/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
+`tools/validate_renderer3d.c`, `tools/validate_boat_water_benchmark.py` and the benchmark
+guide. Counting must not change pixels, traces or the benchmark's timed work beyond a few
+integer additions.
+
+1. Count the CPU reference's mesh/box submissions, submitted, camera-facing and rasterized
+   triangles per frame.
+2. Count every GPU scene `DrawMesh` and its triangles by pass (shadow, reflection, main) and
+   group (map, water, objects), plus the batched sky quads. Label them application
+   submissions, not driver draw calls.
+3. Report them per frame in the benchmark CSV and as statistics in its JSON; report a
+   summary from the `--output` review runs. Record the untiled baseline.
+
+### A2.1 result, 2026-10-25
+
+Started from a clean `642ca78`.
+
+- **CPU:** `Renderer3D.stats` (`Renderer3DStats`, reset by `renderer3d_begin`) counts
+  `meshes`, `triangles`, `front_triangles` and `rasterized`. `validate_renderer3d` checks
+  them for two boxes and a near-clipped triangle.
+- **GPU:** `WaterfrontGpuScene.stats` (`WaterfrontGpuStats`, reset by each
+  `waterfront_gpu_scene_draw`) holds a `WaterfrontGpuCount` (submissions, triangles) per
+  `WaterfrontGpuPass` × `WaterfrontGpuGroup`, plus `sky_quads`;
+  `waterfront_gpu_stats_total()` sums them. All four `DrawMesh` call sites go through one
+  `submit()`. The current pass is a render-thread pointer set only during the scene draw,
+  so submissions outside it are not counted.
+- **Benchmark:** report `schema_revision` 2 adds per-frame `app_submissions`,
+  `scene_triangles` and their pass and group splits to the CSV, and statistics for
+  submissions, triangles, map submissions and map triangles to the JSON.
+  `driver_draw_calls` stays `null`. The contract test checks that the splits partition the
+  totals apart from the two sky quads. `--output` runs print a `scene_work` line.
+- **Counter baseline** (Release, M1 Max, hidden, `--aa off`, one run per preset; counts do
+  not depend on AA or timing). Measured frames after warmup, p50 (range):
+
+  | Count per frame | Flat | Waves |
+  | --- | --- | --- |
+  | Application submissions | 939 (p95 951, max 960) | 943 (p95 963, max 975) |
+  | Scene triangles | 885,348 | 920,480 |
+  | Map submissions / triangles | 22 / 861,251, every frame | the same |
+  | Object submissions / triangles | 914 (699–935) / 23,546 | 917 / 23,582 |
+  | Water triangles | 547 | 35,603 (14,944–37,951) |
+  | Shadow pass submissions / triangles | 214 / 175,627 | 214 / 175,627 |
+  | Reflection pass | 228 / 353,309 | 228 / 353,309 |
+  | Main pass | 496 / 356,420 | 498 / 391,505 |
+
+  The CPU reference (`--output --renderer cpu`, 22 sampled frames) submits 3,847 meshes
+  and boxes on average (max 7,468) with 106,112 triangles; 8,655 clipped triangles reach the rasterizer.
+- **Findings for A2.3:**
+  - The whole map is drawn in every pass, so map triangles never change along the route.
+    The shadow pass draws 175 k city triangles into a 96 m shadow map. Land culling should
+    cut triangles sharply in all three passes.
+  - Map meshes are only 22 of about 940 submissions. Objects (cars, lamps, harbour and
+    traffic boats, gulls, particles, the bridge) are 97% of them. Tiling the map adds map
+    submissions (up to seven per visible tile and pass). A2.3 must therefore report submission
+    cost as well as triangles, and may find that object culling, not tile count, decides
+    the CPU submission time. Object culling is not in A2's scope unless A2.3's measurements
+    show it limits the tiled map.
+- **Unchanged output (Debug):** all 18 CPU, 18 flat-GPU and 18 wave-GPU review PNGs are
+  byte-identical to `build/adventure/a0-original/`. The `--check` and `--check --waves`
+  logs equal A1.5's. The three review logs differ from A1.5 only by timings and the new
+  `scene_work` line. The benchmark final states equal the `--check` states. Evidence:
+  `build/adventure/a2-1/`.
+- **Timing:** one hidden Release run per preset gave frame p95 4.66 (flat) and 6.33 ms
+  (waves) and submission p95 3.81 and 4.06 ms. This is not the controlled three-trial
+  matrix; the counters add one pointer check and two additions per submission.
+- **Verification (M1 Max, macOS 26 / Darwin 25.6, Apple clang 21, Debug):** the build
+  is warning-clean. Desktop CTest passed 116/116 active tests in 183.52 s (15 retired tests
+  disabled; log `build/adventure/a2-1/ctest.log`). After a whitespace-only reformat, the
+  build and the six renderer, view and benchmark tests were rerun and passed. 247 local
+  links in the changed documents resolve, and `git diff --check` passed.
+- **Limitations:** driver-reported draw calls, GPU-side primitive counts and the AA
+  downsample/presentation draws are not counted. No visual, manual or human check was
+  needed, as pixels are unchanged.
+
+**Next: A2.2.**
+
+## A2.2 — tile catalogue and indexed collision
+
+**Edit:** `src/boat_map.[ch]`, a tile module if `boat_map.c` would otherwise mix concerns,
+`tools/validate_boat_map.c`, the core boundary test inventory, and the review tool for
+counts. Keep everything in `proteus_boat_core`: no drawing or file I/O.
+
+1. Build a tile catalogue from a `BoatMapDescription` in memory: a fixed grid origin and
+   size (512 m, with 1 km as the comparison), and per tile its bounds, water triangles,
+   shore edges and land/building triangles. A triangle or edge crossing a seam is listed in
+   every tile it overlaps. Seams are bookkeeping only: they add no shore edges.
+2. Add a spatial index to `BoatMap` and answer `boat_map_water()` and
+   `boat_map_water_contact()` from nearby candidates. Return **exactly** the exhaustive
+   answer: the same containment, nearest edge (first in shore order on equal distance),
+   clearance comparison and normal, including points outside the crop. Choose the index
+   cell size by measured candidate counts; it need not equal the render tile.
+3. Keep the exhaustive scan as a named reference in the core, used by tests and review.
+   Compare every result and normal bit for bit on a dense grid with fine sampling at bridge
+   legs, crop edges, tile seams and corners (±1 ulp around seam coordinates), at clearances
+   0, 0.5, 3 and 12 m. The river query digest (`63225c36181d381d`), the `--check` traces,
+   `boat_world_isolation` and `gpu_view_lifecycle` must be unchanged.
+4. Report resident index bytes, tile counts, empty tiles and candidate counts per query
+   (mean, p95, max) against the exhaustive 547 triangles and 545 edges.
+
+**Done when:** indexed queries equal the exhaustive reference everywhere tested, the
+catalogue is enumerated for both tile sizes, and the river is otherwise unchanged.
+
+## A2.3–A2.5 — outline
+
+These are written in detail at the previous task's handoff, from its evidence.
+
+- **A2.3:** draw only tiles intersecting each pass's frustum: the shadow map's 96 m
+  orthographic box, the reflection camera and the main view, with matching CPU culling.
+  Choose the tile size from submissions, triangles, CPU submission time and GPU time.
+  Captures must be identical, or differ only where justified and inspected.
+- **A2.4:** rebuild GPU wave patches from intersecting tiles' water only, and bound the
+  CPU reference's subdivided surface to the view. Check seams with captures at tile joins
+  and corners.
+- **A2.5:** with the same local view, compare the river against synthetic catalogues
+  with many distant tiles. Tick and render cost must not grow with them. Repeat the
+  controlled matrix and lifecycle tests and record memory per owner. Hand off to A3.
+
 
 ## Verification and handoff template
 

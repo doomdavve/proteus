@@ -113,14 +113,22 @@ Each CSV row has the tick range, route destination, pose and these durations, me
   uses eight query slots, read without waiting; a still-busy slot skips that frame. The
   report counts skipped samples and is `null` when timer queries are unavailable.
 
-The CSV also has per-frame wave-patch rebuilds and wake uploads. The JSON gives p50/p95/p99/
+The CSV also has per-frame wave-patch rebuilds and wake uploads, and, since
+[A2.1](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a21-result-2026-10-25) (`schema_revision` 2),
+the scene's application work: `app_submissions` and `scene_triangles`, split by pass
+(`shadow_`, `reflection_`, `main_`) and by group (`map_`, `water_`, `object_`), each as
+`*_submissions` and `*_triangles`. A submission is one `DrawMesh` in
+`waterfront_gpu_scene_draw`, which raylib issues as one non-instanced GL draw. The totals
+add one batched sky quad (two triangles) for each of the reflection and main passes. They
+exclude the AA downsample and the window blit. The JSON gives p50/p95/p99/
 max and mean over the measured frames, using sorted index
 `floor((samples - 1) * percentile / 100)`. It also counts frames whose `frame_ms` or
 `frame_interval_ms` exceeds 1000/60 ms (`value > deadline_ms`). It records build, GL renderer/
 version, AA, preset, window/pacing, framebuffer and internal resolution, monitor refresh,
-wave-patch capacity/peak triangles, route completion and the final physical state.
-Application submissions, driver draw calls and scene triangles are `null`: the renderer does
-not count them. The voyage checks hull clearance at each frame pose. `--check` covers every
+wave-patch capacity/peak triangles, route completion and the final physical state. It adds
+statistics for `app_submissions`, `scene_triangles`, `map_submissions` and `map_triangles`.
+`driver_draw_calls` stays `null`: the driver's own count is not read. Schema 1 (A0.4, A1.5)
+reported all three as `null`. The voyage checks hull clearance at each frame pose. `--check` covers every
 tick, and the matching final state shows the benchmark followed the same trajectory.
 
 This is a fixed two-tick **render workload**. It does not exercise the app's real-time
@@ -130,6 +138,9 @@ first controlled results.
 Adventure A1.5 repeated the matrix after the ownership changes (2026-10-25): final states
 identical, frame p95 medians 2–8% below A0.4, submission and GPU p95 within about 1%; see the
 [A1.5 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a15-result-2026-10-25).
+A2.1 added the counters; the first counts (about 940 submissions and 0.89–0.92 M triangles per
+frame, the whole map drawn in all three passes) are in the
+[A2.1 result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a21-result-2026-10-25).
 
 ## Frame pacing — 2026-10-25
 

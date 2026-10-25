@@ -42,6 +42,33 @@ typedef struct {
     float outer_cone_cos;
 } WaterfrontGpuLight;
 
+typedef enum {
+    WATERFRONT_GPU_PASS_SHADOW,
+    WATERFRONT_GPU_PASS_REFLECTION,
+    WATERFRONT_GPU_PASS_MAIN,
+    WATERFRONT_GPU_PASS_COUNT
+} WaterfrontGpuPass;
+
+typedef enum {
+    WATERFRONT_GPU_GROUP_MAP, // Bound map meshes: city, facades, roofs, ground, windows, crane.
+    WATERFRONT_GPU_GROUP_WATER, // Map water and the borrowed wave patch.
+    WATERFRONT_GPU_GROUP_OBJECTS, // Transformed meshes: boats, actors, gulls, bridge, basin.
+    WATERFRONT_GPU_GROUP_COUNT
+} WaterfrontGpuGroup;
+
+typedef struct {
+    unsigned int submissions;
+    size_t triangles;
+} WaterfrontGpuCount;
+
+// Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one
+// raylib DrawMesh, which issues one non-instanced GL draw; sky_quads counts the batched sky
+// quad, flushed as one more draw per pass. These are not driver-reported draw calls.
+typedef struct {
+    WaterfrontGpuCount mesh[WATERFRONT_GPU_PASS_COUNT][WATERFRONT_GPU_GROUP_COUNT];
+    unsigned int sky_quads;
+} WaterfrontGpuStats;
+
 // GPU-owned waterfront resources. They must be created, bound and destroyed while a
 // raylib/OpenGL context is alive. Init builds the map-independent shared resources (shaders,
 // sky, unit, boat, gull and harbor/traffic meshes); waterfront_gpu_scene_bind builds the
@@ -97,6 +124,7 @@ typedef struct {
     bool atmosphere_enabled;
     bool reflections_enabled;
     bool ready;
+    WaterfrontGpuStats stats; // Reset by each draw.
 } WaterfrontGpuScene;
 
 bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_shader_path);
@@ -113,5 +141,6 @@ Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);
 void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene);
+WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats);
 
 #endif

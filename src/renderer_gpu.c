@@ -174,10 +174,25 @@ static void unload_mesh(Mesh *mesh)
     *mesh = (Mesh) { 0 };
 }
 
+// Counter for the pass and group being drawn, set only inside waterfront_gpu_scene_draw on the
+// render thread. NULL outside a scene draw, when submissions are not counted.
+static WaterfrontGpuStats *counting;
+static WaterfrontGpuPass counting_pass;
+
+static void submit(Mesh mesh, Material material, Matrix transform, WaterfrontGpuGroup group)
+{
+    DrawMesh(mesh, material, transform);
+    if (counting) {
+        WaterfrontGpuCount *count = &counting->mesh[counting_pass][group];
+        ++count->submissions;
+        count->triangles += (size_t)mesh.triangleCount;
+    }
+}
+
 static void draw_map_mesh(Mesh mesh, Material material)
 {
     if (mesh.vaoId != 0)
-        DrawMesh(mesh, material, MatrixIdentity());
+        submit(mesh, material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
 }
 
 static bool build_source_mesh(Mesh *mesh, const Mesh3D *source)
@@ -764,7 +779,7 @@ static void draw_colored_mesh(
     set_object_color(material.shader, color);
     set_emissive(material.shader, emissive);
     material.maps[MATERIAL_MAP_DIFFUSE].color = color;
-    DrawMesh(mesh, material, transform_matrix(transform));
+    submit(mesh, material, transform_matrix(transform), WATERFRONT_GPU_GROUP_OBJECTS);
 }
 
 typedef enum {
@@ -1451,6 +1466,8 @@ static void draw_sky(
     SetShaderValue(shader, GetShaderLocation(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, GetShaderLocation(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, GetShaderLocation(shader, "skyScale"), scale, SHADER_UNIFORM_VEC2);
+    if (counting)
+        ++counting->sky_quads;
     BeginShaderMode(shader);
     DrawTexturePro(scene->sky_texture,
         (Rectangle) { 0, 0, scene->sky_texture.width, scene->sky_texture.height },
@@ -1615,24 +1632,50 @@ static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *fr
     int pass = scene->near_water.vaoId ? 1 : 0;
     int location = GetShaderLocation(scene->water_shader, "waterPatchPass");
     SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);
-    draw_map_mesh(scene->water, scene->water_material);
+    if (scene->water.vaoId)
+        submit(scene->water, scene->water_material, MatrixIdentity(), WATERFRONT_GPU_GROUP_WATER);
     if (pass) {
         pass = 2;
         set_object_color(scene->water_shader, WHITE);
         SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);
-        DrawMesh(scene->near_water, scene->water_material, MatrixIdentity());
+        submit(
+            scene->near_water, scene->water_material, MatrixIdentity(), WATERFRONT_GPU_GROUP_WATER);
         if (scene->near_water_extra.vaoId)
-            DrawMesh(scene->near_water_extra, scene->water_material, MatrixIdentity());
+            submit(scene->near_water_extra, scene->water_material, MatrixIdentity(),
+                WATERFRONT_GPU_GROUP_WATER);
     }
 }
+
+static void draw_scene(
+    WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);
 
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
 {
+    scene->stats = (WaterfrontGpuStats) { 0 };
     if (!frame->boating_basin && !scene->map) {
         TraceLog(LOG_WARNING, "GPU waterfront frame drawn without a bound map");
         return;
     }
+    counting = &scene->stats;
+    draw_scene(scene, frame, width, height);
+    counting = NULL;
+}
+
+WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats)
+{
+    WaterfrontGpuCount total = { stats->sky_quads, 2 * (size_t)stats->sky_quads };
+    for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
+        for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group) {
+            total.submissions += stats->mesh[pass][group].submissions;
+            total.triangles += stats->mesh[pass][group].triangles;
+        }
+    return total;
+}
+
+static void draw_scene(
+    WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
+{
     if (frame->player_active)
         update_flag_mesh(&scene->player_flag, &frame->player.flag, frame->player.skin);
     if (frame->ghost_opacity > 0)
@@ -1646,14 +1689,17 @@ void waterfront_gpu_scene_draw(
         .projection = CAMERA_PERSPECTIVE };
     Material material = scene->city_material;
     Material life_material = scene->life_material;
+    counting_pass = WATERFRONT_GPU_PASS_SHADOW;
     if (scene->shadows_enabled)
         render_shadow_map(scene, frame);
     select_local_lights(scene, frame);
     set_lighting_uniforms(scene);
+    counting_pass = WATERFRONT_GPU_PASS_REFLECTION;
     if (scene->reflections_enabled) {
         set_atmosphere_uniforms(scene, reflection_camera(frame).position);
         render_reflection(scene, frame, (float)width / height);
     }
+    counting_pass = WATERFRONT_GPU_PASS_MAIN;
     set_atmosphere_uniforms(scene, frame->camera.position);
     ClearBackground(BLACK);
     draw_sky(scene, frame->camera, width, height, (float)width / height);

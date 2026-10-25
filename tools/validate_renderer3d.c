@@ -48,6 +48,11 @@ int main(void)
         blue += pixels[i].b > pixels[i].r;
     }
     CHECK(red > 0 && blue > 0);
+    // Two closed boxes: 24 submitted triangles, of which the camera sees at most three faces
+    // each, and nothing in front of the camera is clipped away.
+    CHECK(renderer.stats.meshes == 2 && renderer.stats.triangles == 24);
+    CHECK(renderer.stats.front_triangles > 0 && renderer.stats.front_triangles <= 12);
+    CHECK(renderer.stats.rasterized == renderer.stats.front_triangles);
 
     // The apex lies behind the near plane; clipping must retain the visible portion.
     Vector3 vertices[] = { { -1, -1, 2 }, { 0, 1, -0.5f }, { 1, -1, 2 } };
@@ -64,6 +69,9 @@ int main(void)
         covered += renderer.depth[i] > 0;
     }
     CHECK(covered > 0 && covered < 80 * 60);
+    // Clipping turns the one triangle into a polygon of several rasterized triangles.
+    CHECK(renderer.stats.meshes == 1 && renderer.stats.triangles == 1);
+    CHECK(renderer.stats.front_triangles == 1 && renderer.stats.rasterized >= 2);
 
     // This triangle lies on z = y + 3. At pixel (40,30), perspective gives
     // inverse_z = (1 + 0.5 / focal_length) / 3, independently of barycentric code.

@@ -31,6 +31,7 @@ bool renderer3d_begin(
         r->capacity = count;
     }
     r->point_light = (PointLight3D) { 0 };
+    r->stats = (Renderer3DStats) { 0 };
     r->pixels = pixels;
     r->width = width;
     r->height = height;
@@ -198,6 +199,8 @@ static void draw_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3D transform,
     const Material3D *material, bool emissive)
 {
     Matrix rotation = MatrixRotateXYZ(transform.rotation);
+    ++r->stats.meshes;
+    r->stats.triangles += mesh->triangle_count;
     for (size_t i = 0; i < mesh->triangle_count; ++i) {
         const Triangle3D *triangle = &mesh->triangles[i];
         Vector3 world[3];
@@ -211,6 +214,7 @@ static void draw_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3D transform,
             Vector3Subtract(world[1], world[0]), Vector3Subtract(world[2], world[0])));
         if (Vector3DotProduct(normal, Vector3Subtract(r->camera.position, world[0])) <= 0)
             continue;
+        ++r->stats.front_triangles;
         float brightness = emissive
             ? 1
             : 0.30f + 0.70f * fmaxf(0, Vector3DotProduct(normal, r->light_direction));
@@ -225,6 +229,7 @@ static void draw_mesh(Renderer3D *r, const Mesh3D *mesh, Transform3D transform,
             count = clip_polygon(r, buffers[source], count, buffers[1 - source], plane);
             source = 1 - source;
         }
+        r->stats.rasterized += count >= 3 ? (size_t)count - 2 : 0;
         for (int j = 1; j + 1 < count; ++j)
             rasterize(r, buffers[source][0], buffers[source][j], buffers[source][j + 1], color,
                 material, normal);

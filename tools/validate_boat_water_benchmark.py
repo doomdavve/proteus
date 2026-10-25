@@ -17,7 +17,9 @@ exe = sys.argv[1]
 options_only = '--options' in sys.argv[2:]
 WARMUP = 120
 STATS = ('simulation_ms', 'render_submit_ms', 'present_ms', 'frame_ms', 'frame_interval_ms',
-         'gpu_ms')
+         'gpu_ms', 'app_submissions', 'scene_triangles', 'map_submissions', 'map_triangles')
+PASSES = ('shadow', 'reflection', 'main')
+GROUPS = ('map', 'water', 'object')
 
 
 def run(*args):
@@ -72,7 +74,7 @@ with tempfile.TemporaryDirectory() as directory:
     with prefix.with_suffix('.csv').open() as stream:
         rows = list(csv.DictReader(stream))
 
-    assert report['schema_revision'] == 1 and report['mode'] == 'benchmark'
+    assert report['schema_revision'] == 2 and report['mode'] == 'benchmark'
     assert report['renderer'] == 'gpu' and report['aa'] == 'off'
     assert report['preset'] == 'waves' and report['window'] == 'hidden'
     assert report['pacing'] == 'unpaced' and report['vsync_hint'] is False
@@ -81,8 +83,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert report['tick_hz'] == 120 and report['ticks_per_frame'] == 2
     assert report['route_completed'] is True and report['destination'] == 5
     assert report['final_state'] == expected_state == final_state(result.stdout)
-    for key in ('app_submissions', 'driver_draw_calls', 'scene_triangles'):
-        assert report[key] is None
+    assert report['driver_draw_calls'] is None and report['submission_counter']
 
     frames = report['frames']
     assert len(rows) == frames and report['warmup_frames'] == WARMUP
@@ -109,6 +110,16 @@ with tempfile.TemporaryDirectory() as directory:
                 value = float(row[key])
                 assert math.isfinite(value) and value >= 0, (i, key)
         assert int(row['wave_patch_rebuilds']) >= 0 and int(row['wake_uploads']) >= 0
+        # Pass and group splits partition the mesh submissions; the remainder is one batched
+        # sky quad (two triangles) for each of the reflection and main passes.
+        for kind, total, sky in (('submissions', 'app_submissions', 2),
+                                 ('triangles', 'scene_triangles', 4)):
+            by_pass = sum(int(row[f'{p}_{kind}']) for p in PASSES)
+            assert by_pass == sum(int(row[f'{g}_{kind}']) for g in GROUPS), (i, kind)
+            assert int(row[total]) == by_pass + sky, (i, kind)
+        for p in PASSES:
+            assert int(row[f'{p}_submissions']) > 0 and int(row[f'{p}_triangles']) > 0, (i, p)
+        assert int(row['map_triangles']) > 0 and int(row['water_triangles']) > 0, i
     assert previous_end == report['total_ticks'] == int(expected_state.split()[0][5:])
     assert report['warmup_end_tick'] == int(rows[WARMUP - 1]['end_tick'])
 

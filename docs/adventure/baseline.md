@@ -247,7 +247,9 @@ included other windows.
   submissions and culling are the first scaling levers.
 - For A1.5/A2 comparisons on this machine, use these medians. Treat >10% p95 growth across
   three controlled runs as the investigation trigger.
-- **Gaps:** no submission, draw-call or triangle counters. GPU time covers only the scene
+- **Gaps:** no submission, draw-call or triangle counters (application counters added later
+  by [A2.1](../FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a21-result-2026-10-25); this finding
+  stays as recorded). GPU time covers only the scene
   passes. Scan-out/VSync timing and the visible run's GPU clock state are not measured.
   There is a single machine and no Instruments trace (no stall needed attribution). The
   benchmark measures a render workload, not real-time accumulator behaviour.

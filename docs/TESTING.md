@@ -95,8 +95,9 @@ The river frame benchmark has two checks in `tools/validate_boat_water_benchmark
 opening a window. With GPU tests enabled, `boat_river_benchmark_contract` (`gpu`, serial;
 about 32 s in Debug on an M1 Max) runs a hidden `--waves --aa off` voyage. It checks row
 counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, finite values,
-route completion and exact final-state parity with `--check --waves`. It asserts no timing
-thresholds. See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25).
+route completion and exact final-state parity with `--check --waves`. Since A2.1 (schema 2)
+it also checks that the per-pass and per-group submission/triangle columns partition the
+totals, apart from the two sky quads. It asserts no timing thresholds. See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25).
 
 `frame_pacer` checks the window frame pacer's deadline chain on synthetic clocks: exact
 period boundaries despite oversleep, repayment of a late frame, restart after a stall, and no

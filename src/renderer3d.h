@@ -33,6 +33,14 @@ typedef struct {
     float intensity;
 } PointLight3D;
 
+// Work submitted since the last successful begin. Counting never changes the drawn pixels.
+typedef struct {
+    size_t meshes; // Mesh and box submissions.
+    size_t triangles; // Submitted triangles.
+    size_t front_triangles; // Triangles facing the camera, before frustum clipping.
+    size_t rasterized; // Clipped triangles handed to the rasterizer.
+} Renderer3DStats;
+
 // Zero-initialize before first use. Owns only its depth buffer; pixels belong to the caller.
 typedef struct {
     Color *pixels;
@@ -48,6 +56,7 @@ typedef struct {
     float focal_length;
     float ghost_opacity; // Zero normally; 0..1 draws cyan screen-door coverage.
     PointLight3D point_light; // Disabled by begin; set before drawing the frame.
+    Renderer3DStats stats; // Reset by begin.
 } Renderer3D;
 
 // Starts a frame and clears depth, preserving the caller's background pixels.

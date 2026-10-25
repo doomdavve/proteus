@@ -406,6 +406,7 @@ typedef struct {
     float x, z, heading;
     float simulation_ms, render_ms, present_ms, frame_ms, interval_ms, gpu_ms;
     bool has_interval, has_gpu;
+    WaterfrontGpuCount total, pass[WATERFRONT_GPU_PASS_COUNT], group[WATERFRONT_GPU_GROUP_COUNT];
 } BenchFrame;
 
 // Asynchronous GL_TIME_ELAPSED samples. A busy slot skips that frame instead of waiting.
@@ -506,6 +507,23 @@ BENCH_SELECT(present, present_ms, true)
 BENCH_SELECT(frame, frame_ms, true)
 BENCH_SELECT(interval, interval_ms, frame->has_interval)
 BENCH_SELECT(gpu, gpu_ms, frame->has_gpu)
+BENCH_SELECT(submissions, total.submissions, true)
+BENCH_SELECT(triangles, total.triangles, true)
+BENCH_SELECT(map_submissions, group[WATERFRONT_GPU_GROUP_MAP].submissions, true)
+BENCH_SELECT(map_triangles, group[WATERFRONT_GPU_GROUP_MAP].triangles, true)
+
+static void bench_count(BenchFrame *frame, const WaterfrontGpuStats *stats)
+{
+    frame->total = waterfront_gpu_stats_total(stats);
+    for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
+        for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group) {
+            WaterfrontGpuCount count = stats->mesh[pass][group];
+            frame->pass[pass].submissions += count.submissions;
+            frame->pass[pass].triangles += count.triangles;
+            frame->group[group].submissions += count.submissions;
+            frame->group[group].triangles += count.triangles;
+        }
+}
 
 static int bench_fail(const char *message)
 {
@@ -614,6 +632,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         frame->interval_ms = count > 0 ? (float)((start - previous_start) * 1000) : 0;
         frame->wave_rebuilds = gpu.wave_rebuilds - rebuilds;
         frame->wake_uploads = gpu.wake_uploads - uploads;
+        bench_count(frame, &gpu.scene.stats);
         previous_start = start;
         gpu_timer_poll(&timer, frames, false);
         ++count;
@@ -648,7 +667,10 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     }
     fputs("frame,warmup,first_tick,end_tick,ticks,destination,x,z,heading,simulation_ms,"
           "render_submit_ms,present_ms,frame_ms,frame_interval_ms,gpu_ms,"
-          "wave_patch_rebuilds,wake_uploads\n",
+          "wave_patch_rebuilds,wake_uploads,app_submissions,scene_triangles,"
+          "shadow_submissions,shadow_triangles,reflection_submissions,reflection_triangles,"
+          "main_submissions,main_triangles,map_submissions,map_triangles,"
+          "water_submissions,water_triangles,object_submissions,object_triangles\n",
         csv);
     for (int i = 0; i < count; ++i) {
         const BenchFrame *f = &frames[i];
@@ -657,15 +679,21 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
             snprintf(interval, sizeof(interval), "%.9g", (double)f->interval_ms);
         if (f->has_gpu)
             snprintf(gpu_ms, sizeof(gpu_ms), "%.9g", (double)f->gpu_ms);
-        fprintf(csv, "%d,%d,%d,%d,%d,%zu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%s,%d,%zu\n", i,
+        fprintf(csv, "%d,%d,%d,%d,%d,%zu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%s,%d,%zu,%u,%zu", i,
             i < BENCH_WARMUP, f->first_tick, f->end_tick, f->end_tick - f->first_tick,
             f->destination, (double)f->x, (double)f->z, (double)f->heading,
             (double)f->simulation_ms, (double)f->render_ms, (double)f->present_ms,
-            (double)f->frame_ms, interval, gpu_ms, f->wave_rebuilds, f->wake_uploads);
+            (double)f->frame_ms, interval, gpu_ms, f->wave_rebuilds, f->wake_uploads,
+            f->total.submissions, f->total.triangles);
+        for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
+            fprintf(csv, ",%u,%zu", f->pass[pass].submissions, f->pass[pass].triangles);
+        for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group)
+            fprintf(csv, ",%u,%zu", f->group[group].submissions, f->group[group].triangles);
+        fputc('\n', csv);
     }
     format_final_state(state, sizeof(state), boat, tick);
     fprintf(json,
-        "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
+        "{\n  \"schema_revision\":2,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
         "  \"route\":\"river-review\",\"route_revision\":1,\"physics_revision\":%d,\n"
         "  \"build\":\"%s\",\"platform\":\"%s\",\n  \"gl_renderer\":",
         BOAT_PHYSICS_REVISION, BOAT_BENCH_BUILD, BOAT_BENCH_PLATFORM);
@@ -699,11 +727,16 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     json_stats(json, "frame_ms", frames, count, scratch, bench_frame);
     json_stats(json, "frame_interval_ms", frames, count, scratch, bench_interval);
     json_stats(json, "gpu_ms", frames, count, scratch, bench_gpu);
+    json_stats(json, "app_submissions", frames, count, scratch, bench_submissions);
+    json_stats(json, "scene_triangles", frames, count, scratch, bench_triangles);
+    json_stats(json, "map_submissions", frames, count, scratch, bench_map_submissions);
+    json_stats(json, "map_triangles", frames, count, scratch, bench_map_triangles);
     fprintf(json,
         "  \"gpu_timer\":%s,\"gpu_samples\":%d,\"gpu_samples_skipped\":%d,\n"
         "  \"wave_patch_rebuilds\":%d,\"wave_patch_rebuilds_measured\":%d,"
         "\"wave_vertex_capacity\":%d,\"wave_peak_triangles\":%d,\n"
-        "  \"app_submissions\":null,\"driver_draw_calls\":null,\"scene_triangles\":null\n}\n",
+        "  \"submission_counter\":\"waterfront_gpu_scene_draw DrawMesh calls plus batched sky "
+        "quads; excludes the AA downsample and presentation\",\"driver_draw_calls\":null\n}\n",
         timer.supported ? "\"GL_TIME_ELAPSED around boat_gpu_draw, asynchronous\"" : "null",
         gpu_samples, timer.supported ? count - BENCH_WARMUP - gpu_samples : 0, gpu.wave_rebuilds,
         measured_rebuilds, gpu.wave_capacity, gpu.wave_peak_triangles);
@@ -878,6 +911,9 @@ int main(int argc, char **argv)
     printf("sequence_camera=%.1f/%.1f\n", review_camera.distance, review_camera.height);
     int frames = 0, ticks = 0, timing_count = 0;
     double timings[MAX_TICKS / 2 + 1], total = 0;
+    // Sampled-frame work: GPU scene submissions and triangles, or CPU meshes, submitted and
+    // rasterized triangles.
+    size_t work_total[3] = { 0 }, work_max[3] = { 0 };
     for (ticks = 0; ticks <= MAX_TICKS; ++ticks) {
         if (!hull_clear(boat)) {
             fprintf(stderr, "Route too close to shore at tick %d: %.3f %.3f\n", ticks,
@@ -961,6 +997,14 @@ int main(int argc, char **argv)
                     goto cleanup;
             }
             double ms = (now() - start) * 1000;
+            WaterfrontGpuCount scene_work = waterfront_gpu_stats_total(&gpu.scene.stats);
+            const size_t work[3] = { use_gpu ? scene_work.submissions : cpu.stats.meshes,
+                use_gpu ? scene_work.triangles : cpu.stats.triangles,
+                use_gpu ? 0 : cpu.stats.rasterized };
+            for (int i = 0; i < 3; ++i) {
+                work_total[i] += work[i];
+                work_max[i] = work[i] > work_max[i] ? work[i] : work_max[i];
+            }
             int warmup = use_gpu ? 120 : 2;
             if (frames >= warmup) {
                 timings[timing_count++] = ms;
@@ -1002,6 +1046,16 @@ int main(int argc, char **argv)
             use_gpu ? 120 : 2, timing_count ? total / timing_count : 0,
             timing_count ? timings[(timing_count - 1) * 95 / 100] : 0,
             timing_count ? timings[timing_count - 1] : 0);
+        if (use_gpu)
+            printf("scene_work frames=%d submissions_mean=%.1f submissions_max=%zu "
+                   "triangles_mean=%.0f triangles_max=%zu\n",
+                frames, (double)work_total[0] / frames, work_max[0], (double)work_total[1] / frames,
+                work_max[1]);
+        else
+            printf("scene_work frames=%d meshes_mean=%.1f meshes_max=%zu triangles_mean=%.0f "
+                   "triangles_max=%zu rasterized_mean=%.0f rasterized_max=%zu\n",
+                frames, (double)work_total[0] / frames, work_max[0], (double)work_total[1] / frames,
+                work_max[1], (double)work_total[2] / frames, work_max[2]);
         const Mesh3D *surface = use_gpu ? NULL
                                         : boat_water_surface(&cpu_view.water_mesh,
                                               world->definition->map, (BoatWater) { 0 }, 0);
