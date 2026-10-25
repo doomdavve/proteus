@@ -125,7 +125,7 @@ self-collision or hull/cabin collision; seek cloth reconstructs bounded history.
 
 ## Speedboat skins — 2026-10-24
 
-Current integration preparation — 2026-10-25: the user accepted the sleeker speed profile
+Current integration handoff — 2026-10-25: the user accepted the sleeker speed profile
 ("Much nicer!") and twin motors ("Great!") and requested preparation for main. The `boat-white-hulls` worktree now adds twin outboards to that
 accepted profile, following the white hulls and deep cockpit (`4010f37`). The profile uses a
 finer seven-station bow, graduated forefoot, lighter rub rail, gently crowned foredeck,
@@ -134,10 +134,13 @@ liveries, the cockpit cutout and lowered seats remain; there is no helm. The ear
 rake experiment was rejected and reverted. The twin-motor extension changes presentation only;
 it does not establish improved hydrodynamic performance or alter the simulation.
 
-Next: combine the accepted work with main's A1.4/A1.5 in the separate
-`boat-white-hulls-integration` worktree, run the combined checks, then fold that branch into
-main. [The integration handoff](BOAT_SKINS_HANDOFF.md) owns the branch/base, commands and
-combined verification status. The main checkout is not edited during preparation.
+Ready: `boat-white-hulls-integration` combines the accepted work with committed main
+`642ca78`, retaining A1.4/A1.5. All 116 enabled combined CTests passed with GPU checks;
+16 deterministic captures match the accepted source worktree byte-for-byte. Next: reconcile
+main's concurrent renderer work (including overlapping `src/renderer_gpu.c`), update and
+verify the candidate if main advances, then fold the prepared branch in.
+[The integration handoff](BOAT_SKINS_HANDOFF.md) owns the exact commits, commands, logs and
+verification scope. Main's working files were not edited during preparation.
 
 The single/twin-outboard comparisons for all four boats are at
 `build/boat-color-review/seat-depth/comparison.html` and

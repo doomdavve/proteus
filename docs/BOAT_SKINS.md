@@ -5,7 +5,7 @@ has a fine pointed bow, simple faceted V hull, flared shoulders, a dark rub rail
 foredeck stripe, low swept windscreen, an open cockpit cutout with a lowered two-seat well and twin compact outboards.
 The accepted baseline uses Sweden, Finland, Denmark and Norway. The user accepted the 2026-10-25 speed
 profile in `boat-white-hulls`, refining the bow taper, forefoot, windscreen and stern/cowl
-shapes. The user also accepted the twin outboards; the package is being prepared for main integration. The [owning plan](BOATING_PLAN.md#speedboat-skins--2026-10-24)
+shapes. The user also accepted the twin outboards; the package is prepared and verified for main integration. The [owning plan](BOATING_PLAN.md#speedboat-skins--2026-10-24)
 records the current review, before/after gallery and verification evidence.
 Each livery now has its matching Nordic-cross flag; the accepted staff and cloth simulation
 remain in place.
@@ -86,5 +86,6 @@ separation. See the owning plan for the dated build, full-suite and visual revie
 The baseline speedboat shape and Nordic color/flag pass are user-accepted; the current
 speed profile and twin-outboard extension are also user-accepted. The
 [integration handoff](BOAT_SKINS_HANDOFF.md) records the accepted package and preparation
-for the current main branch. Hands-on driving, Windows and browser review remain unverified.
+for main at `642ca78`, preserving A1.4/A1.5. The separate prepared branch is
+`boat-white-hulls-integration`; folding it into main is next. Hands-on driving, Windows and browser review remain unverified.
 Scripted desktop playback is a smoke check, not a manual driving or audio assessment.

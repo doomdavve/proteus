@@ -1,6 +1,7 @@
 # Accepted speedboat refinement: integration handoff
 
-The user accepted the white hulls, distinct Nordic liveries, deep open cockpit, sleeker
+Integration candidate verified against committed main `642ca78`, 2026-10-25. The user accepted the white hulls, distinct Nordic
+liveries, deep open cockpit, sleeker
 speed profile and twin outboards on 2026-10-25, then requested preparation for main.
 This handoff supersedes the 2026-10-24 Nordic multiplayer handoff, whose original package
 was already integrated into main. [The boating plan](BOATING_PLAN.md#speedboat-skins--2026-10-24)
@@ -15,10 +16,19 @@ usage and rendering APIs.
 - Source tip: accepted sleeker hull, swept windscreen, tapered stern/cowl and twin outboards,
   with steering-mount validation and updated documentation.
 - Integration target: main `642ca78`, following A1.4 (`853f25d`) and A1.5 (`642ca78`).
-- Prepared branch/worktree: `boat-white-hulls-integration`,
-  `/private/tmp/proteus-boat-integration`; combine and verify there before changing main.
+- Prepared and verified branch/worktree: `boat-white-hulls-integration`,
+  `/private/tmp/proteus-boat-integration`.
+- Accepted source commits `4010f37` and `f5450fe` applied cleanly as `066f0e8` and
+  `61cfb2d` on top of main `642ca78`; the final handoff commit changes documentation only.
 
-The main checkout was clean at preparation start and is left unchanged. Preserve all
+The main checkout was clean at preparation start and has not been edited by this work.
+During verification, concurrent uncommitted renderer edits appeared in main, including
+`src/renderer3d.[ch]`, `src/renderer_gpu.[ch]`, `tools/boat_water_review.c`,
+`tools/validate_boat_water_benchmark.py` and `tools/validate_renderer3d.c` at the last check.
+Those edits are outside this package and were left untouched. `src/renderer_gpu.c` overlaps
+the boat package, so a direct merge must wait until that renderer work is reconciled.
+Candidate verification covers committed main `642ca78`, not those concurrent working-tree edits.
+Preserve all
 A1.4 renderer/map bindings, view-owned scenery, lifecycle gates and adventure planning.
 Do not copy the older source worktree's shared files over newer main files wholesale.
 Apply only its refinement commits, resolving shared documentation around main's status.
@@ -49,23 +59,57 @@ Source artifacts remain under `build/boat-color-review/` in the source worktree.
 page is `seat-depth/comparison.html`; the accepted single/twin comparison is retained in
 `twin-outboards/comparison.html`. Build artifacts and machine-specific caches are not committed.
 
-Combined-main verification: pending in the separate integration worktree. Record actual
-results here after applying both source refinement commits to main `642ca78`.
+Combined-main verification on macOS, 2026-10-25, at candidate code revision `61cfb2d`:
+
+- Fresh Debug configure/build passed with `PROTEUS_GPU_TESTS=ON` and
+  `PROTEUS_WAKE_FIELD_TESTS=OFF`. Cached pinned dependency sources were copied into this
+  worktree's ignored build directory; no main-checkout cache was written. The build emitted
+  one warning in raylib's bundled `stb_vorbis.c:1404` (tautological pointer comparison),
+  and no project-source warnings.
+- All 116 enabled CTests passed in 192.90 seconds; 15 retired experiments were disabled.
+  GPU view binding/lifecycle, CPU lifecycle, the river benchmark contract, multiplayer
+  loopback and skin/mount checks all passed with desktop graphics and localhost access.
+- All 16 deterministic captures matched the accepted source worktree byte-for-byte:
+  four liveries × three CPU angles, the CPU turn, river/basin CPU follow views and the
+  Norway GPU turn. Representative integrated frames were inspected. A 180-frame Sweden
+  GPU turning demo completed successfully.
+- The diff against main touches only the ten refinement/validation/documentation files;
+  no map/world/scenery ownership implementation or physics code changes are introduced.
+- Formatting, changed local documentation links, gallery image links and
+  `git diff --check` passed. No manual driving/listening, Windows or browser check was added.
+
+Combined logs are `build/integration-{configure,build,ctest,gpu-demo,gpu-capture}.log`;
+`build/integration-visual-parity.txt` records the capture hashes. The accepted comparison
+page is also available at `build/boat-color-review/twin-outboards/comparison.html` in the
+integration worktree. Build artifacts remain uncommitted.
 
 ## Integration procedure
 
-Prepare the candidate in its own worktree, applying the source commits after `d73688a` in
-order. Resolve conflicts without replacing main's map/scenery ownership work. Then run:
+The candidate is already prepared and verified against main `642ca78`. To reproduce the
+combined verification in the integration worktree (a normal configure may fetch the pinned
+dependencies), run:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=ON
 cmake --build build -j
 ctest --test-dir build -j 4 --output-on-failure
 ./build/wake_velocity --renderer cpu --skin sweden --location river --screenshot build/river.png --time 3
 ./build/boat_flag_review --renderer gpu --skin norway --angle rear --scenario turn --frames 180
 ```
 
-Once the prepared branch is verified and main still points to its recorded target, fold it
-in from the main checkout with `git merge --ff-only boat-white-hulls-integration`. If main
-advances, prepare and verify against the newer target first. This preparation does not itself
-merge main or change the user's main checkout.
+Next, finish/reconcile the concurrent renderer work in its owning track. If it advances
+main, update the candidate onto that new committed tip, preserve the twin-motor draw loops
+alongside its renderer changes and repeat combined verification. Main currently has an
+overlapping uncommitted `src/renderer_gpu.c`; the merge command below is for after that work
+is reconciled, not for overwriting it.
+
+Then fold the prepared branch in from the main checkout:
+
+```sh
+git status --short
+git merge --ff-only boat-white-hulls-integration
+```
+
+Preserve all concurrent renderer edits. If main's committed tip advances beyond `642ca78`,
+update and verify the candidate against the newer target first. Rebuild the destination after merging and qualify any concurrent local edits
+separately. This preparation does not itself merge main or change its working files.
