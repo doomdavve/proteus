@@ -1,6 +1,6 @@
 # Accepted speedboat refinement: integration handoff
 
-Integration candidate verified against committed main `642ca78`, 2026-10-25. The user accepted the white hulls, distinct Nordic
+Integrated into main on 2026-10-25 on top of A2.3 `76d3883` ([record](#integrated-into-main--2026-10-25)); the candidate was first verified against `642ca78`. The user accepted the white hulls, distinct Nordic
 liveries, deep open cockpit, sleeker
 speed profile and twin outboards on 2026-10-25, then requested preparation for main.
 This handoff supersedes the 2026-10-24 Nordic multiplayer handoff, whose original package
@@ -82,6 +82,18 @@ Combined logs are `build/integration-{configure,build,ctest,gpu-demo,gpu-capture
 `build/integration-visual-parity.txt` records the capture hashes. The accepted comparison
 page is also available at `build/boat-color-review/twin-outboards/comparison.html` in the
 integration worktree. Build artifacts remain uncommitted.
+
+## Integrated into main — 2026-10-25
+
+The concurrent renderer work landed as A2.1–A2.3. The three candidate commits then
+cherry-picked onto main `76d3883` without conflicts, followed by the separate `web-parity`
+browser title/WebRTC commit, which overlaps this package only in `docs/README.md`. On macOS,
+the combined Debug build was warning-clean in project sources and all 120 enabled CTests passed
+in 183 s (`-j 4`, GPU tests on, localhost access). An earlier run of the same suite failed the
+four real-time ENet session tests, which then passed alone and in the full rerun; the cause is
+unconfirmed (load or a concurrent suite sharing the LAN discovery port). CPU river and basin
+captures were rendered and inspected. No manual driving, Windows or browser check was added.
+The procedure below is kept as history.
 
 ## Integration procedure
 

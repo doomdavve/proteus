@@ -87,5 +87,5 @@ The baseline speedboat shape and Nordic color/flag pass are user-accepted; the c
 speed profile and twin-outboard extension are also user-accepted. The
 [integration handoff](BOAT_SKINS_HANDOFF.md) records the accepted package and preparation
 for main at `642ca78`, preserving A1.4/A1.5. The separate prepared branch is
-`boat-white-hulls-integration`; folding it into main is next. Hands-on driving, Windows and browser review remain unverified.
+`boat-white-hulls-integration`; it was folded into main on 2026-10-25 on top of A2.3. Hands-on driving, Windows and browser review remain unverified.
 Scripted desktop playback is a smoke check, not a manual driving or audio assessment.

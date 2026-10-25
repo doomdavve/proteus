@@ -136,9 +136,9 @@ it does not establish improved hydrodynamic performance or alter the simulation.
 
 Ready: `boat-white-hulls-integration` combines the accepted work with committed main
 `642ca78`, retaining A1.4/A1.5. All 116 enabled combined CTests passed with GPU checks;
-16 deterministic captures match the accepted source worktree byte-for-byte. Next: reconcile
-main's concurrent renderer work (including overlapping `src/renderer_gpu.c`), update and
-verify the candidate if main advances, then fold the prepared branch in.
+16 deterministic captures match the accepted source worktree byte-for-byte. The concurrent
+renderer work landed as A2.1–A2.3; the three commits then applied cleanly onto main `76d3883`
+and were folded in on 2026-10-25 ([handoff](BOAT_SKINS_HANDOFF.md#integrated-into-main--2026-10-25)).
 [The integration handoff](BOAT_SKINS_HANDOFF.md) owns the exact commits, commands, logs and
 verification scope. Main's working files were not edited during preparation.
 
