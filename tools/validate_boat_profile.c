@@ -26,6 +26,16 @@ static int check_records(void)
     CHECK(stats.latest == 5 && stats.mean == 5 && stats.p50 == 5 && stats.p95 == 7 && stats.p99 == 7
         && stats.maximum == 9);
     CHECK(known[0] == 9); // Reporting must not reorder caller storage.
+    // Whole-run reports exceed the overlay history and sort the caller's buffer.
+    enum { RUN = 3 * BOAT_PROFILE_HISTORY + 1 };
+    float run[RUN];
+    for (int i = 0; i < RUN; ++i)
+        run[i] = (float)((i * 37) % RUN);
+    BoatMetricStats whole = boat_metric_stats_sort(run, RUN);
+    CHECK(whole.latest == (float)(((RUN - 1) * 37) % RUN) && whole.maximum == RUN - 1);
+    CHECK(whole.p50 == (RUN - 1) * 50 / 100 && whole.p95 == (RUN - 1) * 95 / 100);
+    CHECK(whole.p99 == (RUN - 1) * 99 / 100 && run[0] == 0 && run[RUN - 1] == RUN - 1);
+    CHECK(boat_metric_stats_sort(NULL, 3).maximum == 0);
     BoatFrameMetrics running = { .frame_ms = 16,
         .simulation_ms = 8,
         .physics_ms = 6,

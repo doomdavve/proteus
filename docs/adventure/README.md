@@ -3,8 +3,8 @@
 This directory holds the small, versioned evidence for the staged Gothenburg–Vinga work.
 The [A0/A1 task ledger](../FREE_RIDING_ADVENTURE_FIRST_STEPS.md) owns execution status;
 the [adventure plan](../FREE_RIDING_ADVENTURE_PLAN.md) owns scope. The original river
-reference is summarized in [baseline.md](baseline.md). It precedes any new coastal data
-or runtime map change.
+reference and the A0.4 controlled river frame baseline are in [baseline.md](baseline.md).
+They precede any new coastal data or runtime map change.
 
 Run review commands from the repository root after a Debug build. Full PNGs, CSVs and logs
 belong under the ignored `build/adventure/a0-original/` directory. The baseline gives exact

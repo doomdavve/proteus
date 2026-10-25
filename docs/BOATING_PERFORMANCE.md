@@ -70,6 +70,61 @@ particles/flag/camera state. This is same-build deterministic evidence, not a co
 comparison, portable replay format or claim of cross-platform bit identity. CPU pixel comparisons
 add coverage for the extracted app path.
 
+## River frame benchmark — 2026-10-25
+
+[A0.4](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a04--measure-the-real-river-workload) adds a
+benchmark mode to the existing river route review. It drives the same scripted route and tick
+order as `--check` and renders every two 120 Hz ticks with the GPU renderer:
+
+```sh
+mkdir -p build/adventure/a0-performance
+./build/adventure-release/boat_water_review --benchmark build/adventure/a0-performance/flat-aaoff-t1 --aa off
+./build/adventure-release/boat_water_review --benchmark build/adventure/a0-performance/waves-aa4x4-t1 --aa 4x4 --waves
+./build/adventure-release/boat_water_review --benchmark build/adventure/a0-performance/visible-waves-aa4x4 --aa 4x4 --waves --visible
+```
+
+`--benchmark PREFIX` writes `PREFIX.json` and `PREFIX.csv`. The parent directory must exist;
+the tool opens both files before the voyage and removes them if the run fails. `--aa off|4x4`
+is required. `--renderer` may only be `gpu` (the default), and `--check`, `--check-gpu`,
+`--output` and `--sequence` are rejected. An empty prefix, one over 4000 bytes or one ending
+in `/` is rejected. Any of these, a route failure or a truncated write returns nonzero.
+The existing `--check`, `--output` and `--sequence` modes are unchanged. Every route mode
+now prints a `final_state` line of exact `%a` values.
+
+Frame 0 draws the initial pose. Each later frame steps two ticks, or one when the route ends
+on an odd tick, and then draws. The first 120 frames are warmup on the continuous route; the
+voyage ends at the existing destination or the 240 s timeout. The hidden window is unpaced.
+`--visible` uses the review's existing `SetTargetFPS(60)`. Neither requests VSync. Both draw
+the 320 × 200 target to the 960 × 600 window and call `EndDrawing()`.
+
+Each CSV row has the tick range, route destination, pose and these durations, measured with
+`boat_profile_time(false)` (the platform monotonic clock):
+
+- `simulation_ms`: the frame's ticks, including the route controller.
+- `render_submit_ms`: `boat_gpu_draw()` and the batch flush. This is CPU submission.
+- `present_ms`: the window blit and `EndDrawing()`, including any pacing wait.
+- `frame_ms`: the sum of those three intervals.
+- `frame_interval_ms`: the time between frame starts. It also includes the untimed hull check,
+  GPU query polling and sample recording. It is a CPU interval, not a scan-out time.
+- `gpu_ms`: `GL_TIME_ELAPSED` around `boat_gpu_draw()`, without the presentation blit. It
+  uses eight query slots, read without waiting; a still-busy slot skips that frame. The
+  report counts skipped samples and is `null` when timer queries are unavailable.
+
+The CSV also has per-frame wave-patch rebuilds and wake uploads. The JSON gives p50/p95/p99/
+max and mean over the measured frames, using sorted index
+`floor((samples - 1) * percentile / 100)`. It also counts frames whose `frame_ms` or
+`frame_interval_ms` exceeds 1000/60 ms (`value > deadline_ms`). It records build, GL renderer/
+version, AA, preset, window/pacing, framebuffer and internal resolution, monitor refresh,
+wave-patch capacity/peak triangles, route completion and the final physical state.
+Application submissions, driver draw calls and scene triangles are `null`: the renderer does
+not count them. The voyage checks hull clearance at each frame pose. `--check` covers every
+tick, and the matching final state shows the benchmark followed the same trajectory.
+
+This is a fixed two-tick **render workload**. It does not exercise the app's real-time
+accumulator, dropped ticks, audio, HUD or course logic. The
+[A0.4 baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25) holds the
+first controlled results.
+
 ## P2a completion evidence — 2026-10-23
 
 Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=ON`, default retired field tests disabled:

@@ -63,6 +63,14 @@ stay enabled. With `PROTEUS_GPU_TESTS=ON` and Node.js available, this HUD/contro
 checks as of 2026-10-24 (including the browser event contract; counted by the current CTest run). GPU cases retain serial scheduling while independent
 CPU checks may run concurrently; fixture dependencies still govern capture/replay comparisons.
 
+The river frame benchmark has two checks in `tools/validate_boat_water_benchmark.py`.
+`boat_river_benchmark_options` (`cpu`) checks option and output-path rejection without
+opening a window. With GPU tests enabled, `boat_river_benchmark_contract` (`gpu`, serial;
+about 32 s in Debug on an M1 Max) runs a hidden `--waves --aa off` voyage. It checks row
+counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, finite values,
+route completion and exact final-state parity with `--check --waves`. It asserts no timing
+thresholds. See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25).
+
 Every active test carries one of three labels: `cpu` (display-free), `render` (CPU
 captures and checksums) or `gpu` (graphics context). Skin geometry carries both `cpu` and
 `render` labels. The `core` checks are also

@@ -166,6 +166,100 @@ permission failures and a stalled GPU check. The subsequent complete
 target/anchor checks passed. No runtime, input, audio or asset-loading code changed, so
 no new manual gameplay/audio check was performed. CPU/GPU visual inspection here is
 agent review, not user acceptance. GPU completion timing, physical monitor settings and
-whole-voyage performance remain unverified. The next task at the time was A0.2; it and A0.3
-have since been completed ([coastal sources](README.md#coastal-sources-a02-2026-10-25),
-[route survey](README.md#route-and-coverage-survey-a03-2026-10-25)) and A0.4 is next.
+whole-voyage performance remained unverified at the time. A0.2 and A0.3 have since been
+completed ([coastal sources](README.md#coastal-sources-a02-2026-10-25),
+[route survey](README.md#route-and-coverage-survey-a03-2026-10-25)). A0.4 added GPU timer
+samples and whole-voyage reports ([below](#a04-controlled-river-baseline--2026-10-25)).
+
+## A0.4 controlled river baseline — 2026-10-25
+
+### Setup
+
+Started from a clean `ba45569`. The benchmark is the new `boat_water_review --benchmark` mode
+([guide](../BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25)). The tool reported
+build `ba45569-dirty/Release/AppleClang-21.0.0.21000101`, because the A0.4 source edits were
+uncommitted. Release tree: `build/adventure-release`. Platform `Darwin/arm64`, GL renderer
+`Apple M1 Max`, version `4.1 Metal - 90.5`. The monitor reported 120 Hz. Window 960 × 600,
+framebuffer 960 × 600, virtual image 320 × 200. Internal target: 320 × 200 with AA off,
+1280 × 800 with 4 × 4. Physics revision 8.
+
+All 12 matrix runs were sequential: three trials of flat/waves × AA off/4x4, hidden and unpaced,
+14:10–14:16 UTC. Command: `build/adventure/a0-performance/run-matrix.sh`. No CTest, download,
+profiler or other game process ran. Other desktop applications stayed open. Every run
+completed the route: 6,064 frames (120 warmup, 5,944 measured) and 12,125 ticks. The three
+trials' final states are identical within each preset. They also match `--check` and
+`--check --waves` exactly. Full CSV/JSON/logs and `summary.txt` are under
+`build/adventure/a0-performance/`. Clock values on macOS are quantized to about 1 µs.
+
+### Hidden matrix: median of three runs (ms)
+
+The ranges are the minimum and maximum across the three trials. The sim, submit, GPU and
+present columns are p95. Frame is `simulation + submission + present`.
+
+| Preset / AA | Sim | Submit | GPU scene | Present | Frame p50 | Frame p95 | Frame p99 | Frame max |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| flat / off | 0.184 | 3.686 | 2.597 | 1.604 | 4.074 | 5.178 (5.154–5.638) | 6.012 | 11.062 (8.777–14.081) |
+| flat / 4x4 | 0.183 | 3.801 | 3.193 | 1.949 | 4.221 | 5.668 (5.417–6.346) | 6.912 | 10.049 (8.635–15.804) |
+| waves / off | 0.210 | 3.851 | 2.783 | 1.794 | 4.234 | 5.600 (5.476–6.005) | 6.530 | 12.853 (8.582–13.564) |
+| waves / 4x4 | 0.211 | 3.875 | 3.593 | 1.796 | 4.277 | 5.691 (5.688–5.702) | 6.453 | 9.345 (8.319–10.537) |
+
+GPU scene p99 medians are 2.708, 3.344, 2.861 and 3.653 ms in the same order; maxima are
+3.4–4.8 ms. All 71,328 measured frames have a GPU timer sample (none skipped).
+
+**Outliers:** no measured frame or start-to-start interval exceeded 16.667 ms in any hidden
+run. The maxima above are all the stalls; the largest was 15.80 ms (flat/4x4). Present
+dominates them; simulation never exceeded 0.29 ms.
+
+Waves rebuilt the water patch 177 times during measurement in every trial. Capacity was
+196,608 vertices and the peak was 37,404 triangles. Flat water rebuilt none. Application
+submission, driver draw-call and scene-triangle counts are unavailable (`null`).
+
+### Visible paced voyage and app profiler
+
+`--visible --waves --aa 4x4` used the existing `SetTargetFPS(60)`. It completed with the same
+final state. Simulation p95 was 0.279 ms, submission 5.052 ms, GPU scene 4.101 ms and
+present/wait 12.727 ms. The start-to-start interval was p50/p95/p99/max
+**17.108/17.213/17.262/25.040 ms**, mean 17.062 ms (**58.6 Hz**). 5,537 of the 5,944 intervals
+exceed 16.667 ms; 6 exceed 17.5 ms, 3 exceed 20 ms and 1 exceeds 25 ms. The frame cap
+consistently overshoots, so the miss count does not show long stalls.
+
+The main app was run with
+`./build/adventure-release/wake_velocity --location river --renderer gpu --waves --profiler --demo --frames 600`.
+It exited normally after 1,244 ticks, or 2.07 ticks per frame; exactly 60 Hz would give 1,200.
+The overlay was read at about 7 s of simulation. It showed frame 17.1 ms average and 17.2 ms
+p95, 58.4 FPS observed on a 120 Hz monitor, scene 3.9/4.2 ms, present/wait 12.9 ms, simulation
+p95 0.34 ms, ticks/frame p95 and maximum 3, and no discarded time. The accumulator keeps
+simulation at 120 Hz with periodic three-tick frames. The display cadence is therefore below
+60 Hz on this machine. That is a pacing issue for later work; A0.4 did not change the main
+loop. The overlay was read from a temporary desktop capture, which was deleted because it
+included other windows.
+
+### Interpretation for this machine
+
+- **Active work meets the provisional targets on this route:** hidden frame p95 is at most
+  5.7 ms and p99 at most 6.9 ms, against ≤12 / ≤16.67 ms. This is the current river crop
+  only. **60 FPS is not solved**: the paced cadence is 58.6 Hz.
+- CPU submission (3.7–3.9 ms p95) costs more than completed GPU scene work (2.6–3.6 ms p95)
+  or simulation (≈0.2 ms). AA 4×4 adds at most 0.12 ms of submission p95 and 0.6–0.8 ms of
+  GPU p95. Waves add about 0.2 ms of submission and 0.2–0.4 ms of GPU p95. Reducing
+  submissions and culling are the first scaling levers.
+- For A1.5/A2 comparisons on this machine, use these medians. Treat >10% p95 growth across
+  three controlled runs as the investigation trigger.
+- **Gaps:** no submission, draw-call or triangle counters. GPU time covers only the scene
+  passes. Scan-out/VSync timing and the visible run's GPU clock state are not measured.
+  There is a single machine and no Instruments trace (no stall needed attribution). The
+  benchmark measures a render workload, not real-time accumulator behaviour.
+
+### Verification
+
+On 2026-10-25, the Debug configure/build passed with no project warnings (log
+`build/adventure/a0.4-build.log`). `ctest --test-dir build -j 4 --output-on-failure` passed
+**112/112 active tests** in 175.96 s, including 25 GPU-labelled tests and the new
+`boat_river_benchmark_options` and `boat_river_benchmark_contract` (32.44 s). The 15 retired
+tests remained disabled. Log: `build/adventure/a0.4-ctest.log`. The Release build also
+passed; its only compiler warning comes from raylib's bundled `stb_vorbis.c`.
+
+The unchanged `--output` GPU mode produced `under-bridge-default.png` byte-identical to the
+A0.1 reference (`e70f0b7f…`). The visible voyage was judged only from its report, and the
+600-frame app demo from one overlay capture. Neither was watched in full, and neither is human
+acceptance. Audio was not assessed.

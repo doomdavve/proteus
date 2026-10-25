@@ -364,6 +364,9 @@ add_executable(validate_boat_world tools/validate_boat_world.c)
 add_executable(wake_baseline tools/wake_baseline.c)
 add_executable(boat_water_review tools/boat_water_review.c)
 add_dependencies(boat_water_review proteus_assets)
+target_compile_definitions(boat_water_review PRIVATE
+  BOAT_BENCH_BUILD="${BOAT_BENCH_REV}/${CMAKE_BUILD_TYPE}/${CMAKE_C_COMPILER_ID}-${CMAKE_C_COMPILER_VERSION}"
+  BOAT_BENCH_PLATFORM="${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
 add_executable(boat_banking_review tools/boat_banking_review.c)
 add_dependencies(boat_banking_review proteus_assets)
 add_executable(validate_boat_skin tools/validate_boat_skin.c)
@@ -397,9 +400,11 @@ endforeach()
 target_link_libraries(validate_boat_profile PRIVATE proteus_boat_drive)
 target_link_libraries(validate_boat_world PRIVATE proteus_boat_drive)
 target_link_libraries(wake_baseline PRIVATE proteus_boat_core)
-foreach(target boat_water_review boat_banking_review boat_flag_review boat_fleet_review)
+foreach(target boat_banking_review boat_flag_review boat_fleet_review)
   target_link_libraries(${target} PRIVATE proteus_boat_session proteus_gpu)
 endforeach()
+# The drive library adds boat_profile statistics to the session.
+target_link_libraries(boat_water_review PRIVATE proteus_boat_drive proteus_gpu)
 foreach(target validate_boat validate_boat_banking validate_boat_turn_entry validate_boat_profile
     validate_boat_environment validate_boat_replay validate_boat_world wake_baseline
     boat_water_review boat_banking_review boat_flag_review boat_fleet_review)
@@ -565,6 +570,9 @@ add_test(NAME boat_default_wake_matches_explicit COMMAND ${CMAKE_COMMAND} -E com
 set_tests_properties(boat_default_wake_matches_explicit PROPERTIES FIXTURES_REQUIRED player_wake_defaults)
 add_test(NAME boat_river_route COMMAND boat_water_review --check)
 add_test(NAME boat_river_wave_route COMMAND boat_water_review --check --waves)
+add_test(NAME boat_river_benchmark_options COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_water_benchmark.py
+  $<TARGET_FILE:boat_water_review> --options)
 set(BOAT_REPLAY_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/replay-tests")
 add_test(NAME boat_replay COMMAND validate_boat_replay ${BOAT_REPLAY_TEST_DIR})
 set_tests_properties(boat_replay PROPERTIES FIXTURES_SETUP boat_recording)
@@ -702,6 +710,11 @@ if(PROTEUS_GPU_TESTS)
   set_tests_properties(boat_banking_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
   add_test(NAME gpu_water_surface COMMAND boat_water_review --check-gpu)
   set_tests_properties(gpu_water_surface PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_water_benchmark.py
+    $<TARGET_FILE:boat_water_review>)
+  set_tests_properties(boat_river_benchmark_contract PROPERTIES LABELS "gpu" RUN_SERIAL TRUE
+    TIMEOUT 240)
   add_test(NAME boat_ghost_gpu_screenshot COMMAND wake_velocity --gpu-aa
     --ghost ${BOAT_REPLAY_TEST_DIR}/replay-fixture.run --time 0
     --data-dir ${BOAT_REPLAY_TEST_DIR}/profile

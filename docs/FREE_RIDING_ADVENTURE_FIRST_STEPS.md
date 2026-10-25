@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0.1–A0.3 completed 2026-10-25; A0.4 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; A1.1 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0/A1 task ledger. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -38,8 +38,8 @@ Vinga, a new playable area, streaming, new weather physics or adventure rules.
 | A0.1 | — | Current implementation inventory, compatibility references and original river captures | Complete 2026-10-25; [evidence](adventure/baseline.md) |
 | A0.2 | A0.1 | Pinned coastal source extract and acquisition manifest; terrain/weather access findings | Complete 2026-10-25; [sources](adventure/README.md#coastal-sources-a02-2026-10-25) |
 | A0.3 | A0.2 | Offline coverage map, candidate route, first-slice polygon and tile/cost inventory | Complete 2026-10-25; [survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25) |
-| A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Pending; next |
-| A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Pending |
+| A0.4 | A0.1 | Repeatable river frame report and controlled baseline; A0 decision record | Complete 2026-10-25; [baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25), [decision](#a0-decision-record--2026-10-25) |
+| A1.1 | A0 complete | Explicit immutable map description and independently constructible collision cache | Pending; next |
 | A1.2 | A1.1 | Borrowed map resources wired through simulation, session, fleet and networking | Pending |
 | A1.3 | A1.2 | Caller-owned water-mesh caches with unchanged topology | Pending |
 | A1.4 | A1.3 | Explicit CPU/GPU map binding and map-dependent scenery ownership | Pending |
@@ -253,7 +253,8 @@ and `CMakeLists.txt` for a focused report-contract test. Add a small report vali
 Keep the production simulation/renderer algorithms unchanged.
 
 Add an explicit benchmark mode to the existing route review, preserving all current modes.
-The following is the **proposed interface, not a command available today**:
+This was the proposed interface. It is implemented as written, with `--renderer gpu` optional
+because it is the default:
 
 ```text
 boat_water_review --benchmark PREFIX --renderer gpu --aa off|4x4 [--waves] [--visible]
@@ -292,7 +293,8 @@ cmake --build build/adventure-release -j
 ./build/adventure-release/wake_velocity --location river --renderer gpu --waves --profiler --demo --frames 600
 ```
 
-Write the exact new benchmark invocations into the guide after implementing the parser. The
+The exact benchmark invocations are in the
+[benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25). The
 report-contract test checks row counts, warmup exclusion, percentile recomputation, finite
 values, route completion and final physical-state parity against the existing controller.
 Performance thresholds are engineering reports, not flaky universal wall-time CTest assertions.
@@ -301,6 +303,56 @@ Performance thresholds are engineering reports, not flaky universal wall-time CT
 if available, and frame/pacing costs. Record machine-specific targets and remaining measurement
 gaps. Combine A0.2/A0.3's findings into the A0 decision: first slice, tile-size experiment,
 resident collision/coarse-view estimate and next ownership task. Do not declare 60 FPS solved.
+
+**A0.4 result, 2026-10-25:** Started from a clean `ba45569`.
+`boat_water_review --benchmark PREFIX --aa off|4x4 [--waves] [--visible]` writes per-frame
+CSV and summary JSON. Frames are drawn every two ticks on the continuous route, with 120
+warmup frames. It reports simulation, CPU submission, present/wait, frame and start-to-start
+times, plus asynchronous `GL_TIME_ELAPSED` scene GPU time. It also reports wave rebuilds,
+deadline misses and the exact final state; unavailable counters are null.
+`boat_metric_stats_sort()` gives `boat_profile` unbounded whole-run percentiles. The
+production simulation, renderer and main loop are unchanged. Existing `--output` captures
+are byte-identical to A0.1.
+
+Two tests were added: `boat_river_benchmark_options` (cpu) and the GPU
+`boat_river_benchmark_contract` (row/warmup/tick/percentile/deadline recomputation, route
+completion, final-state parity with `--check --waves`). On an M1 Max, Release, the three-trial
+hidden matrix completed the route with identical final states in all runs. Frame p95 was
+5.2–5.7 ms and p99 6.0–6.9 ms, with no frame above 16.67 ms. GPU scene p95 was 2.6–3.6 ms.
+CPU submission, at 3.7–3.9 ms p95, is the largest cost.
+
+The visible paced voyage and the app profiler both run at **58.4–58.6 Hz**, not 60 Hz,
+because the 60 FPS cap overshoots. The app's accumulator uses periodic three-tick frames.
+This is recorded as a gap, not fixed. Debug CTest passed 112/112 active tests in 175.96 s.
+Remaining gaps: draw-call/triangle counters, scan-out timing, other hardware and human
+acceptance. Full evidence is in the
+[A0.4 baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25).
+
+### A0 decision record — 2026-10-25
+
+- **First slice:** A0.3's [10.9 km² Långedrag slice](adventure/first-slice.json). It joins
+  the river crop and runs past Nya Älvsborg to Långedrag old harbour, a 6.02 km mapped
+  route with 27.6 m minimum clearance. It needs no source edge, invented closure or terrain.
+  Terrain, depth and overhead clearance remain gaps.
+- **Tile experiment: 512 m**, compared against 1 km. This is not a runtime format. The
+  largest modelled tile is smaller (123 vs 429 KiB), and 40% of route tiles have no geometry.
+  A0.4 shows that CPU submission, not GPU or simulation time, dominates the current river.
+  A2 should therefore judge tile size by submissions and culling. A2 must first add
+  application submission and triangle counters, which A0.4 could only report as unavailable.
+- **Resident estimate (not measured):** the current collision cache holds 547 water triangles
+  and allocates 13,128 B of shore-edge pairs. Each query scans every water triangle and every
+  shore edge. The surveyed crop plus slice has 5,779 shore edges, about 7.6× the crop's
+  760. That is roughly 46 KB of edge pairs plus shared vertices, well under 0.5 MB. Linear
+  query cost is the problem, not memory, so the A2 indexed collision is required. The
+  modelled crop-plus-slice coarse view is 1.42 MB and detail 2.65 MB (A0.3 model). Scaled to
+  the river bake, that is about 6.9 MB of resident detail. These are survey estimates, not
+  bake or process sizes.
+- **Budget on this machine:** the current river uses under half of the provisional ≤12 ms
+  p95 active-work target. Display pacing misses 60 Hz before any map growth. A1.5 repeats this
+  matrix and uses >10% p95 growth as its investigation trigger.
+- **Next task: A1.1**, an explicit immutable map description and an independently
+  constructible collision cache. Ownership changes begin there; nothing in A0 changed
+  runtime map ownership.
 
 ## A1 resource contract — decide this before editing callers
 
@@ -464,7 +516,7 @@ Historical A0.1 instruction (completed 2026-10-25):
 > changes. Produce the current-map/copy/cache inventory and original river reference evidence,
 > run the required verification, and update the ledger. Complete A0.1 only; report A0.2 as next.
 
-Suggested follow-up batch after that handoff:
+Historical follow-up batch (A0.2–A0.4 completed 2026-10-25 in separate handoffs):
 
 > Execute A0.2–A0.4 in `docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md`. Finish the reproducible
 > coastal survey and controlled river baseline, with separate evidence per task. Continue

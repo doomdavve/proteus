@@ -21,26 +21,34 @@ static int compare_float(const void *a, const void *b)
     return (left > right) - (left < right);
 }
 
-BoatMetricStats boat_metric_stats(const float *values, int count)
+BoatMetricStats boat_metric_stats_sort(float *values, int count)
 {
     BoatMetricStats result = { 0 };
     if (!values || count <= 0)
         return result;
+    result.latest = values[count - 1];
+    for (int i = 0; i < count; ++i)
+        result.mean += values[i];
+    result.mean /= count;
+    qsort(values, (size_t)count, sizeof(values[0]), compare_float);
+    // 64-bit products keep the index exact for any int count.
+    result.p50 = values[(long long)(count - 1) * 50 / 100];
+    result.p95 = values[(long long)(count - 1) * 95 / 100];
+    result.p99 = values[(long long)(count - 1) * 99 / 100];
+    result.maximum = values[count - 1];
+    return result;
+}
+
+BoatMetricStats boat_metric_stats(const float *values, int count)
+{
+    if (!values || count <= 0)
+        return (BoatMetricStats) { 0 };
     if (count > BOAT_PROFILE_HISTORY)
         count = BOAT_PROFILE_HISTORY;
     float sorted[BOAT_PROFILE_HISTORY];
-    result.latest = values[count - 1];
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < count; ++i)
         sorted[i] = values[i];
-        result.mean += values[i];
-    }
-    result.mean /= count;
-    qsort(sorted, (size_t)count, sizeof(sorted[0]), compare_float);
-    result.p50 = sorted[(count - 1) * 50 / 100];
-    result.p95 = sorted[(count - 1) * 95 / 100];
-    result.p99 = sorted[(count - 1) * 99 / 100];
-    result.maximum = sorted[count - 1];
-    return result;
+    return boat_metric_stats_sort(sorted, count);
 }
 
 void boat_profile_add(BoatProfile *profile, BoatFrameMetrics frame)

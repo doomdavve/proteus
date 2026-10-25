@@ -1,6 +1,9 @@
 // Deterministic boat-level water audit. Uses the playable simulation, not a camera spline.
+#include "external/glad.h"
+
 #include "boat_gpu.h"
 #include "boat_map.h"
+#include "boat_profile.h"
 #include "boat_test_session.h"
 #include "boat_water_mesh.h"
 #include "raymath.h"
@@ -196,14 +199,364 @@ cleanup:
     return result;
 }
 
+static bool route_finished(const Boat *boat, size_t destination)
+{
+    return destination == stop_count - 1
+        && Vector2Distance(boat->position, stops[destination].position) < 12;
+}
+
+// Exact physical state shared by --check and --benchmark for same-build parity.
+static void format_final_state(char *out, size_t size, const Boat *boat, int tick)
+{
+    snprintf(out, size,
+        "tick=%d x=%a z=%a vx=%a vz=%a heading=%a yaw_velocity=%a height=%a "
+        "vertical_velocity=%a pitch=%a roll=%a throttle=%a wheel=%a landings=%u",
+        tick, (double)boat->position.x, (double)boat->position.y, (double)boat->velocity.x,
+        (double)boat->velocity.y, (double)boat->heading, (double)boat->yaw_velocity,
+        (double)boat->height, (double)boat->vertical_velocity, (double)boat->pitch,
+        (double)boat->roll, (double)boat->throttle, (double)boat->wheel, boat->landings);
+}
+
+#define BENCH_WARMUP 120
+#define BENCH_FRAMES (MAX_TICKS / 2 + 2)
+#define BENCH_DEADLINE_MS (1000.0 / 60.0)
+#define GPU_QUERIES 8
+
+typedef struct {
+    int first_tick, end_tick, wave_rebuilds;
+    size_t destination, wake_uploads;
+    float x, z, heading;
+    float simulation_ms, render_ms, present_ms, frame_ms, interval_ms, gpu_ms;
+    bool has_interval, has_gpu;
+} BenchFrame;
+
+// Asynchronous GL_TIME_ELAPSED samples. A busy slot skips that frame instead of waiting.
+typedef struct {
+    GLuint ids[GPU_QUERIES];
+    int frame[GPU_QUERIES];
+    bool supported;
+} GpuTimer;
+
+static void gpu_timer_init(GpuTimer *timer)
+{
+    *timer = (GpuTimer) { .supported = false };
+    if (!glGenQueries || !glBeginQuery || !glEndQuery || !glGetQueryiv || !glGetQueryObjectiv
+        || !glGetQueryObjectui64v)
+        return;
+    while (glGetError() != GL_NO_ERROR) { }
+    GLint bits = 0;
+    glGetQueryiv(GL_TIME_ELAPSED, GL_QUERY_COUNTER_BITS, &bits);
+    if (bits <= 0)
+        return;
+    glGenQueries(GPU_QUERIES, timer->ids);
+    for (int i = 0; i < GPU_QUERIES; ++i)
+        timer->frame[i] = -1;
+    timer->supported = glGetError() == GL_NO_ERROR;
+}
+
+static bool gpu_timer_begin(GpuTimer *timer, int frame)
+{
+    int slot = frame % GPU_QUERIES;
+    if (!timer->supported || timer->frame[slot] >= 0)
+        return false;
+    glBeginQuery(GL_TIME_ELAPSED, timer->ids[slot]);
+    timer->frame[slot] = frame;
+    return true;
+}
+
+// Collects finished samples; WAIT is used only after measurement.
+static void gpu_timer_poll(GpuTimer *timer, BenchFrame *frames, bool wait)
+{
+    for (int i = 0; timer->supported && i < GPU_QUERIES; ++i) {
+        if (timer->frame[i] < 0)
+            continue;
+        GLint ready = wait;
+        if (!wait)
+            glGetQueryObjectiv(timer->ids[i], GL_QUERY_RESULT_AVAILABLE, &ready);
+        if (!ready)
+            continue;
+        GLuint64 elapsed = 0;
+        glGetQueryObjectui64v(timer->ids[i], GL_QUERY_RESULT, &elapsed);
+        frames[timer->frame[i]].gpu_ms = (float)((double)elapsed / 1e6);
+        frames[timer->frame[i]].has_gpu = true;
+        timer->frame[i] = -1;
+    }
+}
+
+static void json_string(FILE *out, const char *text)
+{
+    fputc('"', out);
+    for (; text && *text; ++text) {
+        unsigned char c = (unsigned char)*text;
+        if (c == '"' || c == '\\')
+            fprintf(out, "\\%c", c);
+        else if (c < 0x20)
+            fprintf(out, "\\u%04x", c);
+        else
+            fputc(c, out);
+    }
+    fputc('"', out);
+}
+
+// Statistics over measured frames that have a value; null when none has one.
+static void json_stats(FILE *out, const char *name, const BenchFrame *frames, int count,
+    float *scratch, bool (*select)(const BenchFrame *, float *))
+{
+    int n = 0;
+    for (int i = BENCH_WARMUP; i < count; ++i)
+        n += select(&frames[i], &scratch[n]);
+    fprintf(out, "  \"%s\":", name);
+    if (!n) {
+        fputs("null,\n", out);
+        return;
+    }
+    BoatMetricStats s = boat_metric_stats_sort(scratch, n);
+    fprintf(out,
+        "{\"samples\":%d,\"mean\":%.9g,\"p50\":%.9g,\"p95\":%.9g,\"p99\":%.9g,\"max\":%.9g},\n", n,
+        (double)s.mean, (double)s.p50, (double)s.p95, (double)s.p99, (double)s.maximum);
+}
+
+#define BENCH_SELECT(name, field, present)                                                         \
+    static bool bench_##name(const BenchFrame *frame, float *value)                                \
+    {                                                                                              \
+        *value = frame->field;                                                                     \
+        return present;                                                                            \
+    }
+BENCH_SELECT(simulation, simulation_ms, true)
+BENCH_SELECT(render, render_ms, true)
+BENCH_SELECT(present, present_ms, true)
+BENCH_SELECT(frame, frame_ms, true)
+BENCH_SELECT(interval, interval_ms, frame->has_interval)
+BENCH_SELECT(gpu, gpu_ms, frame->has_gpu)
+
+static int bench_fail(const char *message)
+{
+    fprintf(stderr, "boat_water_review: %s\n", message);
+    return 1;
+}
+
+// Continuous river route at two ticks per rendered frame. Timed work is simulation, scene
+// submission and presentation; route checks, GPU polling and report writing are outside it.
+static int benchmark(const char *prefix, bool waves, bool aa, bool visible)
+{
+    char csv_path[4096], json_path[4096], state[512];
+    snprintf(csv_path, sizeof(csv_path), "%s.csv", prefix);
+    snprintf(json_path, sizeof(json_path), "%s.json", prefix);
+    // Fail on an unusable prefix before the voyage; both reports are rewritten at the end.
+    FILE *csv = fopen(csv_path, "w"), *json = csv ? fopen(json_path, "w") : NULL;
+    if (!csv || !json) {
+        if (csv) {
+            fclose(csv);
+            remove(csv_path);
+        }
+        return bench_fail("cannot create report (parent directory must exist)");
+    }
+    BenchFrame *frames = calloc(BENCH_FRAMES, sizeof(*frames));
+    float *scratch = calloc(BENCH_FRAMES, sizeof(*scratch));
+    const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
+    BoatSession session;
+    boat_session_init(&session, location, waves ? boat_water_gentle() : (BoatWater) { 0 });
+    const Boat *boat = &session.boat;
+    const BoatCamera camera
+        = { .distance = location->camera_distance, .height = location->camera_height };
+    BoatGpu gpu = { 0 };
+    GpuTimer timer = { 0 };
+    const char *error = NULL;
+    int count = 0, tick = 0, refresh = 0, render_width = 0, render_height = 0;
+    size_t destination = 0;
+    bool finished = false, ok = true;
+    char renderer_name[256] = "", gl_version[256] = "";
+    if (!frames || !scratch) {
+        error = "allocation failed";
+        goto cleanup;
+    }
+    SetConfigFlags(visible ? 0 : FLAG_WINDOW_HIDDEN);
+    InitWindow(960, 600, "Proteus / boat water benchmark");
+    if (!IsWindowReady() || !boat_gpu_init(&gpu, aa)) {
+        error = "graphics initialization failed";
+        goto cleanup;
+    }
+    if (visible)
+        SetTargetFPS(60);
+    refresh = GetMonitorRefreshRate(GetCurrentMonitor());
+    render_width = GetRenderWidth();
+    render_height = GetRenderHeight();
+    snprintf(renderer_name, sizeof(renderer_name), "%s", (const char *)glGetString(GL_RENDERER));
+    snprintf(gl_version, sizeof(gl_version), "%s", (const char *)glGetString(GL_VERSION));
+    gpu_timer_init(&timer);
+    double previous_start = 0;
+    for (;;) {
+        BenchFrame *frame = &frames[count];
+        frame->first_tick = tick;
+        double start = boat_profile_time(false);
+        if (count > 0)
+            do {
+                drive(&session, &destination);
+                ++tick;
+                finished = route_finished(boat, destination);
+            } while (tick % 2 && !finished);
+        double simulated = boat_profile_time(false);
+        int rebuilds = gpu.wave_rebuilds;
+        size_t uploads = gpu.wake_uploads;
+        bool timed = gpu_timer_begin(&timer, count);
+        boat_gpu_draw(&gpu, SESSION_VIEW(&session), &session.presentation, &session.world, camera);
+        rlDrawRenderBatchActive();
+        if (timed)
+            glEndQuery(GL_TIME_ELAPSED);
+        double submitted = boat_profile_time(false);
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawTexturePro(gpu.target.texture, (Rectangle) { 0, 0, -320, -200 },
+            (Rectangle) { 0, 0, 960, 600 }, (Vector2) { 0 }, 0, WHITE);
+        EndDrawing();
+        double presented = boat_profile_time(false);
+        frame->end_tick = tick;
+        frame->destination = destination;
+        frame->x = boat->position.x;
+        frame->z = boat->position.y;
+        frame->heading = boat->heading;
+        frame->simulation_ms = (float)((simulated - start) * 1000);
+        frame->render_ms = (float)((submitted - simulated) * 1000);
+        frame->present_ms = (float)((presented - submitted) * 1000);
+        frame->frame_ms = (float)((presented - start) * 1000);
+        frame->has_interval = count > 0;
+        frame->interval_ms = count > 0 ? (float)((start - previous_start) * 1000) : 0;
+        frame->wave_rebuilds = gpu.wave_rebuilds - rebuilds;
+        frame->wake_uploads = gpu.wake_uploads - uploads;
+        previous_start = start;
+        gpu_timer_poll(&timer, frames, false);
+        ++count;
+        // Frame poses only; --check covers every tick and the report's final state proves
+        // that this run followed the same trajectory.
+        if (!hull_clear(boat)) {
+            error = "route too close to shore";
+            goto cleanup;
+        }
+        if (finished)
+            break;
+        if (tick >= MAX_TICKS || count == BENCH_FRAMES) {
+            error = "route did not finish";
+            goto cleanup;
+        }
+        if (visible && WindowShouldClose()) {
+            error = "window closed before the route finished";
+            goto cleanup;
+        }
+    }
+    gpu_timer_poll(&timer, frames, true);
+    if (count <= BENCH_WARMUP) {
+        error = "route finished during warmup";
+        goto cleanup;
+    }
+    int gpu_samples = 0, frame_misses = 0, interval_misses = 0, measured_rebuilds = 0;
+    for (int i = BENCH_WARMUP; i < count; ++i) {
+        gpu_samples += frames[i].has_gpu;
+        frame_misses += frames[i].frame_ms > BENCH_DEADLINE_MS;
+        interval_misses += frames[i].has_interval && frames[i].interval_ms > BENCH_DEADLINE_MS;
+        measured_rebuilds += frames[i].wave_rebuilds;
+    }
+    fputs("frame,warmup,first_tick,end_tick,ticks,destination,x,z,heading,simulation_ms,"
+          "render_submit_ms,present_ms,frame_ms,frame_interval_ms,gpu_ms,"
+          "wave_patch_rebuilds,wake_uploads\n",
+        csv);
+    for (int i = 0; i < count; ++i) {
+        const BenchFrame *f = &frames[i];
+        char interval[32] = "", gpu_ms[32] = "";
+        if (f->has_interval)
+            snprintf(interval, sizeof(interval), "%.9g", (double)f->interval_ms);
+        if (f->has_gpu)
+            snprintf(gpu_ms, sizeof(gpu_ms), "%.9g", (double)f->gpu_ms);
+        fprintf(csv, "%d,%d,%d,%d,%d,%zu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%s,%d,%zu\n", i,
+            i < BENCH_WARMUP, f->first_tick, f->end_tick, f->end_tick - f->first_tick,
+            f->destination, (double)f->x, (double)f->z, (double)f->heading,
+            (double)f->simulation_ms, (double)f->render_ms, (double)f->present_ms,
+            (double)f->frame_ms, interval, gpu_ms, f->wave_rebuilds, f->wake_uploads);
+    }
+    format_final_state(state, sizeof(state), boat, tick);
+    fprintf(json,
+        "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
+        "  \"route\":\"river-review\",\"route_revision\":1,\"physics_revision\":%d,\n"
+        "  \"build\":\"%s\",\"platform\":\"%s\",\n  \"gl_renderer\":",
+        BOAT_PHYSICS_REVISION, BOAT_BENCH_BUILD, BOAT_BENCH_PLATFORM);
+    json_string(json, renderer_name);
+    fputs(",\"gl_version\":", json);
+    json_string(json, gl_version);
+    fprintf(json,
+        ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\",\n"
+        "  \"window_size\":[960,600],\"framebuffer_size\":[%d,%d],"
+        "\"virtual_resolution\":[320,200],\"internal_resolution\":[%d,%d],\n"
+        "  \"pacing\":\"%s\",\"vsync_hint\":false,\"monitor_refresh_hz\":",
+        aa ? "4x4" : "off", waves ? "waves" : "flat", visible ? "visible" : "hidden", render_width,
+        render_height, aa ? 1280 : 320, aa ? 800 : 200, visible ? "SetTargetFPS(60)" : "unpaced");
+    if (refresh > 0)
+        fprintf(json, "%d", refresh);
+    else
+        fputs("null", json);
+    fprintf(json,
+        ",\n  \"clock\":\"boat_profile_time(false) platform monotonic\","
+        "\"tick_hz\":120,\"ticks_per_frame\":2,\n"
+        "  \"frames\":%d,\"warmup_frames\":%d,\"measured_frames\":%d,\"total_ticks\":%d,"
+        "\"warmup_end_tick\":%d,\n"
+        "  \"route_completed\":true,\"destination\":%zu,\"final_state\":\"%s\",\n"
+        "  \"deadline_ms\":%.9g,\"deadline_rule\":\"value > deadline_ms\","
+        "\"frame_deadline_misses\":%d,\"interval_deadline_misses\":%d,\n",
+        count, BENCH_WARMUP, count - BENCH_WARMUP, tick, frames[BENCH_WARMUP - 1].end_tick,
+        destination, state, BENCH_DEADLINE_MS, frame_misses, interval_misses);
+    json_stats(json, "simulation_ms", frames, count, scratch, bench_simulation);
+    json_stats(json, "render_submit_ms", frames, count, scratch, bench_render);
+    json_stats(json, "present_ms", frames, count, scratch, bench_present);
+    json_stats(json, "frame_ms", frames, count, scratch, bench_frame);
+    json_stats(json, "frame_interval_ms", frames, count, scratch, bench_interval);
+    json_stats(json, "gpu_ms", frames, count, scratch, bench_gpu);
+    fprintf(json,
+        "  \"gpu_timer\":%s,\"gpu_samples\":%d,\"gpu_samples_skipped\":%d,\n"
+        "  \"wave_patch_rebuilds\":%d,\"wave_patch_rebuilds_measured\":%d,"
+        "\"wave_vertex_capacity\":%d,\"wave_peak_triangles\":%d,\n"
+        "  \"app_submissions\":null,\"driver_draw_calls\":null,\"scene_triangles\":null\n}\n",
+        timer.supported ? "\"GL_TIME_ELAPSED around boat_gpu_draw, asynchronous\"" : "null",
+        gpu_samples, timer.supported ? count - BENCH_WARMUP - gpu_samples : 0, gpu.wave_rebuilds,
+        measured_rebuilds, gpu.wave_capacity, gpu.wave_peak_triangles);
+    ok = !ferror(csv) && !ferror(json);
+    printf("benchmark aa=%s preset=%s window=%s frames=%d warmup=%d ticks=%d gpu_samples=%d\n",
+        aa ? "4x4" : "off", waves ? "waves" : "flat", visible ? "visible" : "hidden", count,
+        BENCH_WARMUP, tick, gpu_samples);
+    printf("final_state %s\n", state);
+cleanup:
+    if (error)
+        ok = false;
+    if (fclose(csv))
+        ok = false;
+    if (fclose(json))
+        ok = false;
+    if (!ok) {
+        remove(csv_path);
+        remove(json_path);
+    }
+    if (IsWindowReady()) {
+        if (timer.supported)
+            glDeleteQueries(GPU_QUERIES, timer.ids);
+        boat_gpu_destroy(&gpu);
+        CloseWindow();
+    }
+    boat_water_mesh_destroy();
+    boat_map_destroy();
+    free(frames);
+    free(scratch);
+    return ok ? 0 : bench_fail(error ? error : "cannot write report");
+}
+
 int main(int argc, char **argv)
 {
-    const char *output = NULL;
+    const char *output = NULL, *bench = NULL, *aa_name = NULL;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool gpu_check = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
             output = argv[++i];
+        else if (strcmp(argv[i], "--benchmark") == 0 && i + 1 < argc)
+            bench = argv[++i];
+        else if (strcmp(argv[i], "--aa") == 0 && i + 1 < argc)
+            aa_name = argv[++i];
         else if (strcmp(argv[i], "--waves") == 0)
             waves = true;
         else if (strcmp(argv[i], "--check-gpu") == 0)
@@ -223,6 +576,9 @@ int main(int argc, char **argv)
             puts("Usage: boat_water_review --check [--waves] | --check-gpu\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--visible]\n"
+                 "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
+                 "                         [--waves] [--visible]\n"
+                 "Benchmark writes PREFIX.json and PREFIX.csv: two ticks per frame, 120 warmup.\n"
                  "GPU uses existing 4x AA. GPU sequence: 10 Hz; CPU samples: five seconds.\n"
                  "Visible GPU playback uses 60 Hz; simulation remains 120 Hz.\n"
                  "Named captures use both default and close follow cameras.\n"
@@ -230,11 +586,26 @@ int main(int argc, char **argv)
             return strcmp(argv[i], "--help") == 0 ? 0 : 2;
         }
     }
+    if (bench || aa_name) {
+        const char *problem = !bench                           ? "--aa requires --benchmark"
+            : !aa_name                                         ? "--benchmark requires --aa off|4x4"
+            : strcmp(aa_name, "off") && strcmp(aa_name, "4x4") ? "--aa must be off or 4x4"
+            : check || gpu_check || output || sequence
+            ? "--benchmark excludes --check, --check-gpu, --output and --sequence"
+            : !use_gpu ? "--benchmark supports only --renderer gpu"
+            : !*bench || strlen(bench) > 4000 || bench[strlen(bench) - 1] == '/'
+            ? "--benchmark needs a file prefix of 1..4000 bytes"
+            : NULL;
+        if (problem) {
+            fprintf(stderr, "boat_water_review: %s\n", problem);
+            return 2;
+        }
+    }
     if (gpu_check) {
         SetTraceLogLevel(LOG_WARNING);
         return check_gpu_water();
     }
-    if (!check && !output)
+    if (!check && !output && !bench)
         return 2;
     SetTraceLogLevel(LOG_WARNING);
     // These samples distinguish navigable space under the deck from solid legs.
@@ -247,6 +618,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "River support/water/crop checks failed.\n");
         return 1;
     }
+    if (bench)
+        return benchmark(bench, waves, strcmp(aa_name, "4x4") == 0, visible);
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
     boat_session_init(&session, location, waves ? boat_water_gentle() : (BoatWater) { 0 });
@@ -303,8 +676,7 @@ int main(int argc, char **argv)
             goto cleanup;
         }
         bool arrival = destination != captured_destination;
-        bool finished = destination == stop_count - 1
-            && Vector2Distance(boat->position, stops[destination].position) < 12;
+        bool finished = route_finished(boat, destination);
         const char *name = ticks == 0 ? "dock"
             : finished                ? "beyond"
             : arrival                 ? stops[destination - 1].name
@@ -409,6 +781,9 @@ int main(int argc, char **argv)
             boat->position.x, boat->position.y);
         goto cleanup;
     }
+    char state[512];
+    format_final_state(state, sizeof(state), boat, ticks);
+    printf("final_state %s\n", state);
     if (!check) {
         qsort(timings, (size_t)timing_count, sizeof(*timings), compare_double);
         printf("renderer=%s preset=%s frames=%d warmup=%d mean_ms=%.3f p95_ms=%.3f max_ms=%.3f\n",

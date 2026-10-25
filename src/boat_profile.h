@@ -33,6 +33,9 @@ typedef struct {
 void boat_profile_add(BoatProfile *profile, BoatFrameMetrics frame);
 BoatMetricStats boat_profile_stats(const BoatProfile *profile, float (*select)(BoatFrameMetrics));
 BoatMetricStats boat_metric_stats(const float *values, int count);
+// Whole-run reports: sorts VALUES in place, with no history bound. Percentiles use sorted index
+// floor((count - 1) * percentile / 100); latest is the last value before sorting.
+BoatMetricStats boat_metric_stats_sort(float *values, int count);
 float boat_metric_frame(BoatFrameMetrics frame);
 float boat_metric_simulation(BoatFrameMetrics frame);
 float boat_metric_physics(BoatFrameMetrics frame);

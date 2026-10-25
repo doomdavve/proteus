@@ -3,8 +3,10 @@
 Status, 2026-10-25: [A0.1 original-river inventory and reference](adventure/baseline.md),
 the [A0.2 pinned coastal sources](adventure/README.md#coastal-sources-a02-2026-10-25) and the
 [A0.3 route/coverage survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25)
-completed; no expanded geography, streaming, adventure rules or new weather implemented.
-**Next: A0.4, the controlled river frame baseline and A0 decision record in the
+and the [A0.4 controlled river baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25)
+completed, closing A0 with its [decision record](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a0-decision-record--2026-10-25).
+No expanded geography, streaming, adventure rules or new weather is implemented.
+**Next: A1.1, explicit map description and collision cache, in the
 [execution handoff](FREE_RIDING_ADVENTURE_FIRST_STEPS.md).**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks; those later tasks remain pending. The proposed first playable is a short
@@ -190,7 +192,9 @@ Use scene detail/visibility and reflection quality as the first performance cont
 physics cadence, collisions and the existing nearest-neighbour presentation consistent.
 Clear weather must pass too; storm fog is atmosphere, not the only culling mechanism.
 
-Initial **engineering targets**, to qualify against named hardware in A0:
+Initial **engineering targets**, to qualify against named hardware in A0. A0.4 qualified the
+current river on an M1 Max: active-work p95 is at most 5.7 ms, but paced display runs at
+58.6 Hz ([baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25)).
 
 - Native GPU: 60 displayed frames/s, 16.67 ms frame deadline. Aim for active work p95 ≤12 ms
   and p99 ≤16.67 ms, and separately report presented-frame intervals, missed deadlines and
@@ -254,13 +258,13 @@ need their own budget test.
 
 The [first-steps handoff for Sol](FREE_RIDING_ADVENTURE_FIRST_STEPS.md) owns the detailed
 A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance checks.
-A0.1's inventory and original references are complete; source processing and code changes
-remain later tasks.
+A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
+(a review-tool benchmark only). Runtime map ownership changes begin with A1.1.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |
-| **A0 — survey and baseline (active; A0.4 next)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
-| **A1 — world ownership** | Complete the necessary mapped W1/W2/W3/W4 foundations work on current river data | Two independent map/view owners, repeat init/destroy, partial-failure cleanup and unchanged existing river behaviour; use two river instances now that Eriksberg is retired |
+| **A0 — survey and baseline (complete 2026-10-25)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
+| **A1 — world ownership (next: A1.1)** | Complete the necessary mapped W1/W2/W3/W4 foundations work on current river data | Two independent map/view owners, repeat init/destroy, partial-failure cleanup and unchanged existing river behaviour; use two river instances now that Eriksberg is retired |
 | **A2 — tiled current river** | Bake tiles and indexed collision; cull land in main/reflection/shadow passes; bound CPU/GPU water coverage | Match current shoreline/bridge queries against exhaustive reference; no seams or false tile-edge contacts; measured same-view scaling; all small-slice assets may remain resident |
 | **A3 — first outer-river adventure** | New connected geography, one destination/shelter, local weather transition, checkpoint recovery; bounded detailed-asset loading | Playable 5–10 minute outing, cold-load/rapid-turn/recovery tests, clear/storm performance and memory targets; human feedback on travel and exposure |
 | **A4 — islands and Vinga** | Terrain silhouettes, selected harbour/landmark detail, continuous full voyage and nearby start | Actual route/time measurements, long out-and-back cache test, storm tuning, readable lighthouse/arrival and user playtest |
