@@ -955,7 +955,9 @@ static int study(int argc, char **argv)
         BoatAudioInput audio_input = { .thrust = view->boat.engine_response,
             .speed = water_speed,
             .planing = view->boat.planing,
-            .wave_entry = view->boat.wave_spray };
+            .wave_entry = view->boat.wave_spray,
+            .landing = view_presentation->landing_strength,
+            .landing_serial = view_presentation->landing_serial };
         boat_audio_update(
             &audio, audio_input, active && (!session.runs.playing || !session.runs.paused));
         if (music_ready) {

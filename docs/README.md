@@ -18,7 +18,7 @@ Both default to GPU rendering; the CPU reference supports display-free captures.
 | [Marine HUD](BOAT_HUD.md) | Merged into `main` 2026-10-24 (from `boat-marine-hud`): four forward/two reverse thrust steps plus neutral, scroll thrust and captured relative mouse steering; translucent bottom HUD sharing the scene pixel grid | Captured/stateful steering and scroll thrust user-accepted (2026-10-24); browser capture/scroll qualification added; merged build passes all 105 active CTests on macOS, not hand-played; native Windows/Linux and connected HUD/control checks pending |
 | [Boating design](BOATING_PLAN.md) | Basin, Eriksberg, and river locations; timed S course, recordings, persistent bests, ghosts, replays, full-window presentation with modal `?` help, quiet engine/water audio with a joyful repeating XM, a user-accepted wind-driven Swedish ensign, and a user-accepted speedboat shape with [four Nordic skins and flags](BOAT_SKINS.md) implemented in an isolated branch | Nordic skins/flags user-accepted; [multiplayer integration handoff](BOAT_SKINS_HANDOFF.md) ready; river close-camera default implemented and user-approved; score-loop and archipelago remain proposals |
 | [Boating music](BOATING_PLAN.md#selectable-soundtracks--2026-10-24) | Saved native soundtrack choice and browser selector: A little boat (default), original Acid Wake techno (132 BPM), or Off; new XM decoder/loop check and native Wayland menu/playback checks passed | Listen to Acid Wake and play the selector; connected, browser and packaged playback pending; Fedora suite retains the earlier CPU checksum failure |
-| [Boat physics](BOAT_PHYSICS_PLAN.md) | Accepted H3 grip and turn banking retained; [arcade stability study](ARCADE_STABILITY.md) adds recovery and steering air roll, handling revision 7, integrated into main | **Next requested (2026-10-24):** [heavier, more satisfying landings](BOAT_PHYSICS_PLAN.md#landing-weight-request--2026-10-24) where the boat's weight against the water is felt; first tuning candidate needs play feedback; combined multiplayer feel and platform qualification pending |
+| [Boat physics](BOAT_PHYSICS_PLAN.md) | Accepted H3 grip and turn banking retained; [arcade stability study](ARCADE_STABILITY.md) adds recovery and steering air roll (revision 7), integrated into main | User requested heavier, more satisfying landings (2026-10-24); [landing candidate L1](BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24) (landing speed scrub, revision 8; splash, hull slap) played 2026-10-25: the user liked the impact feel after the camera dip was removed; stability candidate needs play feedback; combined multiplayer feel and platform qualification pending |
 | [Wake rewrite](WAKE_REWRITE_PLAN.md) | Bounded arcade objects remain default; [stability study](ARCADE_STABILITY.md) lowers default crests to 1.2 m while retaining signed overlap and jumps | Play the stability/roll candidate; tight-turn readability and platform/fleet costs remain open |
 | [Living city](LIVING_CITY_PLAN.md) | 01–05: city dressing, materials, berths, shared actors; travelling boats and a compact ferry brought forward; demo flock and 32 reactive boating gulls | 06 people/cyclists; varied road traffic, building activity, ferry polish, perched gulls, and final review remain |
 | [River / Älvsborgsbron](eriksberg/bridge/README.md) | Separate source/crop, navigable bridge blockout, blocking tower legs, and grounded road approaches | Bridge/shoreline/building refinement; human handling and camera review |
@@ -27,7 +27,7 @@ Both default to GPU rendering; the CPU reference supports display-free captures.
 | [macOS app builds](MACOS_BUILD.md) | Apple Silicon action, relocatable app bundle, preferred river launch, ad-hoc signing, ZIP/checksum; title backdrop packaging fix added | Verify macOS packaging CI and launch the downloaded app from Finder; macOS 13 execution pending |
 | [Windows builds](WINDOWS_BUILD.md) | Portable x64 action; reversal and basin impact-bound corrections, bundled music, relocated CPU check; ENet/`boat_server` MSVC build and packaged server passed CI (run 40083439355, 2026-10-24); title backdrop packaging fix added, pending CI | Verify the current Windows workflow and launch the downloaded app; then physical mouse/scroll, GPU/audio and connected controls |
 | [Linux builds](LINUX_BUILD.md) | Native Wayland enabled with X11 compatibility; Weston/Xvfb CI checks configured; bundled GLFW no-seat startup crash backport implemented | Rerun Linux CI to verify the Weston crash fix and X11 startup, review CPU screenshots; GNOME/KDE physical input, display scaling, audio and connected play pending |
-| [Automated releases](RELEASES.md) | Version-tag/UI release workflow reuses both platform builds, uploads ZIPs/checksums, then publishes; offline publication tests passed | Tags through `v0.0.16` pushed; confirm its workflow/release runs and download both packages ([status](RELEASES.md#status-and-verification)) |
+| [Automated releases](RELEASES.md) | Version-tag/UI release workflow reuses both platform builds, uploads ZIPs/checksums, then publishes; offline publication tests passed | `v0.0.16` release and all platform runs succeeded (checked 2026-10-24); download and launch both packages ([status](RELEASES.md#status-and-verification)) |
 | [Browser boating](WEB_BUILD.md) | Emscripten/WebGL 2 build, IndexedDB bests, `v*` Pages workflow; deployed gameplay user-confirmed; user-accepted compact screenshot/PLAY/settings launcher; build-version footer and README live link; AA/fullscreen default on; canvas focus-border fix | Chrome/Firefox controls automatically checked; WebKit fallback and shipping Safari qualification recorded in owner; review deployed footer/focus, physical GPU and audio |
 
 These are separate work tracks, not a single execution queue. A next task in one plan
@@ -62,11 +62,16 @@ does not authorize advancing every plan. Use the requested track's scope and acc
 
 ## Verification baseline
 
+Landing weight L1, 2026-10-24, macOS Debug: landing speed scrub (handling revision 8),
+splash, camera dip and hull slap (tonal thump replaced after user feedback). Build warning-free; all 118 active CTests passed (15 retired
+disabled); CPU/GPU landing captures inspected; race bots finish in 63.96–75.65 s. 2026-10-25:
+camera dip removed (118 CTests passed); the user played it and liked the impact feel. [L1 evidence](BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24).
+
 Race smoke-test timing fix, 2026-10-24, macOS Debug: the bot now measures held simulation
 ticks instead of service-loop iterations. Both v0.0.14/v0.0.15 contain the faulty counter.
 Slow-polling reproduction fails before the fix and passes after it; the normal race check
-also passes. All 118 active CTests then passed at `73e2c4f` (15 retired checks disabled); v0.0.16 is tagged
-there and its CI release runs remain unchecked. [Evidence and next check](RACE_PLAN.md#race-smoke-test-timing--2026-10-24).
+also passes. All 118 active CTests then passed at `73e2c4f` (15 retired checks disabled); the v0.0.16
+release and macOS/Windows/Linux/web runs there succeeded (checked with `gh`). [Evidence and next check](RACE_PLAN.md#race-smoke-test-timing--2026-10-24).
 
 Closer camera / finer rain, 2026-10-24, macOS Debug: build and all 117 active CTests
 passed; 15 retired wake-field checks stayed disabled. CPU/GPU storm captures inspected;

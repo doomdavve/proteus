@@ -103,7 +103,7 @@ are discarded. This receiver buffering does not change the wire layout or channe
 
 ### Hello, Accept, Reject
 
-Hello: `u32` handling revision (`BOAT_PHYSICS_REVISION`, currently 7), `u64` content digest,
+Hello: `u32` handling revision (`BOAT_PHYSICS_REVISION`, currently 8), `u64` content digest,
 then the name (≤16), room token (≤32) and build label (≤32) strings.
 
 The content digest is FNV-1a 64 over every compiled location in ID order: identity, mapped

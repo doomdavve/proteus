@@ -1,12 +1,17 @@
 # Boat physics: learnable handling
 
-2026-10-24 current tuning: [arcade stability and steering roll](ARCADE_STABILITY.md) reduces
+2026-10-24 current tuning: [landing weight L1](#l1-candidate--2026-10-24) advances handling to
+revision 8 on top of [arcade stability and steering roll](ARCADE_STABILITY.md) reduces
 the default object wake to 1.2 m, adds object-world recovery and lets steering command
-air roll. Handling revision is now 7; user play/acceptance of this first candidate is pending.
+air roll (revision 7). The user liked L1's impact feel once its camera dip was removed
+(2026-10-25); acceptance of the stability candidate is still pending.
 
 2026-10-24 next requested work: the user wants to work on boat physics, especially making
-landings more satisfying so the boat's weight against the water is felt. See the
-[landing weight request](#landing-weight-request--2026-10-24); nothing is implemented yet.
+landings more satisfying so the boat's weight against the water is felt. The first
+[landing weight candidate L1](#l1-candidate--2026-10-24) is implemented: landing speed scrub
+(handling revision 8), splash and hull slap. The first version also dipped the camera; on
+2026-10-25 it was removed for comparison and the user said: "Now I like the impact feel!"
+L1 without the dip is the accepted landing feel.
 
 2026-10-23: the user enjoys the current jumping, landing and capsizing. Preserve this
 arcade handling baseline in the [multiplayer plan](MULTIPLAYER_PLAN.md), which owns shared
@@ -78,13 +83,79 @@ Public controls: [README](../README.md#boating-sketch). [All plans](README.md).
 
 **Requested by the user:** work on the boat physics next, with the landing as the main focus:
 it should be more satisfying, and the weight of the boat against the water should be felt.
-Recorded as a direction only; no candidate, measurement or design exists yet.
+
+**Baseline measured (revision 7, 2026-10-24):** a scratch probe dropped a planing hull at
+15 m/s onto gently waving basin water. Landings settled within about 0.15 s with peak heave
+deceleration of 4–16 g (1–8 m drops) and no speed loss: thrust carried the boat from 15 to
+about 16.2 m/s half a second later. Nothing reacted in presentation: no landing splash,
+sound or camera response (the camera height ignores the hull's heave).
 
 **Constraints carried forward:** keep the enjoyed jumping/capsizing baseline (2026-10-23) and
 the pending revision-7 stability candidate in view; physics changes must bump
 `BOAT_PHYSICS_REVISION`, keep prediction replays deterministic, and be judged by human play,
 not by automated checks alone. The [wake plan](WAKE_REWRITE_PLAN.md) owns crest shapes and
 the [race plan](RACE_PLAN.md) relies on current jump counts, so record any change to either.
+
+### L1 candidate — 2026-10-24
+
+**Physics (`src/boat.c`, revision 8).** While the motion state is `BOAT_LANDING` (the
+0.35 s after a whole-hull flight regains water support), each wetted support plunging faster
+than 2.5 m/s adds its squared excess entry speed to a plunge measure. Water-relative
+horizontal velocity then decays by `exp(-0.14 × plunge × dt)`. Hard and bow-first landings
+cost speed; small hops and ordinary wave bobbing stay free. Vertical support, damping and air
+control are unchanged. No state, input or network field is added; `BOAT_PHYSICS_REVISION`
+is 8, so revision-7 recordings, bests and peers do not mix.
+
+**Presentation (cosmetic, outside physics).** `BoatPresentation` notices a new landing and
+grades it 0..1 from the previous tick's fall speed (1.5 → 10.5 m/s). It throws spray sheets
+along both sides plus a spreading foam ring. `boat_study` passes the strength and a landing serial to
+the engine audio, which adds a dull 90 ms hull slap (filtered noise, roughly 80–450 Hz, no
+tone) under a 350 ms splash wash. Replays reset presentation, so recorded playback shows no landing splash.
+
+**Measured (scratch drop probe, 15 m/s, 8° bow-up unless noted; speed 0.5 s after touchdown,
+revision 7 ≈ 16.2 m/s in every case):**
+
+| Drop | Fall speed | Revision 8 speed | Loss vs revision 7 |
+| --- | --- | --- | --- |
+| 1 m | 3.3 m/s | 16.1 m/s | ~0% |
+| 2 m | 5.5 m/s | 16.0 m/s | ~1.5% |
+| 4 m | 8.3 m/s | 15.2 m/s (14.9 at 8° bow-down) | ~6.5% (8%) |
+| 8 m | 12.2 m/s | 13.4 m/s | ~17% |
+
+The first trial (no free entry speed, gain 0.14, then 0.08) scrubbed 18%/11% at 4 m and
+slowed the race bots to 67.5–78 s with 11–18 jumps; it was replaced by the thresholded form.
+On the race course (`validate_boat_race`), four bots now finish in 63.96–75.65 s with 7–12
+jumps and no recoveries, against 63.06–70.57 s with 6–10 jumps at revision 7. The skill-course
+preview's six landings grade 0.32–0.80. The hardest landing's audio peaks at 0.24
+(engine alone 0.085; first 200 ms RMS 0.070 against 0.025) beneath the 0.75 soft limiter.
+
+**Audio feedback, 2026-10-24:** the user disliked the first landing sound, a tonal 90→42 Hz
+sine thump peaking at 0.36 (RMS 0.139): "Maybe it's too strong. I can't really explain it."
+It was replaced by the noise slap above at about half the loudness, with the splash wash
+lowered. Offline preview (planing engine, landings 0.3/0.6/1.0 at 1, 3 and 5 s):
+`build/landing-slap-preview.wav`, rendered by a scratch program, not a project tool.
+
+**Verification, 2026-10-24, Apple Silicon/macOS Debug:** project build without warnings;
+all 118 active CTests passed with GPU checks; 15 retired wake-field checks stayed disabled.
+CPU frames at 16.10/16.17/16.22/16.45 s and GPU frames at 16.22/16.45 s of
+`boat_race_trial --skill-course` were inspected: the side sheets and foam ring render on both
+renderers. The camera dip (then part of L1) was subtle in stills, so its amplitude was raised
+from 0.8 to 1.2 m before the GPU captures. `boat_benchmark` wake-loop now reports `physics_revision` 8, 18
+births and one landing (hash `82a88bf33eff247a`). Changed lines pass `git clang-format`.
+
+A 900-frame windowed `boat_study --location river --demo` run exited 0, but its scripted
+drive made no wake jumps, so it did not exercise a landing. The full suite was rerun on the
+final tuning (0.14/2.5 m/s scrub, 1.2 m dip) and passed.
+
+**Play feedback, 2026-10-25:** after the camera dip was removed, the user liked the impact
+feel. Verification of that change (Apple Silicon/macOS Debug): build without warnings, all 118
+active CTests passed.
+
+**Not verified / next:** splash size and slap loudness were not singled out in that feedback. Race pacing grows slightly (above). Remote boats' splashes appear only where their
+presentation is stepped; remote slaps are not played. Possible follow-ups depending on
+feedback: restoring a camera dip (removed 2026-10-25, last tuned to 1.2 m peaking at 70 ms),
+heavier heave/no-rebound settling, bow slap on nose-down entries, and landing
+quality shown in the HUD.
 
 ## Experience to build toward
 

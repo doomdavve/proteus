@@ -1,6 +1,9 @@
 # Boating performance tools
 
-2026-10-24: [arcade stability tuning](ARCADE_STABILITY.md) advances handling to revision 7.
+2026-10-24: [landing candidate L1](BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24) advances
+handling to revision 8; its wake-loop trace has 18 births, one landing and final hash
+`82a88bf33eff247a`. Revision-7 figures below are historical.
+Earlier 2026-10-24: [arcade stability tuning](ARCADE_STABILITY.md) advanced handling to revision 7.
 The benchmark retains its explicit 1.8 m stress setting; historical physics-6 trajectories
 and timings below do not establish a baseline for the revised handling.
 Revision-7 reports include `physics_revision`; the updated three-run trace has 19 births,

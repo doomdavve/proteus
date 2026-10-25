@@ -86,9 +86,11 @@ archives, checksums and Actions artifacts are implemented. The macOS executable,
 bundle display name, Windows launcher/readme and CLI usage use the released name.
 Internal source/CMake names remain unchanged. Version tags `v0.0.1`–`v0.0.16` have since
 been pushed to `origin` (2026-10-17 to 2026-10-24; `v0.0.16` at `73e2c4f`, the race
-smoke-test timing fix). The workflow results and published GitHub release assets for those
-tags were not checked when this status was reconciled (2026-10-24). Next: confirm the
-`v0.0.16` platform and release runs, then download both packages for user review.
+smoke-test timing fix). Checked with `gh` on 2026-10-24: the `v0.0.16` release run and the macOS, Windows, Linux
+and web runs at `73e2c4f` succeeded, and `v0.0.16` is the latest GitHub release. The
+`v0.0.14` and `v0.0.15` release runs failed (the race smoke-test timing defect fixed in
+`v0.0.16`); `v0.0.11`–`v0.0.13` are also published. Release assets were not downloaded or
+launched. Next: download both packages for user review.
 
 Verification on Apple Silicon/macOS 26, 2026-10-24:
 

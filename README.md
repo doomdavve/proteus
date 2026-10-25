@@ -321,9 +321,9 @@ Personal bests persist between launches, with separate files for calm water and 
 The browser version stores these in IndexedDB for the current site; clearing site data removes them.
 On macOS they live in `~/Library/Application Support/Proteus/`; Windows uses `%LOCALAPPDATA%/Proteus/`,
 and Linux uses `$XDG_DATA_HOME/proteus/` (or `~/.local/share/proteus/`). The files are
-`course-calm-physics7.run` and `course-waves-physics7.run`. Use `--data-dir DIR` to select another
-directory. Arcade handling revision 7 starts a separate set of bests; revision-6, revision-5, revision-4,
-revision-3, revision-2 and original best files remain on disk and are not loaded or overwritten
+`course-calm-physics8.run` and `course-waves-physics8.run`. Use `--data-dir DIR` to select another
+directory. Handling revision 8 (heavier landings) starts a separate set of bests; revision-7,
+revision-6, revision-5, revision-4, revision-3, revision-2 and original best files remain on disk and are not loaded or overwritten
 automatically. Version-1/revision-5 recordings are rejected as replays/ghosts by this version.
 Incompatible or damaged saved bests are ignored with a message. Failed saves preserve the best in
 memory. Recording is limited to ten minutes per attempt; longer attempts can still finish, but
@@ -433,6 +433,8 @@ give gentle roll control; full steering permits a barrel roll. Centre the wheel 
 the spin and help prepare for landing. In mouse mode, move the mouse back to centre:
 stopping it holds the wheel angle. The hull has stronger passive recovery, but an inverted
 landing can still capsize it. This [first stability tuning](docs/ARCADE_STABILITY.md) awaits play feedback.
+Hard landings now cost some speed (more when the bow digs in) and land with a splash and a
+hull slap; the user liked this [landing feel](docs/BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24).
 
 Scroll down/up to increase/decrease thrust one step per scroll unit, in either steering mode.
 Fractional trackpad scrolling accumulates until a full step; larger scrolls can move several

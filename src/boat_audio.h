@@ -17,6 +17,9 @@ typedef struct {
     float thrust; // Actual signed propulsion, -1..1.
     float speed; // Hull speed through still water, world units/second.
     float planing, wave_entry; // Live hull state, 0..1; optional for old replays.
+    // Last landing strength, 0..1; each new serial starts one hull slap and splash.
+    float landing;
+    unsigned landing_serial;
 } BoatAudioInput;
 
 typedef struct {
@@ -32,6 +35,9 @@ typedef struct {
     float water_speed, water_planing, wave_entry;
     float water_low, water_body, water_modulation, water_splash;
     uint32_t water_random;
+    unsigned landing_serial;
+    float slap, slap_low, slap_body, splash, splash_low, splash_body;
+    uint32_t splash_random;
     float active_gain, active_target;
     bool ready;
 } BoatAudio;

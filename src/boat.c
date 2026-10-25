@@ -63,6 +63,11 @@ static const float ARCADE_AIR_ROLL_RESPONSE = 6;
 static const float ARCADE_AIR_ROLL_RECOVERY = 12;
 static const float ARCADE_WET_ROLL_RECOVERY = 14;
 static const float ARCADE_WET_ROLL_DAMPING = 5;
+// Landing weight: while a hull lands, supports plunging into the water faster than the free
+// entry speed scrub water-relative horizontal speed by the squared excess, so hard and
+// bow-first landings cost more while small hops and wave bobbing stay free.
+static const float LANDING_SCRUB = .14f;
+static const float LANDING_FREE_ENTRY = 2.5f;
 // Contact samples form an intentionally simple, forgiving hull footprint.
 static const float HULL_BOW = 2.0f;
 static const float HULL_STERN = 1.6f;
@@ -413,7 +418,7 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
     float sp = sinf(boat->pitch), cp = cosf(boat->pitch);
     float sr = sinf(boat->roll), cr = cosf(boat->roll);
     Vector3 wave_force = { 0 };
-    float wave_yaw = 0, bow_entry = 0;
+    float wave_yaw = 0, bow_entry = 0, plunge = 0;
     bool waves = boat_world_displaced(world);
     for (int end = -1; end <= 1; ++end) {
         for (int side = -1; side <= 1; side += 2) {
@@ -429,6 +434,9 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
             float support_height
                 = water.height + PLANING_HEIGHT * boat->planing + fore * sinf(trim);
             float force = GRAVITY / 6 + BUOYANCY_STIFFNESS / 6 * (support_height - point.y);
+            float entry = fmaxf(0, -speed - LANDING_FREE_ENTRY);
+            if (force > 0)
+                plunge += entry * entry / 6;
             if (waves) {
                 BoatPoseMotion motion = boat_pose_motion(boat, (Vector3) { across, 0, -fore });
                 Vector3 velocity = { -motion.velocity.x, motion.velocity.y, motion.velocity.z };
@@ -459,6 +467,12 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
     }
     boat->velocity.x += wave_force.x * BOAT_STEP;
     boat->velocity.y += wave_force.z * BOAT_STEP;
+    if (boat->motion_state == BOAT_LANDING && plunge > 0) {
+        Vector2 flow = boat_water_current(world->water, boat->position);
+        Vector2 relative = Vector2Subtract(boat->velocity, flow);
+        float keep = expf(-LANDING_SCRUB * plunge * BOAT_STEP);
+        boat->velocity = Vector2Add(flow, Vector2Scale(relative, keep));
+    }
     boat->yaw_velocity += wave_yaw / YAW_INERTIA * BOAT_STEP;
     acceleration += wave_force.y;
     float spray_target = Clamp(bow_entry / WAVE_SPRAY_ENTRY_SPEED, 0, 1);

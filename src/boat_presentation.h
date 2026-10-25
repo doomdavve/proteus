@@ -22,6 +22,12 @@ typedef struct {
     BoatWaterParticle water[BOAT_WATER_PARTICLES];
     unsigned int next_particle, emission, wake_emission;
     float wake_distance, spray_time, propeller_time;
+    // Last landing: 0..1 strength from the fall speed, seconds since touchdown and a serial
+    // that advances once per landing (splash and slap). Replays reset it.
+    float landing_strength, landing_age;
+    unsigned landing_serial;
+    unsigned seen_landings; // Boat landing count + 1; zero until the first step.
+    float fall_speed; // Downward speed after the previous tick, before any touchdown.
 } BoatPresentation;
 
 void boat_presentation_reset(BoatPresentation *presentation);

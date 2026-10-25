@@ -74,9 +74,9 @@ int main(int argc, char **argv)
     boat_audio_reset(&split, fast);
     float a[4096], b[4096];
     for (int block = 0; block < 100; ++block) {
-        boat_audio_render(&whole, (BoatAudioInput) { 1, 10, .5f, .7f }, a, 4096);
-        boat_audio_render(&split, (BoatAudioInput) { 1, 10, .5f, .7f }, b, 137);
-        boat_audio_render(&split, (BoatAudioInput) { 1, 10, .5f, .7f }, b + 137, 4096 - 137);
+        boat_audio_render(&whole, (BoatAudioInput) { 1, 10, .5f, .7f, 0, 0 }, a, 4096);
+        boat_audio_render(&split, (BoatAudioInput) { 1, 10, .5f, .7f, 0, 0 }, b, 137);
+        boat_audio_render(&split, (BoatAudioInput) { 1, 10, .5f, .7f, 0, 0 }, b + 137, 4096 - 137);
         valid = valid && memcmp(a, b, sizeof(a)) == 0;
         for (int i = 0; i < 4096; ++i)
             valid = valid && isfinite(a[i]) && fabsf(a[i]) < .99f;

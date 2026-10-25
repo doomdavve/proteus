@@ -174,6 +174,83 @@ static void water_step(
     }
 }
 
+// Fall speeds from 1.5 to 10.5 m/s map to strength 0..1 (about 0.3 to 6 m drops).
+static const float LANDING_SOFT_SPEED = 1.5f;
+static const float LANDING_HARD_SPEED = 10.5f;
+
+static float landing_variation(unsigned serial, unsigned index)
+{
+    unsigned bits = (serial * 2654435761u) ^ (index * 2246822519u);
+    bits = ((bits >> 15u) ^ bits) * 2246822519u;
+    return (float)((bits >> 22u) & 1023u) / 1023;
+}
+
+// Thrown sheets along both sides and a foam ring that spreads from the hull.
+static void landing_splash(
+    BoatPresentation *presentation, const Boat *boat, const BoatWorld *world, double time)
+{
+    float strength = presentation->landing_strength;
+    Vector2 right = { cosf(boat->heading), sinf(boat->heading) };
+    Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
+    int sheets = 4 + (int)(10 * strength);
+    for (int i = 0; i < sheets; ++i) {
+        for (int side = -1; side <= 1; side += 2) {
+            float v
+                = landing_variation(presentation->landing_serial, (unsigned)(2 * i + (side > 0)));
+            float along = ((float)i + .5f) / (float)sheets * 3.0f - 1.6f;
+            Vector3 origin = boat_pose_attachment(boat, (Vector3) { -side * .8f, .1f, -along });
+            Vector2 out = Vector2Scale(right, (float)side);
+            water_emit(presentation, world, time,
+                (BoatWaterParticle) { .position = { -origin.x, origin.z },
+                    .velocity = Vector2Add(Vector2Scale(boat->velocity, .35f),
+                        Vector2Add(Vector2Scale(out, (1.5f + 3.5f * strength) * (.7f + .6f * v)),
+                            Vector2Scale(forward, (v - .5f) * 1.5f))),
+                    .height = fmaxf(boat_water_query_field(world->water, world->wake_field,
+                                        (Vector2) { -origin.x, origin.z }, time)
+                                        .height
+                            + .05f,
+                        origin.y),
+                    .lift = (2.5f + 5.5f * strength) * (.65f + .7f * v),
+                    .lifetime = 1.4f,
+                    .size = (.28f + .3f * strength) * (.75f + .5f * v),
+                    .spray = true });
+        }
+    }
+    int foam = 6 + (int)(10 * strength);
+    for (int i = 0; i < foam; ++i) {
+        float v = landing_variation(presentation->landing_serial, 64u + (unsigned)i);
+        float angle = 2 * PI * ((float)i + .5f * v) / (float)foam;
+        Vector2 out = { cosf(angle), sinf(angle) };
+        Vector2 at = Vector2Add(boat->position,
+            Vector2Add(Vector2Scale(right, 1.0f * out.x), Vector2Scale(forward, 1.9f * out.y)));
+        water_emit(presentation, world, time,
+            (BoatWaterParticle) { .position = at,
+                .velocity = Vector2Scale(out, (1.2f + 2.2f * strength) * (.8f + .4f * v)),
+                .lifetime = (1.4f + 1.2f * strength) * (.8f + .4f * v),
+                .size = (.45f + .45f * strength) * (.8f + .4f * v),
+                .variation = v });
+    }
+}
+
+static void landing_step(
+    BoatPresentation *presentation, const Boat *boat, const BoatWorld *world, double time)
+{
+    presentation->landing_age = fminf(presentation->landing_age + BOAT_STEP, 10);
+    if (presentation->seen_landings && boat->landings + 1 != presentation->seen_landings) {
+        float strength = Clamp((presentation->fall_speed - LANDING_SOFT_SPEED)
+                / (LANDING_HARD_SPEED - LANDING_SOFT_SPEED),
+            0, 1);
+        if (strength > 0) {
+            presentation->landing_strength = strength;
+            presentation->landing_age = 0;
+            ++presentation->landing_serial;
+            landing_splash(presentation, boat, world, time);
+        }
+    }
+    presentation->seen_landings = boat->landings + 1;
+    presentation->fall_speed = fmaxf(0, -boat->vertical_velocity);
+}
+
 void boat_presentation_step(
     BoatPresentation *presentation, const Boat *boat, const BoatWorld *world, double now)
 {
@@ -183,4 +260,5 @@ void boat_presentation_step(
         presentation->camera_heading + camera_delta * (1 - expf(-6 * BOAT_STEP)), 2 * PI);
     boat_presentation_step_flag(&presentation->flag, boat, now);
     water_step(presentation, boat, world, now);
+    landing_step(presentation, boat, world, now);
 }

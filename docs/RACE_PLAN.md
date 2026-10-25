@@ -23,7 +23,9 @@ waves/rain and independent movement on 2026-10-24 ("I like it. Commit."). A late
 [crest shading tweak](#crest-shading-tweak--2026-10-24) addresses tall waves whitening and
 was user-approved ("Much better"). The [three-crest ferry wake](#three-crest-ferry-wake--2026-10-24)
 is implemented and user-approved ("Looks great!"). Two humans then raced the river course and
-reported it a successful, fun race with things to improve. Next: record those improvements,
+reported it a successful, fun race with things to improve. The later
+[landing candidate L1](BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24) makes hard landings cost
+speed; bots now finish in 63.96–75.65 s with 7–12 jumps. Next: record those improvements,
 then assess pacing, missed-gate recovery and turn/wave overlap before extending the route. The current bot runs take
 63–71 s, exceeding the original 45–60 s aim; this pacing tradeoff awaits feedback. Full
 downtown coverage remains outside the current map. See the [R2 implementation](#r2-network-race--2026-10-24),
@@ -706,7 +708,8 @@ Debug at `73e2c4f` (the `v0.0.16` commit): rebuild and all 118 active CTests pas
 the GPU checks; 15 retired wake-field checks stayed disabled.
 The user requested this fix for release v0.0.16; native release CI remains the next check.
 
-**Next / limitations:** rerun Windows release CI to qualify the original environment. No
+**Next / limitations:** the `v0.0.16` release run and the macOS/Windows/Linux/web runs at
+`73e2c4f` succeeded (checked with `gh`, 2026-10-24), qualifying the CI environment. No
 native Windows run, shipped-tag replacement or new human multiplayer acceptance is claimed.
 No audiovisual behavior changed; no new frame or listening review is needed for this fix.
 

@@ -37,6 +37,7 @@ void boat_audio_reset(BoatAudio *audio, BoatEngineVoice voice)
         .random = 0x71ab39u,
         .firing_jitter = 1,
         .water_random = 0x38ac17u,
+        .splash_random = 0x5d2f61u,
         .active_gain = 1,
         .active_target = 1 };
 }
@@ -66,6 +67,11 @@ void boat_audio_render(BoatAudio *audio, BoatAudioInput input, float *samples, s
     float planing = bounded(input.planing, 1);
     float entry = bounded(input.wave_entry, 1);
     static const float cycle[] = { .08f, -.05f, .03f, -.07f, .05f, -.04f };
+    if (input.landing_serial != audio->landing_serial) {
+        audio->landing_serial = input.landing_serial;
+        float landing = bounded(input.landing, 1);
+        audio->slap = audio->splash = landing;
+    }
     for (size_t i = 0; i < count; ++i) {
         audio->load += (target - audio->load) * .00012f;
         float load = audio->load;
@@ -111,7 +117,18 @@ void boat_audio_render(BoatAudio *audio, BoatAudioInput input, float *samples, s
         float swell = fmaxf(.8f, fminf(1.2f, 1 + 8 * audio->water_modulation));
         float water = (audio->water_splash - audio->water_body) * swell * audio->water_speed
             * (.32f + .55f * audio->wave_entry);
-        float value = engine + water;
+        // Landing: a dull 90 ms hull slap (noise, roughly 80-450 Hz, no tone) under a
+        // 350 ms splash wash.
+        float splash_noise = random_state(&audio->splash_random);
+        audio->slap_low += .06f * (splash_noise - audio->slap_low);
+        audio->slap_body += .011f * (audio->slap_low - audio->slap_body);
+        float slap = audio->slap * (audio->slap_low - audio->slap_body);
+        audio->slap *= .99977f;
+        audio->splash_low += .2f * (splash_noise - audio->splash_low);
+        audio->splash_body += .02f * (audio->splash_low - audio->splash_body);
+        float splash = audio->splash * (audio->splash_low - audio->splash_body);
+        audio->splash *= .99994f;
+        float value = engine + water + .9f * slap + .5f * splash;
         // DC removal (~25 Hz), then soft limiting with ample stream headroom.
         float centered = value - audio->dc_input + .99673f * audio->dc_output;
         audio->dc_input = value;
