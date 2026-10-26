@@ -803,12 +803,18 @@ broader platform/impairment/soak checks; M6 acceptance remains outstanding.
 The user confirmed browser connection without VPN on 2026-10-26 after switching from the
 Pages launcher (empty browser STUN) to the Winterfell launcher; this is connection workflow
 acceptance, not completion of the broader gameplay/soak gates.
-The subsequent browser directory slice adds fetched same-origin `servers.json`, a default
+The subsequent browser directory slice adds a fetched public `servers.json`, a default
 named Winterfell row and manual fallback (2026-10-26). It is deployed as a UI update built
 against v0.0.17's core; the server stays at handling 8. Named joining and simulated-list-failure
 manual joining passed agent browser checks; the new row is not yet user-reviewed. Native
 public-directory fetching and publication on Pages remain deferred; see the
 [directory operator contract](MULTIPLAYER_HOSTING.md#known-server-directory).
+Release preparation rebased this slice onto the weapons-enabled main. The shared directory
+is now served by Winterfell with public CORS and generated server compatibility, so a newly
+published protocol-v6 Pages client can discover the upgraded server without a second Pages
+build. The release-aware browser recipe verifies its source commit against deployment.
+The [cutover guide](MULTIPLAYER_HOSTING.md#cut-over-to-the-next-release) owns the coordinated
+server/browser upgrade; the live server stays at v0.0.17 until that step is performed.
 
 Depends on M5. Likely `tools/boat_server.c`, Host launcher/client connection UI, native
 packagers/workflows, CMake server-only Linux configuration, README, platform/release/test guides.

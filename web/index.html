@@ -87,6 +87,8 @@
       noInitialRun: true,
       // Public address discovery is needed on Pages as well as operator-hosted clients.
       boatIceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+      // The operator publishes live compatibility metadata when upgrading the room.
+      boatServerListUrl: 'https://winterfell.davve.net:24443/servers.json',
       locateFile: path => webFiles[path] || path,
       print: text => console.log(text),
       printErr: text => console.error(text),

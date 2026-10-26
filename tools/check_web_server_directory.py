@@ -9,6 +9,7 @@ parser.add_argument('--url', required=True)
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--executable', default='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 parser.add_argument('--unavailable', action='store_true', help='Fail the directory and verify manual joining still works.')
+parser.add_argument('--incompatible', action='store_true', help='Expect the listed room to require a different client version.')
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 
@@ -54,6 +55,13 @@ with sync_playwright() as p:
         else:
             assert page.evaluate("Module['boatServers'].server(0).name") == 'Winterfell'
             key('Enter')  # The default named server; no URL editing or typing.
+        if args.incompatible:
+            page.wait_for_timeout(1000)
+            assert not any('Connecting to' in line or 'Joined as slot' in line for line in logs), logs
+            page.screenshot(path=str(args.output / 'incompatible.png'))
+            assert not errors, errors
+            print('web_server_directory_incompatible=ok')
+            raise SystemExit(0)
         page.wait_for_timeout(8000)
         page.screenshot(path=str(args.output / 'joined.png'))
         assert any('Joined as slot' in line for line in logs), logs

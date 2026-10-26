@@ -47,5 +47,12 @@ const manifest = require('../web/servers.json');
   const empty = installBoatServerDirectory({}, async () => ({ ok: true, text: async () => '{"version":1,"servers":[]}' }));
   await empty.refresh();
   assert.match(empty.status(), /NO PUBLIC SERVERS/);
+  const remote = installBoatServerDirectory({ boatServerListUrl: 'https://directory.example/servers.json' },
+    async url => {
+      assert.equal(url, 'https://directory.example/servers.json');
+      return { ok: true, text: async () => JSON.stringify(manifest) };
+    });
+  await remote.refresh();
+  assert.equal(remote.count(), 1);
   console.log('web_server_directory=ok');
 })().catch(error => { console.error(error); process.exitCode = 1; });

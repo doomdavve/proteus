@@ -46,12 +46,14 @@ No native desktop graphics/audio, Firefox/Safari, physical-device or human balan
 
 ## Known browser servers, 2026-10-26
 
-The source now fetches same-origin `servers.json` at startup and when MULTIPLAYER opens.
+The source now fetches Winterfell’s public `servers.json` at startup and when MULTIPLAYER opens.
 Winterfell is the first/default named SERVER choice; Enter joins without typing. Manual
 URL / CONNECT remain available if the list cannot load. The list has bounded schema and
 protocol/physics metadata, and refresh failures preserve a previously loaded list. Its
 [operator guide](MULTIPLAYER_HOSTING.md#known-server-directory) owns the fields and update
-commands. The default launcher now includes public STUN on every host, including Pages.
+commands. Pages uses the same authoritative directory through its public CORS endpoint,
+so deployment can update compatibility metadata without republishing Pages. The default
+launcher includes public STUN on every host, including Pages.
 
 Both features are deployed on Winterfell as `v0.0.17-server-directory`, built with the released
 core using `bash tools/build_winterfell_web.sh`. The current development browser also builds,
