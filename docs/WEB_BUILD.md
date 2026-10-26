@@ -66,7 +66,8 @@ First the test overrode only the launcher URL; after PR #14 merged and Pages run
 a fresh Chrome run against the actual published URL also fetched the list, joined and drove.
 The live launcher remains v0.0.18. Routine server updates use the
 [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native clients
-retain LAN/manual joining. Human gameplay and wider browser/platform checks remain.
+also fetch the directory for native addresses and retain LAN/manual joining. Human gameplay
+and wider browser/platform checks remain.
 
 Run the directory contract check with Node, or test a served released-compatible client:
 

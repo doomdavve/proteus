@@ -1471,6 +1471,9 @@ int main(int argc, char **argv)
     SetTargetFPS(60);
     InitAudioDevice(); // Start inside the page's Play gesture, before the title yields.
 #endif
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    boat_title_directory_start();
+#endif
     SetWindowMinSize(320, 200);
     SetExitKey(KEY_NULL);
     for (BoatTitleChoice choice; (choice = boat_title_run(&settings)) != BOAT_TITLE_EXIT;) {
@@ -1489,6 +1492,9 @@ int main(int argc, char **argv)
             break;
     }
     boat_title_save(&settings); // Also keep settings changed just before Exit.
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+    boat_title_directory_stop();
+#endif
 #if defined(__EMSCRIPTEN__)
     CloseAudioDevice();
 #endif

@@ -49,7 +49,7 @@ review of the new baseline remain unverified.
 On Ubuntu 24.04:
 
 ```sh
-sudo apt-get install libasound2-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
+sudo apt-get install libcurl4-openssl-dev libasound2-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev \
   libxinerama-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev \
   wayland-protocols pkg-config weston xvfb xauth
 cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF \

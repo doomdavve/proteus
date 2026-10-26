@@ -2,7 +2,7 @@ Wake Velocity - Windows x64
 
 Extract the entire ZIP, then double-click launch.bat (or wake_velocity.exe) to open
 the Wake Velocity title. Pick NAME, BOAT and STEERING under SETTINGS, then SINGLE PLAYER for the river, or
-MULTIPLAYER to join a room found on the network (LAN) or type its HOST:PORT address.
+MULTIPLAYER to join a published SERVER, a room found on the network (LAN), or a HOST:PORT address.
 Esc in a session opens a menu; BACK TO TITLE (or LEAVE ROOM) returns to the title.
 Keep assets beside wake_velocity.exe.
 

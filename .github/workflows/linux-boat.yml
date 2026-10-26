@@ -19,7 +19,7 @@ jobs:
       - name: Install desktop build and virtual display dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev wayland-protocols pkg-config weston xvfb xauth
+          sudo apt-get install -y libcurl4-openssl-dev libasound2-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev wayland-protocols pkg-config weston xvfb xauth
       - name: Configure, build and test
         run: |
           cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF -DGLFW_BUILD_WAYLAND=ON -DGLFW_BUILD_X11=ON
