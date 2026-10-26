@@ -56,11 +56,11 @@ so deployment can update compatibility metadata without republishing Pages. The 
 launcher includes public STUN on every host, including Pages.
 
 Both features were introduced as `v0.0.17-server-directory`; Winterfell now serves the exact
-v0.0.18 client, built on the server by the `davve-srv` baseline role. The current development browser also builds,
-but its newer physics do not match that room. The v0.0.18 Pages build and deployment also passed, including default STUN and the shared
-public directory. Routine updates use the [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native clients
-retain LAN/manual joining. Next: human review of the named-server flow, then next-release
-Pages verification and the wider browser/platform checks below.
+v0.0.18 client, built on the server by the `davve-srv` baseline role. The v0.0.18 Pages build
+and deployment also passed, including default STUN and the shared public directory. Routine
+updates use the [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
+Native clients retain LAN/manual joining. Next: human review of the named-server and weapons
+flow, then the wider browser/platform checks below.
 
 Run the directory contract check with Node, or test a served released-compatible client:
 

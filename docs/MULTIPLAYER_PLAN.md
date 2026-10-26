@@ -791,10 +791,10 @@ play and deferred M4 acceptance remain open. M5 is not complete.
 ### M6 — friends over the internet and native packaging
 
 The user requested a released Winterfell internet room on 2026-10-26, including browser
-access, ahead of the remaining hardening. The deployment uses pinned v0.0.17 sources with
+access, ahead of the remaining hardening. The initial deployment used pinned v0.0.17 sources with
 optional WebRTC, systemd, existing nginx TLS and a private bounded coturn relay. The
 [hosting guide](MULTIPLAYER_HOSTING.md) owns deployment commands and current verification;
-this is a scoped hosting slice, not M5/M6 acceptance or a new weapons release. This explicit
+that was a scoped hosting slice, not M5/M6 acceptance or a new weapons release at that point. This explicit
 deployment request supersedes the implementation-test-only deployment restriction below
 for Winterfell. Native and Chrome browser clients were verified together from a separate
 internet connection with the VPN off; browser leave/rejoin and the public relay route passed.
@@ -803,11 +803,11 @@ broader platform/impairment/soak checks; M6 acceptance remains outstanding.
 The user confirmed browser connection without VPN on 2026-10-26 after switching from the
 Pages launcher (empty browser STUN) to the Winterfell launcher; this is connection workflow
 acceptance, not completion of the broader gameplay/soak gates.
-The subsequent browser directory slice adds a fetched public `servers.json`, a default
-named Winterfell row and manual fallback (2026-10-26). It is deployed as a UI update built
-against v0.0.17's core; the server stays at handling 8. Named joining and simulated-list-failure
+The subsequent browser directory slice added a fetched public `servers.json`, a default
+named Winterfell row and manual fallback (2026-10-26). It initially deployed as a UI update
+against v0.0.17's core, when the server was still at handling 8. Named joining and simulated-list-failure
 manual joining passed agent browser checks; the new row is not yet user-reviewed. Native
-public-directory fetching and publication on Pages remain deferred; see the
+public-directory fetching remains deferred; Pages subsequently published v0.0.18. See the
 [directory operator contract](MULTIPLAYER_HOSTING.md#known-server-directory).
 Release preparation rebased this slice onto the weapons-enabled main. The shared directory
 is now served by Winterfell with public CORS and generated server compatibility, so a newly
