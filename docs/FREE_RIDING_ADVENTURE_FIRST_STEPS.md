@@ -1590,7 +1590,7 @@ so the first slice uses Göteborg's CC0 Baskarta, which the user downloaded.
 ### A3.2 result, 2026-10-26
 
 Branch `adventure-a3-2`, cut from `adventure-a3-1` because the A3.1 pull request (#5) was not
-yet merged; rebase onto `origin/main` once it is.
+yet merged; it was later rebased and merged into `main` (pull request #7).
 
 - **Location:** `--location outer` (`BOAT_LOCATION_OUTER`, a third `BoatWorldDefinition`) binds
   `waterfront_outer_map`. The map shares the river's frame, so the spawn (the dock), fleet
@@ -1642,7 +1642,11 @@ yet merged; rebase onto `origin/main` once it is.
 ### A3.3 result, 2026-10-26
 
 Branch `adventure-a3-3`, cut from `adventure-a3-2` (pull request #7, still in CI when this was
-written); rebase onto `origin/main` once it is merged.
+written). Its pull request (#8) merged into `adventure-a3-2` after #7 had landed on `main`, so
+the A3.3 commit was rebased onto `origin/main` (`6c1d137`) on branch `adventure-a3-2`
+(2026-10-26, no conflicts). After the rebase, on macOS arm64, Debug with
+`PROTEUS_GPU_TESTS=ON` and a display, the build was warning-free and all 123 active tests
+passed in 200 s (13 retired disabled).
 
 - **Approach (decision):** the river's own bake is the source for the river crop, so the outing
   looks and behaves there as the river location does. `tools/prepare_outer_map.py` keeps the
