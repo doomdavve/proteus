@@ -2,6 +2,7 @@
 #include "boat_skin.h"
 #include "raylib.h"
 #include "raymath.h"
+#include <inttypes.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -56,7 +57,7 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
         return false;
     }
     net->enet = boat_net_enet_connect(host, port, error, sizeof(error));
-    if (!net->transport_open) {
+    if (!net->enet) {
         fail(net, "Cannot connect: %s", error);
         boat_net_enet_cleanup();
         return false;
@@ -74,7 +75,14 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
     fflush(stdout);
     while (net->client.phase < BOAT_NET_CLIENT_PLAYING) {
         if (!boat_net_client_service(&net->client, boat_net_clock(), (BoatInput) { 0 }, true)) {
-            if (net->client.phase == BOAT_NET_CLIENT_REJECTED)
+            if (net->client.phase == BOAT_NET_CLIENT_REJECTED
+                && net->client.reject.reason == BOAT_NET_REJECT_CONTENT) {
+                fail(net, "Game data mismatch. Server: protocol %u, physics %u, hash %016" PRIx64
+                          "; client: protocol %d, physics %d, hash %016" PRIx64,
+                    (unsigned)net->client.reject.version,
+                    (unsigned)net->client.reject.physics_revision, net->client.reject.content_digest,
+                    BOAT_NET_VERSION, BOAT_PHYSICS_REVISION, boat_net_content_digest());
+            } else if (net->client.phase == BOAT_NET_CLIENT_REJECTED)
                 fail(net, "Rejected by %s: %s (server protocol %u, revision %u; this build %d, %d)",
                     endpoint, boat_net_client_failure(&net->client),
                     (unsigned)net->client.reject.version,

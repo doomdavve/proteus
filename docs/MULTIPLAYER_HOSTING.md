@@ -9,8 +9,8 @@ to join directly. There are no player accounts.
 
 ## Join
 
-- Native: download v0.0.18 from [Releases](https://github.com/doomdavve/proteus/releases/tag/v0.0.18),
-  choose MULTIPLAYER and enter `winterfell.davve.net:24680`.
+- Native: v0.0.18 has the connection bug described below. Build its source with the native
+  connection fix, then choose MULTIPLAYER and enter `wake.davve.net:24680`.
 - Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/), press PLAY,
   choose MULTIPLAYER, then the selected **SERVER: WINTERFELL** row. No address entry is needed.
   URL / CONNECT remain available for manual joining.
@@ -335,6 +335,20 @@ machine and connection. After switching to the Winterfell launcher, the user con
 audio acceptance remain separate.
 
 ## Native directory client, 2026-10-26
+
+Follow-up, 2026-10-26: fixed the native game client checking an unset transport flag after
+creating its ENet connection, which caused an empty `Cannot connect:` message for every
+native join. The macOS Debug build and full preset passed (230 active tests); the loopback
+host test now exercises the game client's token rejection. A direct connection to
+`wake.davve.net:24680` reached the server but was rejected for a map/content mismatch
+(both sides reported protocol 6 / physics 9). The digest includes all compiled maps, including
+the outer map changed since the deployed v0.0.18 release, even though the room uses the river.
+Protocol and physics numbers alone do not establish content compatibility. The client reports
+the server and client protocol, physics revision and content hash together on a mismatch.
+For the deployed room, build a client from v0.0.18 with the connection fix applied; the released
+native client also contains that bug. Alternatively deploy a server built from the same source
+as the fixed client. A compatible live build and manual gameplay
+remain to be verified; this fix has not been deployed or packaged.
 
 Native builds now fetch the public directory asynchronously and offer its compatible native
 rooms in the SERVER row. Refresh failure preserves the last successful list for the current

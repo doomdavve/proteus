@@ -22,6 +22,8 @@ see the [hosting guide](MULTIPLAYER_HOSTING.md#native-directory-client-2026-10-2
 `wake.davve.net` endpoint is deployed. PR #14's release-pinned workflow republished the
 v0.0.18 Pages launcher; a fresh Chrome browser joined from the live Pages URL without
 local-network permission. Human gameplay and broader browser/network qualification remain open.
+The native client connection check is fixed locally; a live server handshake now reports a
+map/content mismatch for this checkout, so a compatible live join remains to be verified.
 Details and current verification limits stay in the guide.
 
 | Area and owning document | Implemented | Remaining / next task |
