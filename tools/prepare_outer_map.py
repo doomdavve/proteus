@@ -7,9 +7,11 @@ Requires the pins in docs/adventure/requirements.txt. Run from anywhere:
     python -I tools/prepare_outer_map.py                 # writes assets/geometry/outer/
 
 Reads only the checked-in A0.2 sources and never fetches. Normal C builds use the checked-in
-output. Outside the river crop the map holds water, Baskarta terrain and quay walls only: no
-buildings, roads or planting. Inside the crop (A3.3) the ground is the river's flat 3.5 m and the
-river bake's buildings, roads, gardens, trees and bridge are imported unchanged from
+output. Outside the river crop the map holds water, Baskarta terrain and quay walls, and since
+A3.5a the corridor's buildings, the container cranes and port masts, channel marks and a
+scattered tree cover (tools/outer_dressing.py); no roads. Inside the crop (A3.3) the ground is
+the river's flat 3.5 m and the river bake's buildings, roads, gardens, trees and bridge are
+imported unchanged from
 assets/geometry/river/geometry.h, so the crop looks and behaves as the river location does; the
 terrain blends in over BLEND_M outside it. Water is the A0.3 assembly (land polygons plus OSM
 inland water, bridge legs removed).
@@ -32,6 +34,7 @@ from shapely.geometry import LineString, Point, Polygon, box  # noqa: E402
 from shapely.geometry.polygon import orient  # noqa: E402
 from shapely.ops import unary_union  # noqa: E402
 
+import outer_dressing  # noqa: E402
 import outer_terrain  # noqa: E402
 from prepare_waterfront import GROUND, polygons, triangulate  # noqa: E402
 
@@ -180,12 +183,14 @@ def check_watertight(cells, land):
     assert not bad, f"{len(bad)} open interior edges, first {bad[:3]}"
 
 
-def bake(water, region, model=None, overlay=None):
+def bake(water, region, model=None, overlay=None, dressing=()):
     """Return (vertices, triangles, stats) for water at y=0 then land and walls.
 
     Without MODEL the land is flat at GROUND; with one it is the 20 m/5 m terrain surface.
     OVERLAY is river_overlay()'s (plain, bridge): the plain triangles follow the land and the
-    bridge ones come last, from the returned bridge_first index.
+    bridge ones follow, from the returned bridge_first index. DRESSING triangles, already on
+    the terrain, come last: like the bridge they are authored geometry in flat colours, so they
+    share its range, which the renderers keep out of facade texturing and windows.
     """
     vertices, triangles, lookup = [], [], {}
 
@@ -261,12 +266,16 @@ def bake(water, region, model=None, overlay=None):
     bridge_first = len(triangles)
     for points, color in bridge:
         triangle(points, color)
+    dressing_first = len(triangles)
+    for points, color in dressing:
+        triangle(points, color)
     assert abs(surface_area - land.area) < 1.0 + sum(a for a, _ in DROPPED), \
         f"land surface {surface_area:.1f} m2 differs from land {land.area:.1f} m2"
     check_watertight(cells, land)
     assert sum(a for a, _ in DROPPED) < 1.0, f"untriangulated land {DROPPED[:5]}"
     stats.update(overlay_triangles=len(plain), bridge_first=bridge_first,
-                 bridge_triangles=len(bridge), dropped_pieces=len(DROPPED), dropped_area_m2=sum(a for a, _ in DROPPED),
+                 bridge_triangles=len(bridge), dressing_first=dressing_first,
+                 dropped_pieces=len(DROPPED), dropped_area_m2=sum(a for a, _ in DROPPED),
                  land_triangles=len(cells), shore_edges=len(shore_edges),
                  height_min=min(height.values()), height_max=max(height.values()))
     return vertices, triangles, stats
@@ -334,7 +343,10 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "vertices": len(vertices), "triangles": len(triangles),
         "water_triangles": stats["water_triangles"],
         "contents": "water, land surface and quay walls; inside the river crop also the river "
-                    "bake's buildings, roads, gardens, trees and bridge (A3.3)",
+                    "bake's buildings, roads, gardens, trees and bridge (A3.3); outside it "
+                    "buildings, container cranes, port masts, channel marks and trees (A3.5a)",
+        "dressing": stats.get("dressing") and {
+            "first_triangle": stats["dressing_first"], **stats["dressing"]},
         "river_overlay": {"source": "assets/geometry/river/geometry.h",
                           "triangles": stats.get("overlay_triangles"),
                           "bridge_triangles": stats.get("bridge_triangles"),
@@ -348,6 +360,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
 
 
 def self_test():
+    outer_dressing.self_test()
     # Water stays below a raised shelf; land is the region less water; an island hole survives.
     region = box(0, 0, 100, 100)
     water = box(10, 10, 90, 90).difference(box(40, 40, 60, 60))
@@ -401,6 +414,9 @@ def main():
     land_source, _ = survey.read_source("land-polygons.json.gz", sources)
     frame = survey.Frame()
     geo, region, water = assemble_region(frame, osm, land_source)
+    crop = box(*survey.RIVER_CROP)
+    water, carved = outer_dressing.carve_marks(
+        water, outer_dressing.marks(osm, frame, region, crop))
     route = check(geo, region, water)
     import numpy as np
 
@@ -420,7 +436,15 @@ def main():
             contours, spots, geo_land(region, water)),
     }
     overlay = river_overlay()
-    vertices, triangles, stats = bake(water, region, flatten_in_crop(model), overlay)
+    blended = flatten_in_crop(model)
+    fort = next(Point(m["east_north"]) for m in survey.features(osm, frame)[1]
+                if m["label"] == "Nya Älvsborg")
+    dressing, dressed = outer_dressing.dress(osm, frame, region, crop, water,
+                                             geo_land(region, water), blended, fort,
+                                             survey.multipolygon)
+    dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS)
+    vertices, triangles, stats = bake(water, region, blended, overlay, dressing)
+    stats["dressing"] = dressed
     terrain.update(dropped_pieces=stats["dropped_pieces"],
                    dropped_area_m2=round(stats["dropped_area_m2"], 4),
                    height_min_m=round(stats["height_min"], 2),

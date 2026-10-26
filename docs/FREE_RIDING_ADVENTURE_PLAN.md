@@ -50,7 +50,11 @@ the river's buildings, roads, gardens and bridge into that map
 unmeasured). A3.4 (2026-10-26) added the solo voyage: a Långedrag destination cue and arrival,
 shelters that recovery returns to, and a fixed exposed rough-water patch in the outer fjord
 ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a34-result-2026-10-26); autopilot-verified, not
-yet played).
+yet played). The user's first playtest (2026-10-26) found the run long and the land past the
+bridge barren ([notes](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a34-playtest-2026-10-26)). A3.5a
+(2026-10-26) dressed it: the corridor's buildings on the terrain, the container cranes, channel
+marks and a tree scatter ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35a-result-2026-10-26);
+not yet played). Boat speed is unchanged by the user's choice.
 **Next: A3.5, the local weather transition and bounded per-region detailed-asset loading.**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short
@@ -308,7 +312,7 @@ A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance c
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
 (a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1 (A1.1–A1.5)
 completed 2026-10-25. A2 is in progress: A2.1 (counters) and A2.2 (tile catalogue and indexed
-collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) are complete and A3.5 is next.
+collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) are complete and A3.5 is next.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |

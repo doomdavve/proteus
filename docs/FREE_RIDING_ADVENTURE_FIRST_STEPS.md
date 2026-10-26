@@ -1496,7 +1496,8 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.2 | A3.1b | A mapped `outer` location starting at the dock: spawn, camera, CPU/GPU water and land rendering, fog or fade at the playable boundary; scenery, harbor and traffic for the added geography decided here | Complete 2026-10-26; [result](#a32-result-2026-10-26) |
 | A3.3 | A3.2 | Bake the existing river buildings, bridge and roads into the combined map so the outing is continuous under Älvsborgsbron | Complete 2026-10-26; [result](#a33-result-2026-10-26) |
 | A3.4 | A3.3 | Långedrag shelter destination, checkpoint recovery and the exposed-water encounter | Complete 2026-10-26; [result](#a34-result-2026-10-26) |
-| A3.5 | A3.4 | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
+| A3.5a | A3.4 | Dressing beyond the river crop, pulled ahead of A3.5 by the [first playtest](#a34-playtest-2026-10-26): the corridor's buildings on the terrain, the container cranes and port masts, channel marks and a tree scatter | Complete 2026-10-26; [result](#a35a-result-2026-10-26) |
+| A3.5 | A3.5a | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
 
 ### A3.1 result, 2026-10-26
 
@@ -1763,6 +1764,72 @@ Branch `adventure-a3-4`, cut from `adventure-a3-2` after the A3.3 commit was reb
   - The panel is drawn in window pixels like the course panel, not in the 320×200 frame.
   - Still open from A3.2/A3.3: GPU frame cost and memory of the outer map, the boundary
     edges, the multiplayer outer session.
+
+### A3.4 playtest, 2026-10-26
+
+The first human run of the outing, reported by the user: they drove from the dock all the way
+to Långedrag. Their words: "It's pretty far. It takes a while. I wished I had a faster boat
+when going there. It's still quite barren past the bridge too, not much to look at." They
+expected the barrenness to change as the plan progresses. This is play feedback, not
+acceptance of the outing.
+
+Asked how to act on it (2026-10-26), the user chose to leave the boat's speed alone for now
+(options offered: a faster gear for the outer map only, a faster boat everywhere, later start
+points at the shelters) and to dress the land past the bridge before the weather transition,
+which became A3.5a. The length remains open. The plan's rule (start points before changing
+geographic scale) still applies when it is revisited.
+
+### A3.5a result, 2026-10-26
+
+Branch `adventure-a3-5a`, cut from `main` (`1fe24a8`).
+
+- **Bake:** [`tools/outer_dressing.py`](../tools/outer_dressing.py), called by
+  `tools/prepare_outer_map.py`, dresses the outer land outside the river crop from the pinned
+  OSM corridor (no new sources): 1,956 building footprints (ways and multipolygons; 44 slivers
+  under 6 m² skipped) extruded on the Baskarta terrain, walls sunk 0.6 m below the lowest corner;
+  1,017 near-rectangular houses get a gable roof along their long side. The 13 container cranes
+  of the Skandia/Arendal quays are a raised-boom blockout at the mapped 118 m (the untagged
+  ones too), boom toward the nearest water; 60 port lighting masts are 30 m poles; 8 channel
+  marks and minor lights are piles in their mapped colour; 10 buildings near Nya Älvsborg are
+  stone; and 3,050 trees are an authored scatter (clustered value noise on gentle ground at
+  least 3 m up, clear of shore, buildings, roads and the port). Heights, roofs, proportions,
+  colours and trees are assumptions, listed in the manifest's `dressing.assumptions`.
+- **Collision:** the 7 marks that stand in water sit on a carved 1.5 m rock, so a boat meets the
+  pile instead of driving through it. Water triangles 2,668 → 2,738. The A0.3 route and all
+  of A3.4's checks still pass.
+- **Range (decision):** the dressing follows the bridge in the map's authored range
+  (`bridge_first_triangle` on), which both renderers draw in flat colours without facade
+  texturing or windows. As ordinary land triangles the GPU facade path rejected the new walls
+  (it expects the bake's a,c,b / a,d,c wall pairs) and the scene failed to bind ("Wake render
+  allocation failed"); it would also have re-tinted tall walls and the cranes as plaster. No
+  renderer code changed; `boat_map.h` documents the range. The river map is untouched.
+- **Output:** 306,538 triangles (240,538 before; dressing 65,612), 195,326 vertices,
+  `geometry.h` 25.7 MB (19.8 MB). The highest point is a crane boom tip at 121.1 m; the
+  `boat_outer_map` height bound moved to 118–125 m and it checks the authored range's size.
+- **Captures (agent review, 2026-10-26, macOS arm64, 2 s scripted drive):**
+  [container port, GPU](adventure/outer-dressing-port-gpu.png) (`--start 3000,-1400,180`),
+  [Långedrag shore, GPU](adventure/outer-dressing-langedrag-gpu.png) and
+  [CPU](adventure/outer-dressing-langedrag-cpu.png) (`--start 3700,-3000,270`),
+  [Nya Älvsborg and a red mark, GPU](adventure/outer-dressing-fort-gpu.png)
+  (`--start 4000,-1550,135`). Cranes read from the fjord at over 1 km, the Långedrag villas
+  as a coloured village with roofs, the fortress island as stone blocks.
+- **Measured cost (Debug, M1 Max, CPU renderer, 3 s scripted screenshot, two runs each):** peak
+  resident memory 229 MB with the dressing against 230 MB without; wall time 0.8 s both.
+- **Verification (2026-10-26, macOS arm64, Debug):** build warning-free; bake self-test and
+  the bake runs in 38 s; `ctest --preset full` passed all 229 active tests (13 retired disabled)
+  in 15 s, with `PROTEUS_GPU_TESTS=OFF` in that build, so the GPU-labelled tests did not run.
+- **Limitations:**
+  - **No manual playback and no user acceptance** of the dressing; whether it fixes "barren"
+    is the user's call.
+  - GPU frame time with the extra 66 k triangles is still unmeasured, as for A3.2/A3.3.
+  - No roads, gardens, quays or harbour furniture outside the crop; the port is cranes and
+    masts on bare ground. The fortress is its mapped buildings in stone, not an authored
+    citadel. Smaller cranes and the Långedrag boat hoist are not drawn.
+  - Trees are not mapped vegetation (the corridor extract holds almost none); they may stand
+    where the real ground is rock or lawn.
+  - The multiplayer content digest changes with the mesh, so an outer room needs matching
+    builds.
+  - Travel time, the user's other point, is unchanged.
 
 **Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
 

@@ -7,8 +7,9 @@
 
 // Read-only, process-lifetime map description. Water triangles come first (all three vertices at
 // y = 0), followed by raised land and buildings; triangles from bridge_first_triangle on are
-// authored bridge/approach geometry. Coordinates use the map's east axis, reflected relative to
-// simulation X.
+// authored geometry in flat colours, kept out of facade texturing and windows: the bridge and its
+// approaches, then in the outer map the A3.5a dressing. Coordinates use the map's east axis,
+// reflected relative to simulation X.
 typedef struct {
     const Mesh3D *mesh;
     size_t bridge_first_triangle;
