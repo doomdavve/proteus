@@ -7,6 +7,13 @@ tracker music. Its main program is the boating game `wake_velocity` (released as
 the basin and the Gothenburg river. Keep the code and project structure simple; this is a
 playground for iterating on effects, timing, audio, and presentation.
 
+## Development workflow
+
+- Implement all changes, including features and bug fixes, in a separate Git worktree.
+- Push the worktree branch and open a pull request for CI checks.
+- Reserve the main checkout for the user to explore and run different branches; do not use it
+  for implementation work.
+
 ## Layout
 
 - `tools/wake_velocity.c`: the boating game's command line, title, application loop and presentation.
