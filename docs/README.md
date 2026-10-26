@@ -19,9 +19,10 @@ role; named joining, weapon inputs and combat pages passed automation. Human wea
 and full internet-play qualification remain pending.
 The browser now fetches a known-server list and defaults to Winterfell for joining without
 typing. The dedicated public `wake.davve.net` DNS/TLS endpoint is deployed, and a fresh
-GitHub Pages browser joined through it on VPN without local-network permission. PR #12 carries
-the release-pinned Pages configuration update; production Pages republish awaits merge and
-workflow dispatch. Human gameplay and broader browser/network qualification remain open.
+GitHub Pages browser joined through it on VPN without local-network permission. PR #14 is
+merged; its release-pinned manual workflow republished the v0.0.18 launcher, and a fresh
+Chrome browser joined from the live Pages URL without local-network permission. Human
+gameplay and broader browser/network qualification remain open.
 Details and current verification limits stay in the guide.
 
 | Area and owning document | Implemented | Remaining / next task |
