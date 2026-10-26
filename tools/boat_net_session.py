@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""M5 real-ENet four-player lifecycle check; --seconds 1800 runs a longer churn lane.
+"""M5 real-time soak driver over real ENet processes; for manual runs such as --seconds 1800.
 
-Uses only loopback and private UDP ports. Three clients stay while the fourth leaves,
-rejoins, crashes and is replaced after timeout. All drive, reset and send inactive input.
-The room drops silent peers after --peer-timeout seconds (default 1 here, 5 in a normal
-room), so one churn cycle takes about ten seconds.
+Not a CTest test: it runs on the wall clock. The same lifecycle runs on a virtual clock in
+validate_boat_net_enet (boat_net_enet.enet_lifecycle). Uses only loopback and private UDP
+ports. Three clients stay while the fourth leaves, rejoins, crashes and is replaced after
+timeout. All drive, reset and send inactive input. The room drops silent peers after
+--peer-timeout seconds (default 5, as in a normal room).
 Every child has a deadline and is reaped, including on assertion failure or interruption.
 Logs go to temporary files so a child's output cannot block a pipe or exhaust memory.
 This does not measure memory plateaus or simulate network impairment.
@@ -16,7 +17,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from boat_net_smoke import fields, free_port
+from boat_net_process import fields, free_port
 
 CHURN_SECONDS = 3  # Each leaving or replacement bot: long enough to reset and go inactive.
 CRASH_HOLD = 1  # Seconds the crashing bot drives before it is killed.
@@ -163,8 +164,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--server", required=True)
     parser.add_argument("--bot", required=True)
-    parser.add_argument("--seconds", type=int, default=12)
-    parser.add_argument("--peer-timeout", type=int, default=1, choices=range(1, 61),
+    parser.add_argument("--seconds", type=int, default=30)
+    parser.add_argument("--peer-timeout", type=int, default=5, choices=range(1, 61),
                         metavar="1-60")
     parser.add_argument("--location", choices=("basin", "river"), default="basin")
     parser.add_argument("--mode", choices=("free", "deathmatch"), default="free")

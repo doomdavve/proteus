@@ -18,12 +18,13 @@
 static void usage(FILE *out)
 {
     fprintf(out,
-        "usage: boat_bot --connect HOST:PORT [--name TEXT] [--token TEXT] [--seconds S]\n"
-        "                [--hunt] [--predict] [--reset-every S] [--inactive-every S]\n"
-        "                [--expect-reject]\n"
-        "       boat_bot --discover [--lan-port N] [--seconds S]\n"
-        "Join a boat_server room, drive one boat by script for S seconds (default 5), then\n"
-        "leave and print a summary. --hunt drives at the nearest other boat to ram it or cross\n"
+        "usage: boat_bot --connect HOST:PORT [--name TEXT] [--token TEXT]\n"
+        "                [--seconds S | --snapshots N] [--hunt] [--predict] [--reset-every S]\n"
+        "                [--inactive-every S] [--expect-reject]\n"
+        "       boat_bot --discover [--lan-port N] [--seconds S] [--first]\n"
+        "Join a boat_server room, drive one boat by script for S seconds (default 5), or until\n"
+        "it has received N snapshots after joining, then leave and print a summary.\n"
+        "--hunt drives at the nearest other boat to ram it or cross\n"
         "it with its wake (for deathmatch rooms). In race rooms the bot races the course.\n"
         "--expect-reject succeeds only when the room\n"
         "refuses it. --predict exercises client prediction. --reset-every requests a reset every "
@@ -32,12 +33,12 @@ static void usage(FILE *out)
         "(S: integer 2-86400). These options exercise session lifecycle in headless tests.\n"
         "--discover: search the local network (and this machine) for rooms for S seconds\n"
         "(default 2) on UDP --lan-port (default %d) and print one line per room; exit 1 if\n"
-        "none answered.\n"
+        "none answered. --first stops at the first answer (S is then only a deadline).\n"
         "Exit status: 0 success, 1 connection failure, 2 usage, 3 rejected.\n",
         BOAT_NET_DISCOVERY_PORT);
 }
 
-static int discover(uint16_t lan_port, unsigned long seconds)
+static int discover(uint16_t lan_port, unsigned long seconds, bool first)
 {
     char error[160];
     if (!boat_net_enet_startup()) {
@@ -53,7 +54,8 @@ static int discover(uint16_t lan_port, unsigned long seconds)
     static const char *const modes[] = { "free", "deathmatch", "race" };
     BoatNetLanList list = { 0 };
     double start = boat_net_clock(), queried = -1;
-    for (double now = start; now - start < (double)seconds; now = boat_net_clock()) {
+    for (double now = start; now - start < (double)seconds && !(first && list.count);
+        now = boat_net_clock()) {
         if (queried < 0 || now - queried >= .5) {
             boat_net_lan_query(lan, lan_port);
             queried = now;
@@ -61,7 +63,8 @@ static int discover(uint16_t lan_port, unsigned long seconds)
         BoatNetLanRoom room;
         while (boat_net_lan_receive(lan, &room))
             boat_net_lan_list_note(&list, &room, now);
-        boat_net_sleep(.02);
+        if (!(first && list.count))
+            boat_net_lan_wait(lan, .02); // Wakes at once when an answer arrives.
     }
     boat_net_lan_close(lan);
     boat_net_enet_cleanup();
@@ -81,8 +84,9 @@ static int discover(uint16_t lan_port, unsigned long seconds)
 int main(int argc, char **argv)
 {
     const char *endpoint = NULL, *name = "bot", *token = "";
-    unsigned long seconds = 5, reset_every = 0, inactive_every = 0;
+    unsigned long seconds = 5, snapshots = 0, reset_every = 0, inactive_every = 0;
     bool expect_reject = false, hunt = false, search = false, timed = false, predict = false;
+    bool first = false;
     uint16_t lan_port = BOAT_NET_DISCOVERY_PORT;
     for (int i = 1; i < argc; ++i) {
         const char *value = i + 1 < argc ? argv[i + 1] : NULL;
@@ -120,6 +124,16 @@ int main(int argc, char **argv)
             else
                 inactive_every = interval;
             ++i;
+        } else if (strcmp(argv[i], "--snapshots") == 0 && value) {
+            char *end;
+            snapshots = strtoul(value, &end, 10);
+            if (!*value || *end || value[0] == '-' || snapshots < 1 || snapshots > 10000000) {
+                usage(stderr);
+                return 2;
+            }
+            ++i;
+        } else if (strcmp(argv[i], "--first") == 0) {
+            first = true;
         } else if (strcmp(argv[i], "--predict") == 0) {
             predict = true;
         } else if (strcmp(argv[i], "--discover") == 0) {
@@ -138,11 +152,16 @@ int main(int argc, char **argv)
         }
     }
     if (search) {
-        if (endpoint || hunt || expect_reject || predict || reset_every || inactive_every) {
+        if (endpoint || hunt || expect_reject || predict || reset_every || inactive_every
+            || snapshots) {
             fprintf(stderr, "boat_bot: --discover does not join a room.\n");
             return 2;
         }
-        return discover(lan_port, timed ? seconds : 2);
+        return discover(lan_port, timed ? seconds : 2, first);
+    }
+    if (first || (snapshots && timed)) {
+        fprintf(stderr, "boat_bot: --first needs --discover; --snapshots replaces --seconds.\n");
+        return 2;
     }
     char host[256], error[160];
     uint16_t port;
@@ -311,7 +330,7 @@ int main(int argc, char **argv)
         }
         unsigned peer_mtu = boat_net_enet_peer_mtu(enet, 0);
         mtu = peer_mtu > mtu ? peer_mtu : mtu;
-        if (joined && now >= end)
+        if (joined && (snapshots ? client.stats.snapshots >= snapshots : now >= end))
             break;
         boat_net_enet_wait(enet, 1.0 / 60);
     }

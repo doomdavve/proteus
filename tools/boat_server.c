@@ -41,7 +41,8 @@ static void usage(FILE *out)
         "                   [--location basin|river|outer] [--ticks N | --seconds S] "
         "[--report-every N]\n"
         "                   [--mode free|deathmatch|race] [--round-seconds S]\n"
-        "                   [--lan-port N | --no-lan] [--exit-with-stdin] [--peer-timeout S]\n"
+        "                   [--lan-port N | --no-lan] [--exit-with-stdin] [--until-empty]\n"
+        "                   [--peer-timeout S]\n"
         "                   [--rtc-port N] [--ice-server URL] (optional WebRTC build)\n"
         "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
         "basin|river|outer]\n"
@@ -56,6 +57,8 @@ static void usage(FILE *out)
         "from the local network. --no-lan stays silent.\n"
         "--exit-with-stdin: close the room when standard input ends, so a game that hosts the\n"
         "room through a pipe (wake_velocity --host) cannot leave it running after it exits.\n"
+        "--until-empty: close the room once every accepted player has left or timed out, so a\n"
+        "test ends on events instead of after a fixed time.\n"
         "--peer-timeout: drop a client after S silent seconds (1-60, default 5); for tests.\n"
         "--scripted: bots drive N ticks (default 7200, one minute at 120 Hz) as fast as\n"
         "possible, then print the fleet hash and per-tick cost; no socket.\n"
@@ -331,7 +334,7 @@ typedef struct {
     unsigned long players, ticks, report;
     unsigned long peer_timeout; // Seconds; 0 keeps BOAT_NET_TIMEOUT.
     const BoatMatchRules *rules; // Deathmatch rules, or NULL for free play.
-    bool race, exit_with_stdin;
+    bool race, exit_with_stdin, until_empty;
     BoatLocationId location;
     const BoatWorldResources *world; // The location's resources, owned by main.
 } RoomOptions;
@@ -453,6 +456,11 @@ static int room(const RoomOptions *options)
     while (!stop_requested && (!options->ticks || server.fleet.state.tick < options->ticks)) {
         if (options->exit_with_stdin && stdin_closed()) {
             printf("boat_server: standard input closed; closing the room.\n");
+            break;
+        }
+        const BoatNetServerStats *st = &server.stats;
+        if (options->until_empty && st->accepted && st->left + st->timeouts >= st->accepted) {
+            printf("boat_server: every player has left; closing the room.\n");
             break;
         }
         double now = boat_net_clock();
@@ -607,6 +615,9 @@ int boat_server_main(int argc, char **argv)
         } else if (strcmp(argv[i], "--exit-with-stdin") == 0) {
             room_options.exit_with_stdin = true;
             room_option = true;
+        } else if (strcmp(argv[i], "--until-empty") == 0) {
+            room_options.until_empty = true;
+            room_option = true;
         } else if (strcmp(argv[i], "--no-lan") == 0) {
             room_options.lan_port = 0;
             room_option = true;
@@ -681,8 +692,8 @@ int boat_server_main(int argc, char **argv)
         if (room_option || seconds) {
             fprintf(stderr,
                 "boat_server: --scripted runs without a socket; room options "
-                "(--bind, --port, --lan-port, --no-lan, --exit-with-stdin, --token, --players, "
-                "--waves, --peer-timeout, --seconds) do not apply.\n");
+                "(--bind, --port, --lan-port, --no-lan, --exit-with-stdin, --until-empty, --token, "
+                "--players, --waves, --peer-timeout, --seconds) do not apply.\n");
             return 2;
         }
         if (!open_world(&world, room_options.location))

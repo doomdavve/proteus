@@ -2,15 +2,15 @@
 """Hosting from the game: `wake_velocity --serve` is boat_server's room, and --exit-with-stdin closes
 it when the hosting game's pipe ends (as when wake_velocity --host leaves or is killed).
 
-Starts the room through wake_velocity with private ports, lets a boat_bot drive in it, closes the
-room's standard input and checks that the room says goodbye and exits within two seconds.
+Starts the room through wake_velocity with private ports, lets a boat_bot join and leave after a
+few snapshots, closes the room's standard input and checks that the room says goodbye and exits.
+The 2 s limit on that exit is a failure deadline; nothing waits for time to pass.
 """
 
 import argparse
 import socket
 import subprocess
 import sys
-import time
 
 
 def free_port():
@@ -32,14 +32,12 @@ def main():
     try:
         first = room.stdout.readline()
         assert first.startswith("boat_server listening on"), first
-        bot = subprocess.run([args.bot, "--connect", f"127.0.0.1:{port}", "--seconds", "1"],
+        bot = subprocess.run([args.bot, "--connect", f"127.0.0.1:{port}", "--snapshots", "3"],
                              capture_output=True, text=True, timeout=20)
         assert bot.returncode == 0, bot.stdout + bot.stderr
         assert "control: commands=" in bot.stdout, bot.stdout
-        closed = time.monotonic()
         room.stdin.close()
         room.wait(timeout=2)
-        waited = time.monotonic() - closed
         out = room.stdout.read()
         assert room.returncode == 0, out
         assert "standard input closed; closing the room" in out, out
@@ -48,7 +46,7 @@ def main():
         if room.poll() is None:
             room.kill()
             room.wait()
-    print(f"boat_host=ok closed_in={waited:.2f}s")
+    print("boat_host=ok")
 
 
 if __name__ == "__main__":

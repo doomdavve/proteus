@@ -32,13 +32,29 @@
 #endif
 #include <ctype.h>
 
+#define STASH_EVENTS 256 // Events received by a wait or settle before the next poll.
+
 struct BoatNetEnet {
     ENetHost *host;
     ENetPeer *server; // Client side only.
-    bool client, stashed;
-    ENetEvent stash;
+    bool client;
+    ENetEvent stash[STASH_EVENTS]; // A ring, oldest first.
+    unsigned stash_first, stashed;
     BoatNetTransportStats stats;
 };
+
+// Service HOST for at most MS milliseconds, keeping any event for the next poll. False when
+// nothing arrived or the stash is full.
+static bool stash_service(BoatNetEnet *e, enet_uint32 ms)
+{
+    if (e->stashed == STASH_EVENTS)
+        return false;
+    ENetEvent *slot = &e->stash[(e->stash_first + e->stashed) % STASH_EVENTS];
+    if (enet_host_service(e->host, slot, ms) <= 0)
+        return false;
+    ++e->stashed;
+    return true;
+}
 
 // Largest UDP datagram any host in this process received (the intercept has no context).
 static size_t max_datagram;
@@ -129,8 +145,9 @@ static bool poll_event(void *context, BoatNetEvent *event)
     for (;;) {
         ENetEvent in;
         if (e->stashed) {
-            in = e->stash;
-            e->stashed = false;
+            in = e->stash[e->stash_first];
+            e->stash_first = (e->stash_first + 1) % STASH_EVENTS;
+            --e->stashed;
         } else if (enet_host_service(e->host, &in, 0) <= 0) {
             return false;
         }
@@ -227,7 +244,26 @@ void boat_net_enet_wait(BoatNetEnet *enet, double seconds)
     if (enet->stashed)
         return;
     enet_uint32 ms = seconds <= 0 ? 0 : seconds > 1 ? 1000 : (enet_uint32)(seconds * 1000);
-    enet->stashed = enet_host_service(enet->host, &enet->stash, ms) > 0;
+    stash_service(enet, ms);
+}
+
+bool boat_net_enet_settle(BoatNetEnet *const *hosts, unsigned count, double timeout)
+{
+    double deadline = boat_net_clock() + timeout;
+    for (;;) {
+        uint64_t sent = 0, received = 0;
+        bool full = false;
+        for (unsigned i = 0; i < count; ++i) {
+            while (stash_service(hosts[i], 0)) { }
+            full |= hosts[i]->stashed == STASH_EVENTS;
+            sent += hosts[i]->host->totalSentPackets;
+            received += hosts[i]->host->totalReceivedPackets;
+        }
+        if (sent == received)
+            return true;
+        if (full || boat_net_clock() > deadline)
+            return false;
+    }
 }
 
 void boat_net_enet_close(BoatNetEnet *enet, double seconds)
@@ -254,6 +290,14 @@ unsigned boat_net_enet_peer_mtu(BoatNetEnet *enet, unsigned peer)
     ENetPeer *p = peer_of(enet, peer);
     return p && p->state == ENET_PEER_STATE_CONNECTED ? p->mtu : 0;
 }
+
+static uint16_t socket_port(ENetSocket socket)
+{
+    ENetAddress address = { 0 };
+    return enet_socket_get_address(socket, &address) == 0 ? address.port : 0;
+}
+
+uint16_t boat_net_enet_port(const BoatNetEnet *enet) { return socket_port(enet->host->socket); }
 
 double boat_net_clock(void)
 {
@@ -471,6 +515,15 @@ bool boat_net_lan_receive(BoatNetLan *lan, BoatNetLanRoom *room)
             room->address = ENET_NET_TO_HOST_32(from.host);
         return true;
     }
+}
+
+uint16_t boat_net_lan_port(const BoatNetLan *lan) { return socket_port(lan->socket); }
+
+bool boat_net_lan_wait(BoatNetLan *lan, double timeout)
+{
+    enet_uint32 condition = ENET_SOCKET_WAIT_RECEIVE;
+    return enet_socket_wait(lan->socket, &condition, (enet_uint32)(timeout * 1000)) == 0
+        && (condition & ENET_SOCKET_WAIT_RECEIVE);
 }
 
 void boat_net_lan_close(BoatNetLan *lan)
