@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`; [A2.5](#a25--outline) is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. A3 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -996,7 +996,7 @@ harness throughout.
 | A2.2 | A2.1 | In-memory tile catalogue of the river map (512 m, 1 km comparison) and an indexed collision query with exhaustive parity | Complete 2026-10-25; [result](#a22-result-2026-10-25) |
 | A2.3 | A2.2 | Per-tile land culling in the GPU shadow, reflection and main passes and the CPU reference; 512 m vs 1 km judged by submissions, triangles and time | Complete 2026-10-25; [result](#a23-result-2026-10-25) |
 | A2.4 | A2.3 | Water coverage bounded by intersecting tiles: GPU patch rebuilds and the CPU reference surface, crack-free across seams | Complete 2026-10-26 (GPU CTests passed; Release matrix not rerun, see limitations); [task](#a24--water-bounded-by-intersecting-tiles), [result](#a24-result-2026-10-26) |
-| A2.5 | A2.4 | Same-view scaling against enlarged synthetic catalogues (up to a ≈25 km corridor), lifecycle and performance gates, A3 handoff | Next; [outline](#a25--outline) |
+| A2.5 | A2.4 | Same-view scaling against enlarged synthetic catalogues (up to a ≈25 km corridor), lifecycle and performance gates, A3 handoff | Complete 2026-10-26 (GPU timing, lifecycle and the Release matrix not run, see limitations); [result](#a25-result-2026-10-26) |
 
 ## A2.1 — application submission and triangle counters
 
@@ -1387,7 +1387,7 @@ Started from a clean `65434fc` (v0.0.17) on branch `adventure-a2-4`, in a worktr
   - Allocation failure in the index and rest builders is code-inspected, not injected.
   - No manual playback or human visual acceptance was performed.
 
-**Next: A2.5.**
+**Next: A2.5.** (Done; see [A2.5 result](#a25-result-2026-10-26).)
 
 ## A2.4 — water bounded by intersecting tiles
 
@@ -1423,14 +1423,65 @@ and displaces every water triangle every frame, and the flat GPU water mesh is o
 the map; patches equal the full-map result across seams; and captures are unchanged or
 explained.
 
-## A2.5 — outline
-
-Written in detail at the A2.4 handoff, from its evidence.
+## A2.5 — same-view scaling
 
 - **A2.5:** with the same local view, compare the river against synthetic catalogues
   with many distant tiles. Tick and render cost must not grow with them. Repeat the
   controlled matrix and lifecycle tests and record memory per owner. Hand off to A3.
 
+### A2.5 result, 2026-10-26
+
+Started from `origin/main` at `d66a8a8` (A2.4 merged) on branch `adventure-a2-5`.
+
+- **Synthetic corridors:** `tools/validate_boat_map_scaling.c` (CTest `boat_map_scaling`,
+  about 5 s in Debug) copies the river 1, 2, 4, 5 (about 25 km), 8 and 16 times along its long
+  (map east) axis at a stride of 5,120 m, a whole number of tiles, so the first copy keeps the
+  river's tile grid and indices. Water, land and bridge triangles are ordered as a description
+  requires. The local view is always the first copy.
+- **Same-view equality (asserted at every size):** 4,000 collision samples (half off the
+  water) return the river's containment and normal bit for bit and visit the same candidate
+  triangles and shore edges (2.49 triangles per query), every 40th also equalling the
+  exhaustive scan; the tiles within the first copy list the same water, shore and land counts;
+  three water patches are identical in topology, vertices and colours and clip the same source
+  triangles; a windowed CPU surface is identical and displaces the same triangles. Only the
+  collision query's count of cells touched differs (by 105 of 33,888 in total), from samples
+  that fall outside the river's smaller grid, so it is not asserted.
+- **Cost (Debug, M1 Max, single runs; `validate_boat_map_scaling --report`):** the per-query
+  time (0.075–0.13 µs), patch rebuild (0.20 ms) and windowed surface (136 ms) do not change
+  from 1 to 16 copies (547 to 8,752 water triangles, 78.6 k to 1.26 M triangles, 9 to 234
+  tiles). Build costs scale with the map, once per bind: collision map 2.7 to 23.9 ms, tile
+  catalogue 1.5 to 36.8 ms, water index and first patch 0.26 to 0.61 ms.
+- **Defect found and fixed:** A2.4 tessellated every water triangle into the CPU reference's
+  rest surface on first use: 218 MB for the river, growing linearly (3.5 GB at 16 copies).
+  `BoatWaterMeshCache` now tessellates a triangle the first time it is in view
+  (`rest_first`/`rest_end`, `UINT_MAX` until used), so the cache is 112 MB at every size
+  (54.5 MB of it rest tessellation of the view's window, the rest the displaced surface and
+  patches). The test now requires the cache to stay within 5% of the river's. The 18 CPU
+  `--waves` review captures are byte-identical to a rebuild of `origin/main`
+  (`build/adventure/a2-5/`), and mean frame time is unchanged (338 against 337 ms, Debug).
+- **Memory per owner at 1 / 5 (25 km) / 16 copies:** collision map 0.22 / 1.7 / 6.0 MB; full
+  tile catalogue 0.32 / 1.6 / 5.1 MB; land-only render catalogue 0.31 / 1.6 / 5.0 MB; water
+  cache 112 MB at every size, and a GPU-only view does not build the rest or surface (patches
+  and the index only). The three map-sized owners together grow linearly, by about 1 MB per
+  5.1 km copy of river; nothing is quadratic.
+- **Verification (M1 Max, Darwin 25.6, Apple clang, Debug):** warning-clean build; CTest
+  without the GPU label passed 95/95 active tests (the new one included; 13 retired tests
+  disabled); the changed C is clang-formatted.
+- **Limitations:**
+  - **Not run, no display in this session:** GPU CTests and captures, the GPU frame and
+    submission cost against enlarged maps, `--check-gpu-lifecycle`, and the A2.3 Release
+    matrix. Scaling is therefore proved for the core and CPU-reference paths and the
+    renderer-independent water and tile data, not measured for GPU frames. The GPU land
+    passes cull by the same land catalogue, whose local lists the test shows are unchanged.
+  - The corridors repeat the river's shape, so they test distance and map size, not new
+    geometry. ASan/UBSan were not run on the new test.
+  - Build and bind costs still grow with the whole map, which A3's bounded asset loading must
+    not hide behind a frame hitch. The Debug timings are single runs.
+  - No manual playback or human visual acceptance was performed.
+
+**A2 is complete. Next: A3** ([plan](FREE_RIDING_ADVENTURE_PLAN.md)): the first outer-river
+adventure. Its hand-off from this work is that detailed assets must load per region, since
+bind costs and the water-index, tile and collision memory scale with the loaded map.
 
 ## Verification and handoff template
 

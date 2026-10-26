@@ -148,6 +148,11 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   and 1 km tile catalogues' lists, land ownership and bounds, and reports index, tile and
   candidate counts. Since A2.3 it also checks that the renderers' land-only catalogue equals
   the full one, and that land-only construction rejects bad input.
+- `boat_map_scaling` runs `validate_boat_map_scaling` (adventure A2.5, about 5 s in Debug). It
+  copies the river into synthetic corridors of up to 16 copies (25 km at 5), and requires the
+  first copy's collision answers, tiles, water patches and windowed CPU water to be identical
+  at every size, visiting the same candidates, with a water cache that does not grow. Run it
+  with `--report` for build costs, per-operation times and memory per owner.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and

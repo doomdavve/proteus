@@ -39,8 +39,10 @@ typedef struct {
 typedef struct {
     const BoatMapDescription *map;
     BoatWaterIndex index;
-    BoatWaterMeshSurface rest; // Undisplaced tessellation of every water triangle.
-    unsigned int *rest_first; // Per water triangle (+1): its first rest triangle.
+    BoatWaterMeshSurface rest; // Undisplaced tessellation of the water triangles used so far.
+    unsigned int *rest_first, *rest_end; // Per water triangle: its rest range; first is UINT_MAX
+                                         // until the triangle is first in view.
+    bool rest_ready;
     BoatWaterMeshSurface surface; // CPU reference surface of the bound map: the triangles in view.
     size_t surface_sources; // Water triangles displaced by the last surface call.
     size_t patch_sources[2]; // Water triangles clipped by each patch's last rebuild.
