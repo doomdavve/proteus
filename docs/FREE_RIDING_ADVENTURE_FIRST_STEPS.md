@@ -995,7 +995,7 @@ harness throughout.
 | A2.1 | A1 complete | Application submission and triangle counters on both renderers; counter baseline of the untiled river | Complete 2026-10-25; [result](#a21-result-2026-10-25) |
 | A2.2 | A2.1 | In-memory tile catalogue of the river map (512 m, 1 km comparison) and an indexed collision query with exhaustive parity | Complete 2026-10-25; [result](#a22-result-2026-10-25) |
 | A2.3 | A2.2 | Per-tile land culling in the GPU shadow, reflection and main passes and the CPU reference; 512 m vs 1 km judged by submissions, triangles and time | Complete 2026-10-25; [result](#a23-result-2026-10-25) |
-| A2.4 | A2.3 | Water coverage bounded by intersecting tiles: GPU patch rebuilds and the CPU reference surface, crack-free across seams | Complete 2026-10-26 (GPU captures and flat-water split not verified, see limitations); [task](#a24--water-bounded-by-intersecting-tiles), [result](#a24-result-2026-10-26) |
+| A2.4 | A2.3 | Water coverage bounded by intersecting tiles: GPU patch rebuilds and the CPU reference surface, crack-free across seams | Complete 2026-10-26 (GPU CTests and matrix pair still to run, see limitations); [task](#a24--water-bounded-by-intersecting-tiles), [result](#a24-result-2026-10-26) |
 | A2.5 | A2.4 | Same-view scaling against enlarged synthetic catalogues (up to a ≈25 km corridor), lifecycle and performance gates, A3 handoff | Next; [outline](#a25--outline) |
 
 ## A2.1 — application submission and triangle counters
@@ -1374,12 +1374,12 @@ Started from a clean `65434fc` (v0.0.17) on branch `adventure-a2-4`, in a worktr
   94/94 active tests, 12 retired tests disabled (`build/adventure/a2-4/ctest.log`); the
   changed C is clang-formatted.
 - **Limitations:**
-  - **GPU not verified.** This session had no display (`GLFW: Failed to initialize
-    platform`), so `gpu_view_lifecycle`, `tile_culling`, the GPU captures and the A2.3
-    matrix pair were not run. The GPU patch path is covered only by the cache-level
-    equality test above. Before merging, run `ctest --test-dir build -L gpu` with
-    `-DPROTEUS_GPU_TESTS=ON`, compare the river GPU and waves captures with
-    `build/adventure/a2-3/`, and repeat the A2.3 matrix for patch rebuild time.
+  - **GPU partly verified.** This agent session had no display, so the GPU CTests, the
+    A2.3 matrix pair and flat-water GPU captures were not run by it. The user ran
+    `boat_water_review --renderer gpu --waves` from the main checkout (`65434fc`) and from this
+    branch on 2026-10-26 (M1 Max, Debug): all 18 captures were byte-identical, with 176 patch
+    rebuilds, 37,404 wave triangles and 311,584 mean scene triangles in both. The GPU CTests
+    (`ctest -L gpu`, `-DPROTEUS_GPU_TESTS=ON`) and the A2.3 matrix pair remain to be run.
   - The 8 m wave padding is a constant, not derived from the wave model; the CPU
     capture identity covers the review poses only.
   - Allocation failure in the index and rest builders is code-inspected, not injected.
