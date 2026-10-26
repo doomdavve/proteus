@@ -7,7 +7,7 @@ refused; a second server on the same port must fail with a clear message; a LAN 
 (boat_bot --discover, on a private discovery port) must find the room. Checks exit codes,
 summaries, message/datagram/MTU bounds and that every process stops within a bounded time.
 
-With --deathmatch (protocol v2): a deathmatch room with a 10 s round and two hunting bots that
+With --deathmatch (protocol v2): a deathmatch room with a 4 s round and two hunting bots that
 stay through the intermission. Each bot's received scoreboard for round 1 must equal the
 server log's, and each must have received every round event and capsize the server logged.
 
@@ -60,10 +60,10 @@ def bot_round(out, number):
 def deathmatch(args):
     port = free_port()
     endpoint = f"127.0.0.1:{port}"
-    bot_seconds = 16  # The round starts within a second of joining and lasts 10 s.
-    server_seconds = bot_seconds + 4
+    bot_seconds = 8  # The round starts within a second of joining and lasts 4 s.
+    server_seconds = bot_seconds + 2  # Bots join at once and leave first.
     server = subprocess.Popen(
-        [args.server, "--port", str(port), "--mode", "deathmatch", "--round-seconds", "10",
+        [args.server, "--port", str(port), "--mode", "deathmatch", "--round-seconds", "4",
          "--location", args.location,
          "--seconds", str(server_seconds)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -118,8 +118,8 @@ def race(args):
     port = free_port()
     lan_port = free_port()
     endpoint = f"127.0.0.1:{port}"
-    bot_seconds = 10  # Grid within a second of the second join, GO 4 s later.
-    server_seconds = bot_seconds + 4
+    bot_seconds = 8  # Grid within a second of the second join, GO 4 s later.
+    server_seconds = bot_seconds + 3  # The LAN search delays the bots by 1 s.
     server = subprocess.Popen(
         [args.server, "--port", str(port), "--lan-port", str(lan_port), "--mode", "race",
          "--seconds", str(server_seconds)],
@@ -202,7 +202,7 @@ def main():
     port = free_port()
     lan_port = free_port()
     endpoint = f"127.0.0.1:{port}"
-    server_seconds = args.seconds + 5
+    server_seconds = args.seconds + 3  # The LAN search delays the bots by 1 s.
     started = time.monotonic()
     server = subprocess.Popen(
         [args.server, "--port", str(port), "--lan-port", str(lan_port), "--token", "smoke",

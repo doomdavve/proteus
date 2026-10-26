@@ -3,6 +3,8 @@
 
 Uses only loopback and private UDP ports. Three clients stay while the fourth leaves,
 rejoins, crashes and is replaced after timeout. All drive, reset and send inactive input.
+The room drops silent peers after --peer-timeout seconds (default 1 here, 5 in a normal
+room), so one churn cycle takes about ten seconds.
 Every child has a deadline and is reaped, including on assertion failure or interruption.
 Logs go to temporary files so a child's output cannot block a pipe or exhaust memory.
 This does not measure memory plateaus or simulate network impairment.
@@ -15,6 +17,14 @@ import time
 from pathlib import Path
 
 from boat_net_smoke import fields, free_port
+
+CHURN_SECONDS = 3  # Each leaving or replacement bot: long enough to reset and go inactive.
+CRASH_HOLD = 1  # Seconds the crashing bot drives before it is killed.
+
+
+def cycle_seconds(peer_timeout):
+    """One leave/reject/crash/timeout/replace cycle, with a second for joins."""
+    return 2 * CHURN_SECONDS + CRASH_HOLD + peer_timeout + 1 + 1
 
 
 class Child:
@@ -82,42 +92,43 @@ def run(args, directory):
 
     port = free_port()
     endpoint = f"127.0.0.1:{port}"
-    server_seconds = args.seconds + 12
+    server_seconds = args.seconds + 4
     try:
         server = spawn([args.server, "--port", str(port), "--no-lan", "--waves",
                         "--location", args.location, "--mode", args.mode,
+                        "--peer-timeout", str(args.peer_timeout),
                         "--seconds", str(server_seconds)], "server")
         server.wait_for("listening on")
         server.deadline = time.monotonic() + server_seconds + 10
 
-        def bot(name, seconds):
+        def bot(name, seconds, inactive_every=3):
             child = spawn([args.bot, "--connect", endpoint, "--name", name,
                            "--seconds", str(seconds), "--predict", "--reset-every", "2",
-                           "--inactive-every", "3"], name)
+                           "--inactive-every", str(inactive_every)], name)
             child.wait_for("boat_bot joined:")
             assert f"location={args.location}" in child.output(), child.name
             child.deadline = time.monotonic() + seconds + 10
             return child
 
         persistent = [bot(f"stay-{i}", args.seconds) for i in range(3)]
-        churn_until = time.monotonic() + args.seconds - 20
+        churn_until = time.monotonic() + args.seconds - cycle_seconds(args.peer_timeout)
         cycles = 0
         while True:
-            fourth = bot(f"leave-{cycles}", 4)
+            fourth = bot(f"leave-{cycles}", CHURN_SECONDS, 2)
             full = spawn([args.bot, "--connect", endpoint, "--expect-reject"],
                          f"full-{cycles}")
             assert "room is full" in full.finish()
-            check_bot(fourth, 4)
+            check_bot(fourth, CHURN_SECONDS)
             crashed = bot(f"crash-{cycles}", 10)
             # Join-in-progress while the other three continue driving and resetting.
-            time.sleep(2)
+            time.sleep(CRASH_HOLD)
             crashed.process.kill()
             crashed.process.wait(timeout=5)
             crashed.log.close()
-            # Application timeout is 5 s; ENet may report the disconnect first.
-            time.sleep(6)
-            replacement = bot(f"rejoin-{cycles}", 4)
-            check_bot(replacement, 4)
+            # The room's peer timeout; ENet may report the disconnect first.
+            time.sleep(args.peer_timeout + 1)
+            replacement = bot(f"rejoin-{cycles}", CHURN_SECONDS, 2)
+            check_bot(replacement, CHURN_SECONDS)
             cycles += 1
             if time.monotonic() >= churn_until:
                 break
@@ -152,12 +163,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--server", required=True)
     parser.add_argument("--bot", required=True)
-    parser.add_argument("--seconds", type=int, default=24)
+    parser.add_argument("--seconds", type=int, default=12)
+    parser.add_argument("--peer-timeout", type=int, default=1, choices=range(1, 61),
+                        metavar="1-60")
     parser.add_argument("--location", choices=("basin", "river"), default="basin")
     parser.add_argument("--mode", choices=("free", "deathmatch"), default="free")
     args = parser.parse_args()
-    if not 24 <= args.seconds <= 7200:
-        parser.error("--seconds must be between 24 and 7200")
+    shortest = cycle_seconds(args.peer_timeout) + 1
+    if not shortest <= args.seconds <= 7200:
+        parser.error(f"--seconds must be between {shortest} and 7200")
     with tempfile.TemporaryDirectory(prefix="boat-net-session-") as directory:
         run(args, directory)
 
