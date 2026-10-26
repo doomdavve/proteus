@@ -7,6 +7,8 @@
 #define BOAT_BASIN_HALF_X 120.0f
 #define BOAT_BASIN_HALF_Z 80.0f
 
+struct BoatVoyageRoute;
+
 typedef enum {
     BOAT_LOCATION_BASIN,
     BOAT_LOCATION_RIVER,
@@ -28,6 +30,8 @@ typedef struct {
     // Authored current/crossing-source placement for opt-in water tests.
     float current_center;
     Vector2 wake_offset;
+    // Single-player adventure destination, shelters and exposed water; NULL for none.
+    const struct BoatVoyageRoute *voyage;
     // Presentation companion values; physics never reads these.
     float camera_distance, camera_height;
     float far_plane;

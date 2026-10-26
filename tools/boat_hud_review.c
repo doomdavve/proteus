@@ -1,4 +1,5 @@
 #include "boat_hud.h"
+#include "boat_voyage_view.h"
 #include "raylib.h"
 
 #include <stdio.h>
@@ -10,6 +11,10 @@ int main(int argc, char **argv)
     const char *background = NULL, *screenshot = NULL;
     int width = 960, height = 600, frames = 1;
     BoatHudTelemetry telemetry = { .speed_mps = 12.6f, .thrust = .50f, .steering = .35f };
+    // Optional outer-voyage cue (A3.4), drawn in window pixels as wake_velocity draws it.
+    BoatVoyage voyage = { 0 };
+    Boat boat = { 0 };
+    double voyage_time = 100;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--background") && i + 1 < argc)
             background = argv[++i];
@@ -44,11 +49,45 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Unknown HUD case: %s\n", name);
                 return 1;
             }
+        } else if (!strcmp(argv[i], "--voyage") && i + 1 < argc) {
+            const char *name = argv[++i];
+            const BoatVoyageRoute *route = &boat_voyage_outer;
+            boat_voyage_start(&voyage, route, 0);
+            voyage.shelter = 2;
+            boat.position = route->shelters[2].position;
+            boat.heading = route->shelters[2].heading;
+            if (!strcmp(name, "exposed")) {
+                boat.position = (Vector2) { 3900, -2600 };
+                boat.heading = 3.4f;
+                voyage.exposed = true;
+                voyage.event = BOAT_VOYAGE_EXPOSED;
+                voyage.event_time = voyage_time - 1;
+            } else if (!strcmp(name, "slow")) {
+                boat.position = (Vector2) { 3640, -3370 };
+                boat.heading = -1.57f;
+                voyage.too_fast = true;
+            } else if (!strcmp(name, "arrived")) {
+                boat.position = route->arrival_centre;
+                boat.heading = 1.57f;
+                voyage.arrived = true;
+                voyage.arrival = 412;
+                voyage.shelter = route->shelter_count - 1;
+                voyage.event = BOAT_VOYAGE_ARRIVED;
+                voyage.event_shelter = voyage.shelter;
+                voyage.event_time = voyage_time - 1;
+            } else if (!strcmp(name, "recovered")) {
+                voyage.event = BOAT_VOYAGE_RECOVERED;
+                voyage.event_shelter = 2;
+                voyage.event_time = voyage_time - 1;
+            } else if (strcmp(name, "shelter")) {
+                fprintf(stderr, "Unknown voyage case: %s\n", name);
+                return 1;
+            }
         } else {
             fprintf(stderr,
                 "Usage: boat_hud_review [--background PNG] [--screenshot PNG] "
                 "[--case neutral|docking|reverse-docking|cruise|reverse|full|reset] "
-                "[--compact|--large] "
+                "[--compact|--large] [--voyage shelter|exposed|slow|arrived|recovered] "
                 "[--frames N]\n");
             return 1;
         }
@@ -95,6 +134,7 @@ int main(int argc, char **argv)
         ClearBackground(BLACK);
         DrawTexturePro(native.texture, (Rectangle) { 0, 0, 320, -200 },
             (Rectangle) { 0, 0, (float)width, (float)height }, (Vector2) { 0 }, 0, WHITE);
+        boat_voyage_hud(&voyage, &boat, voyage_time, width);
         EndTextureMode();
         BeginDrawing();
         ClearBackground(BLACK);

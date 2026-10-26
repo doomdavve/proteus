@@ -7,6 +7,7 @@ static void reset(BoatSession *session)
     session->presentation_enabled = true;
     session->tick = 0;
     session->course = (BoatCourse) { 0 };
+    boat_voyage_start(&session->voyage, session->world.definition->voyage, 0);
     session->runs = (BoatReplayRuns) { 0 };
     session->record_runs = false;
 }
@@ -63,6 +64,16 @@ void boat_session_respawn(BoatSession *session)
     boat_presentation_reset(&session->presentation);
 }
 
+void boat_session_recover(BoatSession *session)
+{
+    if (!session->voyage.route) {
+        boat_session_respawn(session);
+        return;
+    }
+    boat_voyage_recover(&session->voyage, &session->boat, boat_session_time(session));
+    boat_presentation_reset(&session->presentation);
+}
+
 bool boat_session_step(BoatSession *session, BoatInput input)
 {
     if (session->tick == UINT64_MAX)
@@ -76,6 +87,7 @@ bool boat_session_step(BoatSession *session, BoatInput input)
     double now = boat_session_time(session);
     boat_step(&session->boat, &session->world, now, input);
     boat_course_step(&session->course, previous, session->boat.position, BOAT_TICK_SECONDS);
+    boat_voyage_step(&session->voyage, session->boat.position, session->boat.velocity, now);
     if (session->presentation_enabled)
         boat_presentation_step(&session->presentation, &session->boat, &session->world, now);
     if (record)

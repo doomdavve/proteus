@@ -20,8 +20,8 @@ no numeric readouts or units:
   unassigned. The seven instrument marks remain visual power references, not input detents.
   R does nothing; Space fires the deathmatch gun and E throws a wave grenade; free/race play leaves Space unused. A one-second Backspace hold shows
   HOLD: RESET and a progress bar; releasing early, help/menu, focus loss or replay cancels it.
-  One hold triggers once until released. The Escape menu also offers RESET BOAT, RESTART RUN
-  or REQUEST RESET. Rooms retain authority restrictions; inactive room controls neutralize.
+  One hold triggers once until released. The Escape menu also offers RESET BOAT, RESTART RUN,
+  RECOVER BOAT (solo `outer`: back to the last shelter) or REQUEST RESET. Rooms retain authority restrictions; inactive room controls neutralize.
 - **Speed:** a needle shows planar ground-speed magnitude, including lateral/reverse motion.
   Its internal display range remains 0..60 knots, saturating above that range, without
   displaying units or numbers. This is not signed forward speed or speed through water.
@@ -236,7 +236,11 @@ telemetry onto a background at 320x200, then nearest-scales the combined frame:
 ./build/boat_hud_review --case docking --screenshot build/hud-docking.png
 ./build/boat_hud_review --case reverse-docking --screenshot build/hud-reverse-docking.png
 ./build/boat_hud_review --background build/hud-river-background.png --case full --large --screenshot build/hud-full-large.png
+./build/boat_hud_review --voyage exposed --screenshot build/hud-voyage-exposed.png
 ```
+
+`--voyage shelter|exposed|slow|arrived|recovered` adds the outer location's destination panel
+(adventure A3.4) in window pixels, as `wake_velocity` draws it, from fixed fixture states.
 
 The review tool requires a graphics context. Default output is 960x600 (3x), compact
 320x200 (1x), large 1280x800 (4x); all use the same layout and pixel grid. Omit

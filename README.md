@@ -104,7 +104,7 @@ waves continue moving the same hull, while the chase camera keeps a level horizo
 Dry flight preserves horizontal momentum. The wheel provides modest yaw control; the engine,
 hull grip, skeg and automatic banking need water contact. Brief inverted flight is allowed;
 0.6 seconds of inverted water contact capsizes the boat and stops propulsion. Hold Backspace for one second or choose RESET BOAT in the Escape menu to
-restart. The HUD reports flight, landing and capsize. Traffic and berth obstacles require
+restart (on `outer`, RECOVER BOAT returns to the last shelter instead). The HUD reports flight, landing and capsize. Traffic and berth obstacles require
 vertical overlap, so jumps can clear low craft while tall masts/quays remain solid.
 The optional `--wake-objects-crossing` basin rival is a second boat in the multiplayer M2 fleet:
 both boats step together, share the waves and wakes, and meet with simultaneous equal-mass hull
@@ -372,9 +372,22 @@ The river covers a local waterfront area, not all of Gothenburg.
 `--location outer` starts at the same dock but loads the baked 16.5 km² first outer-river slice:
 the river's water and shore joined to Älvsborgsfjorden, Nya Älvsborg and the run to the Långedrag
 old harbour, with real land heights from Göteborg's Baskarta contours (see the
-[adventure ledger](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a32-result-2026-10-26)). It has no
-buildings, bridge or roads yet; where the region cuts open water the water ends at the
-horizon and collision keeps the boat inside. `--start X,Z[,DEGREES]` places the boat anywhere in a
+[adventure ledger](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a32-result-2026-10-26)). The river's
+buildings, roads and Älvsborgsbron are baked into it (A3.3); the land beyond the river has no
+buildings. Where the region cuts open water the water ends at the horizon and collision keeps
+the boat inside.
+
+Solo `outer` outings are a small voyage
+([A3.4](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a34-result-2026-10-26)). A panel at the top
+shows an arrow (the way to steer) and the distance to Långedrag's old harbour, about 6 km by
+water. Arrive by entering the harbour basin at 6 m/s or less; the panel then shows the time
+since the start. The dock, the river past the bridge and the outer fjord's east shore are
+shelters: passing one makes it the recovery point, and holding Backspace for 1 s (or RECOVER
+BOAT in the Esc menu) returns the boat there while the clock and water keep running. West of
+the direct line down the outer fjord lies a fixed patch of rough water with rain. The direct
+line crosses its flank, the east shore stays calm, and its middle has swells of several
+metres. The patch is authored, not observed weather. Rooms on `outer` keep calm water and no
+voyage. `--start X,Z[,DEGREES]` places the boat anywhere in a
 mapped location (simulation X/Z; heading 0 faces -Z), for example
 `--location outer --start 1980,-1196,75` on the open leg of the route.
 

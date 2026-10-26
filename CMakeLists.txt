@@ -64,7 +64,8 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
   src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
   src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
-  src/boat_water.h src/boat_world.c src/boat_world.h src/geometry3d.h
+  src/boat_voyage.c src/boat_voyage.h src/boat_water.h src/boat_world.c src/boat_world.h
+  src/geometry3d.h
   src/waterfront_city.c src/waterfront_city.h src/waterfront_harbor.c src/waterfront_harbor.h
   src/waterfront_outer.c src/waterfront_outer.h
   src/waterfront_traffic.c src/waterfront_traffic.h)
@@ -77,6 +78,7 @@ target_compile_options(proteus_boat_core PRIVATE ${PROTEUS_WARNINGS})
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 add_library(proteus_render STATIC
   src/boat_hud.c src/boat_hud.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
+  src/boat_voyage_view.c src/boat_voyage_view.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
   src/waterfront_scene.c)
@@ -459,6 +461,12 @@ target_link_libraries(validate_boat_outer_map PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_outer_map PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_outer_map COMMAND validate_boat_outer_map)
 set_tests_properties(boat_outer_map PROPERTIES PASS_REGULAR_EXPRESSION "boat_outer_map=ok")
+# Adventure A3.4: the outer voyage's shelters, exposed water, arrival and recovery.
+add_executable(validate_boat_voyage tools/validate_boat_voyage.c)
+target_link_libraries(validate_boat_voyage PRIVATE proteus_boat_session)
+target_compile_options(validate_boat_voyage PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_voyage COMMAND validate_boat_voyage)
+set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage=ok")
 # Adventure A2.2: in-memory tile catalogue and indexed collision, exact against the full scan.
 add_executable(validate_boat_map_index tools/validate_boat_map_index.c)
 target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_core)
@@ -882,7 +890,7 @@ if(PROTEUS_OPTIMIZE_TESTS)
       validate_boat validate_boat_banking validate_boat_turn_entry
       validate_boat_environment validate_boat_replay boat_water_review wake_objects_review
       validate_boat_clock validate_boat_world validate_boat_core validate_boat_map
-      validate_boat_map_index validate_boat_outer_map validate_boat_fleet
+      validate_boat_map_index validate_boat_outer_map validate_boat_voyage validate_boat_fleet
       boat_server
       proteus_boat_net validate_boat_net)
     target_compile_options(${target} PRIVATE
