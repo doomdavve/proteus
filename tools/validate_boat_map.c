@@ -28,10 +28,10 @@
 #define RIVER_QUERY_WATER 20356
 
 // Synthetic 10 m square of water in map east/Z, with one raised land triangle after it.
-static const Vector3 square_vertices[] = {
-    { 0, 0, 0 }, { 10, 0, 0 }, { 10, 0, 10 }, { 0, 0, 10 }, { 20, 2, 0 }, { 20, 2, 10 } };
-static const Triangle3D square_triangles[] = {
-    { { 0, 2, 1 }, WHITE }, { { 0, 3, 2 }, WHITE }, { { 1, 2, 4 }, GREEN } };
+static const Vector3 square_vertices[]
+    = { { 0, 0, 0 }, { 10, 0, 0 }, { 10, 0, 10 }, { 0, 0, 10 }, { 20, 2, 0 }, { 20, 2, 10 } };
+static const Triangle3D square_triangles[] = { { { 0, 2, 1 }, { 255, 255, 255, 255 } },
+    { { 0, 3, 2 }, { 255, 255, 255, 255 } }, { { 1, 2, 4 }, { 0, 228, 48, 255 } } };
 static const Mesh3D square_mesh = { square_vertices, square_triangles, 3 };
 static const BoatMapDescription square = { &square_mesh, 3 };
 // Only raised land: no leading water, so preparation must fail.

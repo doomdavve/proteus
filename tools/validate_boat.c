@@ -1202,8 +1202,8 @@ static uint64_t mesh_digest(const Mesh3D *mesh)
 // Synthetic 10 m pond in map east/Z, followed by one raised land triangle.
 static const Vector3 pond_vertices[]
     = { { 0, 0, 0 }, { 10, 0, 0 }, { 10, 0, 10 }, { 0, 0, 10 }, { 20, 2, 0 } };
-static const Triangle3D pond_triangles[]
-    = { { { 0, 2, 1 }, WHITE }, { { 0, 3, 2 }, WHITE }, { { 1, 2, 4 }, GREEN } };
+static const Triangle3D pond_triangles[] = { { { 0, 2, 1 }, { 255, 255, 255, 255 } },
+    { { 0, 3, 2 }, { 255, 255, 255, 255 } }, { { 1, 2, 4 }, { 0, 228, 48, 255 } } };
 static const Mesh3D pond_mesh = { pond_vertices, pond_triangles, 3 };
 static const BoatMapDescription pond = { &pond_mesh, 3 };
 
