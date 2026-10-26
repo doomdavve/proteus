@@ -22,6 +22,11 @@ same public directory and signaling endpoint. Both launchers include public STUN
 address discovery. The public `wake.davve.net` hostname avoids the VPN's private
 `*.winterfell.davve.net` DNS override.
 
+The v0.0.18 Pages launcher was republished from the selected published tag after PR #14 merged.
+On 2026-10-26 the live page returned the public directory, and fresh Chrome joined its listed
+room through `wss://wake.davve.net/room` without local-network permission. The game release
+and compiled client were unchanged.
+
 ## Routine deployments (davve-srv)
 
 `davve-srv` now owns normal deployment. Pin `wake_velocity_version` in

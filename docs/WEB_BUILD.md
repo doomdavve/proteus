@@ -60,11 +60,13 @@ Both features were introduced as `v0.0.17-server-directory`; Winterfell now serv
 v0.0.18 client, built on the server by the `davve-srv` baseline role. The public directory
 and launcher at `wake.davve.net` report protocol 6 / physics 9 and use
 `wss://wake.davve.net/room`. On 2026-10-26, a fresh Chrome/SwiftShader run of the published
-Pages build, with only its launcher directory URL overridden in Playwright, fetched Winterfell,
-joined that room and drove without local-network permission. Production Pages still needs the
-release-pinned workflow change in PR #12 to be merged and dispatched. Routine server updates
-use the [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native
-clients retain LAN/manual joining. Human gameplay and wider browser/platform checks remain.
+Pages build fetched Winterfell, joined that room and drove without local-network permission.
+First the test overrode only the launcher URL; after PR #14 merged and Pages run
+[40391231764](https://github.com/doomdavve/proteus/actions/runs/40391231764) completed,
+a fresh Chrome run against the actual published URL also fetched the list, joined and drove.
+The live launcher remains v0.0.18. Routine server updates use the
+[davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native clients
+retain LAN/manual joining. Human gameplay and wider browser/platform checks remain.
 
 Run the directory contract check with Node, or test a served released-compatible client:
 
@@ -73,6 +75,8 @@ node tools/test_web_server_directory.cjs
 python3 tools/check_web_server_directory.py --url https://wake.davve.net/ --output build/directory-review
 python3 tools/check_web_server_directory.py --url https://doomdavve.github.io/proteus/ \
   --directory-url https://wake.davve.net/servers.json --output build/pages-preview
+python3 tools/check_web_server_directory.py --url https://doomdavve.github.io/proteus/ \
+  --output build/pages-live
 python3 tools/check_web_server_directory.py --url https://wake.davve.net/ --unavailable --output build/directory-fallback
 ```
 
