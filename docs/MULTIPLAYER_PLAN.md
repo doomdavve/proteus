@@ -381,7 +381,7 @@ Prediction cannot guarantee identical perceived impact times on two machines.
 | Airborne clearance | Use transformed hull/cabin intervals from predicted/authoritative physical orientation; an interpolated low silhouette must not become a collider. No full 3D landing-on-boat feature. |
 | Capsize | Authority latches the existing sustained inverted wet contact rule. Speculative overturn is possible; confirmed capsize and disabled engine persist until a new life. UI/outcome counters only confirm server state. A late correction may change a speculative outcome once, but cannot repeatedly relaunch or relatch it. |
 | Three/four simultaneous contacts | Common candidate fleet and bounded simultaneous solver; conservation/symmetry tests. A canonical player loop alone is insufficient. |
-| Recovery near others | `R` requests a server reset. Use authored safe-water candidates with hull clearance plus a 10 m center buffer, no imminent swept boat/traffic approach for 0.5 s and a calm-surface check. Reserve accepted slots for the whole spawn batch. If none is safe, wait visibly; never spawn intersecting or clear other players' wakes. |
+| Recovery near others | Escape > REQUEST RESET or a one-second Backspace hold requests a server reset. Use authored safe-water candidates with hull clearance plus a 10 m center buffer, no imminent swept boat/traffic approach for 0.5 s and a calm-surface check. Reserve accepted slots for the whole spawn batch. If none is safe, wait visibly; never spawn intersecting or clear other players' wakes. |
 
 Respawn target: <=2 s after R in the ordinary basin scenario; retry at 10 Hz if blocked, offer
 another authored safe berth. Reset only that boat, its prediction/cosmetics and its emitter's
@@ -568,7 +568,7 @@ reduce snapshots from 30 to 20 Hz first. If backlog >500 ms persists for 1 s, re
 and end/restart the room cleanly with a new epoch. A client that cannot keep up resyncs or
 disconnects; it cannot slow everyone else. Record these events in performance evidence.
 
-Local offline pause/R behavior remains its own session rule. Multiplayer R resets one boat;
+Local offline pause/reset behavior remains its own session rule. A multiplayer reset request resets one boat;
 changing map/settings starts a new room epoch and baseline for everyone. Network runs never
 write offline time-trial personal bests or masquerade as compatible pose recordings. Existing
 replay/handling checks and old best files remain preserved under their revision paths. Clock

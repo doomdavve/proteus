@@ -154,7 +154,7 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
     double now = boat_net_clock();
     // Held boats (grid, countdown, parked) cannot reset; do not ask.
     const BoatFleetSlot *held = boat_net_client_own(c);
-    if (reset && active && !(held && held->held))
+    if (reset && !(held && held->held))
         boat_net_client_request_reset(c);
     if (!boat_net_client_service_targets(c, now, input, !active, thrust_target, steering_target)) {
         fail(net, "Disconnected: %s.", boat_net_client_failure(c));
@@ -250,8 +250,8 @@ static const BoatNetFeedEntry *own_capsize(const BoatNetClient *c, uint32_t life
     return NULL;
 }
 
-// "CAPSIZED BY NAME / RESPAWN 2": the authority respawns a capsized boat by itself; R skips
-// the rest of the wait after skip_ticks.
+// "CAPSIZED BY NAME / RESPAWN 2": the authority respawns a capsized boat by itself; a reset request
+// skips the rest of the wait after skip_ticks.
 static const char *capsize_notice(const NetStudy *net, const Boat *boat, uint32_t life)
 {
     static char text[96];
@@ -270,11 +270,11 @@ static const char *capsize_notice(const NetStudy *net, const Boat *boat, uint32_
     else if (e)
         snprintf(who, sizeof(who), "CAPSIZED / -1");
     snprintf(text, sizeof(text), "%s / RESPAWN %.0f%s", who, ceil(fmax(0, left)),
-        waited >= c->match.skip_ticks ? " / R TO SKIP" : "");
+        waited >= c->match.skip_ticks ? " / HOLD BACKSPACE" : "");
     return text;
 }
 
-// "CAPSIZED / RECOVERY 2 / R TO SKIP" while a race recovers the own boat by itself.
+// "CAPSIZED / RECOVERY 2 / HOLD BACKSPACE" while a race recovers the own boat by itself.
 static const char *race_capsize_notice(const NetStudy *net, const Boat *boat)
 {
     static char text[64];
@@ -284,7 +284,7 @@ static const char *race_capsize_notice(const NetStudy *net, const Boat *boat)
     double waited = boat_net_client_server_tick(c, boat_net_clock()) - (double)net->capsized_tick;
     double left = ((double)c->race.recovery_ticks - waited) / BOAT_TICK_HZ;
     snprintf(text, sizeof(text), "CAPSIZED / RECOVERY %.0f%s", ceil(fmax(0, left)),
-        waited >= c->race.skip_ticks ? " / R TO SKIP" : "");
+        waited >= c->race.skip_ticks ? " / HOLD BACKSPACE" : "");
     return text;
 }
 

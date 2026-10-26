@@ -12,6 +12,7 @@ typedef enum {
     BOAT_MENU_RESUME,
     BOAT_MENU_STEERING, // Toggle mouse / keyboard steering.
     BOAT_MENU_CONTROLS, // Open the keyboard guide over the menu.
+    BOAT_MENU_RESET, // Explicit reset/restart/request, using the session's existing action.
     BOAT_MENU_LEAVE,
 } BoatMenuChoice;
 
@@ -20,6 +21,7 @@ typedef struct {
     int selected;
     double time;
     bool can_leave; // A shared title window lets a browser session return too.
+    const char *reset_label; // RESET BOAT, RESTART RUN or REQUEST RESET.
     const char *leave_label; // QUIT, BACK TO TITLE, LEAVE ROOM or CLOSE ROOM.
     const char *room_hint; // Replaces the networked hint (a hosted room), if set.
 } BoatMenu;

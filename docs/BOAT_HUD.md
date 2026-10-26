@@ -1,33 +1,27 @@
 # Marine boat instruments
 
-Status, 2026-10-24: implemented in branch `boat-marine-hud`, then cherry-picked onto `main` after
-`29d1afb` (title screen, M4 reset feedback, packaged `boat_server`). In the merge the HUD draws into
-the 320x200 frame and the reset fade, notices and room roster stay in screen space. (At the
-merge Esc released the mouse and then left; since 2026-10-25 it opens the in-game menu instead.) Native macOS checks after the merge: Debug
-build and all 105 active CTests; the merged controls were not hand-played. The bottom-anchored translucent instrument panel now accompanies
-stepped keyboard/scroll thrust and captured, stateful mouse steering. The initial absolute
-pointer prototype is superseded following user feedback. The user accepted captured/stateful
-steering with scroll thrust on 2026-10-24. Native macOS and browser qualification is recorded
-below; native Windows/Linux, shipping Safari and multiplayer integration remain pending.
-The [boating plan](BOATING_PLAN.md) owns gameplay direction.
+Status, 2026-10-26: the `controls-pedals-stability` branch implements pedal thrust, Shift
+precision, automatic aerial stabilization, and safe reset, based on `2b55994`. It is isolated
+for later integration and has not been merged or user-played. The existing captured/held-wheel
+mouse steering and keyboard spring return remain. This supersedes the 2026-10-24 stepped/scroll
+thrust and steering-roll controls; the dated records below retain their original evidence.
+The [controls handoff](CONTROLS_PEDALS_HANDOFF.md) records integration, verification and limits.
+Next: integrate, then human docking, wake-crossing and recovery playtests on native/browser.
 
 Completed task: a bottom-centred marine case with pale markings, muted metal trim,
 flush screws and amber/sea-green needles. All three readings are visual ranges, with
 no numeric readouts or units:
 
-- **Thrust:** a vertical telegraph. Forward is above neutral; reverse is below.
-  The handle shows `Boat.throttle`, not delayed engine response. Thrust still holds when
-  released. Tap Up/W or Down/S once per step; a held key steps again every 0.5 s, and each new
-  press steps at once, so quick taps are faster than holding. Scroll down/up adds/removes
-  thrust (down opens the throttle since 2026-10-24), in either steering mode: one scroll unit per step, with fractional trackpad
-  motion accumulated and larger scrolls allowed to cross several steps. No scrolling holds
-  the selected thrust. Overscrolling at either limit does not delay the next reverse scroll.
-  Forward steps are
-  ultra-slow (5%), slow (20%), medium (50%) and max (100%). Reverse steps are ultra-slow
-  (5%) and slow (20%), with neutral between the directions. Seven marks give each setting
-  distinct visual travel, including docking. Command travel and engine spool remain smooth;
-  the handle tracks actual command travel. R selects neutral. Solo focus/help pauses retain
-  the selection; multiplayer focus/help and new lives clear it to neutral.
+- **Thrust:** the vertical handle shows `Boat.throttle`, not delayed engine response. Hold
+  W/Up for 100% forward, S/Down for 20% reverse. Release both, or hold both, for neutral;
+  water resistance slows travel, and reverse thrust adds braking. Hold either Shift for
+  5% forward/reverse power; PRECISION appears above the instruments. Command travel is
+  4 units/s (0.25 s neutral-to-full), retaining the separate engine spool. Scroll is
+  unassigned. The seven instrument marks remain visual power references, not input detents.
+  R does nothing; Space is reserved during ordinary play. A one-second Backspace hold shows
+  HOLD: RESET and a progress bar; releasing early, help/menu, focus loss or replay cancels it.
+  One hold triggers once until released. The Escape menu also offers RESET BOAT, RESTART RUN
+  or REQUEST RESET. Rooms retain authority restrictions; inactive room controls neutralize.
 - **Speed:** a needle shows planar ground-speed magnitude, including lateral/reverse motion.
   Its internal display range remains 0..60 knots, saturating above that range, without
   displaying units or numbers. This is not signed forward speed or speed through water.
@@ -43,15 +37,15 @@ no numeric readouts or units:
   [title plan](TITLE_SCREEN_PLAN.md#in-game-escape-menu-2026-10-25)) and releases capture
   without changing the mode; its STEERING row also switches it. Resuming recaptures.
   Help/focus loss releases capture; returning resumes it with capture-frame motion discarded.
-  Solo pause retains the target; multiplayer inactivity neutralizes it. R/new life resets
-  the target to centre. Keyboard mode retains spring return. Demo/replay release capture and
+  Solo pause retains the target; multiplayer inactivity neutralizes it. A deliberate reset/new life centres
+  the target. Keyboard mode retains spring return. Demo/replay release capture and
   retain their existing controls. The scene-pixel label shows `MOUSE / ESC: MENU`
   (hidden while the menu is open). A browser unlock the game did not request (Escape,
   focus loss) opens the menu instead of switching to keyboard; denied capture still
   falls back to keyboard with `MOUSE UNAVAILABLE / USE A/D`.
-  In object-wake flight the same wheel also commands roll, progressively up to a barrel
-  roll at full steering. Centre it to brake and assist an upright landing; stopping the
-  mouse holds the roll command. The [stability study](ARCADE_STABILITY.md) owns the first tuning.
+  In object-wake flight steering retains yaw and automatic upright assistance, but cannot
+  command a roll. Stopping the mouse still holds the wheel; it does not suppress recovery.
+  Impacts and bad/inverted landings can still capsize the boat. See [stability](ARCADE_STABILITY.md).
 
 
 The 166x44 panel has one layout at every window size and sits flush against the scene's
@@ -67,7 +61,7 @@ Existing course/help/profiler/status overlays retain their previous screen-resol
 rendering; this change owns the three-instrument HUD. Wake/connection status moves above
 the case so it does not cover the instruments. Help covers the HUD.
 
-## Integration handoff
+## Original HUD integration handoff (historical)
 
 `src/boat_hud.[ch]` is presentation-only and linked in `proteus_render`. The draw function
 allocates no resources and retains no state. It needs raylib and three telemetry floats.
@@ -91,7 +85,7 @@ Next task: qualify Windows/Linux and shipping Safari, then integrate the accepte
 controls with multiplayer.
 Inspect a connected session after integration, especially own spawn/reset and new UI.
 Preserve the main agent's uncommitted work; this branch does not include those changes.
-The current control behavior holds the selected thrust until another tap or reset.
+Historical integration behavior: selected thrust held until another tap or reset; superseded by the pedal controls above.
 
 ## Stepped-thrust verification, 2026-10-24
 

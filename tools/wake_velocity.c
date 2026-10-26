@@ -6,6 +6,7 @@
 #include "boat_music.h"
 #include "boat_profile.h"
 #include "boat_replay.h"
+#include "boat_reset_hold.h"
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
@@ -48,12 +49,12 @@ static void usage(void)
         "  mouse steering, soundtrack)\n"
         "  Esc > BACK TO TITLE returns to it | --title --screenshot FILE: capture the title\n"
         "--soundtrack a-little-boat|acid-wake|off: local background music (default a-little-boat)\n"
-        "Left/Right or A/D: adjust wheel | Up/Down or W/S: step thrust (4 forward / neutral / 2 "
-        "reverse); hold to step every 0.5 s\n"
-        "Scroll down/up: more/less thrust (also Up/Down or W/S)\n"
+        "Left/Right or A/D: adjust wheel\n"
+        "Hold W/Up: forward | S/Down: reverse | release: neutral | Shift: precision\n"
         "M: capture/release mouse steering (move to turn; stop to hold) | --mouse-steering\n"
-        "Arcade jumps: steering rolls in the air; centre the wheel to stabilize for landing\n"
-        "Keyboard wheel springs to centre; mouse wheel and thrust hold. R: reset | Esc: menu "
+        "Arcade jumps: automatic aerial stabilization; steering retains yaw\n"
+        "Keyboard wheel springs to centre; mouse wheel holds. Hold Backspace 1 s: reset | Esc: "
+        "menu "
         "(steering, controls, leave; solo pauses, rooms keep running)\n"
         "+/-: closer/farther | PageUp/PageDown: raise/lower camera | C: reset view\n"
         "--wake-field: opt-in coherent CPU field, native basin only\n"
@@ -62,14 +63,16 @@ static void usage(void)
         "(basin only)\n"
         "--wake-life-ticks 240..1920 (default 1920) | --wake-height 0.1..3 (default 1.2 m)\n"
         "--player-wake: legacy D3 trail | --no-player-wake: visual-only player trail\n"
-        "--current / --crossing-wake: opt-in authored tests in all locations; R restarts passage\n"
+        "--current / --crossing-wake: opt-in authored tests in all locations; hold Backspace 1 s "
+        "to restart passage\n"
         "--skin sweden|finland|denmark|norway: cosmetic speedboat livery (default sweden)\n"
         "--camera-distance UNITS: 8..48 (default 20; river 12)\n"
         "--camera-height UNITS: 4..36 (default 14; river 6)\n"
         "--fixed-fov: keep the 55-degree view instead of widening gently with speed\n"
         "--location basin|river (default basin; river extends to Alvsborgsbron)\n"
         "--waves: gentle crossing waves and a floating hull\n"
-        "--course: timed S course in the basin; cross highlighted gates in order | R: retry\n"
+        "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
+        "1 s: retry\n"
         "G: ghost on/off | P/B: replay last/best | Space: pause replay | Enter: restart replay\n"
         "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed 0.25x..4x\n"
         "Click/drag the replay timeline to seek and pause; Space resumes.\n"
@@ -82,9 +85,10 @@ static void usage(void)
         "  --no-vsync: pace to exactly 60 Hz instead\n"
         "CPU screenshots need no window; GPU screenshots require a graphics context.\n"
         "--time is screenshot-only (0..60, or 0..600 with --replay); --frames limits a smoke run.\n"
-        "--demo drives the screenshot example in a window; R restarts it.\n"
+        "--demo drives the screenshot example in a window; hold Backspace for 1 s to restart it.\n"
         "--connect HOST:PORT: join a boat_server room (native multiplayer, in progress: the own\n"
-        "  boat is predicted and answers at once; R asks for a new life; every boat is drawn in\n"
+        "  boat is predicted and answers at once; hold Backspace 1 s for a new life; every boat is "
+        "drawn in\n"
         "  its slot's country: 1 Sweden, 2 Finland, 3 Denmark, 4 Norway) | --name TEXT |\n"
         "  --token TEXT\n"
         "--host free|deathmatch|race: start a room open to the local network (a second copy of\n"
@@ -109,13 +113,13 @@ static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
         "Left/Right or A/D: steer (keyboard mode)",
         "M: toggle mouse / keyboard steering",
         "Mouse: move to turn; stop to hold wheel",
-        "In air: steer to roll; centre to stabilize",
+        "In air: automatic upright assistance",
         "Esc: menu (steering, controls, leave)",
-        "W/S or scroll down/up: step thrust",
+        "Hold W/Up: forward | S/Down: reverse",
         "Release keyboard steering: centre wheel",
-        "Thrust: 4 forward / neutral / 2 reverse",
-        "Tap: one step | hold: step each 0.5 s",
-        "R: reset boat / restart demo",
+        "Release thrust keys: neutral / coast",
+        "Hold Shift: low-power maneuvering",
+        "Hold Backspace 1 s: reset / restart",
         deathmatch ? "Hold Tab: deathmatch scoreboard"
             : race ? "Hold Tab: race standings"
                    : "",
@@ -547,8 +551,8 @@ static int study(int argc, char **argv)
     BoatAudio audio = { 0 };
     Music music = { 0 };
     bool music_ready = false;
-    int thrust_step = BOAT_THROTTLE_NEUTRAL;
-    float throttle_scroll = 0, throttle_held = 0;
+    float thrust_target = 0;
+    BoatResetHold reset_hold = { 0 };
     BoatSession session;
     boat_session_init(&session, &worlds[location->id],
         study_water(location, waves, current, crossing_wake, player_wake));
@@ -770,6 +774,9 @@ static int study(int argc, char **argv)
     bool replay_dragging = false;
     bool help_visible = false;
     BoatMenu menu = { .can_leave = true,
+        .reset_label = networked ? "REQUEST RESET"
+            : course             ? "RESTART RUN"
+                                 : "RESET BOAT",
         .leave_label = host_mode ? "CLOSE ROOM"
             : networked          ? "LEAVE ROOM"
             : window_owned       ? "QUIT"
@@ -802,6 +809,7 @@ static int study(int argc, char **argv)
         if (help_pressed)
             help_visible = !help_visible;
         // Escape never changes the steering mode: it opens the menu, which releases capture.
+        bool reset_requested = false;
         bool menu_was_open = menu.open;
         if (IsKeyPressed(KEY_ESCAPE)) {
             if (help_visible)
@@ -819,13 +827,16 @@ static int study(int argc, char **argv)
         Rectangle destination = { (GetScreenWidth() - WIDTH * scale) / 2,
             (GetScreenHeight() - HEIGHT * scale) / 2, WIDTH * scale, HEIGHT * scale };
         Camera2D menu_camera = { .offset = { destination.x, destination.y }, .zoom = scale };
-        if (menu.open && menu_was_open && !help_visible) {
+        if (menu.open && menu_was_open && !help_visible && IsWindowFocused()) {
             BoatMenuChoice choice = boat_menu_update(&menu, menu_camera, GetFrameTime());
             if (choice == BOAT_MENU_RESUME)
                 menu.open = false;
             else if (choice == BOAT_MENU_CONTROLS)
                 help_visible = true;
-            else if (choice == BOAT_MENU_LEAVE)
+            else if (choice == BOAT_MENU_RESET) {
+                reset_requested = true;
+                menu.open = false;
+            } else if (choice == BOAT_MENU_LEAVE)
                 break;
             else if (choice == BOAT_MENU_STEERING) {
 #if defined(__EMSCRIPTEN__)
@@ -872,7 +883,7 @@ static int study(int argc, char **argv)
         bool capture_changed = capture_mouse != mouse_captured;
         mouse_captured = capture_mouse;
         float mouse_delta = boat_web_mouse_movement();
-        float scroll_delta = boat_web_mouse_scroll();
+        (void)boat_web_mouse_scroll(); // Drain browser input; scrolling no longer applies thrust.
 #else
         bool capture_mouse = active && mouse_driving;
         bool capture_changed = capture_mouse != mouse_captured;
@@ -884,13 +895,10 @@ static int study(int argc, char **argv)
             mouse_captured = capture_mouse;
         }
         float mouse_delta = GetMouseDelta().x;
-        float scroll_delta = GetMouseWheelMoveV().y;
 #endif
         // Capture warps the native cursor; discard that frame's delta. Stop moving to
         // hold this target, rather than deriving steering from a screen position.
-        if (active && IsKeyPressed(KEY_R))
-            mouse_wheel = 0;
-        else if (mouse_captured && !capture_changed)
+        if (mouse_captured && !capture_changed)
             mouse_wheel = boat_mouse_wheel(mouse_wheel, mouse_delta);
         if (!active && networked)
             mouse_wheel = 0; // The authority neutralizes inactive controls too.
@@ -911,18 +919,12 @@ static int study(int argc, char **argv)
             if (IsKeyPressed(KEY_C))
                 camera_settings = camera_default;
         }
-        if (active && !demo && !session.runs.playing) {
-            int pressed = (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
-                - (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S));
-            int held = (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W))
-                - (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S));
-            thrust_step = boat_throttle_hold(
-                thrust_step, pressed, held, fminf(GetFrameTime(), 0.1f), &throttle_held);
-            // Scrolling down (toward the player) opens the throttle.
-            thrust_step = boat_throttle_scroll(thrust_step, -scroll_delta, &throttle_scroll);
-        } else {
-            throttle_scroll = throttle_held = 0;
-        }
+        bool precision = active && !demo && !session.runs.playing
+            && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
+        thrust_target = active && !demo && !session.runs.playing
+            ? boat_pedal_target(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W),
+                  IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S), precision)
+            : 0;
         bool replay_adjusted = false;
         if (!active)
             replay_dragging = false;
@@ -985,6 +987,13 @@ static int study(int argc, char **argv)
         }
         metrics.course_replay_ms
             += (float)((boat_profile_time(true) - course_input_started_at) * 1000.0);
+        reset_requested |= boat_reset_hold_update(
+            &reset_hold, IsKeyDown(KEY_BACKSPACE), active && !session.runs.playing, GetFrameTime());
+        if (reset_requested) {
+            thrust_target = 0;
+            mouse_wheel = 0;
+            steering_target = mouse_driving ? 0 : NAN;
+        }
         double simulation_started_at = boat_profile_time(true);
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
@@ -996,12 +1005,8 @@ static int study(int argc, char **argv)
                 };
             // No multiplayer pause: the room keeps running while help or focus is away.
             uint32_t previous_life = net->own_life;
-            if (!active || IsKeyPressed(KEY_R)) {
-                thrust_step = BOAT_THROTTLE_NEUTRAL;
-                throttle_scroll = 0;
-            }
-            if (!net_study_frame(net, &session, input, boat_throttle_setting(thrust_step),
-                    steering_target, active, active && IsKeyPressed(KEY_R))) {
+            if (!net_study_frame(net, &session, input, thrust_target, steering_target, active,
+                    reset_requested)) {
                 result = 1;
                 break;
             }
@@ -1013,14 +1018,12 @@ static int study(int argc, char **argv)
             }
 #endif
             if (net->own_life != previous_life) {
-                thrust_step = BOAT_THROTTLE_NEUTRAL;
-                throttle_scroll = 0;
+                thrust_target = 0;
                 mouse_wheel = 0;
             }
 #endif
-        } else if (active && IsKeyPressed(KEY_R)) {
-            thrust_step = BOAT_THROTTLE_NEUTRAL;
-            throttle_scroll = 0;
+        } else if (reset_requested) {
+            thrust_target = 0;
             boat_session_restart(
                 &session, study_water(location, waves, current, crossing_wake, player_wake));
             if (wake) {
@@ -1054,8 +1057,7 @@ static int study(int argc, char **argv)
                     if (mouse_driving)
                         input.steering_rate
                             = boat_steering_rate(session.boat.wheel, steering_target);
-                    input.throttle_rate = boat_throttle_rate(
-                        session.boat.throttle, boat_throttle_setting(thrust_step));
+                    input.throttle_rate = boat_throttle_rate(session.boat.throttle, thrust_target);
                     timed_boat_step(&session, input, &metrics, wake, objects);
                 }
                 accumulator -= BOAT_TICK_SECONDS;
@@ -1180,7 +1182,9 @@ static int study(int argc, char **argv)
         boat_hud_draw(
             (BoatHudTelemetry) { .speed_mps = hypotf(view->boat.velocity.x, view->boat.velocity.y),
                 .thrust = view->boat.throttle,
-                .steering = view->boat.wheel },
+                .steering = view->boat.wheel,
+                .precision = precision,
+                .reset_progress = reset_hold.seconds / BOAT_RESET_HOLD_SECONDS },
             WIDTH, HEIGHT);
         if (mouse_driving && !menu.open)
             DrawText(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4, 4, 10,
@@ -1208,7 +1212,7 @@ static int study(int argc, char **argv)
         if (notice)
             DrawText(notice, 12, 36, 20, ORANGE);
         else if (view->boat.motion_state == BOAT_CAPSIZED)
-            DrawText("CAPSIZED / R TO RESTART", 12, 36, 20, ORANGE);
+            DrawText("CAPSIZED / HOLD BACKSPACE 1s", 12, 36, 20, ORANGE);
         else if (view->boat.motion_state == BOAT_AIRBORNE)
             DrawText("AIRBORNE", 12, 36, 16, SKYBLUE);
         else if (view->boat.motion_state == BOAT_LANDING)

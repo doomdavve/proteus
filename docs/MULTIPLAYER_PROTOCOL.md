@@ -25,6 +25,12 @@ v5 (2026-10-25) removes the Eriksberg location: Accept's location byte is now 0 
 1 river (v3/v4 sent river as 2), and the content digest covers only those two locations and
 the single river crop. Message layouts are otherwise unchanged; v1–v4 are incompatible.
 
+Handling revision 9 (2026-10-26, isolated controls branch) increases commanded-thrust travel
+to 4 units/s and removes steering-commanded aerial roll. Protocol v5 bytes are unchanged;
+old handling revisions are rejected. Pedals/Shift become ordinary target-derived rate inputs,
+and the menu/held shortcut use the existing reset request. Inactive authority input uses the
+same shared command rate, preventing neutral overshoot. [Integration status](CONTROLS_PEDALS_HANDOFF.md).
+
 ## Conventions
 
 - Every multi-byte integer is **big-endian** (network order). `i8` is two's complement.
@@ -109,7 +115,7 @@ are discarded. This receiver buffering does not change the wire layout or channe
 
 ### Hello, Accept, Reject
 
-Hello: `u32` handling revision (`BOAT_PHYSICS_REVISION`, currently 8), `u64` content digest,
+Hello: `u32` handling revision (`BOAT_PHYSICS_REVISION`, currently 9), `u64` content digest,
 then the name (≤16), room token (≤32) and build label (≤32) strings.
 
 The content digest is FNV-1a 64 over every compiled location in ID order: identity, mapped

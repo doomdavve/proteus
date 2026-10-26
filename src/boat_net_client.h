@@ -153,7 +153,7 @@ bool boat_net_client_service_thrust(
 // As above, with optional absolute wheel target; NAN keeps INPUT's steering rate.
 bool boat_net_client_service_targets(BoatNetClient *client, double now, BoatInput input,
     bool inactive, float thrust_target, float steering_target);
-// Ask the authority for a new life at a safe spawn (the R key).
+// Ask the authority for a new life at a safe spawn (menu action or held Backspace).
 void boat_net_client_request_reset(BoatNetClient *client);
 // Progress of the latest reset request; SECONDS (may be NULL) receives its age.
 BoatNetResetState boat_net_client_reset_state(

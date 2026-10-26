@@ -1,4 +1,14 @@
-# Arcade stability and steering roll study
+# Arcade stability and aerial assistance
+
+Status, 2026-10-26: `controls-pedals-stability` removes steering-commanded aerial rolls and
+keeps the existing automatic damping/upright recovery active through held turns. Keyboard
+spring return, held mouse steering, air yaw, wet landing assistance, inversion fade and the
+capsize latch remain. Physics revision **9** also adds faster pedal thrust; no wire layout
+changes. Source changes are isolated for integration, not merged or user-accepted.
+Next: integrate and play turning wake crossings, docking, recovery and difficult landings.
+[Evidence and handoff](CONTROLS_PEDALS_HANDOFF.md).
+
+## Original study (historical, superseded controls)
 
 2026-10-24, branch `arcade-stability`. Owner: [wake plan](WAKE_REWRITE_PLAN.md).
 The user finds the current boat too easy to capsize, requests lower default waves and
@@ -11,7 +21,7 @@ and the title's mouse-steering setting.
 Handoff feedback, 2026-10-24: the user responded "Great!" and requested this candidate be
 committed. No additional hands-on play session or platform acceptance was reported.
 
-## Current tuning
+## Original revision-7 tuning (historical)
 
 - The default object crest scale is **1.2 m**, down from 1.8 m. Lifetime, emission cadence,
   propagation and signed overlap stay as before. Overlapping crests can still be taller.

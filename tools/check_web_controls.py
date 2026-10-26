@@ -67,7 +67,9 @@ def main():
             page.evaluate("Module.canvas.dispatchEvent(new WheelEvent('wheel', {deltaY:-100, cancelable:true}))")
             page.wait_for_function('controlAudit.scroll.includes(1)')
             page.keyboard.press('w', delay=150)
-            page.keyboard.press('r', delay=150)
+            page.keyboard.down('Backspace')
+            page.wait_for_timeout(1250)
+            page.keyboard.up('Backspace')
             page.screenshot(path=str(args.output / 'keyboard-fallback.png'))
             result = {'browser': args.browser, 'pointer_lock': 'unavailable-or-denied',
                       'audit': page.evaluate('controlAudit'), 'errors': errors}
@@ -128,7 +130,9 @@ def main():
         page.locator('#canvas').click()
         page.wait_for_function('controlAudit.wanted === 0')
         page.keyboard.press('w')
-        page.keyboard.press('r')
+        page.keyboard.down('Backspace')
+        page.wait_for_timeout(1250)
+        page.keyboard.up('Backspace')
         page.screenshot(path=str(args.output / 'keyboard-fallback.png'))
         result = {'browser': args.browser, 'pointer_lock': 'verified', 'audit': page.evaluate('controlAudit'), 'errors': errors}
         (args.output / 'results.json').write_text(json.dumps(result, indent=2))

@@ -149,7 +149,9 @@ static int large_time_locations(void)
                 float wheel = tick > 240 && tick < 120 * 12 ? .5f : 0;
                 boat_session_step(&session,
                     (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-                        Clamp((throttle - boat->throttle) / (.5f * BOAT_STEP), -1, 1) });
+                        Clamp(
+                            (throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP),
+                            -1, 1) });
                 CHECK(boat_finite(boat) && fabsf(boat->height) < 1.5f);
                 CHECK(boat_session_time(&session)
                     == boat_tick_seconds(starts[s] + (uint64_t)tick + 1));
@@ -248,7 +250,8 @@ static int soak(double seconds, const char *directory, bool waves)
         float throttle = tick % (200 * 120) < 190 * 120 ? 1 : 0;
         timed_boat_step(&session,
             (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-                Clamp((throttle - boat->throttle) / (.5f * BOAT_STEP), -1, 1) },
+                Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
+                    1) },
             NULL, NULL, &study);
         // Recover pose only after a capsize or a shoreline stall: the world clock, water
         // settings and wake history continue.

@@ -47,7 +47,7 @@ static void drive(CoreRun *run, int tick)
     float throttle = tick < 1440 ? 1 : 0;
     float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
     core_step(run, Clamp((wheel - run->boat.wheel) / BOAT_STEP, -1, 1),
-        Clamp((throttle - run->boat.throttle) / (.5f * BOAT_STEP), -1, 1));
+        Clamp((throttle - run->boat.throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1));
 }
 
 static void start(CoreRun *run, int index)

@@ -62,7 +62,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_race.c src/boat_race.h src/boat_location.c src/boat_location.h src/boat_map.c
   src/boat_map.h src/boat_map_tiles.c src/boat_map_tiles.h
   src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
-  src/boat_input.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
+  src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
   src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
   src/boat_water.h src/boat_world.c src/boat_world.h src/geometry3d.h
   src/waterfront_city.c src/waterfront_city.h src/waterfront_harbor.c src/waterfront_harbor.h

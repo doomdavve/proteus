@@ -5,6 +5,14 @@
 #include "boat_throttle.h"
 #include "raymath.h"
 
+// Scripted bots may observe a delayed network mirror. A quarter-second feedback horizon
+// avoids chasing that stale command with full-rate oscillation after the faster pedal change.
+// Player pedals use boat_throttle_rate() against their locally predicted boat instead.
+static inline float boat_fleet_bot_throttle_rate(float current, float target)
+{
+    return Clamp((target - current) / (BOAT_THROTTLE_COMMAND_RATE * .25f), -1, 1);
+}
+
 // Scripted fleet drivers for validators and boat_server. Every slot laps the crossing rival's
 // four basin waypoints, odd slots in the opposite direction, so trails cross and boats meet
 // head-on. Two seconds after a capsize a bot asks the fleet for a reset.
@@ -31,7 +39,7 @@ static inline BoatInput boat_fleet_bot_input(
     float wheel = Clamp(2 * error - boat->yaw_velocity, -1, 1);
     float throttle = .65f + .1f * (float)slot;
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        Clamp((throttle - boat->throttle) / (.5f * BOAT_STEP), -1, 1) };
+        boat_fleet_bot_throttle_rate(boat->throttle, throttle) };
 }
 
 // Deathmatch hunter (boat_bot --hunt): full throttle at a point just ahead of the nearest
@@ -60,7 +68,7 @@ static inline BoatInput boat_fleet_bot_hunt_input(
     float error = remainderf(target - boat->heading, 2 * PI);
     float wheel = Clamp(2 * error - boat->yaw_velocity, -1, 1);
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        Clamp((1 - boat->throttle) / (.5f * BOAT_STEP), -1, 1) };
+        boat_fleet_bot_throttle_rate(boat->throttle, 1) };
 }
 
 // Race route bot (validate_boat_race, boat_bot --race): the next gate's centre, offset to the
@@ -79,7 +87,7 @@ static inline BoatInput boat_fleet_bot_race_input(const BoatFleet *fleet,
     float error = remainderf(heading - boat->heading, 2 * PI);
     float wheel = Clamp(1.5f * error - .8f * boat->yaw_velocity, -.6f, .6f);
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        boat_throttle_rate(boat->throttle, finished ? 0 : 1) };
+        boat_fleet_bot_throttle_rate(boat->throttle, finished ? 0 : 1) };
 }
 
 // Inputs for every slot, then recovery requests for boats capsized for two seconds.

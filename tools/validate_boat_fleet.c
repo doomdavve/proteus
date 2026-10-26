@@ -44,7 +44,7 @@ static BoatInput loop_input(const Boat *boat, unsigned tick)
     float throttle = tick < 1440 ? 1 : 0;
     float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        Clamp((throttle - boat->throttle) / (.5f * BOAT_STEP), -1, 1) };
+        Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
 }
 
 static bool track(

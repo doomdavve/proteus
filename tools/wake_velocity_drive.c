@@ -74,7 +74,7 @@ static BoatInput rival_input(ObjectStudy *study)
     float error = remainderf(target - other->heading, 2 * PI);
     float wheel = Clamp(2 * error - other->yaw_velocity, -1, 1);
     return (BoatInput) { Clamp((wheel - other->wheel) / BOAT_STEP, -1, 1),
-        Clamp((.75f - other->throttle) / (.5f * BOAT_STEP), -1, 1) };
+        Clamp((.75f - other->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
 }
 
 // The session keeps the player for R, views and audio; the fleet steps it with the rival.
@@ -144,7 +144,8 @@ void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWa
         float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
         timed_boat_step(session,
             (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-                Clamp((throttle - boat->throttle) / (.5f * BOAT_STEP), -1, 1) },
+                Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
+                    1) },
             metrics, wake, objects);
         return;
     }
@@ -152,8 +153,10 @@ void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWa
         // Let the source become visible, approach its spreading wake, then recover in neutral.
         float target = tick < 720 ? 0 : tick < 1200 ? .65f : 0;
         timed_boat_step(session,
-            (BoatInput) { 0, Clamp((target - boat->throttle) / (.5f * BOAT_STEP), -1, 1) }, metrics,
-            wake, objects);
+            (BoatInput) { 0,
+                Clamp(
+                    (target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) },
+            metrics, wake, objects);
         return;
     }
     // Ease through neutral into reverse with the same held steering.

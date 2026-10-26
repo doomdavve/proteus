@@ -53,10 +53,13 @@ water, `motion_step` in `src/boat.c`), the latest touch within a 5 s credit wind
 for its slot. Without such a touch the victim scores −1 (self-capsize). Rows track score,
 capsizes caused, times capsized and self-capsizes.
 
-**Bailout.** R while upright within the credit window after a touch counts as a capsize
-credited to the toucher; R otherwise is free.
+The controls branch uses Escape > REQUEST RESET or a one-second Backspace hold for manual
+requests; R no longer acts. [Current integration status](CONTROLS_PEDALS_HANDOFF.md).
 
-**Respawn.** After a confirmed capsize the authority requests a spawn itself after 3 s; R
+**Bailout.** An explicit reset request while upright within the credit window after a touch counts as a capsize
+credited to the toucher; an untouched upright reset is otherwise free.
+
+**Respawn.** After a confirmed capsize the authority requests a spawn itself after 3 s; a reset request
 skips the remaining wait after 1 s. Spawns use the existing `boat_fleet_request_spawn` safe
 spawn rules. A new life has a 2 s credit grace: touches by or against it are not recorded.
 This is not physical invulnerability, which the multiplayer plan rules out.

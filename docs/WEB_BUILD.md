@@ -29,6 +29,26 @@ suspension, measure memory/runtime budgets, and establish secure public signalin
 hosting before internet-play acceptance. User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
 
+## Pedal controls update, 2026-10-26
+
+The isolated `controls-pedals-stability` branch replaces stepped/scroll thrust with held W/S
+(or Up/Down) forward/reverse pedals, neutral on release and Shift precision. R is inactive;
+Space remains reserved in ordinary play. Backspace is prevented from browser navigation while
+the canvas is focused and resets only after a one-second active hold. Escape also offers an
+explicit reset/restart/request. Captured mouse wheel hold remains, with automatic aerial
+stabilization instead of steering rolls. [Current controls and integration evidence](CONTROLS_PEDALS_HANDOFF.md).
+The dated mouse/scroll qualification below remains historical: its adapter still drains and
+normalizes scroll for its event contract, but scroll no longer affects propulsion.
+
+```sh
+python3 tools/check_web_pedals.py --url http://127.0.0.1:8000/ --output build-web/pedals
+```
+
+This optional Playwright check samples the actual rendered thrust needle for power/neutral,
+precision, opposing pedals and ignored scroll; compares held steering around R, Space and a
+cancelled reset; and captures reset progress and the menu action. Multiplayer integration now
+checks both shortcut and menu reset messages explicitly before asserting two completions.
+
 ## Build and deployment
 
 The [README](../README.md#browser-build-and-github-pages) owns the SDK installation,
@@ -185,7 +205,7 @@ Native regression and final browser input results are recorded at handoff below.
 
 ## Mouse and scroll qualification, 2026-10-24
 
-Current control implementation in `boat-marine-hud`: captured relative mouse steering, held
+Historical control implementation in `boat-marine-hud` (propulsion superseded by pedals): captured relative mouse steering, held
 wheel state and scroll thrust share the native C controllers. The browser adapter lives in
 [mouse_controls.js](../web/mouse_controls.js), installed by `runtime.js` and linked before it
 through `Web.cmake`. It requests capture directly from M/canvas-click gestures, waits for actual

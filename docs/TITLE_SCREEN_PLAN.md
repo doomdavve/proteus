@@ -30,6 +30,16 @@ Escape/return, save/reload and audio-context checks pass; captures inspected. Na
 multiplayer verification, next tasks and limits are owned by
 [browser boating](WEB_BUILD.md#webrtc-rooms). Hand play/listening acceptance remains outstanding.
 
+## Safe reset menu, 2026-10-26
+
+Implemented in `controls-pedals-stability`: insert RESET BOAT / RESTART RUN / REQUEST RESET
+between CONTROLS and the leave row, preserving RESUME as the default. Activation closes the
+menu and invokes the existing session reset or authoritative request with neutral controls.
+A room request is allowed from this paused input frame; race/grid/respawn restrictions still
+belong to the authority. The one-second Backspace shortcut is device-free state shared with
+the interactive race trial, with cancellation and one-fire-per-hold semantics. R no longer
+resets. Current behavior, verification and next task: [controls handoff](CONTROLS_PEDALS_HANDOFF.md).
+
 ## Identity
 
 **Wake Velocity** is the selected game title, per the user on 2026-10-23; his son likes

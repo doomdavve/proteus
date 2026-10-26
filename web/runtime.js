@@ -67,7 +67,7 @@ playButton.addEventListener('click', () => {
 canvas.addEventListener('click', () => canvas.focus());
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 canvas.addEventListener('keydown', event => {
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3'].includes(event.key))
+  if (['Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3'].includes(event.key))
     event.preventDefault();
 });
 window.addEventListener('resize', fitCanvas);

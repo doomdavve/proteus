@@ -5,7 +5,17 @@
 #include <math.h>
 #include <stdbool.h>
 
-// Two reverse detents, neutral, and four forward detents. Index 2 is neutral.
+// Pedals apply power only while held. Opposing pedals select neutral; precision preserves
+// the original 5% docking settings in both directions and the normal 20% reverse limit.
+static inline float boat_pedal_target(bool forward, bool reverse, bool precision)
+{
+    if (forward == reverse)
+        return 0;
+    return forward ? (precision ? .05f : 1) : (precision ? -.05f : -.20f);
+}
+
+// Legacy reference levels, also used to space the thrust instrument and review fixtures.
+// Two reverse levels, neutral, and four forward levels. Index 2 is neutral.
 #define BOAT_THROTTLE_NEUTRAL 2
 #define BOAT_THROTTLE_COUNT 7
 static inline float boat_throttle_setting(int step)
@@ -61,7 +71,7 @@ static inline int boat_throttle_scroll(int step, float scroll, float *remainder)
 // Preserve the core's signed rate input and engine spool, stopping exactly at the target.
 static inline float boat_throttle_rate(float current, float target)
 {
-    float rate = (target - current) / (.5f * BOAT_STEP);
+    float rate = (target - current) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP);
     return fmaxf(-1, fminf(1, rate));
 }
 

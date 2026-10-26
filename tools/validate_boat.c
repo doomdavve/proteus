@@ -1,4 +1,5 @@
 #include "boat_map.h"
+#include "boat_reset_hold.h"
 #include "boat_steering.h"
 #include "boat_test_session.h"
 #include "boat_throttle.h"
@@ -966,9 +967,11 @@ static int validate_gentle_encounters(void)
 
 static int validate_calm_reference(void)
 {
-    // Straight sample retains the accepted C2 baseline. Turning/coasting samples are
-    // measured H3 trajectories. Revision 5 updates only the final coast after dry-stern
-    // skeg disengagement; the powered straight/turn references remain unchanged.
+    // Scale this legacy rate script to its original physical throttle travel, isolating
+    // hydrodynamics from revision 9 pedal response. Straight sample retains the accepted C2
+    // baseline. Turning/coasting samples are measured H3 trajectories. Revision 5 updates only the
+    // final coast after dry-stern skeg disengagement; the powered straight/turn references remain
+    // unchanged.
     const float expected[3][10] = { { 0, 3.60687423f, 0, -8.85409927f, 0, 0, .00596522959f,
                                         .0537321381f, 0, .276249886f },
         { 23.757431f, -49.1584587f, 15.6087561f, 1.88263535f, 1.85332334f, 1.05519712f,
@@ -980,7 +983,8 @@ static int validate_calm_reference(void)
     for (int tick = 0; tick < 1800; ++tick) {
         float wheel = tick >= 360 && tick < 900 ? .35f : 0;
         float thrust = tick < 240 ? 1 : tick < 900 ? 0 : tick < 1380 ? -1 : 0;
-        boat_session_step(&boat, (BoatInput) { wheel, thrust });
+        boat_session_step(
+            &boat, (BoatInput) { wheel, thrust * (.5f / BOAT_THROTTLE_COMMAND_RATE) });
         CHECK(boat.boat.wave_spray == 0);
         if (tick == 239 || tick == 719 || tick == 1799) {
             const float actual[]
@@ -1356,6 +1360,59 @@ static int validate_throttle_detents(void)
     return 0;
 }
 
+static int validate_pedal_controls(void)
+{
+    const float expected[2][2][2] = { { { 0, -.20f }, { 1, 0 } }, { { 0, -.05f }, { .05f, 0 } } };
+    for (int precision = 0; precision < 2; ++precision)
+        for (int forward = 0; forward < 2; ++forward)
+            for (int reverse = 0; reverse < 2; ++reverse)
+                CHECK(boat_pedal_target(forward, reverse, precision)
+                    == expected[precision][forward][reverse]);
+    BoatSession session = basin_session((Boat) { 0 });
+    for (int tick = 0; tick < 29; ++tick)
+        boat_session_step(
+            &session, (BoatInput) { 0, boat_throttle_rate(session.boat.throttle, 1) });
+    CHECK(session.boat.throttle < 1 && session.boat.throttle > .96f);
+    boat_session_step(&session, (BoatInput) { 0, boat_throttle_rate(session.boat.throttle, 1) });
+    CHECK(fabsf(session.boat.throttle - 1) < .000001f);
+    const float targets[] = { .05f, -.05f, -.20f, 0, 1, 0 };
+    for (unsigned i = 0; i < sizeof(targets) / sizeof(targets[0]); ++i) {
+        for (int tick = 0; tick < 45; ++tick)
+            boat_session_step(
+                &session, (BoatInput) { 0, boat_throttle_rate(session.boat.throttle, targets[i]) });
+        CHECK(fabsf(session.boat.throttle - targets[i]) < .000001f);
+        CHECK(fabsf(session.boat.engine_response - targets[i]) < .000001f);
+    }
+    BoatSession coast = basin_session((Boat) { .velocity = { 0, -7 } });
+    BoatSession braking = coast;
+    for (int tick = 0; tick < 120; ++tick) {
+        boat_session_step(&coast, (BoatInput) { 0, boat_throttle_rate(coast.boat.throttle, 0) });
+        boat_session_step(
+            &braking, (BoatInput) { 0, boat_throttle_rate(braking.boat.throttle, -.20f) });
+    }
+    CHECK(coast.boat.velocity.y < 0 && coast.boat.velocity.y > -7);
+    CHECK(braking.boat.velocity.y > coast.boat.velocity.y + 1);
+
+    BoatResetHold hold = { 0 };
+    for (int tick = 0; tick < 5; ++tick)
+        CHECK(!boat_reset_hold_update(&hold, true, true, .1f));
+    CHECK(!boat_reset_hold_update(&hold, false, true, .1f) && hold.seconds == 0);
+    for (int tick = 0; tick < 5; ++tick)
+        CHECK(!boat_reset_hold_update(&hold, true, true, .1f));
+    CHECK(!boat_reset_hold_update(&hold, true, false, .1f) && hold.seconds == 0);
+    CHECK(!boat_reset_hold_update(&hold, true, true, NAN) && hold.seconds == 0);
+    for (int tick = 0; tick < 9; ++tick)
+        CHECK(!boat_reset_hold_update(&hold, true, true, .1f));
+    CHECK(boat_reset_hold_update(&hold, true, true, .1f));
+    for (int tick = 0; tick < 30; ++tick)
+        CHECK(!boat_reset_hold_update(&hold, true, true, .1f));
+    CHECK(!boat_reset_hold_update(&hold, true, false, .1f));
+    CHECK(!boat_reset_hold_update(&hold, true, true, 10));
+    CHECK(!boat_reset_hold_update(&hold, false, false, .1f));
+    CHECK(!boat_reset_hold_update(&hold, true, true, 10) && hold.seconds == .1f);
+    return 0;
+}
+
 static int validate_mouse_steering(void)
 {
     CHECK(boat_mouse_wheel(.4f, 0) == .4f); // Stationary mouse holds its wheel state.
@@ -1393,6 +1450,7 @@ static int validate_mouse_steering(void)
 int main(void)
 {
     test_worlds_open();
+    CHECK(validate_pedal_controls() == 0);
     CHECK(validate_throttle_detents() == 0);
     CHECK(validate_mouse_steering() == 0);
     CHECK(validate_flight_outcomes() == 0);
@@ -1571,7 +1629,7 @@ int main(void)
     CHECK(boat.boat.wheel == 0 && boat.boat.engine_angle == 0
         && fabsf(boat.boat.yaw_velocity) < 0.001f);
     boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    for (int i = 0; i < 120; ++i)
+    for (int i = 0; i < 15; ++i)
         boat_session_step(&boat, (BoatInput) { 0, 1 });
     CHECK(fabsf(boat.boat.throttle - 0.5f) < 0.001f);
     float held = boat.boat.throttle;
@@ -1581,7 +1639,7 @@ int main(void)
     for (int i = 0; i < 600; ++i)
         boat_session_step(&boat, (BoatInput) { 0, 1 });
     CHECK(boat.boat.throttle == 1);
-    for (int i = 0; i < 240; ++i)
+    for (int i = 0; i < 30; ++i)
         boat_session_step(&boat, (BoatInput) { 0, -1 });
     CHECK(fabsf(boat.boat.throttle) < .001f);
     boat.boat.throttle = 0.75f;

@@ -104,13 +104,35 @@ try:
                 extra.close()
             page.bring_to_front()
             page.locator('#canvas').focus()
+        page.bring_to_front()
+        page.evaluate("""() => {
+            window.spawnRequests = 0;
+            const original = Module['boatRtc'].send;
+            Module['boatRtc'].send = (channel, data) => {
+                if (channel === 0 && data[6] === 12) ++spawnRequests;
+                return original(channel, data);
+            };
+        }""")
         page.keyboard.down('w')
         page.wait_for_timeout(1500)
         page.keyboard.up('w')
-        key('r')
+        page.keyboard.down('Backspace')
+        if args.mode != 'race':
+            page.wait_for_function('spawnRequests === 1', timeout=6000)
+        else:
+            page.wait_for_timeout(1800)
+        page.keyboard.up('Backspace')
+        page.wait_for_timeout(1500)
+        key('Escape')
+        for _ in range(3): key('ArrowDown')
+        page.screenshot(path=str(args.output / 'menu-reset.png'))
+        key('Enter')
+        if args.mode != 'race':
+            page.wait_for_function('spawnRequests === 2', timeout=6000)
         page.wait_for_timeout(1500)
         key('Escape')
         page.screenshot(path=str(args.output / 'menu.png'))
+        key('ArrowDown')
         key('ArrowDown')
         key('ArrowDown')
         key('ArrowDown')
@@ -124,7 +146,7 @@ try:
         assert sum(('Joined as slot' in line for line in logs)) == 2, logs
         assert not errors, errors
         if args.mode != 'race':
-            assert any('resets: 1 completed' in line for line in logs), logs
+            assert any('resets: 2 completed' in line for line in logs), logs
         b.close()
         print('web_multiplayer=ok', flush=True)
 finally:

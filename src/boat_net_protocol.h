@@ -219,7 +219,8 @@ typedef struct {
 // Deathmatch scoreboard and round clock (docs/DEATHMATCH_PLAN.md); deathmatch rooms only.
 typedef struct {
     uint8_t phase; // BoatMatchPhase.
-    uint16_t respawn_ticks, skip_ticks; // Automatic respawn; R skips the rest after skip_ticks.
+    uint16_t respawn_ticks,
+        skip_ticks; // Automatic respawn; a reset request skips the rest after skip_ticks.
     uint32_t round; // Rounds started.
     uint32_t round_ticks;
     uint64_t phase_end; // Tick the phase ends; zero in warmup.

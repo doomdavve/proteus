@@ -319,7 +319,8 @@ static int banked_course(const char *directory)
             = boat_replay_pose(b, &session.presentation, boat_session_time(&session));
         boat_session_step(&session,
             (BoatInput) { Clamp((wheel - b->wheel) / BOAT_STEP, -1, 1),
-                Clamp((throttle - b->throttle) / (.5f * BOAT_STEP), -1, 1) });
+                Clamp(
+                    (throttle - b->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) });
         boat_replay_record(&live, before,
             boat_replay_pose(b, &session.presentation, boat_session_time(&session)),
             &session.course, false);

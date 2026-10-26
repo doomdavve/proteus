@@ -4,7 +4,7 @@
 
 enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
 
-typedef enum { ROW_RESUME, ROW_STEERING, ROW_CONTROLS, ROW_LEAVE, ROWS } Row;
+typedef enum { ROW_RESUME, ROW_STEERING, ROW_CONTROLS, ROW_RESET, ROW_LEAVE, ROWS } Row;
 
 static Color rgb(unsigned char r, unsigned char g, unsigned char b)
 {
@@ -54,6 +54,7 @@ BoatMenuChoice boat_menu_update(BoatMenu *menu, Camera2D camera, float dt)
         return BOAT_MENU_NONE;
     return menu->selected == ROW_RESUME  ? BOAT_MENU_RESUME
         : menu->selected == ROW_CONTROLS ? BOAT_MENU_CONTROLS
+        : menu->selected == ROW_RESET    ? BOAT_MENU_RESET
                                          : BOAT_MENU_LEAVE;
 }
 
@@ -66,7 +67,7 @@ void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, 
     DrawRectangleLines(52, top, 216, height, rgb(140, 210, 199));
     const char *heading = networked ? "ROOM MENU" : "PAUSED";
     DrawText(heading, (WIDTH - MeasureText(heading, 10)) / 2, top + 5, 10, rgb(255, 239, 177));
-    static const char *labels[ROWS] = { "RESUME", "STEERING", "CONTROLS", "" };
+    static const char *labels[ROWS] = { "RESUME", "STEERING", "CONTROLS", "", "" };
     for (int i = 0; i < row_count(menu); ++i) {
         Rectangle row = row_bounds(menu, i);
         bool active = i == menu->selected;
@@ -77,14 +78,18 @@ void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, 
             DrawText("(*)", 65, (int)row.y + 2 + tick, 10, rgb(33, 55, 66));
         }
         Color ink = active ? rgb(29, 52, 68) : rgb(229, 241, 220);
-        DrawText(i == ROW_LEAVE ? menu->leave_label : labels[i], 87, (int)row.y + 2, 10, ink);
+        DrawText(i == ROW_LEAVE  ? menu->leave_label
+                : i == ROW_RESET ? menu->reset_label
+                                 : labels[i],
+            87, (int)row.y + 2, 10, ink);
         if (i == ROW_STEERING)
             DrawText(mouse_steering ? "< MOUSE >" : "< KEYBOARD >", 162, (int)row.y + 2, 10, ink);
     }
-    const char *hint = menu->selected == ROW_STEERING ? "LEFT / RIGHT OR CLICK; M IN GAME"
-        : networked && menu->room_hint                ? menu->room_hint
-        : networked                                   ? "THE ROOM KEEPS RUNNING; YOUR BOAT IDLES"
-                                                      : "ESC: RESUME";
+    const char *hint = menu->selected == ROW_RESET ? "ALSO: HOLD BACKSPACE FOR ONE SECOND"
+        : menu->selected == ROW_STEERING           ? "LEFT / RIGHT OR CLICK; M IN GAME"
+        : networked && menu->room_hint             ? menu->room_hint
+        : networked                                ? "THE ROOM KEEPS RUNNING; YOUR BOAT IDLES"
+                                                   : "ESC: RESUME";
     int x = (WIDTH - MeasureText(hint, 10)) / 2, y = top + height + 3;
     DrawRectangle(x - 3, y - 1, MeasureText(hint, 10) + 6, 12, (Color) { 10, 38, 57, 200 });
     DrawText(hint, x, y + 1, 10, rgb(255, 196, 150));
