@@ -26,7 +26,8 @@ weston --backend=headless-backend.so --use-gl --width=960 --height=600 \
     >"$build_dir/weston-smoke.log" 2>&1 &
 weston_pid=$!
 
-for ((attempt = 0; attempt < 100; attempt++)); do
+# Allow slow software EGL initialization on shared CI runners.
+for ((attempt = 0; attempt < 600; attempt++)); do
     if [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
         break
     fi
