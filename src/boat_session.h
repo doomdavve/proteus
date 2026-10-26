@@ -2,6 +2,7 @@
 #define PROTEUS_BOAT_SESSION_H
 
 #include "boat_replay.h"
+#include "boat_voyage.h"
 
 // Single-player owner: one world, one boat with its presentation, the only live clock, course
 // progress and the race-session runs. Assignment clones a session whose runs hold no
@@ -15,6 +16,9 @@ typedef struct {
     bool presentation_enabled;
     uint64_t tick; // Authoritative world clock.
     BoatCourse course; // Swept gate progress; disabled for free boating.
+    // The definition's adventure destination and shelters, observed after every step; no
+    // route outside the outer location. Restarts begin it again at the start shelter.
+    BoatVoyage voyage;
     // Recorded on course ticks while record_runs is set. A finish only updates memory; its
     // save/export waits for boat_session_flush() outside the tick loop.
     BoatReplayRuns runs;
@@ -42,8 +46,12 @@ BoatViewState boat_session_view(const BoatSession *session);
 // Put the boat back at the definition's spawn and reset its presentation; the clock and world
 // water/history continue.
 void boat_session_respawn(BoatSession *session);
+// Return the boat to the voyage's most recently reached shelter with a reset presentation, or
+// respawn it without a voyage. The clock, water and voyage progress continue.
+void boat_session_recover(BoatSession *session);
 // Advance the clock once, step the boat at the new tick, sweep the course gates from its
-// previous position, step its presentation when enabled and record course runs when enabled.
+// previous position, observe the voyage, step its presentation when enabled and record course
+// runs when enabled.
 // No file I/O. False at the clock limit.
 bool boat_session_step(BoatSession *session, BoatInput input);
 

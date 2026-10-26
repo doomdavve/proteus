@@ -10,6 +10,7 @@
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
+#include "boat_voyage_view.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
 #ifdef PROTEUS_BOAT_NET
@@ -70,7 +71,8 @@ static void usage(void)
         "--camera-height UNITS: 4..36 (default 14; river 6)\n"
         "--fixed-fov: keep the 55-degree view instead of widening gently with speed\n"
         "--location basin|river|outer (default basin; river extends to Alvsborgsbron, outer\n"
-        "  adds the baked run to Langedrag)\n"
+        "  adds the baked run to Langedrag: a destination cue, rough exposed water in the outer\n"
+        "  fjord, and hold Backspace 1 s to return to the last shelter reached)\n"
         "--start X,Z[,DEGREES]: place the boat in a mapped location (simulation X/Z, heading)\n"
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
@@ -104,10 +106,12 @@ static BoatWater study_water(
 {
     BoatWater water = boat_world_test_water(location, waves, current, crossing);
     water.player_wake_enabled = player;
+    if (location->voyage)
+        water.storm = location->voyage->exposure; // Single player only; rooms keep calm water.
     return water;
 }
 
-static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
+static void draw_help(bool course, bool mapped, bool voyage, bool deathmatch, bool race)
 {
     int width = GetScreenWidth(), height = GetScreenHeight();
     const char *lines[] = {
@@ -121,7 +125,7 @@ static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
         "Release keyboard steering: centre wheel",
         "Release thrust keys: neutral / coast",
         "Hold Shift: low-power maneuvering",
-        "Hold Backspace 1 s: reset / restart",
+        voyage ? "Hold Backspace 1 s: back to last shelter" : "Hold Backspace 1 s: reset / restart",
         deathmatch ? "Space: gun | E: wave grenade | Tab: scores"
             : race ? "Hold Tab: race standings"
                    : "",
@@ -793,9 +797,10 @@ static int study(int argc, char **argv)
     bool replay_dragging = false;
     bool help_visible = false;
     BoatMenu menu = { .can_leave = true,
-        .reset_label = networked ? "REQUEST RESET"
-            : course             ? "RESTART RUN"
-                                 : "RESET BOAT",
+        .reset_label = networked   ? "REQUEST RESET"
+            : course               ? "RESTART RUN"
+            : session.voyage.route ? "RECOVER BOAT"
+                                   : "RESET BOAT",
         .leave_label = host_mode ? "CLOSE ROOM"
             : networked          ? "LEAVE ROOM"
             : window_owned       ? "QUIT"
@@ -1041,6 +1046,11 @@ static int study(int argc, char **argv)
                 mouse_wheel = 0;
             }
 #endif
+        } else if (reset_requested && session.voyage.route) {
+            // The outing continues: back to the last shelter, clock, water and wakes running.
+            thrust_target = 0;
+            boat_session_recover(&session);
+            accumulator = 0;
         } else if (reset_requested) {
             thrust_target = 0;
             boat_session_restart(
@@ -1246,6 +1256,8 @@ static int study(int argc, char **argv)
         }
 #endif
         boat_course_hud(&view->course, view->boat.position, GetScreenWidth());
+        if (!networked)
+            boat_voyage_hud(&session.voyage, &session.boat, live_view.time, GetScreenWidth());
         if (notice)
             DrawText(notice, 12, 36, 20, ORANGE);
         else if (view->boat.motion_state == BOAT_CAPSIZED)
@@ -1285,7 +1297,8 @@ static int study(int argc, char **argv)
             deathmatch = networked && net_study_deathmatch(net);
             race = networked && net_study_race(net);
 #endif
-            draw_help(course, location->mapped, deathmatch, race);
+            draw_help(
+                course, location->mapped, !networked && session.voyage.route, deathmatch, race);
         }
         frame_pacer_wait(&pacer);
         EndDrawing();

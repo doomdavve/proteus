@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`; A3.4 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`; A3.5 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1495,7 +1495,7 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.1b | A3.1 | Real land heights from Göteborg's Baskarta contours, replacing the flat 3.5 m ground; 20 m inland, 5 m near the shore | Complete 2026-10-26; [result](#a31b-result-2026-10-26) |
 | A3.2 | A3.1b | A mapped `outer` location starting at the dock: spawn, camera, CPU/GPU water and land rendering, fog or fade at the playable boundary; scenery, harbor and traffic for the added geography decided here | Complete 2026-10-26; [result](#a32-result-2026-10-26) |
 | A3.3 | A3.2 | Bake the existing river buildings, bridge and roads into the combined map so the outing is continuous under Älvsborgsbron | Complete 2026-10-26; [result](#a33-result-2026-10-26) |
-| A3.4 | A3.3 | Långedrag shelter destination, checkpoint recovery and the exposed-water encounter | Proposed |
+| A3.4 | A3.3 | Långedrag shelter destination, checkpoint recovery and the exposed-water encounter | Complete 2026-10-26; [result](#a34-result-2026-10-26) |
 | A3.5 | A3.4 | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
 
 ### A3.1 result, 2026-10-26
@@ -1694,8 +1694,77 @@ passed in 200 s (13 retired disabled).
   - The generator needs the pinned Python packages; this session installed them into a scratch
     virtual environment outside the repository.
 
-**Next: A3.4**, the Långedrag shelter destination, checkpoint recovery and the exposed-water
-encounter.
+### A3.4 result, 2026-10-26
+
+Branch `adventure-a3-4`, cut from `adventure-a3-2` after the A3.3 commit was rebased onto
+`origin/main` (above).
+
+- **Voyage (core):** [`src/boat_voyage.[ch]`](../src/boat_voyage.h) holds a pointer-free
+  `BoatVoyage` and the authored `boat_voyage_outer` route, which `BoatWorldDefinition.voyage`
+  attaches to `outer` only. `BoatSession` observes it after every step; it never moves the boat.
+  `boat_session_recover` puts a reset boat at the latest shelter and keeps the clock, water and
+  progress. Coordinates are simulation X = -east, Z = north:
+  - **Shelters:** DOCK (the spawn), BRIDGE (650, -850; the river past Älvsborgsbron), EAST SHORE
+    (3250, -2000; a bay on the outer fjord's east shore, outside the exposure) and LANGEDRAG.
+    Passing within a shelter's radius makes it the recovery point; LANGEDRAG is reached only by
+    arriving.
+  - **Destination:** Långedrag's old harbour basin. Arrival means being within 75 m of
+    (3595, -3370) at a ground speed of at most 6 m/s. Faster inside shows SLOW DOWN TO ARRIVE.
+    Arriving records the time since the start; coming back later re-selects the shelter
+    without a second arrival.
+  - **Exposed water (decision):** the race's stationary `BoatStorm` recipe (no new water or shader
+    code, CPU/GPU parity as already tested), centre (4300, -2650), radius 700 m, height 1.6 m,
+    over the open fjord west of the direct route's southern leg. Inside 80% of the radius counts
+    as exposed. The direct A0.3 line reaches 0.64 of the radius, a coastal line along the east
+    shore 0.89, and the middle swells 4.3 m peak to trough. It is authored, not observed weather,
+    and present from the start; A3.5 owns the transition.
+- **Game:** solo `wake_velocity --location outer` adds the patch to the free-boating water, a
+  top-centre panel (bearing arrow, distance or arrival time, the latest notice or the current
+  shelter; [`boat_voyage_view.c`](../src/boat_voyage_view.c)), and Backspace / Esc > RECOVER
+  BOAT returns to the last shelter. Rooms (`--host`, `--connect`, `boat_server`) are unchanged:
+  calm water, no voyage, no protocol or digest change.
+- **Tests:** new `boat_voyage` CTest (`tools/validate_boat_voyage.c`, under 1 s): shelters and
+  harbour are navigable with an 8 m envelope; the patch crosses the direct leg but not the
+  coastal line (checked as water), the shelters or the harbour; it is rough at its centre and
+  the harbour water stays flat; events; recovery pose and clock; right steering increases the
+  heading, so the cue's sign is the steering direction. Two autopiloted sessions from the fjord
+  turn arrive at controlled speed: coastal 97.3 s, never exposed; direct 109.2 s, 27.5 s exposed,
+  hull height up to 0.40 m, no capsizes. A first attempt to steer straight on the cue from EAST
+  SHORE ran into the headland south of it, so the cue is a bearing, not a route.
+- **Captures (agent review, 2026-10-26, macOS arm64, 3 s scripted drive):**
+  [exposed GPU](adventure/outer-exposed-gpu.png) and [exposed CPU](adventure/outer-exposed-cpu.png)
+  (`--start 4300,-2650,90`: swell and rain around the boat),
+  [approach from EAST SHORE, CPU](adventure/outer-approach-cpu.png) and
+  [harbour approach, CPU](adventure/outer-harbour-cpu.png). The squall cloud does not show from the
+  approach: it is drawn but fades into the distance haze at about 1.2 km, and is overhead and out
+  of view inside the patch. Scaling the cloud with the radius was tried and reverted as invisible.
+  The approach and harbour GPU captures failed (`GLFW: Failed to initialize platform`, six attempts
+  each, while the display was intermittently unavailable).
+  [HUD](adventure/outer-voyage-hud.png): `boat_hud_review --voyage exposed` (new `--voyage` cases
+  shelter, exposed, slow, arrived, recovered, all inspected). The arrow directions were checked
+  against the expected bearings.
+- **Verification (2026-10-26, macOS arm64, Debug, `PROTEUS_GPU_TESTS=ON`):** build warning-free.
+  The full `ctest --test-dir build -j 4 --output-on-failure` passed 121 of 124 active tests in
+  2,002 s; `boat_net_deathmatch`, `boat_net_race` and `wake_objects_gpu` timed out. Run alone right
+  after, all three passed (14–41 s). The full run was about ten times slower than the 200 s run
+  before this change, during the same period as the GPU-context failures, so the timeouts are
+  attributed to the machine stalling, not proven. A full suite in a stable session is still
+  owed. A 600-frame windowed GPU run (`--location outer --start 3650,-2400,70 --frames 600`)
+  exited cleanly, but the window was not focused, so no ticks ran.
+- **Limitations:**
+  - **No manual playback or human acceptance.** Arrival speed, the patch size and height, the
+    shelter spacing (BRIDGE to EAST SHORE is about 3 km) and the 5–10 minute target are
+    unplayed. The autopilot runs are evidence the outing is completable, not that it feels good.
+  - The exposure is present from the start and has no visible cloud from afar; rain is only seen
+    near or inside it. The weather transition and distant visibility belong to A3.5.
+  - Shelter names are descriptive (BRIDGE, EAST SHORE); no landmark is claimed for them.
+  - Arrival time counts from the session start, including time spent before setting off, and
+    a `--start` placement still recovers to DOCK until another shelter is passed.
+  - The panel is drawn in window pixels like the course panel, not in the 320×200 frame.
+  - Still open from A3.2/A3.3: GPU frame cost and memory of the outer map, the boundary
+    edges, the multiplayer outer session.
+
+**Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
 
 ## Verification and handoff template
 

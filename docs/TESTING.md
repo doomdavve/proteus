@@ -160,6 +160,12 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   and checks that points outside the region and on the quay are not water. Since A3.1b it
   also requires real relief: land tops never below 1 m, hills between 60 and 100 m, and at
   least 100,000 triangles.
+- `boat_voyage` runs `validate_boat_voyage` (adventure A3.4, under 1 s in Debug). It checks that
+  the outer voyage's shelters and harbour are navigable, that the exposed patch crosses the A0.3
+  route's southern leg while a coastal line, the shelters and the harbour stay outside it, the
+  shelter/exposure/arrival/recovery events, the bearing cue's sign against real right steering,
+  and two autopiloted sessions (coastal and direct, from the fjord turn) that must arrive at
+  controlled speed. It prints both times, the exposed seconds and any capsizes.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
