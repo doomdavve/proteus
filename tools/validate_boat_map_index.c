@@ -6,6 +6,7 @@
 #include "boat_location.h"
 #include "boat_map.h"
 #include "boat_map_tiles.h"
+#include "boat_test_cases.h"
 #include "raymath.h"
 #include "waterfront_city.h"
 
@@ -32,6 +33,7 @@ static const float tile_sizes[] = { 512, 1024 };
 typedef struct {
     BoatMap maps[CELL_SIZES];
     size_t queries, mismatches;
+    unsigned int stride, skipped; // Compare every stride-th point (0 or 1: all of them).
     // Candidate edges and triangles per default-cell query with a normal at 3 m clearance,
     // for points in open water (at 0 m) and for the rest.
     unsigned int *edges[2], *triangles[2];
@@ -57,6 +59,8 @@ static void bounds(Vector2 *lo, Vector2 *hi)
 // Compares every cell size against the exhaustive answer at map east/Z point P.
 static bool compare(Vector2 p)
 {
+    if (parity.stride > 1 && parity.skipped++ % parity.stride)
+        return true;
     Vector2 position = { -p.x, p.y };
     const BoatMap *reference = &parity.maps[1];
     bool wet = false;
@@ -135,7 +139,11 @@ static void report_cost(const char *name, unsigned int *values, size_t n)
         values[n - 1]);
 }
 
-static int queries(void)
+// Point families: each case builds the three indexes, compares one family with the exhaustive
+// scan and reports its candidate counts.
+enum { LATTICE, SHORE, SEAMS, RANDOM, FAR };
+
+static int queries(int family)
 {
     const BoatMapDescription *river = &waterfront_city_river_map;
     for (int m = 0; m < CELL_SIZES; ++m)
@@ -145,7 +153,7 @@ static int queries(void)
     bounds(&lo, &hi);
     // 1. Dense lattice on 8 m multiples over the crop plus 40 m: every tested cell size's seams
     // lie on it, so many points sit exactly on cell boundaries.
-    for (float z = floorf((lo.y - 40) / 8) * 8; z <= hi.y + 40; z += 8)
+    for (float z = floorf((lo.y - 40) / 8) * 8; family == LATTICE && z <= hi.y + 40; z += 8)
         for (float x = floorf((lo.x - 40) / 8) * 8; x <= hi.x + 40; x += 8)
             CHECK(compare((Vector2) { x, z }));
     size_t lattice = parity.queries;
@@ -154,7 +162,7 @@ static int queries(void)
     const float offsets[] = { 0, .01f, -.01f, .49f, -.49f, .51f, -.51f, 2.99f, -2.99f, 3.01f,
         -3.01f, 11.99f, -11.99f, 12.01f, -12.01f, 30, -30 };
     const Mesh3D *mesh = river->mesh;
-    for (size_t i = 0; i < map->shore_count; ++i) {
+    for (size_t i = 0; family == SHORE && i < map->shore_count; ++i) {
         Vector2 a = { mesh->vertices[map->shore[i].a].x, mesh->vertices[map->shore[i].a].z };
         Vector2 b = { mesh->vertices[map->shore[i].b].x, mesh->vertices[map->shore[i].b].z };
         Vector2 along = Vector2Subtract(b, a);
@@ -167,7 +175,7 @@ static int queries(void)
     size_t shore = parity.queries - lattice;
     // 3. Tile seams of both sizes, every 2 m and one float either side; then a fine patch
     // around each tile corner.
-    for (size_t s = 0; s < sizeof(tile_sizes) / sizeof(*tile_sizes); ++s) {
+    for (size_t s = 0; family == SEAMS && s < sizeof(tile_sizes) / sizeof(*tile_sizes); ++s) {
         float size = tile_sizes[s];
         for (float seam = floorf(lo.x / size) * size; seam <= hi.x; seam += size)
             for (float z = lo.y - 40; z <= hi.y + 40; z += 2)
@@ -184,7 +192,7 @@ static int queries(void)
     size_t seams = parity.queries - lattice - shore;
     // 4. Deterministic random points over the crop plus 100 m.
     uint32_t state = 0x2a2a2a2au;
-    for (int i = 0; i < 50000; ++i) {
+    for (int i = 0; family == RANDOM && i < 50000; ++i) {
         float u[2];
         for (int k = 0; k < 2; ++k) {
             state = state * 1664525u + 1013904223u;
@@ -196,13 +204,15 @@ static int queries(void)
     // 5. Far away, including the exhaustive fallback beyond 1e6 m.
     const Vector2 far[]
         = { { 5000, 0 }, { -20000, 3000 }, { 0, -250000 }, { 2e6f, 2e6f }, { -FLT_MAX, 0 } };
-    for (size_t i = 0; i < sizeof(far) / sizeof(*far); ++i)
+    for (size_t i = 0; family == FAR && i < sizeof(far) / sizeof(*far); ++i)
         CHECK(compare(far[i]));
     printf("parity queries=%zu lattice=%zu shore=%zu seams=%zu mismatches=%zu\n", parity.queries,
         lattice, shore, seams, parity.mismatches);
     CHECK(parity.mismatches == 0);
 
     for (int k = 0; k < 2; ++k) {
+        if (!parity.samples[k])
+            continue;
         printf("index cell=%g %s candidates(normal, 3 m, %zu points): ", (double)BOAT_MAP_CELL_SIZE,
             k ? "land" : "water", parity.samples[k]);
         report_cost("edges", parity.edges[k], parity.samples[k]);
@@ -217,12 +227,30 @@ static int queries(void)
             (double)grid->cell_size, grid->columns, grid->rows, grid->water_start[cells],
             grid->shore_start[cells], boat_map_bytes(&parity.maps[m]));
     }
+    for (int m = 0; m < CELL_SIZES; ++m)
+        boat_map_destroy(&parity.maps[m]);
     for (int k = 0; k < 2; ++k) {
         free(parity.edges[k]);
         free(parity.triangles[k]);
     }
-    for (int m = 0; m < CELL_SIZES; ++m)
-        boat_map_destroy(&parity.maps[m]);
+    parity = (Parity) { 0 };
+    return 0;
+}
+
+static int lattice_queries(void) { return queries(LATTICE); }
+static int shore_queries(void) { return queries(SHORE); }
+static int seam_queries(void) { return queries(SEAMS); }
+static int random_queries(void) { return queries(RANDOM); }
+static int far_queries(void) { return queries(FAR); }
+
+// Every family, comparing one point in 512 (the quick lane; the families above are slow).
+static int sampled_queries(void)
+{
+    for (int family = LATTICE; family <= FAR; ++family) {
+        parity.stride = 512;
+        if (queries(family))
+            return 1;
+    }
     return 0;
 }
 
@@ -355,10 +383,21 @@ static int failures(void)
     return 0;
 }
 
-int main(void)
+static const TestCase cases[] = {
+    TEST_CASE(failures),
+    TEST_CASE(tiles),
+    TEST_CASE(sampled_queries),
+    SLOW_CASE(lattice_queries),
+    SLOW_CASE(shore_queries),
+    SLOW_CASE(seam_queries),
+    SLOW_CASE(random_queries),
+    TEST_CASE(far_queries),
+};
+
+int main(int argc, char **argv)
 {
-    if (failures() || tiles() || queries())
-        return 1;
-    puts("boat_map_index=ok");
-    return 0;
+    int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    if (!result && argc == 1)
+        puts("boat_map_index=ok");
+    return result;
 }

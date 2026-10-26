@@ -1,17 +1,22 @@
 #include "wake_velocity_state.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
+static void fold(uint64_t *hash, unsigned char byte)
+{
+    *hash ^= byte;
+    *hash *= UINT64_C(1099511628211);
+}
+
+// Hash revision 2: the field name, then the value's IEEE-754 double bits, least significant
+// byte first on every platform (revision 1 formatted "name=%a;", about 30 times slower).
 static void value(uint64_t *hash, const char *name, double number)
 {
-    char text[128];
-    int n = snprintf(text, sizeof(text), "%s=%a;", name, number);
-    if (n < 0 || (size_t)n >= sizeof(text))
-        abort();
-    for (int i = 0; i < n; ++i) {
-        *hash ^= (unsigned char)text[i];
-        *hash *= UINT64_C(1099511628211);
-    }
+    for (const char *c = name; *c; ++c)
+        fold(hash, (unsigned char)*c);
+    uint64_t bits;
+    memcpy(&bits, &number, sizeof(bits));
+    for (int i = 0; i < 8; ++i)
+        fold(hash, (unsigned char)(bits >> (8 * i)));
 }
 uint64_t wake_velocity_state_hash(
     uint64_t hash, const Boat *b, double time, const BoatWakeObjects *w)

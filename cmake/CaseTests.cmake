@@ -1,26 +1,29 @@
 # One CTest entry per case of a validator built on tools/boat_test_cases.h.
 #
-#   proteus_add_case_tests(boat_banking validate_boat_banking LABELS cpu [WORKING_DIRECTORY dir])
+#   proteus_add_case_tests(boat_banking validate_boat_banking LABELS cpu [WORKING_DIRECTORY dir]
+#     [ARGS arguments...])
 #
 # registers boat_banking.<case> for every line of `validate_boat_banking --list`, labelled with
-# LABELS plus `quick` or `slow`. The list is regenerated after each build of the target, so
-# case names live only in the C table; before the first build a single <prefix>_NOT_BUILT test
-# fails in their place.
+# LABELS plus `quick` or `slow`; ARGS precede --list and --case. The list is regenerated after
+# each build of the target, so case names live only in the C table; before the first build a
+# single <prefix>_NOT_BUILT test fails in their place.
 
 set(PROTEUS_CASE_TESTS_SCRIPT ${CMAKE_CURRENT_LIST_FILE})
 
 function(proteus_add_case_tests prefix target)
-  cmake_parse_arguments(ARG "" "WORKING_DIRECTORY" "LABELS" ${ARGN})
+  cmake_parse_arguments(ARG "" "WORKING_DIRECTORY" "LABELS;ARGS" ${ARGN})
   if(NOT ARG_WORKING_DIRECTORY)
     set(ARG_WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   endif()
   set(cases ${CMAKE_CURRENT_BINARY_DIR}/case_tests/${prefix}.cmake)
   set(include ${CMAKE_CURRENT_BINARY_DIR}/case_tests/${prefix}_include.cmake)
   string(REPLACE ";" "," labels "${ARG_LABELS}")
+  string(REPLACE ";" "," args "${ARG_ARGS}")
   add_custom_command(TARGET ${target} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -D PROTEUS_CASE_EXE=$<TARGET_FILE:${target}>
       -D PROTEUS_CASE_PREFIX=${prefix} -D PROTEUS_CASE_OUT=${cases}
       -D PROTEUS_CASE_LABELS=${labels} -D PROTEUS_CASE_DIR=${ARG_WORKING_DIRECTORY}
+      -D PROTEUS_CASE_ARGS=${args}
       -P ${PROTEUS_CASE_TESTS_SCRIPT}
     VERBATIM)
   file(WRITE ${include}
@@ -34,7 +37,13 @@ endfunction()
 
 # Script mode: list the cases and write their add_test calls.
 if(CMAKE_SCRIPT_MODE_FILE AND PROTEUS_CASE_EXE)
-  execute_process(COMMAND ${PROTEUS_CASE_EXE} --list WORKING_DIRECTORY ${PROTEUS_CASE_DIR}
+  string(REPLACE "," ";" PROTEUS_CASE_ARGS "${PROTEUS_CASE_ARGS}")
+  set(arguments "")
+  foreach(argument IN LISTS PROTEUS_CASE_ARGS)
+    string(APPEND arguments " \"${argument}\"")
+  endforeach()
+  execute_process(COMMAND ${PROTEUS_CASE_EXE} ${PROTEUS_CASE_ARGS} --list
+    WORKING_DIRECTORY ${PROTEUS_CASE_DIR}
     OUTPUT_VARIABLE listing RESULT_VARIABLE result)
   if(NOT result EQUAL 0)
     message(FATAL_ERROR "${PROTEUS_CASE_EXE} --list failed: ${result}")
@@ -46,7 +55,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND PROTEUS_CASE_EXE)
     if(line MATCHES "^([A-Za-z0-9_]+) (quick|slow)$")
       set(name ${PROTEUS_CASE_PREFIX}.${CMAKE_MATCH_1})
       string(APPEND script
-        "add_test(${name} \"${PROTEUS_CASE_EXE}\" --case ${CMAKE_MATCH_1})\n"
+        "add_test(${name} \"${PROTEUS_CASE_EXE}\"${arguments} --case ${CMAKE_MATCH_1})\n"
         "set_tests_properties(${name} PROPERTIES LABELS \"${PROTEUS_CASE_LABELS};${CMAKE_MATCH_2}\""
         " WORKING_DIRECTORY \"${PROTEUS_CASE_DIR}\")\n")
     elseif(NOT line STREQUAL "")

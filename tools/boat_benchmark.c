@@ -161,7 +161,7 @@ int main(int argc, char **argv)
                 "\"measured_ticks\":%u,\"total_ticks\":%u,\n"
                 "  \"life_ticks\":%u,\"crest_height\":%.9g,\"births\":%" PRIu64
                 ",\"peak_objects\":%u,\"landings\":%u,\n"
-                "  \"state_hash\":\"%016" PRIx64 "\",\"hash_revision\":1,\n"
+                "  \"state_hash\":\"%016" PRIx64 "\",\"hash_revision\":2,\n"
                 "  \"simulation_ms\":{\"p50\":%.9f,\"p95\":%.9f,\"p99\":%.9f,\"max\":%.9f},\n"
                 "  \"render_cpu_ms\":null,\"gpu_ms\":null\n}\n",
                 BOAT_PHYSICS_REVISION, presentation ? "on" : "off", BOAT_BENCH_BUILD,

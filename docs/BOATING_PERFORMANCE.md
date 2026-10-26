@@ -53,7 +53,8 @@ script commands neutral throttle and steering. This is a finite scripted wake-re
 not sustained powered driving or a full-pool workload. Births, peak objects and landings cover
 the entire run, including warmup. The pool remains 128 slots, 32 per emitter; one emitter is used.
 
-JSON schema/scenario/hash revisions are currently 1. The report identifies the build's configure-time
+JSON schema and scenario revisions are currently 1; the hash revision is 2 (since 2026-10-26).
+The report identifies the build's configure-time
 Git revision (with `-dirty` for tracked changes), build type/compiler, platform, selected options,
 presentation choice, warmup/measured/total tick counts, wake lifetime/height and observed births/peak/landings.
 `simulation_ms` contains p50/p95/p99/max over **all measured frames**, using sorted index
@@ -62,9 +63,11 @@ presentation choice, warmup/measured/total tick counts, wake lifetime/height and
 existing shared tick wrapper. `render_cpu_ms` and `gpu_ms` are null because they are unavailable.
 The report is written and samples sorted after all ticks; timing excludes hashing and file I/O.
 
-`state_hash` folds FNV-1a over named numerical `%a` values after every nominal frame, including
-warmup. `wake_velocity_state.c` lists its contract: physical pose, velocities, controls, motion state,
-motion timers/landing counter, physical wake bookkeeping, world tick/emission/expiry counters,
+`state_hash` folds FNV-1a over each named value's field name and IEEE-754 double bits (least
+significant byte first) after every nominal frame, including warmup. Revision 1 hashed
+`name=%a;` text instead; the values and contract are unchanged, only the encoding is about
+30 times cheaper. `wake_velocity_state.c` lists its contract: physical pose, velocities,
+controls, motion state, motion timers/landing counter, physical wake bookkeeping, world tick/emission/expiry counters,
 all object records and all emitter fields. It excludes raw structs, padding, pointers and cosmetic
 particles/flag/camera state. This is same-build deterministic evidence, not a collision-proof state
 comparison, portable replay format or claim of cross-platform bit identity. CPU pixel comparisons
