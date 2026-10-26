@@ -4,6 +4,17 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      release_ref:
+        description: 'Published release tag to build (keeps game/server versions aligned)'
+        required: true
+        default: 'v0.0.18'
+        type: string
+      server_list_url:
+        description: 'Public HTTPS server directory'
+        required: true
+        default: 'https://wake.davve.net/servers.json'
+        type: string
 
 permissions:
   contents: read
@@ -17,8 +28,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
+      - name: Require a published release for manual deployment
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REF: ${{ inputs.release_ref }}
+        run: |
+          [[ "$RELEASE_REF" == v* ]]
+          test "$(gh release view "$RELEASE_REF" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.release_ref || github.ref }}
           persist-credentials: false
 
       - name: Check browser input and network event contracts
@@ -45,6 +65,15 @@ jobs:
           emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=MinSizeRel
           cmake --build build-web --target web --parallel 2
           test -s build-web/site/index.html
+
+      - name: Configure the public directory on the selected release
+        env:
+          SERVER_LIST_URL: ${{ inputs.server_list_url || 'https://wake.davve.net/servers.json' }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git show "$GITHUB_SHA:tools/configure_web_endpoint.py" > "$RUNNER_TEMP/configure_web_endpoint.py"
+          python3 "$RUNNER_TEMP/configure_web_endpoint.py" \
+            --index build-web/site/index.html --directory-url "$SERVER_LIST_URL"
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3

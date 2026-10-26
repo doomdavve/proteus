@@ -350,6 +350,9 @@ proteus_add_case_tests(boat_clock validate_boat_clock LABELS cpu ARGS ${BOAT_CLO
 add_test(NAME boat_clock_soak_smoke
   COMMAND validate_boat_clock --soak 60 ${BOAT_CLOCK_TEST_DIR} --waves)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME web_endpoint_configuration COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_configure_web_endpoint.py)
+set_tests_properties(web_endpoint_configuration PROPERTIES LABELS "cpu")
 add_test(NAME boat_benchmark_contract COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_benchmark.py $<TARGET_FILE:boat_benchmark>)
 

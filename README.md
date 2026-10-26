@@ -253,10 +253,11 @@ forwarding or a VPN; the [Winterfell hosting guide](docs/MULTIPLAYER_HOSTING.md)
 released native and browser room. A standalone Linux server package remains part of
 [M6](docs/MULTIPLAYER_PLAN.md#m6--friends-over-the-internet-and-native-packaging).
 
-For browser play, open [Winterfell](https://winterfell.davve.net:24443/), press PLAY and
+For browser play, open [Winterfell](https://wake.davve.net/), press PLAY and
 choose MULTIPLAYER → WINTERFELL. The browser fetches a known-server list, so the common
 join needs no address entry. Manual URL / CONNECT remain available. The deployed client
-and room now run v0.0.18 with both deathmatch weapons; native clients still use LAN
+and room now run v0.0.18 with both deathmatch weapons; the public host stays outside the
+VPN's private Winterfell DNS override. Native clients still use LAN
 discovery or an address. Routine hosting updates are owned by `davve-srv`
 ([operator workflow](docs/MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv)).
 

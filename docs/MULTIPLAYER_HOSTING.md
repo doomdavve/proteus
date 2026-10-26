@@ -11,15 +11,16 @@ to join directly. There are no player accounts.
 
 - Native: download v0.0.18 from [Releases](https://github.com/doomdavve/proteus/releases/tag/v0.0.18),
   choose MULTIPLAYER and enter `winterfell.davve.net:24680`.
-- Browser: open [Wake Velocity on Winterfell](https://winterfell.davve.net:24443/), press PLAY,
+- Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/), press PLAY,
   choose MULTIPLAYER, then the selected **SERVER: WINTERFELL** row. No address entry is needed.
   URL / CONNECT remain available for manual joining.
 - On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
 
 The native server and hosted browser client are built from the same v0.0.18 tag by the
 `wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.18 and uses the
-same public directory. Both launchers include public STUN for internet address discovery.
-The v0.0.17 Pages launcher previously timed out outside the VPN; that limitation is historical.
+same public directory and signaling endpoint. Both launchers include public STUN for internet
+address discovery. The public `wake.davve.net` hostname avoids the VPN's private
+`*.winterfell.davve.net` DNS override.
 
 ## Routine deployments (davve-srv)
 
@@ -57,7 +58,7 @@ LAN discovery or manual joining. The listing is curated, not a live availability
 A listed room with different protocol/handling metadata shows a version warning and cannot
 be selected; this avoids offering the live handling-8 room to development handling-9 clients.
 
-The browser fetches `https://winterfell.davve.net:24443/servers.json` at startup and refreshes it when MULTIPLAYER opens, without
+The browser fetches `https://wake.davve.net/servers.json` at startup and refreshes it when MULTIPLAYER opens, without
 blocking the game. Left/Right cycles multiple named servers; Enter/click joins the selected
 one. Requests bypass the browser cache, time out after five seconds, and bound accepted JSON
 to 16 KiB. If a refresh fails, an already loaded list remains usable. An initial failure or
@@ -84,7 +85,8 @@ Forward these ports to **10.0.21.3**, preserving the external and internal port 
 | Protocol | Ports | Purpose |
 | --- | --- | --- |
 | UDP | 24680 | Native ENet gameplay |
-| TCP | 24443 | Dedicated nginx TLS listener: released browser game and signaling |
+| TCP | 443 | Public Wake Velocity HTTPS and WebSocket signaling (router forwards to Winterfell TCP 24443) |
+| TCP | 24443 | Legacy direct listener; optional compatibility forward |
 | UDP | 49160–49200 | WebRTC relay allocations |
 
 Do not forward TCP 24682 or UDP/TCP 3478. The former is the plain WebSocket upstream
@@ -110,8 +112,8 @@ set port-forward rule 21 original-port 49160-49200
 set port-forward rule 21 protocol udp
 set port-forward rule 21 forward-to address 10.0.21.3
 set port-forward rule 21 forward-to port 49160-49200
-set port-forward rule 22 description 'Wake Velocity browser TLS'
-set port-forward rule 22 original-port 24443
+set port-forward rule 22 description 'Wake Velocity public HTTPS'
+set port-forward rule 22 original-port 443
 set port-forward rule 22 protocol tcp
 set port-forward rule 22 forward-to address 10.0.21.3
 set port-forward rule 22 forward-to port 24443
