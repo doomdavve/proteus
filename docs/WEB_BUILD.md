@@ -55,10 +55,10 @@ commands. Pages uses the same authoritative directory through its public CORS en
 so deployment can update compatibility metadata without republishing Pages. The default
 launcher includes public STUN on every host, including Pages.
 
-Both features are deployed on Winterfell as `v0.0.17-server-directory`, built with the released
-core using `bash tools/build_winterfell_web.sh`. The current development browser also builds,
-but its newer physics do not match that room. The normal Pages packaging includes the JSON
-and default STUN for a future build; no Pages publication was performed here. Native clients
+Both features were introduced as `v0.0.17-server-directory`; Winterfell now serves the exact
+v0.0.18 client, built on the server by the `davve-srv` baseline role. The current development browser also builds,
+but its newer physics do not match that room. The v0.0.18 Pages build and deployment also passed, including default STUN and the shared
+public directory. Routine updates use the [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native clients
 retain LAN/manual joining. Next: human review of the named-server flow, then next-release
 Pages verification and the wider browser/platform checks below.
 

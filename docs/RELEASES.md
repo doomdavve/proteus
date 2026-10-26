@@ -8,16 +8,17 @@ title's HOST A ROOM, Windows `host.bat`), so packages carry one executable. M6 w
 identity, native cross-platform checks and a separate Linux headless-server distribution to
 release documentation. A future native multiplayer release need not imply browser multiplayer parity.
 
-The [Winterfell room](MULTIPLAYER_HOSTING.md) builds the exact v0.0.17 source with the optional
-WebRTC transport for shared native/browser play. This deployment is separate from release
-packaging; there is still no downloadable Linux server distribution.
-Winterfell's browser is subsequently labeled `v0.0.17-server-directory`: released core with
-the fetched-server menu added, built by `tools/build_winterfell_web.sh`. This is an operator
-UI deployment, not a new published release or a change to the server/native packages.
-The next release is based on protocol-v6 weapons-enabled main; publishing it does not upgrade
-Winterfell's protocol-v5 room automatically. Follow the [coordinated server/browser cutover](MULTIPLAYER_HOSTING.md#cut-over-to-the-next-release)
-after tagging. The public directory reports the deployed server's compatibility to both
-Pages and Winterfell clients, and blocks mismatched releases until the upgrade is complete.
+The [Winterfell room](MULTIPLAYER_HOSTING.md) now runs v0.0.18 with the optional WebRTC
+transport, serving native and browser players. Routine upgrades are owned by the `wake_velocity`
+role in `davve-srv`: pin a published version, commit/push, then run the ordinary Ansible wrapper.
+Both native and browser builds run on Winterfell. This remains separate from release packaging;
+there is still no downloadable Linux server distribution.
+
+The earlier `v0.0.17-server-directory` UI backport is historical. v0.0.18 includes the directory,
+STUN defaults and protocol-v6 weapons; its release/Pages publication and server cutover have
+completed. Future publications do not automatically upgrade the room: follow the
+[routine deployment workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). The public
+directory reports the deployed server's compatibility to Pages and Winterfell clients.
 
 The **Release Wake Velocity** workflow builds and tests the Apple Silicon Mac app
 and Windows x64 package for the same version tag, then attaches both ZIPs and their
@@ -92,14 +93,24 @@ provided token. No personal access token or additional secret is needed.
 
 ## Status and verification
 
-Current status, 2026-10-26: Wake Velocity native package naming and versioned
+Current status, 2026-10-26: **v0.0.18** is published at commit `2f94335`. The
+[release run](https://github.com/doomdavve/proteus/actions/runs/40371176253) passed macOS,
+Windows and publication; [Pages](https://github.com/doomdavve/proteus/actions/runs/40371176205)
+also built and deployed successfully. Both native ZIPs were downloaded and passed SHA-256
+and ZIP-integrity checks; both `build.txt` files identify v0.0.18 and the tagged commit.
+Neither downloaded package was manually launched. Winterfell subsequently cut over through
+`davve-srv` main `dc206f9`, with native/browser builds from that tag, an idempotent wrapper rerun,
+and automated named joining plus weapon-input/combat-page checks. Next: human package and
+weapons review, then wider platform/soak qualification.
+
+Earlier publication evidence (superseded by v0.0.18): native package naming and versioned
 archives, checksums and Actions artifacts are implemented. The macOS executable,
 bundle display name, Windows launcher/readme and CLI usage use the released name.
 Internal source/CMake names remain unchanged. Version tags `v0.0.1`–`v0.0.17` have since
 been pushed to `origin` (2026-10-17 to 2026-10-26; `v0.0.17` at `2b55994`, after the MSVC
 initializer and `-ffp-contract=off` portability fixes). Checked with `gh` on 2026-10-26: the
 `v0.0.17` release run (40306222878) and the web run succeeded, the macOS, Windows and Linux
-runs at `2b55994` succeeded, and `v0.0.17` is the latest GitHub release with macOS arm64 and
+runs at `2b55994` succeeded, and `v0.0.17` was the latest GitHub release at that check with macOS arm64 and
 Windows x64 ZIPs plus checksums. Both ZIPs were downloaded and matched their `.sha256` files;
 neither package was launched. The `v0.0.14` and `v0.0.15` release runs failed (the race
 smoke-test timing defect fixed in `v0.0.16`); `v0.0.11`–`v0.0.13` and `v0.0.16` are also

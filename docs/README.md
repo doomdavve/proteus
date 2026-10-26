@@ -12,9 +12,11 @@ history.
 ## Current work
 
 Released internet hosting: the [Winterfell operator guide](MULTIPLAYER_HOSTING.md) owns the
-v0.0.17 native/browser room deployment and its verification status (2026-10-26). This hosting
+v0.0.18 native/browser room deployment and its verification status (2026-10-26). This hosting
 slice is pulled forward from M6; native/browser play and browser reconnect passed over a
-separate internet path. Weapons, human play and full internet-play qualification remain pending.
+separate internet path. Both weapons are now deployed through the `davve-srv` baseline
+role; named joining, weapon inputs and combat pages passed automation. Human weapons play
+and full internet-play qualification remain pending.
 The browser now fetches a known-server list and defaults to Winterfell for joining without
 typing; that UI is deployed and agent-checked, awaiting user review. Release preparation
 adds a shared CORS directory with deployment-generated compatibility and a coordinated
@@ -38,7 +40,7 @@ protocol-v6 cutover recipe. Details and current verification limits stay in the 
 | [macOS app builds](MACOS_BUILD.md) | Apple Silicon action, relocatable app bundle, preferred river launch, ad-hoc signing, ZIP/checksum; title backdrop packaging fix added | Verify macOS packaging CI and launch the downloaded app from Finder; macOS 13 execution pending |
 | [Windows builds](WINDOWS_BUILD.md) | Portable x64 action; reversal and basin impact-bound corrections, bundled music, relocated CPU check; ENet/`boat_server` MSVC build and packaged server passed CI (run 40083439355, 2026-10-24); title backdrop packaging fix added, pending CI | Verify the current Windows workflow and launch the downloaded app; then physical mouse/scroll, GPU/audio and connected controls |
 | [Linux builds](LINUX_BUILD.md) | Native Wayland enabled with X11 compatibility; Weston/Xvfb CI checks configured; bundled GLFW no-seat startup crash backport implemented | Rerun Linux CI to verify the Weston crash fix and X11 startup, review CPU screenshots; GNOME/KDE physical input, display scaling, audio and connected play pending |
-| [Automated releases](RELEASES.md) | Version-tag/UI release workflow reuses both platform builds, uploads ZIPs/checksums, then publishes; offline publication tests passed | `v0.0.17` release and all platform runs succeeded, ZIP checksums verified (checked 2026-10-26); launch both packages ([status](RELEASES.md#status-and-verification)) |
+| [Automated releases](RELEASES.md) | Version-tag/UI release workflow reuses both platform builds, uploads ZIPs/checksums, then publishes; offline publication tests passed | `v0.0.18` release and Pages succeeded; Mac/Windows ZIP checksums verified and Winterfell baseline cutover completed (2026-10-26); launch both packages ([status](RELEASES.md#status-and-verification)) |
 | [Browser boating](WEB_BUILD.md) | Shared title, saved setup/settings, Escape/return-to-title; optional WebRTC client and native endpoint alongside ENet | Chrome/SwiftShader title/persistence/repeated-session and mixed native/browser free/deathmatch/race automation pass (2026-10-25); next: real impairment, physical devices, Firefox/Safari, tab suspension and public WSS/ICE/TURN qualification; [status and limits](WEB_BUILD.md#webrtc-rooms) |
 
 These are separate work tracks, not a single execution queue. A next task in one plan

@@ -1,32 +1,51 @@
 # Winterfell internet room
 
-The Winterfell deployment uses released **v0.0.17**, commit
-`2b55994a326350f8addc0431c36e0bb086c94b6b`, with the optional WebRTC transport enabled.
+The Winterfell deployment uses released **v0.0.18**, commit
+`2f9433565d59506607634fbb69a916593779864e`, with the optional WebRTC transport enabled.
 It hosts one shared four-player river deathmatch room for native and browser players.
-This is the released capsize/contact/wake mode; weapons are not included. A round starts
+The room includes the released machine gun and wave grenade (Space and E). A round starts
 when two players join. There is no room token, allowing the native and browser title screens
 to join directly. There are no player accounts.
 
 ## Join
 
-- Native: download v0.0.17 from [Releases](https://github.com/doomdavve/proteus/releases/tag/v0.0.17),
+- Native: download v0.0.18 from [Releases](https://github.com/doomdavve/proteus/releases/tag/v0.0.18),
   choose MULTIPLAYER and enter `winterfell.davve.net:24680`.
 - Browser: open [Wake Velocity on Winterfell](https://winterfell.davve.net:24443/), press PLAY,
   choose MULTIPLAYER, then the selected **SERVER: WINTERFELL** row. No address entry is needed.
   URL / CONNECT remain available for manual joining.
 - On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
 
-The deployed browser is **v0.0.17-server-directory**: the released v0.0.17 core plus a
-browser menu/directory update. It fetches [servers.json](https://winterfell.davve.net:24443/servers.json)
-from Winterfell’s public directory, with Winterfell as the only entry. It uses the original protocol, handling
-and content identities; the server and native packages remain v0.0.17. Its launcher configures
-[Cloudflare public STUN](https://developers.cloudflare.com/realtime/turn/) for browser address
-discovery. It stays at this deployed core when the separate Pages site advances.
+The native server and hosted browser client are built from the same v0.0.18 tag by the
+`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.18 and uses the
+same public directory. Both launchers include public STUN for internet address discovery.
+The v0.0.17 Pages launcher previously timed out outside the VPN; that limitation is historical.
 
-Use the Winterfell page for this deployed UI. The currently published v0.0.17 GitHub Pages
-launcher lacks both the directory and STUN configuration; entering a correct room URL there
-can work over VPN and time out outside it. The source now includes both features for the next
-Pages build, which has not been published as part of this update.
+## Routine deployments (davve-srv)
+
+`davve-srv` now owns normal deployment. Pin `wake_velocity_version` in
+`ansible/host_vars/winterfell/main.yml`, commit and push, then run from that repository:
+
+```sh
+git add ansible/host_vars/winterfell/main.yml
+git commit -m "Update Wake Velocity version"
+git push
+scripts/ansible-run.sh --limit winterfell --tags wake_velocity
+```
+
+The ordinary unfiltered wrapper also includes the game in the baseline. The tagged command
+limits changes to this role. It builds native and browser artifacts on Winterfell, reads the
+SDK version from the selected release, and caches the pinned SDK per version under `/srv`.
+The controller needs no Proteus checkout, local Emscripten, release artifacts or extra-vars.
+Both builds finish before service/nginx configuration is switched. Upgrades briefly disconnect
+players; repeat deployments reuse the builds and leave a healthy room running.
+
+The v0.0.18 cutover passed through that exact wrapper on 2026-10-26, followed by a complete
+`changed=0` rerun. Native/browser joining and gun/grenade input plus combat-page checks passed;
+no human balance/audio acceptance is inferred. `davve-srv/docs/wake-velocity.md` owns the
+current operator commands and detailed deployment evidence. Do not alternate the baseline
+role with the standalone Proteus playbook: they manage the same service names and ports.
+The standalone commands below remain a legacy/reference path, not the routine workflow.
 
 ## Known-server directory
 
@@ -52,7 +71,8 @@ checked-out server headers. After an upgrade, all clients see the new metadata o
 an older or newer client remains blocked until its room version matches. A new Pages client
 must not keep using a stale version entry bundled in its own build.
 
-To change names, descriptions or add known servers, edit `deploy/templates/servers.json.j2`
+To change names, descriptions or add known servers, edit
+`davve-srv/ansible/roles/wake_velocity/templates/servers.json.j2`
 and rerun deployment; no Wasm rebuild is needed. `web/servers.json` remains a local fixture/
 example directory. Custom launchers can use it by setting `boatServerListUrl: 'servers.json'`
 or omitting that setting. No accounts or dynamic registry service is required.
@@ -118,7 +138,7 @@ relay config. After the ISP changes that address, update DNS as usual and rerun 
 Check from a separate internet connection: an on-LAN public-address test depends on router
 hairpin NAT and does not qualify a residential WAN path.
 
-## Deploy and operate
+## Standalone controller deployment (legacy)
 
 From the Proteus repository root, activate the pinned Emscripten SDK as described in
 [the browser guide](WEB_BUILD.md), then build the released-core browser UI and deploy using
@@ -181,8 +201,11 @@ remain unmodified. No automatic upgrade, old-release cleanup or persistent state
 
 ## Cut over to the next release
 
-The PR is based on the protocol-v6 weapons-enabled main; the currently deployed server
-remains v0.0.17 (protocol 5, handling 8). Publishing a newer browser/native release does not
+For routine cutovers, use the version pin and `davve-srv` wrapper above. The following records
+the earlier standalone procedure; the v0.0.18 baseline cutover is already complete.
+
+The original hosting PR was based on protocol-v6 weapons-enabled main while the server
+still ran v0.0.17 (protocol 5, handling 8). Publishing a newer browser/native release does not
 upgrade that server automatically. Plan a brief room interruption and deploy matching server
 and browser artifacts after the new release tag has been pushed. For example, using the next
 unused version tag containing this PR:
@@ -221,6 +244,14 @@ receive snapshots and play alongside a native client, then leave and rejoin. Ins
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
 
 ## Status and verification — 2026-10-26
+
+Current: v0.0.18 is deployed by `davve-srv` main commit `dc206f9`, with protocol 6 / handling 9.
+The native server and browser were built on Winterfell; both services are active. A complete
+wrapper rerun reported no changes and preserved the room's active timestamp. A 90-second
+matching native bot run ended consistent with zero decode errors; Chrome/SwiftShader named
+joining, gun/grenade inputs and authoritative combat-page reception passed. Captures were
+inspected. The SDK is cached, and all test clients exited. Next: human weapons play and wider
+platform/soak checks. The following records are earlier standalone/development evidence.
 
 PR preparation on the rebased weapons-enabled main: native Debug build and the routine
 CTest suite passed all 98 enabled checks with optional GPU tests off. The full opt-in GPU
