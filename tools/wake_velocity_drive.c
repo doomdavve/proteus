@@ -74,7 +74,7 @@ static BoatInput rival_input(ObjectStudy *study)
     float error = remainderf(target - other->heading, 2 * PI);
     float wheel = Clamp(2 * error - other->yaw_velocity, -1, 1);
     return (BoatInput) { Clamp((wheel - other->wheel) / BOAT_STEP, -1, 1),
-        Clamp((.75f - other->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
+        Clamp((.75f - other->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1), 0, 0 };
 }
 
 // The session keeps the player for R, views and audio; the fleet steps it with the rival.
@@ -144,8 +144,9 @@ void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWa
         float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
         timed_boat_step(session,
             (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-                Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
-                    1) },
+                Clamp(
+                    (throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1),
+                0, 0 },
             metrics, wake, objects);
         return;
     }
@@ -154,8 +155,8 @@ void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWa
         float target = tick < 720 ? 0 : tick < 1200 ? .65f : 0;
         timed_boat_step(session,
             (BoatInput) { 0,
-                Clamp(
-                    (target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) },
+                Clamp((target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1),
+                0, 0 },
             metrics, wake, objects);
         return;
     }
@@ -163,5 +164,6 @@ void demo_step(BoatSession *session, int tick, BoatFrameMetrics *metrics, BoatWa
     float target_wheel = tick >= 360 ? 0.65f : 0;
     float wheel_change = fmaxf(-1, fminf(1, (target_wheel - boat->wheel) / BOAT_STEP));
     float throttle_change = tick < 240 ? 1 : tick < 480 ? 0 : tick < 960 ? -1 : 0;
-    timed_boat_step(session, (BoatInput) { wheel_change, throttle_change }, metrics, wake, objects);
+    timed_boat_step(
+        session, (BoatInput) { wheel_change, throttle_change, 0, 0 }, metrics, wake, objects);
 }

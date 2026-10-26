@@ -561,6 +561,11 @@ const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMa
                         / .38f,
                     0, 1);
         crest = fmaxf(crest, .28f * wave_crest_foam(storm.height, storm.gradient, .42f));
+        if (water.radial)
+            for (unsigned k = 0; k < BOAT_RADIAL_WAVES; ++k) {
+                BoatStormSample ring = boat_water_radial_query(water.radial[k], point, time);
+                crest = fmaxf(crest, .8f * wave_crest_foam(ring.height, ring.gradient, .4f));
+            }
         if (water.vessel.wavelength > 0)
             crest = fmaxf(crest,
                 .38f

@@ -5,7 +5,7 @@
 #include <math.h>
 #include <string.h>
 
-static_assert(sizeof(BoatFleetState) <= 8192, "a fleet checkpoint must stay within 8 KiB");
+static_assert(sizeof(BoatFleetState) <= 16384, "a fleet checkpoint must stay within 16 KiB");
 static_assert(sizeof(Boat) == 27 * sizeof(float), "boat_fleet_hash must list every Boat field");
 
 // Authored basin spawn candidates in simulation X/Z, each facing the basin centre.
@@ -59,6 +59,7 @@ void boat_fleet_place(BoatFleet *fleet, unsigned slot, Boat boat)
     s->pending = false;
     s->held = false;
     ++s->life;
+    boat_combat_spawn(fleet, slot);
     // A new span without a seam across the teleport. The cursor stays, and the new span's own
     // sample window keeps births at least BOAT_OBJECT_EMIT_TICKS apart.
     BoatWakeObjectEmitter *emitter = &fleet->state.wakes.emitters[slot];
@@ -68,6 +69,7 @@ void boat_fleet_place(BoatFleet *fleet, unsigned slot, Boat boat)
 void boat_fleet_leave(BoatFleet *fleet, unsigned slot)
 {
     assert(slot < BOAT_FLEET_SLOTS);
+    boat_combat_leave(fleet, slot);
     fleet->state.slots[slot].active = false;
     fleet->state.slots[slot].pending = false;
     fleet->state.slots[slot].held = false;
@@ -83,6 +85,8 @@ BoatWorld boat_fleet_world(const BoatFleet *fleet)
 {
     BoatWorld world = fleet->world;
     world.water.objects = &fleet->state.wakes;
+    world.combat = fleet->state.combat.enabled ? &fleet->state.combat : NULL;
+    world.water.radial = fleet->state.combat.enabled ? fleet->state.combat.waves : NULL;
     return world;
 }
 
@@ -96,6 +100,7 @@ void boat_fleet_save(const BoatFleet *fleet, BoatFleetState *checkpoint)
 void boat_fleet_restore(BoatFleet *fleet, const BoatFleetState *checkpoint)
 {
     fleet->state = *checkpoint;
+    boat_combat_bind(fleet);
     fleet->world.water.objects = &fleet->state.wakes;
     fleet->stats = (BoatFleetStats) { 0 };
 }
@@ -268,6 +273,8 @@ BoatFleetStats boat_fleet_solve(Boat boats[BOAT_FLEET_SLOTS], const bool active[
  *    to their plane position and heading with no planar motion.
  * 5. Commit, sample every wet stern from the committed fleet and the pre-emission pool, then
  *    track each emitter once. Births at n+1 contribute nothing until n+2 (zero birth envelope).
+ * Combat launches/fuses advance after lifecycle operations and before water integration;
+ * swept projectile hits resolve after the hull commit. Match observation follows outside.
  * Presentation, course progress and every file or device stay outside. */
 bool boat_fleet_step(BoatFleet *fleet, const BoatInput inputs[BOAT_FLEET_SLOTS])
 {
@@ -279,6 +286,10 @@ bool boat_fleet_step(BoatFleet *fleet, const BoatInput inputs[BOAT_FLEET_SLOTS])
     spawn_pending(fleet);
     BoatFleetStats spawns = fleet->stats;
     ++s->tick;
+    boat_combat_advance(fleet, inputs);
+    Boat before[BOAT_FLEET_SLOTS];
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        before[i] = s->slots[i].boat;
     boat_wake_objects_advance(&s->wakes);
     assert(s->wakes.tick == s->tick);
     double now = boat_tick_seconds(s->tick);
@@ -321,6 +332,7 @@ bool boat_fleet_step(BoatFleet *fleet, const BoatInput inputs[BOAT_FLEET_SLOTS])
                 (Vector2) { (float)sterns[i].x, (float)sterns[i].z },
                 (float)hypot(sterns[i].vx, sterns[i].vz), (float)sterns[i].wet))
             ++fleet->stats.emission_failures;
+    boat_combat_hits(fleet, before);
     return true;
 }
 
@@ -412,6 +424,11 @@ uint64_t boat_fleet_hash(const BoatFleetState *state)
         hash_float(&hash, e->strength);
         hash_float(&hash, e->strength_sum);
         hash_u64(&hash, e->initialized);
+    }
+    if (state->combat.enabled) {
+        uint8_t bytes[BOAT_COMBAT_BYTES];
+        boat_combat_encode(&state->combat, bytes);
+        hash_bytes(&hash, bytes, sizeof(bytes));
     }
     return hash;
 }

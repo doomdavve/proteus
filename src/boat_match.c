@@ -61,8 +61,8 @@ static unsigned credited(const BoatMatch *m, unsigned victim, uint64_t tick)
 }
 
 // Mark VICTIM out for this life; during a round, score it and report the event.
-static void capsize(
-    BoatMatch *m, unsigned victim, uint32_t life, uint64_t tick, bool bailout, BoatMatchOutput *out)
+static void capsize(BoatMatch *m, unsigned victim, uint32_t life, uint64_t tick, bool bailout,
+    uint8_t reason, BoatMatchOutput *out)
 {
     BoatMatchSlot *s = &m->slots[victim];
     s->out = true;
@@ -85,6 +85,7 @@ static void capsize(
             .victim = (uint8_t)victim,
             .attacker = (uint8_t)by,
             .cause = by == BOAT_MATCH_NOBODY ? BOAT_MATCH_CAUSE_NONE : s->touch.cause,
+            .reason = reason,
             .bailout = bailout });
 }
 
@@ -103,7 +104,8 @@ static void presence(BoatMatch *m, const BoatFleet *fleet, uint64_t tick)
         } else if (!s->present && present) {
             *s = (BoatMatchSlot) { .touch.slot = BOAT_MATCH_NOBODY,
                 .life = f->life,
-                .life_start = tick,
+                .life_start
+                = fleet->state.combat.enabled ? fleet->state.combat.players[i].life_start : tick,
                 .present = true };
             m->rows[i] = (BoatMatchRow) { 0 }; // Joiners start at zero.
         }
@@ -111,7 +113,8 @@ static void presence(BoatMatch *m, const BoatFleet *fleet, uint64_t tick)
             // A new life: grace, a clean touch record and nothing pending.
             *s = (BoatMatchSlot) { .touch.slot = BOAT_MATCH_NOBODY,
                 .life = f->life,
-                .life_start = tick,
+                .life_start
+                = fleet->state.combat.enabled ? fleet->state.combat.players[i].life_start : tick,
                 .present = true,
                 .airborne = f->boat.motion_state == BOAT_AIRBORNE };
         }
@@ -210,6 +213,22 @@ static void touches(BoatMatch *m, const BoatFleet *fleet, uint64_t tick)
         if (source != BOAT_MATCH_NOBODY
             && (other >= m->rules.wake_height || (launched && owner == source)))
             touch(m, i, source, BOAT_MATCH_WAKE, tick);
+        if (fleet->state.combat.enabled) {
+            const BoatCombat *c = &fleet->state.combat;
+            for (unsigned k = 0; k < BOAT_COMBAT_WAVES; ++k) {
+                const BoatRadialWave *w = &c->waves[k];
+                if (!w->active || w->owner == i || !m->slots[w->owner].present
+                    || w->generation != c->players[w->owner].generation
+                    || in_grace(m, w->owner, tick) || w->born < m->slots[i].life_start)
+                    continue;
+                float h
+                    = boat_water_radial_query(*w, boat->position, boat_fleet_time(fleet)).height;
+                if (h >= m->rules.wake_height && h > other) {
+                    touch(m, i, w->owner, BOAT_MATCH_GRENADE, tick);
+                    other = h;
+                }
+            }
+        }
     }
     // Contacts after wakes: a hit on the same tick is the more direct cause.
     for (unsigned i = 0, k = 0; i < BOAT_FLEET_SLOTS; ++i)
@@ -234,8 +253,13 @@ void boat_match_observe(BoatMatch *m, const BoatFleet *fleet, BoatMatchOutput *o
         BoatMatchSlot *s = &m->slots[i];
         if (!s->present || !f->active)
             continue;
-        if (!s->out && f->boat.motion_state == BOAT_CAPSIZED)
-            capsize(m, i, f->life, tick, false, out);
+        const BoatCombat *c = &fleet->state.combat;
+        bool destroyed = c->enabled && c->players[i].health <= 0;
+        if (!s->out && destroyed && c->players[i].killer < BOAT_FLEET_SLOTS)
+            touch(m, i, c->players[i].killer, BOAT_MATCH_GUN, tick);
+        if (!s->out && (destroyed || f->boat.motion_state == BOAT_CAPSIZED))
+            capsize(m, i, f->life, tick, false,
+                destroyed ? BOAT_MATCH_DEFEAT_HULL : BOAT_MATCH_DEFEAT_CAPSIZE, out);
         uint64_t since = tick - s->capsized_at;
         if (s->out && !s->respawn_requested
             && (since >= m->rules.respawn_ticks
@@ -257,7 +281,7 @@ bool boat_match_reset(BoatMatch *m, const BoatFleet *fleet, unsigned slot, BoatM
     if (!f->active || !s->present)
         return true; // Not placed yet: the fleet's own spawn rules apply.
     if (s->out) {
-        if (f->boat.motion_state == BOAT_CAPSIZED && tick - s->capsized_at < m->rules.skip_ticks) {
+        if (tick - s->capsized_at < m->rules.skip_ticks) {
             s->reset_wanted = true;
             return false;
         }
@@ -266,7 +290,7 @@ bool boat_match_reset(BoatMatch *m, const BoatFleet *fleet, unsigned slot, BoatM
     }
     // Resetting an upright boat cannot deny a capsize to whoever touched it last.
     if (m->phase == BOAT_MATCH_PLAYING && credited(m, slot, tick) != BOAT_MATCH_NOBODY)
-        capsize(m, slot, f->life, tick, true, out);
+        capsize(m, slot, f->life, tick, true, BOAT_MATCH_DEFEAT_CAPSIZE, out);
     s->respawn_requested = s->out;
     return true;
 }

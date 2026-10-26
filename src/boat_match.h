@@ -9,7 +9,14 @@
 #define BOAT_MATCH_MAX_EVENTS 8 // Events from one observation; at most one capsize per slot.
 
 typedef enum { BOAT_MATCH_WARMUP, BOAT_MATCH_PLAYING, BOAT_MATCH_INTERMISSION } BoatMatchPhase;
-typedef enum { BOAT_MATCH_CAUSE_NONE, BOAT_MATCH_CONTACT, BOAT_MATCH_WAKE } BoatMatchCause;
+typedef enum {
+    BOAT_MATCH_CAUSE_NONE,
+    BOAT_MATCH_CONTACT,
+    BOAT_MATCH_WAKE,
+    BOAT_MATCH_GUN,
+    BOAT_MATCH_GRENADE
+} BoatMatchCause;
+typedef enum { BOAT_MATCH_DEFEAT_CAPSIZE, BOAT_MATCH_DEFEAT_HULL } BoatMatchDefeat;
 typedef enum { BOAT_MATCH_CAPSIZE, BOAT_MATCH_ROUND_START, BOAT_MATCH_ROUND_END } BoatMatchKind;
 
 typedef struct {
@@ -55,6 +62,7 @@ typedef struct {
     uint64_t tick;
     uint32_t victim_life;
     uint8_t kind, victim, attacker, cause; // Attacker BOAT_MATCH_NOBODY for a self-capsize.
+    uint8_t reason; // BoatMatchDefeat; meaningful for defeats.
     bool bailout; // Reset while upright after a touch.
 } BoatMatchEvent;
 

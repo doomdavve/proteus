@@ -26,6 +26,7 @@ bool boat_world_resources_ready(const BoatWorldResources *resources);
 typedef struct {
     const BoatWorldDefinition *definition; // Always resources->definition.
     const BoatWorldResources *resources; // Shoreline queries use resources->map.
+    const struct BoatCombat *combat; // Optional presentation view; simulation uses fleet state.
     BoatWater water; // Settings plus the legacy D3 trail history that boats publish into.
     const BoatWake *wake_field; // Optional legacy CPU field endpoint (basin review only).
 } BoatWorld;
