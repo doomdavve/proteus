@@ -1,0 +1,99 @@
+{
+  "generator": "tools/prepare_outer_map.py",
+  "sources": [
+    "docs/adventure/sources/osm-corridor.json.gz",
+    "docs/adventure/sources/land-polygons.json.gz"
+  ],
+  "origin_epsg4326": [
+    11.9089495,
+    57.6973921
+  ],
+  "crs": "EPSG:3007 offsets from the crane origin; x = east, z = north",
+  "license": "ODbL-1.0",
+  "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution": "Map data \u00a9 OpenStreetMap contributors",
+  "ground": "Baskarta contours and spot heights; see terrain",
+  "terrain": {
+    "source": "G\u00f6teborgs stad, Baskarta v2 (hojdkurvor, hojdpunkt)",
+    "licence": "CC0 1.0",
+    "source_file": "docs/adventure/sources/terrain-baskarta.json.gz",
+    "source_sha256": "7bc277652d4c03a044435942627c1cf93d0911009dcb17f4e9c64b9475b514e7",
+    "datum": "Not confirmed from the product description; assumed RH 2000 (RH 70 differs by well under half a metre in Gothenburg). Shore heights sit near 0 m.",
+    "cell_inland_m": 20.0,
+    "cell_shore_m": 5.0,
+    "shore_band_m": 20.0,
+    "min_land_m": 1.0,
+    "interpolation": "linear over a Delaunay triangulation of contour vertices and spot heights; nearest sample outside its hull",
+    "holdout_vs_spot_heights": {
+      "samples": 11529,
+      "rmse_m": 2.406,
+      "mean_abs_m": 0.728,
+      "p95_abs_m": 2.484,
+      "max_abs_m": 96.449
+    },
+    "dropped_pieces": 0,
+    "dropped_area_m2": 0,
+    "height_min_m": 1.0,
+    "height_max_m": 77.65
+  },
+  "quay_bottom": -2.0,
+  "region": {
+    "river_crop": [
+      -1500.0,
+      -1600.0,
+      950.0,
+      800.0
+    ],
+    "first_slice": [
+      [
+        -1300,
+        -300
+      ],
+      [
+        -3000,
+        -300
+      ],
+      [
+        -4800,
+        -700
+      ],
+      [
+        -5300,
+        -1600
+      ],
+      [
+        -5300,
+        -3000
+      ],
+      [
+        -4300,
+        -3900
+      ],
+      [
+        -3300,
+        -3900
+      ],
+      [
+        -2600,
+        -3000
+      ],
+      [
+        -1300,
+        -1800
+      ]
+    ],
+    "area_km2": 16.52
+  },
+  "simplify_m": 0.5,
+  "water_area_km2": 8.009,
+  "land_area_km2": 8.511,
+  "playable_boundary_m": 5151.0,
+  "route_length_m": 6016.9,
+  "route_min_shore_clearance_m": 27.6,
+  "vertices": 87049,
+  "triangles": 165210,
+  "water_triangles": 2668,
+  "contents": "water, land surface and quay walls only; no buildings, bridge or roads",
+  "land_triangles": 118938,
+  "geometry_sha256": "a15e6d39d6ba23c95e0cc33b47e6c25ee20945bcb2f56ca4bf0ac227b1138b6e"
+}

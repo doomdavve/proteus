@@ -63,7 +63,8 @@
       "reason": "Download requires an authenticated Geotorget STAC account; no credentials were available for this task and none were created.",
       "access_dependency": "A Geotorget user account and product access for the STAC download service.",
       "fallback": "Author simplified island relief by hand from OSM coastline/rock/peak features and photographs until a terrain sample is obtained.",
-      "licence_when_acquired": "CC BY 4.0 product terms with product/source credit and processing statement"
+      "licence_when_acquired": "CC BY 4.0 product terms with product/source credit and processing statement",
+      "order": "Access ordered on STAC-hojd 2026-10-26; approval pending."
     },
     "smhi_vinga_a": {
       "status": "acquired",
@@ -123,6 +124,17 @@
     "bathymetry_emodnet": {
       "status": "not_acquired",
       "reason": "Optional for A0.2; not needed by the A0.3 coverage survey."
+    },
+    "terrain_baskarta": {
+      "status": "acquired (hand download); clipped extract committed",
+      "product": "Göteborgs stad Baskarta v2, SHP (hojdkurvor, hojdpunkt)",
+      "retrieved": "2026-10-26 (browser download from the Göteborg open-data portal)",
+      "crs": "EPSG:3007",
+      "licence": "CC0 1.0",
+      "published": "2020-06-30",
+      "local_path": "not retained (1.6 GB); regenerate with tools/prepare_terrain_sources.py",
+      "output": "docs/adventure/sources/terrain-baskarta.json.gz",
+      "datum": "not confirmed; assumed RH 2000"
     }
   },
   "derived": {

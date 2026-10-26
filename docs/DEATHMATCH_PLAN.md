@@ -8,7 +8,7 @@ This document owns the deathmatch rules, phases, verification and acceptance. Th
 feel, including tuning of the new mechanics below.
 
 Status (2026-10-26): both weapons are implemented on `deathmatch-weapons`, based on
-`origin/main` (`2c0d7c9`), in `/private/tmp/proteus-deathmatch-weapons`. D1/D2 remain the
+`origin/main` (`2c0d7c9`), then merged with its new `417fca4` outer-map work, in `/private/tmp/proteus-deathmatch-weapons`. D1/D2 remain the
 round/scoring foundation. The weapon milestone below supersedes the earlier immediate
 side-ram → surge → mine sequence. Human balance acceptance is pending. Existing historical
 handoffs below retain their original scope.
@@ -80,7 +80,7 @@ Verification record (macOS/Apple Silicon, Debug, 2026-10-26):
   No HUD text/audio/window was exercised by these captures. Production radial shader parity
   checks were added to `boat_race_trial --gpu-check`, but GLFW could not initialize a desktop
   window here; no GPU or windowed playback pass is claimed.
-- Final Debug project build warning-free; full routine CTest: 96 active cases pass, 13 retired
+- Final Debug project build warning-free; full routine CTest: 97 active cases pass, 13 retired
   cases disabled, GPU tests off. ENet loopback/host/session tests ran with socket access.
   All 17 baseline offline CPU captures remain byte-identical. Free/race trace and replay tests pass.
 - Four held boats, 600-tick synthetic stress: 64 continuously replenished bullets plus four
