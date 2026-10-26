@@ -12,7 +12,7 @@
   "license": "ODbL-1.0",
   "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
   "attribution": "Map data \u00a9 OpenStreetMap contributors",
-  "ground": "Baskarta contours and spot heights; see terrain",
+  "ground": "Baskarta contours and spot heights outside the river crop; flat 3.5 m inside it, blending over terrain_blend_m",
   "terrain": {
     "source": "G\u00f6teborgs stad, Baskarta v2 (hojdkurvor, hojdpunkt)",
     "licence": "CC0 1.0",
@@ -34,7 +34,7 @@
     "dropped_pieces": 0,
     "dropped_area_m2": 0,
     "height_min_m": 1.0,
-    "height_max_m": 77.65
+    "height_max_m": 50.48
   },
   "quay_bottom": -2.0,
   "region": {
@@ -90,10 +90,17 @@
   "playable_boundary_m": 5151.0,
   "route_length_m": 6016.9,
   "route_min_shore_clearance_m": 27.6,
-  "vertices": 87049,
-  "triangles": 165210,
+  "vertices": 148441,
+  "triangles": 240538,
   "water_triangles": 2668,
-  "contents": "water, land surface and quay walls only; no buildings, bridge or roads",
+  "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3)",
+  "river_overlay": {
+    "source": "assets/geometry/river/geometry.h",
+    "triangles": 70940,
+    "bridge_triangles": 4388,
+    "ground_m": 3.5,
+    "terrain_blend_m": 200.0
+  },
   "land_triangles": 118938,
-  "geometry_sha256": "a15e6d39d6ba23c95e0cc33b47e6c25ee20945bcb2f56ca4bf0ac227b1138b6e"
+  "geometry_sha256": "31265d24ea2a7e01f8616ffac3e46859231f33841bd8bab070c0152cd9fc4ace"
 }

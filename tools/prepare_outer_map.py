@@ -7,9 +7,12 @@ Requires the pins in docs/adventure/requirements.txt. Run from anywhere:
     python -I tools/prepare_outer_map.py                 # writes assets/geometry/outer/
 
 Reads only the checked-in A0.2 sources and never fetches. Normal C builds use the checked-in
-output. The map holds water, flat land and quay walls only: no buildings, bridge, roads or
-planting (A3 adds them per region). Water is the A0.3 assembly (land polygons plus OSM inland
-water, bridge legs removed); land is the rest of the region at the river's assumed 3.5 m ground.
+output. Outside the river crop the map holds water, Baskarta terrain and quay walls only: no
+buildings, roads or planting. Inside the crop (A3.3) the ground is the river's flat 3.5 m and the
+river bake's buildings, roads, gardens, trees and bridge are imported unchanged from
+assets/geometry/river/geometry.h, so the crop looks and behaves as the river location does; the
+terrain blends in over BLEND_M outside it. Water is the A0.3 assembly (land polygons plus OSM
+inland water, bridge legs removed).
 Where the region cuts open water, the water ends at an edge that collision treats as shore: a
 playable boundary, not a coastline. The manifest reports its length.
 """
@@ -18,6 +21,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -40,6 +44,49 @@ spec.loader.exec_module(survey)
 SIMPLIFY = 0.5
 QUAY_BOTTOM = -2.0
 ROUTE_CLEARANCE = survey.ROUTE_CLEARANCE
+BLEND_M = 200.0  # Distance outside the river crop over which terrain rises from flat ground.
+RIVER_GEOMETRY = ROOT / "assets/geometry/river/geometry.h"
+# Colours of the river bake's own land top and quay walls, which the outer terrain replaces.
+RIVER_GROUND_COLORS = {(135, 139, 144), (94, 102, 114)}
+
+
+def river_overlay():
+    """The river bake's triangles above its ground: buildings, roads, gardens, trees, bridge.
+
+    Returns (plain, bridge), each a list of (three (x, y, z) points, colour). The river's water,
+    flat land top and quay walls are dropped; the outer map has its own. The bridge keeps all of
+    its triangles, which start at the header's river_bridge_first_triangle.
+    """
+    text = RIVER_GEOMETRY.read_text()
+    vertices = [tuple(map(float, m)) for m in re.findall(
+        r"\{ (-?[\d.]+)f, (-?[\d.]+)f, (-?[\d.]+)f \},?\n", text.split("river_triangles")[0])]
+    triangles = [(tuple(map(int, m[:3])), tuple(map(int, m[3:]))) for m in re.findall(
+        r"\{ \{ (\d+), (\d+), (\d+) \}, \{ (\d+), (\d+), (\d+), 255 \} \},", text)]
+    bridge_first = int(re.search(r"river_bridge_first_triangle = (\d+)", text).group(1))
+    plain, bridge = [], []
+    for index, (ids, color) in enumerate(triangles):
+        points = [vertices[i] for i in ids]
+        if index >= bridge_first:
+            bridge.append((points, color))
+        elif any(y != 0 for _, y, _ in points) and color not in RIVER_GROUND_COLORS:
+            plain.append((points, color))
+    return plain, bridge
+
+
+def flatten_in_crop(model):
+    """Terrain model that is flat at GROUND in the river crop and blends to MODEL beyond it."""
+    import numpy as np
+
+    x0, z0, x1, z1 = survey.RIVER_CROP
+
+    def blended(xy):
+        xy = np.asarray(xy, dtype=float)
+        dx = np.maximum(np.maximum(x0 - xy[:, 0], xy[:, 0] - x1), 0)
+        dz = np.maximum(np.maximum(z0 - xy[:, 1], xy[:, 1] - z1), 0)
+        t = np.clip(np.hypot(dx, dz) / BLEND_M, 0, 1)
+        return GROUND + (model(xy) - GROUND) * (t * t * (3 - 2 * t))
+
+    return blended
 
 
 def region_shape():
@@ -133,10 +180,12 @@ def check_watertight(cells, land):
     assert not bad, f"{len(bad)} open interior edges, first {bad[:3]}"
 
 
-def bake(water, region, model=None):
+def bake(water, region, model=None, overlay=None):
     """Return (vertices, triangles, stats) for water at y=0 then land and walls.
 
     Without MODEL the land is flat at GROUND; with one it is the 20 m/5 m terrain surface.
+    OVERLAY is river_overlay()'s (plain, bridge): the plain triangles follow the land and the
+    bridge ones come last, from the returned bridge_first index.
     """
     vertices, triangles, lookup = [], [], {}
 
@@ -175,6 +224,7 @@ def bake(water, region, model=None):
         surface(land, GROUND, (135, 139, 144))
         walls(land, 0, GROUND, wall_color)
         walls(land, QUAY_BOTTOM, 0, wall_color)
+        stats["bridge_first"] = len(triangles)
         return vertices, triangles, stats
 
     import numpy as np
@@ -205,11 +255,18 @@ def bake(water, region, model=None):
             triangle([a, d, c], wall_color)
     surface_area = sum(abs((x1 - x0) * (z2 - z0) - (x2 - x0) * (z1 - z0)) / 2
                        for (x0, z0), (x1, z1), (x2, z2) in cells)
+    plain, bridge = overlay or ([], [])
+    for points, color in plain:
+        triangle(points, color)
+    bridge_first = len(triangles)
+    for points, color in bridge:
+        triangle(points, color)
     assert abs(surface_area - land.area) < 1.0 + sum(a for a, _ in DROPPED), \
         f"land surface {surface_area:.1f} m2 differs from land {land.area:.1f} m2"
     check_watertight(cells, land)
     assert sum(a for a, _ in DROPPED) < 1.0, f"untriangulated land {DROPPED[:5]}"
-    stats.update(dropped_pieces=len(DROPPED), dropped_area_m2=sum(a for a, _ in DROPPED),
+    stats.update(overlay_triangles=len(plain), bridge_first=bridge_first,
+                 bridge_triangles=len(bridge), dropped_pieces=len(DROPPED), dropped_area_m2=sum(a for a, _ in DROPPED),
                  land_triangles=len(cells), shore_edges=len(shore_edges),
                  height_min=min(height.values()), height_max=max(height.values()))
     return vertices, triangles, stats
@@ -247,7 +304,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
     lines += ["};", "static const Triangle3D outer_triangles[] = {"]
     lines += [f"    {{ {{ {i[0]}, {i[1]}, {i[2]} }}, {{ {c[0]}, {c[1]}, {c[2]}, 255 }} }},"
               for i, c in triangles]
-    lines += ["};", f"enum {{ outer_bridge_first_triangle = {len(triangles)} }};", ""]
+    lines += ["};", f"enum {{ outer_bridge_first_triangle = {stats['bridge_first']} }};", ""]
     content = "\n".join(lines)
     (output / "geometry.h").write_text(content)
     land = stats["land"]
@@ -262,7 +319,8 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "license": "ODbL-1.0", "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
         "attribution": "Map data © OpenStreetMap contributors",
         "ground": ("Assumed flat ground at 3.5 m above water; terrain samples not used"
-                   if terrain is None else "Baskarta contours and spot heights; see terrain"),
+                   if terrain is None else "Baskarta contours and spot heights outside the "
+                   "river crop; flat 3.5 m inside it, blending over terrain_blend_m"),
         "terrain": terrain,
         "quay_bottom": QUAY_BOTTOM,
         "region": {"river_crop": list(survey.RIVER_CROP), "first_slice": survey.FIRST_SLICE,
@@ -275,7 +333,12 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "route_min_shore_clearance_m": round(route.distance(water.boundary), 1),
         "vertices": len(vertices), "triangles": len(triangles),
         "water_triangles": stats["water_triangles"],
-        "contents": "water, land surface and quay walls only; no buildings, bridge or roads",
+        "contents": "water, land surface and quay walls; inside the river crop also the river "
+                    "bake's buildings, roads, gardens, trees and bridge (A3.3)",
+        "river_overlay": {"source": "assets/geometry/river/geometry.h",
+                          "triangles": stats.get("overlay_triangles"),
+                          "bridge_triangles": stats.get("bridge_triangles"),
+                          "ground_m": GROUND, "terrain_blend_m": BLEND_M},
         "land_triangles": stats.get("land_triangles"),
         "geometry_sha256": hashlib.sha256(content.encode()).hexdigest(),
     }
@@ -356,7 +419,8 @@ def main():
         "holdout_vs_spot_heights": outer_terrain.holdout_error(
             contours, spots, geo_land(region, water)),
     }
-    vertices, triangles, stats = bake(water, region, model)
+    overlay = river_overlay()
+    vertices, triangles, stats = bake(water, region, flatten_in_crop(model), overlay)
     terrain.update(dropped_pieces=stats["dropped_pieces"],
                    dropped_area_m2=round(stats["dropped_area_m2"], 4),
                    height_min_m=round(stats["height_min"], 2),
