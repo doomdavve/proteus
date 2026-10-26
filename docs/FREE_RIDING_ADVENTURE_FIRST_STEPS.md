@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. A3 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`; A3.2 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1479,9 +1479,62 @@ Started from `origin/main` at `d66a8a8` (A2.4 merged) on branch `adventure-a2-5`
     not hide behind a frame hitch. The Debug timings are single runs.
   - No manual playback or human visual acceptance was performed.
 
-**A2 is complete. Next: A3** ([plan](FREE_RIDING_ADVENTURE_PLAN.md)): the first outer-river
-adventure. Its hand-off from this work is that detailed assets must load per region, since
+**A2 is complete.** Its hand-off to A3 is that detailed assets must load per region, since
 bind costs and the water-index, tile and collision memory scale with the loaded map.
+
+## A3 — first outer-river adventure
+
+A3 ([plan](FREE_RIDING_ADVENTURE_PLAN.md)) makes the A0.3 first slice playable: the river crop
+joined to the 10.9 km² run past Nya Älvsborg to the Långedrag old harbour, one shelter, one
+exposed-water encounter and recovery. It is split like A2 so each step is verifiable alone.
+Steps after A3.1 are proposals, to be revised from what the earlier steps find.
+
+| Task | Depends on | Deliverable | Status |
+| --- | --- | --- | --- |
+| A3.1 | A2 complete | Offline bake of the first slice's water, land and quay walls into a compiled map description; route and shelter proven against the collision queries | Complete 2026-10-26; [result](#a31-result-2026-10-26) |
+| A3.2 | A3.1 | A mapped `outer` location starting at the dock: spawn, camera, CPU/GPU water and land rendering, fog or fade at the playable boundary; scenery, harbor and traffic for the added geography decided here | Proposed |
+| A3.3 | A3.2 | Bake the existing river buildings, bridge and roads into the combined map so the outing is continuous under Älvsborgsbron | Proposed |
+| A3.4 | A3.3 | Långedrag shelter destination, checkpoint recovery and the exposed-water encounter | Proposed |
+| A3.5 | A3.4 | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
+
+### A3.1 result, 2026-10-26
+
+- **Generator:** [`tools/prepare_outer_map.py`](../tools/prepare_outer_map.py) reuses A0.3's
+  assembly (`docs/adventure/survey.py`: land polygons plus OSM inland water, bridge legs
+  removed) and the river bake's triangulation, then clips to the river crop joined to the first
+  slice. Water keeps only the part connected to the dock, simplified to 0.5 m before clipping.
+  Land is the rest of the region at the river's assumed 3.5 m ground, with quay walls to -2 m.
+  A 1 mm opening removes zero-width spikes where a shore meets the region edge along the same
+  line, which the constrained triangulation rejected (applied only to polygons that fail).
+  It needs the `docs/adventure/requirements.txt` pins and reads only checked-in sources.
+- **Output:** `assets/geometry/outer/geometry.h` (1.15 MB) and `manifest.json`: 7,796
+  vertices, 15,556 triangles (2,668 water first), 8.0 km² water and 8.5 km² land in a 16.5 km²
+  region. Two runs produced identical bytes (2.4 s each). The collision cache is 1.2 MB.
+  [`src/waterfront_outer.[ch]`](../src/waterfront_outer.h) expose it as `waterfront_outer_map`
+  in the core library; nothing uses it at runtime yet, and its bridge range is empty.
+- **Route and shelter:** the A0.3 slice route (6.02 km, dock to Långedrag old harbour) stays in
+  the baked water with the 8 m envelope (generator assertion, 27.6 m minimum shore clearance),
+  and the new `boat_outer_map` CTest repeats it through `boat_map_water` at every waypoint and
+  597 samples. Indexed queries equal the exhaustive scan on 20,000 points.
+- **Visual check:** [`outer-map.png`](adventure/outer-map.png) (agent review) draws the baked
+  water, land and route; coastline, islands and the river join read as in the A0.3 map. It is
+  not a game capture.
+- **Verification (2026-10-26, macOS arm64, Debug):** configure and build passed warning-free
+  and `ctest --test-dir build -j 4 --output-on-failure` passed all 122 active tests in
+  186.75 s (15 retired tests disabled), including the new `boat_outer_map` and the core
+  boundary checks.
+- **Limitations:**
+  - **Playable boundary:** where the region cuts open water (5,151 m of edge, mostly south-west),
+    water ends at an edge that collision treats as shore with no land behind it. A3.2 must hide
+    it (fog, fade or authored land); it is not a coastline.
+  - The map has no buildings, bridge, roads or planting, and the bridge legs are holes in the
+    water only. Terrain, depth, overhead clearance and hazards (rocks near the route) remain
+    gaps. Shoreline vertices are simplified 0.5 m from the A0.3 assembly.
+  - No runtime location, rendering, manual playback or human acceptance. The route test copies
+    `SLICE_ROUTE` from the survey by hand.
+  - GPU CTests were part of the full run but no GPU capture of this map exists.
+
+**Next: A3.2**, a mapped `outer` location that loads this map.
 
 ## Verification and handoff template
 

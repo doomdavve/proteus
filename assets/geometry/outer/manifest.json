@@ -1,0 +1,75 @@
+{
+  "generator": "tools/prepare_outer_map.py",
+  "sources": [
+    "docs/adventure/sources/osm-corridor.json.gz",
+    "docs/adventure/sources/land-polygons.json.gz"
+  ],
+  "origin_epsg4326": [
+    11.9089495,
+    57.6973921
+  ],
+  "crs": "EPSG:3007 offsets from the crane origin; x = east, z = north",
+  "license": "ODbL-1.0",
+  "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+  "attribution": "Map data \u00a9 OpenStreetMap contributors",
+  "ground": "Assumed flat ground at 3.5 m above water; terrain samples not used",
+  "quay_bottom": -2.0,
+  "region": {
+    "river_crop": [
+      -1500.0,
+      -1600.0,
+      950.0,
+      800.0
+    ],
+    "first_slice": [
+      [
+        -1300,
+        -300
+      ],
+      [
+        -3000,
+        -300
+      ],
+      [
+        -4800,
+        -700
+      ],
+      [
+        -5300,
+        -1600
+      ],
+      [
+        -5300,
+        -3000
+      ],
+      [
+        -4300,
+        -3900
+      ],
+      [
+        -3300,
+        -3900
+      ],
+      [
+        -2600,
+        -3000
+      ],
+      [
+        -1300,
+        -1800
+      ]
+    ],
+    "area_km2": 16.52
+  },
+  "simplify_m": 0.5,
+  "water_area_km2": 8.009,
+  "land_area_km2": 8.511,
+  "playable_boundary_m": 5151.0,
+  "route_length_m": 6016.9,
+  "route_min_shore_clearance_m": 27.6,
+  "vertices": 7796,
+  "triangles": 15556,
+  "water_triangles": 2668,
+  "contents": "water, flat land and quay walls only; no buildings, bridge or roads",
+  "geometry_sha256": "ee6ea5bbacf5027a8366cf15a2f5341401b2e05d0b87e65416e1f0ca43d8723a"
+}

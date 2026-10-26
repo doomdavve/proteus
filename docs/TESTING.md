@@ -153,6 +153,11 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   first copy's collision answers, tiles, water patches and windowed CPU water to be identical
   at every size, visiting the same candidates, with a water cache that does not grow. Run it
   with `--report` for build costs, per-operation times and memory per owner.
+- `boat_outer_map` runs `validate_boat_outer_map` (adventure A3.1, about 1 s in Debug). It loads
+  the baked first outer-river slice (`assets/geometry/outer/`, regenerated offline by
+  `tools/prepare_outer_map.py`), requires every A0.3 route waypoint and sampled leg to be water
+  with the 8 m envelope, compares the indexed queries with the exhaustive scan on 20,000 points,
+  and checks that points outside the region and on the quay are not water.
 - `boat_core_boundary` runs `tools/check_core_boundary.py` over the core sources and archive,
   and `boat_net_boundary` does the same for the core and net libraries together.
 - `boat_fleet` runs `validate_boat_fleet` (multiplayer M2 fleet step, contacts, spawns and
