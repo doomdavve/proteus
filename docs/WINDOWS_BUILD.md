@@ -9,8 +9,10 @@ remain unresolved.
 
 Packaged LAN server (2026-10-24): the workflow also builds `boat_server`, `boat_bot` and
 `validate_boat_net`, runs `boat_server_scripted`, `boat_net` and the ENet `boat_net_loopback`
-test, and packages `boat_server.exe` with `host.bat` (a room on `--bind 0.0.0.0`). The relocated
-check runs `boat_server.exe --scripted --ticks 240`.
+test (since 2026-10-26: the `boat_net.*` and `boat_net_enet.*` cases and the
+`boat_net_process` smoke, which replace `boat_net` and `boat_net_loopback`), and packages
+`boat_server.exe` with `host.bat` (a room on `--bind 0.0.0.0`). The relocated check runs
+`boat_server.exe --scripted --ticks 240`.
 
 Host from the game (2026-10-25): the ZIP no longer carries `boat_server.exe`. `wake_velocity.exe
 --serve` is the room (`host.bat` runs it with `--bind 0.0.0.0`), and the title's HOST A ROOM

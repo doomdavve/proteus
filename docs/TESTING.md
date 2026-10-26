@@ -76,14 +76,14 @@ joins the named room without typing and can simulate a failed list with manual f
 ## Lanes, cases and timing
 
 Every test carries exactly one lane label. `quick` tests take under about 100 ms on their own;
-`slow` holds everything heavier: long sweeps, soaks, real-time ENet tests and every GPU test.
+`slow` holds everything heavier: long sweeps, soaks, the process smoke and every GPU test.
 Use the quick lane while editing and the full suite before handing off:
 
 ```sh
 cmake --preset dev            # Same as: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
-ctest --preset quick          # About 1 s: 133 tests on an M1 Max (2026-10-26)
-ctest --preset full           # About 19 s without GPU tests; everything enabled
+ctest --preset quick          # Under 1 s: 140 tests on an M1 Max (2026-10-26)
+ctest --preset full           # About 11 s without GPU tests; everything enabled
 ctest --preset full -L core   # Presets combine with the usual filters and -j N
 ```
 
@@ -123,6 +123,22 @@ quick budget are listed in `PROTEUS_SLOW_TESTS`; configure warns about a name th
   wherever the length is the contract.
 - A large sweep gets a sampled quick case and full slow cases, for example
   `boat_map_index.sampled_queries` and `boat_map_index.lattice_queries`.
+
+### No wall time
+
+No test may wait for time to pass. Code that depends on time takes `now` as an input, and its
+test drives a virtual clock: the room harness steps `boat_net_server_service(server, now)`, and
+sessions step whole ticks. Sleeping, fixed-duration runs and decisions on elapsed time make
+tests slow and flaky, and usually mean state that has not been extracted yet. Wall-clock limits
+appear only as failure deadlines (a subprocess `timeout`, or a wait that returns as soon as its
+event arrives). Measured costs may be printed but never asserted.
+
+`test_time` (`tools/check_test_time.py`) enforces this. It scans the validators, the test
+headers, every script CMake registers as a test, and the `add_test` commands. It rejects
+sleeps and waits, wall-clock reads in test scripts, and `--seconds`/`--frames` runs. A wait
+bounded by a deadline must say so in a `deadline` comment on its line. `*_rejected` argument
+checks are exempt. The one listed exception is `wake_velocity_host_gpu`, whose windowed frames
+follow the display.
 
 **Measuring.** `tools/test_timing.py` ranks a CTest JUnit report. It prints buckets (≤20 ms,
 ≤50 ms, ≤1 s, >1 s) and the quick tests over a budget (`--budget`, default 0.1 s). `--enforce`
@@ -265,11 +281,12 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
 - `boat_match` runs `validate_boat_match` ([deathmatch](DEATHMATCH_PLAN.md) credit window,
   self-capsize, grace, respawn, bailout, leavers, rounds and planted-wake capsizes), and
   `boat_server_scripted_deathmatch` runs a scripted 10 s round through its intermission.
-- `boat_net`, `boat_net_loopback`, `boat_net_deathmatch` and `boat_net_race` are the
+- `boat_net`, `boat_net_enet` and `boat_net_process` are the
   [network checks](#network-checks).
-- Twelve argument checks expect a failure: `boat_server --scripted` with a room option, an invalid
-  `--port` and an invalid `--bind`, `--round-seconds` without `--mode deathmatch`, `boat_bot`
-  without a port, `boat_bot --discover` with `--connect`, `wake_velocity --connect` combined with `--waves` or `--skin`, `--name`
+- Fourteen argument checks expect a failure: `boat_server --scripted` with a room option or
+  `--until-empty`, an invalid `--port` and an invalid `--bind`, `--round-seconds` without
+  `--mode deathmatch`, `boat_bot` without a port, `boat_bot --discover` with `--connect`,
+  `boat_bot --snapshots` with `--seconds`, `wake_velocity --connect` combined with `--waves` or `--skin`, `--name`
   without `--connect`, `wake_velocity --host race --location basin`, `--host` with `--connect`, and
   `--port` without `--host`.
 - `wake_velocity_serve_scripted` runs the scripted authority through `wake_velocity --serve`, the
@@ -333,51 +350,62 @@ a few seconds. It covers:
   blackout recovery, 6 s timeout, slot reuse and stale-life rejection. A lossless tail requires
   all surviving mirrors to match the authority at their snapshot ticks exactly.
 
-`boat_net_loopback` runs `tools/boat_net_smoke.py`, which starts real `boat_server` and
-`boat_bot` processes on a free 127.0.0.1 UDP port for about 9 s. Two bots drive and a
-wrong-token bot is refused. `boat_bot --discover` on a second free port (the room's
-`--lan-port`) must find the room once, with its token flag and player count. A second server on
-the same port must fail, and the message,
-datagram and MTU bounds plus a bounded exit are checked. Each bot must send commands for over
-half of its ticks, and the server must use more than 85% of that share (`received_ratio` against
-command coverage). Busy CI runners deschedule processes for 50-200 ms, and commands for ticks the
-server has already run cannot be used; a fixed 90% ratio failed macOS CI at 0.74 for that reason
-(2026-10-24, reproduced locally by sleeping the bot). Run it alone with:
+**Real transport, virtual clock.** `boat_net_enet` runs `validate_boat_net_enet`: the same
+room harness, built with `BOAT_NET_TEST_ENET`, over real ENet sockets on ephemeral 127.0.0.1
+ports, while the room keeps its virtual clock. Loopback delivery is asynchronous, so after
+every service the room calls `boat_net_enet_settle`. It services every host in the process until
+each datagram sent has been received, keeping the events for the next polls. Its 5 s limit is
+only a failure deadline. Cases:
+- `enet_loopback`: two bots, a wrong-token client refused, a second listen on the port
+  refused. Over 4 s of room time it checks snapshots, one bootstrap, no resyncs or decode
+  errors, applied births and boats that moved, plus message ≤1100, datagram ≤1200 and MTU
+  ≤1200 bytes. It also checks graceful leaves, no faults, and that every mirror matches the
+  authority's hash.
+- `enet_lan`: a loopback LAN answer reaches a search socket with its mode, players, token,
+  compatibility and endpoint.
+- `enet_lifecycle` (slow): three predicting bots stay while a fourth leaves and a fifth is
+  refused as full. Another bot falls silent, times out on the room clock after
+  `BOAT_NET_TIMEOUT`, and a replacement takes its slot.
+- Unchanged room cases over UDP: `rejections`, `resync`, and `deathmatch`, `race_room` and
+  `mapped_rooms` (all three slow). `mapped_rooms` checks that clients take the server's
+  location.
+
+**Processes.** `boat_net_process` runs `tools/boat_net_process.py` (about 0.25 s). It ends on
+events, not elapsed time:
+- `boat_server --until-empty` closes the room once every accepted player has left.
+- `boat_bot --snapshots 3` leaves after three snapshots.
+- `boat_bot --discover --first` stops at the first answer.
+
+It checks a port clash, a LAN search with the room's flags, two token-holding bots and a
+wrong-token refusal, bot summaries and bounds, and the server's accept/leave/rejection counts
+without faults. Its timeouts are failure deadlines. Run it alone with:
 
 ```sh
-python3 tools/boat_net_smoke.py --server build/boat_server --bot build/boat_bot
+python3 tools/boat_net_process.py --server build/boat_server --bot build/boat_bot
 ```
 
-`boat_host` runs `tools/boat_host_check.py` (about 1 s): `wake_velocity --serve --exit-with-stdin`
-on free ports, one `boat_bot` session, then closing the room's standard input, as the hosting
-game does when it leaves or dies. The room must report it, keep `accepted=1 left=1` and exit 0
-within 2 s. With GPU tests enabled, `wake_velocity_host_gpu` hosts a windowed river deathmatch with
-`--host` on port 24779 for 120 frames and requires the room to close after the session.
+`boat_host` runs `tools/boat_host_check.py` (about 0.3 s): `wake_velocity --serve --exit-with-stdin`
+on free ports and one `boat_bot --snapshots 3` session. It then closes the room's standard input,
+as the hosting game does when it leaves or dies. The room must report it, keep
+`accepted=1 left=1` and exit 0 within a 2 s deadline. With GPU tests enabled,
+`wake_velocity_host_gpu` hosts a windowed river deathmatch with `--host` on port 24779 for 120
+frames and requires the room to close after the session. It is the one listed exception to
+[the no-wall-time rule](#no-wall-time): windowed frames follow the display.
 
-`boat_net_session` runs `tools/boat_net_session.py` for about 16 s over real ENet/UDP loopback.
-Three predicting bots stay connected while a fourth leaves, joins in progress, crashes, times
-out and is replaced. A fifth peer must receive a room-full rejection. The room runs with
-`boat_server --peer-timeout 1` (a test option; rooms default to 5 s), so the crashed bot times out
-after a second. Bots request reset every 2 s; the three that stay send inactive controls for 1 s
-every 3 s and the 3 s churn bots every 2 s. Summaries require completed resets, all four
-roster slots, bounded wakes/messages/datagrams, continued snapshots and no decode errors.
-The server must run every scheduled tick, release every slot and report the expected timeout
-and rejection counts without protocol/emission faults. Child startup, exit and failure cleanup
-are bounded; output uses temporary files, with completed process logs printed by the harness.
+**Manual soak.** `tools/boat_net_session.py` is not a CTest test. It runs real processes on the
+wall clock: three predicting bots stay while a fourth leaves, joins in progress, crashes, times
+out and is replaced. Use it for long churn runs:
 
 ```sh
-ctest --test-dir build -R '^boat_net_session$' --output-on-failure
-python3 tools/boat_net_session.py --server build/boat_server --bot build/boat_bot --seconds 1800 \
-  --peer-timeout 5
+python3 tools/boat_net_session.py --server build/boat_server --bot build/boat_bot --seconds 1800
 ```
 
-`--peer-timeout` (1–60, default 1) sets the room's silence timeout; pass 5 for the production
-value in soaks. `--seconds` accepts one churn cycle plus a second (11 at the default timeout) up
-to 7200 and repeats fourth-slot churn during longer runs while the other
-three bots stay. This provides an opt-in soak driver; it does not measure memory plateaus or
-CPU/bandwidth budgets, or apply OS-level impairment. The 30-minute, one-hour and two-hour M5
-gates still require recorded runs and resource measurements. `boat_bot --predict`,
-`--reset-every S` and `--inactive-every S` can also be used independently (integer S: 2–86400).
+`--peer-timeout` (1–60, default 5) sets the room's silence timeout through
+`boat_server --peer-timeout`. `--seconds` (default 30) accepts one churn cycle plus a second up
+to 7200. It does not measure memory plateaus or CPU/bandwidth budgets, or apply OS-level
+impairment. The 30-minute, one-hour and two-hour M5 gates still require recorded runs and
+resource measurements. `boat_bot --predict`, `--reset-every S`, `--inactive-every S`, `--hunt`
+and `boat_server --mode deathmatch|race --round-seconds S` remain available for manual runs.
 
 `boat_net` also runs four predicted clients in the mapped river: shoreline-safe spawns,
 a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
@@ -386,39 +414,6 @@ mirrors at a birth-batch snapshot. The protocol-v6 codec rejects invalid map IDs
 bytes and checks the RaceState/RaceEvent rules; a race room on the in-memory transport checks
 predicted holds released at GO, ferry-exact mirrors, a mid-race joiner and results, and a
 prediction replay through GO matches the authority; discovery uses the complete compiled-map bundle digest.
-
-`boat_net_river` runs the four-player lifecycle harness with `--location river --mode deathmatch`
-(about 16 s). The harness requires clients to select the server's location without
-client-side map arguments. Run this map check with:
-
-```sh
-ctest --test-dir build -R '^boat_net_river$' --output-on-failure
-```
-
-`boat_net_deathmatch` runs the same script with `--deathmatch`: a deathmatch room with a 4 s
-round (`--round-seconds` accepts 2–3600) and two `boat_bot --hunt` clients for 8 s (about 11 s
-in all). Each bot's received
-scoreboard for round 1 must equal the server log's round-end line, and each must have received
-the round start, every logged capsize and the round end. Whether the hunters capsize anyone in a
-given run varies (usually not in 4 s; `boat_net` covers credited capsizes deterministically); the check is that clients agree with the authority. Run it alone with:
-
-```sh
-python3 tools/boat_net_smoke.py --deathmatch --server build/boat_server --bot build/boat_bot
-```
-
-`boat_net_race` (about 12 s) finds a `--mode race` room through LAN discovery and races two
-`boat_bot --predict` clients for 8 s over ENet. Each bot must see round 1 gridded and released
-(at least 150 observed 120 Hz simulation ticks held, a GO tick), receive the server's logged
-race events, and finish without resyncs or decode faults. Run it alone with:
-
-```sh
-python3 tools/boat_net_smoke.py --race --server build/boat_server --bot build/boat_bot
-```
-
-The bot accumulates snapshot tick differences while held; repeated polling of the same
-snapshot adds no time. Releases and inactive slots break the interval. Earlier versions,
-including v0.0.14 and v0.0.15, counted service-loop iterations instead, which could fail
-the held-time check on slower polling loops despite a correct four-second grid/countdown.
 
 None of these tests impairs a real network interface, and none replaces the
 [planned matrix](MULTIPLAYER_PLAN.md#verification-matrix-and-telemetry).
@@ -489,21 +484,27 @@ M1 Max/macOS, Debug, `PROTEUS_OPTIMIZE_TESTS=ON`, GPU tests off unless noted. Ea
 | After shortening the ENet tests, `-j 10` | 171 | 19.0 s | 144.8 s |
 | `ctest --preset full` (`-j 8`) | 220 | 18.7 s | 145.4 s |
 | `ctest --preset quick` | 133 | 0.8–1.1 s | 5.6 s |
+| `ctest --preset full`, network on a virtual clock | 227 | 11.2 s | 88.7 s |
+| `ctest --preset quick`, network on a virtual clock | 140 | 0.75 s | – |
 | `ctest --preset full`, `PROTEUS_GPU_TESTS=ON` | 246 | 60.7 s | 207.7 s |
 
 With GPU tests on, the GPU tests run one at a time, so they bound the wall time. The largest is
 `boat_river_benchmark_contract` at 27 s. The last full GPU run before this work (2026-10-25)
 took 183 s at `-j 4`.
 
-The five real-time ENet tests (9–16 s each) now bound the full suite's wall time. They passed
-three times in a row in parallel. Largest per-test changes:
+Before the virtual-clock change, the five real-time ENet tests (9–16 s each) bounded the full
+suite's wall time. They are now `boat_net_enet` cases and a 0.24 s process smoke, and three
+oversubscribed `-j 40` runs passed. The longest tests are now sweeps:
+`boat_world_isolation.lifecycle` and `boat_map_index.lattice_queries` (about 6 s each) and
+`boat_map_scaling`. Largest per-test changes:
 - `wake_objects_contracts_jumps`: 35 s became 0.12 s of quick cases plus 1.7 s of slow ones.
 - `boat_banking`: 22.3 s became 0.3 s quick plus 1.5 s slow.
 - `boat_world_isolation.view_binding`: 3.9 s → 73 ms; `city_dressing`: 4.2 s → 0.24 s. Both
   come from the scenery ground index in `src/waterfront_corner.c`, which keeps the pinned
   dressing digest and identical captures.
 - `boat_environment`: 2.9 s → 0.3 s.
-- `boat_net_session` and `boat_net_river`: 36 s → 16 s each.
+- `boat_net_session` and `boat_net_river`: 36 s → 16 s each, then replaced by
+  `boat_net_enet.enet_lifecycle` (0.34 s) and `boat_net_enet.mapped_rooms` (0.2 s).
 
 The state hash moved to `hash_revision` 2 (see [the benchmark guide](BOATING_PERFORMANCE.md)).
 For banking, world isolation and the scenery index, outputs, captures and the banking CSV

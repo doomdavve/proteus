@@ -48,6 +48,10 @@ While iterating, `ctest --preset quick` runs the tests labelled `quick` (each un
 about a second in all). Heavy validators are split into `<prefix>.<case>` tests; see
 `docs/TESTING.md` for the lanes, the case runner and `tools/test_timing.py`.
 
+Tests never wait for wall-clock time. Code that depends on time takes `now` as an input, and its
+test drives a virtual clock; wall-clock limits are only failure deadlines. The `test_time` test
+(`tools/check_test_time.py`) enforces this.
+
 The routine suite disables retired physical wake-field experiments by default
 (`PROTEUS_WAKE_FIELD_TESTS=OFF`); re-enable them only when revisiting that work.
 Arcade-wake and gameplay checks remain active. Numerical validators retain assertions
