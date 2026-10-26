@@ -11,11 +11,13 @@ static_assert(BOAT_OBJECT_CAPACITY <= 255, "a pool slot travels as one byte");
 static_assert(BOAT_NET_MAX_CHECKPOINT <= (size_t)BOAT_NET_PAGE_BYTES * 65535, "page count");
 
 enum {
-    SLOT_BYTES = 172,
+    SLOT_BYTES = 174,
     SNAPSHOT_BYTES = 40 + BOAT_FLEET_SLOTS * SLOT_BYTES,
     RECORD_BYTES = 36,
     BIRTH_BYTES = 4 + RECORD_BYTES,
-    CHECKPOINT_BYTES = 48 + BOAT_FLEET_SLOTS * SLOT_BYTES + BOAT_OBJECT_CAPACITY * RECORD_BYTES,
+    CHECKPOINT_BASE_BYTES = 48 + BOAT_FLEET_SLOTS * SLOT_BYTES
+        + BOAT_OBJECT_CAPACITY * RECORD_BYTES,
+    CHECKPOINT_BYTES = CHECKPOINT_BASE_BYTES + BOAT_COMBAT_BYTES,
     RACE_ROW_BYTES = 16,
 };
 static_assert(BOAT_NET_HEADER_BYTES + SNAPSHOT_BYTES <= 800, "snapshot target is 800 bytes");
@@ -291,6 +293,7 @@ static void put_slot(Writer *w, const BoatFleetSlot *slot, const BoatWakeObjectE
     put8(w, rate_byte(input->used.steering));
     put8(w, rate_byte(input->used.throttle));
     put8(w, input->used.flags);
+    put16(w, input->used.grenade);
     put8(w, 0);
     put32(w, slot->boat.landings);
     put_boat(w, &slot->boat);
@@ -332,7 +335,8 @@ static void get_slot(Reader *r, uint64_t tick, BoatFleetSlot *slot, BoatWakeObje
     input->used.steering = get_rate(r);
     input->used.throttle = get_rate(r);
     input->used.flags = get8(r);
-    expect(r, (input->used.flags & ~BOAT_NET_COMMAND_INACTIVE) == 0);
+    input->used.grenade = get16(r);
+    expect(r, (input->used.flags & ~BOAT_NET_COMMAND_MASK) == 0);
     reserved(r, 1);
     slot->boat.landings = get32(r);
     get_boat(r, &slot->boat);
@@ -425,6 +429,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put64(w, m->world_begin.digest);
         put64(w, m->world_begin.fleet_hash);
         break;
+    case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_WORLD_PAGE:
         put32(w, m->world_page.checkpoint);
         put16(w, m->world_page.index);
@@ -449,6 +454,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
             put8(w, rate_byte(m->input.commands[i].steering));
             put8(w, rate_byte(m->input.commands[i].throttle));
             put8(w, m->input.commands[i].flags);
+            put16(w, m->input.commands[i].grenade);
             put8(w, 0);
         }
         break;
@@ -524,7 +530,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put8(w, e->attacker);
         put8(w, e->cause);
         put8(w, e->bailout ? 1 : 0);
-        put8(w, 0);
+        put8(w, e->reason);
         put16(w, 0);
         put32(w, e->victim_life);
         put32(w, e->round);
@@ -704,6 +710,7 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, b->pages == (b->bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
         break;
     }
+    case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_WORLD_PAGE: {
         BoatNetWorldPage *p = &m->world_page;
         p->checkpoint = get32(r);
@@ -711,11 +718,20 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         p->count = get16(r);
         expect(r, p->index < p->count);
         expect(r, p->count <= BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES);
+        if (m->header.type == BOAT_NET_COMBAT_PAGE)
+            expect(r, p->count == 4 && p->index < 4 && p->checkpoint == (uint32_t)m->header.tick);
+
         size_t size = r->size - r->at;
         expect(r, size > 0 && size <= BOAT_NET_PAGE_BYTES);
         if (r->error)
             break;
         p->size = (uint16_t)size;
+        if (m->header.type == BOAT_NET_COMBAT_PAGE)
+            expect(r,
+                size
+                    == (p->index == 3 ? BOAT_COMBAT_BYTES - 3 * BOAT_NET_PAGE_BYTES
+                                      : BOAT_NET_PAGE_BYTES));
+
         for (size_t i = 0; i < size; ++i)
             p->data[i] = get8(r);
         break;
@@ -739,7 +755,8 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
             b->commands[i].steering = get_rate(r);
             b->commands[i].throttle = get_rate(r);
             b->commands[i].flags = get8(r);
-            expect(r, (b->commands[i].flags & ~BOAT_NET_COMMAND_INACTIVE) == 0);
+            b->commands[i].grenade = get16(r);
+            expect(r, (b->commands[i].flags & ~BOAT_NET_COMMAND_MASK) == 0);
             reserved(r, 1);
         }
         break;
@@ -830,7 +847,9 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         uint8_t flags = get8(r);
         expect(r, flags <= 1);
         e->bailout = flags;
-        reserved(r, 3);
+        e->reason = get8(r);
+        expect(r, e->reason <= BOAT_MATCH_DEFEAT_HULL);
+        reserved(r, 2);
         e->victim_life = get32(r);
         e->round = get32(r);
         expect(r, e->round > 0);
@@ -840,11 +859,13 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
             expect(r, self || e->attacker < BOAT_FLEET_SLOTS);
             expect(r,
                 self ? e->cause == BOAT_MATCH_CAUSE_NONE && !e->bailout
-                     : e->cause == BOAT_MATCH_CONTACT || e->cause == BOAT_MATCH_WAKE);
+                     : e->cause >= BOAT_MATCH_CONTACT && e->cause <= BOAT_MATCH_GRENADE);
         } else {
             expect(r, e->kind == BOAT_MATCH_ROUND_START || e->kind == BOAT_MATCH_ROUND_END);
             expect(r, e->victim == BOAT_MATCH_NOBODY && e->attacker == BOAT_MATCH_NOBODY);
-            expect(r, e->cause == BOAT_MATCH_CAUSE_NONE && !e->bailout && !e->victim_life);
+            expect(r,
+                e->cause == BOAT_MATCH_CAUSE_NONE && !e->bailout && !e->victim_life
+                    && e->reason == 0);
         }
         break;
     }
@@ -976,6 +997,8 @@ const char *boat_net_reject_text(uint8_t reason)
 BoatNetChannel boat_net_channel(uint8_t type)
 {
     switch (type) {
+    case BOAT_NET_COMBAT_PAGE:
+        return BOAT_NET_REGISTRY;
     case BOAT_NET_INPUT_BATCH:
     case BOAT_NET_SNAPSHOT:
     case BOAT_NET_PING:
@@ -1008,12 +1031,14 @@ static int8_t rate(float value)
 BoatNetCommand boat_net_command(BoatInput input, uint8_t flags)
 {
     return (BoatNetCommand) { rate(input.steering_rate), rate(input.throttle_rate),
-        (uint8_t)(flags & BOAT_NET_COMMAND_INACTIVE) };
+        (uint8_t)((flags & BOAT_NET_COMMAND_INACTIVE) | (input.gun ? BOAT_NET_COMMAND_GUN : 0)),
+        input.grenade };
 }
 
 BoatInput boat_net_command_input(BoatNetCommand command)
 {
-    return (BoatInput) { command.steering / 127.0f, command.throttle / 127.0f };
+    return (BoatInput) { command.steering / 127.0f, command.throttle / 127.0f,
+        (command.flags & BOAT_NET_COMMAND_GUN) != 0, command.grenade };
 }
 
 BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags)
@@ -1021,7 +1046,7 @@ BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags)
     // Zero steering springs the wheel back; throttle moves toward idle at the ordinary
     // adjustment rate, so the engine response decays. The boat stays physical.
     float throttle = boat->throttle / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP);
-    return boat_net_command((BoatInput) { 0, fmaxf(-1, fminf(1, -throttle)) }, flags);
+    return boat_net_command((BoatInput) { 0, fmaxf(-1, fminf(1, -throttle)), 0, 0 }, flags);
 }
 
 typedef struct {
@@ -1066,6 +1091,10 @@ uint64_t boat_net_content_digest(void)
     if (ready)
         return cached;
     Digest d = { UINT64_C(14695981039346656037) };
+    BoatCombat combat = { .enabled = true, .rules = boat_combat_default_rules() };
+    uint8_t combat_bytes[BOAT_COMBAT_BYTES];
+    boat_combat_encode(&combat, combat_bytes);
+    digest_bytes(&d, combat_bytes, sizeof(combat_bytes));
     digest_bytes(&d, "proteus-boat-net", 16);
     for (int id = 0; id < BOAT_LOCATION_COUNT; ++id) {
         const BoatWorldDefinition *definition = boat_location(id);
@@ -1193,9 +1222,14 @@ size_t boat_net_checkpoint_encode(const BoatFleetState *state,
         put_slot(&writer, &state->slots[i], &w->emitters[i], &inputs[i]);
     for (unsigned i = 0; i < BOAT_OBJECT_CAPACITY; ++i)
         put_record(&writer, &w->objects[i]);
+    uint8_t combat[BOAT_COMBAT_BYTES];
+    if (state->combat.enabled) {
+        boat_combat_encode(&state->combat, combat);
+        put_bytes(&writer, combat, sizeof(combat));
+    }
     if (writer.overflow || w->tick != state->tick)
         return 0;
-    assert(writer.size == CHECKPOINT_BYTES);
+    assert(writer.size == (state->combat.enabled ? CHECKPOINT_BYTES : CHECKPOINT_BASE_BYTES));
     return writer.size;
 }
 
@@ -1227,6 +1261,11 @@ BoatNetError boat_net_checkpoint_decode(const uint8_t *data, size_t size, BoatFl
         live += w->objects[i].amplitude != 0;
     }
     expect(&r, live == w->live);
+    if (r.at + BOAT_COMBAT_BYTES <= r.size) {
+        expect(&r, boat_combat_decode(&decoded.combat, r.data + r.at, decoded.tick));
+        r.at += BOAT_COMBAT_BYTES;
+    } else if (r.at != r.size)
+        fail(&r, BOAT_NET_BAD_LENGTH);
     if (r.at != r.size)
         fail(&r, BOAT_NET_BAD_LENGTH);
     if (r.error)
@@ -1262,6 +1301,7 @@ BoatNetMatchEvent boat_net_match_event_of(const BoatMatch *match, const BoatMatc
         .attacker = event->attacker,
         .cause = event->cause,
         .bailout = event->bailout,
+        .reason = event->reason,
         .victim_life = event->kind == BOAT_MATCH_CAPSIZE ? event->victim_life : 0,
         .round = match->round };
 }

@@ -8,13 +8,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Multiplayer protocol v4 (M3, deathmatch D2, mapped rooms, race R2). docs/MULTIPLAYER_PROTOCOL.md
+// Multiplayer protocol v6 (deathmatch weapons, mapped rooms, race R2). docs/MULTIPLAYER_PROTOCOL.md
 // owns the byte tables.
 // Every multi-byte field is big-endian; floats travel as IEEE-754 binary32 bit patterns. Encoders
 // never copy structs, padding, bool or enum representations; decoders validate every field
 // and never write the destination on failure.
 #define BOAT_NET_MAGIC 0x50424e54u // "PBNT"
-#define BOAT_NET_VERSION 5
+#define BOAT_NET_VERSION 6
 #define BOAT_NET_HEADER_BYTES 32
 #define BOAT_NET_MAX_MESSAGE 1100 // Whole message; the transport MTU allows for its headers.
 #define BOAT_NET_MAX_PAYLOAD (BOAT_NET_MAX_MESSAGE - BOAT_NET_HEADER_BYTES)
@@ -43,7 +43,7 @@ typedef enum {
     BOAT_NET_CONTROL, // Reliable, ordered: handshake, roster, spawn, resync, leave, match, race.
     BOAT_NET_STATE, // Unreliable, sequenced: commands up, snapshots down, ping/pong.
     BOAT_NET_BIRTHS, // Unreliable, sequenced: recent wake births.
-    BOAT_NET_REGISTRY, // Unreliable, unsequenced: reserved for registry pages (M4/M5).
+    BOAT_NET_REGISTRY, // Unreliable, unsequenced: combat snapshot pages.
     BOAT_NET_BOOTSTRAP, // Reliable, ordered: world checkpoints.
     BOAT_NET_CHANNELS
 } BoatNetChannel;
@@ -69,6 +69,7 @@ typedef enum {
     BOAT_NET_MATCH_EVENT = 18,
     BOAT_NET_RACE_STATE = 19,
     BOAT_NET_RACE_EVENT = 20,
+    BOAT_NET_COMBAT_PAGE = 21, // Unsequenced bounded pages tied to snapshot tick.
     BOAT_NET_TYPE_LIMIT
 } BoatNetType;
 
@@ -113,6 +114,8 @@ typedef enum {
     BOAT_NET_INPUT_STATES
 } BoatNetInputState;
 
+#define BOAT_NET_COMMAND_GUN 2u
+#define BOAT_NET_COMMAND_MASK 3u
 #define BOAT_NET_COMMAND_INACTIVE 1u // Help, focus loss: the authority neutralizes controls.
 
 typedef struct {
@@ -126,6 +129,7 @@ typedef struct {
 typedef struct {
     int8_t steering, throttle; // Rates times 127: keyboard -1, 0 and 1 stay exact.
     uint8_t flags;
+    uint16_t grenade;
 } BoatNetCommand;
 
 typedef struct {
@@ -237,6 +241,7 @@ typedef struct {
     uint8_t cause; // BoatMatchCause.
     bool bailout;
     uint32_t victim_life, round;
+    uint8_t reason; // BoatMatchDefeat.
 } BoatNetMatchEvent;
 
 typedef struct {

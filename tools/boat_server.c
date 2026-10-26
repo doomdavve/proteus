@@ -58,8 +58,8 @@ static void usage(FILE *out)
         "room through a pipe (wake_velocity --host) cannot leave it running after it exits.\n"
         "--scripted: bots drive N ticks (default 7200, one minute at 120 Hz) as fast as\n"
         "possible, then print the fleet hash and per-tick cost; no socket.\n"
-        "--mode deathmatch: timed rounds (--round-seconds, default 300) scoring +1 for capsizing\n"
-        "another boat and -1 for capsizing yourself; capsized boats respawn after 3 s.\n"
+        "--mode deathmatch: timed rounds (--round-seconds, default 300) scoring +1 for defeating\n"
+        "another boat by gun or capsize, -1 for self-capsize; defeats respawn after 3 s.\n"
         "--mode race: river sprint rounds on the river location (the default for this mode):\n"
         "two or more players are gridded, held through a 3 s countdown and released together;\n"
         "places are awarded at the finish. The default free mode is shared free boating.\n",
@@ -89,7 +89,7 @@ static int compare_double(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
-static const char *const cause_names[] = { "self", "contact", "wake" };
+static const char *const cause_names[] = { "self", "contact", "wake", "gun", "grenade" };
 
 static const char *slot_name(const BoatNetServer *server, unsigned slot)
 {
@@ -111,7 +111,7 @@ static void print_event(
             printf(" abandoned (too few players)");
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
             if (match->slots[i].present)
-                printf(" %u:%s=%" PRId32 " (#%u, %" PRIu32 " caused, %" PRIu32 " capsized, %" PRIu32
+                printf(" %u:%s=%" PRId32 " (#%u, %" PRIu32 " kills, %" PRIu32 " deaths, %" PRIu32
                        " self)",
                     i + 1, slot_name(server, i), match->rows[i].score, boat_match_rank(match, i),
                     match->rows[i].caused, match->rows[i].capsized, match->rows[i].self);
@@ -190,6 +190,8 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
         fprintf(stderr, "boat_server: cannot create the fleet.\n");
         return 1;
     }
+    if (rules)
+        boat_combat_enable(&fleet);
     for (unsigned slot = 0; slot < boats; ++slot)
         boat_fleet_request_spawn(&fleet, slot);
     double *cost = malloc(ticks * sizeof(*cost));
@@ -205,8 +207,9 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
         if (rules) {
             // The match owns recovery: capsized boats wait for its automatic respawn.
             for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
-                inputs[i] = fleet.state.slots[i].active ? boat_fleet_bot_input(&bots, &fleet, i)
-                                                        : (BoatInput) { 0 };
+                inputs[i] = fleet.state.slots[i].active
+                    ? boat_fleet_bot_hunt_input(&bots, &fleet, i)
+                    : (BoatInput) { 0 };
         } else {
             boat_fleet_bots_drive(&bots, &fleet, inputs);
         }
@@ -219,6 +222,10 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
         if (rules) {
             BoatMatchOutput out;
             boat_match_observe(&match, &fleet, &out);
+            fleet.state.combat.firing = match.phase != BOAT_MATCH_INTERMISSION;
+            for (unsigned i = 0; i < out.count; ++i)
+                if (out.events[i].kind == BOAT_MATCH_ROUND_START)
+                    boat_combat_clear(&fleet);
             for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
                 if (out.spawn[i]) {
                     boat_fleet_request_spawn(&fleet, i);
@@ -256,7 +263,7 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
         for (unsigned i = 0; i < boats; ++i)
             printf(" %u=%" PRId32 "/%" PRIu32 "/%" PRIu32 "/%" PRIu32, i + 1, match.rows[i].score,
                 match.rows[i].caused, match.rows[i].capsized, match.rows[i].self);
-        printf(" (score/caused/capsized/self)\n");
+        printf(" (score/kills/deaths/self)\n");
     }
     printf("wakes: emitted=%" PRIu64 " live=%u peak_live=%u failures=%lu\n",
         fleet.state.wakes.emitted, fleet.state.wakes.live, peak_live, failures);

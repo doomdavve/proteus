@@ -44,7 +44,7 @@ def server_round(out, number):
         if " capsize " in line:
             capsizes += 1
         if f" round {number} end:" in line:
-            rows = re.findall(r" (\d):\S+=(-?\d+) \(#\d+, (\d+) caused, (\d+) capsized, (\d+) self\)",
+            rows = re.findall(r" (\d):\S+=(-?\d+) \(#\d+, (\d+) kills, (\d+) deaths, (\d+) self\)",
                 line)
             return {slot: "/".join(values) for slot, *values in rows}, capsizes
     raise AssertionError(f"server never ended round {number}:\n{out}")

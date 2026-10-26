@@ -42,6 +42,8 @@ bool boat_net_server_init(
         server->slot_peer[i] = -1;
     server->backlog_since = -1;
     server->next_checkpoint = 1;
+    if (config->deathmatch)
+        boat_combat_enable(&server->fleet);
     server->match = match;
     if (config->deathmatch)
         boat_net_match_state_of(&server->match, &server->match_sent);
@@ -101,6 +103,11 @@ static BoatNetMessage match_state(const BoatNetServer *s)
 // events first, then the scoreboard whenever it changed.
 static void match_output(BoatNetServer *s, const BoatMatchOutput *out)
 {
+    s->fleet.state.combat.firing = s->match.phase != BOAT_MATCH_INTERMISSION;
+    for (unsigned i = 0; i < out->count; ++i)
+        if (out->events[i].kind == BOAT_MATCH_ROUND_START)
+            boat_combat_clear(&s->fleet);
+
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         if (out->spawn[i])
             boat_fleet_request_spawn(&s->fleet, i);
@@ -551,6 +558,24 @@ static void send_snapshots(BoatNetServer *s)
     for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
         if (s->peers[peer].phase >= BOAT_NET_PEER_BOOTSTRAP)
             send_message(s, peer, &m);
+    if (s->fleet.state.combat.enabled) {
+        uint8_t bytes[BOAT_COMBAT_BYTES];
+        boat_combat_encode(&s->fleet.state.combat, bytes);
+        for (unsigned i = 0; i < 4; ++i) {
+            BoatNetMessage page
+                = { .header = { .type = BOAT_NET_COMBAT_PAGE, .tick = s->fleet.state.tick } };
+            BoatNetWorldPage *p = &page.world_page;
+            p->checkpoint = (uint32_t)s->fleet.state.tick;
+            p->index = (uint16_t)i;
+            p->count = 4;
+            p->size = (uint16_t)(i == 3 ? BOAT_COMBAT_BYTES - 3 * BOAT_NET_PAGE_BYTES
+                                        : BOAT_NET_PAGE_BYTES);
+            memcpy(p->data, bytes + i * BOAT_NET_PAGE_BYTES, p->size);
+            for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
+                if (s->peers[peer].phase >= BOAT_NET_PEER_BOOTSTRAP)
+                    send_message(s, peer, &page);
+        }
+    }
     ++s->stats.snapshots;
 }
 
