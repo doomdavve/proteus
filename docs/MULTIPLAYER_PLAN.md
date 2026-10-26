@@ -1,5 +1,14 @@
 # Multiplayer: shared boating implementation plan
 
+Current deathmatch extension (2026-10-26): [weapons](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26)
+use protocol v6. The enabled fleet checkpoint is bounded at 16 KiB (currently 10200 bytes in
+memory, 9404 encoded); combat adds eight bounded page assemblies to the client. This supersedes
+the old ≤8 KiB checkpoint assumption for deathmatch. At 30 Hz complete combat pages alone add
+about 123 KiB/s/client, exceeding the original 48 KiB/s download target below; bandwidth
+optimization/qualification remains open. Disabled free/race rooms do not send combat pages.
+The dated M3/M4/M5 budgets and evidence below describe their original revisions.
+
+
 Prepared 2026-10-23 against `2994e0d`. **M3, the protocol, ENet transport and separate
 `boat_server` process, is implemented; M4 has begun with client prediction, so the own boat
 answers the keys at once.** It is not yet the first playable (M4).

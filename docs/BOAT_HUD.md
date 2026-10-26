@@ -18,7 +18,7 @@ no numeric readouts or units:
   5% forward/reverse power; PRECISION appears above the instruments. Command travel is
   4 units/s (0.25 s neutral-to-full), retaining the separate engine spool. Scroll is
   unassigned. The seven instrument marks remain visual power references, not input detents.
-  R does nothing; Space is reserved during ordinary play. A one-second Backspace hold shows
+  R does nothing; Space fires the deathmatch gun and E throws a wave grenade; free/race play leaves Space unused. A one-second Backspace hold shows
   HOLD: RESET and a progress bar; releasing early, help/menu, focus loss or replay cancels it.
   One hold triggers once until released. The Escape menu also offers RESET BOAT, RESTART RUN
   or REQUEST RESET. Rooms retain authority restrictions; inactive room controls neutralize.

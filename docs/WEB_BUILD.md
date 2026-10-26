@@ -29,11 +29,20 @@ suspension, measure memory/runtime budgets, and establish secure public signalin
 hosting before internet-play acceptance. User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
 
+## Deathmatch weapons verification, 2026-10-26
+
+Protocol v6 ships both weapons in the shared C client. Emscripten MinSizeRel builds; the optional
+native WebRTC endpoint builds; mixed Chrome/SwiftShader and native-hunter automation passes
+weapon commands, bounded combat page reception, rendered grenade/HUD, two resets and rejoin.
+Both production radial shader recipes pass independent WebGL2 float probes (2873 each,
+maximum absolute error 0.00001442). [Detailed evidence and captures](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26).
+No native desktop graphics/audio, Firefox/Safari, physical-device or human balance pass is inferred.
+
 ## Pedal controls update, 2026-10-26
 
 The isolated `controls-pedals-stability` branch replaces stepped/scroll thrust with held W/S
 (or Up/Down) forward/reverse pedals, neutral on release and Shift precision. R is inactive;
-Space remains reserved in ordinary play. Backspace is prevented from browser navigation while
+Space fires the machine gun in deathmatch; E throws its wave grenade. Space stays unused in free/race play. Backspace is prevented from browser navigation while
 the canvas is focused and resets only after a one-second active hold. Escape also offers an
 explicit reset/restart/request. Captured mouse wheel hold remains, with automatic aerial
 stabilization instead of steering rolls. [Current controls and integration evidence](CONTROLS_PEDALS_HANDOFF.md).
@@ -127,7 +136,7 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
 The transport feasibility check first echoed C-codec PING bytes unchanged over all five
 negotiated browser/native DataChannels. Gameplay then reused that adapter. Channel IDs 0 and 4
 (control/bootstrap) are reliable and ordered; 1, 2 and 3 are unordered with no retransmissions.
-Existing application sequence numbers discard stale state/births. Protocol v5 bytes are unchanged.
+Existing application sequence numbers discard stale state/births. Current protocol v6 adds combat pages on the existing unreliable unsequenced channel; rebuild browser and native peers together.
 `boat_net_mux` assigns distinct authority peer IDs to colliding ENet/WebRTC local peer IDs.
 
 Build an optional native endpoint (C++ compiler and OpenSSL development files required;

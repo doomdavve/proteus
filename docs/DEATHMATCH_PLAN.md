@@ -1,4 +1,4 @@
-# Capsize deathmatch: multiplayer game mode plan
+# Deathmatch: wave grenades and machine gun
 
 Prepared 2026-10-24 against `7a072c6`. **D1 (match core) and D2 (protocol v2 and the in-game
 HUD) are implemented; no human has played a deathmatch yet.**
@@ -7,16 +7,111 @@ This document owns the deathmatch rules, phases, verification and acceptance. Th
 [physics](BOAT_PHYSICS_PLAN.md) and [wake](WAKE_REWRITE_PLAN.md) plans own handling and wake
 feel, including tuning of the new mechanics below.
 
-Status: D1 (match core, `boat_server --mode deathmatch`) implemented and automatically verified
-on 2026-10-24; see the [D1 handoff](#d1-match-core-handoff--2026-10-24). D2 (protocol v2, round
-clock, kill feed, scoreboard, capsize notice, `boat_bot --hunt`) implemented and automatically
-verified on 2026-10-24, agent-run in a window against two hunting bots, not user-played; see the
-[D2 handoff](#d2-protocol-v2-and-hud-handoff--2026-10-24). Next: the D2 manual check (the user
-against `boat_bot --hunt`, then two humans), then D3, side-ram roll. D3–D6 are pending. Remaining M4 acceptance checks are deferred by user direction while M5 proceeds.
-River/Eriksberg hosting was pulled forward from M7 on 2026-10-24: launch
-`boat_server --bind 0.0.0.0 --mode deathmatch --location river` and join normally. The server
-selects the map; rebuilt protocol-v4 clients load it automatically. See the
-[river hosting handoff](MULTIPLAYER_PLAN.md#river-hosting-handoff--2026-10-24).
+Status (2026-10-26): both weapons are implemented on `deathmatch-weapons`, based on
+`origin/main` (`2c0d7c9`), in `/private/tmp/proteus-deathmatch-weapons`. D1/D2 remain the
+round/scoring foundation. The weapon milestone below supersedes the earlier immediate
+side-ram → surge → mine sequence. Human balance acceptance is pending. Existing historical
+handoffs below retain their original scope.
+
+## Weapon milestone — 2026-10-26
+
+Every deathmatch life has 100 hull health, no regeneration, a cool bow gun and a ready grenade.
+Free boating, race and offline simulation keep combat disabled. `boat_combat_default_rules()`
+is the single tuning definition:
+
+| Weapon | Defaults |
+| --- | --- |
+| Hold Space: machine gun | 8 shots/s, 8 damage, 100 m/s, 100 m range; overheats after 2 s; release cools from full in 3 s; unlocks below 30% |
+| Press E: wave grenade | 24 m forward, splash at 0.65 s, detonate at 1.5 s, recharge 8 s; 2 m crest at 10 m/s, smoothly zero at 30 m |
+
+Grenades cause physical waves, including against the thrower; they never reduce hull health.
+The existing two-second spawn grace blocks firing and bullet damage, while waves remain
+physical. Warmup permits weapons without scores; intermission blocks launches. Menus, help,
+focus loss and respawn require weapon keys to be released before firing resumes.
+
+Zero health marks a hull defeated immediately, with a sinking presentation and lethal-shooter
+credit. Capsizes retain the five-second attribution window and uncredited self-capsize −1.
+The match latches one defeat per life, including coincident destruction/capsize. The existing
+three-second automatic respawn and one-second earliest reset skip remain. Scoreboard columns
+now read kills/deaths; the internal row member names remain compatible with the match code.
+
+Implementation:
+
+- Fixed-capacity, allocation-free tick module `boat_combat.[ch]`: 64 bullets, four grenades and
+  four independently evaluated radial waves. Every grenade reserves its ring until expiration;
+  a rejected full-pool request consumes no cooldown. Identities contain owner, connection
+  generation, life and birth tick. Departure removes that connection's objects; round restart
+  clears all objects; respawn resets health/heat/cooldowns. Bullet birth fences protect new lives.
+- Fleet tick order: pending lifecycle operations, accepted launches/fuses, water and hull
+  integration/contact solve, swept hits, then the authority's match observation. Moving hulls
+  use relative slab sweeps; scenery uses conservative 5 cm clearance/probes, including water,
+  mapped shore, harbor and traffic. Pool order and slot order break simultaneous-hit ties.
+- Radial height, gradient and vertical speed use a smooth compact crest and quadratic fade;
+  the CPU reference and both GPU stages share that recipe, separate from the wake-object pool.
+- Shared boxes draw traces, muzzle flashes, impacts and lobbed/fusing grenades. CPU/GPU water
+  adds crest foam. The integer-scaled HUD shows hull/heat/recharge and authority-confirmed hits;
+  gun/grenade causes appear in the feed. Procedural audio uses event tick high-water marks so
+  corrections cannot replay sounds. Deterministic visual effects have no accumulating event queue.
+- Protocol [v6](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint): held gun plus numbered
+  throw requests, complete combat/rules checkpoints, four bounded unreliable pages per snapshot.
+  Eight in-flight sets tolerate reordering; only complete matching sets correct prediction, and
+  an applied set supersedes older incomplete ones. Native/browser share the C codec/prediction.
+- `boat_bot --hunt` steers its bow at targets, shoots when aligned, slows nearby and throws.
+
+Completed: combat, physical water, checkpoint/prediction, controls, presentation and bots.
+Next: native desktop controls/audio play and native GPU parity; Firefox/Safari and other
+platform qualification; then human aim/visibility/balance acceptance. Side-ram roll, wake surge,
+mines, shrinking arenas, independent aim and pickups are deferred.
+
+Verification record (macOS/Apple Silicon, Debug, 2026-10-26):
+
+- Baseline: warning-free project build and 95 active CTests pass, 13 retired cases disabled,
+  GPU tests off. This is automated evidence, not user acceptance.
+- `boat_combat`: deterministic cadence/overheat/cooling/grace, duplicate throws, pool rejection,
+  fuse/ring lifetime, save/restore replay, relative swept hits, water occlusion, old-life fences,
+  lethal tie, single defeat, automatic respawn, analytic radial derivatives and physical self-wave.
+- `boat_net`: v6 golden bytes (snapshot digest `7aa25c376fac8ec5`), 21 codec types, full combat
+  checkpoint/hash tests; four predicted clients with late joins, 12% loss, duplicated/reordered
+  pages, one-second outage and complete correction recovery. Maximum message 1064 bytes;
+  measured server application traffic about 147.7 KiB/s/client during that synthetic stress,
+  including control/bootstrap/duplicates, excluding transport headers. This is an initial
+  correctness-first bandwidth budget, not a low-bandwidth qualification.
+- Display-free `boat_combat_review` CPU wave and sinking fixtures captured and inspected.
+  No HUD text/audio/window was exercised by these captures. Production radial shader parity
+  checks were added to `boat_race_trial --gpu-check`, but GLFW could not initialize a desktop
+  window here; no GPU or windowed playback pass is claimed.
+- Final Debug project build warning-free; full routine CTest: 96 active cases pass, 13 retired
+  cases disabled, GPU tests off. ENet loopback/host/session tests ran with socket access.
+  All 17 baseline offline CPU captures remain byte-identical. Free/race trace and replay tests pass.
+- Four held boats, 600-tick synthetic stress: 64 continuously replenished bullets plus four
+  waves average 0.113 ms/tick, p95 0.118, p99 0.125; combat disabled average 0.022 ms/tick.
+  Separate 7200-tick scripted four-hunter run: mean 0.0404 ms/tick, p99 0.0601; one gun kill,
+  30 flights and no wake emission failures. These are CPU timings on this Mac, not broad
+  performance or balance acceptance.
+- Emscripten MinSizeRel `web` build passes. Optional WebRTC native endpoint built successfully.
+  Chrome/SwiftShader mixed browser/native deathmatch automation passes: held gun commands,
+  one numbered grenade, 772 received combat pages, rendered burst/HUD, two resets, leave/rejoin,
+  no page errors or prediction snaps. [Browser burst](evidence/deathmatch-weapons/browser-burst.png)
+  and [weapon HUD](evidence/deathmatch-weapons/browser-weapons.png) inspected after moving the
+  HUD to the left to avoid the roster. Headless automation is not audible or human playback.
+- `check_web_combat_wave.py`: both production VS/FS radial recipes pass 2873 WebGL2 float
+  probes each; maximum absolute height/gradient/vertical-speed error 0.00001442 against an
+  independent reference. This verifies SwiftShader, not the unavailable native GPU context.
+- [CPU crest](evidence/deathmatch-weapons/cpu-wave.png) and
+  [sinking fixture](evidence/deathmatch-weapons/cpu-sinking.png) are retained for review.
+  Native windowed playback/sound listening, native GPU probes, Windows/Linux runtime and
+  human acceptance remain unverified locally; CI results belong to the PR.
+
+Review commands (run from repository root):
+
+```sh
+./build/boat_server --mode deathmatch --round-seconds 30
+./build/boat_bot --connect 127.0.0.1:24680 --hunt --seconds 40
+./build/wake_velocity --connect 127.0.0.1:24680 --name captain
+./build/boat_combat_review --time 2.3 --screenshot build/combat-cpu.png
+./build/boat_combat_review --gpu --play --screenshot build/combat-gpu.png
+./build/boat_race_trial --gpu-check
+```
 
 ## Product decision
 
@@ -28,7 +123,7 @@ default in the multiplayer plan's product boundary. Decisions recorded with the 
 | --- | --- |
 | Round structure | Timed rounds (default 5 min), scoreboard intermission, then a new round |
 | Capsizing yourself | −1 point |
-| New capsize mechanics | All four, in order: side-ram roll, wake surge, swell mine, shrinking arena |
+| Current weapon milestone | Machine gun and wave grenade; older side-ram/surge/mine/arena proposals deferred |
 | Sequencing | Start now, in parallel with M4 manual acceptance |
 
 Free mode (current shared free boating) stays the default room mode and must remain unchanged
@@ -46,12 +141,12 @@ predict credit.
 - *Wake*: another emitter's records under the hull sum to at least 0.35 m of |height|, or that
   emitter has the largest share on the tick the boat becomes `BOAT_AIRBORNE`. A boat's own
   emitter never counts.
-- *Later causes*: `SURGE` (D4), `MINE` (D5) and `ARENA` (D6).
+- Gun hull defeats and grenade-wave capsizes extend the causes above; future mechanics are deferred.
 
 **Credit.** When a boat first latches `BOAT_CAPSIZED` (the existing rule: 0.6 s inverted in
 water, `motion_step` in `src/boat.c`), the latest touch within a 5 s credit window scores +1
 for its slot. Without such a touch the victim scores −1 (self-capsize). Rows track score,
-capsizes caused, times capsized and self-capsizes.
+kills, deaths and self-capsizes. Hull health reaching zero credits the lethal shooter immediately; the same per-life latch prevents a second capsize score.
 
 The controls branch uses Escape > REQUEST RESET or a one-second Backspace hold for manual
 requests; R no longer acts. [Current integration status](CONTROLS_PEDALS_HANDOFF.md).
@@ -59,10 +154,10 @@ requests; R no longer acts. [Current integration status](CONTROLS_PEDALS_HANDOFF
 **Bailout.** An explicit reset request while upright within the credit window after a touch counts as a capsize
 credited to the toucher; an untouched upright reset is otherwise free.
 
-**Respawn.** After a confirmed capsize the authority requests a spawn itself after 3 s; a reset request
+**Respawn.** After a confirmed defeat the authority requests a spawn itself after 3 s; a reset request
 skips the remaining wait after 1 s. Spawns use the existing `boat_fleet_request_spawn` safe
-spawn rules. A new life has a 2 s credit grace: touches by or against it are not recorded.
-This is not physical invulnerability, which the multiplayer plan rules out.
+spawn rules. A new life has a 2 s credit and weapon grace: touches are not recorded, weapons cannot fire,
+and bullets cannot damage it. Waves remain physically active.
 
 **Rounds.** `WARMUP` (fewer than two players: free play, no scoring) → `PLAYING` (300 s,
 `--round-seconds`) → `INTERMISSION` (10 s scoreboard; boats keep moving) → scores reset and
@@ -95,7 +190,10 @@ pending credit to them is dropped. Ties share first place.
   scripted deathmatch run. `tools/boat_bot.c`: a `--hunt` script that lays wakes across and
   rams the nearest boat.
 
-## Phases
+## Original phases (superseded after D2)
+
+The D1/D2 records remain historical implementation context. The former D3–D6 sequence below
+is deferred; the weapon milestone above owns current work.
 
 Every phase ends with a warning-free build, the full active CTest suite and an unchanged
 offline `wake_velocity`.
@@ -140,7 +238,7 @@ Each mechanic gets a user feel gate before it is on by default in deathmatch roo
 - D1: `validate_boat_match` and the scripted `boat_server --mode deathmatch` event log.
 - D2: loopback deathmatch smoke, inspected CPU/GPU HUD captures, an agent windowed run against
   `boat_bot --hunt`, then user play.
-- D3–D6: validator cases, prediction-replay identity, captures and a user feel gate.
+- Weapon milestone: deterministic combat/paging/replay cases, CPU/GPU captures, playback and a human balance gate. Deferred D3–D6 proposals have no current acceptance claim.
 
 Acceptance for the mode: two or more humans finish several rounds where credits match what
 they saw, self-capsizes feel fair, nobody can deny a capsize by resetting, and the round loop
