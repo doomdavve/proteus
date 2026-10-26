@@ -17,10 +17,11 @@ typedef struct {
 
 static inline int test_case_run(const TestCase *test)
 {
+    // C11 timespec_get (clock_gettime is POSIX, absent from strict C17 and MSVC). Reported only.
     struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    timespec_get(&start, TIME_UTC);
     int result = test->run();
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    timespec_get(&end, TIME_UTC);
     double ms = (end.tv_sec - start.tv_sec) * 1e3 + (end.tv_nsec - start.tv_nsec) / 1e6;
     printf("case=%s ms=%.1f%s\n", test->name, ms, result ? " FAILED" : "");
     fflush(stdout);
