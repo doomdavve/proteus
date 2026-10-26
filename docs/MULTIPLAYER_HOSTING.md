@@ -344,4 +344,7 @@ is a packaged Windows and macOS manual join against a compatible room. On 2026-1
 the macOS Debug build succeeded and the full CTest preset passed 230 active tests with
 local socket access. The published JSON was retrieved and its native endpoint and revision
 fields checked. Menu interaction, live joining, Windows/Linux builds and packaging have not
-been manually verified.
+been manually verified. PR CI initially exposed Windows header collisions and unsupported C
+atomics; the Windows worker now uses its thread handle for completion. Linux built and passed
+CTest but its Wayland smoke check exceeded Weston’s 10-second startup deadline; the deadline
+is now 60 seconds. The revised CI runs remain to be verified.

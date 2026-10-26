@@ -1,7 +1,11 @@
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
+#endif
 #include "boat_directory.h"
 #include "boat_net_enet.h"
 #include <curl/curl.h>
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +13,7 @@
 #include <windows.h>
 #else
 #include <pthread.h>
+#include <stdatomic.h>
 #endif
 #define JSMN_STATIC
 #define JSMN_STRICT
@@ -265,11 +270,11 @@ static size_t receive(void *data, size_t size, size_t count, void *context)
 }
 struct BoatDirectory {
     BoatDirectoryList list, result;
-    atomic_bool done;
     bool running, success, available;
 #ifdef _WIN32
     HANDLE thread;
 #else
+    atomic_bool done;
     pthread_t thread;
 #endif
 };
@@ -294,7 +299,9 @@ static void fetch(BoatDirectory *d)
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
     }
+#ifndef _WIN32
     atomic_store(&d->done, true);
+#endif
 }
 #ifdef _WIN32
 static DWORD WINAPI worker(LPVOID context)
@@ -320,12 +327,16 @@ BoatDirectory *boat_directory_create(void)
 }
 void boat_directory_poll(BoatDirectory *d)
 {
-    if (!d || !d->running || !atomic_load(&d->done))
+    if (!d || !d->running)
         return;
 #ifdef _WIN32
-    WaitForSingleObject(d->thread, INFINITE);
+    // A signaled thread handle publishes the result and does not block the render loop.
+    if (WaitForSingleObject(d->thread, 0) != WAIT_OBJECT_0)
+        return;
     CloseHandle(d->thread);
 #else
+    if (!atomic_load(&d->done))
+        return;
     pthread_join(d->thread, NULL);
 #endif
     d->running = false;
@@ -341,7 +352,9 @@ void boat_directory_refresh(BoatDirectory *d)
     if (d->running)
         return;
     d->success = false;
+#ifndef _WIN32
     atomic_store(&d->done, false);
+#endif
 #ifdef _WIN32
     d->thread = CreateThread(NULL, 0, worker, d, 0, NULL);
     d->running = d->thread != NULL;
