@@ -23,6 +23,7 @@
     } while (0)
 void boat_vessel_wake_gpu_check(BoatVesselWake wake);
 void boat_water_storm_gpu_check(BoatStorm storm);
+void boat_water_radial_gpu_check(void);
 bool boat_vessel_wake_shadow_read(Texture2D texture, float *pixels);
 
 static const Vector2 route[]
@@ -72,7 +73,7 @@ static BoatInput pilot(const Boat *boat, Vector2 target, float thrust)
     float error = remainderf(heading_to(boat->position, target) - boat->heading, 2 * PI);
     float wheel = Clamp(1.5f * error - .8f * boat->yaw_velocity, -.6f, .6f);
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        boat_throttle_rate(boat->throttle, thrust) };
+        boat_throttle_rate(boat->throttle, thrust), 0, 0 };
 }
 
 static void advance_target(const Boat *boat, unsigned *next)
@@ -590,6 +591,7 @@ int main(int argc, char **argv)
     }
     SetTraceLogLevel(LOG_WARNING);
     if (gpu_check) {
+        boat_water_radial_gpu_check();
         boat_vessel_wake_gpu_check(ferry());
         boat_water_storm_gpu_check(boat_race_river_course()->storm);
         ferry_visibility();
@@ -670,7 +672,7 @@ int main(int argc, char **argv)
                 BoatInput input = play
                     ? (BoatInput) { (float)(IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT))
                               - (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)),
-                          boat_throttle_rate(session.boat.throttle, target_thrust) }
+                          boat_throttle_rate(session.boat.throttle, target_thrust), 0, 0 }
                     : pilot(&session.boat, preview_target(next, skill), next <= targets ? 1 : 0);
                 Vector2 previous = session.boat.position;
                 timed_boat_step(&session, input, NULL, NULL, &objects);

@@ -158,21 +158,27 @@ static int storm_surface(void)
                 CHECK(q.height == 0 && q.vertical_velocity == 0);
                 CHECK(q.gradient.x == 0 && q.gradient.y == 0);
             }
-            float dx = (boat_water_storm_query(storm, Vector2Add(p, (Vector2) { epsilon, 0 }), t).height
-                - boat_water_storm_query(storm, Vector2Add(p, (Vector2) { -epsilon, 0 }), t).height)
+            float dx
+                = (boat_water_storm_query(storm, Vector2Add(p, (Vector2) { epsilon, 0 }), t).height
+                      - boat_water_storm_query(storm, Vector2Add(p, (Vector2) { -epsilon, 0 }), t)
+                          .height)
                 / (2 * epsilon);
-            float dz = (boat_water_storm_query(storm, Vector2Add(p, (Vector2) { 0, epsilon }), t).height
-                - boat_water_storm_query(storm, Vector2Add(p, (Vector2) { 0, -epsilon }), t).height)
+            float dz
+                = (boat_water_storm_query(storm, Vector2Add(p, (Vector2) { 0, epsilon }), t).height
+                      - boat_water_storm_query(storm, Vector2Add(p, (Vector2) { 0, -epsilon }), t)
+                          .height)
                 / (2 * epsilon);
             const double time_epsilon = .004;
             float dt = (boat_water_storm_query(storm, p, t + time_epsilon).height
-                - boat_water_storm_query(storm, p, t - time_epsilon).height) / (2 * time_epsilon);
+                           - boat_water_storm_query(storm, p, t - time_epsilon).height)
+                / (2 * time_epsilon);
             CHECK(fabsf(q.gradient.x - dx) < .002f && fabsf(q.gradient.y - dz) < .002f);
             CHECK(fabsf(q.vertical_velocity - dt) < .003f);
             storm.started = 86400;
             BoatStormSample later = boat_water_storm_query(storm, p, t + 86400);
             CHECK(later.height == q.height && later.gradient.x == q.gradient.x
-                && later.gradient.y == q.gradient.y && later.vertical_velocity == q.vertical_velocity);
+                && later.gradient.y == q.gradient.y
+                && later.vertical_velocity == q.vertical_velocity);
             storm.started = 0;
         }
     CHECK(peak > 1);
@@ -181,8 +187,8 @@ static int storm_surface(void)
     Vector2 rendezvous = boat_water_storm_centre(storm, 45);
     CHECK(Vector2Distance(rendezvous, (Vector2) { 345, -600 }) < .01f);
     CHECK(fabsf(Vector2Length(storm.velocity) - 8) < .01f);
-    Vector2 outside = Vector2Add(boat_water_storm_centre(storm, 12.345),
-        (Vector2) { storm.radius + 1, 0 });
+    Vector2 outside
+        = Vector2Add(boat_water_storm_centre(storm, 12.345), (Vector2) { storm.radius + 1, 0 });
     BoatWaterSample calm = boat_water_query(water, outside, 12.345);
     CHECK(calm.height == 0 && calm.normal.y == 1 && calm.velocity.y == 0);
     CHECK(boat_water_storm_query((BoatStorm) { 0 }, storm.centre, 1).height == 0);
@@ -604,8 +610,8 @@ static int hold(void)
     while (race.phase != BOAT_RACE_RACING) {
         BoatInput inputs[BOAT_FLEET_SLOTS];
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
-            inputs[i]
-                = (BoatInput) { 1, boat_throttle_rate(fleet.state.slots[i].boat.throttle, 1) };
+            inputs[i] = (BoatInput) { 1, boat_throttle_rate(fleet.state.slots[i].boat.throttle, 1),
+                0, 0 };
         CHECK(boat_fleet_step(&fleet, inputs));
         boat_race_observe(&race, &fleet, &out);
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
@@ -697,8 +703,8 @@ static int full_race(void)
 int main(void)
 {
     test_worlds_open();
-    if (geometry() || storm_surface() || crossing() || progress_and_places() || ties() || parking() || recovery()
-        || leavers() || rejects() || hold() || full_race())
+    if (geometry() || storm_surface() || crossing() || progress_and_places() || ties() || parking()
+        || recovery() || leavers() || rejects() || hold() || full_race())
         return 1;
     printf("boat_race=ok\n");
     test_worlds_close();

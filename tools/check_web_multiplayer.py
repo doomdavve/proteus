@@ -30,10 +30,10 @@ for _ in range(100):
 else:
     server.terminate()
     raise RuntimeError('Room did not start')
-bot = subprocess.Popen([str(args.build_dir.resolve() / 'boat_bot'), '--connect', f'127.0.0.1:{udp}', '--name', 'native', '--predict', '--seconds', '300'], stdout=bot_log.open('w'), stderr=subprocess.STDOUT)
+bot = subprocess.Popen([str(args.build_dir.resolve() / 'boat_bot'), *(['--hunt'] if args.mode == 'deathmatch' else []), '--connect', f'127.0.0.1:{udp}', '--name', 'native', '--predict', '--seconds', '300'], stdout=bot_log.open('w'), stderr=subprocess.STDOUT)
 bots = [bot]
 if args.four_players:
-    bots.append(subprocess.Popen([str(args.build_dir.resolve() / 'boat_bot'), '--connect', f'127.0.0.1:{udp}', '--name', 'native2', '--predict', '--seconds', '300'], stdout=(args.output / 'bot2.log').open('w'), stderr=subprocess.STDOUT))
+    bots.append(subprocess.Popen([str(args.build_dir.resolve() / 'boat_bot'), *(['--hunt'] if args.mode == 'deathmatch' else []), '--connect', f'127.0.0.1:{udp}', '--name', 'native2', '--predict', '--seconds', '300'], stdout=(args.output / 'bot2.log').open('w'), stderr=subprocess.STDOUT))
 try:
     with sync_playwright() as p:
         b = p.chromium.launch(executable_path=args.executable, headless=True, args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
@@ -94,7 +94,7 @@ try:
                 extra.wait_for_timeout(3000)
                 assert any('Joined as slot' in line for line in extra_logs), extra_logs
                 extra_pages.append(extra)
-            rejected = subprocess.run([str(args.build_dir.resolve() / 'boat_bot'), '--connect', f'127.0.0.1:{udp}', '--name', 'fifth', '--seconds', '2', '--expect-reject'], capture_output=True, text=True, timeout=15)
+            rejected = subprocess.run([str(args.build_dir.resolve() / 'boat_bot'), *(['--hunt'] if args.mode == 'deathmatch' else []), '--connect', f'127.0.0.1:{udp}', '--name', 'fifth', '--seconds', '2', '--expect-reject'], capture_output=True, text=True, timeout=15)
             (args.output / 'full-room-rejected.log').write_text(rejected.stdout + rejected.stderr)
             assert rejected.returncode == 0, rejected.stdout + rejected.stderr
             assert 'players: 4' in room_log.read_text(), room_log.read_text()
@@ -107,12 +107,40 @@ try:
         page.bring_to_front()
         page.evaluate("""() => {
             window.spawnRequests = 0;
+            window.combatCounters = { gun: 0, grenades: new Set(), pages: 0 };
+            const poll = Module['boatRtc'].poll;
+            Module['boatRtc'].poll = () => {
+                const event = poll();
+                if (event && event.data && event.data[6] === 21) ++combatCounters.pages;
+                return event;
+            };
             const original = Module['boatRtc'].send;
             Module['boatRtc'].send = (channel, data) => {
                 if (channel === 0 && data[6] === 12) ++spawnRequests;
+                if (channel === 1 && data[6] === 9) {
+                    for (let i = 0; i < data[36]; ++i) {
+                        const at = 48 + i * 6;
+                        if (data[at + 2] & 2) ++combatCounters.gun;
+                        const grenade = (data[at + 3] << 8) | data[at + 4];
+                        if (grenade) combatCounters.grenades.add(grenade);
+                    }
+                }
                 return original(channel, data);
             };
         }""")
+        if args.mode == 'deathmatch':
+            page.keyboard.down('Space')
+            page.wait_for_timeout(2300)
+            page.screenshot(path=str(args.output / 'gun-overheat.png'))
+            page.keyboard.up('Space')
+            page.keyboard.press('e', delay=80)
+            page.wait_for_timeout(300)
+            page.screenshot(path=str(args.output / 'grenade-flight.png'))
+            page.wait_for_timeout(1400)
+            page.screenshot(path=str(args.output / 'grenade-burst.png'))
+            counters = page.evaluate('({gun:combatCounters.gun,grenades:combatCounters.grenades.size,pages:combatCounters.pages})')
+            assert counters['gun'] > 0 and counters['grenades'] > 0 and counters['pages'] >= 4, counters
+            print('COMBAT', counters, flush=True)
         page.keyboard.down('w')
         page.wait_for_timeout(1500)
         page.keyboard.up('w')

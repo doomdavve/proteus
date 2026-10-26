@@ -1,4 +1,4 @@
-# Multiplayer protocol v5
+# Multiplayer protocol v6
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -31,13 +31,19 @@ old handling revisions are rejected. Pedals/Shift become ordinary target-derived
 and the menu/held shortcut use the existing reset request. Inactive authority input uses the
 same shared command rate, preventing neutral overshoot. [Integration status](CONTROLS_PEDALS_HANDOFF.md).
 
+v6 (2026-10-26) adds deathmatch combat. Commands gain held gun fire and a numbered grenade
+request, slot blocks gain that request, checkpoints optionally append the complete enabled
+combat state, and CombatPage (type 21) carries bounded periodic correction pages. MatchEvent
+uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
+compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
+
 ## Conventions
 
 - Every multi-byte integer is **big-endian** (network order). `i8` is two's complement.
 - `f32` is an IEEE-754 binary32 bit pattern sent as a `u32`. Builds whose `float` is not binary32
   fail to compile. Decoders reject NaN and infinities in every float field.
 - Structs, padding, `bool`, native `long` and compiler enum representations are never sent.
-  Booleans are `u8` 0 or 1; enums are `u8` with documented values.
+  Booleans are `u8` 0 or 1 unless the combat section specifies `u32`; enums have documented widths.
 - Reserved bytes are written as zero and **must** be zero on receipt.
 - One message is one transport packet of at most **1100 bytes**, header included. The ENet MTU is
   1200 bytes of UDP payload, so a message never fragments.
@@ -53,8 +59,8 @@ same shared command rate, preventing neutral overshoot. [Integration status](CON
 | Offset | Type | Field | Rule |
 | ---: | --- | --- | --- |
 | 0 | u32 | magic | `0x50424e54` ("PBNT") |
-| 4 | u16 | version | 4. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
-| 6 | u8 | type | 1–20, below |
+| 4 | u16 | version | 6. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
+| 6 | u8 | type | 1–21, below |
 | 7 | u8 | flags | 0 |
 | 8 | u32 | epoch | Room session epoch from Accept; 0 in Hello |
 | 12 | u32 | sequence | Per sender and channel, starting anywhere, wrapping modulo 2³² |
@@ -75,7 +81,7 @@ traffic from an earlier session never reaches a room.
 | 0 control | reliable, ordered | Hello, Accept, Reject, Roster, Ready, SpawnRequest, ResyncRequest, Disconnect, MatchState, MatchEvent, RaceState, RaceEvent |
 | 1 state | unreliable, sequenced | InputBatch (up), Snapshot (down), Ping, Pong |
 | 2 births | unreliable, sequenced | WakeBirths |
-| 3 registry | unreliable, unsequenced | Reserved for wake registry pages (M4/M5); unused in v5 |
+| 3 registry | unreliable, unsequenced | CombatPage, tied to a fleet snapshot tick |
 | 4 bootstrap | reliable, ordered | WorldBegin, WorldPage, WorldEnd |
 
 A message on the wrong channel is discarded. Reliable bootstrap traffic cannot hold up new
@@ -101,7 +107,7 @@ are discarded. This receiver buffering does not change the wire layout or channe
 | 7 | WorldEnd | S→C | checkpoint tick | 8 |
 | 8 | Ready | C→S | checkpoint tick | 8 |
 | 9 | InputBatch | C→S | target tick of the newest command | 16 + 4 × count |
-| 10 | Snapshot | S→C | post-tick n | 728 |
+| 10 | Snapshot | S→C | post-tick n | 736 |
 | 11 | WakeBirths | S→C | room tick | 4 + 40 × count |
 | 12 | SpawnRequest | C→S | client's mirror tick | 8 |
 | 13 | Ping | C→S | client's mirror tick | 8 |
@@ -112,6 +118,7 @@ are discarded. This receiver buffering does not change the wire layout or channe
 | 18 | MatchEvent | S→C | event tick | 16 |
 | 19 | RaceState | S→C | room tick | 104 |
 | 20 | RaceEvent | S→C | event tick | 16 |
+| 21 | CombatPage | S→C | matching snapshot tick | 8 + 1024 (pages 0–2), 8 + 980 (page 3) |
 
 ### Hello, Accept, Reject
 
@@ -159,7 +166,8 @@ fixed-width name. It is sent whenever a slot changes.
 
 ### World checkpoint
 
-The bootstrap and resync checkpoint is a byte string of 5344 bytes, at most 16384, cut into
+The bootstrap and resync checkpoint is a byte string of 5352 bytes when combat is disabled, or 9404 in deathmatch,
+at most 16384, cut into
 pages of 1024 bytes:
 
 | Offset | Type | Field |
@@ -173,8 +181,8 @@ pages of 1024 bytes:
 | 24 | u64 | births emitted |
 | 32 | u64 | records expired |
 | 40 | u64 | race GO tick (v4): the room's latest race round, 0 for none and in other modes |
-| 48 | 4 × 172 | slot blocks (below) |
-| 736 | 128 × 36 | wake records (below), in pool order |
+| 48 | 4 × 174 | slot blocks (below) |
+| 744 | 128 × 36 | wake records (below), in pool order |
 
 WorldBegin: `u32` checkpoint ID, `u32` byte count, `u16` page count (must equal
 `ceil(bytes / 1024)`), `u16` reserved, `u64` FNV-1a 64 of the checkpoint bytes, `u64`
@@ -185,7 +193,7 @@ The client installs a checkpoint only when every page arrived, the byte digest m
 decodes and its fleet hash equals the sender's. It then answers Ready. A failed install asks for
 a resync.
 
-### Slot block (172 bytes)
+### Slot block (174 bytes)
 
 Snapshots and checkpoints use the same block for each slot:
 
@@ -200,18 +208,19 @@ Snapshots and checkpoints use the same block for each slot:
 | 12 | u64 | tick of the pending spawn request (≤ header tick) |
 | 20 | u64 | last tick whose received command was used (≤ header tick) |
 | 28 | i8, i8 | steering and throttle rates used on the latest tick, × 127 (−128 invalid) |
-| 30 | u8 | flags of that command: bit 0 inactive |
-| 31 | u8 | reserved |
-| 32 | u32 | landings |
-| 36 | 25 × f32 | position x, z; velocity x, z; heading; throttle; engine response; planing; height; vertical velocity; pitch; pitch velocity; roll; roll velocity; dry time; landing time; inverted-contact time; turn-roll load; wave spray; wheel; engine angle; yaw velocity; legacy trail time; legacy trail start x, z |
-| 136 | 2 × f32 | emitter span start x, z |
-| 144 | u64 | emitter span start tick (≤ header tick) |
-| 152 | u64 | emitter last tracked tick (≤ header tick) |
-| 160 | u8 | emitter cursor (0–31) |
-| 161 | u8 | emitter initialized (0/1) |
-| 162 | u16 | reserved |
-| 164 | f32 | emitter strength |
-| 168 | f32 | emitter strength sum |
+| 30 | u8 | flags: bit 0 inactive, bit 1 held gun; others zero |
+| 31 | u16 | grenade request serial; zero means none |
+| 33 | u8 | reserved |
+| 34 | u32 | landings |
+| 38 | 25 × f32 | position x, z; velocity x, z; heading; throttle; engine response; planing; height; vertical velocity; pitch; pitch velocity; roll; roll velocity; dry time; landing time; inverted-contact time; turn-roll load; wave spray; wheel; engine angle; yaw velocity; legacy trail time; legacy trail start x, z |
+| 138 | 2 × f32 | emitter span start x, z |
+| 146 | u64 | emitter span start tick (≤ header tick) |
+| 154 | u64 | emitter last tracked tick (≤ header tick) |
+| 162 | u8 | emitter cursor (0–31) |
+| 163 | u8 | emitter initialized (0/1) |
+| 164 | u16 | reserved |
+| 166 | f32 | emitter strength |
+| 170 | f32 | emitter strength sum |
 
 ### Wake record (36 bytes)
 
@@ -224,9 +233,50 @@ reflected X never travels.
 Post-tick authoritative state, sent every fourth tick (30 Hz) to every accepted client: `u32`
 next spawn-request number, `u16` live records, `u16` peak live, `u64` births emitted, `u64`
 records expired, `u64` wake digest, `u64` race GO tick (v4, as in the checkpoint), then four
-slot blocks: 760 bytes with the header (target ≤800). The wake digest is FNV-1a 64 over each live record's pool index and fields, in pool
+slot blocks: 768 bytes with the header (target ≤800). The wake digest is FNV-1a 64 over each live record's pool index and fields, in pool
 order (`boat_net_wake_digest()`). The client compares it with the records it rebuilt. Wake
 records themselves travel only in checkpoints and births.
+
+### CombatPage and combat checkpoint
+
+Enabled deathmatch combat appends **4052 bytes** to the checkpoint after its 128 wake records
+(offset 5352; complete deathmatch checkpoint 9404 bytes). Disabled free/race checkpoints are
+5352 bytes and omit this section. All words below are big-endian; flags use `u32` 0/1 in this
+section, floats use binary32, and timestamps use `u64` ticks. The codec in
+`boat_combat.c` is shared by checkpoints and fleet hashing and validates before committing.
+
+| Section | Count × bytes | Fields in order |
+| --- | --- | --- |
+| Flags | 2 × 4 | enabled, launches allowed |
+| Rules | 60 | eight f32: health, damage, bullet speed/range, lob distance, crest height/speed/range; seven u32: fire, heat, cool, recharge, splash, fuse, grace ticks |
+| Players | 4 × 68 | f32 health/heat; u64 life start, next fire, next grenade, defeated tick, confirmed hit tick; u32 connection generation, consumed throw request, hit serial, lethal owner; u32 overheated |
+| Projectiles | 68 × 52 | 64 bullets then four grenades: f32 position x/z, direction x/z, height; u64 birth/end ticks; u32 connection generation, life, owner, active |
+| Waves | 4 × 44 | f32 centre x/z; u64 birth tick; u32 generation, life, owner; f32 height, speed, range; u32 active |
+
+A bullet's active identity is owner/generation/life/birth. Grenades store the landing point;
+presentation derives the flight from direction, lob distance, launch height and splash tick.
+Each grenade index reserves the same wave index until both have expired. Gun commands are
+held. A nonzero throw request is consumed once per life, including rejected requests, so
+redundancy, repetition and prediction replay cannot defer or repeat it. Pool exhaustion does
+not consume the weapon's cooldown.
+
+CombatPage (type 21, server to client, channel 3) uses the WorldPage payload: `u32` low bits of
+snapshot tick, `u16` page index, `u16` count, then data. Count is exactly four. Pages 0–2 have
+1024 data bytes, page 3 has 980; the largest whole packet is **1064 bytes**. Header tick is the
+full matching fleet snapshot tick; page ID must equal its low 32 bits. Wrong counts, indices,
+IDs or lengths are rejected. No transport fragmentation is needed.
+
+Deathmatch clients retain eight bounded in-flight sets indexed by snapshot sequence. A fleet
+snapshot and all four matching pages must arrive before correction. Older complete sets may
+apply while a newer set is partial; applying a newer complete set discards older incomplete
+sets. A lost page never blocks subsequent complete sets. Bootstrap/resync still uses the
+reliable complete checkpoint and its byte/fleet digests. Prediction restores and replays the
+whole combat state and physical waves; match scores/events remain authority-only.
+
+At 30 Hz, the four combat pages add 126360 application bytes/s/client to the 23040-byte/s fleet
+snapshots, before wakes/control/transport headers. This initial fixed-page design favors bounded
+correction correctness over bandwidth optimization. Native and browser transports use the same
+C codec and existing channel 3 delivery class.
 
 ### WakeBirths
 
@@ -242,7 +292,7 @@ the digest mismatch outlasts one second, the client asks for a resync.
 `u32` life the commands steer, `u8` count (1–12, ≤ header tick), three reserved bytes, `u64`
 newest snapshot tick the client has applied, then `count` commands for consecutive ticks ending
 at the header tick: `i8` steering rate × 127, `i8` throttle rate × 127 (−128 invalid), `u8`
-flags (bit 0 inactive), `u8` reserved. Rates −1, 0 and 1 survive exactly.
+flags (bit 0 inactive, bit 1 held gun), `u16` grenade request, `u8` reserved. Rates −1, 0 and 1 survive exactly.
 
 The authority accepts a command for tick t only when the slot is active on that life,
 fleet tick < t ≤ fleet tick + 24, and no command for t is stored yet. Stored commands are
@@ -276,15 +326,15 @@ every peer whenever any field changes: a phase change, a score, a join or a leav
 | 8 | u32 | rounds started (> 0 unless warmup) |
 | 12 | u32 | round length, ticks (> 0) |
 | 16 | u64 | tick the phase ends; 0 exactly in warmup |
-| 24 | 4 × 20 | rows in slot order: `u8` present (0/1), three reserved, `i32` score, `u32` capsizes caused, `u32` times capsized, `u32` self-capsizes (≤ times capsized); an absent row is all zero |
+| 24 | 4 × 20 | rows in slot order: `u8` present (0/1), three reserved, `i32` score, `u32` kills, `u32` deaths, `u32` self-capsizes (≤ times capsized); an absent row is all zero |
 
 During the intermission the rows are the finished round's result; the next round start resets
 them.
 
 MatchEvent: `u8` kind (0 capsize, 1 round start, 2 round end), `u8` victim slot, `u8` attacker
-slot, `u8` cause (0 none, 1 contact, 2 wake), `u8` flags (bit 0 bailout: R while upright after a
-touch), three reserved, `u32` victim life, `u32` round (> 0). A capsize names a victim < 4 and
-either an attacker < 4 other than the victim with cause contact or wake, or attacker 255 (a
+slot, `u8` cause (0 none, 1 contact, 2 wake, 3 gun, 4 grenade), `u8` flags (bit 0 bailout: R while upright after a
+touch), `u8` defeat reason (0 capsize/bailout, 1 hull destruction), two reserved, `u32` victim life, `u32` round (> 0). A capsize names a victim < 4 and
+either an attacker < 4 other than the victim with cause contact, wake, gun or grenade, or attacker 255 (a
 self-capsize, −1) with cause none and no bailout flag. Round events carry 255 in both slots,
 cause none, no flags and life 0. Within a tick, events precede the MatchState that counts them.
 
@@ -412,12 +462,11 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v5 rejects every other version, v1–v4 included; there is no negotiation or
+  protocol version. v6 rejects every other version, v1–v5 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry or the
   fleet/wake contract changes the content digest. Either is rejected at Hello.
-- Registry pages, prediction acknowledgements and remote-input history, if M5 needs them, will
-  be a later version.
+- CombatPage uses channel 3. Additional registry formats, prediction acknowledgements or remote-input history require a later version.
 
 ## Fixtures
 
@@ -425,8 +474,8 @@ must not exceed their capacities, and expired ≤ emitted.
 
 - golden bytes of a Ping, an InputBatch, a Hello, a MatchState, a MatchEvent, a RaceState and
   a RaceEvent payload;
-- the snapshot size (760), the race GO tick and held flag, slot field offsets and an FNV-1a 64
-  digest of a hand-built snapshot's bytes (`4de7f51f1c0586cc`; v4's was `9f816f6333e7646f`, v3's
+- the snapshot size (768), the race GO tick and held flag, slot field offsets and an FNV-1a 64
+  digest of a hand-built snapshot's bytes (`7aa25c376fac8ec5`; v5 was `4de7f51f1c0586cc`, v4's was `9f816f6333e7646f`, v3's
   `690c711d99578e10`);
 - round trips of all 20 types, rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode, a race room away from

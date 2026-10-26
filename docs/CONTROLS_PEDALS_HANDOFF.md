@@ -15,13 +15,13 @@ The [HUD/control owner](BOAT_HUD.md) describes current behavior; the
 - Keyboard steering still springs back, mouse steering still holds its target, and air yaw
   remains. The wheel no longer commands an aerial roll or suppresses upright recovery.
   Existing wet assistance, inversion fade and physical capsize rules remain.
-- R is inactive; Space remains unused in ordinary play. Reset is explicit in the menu or
+- R is inactive; Space now fires the deathmatch gun; E throws a wave grenade. Free/race play leaves Space unused. Reset is explicit in the menu or
   requires a one-second Backspace hold with progress. Release/help/menu/focus loss/replay
   cancels progress; a fired hold stays latched until release. Replay keeps Space pause,
   with Escape > RESTART RUN to leave playback. Room reset restrictions remain authoritative.
 - The interactive race trial shares the pedal and hold helpers. HUD precision/reset indicators
   retain the scene pixel grid. Normal game instruments show actual command travel, not targets.
-- Physics compatibility is **9**; protocol v5 bytes remain unchanged. Old best files stay on
+- Physics compatibility is **9**; that controls change preserved protocol v5 bytes; the subsequent deathmatch weapons milestone uses v6. Old best files stay on
   disk; revision-9 bests use new names and old peers/recordings are rejected normally.
 
 ## Verification evidence

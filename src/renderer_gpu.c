@@ -1245,11 +1245,22 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "physicalWaves"),
         &physical_waves, SHADER_UNIFORM_INT);
     float wake_amplitude = frame->player_active ? water.wake_amplitude : 0;
+    float radial[32], origins[16], motions[16];
+    boat_water_radial_uniforms(water.radial, frame->time, radial);
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j) {
+            origins[4 * i + j] = radial[8 * i + j];
+            motions[4 * i + j] = radial[8 * i + 4 + j];
+        }
+    SetShaderValueV(scene->water_shader, GetShaderLocation(scene->water_shader, "radialOrigin"),
+        origins, SHADER_UNIFORM_VEC4, 4);
+    SetShaderValueV(scene->water_shader, GetShaderLocation(scene->water_shader, "radialMotion"),
+        motions, SHADER_UNIFORM_VEC4, 4);
     float storm[12];
     boat_water_storm_uniforms(
         frame->player_active ? water.storm : (BoatStorm) { 0 }, frame->time, storm);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormArea"),
-        storm, SHADER_UNIFORM_VEC4);
+    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormArea"), storm,
+        SHADER_UNIFORM_VEC4);
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormPhase"),
         storm + 4, SHADER_UNIFORM_VEC4);
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormMotion"),

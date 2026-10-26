@@ -66,6 +66,17 @@ typedef struct {
     char name[BOAT_NET_NAME_BYTES + 1];
 } BoatNetRaceFeedEntry;
 
+// Eight in-flight snapshot sets cover bounded page reordering. A completed correction
+// supersedes older incomplete sets; a partial newer set cannot starve an older complete one.
+#define BOAT_NET_COMBAT_SETS 8
+typedef struct {
+    uint64_t tick;
+    BoatNetSnapshot snapshot;
+    bool snapshot_received;
+    unsigned pages;
+    uint8_t bytes[BOAT_COMBAT_BYTES];
+} BoatNetCombatSet;
+
 // The mirror fleet holds the newest authoritative snapshot, rebuilt from a complete checkpoint
 // plus births. With prediction, every snapshot or applied birth batch corrects the speculative
 // fleet, which each command advances to its target tick; the caller draws that instead.
@@ -107,6 +118,7 @@ typedef struct {
     uint64_t wake_digest; // Of the newest snapshot.
     bool wake_consistent;
     double snapshot_at, mismatch_since, resync_at;
+    BoatNetCombatSet combat_sets[BOAT_NET_COMBAT_SETS];
     // Bootstrap assembly.
     BoatNetWorldBegin begin;
     bool assembling;

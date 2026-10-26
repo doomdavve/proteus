@@ -20,6 +20,7 @@ typedef struct {
     // Last landing strength, 0..1; each new serial starts one hull slap and splash.
     float landing;
     unsigned landing_serial;
+    uint64_t gun_tick, grenade_tick; // Event high-water marks, deduplicated across corrections.
 } BoatAudioInput;
 
 typedef struct {
@@ -39,6 +40,8 @@ typedef struct {
     float slap, slap_low, slap_body, splash, splash_low, splash_body;
     uint32_t splash_random;
     float active_gain, active_target;
+    uint64_t gun_tick, grenade_tick;
+    float gun_pulse, grenade_pulse, weapon_low;
     bool ready;
 } BoatAudio;
 

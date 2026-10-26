@@ -48,7 +48,8 @@ static void drive(BoatSession *session, size_t *destination)
     float thrust = fabsf(error) > .5f ? .25f : .6f;
     boat_session_step(session,
         (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-            Clamp((thrust - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) });
+            Clamp((thrust - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1), 0,
+            0 });
 }
 
 static bool hull_clear(const Boat *boat)
@@ -412,7 +413,7 @@ static int check_gpu_lifecycle(void)
     sessions[1].world.water.objects = &arcade;
     for (int i = 0; i < VIEWS; ++i)
         for (int t = 0; t < 240 * (i + 1); ++t)
-            boat_session_step(&sessions[i], (BoatInput) { i % 2 ? -.3f : .3f, 1 });
+            boat_session_step(&sessions[i], (BoatInput) { i % 2 ? -.3f : .3f, 1, 0, 0 });
     for (int i = 0; i < VIEWS; ++i) {
         BoatGpu own = { 0 };
         bool drawn = boat_gpu_init(&own, false) && gpu_frame(&own, &sessions[i], &reference[i]);

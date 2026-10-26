@@ -120,7 +120,7 @@ static void draw_help(bool course, bool mapped, bool deathmatch, bool race)
         "Release thrust keys: neutral / coast",
         "Hold Shift: low-power maneuvering",
         "Hold Backspace 1 s: reset / restart",
-        deathmatch ? "Hold Tab: deathmatch scoreboard"
+        deathmatch ? "Space: gun | E: wave grenade | Tab: scores"
             : race ? "Hold Tab: race standings"
                    : "",
         "+/-: zoom | PgUp/PgDn: height",
@@ -1104,6 +1104,20 @@ static int study(int argc, char **argv)
             .wave_entry = view->boat.wave_spray,
             .landing = view_presentation->landing_strength,
             .landing_serial = view_presentation->landing_serial };
+#ifdef PROTEUS_BOAT_NET
+        if (net && net_study_deathmatch(net)) {
+            const BoatFleet *f = boat_net_client_view(&net->client);
+            const BoatCombat *c = &f->state.combat;
+            for (unsigned i = 0; i < BOAT_COMBAT_BULLETS; ++i) {
+                const BoatCombatObject *b = &c->bullets[i];
+                if (b->owner == net->client.slot && b->born > audio_input.gun_tick)
+                    audio_input.gun_tick = b->born;
+            }
+            for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i)
+                if (c->waves[i].born > audio_input.grenade_tick)
+                    audio_input.grenade_tick = c->waves[i].born;
+        }
+#endif
         boat_audio_update(
             &audio, audio_input, active && (!session.runs.playing || !session.runs.paused));
         if (music_ready) {
@@ -1186,6 +1200,10 @@ static int study(int argc, char **argv)
                 .precision = precision,
                 .reset_progress = reset_hold.seconds / BOAT_RESET_HOLD_SECONDS },
             WIDTH, HEIGHT);
+#ifdef PROTEUS_BOAT_NET
+        if (net)
+            net_study_combat_hud(net, WIDTH);
+#endif
         if (mouse_driving && !menu.open)
             DrawText(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4, 4, 10,
                 (Color) { 218, 223, 202, 255 });

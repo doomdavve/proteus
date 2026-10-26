@@ -59,7 +59,7 @@ set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wped
 set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_vessel_wake.c src/boat_vessel_wake.h
   src/boat.c src/boat.h src/boat_clock.h src/boat_course.c src/boat_course.h
-  src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_race.c src/boat_race.h src/boat_location.c src/boat_location.h src/boat_map.c
+  src/boat_combat.c src/boat_combat.h src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_race.c src/boat_race.h src/boat_location.c src/boat_location.h src/boat_map.c
   src/boat_map.h src/boat_map_tiles.c src/boat_map_tiles.h
   src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
   src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
@@ -184,6 +184,12 @@ if(NOT EMSCRIPTEN)
   # The game hosts a room by running itself as `--serve`, boat_server's command line.
   target_sources(wake_velocity PRIVATE tools/wake_velocity_net.c tools/wake_velocity_net.h
     tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h)
+endif()
+
+if(NOT EMSCRIPTEN)
+  add_executable(boat_combat_review tools/boat_combat_review.c tools/wake_velocity_net.c src/boat_audio.c)
+  target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu proteus_boat_net_enet)
+  target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
 endif()
 
 if(EMSCRIPTEN)
@@ -469,6 +475,10 @@ set_tests_properties(boat_map_scaling PROPERTIES PASS_REGULAR_EXPRESSION "boat_m
 add_executable(validate_boat_fleet tools/validate_boat_fleet.c)
 target_link_libraries(validate_boat_fleet PRIVATE proteus_boat_core)
 # Capsize deathmatch rules: credit, respawns, bailouts and rounds over a core-only fleet.
+add_executable(validate_boat_combat tools/validate_boat_combat.c)
+target_link_libraries(validate_boat_combat PRIVATE proteus_boat_net)
+add_test(NAME boat_combat COMMAND validate_boat_combat)
+set_tests_properties(boat_combat PROPERTIES PASS_REGULAR_EXPRESSION "boat_combat=ok")
 add_executable(validate_boat_match tools/validate_boat_match.c)
 target_link_libraries(validate_boat_match PRIVATE proteus_boat_core)
 # River sprint rules: gates, grid hold, places, recovery, deadlines and a four-bot ferry race.
@@ -491,7 +501,7 @@ add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
 add_executable(validate_boat_net tools/validate_boat_net.c)
 target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
-foreach(target validate_boat_fleet validate_boat_match validate_boat_race boat_server boat_bot validate_boat_net)
+foreach(target validate_boat_combat validate_boat_fleet validate_boat_match validate_boat_race boat_server boat_bot validate_boat_net)
   target_compile_options(${target} PRIVATE ${PROTEUS_WARNINGS})
 endforeach()
 add_test(NAME boat_fleet COMMAND validate_boat_fleet)
@@ -852,7 +862,7 @@ endforeach()
 get_property(PROTEUS_TESTS DIRECTORY PROPERTY TESTS)
 foreach(test IN LISTS PROTEUS_TESTS)
   get_test_property(${test} LABELS labels)
-  if(test MATCHES "^boat_core|^boat_map$|^boat_map_index$|^boat_outer_map$|^boat_fleet|^boat_match|^boat_race$|^boat_server|^boat_net|^boat_bot")
+  if(test MATCHES "^boat_combat$|^boat_core|^boat_map$|^boat_map_index$|^boat_outer_map$|^boat_fleet|^boat_match|^boat_race$|^boat_server|^boat_net|^boat_bot")
     set_property(TEST ${test} APPEND PROPERTY LABELS core cpu)
   elseif(labels MATCHES "gpu")
   elseif(test MATCHES "screenshot|checksum|_cpu$")

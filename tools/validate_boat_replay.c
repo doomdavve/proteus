@@ -48,7 +48,7 @@ static int clock_contracts(void)
     CHECK(session.tick == 432001 && boat_session_time(&session) == boat_tick_seconds(432001));
     boat_session_set_tick(&session, UINT64_MAX);
     Boat held = session.boat;
-    CHECK(!boat_session_step(&session, (BoatInput) { 1, 1 }) && session.tick == UINT64_MAX);
+    CHECK(!boat_session_step(&session, (BoatInput) { 1, 1, 0, 0 }) && session.tick == UINT64_MAX);
     CHECK(memcmp(&held, &session.boat, sizeof(held)) == 0);
     boat_session_init(&session, basin, (BoatWater) { 0 });
     CHECK(session.tick == 0 && boat_session_time(&session) == 0);
@@ -319,8 +319,8 @@ static int banked_course(const char *directory)
             = boat_replay_pose(b, &session.presentation, boat_session_time(&session));
         boat_session_step(&session,
             (BoatInput) { Clamp((wheel - b->wheel) / BOAT_STEP, -1, 1),
-                Clamp(
-                    (throttle - b->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) });
+                Clamp((throttle - b->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1),
+                0, 0 });
         boat_replay_record(&live, before,
             boat_replay_pose(b, &session.presentation, boat_session_time(&session)),
             &session.course, false);

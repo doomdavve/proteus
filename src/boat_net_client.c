@@ -164,6 +164,7 @@ static void install(BoatNetClient *c, double now)
     // A resync replaces the mirror only when the checkpoint is newer than it.
     if (c->phase == BOAT_NET_CLIENT_PLAYING && state.tick < mirror_tick(c))
         return;
+    memset(c->combat_sets, 0, sizeof(c->combat_sets));
     c->fleet = fleet;
     boat_fleet_restore(&c->fleet, &state);
     memcpy(c->inputs, inputs, sizeof(inputs));
@@ -243,6 +244,44 @@ static void snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
         c->offset_valid = true;
     } else {
         c->offset += (sample - c->offset) * .05;
+    }
+}
+
+// Snapshot and combat pages may arrive in any order on independent channels. Never
+// reconcile a hull against a partial combat state, and never retain superseded pages.
+static void combat_snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
+{
+    uint64_t tick = m->header.tick;
+    if (tick <= mirror_tick(c))
+        return;
+    BoatNetCombatSet *set
+        = &c->combat_sets[(tick / BOAT_NET_SNAPSHOT_TICKS) % BOAT_NET_COMBAT_SETS];
+    if (set->tick > tick)
+        return;
+    if (set->tick != tick)
+        *set = (BoatNetCombatSet) { .tick = tick };
+    if (m->header.type == BOAT_NET_SNAPSHOT) {
+        set->snapshot = m->snapshot;
+        set->snapshot_received = true;
+    } else {
+        const BoatNetWorldPage *p = &m->world_page;
+        memcpy(set->bytes + p->index * BOAT_NET_PAGE_BYTES, p->data, p->size);
+        set->pages |= 1u << p->index;
+    }
+    if (set->pages == 15 && set->snapshot_received) {
+        BoatCombat combat;
+        if (!boat_combat_decode(&combat, set->bytes, tick) || !combat.enabled) {
+            ++c->stats.decode_errors;
+            return;
+        }
+        BoatNetMessage complete
+            = { .header = { .type = BOAT_NET_SNAPSHOT, .tick = tick }, .snapshot = set->snapshot };
+        c->fleet.state.combat = combat;
+        boat_combat_bind(&c->fleet);
+        snapshot(c, &complete, now);
+        for (unsigned i = 0; i < BOAT_NET_COMBAT_SETS; ++i)
+            if (c->combat_sets[i].tick <= tick)
+                c->combat_sets[i] = (BoatNetCombatSet) { 0 };
     }
 }
 
@@ -366,9 +405,14 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         if (c->assembling && m.checkpoint == c->begin.checkpoint)
             install(c, now);
         break;
+    case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_SNAPSHOT:
-        if (c->phase == BOAT_NET_CLIENT_PLAYING)
-            snapshot(c, &m, now);
+        if (c->phase == BOAT_NET_CLIENT_PLAYING) {
+            if (c->accept.mode == BOAT_NET_MODE_DEATHMATCH)
+                combat_snapshot(c, &m, now);
+            else if (m.header.type == BOAT_NET_SNAPSHOT)
+                snapshot(c, &m, now);
+        }
         break;
     case BOAT_NET_WAKE_BIRTHS:
         births(c, &m.births, now);
@@ -440,6 +484,8 @@ static void command(
         return;
     bool new_life = own->life != c->command_life;
     if (new_life) {
+        next.flags &= (uint8_t)~BOAT_NET_COMMAND_GUN;
+        next.grenade = 0;
         c->command_life = own->life;
         c->command_count = 0;
         c->command_tick = 0;
@@ -448,13 +494,15 @@ static void command(
         const BoatFleetSlot *predicted = &boat_net_client_view(c)->state.slots[c->slot];
         float target_thrust = new_life ? 0 : thrust_target;
         next.throttle = boat_net_command(
-            (BoatInput) { 0, boat_throttle_rate(predicted->boat.throttle, target_thrust) }, 0)
+            (BoatInput) { 0, boat_throttle_rate(predicted->boat.throttle, target_thrust), 0, 0 }, 0)
                             .throttle;
     }
     if (isfinite(steering_target) && !(next.flags & BOAT_NET_COMMAND_INACTIVE)) {
         const Boat *boat = &boat_net_client_view(c)->state.slots[c->slot].boat;
         next.steering = boat_net_command(
-            (BoatInput) { boat_steering_rate(boat->wheel, new_life ? 0 : steering_target), 0 }, 0)
+            (BoatInput) {
+                boat_steering_rate(boat->wheel, new_life ? 0 : steering_target), 0, 0, 0 },
+            0)
                             .steering;
     }
     uint64_t target = (uint64_t)fmax(0, floor(now * BOAT_TICK_HZ + c->offset)) + c->lead;

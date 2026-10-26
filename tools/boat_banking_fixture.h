@@ -64,7 +64,7 @@ static inline void banking_exit_step(BoatSession *session, float wheel, int tick
     }
     float input
         = tick < BANKING_EXIT_HOLD_TICKS ? Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1) : 0;
-    boat_session_step(session, (BoatInput) { input, 0 });
+    boat_session_step(session, (BoatInput) { input, 0, 0, 0 });
 }
 // Common powered entry: steer progressively for one second, then let the wheel return.
 #define BOAT_TURN_ENTRY_TICKS 480
@@ -81,6 +81,6 @@ static inline void boat_turn_entry_reset(BoatSession *session)
 
 static inline void boat_turn_entry_step(BoatSession *session, int tick, int direction)
 {
-    boat_session_step(session, (BoatInput) { tick < 120 ? direction : 0, 0 });
+    boat_session_step(session, (BoatInput) { tick < 120 ? direction : 0, 0, 0, 0 });
 }
 #endif

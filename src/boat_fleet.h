@@ -2,6 +2,7 @@
 #define PROTEUS_BOAT_FLEET_H
 
 #include "boat.h"
+#include "boat_combat.h"
 
 // Multiplayer M2: one authority's local fleet. Slot index is the stable player ID and also the
 // slot's wake emitter. Every boat uses normalized mass BOAT_FLEET_MASS.
@@ -29,6 +30,7 @@ typedef struct {
     uint64_t tick; // Authoritative world clock; equals wakes.tick.
     uint32_t next_request;
     BoatFleetSlot slots[BOAT_FLEET_SLOTS];
+    BoatCombat combat;
     BoatWakeObjects wakes; // The shared arcade pool and per-slot emitters.
 } BoatFleetState;
 
@@ -45,7 +47,7 @@ typedef struct {
     float pair_impulse[BOAT_FLEET_PAIRS];
 } BoatFleetStats;
 
-typedef struct {
+typedef struct BoatFleet {
     BoatWorld world; // Immutable definition and water settings; objects borrow state.wakes.
     BoatFleetState state;
     BoatFleetStats stats;

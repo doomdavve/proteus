@@ -299,7 +299,7 @@ gates still require recorded runs and resource measurements. `boat_bot --predict
 `boat_net` also runs four predicted clients in the mapped river: shoreline-safe spawns,
 a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
 a snapshot outside the former basin coordinate envelope, a local loading pause, reset and exact
-mirrors at a birth-batch snapshot. The protocol-v5 codec rejects invalid map IDs and reserved
+mirrors at a birth-batch snapshot. The protocol-v6 codec rejects invalid map IDs and reserved
 bytes and checks the RaceState/RaceEvent rules; a race room on the in-memory transport checks
 predicted holds released at GO, ferry-exact mirrors, a mid-race joiner and results, and a
 prediction replay through GO matches the authority; discovery uses the complete compiled-map bundle digest.
@@ -420,3 +420,36 @@ work resumes. Timings and suite logs are in `build/test-speed/`. The prior defau
 run also completed before the suite policy changed, so its all-98 result remains valid
 historical evidence. New manual motion/audio review was unnecessary for these test-only
 changes; the preceding default switch has its own capture/desktop evidence.
+
+## Deathmatch weapons (protocol v6)
+
+`boat_combat` verifies deterministic weapon cadence, overheating/release cooling, grace,
+numbered throws and replay, pool limits, fuses, relative moving-hull sweeps, water blocking,
+life fences, one lethal defeat, respawn, radial derivatives and physical self-waves. It also
+round-trips combat checkpoints and checks malformed pages and the 1100-byte ceiling.
+`boat_net` adds four predicted deathmatch clients, late joins, loss/duplication/reordering,
+a one-second outage, complete page-set recovery and departure generations. Free/race continue
+through the existing trace/replay cases. `boat_race_trial --gpu-check` now compares both
+production radial shader recipes against CPU height/gradient/vertical velocity.
+
+```sh
+./build/validate_boat_combat
+./build/boat_combat_review --time 2.3 --screenshot build/combat-cpu.png
+./build/boat_combat_review --gpu --play --screenshot build/combat-gpu.png
+./build/boat_server --scripted --mode deathmatch --boats 4 --ticks 7200
+```
+
+The review fixture captures the shared scene at 320×200. CPU screenshots are display-free;
+GPU and `--play` require a desktop and include the production weapon HUD and procedural audio.
+For a display-free WebGL2 comparison of both production radial shader recipes:
+
+```sh
+python tools/check_web_combat_wave.py
+```
+
+This optional command needs Playwright and Chrome; its float probes independently check height,
+gradient and vertical speed. `check_web_multiplayer.py --mode deathmatch` also exercises gun and
+numbered grenade commands, page reception and captures the weapon HUD and burst over WebRTC.
+
+Current automated/manual evidence and unavailable platform checks belong to the
+[deathmatch owner](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26).

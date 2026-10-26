@@ -29,6 +29,17 @@ Vector2 boat_water_storm_centre(BoatStorm storm, double time);
 BoatStormSample boat_water_storm_query(BoatStorm storm, Vector2 position, double time);
 void boat_water_storm_uniforms(BoatStorm storm, double time, float parameters[12]);
 
+#define BOAT_RADIAL_WAVES 4
+typedef struct {
+    Vector2 centre;
+    uint64_t born;
+    uint32_t generation, life, owner;
+    float height, speed, range;
+    bool active;
+} BoatRadialWave;
+BoatStormSample boat_water_radial_query(BoatRadialWave wave, Vector2 position, double time);
+void boat_water_radial_uniforms(const BoatRadialWave *waves, double time, float parameters[32]);
+
 #define BOAT_WAKE_SEGMENTS 64
 #define BOAT_WAKE_LIFETIME 20.0f
 
@@ -51,6 +62,7 @@ typedef struct {
     int player_wake_count, player_wake_next;
     BoatWakeSegment player_wake[BOAT_WAKE_SEGMENTS]; // Owned history: copies never alias a boat.
     BoatWave crossing[2]; // Smaller components; all parameters are shared with the GPU.
+    const BoatRadialWave *radial; // Borrowed combat pool, independent of ordinary wakes.
     BoatStorm storm; // Localised physical rough water; no player wake slots.
     BoatVesselWake vessel; // Opt-in race trial; independent bounded source, no player slot.
 } BoatWater;
