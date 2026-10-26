@@ -871,7 +871,7 @@ set(PROTEUS_SLOW_TESTS
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
-  boat_river_benchmark_options boat_river_route boat_river_wave_route
+  boat_river_benchmark_options boat_river_route boat_river_wave_route boat_voyage
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
