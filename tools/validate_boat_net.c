@@ -615,7 +615,10 @@ static void room_flush(Room *room)
 
 static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
 {
-    *room = (Room) { .steering_target = NAN };
+    // Clear in place: a Room is over 1 MB, more than Windows' default stack, so a compound
+    // literal temporary would overflow it.
+    memset(room, 0, sizeof(*room));
+    room->steering_target = NAN;
     if (!config.epoch)
         config.epoch = 0x5eed;
     if (!config.max_players)
