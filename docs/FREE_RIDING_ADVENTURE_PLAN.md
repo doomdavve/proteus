@@ -43,8 +43,10 @@ constant 112 MB). A2 is complete; GPU timing at enlarged scale was not run.
 A3 began with [A3.1](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a31-result-2026-10-26) (2026-10-26),
 an offline bake of the first slice's water and land with the A0.3 route proven against the
 collision queries, and A3.1b (2026-10-26) gave its land real heights from Göteborg's Baskarta
-([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a31b-result-2026-10-26)); nothing runs in the game yet.
-**Next: A3.2, a mapped `outer` location that loads it.**
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a31b-result-2026-10-26)); and A3.2 (2026-10-26) added the mapped `outer` location that loads it on both renderers
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a32-result-2026-10-26); frame cost unmeasured,
+no buildings or bridge yet).
+**Next: A3.3, bake the river's buildings, bridge and roads into the combined map.**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short
 extension beyond Älvsborgsbron with one sheltered destination and one exposed-water encounter.
@@ -301,7 +303,7 @@ A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance c
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
 (a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1 (A1.1–A1.5)
 completed 2026-10-25. A2 is in progress: A2.1 (counters) and A2.2 (tile catalogue and indexed
-collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, are complete and A3.2 is next.
+collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, and A3.2 (the `outer` location) are complete and A3.3 is next.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |

@@ -38,13 +38,13 @@ static void usage(FILE *out)
 {
     fprintf(out,
         "usage: boat_server [--bind IPV4] [--port N] [--token TEXT] [--players 1-4] [--waves]\n"
-        "                   [--location basin|river] [--ticks N | --seconds S] "
+        "                   [--location basin|river|outer] [--ticks N | --seconds S] "
         "[--report-every N]\n"
         "                   [--mode free|deathmatch|race] [--round-seconds S]\n"
         "                   [--lan-port N | --no-lan] [--exit-with-stdin]\n"
         "                   [--rtc-port N] [--ice-server URL] (optional WebRTC build)\n"
         "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
-        "basin|river]\n"
+        "basin|river|outer]\n"
         "                   [--report-every N] [--mode free|deathmatch] [--round-seconds S]\n"
         "Room (default): listen on --bind (default 127.0.0.1; use a LAN address to accept other\n"
         "machines) and UDP --port (default %d) for up to four wake_velocity --connect or boat_bot\n"

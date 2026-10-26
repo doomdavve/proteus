@@ -210,6 +210,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         if (row == ROW_SOLO_PLACE)
             snprintf(value, size, "< %s >",
                 s->location == BOAT_LOCATION_COUNT       ? "BASIN TRIAL"
+                    : s->location == BOAT_LOCATION_OUTER ? "OUTER RIVER"
                     : s->location == BOAT_LOCATION_RIVER ? "RIVER"
                                                          : "BASIN");
         else if (row == ROW_SOLO_WATER)

@@ -361,6 +361,15 @@ alias for `--renderer gpu`. GPU screenshots require a desktop graphics context; 
 structures have no collision. Follow-camera occlusion near buildings is not resolved.
 The river covers a local waterfront area, not all of Gothenburg.
 
+`--location outer` starts at the same dock but loads the baked 16.5 km² first outer-river slice:
+the river's water and shore joined to Älvsborgsfjorden, Nya Älvsborg and the run to the Långedrag
+old harbour, with real land heights from Göteborg's Baskarta contours (see the
+[adventure ledger](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a32-result-2026-10-26)). It has no
+buildings, bridge or roads yet; where the region cuts open water the water ends at the
+horizon and collision keeps the boat inside. `--start X,Z[,DEGREES]` places the boat anywhere in a
+mapped location (simulation X/Z; heading 0 faces -Z), for example
+`--location outer --start 1980,-1196,75` on the open leg of the route.
+
 `--location river` is a 2,450 × 2,400 m waterfront with an Älvsborgsbron blockout. Start in the
 dock, leave it, and follow the river southwest to sail under the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy
 embankments, with concrete abutments connecting the deck to the land. The approaches follow mapped
