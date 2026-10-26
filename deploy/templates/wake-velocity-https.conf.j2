@@ -10,6 +10,13 @@ server {
     root {{ wake_root }}/browser/{{ wake_commit }}/site;
     index index.html;
 
+    location = /servers.json {
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options nosniff always;
+        try_files $uri =404;
+    }
+
     location = /room {
         proxy_pass http://{{ wake_lan_ip }}:24682/;
         proxy_http_version 1.1;

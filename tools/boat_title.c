@@ -421,7 +421,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
             public_server_text(0, 3, public_hint, sizeof(public_hint));
         else if (!public_server_compatible(
                      (int)t->public_shown, BOAT_NET_VERSION, BOAT_PHYSICS_REVISION))
-            snprintf(public_hint, sizeof(public_hint), "OTHER GAME VERSION; UPDATE THE CLIENT");
+            snprintf(public_hint, sizeof(public_hint), "OTHER GAME VERSION; USE MATCHING CLIENT");
         else {
             char description[65];
             public_server_text((int)t->public_shown, 1, description, sizeof(description));

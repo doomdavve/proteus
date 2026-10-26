@@ -1,6 +1,7 @@
 build/
 build-profile/
 build-web/
+build-web-directory/
 build-rtc/
 # Left by a CMake configure run in the source root.
 /CMakeFiles/

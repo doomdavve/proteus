@@ -1,6 +1,6 @@
 # Documentation and current plans
 
-Current status reconciled on 2026-10-25. The main program is the boating game `wake_velocity`
+Current status reconciled on 2026-10-26. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
 Acid Wake techno or Off. It provides free boating in the basin and on the river, a basin time
@@ -16,7 +16,9 @@ v0.0.17 native/browser room deployment and its verification status (2026-10-26).
 slice is pulled forward from M6; native/browser play and browser reconnect passed over a
 separate internet path. Weapons, human play and full internet-play qualification remain pending.
 The browser now fetches a known-server list and defaults to Winterfell for joining without
-typing; that UI is deployed and agent-checked, awaiting user review. Details stay in the guide.
+typing; that UI is deployed and agent-checked, awaiting user review. Release preparation
+adds a shared CORS directory with deployment-generated compatibility and a coordinated
+protocol-v6 cutover recipe. Details and current verification limits stay in the guide.
 
 | Area and owning document | Implemented | Remaining / next task |
 | --- | --- | --- |

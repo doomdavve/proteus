@@ -18,7 +18,7 @@ to join directly. There are no player accounts.
 
 The deployed browser is **v0.0.17-server-directory**: the released v0.0.17 core plus a
 browser menu/directory update. It fetches [servers.json](https://winterfell.davve.net:24443/servers.json)
-from the same site, with Winterfell as the only entry. It uses the original protocol, handling
+from Winterfell’s public directory, with Winterfell as the only entry. It uses the original protocol, handling
 and content identities; the server and native packages remain v0.0.17. Its launcher configures
 [Cloudflare public STUN](https://developers.cloudflare.com/realtime/turn/) for browser address
 discovery. It stays at this deployed core when the separate Pages site advances.
@@ -30,7 +30,7 @@ Pages build, which has not been published as part of this update.
 
 ## Known-server directory
 
-`web/servers.json` is a version-1 JSON document with a `servers` array (at most eight entries).
+The public directory is a version-1 JSON document with a `servers` array (at most eight entries).
 Each entry has `name` (up to 24 printable ASCII characters), `description` (up to 64),
 `websocket` (a secure `wss://` URL up to 63 characters), `protocol` and `physics` integers.
 `native` records the corresponding native address for operators; native clients still use
@@ -38,17 +38,24 @@ LAN discovery or manual joining. The listing is curated, not a live availability
 A listed room with different protocol/handling metadata shows a version warning and cannot
 be selected; this avoids offering the live handling-8 room to development handling-9 clients.
 
-The browser fetches the file at startup and refreshes it when MULTIPLAYER opens, without
+The browser fetches `https://winterfell.davve.net:24443/servers.json` at startup and refreshes it when MULTIPLAYER opens, without
 blocking the game. Left/Right cycles multiple named servers; Enter/click joins the selected
 one. Requests bypass the browser cache, time out after five seconds, and bound accepted JSON
 to 16 KiB. If a refresh fails, an already loaded list remains usable. An initial failure or
 empty list leaves URL / CONNECT available. Servers must be secure WebSocket endpoints;
 URLs with credentials are rejected. The client still performs the normal server handshake.
 
-To change the known servers, edit `web/servers.json`, copy it into the built site's
-`servers.json`, and rerun deployment. This requires no Wasm rebuild. The default list is
-served from the same origin on Winterfell or a future Pages build; no external registry,
-accounts, cross-origin fetch or dynamic backend is required.
+The normal launcher uses `Module.boatServerListUrl` to query Winterfell from either the
+Winterfell site or Pages. nginx allows anonymous cross-origin GETs for this public JSON only
+and disables its cache. Deployment generates the room's protocol/physics metadata from the
+checked-out server headers. After an upgrade, all clients see the new metadata on refresh;
+an older or newer client remains blocked until its room version matches. A new Pages client
+must not keep using a stale version entry bundled in its own build.
+
+To change names, descriptions or add known servers, edit `deploy/templates/servers.json.j2`
+and rerun deployment; no Wasm rebuild is needed. `web/servers.json` remains a local fixture/
+example directory. Custom launchers can use it by setting `boatServerListUrl: 'servers.json'`
+or omitting that setting. No accounts or dynamic registry service is required.
 
 ## Router and network
 
@@ -168,12 +175,39 @@ ssh winterfell 'sudo systemctl restart wake-velocity'
 ssh winterfell 'sudo systemctl disable --now wake-velocity wake-velocity-relay'
 ```
 
-Restarting disconnects all players and resets the round. To upgrade, change `wake_version`
-and `wake_commit` together in the playbook, update the browser build recipe and directory
-metadata to the matching release, rebuild/deploy, and verify both transports. Update the
-legacy browser manifest too if that fallback is needed. Keep the old release directory for rollback: restore the old
-version/commit and rerun. The pinned source directory must remain unmodified. No automatic
-upgrade, old-release cleanup or persistent game state is configured.
+Restarting disconnects all players and resets the round. Keep old release directories for
+rollback; deploy the old browser/server pair together. The pinned source directory must
+remain unmodified. No automatic upgrade, old-release cleanup or persistent state is configured.
+
+## Cut over to the next release
+
+The PR is based on the protocol-v6 weapons-enabled main; the currently deployed server
+remains v0.0.17 (protocol 5, handling 8). Publishing a newer browser/native release does not
+upgrade that server automatically. Plan a brief room interruption and deploy matching server
+and browser artifacts after the new release tag has been pushed. For example, using the next
+unused version tag containing this PR:
+
+```sh
+release_version=v0.0.18
+git fetch origin --tags
+release_commit=$(git rev-parse "${release_version}^{commit}")
+bash tools/build_winterfell_web.sh "$release_version"
+ansible-playbook -i ../davve-srv/ansible/inventory.yml deploy/winterfell.yml \
+  --vault-password-file ../davve-srv/ansible/.vault_pass.txt \
+  -e "wake_version=$release_version" -e "wake_commit=$release_commit"
+```
+
+The recipe exports the selected commit and emits `build/winterfell-web/deployment.json` with
+its commit/protocol/physics. Ansible rejects a browser bundle for a different server commit
+before installation, and publishes directory metadata from the server headers. Protocol-v6
+clients can then select the upgraded room on Winterfell or Pages. Update the playbook's
+pinned defaults to the chosen release after cutover, so later routine deploys target it too.
+Do not move an existing published tag. Verify native and browser joins, both weapons and
+leave/rejoin; a passing deployment is not human weapon-balance acceptance.
+
+For an isolated rehearsal build, `WAKE_WEB_SOURCE_DIR` and `WAKE_WEB_BUILD_DIR` select ignored
+source/build locations. This does not deploy or publish a release. The default v0.0.17 build
+backports only the UI and removes the newer outer-location title row unavailable in that core.
 
 For a native connection check using a client built from the matching release:
 
@@ -188,7 +222,21 @@ selected ICE candidate pair to distinguish direct connectivity from relay verifi
 
 ## Status and verification — 2026-10-26
 
-Current browser UI: `v0.0.17-server-directory` is deployed. Both current-tree and
+PR preparation on the rebased weapons-enabled main: native Debug build and the routine
+CTest suite passed all 98 enabled checks with optional GPU tests off. The full opt-in GPU
+attempt passed the non-GPU checks but 25 native graphics cases could not initialize a monitor
+(`GLFW: Failed to determine Monitor to center Window`); this desktop-session limit is not
+reported as a graphics pass. Both current protocol-v6 and v0.0.17 browser builds passed.
+The release recipe was also run against the weapons-core commit and emitted protocol 6 /
+physics 9 metadata. Chrome verified deployed named joining, cross-origin directory fetching,
+and the protocol-v6 client's version warning against the still-old room; those captures are
+[the released menu](evidence/internet-hosting/browser-v17-servers.png) and
+[the newer client guard](evidence/internet-hosting/browser-v6-incompatible.png).
+Public JSON returned CORS `*` and `Cache-Control: no-store`. The coordinated release cutover
+has not been run; no tag, Pages update or weapons-server upgrade was published.
+
+Initial UI verification before rebasing onto weapons-enabled main:
+`v0.0.17-server-directory` was deployed. Both current-tree and
 released-core Emscripten MinSizeRel builds passed. The current native Debug build and all
 123 enabled CTests passed (GPU checks enabled; 15 retired checks disabled). The Node
 directory contract covers schema/URL bounds, version matching, coalesced refresh, updates,

@@ -14,6 +14,10 @@ packaging; there is still no downloadable Linux server distribution.
 Winterfell's browser is subsequently labeled `v0.0.17-server-directory`: released core with
 the fetched-server menu added, built by `tools/build_winterfell_web.sh`. This is an operator
 UI deployment, not a new published release or a change to the server/native packages.
+The next release is based on protocol-v6 weapons-enabled main; publishing it does not upgrade
+Winterfell's protocol-v5 room automatically. Follow the [coordinated server/browser cutover](MULTIPLAYER_HOSTING.md#cut-over-to-the-next-release)
+after tagging. The public directory reports the deployed server's compatibility to both
+Pages and Winterfell clients, and blocks mismatched releases until the upgrade is complete.
 
 The **Release Wake Velocity** workflow builds and tests the Apple Silicon Mac app
 and Windows x64 package for the same version tag, then attaches both ZIPs and their

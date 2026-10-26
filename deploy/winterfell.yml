@@ -14,11 +14,17 @@
     # Built from the released core plus the browser directory UI (see the hosting guide).
     wake_browser_site: "{{ playbook_dir }}/../build/winterfell-web/site"
   vars_files:
-    - "browser-{{ wake_version }}.json"
+    - browser-v0.0.17.json
   tasks:
-    - name: Match browser manifest to server release
+    - name: Match legacy browser manifest to server release
       ansible.builtin.assert:
         that: wake_browser_commit == wake_commit
+      when: wake_browser_site | length == 0
+
+    - name: Match locally built browser to server release
+      ansible.builtin.assert:
+        that: (lookup('ansible.builtin.file', wake_browser_site ~ '/../deployment.json') | from_json).commit == wake_commit
+      when: wake_browser_site | length > 0
     - name: Install build and relay dependencies
       ansible.builtin.apt:
         name:
@@ -72,6 +78,19 @@
     - name: Verify release identity
       ansible.builtin.assert:
         that: wake_checkout.after == wake_commit
+
+    - name: Read released protocol and handling identities
+      ansible.builtin.slurp:
+        src: "{{ wake_source }}/{{ item }}"
+      loop:
+        - src/boat_net_protocol.h
+        - src/boat.h
+      register: wake_headers
+
+    - name: Record the authoritative room identities
+      ansible.builtin.set_fact:
+        wake_protocol: "{{ (wake_headers.results[0].content | b64decode | regex_findall('(?m)^#define BOAT_NET_VERSION ([0-9]+)$')) | first | int }}"
+        wake_physics: "{{ (wake_headers.results[1].content | b64decode | regex_findall('(?m)^#define BOAT_PHYSICS_REVISION ([0-9]+)$')) | first | int }}"
 
     - name: Configure optional browser transport from released sources
       become_user: wake-velocity
@@ -199,7 +218,7 @@
         src: "{{ item }}"
         dest: "{{ wake_root }}/browser/{{ wake_commit }}/site/{{ item | basename }}"
         mode: '0644'
-      loop: "{{ lookup('ansible.builtin.fileglob', wake_browser_site ~ '/*', wantlist=True) | reject('search', '/index.html$') | list }}"
+      loop: "{{ lookup('ansible.builtin.fileglob', wake_browser_site ~ '/*', wantlist=True) | reject('search', '/(index.html|servers.json)$') | list }}"
       when: wake_browser_site | length > 0
 
     - name: Publish released-core browser with server directory UI
@@ -208,6 +227,12 @@
         dest: "{{ wake_root }}/browser/{{ wake_commit }}/site/index.html"
         mode: '0644'
       when: wake_browser_site | length > 0
+
+    - name: Publish the known-server list with deployed room compatibility
+      ansible.builtin.template:
+        src: templates/servers.json.j2
+        dest: "{{ wake_root }}/browser/{{ wake_commit }}/site/servers.json"
+        mode: '0644'
 
     - name: Install dedicated game HTTPS listener
       ansible.builtin.template:
