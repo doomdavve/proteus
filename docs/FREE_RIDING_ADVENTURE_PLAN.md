@@ -54,7 +54,9 @@ yet played). The user's first playtest (2026-10-26) found the run long and the l
 bridge barren ([notes](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a34-playtest-2026-10-26)). A3.5a
 (2026-10-26) dressed it: the corridor's buildings on the terrain, the container cranes, channel
 marks and a tree scatter ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35a-result-2026-10-26);
-not yet played). Boat speed is unchanged by the user's choice.
+not yet played). The user then asked for a faster boat: the `explorer` livery free-boats at
+about 30 m/s instead of 23 ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#explorer-boat-2026-10-26);
+autopilot-verified, not yet played).
 **Next: A3.5, the local weather transition and bounded per-region detailed-asset loading.**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short

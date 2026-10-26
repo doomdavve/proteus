@@ -245,7 +245,7 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
     return true;
 }
 
-unsigned net_study_skin(unsigned slot) { return slot % BOAT_SKIN_COUNT; }
+unsigned net_study_skin(unsigned slot) { return slot % BOAT_SKIN_COUNTRIES; }
 
 void net_study_rivals(const NetStudy *net, double time, BoatRivals *rivals)
 {

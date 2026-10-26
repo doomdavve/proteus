@@ -4,15 +4,17 @@
 
 #include <string.h>
 
-static const char *names[] = { "sweden", "finland", "denmark", "norway" };
+static const char *names[] = { "sweden", "finland", "denmark", "norway", "explorer" };
 #define WHITE_HULL { 239, 243, 245, 255 } // A macro: MSVC rejects const objects in initializers.
-static const BoatSkinPalette palettes[]
-    = { // Hull, deck, stripe/seat accent, upholstery. One shape and gameplay class for all four.
-          { WHITE_HULL, { 0, 106, 167, 255 }, { 255, 205, 0, 255 }, { 26, 48, 65, 255 } },
-          { WHITE_HULL, { 239, 243, 245, 255 }, { 0, 53, 128, 255 }, { 29, 48, 71, 255 } },
-          { WHITE_HULL, { 198, 12, 48, 255 }, { 250, 246, 237, 255 }, { 63, 36, 43, 255 } },
-          { WHITE_HULL, { 186, 12, 47, 255 }, { 0, 32, 91, 255 }, { 29, 40, 62, 255 } }
-      };
+static const BoatSkinPalette palettes[] = {
+    // Hull, deck, stripe/seat accent, upholstery. One shape for all; the explorer has a
+    // graphite hull, sand deck and signal-orange stripe (authored, not a real brand).
+    { WHITE_HULL, { 0, 106, 167, 255 }, { 255, 205, 0, 255 }, { 26, 48, 65, 255 } },
+    { WHITE_HULL, { 239, 243, 245, 255 }, { 0, 53, 128, 255 }, { 29, 48, 71, 255 } },
+    { WHITE_HULL, { 198, 12, 48, 255 }, { 250, 246, 237, 255 }, { 63, 36, 43, 255 } },
+    { WHITE_HULL, { 186, 12, 47, 255 }, { 0, 32, 91, 255 }, { 29, 40, 62, 255 } },
+    { { 58, 64, 70, 255 }, { 214, 196, 158, 255 }, { 242, 118, 28, 255 }, { 70, 56, 44, 255 } }
+};
 static const Color rubber = { 27, 39, 47, 255 };
 static const Color glass = { 43, 85, 106, 255 };
 

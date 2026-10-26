@@ -13,7 +13,7 @@ course/replay, environment, audio and renderer checks remain active.
 
 The cosmetic player skin check `boat_skin` runs `validate_boat_skin`: matching geometry
 across liveries, valid triangles, custom palette generation, footprint and ID fallback;
-national flag field/cross colors, Norway's white border and independent render storage.
+flag field/cross colors (the explorer's too), Norway's white border and independent render storage.
 It is device-free; visual review commands live in [the skin guide](BOAT_SKINS.md).
 `boat_fleet_render` runs `boat_fleet_review --check`: a four-boat fleet drawn from slot 0 with
 three rivals through the shared scene call; each rival must change the CPU image, a repeat must

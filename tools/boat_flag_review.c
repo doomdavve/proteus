@@ -67,8 +67,8 @@ int main(int argc, char **argv)
             fprintf(stderr,
                 "Usage: boat_flag_review [--scenario idle|cruise|turn|reverse] "
                 "[--renderer cpu|gpu] [--time 0..60] [--screenshot FILE] "
-                "[--frames COUNT] [--low-resolution] [--skin sweden|finland|denmark|norway] "
-                "[--angle front|side|rear]\n");
+                "[--frames COUNT] [--low-resolution] "
+                "[--skin sweden|finland|denmark|norway|explorer] [--angle front|side|rear]\n");
             return 2;
         }
     }

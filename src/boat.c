@@ -12,7 +12,6 @@
 
 // Normalized mass and world units: these are handling parameters, not a calibrated hull.
 static const float MAX_ENGINE_ANGLE = 0.55f;
-static const float ENGINE_THRUST = 11.0f;
 static const float ENGINE_RESPONSE_RATE = 3.5f;
 // Overdamped spring return when steering is released; larger values centre faster (1/seconds).
 static const float WHEEL_RETURN_RATE = 3.0f;
@@ -485,7 +484,16 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
     boat->roll += boat->roll_velocity * BOAT_STEP;
 }
 
+const BoatHandling boat_handling_speedboat = { .thrust = 11.0f };
+const BoatHandling boat_handling_explorer = { .thrust = 18.0f };
+
 void boat_step(Boat *boat, BoatWorld *world, double now, BoatInput input)
+{
+    boat_step_handling(boat, world, now, input, &boat_handling_speedboat);
+}
+
+void boat_step_handling(
+    Boat *boat, BoatWorld *world, double now, BoatInput input, const BoatHandling *handling)
 {
     float wheel_change = input.steering_rate;
     float throttle_change = input.throttle_rate;
@@ -541,7 +549,7 @@ void boat_step(Boat *boat, BoatWorld *world, double now, BoatInput input)
         ? 1
         : 0;
     Vector2 force = Vector2Scale(
-        boat_pose_thrust_direction(boat), ENGINE_THRUST * boat->engine_response * propulsion);
+        boat_pose_thrust_direction(boat), handling->thrust * boat->engine_response * propulsion);
     float side_load = Vector2DotProduct(force, right);
     // Torque = lever arm x force: a portward stern force produces starboard yaw.
     float torque = -BOAT_ENGINE_ARM * Vector2DotProduct(force, right);

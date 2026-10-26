@@ -15,7 +15,7 @@ Nearest-neighbour presentation remains unchanged.
 The owning status and acceptance record is in [the boating plan](BOATING_PLAN.md#speedboat-skins--2026-10-24).
 The 2026-10-20 cabin refinement proposal is superseded by this speedboat direction.
 
-## Try the four liveries
+## Try the liveries
 
 | Boat / local ID | Selection | Boat colors | Flag |
 | --- | --- | --- | --- |
@@ -23,6 +23,13 @@ The 2026-10-20 cabin refinement proposal is superseded by this speedboat directi
 | 2 / 1 | `finland` | White hull/deck, blue stripe | Blue cross on white |
 | 3 / 2 | `denmark` | White hull, red deck, white stripe | White cross on red |
 | 4 / 3 | `norway` | White hull, red deck, navy stripe | White-bordered navy cross on red |
+| — / 4 | `explorer` | Graphite hull, sand deck, signal-orange stripe | Graphite cross on orange (an authored expedition pennant) |
+
+The explorer (2026-10-26, from the [adventure playtest](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#explorer-boat-2026-10-26))
+is the one livery that is not only cosmetic: `wake_velocity` pairs it with
+`boat_handling_explorer` (`src/boat.h`) in solo free boating, an engine of 18 instead of 11
+thrust units, about 30 m/s flat out. Courses use the standard engine, and room slots use only
+the four countries.
 
 From the worktree root:
 

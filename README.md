@@ -82,9 +82,13 @@ Explore the bundled river with the same boat and controls:
 ```
 
 The player craft is a simple speedboat with a pointed bow and low swept windscreen.
-Choose a cosmetic livery with `--skin sweden|finland|denmark|norway` (default `sweden`), for example
-`./build/wake_velocity --skin finland --location river`. Every livery has identical geometry and
-handling. The choice is local; multiplayer skin synchronization remains pending.
+Choose a livery with `--skin sweden|finland|denmark|norway|explorer` (default `sweden`), for
+example `./build/wake_velocity --skin finland --location river`, or BOAT in the title's settings.
+Every livery has identical geometry. The four countries share the handling. `explorer` (graphite
+hull, sand deck, orange stripe and pennant) is the long-outing boat. When free boating solo it
+has a stronger engine: about 30 m/s (58 knots) flat out against 23 m/s. Courses always use the
+standard engine, so runs and bests compare, and rooms colour boats by slot as before. The choice
+is local; multiplayer skin synchronization remains pending.
 See [player skins](docs/BOAT_SKINS.md) for palette customization and close review commands.
 
 Each skin carries its matching Swedish, Finnish, Danish or Norwegian flag on the stern staff. A light breeze moves the cloth

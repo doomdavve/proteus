@@ -12,7 +12,8 @@ retain their existing models.
 0.75 m starboard stern staff raked about 11° aft. Cross boundaries are mesh edges at the Swedish
 flag's 5:2:9 horizontal and 4:2:4 vertical divisions. Both faces show the selected skin's
 Nordic-cross pattern: Sweden blue/yellow, Finland white/blue, Denmark red/white, or Norway
-red with a white-bordered navy cross. All countries use the accepted common fabric size and
+red with a white-bordered navy cross. The explorer livery flies an authored orange pennant with
+a graphite cross. All countries use the accepted common fabric size and
 cloth grid; their artwork is adapted to it, not a simulation of different flag proportions.
 The hoist is fixed along the staff; the remaining fabric responds to forces.
 
@@ -93,5 +94,5 @@ repeatability, and exact interpolated hoist attachment. `boat_flag_cpu` and opt-
 ## Speedboat review
 
 The [player speedboat skins](BOAT_SKINS.md) select their matching flag while retaining these attachments. The close
-review tool additionally accepts `--skin sweden|finland|denmark|norway` and
+review tool additionally accepts `--skin sweden|finland|denmark|norway|explorer` and
 `--angle front|side|rear`; the default remains Sweden viewed from the rear quarter.
