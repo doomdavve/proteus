@@ -1,5 +1,6 @@
 #include "boat_clock.h"
 #include "boat_map.h"
+#include "boat_test_cases.h"
 #include "boat_test_session.h"
 #include "raymath.h"
 #include "rlgl.h"
@@ -31,8 +32,8 @@ static int current_checks(void)
     }
     // Galilean equivalence in a uniform flow, including steering and the local stern station.
     BoatSession still, moving;
-    boat_session_init(&still, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&moving, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&still, BOAT_LOCATION_BASIN);
+    physics_session(&moving, BOAT_LOCATION_BASIN);
     Vector2 flow = { .7f, -.3f };
     moving.world.water.current = flow;
     moving.boat.velocity = flow;
@@ -49,7 +50,7 @@ static int current_checks(void)
     Vector2 offset = Vector2Scale(flow, 240 * BOAT_STEP);
     CHECK(Vector2Distance(moving.boat.position, Vector2Add(still.boat.position, offset)) < .0001f);
     BoatSession drift;
-    boat_session_init(&drift, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&drift, BOAT_LOCATION_BASIN);
     drift.world.water = channel;
     for (int tick = 0; tick < 1200; tick++)
         boat_session_step(&drift, (BoatInput) { 0 });
@@ -125,16 +126,21 @@ static int wake_checks(void)
         CHECK(boat_water_wake_source(shifted, tick * .1f, &source));
         CHECK(test_river_water(source, 3));
     }
-    // Repeated crossings at different speeds and angles must settle without stored energy.
+    return 0;
+}
+
+// Repeated crossings at different speeds and angles must settle without stored energy.
+static int wake_crossings(void)
+{
+    BoatWater wake = boat_water_test(false, false, true);
     const float speeds[] = { 0, 3, 9 };
     float encounter = 0;
     for (int si = 0; si < 3; si++)
         for (int ai = 0; ai < 3; ai++) {
             BoatSession a, b;
-            boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            physics_session(&a, BOAT_LOCATION_BASIN);
             a.boat.position = (Vector2) { 0, 1.6f };
             a.boat.heading = ai * PI / 4;
-            a.presentation.camera_heading = a.boat.heading;
             boat_session_set_tick(&a, 1200);
             a.boat.velocity = (Vector2) { sinf(a.boat.heading) * speeds[si],
                 -cosf(a.boat.heading) * speeds[si] };
@@ -211,7 +217,7 @@ static int player_wake_checks(void)
         CHECK(fabsf(boat_water_query(copy, (Vector2) { -4, z }, 8).height) <= .65f);
     CHECK(boat_water_query(copy, (Vector2) { -4, 6 }, 25).height == 0);
     BoatSession drifting;
-    boat_session_init(&drifting, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&drifting, BOAT_LOCATION_BASIN);
     drifting.world.water = (BoatWater) { .player_wake_enabled = true, .current = { 1, 0 } };
     drifting.boat.velocity = (Vector2) { 1, 0 };
     for (int tick = 0; tick < 480; ++tick)
@@ -219,8 +225,8 @@ static int player_wake_checks(void)
     CHECK(drifting.world.water.player_wake_count == 0);
     // Drive a loop back through the emitted wake, then coast and settle after it passes.
     BoatSession a, b;
-    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-    boat_session_init(&b, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&a, BOAT_LOCATION_BASIN);
+    physics_session(&b, BOAT_LOCATION_BASIN);
     a.world.water.player_wake_enabled = b.world.water.player_wake_enabled = true;
     float encounter = 0, max_height = 0;
     for (int tick = 0; tick < 6000; ++tick) {
@@ -628,16 +634,21 @@ static int clock_checks(void)
     return 0;
 }
 
+static const TestCase cases[] = {
+    TEST_CASE(current_checks),
+    TEST_CASE(wake_checks),
+    SLOW_CASE(wake_crossings),
+    TEST_CASE(player_wake_checks),
+    TEST_CASE(clock_checks),
+};
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && strcmp(argv[1], "--gpu") == 0)
         return gpu_checks();
-    CHECK(argc == 1);
-    CHECK(current_checks() == 0);
-    CHECK(wake_checks() == 0);
-    CHECK(player_wake_checks() == 0);
-    CHECK(clock_checks() == 0);
-    puts("boat_environment=ok");
+    int status = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    if (status == 0 && argc == 1)
+        puts("boat_environment=ok");
     test_worlds_close();
-    return 0;
+    return status;
 }

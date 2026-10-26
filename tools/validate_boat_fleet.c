@@ -5,6 +5,7 @@
  * invariants and tolerances, never by bitwise identity across platforms. */
 #include "boat_fleet.h"
 #include "boat_fleet_bots.h"
+#include "boat_test_cases.h"
 #include "boat_test_world.h"
 #include "raymath.h"
 
@@ -690,13 +691,24 @@ static int rejects(void)
     return 0;
 }
 
-int main(void)
+static const TestCase cases[] = {
+    SLOW_CASE(one_boat_equivalence),
+    TEST_CASE(pair_equivalence),
+    TEST_CASE(permutations),
+    SLOW_CASE(tunneling),
+    SLOW_CASE(solver_invariants),
+    SLOW_CASE(checkpoints),
+    SLOW_CASE(churn),
+    SLOW_CASE(full_pool),
+    TEST_CASE(spawn_rules),
+    TEST_CASE(rejects),
+};
+
+int main(int argc, char **argv)
 {
-    if (one_boat_equivalence() || pair_equivalence() || permutations() || tunneling()
-        || solver_invariants() || checkpoints() || churn() || full_pool() || spawn_rules()
-        || rejects())
-        return 1;
-    printf("boat_fleet=ok\n");
+    int status = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    if (status == 0 && argc == 1)
+        puts("boat_fleet=ok");
     test_worlds_close();
-    return 0;
+    return status;
 }

@@ -265,7 +265,7 @@ a few seconds. It covers:
   all surviving mirrors to match the authority at their snapshot ticks exactly.
 
 `boat_net_loopback` runs `tools/boat_net_smoke.py`, which starts real `boat_server` and
-`boat_bot` processes on a free 127.0.0.1 UDP port for about 7 s. Two bots drive and a
+`boat_bot` processes on a free 127.0.0.1 UDP port for about 9 s. Two bots drive and a
 wrong-token bot is refused. `boat_bot --discover` on a second free port (the room's
 `--lan-port`) must find the room once, with its token flag and player count. A second server on
 the same port must fail, and the message,
@@ -327,7 +327,7 @@ ctest --test-dir build -R '^boat_net_river$' --output-on-failure
 ```
 
 `boat_net_deathmatch` runs the same script with `--deathmatch`: a deathmatch room with a 4 s
-round (`--round-seconds` accepts 2–3600) and two `boat_bot --hunt` clients for 8 s (about 10 s
+round (`--round-seconds` accepts 2–3600) and two `boat_bot --hunt` clients for 8 s (about 11 s
 in all). Each bot's received
 scoreboard for round 1 must equal the server log's round-end line, and each must have received
 the round start, every logged capsize and the round end. Whether the hunters capsize anyone in a
@@ -337,7 +337,7 @@ given run varies (usually not in 4 s; `boat_net` covers credited capsizes determ
 python3 tools/boat_net_smoke.py --deathmatch --server build/boat_server --bot build/boat_bot
 ```
 
-`boat_net_race` (about 11 s) finds a `--mode race` room through LAN discovery and races two
+`boat_net_race` (about 12 s) finds a `--mode race` room through LAN discovery and races two
 `boat_bot --predict` clients for 8 s over ENet. Each bot must see round 1 gridded and released
 (at least 150 observed 120 Hz simulation ticks held, a GO tick), receive the server's logged
 race events, and finish without resyncs or decode faults. Run it alone with:

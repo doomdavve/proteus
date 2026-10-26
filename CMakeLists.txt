@@ -286,7 +286,7 @@ target_compile_options(wake_gpu_runtime_review PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 if(PROTEUS_GPU_TESTS)
   add_test(NAME wake_gpu_runtime COMMAND wake_gpu_runtime_review --check)
-  set_tests_properties(wake_gpu_runtime PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(wake_gpu_runtime PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
 endif()
 add_executable(validate_boat_flag tools/validate_boat_flag.c)
 target_link_libraries(validate_boat_flag PRIVATE proteus_render)
@@ -308,7 +308,7 @@ set_tests_properties(boat_race_trial PROPERTIES
 set_tests_properties(boat_race_trial PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 if(PROTEUS_GPU_TESTS)
   add_test(NAME boat_race_trial_gpu COMMAND boat_race_trial --gpu-check)
-  set_tests_properties(boat_race_trial_gpu PROPERTIES LABELS "gpu;render" RUN_SERIAL TRUE
+  set_tests_properties(boat_race_trial_gpu PROPERTIES LABELS "gpu;render" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "ferry_visibility=ok" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 add_executable(wake_play_review tools/wake_play_review.c)
@@ -364,7 +364,7 @@ proteus_add_case_tests(wake_objects wake_objects_review LABELS cpu
 if(PROTEUS_GPU_TESTS)
   add_test(NAME wake_objects_gpu COMMAND wake_objects_review --gpu)
   set_tests_properties(wake_objects_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 120)
+    LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 120)
 endif()
 add_test(NAME wake_objects_course_rejected COMMAND wake_velocity --wake-objects --course)
 add_test(NAME wake_objects_mixed_rejected COMMAND wake_velocity --wake-objects --wake-field)
@@ -378,7 +378,7 @@ set_tests_properties(wake_candidate_crossing PROPERTIES WORKING_DIRECTORY ${CMAK
 if(PROTEUS_GPU_TESTS)
   add_test(NAME wake_candidate_gpu COMMAND wake_play_review --gpu)
   set_tests_properties(wake_candidate_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 180)
+    LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 180)
 endif()
 add_test(NAME wake_candidate_course_rejected COMMAND wake_velocity --wake-field --course)
 add_test(NAME wake_candidate_map_rejected COMMAND wake_velocity --wake-field --location river)
@@ -458,8 +458,7 @@ add_test(NAME boat_core COMMAND validate_boat_core)
 add_executable(validate_boat_map tools/validate_boat_map.c)
 target_link_libraries(validate_boat_map PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_map PRIVATE ${PROTEUS_WARNINGS})
-add_test(NAME boat_map COMMAND validate_boat_map)
-set_tests_properties(boat_map PROPERTIES PASS_REGULAR_EXPRESSION "boat_map=ok")
+proteus_add_case_tests(boat_map validate_boat_map LABELS core cpu)
 # Adventure A3.1: the baked first outer-river slice answers the A0.3 route and shelter queries.
 add_executable(validate_boat_outer_map tools/validate_boat_outer_map.c)
 target_link_libraries(validate_boat_outer_map PRIVATE proteus_boat_core)
@@ -516,12 +515,10 @@ target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
 foreach(target validate_boat_combat validate_boat_fleet validate_boat_match validate_boat_race boat_server boat_bot validate_boat_net)
   target_compile_options(${target} PRIVATE ${PROTEUS_WARNINGS})
 endforeach()
-add_test(NAME boat_fleet COMMAND validate_boat_fleet)
-set_tests_properties(boat_fleet PROPERTIES PASS_REGULAR_EXPRESSION "boat_fleet=ok")
+proteus_add_case_tests(boat_fleet validate_boat_fleet LABELS core cpu)
 add_test(NAME boat_match COMMAND validate_boat_match)
 set_tests_properties(boat_match PROPERTIES PASS_REGULAR_EXPRESSION "boat_match=ok")
-add_test(NAME boat_race COMMAND validate_boat_race)
-set_tests_properties(boat_race PROPERTIES PASS_REGULAR_EXPRESSION "boat_race=ok")
+proteus_add_case_tests(boat_race validate_boat_race LABELS core cpu)
 add_test(NAME boat_server_scripted_deathmatch
   COMMAND boat_server --scripted --mode deathmatch --round-seconds 10 --ticks 3000)
 set_tests_properties(boat_server_scripted_deathmatch PROPERTIES
@@ -559,7 +556,7 @@ if(PROTEUS_GPU_TESTS)
   # A windowed host session on a private port: start the room, join it, leave, close it.
   add_test(NAME wake_velocity_host_gpu
     COMMAND wake_velocity --host deathmatch --location river --port 24779 --frames 120)
-  set_tests_properties(wake_velocity_host_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE TIMEOUT 60
+  set_tests_properties(wake_velocity_host_gpu PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 60
     PASS_REGULAR_EXPRESSION "standard input closed; closing the room")
 endif()
 set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_rejected
@@ -567,8 +564,7 @@ set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_
   boat_bot_discover_join_rejected boat_net_study_mode_rejected
   boat_net_study_name_rejected boat_net_study_skin_rejected wake_velocity_host_race_location_rejected
   wake_velocity_host_connect_rejected wake_velocity_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
-add_test(NAME boat_net COMMAND validate_boat_net)
-set_tests_properties(boat_net PROPERTIES PASS_REGULAR_EXPRESSION "boat_net=ok")
+proteus_add_case_tests(boat_net validate_boat_net LABELS core cpu)
 add_test(NAME boat_net_loopback COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_smoke.py --server $<TARGET_FILE:boat_server>
   --bot $<TARGET_FILE:boat_bot>)
@@ -620,7 +616,7 @@ add_test(NAME boat_flag_cpu COMMAND boat_flag_review --scenario cruise --time 5
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-flag-cpu.png)
 set_tests_properties(boat_flag_cpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME boat_profile_records COMMAND validate_boat_profile)
-add_test(NAME boat_environment COMMAND validate_boat_environment)
+proteus_add_case_tests(boat_environment validate_boat_environment LABELS cpu)
 proteus_add_case_tests(boat_world_isolation validate_boat_world LABELS cpu)
 add_test(NAME boat_player_wake_screenshot COMMAND wake_velocity --renderer cpu --player-wake --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake.png)
@@ -766,42 +762,42 @@ add_test(NAME starter_xm_is_valid
 if(PROTEUS_GPU_TESTS)
   add_test(NAME ferry_gpu_screenshot COMMAND harbor_review --renderer gpu --view ferry
     --waves --time 40 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/ferry-gpu.png)
-  set_tests_properties(ferry_gpu_screenshot PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(ferry_gpu_screenshot PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME harbor_gpu_screenshot COMMAND harbor_review --renderer gpu --view marina
     --waves --time 2 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/harbor-marina-gpu.png)
-  set_tests_properties(harbor_gpu_screenshot PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(harbor_gpu_screenshot PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_player_wake_gpu_screenshot COMMAND wake_velocity --player-wake --time 9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake-gpu.png)
   add_test(NAME boat_player_wake_gpu_aa_screenshot COMMAND wake_velocity --player-wake --current --waves
     --gpu-aa --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake-gpu-aa.png)
   set_tests_properties(boat_player_wake_gpu_screenshot boat_player_wake_gpu_aa_screenshot
-    PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+    PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_environment_gpu_screenshot COMMAND wake_velocity --current --crossing-wake
     --waves --gpu-aa --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-environment-gpu.png)
-  set_tests_properties(boat_environment_gpu_screenshot PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(boat_environment_gpu_screenshot PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_environment_gpu COMMAND validate_boat_environment --gpu)
-  set_tests_properties(boat_environment_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(boat_environment_gpu PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_flag_gpu COMMAND boat_flag_review --renderer gpu --scenario turn --time 5
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-flag-gpu.png)
   set_tests_properties(boat_flag_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    LABELS "gpu" RUN_SERIAL TRUE)
+    LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_banking_gpu COMMAND boat_banking_review --gpu
     --output ${CMAKE_CURRENT_BINARY_DIR}/banking-gpu)
-  set_tests_properties(boat_banking_gpu PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(boat_banking_gpu PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME gpu_water_surface COMMAND boat_water_review --check-gpu)
-  set_tests_properties(gpu_water_surface PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(gpu_water_surface PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME gpu_view_binding COMMAND boat_water_review --check-gpu-views)
-  set_tests_properties(gpu_view_binding PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(gpu_view_binding PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   # Adventure A2.3: per-tile culling draws the same GPU and CPU pixels as drawing every tile.
   add_test(NAME tile_culling COMMAND boat_water_review --check-culling)
-  set_tests_properties(tile_culling PROPERTIES LABELS "gpu" RUN_SERIAL TRUE
+  set_tests_properties(tile_culling PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "tile_culling=ok")
   add_test(NAME gpu_view_lifecycle COMMAND boat_water_review --check-gpu-lifecycle)
-  set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_water_benchmark.py
     $<TARGET_FILE:boat_water_review>)
-  set_tests_properties(boat_river_benchmark_contract PROPERTIES LABELS "gpu" RUN_SERIAL TRUE
+  set_tests_properties(boat_river_benchmark_contract PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     TIMEOUT 240)
   add_test(NAME boat_ghost_gpu_screenshot COMMAND wake_velocity --gpu-aa
     --ghost ${BOAT_REPLAY_TEST_DIR}/replay-fixture.run --time 0
@@ -812,7 +808,7 @@ if(PROTEUS_GPU_TESTS)
     --data-dir ${BOAT_REPLAY_TEST_DIR}/profile
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-replay-gpu.png)
   set_tests_properties(boat_ghost_gpu_screenshot boat_replay_gpu_screenshot
-    PROPERTIES FIXTURES_REQUIRED boat_recording LABELS "gpu" RUN_SERIAL TRUE)
+    PROPERTIES FIXTURES_REQUIRED boat_recording LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_gpu_screenshot COMMAND wake_velocity --location river --gpu --time 3
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-gpu.png)
   add_test(NAME boat_gpu_aa_screenshot COMMAND wake_velocity --location river --gpu --gpu-aa --time 3
@@ -829,13 +825,13 @@ if(PROTEUS_GPU_TESTS)
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-course-gpu.png)
   add_test(NAME boat_basin_wave_gpu_screenshot COMMAND wake_velocity --waves --gpu-aa --time 1.8
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-basin-wave-gpu.png)
-  set_tests_properties(boat_basin_wave_gpu_screenshot PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(boat_basin_wave_gpu_screenshot PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   set_tests_properties(boat_basin_gpu_screenshot boat_basin_gpu_aa_screenshot boat_course_gpu_screenshot
-    PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+    PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   set_tests_properties(boat_gpu_screenshot boat_gpu_aa_screenshot boat_wave_gpu_screenshot
-    PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+    PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME gpu_surface_materials COMMAND gpu_fixture --city --check)
-  set_tests_properties(gpu_surface_materials PROPERTIES LABELS "gpu" RUN_SERIAL TRUE)
+  set_tests_properties(gpu_surface_materials PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
 endif()
 
 add_test(NAME boating_xm_is_valid
@@ -869,18 +865,45 @@ foreach(test IN LISTS PROTEUS_WAKE_FIELD_CASES)
   endif()
 endforeach()
 
+# Lanes: quick tests take under about 100 ms on their own (ctest --preset quick); everything
+# else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
+# in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
+set(PROTEUS_SLOW_TESTS
+  acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
+  boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
+  boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
+  boat_host boat_map_scaling boat_net_boundary boat_outer_map boat_race_trial boat_replay
+  boat_river_benchmark_options boat_river_route boat_river_wave_route
+  boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
+  waterfront_actors
+  boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
+  boat_environment_river_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
+  boat_river_screenshot
+  boat_net_deathmatch boat_net_loopback boat_net_race boat_net_river boat_net_session)
+
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
 # and cpu (everything else that runs without a display).
 get_property(PROTEUS_TESTS DIRECTORY PROPERTY TESTS)
 foreach(test IN LISTS PROTEUS_TESTS)
   get_test_property(${test} LABELS labels)
-  if(test MATCHES "^boat_combat$|^boat_core|^boat_map$|^boat_map_index$|^boat_outer_map$|^boat_fleet|^boat_match|^boat_race$|^boat_server|^boat_net|^boat_bot")
+  if(test MATCHES "^boat_combat$|^boat_core|^boat_outer_map$|^boat_fleet|^boat_match|^boat_server|^boat_net|^boat_bot")
     set_property(TEST ${test} APPEND PROPERTY LABELS core cpu)
   elseif(labels MATCHES "gpu")
   elseif(test MATCHES "screenshot|checksum|_cpu$")
     set_property(TEST ${test} APPEND PROPERTY LABELS render)
   else()
     set_property(TEST ${test} APPEND PROPERTY LABELS cpu)
+  endif()
+  get_test_property(${test} LABELS labels)
+  if(labels MATCHES "gpu" OR test IN_LIST PROTEUS_SLOW_TESTS)
+    set_property(TEST ${test} APPEND PROPERTY LABELS slow)
+  else()
+    set_property(TEST ${test} APPEND PROPERTY LABELS quick)
+  endif()
+endforeach()
+foreach(test IN LISTS PROTEUS_SLOW_TESTS)
+  if(NOT TEST ${test})
+    message(AUTHOR_WARNING "PROTEUS_SLOW_TESTS names no test: ${test}")
   endif()
 endforeach()
 
