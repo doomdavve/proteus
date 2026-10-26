@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef BoatWaterMeshSurface Surface;
 
@@ -51,9 +52,14 @@ static void surface_destroy(Surface *s)
     *s = (Surface) { 0 };
 }
 
+static void index_destroy(BoatWaterIndex *index);
+
 void boat_water_mesh_cache_destroy(BoatWaterMeshCache *cache)
 {
     surface_destroy(&cache->surface);
+    surface_destroy(&cache->rest);
+    free(cache->rest_first);
+    index_destroy(&cache->index);
     surface_destroy(&cache->field);
     for (int i = 0; i < 2; ++i)
         surface_destroy(&cache->patches[i]);
@@ -66,6 +72,8 @@ static void cache_bind(BoatWaterMeshCache *cache, const BoatMapDescription *map)
     if (cache->map == map)
         return;
     cache->map = map;
+    cache->index.ready = false;
+    cache->rest.count = 0;
     cache->surface.count = 0;
     cache->patches[0].count = cache->patches[1].count = 0;
 }
@@ -98,6 +106,216 @@ static int clip_edge(
         da = db;
     }
     return written;
+}
+
+// Vertical allowance for displaced water in a visibility box: ambient waves, storm and wakes.
+#define BOAT_WATER_VISIBLE_PAD 8.0f
+
+static int compare_ids(const void *a, const void *b)
+{
+    unsigned int x = *(const unsigned int *)a, y = *(const unsigned int *)b;
+    return (x > y) - (x < y);
+}
+
+// Water triangles of MAP in mesh order: the leading y = 0 triangles, or the two basin ones.
+static const Vector3 basin_water[2][3] = {
+    { { -120, 0, -80 }, { -120, 0, 80 }, { 120, 0, 80 } },
+    { { -120, 0, -80 }, { 120, 0, 80 }, { 120, 0, -80 } },
+};
+
+static void water_triangle(const BoatMapDescription *map, size_t i, Vector3 out[3])
+{
+    if (!map) {
+        for (int j = 0; j < 3; ++j)
+            out[j] = basin_water[i][j];
+        return;
+    }
+    Triangle3D t = map->mesh->triangles[i];
+    for (int j = 0; j < 3; ++j)
+        out[j] = map->mesh->vertices[t.vertices[j]];
+}
+
+static size_t water_triangle_count(const BoatMapDescription *map)
+{
+    if (!map)
+        return 2;
+    const Mesh3D *city = map->mesh;
+    size_t n = 0;
+    while (n < city->triangle_count) {
+        Triangle3D t = city->triangles[n];
+        if (city->vertices[t.vertices[0]].y != 0 || city->vertices[t.vertices[1]].y != 0
+            || city->vertices[t.vertices[2]].y != 0)
+            break; // Imported water triangles precede land.
+        ++n;
+    }
+    return n;
+}
+
+static void index_destroy(BoatWaterIndex *index)
+{
+    free(index->first);
+    free(index->list);
+    free(index->stamp);
+    free(index->gathered);
+    *index = (BoatWaterIndex) { 0 };
+}
+
+// Call VISIT(context, cell) for each grid cell whose square the triangle overlaps, row by row.
+static void index_cover(
+    const BoatWaterIndex *index, const Vector3 t[3], void (*visit)(void *, int), void *context)
+{
+    float min_z = fminf(t[0].z, fminf(t[1].z, t[2].z));
+    float max_z = fmaxf(t[0].z, fmaxf(t[1].z, t[2].z));
+    int row0 = (int)floorf((min_z - index->origin.y) / index->cell);
+    int row1 = (int)floorf((max_z - index->origin.y) / index->cell);
+    row0 = row0 < 0 ? 0 : row0;
+    row1 = row1 >= index->rows ? index->rows - 1 : row1;
+    for (int row = row0; row <= row1; ++row) {
+        Vector3 band[12], clipped[12];
+        float bottom = index->origin.y + row * index->cell;
+        int count = clip_edge(t, 3, clipped, 1, bottom, true);
+        count = clip_edge(clipped, count, band, 1, bottom + index->cell, false);
+        if (!count)
+            continue;
+        float min_x = band[0].x, max_x = band[0].x;
+        for (int j = 1; j < count; ++j) {
+            min_x = fminf(min_x, band[j].x);
+            max_x = fmaxf(max_x, band[j].x);
+        }
+        int col0 = (int)floorf((min_x - index->origin.x) / index->cell);
+        int col1 = (int)floorf((max_x - index->origin.x) / index->cell);
+        col0 = col0 < 0 ? 0 : col0;
+        col1 = col1 >= index->columns ? index->columns - 1 : col1;
+        for (int col = col0; col <= col1; ++col)
+            visit(context, row * index->columns + col);
+    }
+}
+
+typedef struct {
+    BoatWaterIndex *index;
+    unsigned int *cursor;
+    unsigned int triangle;
+} IndexFill;
+
+static void index_count_cell(void *context, int cell)
+{
+    ++((IndexFill *)context)->index->first[cell + 1];
+}
+
+static void index_fill_cell(void *context, int cell)
+{
+    IndexFill *fill = context;
+    fill->index->list[fill->cursor[cell]++] = fill->triangle;
+}
+
+static bool index_build(BoatWaterIndex *index, const BoatMapDescription *map)
+{
+    index_destroy(index);
+    size_t count = water_triangle_count(map);
+    float min_x = INFINITY, min_z = INFINITY, max_x = -INFINITY, max_z = -INFINITY;
+    for (size_t i = 0; i < count; ++i) {
+        Vector3 t[3];
+        water_triangle(map, i, t);
+        for (int j = 0; j < 3; ++j) {
+            min_x = fminf(min_x, t[j].x);
+            max_x = fmaxf(max_x, t[j].x);
+            min_z = fminf(min_z, t[j].z);
+            max_z = fmaxf(max_z, t[j].z);
+        }
+    }
+    index->cell = BOAT_WATER_INDEX_CELL;
+    index->count = count;
+    if (!count) {
+        index->ready = true;
+        return true;
+    }
+    index->origin = (Vector2) { floorf(min_x / index->cell) * index->cell,
+        floorf(min_z / index->cell) * index->cell };
+    index->columns = (int)floorf((max_x - index->origin.x) / index->cell) + 1;
+    index->rows = (int)floorf((max_z - index->origin.y) / index->cell) + 1;
+    size_t cells = (size_t)index->columns * (size_t)index->rows;
+    unsigned int *cursor = NULL;
+    index->first = calloc(cells + 1, sizeof(*index->first));
+    index->stamp = calloc(count, sizeof(*index->stamp));
+    if (!index->first || !index->stamp)
+        goto fail;
+    IndexFill fill = { .index = index };
+    for (int pass = 0; pass < 2; ++pass) {
+        for (size_t i = 0; i < count; ++i) {
+            Vector3 t[3];
+            water_triangle(map, i, t);
+            fill.triangle = (unsigned int)i;
+            index_cover(index, t, pass ? index_fill_cell : index_count_cell, &fill);
+        }
+        if (pass)
+            break;
+        for (size_t c = 0; c < cells; ++c)
+            index->first[c + 1] += index->first[c];
+        index->entries = index->first[cells];
+        index->list = malloc((index->entries ? index->entries : 1) * sizeof(*index->list));
+        cursor = malloc(cells * sizeof(*cursor));
+        if (!index->list || !cursor)
+            goto fail;
+        memcpy(cursor, index->first, cells * sizeof(*cursor));
+        fill.cursor = cursor;
+    }
+    free(cursor);
+    index->ready = true;
+    return true;
+fail:
+    free(cursor);
+    index_destroy(index);
+    return false;
+}
+
+// Triangles listed by any cell of the inclusive range that VISIBLE (when given) accepts, once each,
+// ascending, in the scratch array (valid until the next gather). False on allocation failure.
+static bool index_gather(BoatWaterIndex *index, int col0, int row0, int col1, int row1,
+    BoatWaterMeshVisible visible, void *context, const unsigned int **sources, size_t *count_out)
+{
+    *sources = index->gathered;
+    *count_out = 0;
+    if (!index->count)
+        return true;
+    col0 = col0 < 0 ? 0 : col0;
+    row0 = row0 < 0 ? 0 : row0;
+    col1 = col1 >= index->columns ? index->columns - 1 : col1;
+    row1 = row1 >= index->rows ? index->rows - 1 : row1;
+    if (!++index->epoch) {
+        memset(index->stamp, 0, index->count * sizeof(*index->stamp));
+        index->epoch = 1;
+    }
+    size_t n = 0;
+    for (int row = row0; row <= row1; ++row)
+        for (int col = col0; col <= col1; ++col) {
+            int cell = row * index->columns + col;
+            if (visible && index->first[cell] != index->first[cell + 1]) {
+                Vector3 min = { index->origin.x + col * index->cell, -BOAT_WATER_VISIBLE_PAD,
+                    index->origin.y + row * index->cell };
+                Vector3 max = { min.x + index->cell, BOAT_WATER_VISIBLE_PAD, min.z + index->cell };
+                if (!visible(context, min, max))
+                    continue;
+            }
+            for (unsigned int k = index->first[cell]; k < index->first[cell + 1]; ++k) {
+                unsigned int id = index->list[k];
+                if (index->stamp[id] == index->epoch)
+                    continue;
+                index->stamp[id] = index->epoch;
+                if (n == index->gathered_capacity) {
+                    size_t capacity = n ? n * 2 : 256;
+                    unsigned int *g = realloc(index->gathered, capacity * sizeof(*g));
+                    if (!g)
+                        return false;
+                    index->gathered = g;
+                    index->gathered_capacity = capacity;
+                }
+                index->gathered[n++] = id;
+            }
+        }
+    qsort(index->gathered, n, sizeof(*index->gathered), compare_ids);
+    *sources = index->gathered;
+    *count_out = n;
+    return true;
 }
 
 // A bounded 48 m central square uses .75 m cells; outer cells remain 1.5 m.
@@ -178,23 +396,29 @@ static const Mesh3D *water_patch(
         return &s->mesh;
     s->count = 0;
     Vector2 origin = { center.x - 96, center.y - 96 };
+    if (!cache->index.ready && !index_build(&cache->index, map))
+        return NULL;
+    BoatWaterIndex *index = &cache->index;
+    // Only triangles listed by a cell the patch square touches can contribute to it.
+    size_t count;
+    const unsigned int *sources;
     bool ok = true;
-    if (map) {
-        const Mesh3D *city = map->mesh;
-        for (size_t i = 0; ok && i < city->triangle_count; ++i) {
-            Triangle3D t = city->triangles[i];
-            Vector3 a = city->vertices[t.vertices[0]], b = city->vertices[t.vertices[1]];
-            Vector3 c = city->vertices[t.vertices[2]];
-            if (a.y != 0 || b.y != 0 || c.y != 0)
-                break;
-            ok = patch_triangle(s, a, b, c, origin, fine);
-        }
+    if (cache->full_scan) {
+        sources = NULL;
+        count = index->count;
     } else {
-        ok = patch_triangle(s, (Vector3) { -120, 0, -80 }, (Vector3) { -120, 0, 80 },
-                 (Vector3) { 120, 0, 80 }, origin, fine)
-            && patch_triangle(s, (Vector3) { -120, 0, -80 }, (Vector3) { 120, 0, 80 },
-                (Vector3) { 120, 0, -80 }, origin, fine);
+        ok = index_gather(index, (int)floorf((origin.x - index->origin.x) / index->cell),
+            (int)floorf((origin.y - index->origin.y) / index->cell),
+            (int)floorf((origin.x + 192 - index->origin.x) / index->cell),
+            (int)floorf((origin.y + 192 - index->origin.y) / index->cell), NULL, NULL, &sources,
+            &count);
     }
+    for (size_t i = 0; ok && i < count; ++i) {
+        Vector3 t[3];
+        water_triangle(map, sources ? sources[i] : i, t);
+        ok = patch_triangle(s, t[0], t[1], t[2], origin, fine);
+    }
+    cache->patch_sources[fine] = count;
     if (!ok) {
         s->count = 0;
         return NULL;
@@ -229,31 +453,61 @@ static float wave_crest_foam(float height, Vector2 gradient, float k)
 const Mesh3D *boat_water_surface(
     BoatWaterMeshCache *cache, const BoatMapDescription *map, BoatWater water, double time)
 {
-    cache_bind(cache, map);
-    Surface *s = &cache->surface;
-    if (!s->count) {
-        bool ok = true;
-        if (map) {
-            const Mesh3D *city = map->mesh;
-            for (size_t i = 0; ok && i < city->triangle_count; ++i) {
-                Triangle3D t = city->triangles[i];
-                Vector3 a = city->vertices[t.vertices[0]], b = city->vertices[t.vertices[1]];
-                Vector3 c = city->vertices[t.vertices[2]];
-                if (a.y != 0 || b.y != 0 || c.y != 0)
-                    break; // Imported water triangles precede land.
-                ok = subdivide(s, a, b, c, 0);
-            }
-        } else {
-            ok = subdivide(s, (Vector3) { -120, 0, -80 }, (Vector3) { -120, 0, 80 },
-                     (Vector3) { 120, 0, 80 }, 0)
-                && subdivide(s, (Vector3) { -120, 0, -80 }, (Vector3) { 120, 0, 80 },
-                    (Vector3) { 120, 0, -80 }, 0);
-        }
-        if (!ok) {
-            surface_destroy(s);
-            return NULL;
+    return boat_water_surface_visible(cache, map, water, time, NULL, NULL);
+}
+
+// Tessellate every water triangle once, remembering which rest triangles each produced.
+static bool rest_build(BoatWaterMeshCache *cache, const BoatMapDescription *map)
+{
+    size_t count = cache->index.count;
+    unsigned int *first = realloc(cache->rest_first, (count + 1) * sizeof(*first));
+    if (!first)
+        return false;
+    cache->rest_first = first;
+    Surface *rest = &cache->rest;
+    rest->count = 0;
+    for (size_t i = 0; i < count; ++i) {
+        Vector3 t[3];
+        water_triangle(map, i, t);
+        first[i] = (unsigned int)rest->count;
+        if (!subdivide(rest, t[0], t[1], t[2], 0)) {
+            rest->count = 0;
+            return false;
         }
     }
+    first[count] = (unsigned int)rest->count;
+    return true;
+}
+
+const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMapDescription *map,
+    BoatWater water, double time, BoatWaterMeshVisible visible, void *context)
+{
+    cache_bind(cache, map);
+    Surface *s = &cache->surface;
+    if (!cache->index.ready && !index_build(&cache->index, map))
+        return NULL;
+    if (!cache->rest.count && !rest_build(cache, map))
+        return NULL;
+    BoatWaterIndex *index = &cache->index;
+    const unsigned int *sources = NULL;
+    size_t source_count = index->count;
+    if (visible && !cache->full_scan && index->count
+        && !index_gather(index, 0, 0, index->columns - 1, index->rows - 1, visible, context,
+            &sources, &source_count))
+        return NULL;
+    s->count = 0;
+    for (size_t k = 0; k < source_count; ++k) {
+        size_t i = sources ? sources[k] : k; // No visibility test: every triangle, in order.
+        for (unsigned int r = cache->rest_first[i]; r < cache->rest_first[i + 1]; ++r) {
+            Triangle3D t = cache->rest.triangles[r];
+            if (!surface_triangle(s, cache->rest.vertices[t.vertices[0]],
+                    cache->rest.vertices[t.vertices[1]], cache->rest.vertices[t.vertices[2]])) {
+                s->count = 0;
+                return NULL;
+            }
+        }
+    }
+    cache->surface_sources = source_count;
     BoatWater ambient = water;
     ambient.wake_amplitude = 0;
     ambient.player_wake_enabled = false;

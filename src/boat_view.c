@@ -493,6 +493,11 @@ bool boat_draw_with_ghost(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels,
         camera_settings, NULL, ghost, ghost_flag, opacity);
 }
 
+static bool water_visible(void *renderer, Vector3 min, Vector3 max)
+{
+    return renderer3d_box_visible(renderer, min, max);
+}
+
 bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int width, int height,
     const BoatViewState *view, const BoatPresentation *presentation, const BoatWorld *world,
     BoatCamera camera_settings, const BoatRivals *rivals, const BoatViewState *ghost,
@@ -526,7 +531,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     if (boat_world_displaced(world)) {
         const Mesh3D *surface = world->wake_field
             ? boat_water_surface_field(&cpu->water_mesh, world->water, world->wake_field, time)
-            : boat_water_surface(&cpu->water_mesh, world->definition->map, world->water, time);
+            : boat_water_surface_visible(&cpu->water_mesh, world->definition->map, world->water,
+                time, water_visible, renderer);
         if (!surface)
             return false;
         renderer3d_draw_emissive_mesh(renderer, surface, (Transform3D) { .scale = { 1, 1, 1 } });
