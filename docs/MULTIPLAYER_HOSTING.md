@@ -347,4 +347,6 @@ fields checked. Menu interaction, live joining, Windows/Linux builds and packagi
 been manually verified. PR CI initially exposed Windows header collisions and unsupported C
 atomics; the Windows worker now uses its thread handle for completion. Linux built and passed
 CTest but its Wayland smoke check exceeded Weston’s 10-second startup deadline; the deadline
-is now 60 seconds. The revised CI runs remain to be verified.
+is now 60 seconds. On 2026-10-26 the revised PR CI passed the Windows, Linux and macOS
+builds and their configured automated checks, including the Linux Wayland smoke and Windows
+package check. Manual menu play and a live native room join remain pending.
