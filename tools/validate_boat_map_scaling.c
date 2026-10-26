@@ -57,11 +57,10 @@ static bool long_axis_is_z;
 static float stride, axis_min;
 static Vector2 samples[SAMPLES];
 
+// Milliseconds of processor time: portable, and enough for a single-threaded report.
 static double now(void)
 {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
+    return (double)clock() * 1e3 / CLOCKS_PER_SEC;
 }
 
 // The stride is a whole number of tiles so every copy has the river's tile grid.
