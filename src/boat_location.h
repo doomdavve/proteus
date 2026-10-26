@@ -7,7 +7,12 @@
 #define BOAT_BASIN_HALF_X 120.0f
 #define BOAT_BASIN_HALF_Z 80.0f
 
-typedef enum { BOAT_LOCATION_BASIN, BOAT_LOCATION_RIVER, BOAT_LOCATION_COUNT } BoatLocationId;
+typedef enum {
+    BOAT_LOCATION_BASIN,
+    BOAT_LOCATION_RIVER,
+    BOAT_LOCATION_OUTER,
+    BOAT_LOCATION_COUNT
+} BoatLocationId;
 
 // Immutable, process-lifetime location record. Worlds borrow it; nothing stores an active one.
 // The mapped record binds the compiled river crop's description; collision caches are

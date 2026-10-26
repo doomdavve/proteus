@@ -25,6 +25,11 @@ v5 (2026-10-25) removes the Eriksberg location: Accept's location byte is now 0 
 1 river (v3/v4 sent river as 2), and the content digest covers only those two locations and
 the single river crop. Message layouts are otherwise unchanged; v1–v4 are incompatible.
 
+A3.2 (2026-10-26) adds location 2, `outer` (the baked first outer-river slice), without a
+version bump: Accept's location byte is valid up to 2 and the content digest now also covers
+the outer definition and its mesh, so a build without it fails the digest check at Hello.
+Race rooms still require the river.
+
 Handling revision 9 (2026-10-26, isolated controls branch) increases commanded-thrust travel
 to 4 units/s and removes steering-commanded aerial roll. Protocol v5 bytes are unchanged;
 old handling revisions are rejected. Pedals/Shift become ordinary target-derived rate inputs,
@@ -151,7 +156,7 @@ or boat exists.
 Accept: `u8` slot (0–3), `u8` waves (0/1), `u8` snapshot interval (4), `u8` birth interval (12),
 `u8` input interval (2), `u8` commands per batch (12), `u8` future window (24), `u8` room mode
 (0 free, 1 deathmatch, 2 race; v1 reserved; a race room's location must be the river),
-`u16` tick rate (must be 120), `u8` location (0 basin, 1 river; v5), `u8` reserved,
+`u16` tick rate (must be 120), `u8` location (0 basin, 1 river, 2 outer; v5), `u8` reserved,
 `u32` wake lifetime ticks (240–1920),
 `f32` crest height (0.1–3). The header epoch is the room's epoch.
 

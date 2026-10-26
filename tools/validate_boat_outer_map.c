@@ -4,6 +4,7 @@
  * water. The route is copied from docs/adventure/survey.py (SLICE_ROUTE) in map east/north metres,
  * which the queries take as simulation X = -east, Z = north. */
 #include "boat_map.h"
+#include "boat_world.h"
 #include "waterfront_outer.h"
 
 #include <math.h>
@@ -37,6 +38,19 @@ int main(void)
     CHECK(boat_map_leading_water(waterfront_outer_map.mesh) == WATER_TRIANGLES);
     CHECK(map.water_count == WATER_TRIANGLES);
     CHECK(waterfront_outer_map.bridge_first_triangle == waterfront_outer_map.mesh->triangle_count);
+
+    // A3.2: the `outer` location binds this map; its spawn and fleet start share the river's
+    // frame and lie in navigable water, and a world prepared from it answers collision queries.
+    const BoatWorldDefinition *outer = boat_location_find("outer");
+    CHECK(outer && outer == boat_location(BOAT_LOCATION_OUTER));
+    CHECK(outer->mapped && outer->map == &waterfront_outer_map);
+    CHECK(boat_map_water(&map, outer->spawn, 2.5f));
+    CHECK(boat_map_water(&map, outer->fleet_spawn, 2.5f));
+    BoatWorldResources world;
+    CHECK(boat_world_resources_init(&world, outer));
+    CHECK(boat_world_resources_ready(&world));
+    CHECK(boat_map_water(&world.map, outer->spawn, 2.5f));
+    boat_world_resources_destroy(&world);
 
     // The land is Baskarta terrain (A3.1b): real relief above the water, never below the 1 m
     // floor on its top surface, and with hills that rise tens of metres. Water stays at 0.

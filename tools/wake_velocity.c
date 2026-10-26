@@ -69,7 +69,9 @@ static void usage(void)
         "--camera-distance UNITS: 8..48 (default 20; river 12)\n"
         "--camera-height UNITS: 4..36 (default 14; river 6)\n"
         "--fixed-fov: keep the 55-degree view instead of widening gently with speed\n"
-        "--location basin|river (default basin; river extends to Alvsborgsbron)\n"
+        "--location basin|river|outer (default basin; river extends to Alvsborgsbron, outer\n"
+        "  adds the baked run to Langedrag)\n"
+        "--start X,Z[,DEGREES]: place the boat in a mapped location (simulation X/Z, heading)\n"
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"
@@ -241,6 +243,8 @@ static int study(int argc, char **argv)
     bool networked = false; // Joined a room with --connect (native builds only).
     const char *host_mode = NULL; // --host: the room this session starts and joins.
     bool location_set = false;
+    bool start_set = false;
+    Vector3 start = { 0 }; // --start: simulation X, Z and heading in degrees.
     long host_port = 0; // --port: the hosted room's UDP port.
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
@@ -327,6 +331,13 @@ static int study(int argc, char **argv)
             course = true;
         } else if (strcmp(argv[i], "--mouse-steering") == 0) {
             mouse_steering = true;
+        } else if (strcmp(argv[i], "--start") == 0 && i + 1 < argc) {
+            float values[3] = { 0 };
+            int count = sscanf(argv[++i], "%f,%f,%f", &values[0], &values[1], &values[2]);
+            if (count < 2 || !isfinite(values[0]) || !isfinite(values[1]) || !isfinite(values[2]))
+                goto invalid;
+            start = (Vector3) { values[0], values[1], values[2] };
+            start_set = true;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -457,6 +468,10 @@ static int study(int argc, char **argv)
     }
     if ((!course && (data_dir || export_path)) || (replay_path && ghost_path))
         goto invalid;
+    if (start_set && (!location->mapped || course || replay_path || ghost_path || connect_to)) {
+        fprintf(stderr, "--start places the boat in a mapped location's free boating.\n");
+        goto invalid;
+    }
     if (course && (location->mapped || demo)) {
         fprintf(stderr, "--course requires the basin and cannot be combined with --demo.\n");
         goto invalid;
@@ -558,6 +573,10 @@ static int study(int argc, char **argv)
         study_water(location, waves, current, crossing_wake, player_wake));
     if (course)
         boat_session_start_course(&session);
+    if (start_set) {
+        session.boat.position = (Vector2) { start.x, start.y };
+        session.boat.heading = start.z * DEG2RAD;
+    }
     session.runs.ghost_visible = true;
     session.runs.export_path = export_path;
     BoatWakePlayer *wake = NULL;
