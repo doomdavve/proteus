@@ -452,6 +452,12 @@ target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_map_index PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_map_index COMMAND validate_boat_map_index)
 set_tests_properties(boat_map_index PROPERTIES PASS_REGULAR_EXPRESSION "boat_map_index=ok")
+# Adventure A2.5: the local view's queries, tiles and water do not grow with distant map.
+add_executable(validate_boat_map_scaling tools/validate_boat_map_scaling.c)
+target_link_libraries(validate_boat_map_scaling PRIVATE proteus_render)
+target_compile_options(validate_boat_map_scaling PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_map_scaling COMMAND validate_boat_map_scaling)
+set_tests_properties(boat_map_scaling PROPERTIES PASS_REGULAR_EXPRESSION "boat_map_scaling=ok")
 # Multiplayer M2: the local four-boat authority and its scripted server, also core-only.
 add_executable(validate_boat_fleet tools/validate_boat_fleet.c)
 target_link_libraries(validate_boat_fleet PRIVATE proteus_boat_core)

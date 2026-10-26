@@ -1,6 +1,7 @@
 #include "boat_water_mesh.h"
 #include "raymath.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,6 +60,7 @@ void boat_water_mesh_cache_destroy(BoatWaterMeshCache *cache)
     surface_destroy(&cache->surface);
     surface_destroy(&cache->rest);
     free(cache->rest_first);
+    free(cache->rest_end);
     index_destroy(&cache->index);
     surface_destroy(&cache->field);
     for (int i = 0; i < 2; ++i)
@@ -74,6 +76,7 @@ static void cache_bind(BoatWaterMeshCache *cache, const BoatMapDescription *map)
     cache->map = map;
     cache->index.ready = false;
     cache->rest.count = 0;
+    cache->rest_ready = false;
     cache->surface.count = 0;
     cache->patches[0].count = cache->patches[1].count = 0;
 }
@@ -456,26 +459,39 @@ const Mesh3D *boat_water_surface(
     return boat_water_surface_visible(cache, map, water, time, NULL, NULL);
 }
 
-// Tessellate every water triangle once, remembering which rest triangles each produced.
-static bool rest_build(BoatWaterMeshCache *cache, const BoatMapDescription *map)
+// Forget the rest tessellation: each water triangle is tessellated on first use, so the memory
+// follows what has been in view rather than the map.
+static bool rest_reset(BoatWaterMeshCache *cache)
 {
     size_t count = cache->index.count;
-    unsigned int *first = realloc(cache->rest_first, (count + 1) * sizeof(*first));
-    if (!first)
+    unsigned int *first = realloc(cache->rest_first, (count ? count : 1) * sizeof(*first));
+    if (first)
+        cache->rest_first = first;
+    unsigned int *end = realloc(cache->rest_end, (count ? count : 1) * sizeof(*end));
+    if (end)
+        cache->rest_end = end;
+    if (!first || !end)
         return false;
-    cache->rest_first = first;
-    Surface *rest = &cache->rest;
-    rest->count = 0;
-    for (size_t i = 0; i < count; ++i) {
-        Vector3 t[3];
-        water_triangle(map, i, t);
-        first[i] = (unsigned int)rest->count;
-        if (!subdivide(rest, t[0], t[1], t[2], 0)) {
-            rest->count = 0;
-            return false;
-        }
+    for (size_t i = 0; i < count; ++i)
+        first[i] = UINT_MAX;
+    cache->rest.count = 0;
+    cache->rest_ready = true;
+    return true;
+}
+
+// Tessellate water triangle I into the rest surface unless an earlier call did.
+static bool rest_triangle(BoatWaterMeshCache *cache, const BoatMapDescription *map, size_t i)
+{
+    if (cache->rest_first[i] != UINT_MAX)
+        return true;
+    Vector3 t[3];
+    water_triangle(map, i, t);
+    cache->rest_first[i] = (unsigned int)cache->rest.count;
+    if (!subdivide(&cache->rest, t[0], t[1], t[2], 0)) {
+        cache->rest_ready = false;
+        return false;
     }
-    first[count] = (unsigned int)rest->count;
+    cache->rest_end[i] = (unsigned int)cache->rest.count;
     return true;
 }
 
@@ -486,7 +502,7 @@ const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMa
     Surface *s = &cache->surface;
     if (!cache->index.ready && !index_build(&cache->index, map))
         return NULL;
-    if (!cache->rest.count && !rest_build(cache, map))
+    if (!cache->rest_ready && !rest_reset(cache))
         return NULL;
     BoatWaterIndex *index = &cache->index;
     const unsigned int *sources = NULL;
@@ -498,7 +514,9 @@ const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMa
     s->count = 0;
     for (size_t k = 0; k < source_count; ++k) {
         size_t i = sources ? sources[k] : k; // No visibility test: every triangle, in order.
-        for (unsigned int r = cache->rest_first[i]; r < cache->rest_first[i + 1]; ++r) {
+        if (!rest_triangle(cache, map, i))
+            return NULL;
+        for (unsigned int r = cache->rest_first[i]; r < cache->rest_end[i]; ++r) {
             Triangle3D t = cache->rest.triangles[r];
             if (!surface_triangle(s, cache->rest.vertices[t.vertices[0]],
                     cache->rest.vertices[t.vertices[1]], cache->rest.vertices[t.vertices[2]])) {

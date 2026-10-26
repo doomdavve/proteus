@@ -36,8 +36,11 @@ No expanded geography, streaming, adventure rules or new weather is implemented.
 (256 m grid) so GPU patch rebuilds visit only nearby triangles and the CPU surface displaces
 only what the camera sees (2026-10-26, branch `adventure-a2-4`): CPU captures byte-identical,
 mean CPU triangles 2.34 M to 1.30 M; GPU waves captures identical to main, GPU CTests passed.
-**Next: [A2.5](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a25--outline), same-view scaling against
-synthetic catalogues (after the GPU checks listed in the A2.4 limitations).**
+[A2.5](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a25-result-2026-10-26) then showed, on synthetic
+corridors up to 25 km, that queries, patches and the visible CPU water at an unchanged view
+cost and return exactly the river's, and made the CPU water tessellate lazily (218 MB to a
+constant 112 MB). A2 is complete; GPU timing at enlarged scale was not run.
+**Next: A3, the first outer-river adventure.**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short
 extension beyond Älvsborgsbron with one sheltered destination and one exposed-water encounter.
@@ -294,13 +297,13 @@ A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance c
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
 (a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1 (A1.1–A1.5)
 completed 2026-10-25. A2 is in progress: A2.1 (counters) and A2.2 (tile catalogue and indexed
-collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) 2026-10-26, A2.5 is next.
+collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3 is next.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |
 | **A0 — survey and baseline (complete 2026-10-25)** | Pin a corridor extract, inspect coastline completeness, sample terrain access, measure a water route and useful stops; document package/triangle/collision counts and baseline frame times | Reviewable coverage map with unknowns marked, reproducible manifests, no invented coastline closures; hardware/resolution/AA recorded |
 | **A1 — world ownership (complete 2026-10-25)** | Complete the necessary mapped W1/W2/W3/W4 foundations work on current river data | Two independent map/view owners, repeat init/destroy, partial-failure cleanup and unchanged existing river behaviour; use two river instances now that Eriksberg is retired |
-| **A2 — tiled current river (in progress: A2.1–A2.4 complete, A2.5 next)** | Bake tiles and indexed collision; cull land in main/reflection/shadow passes; bound CPU/GPU water coverage | Match current shoreline/bridge queries against exhaustive reference; no seams or false tile-edge contacts; measured same-view scaling; all small-slice assets may remain resident |
+| **A2 — tiled current river (complete 2026-10-26: A2.1–A2.5)** | Bake tiles and indexed collision; cull land in main/reflection/shadow passes; bound CPU/GPU water coverage | Match current shoreline/bridge queries against exhaustive reference; no seams or false tile-edge contacts; measured same-view scaling; all small-slice assets may remain resident |
 | **A3 — first outer-river adventure** | New connected geography, one destination/shelter, local weather transition, checkpoint recovery; bounded detailed-asset loading | Playable 5–10 minute outing, cold-load/rapid-turn/recovery tests, clear/storm performance and memory targets; human feedback on travel and exposure |
 | **A4 — islands and Vinga** | Terrain silhouettes, selected harbour/landmark detail, continuous full voyage and nearby start | Actual route/time measurements, long out-and-back cache test, storm tuning, readable lighthouse/arrival and user playtest |
 | **A5 — shared and current-weather voyages** | Network world/weather identity, spread-out players, optional cached live data; browser asset strategy if pursued | Replay/late-join consistency, four separated boats, service failure/stale data, packaged/native and browser-specific verification |
