@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`; A3.2 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day; A3.2 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1492,7 +1492,8 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | Task | Depends on | Deliverable | Status |
 | --- | --- | --- | --- |
 | A3.1 | A2 complete | Offline bake of the first slice's water, land and quay walls into a compiled map description; route and shelter proven against the collision queries | Complete 2026-10-26; [result](#a31-result-2026-10-26) |
-| A3.2 | A3.1 | A mapped `outer` location starting at the dock: spawn, camera, CPU/GPU water and land rendering, fog or fade at the playable boundary; scenery, harbor and traffic for the added geography decided here | Proposed |
+| A3.1b | A3.1 | Real land heights from Göteborg's Baskarta contours, replacing the flat 3.5 m ground; 20 m inland, 5 m near the shore | Complete 2026-10-26; [result](#a31b-result-2026-10-26) |
+| A3.2 | A3.1b | A mapped `outer` location starting at the dock: spawn, camera, CPU/GPU water and land rendering, fog or fade at the playable boundary; scenery, harbor and traffic for the added geography decided here | Proposed |
 | A3.3 | A3.2 | Bake the existing river buildings, bridge and roads into the combined map so the outing is continuous under Älvsborgsbron | Proposed |
 | A3.4 | A3.3 | Långedrag shelter destination, checkpoint recovery and the exposed-water encounter | Proposed |
 | A3.5 | A3.4 | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
@@ -1507,7 +1508,8 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
   A 1 mm opening removes zero-width spikes where a shore meets the region edge along the same
   line, which the constrained triangulation rejected (applied only to polygons that fail).
   It needs the `docs/adventure/requirements.txt` pins and reads only checked-in sources.
-- **Output:** `assets/geometry/outer/geometry.h` (1.15 MB) and `manifest.json`: 7,796
+- **Output (as of A3.1; the land is flat here and was replaced by A3.1b):**
+  `assets/geometry/outer/geometry.h` (1.15 MB) and `manifest.json`: 7,796
   vertices, 15,556 triangles (2,668 water first), 8.0 km² water and 8.5 km² land in a 16.5 km²
   region. Two runs produced identical bytes (2.4 s each). The collision cache is 1.2 MB.
   [`src/waterfront_outer.[ch]`](../src/waterfront_outer.h) expose it as `waterfront_outer_map`
@@ -1533,6 +1535,57 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
   - No runtime location, rendering, manual playback or human acceptance. The route test copies
     `SLICE_ROUTE` from the survey by hand.
   - GPU CTests were part of the full run but no GPU capture of this map exists.
+
+### A3.1b result, 2026-10-26
+
+The user asked for real land heights; the Lantmäteriet model was ordered but not yet approved,
+so the first slice uses Göteborg's CC0 Baskarta, which the user downloaded.
+
+- **Source:** [`tools/prepare_terrain_sources.py`](../tools/prepare_terrain_sources.py) clips
+  the Baskarta `hojdkurvor` (0.5 m contours) and `hojdpunkt` (spot heights) to the slice
+  window into [`terrain-baskarta.json.gz`](adventure/sources/terrain-baskarta.json.gz)
+  (5.5 MB; 105,521 contours, 32,917 spot heights). See
+  [the source notes](adventure/README.md#terrain-baskarta-a31b-2026-10-26). The datum is
+  **not confirmed** (assumed RH 2000).
+- **Bake:** [`tools/outer_terrain.py`](../tools/outer_terrain.py) interpolates a height model
+  (linear over a Delaunay triangulation of the contour vertices and spot heights; scipy) and
+  builds the land top as 20 m cells inland and 5 m cells within 20 m of the shore. A coarse
+  cell beside fine cells carries their 5 m vertices on that side, so the surfaces share
+  heights along it. Heights are floored at 1 m so waves do not wash over the surface; shore
+  walls run from the water up to the vertex heights, with the old -2 m underwater skirt.
+  Colour is quay grey near the water, greener with height and bare rock on steep triangles.
+  Generation takes about 23 s.
+- **Output:** 165,210 triangles (2,668 water first; ~119 k land tops), 87,049 vertices,
+  heights 1.0–77.7 m, `geometry.h` 12.9 MB. Water, collision, the playable boundary and the
+  A3.1 route test are unchanged (the same 2,668 water triangles and 2,590 shore edges).
+- **Accuracy:** a contour-only model against the 11,529 spot heights on land: mean error
+  0.73 m, RMSE 2.41 m, 95th percentile 2.48 m, maximum 96 m. The outliers are not
+  understood; spot heights on bridges and rooftops are the likely cause. Contours are
+  0.5 m apart, so open ground is much better than the maximum suggests.
+- **Generator checks:** the surface area equals the land area to 1 m²; no land piece was
+  dropped (zero-width spikes are opened and zero-area triangles removed); every interior edge
+  is shared by exactly two triangles (no T-junctions between the 20 m and 5 m cells, no
+  holes); a synthetic tilted plane is reproduced exactly. `clip_by_rect` returned geometry
+  outside the region near the slice's south edge, so exact intersection is used.
+- **Visual check (agent review, not a game capture):**
+  [`outer-relief.png`](adventure/outer-relief.png) draws the baked land tops with hill
+  shading. The Hisingen and Älvsborg hills, the river valleys and the islands read correctly,
+  and the Arendal quays are flat. The thin hatching in the image is plot anti-aliasing.
+- **Verification (2026-10-26, macOS arm64, Debug):** build warning-free; the 96 non-GPU
+  active tests passed, including the extended `boat_outer_map`. **The 23 GPU-labelled tests
+  could not run in this session** (`GLFW: Failed to initialize platform`, no display); they
+  passed before A3.1b and do not load this map.
+- **Limitations:**
+  - **Datum unconfirmed**, and the hold-out maximum error is unexplained.
+  - Nothing renders this land yet. At 165 k triangles it is about twice the river (78.6 k triangles,
+    buildings and bridge included), so its draw and culling cost is **unmeasured** until A3.2
+    wires it up; the 20 m inland cell is a candidate to coarsen then.
+  - Vinga and the islands west of E ≈ 132 km have no Baskarta heights; the Lantmäteriet
+    order (pending) is the intended source. Heights on bridges, rooftops and quay edges are
+    approximations of ground, and buildings and the bridge are still absent.
+  - The 12.9 MB generated header is large for the repository; a binary format is a later
+    option if clone or compile time becomes a problem.
+  - No manual playback or human acceptance.
 
 **Next: A3.2**, a mapped `outer` location that loads this map.
 

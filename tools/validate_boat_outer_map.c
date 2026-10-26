@@ -38,6 +38,23 @@ int main(void)
     CHECK(map.water_count == WATER_TRIANGLES);
     CHECK(waterfront_outer_map.bridge_first_triangle == waterfront_outer_map.mesh->triangle_count);
 
+    // The land is Baskarta terrain (A3.1b): real relief above the water, never below the 1 m
+    // floor on its top surface, and with hills that rise tens of metres. Water stays at 0.
+    const Mesh3D *mesh = waterfront_outer_map.mesh;
+    float highest = 0, lowest_top = INFINITY;
+    for (size_t i = WATER_TRIANGLES; i < mesh->triangle_count; ++i) {
+        const Triangle3D *t = &mesh->triangles[i];
+        float y[3] = { mesh->vertices[t->vertices[0]].y, mesh->vertices[t->vertices[1]].y,
+            mesh->vertices[t->vertices[2]].y };
+        float flo = fminf(y[0], fminf(y[1], y[2])), fhi = fmaxf(y[0], fmaxf(y[1], y[2]));
+        highest = fmaxf(highest, fhi);
+        if (flo >= .99f) // Land top: every corner at or above the floor.
+            lowest_top = fminf(lowest_top, flo);
+    }
+    CHECK(highest > 60.0f && highest < 100.0f);
+    CHECK(lowest_top >= .99f);
+    CHECK(mesh->triangle_count > 100000);
+
     size_t legs = 0;
     for (int i = 0; i < ROUTE_POINTS; ++i) {
         CHECK(boat_map_water(&map, sim(route[i]), ENVELOPE));

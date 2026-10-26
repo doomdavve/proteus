@@ -104,9 +104,11 @@ synthetic two-tile land shapefile with a hole, a filtered distant polygon and a 
   PBF, with no coastline difference here. Land polygons ignore inland `natural=water`
   areas such as the river and lakes, so A0.3 must combine both layers. That is a layer
   difference, not a conflict.
-- **Terrain.** Not acquired. Lantmäteriet's 1 m Markhöjdmodell needs an authenticated
-  Geotorget STAC account; none was available or created. Fallback: authored island relief
-  informed by OSM coastline/rock/peak features until a terrain sample can be fetched.
+- **Terrain.** A0.2 did not acquire Lantmäteriet's 1 m Markhöjdmodell (it needs an
+  authenticated Geotorget STAC account; none was available or created). Since A3.1b the first
+  slice uses Göteborg's CC0 [Baskarta](#terrain-baskarta-a31b-2026-10-26) contours and spot
+  heights instead. An order for the Lantmäteriet model was placed on 2026-10-26 and is
+  pending; it is still needed for Vinga, which Baskarta does not cover.
 - **Weather.** Vinga A (71380, 10 m mast) recorded a 29.7 m/s gust at 2026-10-25T07:00Z,
   a 23.0 m/s 10-minute mean in the same hour (23.5 m/s maximum 3-hour mean), from
   154–171° during 03–08Z. All retained values carry quality code G. These are station
@@ -234,8 +236,9 @@ parameter, not a runtime or bake format.
 
 ### Gaps
 
-- **Terrain:** not acquired (authenticated Geotorget account needed); island relief stays
-  authored. The map footer and `summary.json` repeat this.
+- **Terrain:** not acquired when A0.3 ran (authenticated Geotorget account needed); the map
+  footer and `summary.json` repeat that historical state. A3.1b later added Baskarta heights
+  for the first slice only.
 - **Depth:** no bathymetry. The rock counts above come from OSM seamark/natural tags only.
   Saltholmen's exit passes five awash rocks within 50 m.
 - **Overhead:** only Älvsborgsbron crosses a route. Its `maxheight:marine=45` tag is unverified.
@@ -266,3 +269,24 @@ runtime paths changed, so no gameplay or audio check was needed.
 | `first-slice.json` | `00382af3d61416ec53065786ae6a4fe780de5e2844fba21bd607ba1fb4ee7ffb` |
 | `coverage.svg` | `cb6f69f5191abb97d0c3056910cef9bab5fcf4cdcb5fb9f6262a410ffccf12d9` |
 | `coverage.png` | `89fc967ea8afa0953f68a0296eb0722c3075cc819f93a852e310cfa0da8a9e5c` |
+
+## Terrain: Baskarta (A3.1b, 2026-10-26)
+
+[`terrain-baskarta.json.gz`](sources/terrain-baskarta.json.gz) holds the contours and spot
+heights of Göteborgs stad's *Baskarta v2* (Stadsbyggnadsförvaltningen, published 2020-06-30,
+**CC0 1.0**, EPSG:3007) inside the first slice plus a margin, as east/north metres from the
+crane origin: 105,521 contours (0.5 m interval, vertices simplified to 0.4 m) and 32,917 spot
+heights, 5.5 MB compressed. The full download is 1.6 GB and is not committed.
+`tools/prepare_terrain_sources.py SHP_DIR` regenerates it from the unzipped
+`baskarta_shp_v2.zip` layers `hojdkurvor` and `hojdpunkt` and records their SHA-256 hashes;
+`--self-test` needs no input.
+
+- **Obtained:** downloaded by hand from the Göteborg open-data portal on 2026-10-26 (the DWG
+  tile zips and `baskarta_shp_v2.zip`; only the SHP layers are read).
+- **Coverage:** the city-wide SHP spans E 132–164 km, N 6376–6416 km, so it covers the whole
+  first slice but not Vinga (E ≈ 126 km); A4 needs the Lantmäteriet model.
+- **Datum not confirmed.** No product description was found. Heights are treated as RH 2000;
+  shore values sit near 0 m and quays at 2–4 m. A change of RH 70 against RH 2000 is well
+  under half a metre in Gothenburg, and nothing here relies on it.
+- **Skipped:** 255 contour pieces whose height varies along the line (bridge and ramp
+  details) are left out.
