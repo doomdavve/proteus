@@ -31,7 +31,7 @@ pair must not disturb another cache's borrowed meshes.
 `boat_world_isolation` (`validate_boat_world`) also checks CPU view binding (adventure A1.4):
 two river views and a view of a synthetic harbor map draw interleaved, and destroying one view
 or rebinding another reproduces every frame exactly. `gpu_view_binding`
-(`boat_water_review --check-gpu-views`, `gpu`, serial) does the same with two GPU views,
+(`boat_water_review --check-gpu-views`, `gpu`) does the same with two GPU views,
 including destroy and recreate with the context alive.
 
 Adventure A1.5 adds the lifecycle gate. `boat_world_isolation` runs five scripted owners
@@ -44,11 +44,11 @@ river B and the harbor run alongside, and A is released mid-run. A failed init o
 owner and double destroys are checked too. `boat_map` releases a fleet's owner and checks that
 a fleet on a surviving owner continues like one restored onto a fresh owner, and `boat_net`'s
 `prediction_owners` releases one room's owner while the other prediction replays exactly.
-`gpu_view_lifecycle` (`boat_water_review --check-gpu-lifecycle`, `gpu`, serial) renders two
+`gpu_view_lifecycle` (`boat_water_review --check-gpu-lifecycle`, `gpu`) renders two
 private river owners (one with an arcade world, so both patch caches build), the harbor and the
 basin. Shared views must reproduce the fresh-view references interleaved, after the first
 owner and its view are destroyed, and over three view recreate cycles with the context alive.
-`tile_culling` (`boat_water_review --check-culling`, `gpu`, serial, about 9 s; adventure A2.3)
+`tile_culling` (`boat_water_review --check-culling`, `gpu`, about 9 s; adventure A2.3)
 renders 144 river poses (512 m and 1 km tiles, six route stops, four headings, default, close
 and overview cameras) culled and unculled, on the GPU with waves and on the CPU on flat water.
 The pixels must be identical, and every pass must cull at least one tile.
@@ -73,6 +73,71 @@ title/persistence and mixed WebRTC/ENet gameplay use the opt-in
 failure behavior under Node. The opt-in [directory browser check](WEB_BUILD.md#known-browser-servers-2026-10-26)
 joins the named room without typing and can simulate a failed list with manual fallback.
 
+## Lanes, cases and timing
+
+Every test carries exactly one lane label. `quick` tests take under about 100 ms on their own;
+`slow` holds everything heavier: long sweeps, soaks, real-time ENet tests and every GPU test.
+Use the quick lane while editing and the full suite before handing off:
+
+```sh
+cmake --preset dev            # Same as: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+ctest --preset quick          # About 1 s: 133 tests on an M1 Max (2026-10-26)
+ctest --preset full           # About 19 s without GPU tests; everything enabled
+ctest --preset full -L core   # Presets combine with the usual filters and -j N
+```
+
+Both test presets use 8 jobs; pass `-j N` to change that. Plain `ctest --test-dir build` still
+works. GPU tests share `RESOURCE_LOCK gpu`: they run one at a time, but CPU tests keep running
+beside them. CTest also runs the fixture setups a selected test requires, so a quick run can
+include a slow setup such as `boat_replay`.
+
+**Case tests.** The heavy validators are tables of small cases (`tools/boat_test_cases.h`).
+`proteus_add_case_tests(prefix target LABELS ...)` in `CMakeLists.txt` lists a target's cases
+after each build (`target --list`) and registers each as its own test, `prefix.case`, so cases
+run in parallel and a failure names the case. A case table entry is `TEST_CASE(fn)` or
+`SLOW_CASE(fn)`, where `fn` returns 0 on success. The binaries keep their old command line:
+without arguments they run every case and print their `=ok` line. Each case prints
+`case=<name> ms=<t>`.
+
+```sh
+./build/validate_boat_banking --list
+./build/validate_boat_banking --case sides
+ctest --test-dir build -R '^boat_banking\.' --output-on-failure
+```
+
+Case tests: `wake_objects` (`wake_objects_review`), `boat_handling` (`validate_boat`),
+`boat_banking`, `boat_world_isolation` (`validate_boat_world`), `boat_map_index`, `boat_clock`,
+`boat_net`, `boat_environment`, `boat_fleet`, `boat_race` and `boat_map`. Their tests are named
+`<prefix>.<case>`; for example, the former `wake_objects_contracts_jumps` is now
+`wake_objects.contracts`, `wake_objects.jumps` and so on. Whole-program tests heavier than the
+quick budget are listed in `PROTEUS_SLOW_TESTS`; configure warns about a name that matches no test.
+
+**Keeping cases fast.**
+- Physics-only checks use `physics_session()` or `physics_basin_session()`
+  (`tools/boat_test_session.h`), which turn presentation off. The flag cloth was about 75–90% of
+  a session tick. `boat_world_isolation.presentation_toggle` proves that physics stay
+  bit-identical without presentation.
+- `test_world(id)` prepares a location on first use, so a basin-only case never builds the river.
+- A sweep can stop once its asserted end state holds. It keeps a hard cap and a fixed length
+  wherever the length is the contract.
+- A large sweep gets a sampled quick case and full slow cases, for example
+  `boat_map_index.sampled_queries` and `boat_map_index.lattice_queries`.
+
+**Measuring.** `tools/test_timing.py` ranks a CTest JUnit report. It prints buckets (≤20 ms,
+≤50 ms, ≤1 s, >1 s) and the quick tests over a budget (`--budget`, default 0.1 s). `--enforce`
+makes it exit non-zero for those. It is not a CTest test, so machine load cannot make the
+suite flaky; times under `-j` contention run high.
+
+```sh
+ctest --test-dir build -j 8 --output-junit test-speed/run.xml
+python3 tools/test_timing.py build/test-speed/run.xml --top 20
+```
+
+On macOS, the first launch of a freshly relinked binary can take 0.3–0.7 s longer while the
+system scans it, so the first run after a build is slower. Adding the terminal app under
+System Settings → Privacy & Security → Developer Tools removes that delay.
+
 ## Pedal controls verification
 
 The isolated controls branch adds all eight pedal/precision key combinations, 0.25-second
@@ -91,7 +156,7 @@ Boating music checks are `boating_xm_is_valid` (A little boat) and `acid_xm_is_v
 The Acid Wake check renders 235 seconds at 132 BPM. These do not establish listening
 acceptance or menu interaction; see [boating music evidence](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
-The [arcade stability candidate](ARCADE_STABILITY.md) extends `wake_objects_contracts_jumps`
+The [arcade stability candidate](ARCADE_STABILITY.md) extends the `wake_objects` cases
 with held-turn automatic stabilization, neutral/held recovery equivalence, dry-flight momentum and inverted
 capsize checks. Its encounter envelope covers both the earlier 1.8 m stress setting and
 the new 1.2 m default; the old 1.8 m geometry/derivative fixtures remain explicit stress tests.
@@ -105,7 +170,7 @@ the observed outliers. This does not change remote rendering or protocol bytes.
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
-ctest --test-dir build -j 4 --output-on-failure
+ctest --preset full
 ```
 
 `PROTEUS_WAKE_FIELD_TESTS` defaults to `OFF`. Fifteen registered experiments are marked
@@ -113,12 +178,13 @@ disabled, covering the owned field, refinement, cadence, candidate sources/boats
 compact packets and Python prototypes. CTest lists them as disabled, not failed. Their
 sources, targets and manual diagnostic commands remain available. All arcade-object tests
 stay enabled. With `PROTEUS_GPU_TESTS=ON` and Node.js available, this HUD/control worktree runs 103 active
-checks as of 2026-10-24 (including the browser event contract; counted by the current CTest run). GPU cases retain serial scheduling while independent
-CPU checks may run concurrently; fixture dependencies still govern capture/replay comparisons.
+checks as of 2026-10-24 (including the browser event contract; counted by the current CTest run;
+historical, before the case split). GPU cases run one at a time under `RESOURCE_LOCK gpu` while
+independent CPU checks run concurrently; fixture dependencies still govern capture/replay comparisons.
 
 The river frame benchmark has two checks in `tools/validate_boat_water_benchmark.py`.
 `boat_river_benchmark_options` (`cpu`) checks option and output-path rejection without
-opening a window. With GPU tests enabled, `boat_river_benchmark_contract` (`gpu`, serial;
+opening a window. With GPU tests enabled, `boat_river_benchmark_contract` (`gpu`;
 about 32 s in Debug on an M1 Max) runs a hidden `--waves --aa off` voyage. It checks row
 counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, finite values,
 route completion and exact final-state parity with `--check --waves`. Since A2.1 (schema 2)
@@ -144,14 +210,17 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   recorded before the ownership change. `BoatWorldResources` lifecycle and validation are
   covered too. Worlds on separate owners step interleaved with bit-identical results, and
   fleet copies and checkpoint restores keep borrowing their owner.
-- `boat_map_index` runs `validate_boat_map_index` (adventure A2.2, about 14 s in Debug). It
+- `boat_map_index` runs `validate_boat_map_index` (adventure A2.2). It
   compares the indexed collision queries at 8, 16 and 32 m cells with the exhaustive scan,
   bit for bit, on about 3.6 million queries. These cover a cell-seam lattice, shore offsets,
   tile seams one float either side, tile corners, random and far points. It checks the 512 m
   and 1 km tile catalogues' lists, land ownership and bounds, and reports index, tile and
   candidate counts. Since A2.3 it also checks that the renderers' land-only catalogue equals
-  the full one, and that land-only construction rejects bad input.
-- `boat_map_scaling` runs `validate_boat_map_scaling` (adventure A2.5, about 5 s in Debug). It
+  the full one, and that land-only construction rejects bad input. The quick
+  `sampled_queries` case compares every 512th query of all families (about 70 ms); the slow
+  `lattice_queries`, `shore_queries`, `seam_queries` and `random_queries` cases compare all of
+  them (about 13 s together in Debug).
+- `boat_map_scaling` runs `validate_boat_map_scaling` (adventure A2.5, about 5 s in Debug, `slow`). It
   copies the river into synthetic corridors of up to 16 copies (25 km at 5), and requires the
   first copy's collision answers, tiles, water patches and windowed CPU water to be identical
   at every size, visiting the same candidates, with a water cache that does not grow. Run it
@@ -408,6 +477,41 @@ suspended verification of the opt-in field implementation, not evidence that the
 meets its original performance or numerical acceptance goals.
 
 ## Measurements and verification
+
+### Fast lanes, 2026-10-26
+
+M1 Max/macOS, Debug, `PROTEUS_OPTIMIZE_TESTS=ON`, GPU tests off (no GPU run was made for this
+change). Each step was a separate commit on the `test-speed` branch.
+
+| Run | Tests | Wall | Summed test time |
+|---|---|---|---|
+| Baseline, `-j 4` | 98 | 71.6 s | 285.8 s |
+| After the case split and presentation-free physics, `-j 10` | 171 | 36.2 s | 216.5 s |
+| After shortening the ENet tests, `-j 10` | 171 | 19.0 s | 144.8 s |
+| `ctest --preset full` (`-j 8`) | 220 | 18.7 s | 145.4 s |
+| `ctest --preset quick` | 133 | 0.8–1.1 s | 5.6 s |
+
+The five real-time ENet tests (9–16 s each) now bound the full suite's wall time. They passed
+three times in a row in parallel. Largest per-test changes:
+- `wake_objects_contracts_jumps`: 35 s became 0.12 s of quick cases plus 1.7 s of slow ones.
+- `boat_banking`: 22.3 s became 0.3 s quick plus 1.5 s slow.
+- `boat_world_isolation.view_binding`: 3.9 s → 73 ms; `city_dressing`: 4.2 s → 0.24 s. Both
+  come from the scenery ground index in `src/waterfront_corner.c`, which keeps the pinned
+  dressing digest and identical captures.
+- `boat_environment`: 2.9 s → 0.3 s.
+- `boat_net_session` and `boat_net_river`: 36 s → 16 s each.
+
+The state hash moved to `hash_revision` 2 (see [the benchmark guide](BOATING_PERFORMANCE.md)).
+For banking, world isolation and the scenery index, outputs, captures and the banking CSV
+were compared byte for byte with the previous binaries. `boat_environment` printed the same
+values. The other conversions were checked by their own assertions passing.
+
+Not done yet:
+- `boat_map_scaling` (5 s), the XM checks (1.4 s each) and `boat_clock_soak_smoke` (1.8 s)
+  are still single slow tests.
+- The CPU water surface, the map build and in-game flag cloth cost remain product follow-ups.
+
+### Routine-suite reduction, 2026-10-22 (history)
 
 2026-10-22, M1 Max/macOS, Debug, GPU tests enabled. The original serial suite passed
 all 98 tests in **748.21 s (12 min 28 s)**. The fifteen retired checks used **434.33 s**;

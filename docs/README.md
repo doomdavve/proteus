@@ -252,11 +252,11 @@ Chrome/SwiftShader river/basin startup, rendering and help/reset without runtime
 cost, the tight-turn overlap investigation and remaining human/platform checks.
 
 Routine test selection and timings are owned by [the test workflow](TESTING.md).
-On 2026-10-22, M1 Max/macOS, all 83 active cases (20 GPU) pass in 97.40 s, down from
-748.21 s for the old 98-case serial suite. Fifteen retired physical-field experiments
-are disabled by default; arcade/gameplay coverage remains active. Debug numerical
-validators retain assertions with optimization. Use four CPU jobs; graphics cases
-retain serial scheduling.
+On 2026-10-26 (M1 Max/macOS, Debug, GPU tests off), `ctest --preset quick` ran 133 quick tests
+in about 1 s. `ctest --preset full` ran all 220 enabled CPU tests in 18.7 s, down from 71.6 s
+for 98 tests earlier that day. Heavy validators are split into `<prefix>.<case>` tests. GPU
+tests run one at a time under a shared resource lock beside the CPU tests. Fifteen retired
+physical-field experiments stay disabled by default.
 
 
 Wake continuity revision, 2026-10-22, macOS / M1 Max: Debug/optimized builds, all 97
