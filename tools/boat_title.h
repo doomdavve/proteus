@@ -37,6 +37,10 @@ const char *boat_title_host_mode(unsigned mode);
 // Remembered between launches in the per-user data directory; defaults when absent.
 void boat_title_load(BoatTitleSettings *settings);
 void boat_title_save(const BoatTitleSettings *settings);
+#if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
+void boat_title_directory_start(void);
+void boat_title_directory_stop(void);
+#endif
 // Run the menu until the player chooses. JOIN and HOST have already shown a status frame.
 BoatTitleChoice boat_title_run(BoatTitleSettings *settings);
 // Deterministic 320x200 capture of the main menu at TIME seconds.

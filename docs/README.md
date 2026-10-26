@@ -17,12 +17,11 @@ slice is pulled forward from M6; native/browser play and browser reconnect passe
 separate internet path. Both weapons are now deployed through the `davve-srv` baseline
 role; named joining, weapon inputs and combat pages passed automation. Human weapons play
 and full internet-play qualification remain pending.
-The browser now fetches a known-server list and defaults to Winterfell for joining without
-typing. The dedicated public `wake.davve.net` DNS/TLS endpoint is deployed, and a fresh
-GitHub Pages browser joined through it on VPN without local-network permission. PR #14 is
-merged; its release-pinned manual workflow republished the v0.0.18 launcher, and a fresh
-Chrome browser joined from the live Pages URL without local-network permission. Human
-gameplay and broader browser/network qualification remain open.
+The browser and native clients fetch the known-server list and default to its public rooms;
+see the [hosting guide](MULTIPLAYER_HOSTING.md#native-directory-client-2026-10-26). The public
+`wake.davve.net` endpoint is deployed. PR #14's release-pinned workflow republished the
+v0.0.18 Pages launcher; a fresh Chrome browser joined from the live Pages URL without
+local-network permission. Human gameplay and broader browser/network qualification remain open.
 Details and current verification limits stay in the guide.
 
 | Area and owning document | Implemented | Remaining / next task |

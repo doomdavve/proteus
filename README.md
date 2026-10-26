@@ -42,7 +42,9 @@ four-on-the-floor drums, bass, minor chords, and a small lead motif.
 ## Build and run
 
 The first configure downloads the pinned raylib source and, for native builds, the pinned
-ENet networking library. Later builds are offline.
+ENet networking library. Native builds also require libcurl development files; macOS uses
+the system library, Linux setup is linked below, and Windows uses static libcurl through
+vcpkg (`x64-windows-static`). Later builds are offline.
 
 Linux builds enable native Wayland by default, with X11 support for X11 sessions.
 See [Linux setup and verification](docs/LINUX_BUILD.md) for dependencies and backend options.
@@ -127,10 +129,11 @@ or the Esc menu) is remembered when the session returns to the title.
 SOUNDTRACK cycles through A LITTLE BOAT, ACID WAKE and OFF with Left/Right, Enter or a click.
 The music choice applies locally in both single player and multiplayer.
 SINGLE PLAYER starts the river with current, crossing wake
-and waves in the chosen livery. MULTIPLAYER's first row, HOST A ROOM, opens MODE (free
+and waves in the chosen livery. MULTIPLAYER defaults to SERVER, which lists published native
+rooms. Left/Right selects a room and Enter joins it; the list refreshes when MULTIPLAYER opens. HOST A ROOM opens MODE (free
 boating, deathmatch or river race), PLACE, WATER and START ROOM; START ROOM runs a room open
 to the local network and joins it (see [hosting](#hosting-from-the-game)). Below it,
-MULTIPLAYER searches the local network for rooms. Its LAN row names the first one found (host machine and players) and selects it. With
+MULTIPLAYER searches the local network for rooms. Its LAN row names the first one found (host machine and players). With
 several rooms it shows LAN 1/2 and so on; Left/Right switch rooms, and Enter joins under NAME.
 The hint below the menu gives the room's mode and address, and says when a room needs a token or
 runs another game version. ADDRESS and CONNECT still join any `HOST:PORT` directly. Rooms colour
@@ -261,8 +264,9 @@ For browser play, open [Winterfell](https://wake.davve.net/), press PLAY and
 choose MULTIPLAYER → WINTERFELL. The browser fetches a known-server list, so the common
 join needs no address entry. Manual URL / CONNECT remain available. The deployed client
 and room now run v0.0.18 with both deathmatch weapons; the public host stays outside the
-VPN's private Winterfell DNS override. Native clients still use LAN
-discovery or an address. Routine hosting updates are owned by `davve-srv`
+VPN's private Winterfell DNS override. Native clients fetch the same directory and use its
+native addresses, alongside LAN discovery and manual joining. Routine hosting updates are
+owned by `davve-srv`
 ([operator workflow](docs/MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv)).
 
 T5 tuning lets the bank ease out sooner as turning load fades. Deterministic presentation/

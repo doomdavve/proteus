@@ -58,16 +58,18 @@ The standalone commands below remain a legacy/reference path, not the routine wo
 The public directory is a version-1 JSON document with a `servers` array (at most eight entries).
 Each entry has `name` (up to 24 printable ASCII characters), `description` (up to 64),
 `websocket` (a secure `wss://` URL up to 63 characters), `protocol` and `physics` integers.
-`native` records the corresponding native address for operators; native clients still use
-LAN discovery or manual joining. The listing is curated, not a live availability/player count.
+`native` records a native HOST:PORT. Native clients fetch this same directory at startup and
+when MULTIPLAYER opens; entries without native addresses are omitted. LAN discovery and manual
+joining remain available. The listing is curated, not a live availability/player count.
 A listed room with different protocol/handling metadata shows a version warning and cannot
 be selected; this avoids offering the live handling-8 room to development handling-9 clients.
 
-The browser fetches `https://wake.davve.net/servers.json` at startup and refreshes it when MULTIPLAYER opens, without
+The browser and native client fetch `https://wake.davve.net/servers.json` at startup and refresh
+it when MULTIPLAYER opens, without
 blocking the game. Left/Right cycles multiple named servers; Enter/click joins the selected
 one. Requests bypass the browser cache, time out after five seconds, and bound accepted JSON
 to 16 KiB. If a refresh fails, an already loaded list remains usable. An initial failure or
-empty list leaves URL / CONNECT available. Servers must be secure WebSocket endpoints;
+empty list leaves manual joining available. Browser servers must be secure WebSocket endpoints;
 URLs with credentials are rejected. The client still performs the normal server handshake.
 
 The normal launcher uses `Module.boatServerListUrl` to query Winterfell from either the
@@ -331,3 +333,15 @@ the Winterfell launcher passed join/drive/leave/rejoin over public relay UDP 491
 machine and connection. After switching to the Winterfell launcher, the user confirmed
 “works!”. This confirms the corrected browser connection workflow; extended gameplay and
 audio acceptance remain separate.
+
+## Native directory client, 2026-10-26
+
+Native builds now fetch the public directory asynchronously and offer its compatible native
+rooms in the SERVER row. Refresh failure preserves the last successful list for the current
+process; manual joining and LAN discovery remain available. Hosted rooms are not registered
+automatically: the directory is still maintained by the operator. The next qualification step
+is a packaged Windows and macOS manual join against a compatible room. On 2026-10-26,
+the macOS Debug build succeeded and the full CTest preset passed 230 active tests with
+local socket access. The published JSON was retrieved and its native endpoint and revision
+fields checked. Menu interaction, live joining, Windows/Linux builds and packaging have not
+been manually verified.

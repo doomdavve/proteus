@@ -61,6 +61,7 @@ def main():
     shutil.copy2(root / "assets/geometry/river/manifest.json", assets / "geometry/river")
     shutil.copy2(raylib / "LICENSE", resources / "raylib-LICENSE.txt")
     shutil.copy2(raylib / "src/external/glfw/LICENSE.md", resources / "glfw-LICENSE.md")
+    shutil.copy2(root / "third_party/jsmn/LICENSE", resources / "jsmn-LICENSE.txt")
     # wake_velocity links ENet for --connect (multiplayer M3).
     shutil.copy2(build / "_deps/enet-src/LICENSE", resources / "enet-LICENSE.txt")
     (resources / "build.txt").write_text(

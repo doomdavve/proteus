@@ -23,14 +23,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install static libcurl
+        run: vcpkg install "curl[ssl]:x64-windows-static"
+
       - name: Configure release with static raylib and C runtime
         run: >-
           cmake -S . -B build-win -G "Visual Studio 17 2022" -A x64
           -DBUILD_SHARED_LIBS=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static
 
       - name: Build Wake Velocity, room server and validators
         run: |
-          $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net'
+          $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net', 'validate_boat_directory'
           cmake --build build-win --config Release --target $targets --parallel 2>&1 |
             Tee-Object -FilePath build-win/build.log
           if ($LASTEXITCODE -ne 0) {
@@ -46,7 +51,7 @@ jobs:
       - name: Run boat CPU and multiplayer checks
         run: >-
           ctest --test-dir build-win -C Release --output-on-failure
-          -R '^(boat_handling\..*|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_net\..*|boat_net_enet\..*|boat_net_process|boat_host)$'
+          -R '^(boat_handling\..*|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_net\..*|boat_net_enet\..*|boat_net_process|boat_host|boat_directory)$'
 
       - name: Package portable Wake Velocity
         run: |
@@ -66,6 +71,8 @@ jobs:
           Copy-Item build-win/_deps/raylib-src/LICENSE "$package/raylib-LICENSE.txt"
           Copy-Item build-win/_deps/raylib-src/src/external/glfw/LICENSE.md "$package/glfw-LICENSE.md"
           Copy-Item build-win/_deps/enet-src/LICENSE "$package/enet-LICENSE.txt"
+          Copy-Item third_party/jsmn/LICENSE "$package/jsmn-LICENSE.txt"
+          Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/share/curl/copyright" "$package/curl-LICENSE.txt"
           Set-Content -Path "$package/build.txt" -Value "Version: $env:PACKAGE_VERSION`nCommit: $env:GITHUB_SHA" -Encoding utf8
 
       - name: Check relocated executable from another working directory
