@@ -57,8 +57,7 @@ static const float ROLL_GUARD_START = 25 * DEG2RAD;
 static const float ROLL_GUARD_BLEND = 5 * DEG2RAD;
 static const float ROLL_GUARD_STIFFNESS = 180;
 static const float ROLL_GUARD_DAMPING = 12;
-// Arcade tuning: preserve deliberate steering rolls, resist uncommanded wake tumbles.
-static const float ARCADE_AIR_ROLL_SPEED = 4.5f;
+// Arcade tuning: resist uncommanded wake tumbles and recover toward an upright landing.
 static const float ARCADE_AIR_ROLL_RESPONSE = 6;
 static const float ARCADE_AIR_ROLL_RECOVERY = 12;
 static const float ARCADE_WET_ROLL_RECOVERY = 14;
@@ -399,13 +398,11 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
     if (world->water.objects && boat->motion_state != BOAT_CAPSIZED) {
         float recovery = Clamp((boat_pose_up(boat) + .2f) / .7f, 0, 1);
         if (wet == 0) {
-            // Steering is also the air-roll command. At neutral, brake the spin and recover
-            // toward the nearest upright turn; held steering permits complete barrel rolls.
-            float command = boat->wheel * fabsf(boat->wheel);
+            // Steering retains modest yaw, but cannot command a roll. Automatic recovery
+            // stays identical for keyboard and held-wheel mouse turns, including wake takeoff.
             roll_torque += ROLL_INERTIA
-                * (ARCADE_AIR_ROLL_RESPONSE
-                        * (ARCADE_AIR_ROLL_SPEED * command - boat->roll_velocity)
-                    - ARCADE_AIR_ROLL_RECOVERY * recovery * (1 - fabsf(command)) * sinf(bank));
+                * (-ARCADE_AIR_ROLL_RESPONSE * boat->roll_velocity
+                    - ARCADE_AIR_ROLL_RECOVERY * recovery * sinf(bank));
             pitch_torque
                 += PITCH_INERTIA * (-5 * recovery * sinf(boat->pitch) - 3 * boat->pitch_velocity);
         } else {
@@ -514,9 +511,10 @@ void boat_step(Boat *boat, BoatWorld *world, double now, BoatInput input)
         if (fabsf(boat->wheel) < 0.001f)
             boat->wheel = 0;
     }
-    // Four seconds end to end through neutral; integrate on fixed ticks, not keyboard repeat.
-    boat->throttle
-        = Clamp(boat->throttle + Clamp(throttle_change, -1, 1) * 0.5f * BOAT_STEP, -1, 1);
+    // Fast command travel through neutral; integrate on fixed ticks, not keyboard repeat.
+    boat->throttle = Clamp(
+        boat->throttle + Clamp(throttle_change, -1, 1) * BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP, -1,
+        1);
     float engine_target = boat->throttle;
     boat->engine_response += Clamp(engine_target - boat->engine_response,
         -ENGINE_RESPONSE_RATE * BOAT_STEP, ENGINE_RESPONSE_RATE * BOAT_STEP);

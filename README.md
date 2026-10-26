@@ -103,7 +103,7 @@ tightness both matter. Roll inertia carries the lean through steering changes an
 waves continue moving the same hull, while the chase camera keeps a level horizon.
 Dry flight preserves horizontal momentum. The wheel provides modest yaw control; the engine,
 hull grip, skeg and automatic banking need water contact. Brief inverted flight is allowed;
-0.6 seconds of inverted water contact capsizes the boat and stops propulsion. Press `R` to
+0.6 seconds of inverted water contact capsizes the boat and stops propulsion. Hold Backspace for one second or choose RESET BOAT in the Escape menu to
 restart. The HUD reports flight, landing and capsize. Traffic and berth obstacles require
 vertical overlap, so jumps can clear low craft while tall masts/quays remain solid.
 The optional `--wake-objects-crossing` basin rival is a second boat in the multiplayer M2 fleet:
@@ -173,8 +173,8 @@ hosting, NAT traversal, encryption and authentication are not provided. The room
 
 `--mode deathmatch` (2026-10-24) runs timed capsize rounds once two players are
 in: capsizing another boat with your wake or a hit within the last 5 s scores +1, capsizing
-yourself −1, and resetting with `R` right after a hit still counts for the hitter. Capsized boats
-respawn after 3 s (`R` after 1 s). `--round-seconds S` (default 300) sets the round, followed by
+yourself −1, and requesting a reset right after a hit still counts for the hitter. Capsized boats
+respawn after 3 s (a reset request after 1 s). `--round-seconds S` (default 300) sets the round, followed by
 a 10 s intermission. In `wake_velocity --connect` the top of the screen shows the round clock, your
 score and place, a kill feed under the player list names who capsized whom, and a capsized boat
 says who did it and when it respawns. Hold Tab for the scoreboard; it also stays up between
@@ -195,7 +195,7 @@ was user-approved on 2026-10-24. Yellow marks your next
 gate, orange ones come later, and teal ones are cleared. The chequered line is the finish.
 The current stronger layout takes bots about 63–71 s; play tuning is still in progress.
 The HUD shows your time,
-position and gate; capsized boats are put back behind their last gate after 2 s (`R` after
+position and gate; capsized boats are put back behind their last gate after 2 s (a reset request after
 0.5 s). Finishers coast for 2 s and are parked beside the river. Racing closes 15 s after the
 winner (90 s at most); results show for 8 s, then the next grid forms. Hold Tab for the
 standings. Late joiners wait for the next grid. `boat_bot` races the course in race rooms. See
@@ -207,7 +207,7 @@ corrections blended over about a tenth of a second. Every other boat is drawn sm
 about 100 ms behind the server, and blends toward its predicted position when it comes within
 about 12 m of yours or is about to hit you. Each room slot has its own country on every client:
 1 Sweden, 2 Finland, 3 Denmark, 4 Norway (`--skin` does not apply). On exit `prediction:` and `other boat:` lines report
-the corrections and how the other boat was drawn. `R` asks the server for a new life at a safe spawn; `RESETTING` shows until it arrives (with
+the corrections and how the other boat was drawn. Holding Backspace for one second or choosing REQUEST RESET asks the server for a new life at a safe spawn; `RESETTING` shows until it arrives (with
 the wait when no spawn point is clear yet), and the view fades in at the new spot. On exit a
 `resets:` line reports them. Help and focus loss make
 the server ease your controls to neutral, but the room keeps running. Course, replay, wake, water,
@@ -268,20 +268,20 @@ start line northbound to start the clock, pass the two offset buoy gates in orde
 the chequered finish line to freeze the time. Yellow marks the next gate; the small route map
 shows the boat and gate order. Cross between the posts in the course direction; missed gates
 can be approached again, and the timer keeps running. Buoys are non-colliding markers.
-R resets the boat and timer for another attempt. Losing focus pauses the timer with the
+Hold Backspace for one second or choose RESTART RUN in the Escape menu to reset the boat and timer. Losing focus pauses the timer with the
 simulation. Course mode is basin-only; free boating remains the default.
 
 Completed attempts are recorded automatically. The fastest completed run becomes your personal best
 and appears as a cyan, stippled ghost on your next attempt. It waits at START, then follows its
 recorded route against your course clock; it has no collisions, wake, shadows, or reflections.
 The HUD shows your best time and the time difference at each gate (negative means ahead).
-`R` abandons an unfinished attempt while preserving your last completed run and best.
+A deliberate reset abandons an unfinished attempt while preserving your last completed run and best.
 
 - `G`: show/hide the ghost.
 - `P`: watch the last completed run; `B`: watch your personal best. Available before START or after
   FINISH. Replays follow the recorded hull and camera heading; water particles are omitted.
-- During replay, `Space` pauses/resumes, `Enter` restarts at the selected speed, and `R` returns to
-  racing. Finishing pauses playback; `Space` then plays again from the beginning.
+- During replay, `Space` pauses/resumes, `Enter` restarts at the selected speed, and Escape > RESTART RUN returns to
+  racing. Backspace reset is inactive during replay. Finishing pauses playback; `Space` then plays again from the beginning.
 - `Left`/`Right` seek one second backward/forward; hold `Shift` for five seconds. `Home`/`End` jump
   to START/FINISH. Seeking preserves pause state; jumping to FINISH pauses.
 - `[`/`]` select 0.25×, 0.5×, 1×, 2×, or 4× playback. Selecting another recording starts at 1×.
@@ -293,8 +293,8 @@ Personal bests persist between launches, with separate files for calm water and 
 The browser version stores these in IndexedDB for the current site; clearing site data removes them.
 On macOS they live in `~/Library/Application Support/Proteus/`; Windows uses `%LOCALAPPDATA%/Proteus/`,
 and Linux uses `$XDG_DATA_HOME/proteus/` (or `~/.local/share/proteus/`). The files are
-`course-calm-physics8.run` and `course-waves-physics8.run`. Use `--data-dir DIR` to select another
-directory. Handling revision 8 (heavier landings) starts a separate set of bests; revision-7,
+`course-calm-physics9.run` and `course-waves-physics9.run`. Use `--data-dir DIR` to select another
+directory. Handling revision 9 (pedal response and automatic aerial stabilization) starts a separate set of bests; revision-8, revision-7,
 revision-6, revision-5, revision-4, revision-3, revision-2 and original best files remain on disk and are not loaded or overwritten
 automatically. Version-1/revision-5 recordings are rejected as replays/ghosts by this version.
 Incompatible or damaged saved bests are ignored with a message. Failed saves preserve the best in
@@ -317,7 +317,7 @@ Recorded world time is absolute session time, so a course started long after lau
 and loads.
 Version-2 recordings store double-precision world time alongside poses at the 120 Hz simulation
 rate, with exact START/FINISH boundary samples and gate splits, so playback does not rerun
-physics. File, course, and physics revisions are checked when loading; bump `BOAT_PHYSICS_REVISION` in `src/boat_replay.h` when changing handling or wave presets,
+physics. File, course, and physics revisions are checked when loading; bump `BOAT_PHYSICS_REVISION` in `src/boat.h` when changing handling or wave presets,
 and the course revision in `src/boat_replay.c` when changing gates.
 Screenshot `--time` accepts up to 600 seconds with `--replay` and clamps to the recorded finish;
 other screenshot modes retain the 60 second limit.
@@ -383,16 +383,20 @@ wheel; release to let it spring smoothly back to centre without overshooting. Th
 stronger farther from centre, reaching within 1% of centre from full lock in about 1.5 seconds.
 One second of held input moves it from centre to either limit. Opposite input unwinds full lock
 in about a third of a second, then builds the new turn at the normal rate. This makes catching a
-turn quicker while retaining progressive steering and hull inertia. Tap up/W or down/S to move
-one thrust step; holding a key steps again every half second, and quick taps step faster. Forward has ultra-slow (5%, for docking), slow
-(20%), medium (50%) and max (100%); reverse has ultra-slow (5%) and slow (20%). Neutral sits
-between the directions. Releasing keys holds the selected setting, with smooth command travel
-and engine response. R resets to neutral thrust and centres the wheel.
+turn quicker while retaining progressive steering and hull inertia. Hold W/Up for forward thrust
+or S/Down for reverse thrust; releasing both, or holding both, selects neutral so water drag
+slows the boat. Reverse thrust also brakes forward travel. Normal power is 100% forward and
+20% reverse; hold either Shift for 5% power in either direction for docking. The command moves
+from neutral to full in 0.25 seconds, with separately smoothed engine response. Scrolling is
+unassigned. R does nothing. Hold Backspace for one second, with a visible progress bar, or
+choose the explicit reset/restart/request action in the Escape menu. A short tap does nothing;
+release, help/menu, loss of focus or replay cancels progress. Each hold triggers at most once.
+Space stays unassigned during ordinary play; replay/menu controls retain their existing use.
 Press `M` to capture the mouse for steering, or launch with `--mouse-steering`. The pointer
 is hidden and horizontal movement accumulates wheel angle: move right/left to turn the wheel,
 then stop moving to hold that setting. About 300 mouse pixels moves the requested wheel from
-centre to full lock, independently of window size. Move back to straighten it; R resets both
-wheel and thrust. The steering needle shows the actual wheel as it follows the target smoothly.
+centre to full lock, independently of window size. Move back to straighten it; a deliberate reset centres the
+wheel and selects neutral thrust. The steering needle shows the actual wheel as it follows the target smoothly.
 M switches between mouse and keyboard steering. Esc never changes the steering mode: it opens
 a menu and releases the pointer. Single player pauses while the menu is open; in a room the
 match keeps running and your boat idles (neutral thrust, centred wheel), as with help or focus
@@ -404,20 +408,16 @@ consume Escape themselves to unlock the pointer, so an unlock the game did not a
 or focus loss) opens the menu; after resuming, click the canvas to capture again. Browsers that deny or lack capture show a keyboard
 fallback message. Mouse mode is inactive during scripted demos and replay playback.
 
-In arcade object-wake jumps, steering also rolls the boat in the air. Small wheel angles
-give gentle roll control; full steering permits a barrel roll. Centre the wheel to brake
-the spin and help prepare for landing. In mouse mode, move the mouse back to centre:
-stopping it holds the wheel angle. The hull has stronger passive recovery, but an inverted
-landing can still capsize it. This [first stability tuning](docs/ARCADE_STABILITY.md) awaits play feedback.
+In arcade object-wake jumps, steering retains modest yaw but no longer commands aerial rolls.
+Automatic roll damping/upright assistance remains active even with a held mouse turn. The
+mouse wheel setting itself still holds; move back to straighten your course. Impacts and
+inverted/bad landings can still capsize the boat. See the current
+[stability behavior](docs/ARCADE_STABILITY.md) and [controls handoff](docs/CONTROLS_PEDALS_HANDOFF.md).
 Hard landings now cost some speed (more when the bow digs in) and land with a splash and a
 hull slap; the user liked this [landing feel](docs/BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24).
 
-Scroll down/up to increase/decrease thrust one step per scroll unit, in either steering mode.
-Fractional trackpad scrolling accumulates until a full step; larger scrolls can move several
-steps. The selected thrust holds when scrolling stops. Up/W and Down/S remain available.
-
 The scene uses the full window with a compact [marine instrument panel](docs/BOAT_HUD.md)
-showing vertical held thrust, a speed needle, and port/starboard steering as visual ranges
+showing actual commanded thrust, a speed needle, and port/starboard steering as visual ranges
 without numbers or units. Its slightly translucent case sits at the bottom of the scene;
 all HUD pixels share the scene's 320x200 grid and integer scaling. Press `?` for a
 modal keyboard guide; `?` or Esc dismisses it. Boating and audio pause while help is open or the
@@ -456,7 +456,7 @@ The horizon stays level and camera height stays fixed.
 
 The follow camera defaults to 20 units back and 14 units above the water. Hold `-` to pull back,
 `+` (or `=`) to move closer, and PageUp/PageDown to raise/lower the camera. `C` restores the default
-view; `R` resets the boat while keeping your view settings. Distance is limited to 8..48 and height
+view; a deliberate reset restarts the boat while keeping your view settings. Distance is limited to 8..48 and height
 to 4..36. Settings last for the current run; reuse a preferred view with command-line options,
 which also work for screenshots:
 
@@ -517,7 +517,7 @@ cmake --build build/review --target wake_velocity -j
 ```
 
 Drive a straight run, turn back across the trail after 10–30 seconds, then try tight loops,
-oblique crossings, reverse, neutral recovery and landings. `R` resets the boat and explicitly
+oblique crossings, reverse, neutral recovery and landings. A deliberate reset restarts the boat and explicitly
 clears the field; `--demo` provides a scripted loop. Start without `--gpu-aa`: that option
 renders 1280x800 rather than 320x200 (16 times as many pixels). The complete
 wake exceeds its provisional 2 ms/frame target; [candidate results](docs/WAKE_CANDIDATE_RESULTS.md)
@@ -541,7 +541,7 @@ The default crest scale is 1.2 m and pieces live for 1920 ticks (16 seconds). Us
 pieces add directly, so crossings can produce taller waves. Half-second emission, smoothed
 strength and age-aligned fading reduce visible packet joins; the sixteen-second lifetime
 is retained. `--wake-height` accepts
-.1–3 m; `--wake-life-ticks` accepts 240–1920. `R` clears the shared wake world and
+.1–3 m; `--wake-life-ticks` accepts 240–1920. A deliberate reset clears the shared wake world and
 restarts the optional crossing boat. The extra craft follows a basin loop and shares
 the same water/contact queries; it does not add hard hull collision with the player.
 Ordinary object mode also supports the river, waves and current. Course/replay/ghost,
@@ -754,8 +754,8 @@ Press **PLAY** to start audio and open the shared Wake Velocity title. The page'
 and soundtrack. SINGLE PLAYER selects River, Basin or Basin trial, waves and smoothing.
 The launcher disappears during play; the game uses integer scaling. Press `?` for controls
 and Escape for the in-game menu (the browser may also leave fullscreen). BACK TO TITLE
-returns to setup without reloading. M enables captured mouse steering; scroll down/up
-adds/removes thrust steps. After help or RESUME, click the canvas to recapture. If capture
+returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;
+release selects neutral and Shift selects precision power. Scrolling is unassigned. After help or RESUME, click the canvas to recapture. If capture
 is unavailable, keyboard steering stays available. MULTIPLAYER joins an operator-provided
 WebRTC room URL; browser hosting and LAN discovery are unavailable. Browser throttling
 can affect animation/audio in background tabs. Bests are local to this browser and site,

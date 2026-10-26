@@ -9,7 +9,7 @@ int main(int argc, char **argv)
 {
     const char *background = NULL, *screenshot = NULL;
     int width = 960, height = 600, frames = 1;
-    BoatHudTelemetry telemetry = { 12.6f, .50f, .35f };
+    BoatHudTelemetry telemetry = { .speed_mps = 12.6f, .thrust = .50f, .steering = .35f };
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--background") && i + 1 < argc)
             background = argv[++i];
@@ -28,13 +28,18 @@ int main(int argc, char **argv)
             if (!strcmp(name, "neutral"))
                 telemetry = (BoatHudTelemetry) { 0 };
             else if (!strcmp(name, "reverse"))
-                telemetry = (BoatHudTelemetry) { 3.2f, -.20f, -1 };
+                telemetry
+                    = (BoatHudTelemetry) { .speed_mps = 3.2f, .thrust = -.20f, .steering = -1 };
             else if (!strcmp(name, "docking"))
-                telemetry = (BoatHudTelemetry) { .7f, .05f, 0 };
+                telemetry
+                    = (BoatHudTelemetry) { .speed_mps = .7f, .thrust = .05f, .precision = true };
             else if (!strcmp(name, "reverse-docking"))
-                telemetry = (BoatHudTelemetry) { .7f, -.05f, 0 };
+                telemetry
+                    = (BoatHudTelemetry) { .speed_mps = .7f, .thrust = -.05f, .precision = true };
+            else if (!strcmp(name, "reset"))
+                telemetry = (BoatHudTelemetry) { .reset_progress = .6f, .precision = true };
             else if (!strcmp(name, "full"))
-                telemetry = (BoatHudTelemetry) { 34, 1, 1 };
+                telemetry = (BoatHudTelemetry) { .speed_mps = 34, .thrust = 1, .steering = 1 };
             else if (strcmp(name, "cruise")) {
                 fprintf(stderr, "Unknown HUD case: %s\n", name);
                 return 1;
@@ -42,7 +47,8 @@ int main(int argc, char **argv)
         } else {
             fprintf(stderr,
                 "Usage: boat_hud_review [--background PNG] [--screenshot PNG] "
-                "[--case neutral|docking|reverse-docking|cruise|reverse|full] [--compact|--large] "
+                "[--case neutral|docking|reverse-docking|cruise|reverse|full|reset] "
+                "[--compact|--large] "
                 "[--frames N]\n");
             return 1;
         }

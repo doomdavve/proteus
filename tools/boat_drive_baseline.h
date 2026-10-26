@@ -67,7 +67,8 @@ static void baseline_step(BoatSession *session, float steering, float throttle,
             double other_time = now;
             boat_step(other, &objects->other_world, now,
                 (BoatInput) { Clamp((wheel - other->wheel) / BOAT_STEP, -1, 1),
-                    Clamp((.75f - other->throttle) / (.5f * BOAT_STEP), -1, 1) });
+                    Clamp((.75f - other->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
+                        1) });
             boat_collide_pair(boat, 1, other, 1.6f);
             if (other->motion_state == BOAT_CAPSIZED) {
                 objects->recovery_time += BOAT_STEP;
@@ -106,14 +107,16 @@ static void baseline_demo(BoatSession *session, int tick, BoatFrameMetrics *metr
         float throttle = tick < 1440 ? 1 : 0;
         float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
         baseline_step(session, Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-            Clamp((throttle - boat->throttle) / (.5f * BOAT_STEP), -1, 1), metrics, wake, objects);
+            Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1),
+            metrics, wake, objects);
         return;
     }
     if (session->world.water.wake_amplitude != 0
         || Vector2LengthSqr(session->world.water.current) > 0) {
         // Let the source become visible, approach its spreading wake, then recover in neutral.
         float target = tick < 720 ? 0 : tick < 1200 ? .65f : 0;
-        baseline_step(session, 0, Clamp((target - boat->throttle) / (.5f * BOAT_STEP), -1, 1),
+        baseline_step(session, 0,
+            Clamp((target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1),
             metrics, wake, objects);
         return;
     }

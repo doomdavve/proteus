@@ -80,7 +80,8 @@ static void crossing(void)
            "vertical velocity %.6g m/s, pitch %.6g deg, dry stern %u ticks\n",
         surface, height, velocity, pitch * 57.2957795131, dry_ticks);
     for (unsigned tick = 0; tick < 720; ++tick) {
-        float neutral = fmaxf(-1, fminf(1, -receiver.boat.throttle / (.5f * BOAT_STEP)));
+        float neutral = fmaxf(
+            -1, fminf(1, -receiver.boat.throttle / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP)));
         boat_session_step(&receiver, (BoatInput) { 0, neutral });
         CHECK(boat_wake_player_step(world, (BoatWakeStern) { 0 }, (BoatWakeStern) { 0 }));
         CHECK(isfinite(receiver.boat.height) && fabs(receiver.boat.height) < 3);
@@ -111,7 +112,8 @@ static void step(BoatSession *session, BoatWakePlayer *world, unsigned tick)
     float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
     boat_session_step(session,
         (BoatInput) { fmaxf(-1, fminf(1, (wheel - boat->wheel) / BOAT_STEP)),
-            fmaxf(-1, fminf(1, (target - boat->throttle) / (.5f * BOAT_STEP))) });
+            fmaxf(-1,
+                fminf(1, (target - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP))) });
     CHECK(tick < 1600);
     recorded[tick][0] = before;
     recorded[tick][1] = boat_wake_stern(boat, &session->world, boat_session_time(session));

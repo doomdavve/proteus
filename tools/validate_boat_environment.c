@@ -228,10 +228,12 @@ static int player_wake_checks(void)
         float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
         boat_session_step(&a,
             (BoatInput) { Clamp((wheel - a.boat.wheel) / BOAT_STEP, -1, 1),
-                Clamp((throttle - a.boat.throttle) / (.5f * BOAT_STEP), -1, 1) });
+                Clamp((throttle - a.boat.throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
+                    1) });
         boat_session_step(&b,
             (BoatInput) { Clamp((wheel - b.boat.wheel) / BOAT_STEP, -1, 1),
-                Clamp((throttle - b.boat.throttle) / (.5f * BOAT_STEP), -1, 1) });
+                Clamp((throttle - b.boat.throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1,
+                    1) });
         CHECK(a.boat.turn_roll_load == b.boat.turn_roll_load);
         CHECK(a.boat.height == b.boat.height && a.boat.position.x == b.boat.position.x
             && a.boat.roll == b.boat.roll);

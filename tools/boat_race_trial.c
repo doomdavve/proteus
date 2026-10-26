@@ -2,6 +2,7 @@
 #include "boat_gpu.h"
 #include "boat_map.h"
 #include "boat_race.h"
+#include "boat_reset_hold.h"
 #include "boat_test_world.h"
 #include "boat_throttle.h"
 #include "raymath.h"
@@ -646,24 +647,24 @@ int main(int argc, char **argv)
     double accumulator = 0;
     unsigned frame = 0;
     float target_thrust = 0;
-    int thrust_step = BOAT_THROTTLE_NEUTRAL;
+    BoatResetHold reset_hold = { 0 };
     while (output || !WindowShouldClose()) {
         if (!output) {
-            if (IsKeyPressed(KEY_R)) {
+            if (boat_reset_hold_update(
+                    &reset_hold, IsKeyDown(KEY_BACKSPACE), IsWindowFocused(), GetFrameTime())) {
                 boat_session_destroy(&session);
                 preview_start(&session, &objects, source, skill);
                 session.world.water.storm.height *= wave_scale;
                 session.world.water.vessel.height *= wave_scale;
                 next = 1;
                 target_thrust = 0;
-                thrust_step = BOAT_THROTTLE_NEUTRAL;
                 accumulator = 0;
             }
-            if (IsKeyPressed(KEY_W))
-                thrust_step = boat_throttle_step(thrust_step, 1);
-            if (IsKeyPressed(KEY_S))
-                thrust_step = boat_throttle_step(thrust_step, -1);
-            target_thrust = boat_throttle_setting(thrust_step);
+            target_thrust = IsWindowFocused()
+                ? boat_pedal_target(IsKeyDown(KEY_W) || IsKeyDown(KEY_UP),
+                      IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN),
+                      IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT))
+                : 0;
             accumulator += fmin(GetFrameTime(), .1);
             while (accumulator >= BOAT_TICK_SECONDS) {
                 BoatInput input = play
@@ -725,9 +726,16 @@ int main(int argc, char **argv)
                 skill ? "SKILL COURSE" : "R0 PROTOTYPE", view.time, session.boat.landings,
                 Vector2Length(session.boat.velocity), next <= targets ? next : targets, targets),
             12, 8, 20, WHITE);
-        DrawText(play ? "W/S thrust steps | A/D steer / air roll | R restart | Esc exit"
-                      : "Scripted full-throttle route | R restart | Esc exit",
+        DrawText(play ? "Hold W/S: forward/reverse | Shift: precision | A/D steer | Esc exit"
+                      : "Scripted route | Hold Backspace 1 s: restart | Esc exit",
             12, 34, 18, WHITE);
+        if (play && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)))
+            DrawText("PRECISION", 12, 64, 14, (Color) { 118, 196, 178, 255 });
+        if (reset_hold.seconds > 0) {
+            DrawText("HOLD BACKSPACE: RESTART", 12, GetScreenHeight() - 32, 16, YELLOW);
+            DrawRectangle(12, GetScreenHeight() - 12,
+                (int)(180 * reset_hold.seconds / BOAT_RESET_HOLD_SECONDS), 4, YELLOW);
+        }
         EndDrawing();
         if (frames && ++frame >= (unsigned)frames)
             break;

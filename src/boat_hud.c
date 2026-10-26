@@ -64,10 +64,11 @@ static void label(Panel p, const char *text, int x, int y, Color color)
         const char *rows;
     } glyphs[] = { { '0', "75557" }, { '1', "26227" }, { '2', "71247" }, { '3', "71217" },
         { '4', "55711" }, { '5', "74717" }, { '6', "74757" }, { '7', "71111" }, { '8', "75757" },
-        { '9', "75717" }, { '.', "00002" }, { '%', "51451" }, { '+', "02720" }, { '-', "00700" },
-        { 'C', "74447" }, { 'D', "65556" }, { 'E', "74647" }, { 'F', "74644" }, { 'H', "55755" },
-        { 'K', "55655" }, { 'N', "57775" }, { 'P', "75544" }, { 'R', "75655" }, { 'S', "74717" },
-        { 'T', "72222" }, { 'U', "55557" } };
+        { '9', "75717" }, { '.', "00002" }, { ':', "02020" }, { 'L', "44447" }, { '%', "51451" },
+        { '+', "02720" }, { '-', "00700" }, { 'C', "74447" }, { 'D', "65556" }, { 'E', "74647" },
+        { 'F', "74644" }, { 'H', "55755" }, { 'I', "72227" }, { 'K', "55655" }, { 'O', "75557" },
+        { 'N', "57775" }, { 'P', "75544" }, { 'R', "75655" }, { 'S', "74717" }, { 'T', "72222" },
+        { 'U', "55557" } };
     int left = x - ((int)strlen(text) * 4 - 1) / 2;
     for (const char *c = text; *c; ++c, left += 4) {
         for (size_t i = 0; i < sizeof(glyphs) / sizeof(glyphs[0]); ++i) {
@@ -143,4 +144,13 @@ void boat_hud_draw(BoatHudTelemetry telemetry, int width, int height)
     circle(p, 139, 27, 1, ink);
     label(p, "P", 122, 22, muted);
     label(p, "S", 156, 22, muted);
+    if (telemetry.precision)
+        label(p, "PRECISION", 83, -8, ahead);
+    float progress = bounded(telemetry.reset_progress, 0, 1);
+    if (progress > 0) {
+        box(p, 45, -22, 76, 12, face);
+        label(p, "HOLD: RESET", 83, -21, amber);
+        box(p, 47, -13, 72, 2, muted);
+        box(p, 47, -13, (int)roundf(72 * progress), 2, amber);
+    }
 }

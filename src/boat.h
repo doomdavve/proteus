@@ -11,7 +11,9 @@
 #define BOAT_LIMIT_Z (BOAT_BASIN_HALF_Z - 2.5f)
 #define BOAT_CONTACT_RESTITUTION 0.12f
 // Handling compatibility: recordings, saved bests and network peers must match it.
-#define BOAT_PHYSICS_REVISION 8
+#define BOAT_PHYSICS_REVISION 9
+// Full command travel in 0.25 seconds; engine response remains separately smoothed.
+#define BOAT_THROTTLE_COMMAND_RATE 4.0f
 
 typedef enum { BOAT_WATERBORNE, BOAT_AIRBORNE, BOAT_LANDING, BOAT_CAPSIZED } BoatMotionState;
 

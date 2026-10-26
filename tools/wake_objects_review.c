@@ -221,7 +221,8 @@ static void jumps(void)
     CHECK(height > .6f && lift > 2 && dry > 10);
     for (unsigned t = 0; t < 2400; ++t) {
         boat_wake_objects_advance(&world);
-        float neutral = Clamp(-receiver.boat.throttle / (.5f * BOAT_STEP), -1, 1);
+        float neutral
+            = Clamp(-receiver.boat.throttle / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1);
         boat_session_step(&receiver, (BoatInput) { 0, neutral });
         CHECK(isfinite(receiver.boat.height) && fabsf(receiver.boat.height) < 8);
     }
@@ -376,13 +377,19 @@ static void air_roll_control(void)
     recover.boat.wheel = 0;
     recover.boat.roll = 70 * DEG2RAD;
     recover.boat.roll_velocity = 2;
+    BoatSession recover_held = recover;
+    recover_held.boat.wheel = 1;
     for (unsigned tick = 0; tick < 240; ++tick) {
+        boat_session_step(&recover_held, (BoatInput) { 1, 0 });
         boat_session_step(&right, (BoatInput) { 1, 0 });
         boat_session_step(&left, (BoatInput) { -1, 0 });
         boat_session_step(&recover, (BoatInput) { 0 });
     }
     CHECK(right.boat.motion_state == BOAT_AIRBORNE && left.boat.motion_state == BOAT_AIRBORNE);
-    CHECK(right.boat.roll > 2 * PI && left.boat.roll < -2 * PI);
+    CHECK(fabsf(right.boat.roll) < .0001f && fabsf(left.boat.roll) < .0001f);
+    CHECK(right.boat.yaw_velocity > 0 && left.boat.yaw_velocity < 0);
+    CHECK(fabsf(recover_held.boat.roll - recover.boat.roll) < .0001f);
+    CHECK(fabsf(recover_held.boat.roll_velocity - recover.boat.roll_velocity) < .0001f);
     CHECK(fabsf(right.boat.roll + left.boat.roll) < .0001f);
     CHECK(fabsf(recover.boat.roll) < 10 * DEG2RAD && fabsf(recover.boat.roll_velocity) < .2f);
     CHECK(right.boat.velocity.x == 3 && right.boat.velocity.y == -7);
@@ -398,8 +405,8 @@ static void air_roll_control(void)
     for (unsigned tick = 0; tick < 120; ++tick)
         boat_session_step(&inverted, (BoatInput) { 0 });
     CHECK(inverted.boat.motion_state == BOAT_CAPSIZED);
-    puts(
-        "arcade air control: mirrored steering rolls, neutral recovery, momentum and capsize pass");
+    puts("arcade air control: held turns stay upright; automatic recovery, yaw, momentum and "
+         "capsize pass");
 }
 
 static BoatWakeObjects curved_world(void)

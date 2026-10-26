@@ -17,7 +17,7 @@ typedef struct {
     uint64_t credit_ticks; // A touch credits a capsize this long afterwards.
     uint64_t grace_ticks; // A new life neither records nor gives touches this long.
     uint64_t respawn_ticks; // Automatic respawn after a capsize.
-    uint64_t skip_ticks; // R after a capsize respawns no earlier than this.
+    uint64_t skip_ticks; // A reset request after a capsize respawns no earlier than this.
     float contact_impulse; // Accumulated pair impulse that counts as a touch.
     float wake_height; // One emitter's |height| under the hull that counts as a touch.
     unsigned min_players; // Present players needed to leave warmup.
@@ -55,7 +55,7 @@ typedef struct {
     uint64_t tick;
     uint32_t victim_life;
     uint8_t kind, victim, attacker, cause; // Attacker BOAT_MATCH_NOBODY for a self-capsize.
-    bool bailout; // R while upright after a touch.
+    bool bailout; // Reset while upright after a touch.
 } BoatMatchEvent;
 
 typedef struct {

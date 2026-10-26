@@ -51,7 +51,9 @@ renders 144 river poses (512 m and 1 km tiles, six route stops, four headings, d
 and overview cameras) culled and unculled, on the GPU with waves and on the CPU on flat water.
 The pixels must be identical, and every pass must cull at least one tile.
 
-The HUD/control worktree also checks all 49 transitions between the seven thrust detents
+The original HUD/control worktree checks below remain legacy numerical fixtures; live pedal
+controls are verified in [the current controls section](#pedal-controls-verification).
+It also checks all 49 transitions between the seven thrust detents
 through the real integrator in `boat_handling`, and forward/reverse target settling on both
 the authority and predicted client in `boat_net`. Mouse steering adds 49 wheel transitions
 with both float and quantized rates, sustained target holding and virtual network target
@@ -66,6 +68,17 @@ checks colliding peer IDs, routing and disconnect isolation across two transport
 title/persistence and mixed WebRTC/ENet gameplay use the opt-in
 [title and multiplayer checks](WEB_BUILD.md#webrtc-rooms), with the optional native endpoint.
 
+## Pedal controls verification
+
+The isolated controls branch adds all eight pedal/precision key combinations, 0.25-second
+command response, precision transitions, coasting versus reverse braking, reset cancellation,
+one-trigger-per-hold and invalid/stalled-frame cases to `boat_handling`. `boat_net` verifies
+quantized target settling within one command quantum and deliberately seeds an inverted
+checkpoint so safer steering does not remove capsize replay coverage. The older calm-water
+reference scales its authored rate input to preserve its physical travel and hydrodynamics.
+Existing detent/scroll helpers remain numerical/review fixtures, not live controls.
+[Browser pixel checks and integration evidence](CONTROLS_PEDALS_HANDOFF.md).
+
 ## Routine checks
 
 Boating music checks are `boating_xm_is_valid` (A little boat) and `acid_xm_is_valid`
@@ -74,7 +87,7 @@ The Acid Wake check renders 235 seconds at 132 BPM. These do not establish liste
 acceptance or menu interaction; see [boating music evidence](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
 The [arcade stability candidate](ARCADE_STABILITY.md) extends `wake_objects_contracts_jumps`
-with mirrored steering air rolls, neutral recovery/braking, dry-flight momentum and inverted
+with held-turn automatic stabilization, neutral/held recovery equivalence, dry-flight momentum and inverted
 capsize checks. Its encounter envelope covers both the earlier 1.8 m stress setting and
 the new 1.2 m default; the old 1.8 m geometry/derivative fixtures remain explicit stress tests.
 `boat_clock` retains per-tick equality across start times, with emission/landing/expiry

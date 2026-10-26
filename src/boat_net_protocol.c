@@ -1020,7 +1020,7 @@ BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags)
 {
     // Zero steering springs the wheel back; throttle moves toward idle at the ordinary
     // adjustment rate, so the engine response decays. The boat stays physical.
-    float throttle = boat->throttle / (.5f * BOAT_STEP);
+    float throttle = boat->throttle / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP);
     return boat_net_command((BoatInput) { 0, fmaxf(-1, fminf(1, -throttle)) }, flags);
 }
 
@@ -1125,9 +1125,9 @@ uint64_t boat_net_content_digest(void)
               v->height, v->duration, v->lifetime, v->wavelength, v->spread, v->half_width };
     for (size_t i = 0; i < sizeof(source) / sizeof(*source); ++i)
         digest_float(&d, source[i]);
-    const float storm[] = { course->storm.centre.x, course->storm.centre.y,
-        course->storm.radius, course->storm.height, (float)course->storm.started,
-        course->storm.velocity.x, course->storm.velocity.y };
+    const float storm[] = { course->storm.centre.x, course->storm.centre.y, course->storm.radius,
+        course->storm.height, (float)course->storm.started, course->storm.velocity.x,
+        course->storm.velocity.y };
     for (size_t i = 0; i < sizeof(storm) / sizeof(*storm); ++i)
         digest_float(&d, storm[i]);
     digest_u64(&d, 3); // Local storm recipe revision (CPU and production GLSL).

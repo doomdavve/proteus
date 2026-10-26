@@ -53,7 +53,7 @@ typedef struct {
     uint64_t after_winner_ticks; // Remaining entrants may finish this long after the winner.
     uint64_t cap_ticks; // Absolute racing time limit after GO.
     uint64_t recovery_ticks; // Automatic recovery after a capsize.
-    uint64_t skip_ticks; // R after a capsize recovers no earlier than this.
+    uint64_t skip_ticks; // A reset request after a capsize recovers no earlier than this.
     uint64_t park_ticks; // A finisher coasts this long, then is parked out of the corridor.
     unsigned min_players;
 } BoatRaceRules;

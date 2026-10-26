@@ -193,9 +193,10 @@ Implemented [`boat_race_trial`](../tools/boat_race_trial.c), a separate, silent 
 fixture. It provides scripted runs, a playable boat, deterministic CPU/GPU captures, route
 measurements and source/physics sweeps. It does not add a room mode or change the basin time
 trial. Follow the river southwest toward the bridge; the HUD reports world elapsed seconds,
-speed, actual landing count and the next route waypoint. W/S taps select the existing thrust
-detents; A/D or arrows steer, including existing air roll; R restarts the entire fixture,
-including the source clock and player wake history. There is no race countdown or recovery yet.
+speed, actual landing count and the next route waypoint. In `controls-pedals-stability`,
+W/S or Up/Down apply forward/reverse thrust while held, Shift selects precision, and A/D or
+arrows steer with automatic aerial stabilization. Hold Backspace for one second to restart
+the fixture, including its source clock and player wake history; R is inactive. There is no race countdown or recovery yet.
 
 ```sh
 ./build/boat_race_trial --play
@@ -443,7 +444,7 @@ teal cleared and a chequered finish. HUD: waiting/next-grid notices, "SET YOUR T
 the grid, a large 3-2-1-GO!, then elapsed time, live position and gate (or "FINISH NEXT"),
 "CLOSES IN n" after the first finish, `FINISHED - 2ND / 00:52.34` or DNF, a feed of finishes,
 DNFs and abandons, the standings board on Tab and the full results during RESULTS, and the
-race capsize notice (recovery countdown, "R TO SKIP"). R is not sent while held.
+race capsize notice (recovery countdown and manual-reset prompt). Reset requests are not sent while held.
 `boat_race_trial` captures now draw the same markers.
 
 **Bot:** `boat_fleet_bot_race_input` (shared by the validator and `boat_bot`) aims at each next

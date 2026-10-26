@@ -3,11 +3,11 @@
  * physical step is the core-only order validate_boat_core uses. W4 extends this file with
  * map/cache lifecycle checks. */
 #include "boat_map.h"
-#include "wake_velocity_state.h"
 #include "boat_test_maps.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
 #include "raymath.h"
+#include "wake_velocity_state.h"
 
 #include <inttypes.h>
 #include <math.h>
@@ -31,7 +31,8 @@ static void loop_inputs(const Boat *boat, int tick, float *wheel_change, float *
     float throttle = tick < 1440 ? 1 : 0;
     float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
     *wheel_change = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1);
-    *throttle_change = Clamp((throttle - boat->throttle) / (.5f * BOAT_STEP), -1, 1);
+    *throttle_change
+        = Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1);
 }
 
 static void drive(BoatSession *session, int tick)

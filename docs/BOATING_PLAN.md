@@ -19,6 +19,12 @@ the completed A0.1 [current-map reference](adventure/baseline.md) and A0.2
 [pinned coastal sources](adventure/README.md#coastal-sources-a02-2026-10-25); the A0.3 route
 survey is next. No expanded world is implemented.
 
+Controls update, 2026-10-26: the isolated `controls-pedals-stability` branch implements the
+approved W/S pedals, Shift precision, safe reset and automatic aerial stabilization plan.
+It is not integrated or user-played. Current controls live in [Marine HUD](BOAT_HUD.md), with
+[verification and integration handoff](CONTROLS_PEDALS_HANDOFF.md); earlier dated control
+claims below describe their historical implementation. Next: integrate, then evaluate feel.
+
 The user reports current jumping, landing and capsizing are fun. The
 [multiplayer plan](MULTIPLAYER_PLAN.md) owns the multiplayer track: preserve that feel
 with an authoritative native-first world for four friends, beginning with a two-player basin

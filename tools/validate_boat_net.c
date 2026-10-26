@@ -1713,6 +1713,14 @@ static int prediction_replay(void)
     float worst = 0;
     BoatNetSlotInput inputs8[BOAT_FLEET_SLOTS], inputs16[BOAT_FLEET_SLOTS];
     for (unsigned window = 0; window < 240; ++window) {
+        // Stabilized steering need not accidentally flip this route anymore. Deliberately
+        // seed an inverted authority state so checkpoint replay still covers capsized boats.
+        if (window == 120) {
+            Boat *boat = &fleet.state.slots[own].boat;
+            boat->roll = PI;
+            boat->pitch = boat->height = boat->roll_velocity = 0;
+            boat->motion_state = BOAT_CAPSIZED;
+        }
         uint64_t a = fleet.state.tick;
         BoatNetCommand held[BOAT_FLEET_SLOTS], own_command[REPLAY_BLOCK + 1];
         uint32_t own_life[REPLAY_BLOCK + 1];
@@ -2072,10 +2080,21 @@ static int throttle_detents(void)
         room.thrust_target = boat_throttle_setting(steps[k]);
         room_run(&room, 2.5);
         CHECK(fabsf(room.server.fleet.state.slots[c->slot].boat.throttle - room.thrust_target)
-            < .0001f);
+            < BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP / 127 + .000001f);
         CHECK(
             fabsf(boat_net_client_view(c)->state.slots[c->slot].boat.throttle - room.thrust_target)
-            < .0001f);
+            < BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP / 127 + .000001f);
+    }
+    // The new pedal targets also settle through quantized predicted commands, including
+    // release, direct reversal, both precision directions and a transition out of precision.
+    const float pedals[] = { 1, 0, -.20f, -.05f, .05f, 1, 0 };
+    for (unsigned k = 0; k < sizeof(pedals) / sizeof(pedals[0]); ++k) {
+        room.thrust_target = pedals[k];
+        room_run(&room, .8);
+        float tolerance = BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP / 127 + .000001f;
+        CHECK(fabsf(room.server.fleet.state.slots[c->slot].boat.throttle - pedals[k]) < tolerance);
+        CHECK(fabsf(boat_net_client_view(c)->state.slots[c->slot].boat.throttle - pedals[k])
+            < tolerance);
     }
     room.thrust_target = 0;
     const float wheel[] = { -.8f, .35f, 1, 0, -1, .01f, -.01f, 0 };
