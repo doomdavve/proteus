@@ -265,7 +265,7 @@ a few seconds. It covers:
   all surviving mirrors to match the authority at their snapshot ticks exactly.
 
 `boat_net_loopback` runs `tools/boat_net_smoke.py`, which starts real `boat_server` and
-`boat_bot` processes on a free 127.0.0.1 UDP port for about 10 s. Two bots drive and a
+`boat_bot` processes on a free 127.0.0.1 UDP port for about 7 s. Two bots drive and a
 wrong-token bot is refused. `boat_bot --discover` on a second free port (the room's
 `--lan-port`) must find the room once, with its token flag and player count. A second server on
 the same port must fail, and the message,
@@ -285,10 +285,12 @@ game does when it leaves or dies. The room must report it, keep `accepted=1 left
 within 2 s. With GPU tests enabled, `wake_velocity_host_gpu` hosts a windowed river deathmatch with
 `--host` on port 24779 for 120 frames and requires the room to close after the session.
 
-`boat_net_session` runs `tools/boat_net_session.py` for about 36 s over real ENet/UDP loopback.
+`boat_net_session` runs `tools/boat_net_session.py` for about 16 s over real ENet/UDP loopback.
 Three predicting bots stay connected while a fourth leaves, joins in progress, crashes, times
-out and is replaced. A fifth peer must receive a room-full rejection. Bots request reset every
-2 s and send inactive controls for 1 s every 3 s; summaries require completed resets, all four
+out and is replaced. A fifth peer must receive a room-full rejection. The room runs with
+`boat_server --peer-timeout 1` (a test option; rooms default to 5 s), so the crashed bot times out
+after a second. Bots request reset every 2 s; the three that stay send inactive controls for 1 s
+every 3 s and the 3 s churn bots every 2 s. Summaries require completed resets, all four
 roster slots, bounded wakes/messages/datagrams, continued snapshots and no decode errors.
 The server must run every scheduled tick, release every slot and report the expected timeout
 and rejection counts without protocol/emission faults. Child startup, exit and failure cleanup
@@ -296,10 +298,13 @@ are bounded; output uses temporary files, with completed process logs printed by
 
 ```sh
 ctest --test-dir build -R '^boat_net_session$' --output-on-failure
-python3 tools/boat_net_session.py --server build/boat_server --bot build/boat_bot --seconds 1800
+python3 tools/boat_net_session.py --server build/boat_server --bot build/boat_bot --seconds 1800 \
+  --peer-timeout 5
 ```
 
-`--seconds` accepts 24–7200 and repeats fourth-slot churn during longer runs while the other
+`--peer-timeout` (1–60, default 1) sets the room's silence timeout; pass 5 for the production
+value in soaks. `--seconds` accepts one churn cycle plus a second (11 at the default timeout) up
+to 7200 and repeats fourth-slot churn during longer runs while the other
 three bots stay. This provides an opt-in soak driver; it does not measure memory plateaus or
 CPU/bandwidth budgets, or apply OS-level impairment. The 30-minute, one-hour and two-hour M5
 gates still require recorded runs and resource measurements. `boat_bot --predict`,
@@ -314,25 +319,26 @@ predicted holds released at GO, ferry-exact mirrors, a mid-race joiner and resul
 prediction replay through GO matches the authority; discovery uses the complete compiled-map bundle digest.
 
 `boat_net_river` runs the four-player lifecycle harness with `--location river --mode deathmatch`
-(about 36 s). The harness requires clients to select the server's location without
+(about 16 s). The harness requires clients to select the server's location without
 client-side map arguments. Run this map check with:
 
 ```sh
 ctest --test-dir build -R '^boat_net_river$' --output-on-failure
 ```
 
-`boat_net_deathmatch` runs the same script with `--deathmatch`: a deathmatch room with a 10 s
-round and two `boat_bot --hunt` clients for 16 s (about 20 s in all). Each bot's received
+`boat_net_deathmatch` runs the same script with `--deathmatch`: a deathmatch room with a 4 s
+round (`--round-seconds` accepts 2–3600) and two `boat_bot --hunt` clients for 8 s (about 10 s
+in all). Each bot's received
 scoreboard for round 1 must equal the server log's round-end line, and each must have received
 the round start, every logged capsize and the round end. Whether the hunters capsize anyone in a
-given run varies; the check is that clients agree with the authority. Run it alone with:
+given run varies (usually not in 4 s; `boat_net` covers credited capsizes deterministically); the check is that clients agree with the authority. Run it alone with:
 
 ```sh
 python3 tools/boat_net_smoke.py --deathmatch --server build/boat_server --bot build/boat_bot
 ```
 
-`boat_net_race` (about 14 s) finds a `--mode race` room through LAN discovery and races two
-`boat_bot --predict` clients for 10 s over ENet. Each bot must see round 1 gridded and released
+`boat_net_race` (about 11 s) finds a `--mode race` room through LAN discovery and races two
+`boat_bot --predict` clients for 8 s over ENet. Each bot must see round 1 gridded and released
 (at least 150 observed 120 Hz simulation ticks held, a GO tick), receive the server's logged
 race events, and finish without resyncs or decode faults. Run it alone with:
 

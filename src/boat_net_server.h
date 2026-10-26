@@ -85,6 +85,7 @@ typedef struct {
     double origin, backlog_since;
     uint64_t origin_tick;
     uint64_t tick_limit; // Never tick past this (0: no limit), even when catching up.
+    double peer_timeout; // Seconds of silence before a peer times out (0: BOAT_NET_TIMEOUT).
     uint32_t next_checkpoint;
     BoatMatch match; // Deathmatch state; untouched in free play.
     BoatNetMatchState match_sent; // The scoreboard clients last received.

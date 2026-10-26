@@ -617,7 +617,8 @@ bool boat_net_server_service(BoatNetServer *s, double now)
         BoatNetServerPeer *p = &s->peers[peer];
         if (p->phase == BOAT_NET_PEER_FREE)
             continue;
-        bool silent = now - p->heard_at > BOAT_NET_TIMEOUT;
+        bool silent
+            = now - p->heard_at > (s->peer_timeout > 0 ? s->peer_timeout : BOAT_NET_TIMEOUT);
         bool unready
             = p->phase != BOAT_NET_PEER_READY && now - p->connected_at > BOAT_NET_HANDSHAKE_TIMEOUT;
         if (silent || unready) {

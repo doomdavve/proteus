@@ -41,7 +41,7 @@ static void usage(FILE *out)
         "                   [--location basin|river|outer] [--ticks N | --seconds S] "
         "[--report-every N]\n"
         "                   [--mode free|deathmatch|race] [--round-seconds S]\n"
-        "                   [--lan-port N | --no-lan] [--exit-with-stdin]\n"
+        "                   [--lan-port N | --no-lan] [--exit-with-stdin] [--peer-timeout S]\n"
         "                   [--rtc-port N] [--ice-server URL] (optional WebRTC build)\n"
         "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
         "basin|river|outer]\n"
@@ -56,10 +56,12 @@ static void usage(FILE *out)
         "from the local network. --no-lan stays silent.\n"
         "--exit-with-stdin: close the room when standard input ends, so a game that hosts the\n"
         "room through a pipe (wake_velocity --host) cannot leave it running after it exits.\n"
+        "--peer-timeout: drop a client after S silent seconds (1-60, default 5); for tests.\n"
         "--scripted: bots drive N ticks (default 7200, one minute at 120 Hz) as fast as\n"
         "possible, then print the fleet hash and per-tick cost; no socket.\n"
-        "--mode deathmatch: timed rounds (--round-seconds, default 300) scoring +1 for defeating\n"
-        "another boat by gun or capsize, -1 for self-capsize; defeats respawn after 3 s.\n"
+        "--mode deathmatch: timed rounds (--round-seconds 2-3600, default 300) scoring +1 for\n"
+        "defeating another boat by gun or capsize, -1 for self-capsize; defeats respawn after\n"
+        "3 s.\n"
         "--mode race: river sprint rounds on the river location (the default for this mode):\n"
         "two or more players are gridded, held through a 3 s countdown and released together;\n"
         "places are awarded at the finish. The default free mode is shared free boating.\n",
@@ -327,6 +329,7 @@ typedef struct {
     uint16_t port, lan_port; // LAN discovery off when zero.
     bool waves;
     unsigned long players, ticks, report;
+    unsigned long peer_timeout; // Seconds; 0 keeps BOAT_NET_TIMEOUT.
     const BoatMatchRules *rules; // Deathmatch rules, or NULL for free play.
     bool race, exit_with_stdin;
     BoatLocationId location;
@@ -407,6 +410,7 @@ static int room(const RoomOptions *options)
         return 1;
     }
     server.tick_limit = options->ticks; // --ticks/--seconds run exactly that many ticks.
+    server.peer_timeout = (double)options->peer_timeout;
     BoatNetLan *lan = NULL;
     char lan_note[64] = "LAN discovery off";
     if (options->lan_port) {
@@ -622,6 +626,10 @@ int boat_server_main(int argc, char **argv)
         } else if (strcmp(argv[i], "--waves") == 0) {
             room_options.waves = true;
             room_option = true;
+        } else if (strcmp(argv[i], "--peer-timeout") == 0 && value
+            && parse_count(value, 1, 60, &room_options.peer_timeout)) {
+            room_option = true;
+            ++i;
         } else if (strcmp(argv[i], "--mode") == 0 && value
             && (strcmp(value, "free") == 0 || strcmp(value, "deathmatch") == 0
                 || strcmp(value, "race") == 0)) {
@@ -629,7 +637,7 @@ int boat_server_main(int argc, char **argv)
             race = strcmp(value, "race") == 0;
             ++i;
         } else if (strcmp(argv[i], "--round-seconds") == 0 && value
-            && parse_count(value, 10, 60ul * 60, &round)) {
+            && parse_count(value, 2, 60ul * 60, &round)) {
             ++i;
         } else if (strcmp(argv[i], "--location") == 0 && value) {
             const BoatWorldDefinition *location = boat_location_find(value);
@@ -674,9 +682,7 @@ int boat_server_main(int argc, char **argv)
             fprintf(stderr,
                 "boat_server: --scripted runs without a socket; room options "
                 "(--bind, --port, --lan-port, --no-lan, --exit-with-stdin, --token, --players, "
-                "--waves, "
-                "--seconds) do not "
-                "apply.\n");
+                "--waves, --peer-timeout, --seconds) do not apply.\n");
             return 2;
         }
         if (!open_world(&world, room_options.location))
