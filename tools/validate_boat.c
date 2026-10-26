@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define CHECK(condition)                                                                           \
     do {                                                                                           \
@@ -1294,6 +1295,121 @@ static int validate_water_mesh_caches(void)
     return 0;
 }
 
+static bool same_triangle(const Mesh3D *a, size_t i, const Mesh3D *b, size_t j)
+{
+    if (memcmp(&a->triangles[i].color, &b->triangles[j].color, sizeof(Color)))
+        return false;
+    for (int k = 0; k < 3; ++k)
+        if (memcmp(&a->vertices[a->triangles[i].vertices[k]],
+                &b->vertices[b->triangles[j].vertices[k]], sizeof(Vector3)))
+            return false;
+    return true;
+}
+
+static bool same_mesh(const Mesh3D *a, const Mesh3D *b)
+{
+    if (!a || !b || a->triangle_count != b->triangle_count)
+        return false;
+    for (size_t i = 0; i < a->triangle_count; ++i)
+        if (!same_triangle(a, i, b, i))
+            return false;
+    return true;
+}
+
+typedef struct {
+    Vector2 min, max;
+} WaterWindow;
+
+static bool water_window(void *context, Vector3 min, Vector3 max)
+{
+    const WaterWindow *w = context;
+    return max.x >= w->min.x && min.x <= w->max.x && max.z >= w->min.y && min.z <= w->max.y;
+}
+
+// The index must not change what the patch and the CPU surface contain, only what they visit:
+// patches equal the full-scan ones on and around every index seam and corner, and a windowed
+// surface is the full surface minus whole triangles outside the window.
+static int validate_water_index(void)
+{
+    const BoatMapDescription *river = boat_location(BOAT_LOCATION_RIVER)->map;
+    BoatWaterMeshCache indexed = { 0 }, full = { 0 };
+    full.full_scan = true;
+    const float offsets[] = { -3, 0, 3 }; // Around and on a seam.
+    const Vector2 corners[] = { { 0, -256 }, { 256, -512 }, { 768, 0 }, { -256, -768 }, { 0, 256 },
+        { 512, 1024 }, { 1024, -1024 }, { -512, -256 } };
+    size_t checked = 0, nonempty = 0, visited = 0, total = 0;
+    for (size_t k = 0; k < sizeof(corners) / sizeof(*corners); ++k)
+        for (size_t dx = 0; dx < 3; ++dx)
+            for (size_t dz = 0; dz < 3; ++dz)
+                for (int fine = 0; fine < 2; ++fine) {
+                    // A patch spans 96 m each way from its centre: alternate which edge sits on
+                    // the seam.
+                    Vector2 c = { corners[k].x + offsets[dx] + (k & 1 ? 96 : 0),
+                        corners[k].y + offsets[dz] - (k & 2 ? 96 : 0) };
+                    const Mesh3D *a = fine ? boat_water_patch_arcade(&indexed, river, c)
+                                           : boat_water_patch(&indexed, river, c);
+                    CHECK(a);
+                    size_t sources = indexed.patch_sources[fine];
+                    nonempty += a->triangle_count > 0;
+                    const Mesh3D *b = fine ? boat_water_patch_arcade(&full, river, c)
+                                           : boat_water_patch(&full, river, c);
+                    CHECK(same_mesh(a, b));
+                    CHECK(sources <= full.patch_sources[fine]);
+                    ++checked;
+                    visited += sources;
+                    total += full.patch_sources[fine];
+                }
+    CHECK(nonempty > 20);
+    CHECK(visited * 4 < total); // The index prunes most of the map.
+
+    BoatWater water = boat_water_gentle();
+    const Mesh3D *all = boat_water_surface(&full, river, water, .7);
+    CHECK(all && all->triangle_count > 0);
+    size_t all_count = all->triangle_count;
+    WaterWindow everything = { { -1e9f, -1e9f }, { 1e9f, 1e9f } };
+    CHECK(same_mesh(
+        boat_water_surface_visible(&indexed, river, water, .7, water_window, &everything), all));
+    CHECK(same_mesh(boat_water_surface(&indexed, river, water, .7), all));
+    const WaterWindow windows[] = { { { -200, -300 }, { 200, 100 } },
+        { { 255, -500 }, { 257, -490 } }, { { -2000, -2000 }, { -1900, -1900 } } };
+    size_t partial = 0;
+    for (size_t w = 0; w < sizeof(windows) / sizeof(*windows); ++w) {
+        const Mesh3D *part = boat_water_surface_visible(
+            &indexed, river, water, .7, water_window, (void *)&windows[w]);
+        CHECK(part && part->triangle_count <= all_count);
+        partial += part->triangle_count < all_count;
+        size_t next = 0;
+        for (size_t i = 0; i < all->triangle_count; ++i) {
+            bool inside = false;
+            for (int j = 0; j < 3; ++j) {
+                Vector3 p = all->vertices[all->triangles[i].vertices[j]];
+                inside |= p.x >= windows[w].min.x && p.x <= windows[w].max.x
+                    && p.z >= windows[w].min.y && p.z <= windows[w].max.y;
+            }
+            bool present = next < part->triangle_count && same_triangle(part, next, all, i);
+            CHECK(present || !inside); // Nothing in view may be dropped.
+            next += present;
+        }
+        CHECK(next == part->triangle_count); // Kept triangles keep the full order and values.
+    }
+    CHECK(partial >= 2);
+    // Informational: the rebuild cost the index removes (Debug-with-optimization builds).
+    double ms[2] = { 0 };
+    for (int pass = 0; pass < 2; ++pass) {
+        BoatWaterMeshCache *cache = pass ? &full : &indexed;
+        clock_t start = clock();
+        for (int n = 0; n < 100; ++n)
+            CHECK(boat_water_patch(cache, river, (Vector2) { 12.0f * n, -600 + 6.0f * n }));
+        ms[pass] = 1000.0 * (double)(clock() - start) / CLOCKS_PER_SEC / 100;
+    }
+    printf("water_patch_rebuild_ms indexed=%.3f full_scan=%.3f\n", ms[0], ms[1]);
+    printf("water_index patches=%zu nonempty=%zu sources_mean=%zu of %zu surface_triangles=%zu\n",
+        checked, nonempty, visited / checked, indexed.index.count, all_count);
+    boat_water_mesh_cache_destroy(&indexed);
+    boat_water_mesh_cache_destroy(&full);
+    return 0;
+}
+
 static int validate_throttle_detents(void)
 {
     // Exercise every transition through the real integrator, including crossing neutral.
@@ -1457,6 +1573,7 @@ int main(void)
     CHECK(validate_dynamic_pair() == 0);
     CHECK(validate_water_patch() == 0);
     CHECK(validate_water_mesh_caches() == 0);
+    CHECK(validate_water_index() == 0);
     CHECK(shared_water() == 0);
     CHECK(validate_buoyancy() == 0);
     CHECK(validate_wave_resistance() == 0);

@@ -23,7 +23,9 @@ be identical and drawing must not change the fleet or presentations. For a look,
 `boat_handling` (`validate_boat`, `cpu`) also checks view-owned water-mesh caches
 (adventure A1.3). Two river caches at different patch centres and a basin cache are held
 together, one is destroyed and rebuilt, and a cache rebinds between the river and a synthetic
-pond map. Every mesh must match its reference built alone, and the 5.99/6.01 m snap-boundary
+pond map. It also checks the water index (A2.4): indexed patches equal full-scan ones around
+index seams and corners, and a view-bounded CPU surface is an ordered subset of the full one.
+Every mesh must match its reference built alone, and the 5.99/6.01 m snap-boundary
 pair must not disturb another cache's borrowed meshes.
 
 `boat_world_isolation` (`validate_boat_world`) also checks CPU view binding (adventure A1.4):

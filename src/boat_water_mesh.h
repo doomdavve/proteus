@@ -17,9 +17,34 @@ typedef struct {
 // 240 x 160 m basin). Zero-initialize it; asking for a different description rebinds it and
 // rebuilds the map-dependent surfaces on that call. Each view owns its own cache. Never copy an
 // initialized cache: its meshes point into its own storage. Borrow it by pointer.
+//
+// The cache indexes the bound map's water triangles on a square grid (BOAT_WATER_INDEX_CELL), so a
+// patch rebuild visits only the triangles near the patch and the CPU surface displaces only the
+// triangles in view. Both produce exactly the triangles, in the order, of a full-map pass.
+#define BOAT_WATER_INDEX_CELL 256.0f
+typedef struct {
+    float cell;
+    Vector2 origin; // World X/Z of cell (0, 0).
+    int columns, rows;
+    unsigned int *first; // columns * rows + 1 offsets into list.
+    unsigned int *list; // Water triangle indices per cell, ascending.
+    unsigned int *stamp; // Per triangle: the epoch that last gathered it.
+    unsigned int *gathered; // Scratch for one gather.
+    size_t count; // Water triangles indexed.
+    size_t entries, gathered_capacity;
+    unsigned int epoch;
+    bool ready;
+} BoatWaterIndex;
+
 typedef struct {
     const BoatMapDescription *map;
-    BoatWaterMeshSurface surface; // CPU reference surface of the bound map.
+    BoatWaterIndex index;
+    BoatWaterMeshSurface rest; // Undisplaced tessellation of every water triangle.
+    unsigned int *rest_first; // Per water triangle (+1): its first rest triangle.
+    BoatWaterMeshSurface surface; // CPU reference surface of the bound map: the triangles in view.
+    size_t surface_sources; // Water triangles displaced by the last surface call.
+    size_t patch_sources[2]; // Water triangles clipped by each patch's last rebuild.
+    bool full_scan; // Review only: visit every water triangle, as before the index existed.
     BoatWaterMeshSurface field; // Basin grid for the retired physical wake field.
     BoatWaterMeshSurface patches[2]; // GPU rest patches: ordinary and arcade (fine) grid.
     Vector2 patch_centers[2];
@@ -32,6 +57,12 @@ typedef struct {
 // draws the colors and full displaced surface. Each call updates the cache's surface.
 const Mesh3D *boat_water_surface(
     BoatWaterMeshCache *cache, const BoatMapDescription *map, BoatWater water, double time);
+// As above, but only water inside boxes VISIBLE accepts (min, max in mesh space, padded for the
+// wave height) is displaced and returned; NULL VISIBLE keeps everything. Kept triangles retain
+// their full-surface order and values.
+typedef bool (*BoatWaterMeshVisible)(void *context, Vector3 min, Vector3 max);
+const Mesh3D *boat_water_surface_visible(BoatWaterMeshCache *cache, const BoatMapDescription *map,
+    BoatWater water, double time, BoatWaterMeshVisible visible, void *context);
 const Mesh3D *boat_water_surface_field(
     BoatWaterMeshCache *cache, BoatWater water, const BoatWake *field, double time);
 // GPU-only rest topology, clipped to MAP's water. World X/Z, not simulation X.

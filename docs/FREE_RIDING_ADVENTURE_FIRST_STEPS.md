@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25; [A2.4](#a24--water-bounded-by-intersecting-tiles) is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`; [A2.5](#a25--outline) is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -995,8 +995,8 @@ harness throughout.
 | A2.1 | A1 complete | Application submission and triangle counters on both renderers; counter baseline of the untiled river | Complete 2026-10-25; [result](#a21-result-2026-10-25) |
 | A2.2 | A2.1 | In-memory tile catalogue of the river map (512 m, 1 km comparison) and an indexed collision query with exhaustive parity | Complete 2026-10-25; [result](#a22-result-2026-10-25) |
 | A2.3 | A2.2 | Per-tile land culling in the GPU shadow, reflection and main passes and the CPU reference; 512 m vs 1 km judged by submissions, triangles and time | Complete 2026-10-25; [result](#a23-result-2026-10-25) |
-| A2.4 | A2.3 | Water coverage bounded by intersecting tiles: GPU patch rebuilds and the CPU reference surface, crack-free across seams | Next; [task](#a24--water-bounded-by-intersecting-tiles) |
-| A2.5 | A2.4 | Same-view scaling against enlarged synthetic catalogues (up to a ≈25 km corridor), lifecycle and performance gates, A3 handoff | Planned |
+| A2.4 | A2.3 | Water coverage bounded by intersecting tiles: GPU patch rebuilds and the CPU reference surface, crack-free across seams | Complete 2026-10-26 (GPU captures and flat-water split not verified, see limitations); [task](#a24--water-bounded-by-intersecting-tiles), [result](#a24-result-2026-10-26) |
+| A2.5 | A2.4 | Same-view scaling against enlarged synthetic catalogues (up to a ≈25 km corridor), lifecycle and performance gates, A3 handoff | Next; [outline](#a25--outline) |
 
 ## A2.1 — application submission and triangle counters
 
@@ -1328,6 +1328,64 @@ Started from a clean `d1f5646`.
     are unchanged.
 
 **Next: A2.4.**
+
+### A2.4 result, 2026-10-26
+
+Started from a clean `65434fc` (v0.0.17) on branch `adventure-a2-4`, in a worktree.
+
+- **Water index:** `BoatWaterMeshCache` now holds a `BoatWaterIndex` of the bound map's
+  leading water triangles on a 256 m grid (`BOAT_WATER_INDEX_CELL`), built on the first patch
+  or surface call after a bind and dropped on a rebind. A triangle is listed in every cell
+  its clipped rows overlap. The cache owns it rather than borrowing the view's `BoatMapTiles`,
+  because the renderers hold only a land catalogue and the water lists need no collision map;
+  the public patch and surface signatures are unchanged. A gather over a cell range dedupes by
+  an epoch stamp and sorts ascending, so triangles are clipped in map order.
+- **GPU patches:** a rebuild clips only the triangles gathered from the cells touching the
+  192 m patch square. On the river that is a mean of 43 of the 547 water triangles. In
+  `validate_boat` (opt-Debug, M1 Max) a rebuild took 0.094 ms against 0.120 ms for a full
+  scan: the old per-triangle bounds rejection was already cheap at 547 triangles, so the gain
+  here is small and is the scaling for larger maps (A2.5 measures it with synthetic
+  catalogues).
+- **CPU surface:** the undisplaced two-metre tessellation is now built once per bind
+  (`rest`, with per-source ranges), and `boat_water_surface_visible()` copies, displaces and
+  colours only the source triangles in cells whose box, padded 8 m vertically for waves,
+  passes `renderer3d_box_visible()`. `boat_view.c` passes the renderer; `boat_water_surface()`
+  keeps every triangle. Kept triangles retain full-surface order and values.
+- **Flat GPU water:** left as one mesh. It is 547 triangles drawn in the reflection and main
+  passes, negligible beside the 0.14 M median land triangles; splitting it would add
+  submissions for no measured gain. Decided from the A2.1 counters, not re-measured.
+- **Review switch:** `BoatWaterMeshCache.full_scan` (review/test only) makes patches visit
+  every triangle and the surface ignore visibility; `--no-cull` already makes the CPU box test
+  accept everything.
+- **Parity test (`boat_handling`, new `validate_water_index`):** 144 patches (both grids,
+  eight points near index seams and corners, offsets −3/0/+3 m and edge-on-seam variants) equal
+  the full-scan patches bit for bit in topology, vertices and colours, with 90 non-empty; the
+  index visits less than a quarter of the triangles in total. The full surface equals the
+  surface through an accept-all callback and through `boat_water_surface()`. Three windows
+  (two in the river, one outside the map) give an ordered subsequence of the full surface with
+  no triangle that has a vertex in the window missing.
+- **CPU captures (Debug, `boat_water_review --renderer cpu --waves`):** 18 frames, culled and
+  `--no-cull` are byte-identical. Mean triangles submitted fell from 2.34 M to 1.30 M and mean
+  frame time from 602 ms to 340 ms (Debug, single runs; indicative only); rasterized
+  triangles are unchanged at 531 k. Flat-water CPU captures render no displaced surface; they
+  are unaffected. Evidence: `build/adventure/a2-4/`.
+- **Verification (M1 Max, Darwin 25.6, Apple clang, Debug):** warning-clean build
+  (apart from the existing raylib `stb_vorbis` note); CTest without the GPU label passed
+  94/94 active tests, 12 retired tests disabled (`build/adventure/a2-4/ctest.log`); the
+  changed C is clang-formatted.
+- **Limitations:**
+  - **GPU not verified.** This session had no display (`GLFW: Failed to initialize
+    platform`), so `gpu_view_lifecycle`, `tile_culling`, the GPU captures and the A2.3
+    matrix pair were not run. The GPU patch path is covered only by the cache-level
+    equality test above. Before merging, run `ctest --test-dir build -L gpu` with
+    `-DPROTEUS_GPU_TESTS=ON`, compare the river GPU and waves captures with
+    `build/adventure/a2-3/`, and repeat the A2.3 matrix for patch rebuild time.
+  - The 8 m wave padding is a constant, not derived from the wave model; the CPU
+    capture identity covers the review poses only.
+  - Allocation failure in the index and rest builders is code-inspected, not injected.
+  - No manual playback or human visual acceptance was performed.
+
+**Next: A2.5.**
 
 ## A2.4 — water bounded by intersecting tiles
 
