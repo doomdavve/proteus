@@ -814,7 +814,11 @@ is now served by Winterfell with public CORS and generated server compatibility,
 published protocol-v6 Pages client can discover the upgraded server without a second Pages
 build. The release-aware browser recipe verifies its source commit against deployment.
 The [cutover guide](MULTIPLAYER_HOSTING.md#cut-over-to-the-next-release) owns the coordinated
-server/browser upgrade; the live server stays at v0.0.17 until that step is performed.
+server/browser upgrade. The subsequent v0.0.18 cutover is complete through the `davve-srv`
+baseline role: version pin → commit → push → `scripts/ansible-run.sh`. Native and browser
+builds now run on Winterfell. The role rerun reported `changed=0`; native/browser joining and
+weapon inputs/combat pages passed. The [routine operator workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv)
+owns future upgrades; human weapons balance/audio and wider soak acceptance remain pending.
 
 Depends on M5. Likely `tools/boat_server.c`, Host launcher/client connection UI, native
 packagers/workflows, CMake server-only Linux configuration, README, platform/release/test guides.

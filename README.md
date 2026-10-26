@@ -256,7 +256,9 @@ released native and browser room. A standalone Linux server package remains part
 For browser play, open [Winterfell](https://winterfell.davve.net:24443/), press PLAY and
 choose MULTIPLAYER → WINTERFELL. The browser fetches a known-server list, so the common
 join needs no address entry. Manual URL / CONNECT remain available. The deployed client
-keeps the v0.0.17 core; native clients still use LAN discovery or an address.
+and room now run v0.0.18 with both deathmatch weapons; native clients still use LAN
+discovery or an address. Routine hosting updates are owned by `davve-srv`
+([operator workflow](docs/MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv)).
 
 T5 tuning lets the bank ease out sooner as turning load fades. Deterministic presentation/
 replay fixtures cover banked poses, straightening and paused seeking. The
