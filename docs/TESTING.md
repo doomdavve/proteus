@@ -480,8 +480,7 @@ meets its original performance or numerical acceptance goals.
 
 ### Fast lanes, 2026-10-26
 
-M1 Max/macOS, Debug, `PROTEUS_OPTIMIZE_TESTS=ON`, GPU tests off (no GPU run was made for this
-change). Each step was a separate commit on the `test-speed` branch.
+M1 Max/macOS, Debug, `PROTEUS_OPTIMIZE_TESTS=ON`, GPU tests off unless noted. Each step was a separate commit on the `test-speed` branch.
 
 | Run | Tests | Wall | Summed test time |
 |---|---|---|---|
@@ -490,6 +489,11 @@ change). Each step was a separate commit on the `test-speed` branch.
 | After shortening the ENet tests, `-j 10` | 171 | 19.0 s | 144.8 s |
 | `ctest --preset full` (`-j 8`) | 220 | 18.7 s | 145.4 s |
 | `ctest --preset quick` | 133 | 0.8–1.1 s | 5.6 s |
+| `ctest --preset full`, `PROTEUS_GPU_TESTS=ON` | 246 | 60.7 s | 207.7 s |
+
+With GPU tests on, the GPU tests run one at a time, so they bound the wall time. The largest is
+`boat_river_benchmark_contract` at 27 s. The last full GPU run before this work (2026-10-25)
+took 183 s at `-j 4`.
 
 The five real-time ENet tests (9–16 s each) now bound the full suite's wall time. They passed
 three times in a row in parallel. Largest per-test changes:
@@ -509,6 +513,8 @@ values. The other conversions were checked by their own assertions passing.
 Not done yet:
 - `boat_map_scaling` (5 s), the XM checks (1.4 s each) and `boat_clock_soak_smoke` (1.8 s)
   are still single slow tests.
+- `boat_river_benchmark_contract` (27 s) and `boat_race_trial_gpu` (12 s) are unsplit GPU
+  tests.
 - The CPU water surface, the map build and in-game flag cloth cost remain product follow-ups.
 
 ### Routine-suite reduction, 2026-10-22 (history)
