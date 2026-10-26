@@ -1,0 +1,31 @@
+{
+  "version": 5,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Debug development build in build/",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" }
+  ],
+  "testPresets": [
+    {
+      "name": "quick",
+      "displayName": "Quick lane: tests under about 100 ms, for the edit loop",
+      "configurePreset": "dev",
+      "filter": { "include": { "label": "quick" } },
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 8 }
+    },
+    {
+      "name": "full",
+      "displayName": "Every enabled test, before handing off",
+      "configurePreset": "dev",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 8 }
+    }
+  ]
+}

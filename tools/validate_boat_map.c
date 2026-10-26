@@ -6,6 +6,7 @@
 #include "boat_fleet.h"
 #include "boat_fleet_bots.h"
 #include "boat_map.h"
+#include "boat_test_cases.h"
 #include "waterfront_city.h"
 
 #include <inttypes.h>
@@ -362,10 +363,18 @@ static int worlds(void)
     return 0;
 }
 
-int main(void)
+static const TestCase cases[] = {
+    TEST_CASE(definitions),
+    TEST_CASE(failures),
+    SLOW_CASE(owners),
+    SLOW_CASE(resources),
+    SLOW_CASE(worlds),
+};
+
+int main(int argc, char **argv)
 {
-    if (definitions() || failures() || owners() || resources() || worlds())
-        return 1;
-    puts("boat_map=ok");
-    return 0;
+    int status = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    if (status == 0 && argc == 1)
+        puts("boat_map=ok");
+    return status;
 }

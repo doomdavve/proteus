@@ -10,6 +10,7 @@
 #include "boat_map.h"
 #include "boat_net_client.h"
 #include "boat_net_server.h"
+#include "boat_test_cases.h"
 #include "boat_test_world.h"
 #include "boat_throttle.h"
 #include "raymath.h"
@@ -27,12 +28,6 @@
             fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #test);                             \
             return 1;                                                                              \
         }                                                                                          \
-    } while (0)
-
-#define RUN(test)                                                                                  \
-    do {                                                                                           \
-        if (test)                                                                                  \
-            return 1;                                                                              \
     } while (0)
 
 static const BoatWorldResources *basin(void) { return test_world(BOAT_LOCATION_BASIN); }
@@ -636,8 +631,11 @@ static void room_step(Room *room, double dt)
     boat_net_memory_set_time(room->network, room->now);
     boat_net_server_service(&room->server, room->now);
     uint64_t tick = room->server.fleet.state.tick;
+    // Client mirrors only ever hold snapshot ticks, so only those are hashed (once each).
+    if (room->history_tick[tick % ROOM_HISTORY] != tick || tick == 0)
+        room->history_hash[tick % ROOM_HISTORY]
+            = tick % BOAT_NET_SNAPSHOT_TICKS == 0 ? boat_fleet_hash(&room->server.fleet.state) : 0;
     room->history_tick[tick % ROOM_HISTORY] = tick;
-    room->history_hash[tick % ROOM_HISTORY] = boat_fleet_hash(&room->server.fleet.state);
     room->history_contact[tick % ROOM_HISTORY] = room->server.fleet.stats.contacts > 0;
     for (unsigned k = 0; k < BOAT_FLEET_SLOTS; ++k) {
         room->history_position[tick % ROOM_HISTORY][k]
@@ -2171,32 +2169,37 @@ static int combat_room(void)
     return 0;
 }
 
-int main(void)
+static const TestCase cases[] = {
+    SLOW_CASE(throttle_detents),
+    TEST_CASE(golden),
+    TEST_CASE(codec),
+    SLOW_CASE(checkpoints),
+    TEST_CASE(lossless),
+    TEST_CASE(deathmatch),
+    SLOW_CASE(combat_room),
+    TEST_CASE(prediction_release),
+    TEST_CASE(prediction_owners),
+    SLOW_CASE(race_room),
+    TEST_CASE(lan_discovery),
+    TEST_CASE(tick_limit),
+    TEST_CASE(rejections),
+    TEST_CASE(authority_rules),
+    TEST_CASE(wrap_and_flood),
+    SLOW_CASE(impaired),
+    SLOW_CASE(mapped_rooms),
+    SLOW_CASE(four_player_lifecycle),
+    TEST_CASE(resync),
+    SLOW_CASE(prediction_replay),
+    TEST_CASE(prediction_wakes),
+    TEST_CASE(remote_view),
+    SLOW_CASE(prediction_network),
+};
+
+int main(int argc, char **argv)
 {
-    RUN(throttle_detents());
-    RUN(golden());
-    RUN(codec());
-    RUN(checkpoints());
-    RUN(lossless());
-    RUN(deathmatch());
-    RUN(combat_room());
-    RUN(prediction_release());
-    RUN(prediction_owners());
-    RUN(race_room());
-    RUN(lan_discovery());
-    RUN(tick_limit());
-    RUN(rejections());
-    RUN(authority_rules());
-    RUN(wrap_and_flood());
-    RUN(impaired());
-    RUN(mapped_rooms());
-    RUN(four_player_lifecycle());
-    RUN(resync());
-    RUN(prediction_replay());
-    RUN(prediction_wakes());
-    RUN(remote_view());
-    RUN(prediction_network());
-    printf("boat_net=ok\n");
+    int status = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    if (status == 0 && argc == 1)
+        printf("boat_net=ok\n");
     test_worlds_close();
-    return 0;
+    return status;
 }

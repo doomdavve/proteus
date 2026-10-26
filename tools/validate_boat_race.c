@@ -7,6 +7,7 @@
 #include "boat_fleet_bots.h"
 #include "boat_map.h"
 #include "boat_race.h"
+#include "boat_test_cases.h"
 #include "boat_test_world.h"
 #include "boat_throttle.h"
 #include "raymath.h"
@@ -700,12 +701,25 @@ static int full_race(void)
     return 0;
 }
 
-int main(void)
+static const TestCase cases[] = {
+    TEST_CASE(geometry),
+    TEST_CASE(storm_surface),
+    TEST_CASE(crossing),
+    TEST_CASE(progress_and_places),
+    TEST_CASE(ties),
+    TEST_CASE(parking),
+    TEST_CASE(recovery),
+    TEST_CASE(leavers),
+    TEST_CASE(rejects),
+    TEST_CASE(hold),
+    SLOW_CASE(full_race),
+};
+
+int main(int argc, char **argv)
 {
-    if (geometry() || storm_surface() || crossing() || progress_and_places() || ties() || parking()
-        || recovery() || leavers() || rejects() || hold() || full_race())
-        return 1;
-    printf("boat_race=ok\n");
+    int status = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    if (status == 0 && argc == 1)
+        puts("boat_race=ok");
     test_worlds_close();
-    return 0;
+    return status;
 }
