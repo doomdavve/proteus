@@ -41,8 +41,12 @@ therefore needs network access.
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
-ctest --test-dir build -j 4 --output-on-failure
+ctest --preset full
 ```
+
+While iterating, `ctest --preset quick` runs the tests labelled `quick` (each under about 100 ms;
+about a second in all). Heavy validators are split into `<prefix>.<case>` tests; see
+`docs/TESTING.md` for the lanes, the case runner and `tools/test_timing.py`.
 
 The routine suite disables retired physical wake-field experiments by default
 (`PROTEUS_WAKE_FIELD_TESTS=OFF`); re-enable them only when revisiting that work.
@@ -107,7 +111,7 @@ xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
 
 ## Before handing off
 
-Run the build and CTest command above. Capture and inspect representative frames when visual effects
+Run the build and the full CTest preset above. Capture and inspect representative frames when visual effects
 change. Add a manual demo check when motion, input, windowing, audio playback, or asset loading
 changed. Use Xcode Instruments when performance or runtime behavior warrants deeper investigation.
 Report anything you could not verify.

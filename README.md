@@ -50,7 +50,7 @@ See [Linux setup and verification](docs/LINUX_BUILD.md) for dependencies and bac
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-ctest --test-dir build -j 4 --output-on-failure
+ctest --preset full   # or --preset quick (about 1 s) while editing
 ./build/wake_velocity
 ```
 
