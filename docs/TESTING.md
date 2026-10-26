@@ -190,6 +190,11 @@ cmake -S . -B build -DPROTEUS_OPTIMIZE_TESTS=OFF
 cmake --build build -j
 ```
 
+Clang/GCC builds, raylib included, compile with `-ffp-contract=off` (since 2026-10-26), so no
+compiler fuses multiply-adds on its own and the `boat_map` and `city_dressing` digests match
+between Apple Silicon macOS and x86-64 Linux. Explicit `fma()` calls are unaffected. MSVC does
+not contract by default.
+
 The optimization override currently applies to Clang/GCC only. MSVC keeps its selected
 configuration; Windows timings have not been measured. GPU checks are opt-in through
 `PROTEUS_GPU_TESTS=ON` and need a desktop context. A display-free suite with GPU checks

@@ -22,8 +22,9 @@
         }                                                                                          \
     } while (0)
 
-// Recorded at 413460d from boat_map_water_contact() before the A1.1 ownership change.
-#define RIVER_QUERY_DIGEST UINT64_C(0x63225c36181d381d)
+// Recorded at 413460d from boat_map_water_contact() before the A1.1 ownership change; re-recorded
+// once floating-point contraction was disabled on every platform.
+#define RIVER_QUERY_DIGEST UINT64_C(0x2cb7d1c44dfa671a)
 #define RIVER_QUERY_WATER 20356
 
 // Synthetic 10 m square of water in map east/Z, with one raised land triangle after it.

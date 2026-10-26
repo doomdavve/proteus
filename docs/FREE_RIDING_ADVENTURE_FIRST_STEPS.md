@@ -50,6 +50,14 @@ run alone. If terrain credentials are unavailable, document that result and cont
 survey; terrain import is optional in this batch. A1 requires a useful survey of the first
 extension, not complete terrain coverage or a complete Boelo observation archive.
 
+**Correction, 2026-10-26:** the A1.1/A1.4 digests recorded below (river query
+`63225c36181d381d`, box `8a15797b4f84d3f3`) were Apple-clang values with multiply-add fusion,
+and failed on x86-64 Linux CI. All Clang/GCC builds now use `-ffp-contract=off` (see
+[testing](TESTING.md)); the current values are `2cb7d1c44dfa671a` (still 20,356 water answers)
+and `ea3fae73bd61a0df` (still 7,944 boxes); the clearance digest is unchanged. The generated
+`river_bridge_first_triangle` is now an enum constant so MSVC accepts it as a static
+initializer. Result sections below keep the values as recorded at the time.
+
 ## A0.1 — preserve the current reference
 
 **Read:** `docs/river/README.md`, `docs/river/survey.py`, `tools/prepare_waterfront.py`,

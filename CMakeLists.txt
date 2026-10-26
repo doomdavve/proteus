@@ -25,6 +25,11 @@ if(EMSCRIPTEN)
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 endif()
 
+# Round every float operation separately on every platform. Clang fuses multiply-adds on ARM by
+# default, which changed map and scenery digests between macOS and x86 Linux. Set before raylib
+# so its compiled raymath rounds like the inline copies in our validators.
+add_compile_options($<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-ffp-contract=off>)
+
 include(FetchContent)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(

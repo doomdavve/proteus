@@ -141651,4 +141651,4 @@ static const Triangle3D river_triangles[] = {
     { { 63030, 63032, 63031 }, { 161, 167, 166, 255 } },
     { { 63030, 63031, 63027 }, { 161, 167, 166, 255 } },
 };
-static const size_t river_bridge_first_triangle = 74224;
+enum { river_bridge_first_triangle = 74224 };

@@ -1638,6 +1638,15 @@ static int four_player_lifecycle(void)
         boat_net_memory_impair(
             room.network, room.link[i], (BoatNetImpairment) { 0 }, (BoatNetImpairment) { 0 });
     room_run(&room, 2);
+    // Births travel at 10 Hz, so a snapshot may still be counting one in flight: allow two batches.
+    for (double end = room.now + .2; room.now < end;) {
+        bool settled = true;
+        for (unsigned i = 0; i < room.count; ++i)
+            settled &= i == fourth || i == full || room.clients[i].wake_consistent;
+        if (settled)
+            break;
+        room_run(&room, 1 / 240.0);
+    }
     for (unsigned i = 0; i < room.count; ++i) {
         if (i == fourth || i == full)
             continue;

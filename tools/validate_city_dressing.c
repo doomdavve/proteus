@@ -77,7 +77,7 @@ static bool near_quay(Vector3 p)
 
 static int owners(const WaterfrontScenery *river)
 {
-    CHECK(box_digest(river) == UINT64_C(0x8a15797b4f84d3f3) && river->count == 7944);
+    CHECK(box_digest(river) == UINT64_C(0xea3fae73bd61a0df) && river->count == 7944);
     CHECK(clear_digest(river) == UINT64_C(0x081bde4a44942f73));
     // A second river owner alive together: equal content, separate storage.
     WaterfrontScenery second = { 0 }, basin = { 0 }, other = { 0 };
@@ -112,7 +112,7 @@ static int owners(const WaterfrontScenery *river)
     waterfront_scenery_destroy(&second);
     waterfront_scenery_destroy(&second);
     CHECK(!second.ready && !second.boxes);
-    CHECK(box_digest(river) == UINT64_C(0x8a15797b4f84d3f3));
+    CHECK(box_digest(river) == UINT64_C(0xea3fae73bd61a0df));
     const WaterfrontCornerBox *kept = other.boxes;
     CHECK(waterfront_scenery_bind(&other, &test_harbor_map) && other.boxes == kept);
     CHECK(waterfront_scenery_bind(&other, &waterfront_city_river_map) && other.river);
@@ -120,7 +120,7 @@ static int owners(const WaterfrontScenery *river)
     CHECK(waterfront_scenery_bind(&other, &test_harbor_map) && !other.river);
     CHECK(box_digest(&other) == other_digest);
     CHECK(waterfront_scenery_bind(&other, NULL) && !other.count && !other.boxes);
-    CHECK(box_digest(river) == UINT64_C(0x8a15797b4f84d3f3));
+    CHECK(box_digest(river) == UINT64_C(0xea3fae73bd61a0df));
     waterfront_scenery_destroy(&other);
     waterfront_scenery_destroy(&basin);
     printf("Scenery owners: two river owners, basin, %zu-box synthetic harbor (%d waterline), "

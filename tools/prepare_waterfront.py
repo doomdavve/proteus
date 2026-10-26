@@ -368,7 +368,7 @@ def prepare(output, expanded=False):
     if expanded:
         content = content.replace("waterfront_vertices", "river_vertices").replace(
             "waterfront_triangles", "river_triangles")
-        content += f"static const size_t river_bridge_first_triangle = {bridge_first_triangle};\n"
+        content += f"enum {{ river_bridge_first_triangle = {bridge_first_triangle} }};\n"
     (output / "geometry.h").write_text(content)
     manifest = {"source": str(SOURCE.relative_to(ROOT)), "source_sha256": EXPECTED_HASH,
                 "snapshot": data.get("osm3s", {}).get("timestamp_osm_base", data.get("retrieved_utc")),
