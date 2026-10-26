@@ -630,7 +630,6 @@ static int clock_checks(void)
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     if (argc == 2 && strcmp(argv[1], "--gpu") == 0)
         return gpu_checks();
     CHECK(argc == 1);

@@ -873,7 +873,6 @@ cleanup:
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
     float tile_size = 0;
     bool no_cull = false;

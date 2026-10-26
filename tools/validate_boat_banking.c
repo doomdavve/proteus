@@ -1,5 +1,6 @@
 #include "boat_banking_fixture.h"
 #include "boat_map.h"
+#include "boat_test_cases.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
 #include "raymath.h"
@@ -39,16 +40,19 @@ static bool same_state(const BoatSession *x, const BoatSession *y)
 {
     const Boat *a = &x->boat, *b = &y->boat;
     // Explicit physical/control state, never padding or a struct-byte hash.
-    // Presentation particles do not feed physics; the camera follow is compared separately.
+    // Sessions here run without presentation, which never feeds physics; camera follow and
+    // presentation determinism are covered by boat_world_isolation's frame hashes.
 #define SAME(member) (a->member == b->member)
     return SAME(position.x) && SAME(position.y) && SAME(velocity.x) && SAME(velocity.y)
         && x->tick == y->tick && SAME(heading) && SAME(yaw_velocity) && SAME(planing)
         && SAME(height) && SAME(vertical_velocity) && SAME(pitch) && SAME(pitch_velocity)
         && SAME(roll) && SAME(roll_velocity) && SAME(turn_roll_load) && SAME(throttle)
-        && SAME(engine_response) && SAME(wheel) && SAME(engine_angle) && SAME(wave_spray)
-        && x->presentation.camera_heading == y->presentation.camera_heading;
+        && SAME(engine_response) && SAME(wheel) && SAME(engine_angle) && SAME(wave_spray);
 #undef SAME
 }
+
+// The --report CSV, or NULL.
+static FILE *report;
 
 // All rows describe the pre-tick state. Acceleration is measured over the following tick,
 // projected on its PRE-tick right vector. This is a force probe only in calm, contact-free
@@ -87,7 +91,7 @@ static int check_filter(const Boat *before, const Boat *after, float measured_lo
 static int validate_core(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     for (int tick = 0; tick < 240; ++tick) {
         boat_session_step(&boat, (BoatInput) { 1, 0, 0, 0 });
         CHECK(boat.boat.turn_roll_load == 0 && fabsf(boat.boat.roll) < .000001f
@@ -99,18 +103,18 @@ static int validate_core(void)
     boat_session_step(&boat, (BoatInput) { 0 });
     CHECK(fabsf(boat.boat.turn_roll_load - previous * expf(-BOAT_STEP / 0.06f)) < .000001f);
     CHECK(boat.boat.roll > 0 && boat.boat.roll_velocity > 0);
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     CHECK(boat.boat.turn_roll_load == 0 && boat.boat.roll == 0 && boat.boat.roll_velocity == 0);
     boat.boat.turn_roll_load = 3;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_RIVER);
     CHECK(boat.boat.turn_roll_load == 0);
     boat.boat.turn_roll_load = 3;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     boat_session_start_course(&boat);
     CHECK(boat.boat.turn_roll_load == 0);
     // Saturated demand is a bounded torque, integrated through angular velocity.
     for (int sign = -1; sign <= 1; sign += 2) {
-        boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        physics_session(&boat, BOAT_LOCATION_BASIN);
         boat.boat.turn_roll_load = sign * 10000;
         boat_session_step(&boat, (BoatInput) { 0 });
         float moment = .45f * boat.boat.roll_velocity / BOAT_STEP;
@@ -118,7 +122,7 @@ static int validate_core(void)
         CHECK(fabsf(boat.boat.roll - boat.boat.roll_velocity * BOAT_STEP) < .000001f);
     }
     // Reverse keeps the low gain, even with stale planing state.
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     boat.boat.velocity = (Vector2) { .8f, 3 };
     boat.boat.yaw_velocity = .4f;
     boat.boat.planing = 1;
@@ -143,7 +147,7 @@ static int validate_core(void)
         "reverse_external_work u=-3 yaw=.4 slip=.8 peak_roll_deg=%.6f\n", reverse_peak * RAD2DEG);
     // Guard recovery does not clamp angle/rate or discard the disturbed state.
     for (int sign = -1; sign <= 1; sign += 2) {
-        boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        physics_session(&boat, BOAT_LOCATION_BASIN);
         boat.boat.roll = sign * 32 * DEG2RAD;
         boat_session_step(&boat, (BoatInput) { 0 });
         CHECK(sign * boat.boat.roll > 30 * DEG2RAD && sign * boat.boat.roll_velocity < 0);
@@ -162,7 +166,7 @@ static int validate_sides(void)
     for (size_t i = 0; i < sizeof(headings) / sizeof(*headings); ++i) {
         for (int sign = -1; sign <= 1; sign += 2) {
             BoatSession boat;
-            boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            physics_session(&boat, BOAT_LOCATION_BASIN);
             boat.boat.heading = headings[i];
             boat.boat.roll = sign * .1f;
             WaterfrontPlayerState pose = { 0 };
@@ -181,15 +185,15 @@ static int validate_sides(void)
     return 0;
 }
 
-static int validate_restoring(FILE *report)
+static int validate_restoring(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     boat.boat.roll = .0001f;
     boat_session_step(&boat, (BoatInput) { 0 });
     float stiffness = -(.45f * boat.boat.roll_velocity / BOAT_STEP) / .0001f;
     CHECK(fabsf(stiffness - 64 * .65f * .65f) < .002f);
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     boat.boat.roll = 10 * DEG2RAD;
     int last_unsettled = 0;
     for (int tick = 0; tick < 360; ++tick) {
@@ -208,13 +212,14 @@ static int validate_restoring(FILE *report)
     return 0;
 }
 
-static int validate_free(FILE *report)
+static int validate_free(void)
 {
     const char *names[]
         = { "straight", "left", "right", "countersteer", "coast", "reverse", "stop" };
     for (int scenario = 0; scenario < 7; ++scenario) {
         BoatSession boat;
         banking_fixture_reset(&boat, scenario);
+        boat.presentation_enabled = false;
         BoatSession repeat = boat;
         float peak_roll = 0, peak_rate = 0, peak_load = 0, sum_roll = 0;
         int ticks = banking_fixture_ticks(scenario);
@@ -269,7 +274,7 @@ static void prescribe(Boat *boat, float speed, float slip, float yaw)
 static float probe_planing(float speed, float slip, float yaw, float planing)
 {
     BoatSession boat;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     prescribe(&boat.boat, speed, slip, yaw);
     boat.boat.planing = planing;
     Vector2 velocity = boat.boat.velocity;
@@ -282,7 +287,7 @@ static float probe(float speed, float slip, float yaw)
     return probe_planing(speed, slip, yaw, 1);
 }
 
-static int validate_tow(FILE *report)
+static int validate_tow(void)
 {
     const float speeds[] = { 4, 8, 12, 8, 8, 8 };
     const float radii[] = { 30, 30, 30, 20, 40, 80 };
@@ -309,7 +314,7 @@ static int validate_tow(FILE *report)
             float slip = (lo + hi) / 2;
             CHECK(fabsf(probe(speed, slip, yaw) - target) < .0002f);
             BoatSession boat;
-            boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            physics_session(&boat, BOAT_LOCATION_BASIN);
             float peak_residual = 0, mean_roll = 0, peak_roll = 0;
             char name[64];
             snprintf(name, sizeof(name), "tow_u%.0f_r%.0f_sign%d", speed, radius, sign);
@@ -372,7 +377,7 @@ static int validate_release(void)
     const float angles[] = { -32, -10, 10, 32 };
     for (int trial = 0; trial < 4; ++trial) {
         BoatSession boat;
-        boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        physics_session(&boat, BOAT_LOCATION_BASIN);
         boat.boat.roll = angles[trial] * DEG2RAD;
         float previous = floating_energy(&boat.boat), peak_gain = 0;
         int last_unsettled = 0;
@@ -399,7 +404,7 @@ static int validate_blend_flow(void)
     float means[3] = { 0 };
     for (int trial = 0; trial < 3; ++trial) {
         BoatSession still, flow;
-        boat_session_init(&still, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        physics_session(&still, BOAT_LOCATION_BASIN);
         flow = still;
         flow.world.water.current = (Vector2) { 1.7f, -.8f };
         float lo = -4, hi = 4, target = 64.0f / 30;
@@ -432,7 +437,7 @@ static int validate_blend_flow(void)
             contact.boat.planing
                 = still.boat.planing; // Propeller check follows this tick's trim update.
             BoatSession reference;
-            boat_session_init(&reference, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+            physics_session(&reference, BOAT_LOCATION_BASIN);
             reference.boat.planing = still.boat.planing;
             float initial_wet
                 = boat_wake_stern(&reference.boat, &reference.world, boat_session_time(&reference))
@@ -459,7 +464,7 @@ static int validate_blend_flow(void)
     CHECK(means[0] > 0 && means[0] < means[1] && means[1] < means[2]);
     // Continuity of the blend: neighboring imposed planing values cannot jump the demand.
     BoatSession a, b;
-    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&a, BOAT_LOCATION_BASIN);
     prescribe(&a.boat, 8, -.55f, 8.0f / 30);
     a.boat.planing = .5f;
     b = a;
@@ -469,7 +474,7 @@ static int validate_blend_flow(void)
     CHECK(fabsf(a.boat.turn_roll_load - b.boat.turn_roll_load) < .0001f);
     const float speeds[] = { 0, 4, 12, 18 };
     for (int si = 0; si < 4; ++si) {
-        boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        physics_session(&a, BOAT_LOCATION_BASIN);
         for (int tick = 0; tick < 960; ++tick) {
             prescribe(&a.boat, speeds[si], 0, 0);
             boat_session_step(&a, (BoatInput) { 0 });
@@ -477,7 +482,7 @@ static int validate_blend_flow(void)
         }
     }
     // Docking: prescribed 1 unit/s with a substantial .4 rad/s yaw and .2 slip.
-    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&a, BOAT_LOCATION_BASIN);
     float docking_peak = 0;
     for (int tick = 0; tick < 960; ++tick) {
         prescribe(&a.boat, 1, .2f, .4f);
@@ -489,10 +494,10 @@ static int validate_blend_flow(void)
     return 0;
 }
 
-static int validate_transitions(FILE *report)
+static int validate_transitions(void)
 {
     BoatSession a, b;
-    boat_session_init(&a, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&a, BOAT_LOCATION_BASIN);
     a.boat.position = (Vector2) { 0, 40 };
     a.boat.velocity.y = -12;
     a.boat.throttle = 1;
@@ -550,12 +555,13 @@ static int validate_transitions(FILE *report)
     return 0;
 }
 
-static int validate_straightening(FILE *report)
+static int validate_straightening(void)
 {
     const float wheels[] = { .25f, .55f, 1 };
     for (int trial = 0; trial < 3; ++trial) {
         BoatSession a, b;
         banking_exit_reset(&a);
+        a.presentation_enabled = false;
         b = a;
         int last_bank = -1, last_rate = -1, last_yaw = -1, last_load = -1;
         float steady = 0, peak = 0, roll_half = 0, roll_one = 0;
@@ -621,77 +627,83 @@ static bool finite_state(const Boat *boat)
         && isfinite(boat->velocity.y);
 }
 
-static int validate_wave_turns(FILE *report)
+static int wave_turn(int trial)
 {
     const char *names[] = { "beam", "head", "following", "scripted_wake", "own_wake", "calm_long" };
-    for (int trial = 0; trial < 6; ++trial) {
-        BoatSession boat;
-        boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
-        boat.boat.position = (Vector2) { 0, 0 };
-        boat.boat.velocity.y = -8;
-        boat.boat.throttle = .55f;
-        if (trial < 3) {
-            boat.world.water = boat_water_gentle();
-            boat.boat.heading = atan2f(.6f, .8f) + (trial == 0 ? PI / 2 : trial == 1 ? 0 : PI);
-            boat.boat.velocity = Vector2Scale(forward(boat.boat.heading), 8);
-        } else if (trial == 3) {
-            boat.world.water = boat_water_test(false, false, true);
-            boat.boat.position.y = 1.6f;
-        } else if (trial == 4)
-            boat.world.water.player_wake_enabled = true;
-        BoatSession repeat = boat;
-        float peak = 0, peak_rate = 0, peak_load = 0, sum = 0, late_peak = 0, early_peak = 0;
-        float peak_height = 0, peak_pitch = 0;
-        int drive_ticks = trial == 1 ? 43200 : 14400;
-        for (int tick = 0; tick < drive_ticks; ++tick) {
-            // Free constant-wheel circles; no imposed positions in spatial wave fields.
-            float wheel = .55f;
-            BoatSession before = boat;
-            boat_session_step(&boat, (BoatInput) { wheel, 0, 0, 0 });
-            boat_session_step(&repeat, (BoatInput) { wheel, 0, 0, 0 });
-            CHECK(same_state(&boat, &repeat) && finite_state(&boat.boat));
-            CHECK(open_water(&boat.boat));
-            CHECK(fabsf(boat.boat.roll) < 30 * DEG2RAD);
-            CHECK(fabsf(boat.boat.height) < 1 && fabsf(boat.boat.pitch) < .65f);
-            peak_height = fmaxf(peak_height, fabsf(boat.boat.height));
-            peak_pitch = fmaxf(peak_pitch, fabsf(boat.boat.pitch));
-            peak = fmaxf(peak, fabsf(boat.boat.roll));
-            peak_rate = fmaxf(peak_rate, fabsf(boat.boat.roll_velocity));
-            peak_load = fmaxf(peak_load, fabsf(boat.boat.turn_roll_load));
-            sum += boat.boat.roll;
-            if (tick >= drive_ticks / 2)
-                late_peak = fmaxf(late_peak, fabsf(boat.boat.roll));
-            else
-                early_peak = fmaxf(early_peak, fabsf(boat.boat.roll));
-            row(report, names[trial], tick, &before, NAN, 0, NAN);
-        }
-        // Wave encounter phase changes as the free circle evolves. Sub-guard peaks
-        // need not recur in the first half. Once the 25-degree guard is involved,
-        // reject growth beyond its engagement envelope or the earlier peak (+1 degree).
-        CHECK(late_peak <= fmaxf(early_peak, 25 * DEG2RAD) + DEG2RAD);
-        printf("standard_turn=%s seconds=%d mean_roll_deg=%.6f peak_roll_deg=%.6f "
-               "late_peak_deg=%.6f peak_rate_deg_s=%.6f peak_filtered_load=%.6f peak_height=%.6f "
-               "peak_pitch_deg=%.6f\n",
-            names[trial], drive_ticks / 120, sum / drive_ticks * RAD2DEG, peak * RAD2DEG,
-            late_peak * RAD2DEG, peak_rate * RAD2DEG, peak_load, peak_height, peak_pitch * RAD2DEG);
-        // Remove external forcing, preserve momentum/filter and recover without a reset.
-        boat.world.water = (BoatWater) { 0 };
-        boat.boat.throttle = 0;
-        for (int tick = 0; tick < 14400; ++tick) {
-            boat_session_step(&boat, (BoatInput) { 0 });
-            CHECK(finite_state(&boat.boat) && fabsf(boat.boat.roll) < 30 * DEG2RAD);
-        }
-        CHECK(fabsf(boat.boat.roll) < .0001f && fabsf(boat.boat.roll_velocity) < .0001f);
-        Vector2 rest = boat.boat.position;
-        for (int tick = 0; tick < 14400; ++tick)
-            boat_session_step(&boat, (BoatInput) { 0 });
-        printf("rest_drift=%g speed=%g\n", Vector2Distance(rest, boat.boat.position),
-            Vector2Length(boat.boat.velocity));
-        CHECK(
-            Vector2Distance(rest, boat.boat.position) < .001f && fabsf(boat.boat.roll) < .000001f);
+    BoatSession boat;
+    physics_session(&boat, BOAT_LOCATION_BASIN);
+    boat.boat.position = (Vector2) { 0, 0 };
+    boat.boat.velocity.y = -8;
+    boat.boat.throttle = .55f;
+    if (trial < 3) {
+        boat.world.water = boat_water_gentle();
+        boat.boat.heading = atan2f(.6f, .8f) + (trial == 0 ? PI / 2 : trial == 1 ? 0 : PI);
+        boat.boat.velocity = Vector2Scale(forward(boat.boat.heading), 8);
+    } else if (trial == 3) {
+        boat.world.water = boat_water_test(false, false, true);
+        boat.boat.position.y = 1.6f;
+    } else if (trial == 4)
+        boat.world.water.player_wake_enabled = true;
+    BoatSession repeat = boat;
+    float peak = 0, peak_rate = 0, peak_load = 0, sum = 0, late_peak = 0, early_peak = 0;
+    float peak_height = 0, peak_pitch = 0;
+    int drive_ticks = trial == 1 ? 43200 : 14400;
+    for (int tick = 0; tick < drive_ticks; ++tick) {
+        // Free constant-wheel circles; no imposed positions in spatial wave fields.
+        float wheel = .55f;
+        static BoatSession before;
+        if (report)
+            before = boat;
+        boat_session_step(&boat, (BoatInput) { wheel, 0, 0, 0 });
+        boat_session_step(&repeat, (BoatInput) { wheel, 0, 0, 0 });
+        CHECK(same_state(&boat, &repeat) && finite_state(&boat.boat));
+        CHECK(open_water(&boat.boat));
+        CHECK(fabsf(boat.boat.roll) < 30 * DEG2RAD);
+        CHECK(fabsf(boat.boat.height) < 1 && fabsf(boat.boat.pitch) < .65f);
+        peak_height = fmaxf(peak_height, fabsf(boat.boat.height));
+        peak_pitch = fmaxf(peak_pitch, fabsf(boat.boat.pitch));
+        peak = fmaxf(peak, fabsf(boat.boat.roll));
+        peak_rate = fmaxf(peak_rate, fabsf(boat.boat.roll_velocity));
+        peak_load = fmaxf(peak_load, fabsf(boat.boat.turn_roll_load));
+        sum += boat.boat.roll;
+        if (tick >= drive_ticks / 2)
+            late_peak = fmaxf(late_peak, fabsf(boat.boat.roll));
+        else
+            early_peak = fmaxf(early_peak, fabsf(boat.boat.roll));
+        row(report, names[trial], tick, &before, NAN, 0, NAN);
     }
+    // Wave encounter phase changes as the free circle evolves. Sub-guard peaks
+    // need not recur in the first half. Once the 25-degree guard is involved,
+    // reject growth beyond its engagement envelope or the earlier peak (+1 degree).
+    CHECK(late_peak <= fmaxf(early_peak, 25 * DEG2RAD) + DEG2RAD);
+    printf("standard_turn=%s seconds=%d mean_roll_deg=%.6f peak_roll_deg=%.6f "
+           "late_peak_deg=%.6f peak_rate_deg_s=%.6f peak_filtered_load=%.6f peak_height=%.6f "
+           "peak_pitch_deg=%.6f\n",
+        names[trial], drive_ticks / 120, sum / drive_ticks * RAD2DEG, peak * RAD2DEG,
+        late_peak * RAD2DEG, peak_rate * RAD2DEG, peak_load, peak_height, peak_pitch * RAD2DEG);
+    // Remove external forcing, preserve momentum/filter and recover without a reset.
+    boat.world.water = (BoatWater) { 0 };
+    boat.boat.throttle = 0;
+    for (int tick = 0; tick < 14400; ++tick) {
+        boat_session_step(&boat, (BoatInput) { 0 });
+        CHECK(finite_state(&boat.boat) && fabsf(boat.boat.roll) < 30 * DEG2RAD);
+    }
+    CHECK(fabsf(boat.boat.roll) < .0001f && fabsf(boat.boat.roll_velocity) < .0001f);
+    Vector2 rest = boat.boat.position;
+    for (int tick = 0; tick < 14400; ++tick)
+        boat_session_step(&boat, (BoatInput) { 0 });
+    printf("rest_drift=%g speed=%g\n", Vector2Distance(rest, boat.boat.position),
+        Vector2Length(boat.boat.velocity));
+    CHECK(Vector2Distance(rest, boat.boat.position) < .001f && fabsf(boat.boat.roll) < .000001f);
     return 0;
 }
+
+static int wave_turn_beam(void) { return wave_turn(0); }
+static int wave_turn_head(void) { return wave_turn(1); }
+static int wave_turn_following(void) { return wave_turn(2); }
+static int wave_turn_scripted_wake(void) { return wave_turn(3); }
+static int wave_turn_own_wake(void) { return wave_turn(4); }
+static int wave_turn_calm_long(void) { return wave_turn(5); }
 
 static bool footprint_clear(const BoatSession *session)
 {
@@ -718,7 +730,7 @@ static bool footprint_clear(const BoatSession *session)
 static int validate_long_transitions(void)
 {
     BoatSession boat;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     boat.world.water = boat_water_gentle();
     BoatSession repeat = boat;
     float peak = 0, peak_rate = 0;
@@ -741,8 +753,7 @@ static int validate_contacts(void)
 {
     for (int trial = 0; trial < 8; ++trial) {
         BoatSession boat;
-        boat_session_init(&boat, test_world(trial >= 2 ? BOAT_LOCATION_RIVER : BOAT_LOCATION_BASIN),
-            (BoatWater) { 0 });
+        physics_session(&boat, trial >= 2 ? BOAT_LOCATION_RIVER : BOAT_LOCATION_BASIN);
         if (trial < 2) {
             boat.boat.position = (Vector2) { 116, trial == 0 ? 0 : 76 };
             boat.boat.velocity = (Vector2) { 8, trial == 0 ? 0 : 8 };
@@ -791,13 +802,33 @@ static int validate_contacts(void)
     return 0;
 }
 
+static const TestCase cases[] = {
+    { "core", validate_core, false },
+    { "sides", validate_sides, false },
+    { "restoring", validate_restoring, false },
+    { "free", validate_free, false },
+    { "tow", validate_tow, false },
+    { "release", validate_release, false },
+    { "blend_flow", validate_blend_flow, false },
+    { "transitions", validate_transitions, false },
+    { "straightening", validate_straightening, false },
+    SLOW_CASE(wave_turn_beam),
+    SLOW_CASE(wave_turn_head),
+    SLOW_CASE(wave_turn_following),
+    SLOW_CASE(wave_turn_scripted_wake),
+    SLOW_CASE(wave_turn_own_wake),
+    SLOW_CASE(wave_turn_calm_long),
+    { "long_transitions", validate_long_transitions, true },
+    { "contacts", validate_contacts, false },
+};
+
 int main(int argc, char **argv)
 {
-    test_worlds_open();
-    if (argc == 2 && strcmp(argv[1], "--straightening") == 0)
-        return validate_straightening(NULL);
-    FILE *report = NULL;
-    if (argc == 3 && strcmp(argv[1], "--report") == 0) {
+    char *straightening[] = { argv[0], "--case", "straightening" };
+    if (argc == 2 && strcmp(argv[1], "--straightening") == 0) {
+        argc = 3;
+        argv = straightening;
+    } else if (argc == 3 && strcmp(argv[1], "--report") == 0) {
         report = fopen(argv[2], "w");
         if (!report) {
             perror(argv[2]);
@@ -807,14 +838,9 @@ int main(int argc, char **argv)
             "fixture,tick,time,u,wheel,engine_angle,planing,yaw_rate,roll,roll_rate,"
             "height,pitch,horizontal_energy,lateral_acceleration,nominal_radius,"
             "load_residual,side_slip,turn_roll_load\n");
-    } else if (argc != 1) {
-        fprintf(stderr, "Usage: %s [--report <path> | --straightening]\n", argv[0]);
-        return 1;
+        argc = 1;
     }
-    int result = validate_core() || validate_sides() || validate_restoring(report)
-        || validate_free(report) || validate_tow(report) || validate_release()
-        || validate_blend_flow() || validate_transitions(report) || validate_straightening(report)
-        || validate_wave_turns(report) || validate_long_transitions() || validate_contacts();
+    int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     if (report) {
         bool failed = ferror(report) != 0;
         if (fclose(report) != 0)
@@ -824,7 +850,7 @@ int main(int argc, char **argv)
             result = 1;
         }
     }
-    if (!result)
+    if (!result && argc == 1)
         puts("boat_banking=ok (T5 dynamics/environment/straightening regression)");
     test_worlds_close();
     return result;

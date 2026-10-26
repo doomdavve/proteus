@@ -200,7 +200,6 @@ static void shader_queries(const BoatSession *session, const BoatGpu *gpu)
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     if (argc > 1 && strcmp(argv[1], "--crossing") == 0) {
         crossing();
         return 0;

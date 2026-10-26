@@ -539,7 +539,6 @@ static int lifecycle(void)
 
 int main(void)
 {
-    test_worlds_open();
     SetTraceLogLevel(LOG_WARNING);
     CHECK(boat_location(BOAT_LOCATION_COUNT) == NULL && !boat_location_find("harbour"));
     for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)

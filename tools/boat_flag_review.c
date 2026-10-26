@@ -35,7 +35,6 @@ static View3D camera_for(const Boat *boat, const char *angle)
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     const char *scenario = "idle", *screenshot = NULL;
     bool gpu = false;
     unsigned int skin = BOAT_SKIN_SWEDEN;

@@ -37,7 +37,6 @@ static bool count(const char *s, unsigned *out)
 }
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     unsigned warmup = 120, frames = 1800;
     const char *output = NULL;
     bool presentation = true; // Cosmetics on by default, as in the P3a baseline.

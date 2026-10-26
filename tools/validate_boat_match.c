@@ -316,7 +316,6 @@ static int rejects(void)
 
 int main(void)
 {
-    test_worlds_open();
     if (warmup_and_rounds() || credit() || respawns() || bailout_and_leavers() || wakes()
         || rejects())
         return 1;

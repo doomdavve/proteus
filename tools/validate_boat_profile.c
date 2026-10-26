@@ -118,7 +118,6 @@ static int check_drive(void)
 
 int main(void)
 {
-    test_worlds_open();
     if (check_records() || check_drive())
         return 1;
     puts("boating profile records and deterministic drive passed");

@@ -166,7 +166,6 @@ static int shoreline(void)
 
 int main(void)
 {
-    test_worlds_open();
     CHECK(interleaved() == 0);
     CHECK(course() == 0);
     CHECK(water() == 0);
