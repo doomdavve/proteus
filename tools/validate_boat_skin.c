@@ -39,9 +39,9 @@ static void flags(void)
     Mesh3D sweden = boat_flag_skin_mesh(&surface, BOAT_SKIN_SWEDEN, &sweden_storage);
     BoatFlagMesh retained = sweden_storage;
     const Color fields[] = { { 0, 106, 167, 255 }, { 250, 246, 237, 255 }, { 198, 12, 48, 255 },
-        { 186, 12, 47, 255 } };
-    const Color crosses[]
-        = { { 255, 205, 0, 255 }, { 0, 53, 128, 255 }, { 250, 246, 237, 255 }, { 0, 32, 91, 255 } };
+        { 186, 12, 47, 255 }, { 242, 118, 28, 255 } };
+    const Color crosses[] = { { 255, 205, 0, 255 }, { 0, 53, 128, 255 }, { 250, 246, 237, 255 },
+        { 0, 32, 91, 255 }, { 58, 64, 70, 255 } };
     for (unsigned int skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
         Mesh3D mesh = boat_flag_skin_mesh(&surface, skin, &other_storage);
         assert(mesh.triangle_count == BOAT_FLAG_MESH_TRIANGLES);
@@ -97,11 +97,13 @@ int main(void)
 {
     twin_outboards();
     flags();
-    // Hull color is invariant; accent stripes retain a distinct livery color.
+    // The countries share the white hull; the explorer's differs. Accent stripes retain a
+    // distinct livery color.
     const Color white_hull = { 239, 243, 245, 255 };
     for (unsigned int skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
         BoatSkinPalette palette = boat_skin_palette(skin);
-        assert(memcmp(&palette.hull, &white_hull, sizeof(Color)) == 0);
+        assert((memcmp(&palette.hull, &white_hull, sizeof(Color)) == 0)
+            == (skin < BOAT_SKIN_COUNTRIES));
         for (unsigned int other = 0; other < skin; ++other) {
             BoatSkinPalette previous = boat_skin_palette(other);
             assert(memcmp(&palette.accent, &previous.accent, sizeof(Color)) != 0);

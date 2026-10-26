@@ -16,6 +16,7 @@ void boat_session_init(BoatSession *session, const BoatWorldResources *resources
 {
     boat_world_init(&session->world, resources, water);
     reset(session);
+    session->handling = &boat_handling_speedboat;
 }
 
 void boat_session_destroy(BoatSession *session) { boat_replay_runs_destroy(&session->runs); }
@@ -85,7 +86,8 @@ bool boat_session_step(BoatSession *session, BoatInput input)
     Vector2 previous = session->boat.position;
     ++session->tick;
     double now = boat_session_time(session);
-    boat_step(&session->boat, &session->world, now, input);
+    boat_step_handling(&session->boat, &session->world, now, input,
+        session->course.enabled ? &boat_handling_speedboat : session->handling);
     boat_course_step(&session->course, previous, session->boat.position, BOAT_TICK_SECONDS);
     boat_voyage_step(&session->voyage, session->boat.position, session->boat.velocity, now);
     if (session->presentation_enabled)

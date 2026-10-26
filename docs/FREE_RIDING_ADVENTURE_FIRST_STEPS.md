@@ -1776,8 +1776,9 @@ acceptance of the outing.
 Asked how to act on it (2026-10-26), the user chose to leave the boat's speed alone for now
 (options offered: a faster gear for the outer map only, a faster boat everywhere, later start
 points at the shelters) and to dress the land past the bridge before the weather transition,
-which became A3.5a. The length remains open. The plan's rule (start points before changing
-geographic scale) still applies when it is revisited.
+which became A3.5a. Later the same day the user changed their mind on the boat and asked for
+a faster explorer boat as a colour variation, at about 60 knots (30 m/s): see
+[explorer boat](#explorer-boat-2026-10-26). Geographic scale is unchanged.
 
 ### A3.5a result, 2026-10-26
 
@@ -1830,6 +1831,42 @@ Branch `adventure-a3-5a`, cut from `main` (`1fe24a8`).
   - The multiplayer content digest changes with the mesh, so an outer room needs matching
     builds.
   - Travel time, the user's other point, is unchanged.
+
+### Explorer boat, 2026-10-26
+
+Branch `adventure-explorer-boat`, cut from `adventure-a3-5a` (`9e72dc1`), at the user's
+request after the playtest.
+
+- **Boat:** a fifth livery, `explorer` (graphite hull, sand deck, signal-orange stripe, an
+  authored orange pennant with a graphite cross), on the same speedboat geometry. Choose it with
+  `--skin explorer` or BOAT in the title's settings, whose hint then reads FASTER ENGINE WHEN
+  FREE RIDING SOLO.
+- **Engine (decision):** `BoatHandling` in `src/boat.h` carries the forward thrust;
+  `boat_step()` keeps the speedboat's 11 units and `boat_step_handling()` takes another.
+  `BoatSession.handling` is the speedboat after init, survives restarts, and is ignored on
+  course ticks, so runs and bests always compare. `wake_velocity` sets the explorer's 18 units
+  when the explorer livery free-boats solo. `Boat`, its hash, recordings, the protocol and
+  `BOAT_PHYSICS_REVISION` are unchanged; rooms simulate the speedboat and colour slots with the
+  four countries only (`BOAT_SKIN_COUNTRIES`).
+- **Measured (`boat_voyage`, calm outer fjord, a minute flat out):** speedboat 22.6 m/s, explorer
+  30.0 m/s (58 knots; the HUD dial ends at 60). Autopiloted from the fjord turn to Långedrag:
+  coastal 97.3 s → 78.0 s, direct 109.2 s → 88.0 s, through the rough patch with up to 0.58 m of
+  heave and no capsizes. The autopilot's slow-approach throttle had to be scaled by engine
+  strength. At the stock 15% the explorer pushed itself against the harbour wall, 90 m out.
+  A player who lifts off the throttle earlier is not affected.
+- **Captures (agent review, 2026-10-26, macOS arm64):** `--location outer --skin explorer` at
+  the dock on CPU and GPU, and on the fjord on GPU; the livery and pennant read clearly. Not
+  saved to the repository.
+- **Verification (2026-10-26, macOS arm64, Debug, `PROTEUS_GPU_TESTS=OFF`):** build
+  warning-free; `ctest --preset full` passed all 229 active tests (13 retired disabled) in 13 s.
+  The GPU-labelled tests did not run.
+- **Limitations:**
+  - **Not played.** Turning, jumps and spray at 30 m/s are untested by a person, and only the
+    autopilot ran the outer route.
+  - Only thrust changes: steering torque grows with it (same lever arm), and the hull's grip,
+    planing and drag are the speedboat's.
+  - The single-player title remembers the livery as before; choosing EXPLORER for a course
+    gives the explorer look with the standard engine.
 
 **Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
 

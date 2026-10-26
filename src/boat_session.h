@@ -23,6 +23,9 @@ typedef struct {
     // save/export waits for boat_session_flush() outside the tick loop.
     BoatReplayRuns runs;
     bool record_runs;
+    // The boat's engine class for free boating; boat_session_init() sets the speedboat and
+    // restarts keep it. Course ticks always use the speedboat, so runs and bests compare.
+    const BoatHandling *handling;
 } BoatSession;
 
 // Tick zero, the boat at the definition's spawn, a reset enabled presentation, no course or

@@ -44,6 +44,15 @@ typedef struct {
     Vector2 physical_wake_start;
 } Boat;
 
+// Engine class: the forward thrust behind the hull's top speed. Everything else is shared.
+// Courses, rooms, recordings and bests use the speedboat; the explorer is the solo free-riding
+// boat, faster for long outings (about 30 m/s flat out against the speedboat's 23 m/s).
+typedef struct {
+    float thrust;
+} BoatHandling;
+extern const BoatHandling boat_handling_speedboat;
+extern const BoatHandling boat_handling_explorer;
+
 // Basin spawn at time zero; boat_reset_location() uses a definition's spawn instead.
 void boat_reset(Boat *boat);
 void boat_reset_location(Boat *boat, const BoatWorldDefinition *definition);
@@ -51,6 +60,9 @@ void boat_reset_location(Boat *boat, const BoatWorldDefinition *definition);
 // Translation starts from the position given, so callers sweep gates from it.
 // Only WORLD's water history is written. Opposite steering unwinds the wheel three times faster.
 void boat_step(Boat *boat, BoatWorld *world, double now, BoatInput input);
+// boat_step() with HANDLING instead of the speedboat's.
+void boat_step_handling(
+    Boat *boat, BoatWorld *world, double now, BoatInput input, const BoatHandling *handling);
 // Planar contact between two dynamic hulls whose transformed vertical intervals overlap:
 // the separating-axis normal pushing A away from B, its penetration depth and both lever arms
 // to the shared contact point.

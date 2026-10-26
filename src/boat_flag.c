@@ -198,6 +198,10 @@ Mesh3D boat_flag_skin_mesh(const BoatFlagSurface *surface, unsigned int skin, Bo
         field = (Color) { 186, 12, 47, 255 };
         cross = white;
         break;
+    case BOAT_SKIN_EXPLORER: // An authored expedition pennant, not a national flag.
+        field = (Color) { 242, 118, 28, 255 };
+        cross = (Color) { 58, 64, 70, 255 };
+        break;
     default:
         field = (Color) { 0, 106, 167, 255 };
         cross = (Color) { 255, 205, 0, 255 };

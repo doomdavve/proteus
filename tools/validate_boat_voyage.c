@@ -49,14 +49,16 @@ typedef struct {
 } Run;
 
 // Autopilot from the fjord turn (the first point of PATH) along PATH, then on the voyage's cue
-// into the harbour, slowing near it. A capsize recovers to the last shelter, as Backspace does.
-static Run autopilot(
-    const BoatWorldResources *world, BoatWater water, const Vector2 *path, int count)
+// into the harbour, slowing near it on the same thrust whatever the engine. A capsize recovers to
+// the last shelter, as Backspace does.
+static Run autopilot(const BoatWorldResources *world, BoatWater water, const Vector2 *path,
+    int count, const BoatHandling *handling)
 {
     Run run = { 0 };
     BoatSession session;
     boat_session_init(&session, world, water);
     session.presentation_enabled = false;
+    session.handling = handling;
     session.boat.position = sim(path[0]);
     Vector2 first = Vector2Subtract(sim(path[1]), session.boat.position);
     session.boat.heading = atan2f(first.x, -first.y);
@@ -77,7 +79,9 @@ static Run autopilot(
             if (remaining < 60)
                 ++waypoint;
         }
-        float target = distance > 250 ? 1.0f : distance > 120 ? .35f : .15f;
+        // Slow settings give the same push on either engine.
+        float slow = boat_handling_speedboat.thrust / handling->thrust;
+        float target = distance > 250 ? 1.0f : distance > 120 ? .35f * slow : .15f * slow;
         float wheel = Clamp(bearing * 1.5f, -1, 1);
         boat_session_step(&session,
             (BoatInput) { .steering_rate = boat_steering_rate(session.boat.wheel, wheel),
@@ -102,6 +106,25 @@ static Run autopilot(
     run.seconds = session.voyage.arrival - session.voyage.started;
     boat_session_destroy(&session);
     return run;
+}
+
+// Flat-out ground speed after a minute at full throttle on calm open water. The boat is held
+// at one point of the fjord so that no shore interferes; speed does not depend on position.
+static float top_speed(const BoatWorldResources *world, BoatWater water, const BoatHandling *h)
+{
+    BoatSession session;
+    boat_session_init(&session, world, water);
+    session.presentation_enabled = false;
+    session.handling = h;
+    Vector2 hold = sim((Vector2) { -3850, -2700 });
+    while (session.tick < (uint64_t)(60 / BOAT_TICK_SECONDS)) {
+        session.boat.position = hold;
+        boat_session_step(&session,
+            (BoatInput) { .throttle_rate = boat_throttle_rate(session.boat.throttle, 1) });
+    }
+    float speed = Vector2Length(session.boat.velocity);
+    boat_session_destroy(&session);
+    return speed;
 }
 
 int main(void)
@@ -213,14 +236,28 @@ int main(void)
 
     // Both ways from the fjord turn arrive at controlled speed. The coastal way stays calm; the
     // direct line crosses the exposed flank.
-    Run calm = autopilot(&world, water, coastal, COASTAL);
-    Run rough = autopilot(&world, water, direct, 3);
+    Run calm = autopilot(&world, water, coastal, COASTAL, &boat_handling_speedboat);
+    Run rough = autopilot(&world, water, direct, 3, &boat_handling_speedboat);
     CHECK(calm.arrived && calm.capsizes == 0 && calm.exposed_seconds == 0);
     CHECK(rough.arrived && rough.exposed_seconds > 5);
+
+    // The explorer is about 30 m/s (60 knots) flat out against the speedboat's 23 m/s, and still
+    // makes both ways in, sooner and at controlled arrival speed.
+    BoatWater flat = boat_world_test_water(outer, false, false, false);
+    float stock = top_speed(&world, flat, &boat_handling_speedboat);
+    float explorer = top_speed(&world, flat, &boat_handling_explorer);
+    CHECK(stock > 21 && stock < 25);
+    CHECK(explorer > 29 && explorer < 31);
+    Run quick_calm = autopilot(&world, water, coastal, COASTAL, &boat_handling_explorer);
+    Run quick_rough = autopilot(&world, water, direct, 3, &boat_handling_explorer);
+    CHECK(quick_calm.arrived && quick_calm.capsizes == 0 && quick_calm.seconds < calm.seconds);
+    CHECK(quick_rough.arrived && quick_rough.seconds < rough.seconds);
     boat_world_resources_destroy(&world);
     printf("boat_voyage=ok reach direct=%.2f coastal=%.2f; centre swell %.2f m; coastal %.1f s; "
-           "direct %.1f s, %.1f s exposed, heave %.2f m, %u capsizes\n",
+           "direct %.1f s, %.1f s exposed, heave %.2f m, %u capsizes; top speed %.1f m/s, "
+           "explorer %.1f m/s: coastal %.1f s, direct %.1f s, heave %.2f m, %u capsizes\n",
         direct_reach, coastal_reach, high - low, calm.seconds, rough.seconds, rough.exposed_seconds,
-        rough.peak_heave, rough.capsizes);
+        rough.peak_heave, rough.capsizes, stock, explorer, quick_calm.seconds, quick_rough.seconds,
+        quick_rough.peak_heave, quick_rough.capsizes);
     return 0;
 }
