@@ -35,7 +35,7 @@ No expanded geography, streaming, adventure rules or new weather is implemented.
 [A2.4](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a24-result-2026-10-26) indexed the water
 (256 m grid) so GPU patch rebuilds visit only nearby triangles and the CPU surface displaces
 only what the camera sees (2026-10-26, branch `adventure-a2-4`): CPU captures byte-identical,
-mean CPU triangles 2.34 M to 1.30 M; GPU waves captures identical to main, GPU CTests still to run.
+mean CPU triangles 2.34 M to 1.30 M; GPU waves captures identical to main, GPU CTests passed.
 **Next: [A2.5](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a25--outline), same-view scaling against
 synthetic catalogues (after the GPU checks listed in the A2.4 limitations).**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
