@@ -82,7 +82,8 @@ Verification record (macOS/Apple Silicon, Debug, 2026-10-26):
   window here; no GPU or windowed playback pass is claimed.
 - Final Debug project build warning-free; full routine CTest: 97 active cases pass, 13 retired
   cases disabled, GPU tests off. ENet loopback/host/session tests ran with socket access.
-  All 17 baseline offline CPU captures remain byte-identical. Free/race trace and replay tests pass.
+  All 17 baseline offline CPU captures remain byte-identical. The new combat validator
+  also passes a dedicated Release build with its assertions explicitly retained. Free/race trace and replay tests pass.
 - Four held boats, 600-tick synthetic stress: 64 continuously replenished bullets plus four
   waves average 0.113 ms/tick, p95 0.118, p99 0.125; combat disabled average 0.022 ms/tick.
   Separate 7200-tick scripted four-hunter run: mean 0.0404 ms/tick, p99 0.0601; one gun kill,

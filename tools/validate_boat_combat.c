@@ -4,6 +4,8 @@
 #include "boat_net_protocol.h"
 #include "raymath.h"
 
+// Validator assertions include setup/tick calls and must run in Release as well.
+#undef NDEBUG
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
