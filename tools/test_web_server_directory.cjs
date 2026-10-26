@@ -17,9 +17,11 @@ const manifest = require('../web/servers.json');
   await first;
   assert.equal(calls, 1);
   assert.equal(directory.server(0).name, 'Winterfell');
-  assert.equal(directory.compatible(0, 5, 8), true);
-  assert.equal(directory.compatible(0, 5, 9), false);
-  assert.equal(directory.compatible(9, 5, 8), false);
+  const { protocol, physics } = manifest.servers[0];
+  assert.equal(directory.compatible(0, protocol, physics), true);
+  assert.equal(directory.compatible(0, protocol, physics + 1), false);
+  assert.equal(directory.compatible(0, protocol + 1, physics), false);
+  assert.equal(directory.compatible(9, protocol, physics), false);
 
   // An operator can update the directory without a Wasm rebuild; a transient outage
   // preserves the last successful list instead of blocking a previously available room.

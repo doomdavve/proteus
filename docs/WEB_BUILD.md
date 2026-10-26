@@ -20,10 +20,11 @@ The GitHub Pages build includes the browser client; Pages does not provide a gam
 The [Winterfell hosting guide](MULTIPLAYER_HOSTING.md) owns the separately deployed released
 room, HTTPS signaling and private TURN relay, including current verification limits.
 For internet play on that room, launch the pinned client at
-`https://winterfell.davve.net:24443/` and choose MULTIPLAYER → WINTERFELL. The v0.0.17
-Pages launcher leaves browser STUN empty;
-entering the same room URL there can work over VPN and time out outside it. The user
-confirmed the Winterfell launcher connects without VPN on 2026-10-26.
+`https://wake.davve.net/` or [GitHub Pages](https://doomdavve.github.io/proteus/) and choose
+MULTIPLAYER → WINTERFELL. Both use the public `wake.davve.net` directory and WebSocket
+endpoint, outside the VPN's private Winterfell DNS override. The Pages launcher publishes
+independently from tagged game releases; its manual workflow can republish a selected
+published release with a changed server-directory URL without changing the game version.
 
 The existing Emscripten/WebGL 2 build, click-to-start audio, IndexedDB bests, content-hashed
 packaging and `v*` Pages deployment workflow remain in use. Both music tracks and the shared
@@ -56,23 +57,29 @@ so deployment can update compatibility metadata without republishing Pages. The 
 launcher includes public STUN on every host, including Pages.
 
 Both features were introduced as `v0.0.17-server-directory`; Winterfell now serves the exact
-v0.0.18 client, built on the server by the `davve-srv` baseline role. The v0.0.18 Pages build
-and deployment also passed, including default STUN and the shared public directory. Routine
-updates use the [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
-Native clients retain LAN/manual joining. Next: human review of the named-server and weapons
-flow, then the wider browser/platform checks below.
+v0.0.18 client, built on the server by the `davve-srv` baseline role. The public directory
+and launcher at `wake.davve.net` report protocol 6 / physics 9 and use
+`wss://wake.davve.net/room`. On 2026-10-26, a fresh Chrome/SwiftShader run of the published
+Pages build, with only its launcher directory URL overridden in Playwright, fetched Winterfell,
+joined that room and drove without local-network permission. Production Pages still needs the
+release-pinned workflow change in PR #12 to be merged and dispatched. Routine server updates
+use the [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native
+clients retain LAN/manual joining. Human gameplay and wider browser/platform checks remain.
 
 Run the directory contract check with Node, or test a served released-compatible client:
 
 ```sh
 node tools/test_web_server_directory.cjs
-python3 tools/check_web_server_directory.py --url https://winterfell.davve.net:24443/ --output build/directory-review
-python3 tools/check_web_server_directory.py --url https://winterfell.davve.net:24443/ --unavailable --output build/directory-fallback
+python3 tools/check_web_server_directory.py --url https://wake.davve.net/ --output build/directory-review
+python3 tools/check_web_server_directory.py --url https://doomdavve.github.io/proteus/ \
+  --directory-url https://wake.davve.net/servers.json --output build/pages-preview
+python3 tools/check_web_server_directory.py --url https://wake.davve.net/ --unavailable --output build/directory-fallback
 ```
 
-The optional Playwright check joins the named room without text input; `--unavailable`
-simulates a directory HTTP failure and uses the manual fallback instead. Both leave the
-server running and close only their own browser client.
+The optional Playwright check joins the named room without text input; `--directory-url`
+tests a launcher-only endpoint change before publishing, and `--unavailable` simulates a
+directory HTTP failure and uses the manual fallback instead. Both leave the server running
+and close only their own browser client.
 
 ## Pedal controls update, 2026-10-26
 

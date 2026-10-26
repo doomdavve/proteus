@@ -4,10 +4,10 @@
     {
       "name": "Winterfell",
       "description": "River capsize deathmatch",
-      "websocket": "wss://winterfell.davve.net:24443/room",
-      "native": "winterfell.davve.net:24680",
-      "protocol": 5,
-      "physics": 8
+      "websocket": "wss://wake.davve.net/room",
+      "native": "wake.davve.net:24680",
+      "protocol": 6,
+      "physics": 9
     }
   ]
 }

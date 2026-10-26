@@ -18,9 +18,11 @@ separate internet path. Both weapons are now deployed through the `davve-srv` ba
 role; named joining, weapon inputs and combat pages passed automation. Human weapons play
 and full internet-play qualification remain pending.
 The browser now fetches a known-server list and defaults to Winterfell for joining without
-typing; that UI is deployed and agent-checked, awaiting user review. Release preparation
-adds a shared CORS directory with deployment-generated compatibility and a coordinated
-protocol-v6 cutover recipe. Details and current verification limits stay in the guide.
+typing. The dedicated public `wake.davve.net` DNS/TLS endpoint is deployed, and a fresh
+GitHub Pages browser joined through it on VPN without local-network permission. PR #12 carries
+the release-pinned Pages configuration update; production Pages republish awaits merge and
+workflow dispatch. Human gameplay and broader browser/network qualification remain open.
+Details and current verification limits stay in the guide.
 
 | Area and owning document | Implemented | Remaining / next task |
 | --- | --- | --- |

@@ -10,6 +10,7 @@ parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--executable', default='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 parser.add_argument('--unavailable', action='store_true', help='Fail the directory and verify manual joining still works.')
 parser.add_argument('--incompatible', action='store_true', help='Expect the listed room to require a different client version.')
+parser.add_argument('--directory-url', help='Test a launcher-only endpoint change before publishing it.')
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 
@@ -22,6 +23,15 @@ with sync_playwright() as p:
         page.on('console', lambda message: logs.append(message.text))
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.on('request', lambda request: requests.append(request.url))
+        if args.directory_url:
+            from configure_web_endpoint import configure_text
+
+            def configure_launcher(route):
+                response = route.fetch()
+                body = configure_text(response.text(), args.directory_url)
+                route.fulfill(status=response.status, content_type='text/html', body=body)
+
+            page.route(args.url, configure_launcher)
         if args.unavailable:
             page.route('**/servers.json', lambda route: route.fulfill(status=503, body='offline'))
         page.goto(args.url)
