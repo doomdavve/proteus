@@ -254,7 +254,7 @@ cost, the tight-turn overlap investigation and remaining human/platform checks.
 Routine test selection and timings are owned by [the test workflow](TESTING.md).
 On 2026-10-26 (M1 Max/macOS, Debug, GPU tests off), `ctest --preset quick` ran 133 quick tests
 in about 1 s. `ctest --preset full` ran all 220 enabled CPU tests in 18.7 s, down from 71.6 s
-for 98 tests earlier that day. Heavy validators are split into `<prefix>.<case>` tests. GPU
+for 98 tests earlier that day; with GPU tests on, all 246 passed in 60.7 s. Heavy validators are split into `<prefix>.<case>` tests. GPU
 tests run one at a time under a shared resource lock beside the CPU tests. Fifteen retired
 physical-field experiments stay disabled by default.
 
