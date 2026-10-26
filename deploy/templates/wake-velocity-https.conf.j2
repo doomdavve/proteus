@@ -1,0 +1,27 @@
+# Game-only listener; the existing infrastructure HTTPS site stays separate.
+server {
+    listen 24443 ssl;
+    server_name {{ wake_domain }};
+    ssl_certificate /etc/letsencrypt/live/{{ wake_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ wake_domain }}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header X-Content-Type-Options nosniff always;
+
+    root {{ wake_root }}/browser/{{ wake_commit }}/site;
+    index index.html;
+
+    location = /room {
+        proxy_pass http://{{ wake_lan_ip }}:24682/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        proxy_buffering off;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

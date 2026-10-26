@@ -57,6 +57,7 @@ target_link_options(wake_velocity PRIVATE
   -lidbfs.js
   "SHELL:--preload-file \"${WEB_ASSETS}@/assets\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js\""
+  "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js\"")
 set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
@@ -65,6 +66,7 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"
+  "${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js")
 

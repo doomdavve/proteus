@@ -85,8 +85,8 @@
     var Module = {
       canvas: document.getElementById('canvas'),
       noInitialRun: true,
-      // Optional STUN/TURN configuration for the operator's WebRTC service.
-      boatIceServers: [],
+      // Public address discovery is needed on Pages as well as operator-hosted clients.
+      boatIceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
       locateFile: path => webFiles[path] || path,
       print: text => console.log(text),
       printErr: text => console.error(text),

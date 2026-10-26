@@ -7,6 +7,23 @@
 #include "boat_skin.h"
 #include "frame_pacer.h"
 #include "raylib.h"
+#if defined(__EMSCRIPTEN__)
+#include "boat.h"
+#include <emscripten.h>
+
+// clang-format off
+EM_JS(void, refresh_public_servers, (void), { Module['boatServers'].refresh(); })
+EM_JS(int, public_server_count, (void), { return Module['boatServers'].count(); })
+EM_JS(int, public_server_compatible, (int index, int protocol, int physics),
+    { return Module['boatServers'].compatible(index, protocol, physics); })
+EM_JS(void, public_server_text, (int index, int field, char *out, int size), {
+    const server = Module['boatServers'].server(index);
+    const value = field === 3 ? Module['boatServers'].status()
+        : server ? [server.name, server.description, server.websocket][field] : "";
+    stringToUTF8(value, out, size);
+})
+// clang-format on
+#endif
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
 #include "boat_net_enet.h"
 #endif
@@ -20,7 +37,15 @@ enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
 
 typedef enum { ROW_SINGLE, ROW_MULTI, ROW_SETTINGS, ROW_EXIT, MAIN_ROWS } MainRow;
 #if defined(__EMSCRIPTEN__)
-typedef enum { ROW_ADDRESS, ROW_CONNECT, ROW_BACK, JOIN_ROWS, ROW_HOST_ROOM, ROW_LAN } JoinRow;
+typedef enum {
+    ROW_PUBLIC_SERVER,
+    ROW_ADDRESS,
+    ROW_CONNECT,
+    ROW_BACK,
+    JOIN_ROWS,
+    ROW_HOST_ROOM,
+    ROW_LAN
+} JoinRow;
 #else
 typedef enum { ROW_HOST_ROOM, ROW_LAN, ROW_ADDRESS, ROW_CONNECT, ROW_BACK, JOIN_ROWS } JoinRow;
 #endif
@@ -64,6 +89,9 @@ typedef struct {
     bool searching, moved; // MOVED: the player has picked a row since opening the panel.
     BoatNetLanList found;
     unsigned shown; // The found room the LAN row offers.
+#if defined(__EMSCRIPTEN__)
+    unsigned public_shown;
+#endif
     double queried;
     FramePacer pacer;
 } Title;
@@ -86,6 +114,9 @@ static void start_search(Title *t)
     t->found.count = t->shown = 0;
     t->moved = false;
     t->queried = -1;
+#if defined(__EMSCRIPTEN__)
+    refresh_public_servers();
+#endif
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     char error[160];
     if (!t->searching && boat_net_enet_startup()) {
@@ -116,6 +147,10 @@ static void search(Title *t)
         t->shown = 0;
     if (none && t->found.count && !t->moved && t->selected == ROW_CONNECT)
         t->selected = ROW_LAN; // The first room found is the likely choice.
+#elif defined(__EMSCRIPTEN__)
+    unsigned count = (unsigned)public_server_count();
+    if (t->public_shown >= count)
+        t->public_shown = 0;
 #else
     (void)t;
 #endif
@@ -253,11 +288,22 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     if (t->panel == PANEL_JOIN) {
         static const char *labels[JOIN_ROWS]
 #if defined(__EMSCRIPTEN__)
-            = { "URL", "CONNECT", "BACK" };
+            = { "SERVER", "URL", "CONNECT", "BACK" };
 #else
             = { "HOST A ROOM", "LAN", "ADDRESS", "CONNECT", "BACK" };
 #endif
         *label = labels[row];
+#if defined(__EMSCRIPTEN__)
+        if (row == ROW_PUBLIC_SERVER) {
+            if (public_server_count()) {
+                char name[25];
+                public_server_text((int)t->public_shown, 0, name, sizeof(name));
+                upper(value, size, name);
+            } else
+                snprintf(value, size, "UNAVAILABLE");
+            return;
+        }
+#endif
         if (row == ROW_ADDRESS)
             snprintf(value, size, "%s", s->address);
         if (row != ROW_LAN)
@@ -369,6 +415,20 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
 #if defined(__EMSCRIPTEN__)
+    char public_hint[96];
+    if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_PUBLIC_SERVER) {
+        if (!public_server_count())
+            public_server_text(0, 3, public_hint, sizeof(public_hint));
+        else if (!public_server_compatible(
+                     (int)t->public_shown, BOAT_NET_VERSION, BOAT_PHYSICS_REVISION))
+            snprintf(public_hint, sizeof(public_hint), "OTHER GAME VERSION; UPDATE THE CLIENT");
+        else {
+            char description[65];
+            public_server_text((int)t->public_shown, 1, description, sizeof(description));
+            upper(public_hint, sizeof(public_hint), description);
+        }
+        hint = public_hint;
+    }
     if (!hint && t->panel == PANEL_JOIN)
         hint = "JOIN A WEBRTC ROOM: WS:// OR WSS://";
 #endif
@@ -560,6 +620,15 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         }
         if (t.panel == PANEL_JOIN && !t.editing)
             search(&t);
+#if defined(__EMSCRIPTEN__)
+        if (t.panel == PANEL_JOIN && t.selected == ROW_PUBLIC_SERVER && !t.editing
+            && public_server_count() > 1) {
+            int count = public_server_count();
+            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
+                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+            t.public_shown = (unsigned)((int)t.public_shown + count + turn) % (unsigned)count;
+        }
+#endif
         if (t.panel == PANEL_JOIN && t.selected == ROW_LAN && !t.editing && t.found.count > 1) {
             int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
                 - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
@@ -623,7 +692,17 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 } else
                     back = true;
             } else if (t.panel == PANEL_JOIN) {
-                if (t.selected == ROW_HOST_ROOM) {
+#if defined(__EMSCRIPTEN__)
+                if (t.selected == ROW_PUBLIC_SERVER) {
+                    if (public_server_compatible(
+                            (int)t.public_shown, BOAT_NET_VERSION, BOAT_PHYSICS_REVISION)) {
+                        public_server_text((int)t.public_shown, 2, s->address, sizeof(s->address));
+                        choice = BOAT_TITLE_JOIN;
+                        chosen = true;
+                    }
+                } else
+#endif
+                    if (t.selected == ROW_HOST_ROOM) {
                     t.panel = PANEL_HOST;
                     t.selected = ROW_START;
                 } else if (t.selected == ROW_LAN) {
@@ -648,6 +727,9 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             } else if (t.selected == ROW_MULTI) {
                 t.panel = PANEL_JOIN;
                 t.selected = ROW_CONNECT;
+#if defined(__EMSCRIPTEN__)
+                t.selected = ROW_PUBLIC_SERVER;
+#endif
                 start_search(&t);
             } else if (t.selected == ROW_SETTINGS) {
                 t.panel = PANEL_SETTINGS;

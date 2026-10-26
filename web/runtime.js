@@ -14,6 +14,7 @@ fullscreenOption.addEventListener('change', () => {
 });
 installBoatMouseControls(Module, canvas, document, window);
 installBoatRtcTransport(Module);
+installBoatServerDirectory(Module).refresh();
 document.getElementById('fullscreen').disabled = !stage.requestFullscreen;
 
 Module['preRun'] = Module['preRun'] || [];

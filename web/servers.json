@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "servers": [
+    {
+      "name": "Winterfell",
+      "description": "River capsize deathmatch",
+      "websocket": "wss://winterfell.davve.net:24443/room",
+      "native": "winterfell.davve.net:24680",
+      "protocol": 5,
+      "physics": 8
+    }
+  ]
+}

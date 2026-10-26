@@ -1,0 +1,21 @@
+[Unit]
+Description=Wake Velocity private TURN allocation service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/turnserver -c /etc/wake-velocity/turnserver.conf
+User=turnserver
+Group=turnserver
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RuntimeDirectory=wake-velocity-relay
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

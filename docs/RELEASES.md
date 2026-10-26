@@ -8,6 +8,13 @@ title's HOST A ROOM, Windows `host.bat`), so packages carry one executable. M6 w
 identity, native cross-platform checks and a separate Linux headless-server distribution to
 release documentation. A future native multiplayer release need not imply browser multiplayer parity.
 
+The [Winterfell room](MULTIPLAYER_HOSTING.md) builds the exact v0.0.17 source with the optional
+WebRTC transport for shared native/browser play. This deployment is separate from release
+packaging; there is still no downloadable Linux server distribution.
+Winterfell's browser is subsequently labeled `v0.0.17-server-directory`: released core with
+the fetched-server menu added, built by `tools/build_winterfell_web.sh`. This is an operator
+UI deployment, not a new published release or a change to the server/native packages.
+
 The **Release Wake Velocity** workflow builds and tests the Apple Silicon Mac app
 and Windows x64 package for the same version tag, then attaches both ZIPs and their
 SHA-256 files to a GitHub Release. Downloads from Releases do not require navigating
