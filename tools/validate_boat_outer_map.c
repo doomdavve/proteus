@@ -21,8 +21,9 @@
     } while (0)
 
 #define ENVELOPE 8.0f
-#define WATER_TRIANGLES 2668 // The manifest's water_triangles.
+#define WATER_TRIANGLES 2738 // The manifest's water_triangles.
 #define BRIDGE_TRIANGLES 4388 // The manifest's river_overlay.bridge_triangles.
+#define DRESSING_TRIANGLES 65612 // The manifest's dressing.triangles.
 static const Vector2 route[] = { { 12, 60 }, { 24, -70 }, { 15, -180 }, { -250, -500 },
     { -650, -850 }, { -1100, -960 }, { -3300, -1550 }, { -3850, -2400 }, { -3850, -3150 },
     { -3700, -3310 }, { -3620, -3380 } };
@@ -38,10 +39,11 @@ int main(void)
     CHECK(boat_map_init(&map, &waterfront_outer_map));
     CHECK(boat_map_leading_water(waterfront_outer_map.mesh) == WATER_TRIANGLES);
     CHECK(map.water_count == WATER_TRIANGLES);
-    // A3.3: the river's bridge triangles come last and are marked as the bridge range.
+    // A3.3: the river's bridge triangles start the authored range, which the A3.5a dressing
+    // (buildings, cranes, marks and trees beyond the crop) completes.
     CHECK(waterfront_outer_map.bridge_first_triangle < waterfront_outer_map.mesh->triangle_count);
     CHECK(waterfront_outer_map.mesh->triangle_count - waterfront_outer_map.bridge_first_triangle
-        == BRIDGE_TRIANGLES);
+        == BRIDGE_TRIANGLES + DRESSING_TRIANGLES);
     CHECK(!boat_map_is_bridge_triangle(
         &waterfront_outer_map, waterfront_outer_map.bridge_first_triangle - 1));
     CHECK(boat_map_is_bridge_triangle(
@@ -62,7 +64,8 @@ int main(void)
 
     // The land is Baskarta terrain (A3.1b) outside the river crop: real relief above the water,
     // never below the 1 m floor on its top surface, with hills that rise tens of metres. The
-    // river's bridge (A3.3) reaches its 107.6 m tower tops. Water stays at 0.
+    // river's bridge (A3.3) reaches its 107.6 m tower tops and the container cranes (A3.5a)
+    // their raised booms at the mapped 118 m above the quay. Water stays at 0.
     const Mesh3D *mesh = waterfront_outer_map.mesh;
     float highest = 0, lowest_top = INFINITY;
     for (size_t i = WATER_TRIANGLES; i < mesh->triangle_count; ++i) {
@@ -74,7 +77,7 @@ int main(void)
         if (flo >= .99f) // Land top: every corner at or above the floor.
             lowest_top = fminf(lowest_top, flo);
     }
-    CHECK(highest > 100.0f && highest < 110.0f);
+    CHECK(highest > 118.0f && highest < 125.0f);
     CHECK(lowest_top >= .99f);
     CHECK(mesh->triangle_count > 200000);
 

@@ -90,10 +90,24 @@
   "playable_boundary_m": 5151.0,
   "route_length_m": 6016.9,
   "route_min_shore_clearance_m": 27.6,
-  "vertices": 148441,
-  "triangles": 240538,
-  "water_triangles": 2668,
-  "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3)",
+  "vertices": 195326,
+  "triangles": 306538,
+  "water_triangles": 2738,
+  "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3); outside it buildings, container cranes, port masts, channel marks and trees (A3.5a)",
+  "dressing": {
+    "first_triangle": 240926,
+    "buildings": 1956,
+    "gabled": 1017,
+    "skipped_small": 44,
+    "stone": 10,
+    "container_cranes": 13,
+    "lighting_masts": 60,
+    "marks": 8,
+    "trees": 3050,
+    "triangles": 65612,
+    "marks_in_water": 7,
+    "assumptions": "Footprints, crane, mast and mark positions and tagged heights are OSM. Untagged heights: houses 5.5 m eaves with a gable roof on near-rectangular footprints, sheds and garages 2.8 m, tanks 14 m, other buildings 8-14 m by area. Walls sink 0.6 m below the lowest corner. Container cranes are a raised-boom blockout at the mapped 118 m (also used where untagged), boom toward the nearest water; lighting masts 30 m; marks are 3.5-4.5 m piles in their mapped colour on a 1.5 m carved rock where they stand in water. Buildings within 150 m of Nya \u00c4lvsborg are stone. Trees are an authored scatter (11 m lattice, 80 m value noise) on ground at least 3 m high and under 24 degrees, 6 m from shore and clear of buildings, roads and the port; not mapped vegetation. Colours are authored."
+  },
   "river_overlay": {
     "source": "assets/geometry/river/geometry.h",
     "triangles": 70940,
@@ -101,6 +115,6 @@
     "ground_m": 3.5,
     "terrain_blend_m": 200.0
   },
-  "land_triangles": 118938,
-  "geometry_sha256": "31265d24ea2a7e01f8616ffac3e46859231f33841bd8bab070c0152cd9fc4ace"
+  "land_triangles": 118992,
+  "geometry_sha256": "50f6d30ff476158c06ea27530693f10ddb5b808c41169f9f842e5ad4288d36ba"
 }
