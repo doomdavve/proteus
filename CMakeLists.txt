@@ -409,6 +409,10 @@ set_tests_properties(boat_fleet_render PROPERTIES LABELS "render;cpu"
   PASS_REGULAR_EXPRESSION "boat_fleet_render=ok")
 find_program(PROTEUS_NODE_EXECUTABLE node)
 if(PROTEUS_NODE_EXECUTABLE)
+  add_test(NAME web_server_directory COMMAND ${PROTEUS_NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_server_directory.cjs)
+  set_tests_properties(web_server_directory PROPERTIES LABELS "cpu"
+    PASS_REGULAR_EXPRESSION "web_server_directory=ok")
   add_test(NAME web_rtc_transport COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_rtc_transport.cjs)
   set_tests_properties(web_rtc_transport PROPERTIES LABELS "cpu"

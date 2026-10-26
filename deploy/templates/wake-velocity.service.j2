@@ -1,0 +1,23 @@
+[Unit]
+Description=Wake Velocity {{ wake_version }} river room
+Wants=network-online.target wake-velocity-relay.service
+After=network-online.target wake-velocity-relay.service
+
+[Service]
+Type=simple
+User=wake-velocity
+Group=wake-velocity
+WorkingDirectory={{ wake_root }}
+ExecStart={{ wake_source }}/build-server/boat_server --bind {{ wake_lan_ip }} --port 24680 --no-lan --players 4 --mode {{ wake_mode }} --location {{ wake_location }} --rtc-port 24682 --ice-server turn:wake:{{ wake_password.content | b64decode | trim }}@127.0.0.1:3478
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

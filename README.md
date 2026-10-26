@@ -177,7 +177,10 @@ other machines, bind a LAN address (`--bind 192.168.1.20`) and allow the UDP por
 firewall (`--bind 0.0.0.0` accepts every interface). Such rooms also answer LAN searches on
 UDP port 24681 (`--lan-port N` moves it, `--no-lan` turns it off). A loopback room answers only
 searches from its own machine. `./build/boat_bot --discover` lists the rooms it finds. Internet
-hosting, NAT traversal, encryption and authentication are not provided. The room's players are listed at the top right.
+hosting uses manual port forwarding or a VPN; see the
+[Winterfell hosting guide](docs/MULTIPLAYER_HOSTING.md) for native and browser access.
+Native clients have no automatic NAT traversal or transport encryption; there are no player accounts.
+The room's players are listed at the top right.
 
 `--mode deathmatch` (2026-10-24) runs timed capsize rounds once two players are
 in: capsizing another boat with your wake or a hit within the last 5 s scores +1, capsizing
@@ -246,8 +249,14 @@ Friends on the same network choose MULTIPLAYER on the title. The room appears in
 named after the host machine; Enter joins. If it does not appear (a firewall, a separate guest
 network or a VPN), enter the host's LAN address with port 24680 under ADDRESS. The title has no
 token field, so leave `--token` off rooms meant for it. Internet play needs UDP port
-forwarding or a VPN; [M6](docs/MULTIPLAYER_PLAN.md#m6--friends-over-the-internet-and-native-packaging)
-owns that guidance and a standalone Linux server.
+forwarding or a VPN; the [Winterfell hosting guide](docs/MULTIPLAYER_HOSTING.md) covers the
+released native and browser room. A standalone Linux server package remains part of
+[M6](docs/MULTIPLAYER_PLAN.md#m6--friends-over-the-internet-and-native-packaging).
+
+For browser play, open [Winterfell](https://winterfell.davve.net:24443/), press PLAY and
+choose MULTIPLAYER → WINTERFELL. The browser fetches a known-server list, so the common
+join needs no address entry. Manual URL / CONNECT remain available. The deployed client
+keeps the v0.0.17 core; native clients still use LAN discovery or an address.
 
 T5 tuning lets the bank ease out sooner as turning load fades. Deterministic presentation/
 replay fixtures cover banked poses, straightening and paused seeking. The

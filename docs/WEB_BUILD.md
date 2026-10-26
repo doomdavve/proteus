@@ -14,10 +14,16 @@ river/waves/smoothing defaults. IndexedDB denial still permits play without dura
 Browser multiplayer now uses a JavaScript WebRTC transport and the existing C protocol,
 client prediction, wake reconciliation and remote rendering. The optional native endpoint accepts
 browser players alongside ENet clients in the same four-player authority. MULTIPLAYER offers a
-room signaling URL, CONNECT and BACK; browser hosting and UDP LAN discovery are unavailable.
+named SERVER choice, manual URL, CONNECT and BACK; browser hosting and UDP LAN discovery are unavailable.
 See [WebRTC setup and limits](#webrtc-rooms). Normal native/release builds remain ENet-only.
 The GitHub Pages build includes the browser client; Pages does not provide a game server.
-No deployment or public service was created by this change.
+The [Winterfell hosting guide](MULTIPLAYER_HOSTING.md) owns the separately deployed released
+room, HTTPS signaling and private TURN relay, including current verification limits.
+For internet play on that room, launch the pinned client at
+`https://winterfell.davve.net:24443/` and choose MULTIPLAYER → WINTERFELL. The v0.0.17
+Pages launcher leaves browser STUN empty;
+entering the same room URL there can work over VPN and time out outside it. The user
+confirmed the Winterfell launcher connects without VPN on 2026-10-26.
 
 The existing Emscripten/WebGL 2 build, click-to-start audio, IndexedDB bests, content-hashed
 packaging and `v*` Pages deployment workflow remain in use. Both music tracks and the shared
@@ -25,8 +31,8 @@ title backdrop are bundled. One browser audio device starts during PLAY and rema
 across title/session transitions; Off disables the soundtrack, retaining engine/water sound.
 
 Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/latency and tab
-suspension, measure memory/runtime budgets, and establish secure public signaling/ICE/TURN
-hosting before internet-play acceptance. User play/listening acceptance remains outstanding.
+suspension, measure memory/runtime budgets, and complete internet-play acceptance of the
+[Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
 
 ## Deathmatch weapons verification, 2026-10-26
@@ -37,6 +43,34 @@ weapon commands, bounded combat page reception, rendered grenade/HUD, two resets
 Both production radial shader recipes pass independent WebGL2 float probes (2873 each,
 maximum absolute error 0.00001442). [Detailed evidence and captures](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26).
 No native desktop graphics/audio, Firefox/Safari, physical-device or human balance pass is inferred.
+
+## Known browser servers, 2026-10-26
+
+The source now fetches same-origin `servers.json` at startup and when MULTIPLAYER opens.
+Winterfell is the first/default named SERVER choice; Enter joins without typing. Manual
+URL / CONNECT remain available if the list cannot load. The list has bounded schema and
+protocol/physics metadata, and refresh failures preserve a previously loaded list. Its
+[operator guide](MULTIPLAYER_HOSTING.md#known-server-directory) owns the fields and update
+commands. The default launcher now includes public STUN on every host, including Pages.
+
+Both features are deployed on Winterfell as `v0.0.17-server-directory`, built with the released
+core using `bash tools/build_winterfell_web.sh`. The current development browser also builds,
+but its newer physics do not match that room. The normal Pages packaging includes the JSON
+and default STUN for a future build; no Pages publication was performed here. Native clients
+retain LAN/manual joining. Next: human review of the named-server flow, then next-release
+Pages verification and the wider browser/platform checks below.
+
+Run the directory contract check with Node, or test a served released-compatible client:
+
+```sh
+node tools/test_web_server_directory.cjs
+python3 tools/check_web_server_directory.py --url https://winterfell.davve.net:24443/ --output build/directory-review
+python3 tools/check_web_server_directory.py --url https://winterfell.davve.net:24443/ --unavailable --output build/directory-fallback
+```
+
+The optional Playwright check joins the named room without text input; `--unavailable`
+simulates a directory HTTP failure and uses the manual fallback instead. Both leave the
+server running and close only their own browser client.
 
 ## Pedal controls update, 2026-10-26
 
@@ -162,7 +196,9 @@ one complete SDP offer/answer after ICE gathering. Secure-page deployment needs 
 operated WSS/TLS endpoint (for example, a reverse proxy to this signaling listener), a reachable
 authority and a tested ICE route. `--ice-server URL` configures the native endpoint; the
 `boatIceServers` array in [index.html](../web/index.html) configures browser STUN/TURN servers
-using standard `RTCIceServer` objects. There is no bundled public server, TURN credential
+using standard `RTCIceServer` objects. Winterfell's separate operator deployment configures
+browser STUN and a private native TURN client; its [guide](MULTIPLAYER_HOSTING.md) owns the
+internet-path evidence. There is no bundled public server, TURN credential
 service, automatic port forwarding or internet-connectivity guarantee.
 
 WebRTC encrypts its DataChannel transport, but this application has no player identity or

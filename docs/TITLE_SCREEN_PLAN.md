@@ -23,7 +23,11 @@ BACK TO LAUNCHER, flushing saves before reload. SINGLE PLAYER now opens a five-r
 River/Basin/Basin trial choices. Settings and setup persist through native `title.txt` /
 browser IndexedDB. Browser sessions reuse the title window and retain the gesture-started audio
 device, so BACK TO TITLE and repeated sessions work without reloading. The browser multiplayer
-panel offers URL/CONNECT/BACK, using the existing join flow with WebRTC; no host/LAN rows.
+panel originally offered URL/CONNECT/BACK, using the existing join flow with WebRTC; no host/LAN rows.
+Since 2026-10-26 it adds a default named SERVER row fetched from `servers.json`: Winterfell
+can be joined without typing, with manual URL/CONNECT retained. The
+[browser guide](WEB_BUILD.md#known-browser-servers-2026-10-26) owns implementation,
+verification and deployment limits; human review of this new row remains pending.
 
 Verification: Chrome/SwiftShader automated title/settings/solo navigation, repeated sessions,
 Escape/return, save/reload and audio-context checks pass; captures inspected. Native and

@@ -1,0 +1,29 @@
+{
+  "wake_browser_commit": "2b55994a326350f8addc0431c36e0bb086c94b6b",
+  "wake_browser_files": [
+    {
+      "name": "index.html",
+      "sha256": "0c39fa9ce6f40c945583391d4b822db9c995498bd1c8c43829c950dbc442fa4f"
+    },
+    {
+      "name": "wake_velocity-3fc9f7fccae47708.js",
+      "sha256": "3fc9f7fccae477088941e629a1435f5c552d2c84bba24597779f1c2403bce740"
+    },
+    {
+      "name": "wake_velocity-6c41ad6bde993b0a.wasm",
+      "sha256": "6c41ad6bde993b0a79c29dbb7c96c14dd7abc73cee890ed365fffc068e4d7d0c"
+    },
+    {
+      "name": "wake_velocity-5e67c17baced23bd.data",
+      "sha256": "5e67c17baced23bdc55dd774cf9e5e9974b5883402653310dc6cf51acf94c19d"
+    },
+    {
+      "name": "river.png",
+      "sha256": "3afbd41189c9822675d15a553382b9aa2e3da8e94b15fd5fc6d37f402c06b3a8"
+    },
+    {
+      "name": "raylib-LICENSE.txt",
+      "sha256": "882a5a819cf562aa3583aae3af3f2211dda15c63de9fc8cc4b399a2f9e78d799"
+    }
+  ]
+}

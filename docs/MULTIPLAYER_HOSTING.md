@@ -1,0 +1,247 @@
+# Winterfell internet room
+
+The Winterfell deployment uses released **v0.0.17**, commit
+`2b55994a326350f8addc0431c36e0bb086c94b6b`, with the optional WebRTC transport enabled.
+It hosts one shared four-player river deathmatch room for native and browser players.
+This is the released capsize/contact/wake mode; weapons are not included. A round starts
+when two players join. There is no room token, allowing the native and browser title screens
+to join directly. There are no player accounts.
+
+## Join
+
+- Native: download v0.0.17 from [Releases](https://github.com/doomdavve/proteus/releases/tag/v0.0.17),
+  choose MULTIPLAYER and enter `winterfell.davve.net:24680`.
+- Browser: open [Wake Velocity on Winterfell](https://winterfell.davve.net:24443/), press PLAY,
+  choose MULTIPLAYER, then the selected **SERVER: WINTERFELL** row. No address entry is needed.
+  URL / CONNECT remain available for manual joining.
+- On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
+
+The deployed browser is **v0.0.17-server-directory**: the released v0.0.17 core plus a
+browser menu/directory update. It fetches [servers.json](https://winterfell.davve.net:24443/servers.json)
+from the same site, with Winterfell as the only entry. It uses the original protocol, handling
+and content identities; the server and native packages remain v0.0.17. Its launcher configures
+[Cloudflare public STUN](https://developers.cloudflare.com/realtime/turn/) for browser address
+discovery. It stays at this deployed core when the separate Pages site advances.
+
+Use the Winterfell page for this deployed UI. The currently published v0.0.17 GitHub Pages
+launcher lacks both the directory and STUN configuration; entering a correct room URL there
+can work over VPN and time out outside it. The source now includes both features for the next
+Pages build, which has not been published as part of this update.
+
+## Known-server directory
+
+`web/servers.json` is a version-1 JSON document with a `servers` array (at most eight entries).
+Each entry has `name` (up to 24 printable ASCII characters), `description` (up to 64),
+`websocket` (a secure `wss://` URL up to 63 characters), `protocol` and `physics` integers.
+`native` records the corresponding native address for operators; native clients still use
+LAN discovery or manual joining. The listing is curated, not a live availability/player count.
+A listed room with different protocol/handling metadata shows a version warning and cannot
+be selected; this avoids offering the live handling-8 room to development handling-9 clients.
+
+The browser fetches the file at startup and refreshes it when MULTIPLAYER opens, without
+blocking the game. Left/Right cycles multiple named servers; Enter/click joins the selected
+one. Requests bypass the browser cache, time out after five seconds, and bound accepted JSON
+to 16 KiB. If a refresh fails, an already loaded list remains usable. An initial failure or
+empty list leaves URL / CONNECT available. Servers must be secure WebSocket endpoints;
+URLs with credentials are rejected. The client still performs the normal server handshake.
+
+To change the known servers, edit `web/servers.json`, copy it into the built site's
+`servers.json`, and rerun deployment. This requires no Wasm rebuild. The default list is
+served from the same origin on Winterfell or a future Pages build; no external registry,
+accounts, cross-origin fetch or dynamic backend is required.
+
+## Router and network
+
+Forward these ports to **10.0.21.3**, preserving the external and internal port numbers:
+
+| Protocol | Ports | Purpose |
+| --- | --- | --- |
+| UDP | 24680 | Native ENet gameplay |
+| TCP | 24443 | Dedicated nginx TLS listener: released browser game and signaling |
+| UDP | 49160–49200 | WebRTC relay allocations |
+
+Do not forward TCP 24682 or UDP/TCP 3478. The former is the plain WebSocket upstream
+behind nginx on the LAN address; the TURN allocation listener binds only to localhost. LAN discovery is disabled.
+Winterfell's inspected host firewall had no INPUT filtering; preserve the rules for other
+services. If an INPUT firewall is added, it must also allow the table above.
+
+For EdgeRouter Lite / EdgeOS, run `show configuration commands | match port-forward`
+first. These additive commands assume rule numbers 20, 21 and 22 are unused and reuse the
+existing WAN/LAN forwarding configuration. Substitute unused numbers if needed.
+Enabling auto-firewall lets EdgeOS maintain firewall openings for configured forwards.
+
+```text
+configure
+set port-forward auto-firewall enable
+set port-forward rule 20 description 'Wake Velocity native'
+set port-forward rule 20 original-port 24680
+set port-forward rule 20 protocol udp
+set port-forward rule 20 forward-to address 10.0.21.3
+set port-forward rule 20 forward-to port 24680
+set port-forward rule 21 description 'Wake Velocity WebRTC relay'
+set port-forward rule 21 original-port 49160-49200
+set port-forward rule 21 protocol udp
+set port-forward rule 21 forward-to address 10.0.21.3
+set port-forward rule 21 forward-to port 49160-49200
+set port-forward rule 22 description 'Wake Velocity browser TLS'
+set port-forward rule 22 original-port 24443
+set port-forward rule 22 protocol tcp
+set port-forward rule 22 forward-to address 10.0.21.3
+set port-forward rule 22 forward-to port 24443
+compare
+commit
+save
+exit
+```
+
+The [EdgeOS guide](https://dl.ui.com/guides/edgemax/EdgeOS_UG.pdf) documents ranges and
+auto-firewall. To undo just these forwards, delete rules 20, 21 and 22 in configuration mode,
+then commit/save. Preserve existing shared auto-firewall and interface settings.
+
+Browser data uses WebRTC rather than ENet or the signaling WebSocket. The release cannot
+constrain its direct ICE socket ports. A private coturn instance gives the authority public
+relay candidates in the bounded range above; browser clients need no TURN credentials. Public STUN lets the browser advertise its
+external address so the authority can establish relay permissions for it.
+The server can also negotiate a direct LAN route. Coturn requires port-preserving forwards
+for its [public/private address mapping](https://github.com/coturn/coturn/wiki/turnserver).
+Clients on networks blocking UDP may still fail; no public TCP/TLS TURN fallback is provided.
+
+The playbook discovers the public IPv4 address at deployment time and records it in the
+relay config. After the ISP changes that address, update DNS as usual and rerun the playbook.
+Check from a separate internet connection: an on-LAN public-address test depends on router
+hairpin NAT and does not qualify a residential WAN path.
+
+## Deploy and operate
+
+From the Proteus repository root, activate the pinned Emscripten SDK as described in
+[the browser guide](WEB_BUILD.md), then build the released-core browser UI and deploy using
+the existing controller inventory and vault file:
+
+```sh
+bash tools/build_winterfell_web.sh
+ansible-playbook -i ../davve-srv/ansible/inventory.yml deploy/winterfell.yml \
+  --vault-password-file ../davve-srv/ansible/.vault_pass.txt
+```
+
+This installs Debian build dependencies and coturn, checks out the pinned commit under
+`/srv/wake-velocity/releases/`, and builds only `boat_server` and `boat_bot`. CMake still
+requires desktop development libraries because this release has no server-only configure.
+No display, audio device or game assets are needed at runtime. The optional libjuice build
+needs `-DCMAKE_C_FLAGS=-D_DEFAULT_SOURCE` with the release's strict C17 on Debian 13.
+
+The `wake-velocity` account builds and runs the authority; systemd makes its filesystem
+read-only at runtime. A separate `turnserver` account runs `wake-velocity-relay` with eight
+allocations at most. Both services start at boot and restart on failure. The package's unused
+default `coturn` service is disabled. Logs go to the system journal. The persistent private
+relay credential lives under `/etc/wake-velocity/`; it is not a player admission token.
+
+The room binds specifically to `10.0.21.3`. Binding to all interfaces on this multihomed
+host made ENet replies to VPN clients originate from `10.0.90.1`, which clients discarded.
+nginx therefore proxies signaling to `10.0.21.3:24682` on the same machine.
+The systemd address-family allowlist includes `AF_NETLINK` for Linux interface discovery;
+without it, WebRTC fails to gather host candidates. Room and relay restart independently.
+
+The playbook adds `/etc/nginx/conf.d/wake-velocity.conf`, validates nginx, then reloads it.
+Its dedicated TLS listener serves only the game assets and `/room`, using Winterfell's
+existing Let's Encrypt certificate. The baseline's infrastructure HTTPS site is unchanged;
+public TCP 443 was refused during the external check and is not required for this room.
+The game deployment remains a separate playbook; running the baseline does not deploy or
+upgrade the game. Keep the existing certificate renewal setup operating.
+
+`tools/build_winterfell_web.sh` exports the pinned release into ignored build storage and
+copies only the title/browser UI, directory and web packaging files from this checkout.
+It builds `build/winterfell-web/site` with the released handling-8 core. The ordinary current
+branch browser build retains its current physics and is not a substitute for that bundle.
+The playbook copies its assets and publishes the launcher last, without restarting the room.
+It serves the bundle under `/srv/wake-velocity/browser/<commit>/site/`.
+
+For the earlier unmodified release client, `-e wake_browser_site=` selects the checksum-pinned
+Pages downloads in `deploy/browser-v0.0.17.json` instead. Old hashed files may disappear from
+Pages, so keep cached copies for that fallback. The default locally built directory UI does
+not depend on those downloads. No new GitHub release or Pages deployment is performed.
+
+```sh
+ssh winterfell 'systemctl is-active wake-velocity wake-velocity-relay'
+ssh winterfell 'sudo journalctl -u wake-velocity -n 50 --no-pager'
+ssh winterfell 'sudo journalctl -u wake-velocity-relay -n 50 --no-pager'
+ssh winterfell 'sudo systemctl restart wake-velocity'
+ssh winterfell 'sudo systemctl disable --now wake-velocity wake-velocity-relay'
+```
+
+Restarting disconnects all players and resets the round. To upgrade, change `wake_version`
+and `wake_commit` together in the playbook, update the browser build recipe and directory
+metadata to the matching release, rebuild/deploy, and verify both transports. Update the
+legacy browser manifest too if that fallback is needed. Keep the old release directory for rollback: restore the old
+version/commit and rerun. The pinned source directory must remain unmodified. No automatic
+upgrade, old-release cleanup or persistent game state is configured.
+
+For a native connection check using a client built from the matching release:
+
+```sh
+./build/boat_bot --connect winterfell.davve.net:24680 --seconds 15 --predict
+```
+
+Use `10.0.21.3:24680` for the LAN check. A development build with newer handling may correctly
+be rejected; use the release checkout's bot instead. Browser testing must reach the room,
+receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
+selected ICE candidate pair to distinguish direct connectivity from relay verification.
+
+## Status and verification — 2026-10-26
+
+Current browser UI: `v0.0.17-server-directory` is deployed. Both current-tree and
+released-core Emscripten MinSizeRel builds passed. The current native Debug build and all
+123 enabled CTests passed (GPU checks enabled; 15 retired checks disabled). The Node
+directory contract covers schema/URL bounds, version matching, coalesced refresh, updates,
+cached-list failure and empty lists. Chrome/SwiftShader joined through the default named
+row from a local served build and the deployed site without typing; a simulated directory
+HTTP 503 still allowed manual joining. Local/server-list and fallback captures were inspected.
+Evidence is in ignored `build/directory-*.log` and `build/directory-*-review/` files.
+Deployment passed and its complete rerun reported `changed=0`; the room's active timestamp
+stayed at 16:09:12 and `NRestarts=0`, confirming this UI deploy did not restart the server.
+The new named-server flow awaits human review. Native directory fetching and a new Pages
+publication were not part of this slice. Next: user review, then next-release Pages testing.
+
+The following records the original room deployment and manual-address browser qualification
+before the directory UI was added:
+
+Implemented and deployed: v0.0.17 authority, private coturn relay, pinned browser client and
+dedicated game TLS listener. The user confirmed adding the EdgeRouter UDP 24680,
+UDP 49160–49200 and TCP 24443 forwards. No weapons patches or new release were published.
+
+Verification actually performed on 2026-10-26:
+
+- Apple Silicon/macOS: Debug configure/build passed. CTest passed all 122 enabled checks
+  with `PROTEUS_GPU_TESTS=ON`; 15 retired wake-field checks remained disabled. Evidence:
+  ignored `build/winterfell-ctest.log`.
+- Debian 13/x86-64 Winterfell: released-source Release build with WebRTC passed; both
+  services were active and enabled at boot. Core-service deployment was repeated with
+  `changed=0` before adding the pinned browser site. Final site deployment passed with
+  checksum validation and nginx validation/reload; its cache rerun was not yet checked.
+- A matching v0.0.17 macOS bot joined over the VPN after the explicit bind fix, then via
+  the router's public address. With the VPN disconnected, its route used `en0` and its
+  public source address differed from Winterfell's: the separate-internet-path native
+  check ran 90 seconds, ended consistent and reported zero decode errors.
+- Chrome headless/SwiftShader opened the deployed game URL from that separate internet
+  path, joined alongside a native bot, drove, selected LEAVE ROOM and rejoined. The browser
+  reported no page errors; gameplay, menu and rejoined captures were inspected. The selected
+  remote ICE candidate was the public **relay** on UDP 49180, verifying the bounded relay
+  path rather than a direct VPN path. A simultaneous 90-second native run saw two players,
+  ended consistent and reported zero decode errors. Evidence: ignored
+  `build/winterfell-browser-external-final.log`, `build/winterfell-browser/` and
+  `build/winterfell-mixed-external-reconnect.log`.
+- Playbook syntax, changed local documentation links and both repositories' whitespace
+  checks passed. Test clients exited; the room remains running. Earlier automation failures
+  exposed missing public TLS forwarding and `AF_NETLINK`, and a test menu mismatch (the
+  released menu has four rows); the final external check passed after these were corrected.
+
+Next: human native/browser play, then Firefox/Safari, Windows and longer mixed/four-player
+sessions with loss/jitter. No human gameplay/audio acceptance, restrictive-network TCP TURN
+fallback, full M5/M6 soak or broader cross-platform qualification is claimed. Those gates
+remain owned by the [multiplayer plan](MULTIPLAYER_PLAN.md).
+
+Follow-up, same date: the user reported Chrome joining only over VPN. With the VPN off,
+agent automation reproduced the exact 10-second join timeout from the GitHub Pages launcher;
+the Winterfell launcher passed join/drive/leave/rejoin over public relay UDP 49168 on the same
+machine and connection. After switching to the Winterfell launcher, the user confirmed
+“works!”. This confirms the corrected browser connection workflow; extended gameplay and
+audio acceptance remain separate.

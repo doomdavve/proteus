@@ -25,6 +25,7 @@ jobs:
         run: |
           node tools/test_web_mouse_controls.cjs
           node tools/test_web_rtc_transport.cjs
+          node tools/test_web_server_directory.cjs
 
       - name: Check out official Emscripten SDK
         uses: actions/checkout@v6

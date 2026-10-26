@@ -69,6 +69,9 @@ checks use the opt-in [Playwright command](WEB_BUILD.md#mouse-and-scroll-qualifi
 checks colliding peer IDs, routing and disconnect isolation across two transports. Browser
 title/persistence and mixed WebRTC/ENet gameplay use the opt-in
 [title and multiplayer checks](WEB_BUILD.md#webrtc-rooms), with the optional native endpoint.
+`web_server_directory` checks fetched known-server schema, version matching, refresh and
+failure behavior under Node. The opt-in [directory browser check](WEB_BUILD.md#known-browser-servers-2026-10-26)
+joins the named room without typing and can simulate a failed list with manual fallback.
 
 ## Pedal controls verification
 

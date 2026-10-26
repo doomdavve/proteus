@@ -43,6 +43,7 @@ def main():
     page = page.replace("@WEB_VERSION@", html.escape(version))
     (site / "index.html").write_text(page)
     shutil.copyfile(root / "web/river.png", site / "river.png")
+    shutil.copyfile(root / "web/servers.json", site / "servers.json")
     (site / ".nojekyll").touch()
     shutil.copyfile(args.raylib_license, site / "raylib-LICENSE.txt")
     # Remove outputs from earlier builds only, never unrelated files.

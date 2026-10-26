@@ -1,0 +1,260 @@
+---
+- name: Released Wake Velocity room on Winterfell
+  hosts: winterfell
+  become: true
+  vars:
+    wake_version: v0.0.17
+    wake_commit: 2b55994a326350f8addc0431c36e0bb086c94b6b
+    wake_root: /srv/wake-velocity
+    wake_source: "{{ wake_root }}/releases/{{ wake_commit }}"
+    wake_domain: winterfell.davve.net
+    wake_lan_ip: 10.0.21.3
+    wake_mode: deathmatch
+    wake_location: river
+    # Built from the released core plus the browser directory UI (see the hosting guide).
+    wake_browser_site: "{{ playbook_dir }}/../build/winterfell-web/site"
+  vars_files:
+    - "browser-{{ wake_version }}.json"
+  tasks:
+    - name: Match browser manifest to server release
+      ansible.builtin.assert:
+        that: wake_browser_commit == wake_commit
+    - name: Install build and relay dependencies
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - cmake
+          - git
+          - pkg-config
+          - libssl-dev
+          - libasound2-dev
+          - libx11-dev
+          - libxrandr-dev
+          - libxi-dev
+          - libxcursor-dev
+          - libxinerama-dev
+          - libgl1-mesa-dev
+          - coturn
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Disable the package's unused public TURN service
+      ansible.builtin.systemd_service:
+        name: coturn
+        enabled: false
+        state: stopped
+
+    - name: Create room account
+      ansible.builtin.user:
+        name: wake-velocity
+        system: true
+        home: "{{ wake_root }}"
+        create_home: false
+        shell: /usr/sbin/nologin
+
+    - name: Create release directory
+      ansible.builtin.file:
+        path: "{{ wake_root }}/releases"
+        state: directory
+        owner: wake-velocity
+        group: wake-velocity
+        mode: '0755'
+
+    - name: Fetch the pinned released source
+      become_user: wake-velocity
+      ansible.builtin.git:
+        repo: https://github.com/doomdavve/proteus.git
+        dest: "{{ wake_source }}"
+        version: "{{ wake_commit }}"
+      register: wake_checkout
+
+    - name: Verify release identity
+      ansible.builtin.assert:
+        that: wake_checkout.after == wake_commit
+
+    - name: Configure optional browser transport from released sources
+      become_user: wake-velocity
+      ansible.builtin.command:
+        argv:
+          - cmake
+          - -S
+          - "{{ wake_source }}"
+          - -B
+          - "{{ wake_source }}/build-server"
+          - -DCMAKE_BUILD_TYPE=Release
+          # libjuice needs POSIX networking declarations under the release's strict C17.
+          - -DCMAKE_C_FLAGS=-D_DEFAULT_SOURCE
+          - -DPROTEUS_WEBRTC=ON
+          - -DGLFW_BUILD_WAYLAND=OFF
+          - -DGLFW_BUILD_X11=ON
+      changed_when: false
+
+    - name: Build authority and diagnostic client
+      become_user: wake-velocity
+      ansible.builtin.command:
+        argv:
+          - cmake
+          - --build
+          - "{{ wake_source }}/build-server"
+          - --target
+          - boat_server
+          - boat_bot
+          - --parallel
+          - '2'
+      register: wake_build
+      changed_when: "'Building ' in wake_build.stdout or 'Linking ' in wake_build.stdout"
+      notify: Restart room
+
+    - name: Read current public IPv4 address
+      ansible.builtin.uri:
+        url: https://api.ipify.org
+        return_content: true
+      register: wake_public
+
+    - name: Validate public address
+      ansible.builtin.assert:
+        that: wake_public.content | trim is match('^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+
+    - name: Create private configuration directory
+      ansible.builtin.file:
+        path: /etc/wake-velocity
+        state: directory
+        group: turnserver
+        mode: '0750'
+
+    - name: Check relay credential
+      ansible.builtin.stat:
+        path: /etc/wake-velocity/relay-password
+      register: wake_password_file
+
+    - name: Generate persistent local relay credential
+      ansible.builtin.shell: umask 077; openssl rand -hex 24 > /etc/wake-velocity/relay-password
+      when: not wake_password_file.stat.exists
+      no_log: true
+
+    - name: Read relay credential
+      ansible.builtin.slurp:
+        src: /etc/wake-velocity/relay-password
+      register: wake_password
+      no_log: true
+
+    - name: Configure private TURN allocation listener and bounded public relay ports
+      ansible.builtin.template:
+        src: templates/turnserver.conf.j2
+        dest: /etc/wake-velocity/turnserver.conf
+        group: turnserver
+        mode: '0640'
+      no_log: true
+      notify: Restart relay
+
+    - name: Install private relay service
+      ansible.builtin.template:
+        src: templates/wake-velocity-relay.service.j2
+        dest: /etc/systemd/system/wake-velocity-relay.service
+        mode: '0644'
+      notify: Restart relay
+
+    - name: Install room service
+      ansible.builtin.template:
+        src: templates/wake-velocity.service.j2
+        dest: /etc/systemd/system/wake-velocity.service
+        mode: '0600'
+      no_log: true
+      notify: Restart room
+
+    - name: Create pinned browser site directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ wake_root }}/browser/{{ wake_commit }}"
+        - "{{ wake_root }}/browser/{{ wake_commit }}/site"
+
+    - name: Download and verify released browser assets
+      ansible.builtin.get_url:
+        url: "https://doomdavve.github.io/proteus/{{ item.name }}"
+        dest: "{{ wake_root }}/browser/{{ wake_commit }}/{{ 'index.original.html' if item.name == 'index.html' else 'site/' ~ item.name }}"
+        checksum: "sha256:{{ item.sha256 }}"
+        mode: '0644'
+      loop: "{{ wake_browser_files }}"
+      when: wake_browser_site | length == 0
+
+    - name: Read original released launcher
+      ansible.builtin.slurp:
+        src: "{{ wake_root }}/browser/{{ wake_commit }}/index.original.html"
+      register: wake_browser_index
+      when: wake_browser_site | length == 0
+
+    - name: Configure browser public address discovery
+      ansible.builtin.copy:
+        content: "{{ wake_browser_index.content | b64decode | replace('boatIceServers: [],', 'boatIceServers: [{ urls: \"stun:stun.cloudflare.com:3478\" }],') }}"
+        dest: "{{ wake_root }}/browser/{{ wake_commit }}/site/index.html"
+        mode: '0644'
+      when: wake_browser_site | length == 0
+
+    - name: Install browser assets before publishing their launcher
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ wake_root }}/browser/{{ wake_commit }}/site/{{ item | basename }}"
+        mode: '0644'
+      loop: "{{ lookup('ansible.builtin.fileglob', wake_browser_site ~ '/*', wantlist=True) | reject('search', '/index.html$') | list }}"
+      when: wake_browser_site | length > 0
+
+    - name: Publish released-core browser with server directory UI
+      ansible.builtin.copy:
+        src: "{{ wake_browser_site }}/index.html"
+        dest: "{{ wake_root }}/browser/{{ wake_commit }}/site/index.html"
+        mode: '0644'
+      when: wake_browser_site | length > 0
+
+    - name: Install dedicated game HTTPS listener
+      ansible.builtin.template:
+        src: templates/wake-velocity-https.conf.j2
+        dest: /etc/nginx/conf.d/wake-velocity.conf
+        mode: '0644'
+      notify: Reload nginx
+
+    - name: Apply service changes
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable room and its private relay on boot
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop:
+        - wake-velocity-relay
+        - wake-velocity
+
+    - name: Wait for browser signaling listener
+      ansible.builtin.wait_for:
+        host: "{{ wake_lan_ip }}"
+        port: 24682
+        timeout: 30
+
+  handlers:
+    - name: Restart relay
+      ansible.builtin.systemd_service:
+        name: wake-velocity-relay
+        daemon_reload: true
+        state: restarted
+
+    - name: Restart room
+      ansible.builtin.systemd_service:
+        name: wake-velocity
+        daemon_reload: true
+        state: restarted
+
+    - name: Validate nginx
+      listen: Reload nginx
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Apply nginx reload
+      listen: Reload nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        state: reloaded
