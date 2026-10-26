@@ -39,7 +39,7 @@ static inline BoatInput boat_fleet_bot_input(
     float wheel = Clamp(2 * error - boat->yaw_velocity, -1, 1);
     float throttle = .65f + .1f * (float)slot;
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        boat_fleet_bot_throttle_rate(boat->throttle, throttle) };
+        boat_fleet_bot_throttle_rate(boat->throttle, throttle), 0, 0 };
 }
 
 // Deathmatch hunter (boat_bot --hunt): full throttle at a point just ahead of the nearest
@@ -67,8 +67,11 @@ static inline BoatInput boat_fleet_bot_hunt_input(
     float target = atan2f(delta.x, -delta.y);
     float error = remainderf(target - boat->heading, 2 * PI);
     float wheel = Clamp(2 * error - boat->yaw_velocity, -1, 1);
-    return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        boat_fleet_bot_throttle_rate(boat->throttle, 1) };
+    uint16_t grenade = (uint16_t)(fleet->state.tick / (8 * BOAT_TICK_HZ) + 1);
+    return (BoatInput) { .steering_rate = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
+        .throttle_rate = boat_fleet_bot_throttle_rate(boat->throttle, nearest < 35 ? .35f : 1),
+        .gun = fabsf(error) < .06f && nearest < 95,
+        .grenade = fabsf(error) < .4f && nearest < 35 ? grenade : 0 };
 }
 
 // Race route bot (validate_boat_race, boat_bot --race): the next gate's centre, offset to the
@@ -87,7 +90,7 @@ static inline BoatInput boat_fleet_bot_race_input(const BoatFleet *fleet,
     float error = remainderf(heading - boat->heading, 2 * PI);
     float wheel = Clamp(1.5f * error - .8f * boat->yaw_velocity, -.6f, .6f);
     return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        boat_fleet_bot_throttle_rate(boat->throttle, finished ? 0 : 1) };
+        boat_fleet_bot_throttle_rate(boat->throttle, finished ? 0 : 1), 0, 0 };
 }
 
 // Inputs for every slot, then recovery requests for boats capsized for two seconds.

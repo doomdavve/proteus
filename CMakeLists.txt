@@ -185,6 +185,12 @@ if(NOT EMSCRIPTEN)
     tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h)
 endif()
 
+if(NOT EMSCRIPTEN)
+  add_executable(boat_combat_review tools/boat_combat_review.c tools/wake_velocity_net.c src/boat_audio.c)
+  target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu proteus_boat_net_enet)
+  target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
+endif()
+
 if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)

@@ -27,6 +27,28 @@ out vec3 fragWorldNormal;
 
 // Same bounded packet and derivatives as boat_water.c, in reflected world X/Z.
 // BEGIN STORM RECIPE
+
+// BEGIN RADIAL RECIPE
+uniform vec4 radialOrigin[4]; // world centre, radius, amplitude
+uniform vec4 radialMotion[4]; // speed, max range
+vec4 radialWave(vec2 world) {
+    vec4 result=vec4(0.0);
+    for(int i=0;i<4;++i) {
+        vec4 o=radialOrigin[i];
+        if(o.w<=0.0) continue;
+        vec2 delta=world-o.xy;
+        float d=length(delta), x=(d-o.z)/2.0;
+        if(abs(x)>=1.0) continue;
+        float q=1.0-x*x, fade=1.0-o.z/radialMotion[i].y;
+        float slope=-2.0*o.w*fade*fade*x*q;
+        float h=o.w*fade*fade*q*q;
+        result+=vec4(h,d>0.00001 ? slope*delta/d : vec2(0.0),
+            -radialMotion[i].x*slope-2.0*o.w*fade*radialMotion[i].x/radialMotion[i].y*q*q);
+    }
+    return result;
+}
+// END RADIAL RECIPE
+
 uniform vec4 stormArea; // World centre X/Z, radius, height.
 uniform vec4 stormPhase; // CPU-reduced phases for the four directional wave trains.
 uniform vec4 stormMotion; // World velocity X/Z, CPU-reduced long-bend phase, reserved.
@@ -280,7 +302,7 @@ void main()
             position.y += w.z * sin(dot(w.xy, position.xz) - w.w);
         }
         position.y += crossingWake(position.xz, crossingWakeTime).x + playerWake(position.xz).x
-            + wakeVertexHeight(position.xz) + vesselWake(position.xz).x + stormWave(position.xz).x;
+            + wakeVertexHeight(position.xz) + vesselWake(position.xz).x + stormWave(position.xz).x + radialWave(position.xz).x;
         if (waterPatchPass == 2 && wakeFieldEnabled == 0)
             position.y *= 1.0 - smoothstep(wavePatch.z, wavePatch.w,
                 length(position.xz - wavePatch.xy));

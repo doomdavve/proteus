@@ -1,4 +1,5 @@
 #include "boat_view.h"
+#include "boat_combat.h"
 #include "boat_course_view.h"
 #include "boat_map.h"
 #include "boat_pose.h"
@@ -109,7 +110,8 @@ static void vessel_box(BoatCourseBoxDraw draw, void *context, Vector2 position, 
 {
     Vector3 p = Vector3Transform(local, MatrixRotateY(heading));
     p = Vector3Add(p, (Vector3) { -position.x, 0, position.y });
-    draw(context, (Transform3D) { .position = p, .rotation = { 0, heading, 0 }, .scale = size }, color);
+    draw(context, (Transform3D) { .position = p, .rotation = { 0, heading, 0 }, .scale = size },
+        color);
 }
 
 // Skill gates have tall endpoint markers and an open passage. Start/finish retain rows
@@ -141,8 +143,8 @@ static void race_visit(
                 // Flags point into the opening, leaving the gate centre unobstructed.
                 float inward = (float)side * 1.5f;
                 draw(context,
-                    (Transform3D) { .position
-                        = { -p.x + across.x * inward, 7, p.y - across.y * inward },
+                    (Transform3D) {
+                        .position = { -p.x + across.x * inward, 7, p.y - across.y * inward },
                         .rotation = { 0, atan2f(across.y, across.x), 0 },
                         .scale = { 3, 1.8f, .25f } },
                     color);
@@ -181,9 +183,8 @@ static float storm_rain_hash(uint32_t seed)
 
 // Independent drop cycles break up the placement grid and stagger speeds, gaps and streak
 // sizes. Reposition only at the top of a fall; seeking/replays need no particle state.
-static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double clock,
-    float top, float span, unsigned x, unsigned z, bool upper,
-    BoatCourseBoxDraw draw, void *context)
+static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double clock, float top,
+    float span, unsigned x, unsigned z, bool upper, BoatCourseBoxDraw draw, void *context)
 {
     // Concentrate the low curtain around the viewer on a storm-relative 5 m lattice.
     // Hash actual cell coordinates so following the boat never relocates existing drops.
@@ -234,8 +235,8 @@ static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double c
 
 // A travelling world-space squall: its cloud, rain curtain and bolts advertise the physical
 // patch from outside it. All animation is a function of the shared race clock.
-static void storm_visit(const BoatViewState *view, const BoatWorld *world,
-    BoatCourseBoxDraw draw, void *context)
+static void storm_visit(
+    const BoatViewState *view, const BoatWorld *world, BoatCourseBoxDraw draw, void *context)
 {
     BoatStorm storm = world->water.storm;
     storm.centre = boat_water_storm_centre(storm, view->time);
@@ -250,8 +251,10 @@ static void storm_visit(const BoatViewState *view, const BoatWorld *world,
         for (int x = -1; x <= 1; ++x)
             draw(context,
                 (Transform3D) { .position = { -storm.centre.x + (float)x * 52,
-                    cloud_height + (float)((x + z + 4) % 3) * 6, storm.centre.y + (float)z * 52 },
-                    .scale = { 68, 12, 68 } }, cloud);
+                                    cloud_height + (float)((x + z + 4) % 3) * 6,
+                                    storm.centre.y + (float)z * 52 },
+                    .scale = { 68, 12, 68 } },
+                cloud);
     // Jittered, independently cycling drops near the boat, plus a sparse upper curtain.
     // Counts remain bounded below the shared scenery capacity even during lightning.
     for (unsigned z = 0; z < 24; ++z)
@@ -259,19 +262,72 @@ static void storm_visit(const BoatViewState *view, const BoatWorld *world,
             if (x < 20 && z < 20)
                 storm_rain_drop(view, storm, clock, 32, 30, x, z, false, draw, context);
             if (x % 2 == 0 && z % 2 == 0)
-                storm_rain_drop(view, storm, clock, cloud_height - 8, cloud_height - 44,
-                    x, z, true, draw, context);
+                storm_rain_drop(view, storm, clock, cloud_height - 8, cloud_height - 44, x, z, true,
+                    draw, context);
         }
     if (flash) {
         float x = -storm.centre.x - 42;
         float segment = (cloud_height - 4) / 10;
         for (int i = 0; i < 10; ++i)
             draw(context,
-                (Transform3D) { .position = { x + (float)(i % 2) * 3,
-                    cloud_height - 4 - ((float)i + .5f) * segment, storm.centre.y + 25 },
+                (Transform3D) {
+                    .position = { x + (float)(i % 2) * 3,
+                        cloud_height - 4 - ((float)i + .5f) * segment, storm.centre.y + 25 },
                     .rotation = { 0, 0, i % 2 ? -.18f : .18f },
                     .scale = { 1.4f, segment + 2, 1.4f } },
                 (Color) { 235, 246, 255, 255 });
+    }
+}
+
+// Cosmetic pieces use the same boxes, depth testing and integer-scaled target on CPU/GPU.
+static void combat_visit(
+    const BoatViewState *view, const BoatWorld *world, BoatCourseBoxDraw draw, void *context)
+{
+    const BoatCombat *c = world->combat;
+    if (!c || !c->enabled)
+        return;
+    uint64_t tick = (uint64_t)llround(view->time * BOAT_TICK_HZ);
+    for (unsigned i = 0; i < BOAT_COMBAT_BULLETS; ++i) {
+        const BoatCombatObject *b = &c->bullets[i];
+        if (!b->born || tick < b->born)
+            continue;
+        if (b->active) {
+            draw(context,
+                (Transform3D) { .position = { -b->position.x, b->height, b->position.y },
+                    .rotation = { 0, -atan2f(b->direction.x, -b->direction.y), 0 },
+                    .scale = { .07f, .07f, .9f } },
+                (Color) { 255, 234, 145, 255 });
+            if (tick - b->born < 4)
+                draw(context,
+                    (Transform3D) { .position = { -b->position.x, b->height, b->position.y },
+                        .scale = { .35f, .3f, .35f } },
+                    (Color) { 255, 191, 67, 255 });
+        } else if (b->ended && tick - b->ended < 27) {
+            // Brief deterministic impact sparkle/splash at the terminal point.
+            float age = (float)(tick - b->ended) * BOAT_STEP;
+            if (age < .22f)
+                for (unsigned k = 0; k < 3; ++k)
+                    draw(context,
+                        (Transform3D) { .position = { -b->position.x + ((float)k - 1) * age,
+                                            b->height + age * (float)(k + 1), b->position.y },
+                            .scale = { .1f, .18f, .1f } },
+                        (Color) { 230, 239, 222, 255 });
+        }
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_GRENADES; ++i) {
+        const BoatCombatObject *g = &c->grenades[i];
+        if (!g->active || tick < g->born)
+            continue;
+        float age = (float)(tick - g->born) * BOAT_STEP;
+        float flight = (float)c->rules.splash_ticks * BOAT_STEP;
+        float t = Clamp(age / flight, 0, 1);
+        Vector2 p = Vector2Subtract(
+            g->position, Vector2Scale(g->direction, c->rules.grenade_distance * (1 - t)));
+        float y = t < 1 ? (1 - t) * g->height + 4 * 5 * t * (1 - t) : .2f;
+        Color color
+            = ((tick / 8) % 2) ? (Color) { 255, 92, 54, 255 } : (Color) { 255, 215, 116, 255 };
+        draw(context, (Transform3D) { .position = { -p.x, y, p.y }, .scale = { .45f, .45f, .45f } },
+            color);
     }
 }
 
@@ -281,6 +337,7 @@ static void environment_visit(
     if (view->race.enabled && world->definition->mapped)
         race_visit(view, &world->resources->map, draw, context);
     storm_visit(view, world, draw, context);
+    combat_visit(view, world, draw, context);
     const Boat *boat = &view->boat;
     double time = view->time;
     if (Vector2LengthSqr(world->water.current) > 0) {
@@ -311,8 +368,8 @@ static void environment_visit(
         Color hull = { 41, 75, 99, 255 }, deck = { 221, 224, 209, 255 };
         vessel_box(draw, context, source, heading, (Vector3) { 0, .2f, 0 },
             (Vector3) { BOAT_VESSEL_BEAM, 2.8f, BOAT_VESSEL_LENGTH }, hull);
-        vessel_box(draw, context, source, heading, (Vector3) { 0, 2.6f, 0 },
-            (Vector3) { 9, 2, 28 }, deck);
+        vessel_box(
+            draw, context, source, heading, (Vector3) { 0, 2.6f, 0 }, (Vector3) { 9, 2, 28 }, deck);
         vessel_box(draw, context, source, heading, (Vector3) { 0, 4.2f, -7 },
             (Vector3) { 8, 1.2f, 12 }, deck);
         vessel_box(draw, context, source, heading, (Vector3) { 0, 4.4f, -13.05f },
@@ -532,7 +589,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         const Mesh3D *surface = world->wake_field
             ? boat_water_surface_field(&cpu->water_mesh, world->water, world->wake_field, time)
             : boat_water_surface_visible(&cpu->water_mesh, world->definition->map, world->water,
-                time, water_visible, renderer);
+                  time, water_visible, renderer);
         if (!surface)
             return false;
         renderer3d_draw_emissive_mesh(renderer, surface, (Transform3D) { .scale = { 1, 1, 1 } });

@@ -204,7 +204,7 @@ int main(int argc, char **argv)
             if (client.accept.mode == BOAT_NET_MODE_RACE && client.race_valid && row->current) {
                 if (own->held) // Grid, countdown or parked: prepare full throttle on the grid.
                     input = (BoatInput) { 0,
-                        boat_throttle_rate(own->boat.throttle, row->parked ? 0 : 1) };
+                        boat_throttle_rate(own->boat.throttle, row->parked ? 0 : 1), 0, 0 };
                 else if (client.race.phase == BOAT_RACE_RACING
                     || client.race.phase == BOAT_RACE_RESULTS)
                     input = boat_fleet_bot_race_input(&client.fleet, boat_race_river_course(),
@@ -285,7 +285,7 @@ int main(int argc, char **argv)
                     printf(" %u=%" PRId32 "/%" PRIu32 "/%" PRIu32 "/%" PRIu32, i + 1, row->score,
                         row->caused, row->capsized, row->self);
             }
-            printf(" (score/caused/capsized/self)\n");
+            printf(" (score/kills/deaths/self)\n");
             fflush(stdout);
         }
         if (client.race_result.round != reported_race) {

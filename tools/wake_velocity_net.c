@@ -152,6 +152,18 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
 {
     BoatNetClient *c = &net->client;
     double now = boat_net_clock();
+    if (!active || reset)
+        net->weapons_blocked = true;
+    if (!IsKeyDown(KEY_SPACE) && !IsKeyDown(KEY_E) && active)
+        net->weapons_blocked = false;
+    if (active && !net->weapons_blocked && c->accept.mode == BOAT_NET_MODE_DEATHMATCH) {
+        input.gun = IsKeyDown(KEY_SPACE);
+        if (IsKeyPressed(KEY_E)) {
+            if (++net->grenade_request == 0)
+                ++net->grenade_request;
+        }
+        input.grenade = net->grenade_request;
+    }
     // Held boats (grid, countdown, parked) cannot reset; do not ask.
     const BoatFleetSlot *held = boat_net_client_own(c);
     if (reset && !(held && held->held))
@@ -175,10 +187,16 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
     if (own->active) {
         if (own->life != net->own_life) {
             net->own_life = own->life;
+            net->weapons_blocked = true;
+            net->grenade_request = 0;
             net->respawned_at = now;
             boat_presentation_reset(&session->presentation);
         }
         session->boat = shown(net, c->slot);
+        const BoatCombatPlayer *p = &view->state.combat.players[c->slot];
+        if (view->state.combat.enabled && p->health <= 0 && p->defeated)
+            session->boat.height
+                -= fminf(4, (float)(view->state.tick - p->defeated) * BOAT_STEP * 1.5f);
     }
     // Every remote's proximity mode follows the physical predicted hulls.
     double server_tick = boat_net_client_server_tick(c, now);
@@ -206,6 +224,10 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
             boat_presentation_reset(&net->presentations[i]);
         }
         net->shown[i] = boat_remote_blend(&past, &proxy, weight);
+        const BoatCombatPlayer *p = &view->state.combat.players[i];
+        if (view->state.combat.enabled && p->health <= 0 && p->defeated)
+            net->shown[i].height
+                -= fminf(4, (float)(view->state.tick - p->defeated) * BOAT_STEP * 1.5f);
     }
     uint64_t tick = view->state.tick;
     boat_session_set_tick(session, tick);
@@ -266,7 +288,8 @@ static const char *capsize_notice(const NetStudy *net, const Boat *boat, uint32_
     double waited = boat_net_client_server_tick(c, boat_net_clock()) - (double)since;
     char who[48] = "CAPSIZED";
     if (e && e->event.attacker != BOAT_MATCH_NOBODY)
-        snprintf(who, sizeof(who), "CAPSIZED BY %s", e->attacker);
+        snprintf(who, sizeof(who), "%s BY %s",
+            e->event.reason == BOAT_MATCH_DEFEAT_HULL ? "DESTROYED" : "CAPSIZED", e->attacker);
     else if (e)
         snprintf(who, sizeof(who), "CAPSIZED / -1");
     snprintf(text, sizeof(text), "%s / RESPAWN %.0f%s", who, ceil(fmax(0, left)),
@@ -390,10 +413,12 @@ static const char *feed_text(const BoatNetFeedEntry *e)
         return TextFormat("ROUND %u OVER", (unsigned)v->round);
     if (v->attacker == BOAT_MATCH_NOBODY)
         return TextFormat("%s CAPSIZED  -1", e->victim);
-    return TextFormat("%s CAPSIZED %s  %s", e->attacker, e->victim,
-        v->bailout                        ? "BAILOUT"
-            : v->cause == BOAT_MATCH_WAKE ? "WAKE"
-                                          : "HIT");
+    return TextFormat("%s DEFEATED %s  %s", e->attacker, e->victim,
+        v->bailout                           ? "BAILOUT"
+            : v->cause == BOAT_MATCH_GUN     ? "GUN"
+            : v->cause == BOAT_MATCH_GRENADE ? "GRENADE"
+            : v->cause == BOAT_MATCH_WAKE    ? "WAKE"
+                                             : "HIT");
 }
 
 static void draw_feed(const BoatNetClient *c, int right, int top, double now)
@@ -443,7 +468,7 @@ static void draw_scoreboard(const BoatNetClient *c, int width, int height, doubl
                                          : "WARMUP";
     DrawText(title, x, y, font, RAYWHITE);
     y += line + line / 2;
-    const char *headings[] = { "#", "PLAYER", "SCORE", "CAUSED", "CAPSIZED", "SELF" };
+    const char *headings[] = { "#", "PLAYER", "SCORE", "KILLS", "DEATHS", "SELF" };
     for (unsigned k = 0; k < 6; ++k)
         DrawText(headings[k], x + columns[k] * font, y, font, GRAY);
     y += line;
@@ -708,4 +733,24 @@ void net_study_close(NetStudy *net)
     boat_net_enet_cleanup();
 #endif
     net->transport_open = false;
+}
+
+void net_study_combat_hud(const NetStudy *net, int width)
+{
+    const BoatNetClient *c = &net->client;
+    if (c->accept.mode != BOAT_NET_MODE_DEATHMATCH)
+        return;
+    const BoatFleet *f = boat_net_client_view(c);
+    const BoatCombatPlayer *p = &f->state.combat.players[c->slot];
+    float cooldown = (float)(p->next_grenade > f->state.tick ? p->next_grenade - f->state.tick : 0)
+        / BOAT_TICK_HZ;
+    DrawText(TextFormat("HULL %.0f", p->health), 5, 20, 10, p->health < 30 ? ORANGE : RAYWHITE);
+    DrawRectangle(5, 33, 72, 4, (Color) { 40, 50, 59, 255 });
+    DrawRectangle(5, 33, (int)(72 * p->heat), 4, p->overheated ? RED : ORANGE);
+    DrawText(p->overheated ? "GUN: RELEASE" : "SPACE: GUN", 5, 40, 10, RAYWHITE);
+    DrawText(cooldown > 0 ? TextFormat("E: %.1fs", cooldown) : "E: GRENADE", 5, 52, 10,
+        cooldown > 0 ? GRAY : YELLOW);
+    const BoatCombatPlayer *confirmed = &c->fleet.state.combat.players[c->slot];
+    if (confirmed->hit_tick && c->fleet.state.tick - confirmed->hit_tick < 18)
+        DrawText("+", width / 2 - 3, 70, 10, YELLOW);
 }

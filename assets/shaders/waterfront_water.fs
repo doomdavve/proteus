@@ -74,6 +74,28 @@ vec3 ambientWaves(vec2 world, float footprint)
 }
 
 // BEGIN STORM RECIPE
+
+// BEGIN RADIAL RECIPE
+uniform vec4 radialOrigin[4]; // world centre, radius, amplitude
+uniform vec4 radialMotion[4]; // speed, max range
+vec4 radialWave(vec2 world) {
+    vec4 result=vec4(0.0);
+    for(int i=0;i<4;++i) {
+        vec4 o=radialOrigin[i];
+        if(o.w<=0.0) continue;
+        vec2 delta=world-o.xy;
+        float d=length(delta), x=(d-o.z)/2.0;
+        if(abs(x)>=1.0) continue;
+        float q=1.0-x*x, fade=1.0-o.z/radialMotion[i].y;
+        float slope=-2.0*o.w*fade*fade*x*q;
+        float h=o.w*fade*fade*q*q;
+        result+=vec4(h,d>0.00001 ? slope*delta/d : vec2(0.0),
+            -radialMotion[i].x*slope-2.0*o.w*fade*radialMotion[i].x/radialMotion[i].y*q*q);
+    }
+    return result;
+}
+// END RADIAL RECIPE
+
 uniform vec4 stormArea; // World centre X/Z, radius, height.
 uniform vec4 stormPhase; // CPU-reduced phases for the four directional wave trains.
 uniform vec4 stormMotion; // World velocity X/Z, CPU-reduced long-bend phase, reserved.
@@ -337,13 +359,14 @@ void main()
     vec3 wake = vec3(0.0);
     vec3 vessel = vesselWake(fragWorldPosition.xz).xyz;
     vec3 storm = stormWave(fragWorldPosition.xz).xyz;
+    vec3 radial = radialWave(fragWorldPosition.xz).xyz;
     if (physicalWaves != 0) {
         vec3 ambient = ambientWaves(fragWorldPosition.xz, footprint);
         vec2 slope = ambient.yz;
         float surfaceHeight = ambient.x;
         wake = crossingWake(fragWorldPosition.xz, crossingWakeTime)
             + playerWake(fragWorldPosition.xz)
-            + wakeFieldSample(fragWorldPosition.xz) + vessel + storm;
+            + wakeFieldSample(fragWorldPosition.xz) + vessel + storm + radial;
         slope += wake.yz;
         surfaceHeight += wake.x;
         if (waterPatchPass != 0 && wakeFieldEnabled == 0) {
@@ -404,7 +427,7 @@ void main()
             : vec3(0.28, 0.25, 0.17);
         color += highlight * pow(max(dot(normal, halfVector), 0.0), 96.0);
     }
-    if (wakeAmplitude > 0.0 || playerWakeCount > 0 || wakeFieldEnabled != 0 || vesselMotion.y > 0.0 || stormArea.w > 0.0) {
+    if (wakeAmplitude > 0.0 || playerWakeCount > 0 || wakeFieldEnabled != 0 || vesselMotion.y > 0.0 || stormArea.w > 0.0 || radial.x > 0.0) {
         float wakeHeight = wake.x - vessel.x - storm.x;
         float crest = objectWakeEnabled != 0
             ? clamp(objectCrestFoam, 0.0, 1.0) * clamp(wakeHeight / 0.3, 0.0, 1.0)
@@ -412,6 +435,7 @@ void main()
         float foam = crest * 0.65;
         foam = max(foam, 0.38 * waveCrestFoam(vessel, 6.2831853 / max(vesselShape.y, 0.001)));
         foam = max(foam, 0.28 * waveCrestFoam(storm, 0.42));
+        foam = max(foam, 0.8 * waveCrestFoam(radial, 0.4));
         // The compact rain footprint darkens only the rough patch.
         vec2 stormDelta = (fragWorldPosition.xz-stormArea.xy)/max(stormArea.z,1.0);
         float stormShade = pow(max(0.0,1.0-dot(stormDelta,stormDelta)),2.0);

@@ -73,6 +73,14 @@ void boat_audio_render(BoatAudio *audio, BoatAudioInput input, float *samples, s
         float landing = bounded(input.landing, 1);
         audio->slap = audio->splash = landing;
     }
+    if (input.gun_tick > audio->gun_tick) {
+        audio->gun_tick = input.gun_tick;
+        audio->gun_pulse = 1;
+    }
+    if (input.grenade_tick > audio->grenade_tick) {
+        audio->grenade_tick = input.grenade_tick;
+        audio->grenade_pulse = 1;
+    }
     for (size_t i = 0; i < count; ++i) {
         audio->load += (target - audio->load) * .00012f;
         float load = audio->load;
@@ -129,7 +137,12 @@ void boat_audio_render(BoatAudio *audio, BoatAudioInput input, float *samples, s
         audio->splash_body += .02f * (audio->splash_low - audio->splash_body);
         float splash = audio->splash * (audio->splash_low - audio->splash_body);
         audio->splash *= .99994f;
-        float value = engine + water + .9f * slap + .5f * splash;
+        audio->weapon_low += .018f * (splash_noise - audio->weapon_low);
+        float weapon = .35f * audio->gun_pulse * splash_noise
+            + 1.5f * audio->grenade_pulse * audio->weapon_low;
+        audio->gun_pulse *= .998f;
+        audio->grenade_pulse *= .99985f;
+        float value = engine + water + .9f * slap + .5f * splash + weapon;
         // DC removal (~25 Hz), then soft limiting with ample stream headroom.
         float centered = value - audio->dc_input + .99673f * audio->dc_output;
         audio->dc_input = value;
