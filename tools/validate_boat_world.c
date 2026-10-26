@@ -3,6 +3,7 @@
  * physical step is the core-only order validate_boat_core uses. W4 extends this file with
  * map/cache lifecycle checks. */
 #include "boat_map.h"
+#include "boat_test_cases.h"
 #include "boat_test_maps.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
@@ -537,21 +538,32 @@ static int lifecycle(void)
     return 0;
 }
 
-int main(void)
+static int locations(void)
 {
-    SetTraceLogLevel(LOG_WARNING);
     CHECK(boat_location(BOAT_LOCATION_COUNT) == NULL && !boat_location_find("harbour"));
     for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
         CHECK(boat_location_find(boat_location(i)->name) == boat_location(i));
-    CHECK(interleaved() == 0);
-    CHECK(clones() == 0);
-    CHECK(views() == 0);
-    CHECK(presentation_toggle() == 0);
-    CHECK(render_rates() == 0);
-    CHECK(core_order() == 0);
-    CHECK(view_binding() == 0);
-    CHECK(lifecycle() == 0);
-    puts("boat_world=ok");
-    test_worlds_close();
     return 0;
+}
+
+static const TestCase cases[] = {
+    TEST_CASE(locations),
+    SLOW_CASE(interleaved),
+    SLOW_CASE(clones),
+    SLOW_CASE(views),
+    SLOW_CASE(presentation_toggle),
+    SLOW_CASE(render_rates),
+    TEST_CASE(core_order),
+    TEST_CASE(view_binding),
+    SLOW_CASE(lifecycle),
+};
+
+int main(int argc, char **argv)
+{
+    SetTraceLogLevel(LOG_WARNING);
+    int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    if (!result && argc == 1)
+        puts("boat_world=ok");
+    test_worlds_close();
+    return result;
 }

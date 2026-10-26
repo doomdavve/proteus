@@ -3,7 +3,8 @@
 #include "boat_map.h"
 #include "boat_replay.h"
 #include "boat_session.h"
-#include "boat_test_world.h"
+#include "boat_test_cases.h"
+#include "boat_test_session.h"
 #include "boat_view.h"
 #include "raymath.h"
 #include "wake_velocity_state.h"
@@ -78,7 +79,7 @@ static int calm_independence(void)
     static BoatSession sessions[3];
     static ObjectStudy studies[3];
     for (int i = 0; i < 3; ++i) {
-        boat_session_init(&sessions[i], test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        physics_session(&sessions[i], BOAT_LOCATION_BASIN);
         object_study_reset(&studies[i], &sessions[i], false, BOAT_OBJECT_LIFE_TICKS, 1.8f);
         boat_session_set_tick(&sessions[i], starts[i]);
     }
@@ -99,6 +100,7 @@ static int calm_independence(void)
     for (int i = 0; i < 3; ++i) {
         boat_session_init(&sessions[i], test_world(BOAT_LOCATION_BASIN),
             (BoatWater) { .player_wake_enabled = true });
+        sessions[i].presentation_enabled = false;
         boat_session_set_tick(&sessions[i], starts[i]);
     }
     float divergence = 0;
@@ -141,6 +143,7 @@ static int large_time_locations(void)
             BoatWater water = boat_water_gentle();
             water.player_wake_enabled = true;
             boat_session_init(&session, test_world(definition->id), water);
+            session.presentation_enabled = false; // Time-driven physics only.
             boat_session_set_tick(&session, starts[s]);
             const Boat *boat = &session.boat;
             float peak = 0;
@@ -176,8 +179,11 @@ static int large_time_locations(void)
 }
 
 // Course recordings keep world time as recorded; a run started late in a session must load.
-static int replay_world_time(const char *path)
+static char replay_path[4096];
+
+static int replay_world_time(void)
 {
+    const char *path = replay_path;
     BoatSession session;
     boat_session_init(&session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
     boat_session_start_course(&session);
@@ -310,6 +316,13 @@ static int soak(double seconds, const char *directory, bool waves)
     return 0;
 }
 
+static const TestCase cases[] = {
+    TEST_CASE(reduction_checks),
+    SLOW_CASE(calm_independence),
+    SLOW_CASE(large_time_locations),
+    TEST_CASE(replay_world_time),
+};
+
 int main(int argc, char **argv)
 {
     SetTraceLogLevel(LOG_WARNING);
@@ -323,18 +336,18 @@ int main(int argc, char **argv)
         }
         return soak(seconds, argv[3], waves);
     }
-    if (argc != 2) {
-        fputs("Usage: validate_boat_clock TEMP_DIRECTORY | --soak SECONDS DIRECTORY [--waves]\n",
+    if (argc < 2 || argv[1][0] == '-') {
+        fputs("Usage: validate_boat_clock TEMP_DIRECTORY [--list | --case NAME] | --soak SECONDS "
+              "DIRECTORY [--waves]\n",
             stderr);
         return 2;
     }
-    char path[4096];
-    CHECK(snprintf(path, sizeof(path), "%s/late-world.run", argv[1]) < (int)sizeof(path));
-    CHECK(reduction_checks() == 0);
-    CHECK(calm_independence() == 0);
-    CHECK(large_time_locations() == 0);
-    CHECK(replay_world_time(path) == 0);
-    puts("boat_clock=ok");
+    CHECK(snprintf(replay_path, sizeof(replay_path), "%s/late-world.run", argv[1])
+        < (int)sizeof(replay_path));
+    argv[1] = argv[0];
+    int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc - 1, argv + 1);
+    if (!result && argc == 2)
+        puts("boat_clock=ok");
     test_worlds_close();
-    return 0;
+    return result;
 }

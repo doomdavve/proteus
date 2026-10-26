@@ -346,7 +346,7 @@ target_compile_options(validate_boat_clock PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 set(BOAT_CLOCK_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-clock-test")
 file(MAKE_DIRECTORY "${BOAT_CLOCK_TEST_DIR}")
-add_test(NAME boat_clock COMMAND validate_boat_clock ${BOAT_CLOCK_TEST_DIR})
+proteus_add_case_tests(boat_clock validate_boat_clock LABELS cpu ARGS ${BOAT_CLOCK_TEST_DIR})
 add_test(NAME boat_clock_soak_smoke
   COMMAND validate_boat_clock --soak 60 ${BOAT_CLOCK_TEST_DIR} --waves)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -476,8 +476,7 @@ set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage
 add_executable(validate_boat_map_index tools/validate_boat_map_index.c)
 target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_map_index PRIVATE ${PROTEUS_WARNINGS})
-add_test(NAME boat_map_index COMMAND validate_boat_map_index)
-set_tests_properties(boat_map_index PROPERTIES PASS_REGULAR_EXPRESSION "boat_map_index=ok")
+proteus_add_case_tests(boat_map_index validate_boat_map_index LABELS core cpu)
 # Adventure A2.5: the local view's queries, tiles and water do not grow with distant map.
 add_executable(validate_boat_map_scaling tools/validate_boat_map_scaling.c)
 target_link_libraries(validate_boat_map_scaling PRIVATE proteus_render)
@@ -613,7 +612,7 @@ add_test(NAME boat_net_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_NET_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES} ${PROTEUS_BOAT_NET_SOURCES})
 set_tests_properties(boat_net_boundary PROPERTIES PASS_REGULAR_EXPRESSION "core_boundary=ok")
-add_test(NAME boat_handling COMMAND validate_boat)
+proteus_add_case_tests(boat_handling validate_boat LABELS cpu)
 proteus_add_case_tests(boat_banking validate_boat_banking LABELS cpu)
 add_test(NAME boat_turn_entry COMMAND validate_boat_turn_entry)
 add_test(NAME boat_banking_presentation COMMAND boat_banking_review)
@@ -622,7 +621,7 @@ add_test(NAME boat_flag_cpu COMMAND boat_flag_review --scenario cruise --time 5
 set_tests_properties(boat_flag_cpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME boat_profile_records COMMAND validate_boat_profile)
 add_test(NAME boat_environment COMMAND validate_boat_environment)
-add_test(NAME boat_world_isolation COMMAND validate_boat_world)
+proteus_add_case_tests(boat_world_isolation validate_boat_world LABELS cpu)
 add_test(NAME boat_player_wake_screenshot COMMAND wake_velocity --renderer cpu --player-wake --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake.png)
 add_test(NAME boat_player_wake_course_rejected COMMAND wake_velocity --player-wake --course)

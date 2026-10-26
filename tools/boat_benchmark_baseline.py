@@ -22,7 +22,7 @@ for attempt in range(1, 4):
     with pathlib.Path(str(prefix) + '.state.csv').open() as stream:
         trace = list(csv.DictReader(stream))
     # The finite one-boat fixture must emit and return to a landing, not fill the fleet pool.
-    assert report['scenario_revision'] == report['hash_revision'] == 1
+    assert report['scenario_revision'] == 1 and report['hash_revision'] == 2
     assert report['warmup_ticks'] == 240 and report['measured_ticks'] == 14400
     assert report['total_ticks'] == 14640 and len(trace) == 7320
     assert report['physics_revision'] == 7

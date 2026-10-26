@@ -27,4 +27,12 @@ static inline void physics_session(BoatSession *session, BoatLocationId location
     session->presentation_enabled = false;
 }
 
+// basin_session without presentation, for physics-only checks.
+static inline BoatSession physics_basin_session(Boat boat)
+{
+    BoatSession session = basin_session(boat);
+    session.presentation_enabled = false;
+    return session;
+}
+
 #endif

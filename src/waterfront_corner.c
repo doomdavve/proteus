@@ -31,6 +31,12 @@ typedef struct {
     Vector3 origin, axis_u, axis_v;
     Surface *surfaces;
     size_t surface_count;
+    // Uniform XZ grid over the surfaces' bounds: cell i lists surfaces[cell_items[cell_start[i]
+    // .. cell_start[i + 1]]], every surface whose bounds overlap it.
+    Vector2 grid_low;
+    float cell;
+    int columns, rows;
+    size_t *cell_start, *cell_items;
     int entrances, shops, parked_cars, benches, bicycles, quay_sections, sidewalk_sections;
     int forecourts, trees;
 } Builder;
@@ -245,11 +251,85 @@ static float cross_xz(Vector3 a, Vector3 b, Vector3 p)
     return (b.x - a.x) * (p.z - a.z) - (b.z - a.z) * (p.x - a.x);
 }
 
+// Cell range of [low, high] along one grid axis, clamped to the grid; floor is monotone, so a
+// point inside a surface's bounds always falls in one of the surface's cells.
+// An empty span (span[0] > span[1]) lies outside the grid.
+static void cell_span(float low, float high, float origin, float cell, int count, int span[2])
+{
+    span[0] = (int)fminf(count, fmaxf(0, floorf((low - origin) / cell)));
+    span[1] = (int)fmaxf(-1, fminf(count - 1, floorf((high - origin) / cell)));
+}
+
+static bool surface_grid_init(Builder *k)
+{
+    Vector2 low = { INFINITY, INFINITY }, high = { -INFINITY, -INFINITY };
+    for (size_t i = 0; i < k->surface_count; ++i) {
+        low = Vector2Min(low, (Vector2) { k->surfaces[i].low.x, k->surfaces[i].low.z });
+        high = Vector2Max(high, (Vector2) { k->surfaces[i].high.x, k->surfaces[i].high.z });
+    }
+    if (!k->surface_count)
+        low = high = (Vector2) { 0 };
+    // About 8 m cells, coarser for very large maps so the grid stays near 512 x 512.
+    k->grid_low = low;
+    k->cell = fmaxf(8, fmaxf(high.x - low.x, high.y - low.y) / 512);
+    k->columns = (int)floorf((high.x - low.x) / k->cell) + 1;
+    k->rows = (int)floorf((high.y - low.y) / k->cell) + 1;
+    size_t cells = (size_t)k->columns * k->rows;
+    k->cell_start = calloc(cells + 1, sizeof(*k->cell_start));
+    size_t *fill = calloc(cells, sizeof(*fill));
+    if (!k->cell_start || !fill) {
+        free(fill);
+        return false;
+    }
+    // Count per cell, take prefix sums as starts, then place each surface (a counting sort).
+    for (int pass = 0; pass < 2; ++pass) {
+        for (size_t i = 0; i < k->surface_count; ++i) {
+            const Surface *s = &k->surfaces[i];
+            int x[2], z[2];
+            cell_span(s->low.x, s->high.x, low.x, k->cell, k->columns, x);
+            cell_span(s->low.z, s->high.z, low.y, k->cell, k->rows, z);
+            for (int row = z[0]; row <= z[1]; ++row)
+                for (int column = x[0]; column <= x[1]; ++column) {
+                    size_t cell = (size_t)row * k->columns + column;
+                    if (pass)
+                        k->cell_items[k->cell_start[cell] + fill[cell]++] = i;
+                    else
+                        ++k->cell_start[cell + 1];
+                }
+        }
+        if (pass)
+            break;
+        for (size_t cell = 0; cell < cells; ++cell)
+            k->cell_start[cell + 1] += k->cell_start[cell];
+        size_t items = k->cell_start[cells];
+        k->cell_items = malloc((items ? items : 1) * sizeof(*k->cell_items));
+        if (!k->cell_items) {
+            free(fill);
+            return false;
+        }
+    }
+    free(fill);
+    return true;
+}
+
+static void surface_grid_destroy(Builder *k)
+{
+    free(k->cell_start);
+    free(k->cell_items);
+    k->cell_start = k->cell_items = NULL;
+}
+
 static float surface_height(Builder *k, Vector3 p)
 {
     float height = -100;
-    for (size_t i = 0; i < k->surface_count; ++i) {
-        const Surface *s = &k->surfaces[i];
+    int x[2], z[2];
+    cell_span(p.x, p.x, k->grid_low.x, k->cell, k->columns, x);
+    cell_span(p.z, p.z, k->grid_low.y, k->cell, k->rows, z);
+    if (x[0] > x[1] || z[0] > z[1])
+        return height; // Outside every surface's bounds.
+    size_t cell = (size_t)z[0] * k->columns + x[0];
+    for (size_t item = k->cell_start[cell]; item < k->cell_start[cell + 1]; ++item) {
+        const Surface *s = &k->surfaces[k->cell_items[item]];
         if (s->a.y <= height || p.x < s->low.x || p.x > s->high.x || p.z < s->low.z
             || p.z > s->high.z)
             continue;
@@ -642,6 +722,8 @@ bool waterfront_scenery_init_tiled(
             k->surfaces[k->surface_count++] = (Surface) { a, b, c, Vector3Min(a, Vector3Min(b, c)),
                 Vector3Max(a, Vector3Max(b, c)) };
     }
+    if (!surface_grid_init(k))
+        goto failed;
     // The cafe and street furniture are authored for the river crop's streets; frontages,
     // quays and forecourts are derived from whichever map is bound.
     if (scenery->river) {
@@ -653,6 +735,7 @@ bool waterfront_scenery_init_tiled(
     build_forecourts(k, city);
     free(k->surfaces);
     k->surfaces = NULL;
+    surface_grid_destroy(k);
     if (k->overflow)
         goto failed;
     scenery->bounds = malloc((scenery->count ? scenery->count : 1) * sizeof(*scenery->bounds));
@@ -677,6 +760,7 @@ bool waterfront_scenery_init_tiled(
     return true;
 failed:
     free(k->surfaces);
+    surface_grid_destroy(k);
     waterfront_scenery_destroy(scenery);
     return false;
 }
