@@ -104,7 +104,6 @@ static int check(void)
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     const char *screenshot = NULL;
     bool gpu = false, waves = false;
     float time = 3;

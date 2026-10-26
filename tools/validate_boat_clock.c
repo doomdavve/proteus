@@ -312,7 +312,6 @@ static int soak(double seconds, const char *directory, bool waves)
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     SetTraceLogLevel(LOG_WARNING);
     if (argc >= 4 && strcmp(argv[1], "--soak") == 0) {
         char *end;

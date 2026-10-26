@@ -207,7 +207,6 @@ static int check_gulls(void)
 
 int main(void)
 {
-    test_worlds_open();
     CHECK(check_vertical_contacts() == 0);
     if (check_gulls() || check_long_session())
         return 1;

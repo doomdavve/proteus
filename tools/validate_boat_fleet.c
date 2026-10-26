@@ -692,7 +692,6 @@ static int rejects(void)
 
 int main(void)
 {
-    test_worlds_open();
     if (one_boat_equivalence() || pair_equivalence() || permutations() || tunneling()
         || solver_invariants() || checkpoints() || churn() || full_pool() || spawn_rules()
         || rejects())

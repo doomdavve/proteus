@@ -540,7 +540,6 @@ static void preview_advance(const Boat *boat, Vector2 previous, unsigned *next, 
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     bool check = false, gpu_check = false, gpu_enabled = true, play = false, source = true;
     bool skill = false;
     const char *output = NULL;

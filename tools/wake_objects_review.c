@@ -1,5 +1,6 @@
 /* Arcade wake contracts, actual hull jumps, bounded stress and complete GPU timing. */
 #include "boat_gpu.h"
+#include "boat_test_cases.h"
 #include "boat_test_session.h"
 #include "external/glad.h"
 #include "raymath.h"
@@ -40,7 +41,7 @@ static BoatWakeObjects seed(void)
     return w;
 }
 
-static void contracts(void)
+static int contracts(void)
 {
     BoatWakeObjects a = seed(), b = a, sum = a;
     Vector2 p = { 2.8f, 2.8f };
@@ -86,9 +87,10 @@ static void contracts(void)
     CHECK(a.live == 0 && a.expired == 1 && boat_wake_objects_query(&a, p).height == 0);
     CHECK(!boat_wake_objects_init(&a, BOAT_OBJECT_LIFE_TICKS + 1, 1.8f));
     puts("object contracts: signed crossing >3m, derivatives, phase, expiry and validation pass");
+    return 0;
 }
 
-static void continuity(void)
+static int continuity(void)
 {
     BoatWakeObjects w;
     CHECK(boat_wake_objects_init(&w, BOAT_OBJECT_LIFE_TICKS, 1.8f));
@@ -164,9 +166,10 @@ static void continuity(void)
     printf("continuity: brief wetness dips retain %.4gm, adjacent strength delta %.4gm, "
            "straight crest ripple %.4gm, growth/fade gradient error %.4g, time error %.4g\n",
         minimum, change, ripple, gradient_error, time_error);
+    return 0;
 }
 
-static void stress(void)
+static int stress(void)
 {
     BoatWakeObjects w;
     CHECK(boat_wake_objects_init(&w, BOAT_OBJECT_LIFE_TICKS, 1.8f));
@@ -188,14 +191,15 @@ static void stress(void)
     printf("four-boat 180s loop stress: peak %u/%d objects, %llu expired, %zu bytes, local peak "
            "%.4gm\n",
         w.peak_live, BOAT_OBJECT_CAPACITY, (unsigned long long)w.expired, sizeof(w), maximum);
+    return 0;
 }
 
-static void jumps(void)
+static int jumps(void)
 {
     BoatWakeObjects world = seed(), flat;
     CHECK(boat_wake_objects_init(&flat, BOAT_OBJECT_LIFE_TICKS, 1.8f));
     BoatSession receiver;
-    boat_session_init(&receiver, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&receiver, BOAT_LOCATION_BASIN);
     receiver.boat.position = (Vector2) { 0, 14 };
     receiver.boat.velocity = (Vector2) { 0, -16 };
     receiver.boat.throttle = receiver.boat.engine_response = .7f;
@@ -227,6 +231,7 @@ static void jumps(void)
         CHECK(isfinite(receiver.boat.height) && fabsf(receiver.boat.height) < 8);
     }
     CHECK(world.live == 0 && fabsf(receiver.boat.vertical_velocity) < .2f);
+    return 0;
 }
 
 static float diagonal_jump(bool crossing)
@@ -239,7 +244,7 @@ static float diagonal_jump(bool crossing)
         world.live = 2;
     }
     BoatSession boat;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&boat, BOAT_LOCATION_BASIN);
     boat.boat.position = (Vector2) { 12, 12 };
     boat.boat.heading = -PI / 4;
     boat.boat.velocity = (Vector2) { -11.3137f, -11.3137f };
@@ -260,14 +265,14 @@ static float diagonal_jump(bool crossing)
     return peak;
 }
 
-static void local_fleet(void)
+static int local_fleet(void)
 {
     BoatWakeObjects world;
     CHECK(boat_wake_objects_init(&world, BOAT_OBJECT_LIFE_TICKS, 1.8f));
     BoatSession fleet[4];
     unsigned contacts = 0, flights = 0;
     for (unsigned i = 0; i < 4; ++i) {
-        boat_session_init(&fleet[i], test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+        physics_session(&fleet[i], BOAT_LOCATION_BASIN);
         fleet[i].boat.position = (Vector2) { (i % 2 ? 1 : -1) * 12, (i / 2 ? 1 : -1) * 12 };
         fleet[i].boat.heading = i * PI / 2;
         fleet[i].world.water.objects = &world;
@@ -301,18 +306,21 @@ static void local_fleet(void)
     CHECK(world.emitted > 4 && world.peak_live > 4 && contacts > 0);
     printf("local four-boat play: emitted %llu, peak live %u, contacts %u, flights %u\n",
         (unsigned long long)world.emitted, world.peak_live, contacts, flights);
+    return 0;
 }
 
-static unsigned gameplay_envelope(float crest_height)
+// The full grid, or with SAMPLE only the fastest approach to the youngest one and four crests
+// from every angle (flights, upright landings and capsizes).
+static unsigned gameplay_envelope(float crest_height, bool sample)
 {
     unsigned cases = 0, flights = 0, landings = 0, capsizes = 0;
     float peak = 0, peak_lift = 0;
     const float speeds[] = { 6, 12, 18 }, angles[] = { 0, PI / 4, PI / 2 };
     const unsigned ages[] = { 120, 480, 960 };
-    for (unsigned sources = 1; sources <= 4; ++sources)
-        for (unsigned speed = 0; speed < 3; ++speed)
+    for (unsigned sources = 1; sources <= 4; sources += sample ? 3 : 1)
+        for (unsigned speed = sample ? 2 : 0; speed < 3; ++speed)
             for (unsigned angle = 0; angle < 3; ++angle)
-                for (unsigned age = 0; age < 3; ++age) {
+                for (unsigned age = 0; age < (sample ? 1 : 3); ++age) {
                     BoatWakeObjects world = seed();
                     world.crest_height = crest_height;
                     world.objects[0].amplitude *= crest_height / 1.8f;
@@ -325,7 +333,7 @@ static unsigned gameplay_envelope(float crest_height)
                     }
                     world.live = sources;
                     BoatSession boat;
-                    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+                    physics_session(&boat, BOAT_LOCATION_BASIN);
                     float radius = .9f + 2.4f * ages[age] * BOAT_STEP + 8;
                     boat.boat.position
                         = (Vector2) { sinf(angles[angle]) * radius, cosf(angles[angle]) * radius };
@@ -342,6 +350,12 @@ static unsigned gameplay_envelope(float crest_height)
                         airborne |= boat.boat.motion_state == BOAT_AIRBORNE;
                         peak = fmaxf(peak, boat.boat.height);
                         peak_lift = fmaxf(peak_lift, boat.boat.vertical_velocity);
+                        // Calm water after the last crest expires: a boat at rest stays so.
+                        if (world.live == 0 && boat.boat.motion_state != BOAT_AIRBORNE
+                            && fabsf(boat.boat.vertical_velocity) < .01f
+                            && fabsf(boat.boat.pitch_velocity) < .01f
+                            && fabsf(boat.boat.roll_velocity) < .01f)
+                            break;
                     }
                     float up = cosf(boat.boat.pitch) * cosf(boat.boat.roll);
                     CHECK(world.live == 0);
@@ -361,12 +375,12 @@ static unsigned gameplay_envelope(float crest_height)
     return capsizes;
 }
 
-static void air_roll_control(void)
+static int air_roll_control(void)
 {
     BoatWakeObjects water;
     CHECK(boat_wake_objects_init(&water, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     BoatSession left, right, recover;
-    boat_session_init(&right, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&right, BOAT_LOCATION_BASIN);
     right.world.water.objects = &water;
     right.boat.height = 200; // Isolate several seconds of dry controls from landing forces.
     right.boat.wheel = 1;
@@ -399,7 +413,7 @@ static void air_roll_control(void)
     CHECK(fabsf(right.boat.roll_velocity) < .3f);
 
     BoatSession inverted;
-    boat_session_init(&inverted, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    physics_session(&inverted, BOAT_LOCATION_BASIN);
     inverted.world.water.objects = &water;
     inverted.boat.roll = PI;
     for (unsigned tick = 0; tick < 120; ++tick)
@@ -407,6 +421,7 @@ static void air_roll_control(void)
     CHECK(inverted.boat.motion_state == BOAT_CAPSIZED);
     puts("arcade air control: held turns stay upright; automatic recovery, yaw, momentum and "
          "capsize pass");
+    return 0;
 }
 
 static BoatWakeObjects curved_world(void)
@@ -600,6 +615,7 @@ static void runtime(bool graphics, bool visible)
     CHECK(boat_wake_objects_init(&w, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     BoatSession boat;
     boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat.presentation_enabled = graphics; // Only the GPU review draws the flag and particles.
     boat.world.water.objects = &w;
     BoatGpu gpu = { 0 };
     double cold_draw_ms = 0;
@@ -737,26 +753,66 @@ static void runtime(bool graphics, bool visible)
     }
 }
 
-int main(int argc, char **argv)
+static int diagonal_jumps(void)
 {
-    test_worlds_open();
-    SetTraceLogLevel(LOG_WARNING);
-    contracts();
-    continuity();
-    stress();
-    jumps();
     float single = diagonal_jump(false), crossed = diagonal_jump(true);
     printf("same diagonal approach: one wake %.4gm, crossing wakes %.4gm above calm\n", single,
         crossed);
     CHECK(crossed > single * 1.2f);
-    air_roll_control();
-    unsigned tall_capsizes = gameplay_envelope(1.8f);
-    unsigned default_capsizes = gameplay_envelope(BOAT_OBJECT_DEFAULT_HEIGHT);
-    CHECK(tall_capsizes < 43 && default_capsizes < tall_capsizes);
-    local_fleet();
-    (void)curved_world();
-    bool visible = argc == 2 && strcmp(argv[1], "--desktop") == 0;
-    runtime(visible || (argc == 2 && strcmp(argv[1], "--gpu") == 0), visible);
-    test_worlds_close();
     return 0;
+}
+
+static int gameplay_envelope_sample(void)
+{
+    (void)gameplay_envelope(1.8f, true);
+    return 0;
+}
+
+static int gameplay_envelopes(void)
+{
+    unsigned tall_capsizes = gameplay_envelope(1.8f, false);
+    unsigned default_capsizes = gameplay_envelope(BOAT_OBJECT_DEFAULT_HEIGHT, false);
+    CHECK(tall_capsizes < 43 && default_capsizes < tall_capsizes);
+    return 0;
+}
+
+static int curved_crests(void)
+{
+    (void)curved_world();
+    return 0;
+}
+
+static int cpu_runtime(void)
+{
+    runtime(false, false);
+    return 0;
+}
+
+static const TestCase cases[] = {
+    TEST_CASE(contracts),
+    TEST_CASE(continuity),
+    TEST_CASE(stress),
+    TEST_CASE(jumps),
+    TEST_CASE(diagonal_jumps),
+    TEST_CASE(air_roll_control),
+    TEST_CASE(gameplay_envelope_sample),
+    SLOW_CASE(gameplay_envelopes),
+    SLOW_CASE(local_fleet),
+    TEST_CASE(curved_crests),
+    TEST_CASE(cpu_runtime),
+};
+
+// --gpu (hidden window) and --desktop (visible review) run only the GPU runtime; the CPU
+// cases are separate CTest entries.
+int main(int argc, char **argv)
+{
+    SetTraceLogLevel(LOG_WARNING);
+    bool visible = argc == 2 && strcmp(argv[1], "--desktop") == 0;
+    int result = 0;
+    if (visible || (argc == 2 && strcmp(argv[1], "--gpu") == 0))
+        runtime(true, visible);
+    else
+        result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+    test_worlds_close();
+    return result;
 }

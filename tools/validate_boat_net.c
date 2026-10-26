@@ -2173,7 +2173,6 @@ static int combat_room(void)
 
 int main(void)
 {
-    test_worlds_open();
     RUN(throttle_detents());
     RUN(golden());
     RUN(codec());

@@ -233,6 +233,7 @@ if(NOT MSVC)
 endif()
 
 enable_testing()
+include(cmake/CaseTests.cmake)
 add_executable(validate_boat_wake tools/validate_boat_wake.c)
 target_link_libraries(validate_boat_wake PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_wake PRIVATE
@@ -358,8 +359,8 @@ target_link_libraries(wake_objects_review PRIVATE proteus_boat_session proteus_g
 target_compile_options(wake_objects_review PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_dependencies(wake_objects_review proteus_assets)
-add_test(NAME wake_objects_contracts_jumps COMMAND wake_objects_review)
-set_tests_properties(wake_objects_contracts_jumps PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 120)
+proteus_add_case_tests(wake_objects wake_objects_review LABELS cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 if(PROTEUS_GPU_TESTS)
   add_test(NAME wake_objects_gpu COMMAND wake_objects_review --gpu)
   set_tests_properties(wake_objects_gpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -613,7 +614,7 @@ add_test(NAME boat_net_boundary COMMAND ${Python3_EXECUTABLE}
   ${BOAT_NET_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES} ${PROTEUS_BOAT_NET_SOURCES})
 set_tests_properties(boat_net_boundary PROPERTIES PASS_REGULAR_EXPRESSION "core_boundary=ok")
 add_test(NAME boat_handling COMMAND validate_boat)
-add_test(NAME boat_banking COMMAND validate_boat_banking)
+proteus_add_case_tests(boat_banking validate_boat_banking LABELS cpu)
 add_test(NAME boat_turn_entry COMMAND validate_boat_turn_entry)
 add_test(NAME boat_banking_presentation COMMAND boat_banking_review)
 add_test(NAME boat_flag_cpu COMMAND boat_flag_review --scenario cruise --time 5

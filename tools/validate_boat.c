@@ -1567,7 +1567,6 @@ static int validate_mouse_steering(void)
 
 int main(void)
 {
-    test_worlds_open();
     CHECK(validate_pedal_controls() == 0);
     CHECK(validate_throttle_detents() == 0);
     CHECK(validate_mouse_steering() == 0);

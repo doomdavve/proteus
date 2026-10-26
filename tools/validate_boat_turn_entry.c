@@ -105,7 +105,6 @@ static int validate(FILE *report)
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     FILE *report = NULL;
     if (argc == 3 && !strcmp(argv[1], "--report")) {
         report = fopen(argv[2], "w");

@@ -18,4 +18,13 @@ static inline BoatSession basin_session(Boat boat)
     return session;
 }
 
+// Test fixture for checks that read only physics, wakes or contacts: a calm session at LOCATION
+// without the cosmetic presentation (flag cloth, particles), which leaves physics bit-identical
+// (validate_boat_world's presentation_toggle) and otherwise dominates long scripted runs.
+static inline void physics_session(BoatSession *session, BoatLocationId location)
+{
+    boat_session_init(session, test_world(location), (BoatWater) { 0 });
+    session->presentation_enabled = false;
+}
+
 #endif

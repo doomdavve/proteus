@@ -59,7 +59,6 @@ static bool player_clear(const Boat *boat)
 
 int main(void)
 {
-    test_worlds_open();
     static BoatModel a, b;
     size_t triangles = 0;
     for (int kind = 0; kind < BOAT_MODEL_KIND_COUNT; ++kind) {

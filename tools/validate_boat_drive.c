@@ -18,7 +18,6 @@
     } while (0)
 int main(void)
 {
-    test_worlds_open();
     const BoatWorldResources *basin = test_world(BOAT_LOCATION_BASIN);
     BoatSession a, b;
     BaselineStudy wa;

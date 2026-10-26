@@ -136,7 +136,6 @@ static int capture(BoatGpu *gpu, Renderer3D *cpu, BoatCpuView *cpu_view, const B
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     bool gpu_enabled = false;
     const char *output = NULL;
     for (int i = 1; i < argc; ++i) {

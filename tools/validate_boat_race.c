@@ -702,7 +702,6 @@ static int full_race(void)
 
 int main(void)
 {
-    test_worlds_open();
     if (geometry() || storm_surface() || crossing() || progress_and_places() || ties() || parking()
         || recovery() || leavers() || rejects() || hold() || full_race())
         return 1;

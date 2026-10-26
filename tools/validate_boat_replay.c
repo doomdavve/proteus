@@ -415,7 +415,6 @@ static int banked_course(const char *directory)
 
 int main(int argc, char **argv)
 {
-    test_worlds_open();
     CHECK(clock_contracts() == 0);
     CHECK(flag_playback() == 0);
     CHECK(argc == 2);
