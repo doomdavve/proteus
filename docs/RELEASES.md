@@ -81,16 +81,18 @@ provided token. No personal access token or additional secret is needed.
 
 ## Status and verification
 
-Current status, 2026-10-24: Wake Velocity native package naming and versioned
+Current status, 2026-10-26: Wake Velocity native package naming and versioned
 archives, checksums and Actions artifacts are implemented. The macOS executable,
 bundle display name, Windows launcher/readme and CLI usage use the released name.
-Internal source/CMake names remain unchanged. Version tags `v0.0.1`–`v0.0.16` have since
-been pushed to `origin` (2026-10-17 to 2026-10-24; `v0.0.16` at `73e2c4f`, the race
-smoke-test timing fix). Checked with `gh` on 2026-10-24: the `v0.0.16` release run and the macOS, Windows, Linux
-and web runs at `73e2c4f` succeeded, and `v0.0.16` is the latest GitHub release. The
-`v0.0.14` and `v0.0.15` release runs failed (the race smoke-test timing defect fixed in
-`v0.0.16`); `v0.0.11`–`v0.0.13` are also published. Release assets were not downloaded or
-launched. Next: download both packages for user review.
+Internal source/CMake names remain unchanged. Version tags `v0.0.1`–`v0.0.17` have since
+been pushed to `origin` (2026-10-17 to 2026-10-26; `v0.0.17` at `2b55994`, after the MSVC
+initializer and `-ffp-contract=off` portability fixes). Checked with `gh` on 2026-10-26: the
+`v0.0.17` release run (40306222878) and the web run succeeded, the macOS, Windows and Linux
+runs at `2b55994` succeeded, and `v0.0.17` is the latest GitHub release with macOS arm64 and
+Windows x64 ZIPs plus checksums. Both ZIPs were downloaded and matched their `.sha256` files;
+neither package was launched. The `v0.0.14` and `v0.0.15` release runs failed (the race
+smoke-test timing defect fixed in `v0.0.16`); `v0.0.11`–`v0.0.13` and `v0.0.16` are also
+published. Next: launch both packages for user review.
 
 Verification on Apple Silicon/macOS 26, 2026-10-24:
 
