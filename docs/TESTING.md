@@ -1,5 +1,11 @@
 # Test workflow and timing
 
+The Linux, macOS and Windows Actions builds run on pull requests and pushes to `main`, skipping
+events that change only Markdown files. Any non-Markdown change runs the normal builds and tests,
+including on mixed documentation and code pull requests. Manual workflow runs and the macOS and
+Windows release builds remain available regardless of these filters. GitHub does not create a
+successful check for a skipped workflow; do not require these checks for Markdown-only pull requests.
+
 Multiplayer M2's local authority and M3's protocol and transport have display-free checks
 (see [below](#core-boundary-gate) and [network checks](#network-checks)). The M3 suite covers
 the codec, sessions over a seeded in-memory network (including profile F one way) and a real
