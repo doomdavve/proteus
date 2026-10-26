@@ -512,6 +512,12 @@ add_test(NAME boat_net_mux COMMAND validate_boat_net_mux)
 set_tests_properties(boat_net_mux PROPERTIES LABELS "core;cpu" PASS_REGULAR_EXPRESSION "boat_net_mux=ok")
 add_executable(validate_boat_net tools/validate_boat_net.c)
 target_link_libraries(validate_boat_net PRIVATE proteus_boat_net)
+# The same room harness over real ENet sockets on 127.0.0.1, still on a virtual clock. Cases
+# that need the memory network's impairment are left out, hence -Wno-unused-function.
+add_executable(validate_boat_net_enet tools/validate_boat_net.c)
+target_link_libraries(validate_boat_net_enet PRIVATE proteus_boat_net_enet)
+target_compile_definitions(validate_boat_net_enet PRIVATE BOAT_NET_TEST_ENET)
+target_compile_options(validate_boat_net_enet PRIVATE ${PROTEUS_WARNINGS} -Wno-unused-function)
 foreach(target validate_boat_combat validate_boat_fleet validate_boat_match validate_boat_race boat_server boat_bot validate_boat_net)
   target_compile_options(${target} PRIVATE ${PROTEUS_WARNINGS})
 endforeach()
@@ -535,6 +541,10 @@ add_test(NAME boat_server_bind_rejected COMMAND boat_server --bind not-an-addres
 add_test(NAME boat_bot_endpoint_rejected COMMAND boat_bot --connect 127.0.0.1)
 add_test(NAME boat_bot_discover_join_rejected
   COMMAND boat_bot --discover --connect 127.0.0.1:24680)
+add_test(NAME boat_bot_snapshots_with_seconds_rejected
+  COMMAND boat_bot --connect 127.0.0.1:24680 --snapshots 3 --seconds 2)
+add_test(NAME boat_server_scripted_until_empty_rejected
+  COMMAND boat_server --scripted --until-empty)
 add_test(NAME boat_net_study_mode_rejected COMMAND wake_velocity --connect 127.0.0.1:24680 --waves)
 add_test(NAME boat_net_study_name_rejected COMMAND wake_velocity --name lonely)
 add_test(NAME boat_net_study_skin_rejected
@@ -561,39 +571,27 @@ if(PROTEUS_GPU_TESTS)
 endif()
 set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_rejected
   boat_server_bind_rejected boat_server_round_without_deathmatch_rejected boat_bot_endpoint_rejected
-  boat_bot_discover_join_rejected boat_net_study_mode_rejected
+  boat_bot_discover_join_rejected boat_bot_snapshots_with_seconds_rejected
+  boat_server_scripted_until_empty_rejected boat_net_study_mode_rejected
   boat_net_study_name_rejected boat_net_study_skin_rejected wake_velocity_host_race_location_rejected
   wake_velocity_host_connect_rejected wake_velocity_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
 proteus_add_case_tests(boat_net validate_boat_net LABELS core cpu)
-add_test(NAME boat_net_loopback COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_smoke.py --server $<TARGET_FILE:boat_server>
+proteus_add_case_tests(boat_net_enet validate_boat_net_enet LABELS cpu)
+# Event-driven process smoke: boat_server and boat_bot connect, discover and exit. Session rules
+# over the real transport are the boat_net_enet cases, on a virtual clock.
+add_test(NAME boat_net_process COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_process.py --server $<TARGET_FILE:boat_server>
   --bot $<TARGET_FILE:boat_bot>)
-set_tests_properties(boat_net_loopback PROPERTIES PASS_REGULAR_EXPRESSION "boat_net_loopback=ok"
+set_tests_properties(boat_net_process PROPERTIES PASS_REGULAR_EXPRESSION "boat_net_process=ok"
   TIMEOUT 60)
-add_test(NAME boat_net_deathmatch COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_smoke.py --deathmatch
-  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
-set_tests_properties(boat_net_deathmatch PROPERTIES
-  PASS_REGULAR_EXPRESSION "boat_net_deathmatch=ok" TIMEOUT 60)
-add_test(NAME boat_net_race COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_smoke.py --race
-  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
-set_tests_properties(boat_net_race PROPERTIES PASS_REGULAR_EXPRESSION "boat_net_race=ok"
-  TIMEOUT 60)
-add_test(NAME boat_net_session COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_session.py
-  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
-set_tests_properties(boat_net_session PROPERTIES
-  PASS_REGULAR_EXPRESSION "boat_net_session=ok" TIMEOUT 90)
-add_test(NAME boat_net_river COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/boat_net_session.py --location river --mode deathmatch
-  --server $<TARGET_FILE:boat_server> --bot $<TARGET_FILE:boat_bot>)
-set_tests_properties(boat_net_river PROPERTIES
-  PASS_REGULAR_EXPRESSION "boat_net_session=ok" TIMEOUT 90)
 set(BOAT_CORE_BOUNDARY_NM)
 if(CMAKE_NM AND NOT MSVC)
   set(BOAT_CORE_BOUNDARY_NM --nm ${CMAKE_NM} --archive $<TARGET_FILE:proteus_boat_core>)
 endif()
+# No test may wait for wall-clock time to pass (docs/TESTING.md, "No wall time").
+add_test(NAME test_time COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_test_time.py --root ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(test_time PROPERTIES PASS_REGULAR_EXPRESSION "test_time=ok")
 add_test(NAME boat_core_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_CORE_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES})
@@ -872,14 +870,13 @@ set(PROTEUS_SLOW_TESTS
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
-  boat_host boat_map_scaling boat_net_boundary boat_outer_map boat_race_trial boat_replay
+  boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
   boat_river_benchmark_options boat_river_route boat_river_wave_route
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_river_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
-  boat_river_screenshot
-  boat_net_deathmatch boat_net_loopback boat_net_race boat_net_river boat_net_session)
+  boat_river_screenshot)
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
 # and cpu (everything else that runs without a display).
@@ -919,7 +916,7 @@ if(PROTEUS_OPTIMIZE_TESTS)
       validate_boat_clock validate_boat_world validate_boat_core validate_boat_map
       validate_boat_map_index validate_boat_outer_map validate_boat_voyage validate_boat_fleet
       boat_server
-      proteus_boat_net validate_boat_net)
+      proteus_boat_net validate_boat_net validate_boat_net_enet)
     target_compile_options(${target} PRIVATE
       $<$<AND:$<CONFIG:Debug>,$<C_COMPILER_ID:AppleClang,Clang,GNU>>:-O2>)
   endforeach()

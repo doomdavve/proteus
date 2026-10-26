@@ -46,7 +46,7 @@ jobs:
       - name: Run boat CPU and multiplayer checks
         run: >-
           ctest --test-dir build-win -C Release --output-on-failure
-          -R '^(boat_handling|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_net|boat_net_loopback|boat_host)$'
+          -R '^(boat_handling\..*|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_net\..*|boat_net_enet\..*|boat_net_process|boat_host)$'
 
       - name: Package portable Wake Velocity
         run: |

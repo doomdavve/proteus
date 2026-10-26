@@ -24,10 +24,16 @@ BoatNetTransport boat_net_enet_transport(BoatNetEnet *enet);
 void boat_net_enet_flush(BoatNetEnet *enet);
 // Block up to SECONDS for network activity; the event (if any) is returned by the next poll.
 void boat_net_enet_wait(BoatNetEnet *enet, double seconds);
+// Tests with every host in one process: service HOSTS until each datagram any of them sent has
+// been received by one of them (loopback delivery is asynchronous), keeping the events for the
+// next polls. False if that takes longer than TIMEOUT seconds or an event stash fills.
+bool boat_net_enet_settle(BoatNetEnet *const *hosts, unsigned count, double timeout);
 // Disconnect every peer gracefully, waiting up to SECONDS, then destroy the host.
 void boat_net_enet_close(BoatNetEnet *enet, double seconds);
 // Negotiated UDP payload MTU of transport peer PEER, or zero when not connected.
 unsigned boat_net_enet_peer_mtu(BoatNetEnet *enet, unsigned peer);
+// The local UDP port, as bound (a listen on port 0 gets an ephemeral one); 0 if unknown.
+uint16_t boat_net_enet_port(const BoatNetEnet *enet);
 
 // Monotonic seconds for scheduling (not wall-clock time).
 double boat_net_clock(void);
@@ -52,6 +58,10 @@ BoatNetLan *boat_net_lan_search(char *error, size_t size);
 void boat_net_lan_query(BoatNetLan *lan, uint16_t port);
 // The next answer without blocking. A room advertising no address gets its sender's.
 bool boat_net_lan_receive(BoatNetLan *lan, BoatNetLanRoom *room);
+// The local UDP port, as bound; 0 if unknown.
+uint16_t boat_net_lan_port(const BoatNetLan *lan);
+// Block until LAN has a datagram to read, at most TIMEOUT seconds; false if none arrived.
+bool boat_net_lan_wait(BoatNetLan *lan, double timeout);
 void boat_net_lan_close(BoatNetLan *lan);
 // This machine's name for answers: its first label in printable ASCII, at most
 // BOAT_NET_NAME_BYTES; empty when unknown.

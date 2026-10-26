@@ -9,6 +9,9 @@
 #include "boat_fleet_bots.h"
 #include "boat_map.h"
 #include "boat_net_client.h"
+#ifdef BOAT_NET_TEST_ENET
+#include "boat_net_enet.h"
+#endif
 #include "boat_net_server.h"
 #include "boat_test_cases.h"
 #include "boat_test_world.h"
@@ -16,6 +19,7 @@
 #include "raymath.h"
 
 #include <inttypes.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -509,10 +513,17 @@ static int checkpoints(void)
 }
 
 // A virtual room: one authority, clients driven by bots from their own mirrors.
-#define ROOM_CLIENTS 6
+#define ROOM_CLIENTS 8
 #define ROOM_HISTORY 1024
+#define ROOM_ENET_HOSTS 16 // Joined and raw client hosts per ENet room.
 typedef struct {
-    BoatNetMemory *network;
+    BoatNetMemory *network; // NULL when the room runs over ENet.
+#ifdef BOAT_NET_TEST_ENET
+    // Real UDP on 127.0.0.1, still on the room's virtual clock: the listening host and every
+    // client host, joined or raw. The server's peer index for a client is ENet's choice.
+    BoatNetEnet *enet, *enet_clients[ROOM_ENET_HOSTS];
+    unsigned enet_count;
+#endif
     BoatNetServer server;
     BoatNetClient clients[ROOM_CLIENTS];
     unsigned link[ROOM_CLIENTS];
@@ -543,9 +554,68 @@ typedef struct {
     unsigned checks, matches, mismatches;
 } Room;
 
+// The room's server transport: the seeded in-memory network, or with BOAT_NET_TEST_ENET (the
+// boat_net_enet tests) an ENet host on an ephemeral 127.0.0.1 port.
+static bool room_listen(Room *room, uint64_t seed, BoatNetTransport *transport)
+{
+#ifdef BOAT_NET_TEST_ENET
+    (void)seed;
+    char error[128];
+    room->enet = boat_net_enet_listen("127.0.0.1", 0, error, sizeof(error));
+    if (!room->enet)
+        return false;
+    *transport = boat_net_enet_transport(room->enet);
+#else
+    room->network = boat_net_memory_create(seed);
+    if (!room->network)
+        return false;
+    *transport = boat_net_memory_server(room->network);
+#endif
+    return true;
+}
+
+// A new client transport into the room. LINK is the in-memory link (UINT_MAX over ENet).
+static BoatNetTransport room_transport(Room *room, unsigned *link)
+{
+    BoatNetTransport transport;
+#ifdef BOAT_NET_TEST_ENET
+    char error[128];
+    BoatNetEnet *e = room->enet_count < ROOM_ENET_HOSTS
+        ? boat_net_enet_connect("127.0.0.1", boat_net_enet_port(room->enet), error, sizeof(error))
+        : NULL;
+    if (!e) {
+        fprintf(stderr, "cannot open an ENet client host\n");
+        exit(1);
+    }
+    room->enet_clients[room->enet_count++] = e;
+    *link = UINT_MAX;
+    transport = boat_net_enet_transport(e);
+#else
+    boat_net_memory_client(room->network, link, &transport);
+#endif
+    return transport;
+}
+
+// Over ENet, deliver every datagram sent so far before the clock moves on. Loopback delivery
+// is asynchronous, and the virtual clock would otherwise outrun it on a loaded machine. The
+// wall-clock limit is only a failure deadline.
+static void room_flush(Room *room)
+{
+#ifdef BOAT_NET_TEST_ENET
+    BoatNetEnet *hosts[ROOM_ENET_HOSTS + 1] = { room->enet };
+    memcpy(hosts + 1, room->enet_clients, room->enet_count * sizeof(*hosts));
+    if (!boat_net_enet_settle(hosts, room->enet_count + 1, 5)) {
+        fprintf(stderr, "ENet loopback did not settle within 5 s\n");
+        exit(1);
+    }
+#else
+    (void)room;
+#endif
+}
+
 static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
 {
-    *room = (Room) { .network = boat_net_memory_create(seed), .steering_target = NAN };
+    *room = (Room) { .steering_target = NAN };
     if (!config.epoch)
         config.epoch = 0x5eed;
     if (!config.max_players)
@@ -554,17 +624,30 @@ static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
         config.token = "room";
     if (!config.resources)
         config.resources = basin();
-    return room->network
-        && boat_net_server_init(&room->server, boat_net_memory_server(room->network), &config);
+    BoatNetTransport transport;
+    return room_listen(room, seed, &transport)
+        && boat_net_server_init(&room->server, transport, &config);
 }
 
-static void room_close(Room *room) { boat_net_memory_destroy(room->network); }
+static void room_close(Room *room)
+{
+#ifdef BOAT_NET_TEST_ENET
+    for (unsigned i = 0; i < room->enet_count; ++i)
+        boat_net_enet_close(room->enet_clients[i], 0); // Destroy now; never wait for acks.
+    boat_net_enet_close(room->enet, 0);
+#else
+    boat_net_memory_destroy(room->network);
+#endif
+}
 
 static unsigned room_join(Room *room, const char *name, const char *token, uint32_t sequence)
 {
+    if (room->count == ROOM_CLIENTS) {
+        fprintf(stderr, "room_join: more than %d clients\n", ROOM_CLIENTS);
+        exit(1);
+    }
     unsigned i = room->count++;
-    BoatNetTransport transport;
-    boat_net_memory_client(room->network, &room->link[i], &transport);
+    BoatNetTransport transport = room_transport(room, &room->link[i]);
     BoatNetClientConfig config
         = { name, token ? token : "room", "validate", sequence, room->predict, test_worlds };
     boat_net_client_init(&room->clients[i], transport, &config, room->now);
@@ -628,8 +711,10 @@ static void room_view_remote(Room *room, unsigned i, uint64_t tick, double dt)
 static void room_step(Room *room, double dt)
 {
     room->now += dt;
-    boat_net_memory_set_time(room->network, room->now);
+    if (room->network)
+        boat_net_memory_set_time(room->network, room->now);
     boat_net_server_service(&room->server, room->now);
+    room_flush(room);
     uint64_t tick = room->server.fleet.state.tick;
     // Client mirrors only ever hold snapshot ticks, so only those are hashed (once each).
     if (room->history_tick[tick % ROOM_HISTORY] != tick || tick == 0)
@@ -692,6 +777,7 @@ static void room_step(Room *room, double dt)
                 ++room->mismatches;
         }
     }
+    room_flush(room);
 }
 
 static void room_run(Room *room, double seconds)
@@ -783,8 +869,7 @@ static int lossless(void)
 static uint8_t raw_hello(Room *room, const uint8_t *bytes, size_t size, BoatNetMessage *reply)
 {
     unsigned link;
-    BoatNetTransport t;
-    boat_net_memory_client(room->network, &link, &t);
+    BoatNetTransport t = room_transport(room, &link);
     room_step(room, 1 / 240.0);
     BoatNetEvent event;
     while (boat_net_poll(&t, &event)) { }
@@ -932,7 +1017,8 @@ static int rejections(void)
     CHECK(s->accepted == 1 && active_boats(&room.server) == 1);
     CHECK(room.clients[first].phase == BOAT_NET_CLIENT_PLAYING);
     for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
-        CHECK(peer == room.link[first] || room.server.peers[peer].phase == BOAT_NET_PEER_FREE);
+        CHECK(peer == (unsigned)room.server.slot_peer[room.clients[first].slot]
+            || room.server.peers[peer].phase == BOAT_NET_PEER_FREE);
     printf("rejections: full, token, version, handling, content and malformed Hellos refused "
            "before any slot\n");
     room_close(&room);
@@ -2169,6 +2255,169 @@ static int combat_room(void)
     return 0;
 }
 
+#ifdef BOAT_NET_TEST_ENET
+static BoatNetTransportStats room_client_stats(const Room *room, unsigned i)
+{
+    BoatNetTransport t = boat_net_enet_transport(room->enet_clients[i]);
+    return t.stats(t.context);
+}
+
+// Two bots and a wrong-token client over real UDP: what the former boat_net_loopback process
+// test checked, on the room's virtual clock. Mirrors must match the authority bit for bit.
+static int enet_loopback(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 1, (BoatNetServerConfig) { .token = "smoke" }));
+    uint16_t port = boat_net_enet_port(room.enet);
+    CHECK(port != 0);
+    char error[128] = "";
+    CHECK(!boat_net_enet_listen("127.0.0.1", port, error, sizeof(error)));
+    CHECK(strstr(error, "cannot listen") != NULL);
+    unsigned a = room_join(&room, "smoke-a", "smoke", 0);
+    unsigned b = room_join(&room, "smoke-b", "smoke", 0);
+    unsigned intruder = room_join(&room, "intruder", "wrong", 0);
+    room_run(&room, .5);
+    CHECK(room.clients[intruder].phase == BOAT_NET_CLIENT_REJECTED);
+    CHECK(room.clients[intruder].reject.reason == BOAT_NET_REJECT_TOKEN);
+    room.live[intruder] = false;
+    Vector2 start[2];
+    for (unsigned k = 0; k < 2; ++k) {
+        const BoatNetClient *c = &room.clients[k == 0 ? a : b];
+        CHECK(c->phase == BOAT_NET_CLIENT_PLAYING);
+        start[k] = room.server.fleet.state.slots[c->slot].boat.position;
+    }
+    uint64_t snapshots[2] = { room.clients[a].stats.snapshots, room.clients[b].stats.snapshots };
+    room_run(&room, 4);
+    CHECK(room.checks > 0 && room.mismatches == 0);
+    for (unsigned k = 0; k < 2; ++k) {
+        unsigned i = k == 0 ? a : b;
+        const BoatNetClient *c = &room.clients[i];
+        const BoatNetClientStats *st = &c->stats;
+        CHECK(c->phase == BOAT_NET_CLIENT_PLAYING);
+        CHECK(st->snapshots - snapshots[k] >= 4 * BOAT_TICK_HZ / BOAT_NET_SNAPSHOT_TICKS - 1);
+        CHECK(st->resyncs == 0 && st->bootstraps == 1 && st->decode_errors == 0);
+        CHECK(st->births_applied > 0 && st->births_dropped == 0);
+        Vector2 now = room.server.fleet.state.slots[c->slot].boat.position;
+        CHECK(Vector2Distance(start[k], now) > 10);
+        BoatNetTransportStats t = room_client_stats(&room, i);
+        CHECK(t.max_message <= 1100 && t.max_datagram > 0 && t.max_datagram <= 1200);
+        unsigned mtu = boat_net_enet_peer_mtu(room.enet_clients[i], 0);
+        CHECK(mtu > 0 && mtu <= 1200);
+    }
+    boat_net_client_leave(&room.clients[a]);
+    boat_net_client_leave(&room.clients[b]);
+    room_run(&room, .5);
+    const BoatNetServerStats *st = &room.server.stats;
+    CHECK(st->accepted == 2 && st->left == 2 && st->rejected[BOAT_NET_REJECT_TOKEN] == 1);
+    CHECK(boat_net_server_players(&room.server) == 0);
+    CHECK(!st->malformed && !st->forbidden && !st->misbehaving && !st->output_faults
+        && !st->emission_failures);
+    BoatNetTransport server = boat_net_enet_transport(room.enet);
+    CHECK(server.stats(server.context).max_message <= 1100);
+    printf("enet_loopback: two bots, %.0f snapshots each, token refused, port clash\n",
+        (double)room.clients[a].stats.snapshots);
+    room_close(&room);
+    return 0;
+}
+
+// A loopback room answers a LAN search on its own discovery socket.
+static int enet_lan(void)
+{
+    char error[128];
+    BoatNetLan *answer = boat_net_lan_listen("127.0.0.1", 0, error, sizeof(error));
+    BoatNetLan *search = boat_net_lan_search(error, sizeof(error));
+    CHECK(answer && search && boat_net_lan_port(answer) != 0);
+    BoatNetLanRoom advert = { .version = BOAT_NET_VERSION,
+        .physics_revision = BOAT_PHYSICS_REVISION,
+        .content_digest = boat_net_content_digest(),
+        .epoch = 0x5eed,
+        .port = 24601,
+        .mode = BOAT_NET_MODE_RACE,
+        .max_players = 4,
+        .players = 1,
+        .token = true,
+        .name = "lan-room" };
+    CHECK(boat_net_parse_ipv4("127.0.0.1", &advert.address));
+    boat_net_lan_query(search, boat_net_lan_port(answer));
+    // Loopback delivery is asynchronous: each wait returns when its datagram arrives.
+    CHECK(boat_net_lan_wait(answer, 5)); // 5 s deadline
+    CHECK(boat_net_lan_answer(answer, &advert) >= 1);
+    BoatNetLanRoom heard;
+    bool found = false;
+    CHECK(boat_net_lan_wait(search, 5)); // 5 s deadline
+    while (boat_net_lan_receive(search, &heard) && !found)
+        found = heard.port == 24601 && heard.epoch == 0x5eed;
+    CHECK(found && heard.mode == BOAT_NET_MODE_RACE && heard.players == 1 && heard.token);
+    CHECK(boat_net_lan_room_compatible(&heard) && strcmp(heard.name, "lan-room") == 0);
+    char endpoint[32];
+    boat_net_lan_endpoint(&heard, endpoint, sizeof(endpoint));
+    CHECK(strcmp(endpoint, "127.0.0.1:24601") == 0);
+    boat_net_lan_close(search);
+    boat_net_lan_close(answer);
+    return 0;
+}
+
+// Three bots stay while a fourth leaves, a fifth is refused as full, one crashes (falls silent
+// with its socket open) and times out on the room clock, and a replacement takes the slot:
+// the former boat_net_session process test without its wall-clock waits.
+static int enet_lifecycle(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 2, (BoatNetServerConfig) { .waves = true }));
+    room.predict = true;
+    unsigned stay[3];
+    for (unsigned k = 0; k < 3; ++k)
+        stay[k] = room_join(&room, "stay", NULL, 0);
+    unsigned leaver = room_join(&room, "leave", NULL, 0);
+    room_run(&room, 1);
+    unsigned full = room_join(&room, "full", NULL, 0);
+    room_run(&room, .5);
+    CHECK(room.clients[full].phase == BOAT_NET_CLIENT_REJECTED);
+    CHECK(room.clients[full].reject.reason == BOAT_NET_REJECT_FULL);
+    room.live[full] = false;
+    CHECK(room.clients[leaver].phase == BOAT_NET_CLIENT_PLAYING);
+    boat_net_client_leave(&room.clients[leaver]);
+    room_run(&room, .5);
+    room.live[leaver] = false;
+    CHECK(room.server.stats.left == 1 && boat_net_server_players(&room.server) == 3);
+    unsigned crash = room_join(&room, "crash", NULL, 0);
+    room_run(&room, 1);
+    CHECK(room.clients[crash].phase == BOAT_NET_CLIENT_PLAYING);
+    unsigned slot = room.clients[crash].slot;
+    room.live[crash] = false; // Silent from now on, as a killed process.
+    room_run(&room, BOAT_NET_TIMEOUT + 1);
+    CHECK(room.server.stats.timeouts == 1 && room.server.slot_peer[slot] == -1);
+    unsigned replacement = room_join(&room, "rejoin", NULL, 0);
+    room_run(&room, 1.5);
+    CHECK(room.clients[replacement].phase == BOAT_NET_CLIENT_PLAYING);
+    CHECK(room.clients[replacement].slot == slot);
+    for (unsigned k = 0; k < 3; ++k) {
+        const BoatNetClient *c = &room.clients[stay[k]];
+        CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.decode_errors == 0);
+        CHECK(c->stats.resyncs == 0 && c->wake_consistent);
+    }
+    CHECK(room.checks > 0 && room.mismatches == 0);
+    const BoatNetServerStats *st = &room.server.stats;
+    CHECK(st->accepted == 6 && st->rejected[BOAT_NET_REJECT_FULL] == 1);
+    CHECK(!st->malformed && !st->forbidden && !st->output_faults && !st->emission_failures);
+    printf(
+        "enet_lifecycle: leave, full, crash timeout on the room clock and slot %u reused\n", slot);
+    room_close(&room);
+    return 0;
+}
+
+// Room cases without simulated impairment run unchanged over real UDP.
+static const TestCase cases[] = {
+    TEST_CASE(enet_loopback),
+    TEST_CASE(enet_lan),
+    SLOW_CASE(enet_lifecycle),
+    TEST_CASE(rejections),
+    SLOW_CASE(deathmatch),
+    TEST_CASE(resync),
+    SLOW_CASE(race_room),
+    SLOW_CASE(mapped_rooms),
+};
+#else
 static const TestCase cases[] = {
     SLOW_CASE(throttle_detents),
     TEST_CASE(golden),
@@ -2194,12 +2443,25 @@ static const TestCase cases[] = {
     TEST_CASE(remote_view),
     SLOW_CASE(prediction_network),
 };
+#endif
 
 int main(int argc, char **argv)
 {
+#ifdef BOAT_NET_TEST_ENET
+    if (!boat_net_enet_startup()) {
+        fprintf(stderr, "ENet startup failed\n");
+        return 1;
+    }
+    const char *name = "boat_net_enet";
+#else
+    const char *name = "boat_net";
+#endif
     int status = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     if (status == 0 && argc == 1)
-        printf("boat_net=ok\n");
+        printf("%s=ok\n", name);
     test_worlds_close();
+#ifdef BOAT_NET_TEST_ENET
+    boat_net_enet_cleanup();
+#endif
     return status;
 }
