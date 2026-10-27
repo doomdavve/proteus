@@ -5,7 +5,8 @@
 #include "boat_water.h"
 
 #define WATERFRONT_HARBOR_BOATS 7
-#define WATERFRONT_HARBOR_LINES (WATERFRONT_HARBOR_BOATS * 4 + 6)
+#define WATERFRONT_FERRY_LINES 4
+#define WATERFRONT_HARBOR_LINES (WATERFRONT_HARBOR_BOATS * 4 + 6 + WATERFRONT_FERRY_LINES * 2)
 
 typedef struct {
     BoatModelKind kind;
@@ -13,8 +14,16 @@ typedef struct {
     float heading;
 } WaterfrontBerth;
 
+// The docked Gothenburg-Frederikshavn ro-pax ferry across the river from the Eriksberg crane:
+// an authored berth (renderer coordinates; heading as WaterfrontBerth) at Stena Danica's size.
+typedef struct {
+    Vector3 position;
+    float heading, length, beam, draft, height; // Draft below and height above the waterline.
+} WaterfrontFerry;
+
 typedef struct {
     Transform3D boats[WATERFRONT_HARBOR_BOATS];
+    Transform3D ferry;
     Transform3D pontoon;
     Transform3D gangway;
     Transform3D quay; // Places the quay mesh; identity on the river's 3.5 m ground.
@@ -27,6 +36,8 @@ BoatModelSpec waterfront_harbor_spec(int index);
 const Mesh3D *waterfront_harbor_boat_mesh(int index);
 const Mesh3D *waterfront_harbor_pontoon_mesh(void);
 const Mesh3D *waterfront_harbor_quay_mesh(void);
+const WaterfrontFerry *waterfront_harbor_ferry(void);
+const Mesh3D *waterfront_harbor_ferry_mesh(void);
 // Stateless shared pose/rope evaluation. Flat water stays still; waves use boat_water_query.
 void waterfront_harbor_evaluate(BoatWater water, double time, WaterfrontHarborFrame *frame);
 // The same with the gangway's shore end and the quay gear set on GROUND, the land height under

@@ -385,6 +385,11 @@ circuits. They have visual wakes, navigation lights, reflections, shadows, and f
 hull contacts. Inspect `./build/harbor_review --view ferry --waves` or `--view launch`;
 see [harbor traffic](docs/HARBOR_TRAFFIC.md) for routes and limits.
 
+Across the river from the crane a white ro-pax ferry of the made-up Vinga Line lies docked at
+the south bank, in Stena Line's colours at Stena Danica's 155 m, on both the river and `outer`. It rides the gentle waves on its
+mooring lines, and its hull blocks boats and projectiles like the moored fleet
+([A3.5e](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35e-result-2026-10-27)).
+
 River boating also has 32 gulls in four small flocks. They circle, dip toward
 imagined food, follow the cruiser's disturbed water, and spread out with staggered alarm climbs.
 They bank into turns, alternate individual wingbeats with gliding, and climb away from passing

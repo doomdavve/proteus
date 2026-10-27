@@ -49,5 +49,7 @@ bool boat_model_generate(BoatModel *model, BoatModelSpec spec);
 void boat_model_begin(BoatModel *model);
 void boat_model_box(BoatModel *model, Vector3 position, Vector3 size, Color color);
 void boat_model_beam(BoatModel *model, Vector3 a, Vector3 b, float width, Color color);
+// A one-sided panel, counter-clockwise as seen from its front (as the box faces).
+void boat_model_quad(BoatModel *model, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color color);
 
 #endif

@@ -16,13 +16,22 @@ static const WaterfrontBerth berths[WATERFRONT_HARBOR_BOATS] = {
     { BOAT_MODEL_WORKBOAT, { 44, 0, 35 }, -.10f },
 };
 static const Vector3 dock_center = { -20, 0, 182 };
+// The user asked for a Stena Line ferry "docked right across the Eriksbergs crane" (A3.5e): an
+// authored berth on the quay facing the crane, not the real terminal, clear of the race start
+// and the traffic circuits, 2-7 m off the mapped bank (its bollards stand 12 m off the hull's
+// quay side to reach land). Size and draught are Stena Danica's (154.89 x 28.04 m, 6.31 m); the
+// height, decks and colours are read from photos. The name is a made-up line's, so the real
+// company's name and logo are not reproduced. The bow points upstream, so the river side shows
+// the name reading from bow to stern, as in the user's photo.
+static const WaterfrontFerry ferry = { { 237, 0, -376 }, 2.865f, 155, 28, 6.3f, 34 };
 static const Color timber = { 154, 123, 84, 255 };
 static const Color rubber = { 44, 52, 55, 255 };
 static const Color steel = { 128, 144, 146, 255 };
-static BoatModel boats[WATERFRONT_HARBOR_BOATS], pontoon, quay;
+static BoatModel boats[WATERFRONT_HARBOR_BOATS], pontoon, quay, ferry_model;
 static bool initialized;
 
 const WaterfrontBerth *waterfront_harbor_berths(void) { return berths; }
+const WaterfrontFerry *waterfront_harbor_ferry(void) { return &ferry; }
 
 BoatModelSpec waterfront_harbor_spec(int index)
 {
@@ -39,6 +48,125 @@ BoatModelSpec waterfront_harbor_spec(int index)
         s.trim = (Color) { 75, 117, 108, 255 };
     }
     return s;
+}
+
+// Five-row pixel capitals, as the cafe's KAFFE sign; '#' is a filled cell, '|' ends a row.
+static const char *glyph(char c)
+{
+    switch (c) {
+    case 'V':
+        return "#...#|#...#|.#.#.|.#.#.|..#..";
+    case 'G':
+        return "###|#..|#.#|#.#|###";
+    case 'E':
+        return "###|#..|##.|#..|###";
+    case 'N':
+        return "#..#|##.#|#.##|#..#|#..#";
+    case 'A':
+        return ".#.|#.#|###|#.#|#.#";
+    case 'L':
+        return "#..|#..|#..|#..|###";
+    case 'I':
+        return "#|#|#|#|#";
+    default:
+        return "..|..|..|..|..";
+    }
+}
+
+// Lettering on one hull side (SIDE: +1 river, -1 quay), reading from bow to stern as seen from
+// that side. Cells are CELL metres; the text starts at local z = START and rows run down from TOP.
+// Each run of filled cells is one outward panel just off the hull.
+static void lettering(
+    BoatModel *m, const char *text, int side, float start, float top, float cell, Color color)
+{
+    float x = side * (ferry.beam * .5f + .05f);
+    float column = 0;
+    for (const char *c = text; *c; ++c) {
+        int row = 0, at = 0, width = 0, run = -1;
+        for (const char *q = glyph(*c);; ++q) {
+            if (*q == '#' && run < 0)
+                run = at;
+            if (*q != '#' && run >= 0) {
+                float y0 = top - (row + 1) * cell, y1 = top - row * cell;
+                float z0 = start + side * (column + run) * cell;
+                float z1 = start + side * (column + at) * cell;
+                if (z0 > z1) {
+                    float swap = z0;
+                    z0 = z1;
+                    z1 = swap;
+                }
+                if (side > 0)
+                    boat_model_quad(m, (Vector3) { x, y0, z0 }, (Vector3) { x, y1, z0 },
+                        (Vector3) { x, y1, z1 }, (Vector3) { x, y0, z1 }, color);
+                else
+                    boat_model_quad(m, (Vector3) { x, y0, z0 }, (Vector3) { x, y0, z1 },
+                        (Vector3) { x, y1, z1 }, (Vector3) { x, y1, z0 }, color);
+                run = -1;
+            }
+            if (!*q)
+                break;
+            if (*q == '|') {
+                ++row;
+                at = 0;
+                continue;
+            }
+            if (++at > width)
+                width = at;
+        }
+        column += width + 1;
+    }
+}
+
+// Blocky ro-pax: bow at local -z, waterline at y = 0, river side +x.
+static void build_ferry(BoatModel *m)
+{
+    const Color white = { 236, 238, 240, 255 }, navy = { 27, 49, 104, 255 };
+    const Color antifouling = { 118, 46, 40, 255 }, glass = { 38, 52, 66, 255 };
+    const Color green = { 73, 168, 82, 255 }, orange = { 228, 112, 34, 255 };
+    float l = ferry.length, b = ferry.beam, d = ferry.draft;
+    boat_model_begin(m);
+    // Hull: a square stern, a parallel body and a bow stepped narrower toward the stem.
+    static const float bow_widths[] = { .86f, .7f, .52f, .32f, .14f };
+    for (int i = 0; i < 6; ++i) {
+        float front = -l * .5f + 30 - i * 5, back = i ? front + 5 : l * .5f;
+        float width = i ? b * bow_widths[i - 1] : b;
+        float z = (front + back) * .5f, length = back - front;
+        boat_model_box(m, (Vector3) { 0, (-d - .5f) * .5f, z },
+            (Vector3) { width, d - .5f, length }, antifouling);
+        boat_model_box(m, (Vector3) { 0, 1.5f, z }, (Vector3) { width, 4, length }, navy);
+        boat_model_box(m, (Vector3) { 0, 7.25f, z }, (Vector3) { width, 7.5f, length }, white);
+    }
+    // The car deck's stern door, and the name in navy on both sides with the green wave aft.
+    boat_model_box(m, (Vector3) { 0, 7, l * .5f + .05f }, (Vector3) { 16, 6, .14f }, glass);
+    for (int side = -1; side <= 1; side += 2) {
+        lettering(m, "VINGA LINE", side, side > 0 ? -38 : 22, 10.2f, 1.2f, navy);
+        for (int stripe = 0; stripe < 2; ++stripe) {
+            float z = 26 + stripe * 2.4f;
+            boat_model_beam(m, (Vector3) { side * (b * .5f + .08f), 4.6f, z },
+                (Vector3) { side * (b * .5f + .08f), 10.4f, z + 9 }, 1.1f, green);
+        }
+    }
+    // Superstructure tiers (bottom, top, front, back, inset) with window bands, the bridge
+    // forward with its wings, lifeboats, a funnel aft and a mast.
+    static const float tiers[][5]
+        = { { 11, 17, -48, 58, 2 }, { 17, 22.5f, -44, 46, 4 }, { 22.5f, 27, -44, 10, 6 } };
+    for (int i = 0; i < 3; ++i) {
+        const float *t = tiers[i];
+        float z = (t[2] + t[3]) * .5f, length = t[3] - t[2];
+        boat_model_box(m, (Vector3) { 0, (t[0] + t[1]) * .5f, z },
+            (Vector3) { b - t[4], t[1] - t[0], length }, white);
+        boat_model_box(m, (Vector3) { 0, t[0] + (t[1] - t[0]) * .55f, z },
+            (Vector3) { b - t[4] + .2f, 1.3f, length - 1 }, glass);
+    }
+    boat_model_box(m, (Vector3) { 0, 25, -44.2f }, (Vector3) { b + 1, 2.6f, 3 }, white);
+    boat_model_box(m, (Vector3) { 0, 25.3f, -45.8f }, (Vector3) { b + 1.2f, 1.2f, .3f }, glass);
+    for (int side = -1; side <= 1; side += 2)
+        for (int i = 0; i < 3; ++i)
+            boat_model_box(m, (Vector3) { side * (b * .5f - .6f), 18.6f, -20 + i * 22 },
+                (Vector3) { 2.4f, 2.2f, 8.5f }, orange);
+    boat_model_box(m, (Vector3) { 0, 28.5f, 32 }, (Vector3) { 6, 9, 9 }, white);
+    boat_model_box(m, (Vector3) { 0, 33.4f, 32 }, (Vector3) { 6.2f, 1.2f, 9.2f }, navy);
+    boat_model_beam(m, (Vector3) { 0, 27, -36 }, (Vector3) { 0, ferry.height, -36 }, .5f, white);
 }
 
 static void initialize(void)
@@ -70,6 +198,7 @@ static void initialize(void)
         boat_model_box(
             &pontoon, (Vector3) { 1.05f, 1.04f, z }, (Vector3) { .16f, .10f, .38f }, steel);
     }
+    build_ferry(&ferry_model);
     boat_model_begin(&quay);
     // East quay working berth: grounded gear, a coiled hose and an equipment stack.
     for (int i = 0; i < 3; ++i)
@@ -106,6 +235,11 @@ const Mesh3D *waterfront_harbor_quay_mesh(void)
 {
     initialize();
     return &quay.mesh;
+}
+const Mesh3D *waterfront_harbor_ferry_mesh(void)
+{
+    initialize();
+    return &ferry_model.mesh;
 }
 
 Vector3 waterfront_harbor_attachment(Transform3D pose, Vector3 local)
@@ -192,6 +326,23 @@ void waterfront_harbor_evaluate_ground(
             mooring(frame, attachment, anchor);
         }
     }
+    // The ferry rides the water averaged over its length. Bow, stern and two spring lines run
+    // from its quay-side deck edge to bollards on the quay, set on the ground there.
+    frame->ferry
+        = boat_water_pose(water, time, ferry.position, ferry.heading, ferry.length, ferry.beam);
+    Transform3D rest = { .position = ferry.position,
+        .rotation = boat_model_rotation(MatrixRotateY(ferry.heading)),
+        .scale = { 1, 1, 1 } };
+    static const float line_z[WATERFRONT_FERRY_LINES][2]
+        = { { -70, -82 }, { -30, -12 }, { 30, 12 }, { 70, 82 } };
+    for (int i = 0; i < WATERFRONT_FERRY_LINES; ++i) {
+        Vector3 deck = waterfront_harbor_attachment(
+            frame->ferry, (Vector3) { -ferry.beam * .5f + 1, 11.2f, line_z[i][0] });
+        Vector3 bollard = waterfront_harbor_attachment(
+            rest, (Vector3) { -ferry.beam * .5f - 12, 0, line_z[i][1] });
+        bollard.y = (ground ? ground(bollard.x, bollard.z) : 3.5f) + .4f;
+        mooring(frame, deck, bollard);
+    }
 }
 
 // Conservative OBBs use rest poses, padded by 0.45 m for modest wave attitude and fenders.
@@ -237,6 +388,16 @@ bool waterfront_harbor_contact_height(Vector2 position, float clearance, float b
             hit = bottom <= high && top >= low;
         }
     }
+    if (!hit) {
+        hit = obstacle(p, (Vector2) { ferry.position.x, ferry.position.z },
+            (Vector2) { ferry.beam * .5f + .45f, ferry.length * .5f + .9f }, ferry.heading,
+            clearance, &world_normal);
+        if (hit && (isfinite(bottom) || isfinite(top))) {
+            Transform3D pose = boat_water_pose(
+                water, time, ferry.position, ferry.heading, ferry.length, ferry.beam);
+            hit = bottom <= pose.position.y + ferry.height && top >= pose.position.y - ferry.draft;
+        }
+    }
     bool dock_overlap = fabsf(p.x - dock_center.x) < 12 + clearance
         && fabsf(p.y - dock_center.z) < 21 + clearance;
     if (dock_overlap && (isfinite(bottom) || isfinite(top))) {
@@ -273,6 +434,11 @@ bool waterfront_harbor_camera_clear(Vector3 p, float clearance)
                 NULL))
             return false;
     }
+    if (p.y < ferry.height + clearance && p.y > -ferry.draft - clearance
+        && obstacle((Vector2) { p.x, p.z }, (Vector2) { ferry.position.x, ferry.position.z },
+            (Vector2) { ferry.beam * .5f + .5f, ferry.length * .5f + 1 }, ferry.heading, clearance,
+            NULL))
+        return false;
     if (p.y < 4.5f + clearance && p.y > -.5f - clearance
         && waterfront_harbor_contact((Vector2) { -p.x, p.z }, clearance, NULL))
         return false;

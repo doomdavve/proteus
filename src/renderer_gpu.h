@@ -109,7 +109,7 @@ typedef struct {
     Mesh player_flag, ghost_flag; // Dynamic cloth, uploaded once before all scene passes.
     Mesh rival_flags[WATERFRONT_RIVALS];
     Mesh traffic_boats[WATERFRONT_TRAFFIC_VESSELS];
-    Mesh harbor_boats[WATERFRONT_HARBOR_BOATS], harbor_pontoon, harbor_quay;
+    Mesh harbor_boats[WATERFRONT_HARBOR_BOATS], harbor_pontoon, harbor_quay, harbor_ferry;
     Mesh plane;
     Mesh gull[WATERFRONT_GULL_PARTS];
     Shader shader;

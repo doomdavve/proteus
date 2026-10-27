@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27); A3.5 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27), and [A3.5e](#a35e-result-2026-10-27) (the docked Stena ferry across from the crane, in `river` and `outer`; CPU and GPU captures) completed 2026-10-27 on branch `stena-ferry`; A3.5 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1500,7 +1500,7 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.5b | A3.5a | Göteborg's laser-scanned Höjdmodell 2022 for all of the outer map's land, the river crop included (user request); the river's houses, trees and street life moved onto it | Complete 2026-10-27; [result](#a35b-result-2026-10-27) |
 | A3.5c | A3.5b | The river kit in `outer` (user request): the Eriksberg crane, the bridge deck, cafe, street furniture, frontages, quay fittings and forecourts, laid out as in the river and set on the terrain | Complete 2026-10-27; [result](#a35c-result-2026-10-27) |
 | A3.5d | A3.5f | Göteborg landmarks from OSM in the bake (user request, [backlog](#landmark-backlog-2026-10-27)): towers, masts, chimneys and cranes, `building:part` heights and bridge outlines, over the extended map | Proposed |
-| A3.5e | A3.5c | A docked Stena Line ro-pax ferry across the river from the Eriksberg crane (user must-have; [plan](#a35e--the-stena-ferry-at-eriksberg)) | Proposed |
+| A3.5e | A3.5c | A docked Stena Line ro-pax ferry across the river from the Eriksberg crane (user must-have; [plan](#a35e--the-stena-ferry-at-eriksberg)) | Complete 2026-10-27; [result](#a35e-result-2026-10-27) |
 | A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Proposed |
 | A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Proposed |
 | A3.5 | A3.5a | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
@@ -2067,7 +2067,8 @@ No new geography, so it can come first.
 - A docked ro-pax ferry at the south-bank quay on the line across the river from the crane. The
   position follows the user's wish and is authored, not the real terminal. The berth is chosen
   where the quay is straight for about 190 m and the water stays navigable around the hull.
-- Model: a new `boat_model` recipe at Stena Jutlandica's 182 × 28 m. Hull dark blue with a white
+- Model (as planned; built at Stena Danica's size instead, see the
+  [result](#a35e-result-2026-10-27)): a new `boat_model` recipe at Stena Jutlandica's 182 × 28 m. Hull dark blue with a white
   boot top, a white superstructure, bridge forward, a funnel aft, and a car-deck stern door. The
   green wave is drawn as boxes, and "STENA LINE" in the pixel letters the cafe's KAFFE sign uses.
   Superstructure height and deck count are not stated; take them from photos (about 30–35 m above
@@ -2125,6 +2126,64 @@ assumptions.
 **Proposed order:** A3.5e (the ferry; independent), then A3.5f with A3.5d's re-extraction, then
 A3.5g, then A3.5d for the rest of the OSM landmarks. A3.5, the weather transition and bounded
 loading, may be needed before A3.5f for size.
+
+### A3.5e result, 2026-10-27
+
+Branch `stena-ferry`, from `main` after pull request #26. The user: "#26 merged, start with the
+Stena ferry", which they wanted "docked right across the Eriksbergs crane", with a photo of the
+livery (white, dark blue hull band, "Stena Line" and a green wave).
+
+- **Ship (decision):** Stena Danica's 154.89 × 28.04 m and 6.31 m draught, not Stena
+  Jutlandica's 182 m. The longer hull did not fit the south bank there without coming within
+  20 m of the race start line and grid; the Danica sails the same Frederikshavn route.
+- **Berth:** authored, not the real terminal. Centre (237, −376) in renderer coordinates,
+  heading 2.865 rad, bow upstream, so from the river the name reads bow to stern as in the
+  photo. It was fitted against the river and outer water polygons (hull 1.5 m inside both),
+  with its quay side 2–7 m off the mapped bank (the bank curves; nothing fills the gap) and
+  22 m clear of the race start and grid. A first berth lay square to a bank corner 15–30 m off
+  the quay; the harbour test's bollard check caught it.
+- **Model:** built in [`waterfront_harbor.c`](../src/waterfront_harbor.c) from `boat_model`
+  boxes, 736 triangles under the 1,024 cap: antifouling, navy band and white topsides, a
+  stepped bow, the stern door, three superstructure tiers with window bands, bridge wings,
+  lifeboats, funnel and mast, the name in five-row pixel letters and two green wave
+  stripes on both sides. Height 34 m to the masthead; decks, colours and proportions are by
+  eye from the photo. The letters are one panel per run of lit cells through a new
+  `boat_model_quad`; a box per cell overflowed the cap and silently dropped the whole hull.
+- **Mooring and contact:** the ferry rides the gentle waves like the moored fleet, with four
+  lines from its quay-side deck edge to bollards 12 m inland on the ground. A padded box
+  (beam + 0.9 m, length + 1.8 m, from the keel to the masthead) joins the harbour contact, so
+  hulls, grenades and torpedoes meet it. `waterfront_harbor_camera_clear` covers it too, but
+  nothing calls that outside the test, so the follow camera can still pass through the hull.
+- **Multiplayer:** the harbour obstacles (berths, ferry and a contact recipe revision) are now
+  in the content digest, without a protocol version bump
+  ([protocol](MULTIPLAYER_PROTOCOL.md)).
+- **Tests:** `harbor_geometry` checks the ferry mesh, that its whole footprint is water with
+  1 m to spare on both maps, the contact inside and over the top, open water 4 m off the river
+  side, the camera envelope, the mooring line ends and bollards ashore, and a boat driven at
+  the hull from 30 m that stops and backs away. `harbor_traffic` still passes with the
+  travelling craft against the new contact.
+- **Captures (agent review, 2026-10-27, macOS arm64, 2 s scripted drive):**
+  [outer, CPU](adventure/stena-ferry-outer-cpu.png) and
+  [outer, GPU](adventure/stena-ferry-outer-gpu.png) (`--start -100,-300,290`, camera 20/8),
+  [river close-up](adventure/stena-ferry-river-close-cpu.png) (`--start -150,-370,270`) and
+  [from the crane side](adventure/stena-ferry-from-crane-cpu.png) (`--location outer
+  --start -40,-90,328`, camera 20/10). The lettering reads left to right from the river.
+- **Measured cost (Debug, M1 Max, CPU renderer, `outer`, 3 s scripted screenshot, two runs):**
+  peak resident memory 246 MB against 245 MB for A3.5c; wall time 0.8 s both.
+- **Verification (2026-10-27, macOS arm64, Debug):** build warning-free; `ctest --preset full`
+  passed all 230 active tests (13 retired disabled); with `PROTEUS_GPU_TESTS=ON` the 27
+  GPU-labelled tests passed.
+- **Limitations:**
+  - **Name (decided 2026-10-27):** the first version read "STENA LINE". The user chose to
+    keep the look and replace the name, so the hull now reads "VINGA LINE", a made-up line
+    named after the adventure's goal. The colours (white, navy band, green stripes) stay
+    close to the real ferries; the stripes are two plain slanted bars, not Stena's logo.
+    The user, seeing the captures: "VINGA LINE is excellent!"
+  - No manual playback or user acceptance. The quay side (lines, bollards) was not captured;
+    it faces the bank.
+  - No ramp, terminal building or linkspan; the gap to the curved bank is open water too
+    narrow to enter (the contact pads it).
+  - The ferry never sails. It is static content, not part of the traffic circuits.
 
 **Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
 

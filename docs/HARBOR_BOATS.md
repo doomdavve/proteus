@@ -6,6 +6,9 @@ Six leisure boats share a floating pontoon along the west dock bank; a workboat
 lies beside equipment on the east quay. They appear in the river boating location (and appeared
 in the demo, storyboards and Eriksberg location removed on 2026-10-25). The basin course is unchanged.
 Placements and vessel designs are artistic additions, not surveyed marina facilities.
+Since 2026-10-27 the same module also docks a Stena-style ferry ("VINGA LINE") across the river from the crane
+([A3.5e](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35e-result-2026-10-27)): one static model, posed
+and moored like the fleet, with its own contact box.
 
 ## Boat recipes
 
