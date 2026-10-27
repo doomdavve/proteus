@@ -6,6 +6,7 @@
 #include "boat_race.h"
 #include "raymath.h"
 #include "waterfront.h"
+#include "waterfront_outer.h"
 
 #include <assert.h>
 #include <math.h>
@@ -482,7 +483,8 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     const Boat *boat = &view->boat;
     double time = view->time;
     _Static_assert(BOAT_WATER_PARTICLES <= WATERFRONT_PLAYER_PARTICLES, "Player particle capacity");
-    waterfront_scene_evaluate_ground(time, world->water, world->definition->kit_ground, frame);
+    waterfront_scene_evaluate_ground(
+        time, world->water, waterfront_kit_ground(world->definition->map), frame);
     frame->camera = boat_camera(boat, presentation, world->definition, camera);
     frame->player_active = true;
     if (!world->definition->mapped)
@@ -600,7 +602,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         waterfront_draw_traffic(renderer, &traffic);
         WaterfrontHarborFrame harbor;
         waterfront_harbor_evaluate_ground(
-            world->water, time, world->definition->kit_ground, &harbor);
+            world->water, time, waterfront_kit_ground(world->definition->map), &harbor);
         waterfront_draw_harbor(renderer, &harbor);
         WaterfrontSceneFrame birds = { 0 };
         waterfront_boating_gulls(time,
