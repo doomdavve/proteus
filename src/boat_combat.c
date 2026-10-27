@@ -43,8 +43,9 @@ float boat_combat_cannon_rise(float age)
 
 Vector3 boat_combat_cannon_muzzle(const Boat *boat)
 {
-    return boat_pose_attachment(
-        boat, (Vector3) { 0, BOAT_CANNON_MUZZLE_HEIGHT, -BOAT_CANNON_MUZZLE_FORWARD });
+    return boat_pose_attachment(boat,
+        (Vector3) {
+            BOAT_CANNON_MUZZLE_SIDE, BOAT_CANNON_MUZZLE_HEIGHT, -BOAT_CANNON_MUZZLE_FORWARD });
 }
 
 void boat_combat_bind(BoatFleet *f)

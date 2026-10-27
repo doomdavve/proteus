@@ -12,7 +12,8 @@
 #define BOAT_CANNON_GRAVITY 16.0f // Downward acceleration, m/s squared.
 #define BOAT_CANNON_RADIUS .275f // Half the visible water cube's side.
 #define BOAT_CANNON_MUZZLE_HEIGHT 1.25f
-#define BOAT_CANNON_MUZZLE_FORWARD 2.55f
+#define BOAT_CANNON_MUZZLE_FORWARD 1.8f
+#define BOAT_CANNON_MUZZLE_SIDE -.75f // Starboard in the renderer's mirrored-X hull frame.
 
 // Vertical displacement from launch, shared with deterministic presentation fixtures.
 float boat_combat_cannon_rise(float age);

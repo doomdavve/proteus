@@ -10,7 +10,7 @@ machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
 
 | Control | Current behavior |
 | --- | --- |
-| Hold Space | Water cannon: 70 m maximum travel, about 52 m calm-water reach; 84 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
+| Hold Space | Water cannon: 70 m maximum travel, about 51 m calm-water reach; 84 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
 | Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; unchanged 2 m crest, 10 m/s propagation, 30 m range |
 | Press Q | Straight torpedo: three per life, 40 hull damage, 32 m/s, 160 m range, 0.25 s arming, 1.5 s reload; no homing |
 
@@ -27,14 +27,19 @@ The bottom control panel gains matching hull/heel and weapon instruments only in
 Opponent numbers show authority-confirmed damage dealt by the viewer, merge hits within 0.75 s,
 float for 1 s, and are fenced by target life and connection generation. No opponent health bar
 is drawn. Cannon contact uses a cyan hit marker and visible hull heel instead of damage numbers.
-Shared CPU/GPU boxes draw cyan 0.55 m water cubes, surface torpedoes, bubble trails and impact
-splashes. Water cubes briefly brighten at launch and break into smaller cubes on impact.
-A small rectangular housing on each deathmatch boat's bow has a dark face and cyan opening.
+Shared CPU/GPU boxes draw cyan water cubes, surface torpedoes, bubble trails and impact
+splashes. Water cubes briefly brighten at launch, visually expand from 0.14 m to 0.55 m over
+ten ticks (about 7 m), and break into smaller cubes on impact. This growth is presentation-only;
+the existing fixed combat envelope remains. A compact graphite rectangular housing on each
+deathmatch boat's starboard foredeck has a dark face and narrow cyan opening. Its body is
+0.30 × 0.25 × 0.45 m, replacing the earlier 0.85 × 0.65 × 1 m central housing.
 Cubes originate at that opening, using the same full pitch/roll/heading attachment in the core
-and both renderers. The local muzzle is 2.55 m forward and 1.25 m above the boat origin.
+and both renderers. The local muzzle is 1.8 m forward, 0.75 m starboard and 1.25 m above
+the boat origin.
 Cannon cubes follow a parabola: the default 1.25 m launch height rises to about 1.53 m, then
-the bottom of the cube touches calm water after about 0.58 s. The roughly 52 m reach is about
-2.4 times the initial arc's 21 m reach, including the muzzle's distance from the boat centre. Height advances in the core,
+the bottom of the cube touches calm water after about 0.58 s. The roughly 51 m reach is about
+2.4 times the initial arc's 21 m reach, including the muzzle's distance from the boat centre.
+Height advances in the core,
 including curved scenery probes and three-dimensional moving-hull sweeps with the cube radius;
 rendering reads that same committed height. Spawn height and waves affect the landing point.
 The procedural weapon sound is a water wash, with low splashes for torpedo launches/impacts.
@@ -47,7 +52,8 @@ free/race omit combat. Rebuild native/browser peers together. See the
 [wire layout](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint).
 
 Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments;
-water-cannon cubes follow a ballistic arc from a bow housing with extended reach (2026-10-27 user requests).
+water-cannon cubes expand from a compact starboard housing and follow an extended ballistic
+arc (2026-10-27 user requests).
 Next: human balance playtest, especially extended cannon reach/recovery/roll strength, torpedo evasion and
 rear-grenade timing; browser/Windows/Linux qualification and public deployment remain pending.
 No user acceptance or public deployment is implied by local verification.
@@ -88,7 +94,7 @@ The protocol-v7 wire layout is unchanged. The launch lift, gravity and cube radi
 the forward-speed rules in the content fingerprint, so all peers must rebuild together;
 a straight-flight build cannot join an arc build.
 
-Mounted-cannon follow-up (2026-10-27, macOS/Apple Silicon Debug): warning-clean build and
+Earlier central-housing follow-up, before the compact side mount (2026-10-27, macOS/Apple Silicon Debug): warning-clean build and
 all 230 enabled CTests pass (13 retired cases disabled; GPU-context CTests off). Production
 ticks capsize broadside targets at both 10 m and 45 m before overheating. The arc test checks
 calm-water contact 50–55 m from the boat centre, plus a tilted boat launching from the exact
@@ -99,6 +105,16 @@ housing on the local and rival boat, and completed the eight-second native GPU d
 captures above retain their original short-range/unmounted presentation. Human feel acceptance
 and browser/Windows/Linux qualification remain pending; next is the extended-range playtest.
 The wire layout stays v7; muzzle height/forward offset now also enter the content fingerprint.
+
+Compact side-mount follow-up (2026-10-27, macOS/Apple Silicon Debug): warning-clean build
+and all 230 enabled CTests pass (13 retired cases disabled, GPU-context CTests off), including
+10 m/45 m capsize checks and exact sideways muzzle position with trajectory replay. Inspected
+[CPU](evidence/deathmatch-arsenal/cannon-small-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/cannon-small-gpu.png) captures at 1.025 s and completed the
+eight-second windowed GPU fixture demo. These supersede the central-housing visuals above.
+The side offset also enters the content fingerprint; the v7 layout stays unchanged. Human
+visual/feel acceptance and browser/Windows/Linux review remain pending. Next: play the compact
+side mount and extended reach together.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 
