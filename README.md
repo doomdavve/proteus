@@ -165,8 +165,8 @@ only the room:
 
 Deathmatch has three weapons: hold **Space** for a short-range water cannon, press **E**
 to drop a wave grenade 7 m astern, and press **Q** to launch a straight-running torpedo.
-The bow-mounted rectangular cannon throws water cubes from its opening in a gravity-driven arc,
-reaching about 52 m on calm water.
+A small rectangular cannon on the starboard foredeck throws water cubes in a gravity-driven
+arc, reaching about 51 m on calm water. The cubes expand after leaving its narrow opening.
 Sustained cannon hits build recoverable heel pressure, strongest against a broadside, and can
 capsize a boat without hull damage. The cannon overheats after four seconds and cools on release.
 Grenades splash after 0.3 s, detonate after 1 s and recharge in 8 s; their physical wave can

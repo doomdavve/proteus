@@ -297,6 +297,7 @@ static void cannon_arc(void)
     inputs[0].gun = false;
     BoatCombatObject *b = &f.state.combat.bullets[0];
     float speed = f.state.combat.rules.bullet_speed;
+    assert(fabsf(b->position.x + BOAT_CANNON_MUZZLE_SIDE) < 1e-6f);
     assert(fabsf(b->height - (BOAT_CANNON_MUZZLE_HEIGHT + boat_combat_cannon_rise(BOAT_STEP)))
         < 1e-5f);
     advance(21);

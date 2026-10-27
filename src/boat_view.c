@@ -303,16 +303,18 @@ static void storm_visit(
 static void cannon_visit(const Boat *boat, BoatCourseBoxDraw draw, void *context)
 {
     Transform3D part = boat_pose_hull(boat);
-    part.position = boat_pose_attachment(
-        boat, (Vector3) { 0, BOAT_CANNON_MUZZLE_HEIGHT, -BOAT_CANNON_MUZZLE_FORWARD + .55f });
-    part.scale = (Vector3) { .85f, .65f, 1.0f };
-    draw(context, part, (Color) { 129, 159, 161, 255 });
-    part.position = boat_pose_attachment(
-        boat, (Vector3) { 0, BOAT_CANNON_MUZZLE_HEIGHT, -BOAT_CANNON_MUZZLE_FORWARD + .04f });
-    part.scale = (Vector3) { .65f, .52f, .04f };
+    part.position = boat_pose_attachment(boat,
+        (Vector3) { BOAT_CANNON_MUZZLE_SIDE, BOAT_CANNON_MUZZLE_HEIGHT,
+            -BOAT_CANNON_MUZZLE_FORWARD + .25f });
+    part.scale = (Vector3) { .30f, .25f, .45f };
+    draw(context, part, (Color) { 67, 91, 99, 255 });
+    part.position = boat_pose_attachment(boat,
+        (Vector3) { BOAT_CANNON_MUZZLE_SIDE, BOAT_CANNON_MUZZLE_HEIGHT,
+            -BOAT_CANNON_MUZZLE_FORWARD + .01f });
+    part.scale = (Vector3) { .22f, .19f, .03f };
     draw(context, part, (Color) { 24, 50, 61, 255 });
     part.position = boat_combat_cannon_muzzle(boat);
-    part.scale = (Vector3) { .55f, .42f, .03f };
+    part.scale = (Vector3) { .14f, .14f, .015f };
     draw(context, part, (Color) { 91, 191, 215, 255 });
 }
 
@@ -329,10 +331,12 @@ static void combat_visit(
         if (!b->born || tick < b->born)
             continue;
         if (b->active) {
+            // A narrow outlet emits a small cube which opens into the full-sized water packet.
+            float size = .14f + .41f * Clamp((float)(tick - b->born) / 10, 0, 1);
             draw(context,
                 (Transform3D) { .position = { -b->position.x, b->height, b->position.y },
                     .rotation = { 0, -atan2f(b->direction.x, -b->direction.y), 0 },
-                    .scale = { .55f, .55f, .55f } },
+                    .scale = { size, size, size } },
                 tick - b->born < 4 ? (Color) { 218, 244, 250, 255 }
                                    : (Color) { 142, 220, 240, 255 });
         } else if (b->ended && tick - b->ended < 27) {
