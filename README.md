@@ -391,9 +391,10 @@ The river covers a local waterfront area, not all of Gothenburg.
 
 `--location outer` starts at the same dock but loads the baked 16.5 km² first outer-river slice:
 the river's water and shore joined to Älvsborgsfjorden, Nya Älvsborg and the run to the Långedrag
-old harbour, with real land heights from Göteborg's Baskarta contours (see the
-[adventure ledger](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a32-result-2026-10-26)). The river's
-buildings, roads and Älvsborgsbron are baked into it (A3.3). Beyond the river (A3.5a) stand
+old harbour, with real land heights from Göteborg's laser-scanned Höjdmodell 2022 (see the
+[adventure ledger](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35b-result-2026-10-27)). The river's
+buildings, roads and Älvsborgsbron are baked into it (A3.3); its houses, trees, street cars and
+lamps stand on that terrain, so the outer river is hillier than the flat river location. Beyond the river (A3.5a) stand
 the mapped buildings, the container cranes of the port, channel marks and scattered trees; there
 are no roads there yet. Where the region cuts open water the water ends at the horizon and collision keeps
 the boat inside.

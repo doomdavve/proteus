@@ -227,7 +227,9 @@ static bool verify_facade_mapping(const Mesh *mesh, int *families)
         for (int j = i; j < i + 3; ++j) {
             if (mesh->colors[j * 4 + 3] != kind || !isfinite(mesh->texcoords[j * 2])
                 || !isfinite(mesh->texcoords[j * 2 + 1]) || mesh->texcoords[j * 2] < -.001f
-                || fabsf(mesh->texcoords[j * 2 + 1] - (mesh->vertices[j * 3 + 1] - 3.5f)) > .001f)
+                || fabsf(mesh->texcoords[j * 2 + 1]
+                       - (mesh->vertices[j * 3 + 1] - mesh->vertices[i * 3 + 1]))
+                    > .001f) // Rows start at the wall's base corner, vertex zero.
                 return false;
             for (int k = i; k < j; ++k) {
                 float dx = mesh->vertices[j * 3] - mesh->vertices[k * 3];

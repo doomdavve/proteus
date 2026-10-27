@@ -11,7 +11,9 @@ Writes docs/adventure/sources/terrain-baskarta.json.gz: `hojdkurvor` (0.5 m cont
 `hojdpunkt` (spot heights) inside the slice window plus a margin, as east/north metres from
 the crane origin and heights in metres. The full 1.6 GB city download is never committed.
 Source: Göteborgs stad, Stadsbyggnadsförvaltningen, Baskarta v2 (EPSG:3007), released as open
-data under CC0 1.0. Reads only the named directory and never fetches.
+data under CC0 1.0. Reads only the named directory and never fetches. Since A3.5b the outer
+bake takes its heights from tools/prepare_terrain_dem.py and reads only the spot heights here,
+as a check.
 """
 import argparse
 import gzip

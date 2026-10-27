@@ -133,7 +133,8 @@ static const Vector3 west_street[] = { { -99.4f, 3.56f, 308.7f }, { -86.9f, 3.56
 static const Vector3 east_street[] = { { 67.4f, 3.56f, 406.2f }, { 82.5f, 3.56f, 269.5f },
     { 92.7f, 3.56f, 167.2f }, { 95.6f, 3.56f, 133.7f }, { 103.7f, 3.56f, 67.1f } };
 
-static void evaluate_life(double time, WaterfrontSceneFrame *frame)
+static void evaluate_life(
+    double time, float (*ground)(float x, float z), WaterfrontSceneFrame *frame)
 {
     static const Color colors[] = { { 153, 69, 57, 255 }, { 170, 178, 181, 255 },
         { 51, 88, 117, 255 }, { 183, 142, 72, 255 } };
@@ -152,13 +153,15 @@ static void evaluate_life(double time, WaterfrontSceneFrame *frame)
             Vector3 p = waterfront_scene_street_position(route, distance, &direction);
             Vector3 side = { direction.z, 0, -direction.x };
             p = Vector3Add(p, Vector3Scale(side, 2.6f));
+            float lift = ground ? ground(p.x, p.z) - 3.5f : 0;
+            p.y += lift;
             frame->lamps[frame->lamp_count++]
                 = (WaterfrontLampState) { .id = 100 + street * 100 + lamp_index,
                       .street = street,
                       .position = p,
                       .pool_direction = Vector3Negate(side),
-                      .pole = { .position = { p.x, 6, p.z }, .scale = { .16f, 5, .16f } },
-                      .lens = { p.x, 8.5f, p.z } };
+                      .pole = { .position = { p.x, 6 + lift, p.z }, .scale = { .16f, 5, .16f } },
+                      .lens = { p.x, 8.5f + lift, p.z } };
         }
         for (int car = 0; car < 10; ++car) {
             int sign = car % 2 ? 1 : -1;
@@ -172,6 +175,8 @@ static void evaluate_life(double time, WaterfrontSceneFrame *frame)
             forward = Vector3Scale(forward, (float)sign);
             Vector3 right = { forward.z, 0, -forward.x };
             p = Vector3Add(p, Vector3Scale(right, 1.25f));
+            float lift = ground ? ground(p.x, p.z) - 3.5f : 0;
+            p.y += lift;
             float yaw = atan2f(forward.x, forward.z);
             WaterfrontCarState *out = &frame->cars[street * 10 + car];
             *out = (WaterfrontCarState) { .id = 1000 + street * 100 + car * 2,
@@ -179,10 +184,10 @@ static void evaluate_life(double time, WaterfrontSceneFrame *frame)
                 .position = p,
                 .forward = forward,
                 .right = right,
-                .body = { .position = { p.x, 4.2f, p.z },
+                .body = { .position = { p.x, 4.2f + lift, p.z },
                     .rotation = { 0, yaw, 0 },
                     .scale = { 1.7f, .9f, 3.9f } },
-                .cabin = { .position = { p.x, 4.9f, p.z },
+                .cabin = { .position = { p.x, 4.9f + lift, p.z },
                     .rotation = { 0, yaw, 0 },
                     .scale = { 1.4f, .65f, 1.9f } },
                 .color = colors[car % 4],
@@ -194,29 +199,41 @@ static void evaluate_life(double time, WaterfrontSceneFrame *frame)
                     Vector3 lens = Vector3Add(p,
                         Vector3Add(
                             Vector3Scale(forward, end * 2.0f), Vector3Scale(right, side * .6f)));
-                    lens.y = 4.3f;
+                    lens.y = 4.3f + lift;
                     out->lenses[end > 0][side > 0] = lens;
                 }
         }
     }
 }
 
-void waterfront_scene_evaluate_actors(double time, BoatWater water, WaterfrontSceneFrame *frame)
+static void evaluate_actors(
+    double time, BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame)
 {
     frame->time = time;
-    evaluate_life(time, frame);
-    waterfront_harbor_evaluate(water, time, &frame->harbor);
+    evaluate_life(time, ground, frame);
+    waterfront_harbor_evaluate_ground(water, time, ground, &frame->harbor);
     waterfront_traffic_evaluate(water, time, &frame->traffic);
 }
 
+void waterfront_scene_evaluate_actors(double time, BoatWater water, WaterfrontSceneFrame *frame)
+{
+    evaluate_actors(time, water, NULL, frame);
+}
+
 void waterfront_scene_evaluate(double time, BoatWater water, WaterfrontSceneFrame *frame)
+{
+    waterfront_scene_evaluate_ground(time, water, NULL, frame);
+}
+
+void waterfront_scene_evaluate_ground(
+    double time, BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame)
 {
     *frame = (WaterfrontSceneFrame) { 0 };
     frame->bridge = (Transform3D) {
         .position = { 11, 7, 126 }, .rotation = { 0, -.08f, 0 }, .scale = { 68, 1, 3 }
     };
     frame->bridge_color = (Color) { 119, 128, 145, 255 };
-    waterfront_scene_evaluate_actors(time, water, frame);
+    evaluate_actors(time, water, ground, frame);
 }
 
 WaterfrontStreet waterfront_scene_street(int index)

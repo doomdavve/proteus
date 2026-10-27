@@ -112,6 +112,10 @@ const Mesh3D *waterfront_player_engine_mesh(void);
 
 // Static scenery and actors at an explicit time; the caller supplies the camera.
 void waterfront_scene_evaluate(double time, BoatWater water, WaterfrontSceneFrame *frame);
+// The same with the river kit's street cars, lamps and harbour set on GROUND, the land height
+// under renderer X/Z, instead of the river's flat 3.5 m ground; NULL keeps that.
+void waterfront_scene_evaluate_ground(
+    double time, BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame);
 WaterfrontStreet waterfront_scene_street(int index);
 Vector3 waterfront_scene_street_position(
     WaterfrontStreet street, float distance, Vector3 *direction);

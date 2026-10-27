@@ -89,8 +89,9 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
 static void windows(
     Renderer3D *r, const BoatMapDescription *map, const unsigned int *triangles, size_t count)
 {
-    // Each imported wall starts with a triangle a,c,b (two ground vertices).
+    // Each imported wall starts with a triangle a,c,b (two base vertices).
     // Derive inset windows from that edge, preserving arbitrary facade orientation.
+    // Rows are measured from the wall's base, which is 3.5 m in the river.
     const Mesh3D *city = map->mesh;
     for (size_t k = 0; k < count; ++k) {
         size_t i = triangles[k];
@@ -100,7 +101,7 @@ static void windows(
         Vector3 a = city->vertices[t->vertices[0]];
         Vector3 c = city->vertices[t->vertices[1]];
         Vector3 b = city->vertices[t->vertices[2]];
-        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 9)
+        if (!waterfront_window_wall(t->color, a, c, b))
             continue;
         Vector3 edge = Vector3Subtract(b, a);
         float length = Vector3Length(edge);
@@ -109,7 +110,7 @@ static void windows(
         if (Vector3DotProduct(normal, Vector3Subtract(r->camera.position, a)) <= 0
             || Vector3Distance(r->camera.position, a) > 430)
             continue;
-        for (int floor = 0; 6.0f + floor * 3.2f < c.y - 1; ++floor) {
+        for (int floor = 0; a.y + 2.5f + floor * 3.2f < c.y - 1; ++floor) {
             for (int column = 0; 2.5f + column * 4 < length - 1.5f; ++column) {
                 unsigned int seed = (unsigned int)i * 1664525u + (unsigned int)column * 1013904223u
                     + (unsigned int)floor * 374761393u;
@@ -118,7 +119,7 @@ static void windows(
                                            : (Color) { 66, 100, 120, 255 };
                 Vector3 p = Vector3Add(Vector3Add(a, Vector3Scale(along, 2.5f + column * 4)),
                     Vector3Scale(normal, .035f));
-                p.y = 5.0f + floor * 3.2f;
+                p.y = a.y + 1.5f + floor * 3.2f;
                 Vector3 q = Vector3Add(p, Vector3Scale(along, floor == 0 ? 2.2f : 1.5f));
                 Vector3 up = { 0, floor == 0 ? 1.9f : 1.5f, 0 };
                 glow_quad(r, p, Vector3Add(p, up), Vector3Add(q, up), q, color);
@@ -168,7 +169,7 @@ void waterfront_draw_traffic(Renderer3D *r, const WaterfrontTrafficFrame *frame)
 
 void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
 {
-    renderer3d_draw_mesh(r, waterfront_harbor_quay_mesh(), (Transform3D) { .scale = { 1, 1, 1 } });
+    renderer3d_draw_mesh(r, waterfront_harbor_quay_mesh(), frame->quay);
     renderer3d_draw_mesh(r, waterfront_harbor_pontoon_mesh(), frame->pontoon);
     renderer3d_draw_box(r, frame->gangway, (Color) { 154, 123, 84, 255 });
     for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i)

@@ -15,6 +15,33 @@ Vector3 waterfront_corner_position(float u, float height, float v)
         105.9f + .11952f * u + .99284f * v };
 }
 
+// The bake's four building tints; roofs are each tint darkened by 30.
+static const Color building_tints[] = { { 166, 173, 195, 255 }, { 185, 183, 191, 255 },
+    { 154, 166, 188, 255 }, { 190, 177, 163, 255 } };
+
+bool waterfront_building_wall(Color color)
+{
+    for (size_t i = 0; i < sizeof(building_tints) / sizeof(building_tints[0]); ++i)
+        if (ColorIsEqual(color, building_tints[i]))
+            return true;
+    return false;
+}
+
+bool waterfront_building_roof(Color color)
+{
+    for (size_t i = 0; i < sizeof(building_tints) / sizeof(building_tints[0]); ++i) {
+        Color tint = building_tints[i];
+        if (color.r == tint.r - 30 && color.g == tint.g - 30 && color.b == tint.b - 30)
+            return true;
+    }
+    return false;
+}
+
+bool waterfront_window_wall(Color color, Vector3 a, Vector3 c, Vector3 b)
+{
+    return waterfront_building_wall(color) && fabsf(b.y - a.y) <= .001f && c.y - a.y >= 5.5f;
+}
+
 #define SCENERY_MAX_BOXES 16384
 
 // Ground queries are only used during construction. Keep the actual map as the

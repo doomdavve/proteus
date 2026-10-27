@@ -429,14 +429,18 @@ static bool build_corner(const WaterfrontScenery *scenery, WaterfrontGpuTiled *o
     return true;
 }
 
-static CitySurface city_surface(Vector3 a, Vector3 b, Vector3 c)
+// Only imported buildings take roof and facade materials, by colour and measured from their own
+// base, so terrain and shore walls at any height stay flat.
+static CitySurface city_surface(Vector3 a, Vector3 b, Vector3 c, Color color)
 {
     Vector3 normal
         = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
     float top = fmaxf(a.y, fmaxf(b.y, c.y));
+    float bottom = fminf(a.y, fminf(b.y, c.y));
     if (normal.y > .95f)
-        return top > 4.0f ? CITY_SURFACE_ROOF : CITY_SURFACE_FLAT;
-    if (fabsf(normal.y) < .15f && top >= 9.0f)
+        return top > 4.0f && waterfront_building_roof(color) ? CITY_SURFACE_ROOF
+                                                             : CITY_SURFACE_FLAT;
+    if (fabsf(normal.y) < .15f && waterfront_building_wall(color) && top - bottom >= 5.5f)
         return CITY_SURFACE_FACADE;
     return CITY_SURFACE_FLAT;
 }
@@ -451,7 +455,8 @@ static bool builder_facade_triangle(
     MeshBuilder *builder, Vector3 a, Vector3 b, Vector3 c, Color source)
 {
     // Generated wall pairs are a,c,b and a,d,c: vertex zero is the same lower
-    // corner, and the last vertex reaches the other end in both triangles.
+    // corner, and the last vertex reaches the other end in both triangles. Texture rows start
+    // at the wall's base, which is 3.5 m in the river.
     Vector3 edge = { c.x - a.x, 0, c.z - a.z };
     float length = Vector3Length(edge);
     if (length < .001f)
@@ -472,7 +477,7 @@ static bool builder_facade_triangle(
     for (int i = 0; i < 3; ++i) {
         int vertex = builder->count - 3 + i;
         builder->texcoords[vertex * 2] = Vector3DotProduct(Vector3Subtract(points[i], a), along);
-        builder->texcoords[vertex * 2 + 1] = points[i].y - 3.5f;
+        builder->texcoords[vertex * 2 + 1] = points[i].y - a.y;
     }
     return true;
 }
@@ -506,13 +511,18 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
             || (triangle->color.r == 61 && triangle->color.g == 91);
         // Authored bridge beams retain their flat steel/concrete colors.
         bool bridge = boat_map_is_bridge_triangle(scenery->map, i);
-        CitySurface surface = planting || bridge ? CITY_SURFACE_FLAT : city_surface(a, b, c);
+        CitySurface surface
+            = planting || bridge ? CITY_SURFACE_FLAT : city_surface(a, b, c, triangle->color);
         Vector3 normal
             = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
         bool road = ColorIsEqual(triangle->color, (Color) { 83, 89, 99, 255 });
         bool land = ColorIsEqual(triangle->color, (Color) { 135, 139, 144, 255 });
         size_t tile = tile_of(scenery, a, b, c);
-        if (normal.y > .95f && (road || land || planting) && fmaxf(a.y, fmaxf(b.y, c.y)) < 4.3f) {
+        // Roads and planting painted on terrain (the outer map) keep their finish at any
+        // height; the bridge deck's road colour stays out of it.
+        float top = fmaxf(a.y, fmaxf(b.y, c.y));
+        if (normal.y > .95f
+            && (((road || land || planting) && top < 4.3f) || ((road || planting) && !bridge))) {
             int finish = planting ? WATERFRONT_GROUND_PLANTING : WATERFRONT_GROUND_CONCRETE;
             if (road)
                 finish = WATERFRONT_GROUND_ASPHALT;
@@ -571,14 +581,14 @@ static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *
         Vector3 a = city->vertices[triangle->vertices[0]];
         Vector3 c = city->vertices[triangle->vertices[1]];
         Vector3 b = city->vertices[triangle->vertices[2]];
-        if (fabsf(a.y - 3.5f) > .001f || fabsf(b.y - a.y) > .001f || c.y < 9)
+        if (!waterfront_window_wall(triangle->color, a, c, b))
             continue;
         Vector3 edge = Vector3Subtract(b, a);
         float length = Vector3Length(edge);
         Vector3 along = Vector3Scale(edge, 1 / length);
         Vector3 normal = { along.z, 0, -along.x };
         MeshBuilder *builder = &tiled.tiles[tile_of(scenery, a, c, b)];
-        for (int floor = 0; 6.0f + floor * 3.2f < c.y - 1; ++floor) {
+        for (int floor = 0; a.y + 2.5f + floor * 3.2f < c.y - 1; ++floor) {
             for (int column = 0; 2.5f + column * 4 < length - 1.5f; ++column) {
                 unsigned int seed = (unsigned int)i * 1664525u + (unsigned int)column * 1013904223u
                     + (unsigned int)floor * 374761393u;
@@ -587,7 +597,7 @@ static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *
                                            : (Color) { 66, 100, 120, 255 };
                 Vector3 p = Vector3Add(Vector3Add(a, Vector3Scale(along, 2.5f + column * 4)),
                     Vector3Scale(normal, .035f));
-                p.y = 5.0f + floor * 3.2f;
+                p.y = a.y + 1.5f + floor * 3.2f;
                 Vector3 q = Vector3Add(p, Vector3Scale(along, floor == 0 ? 2.2f : 1.5f));
                 Vector3 up = { 0, floor == 0 ? 1.9f : 1.5f, 0 };
                 if (!builder_quad(builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color)) {
@@ -1427,8 +1437,7 @@ static void draw_harbor(
     const WaterfrontGpuScene *scene, Material material, const WaterfrontSceneFrame *frame)
 {
     const WaterfrontHarborFrame *harbor = &frame->harbor;
-    draw_colored_mesh(
-        scene->harbor_quay, material, (Transform3D) { .scale = { 1, 1, 1 } }, WHITE, false);
+    draw_colored_mesh(scene->harbor_quay, material, harbor->quay, WHITE, false);
     draw_colored_mesh(scene->harbor_pontoon, material, harbor->pontoon, WHITE, false);
     draw_colored_mesh(scene->cube, material, harbor->gangway, (Color) { 154, 123, 84, 255 }, false);
     for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i)

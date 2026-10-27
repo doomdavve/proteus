@@ -134,7 +134,26 @@
       "published": "2020-06-30",
       "local_path": "not retained (1.6 GB); regenerate with tools/prepare_terrain_sources.py",
       "output": "docs/adventure/sources/terrain-baskarta.json.gz",
-      "datum": "not confirmed; assumed RH 2000"
+      "datum": "not confirmed; assumed RH 2000",
+      "use_since_a3_5b": "spot heights only, as a check of terrain_hojdmodell"
+    },
+    "terrain_hojdmodell": {
+      "status": "acquired (hand download); resampled grid committed",
+      "product": "Göteborgs stad Höjdmodell 2022, markmodell (ground model), 0.5 m float32 GeoTIFF tiles",
+      "url": "https://opengeodata.goteborg.se/files/hojdmodell/2022/hojdmodell_2022.html",
+      "retrieved": "2026-10-27 (browser download by the user)",
+      "survey": "airborne laser scanning, 9, 15 and 16 May 2022, about 10 points/m²",
+      "crs": "EPSG:3007",
+      "datum": "RH 2000",
+      "licence": "CC0 1.0",
+      "files": {
+        "hojdmodell_2022_639_13.zip": "9d3f3bb88d9b5515bc750de674921cafc4ab3ae3d6e9138c36a33c68ca8ebaef",
+        "hojdmodell_2022_639_14.zip": "1a52543072d1d6e8f16f8ce1c4f214f5a1caa8d0f514966961021ce90709d704"
+      },
+      "local_path": "not retained; regenerate with tools/prepare_terrain_dem.py ZIP...",
+      "output": "docs/adventure/sources/terrain-hojdmodell.bin.gz",
+      "wcs": "https://opengeodata.goteborg.se/services/hojdmodell/wcs/v1, coverage hojdmodell-v2__hojdgrid; returns the same float32 values (reviewed 2026-10-27, not used by the bake)",
+      "coverage_note": "The two zips cover E 138-145 km, N 6393-6398 km (the first slice). Vinga is not covered."
     }
   },
   "derived": {

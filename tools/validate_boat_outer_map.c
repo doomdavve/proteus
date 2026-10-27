@@ -23,7 +23,7 @@
 #define ENVELOPE 8.0f
 #define WATER_TRIANGLES 2738 // The manifest's water_triangles.
 #define BRIDGE_TRIANGLES 4388 // The manifest's river_overlay.bridge_triangles.
-#define DRESSING_TRIANGLES 65612 // The manifest's dressing.triangles.
+#define DRESSING_TRIANGLES 66352 // The manifest's dressing.triangles.
 static const Vector2 route[] = { { 12, 60 }, { 24, -70 }, { 15, -180 }, { -250, -500 },
     { -650, -850 }, { -1100, -960 }, { -3300, -1550 }, { -3850, -2400 }, { -3850, -3150 },
     { -3700, -3310 }, { -3620, -3380 } };
@@ -62,10 +62,10 @@ int main(void)
     CHECK(boat_map_water(&world.map, outer->spawn, 2.5f));
     boat_world_resources_destroy(&world);
 
-    // The land is Baskarta terrain (A3.1b) outside the river crop: real relief above the water,
-    // never below the 1 m floor on its top surface, with hills that rise tens of metres. The
-    // river's bridge (A3.3) reaches its 107.6 m tower tops and the container cranes (A3.5a)
-    // their raised booms at the mapped 118 m above the quay. Water stays at 0.
+    // The land is Höjdmodell 2022 terrain everywhere, the river crop included: real relief
+    // above the water, never below the 1 m floor on its top surface, with hills that rise tens
+    // of metres. The river's bridge (A3.3) reaches its 107.6 m tower tops and the container
+    // cranes (A3.5a) their raised booms at the mapped 118 m above the quay. Water stays at 0.
     const Mesh3D *mesh = waterfront_outer_map.mesh;
     float highest = 0, lowest_top = INFINITY;
     for (size_t i = WATER_TRIANGLES; i < mesh->triangle_count; ++i) {
@@ -80,6 +80,17 @@ int main(void)
     CHECK(highest > 118.0f && highest < 125.0f);
     CHECK(lowest_top >= .99f);
     CHECK(mesh->triangle_count > 200000);
+
+    // The river kit's cars, lamps and harbour stand on the baked ground: real land heights on
+    // the dock's shore and both streets, and the river's 3.5 m outside the lattice.
+    CHECK(outer->kit_ground == waterfront_outer_ground);
+    static const Vector2 kit[] = { { -34.1f, 182 }, { -73.9f, 53.6f }, { 92.7f, 167.2f } };
+    for (int i = 0; i < 3; ++i) {
+        float ground = waterfront_outer_ground(kit[i].x, kit[i].y);
+        CHECK(ground >= 1.0f && ground < 10.0f && ground != 3.5f);
+    }
+    CHECK(waterfront_outer_ground(-2000, 60) == 3.5f);
+    CHECK(waterfront_outer_ground(0, 2000) == 3.5f);
 
     size_t legs = 0;
     for (int i = 0; i < ROUTE_POINTS; ++i) {

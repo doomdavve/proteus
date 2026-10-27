@@ -40,7 +40,8 @@ static const BoatWorldDefinition locations[BOAT_LOCATION_COUNT] = {
         .camera_distance = 12,
         .camera_height = 6,
         .far_plane = 4500,
-        .particle_water = { 45, 79, 104, 255 } },
+        .particle_water = { 45, 79, 104, 255 },
+        .kit_ground = waterfront_outer_ground },
 };
 
 const BoatWorldDefinition *boat_location(BoatLocationId id)

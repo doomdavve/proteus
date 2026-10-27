@@ -7,14 +7,13 @@ Requires the pins in docs/adventure/requirements.txt. Run from anywhere:
     python -I tools/prepare_outer_map.py                 # writes assets/geometry/outer/
 
 Reads only the checked-in A0.2 sources and never fetches. Normal C builds use the checked-in
-output. Outside the river crop the map holds water, Baskarta terrain and quay walls, and since
+output. Outside the river crop the map holds water, Höjdmodell terrain and quay walls, and since
 A3.5a the corridor's buildings, the container cranes and port masts, channel marks and a
-scattered tree cover (tools/outer_dressing.py); no roads. Inside the crop (A3.3) the ground is
-the river's flat 3.5 m and the river bake's buildings, roads, gardens, trees and bridge are
-imported unchanged from
-assets/geometry/river/geometry.h, so the crop looks and behaves as the river location does; the
-terrain blends in over BLEND_M outside it. Water is the A0.3 assembly (land polygons plus OSM
-inland water, bridge legs removed).
+scattered tree cover (tools/outer_dressing.py); no roads. Inside the crop (A3.3) the river
+bake's buildings, roads, gardens, trees and bridge are imported from
+assets/geometry/river/geometry.h. The terrain covers the crop too: roads and garden beds are
+painted onto it and the other solids are moved onto it (drape_objects); the bridge is kept as
+it is. Water is the A0.3 assembly (land polygons plus OSM inland water, bridge legs removed).
 Where the region cuts open water, the water ends at an edge that collision treats as shore: a
 playable boundary, not a coastline. The manifest reports its length.
 """
@@ -47,10 +46,17 @@ spec.loader.exec_module(survey)
 SIMPLIFY = 0.5
 QUAY_BOTTOM = -2.0
 ROUTE_CLEARANCE = survey.ROUTE_CLEARANCE
-BLEND_M = 200.0  # Distance outside the river crop over which terrain rises from flat ground.
 RIVER_GEOMETRY = ROOT / "assets/geometry/river/geometry.h"
 # Colours of the river bake's own land top and quay walls, which the outer terrain replaces.
 RIVER_GROUND_COLORS = {(135, 139, 144), (94, 102, 114)}
+# River ground paint: colour and its height above the river's GROUND (roads, garden beds).
+PAINT = {(83, 89, 99): .03, (72, 105, 79): .08}
+PAINT_GRID = .01  # metres
+TINY_EDGE = .001  # metres; open land edges this short are tolerated (check_watertight)
+# The river kit's streets and harbour (x0, z0, x1, z1): the runtime raises their cars, lamps,
+# gangway and quay props by the land surface sampled here every GROUND_STEP metres.
+GROUND_AREA = (-120.0, -90.0, 130.0, 430.0)
+GROUND_STEP = 2.0
 
 
 def river_overlay():
@@ -76,20 +82,119 @@ def river_overlay():
     return plain, bridge
 
 
-def flatten_in_crop(model):
-    """Terrain model that is flat at GROUND in the river crop and blends to MODEL beyond it."""
+def split_overlay(plain):
+    """Separate the river's ground paint from its solid objects.
+
+    Roads and garden beds are flat triangles just above the river's GROUND. They become paint:
+    the terrain surface takes their colour where they lie, so they follow the ground with no
+    extra layer. Everything else (buildings, planting islands, trees) stays solid and is moved
+    onto the terrain by drape_objects. Returns (objects, paint), paint being
+    [(geometry in X/Z, colour)].
+    """
+    from shapely.geometry import Polygon
+
+    pieces = {color: [] for color in PAINT}
+    objects = []
+    for points, color in plain:
+        if color in PAINT and all(abs(y - GROUND - PAINT[color]) < 1e-3 for _, y, _ in points):
+            pieces[color].append(Polygon([(x, z) for x, _, z in points]))
+        else:
+            objects.append((points, color))
+    return objects, [(p, color) for color, p in pieces.items()]
+
+
+def paint_layers(land, paint):
+    """Partition LAND by PAINT (split_overlay's) into [(geometry, colour or None)].
+
+    The split is made once for the whole map, so the terrain cells cut every layer at the same
+    points and the layers share their vertices. A PAINT_GRID snap closes the hairline gaps
+    between the river's decal triangles.
+    """
+    from shapely import set_precision
+
+    layers, taken = [], None
+    for shapes, color in paint:
+        if not shapes:
+            continue
+        # Snapping attaches the grid to the geometry and to everything made from it, and the
+        # constrained triangulation then places triangles outside its polygon; return to
+        # floating precision.
+        cover = set_precision(set_precision(unary_union(shapes), PAINT_GRID), 0)
+        cover = unary_union(polygons(cover.intersection(land)))
+        if taken is not None:
+            cover = unary_union(polygons(cover.difference(taken)))
+        taken = cover if taken is None else taken.union(cover)
+        layers.append((cover, color))
+    rest = land if taken is None else unary_union(polygons(land.difference(taken)))
+    return [(rest, None)] + layers
+
+
+def drape_objects(objects, model):
+    """Move each solid of the river overlay by the terrain under it, less the river's GROUND.
+
+    Solids are the groups of triangles that share a corner in X/Z. One standing on the
+    ground goes to the lowest terrain under its footprint (corners and a 5 m lattice inside),
+    so no edge floats and the uphill side is sunk instead. A raised building part moves with
+    the solid whose footprint holds its centre; a floating one without such a solid uses its
+    own footprint. Returns (moved triangles, per-solid lifts in metres).
+    """
     import numpy as np
+    from shapely import STRtree, contains_xy, get_coordinates
+    from shapely.geometry import MultiPoint
 
-    x0, z0, x1, z1 = survey.RIVER_CROP
+    parent = {}
 
-    def blended(xy):
-        xy = np.asarray(xy, dtype=float)
-        dx = np.maximum(np.maximum(x0 - xy[:, 0], xy[:, 0] - x1), 0)
-        dz = np.maximum(np.maximum(z0 - xy[:, 1], xy[:, 1] - z1), 0)
-        t = np.clip(np.hypot(dx, dz) / BLEND_M, 0, 1)
-        return GROUND + (model(xy) - GROUND) * (t * t * (3 - 2 * t))
+    def find(k):
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]
+            k = parent[k]
+        return k
 
-    return blended
+    def key(x, z):
+        return (round(x, 3), round(z, 3))
+
+    for points, _ in objects:
+        ks = [key(x, z) for x, _, z in points]
+        for k in ks:
+            parent.setdefault(k, k)
+        for k in ks[1:]:
+            a, b = find(ks[0]), find(k)
+            if a != b:
+                parent[b] = a
+    groups = {}
+    for index, (points, _) in enumerate(objects):
+        groups.setdefault(find(key(points[0][0], points[0][2])), []).append(index)
+
+    def footprint(indices):
+        pts = [p for i in indices for p in objects[i][0]]
+        base = min(y for _, y, _ in pts)
+        return base, MultiPoint([(x, z) for x, y, z in pts if y < base + .01]).convex_hull
+
+    def lowest(shape):
+        coords = [tuple(c) for c in get_coordinates(shape)]
+        x0, z0, x1, z1 = shape.bounds
+        lattice = np.array([(x, z) for x in np.arange(math.ceil(x0 / 5) * 5, x1, 5.0)
+                            for z in np.arange(math.ceil(z0 / 5) * 5, z1, 5.0)])
+        if len(lattice) and shape.area > 0:
+            coords += [tuple(p) for p in lattice[contains_xy(shape, *lattice.T)]]
+        return float(model(np.array(coords)).min())
+
+    lift, standing, raised = {}, [], []
+    for root, indices in sorted(groups.items()):
+        base, shape = footprint(indices)
+        if base < GROUND + 1:
+            lift[root] = lowest(shape) - GROUND
+            standing.append((root, shape))
+        else:
+            raised.append((root, shape))
+    tree = STRtree([shape for _, shape in standing])
+    for root, shape in raised:
+        holders = sorted(tree.query(shape.centroid, predicate="within"))
+        lift[root] = lift[standing[holders[0]][0]] if holders else lowest(shape) - GROUND
+    # The original order is kept: the renderers pair consecutive facade triangles.
+    moved = [([(x, y + lift[find(key(points[0][0], points[0][2]))], z) for x, y, z in points],
+              color) for points, color in objects]
+    return moved, lift
 
 
 def region_shape():
@@ -159,6 +264,9 @@ def check_watertight(cells, land):
     """Every land edge is shared by two triangles unless it lies on the land boundary.
 
     A single-use edge elsewhere is a T-junction or hole, where the 20 m and 5 m cells disagree.
+    Edges shorter than TINY_EDGE are allowed: where a paint boundary passes within a millimetre
+    of a cell corner, the sliver between them is dropped as a zero-area triangle. Returns their
+    count.
     """
     from collections import Counter
 
@@ -174,21 +282,54 @@ def check_watertight(cells, land):
             edges[frozenset((key(tri[p]), key(tri[q])))] += 1
     boundary = land.boundary.buffer(.02, quad_segs=2)
     prepare(boundary)
-    bad = []
+    bad, tiny = [], 0
     for edge, count in edges.items():
         a, b = tuple(edge)
         if count == 1 and not boundary.contains(Point((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)):
-            bad.append((a, b))
+            if math.dist(a, b) < TINY_EDGE:
+                tiny += 1
+            else:
+                bad.append((a, b))
         assert count <= 2, f"edge used {count} times at {tuple(edge)}"
     assert not bad, f"{len(bad)} open interior edges, first {bad[:3]}"
+    return tiny
+
+
+def ground_grid(cells, height, model, area=GROUND_AREA, step=GROUND_STEP):
+    """The baked land surface on a lattice over AREA, in centimetres, rows south to north.
+
+    Points on land take the height of the land triangle under them; points in water take the
+    terrain model's. Returns {"origin": (x0, z0), "step", "columns", "rows", "cm"}.
+    """
+    import numpy as np
+    from shapely import STRtree, points
+    from shapely.geometry import Polygon
+
+    x0, z0, x1, z1 = area
+    columns, rows = int((x1 - x0) / step) + 1, int((z1 - z0) / step) + 1
+    xs, zs = np.meshgrid(x0 + step * np.arange(columns), z0 + step * np.arange(rows))
+    xy = np.c_[xs.ravel(), zs.ravel()]
+    values = model(xy)
+    tree = STRtree([Polygon(tri) for tri in cells])
+    point_index, cell_index = tree.query(points(xy), predicate="intersects")
+    for p, c in zip(point_index, cell_index):
+        (ax, az), (bx, bz), (cx, cz) = cells[c]
+        ha, hb, hc = (height[tuple(q)] for q in cells[c])
+        det = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz)
+        u = ((bz - cz) * (xy[p, 0] - cx) + (cx - bx) * (xy[p, 1] - cz)) / det
+        v = ((cz - az) * (xy[p, 0] - cx) + (ax - cx) * (xy[p, 1] - cz)) / det
+        values[p] = u * ha + v * hb + (1 - u - v) * hc
+    return {"origin": (x0, z0), "step": step, "columns": columns, "rows": rows,
+            "cm": [int(round(h * 100)) for h in values]}
 
 
 def bake(water, region, model=None, overlay=None, dressing=()):
     """Return (vertices, triangles, stats) for water at y=0 then land and walls.
 
     Without MODEL the land is flat at GROUND; with one it is the 20 m/5 m terrain surface.
-    OVERLAY is river_overlay()'s (plain, bridge): the plain triangles follow the land and the
-    bridge ones follow, from the returned bridge_first index. DRESSING triangles, already on
+    OVERLAY is (plain, bridge, paint): the plain triangles (river_overlay's solids, moved by
+    drape_objects) follow the land and the bridge ones follow, from the returned bridge_first
+    index; PAINT (split_overlay's) colours the land top. DRESSING triangles, already on
     the terrain, come last: like the bridge they are authored geometry in flat colours, so they
     share its range, which the renderers keep out of facade texturing and windows.
     """
@@ -234,12 +375,15 @@ def bake(water, region, model=None, overlay=None, dressing=()):
 
     import numpy as np
 
-    cells, shore_edges = outer_terrain.cell_pieces(land, region, triangulate_cell)
+    plain, bridge, paint = overlay or ([], [], [])
+    cells, shore_edges, tags = outer_terrain.cell_pieces(
+        land, region, triangulate_cell, paint_layers(land, paint))
+    painted = list(zip(cells, tags))
     points = {tuple(p) for tri in cells for p in tri}
     points |= {tuple(p) for edge in shore_edges for p in edge}
     ordered = sorted(points)
     height = dict(zip(ordered, model(np.array(ordered)).tolist()))
-    for tri in cells:
+    for tri, paint_color in painted:
         hs = [height[tuple(p)] for p in tri]
         (x0, z0), (x1, z1), (x2, z2) = tri
         # Upward normal of the clockwise-in-X/Z triangle, from its height gradient.
@@ -249,7 +393,7 @@ def bake(water, region, model=None, overlay=None, dressing=()):
         nx, nz = uh * vz - uz * vh, ux * vh - uh * vx
         slope = math.degrees(math.atan2(math.hypot(nx, nz), ny)) if ny else 90.0
         triangle([(p[0], h, p[1]) for p, h in zip(tri, hs)],
-                 terrain_color(sum(hs) / 3, slope))
+                 paint_color or terrain_color(sum(hs) / 3, slope))
     for p, q in shore_edges:
         (x, z), (xx, zz) = p, q
         h, hh = height[tuple(p)], height[tuple(q)]
@@ -260,7 +404,6 @@ def bake(water, region, model=None, overlay=None, dressing=()):
             triangle([a, d, c], wall_color)
     surface_area = sum(abs((x1 - x0) * (z2 - z0) - (x2 - x0) * (z1 - z0)) / 2
                        for (x0, z0), (x1, z1), (x2, z2) in cells)
-    plain, bridge = overlay or ([], [])
     for points, color in plain:
         triangle(points, color)
     bridge_first = len(triangles)
@@ -271,13 +414,15 @@ def bake(water, region, model=None, overlay=None, dressing=()):
         triangle(points, color)
     assert abs(surface_area - land.area) < 1.0 + sum(a for a, _ in DROPPED), \
         f"land surface {surface_area:.1f} m2 differs from land {land.area:.1f} m2"
-    check_watertight(cells, land)
+    tiny_edges = check_watertight(cells, land)
     assert sum(a for a, _ in DROPPED) < 1.0, f"untriangulated land {DROPPED[:5]}"
     stats.update(overlay_triangles=len(plain), bridge_first=bridge_first,
                  bridge_triangles=len(bridge), dressing_first=dressing_first,
                  dropped_pieces=len(DROPPED), dropped_area_m2=sum(a for a, _ in DROPPED),
                  land_triangles=len(cells), shore_edges=len(shore_edges),
-                 height_min=min(height.values()), height_max=max(height.values()))
+                 painted_triangles=sum(1 for _, c in painted if c), tiny_open_edges=tiny_edges,
+                 height_min=min(height.values()), height_max=max(height.values()),
+                 ground=ground_grid(cells, height, model))
     return vertices, triangles, stats
 
 
@@ -313,7 +458,20 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
     lines += ["};", "static const Triangle3D outer_triangles[] = {"]
     lines += [f"    {{ {{ {i[0]}, {i[1]}, {i[2]} }}, {{ {c[0]}, {c[1]}, {c[2]}, 255 }} }},"
               for i, c in triangles]
-    lines += ["};", f"enum {{ outer_bridge_first_triangle = {stats['bridge_first']} }};", ""]
+    lines += ["};", f"enum {{ outer_bridge_first_triangle = {stats['bridge_first']} }};"]
+    ground = stats["ground"]
+    lines += ["// The land surface over the river kit's streets and harbour, in centimetres, rows",
+              "// from south to north (tools/prepare_outer_map.py ground_grid).",
+              f"enum {{ outer_ground_columns = {ground['columns']}, "
+              f"outer_ground_rows = {ground['rows']} }};",
+              f"static const float outer_ground_x0 = {ground['origin'][0]:.1f}f, "
+              f"outer_ground_z0 = {ground['origin'][1]:.1f}f, "
+              f"outer_ground_step = {ground['step']:.1f}f;",
+              "static const short outer_ground_cm[] = {"]
+    cm = ground["cm"]
+    lines += ["    " + ", ".join(str(v) for v in cm[i:i + 16]) + ","
+              for i in range(0, len(cm), 16)]
+    lines += ["};", ""]
     content = "\n".join(lines)
     (output / "geometry.h").write_text(content)
     land = stats["land"]
@@ -328,8 +486,8 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "license": "ODbL-1.0", "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
         "attribution": "Map data © OpenStreetMap contributors",
         "ground": ("Assumed flat ground at 3.5 m above water; terrain samples not used"
-                   if terrain is None else "Baskarta contours and spot heights outside the "
-                   "river crop; flat 3.5 m inside it, blending over terrain_blend_m"),
+                   if terrain is None else "Höjdmodell 2022 heights everywhere, the river "
+                   "crop included"),
         "terrain": terrain,
         "quay_bottom": QUAY_BOTTOM,
         "region": {"river_crop": list(survey.RIVER_CROP), "first_slice": survey.FIRST_SLICE,
@@ -350,8 +508,17 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "river_overlay": {"source": "assets/geometry/river/geometry.h",
                           "triangles": stats.get("overlay_triangles"),
                           "bridge_triangles": stats.get("bridge_triangles"),
-                          "ground_m": GROUND, "terrain_blend_m": BLEND_M},
+                          "river_ground_m": GROUND,
+                          "placement": "roads and garden beds paint the terrain; each other "
+                                       "solid moves by the lowest terrain under it less "
+                                       "river_ground_m; the bridge is unchanged",
+                          **(stats.get("draped") or {})},
         "land_triangles": stats.get("land_triangles"),
+        "kit_ground": stats.get("ground") and {
+            "area": list(GROUND_AREA), "step_m": GROUND_STEP,
+            "columns": stats["ground"]["columns"], "rows": stats["ground"]["rows"],
+            "use": "waterfront_outer_ground: the river kit's street cars and lamps, gangway "
+                   "and quay gear stand on the baked land surface"},
         "geometry_sha256": hashlib.sha256(content.encode()).hexdigest(),
     }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -361,6 +528,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
 
 def self_test():
     outer_dressing.self_test()
+    outer_terrain.self_test()
     # Water stays below a raised shelf; land is the region less water; an island hole survives.
     region = box(0, 0, 100, 100)
     water = box(10, 10, 90, 90).difference(box(40, 40, 60, 60))
@@ -390,6 +558,13 @@ def self_test():
             assert abs(y - (x * .1 + z * .05 + 2)) < 1e-3, "height off the plane"
     assert abs(area - stats["land"].area) < 1e-3, (area, stats["land"].area)
     assert stats["land_triangles"] > 2 * len(triangulate(stats["land"])), "no refinement"
+    # The kit's ground lattice follows the land surface (and the model over water).
+    ground = stats["ground"]
+    for j in range(0, ground["rows"], 7):
+        for i in range(0, ground["columns"], 7):
+            x, z = ground["origin"][0] + i * GROUND_STEP, ground["origin"][1] + j * GROUND_STEP
+            cm = ground["cm"][j * ground["columns"] + i]
+            assert abs(cm - (x * .1 + z * .05 + 2) * 100) <= 1, (x, z, cm)
     # Region edge through open water is a playable boundary, not shoreline.
     cut = region.intersection(box(-50, 20, 150, 80))
     assert abs(cut.boundary.intersection(region.boundary.buffer(.01)).length - 120) < .1
@@ -418,34 +593,38 @@ def main():
     water, carved = outer_dressing.carve_marks(
         water, outer_dressing.marks(osm, frame, region, crop))
     route = check(geo, region, water)
-    import numpy as np
-
-    data, contours, spots = outer_terrain.load_samples()
-    model = outer_terrain.HeightModel(np.vstack([contours, spots]))
+    header, heights = outer_terrain.load_grid()
+    model = outer_terrain.GridModel(header, heights)
     terrain = {
-        "source": data["source"], "licence": data["licence"],
-        "source_file": "docs/adventure/sources/terrain-baskarta.json.gz",
+        "source": header["source"], "licence": header["licence"], "survey": header["survey"],
+        "source_file": "docs/adventure/sources/terrain-hojdmodell.bin.gz",
         "source_sha256": hashlib.sha256(outer_terrain.SOURCE.read_bytes()).hexdigest(),
-        "datum": "Not confirmed from the product description; assumed RH 2000 (RH 70 differs "
-                 "by well under half a metre in Gothenburg). Shore heights sit near 0 m.",
+        "datum": "RH 2000 (product description). Heights are used as metres above the water "
+                 "at y = 0; the scanned water surface sits near -0.26 m.",
+        "grid_cell_m": header["cell_m"],
         "cell_inland_m": outer_terrain.COARSE, "cell_shore_m": outer_terrain.FINE,
         "shore_band_m": outer_terrain.BAND, "min_land_m": outer_terrain.MIN_LAND,
-        "interpolation": "linear over a Delaunay triangulation of contour vertices and spot "
-                         "heights; nearest sample outside its hull",
-        "holdout_vs_spot_heights": outer_terrain.holdout_error(
-            contours, spots, geo_land(region, water)),
+        "interpolation": "bilinear between the centres of the grid's cell means",
+        "check_vs_baskarta_spot_heights": outer_terrain.spot_check(
+            model, outer_terrain.load_spots(), geo_land(region, water)),
     }
-    overlay = river_overlay()
-    blended = flatten_in_crop(model)
+    plain, bridge = river_overlay()
+    objects, paint = split_overlay(plain)
+    objects, lifts = drape_objects(objects, model)
     fort = next(Point(m["east_north"]) for m in survey.features(osm, frame)[1]
                 if m["label"] == "Nya Älvsborg")
     dressing, dressed = outer_dressing.dress(osm, frame, region, crop, water,
-                                             geo_land(region, water), blended, fort,
+                                             geo_land(region, water), model, fort,
                                              survey.multipolygon)
     dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS)
-    vertices, triangles, stats = bake(water, region, blended, overlay, dressing)
+    vertices, triangles, stats = bake(water, region, model, (objects, bridge, paint), dressing)
     stats["dressing"] = dressed
-    terrain.update(dropped_pieces=stats["dropped_pieces"],
+    values = sorted(lifts.values())
+    stats["draped"] = {"solids": len(values), "paint_source_triangles": sum(len(p) for p, _ in paint),
+                       "painted_land_triangles": stats["painted_triangles"],
+                       "lift_min_m": round(values[0], 2), "lift_max_m": round(values[-1], 2),
+                       "lift_median_m": round(values[len(values) // 2], 2)}
+    terrain.update(tiny_open_edges=stats["tiny_open_edges"], dropped_pieces=stats["dropped_pieces"],
                    dropped_area_m2=round(stats["dropped_area_m2"], 4),
                    height_min_m=round(stats["height_min"], 2),
                    height_max_m=round(stats["height_max"], 2))
