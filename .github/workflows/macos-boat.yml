@@ -57,6 +57,11 @@ jobs:
           test -s "$app/Contents/Resources/assets/music/a-little-boat.xm"
           test -s "$app/Contents/Resources/assets/shaders/waterfront_city.fs"
           test -s "$app/Contents/Resources/assets/title/river-backdrop.png"
+          test -s "$app/Contents/Resources/assets/title/wake-velocity.png"
+          test -s "$app/Contents/Resources/assets/fonts/m5x7.fnt"
+          test -s "$app/Contents/Resources/assets/fonts/m3x6.fnt"
+          test -s "$app/Contents/Resources/assets/fonts/m5x7.png"
+          test -s "$app/Contents/Resources/assets/fonts/m3x6.png"
 
       - name: Upload downloadable app
         uses: actions/upload-artifact@v4

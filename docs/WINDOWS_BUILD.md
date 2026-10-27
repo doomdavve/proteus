@@ -65,7 +65,8 @@ on Windows and double-click `launch.bat`. Here `<version>` is the release tag
 5. Double-click launch.bat to open the Wake Velocity title (`wake_velocity.exe` without options).
 
 Artifacts expire after 30 days. `build.txt` records the version and source commit. The package
-includes shader/texture/title assets, background music, and map attribution; geometry is
+includes shader/texture/title assets, bitmap menu fonts and their attribution, background
+music, and map attribution; geometry is
 compiled into the executable. Asset loading uses the executable directory, so the folder can be moved.
 raylib and the MSVC runtime are statically linked for this workflow.
 

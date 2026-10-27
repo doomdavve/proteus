@@ -192,7 +192,8 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
   which otherwise takes over canvas sizing. The launcher hides before the game starts;
   the canvas then fits the full viewport. Fullscreen is selected before launch. Escape opens
   the in-game menu (and may leave fullscreen); title and sessions share the window.
-- **Assets:** preload both game XM tracks, the title backdrop, textures and used shaders into `/assets`.
+- **Assets:** preload both game XM tracks, the title backdrop, bitmap menu fonts and
+  their attribution, textures and used shaders into `/assets`.
   `boat_asset_path()` already resolves that path under Wasm. Geometry is compiled from C
   headers; geometry manifests, editor samples, dance files, and unrelated music are not
   runtime dependencies. The engine/water sounds are synthesized by the existing C audio code.

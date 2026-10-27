@@ -116,6 +116,23 @@ add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c to
   src/boat_audio.c src/xm_audio.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
+# Share the web packager's version convention. Source archives can supply an explicit value.
+set(PROTEUS_VERSION "" CACHE STRING "Build version displayed on the title (empty uses Git)")
+if(PROTEUS_VERSION STREQUAL "")
+  execute_process(COMMAND git describe --tags --match "v[0-9]*" --always --dirty
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    OUTPUT_VARIABLE PROTEUS_TITLE_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  if(PROTEUS_TITLE_VERSION STREQUAL "")
+    set(PROTEUS_TITLE_VERSION "unknown")
+  endif()
+else()
+  set(PROTEUS_TITLE_VERSION "${PROTEUS_VERSION}")
+endif()
+# The cache override is text, including when a source archive has no Git metadata.
+string(REPLACE "\\" "\\\\" PROTEUS_TITLE_VERSION "${PROTEUS_TITLE_VERSION}")
+string(REPLACE "\"" "\\\"" PROTEUS_TITLE_VERSION "${PROTEUS_TITLE_VERSION}")
+configure_file(cmake/boat_version.h.in generated/boat_version.h @ONLY)
+target_include_directories(wake_velocity PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # Race R0: measured shortened river route, source contracts, captures and playable trial.
 add_executable(boat_race_trial tools/boat_race_trial.c tools/boat_vessel_wake_gpu.c)
@@ -217,6 +234,11 @@ add_custom_target(proteus_assets
           $<TARGET_FILE_DIR:wake_velocity>/assets
 )
 
+# Reproducible, scenery-only title sample at the original bridge-lookback camera.
+add_executable(title_backdrop tools/title_backdrop.c)
+target_link_libraries(title_backdrop PRIVATE proteus_gpu)
+target_compile_options(title_backdrop PRIVATE ${PROTEUS_WARNINGS})
+
 add_executable(gpu_fixture tools/gpu_fixture.c)
 target_include_directories(gpu_fixture PRIVATE ${raylib_SOURCE_DIR}/src)
 target_link_libraries(gpu_fixture PRIVATE proteus_gpu)
@@ -310,6 +332,7 @@ target_compile_options(validate_boat_audio PRIVATE
 add_test(NAME boat_audio_is_valid COMMAND validate_boat_audio)
 
 add_dependencies(wake_velocity proteus_assets)
+add_dependencies(title_backdrop proteus_assets)
 add_dependencies(boat_race_trial proteus_assets)
 add_test(NAME boat_race_trial COMMAND boat_race_trial --check)
 set_tests_properties(boat_race_trial PROPERTIES
