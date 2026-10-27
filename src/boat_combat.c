@@ -13,7 +13,7 @@ BoatCombatRules boat_combat_default_rules(void)
 {
     return (BoatCombatRules) { .health = 100,
         .damage = 0,
-        .bullet_speed = 84,
+        .bullet_speed = 94,
         .bullet_range = 70,
         .grenade_distance = 7,
         .wave_height = 2,

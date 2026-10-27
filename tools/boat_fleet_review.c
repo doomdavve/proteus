@@ -74,6 +74,58 @@ static bool draw_cpu(
         BOAT_CAMERA_DEFAULT, &rivals, NULL, NULL, 0);
 }
 
+// Probe the rendered hull triangles, including the hull pose's scale and mesh normalization.
+// A hand-authored deck height here would repeat the attachment's original scale mistake.
+static float hull_surface(const Mesh3D *mesh, Transform3D hull, float x, float z)
+{
+    float top = -INFINITY;
+    for (size_t i = 0; i < mesh->triangle_count; ++i) {
+        const Triangle3D *triangle = &mesh->triangles[i];
+        Vector3 a = boat_model_point(hull, mesh->vertices[triangle->vertices[0]]);
+        Vector3 b = boat_model_point(hull, mesh->vertices[triangle->vertices[1]]);
+        Vector3 c = boat_model_point(hull, mesh->vertices[triangle->vertices[2]]);
+        float area = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+        if (fabsf(area) < 1e-8f)
+            continue;
+        float u = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / area;
+        float v = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / area;
+        if (u >= -1e-5f && v >= -1e-5f && u + v <= 1 + 1e-5f)
+            top = fmaxf(top, u * a.y + v * b.y + (1 - u - v) * c.y);
+    }
+    return top;
+}
+
+static int cannon_attachment(Formation *f)
+{
+    boat_combat_enable(&f->fleet);
+    BoatWorld world = boat_fleet_world(&f->fleet);
+    BoatViewState view = { 0 };
+    BoatPresentation presentation = { 0 };
+    static WaterfrontSceneFrame frame;
+    for (unsigned skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
+        view.skin = skin;
+        boat_scene_frame(&view, &presentation, &world, BOAT_CAMERA_DEFAULT, &frame);
+        // The scene appends the cannon's foot, body, face and opening after its environment.
+        CHECK(frame.scenery_count >= 4);
+        Transform3D foot = frame.scenery[frame.scenery_count - 4].transform;
+        Transform3D body = frame.scenery[frame.scenery_count - 3].transform;
+        const Mesh3D *hull = boat_skin_mesh(skin, BOAT_SKIN_HULL);
+        for (int x = -1; x <= 1; x += 2)
+            for (int z = -1; z <= 1; z += 2) {
+                float deck = hull_surface(hull, frame.player.hull,
+                    foot.position.x + (float)x * foot.scale.x * .5f,
+                    foot.position.z + (float)z * foot.scale.z * .5f);
+                CHECK(isfinite(deck)); // Every corner is inside the rendered hull outline.
+                CHECK(deck > foot.position.y - foot.scale.y * .5f);
+                CHECK(deck < foot.position.y + foot.scale.y * .5f); // Foot penetrates the deck.
+            }
+        CHECK(body.position.y - body.scale.y * .5f < foot.position.y + foot.scale.y * .5f);
+        CHECK(body.position.y + body.scale.y * .5f > foot.position.y - foot.scale.y * .5f);
+    }
+    puts("cannon attachment: every mounting-foot corner intersects the actual hull on all skins");
+    return 0;
+}
+
 static int check(void)
 {
     static Formation f, copy;
@@ -94,6 +146,7 @@ static int check(void)
             changed[skip] += memcmp(&all[p], &without[p], sizeof(Color)) != 0;
         CHECK(changed[skip] > 40);
     }
+    CHECK(cannon_attachment(&f) == 0);
     boat_cpu_view_destroy(&cpu_view);
     renderer3d_destroy(&renderer);
     printf("fleet render: three rivals each drew %u/%u/%u pixels; repeat identical; fleet and "
