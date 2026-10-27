@@ -173,8 +173,8 @@ int main(int argc, char **argv)
         for (int tick = 0; tick < ticks; ++tick) {
             CHECK(fabsf(boat.boat.position.x) + 3 < BOAT_BASIN_HALF_X
                 && fabsf(boat.boat.position.y) + 3 < BOAT_BASIN_HALF_Z);
-            boat_session_step(
-                &boat, (BoatInput) { banking_fixture_input(&boat.boat, scenario, tick), 0, 0, 0 });
+            boat_session_step(&boat,
+                (BoatInput) { .steering_rate = banking_fixture_input(&boat.boat, scenario, tick) });
             CHECK(pose_check(&boat) == 0);
             CHECK(isfinite(boat.boat.roll) && fabsf(boat.boat.roll) < 30 * DEG2RAD);
             bool select = fixture >= 4 ? fabsf(boat.boat.roll) > peak

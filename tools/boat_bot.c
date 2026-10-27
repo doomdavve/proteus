@@ -222,8 +222,8 @@ int main(int argc, char **argv)
             const BoatNetRaceRow *row = &client.race.slots[client.slot];
             if (client.accept.mode == BOAT_NET_MODE_RACE && client.race_valid && row->current) {
                 if (own->held) // Grid, countdown or parked: prepare full throttle on the grid.
-                    input = (BoatInput) { 0,
-                        boat_throttle_rate(own->boat.throttle, row->parked ? 0 : 1), 0, 0 };
+                    input = (BoatInput) { .throttle_rate
+                        = boat_throttle_rate(own->boat.throttle, row->parked ? 0 : 1) };
                 else if (client.race.phase == BOAT_RACE_RACING
                     || client.race.phase == BOAT_RACE_RESULTS)
                     input = boat_fleet_bot_race_input(&client.fleet, boat_race_river_course(),

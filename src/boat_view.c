@@ -67,6 +67,25 @@ static View3D boat_camera(const Boat *boat, const BoatPresentation *presentation
         .far_plane = definition->far_plane };
 }
 
+bool boat_view_project(const BoatViewState *view, const BoatPresentation *presentation,
+    const BoatWorld *world, BoatCamera settings, Vector3 point, int width, int height,
+    Vector2 *screen)
+{
+    View3D camera = boat_camera(&view->boat, presentation, world->definition, settings);
+    Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(camera.up, forward));
+    Vector3 up = Vector3CrossProduct(forward, right);
+    Vector3 delta = Vector3Subtract(point, camera.position);
+    float depth = Vector3DotProduct(delta, forward);
+    if (depth < camera.near_plane || depth > camera.far_plane)
+        return false;
+    float focal = (float)height / (2 * tanf(camera.vertical_fov * .5f));
+    *screen = (Vector2) { (float)width * .5f + Vector3DotProduct(delta, right) * focal / depth,
+        (float)height * .5f - Vector3DotProduct(delta, up) * focal / depth };
+    return screen->x >= 8 && screen->x < (float)width - 8 && screen->y >= 4
+        && screen->y < (float)height - 50;
+}
+
 static float water_particle_size(const BoatWaterParticle *water)
 {
     if (water->spray)
@@ -295,13 +314,13 @@ static void combat_visit(
             draw(context,
                 (Transform3D) { .position = { -b->position.x, b->height, b->position.y },
                     .rotation = { 0, -atan2f(b->direction.x, -b->direction.y), 0 },
-                    .scale = { .07f, .07f, .9f } },
-                (Color) { 255, 234, 145, 255 });
+                    .scale = { .18f, .18f, 1.5f } },
+                (Color) { 142, 220, 240, 255 });
             if (tick - b->born < 4)
                 draw(context,
                     (Transform3D) { .position = { -b->position.x, b->height, b->position.y },
                         .scale = { .35f, .3f, .35f } },
-                    (Color) { 255, 191, 67, 255 });
+                    (Color) { 218, 244, 250, 255 });
         } else if (b->ended && tick - b->ended < 27) {
             // Brief deterministic impact sparkle/splash at the terminal point.
             float age = (float)(tick - b->ended) * BOAT_STEP;
@@ -312,6 +331,38 @@ static void combat_visit(
                                             b->height + age * (float)(k + 1), b->position.y },
                             .scale = { .1f, .18f, .1f } },
                         (Color) { 230, 239, 222, 255 });
+        }
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_TORPEDOES; ++i) {
+        const BoatCombatObject *t = &c->torpedoes[i];
+        if (!t->born || tick < t->born)
+            continue;
+        if (t->active) {
+            draw(context,
+                (Transform3D) { .position = { -t->position.x, t->height, t->position.y },
+                    .rotation = { 0, -atan2f(t->direction.x, -t->direction.y), 0 },
+                    .scale = { .4f, .25f, 1.6f } },
+                (Color) { 221, 166, 91, 255 });
+            for (unsigned j = 1; j <= 8; ++j) {
+                Vector2 p
+                    = Vector2Subtract(t->position, Vector2Scale(t->direction, (float)j * .65f));
+                float water = boat_water_query_borrowed(&world->water, p, view->time).height;
+                draw(context,
+                    (Transform3D) { .position = { -p.x, water + .08f, p.y },
+                        .scale = { .3f + (float)j * .03f, .1f, .4f } },
+                    (Color) { 216, 237, 229, 255 });
+            }
+        } else if (t->ended && tick - t->ended < 45) {
+            float age = (float)(tick - t->ended) * BOAT_STEP;
+            for (unsigned j = 0; j < 7; ++j) {
+                float angle = (float)j * 2 * PI / 7;
+                draw(context,
+                    (Transform3D) {
+                        .position = { -t->position.x + sinf(angle) * age * 5,
+                            t->height + sinf(age * 6) * 2, t->position.y + cosf(angle) * age * 5 },
+                        .scale = { .3f, .8f, .3f } },
+                    (Color) { 224, 242, 235, 255 });
+            }
         }
     }
     for (unsigned i = 0; i < BOAT_COMBAT_GRENADES; ++i) {

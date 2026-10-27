@@ -23,6 +23,7 @@ typedef struct {
     bool transport_open;
     bool weapons_blocked;
     uint16_t grenade_request;
+    uint8_t torpedo_request;
     BoatNetClient client;
     BoatPresentation presentations[BOAT_FLEET_SLOTS]; // Other slots; the own one is the session's.
     Boat shown[BOAT_FLEET_SLOTS]; // Drawn poses of the other boats.
@@ -67,7 +68,8 @@ bool net_study_deathmatch(const NetStudy *net);
 bool net_study_race(const NetStudy *net);
 // Fill VIEW's race markers: the course lines and the own next gate.
 void net_study_race_view(const NetStudy *net, BoatViewState *view);
-void net_study_combat_hud(const NetStudy *net, int width);
+void net_study_combat_hud(const NetStudy *net, int width, int height, const BoatViewState *view,
+    const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera);
 // Deathmatch HUD at window resolution: round clock and own score at the top centre, a kill feed
 // below FEED_TOP at the right, and the scoreboard while SCOREBOARD is held or between rounds.
 void net_study_draw_match(

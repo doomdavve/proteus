@@ -40,7 +40,7 @@ static void drive(BoatSession *session, int tick)
 {
     float wheel, throttle;
     loop_inputs(&session->boat, tick, &wheel, &throttle);
-    boat_session_step(session, (BoatInput) { wheel, throttle, 0, 0 });
+    boat_session_step(session, (BoatInput) { .steering_rate = wheel, .throttle_rate = throttle });
 }
 
 static void start(BoatSession *session, int index)
@@ -117,7 +117,7 @@ static int clones(void)
     reference = original;
     for (int tick = 1200; tick < 1800; ++tick) {
         drive(&original, tick);
-        boat_session_step(&clone, (BoatInput) { -1, -1, 0, 0 });
+        boat_session_step(&clone, (BoatInput) { .steering_rate = -1, .throttle_rate = -1 });
     }
     for (int tick = 1200; tick < 1800; ++tick)
         drive(&reference, tick);
@@ -232,7 +232,8 @@ static int core_order(void)
         float wheel, throttle;
         loop_inputs(&boat, i, &wheel, &throttle);
         Vector2 previous = boat.position;
-        boat_step(&boat, &world, boat_tick_seconds(++tick), (BoatInput) { wheel, throttle, 0, 0 });
+        boat_step(&boat, &world, boat_tick_seconds(++tick),
+            (BoatInput) { .steering_rate = wheel, .throttle_rate = throttle });
         boat_course_step(&course, previous, boat.position, BOAT_TICK_SECONDS);
         drive(&session, i);
         CHECK(session.tick == tick && memcmp(&session.boat, &boat, sizeof(boat)) == 0);
@@ -376,7 +377,8 @@ static void participant_drive(Participant *p, int ticks)
     for (int i = 0; i < ticks; ++i, ++p->tick) {
         float wheel, throttle;
         loop_inputs(&p->session.boat, p->tick % 1800, &wheel, &throttle);
-        boat_session_step(&p->session, (BoatInput) { wheel * p->script->steer, throttle, 0, 0 });
+        boat_session_step(&p->session,
+            (BoatInput) { .steering_rate = wheel * p->script->steer, .throttle_rate = throttle });
         if (p->replay.count < p->replay.capacity) {
             BoatReplaySample sample = boat_replay_pose(
                 &p->session.boat, &p->session.presentation, boat_session_time(&p->session));

@@ -14,8 +14,8 @@ static void advance(BoatSession *session, const char *scenario, int tick)
     if (strcmp(scenario, "idle") != 0)
         boat->throttle = strcmp(scenario, "reverse") == 0 ? -.65f : 1;
     float steering = strcmp(scenario, "turn") == 0 && t > 3 ? .7f : 0;
-    boat_session_step(
-        session, (BoatInput) { Clamp((steering - boat->wheel) / BOAT_STEP, -1, 1), 0, 0, 0 });
+    boat_session_step(session,
+        (BoatInput) { .steering_rate = Clamp((steering - boat->wheel) / BOAT_STEP, -1, 1) });
 }
 
 static View3D camera_for(const Boat *boat, const char *angle)

@@ -1,19 +1,62 @@
-# Deathmatch: wave grenades and machine gun
+# Deathmatch: water cannon, stern waves and torpedoes
 
-Prepared 2026-10-24 against `7a072c6`. **D1 (match core) and D2 (protocol v2 and the in-game
-HUD) are implemented; no human has played a deathmatch yet.**
-This document owns the deathmatch rules, phases, verification and acceptance. The
-[multiplayer plan](MULTIPLAYER_PLAN.md) owns transport, prediction and room hosting; the
-[physics](BOAT_PHYSICS_PLAN.md) and [wake](WAKE_REWRITE_PLAN.md) plans own handling and wake
-feel, including tuning of the new mechanics below.
+This document owns deathmatch rules, implementation, verification and acceptance. Multiplayer
+transport is owned by [the multiplayer plan](MULTIPLAYER_PLAN.md).
 
-Status (2026-10-26): both weapons are implemented on `deathmatch-weapons`, based on
-`origin/main` (`2c0d7c9`), then merged with its new `417fca4` outer-map work, in `/private/tmp/proteus-deathmatch-weapons`. D1/D2 remain the
-round/scoring foundation. The weapon milestone below supersedes the earlier immediate
-side-ram → surge → mine sequence. Human balance acceptance is pending. Existing historical
-handoffs below retain their original scope.
+## Arsenal milestone — 2026-10-27
 
-## Weapon milestone — 2026-10-26
+Current status: implemented in `deathmatch-arsenal`, based on `a6bec2c`. This supersedes the
+machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
+
+| Control | Current behavior |
+| --- | --- |
+| Hold Space | Water cannon: 28 m range, 60 m/s packets at 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
+| Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; unchanged 2 m crest, 10 m/s propagation, 30 m range |
+| Press Q | Straight torpedo: three per life, 40 hull damage, 32 m/s, 160 m range, 0.25 s arming, 1.5 s reload; no homing |
+
+Water packets add 0.1 pressure per broadside hit, scaled down to 20% end-on. Pressure recovers
+at 0.22/s. Hits push and roll the hull; accumulated pressure of 1 latches a capsize, with
+cannon attribution under the existing five-second credit rule. The cannon never damages hulls.
+Torpedoes follow the water surface, stop at scenery, and break harmlessly on unarmed hull
+contact. Swept hull collision, spawn grace and projectile birth/life fences apply. Repeated
+nonzero grenade/torpedo requests, including rejected requests, are consumed once per life;
+rejection consumes neither ammo nor cooldown. Respawn restores hull, ammunition and cooldowns.
+Grenade waves remain dangerous to their thrower.
+
+The bottom control panel gains matching hull/heel and weapon instruments only in deathmatch.
+Opponent numbers show authority-confirmed damage dealt by the viewer, merge hits within 0.75 s,
+float for 1 s, and are fenced by target life and connection generation. No opponent health bar
+is drawn. Cannon contact uses a cyan hit marker and visible hull heel instead of damage numbers.
+Shared CPU/GPU boxes draw water packets, surface torpedoes, bubble trails and impact splashes.
+The procedural weapon sound is a water wash, with low splashes for torpedo launches/impacts.
+Hunting bots use the cannon nearby, torpedoes ahead, and grenades against trailing targets.
+
+Protocol **v7** repurposes the command's reserved byte for a torpedo request serial. Combat
+checkpoints include pressure, ammo, recent damage bursts and eight torpedoes; 40 short-lived
+water packets replace 64 bullets. Combat remains four pages per snapshot, now 3716 bytes;
+free/race omit combat. Rebuild native/browser peers together. See the
+[wire layout](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint).
+
+Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments.
+Next: human balance playtest, especially cannon recovery/roll strength, torpedo evasion and
+rear-grenade timing; browser/Windows/Linux qualification and public deployment remain pending.
+No user acceptance or public deployment is implied by local verification.
+
+Verification (macOS/Apple Silicon, Debug, 2026-10-27): deterministic combat checks cover gradual
+cannon heel/capsize/recovery, torpedo ammo/arming/serial wrap, rearward fuses, swept collisions,
+actual damage/overkill, life fences, respawn, attribution and checkpoint/page round trips.
+The warning-clean Debug build and all **230 enabled CTests** pass (13 retired wake cases
+remain disabled), including four predicted clients with late joins, loss/duplication/reordering
+and complete combat-page recovery. The final full run used local socket access outside the
+restricted sandbox. GPU-context CTests remain off.
+
+Inspected [GPU HUD/damage feedback](evidence/deathmatch-arsenal/gpu-hud.png),
+[CPU weapon scene](evidence/deathmatch-arsenal/cpu-weapons.png), and a CPU river frame at 3 s.
+An eight-second native GPU fixture demo completed and the audio device initialized/closed
+successfully; this is an agent-run demo, not a human listening or balance acceptance check.
+Browser, Windows/Linux, coordinated deployment and human play are unverified for this revision.
+
+## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 
 Every deathmatch life has 100 hull health, no regeneration, a cool bow gun and a ready grenade.
 Free boating, race and offline simulation keep combat disabled. `boat_combat_default_rules()`
@@ -124,7 +167,7 @@ default in the multiplayer plan's product boundary. Decisions recorded with the 
 | --- | --- |
 | Round structure | Timed rounds (default 5 min), scoreboard intermission, then a new round |
 | Capsizing yourself | −1 point |
-| Current weapon milestone | Machine gun and wave grenade; older side-ram/surge/mine/arena proposals deferred |
+| Current weapon milestone | Water cannon, rearward wave grenade, torpedoes and bottom instruments; see the arsenal milestone above |
 | Sequencing | Start now, in parallel with M4 manual acceptance |
 
 Free mode (current shared free boating) stays the default room mode and must remain unchanged
@@ -142,7 +185,7 @@ predict credit.
 - *Wake*: another emitter's records under the hull sum to at least 0.35 m of |height|, or that
   emitter has the largest share on the tick the boat becomes `BOAT_AIRBORNE`. A boat's own
   emitter never counts.
-- Gun hull defeats and grenade-wave capsizes extend the causes above; future mechanics are deferred.
+- Torpedo hull defeats, cannon capsizes and grenade-wave capsizes extend the causes above.
 
 **Credit.** When a boat first latches `BOAT_CAPSIZED` (the existing rule: 0.6 s inverted in
 water, `motion_step` in `src/boat.c`), the latest touch within a 5 s credit window scores +1

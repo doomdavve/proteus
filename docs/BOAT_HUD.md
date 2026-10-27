@@ -1,6 +1,15 @@
 # Marine boat instruments
 
-Status, 2026-10-26: the `controls-pedals-stability` branch implements pedal thrust, Shift
+Current deathmatch extension (2026-10-27): matching 54×44 side cases flank the central
+controls. Port shows hull health/segments and recoverable heel pressure; starboard shows
+Space/cannon heat (COOL when overheated), E/grenade readiness and Q/remaining torpedoes
+(amber while reloading or empty). These cases are drawn only in deathmatch, at scene
+resolution before integer scaling. Free/race retain the three central instruments.
+Implemented and [locally captured](evidence/deathmatch-arsenal/gpu-hud.png); human balance and other-platform review remain pending.
+The [deathmatch plan](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) owns arsenal verification
+and the next playtest. The controls record below describes its original branch handoff.
+
+Historical controls status, 2026-10-26: the `controls-pedals-stability` branch implements pedal thrust, Shift
 precision, automatic aerial stabilization, and safe reset, based on `2b55994`. It is isolated
 for later integration and has not been merged or user-played. The existing captured/held-wheel
 mouse steering and keyboard spring return remain. This supersedes the 2026-10-24 stepped/scroll
@@ -18,7 +27,7 @@ no numeric readouts or units:
   5% forward/reverse power; PRECISION appears above the instruments. Command travel is
   4 units/s (0.25 s neutral-to-full), retaining the separate engine spool. Scroll is
   unassigned. The seven instrument marks remain visual power references, not input detents.
-  R does nothing; Space fires the deathmatch gun and E throws a wave grenade; free/race play leaves Space unused. A one-second Backspace hold shows
+  R does nothing; Space operates the deathmatch water cannon, E drops a stern wave grenade, and Q launches a torpedo; free/race play leaves Space unused. A one-second Backspace hold shows
   HOLD: RESET and a progress bar; releasing early, help/menu, focus loss or replay cancels it.
   One hold triggers once until released. The Escape menu also offers RESET BOAT, RESTART RUN,
   RECOVER BOAT (solo `outer`: back to the last shelter) or REQUEST RESET. Rooms retain authority restrictions; inactive room controls neutralize.

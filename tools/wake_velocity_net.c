@@ -1,4 +1,5 @@
 #include "wake_velocity_net.h"
+#include "boat_hud.h"
 #include "boat_skin.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -77,11 +78,13 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
         if (!boat_net_client_service(&net->client, boat_net_clock(), (BoatInput) { 0 }, true)) {
             if (net->client.phase == BOAT_NET_CLIENT_REJECTED
                 && net->client.reject.reason == BOAT_NET_REJECT_CONTENT) {
-                fail(net, "Game data mismatch. Server: protocol %u, physics %u, hash %016" PRIx64
-                          "; client: protocol %d, physics %d, hash %016" PRIx64,
+                fail(net,
+                    "Game data mismatch. Server: protocol %u, physics %u, hash %016" PRIx64
+                    "; client: protocol %d, physics %d, hash %016" PRIx64,
                     (unsigned)net->client.reject.version,
-                    (unsigned)net->client.reject.physics_revision, net->client.reject.content_digest,
-                    BOAT_NET_VERSION, BOAT_PHYSICS_REVISION, boat_net_content_digest());
+                    (unsigned)net->client.reject.physics_revision,
+                    net->client.reject.content_digest, BOAT_NET_VERSION, BOAT_PHYSICS_REVISION,
+                    boat_net_content_digest());
             } else if (net->client.phase == BOAT_NET_CLIENT_REJECTED)
                 fail(net, "Rejected by %s: %s (server protocol %u, revision %u; this build %d, %d)",
                     endpoint, boat_net_client_failure(&net->client),
@@ -162,7 +165,7 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
     double now = boat_net_clock();
     if (!active || reset)
         net->weapons_blocked = true;
-    if (!IsKeyDown(KEY_SPACE) && !IsKeyDown(KEY_E) && active)
+    if (!IsKeyDown(KEY_SPACE) && !IsKeyDown(KEY_E) && !IsKeyDown(KEY_Q) && active)
         net->weapons_blocked = false;
     if (active && !net->weapons_blocked && c->accept.mode == BOAT_NET_MODE_DEATHMATCH) {
         input.gun = IsKeyDown(KEY_SPACE);
@@ -171,6 +174,9 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
                 ++net->grenade_request;
         }
         input.grenade = net->grenade_request;
+        if (IsKeyPressed(KEY_Q) && ++net->torpedo_request == 0)
+            ++net->torpedo_request;
+        input.torpedo = net->torpedo_request;
     }
     // Held boats (grid, countdown, parked) cannot reset; do not ask.
     const BoatFleetSlot *held = boat_net_client_own(c);
@@ -197,6 +203,7 @@ bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float
             net->own_life = own->life;
             net->weapons_blocked = true;
             net->grenade_request = 0;
+            net->torpedo_request = 0;
             net->respawned_at = now;
             boat_presentation_reset(&session->presentation);
         }
@@ -424,6 +431,8 @@ static const char *feed_text(const BoatNetFeedEntry *e)
     return TextFormat("%s DEFEATED %s  %s", e->attacker, e->victim,
         v->bailout                           ? "BAILOUT"
             : v->cause == BOAT_MATCH_GUN     ? "GUN"
+            : v->cause == BOAT_MATCH_CANNON  ? "CANNON"
+            : v->cause == BOAT_MATCH_TORPEDO ? "TORPEDO"
             : v->cause == BOAT_MATCH_GRENADE ? "GRENADE"
             : v->cause == BOAT_MATCH_WAKE    ? "WAKE"
                                              : "HIT");
@@ -743,22 +752,48 @@ void net_study_close(NetStudy *net)
     net->transport_open = false;
 }
 
-void net_study_combat_hud(const NetStudy *net, int width)
+void net_study_combat_hud(const NetStudy *net, int width, int height, const BoatViewState *view,
+    const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera)
 {
     const BoatNetClient *c = &net->client;
     if (c->accept.mode != BOAT_NET_MODE_DEATHMATCH)
         return;
     const BoatFleet *f = boat_net_client_view(c);
     const BoatCombatPlayer *p = &f->state.combat.players[c->slot];
-    float cooldown = (float)(p->next_grenade > f->state.tick ? p->next_grenade - f->state.tick : 0)
-        / BOAT_TICK_HZ;
-    DrawText(TextFormat("HULL %.0f", p->health), 5, 20, 10, p->health < 30 ? ORANGE : RAYWHITE);
-    DrawRectangle(5, 33, 72, 4, (Color) { 40, 50, 59, 255 });
-    DrawRectangle(5, 33, (int)(72 * p->heat), 4, p->overheated ? RED : ORANGE);
-    DrawText(p->overheated ? "GUN: RELEASE" : "SPACE: GUN", 5, 40, 10, RAYWHITE);
-    DrawText(cooldown > 0 ? TextFormat("E: %.1fs", cooldown) : "E: GRENADE", 5, 52, 10,
-        cooldown > 0 ? GRAY : YELLOW);
+    boat_hud_combat_draw(
+        (BoatHudCombat) { .hull = 100 * p->health / f->state.combat.rules.health,
+            .heat = p->heat,
+            .pressure = p->pressure,
+            .overheated = p->overheated,
+            .grenade_seconds
+            = (float)(p->next_grenade > f->state.tick ? p->next_grenade - f->state.tick : 0)
+                / BOAT_TICK_HZ,
+            .torpedo_seconds
+            = (float)(p->next_torpedo > f->state.tick ? p->next_torpedo - f->state.tick : 0)
+                / BOAT_TICK_HZ,
+            .torpedoes = p->ammo },
+        width, height);
+    // Confirmed damage only: prediction corrections cannot invent hit numbers.
     const BoatCombatPlayer *confirmed = &c->fleet.state.combat.players[c->slot];
-    if (confirmed->hit_tick && c->fleet.state.tick - confirmed->hit_tick < 18)
-        DrawText("+", width / 2 - 3, 70, 10, YELLOW);
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+        const BoatFleetSlot *target = &c->fleet.state.slots[i];
+        if (i == c->slot || !target->active || !confirmed->damage_tick[i]
+            || c->fleet.state.tick < confirmed->damage_tick[i]
+            || c->fleet.state.tick - confirmed->damage_tick[i] >= 120
+            || confirmed->damage_life[i] != target->life
+            || confirmed->damage_generation[i] != c->fleet.state.combat.players[i].generation)
+            continue;
+        Boat pose = shown(net, i);
+        float age = (float)(c->fleet.state.tick - confirmed->damage_tick[i]) / BOAT_TICK_HZ;
+        Vector2 screen;
+        if (boat_view_project(view, presentation, world, camera,
+                (Vector3) { -pose.position.x, pose.height + 2 + age, pose.position.y }, width,
+                height, &screen)) {
+            const char *text = TextFormat("%.0f", confirmed->damage[i]);
+            DrawText(text, (int)screen.x - MeasureText(text, 10) / 2, (int)screen.y, 10, YELLOW);
+        }
+    }
+    if (confirmed->hit_tick && c->fleet.state.tick >= confirmed->hit_tick
+        && c->fleet.state.tick - confirmed->hit_tick < 18)
+        DrawText("+", width / 2 - 3, 70, 10, (Color) { 164, 228, 239, 255 });
 }

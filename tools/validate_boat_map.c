@@ -242,7 +242,8 @@ static void run_start(Run *run, const BoatWorldResources *resources, Vector2 pos
 static void run_step(Run *run, uint64_t tick)
 {
     double now = boat_tick_seconds(tick + 1);
-    boat_step(&run->boat, &run->world, now, (BoatInput) { tick % 240 < 120 ? .3f : -.3f, 1, 0, 0 });
+    boat_step(&run->boat, &run->world, now,
+        (BoatInput) { .steering_rate = tick % 240 < 120 ? .3f : -.3f, .throttle_rate = 1 });
 }
 
 static uint64_t boat_digest(const Boat *boat)

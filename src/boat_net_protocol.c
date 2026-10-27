@@ -294,7 +294,7 @@ static void put_slot(Writer *w, const BoatFleetSlot *slot, const BoatWakeObjectE
     put8(w, rate_byte(input->used.throttle));
     put8(w, input->used.flags);
     put16(w, input->used.grenade);
-    put8(w, 0);
+    put8(w, input->used.torpedo);
     put32(w, slot->boat.landings);
     put_boat(w, &slot->boat);
     putf(w, e->start.x);
@@ -337,7 +337,7 @@ static void get_slot(Reader *r, uint64_t tick, BoatFleetSlot *slot, BoatWakeObje
     input->used.flags = get8(r);
     input->used.grenade = get16(r);
     expect(r, (input->used.flags & ~BOAT_NET_COMMAND_MASK) == 0);
-    reserved(r, 1);
+    input->used.torpedo = get8(r);
     slot->boat.landings = get32(r);
     get_boat(r, &slot->boat);
     slot->boat.motion_state = (BoatMotionState)(motion <= BOAT_CAPSIZED ? motion : 0);
@@ -455,7 +455,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
             put8(w, rate_byte(m->input.commands[i].throttle));
             put8(w, m->input.commands[i].flags);
             put16(w, m->input.commands[i].grenade);
-            put8(w, 0);
+            put8(w, m->input.commands[i].torpedo);
         }
         break;
     case BOAT_NET_SNAPSHOT: {
@@ -757,7 +757,7 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
             b->commands[i].flags = get8(r);
             b->commands[i].grenade = get16(r);
             expect(r, (b->commands[i].flags & ~BOAT_NET_COMMAND_MASK) == 0);
-            reserved(r, 1);
+            b->commands[i].torpedo = get8(r);
         }
         break;
     }
@@ -859,7 +859,7 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
             expect(r, self || e->attacker < BOAT_FLEET_SLOTS);
             expect(r,
                 self ? e->cause == BOAT_MATCH_CAUSE_NONE && !e->bailout
-                     : e->cause >= BOAT_MATCH_CONTACT && e->cause <= BOAT_MATCH_GRENADE);
+                     : e->cause >= BOAT_MATCH_CONTACT && e->cause <= BOAT_MATCH_TORPEDO);
         } else {
             expect(r, e->kind == BOAT_MATCH_ROUND_START || e->kind == BOAT_MATCH_ROUND_END);
             expect(r, e->victim == BOAT_MATCH_NOBODY && e->attacker == BOAT_MATCH_NOBODY);
@@ -1032,13 +1032,13 @@ BoatNetCommand boat_net_command(BoatInput input, uint8_t flags)
 {
     return (BoatNetCommand) { rate(input.steering_rate), rate(input.throttle_rate),
         (uint8_t)((flags & BOAT_NET_COMMAND_INACTIVE) | (input.gun ? BOAT_NET_COMMAND_GUN : 0)),
-        input.grenade };
+        input.grenade, input.torpedo };
 }
 
 BoatInput boat_net_command_input(BoatNetCommand command)
 {
     return (BoatInput) { command.steering / 127.0f, command.throttle / 127.0f,
-        (command.flags & BOAT_NET_COMMAND_GUN) != 0, command.grenade };
+        (command.flags & BOAT_NET_COMMAND_GUN) != 0, command.grenade, command.torpedo };
 }
 
 BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags)
@@ -1046,7 +1046,7 @@ BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags)
     // Zero steering springs the wheel back; throttle moves toward idle at the ordinary
     // adjustment rate, so the engine response decays. The boat stays physical.
     float throttle = boat->throttle / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP);
-    return boat_net_command((BoatInput) { 0, fmaxf(-1, fminf(1, -throttle)), 0, 0 }, flags);
+    return boat_net_command((BoatInput) { .throttle_rate = fmaxf(-1, fminf(1, -throttle)) }, flags);
 }
 
 typedef struct {

@@ -486,6 +486,7 @@ static void command(
     if (new_life) {
         next.flags &= (uint8_t)~BOAT_NET_COMMAND_GUN;
         next.grenade = 0;
+        next.torpedo = 0;
         c->command_life = own->life;
         c->command_count = 0;
         c->command_tick = 0;
@@ -493,15 +494,17 @@ static void command(
     if (isfinite(thrust_target) && !(next.flags & BOAT_NET_COMMAND_INACTIVE)) {
         const BoatFleetSlot *predicted = &boat_net_client_view(c)->state.slots[c->slot];
         float target_thrust = new_life ? 0 : thrust_target;
-        next.throttle = boat_net_command(
-            (BoatInput) { 0, boat_throttle_rate(predicted->boat.throttle, target_thrust), 0, 0 }, 0)
-                            .throttle;
+        next.throttle
+            = boat_net_command((BoatInput) { .throttle_rate
+                                   = boat_throttle_rate(predicted->boat.throttle, target_thrust) },
+                0)
+                  .throttle;
     }
     if (isfinite(steering_target) && !(next.flags & BOAT_NET_COMMAND_INACTIVE)) {
         const Boat *boat = &boat_net_client_view(c)->state.slots[c->slot].boat;
         next.steering = boat_net_command(
             (BoatInput) {
-                boat_steering_rate(boat->wheel, new_life ? 0 : steering_target), 0, 0, 0 },
+                .steering_rate = boat_steering_rate(boat->wheel, new_life ? 0 : steering_target) },
             0)
                             .steering;
     }

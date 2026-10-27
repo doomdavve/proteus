@@ -611,8 +611,8 @@ static int hold(void)
     while (race.phase != BOAT_RACE_RACING) {
         BoatInput inputs[BOAT_FLEET_SLOTS];
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
-            inputs[i] = (BoatInput) { 1, boat_throttle_rate(fleet.state.slots[i].boat.throttle, 1),
-                0, 0 };
+            inputs[i] = (BoatInput) { .steering_rate = 1,
+                .throttle_rate = boat_throttle_rate(fleet.state.slots[i].boat.throttle, 1) };
         CHECK(boat_fleet_step(&fleet, inputs));
         boat_race_observe(&race, &fleet, &out);
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {

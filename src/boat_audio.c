@@ -138,9 +138,9 @@ void boat_audio_render(BoatAudio *audio, BoatAudioInput input, float *samples, s
         float splash = audio->splash * (audio->splash_low - audio->splash_body);
         audio->splash *= .99994f;
         audio->weapon_low += .018f * (splash_noise - audio->weapon_low);
-        float weapon = .35f * audio->gun_pulse * splash_noise
+        float weapon = .22f * audio->gun_pulse * (splash_noise - audio->weapon_low)
             + 1.5f * audio->grenade_pulse * audio->weapon_low;
-        audio->gun_pulse *= .998f;
+        audio->gun_pulse *= .9998f;
         audio->grenade_pulse *= .99985f;
         float value = engine + water + .9f * slap + .5f * splash + weapon;
         // DC removal (~25 Hz), then soft limiting with ample stream headroom.

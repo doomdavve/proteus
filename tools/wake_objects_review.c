@@ -227,7 +227,7 @@ static int jumps(void)
         boat_wake_objects_advance(&world);
         float neutral
             = Clamp(-receiver.boat.throttle / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1);
-        boat_session_step(&receiver, (BoatInput) { 0, neutral, 0, 0 });
+        boat_session_step(&receiver, (BoatInput) { .throttle_rate = neutral });
         CHECK(isfinite(receiver.boat.height) && fabsf(receiver.boat.height) < 8);
     }
     CHECK(world.live == 0 && fabsf(receiver.boat.vertical_velocity) < .2f);
@@ -289,7 +289,8 @@ static int local_fleet(void)
             Boat *boat = &fleet[i].boat;
             bool airborne = boat->motion_state == BOAT_AIRBORNE;
             boat_session_step(&fleet[i],
-                (BoatInput) { tick < 180 ? 0 : (i % 2 ? -1 : 1) * .7f, tick < 240 ? 1 : 0, 0, 0 });
+                (BoatInput) { .steering_rate = tick < 180 ? 0 : (i % 2 ? -1 : 1) * .7f,
+                    .throttle_rate = tick < 240 ? 1 : 0 });
             flights += !airborne && boat->motion_state == BOAT_AIRBORNE;
             CHECK(isfinite(boat->height) && isfinite(boat->heading));
             BoatWakeStern stern
@@ -394,9 +395,9 @@ static int air_roll_control(void)
     BoatSession recover_held = recover;
     recover_held.boat.wheel = 1;
     for (unsigned tick = 0; tick < 240; ++tick) {
-        boat_session_step(&recover_held, (BoatInput) { 1, 0, 0, 0 });
-        boat_session_step(&right, (BoatInput) { 1, 0, 0, 0 });
-        boat_session_step(&left, (BoatInput) { -1, 0, 0, 0 });
+        boat_session_step(&recover_held, (BoatInput) { .steering_rate = 1 });
+        boat_session_step(&right, (BoatInput) { .steering_rate = 1 });
+        boat_session_step(&left, (BoatInput) { .steering_rate = -1 });
         boat_session_step(&recover, (BoatInput) { 0 });
     }
     CHECK(right.boat.motion_state == BOAT_AIRBORNE && left.boat.motion_state == BOAT_AIRBORNE);
@@ -642,7 +643,8 @@ static void runtime(bool graphics, bool visible)
             boat_wake_objects_advance(&w);
             float wheel = frame > 210 ? 1 : 0;
             boat_session_step(&boat,
-                (BoatInput) { Clamp((wheel - boat.boat.wheel) / BOAT_STEP, -1, 1), 1, 0, 0 });
+                (BoatInput) { .steering_rate = Clamp((wheel - boat.boat.wheel) / BOAT_STEP, -1, 1),
+                    .throttle_rate = 1 });
             track(&w, &boat);
             CHECK(isfinite(boat.boat.height) && fabsf(boat.boat.height) < 8);
             dry += boat_wake_stern(&boat.boat, &boat.world, boat_session_time(&boat)).wet == 0;

@@ -16,6 +16,11 @@ typedef struct {
     bool fixed_fov; // Disable the modest speed lens for a constant 55-degree vertical view.
 } BoatCamera;
 
+// Project a world point with the same camera as the scene. False behind the near plane.
+bool boat_view_project(const BoatViewState *view, const BoatPresentation *presentation,
+    const BoatWorld *world, BoatCamera settings, Vector3 point, int width, int height,
+    Vector2 *screen);
+
 // Other boats of a shared session, drawn as ordinary opaque hulls in every pass like the
 // player. VIEW supplies pose and skin (its time is ignored); PRESENTATION (may be NULL)
 // supplies spray, at most WATERFRONT_RIVAL_PARTICLES pieces, and cloth.

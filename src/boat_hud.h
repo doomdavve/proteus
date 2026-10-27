@@ -12,6 +12,14 @@ typedef struct {
     float reset_progress; // 0..1; zero hides the hold-to-reset prompt.
 } BoatHudTelemetry;
 
+typedef struct {
+    float hull, heat, pressure, grenade_seconds, torpedo_seconds;
+    unsigned torpedoes;
+    bool overheated;
+} BoatHudCombat;
+// Matching side instruments around the existing controls, deathmatch callers only.
+void boat_hud_combat_draw(BoatHudCombat combat, int width, int height);
+
 // Draw at scene resolution (320x200) in a render texture, then present with the scene
 // destination and nearest filtering. Composite over the scene before scaling so case
 // transparency blends correctly. Anchored to the bottom edge. No retained state.

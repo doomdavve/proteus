@@ -54,10 +54,10 @@ static void gun(void)
     assert(bullets() == 1);
     advance(119);
     assert(launches == 8);
+    advance(360);
+    assert(launches == 32 && f.state.combat.players[0].overheated);
     advance(120);
-    assert(launches == 16 && f.state.combat.players[0].overheated);
-    advance(120);
-    assert(launches == 16 && f.state.combat.players[0].heat == 1);
+    assert(launches == 32 && f.state.combat.players[0].heat == 1);
     inputs[0].gun = false;
     advance(253);
     assert(!f.state.combat.players[0].overheated);
@@ -73,7 +73,7 @@ static void gun(void)
     inputs[0].gun = true;
     advance(1);
     assert(f.state.combat.players[0].next_fire == 0);
-    puts("combat: grace, 8 Hz, two-second overheat, release cooling and bullet capacity");
+    puts("combat: grace, 8 Hz, four-second overheat, release cooling and bullet capacity");
 }
 static void grenades(void)
 {
@@ -83,11 +83,11 @@ static void grenades(void)
     advance(1);
     assert(f.state.combat.grenades[0].active);
     uint64_t cooldown = f.state.combat.players[0].next_grenade;
-    advance(179);
+    advance(119);
     assert(!f.state.combat.waves[0].active);
     advance(1);
     assert(f.state.combat.waves[0].active);
-    assert(f.state.combat.waves[0].centre.y == -24);
+    assert(f.state.combat.waves[0].centre.y == 7);
     // Duplicate requests stay consumed after cooldown and prediction save/restore.
     BoatFleetState saved;
     boat_fleet_save(&f, &saved);
@@ -129,12 +129,17 @@ static void target(void)
     boat_fleet_place(&f, 1, b);
     f.state.combat.players[1].life_start = 0;
 }
-static void shot(unsigned pool, unsigned owner, Vector2 start, Vector2 dir, float height)
+static void copy_boats(Boat before[4])
 {
-    f.state.combat.bullets[pool] = (BoatCombatObject) { .position = start,
+    for (unsigned i = 0; i < 4; ++i)
+        before[i] = f.state.slots[i].boat;
+}
+static void shot(unsigned pool, unsigned owner, Vector2 start, Vector2 dir)
+{
+    f.state.combat.torpedoes[pool] = (BoatCombatObject) { .position = start,
         .direction = dir,
-        .height = height,
-        .born = f.state.tick,
+        .height = .2f,
+        .born = f.state.tick - f.state.combat.rules.arming_ticks,
         .owner = owner,
         .life = f.state.slots[owner].life,
         .active = true };
@@ -143,45 +148,21 @@ static void hits(void)
 {
     target();
     Boat before[4];
-    for (unsigned i = 0; i < 4; ++i)
-        before[i] = f.state.slots[i].boat;
-    shot(0, 0, (Vector2) { 0, -7.7f }, (Vector2) { 0, -1 }, .65f);
+    copy_boats(before);
+    shot(0, 0, (Vector2) { 0, -8 }, (Vector2) { 0, -1 });
     boat_combat_hits(&f, before);
-    assert(f.state.combat.players[1].health == 92);
-    assert(!f.state.combat.bullets[0].active && f.state.combat.players[0].hit_serial == 1);
-    // A target crossing a stationary projectile's path is swept in relative motion.
-    target();
-    before[1] = f.state.slots[1].boat;
-    before[1].position.x = -4;
-    f.state.slots[1].boat.position.x = 4;
-    shot(0, 0, (Vector2) { 0, -10 }, (Vector2) { 0, -1 }, .65f);
+    assert(f.state.combat.players[1].health == 60);
+    assert(f.state.combat.players[0].damage[1] == 40);
+    assert(!f.state.combat.torpedoes[0].active && f.state.combat.players[0].hit_serial == 1);
+    // Damage feedback merges close hits and reports actual damage, including overkill.
+    shot(0, 0, (Vector2) { 0, -8 }, (Vector2) { 0, -1 });
     boat_combat_hits(&f, before);
-    assert(f.state.combat.players[1].health == 92);
-    target();
-    for (unsigned i = 0; i < 4; ++i)
-        before[i] = f.state.slots[i].boat;
-    // Water blocks a low shot before the hull; grazing scenery never hits through it.
-    shot(0, 0, (Vector2) { 0, -7.7f }, (Vector2) { 0, -1 }, -.1f);
-    boat_combat_hits(&f, before);
-    assert(f.state.combat.players[1].health == 100);
-    shot(0, 0, (Vector2) { 0, -7.7f }, (Vector2) { 0, -1 }, .65f);
-    f.state.combat.players[1].life_start = 301;
-    boat_combat_hits(&f, before);
-    assert(f.state.combat.players[1].health == 100);
-    f.state.combat.players[1].life_start = 300;
-    f.state.tick = 301;
-    boat_combat_hits(&f, before);
-    assert(f.state.combat.players[1].health == 100);
-    // Two bullets on the same tick score one defeat, lethal shooter wins.
-    target();
-    for (unsigned i = 0; i < 4; ++i)
-        before[i] = f.state.slots[i].boat;
-    f.state.combat.players[1].health = 8;
-    shot(0, 0, (Vector2) { 0, -7.7f }, (Vector2) { 0, -1 }, .65f);
-    shot(1, 2, (Vector2) { 0, -7.7f }, (Vector2) { 0, -1 }, .65f);
+    assert(f.state.combat.players[1].health == 20 && f.state.combat.players[0].damage[1] == 80);
+    shot(0, 0, (Vector2) { 0, -8 }, (Vector2) { 0, -1 });
+    shot(1, 2, (Vector2) { 0, -8 }, (Vector2) { 0, -1 });
     boat_combat_hits(&f, before);
     assert(f.state.combat.players[1].health == 0 && f.state.combat.players[1].killer == 0);
-    assert(f.state.slots[1].boat.motion_state == BOAT_CAPSIZED);
+    assert(f.state.combat.players[0].damage[1] == 100);
     BoatMatch m;
     BoatMatchRules r = boat_match_default_rules();
     BoatMatchOutput out;
@@ -191,7 +172,7 @@ static void hits(void)
     m.phase_end = 10000;
     boat_match_observe(&m, &f, &out);
     assert(m.rows[0].score == 1 && m.rows[1].capsized == 1 && out.count == 1
-        && out.events[0].cause == BOAT_MATCH_GUN);
+        && out.events[0].cause == BOAT_MATCH_TORPEDO);
     boat_match_observe(&m, &f, &out);
     assert(!out.count && m.rows[0].score == 1);
     f.state.tick += 360;
@@ -200,8 +181,159 @@ static void hits(void)
     Boat b;
     boat_reset(&b);
     boat_fleet_place(&f, 1, b);
-    assert(f.state.combat.players[1].health == 100 && !f.state.combat.players[1].heat);
-    puts("combat: moving sweeps, water occlusion, life fences, lethal tie, one defeat and respawn");
+    assert(f.state.combat.players[1].health == 100 && f.state.combat.players[1].ammo == 3);
+    // A target's replacement life resets its damage burst, even inside the merge interval.
+    b.position = (Vector2) { 0, -10 };
+    boat_fleet_place(&f, 1, b);
+    f.state.combat.rules.grace_ticks = 0;
+    copy_boats(before);
+    shot(0, 0, (Vector2) { 0, -8 }, (Vector2) { 0, -1 });
+    f.state.combat.torpedoes[0].born = f.state.tick;
+    f.state.combat.rules.arming_ticks = 0;
+    boat_combat_hits(&f, before);
+    assert(f.state.combat.players[0].damage[1] == 40);
+    assert(f.state.combat.players[0].damage_life[1] == f.state.slots[1].life);
+    // Moving hull sweeps, birth fences, spawn grace and unarmed contact.
+    target();
+    copy_boats(before);
+    before[1].position.x = -4;
+    f.state.slots[1].boat.position.x = 4;
+    shot(0, 0, (Vector2) { 0, -10 }, (Vector2) { 0, -1 });
+    boat_combat_hits(&f, before);
+    assert(f.state.combat.players[1].health == 60);
+    target();
+    copy_boats(before);
+    shot(0, 0, (Vector2) { 0, -8 }, (Vector2) { 0, -1 });
+    f.state.combat.players[1].life_start = 280;
+    boat_combat_hits(&f, before);
+    assert(f.state.combat.players[1].health == 100);
+    f.state.combat.players[1].life_start = 0;
+    f.state.combat.torpedoes[0].born = f.state.tick;
+    boat_combat_hits(&f, before);
+    assert(f.state.combat.players[1].health == 100 && !f.state.combat.torpedoes[0].active);
+    // Torpedoes stop at basin walls even during their arming interval.
+    target();
+    copy_boats(before);
+    shot(0, 0, (Vector2) { f.world.definition->half_extent.x - .01f, 0 }, (Vector2) { 1, 0 });
+    boat_combat_hits(&f, before);
+    assert(!f.state.combat.torpedoes[0].active);
+    puts(
+        "combat: armed torpedoes, swept hull/scenery, life fence, actual damage and single defeat");
+}
+static void cannon(void)
+{
+    target();
+    Boat old[4];
+    copy_boats(old);
+    f.state.combat.bullets[0] = (BoatCombatObject) { .active = true,
+        .position = { 0, -8 },
+        .direction = { 0, -1 },
+        .height = -.1f,
+        .born = f.state.tick,
+        .owner = 0 };
+    boat_combat_hits(&f, old);
+    assert(!f.state.combat.bullets[0].active && !f.state.combat.players[1].pressure);
+    target();
+    f.state.combat.rules.grace_ticks = 0;
+    Boat before[4];
+    copy_boats(before);
+    for (unsigned n = 0; n < 40; ++n) {
+        Boat *victim = &f.state.slots[1].boat;
+        f.state.combat.bullets[0]
+            = (BoatCombatObject) { .position = { victim->position.x - 1, victim->position.y },
+                  .direction = { 1, 0 },
+                  .height = victim->height + .65f,
+                  .born = f.state.tick,
+                  .owner = 0,
+                  .active = true };
+        boat_combat_hits(&f, before);
+        assert(f.state.combat.players[1].health == 100);
+        if (n == 0) {
+            assert(victim->motion_state != BOAT_CAPSIZED);
+            assert(f.state.combat.players[1].pressure > 0 && fabsf(victim->roll) > 0);
+            assert(f.state.combat.players[0].damage[1] == 0);
+        }
+        if (victim->motion_state == BOAT_CAPSIZED)
+            break;
+        // Virtual cadence: recovery between packets, with the hull held in the stream.
+        for (unsigned t = 0; t < 15; ++t) {
+            ++f.state.tick;
+            boat_combat_advance(&f, inputs);
+        }
+    }
+    assert(f.state.slots[1].boat.motion_state == BOAT_CAPSIZED);
+    BoatMatch m;
+    BoatMatchRules r = boat_match_default_rules();
+    r.grace_ticks = 0;
+    BoatMatchOutput out;
+    assert(boat_match_init(&m, &r));
+    m.phase = BOAT_MATCH_PLAYING;
+    m.phase_end = 10000;
+    boat_match_observe(&m, &f, &out);
+    assert(out.count == 1 && out.events[0].cause == BOAT_MATCH_CANNON && m.rows[0].score == 1);
+    // Production tick path: a stationary broadside target can be capsized within one tank.
+    target();
+    f.state.combat.rules.grace_ticks = 0;
+    f.state.slots[0].boat.heading = PI / 2;
+    f.state.slots[1].boat.position = (Vector2) { 10, 0 };
+    inputs[0].gun = true;
+    for (unsigned t = 0; t < 480 && f.state.slots[1].boat.motion_state != BOAT_CAPSIZED; ++t)
+        advance(1);
+    assert(f.state.slots[1].boat.motion_state == BOAT_CAPSIZED);
+    target();
+    f.state.combat.players[1].pressure = .7f;
+    advance(400);
+    assert(f.state.combat.players[1].pressure == 0);
+    puts("combat: progressive cannon heel, capsize credit, recovery, no hull damage");
+}
+static void torpedoes(void)
+{
+    setup();
+    inputs[0].torpedo = 1;
+    advance(300);
+    assert(f.state.combat.players[0].ammo == 3); // Grace-period request was consumed.
+    inputs[0].torpedo = 2;
+    f.state.combat.firing = false;
+    advance(1);
+    assert(f.state.combat.players[0].ammo == 3); // Intermission blocks launches.
+    setup();
+    f.state.combat.rules.grace_ticks = 0;
+    for (unsigned k = 0; k < BOAT_COMBAT_TORPEDOES; ++k)
+        f.state.combat.torpedoes[k] = (BoatCombatObject) {
+            .active = true, .born = 1, .height = .2f, .direction = { 0, -1 }
+        };
+    f.state.tick = f.state.wakes.tick = 1;
+    inputs[0].torpedo = 1;
+    advance(1);
+    assert(f.state.combat.players[0].ammo == 3 && !f.state.combat.players[0].next_torpedo);
+    boat_combat_clear(&f);
+    advance(1);
+    assert(f.state.combat.players[0].ammo == 3); // Pool rejection remains consumed.
+    setup();
+    f.state.combat.rules.grace_ticks = 0;
+    inputs[0].torpedo = 255;
+    advance(1);
+    assert(f.state.combat.players[0].ammo == 2 && f.state.combat.torpedoes[0].active);
+    advance(200);
+    assert(f.state.combat.players[0].ammo == 2); // A repeated request never relaunches.
+    inputs[0].torpedo = 1;
+    advance(1);
+    assert(f.state.combat.players[0].ammo == 1);
+    inputs[0].torpedo = 2;
+    advance(1); // Rejected during reload, stays consumed.
+    advance(200);
+    assert(f.state.combat.players[0].ammo == 1);
+    inputs[0].torpedo = 3;
+    advance(1);
+    assert(f.state.combat.players[0].ammo == 0);
+    advance(200);
+    inputs[0].torpedo = 4;
+    advance(1);
+    assert(f.state.combat.players[0].ammo == 0);
+    boat_fleet_leave(&f, 0);
+    for (unsigned i = 0; i < BOAT_COMBAT_TORPEDOES; ++i)
+        assert(!f.state.combat.torpedoes[i].active);
+    puts("combat: three torpedoes per life, serial wrap, cooldown, duplicate and departure");
 }
 static void attribution(void)
 {
@@ -226,24 +358,7 @@ static void attribution(void)
     f.state.slots[1].boat.motion_state = BOAT_CAPSIZED;
     boat_match_observe(&m, &f, &out);
     assert(out.count == 1 && out.events[0].cause == BOAT_MATCH_GRENADE && m.rows[0].score == 1);
-    // Simultaneous reciprocal lethal hits each receive one authority-owned kill.
-    target();
-    f.state.combat.players[0].health = f.state.combat.players[1].health = 8;
-    f.state.combat.rules.grace_ticks = 0;
-    Boat before[4];
-    for (unsigned i = 0; i < 4; ++i)
-        before[i] = f.state.slots[i].boat;
-    shot(0, 0, (Vector2) { 0, -7.7f }, (Vector2) { 0, -1 }, .65f);
-    shot(1, 1, (Vector2) { 0, -2.8f }, (Vector2) { 0, 1 }, .65f);
-    boat_combat_hits(&f, before);
-    assert(boat_match_init(&m, &r));
-    m.phase = BOAT_MATCH_PLAYING;
-    m.round = 1;
-    m.phase_end = 10000;
-    boat_match_observe(&m, &f, &out);
-    assert(out.count == 2 && m.rows[0].caused == 1 && m.rows[1].caused == 1);
-    assert(out.events[0].reason == BOAT_MATCH_DEFEAT_HULL);
-    puts("combat: grenade attribution and simultaneous reciprocal hull defeats");
+    puts("combat: grenade-wave attribution");
 }
 
 static void wave(void)
@@ -273,7 +388,7 @@ static void codec(void)
 {
     setup();
     f.state.combat.rules.grace_ticks = 0;
-    inputs[0] = (BoatInput) { .gun = true, .grenade = 1 };
+    inputs[0] = (BoatInput) { .gun = true, .grenade = 1, .torpedo = 1 };
     advance(200);
     uint8_t data[BOAT_NET_MAX_CHECKPOINT];
     BoatNetSlotInput records[4] = { 0 }, decoded[4];
@@ -325,7 +440,7 @@ static void benchmark(void)
         double cost[600], sum = 0;
         for (unsigned t = 0; t < 600; ++t) {
             if (mode) {
-                for (unsigned k = 0; k < 64; ++k)
+                for (unsigned k = 0; k < BOAT_COMBAT_BULLETS; ++k)
                     f.state.combat.bullets[k] = (BoatCombatObject) { .active = true,
                         .born = f.state.tick,
                         .height = 8,
@@ -348,7 +463,7 @@ static void benchmark(void)
         }
         qsort(cost, 600, sizeof(*cost), compare_cost);
         printf("combat cost (%s, four held boats): mean %.3f ms p95 %.3f ms p99 %.3f ms/tick\n",
-            mode ? "64 bullets + four waves" : "disabled", sum / 600, cost[569], cost[593]);
+            mode ? "40 packets + four waves" : "disabled", sum / 600, cost[569], cost[593]);
     }
 }
 
@@ -358,6 +473,8 @@ int main(void)
     gun();
     grenades();
     hits();
+    cannon();
+    torpedoes();
     attribution();
     wave();
     codec();

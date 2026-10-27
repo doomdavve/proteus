@@ -3,6 +3,7 @@
 #include "boat_audio.h"
 #include "boat_fleet.h"
 #include "boat_gpu.h"
+#include "boat_hud.h"
 #include "wake_velocity_net.h"
 #include <math.h>
 #include <stdio.h>
@@ -46,6 +47,9 @@ int main(int argc, char **argv)
     boat_reset(&b);
     b.position = (Vector2) { 0, 15 };
     boat_fleet_place(f, 0, b);
+    Boat rival = b;
+    rival.position = (Vector2) { 7, 0 };
+    boat_fleet_place(f, 1, rival);
     BoatGpu gpu = { 0 };
     Renderer3D cpu = { 0 };
     BoatCpuView cpu_view = { 0 };
@@ -82,6 +86,14 @@ int main(int argc, char **argv)
             .position = { -2, 8 - (float)fmod(time * 30, 25) },
             .height = .65f,
             .direction = { 0, -1 } };
+        c->torpedoes[0] = (BoatCombatObject) { .active = true,
+            .born = tick > 30 ? tick - 30 : 0,
+            .position = { 3, 3 },
+            .height = .2f,
+            .direction = { 0, -1 } };
+        c->players[0].damage[1] = 40;
+        c->players[0].damage_tick[1] = tick > 20 ? tick - 20 : 0;
+        c->players[0].damage_life[1] = f->state.slots[1].life;
         c->players[0].health = 68;
         c->players[0].heat = (float)fmod(time / 2, 1);
         c->players[0].next_grenade = tick + 360;
@@ -114,7 +126,8 @@ int main(int argc, char **argv)
         DrawTexturePro(gpu_enabled ? gpu.target.texture : texture,
             (Rectangle) { 0, 0, gpu_enabled ? -320 : 320, gpu_enabled ? -200 : 200 },
             (Rectangle) { 0, 0, 320, 200 }, (Vector2) { 0 }, 0, WHITE);
-        net_study_combat_hud(&net, 320);
+        boat_hud_draw((BoatHudTelemetry) { .speed_mps = 12, .thrust = .5f }, 320, 200);
+        net_study_combat_hud(&net, 320, 200, &view, &presentation, &world, camera);
         EndTextureMode();
         if (play) {
             boat_audio_update(&audio,

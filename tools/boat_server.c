@@ -63,7 +63,7 @@ static void usage(FILE *out)
         "--scripted: bots drive N ticks (default 7200, one minute at 120 Hz) as fast as\n"
         "possible, then print the fleet hash and per-tick cost; no socket.\n"
         "--mode deathmatch: timed rounds (--round-seconds 2-3600, default 300) scoring +1 for\n"
-        "defeating another boat by gun or capsize, -1 for self-capsize; defeats respawn after\n"
+        "defeating another boat by torpedo or capsize, -1 for self-capsize; defeats respawn after\n"
         "3 s.\n"
         "--mode race: river sprint rounds on the river location (the default for this mode):\n"
         "two or more players are gridded, held through a 3 s countdown and released together;\n"
@@ -94,7 +94,8 @@ static int compare_double(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
-static const char *const cause_names[] = { "self", "contact", "wake", "gun", "grenade" };
+static const char *const cause_names[]
+    = { "self", "contact", "wake", "gun", "grenade", "cannon", "torpedo" };
 
 static const char *slot_name(const BoatNetServer *server, unsigned slot)
 {
