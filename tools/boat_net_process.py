@@ -4,8 +4,8 @@ ENet/UDP on 127.0.0.1, ended by events rather than by elapsed time.
 
 A second server on the same port must fail with a clear message. A LAN search
 (boat_bot --discover --first, on a private discovery port) must find the room once. Two bots
-join with the room token, leave after a few snapshots, and a third with the wrong token must
-be refused. The room (--until-empty) closes once both have left. Checks exit codes, summaries
+join with the room token and leave after a few snapshots; before them, a bot with the wrong
+token must be refused. The room (--until-empty) closes once both have left. Checks exit codes, summaries
 and the message/datagram/MTU bounds.
 
 Session rules over the real transport (deathmatch, race, churn and timeouts, the river map)
@@ -66,15 +66,17 @@ def main():
             problems.append(f"LAN search: {search.returncode} {search.stdout}{search.stderr}")
         else:
             print(rooms[0])
-        bots = [subprocess.Popen([args.bot, "--connect", endpoint, "--token", "smoke",
-                    "--name", name, "--snapshots", str(SNAPSHOTS)],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                for name in ("smoke-a", "smoke-b")]
+        # The intruder goes first: --until-empty closes the room once every accepted player
+        # has left, and fast bots could otherwise leave before its Hello arrives.
         intruder = subprocess.run([args.bot, "--connect", endpoint, "--token", "wrong",
             "--expect-reject"], capture_output=True, text=True, timeout=DEADLINE)
         if intruder.returncode != 0 or "wrong room token" not in intruder.stdout:
             problems.append(f"wrong token: {intruder.returncode} {intruder.stdout}"
                 f"{intruder.stderr}")
+        bots = [subprocess.Popen([args.bot, "--connect", endpoint, "--token", "smoke",
+                    "--name", name, "--snapshots", str(SNAPSHOTS)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                for name in ("smoke-a", "smoke-b")]
         for bot in bots:
             out, err = bot.communicate(timeout=DEADLINE)
             print(out.strip())
