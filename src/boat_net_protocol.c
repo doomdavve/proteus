@@ -1095,6 +1095,9 @@ uint64_t boat_net_content_digest(void)
     uint8_t combat_bytes[BOAT_COMBAT_BYTES];
     boat_combat_encode(&combat, combat_bytes);
     digest_bytes(&d, combat_bytes, sizeof(combat_bytes));
+    digest_float(&d, BOAT_CANNON_LIFT);
+    digest_float(&d, BOAT_CANNON_GRAVITY);
+    digest_float(&d, BOAT_CANNON_RADIUS);
     digest_bytes(&d, "proteus-boat-net", 16);
     for (int id = 0; id < BOAT_LOCATION_COUNT; ++id) {
         const BoatWorldDefinition *definition = boat_location(id);

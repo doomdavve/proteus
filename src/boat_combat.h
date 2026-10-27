@@ -8,6 +8,12 @@
 #define BOAT_COMBAT_GRENADES 4
 #define BOAT_COMBAT_WAVES 4
 #define BOAT_COMBAT_PLAYERS 4
+#define BOAT_CANNON_LIFT 5.0f // Initial upward speed, m/s.
+#define BOAT_CANNON_GRAVITY 16.0f // Downward acceleration, m/s squared.
+#define BOAT_CANNON_RADIUS .275f // Half the visible water cube's side.
+
+// Vertical displacement from launch, shared with deterministic presentation fixtures.
+float boat_combat_cannon_rise(float age);
 
 typedef struct {
     float health, damage, bullet_speed, bullet_range;

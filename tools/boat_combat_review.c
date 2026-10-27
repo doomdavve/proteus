@@ -81,11 +81,18 @@ int main(int argc, char **argv)
             .position = { 7, -9 },
             .direction = { 0, -1 },
             .height = .6f };
-        c->bullets[0] = (BoatCombatObject) { .active = true,
-            .born = tick > 6 ? tick - 6 : 0,
-            .position = { -2, 8 - (float)fmod(time * 30, 25) },
-            .height = .65f,
-            .direction = { 0, -1 } };
+        // The production launch cadence and parabola, sampled without a hidden visual clock.
+        for (unsigned k = 0; k < 6; ++k) {
+            uint64_t age_ticks = tick % c->rules.fire_ticks + k * c->rules.fire_ticks;
+            float age = (float)age_ticks * BOAT_STEP;
+            float height = .65f + boat_combat_cannon_rise(age);
+            c->bullets[k]
+                = (BoatCombatObject) { .active = tick >= age_ticks && height > BOAT_CANNON_RADIUS,
+                      .born = tick >= age_ticks ? tick - age_ticks : 0,
+                      .position = { 0, 12.9f - c->rules.bullet_speed * age },
+                      .height = height,
+                      .direction = { 0, -1 } };
+        }
         c->torpedoes[0] = (BoatCombatObject) { .active = true,
             .born = tick > 30 ? tick - 30 : 0,
             .position = { 3, 3 },

@@ -286,6 +286,57 @@ static void cannon(void)
     assert(f.state.combat.players[1].pressure == 0);
     puts("combat: progressive cannon heel, capsize credit, recovery, no hull damage");
 }
+static void cannon_arc(void)
+{
+    setup();
+    f.state.combat.rules.grace_ticks = 0;
+    inputs[0].gun = true;
+    advance(1);
+    inputs[0].gun = false;
+    BoatCombatObject *b = &f.state.combat.bullets[0];
+    float speed = f.state.combat.rules.bullet_speed;
+    assert(fabsf(b->height - (.65f + boat_combat_cannon_rise(BOAT_STEP))) < 1e-5f);
+    advance(36);
+    float peak = b->height;
+    assert(b->active && peak > 1.4f && peak < 1.45f);
+    advance(15);
+    assert(b->active && b->height < peak);
+    assert(fabsf(b->height - (.65f + boat_combat_cannon_rise(52 * BOAT_STEP))) < 1e-5f);
+    assert(fabsf(b->position.y - (-2.1f - speed * 52 * BOAT_STEP)) < 1e-4f);
+    BoatFleetState saved;
+    boat_fleet_save(&f, &saved);
+    advance(60);
+    uint64_t hash = boat_fleet_hash(&f.state);
+    assert(!b->active && b->ended && b->height <= BOAT_CANNON_RADIUS + .02f);
+    assert(b->position.y > -24 && b->position.y < -20); // Water contact before the range limit.
+    boat_fleet_restore(&f, &saved);
+    advance(60);
+    assert(boat_fleet_hash(&f.state) == hash);
+    // A descending cube crosses the hull's top within one tick; an overhead cube misses.
+    target();
+    Boat before[4];
+    copy_boats(before);
+    f.state.combat.bullets[0] = (BoatCombatObject) { .active = true,
+        .position = { 0, -10 },
+        .direction = { 0, -1 },
+        .height = 1.59f,
+        .born = f.state.tick - 72,
+        .owner = 0 };
+    boat_combat_hits(&f, before);
+    assert(f.state.combat.players[1].pressure > 0);
+    target();
+    copy_boats(before);
+    f.state.combat.bullets[0] = (BoatCombatObject) { .active = true,
+        .position = { 0, -10 },
+        .direction = { 0, -1 },
+        .height = 1.8f,
+        .born = f.state.tick,
+        .owner = 0 };
+    boat_combat_hits(&f, before);
+    assert(f.state.combat.bullets[0].active && !f.state.combat.players[1].pressure);
+    puts("combat: cannon parabola, ascending/descending height sweeps, water landing and replay");
+}
+
 static void torpedoes(void)
 {
     setup();
@@ -474,6 +525,7 @@ int main(void)
     grenades();
     hits();
     cannon();
+    cannon_arc();
     torpedoes();
     attribution();
     wave();
