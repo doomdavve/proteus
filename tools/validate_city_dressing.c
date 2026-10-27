@@ -1,6 +1,7 @@
 #include "boat_test_maps.h"
 #include "waterfront_city.h"
 #include "waterfront_corner.h"
+#include "waterfront_outer.h"
 #include "waterfront_scene.h"
 
 #include <math.h>
@@ -119,6 +120,32 @@ static int owners(const WaterfrontScenery *river)
     CHECK(box_digest(&other) == box_digest(river));
     CHECK(waterfront_scenery_bind(&other, &test_harbor_map) && !other.river);
     CHECK(box_digest(&other) == other_digest);
+    // The outer map carries the river kit laid out as on the river and set on its ground: the
+    // same boxes, colours and plan positions; each vertex above the river's 3.5 m ground rises
+    // with the ground under it, and fittings below it stretch toward the water they still reach.
+    CHECK(waterfront_scenery_bind(&other, &waterfront_outer_map) && other.river && other.ground);
+    CHECK(other.count == river->count);
+    CHECK(waterfront_scenery_ground(river, 0, 0) == 3.5f);
+    size_t lifted = 0;
+    for (size_t i = 0; i < other.count; ++i) {
+        const WaterfrontCornerBox *a = &river->boxes[i], *b = &other.boxes[i];
+        CHECK(ColorIsEqual(a->color, b->color) && a->waterline == b->waterline);
+        bool moved = false;
+        for (int v = 0; v < 8; ++v) {
+            Vector3 p = a->vertices[v], q = b->vertices[v];
+            float ground = waterfront_outer_ground(q.x, q.z);
+            CHECK(p.x == q.x && p.z == q.z);
+            if (p.y <= 0)
+                CHECK(q.y == p.y);
+            else if (p.y >= 3.5f)
+                CHECK(fabsf(q.y - p.y - (ground - 3.5f)) < 1e-3f);
+            else
+                CHECK(fabsf(q.y - p.y * ground / 3.5f) < 1e-3f);
+            moved |= fabsf(q.y - p.y) > .05f;
+        }
+        lifted += moved;
+    }
+    CHECK(lifted > other.count / 2);
     CHECK(waterfront_scenery_bind(&other, NULL) && !other.count && !other.boxes);
     CHECK(box_digest(river) == UINT64_C(0xea3fae73bd61a0df));
     waterfront_scenery_destroy(&other);
