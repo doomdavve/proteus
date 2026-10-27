@@ -1,19 +1,137 @@
 # Boating game title screen and main-program plan
 
-Status: revised 2026-10-24. This document owns the title, menu, and promotion of the
-playable boating program. The playtest title slice is integrated into `wake_velocity`
-(see [playtest integration](#playtest-integration-2026-10-24)): a no-argument launch shows
-the prototype's logo and river backdrop with SINGLE PLAYER, MULTIPLAYER (join by address),
-SETTINGS (NAME, BOAT, STEERING, SOUNDTRACK; added 2026-10-24) and EXIT. The standalone visual prototype remains at
-`.worktrees/title-screen-demo`. The user and his son chose
-**Wake Velocity** after considering GBG/Gothenburg names. The current bowed logo is the
-one to keep for now; genuine modeled 3D is deferred. Next task: user playtest of the
-title, soundtrack selection and join flow with distributed binaries. The marine HUD branch
-was merged on 2026-10-24. A first [in-game Escape menu](#in-game-escape-menu-2026-10-25)
-(RESUME, STEERING, CONTROLS, BACK TO TITLE / LEAVE ROOM) was implemented 2026-10-25 and has its
-BACK TO TITLE path user-checked; rooms, STEERING and resume recapture await play. Location
-choice and smoothing/waves setup are now shared with the browser (2026-10-25); volume settings, title music and the live boat-and-gulls scene stay deferred. Boating music implementation and current
-verification are owned by the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+Status: revised 2026-10-27. This document owns the title, menu and promotion of
+**Wake Velocity**. The user selected the cyan workstation mock-up (B): straight outlined
+lettering, restrained coral depth, open corner brackets and a dusk river. The latest
+revision removes menu numbers and the indistinct center boat, and uses consistent
+geometric title letters.
+The redesign is implemented on `title-dusk-console`. Compact m5x7/m3x6 UI fonts remain
+in use; the earlier coarse title lettering was rejected. The geometric replacement and
+clean river capture are implemented; visual acceptance remains pending.
+The shared title retains single-player setup, public/LAN/address joining, hosting and saved
+settings. The main screen's only credit is **A PROTEUS GAME**; the build version is at lower
+left and the retained OSM map credit is in SETTINGS. Next: user review of the implemented
+title and distributed native/browser builds. Gameplay sunset is planned separately in
+[the sunset plan](SUNSET_PLAN.md); the title palette does not implement world lighting.
+Volume settings, title music and a live river backdrop remain deferred.
+Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## Cyan workstation redesign, 2026-10-27
+
+Native review capture (development build version shown):
+
+![Cyan workstation title over the dusk river](title/cyan-workstation.png)
+
+Completed: replace the bowed/bobbing logo with a title-owned, outlined bitmap wordmark;
+keep coral offset depth and a small centered A PROTEUS GAME. The main menu is compact,
+left of center over the water, with plain option labels, a cyan reverse-video selection, coral
+chevron, fine dividers, bracket corners and sparse registration marks. Text stays fixed
+when selection changes. Submenus retain their wider value/editing space with the same
+cyan selection and framing; hints have dedicated room above the footer. Rendering stays
+320×200, nearest-neighbour and integer-scaled, including browser BACK TO LAUNCHER.
+
+The scenery-only river capture is graded once when loaded, with a deeper blue sky,
+cooler water and a few authored occupied-window pixels anchored to its fixed facades.
+No generated mock-up art is shipped. Gameplay scenery, physics, replay and network
+content are unchanged. A live sunset requires the shared renderer work in the sunset plan.
+
+The lower-left version follows the web packager's Git convention:
+`git describe --tags --match 'v[0-9]*' --always --dirty`, resolved at CMake configure time.
+Reconfigure after changing revisions to refresh it. Source archives/release builds may
+supply `-DPROTEUS_VERSION=v0.0.19`; absent Git metadata and an override, it says `unknown`.
+The old PROTEUS 2026 footer is removed; SETTINGS retains MAP: OSM CONTRIBUTORS.
+
+## Geometric lettering and clean river, 2026-10-27
+
+User feedback: the first two custom alphabets still looked uneven compared with mock-up B;
+menu row numbers and the small center boat were unnecessary. Completed: replace the
+coarse alphabet with a separately generated native bitmap wordmark. All letters share a
+24 px cap height and 6 px stems/bars; diagonal strokes are drawn at final pixel resolution,
+with consistent spacing and no oversized I serifs. The one-pixel cyan edge, dark fill and
+two-pixel coral depth follow B. `tools/generate_title_wordmark.py` owns the geometric source;
+[asset notes and regeneration](../assets/title/README.md) document both graphics.
+
+The main menu now has only the four option labels and selection chevron; the number gutter
+is removed and the panel fits the shorter rows, including browser BACK TO LAUNCHER. A fresh
+scenery-only river render removes the player boat and its wake while preserving the bridge
+composition. `title_backdrop` uses the existing GPU renderer, a fixed camera/time and no
+player layer; gameplay rendering is untouched. Native/browser packaging includes the
+wordmark and native relocation workflows check its presence.
+
+Verification, 2026-10-27, Apple Silicon/macOS: Debug build and all 256 enabled CTests
+passed with GPU tests ON (62.50 s; 15 retired cases disabled). Native all-panel captures,
+row-center hit checks and 120 windowed title frames passed; captures were inspected.
+A temporary bitmap audit found twelve connected glyphs sharing the same top/baseline,
+6 px stems and 3/10 px letter/word gaps. Wordmark regeneration produced identical bytes.
+
+Emscripten MinSizeRel packaging, Chrome/SwiftShader title/settings persistence, repeated
+sessions and audio-context checks passed. A pointer check entered Settings/Multiplayer,
+returned and exited to the launcher. Native and 4× browser captures were compared with B.
+A local ad-hoc-signed macOS ZIP was extracted outside the checkout; its title capture
+loaded the new wordmark and clean river and was inspected. Chrome retained its existing
+ScriptProcessorNode/ReadPixels warnings. C formatting, Python syntax, changed local links
+and diff checks passed. Next: user visual review. Physical input/listening, Finder launch,
+Windows/Linux runtime and Firefox/Safari remain unverified for this revision; passing
+checks do not establish acceptance of the lettering.
+
+## Initial redesign verification (historical)
+
+Initial implementation verification, 2026-10-27 (before the font refinement below),
+Apple Silicon/macOS: Debug configure/build passed, with no
+project-source warnings (raylib's bundled stb_vorbis emits its existing pointer-comparison
+warning on the first build). Full CTest with `PROTEUS_GPU_TESTS=ON`: all 256 enabled tests
+passed (63.58 s); 15 retired wake-field/prototype cases disabled. A temporary, uncommitted review
+harness captured every panel and selected row, checked row-center hit bounds and the
+main error hint, and completed 120 windowed title frames. Native title, settings, join
+and error captures were inspected; the explicit river `--demo --frames 120` smoke run
+exited cleanly. Final title lettering was captured and inspected again.
+
+Emscripten MinSizeRel packaging passed. Chrome/SwiftShader's existing
+`tools/check_web_title.py` passed keyboard navigation, settings save/reload, two solo
+sessions and return to title, plus the audio-context assertions; captures were inspected.
+It reported ScriptProcessorNode deprecation and ReadPixels performance warnings, with
+no failing runtime/shader errors. Local documentation links, clang-format and diff checks
+passed. The initial sandboxed graphics attempt was stopped and rerun with desktop access.
+
+Limits: no physical keyboard/mouse play, listening acceptance, Windows/Linux run,
+Safari/Firefox or packaged-binary review. The temporary title harness was agent-run,
+not a human playtest. Mock-up B was user-selected; implementation acceptance remains
+pending. Next: user visual review and physical playback, then the sunset lighting-frame step.
+
+## First compact-font refinement, 2026-10-27 (lettering/layout superseded)
+
+User feedback: the generated B mock-up's title and font looked better than the first
+implementation. Completed: replace the narrow 5×7 title alphabet with a separately
+authored 7×9 bitmap wordmark using broad two-cell strokes, square counters, a cyan edge
+and coral depth. Menu labels, values, row numbers and A PROTEUS GAME now use Daniel
+Linssen's **m5x7**; hints and footer data use **m3x6**. Both fonts are credited in SETTINGS
+and in [the bundled font notes](../assets/fonts/README.md). Existing gameplay HUD and
+in-game Escape menu fonts remain outside this title-menu refinement.
+
+The supplied TTFs are retained as source assets. The first runtime-TTF experiment was
+superseded: raylib's ascent-to-descent sizing produced uneven 7×9 / 4×8 capitals at its
+nominal 16 px height. `tools/generate_menu_fonts.py` now bakes BMFont metrics/atlases at
+the author's intended 16 px em size using Pillow/FreeType. The shipped atlases have true
+5×7 / 3×6 capitals, integral advances and binary coverage; title-owned fonts load/unload
+with the title and draw 1:1 with point filtering. Width fitting and edit cursors use the
+same font metrics as drawing. Native/macOS/Windows and browser packaging include the
+fonts and attribution. No TTF rasterization happens at runtime.
+
+Verification, 2026-10-27, Apple Silicon/macOS: Debug build and all 256 enabled CTests
+passed with GPU tests ON (62.67 s; 15 retired cases disabled). The temporary native
+review captured every panel/selected row and completed 120 windowed title frames;
+font glyphs were checked for binary coverage, native capital size and integral advances.
+Captures were inspected at 1× and integer scale. Atlas regeneration with Pillow 13.0.0
+produced identical file hashes. A locally ad-hoc-signed macOS ZIP was extracted outside
+the checkout; its title capture loaded the packaged fonts and was inspected.
+
+Emscripten MinSizeRel packaging, Chrome/SwiftShader title/settings persistence, repeated
+solo sessions and audio-context checks passed. A separate pointer check entered Settings,
+returned, entered Multiplayer and returned to the launcher; captures were inspected.
+Chrome reported the existing ScriptProcessorNode deprecation and ReadPixels warnings.
+Changed local documentation links, Python syntax, C formatting and diff checks passed.
+Next: user visual review of this capture. Physical input/listening, Finder launch,
+Windows/Linux runtime and Firefox/Safari remain unverified for this refinement.
 
 ## Browser parity, 2026-10-25
 
@@ -44,67 +162,35 @@ belong to the authority. The one-second Backspace shortcut is device-free state 
 the interactive race trial, with cancellation and one-fire-per-hold semantics. R no longer
 resets. Current behavior, verification and next task: [controls handoff](CONTROLS_PEDALS_HANDOFF.md).
 
-## Identity
+## Identity and first screen
 
-**Wake Velocity** is the selected game title, per the user on 2026-10-23; his son likes
-it. Set the logo in a broad upward bow with individually tilted chunky letters, layered
-depth, a bevel-like top highlight, and restrained gloss. The user-supplied retro 3D
-"LEGEND" image is a shape reference, not a color target. Keep **A PROTEUS GAME** as the
-small demo-group credit. The user chose to retain the current worktree logo on
-2026-10-23. Further 3D modeling is optional later, not the current next task.
+**Wake Velocity** remains the user-selected name (2026-10-23). The 2026-10-27 cyan
+workstation direction above supersedes the original bowed cream/coral logo and bouncing
+`(*)` selection. Keep **A PROTEUS GAME** as the small demo-group credit.
 
-Earlier comparisons included **Watercraft** and GBG/Gothenburg names. Watercraft's
-“craft” ending, paired with block letters, may suggest Minecraft or building gameplay.
-**BUOY!** was superseded because
-[Buoy already has a Steam listing](https://store.steampowered.com/app/1687170/Buoy/).
+The backdrop is a scenery-only GPU river sample, just past Älvsborgsbron looking
+back from boat-local `(641.115, -842.196)` with a 32 m / 4 m camera and fixed 62° lens.
+Its explicit scene time is 73.350 s; it preserves the original sample's composition without
+the player layer. The title-only dusk grade preserves the 320×200 pixel grid. A later live title scene may show a slowly passing boat and gulls,
+driven by its own presentation clock without advancing a player's session or wakes.
 
-## First screen
-
-At 320×200 virtual resolution, use the game's river renderer as the visual source. The
-supplied bridge photo identifies the landmarks and composition to seek: Älvsborgsbron,
-the harbor crane, open water, and the far shore. The current prototype uses an actual
-GPU-rendered sample from just past the bridge, looking back at boat-local position
-`(641.115, -842.196)` with a 32 m / 4 m camera. It is a static backdrop while the menu
-and logo animate. After the name/layout review, try a live title scene with a boat passing
-slowly through the bay and a few gulls crossing the view. Drive this with a separate
-presentation clock so the menu does not alter a player's session, replay, or course.
-Keep the menu readable over the scene. The title floats above the bridge:
-warm cream faces, coral or yellow side faces, navy undersides, a few pixel highlights,
-and a dark offset shadow. Use the game's existing low-resolution, nearest-neighbour
-presentation. The blocky 3D silhouette borrows the *idea* of Minecraft's prominent
-title, while the lettering, colors, water setting, and movement are Proteus's own.
-
-```text
-          W A K E   V E L O C I T Y   <- bowed 3D logo
-             A PROTEUS GAME
-
-          (*) SINGLE PLAYER
-              MULTIPLAYER
-              SETTINGS
-              EXIT
-
-       game-rendered bridge / crane / river
-```
-
-The active row gets the `(*)` marker, a brighter face, and a gentle one-pixel bob.
-Keep row positions fixed when selection changes. A dark translucent panel or shaded
-water behind the list provides contrast at every point in the background loop. Prefer
-legibility and charm over extra particles or constant camera motion. A brief, light
-tracker phrase may play on the title; gameplay music starts or resumes on entering play.
+Earlier comparisons included Watercraft and GBG/Gothenburg names. BUOY! was superseded
+because [Buoy already has a Steam listing](https://store.steampowered.com/app/1687170/Buoy/).
+The original 2026-10-23 prototype and 2026-10-24 integration evidence below are history;
+they do not describe the current logo, footer or selected-row appearance.
 
 ## Menu behavior
 
-| Entry | First implementation | Later integration |
+| Entry | Current behavior | Later work |
 | --- | --- | --- |
 | Single Player | Opens River, Basin or Basin trial plus waves/smoothing setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
-| Multiplayer | Visible from day one. Until the network flow is ready, show a clear “Coming soon” message and return to selection. | Hand off to the multiplayer agent's Host/Join flow; do not invent a separate networking state machine in this menu. |
-| Settings | Music and effects volume, fullscreen on native, and a small controls page. Keep defaults and saved values clear. | Add display options only after checking native and browser support. |
+| Multiplayer | Public server selection, native LAN/host flow and manual address joining; browser WebRTC joining. | Broader platform/network qualification remains owned by the multiplayer plans. |
+| Settings | Name, boat, steering, soundtrack and smoothing, with retained map credit. | Volume and display controls remain deferred. |
 | Exit | Close the native program. | On the web, replace with “Back to launcher” if the page launcher remains; browser tabs cannot be closed reliably by game code. |
 
 Up/Down or W/S moves one row; Enter/Space activates; mouse hover/click also works.
-Escape goes back one menu level. In play, Escape should open a pause menu with Resume,
-Settings, Return to Title, and Exit on native (first slice below, 2026-10-25). This replaces the current immediate
-Escape-to-close behavior only for ordinary interactive play. Focus loss continues to
+Escape goes back one menu level. In ordinary interactive play, Escape opens the in-game
+menu (see the dated implementation below); explicit scripted modes retain their exit behavior. Focus loss continues to
 pause the simulation. Do not let the title, settings, or pause menu advance the player's
 120 Hz boat session or emit gameplay wakes. A later title-only scene may animate its own
 boat, gulls, and visual wake independently.
@@ -112,8 +198,8 @@ boat, gulls, and visual wake independently.
 Direct command-line modes (`--screenshot`, `--time`, `--frames`, `--demo`, `--replay`,
 `--course`, explicit location and review flags) enter the requested session directly.
 That keeps scripted visual checks, benchmarks, and developer workflows deterministic.
-Add a dedicated `--screen title --screenshot ...` capture path for title review rather
-than changing the meaning of existing screenshot commands. Browser startup may use the
+Use the existing `--title --screenshot FILE` capture path for title review. It needs a
+graphics context; gameplay CPU captures remain display-free. Browser startup may use the
 title immediately after the current page launcher; remove duplicate controls only after
 the native and web flows have been reviewed together.
 
@@ -149,7 +235,7 @@ help text changed but no new title capture was reviewed.
 Next task: user plays the Escape menu solo and in a room (mouse mode, Esc, STEERING, RESUME,
 leave), then decide whether SOUNDTRACK or other settings belong in it.
 
-## Playtest integration, 2026-10-24
+## Historical playtest integration, 2026-10-24
 
 Scope was cut to what multiplayer playtesting needs (user request, 2026-10-24): choose a
 nick, pick a livery where supported, and enter an address to join. Everything else in
@@ -207,11 +293,14 @@ package naming independently of promotion step 3 below. On 2026-10-25 the CMake 
 sources and developer commands were renamed from `boat_study` to `wake_velocity` as well. [Releases](RELEASES.md) owns verification and
 the next packaging checks. Main-program promotion remains deferred.
 
-## Promotion sequence and ownership
+## Historical promotion sequence and ownership
+
+This sequence records the original integration proposal. The dated results above supersede
+its prototype appearance and initial flow limitations; volume/live scenery remain deferred.
 
 1. **Title slice:** Put menu input, screen state, and rendering behind a small interface
-   used by `tools/wake_velocity.c`. Keep the 3D letter shapes and animation data owned by
-   the title module. Reuse the existing 320×200 render target and integer scaling.
+   used by `tools/wake_velocity.c`. Keep the letter shapes owned by the title module.
+   Reuse the existing 320×200 render target and integer scaling.
    Use the worktree prototype and its real river sample as the review baseline. Capture
    idle and selected frames and inspect them at native size and 3× scale.
 2. **Flow:** Add location and settings submenus, pause/return behavior, audio transitions,
@@ -236,8 +325,9 @@ time and has no effect on deterministic sessions or replay compatibility.
 - Logo and all four rows read clearly in a 320×200 capture; selected state is clear in
   still frames and motion, with no menu text hidden by water or window scaling.
 - A fresh normal launch reaches the title. Single Player reaches each location; returning
-  to title and starting again produces a fresh session. Multiplayer explains its status
-  until Host/Join is wired. Settings and native Exit perform their stated actions.
+  to title and starting again produces a fresh session. Multiplayer offers server selection
+  and joining, and reports connection failures. Settings and native Exit perform their
+  stated actions.
 - Existing explicit CLI screenshot/replay/course and benchmark paths produce their prior
   outcomes. Native and web input, audio, focus, and resize behavior receive manual checks.
 - Run Debug configure/build and CTest; inspect CPU and GPU title captures where supported;

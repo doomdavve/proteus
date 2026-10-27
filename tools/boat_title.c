@@ -6,6 +6,7 @@
 #include "boat_net_protocol.h"
 #include "boat_replay.h"
 #include "boat_skin.h"
+#include "boat_version.h"
 #include "frame_pacer.h"
 #include "raylib.h"
 #include <stdio.h>
@@ -123,7 +124,8 @@ static unsigned host_location(const BoatTitleSettings *s)
 }
 
 typedef struct {
-    Texture2D backdrop;
+    Texture2D backdrop, wordmark;
+    Font ui, small; // m5x7 labels/values; m3x6 hints/footer, baked at their native 16 px em.
     RenderTexture2D target;
     Panel panel; // The multiplayer or settings panel replaces the main rows.
     int selected;
@@ -198,46 +200,36 @@ static Color rgb(unsigned char r, unsigned char g, unsigned char b)
     return (Color) { r, g, b, 255 };
 }
 
-static void draw_bent_text(const char *label, int y, int size, Color face, Color edge, Color shadow)
+// The TTF em square is 16 px; visible capitals are seven/six pixels high. Draw the
+// native atlas 1:1 and align its capital top, rather than shrinking it to a nominal 7 px.
+static int text_width(Font font, const char *text)
 {
-    Font font = GetFontDefault();
-    size_t length = strlen(label);
-    float widths[32], total = 0;
-    for (size_t i = 0; i < length; ++i) {
-        char glyph[] = { label[i], '\0' };
-        widths[i] = label[i] == ' ' ? size * .34f : MeasureTextEx(font, glyph, size, 0).x;
-        total += widths[i] + (i + 1 < length ? 1 : 0);
-    }
-    float cursor = (WIDTH - total) * .5f;
-    for (size_t i = 0; i < length; ++i) {
-        char glyph[] = { label[i], '\0' };
-        float center = cursor + widths[i] * .5f;
-        float side = (center - WIDTH * .5f) / (total * .5f);
-        float top = y + 13 * side * side;
-        float turn = 12 * side;
-        Vector2 origin = { widths[i] * .5f, 0 };
-        for (int depth = 5; depth >= 1; --depth) {
-            Color layer = depth == 5 ? shadow : edge;
-            DrawTextPro(font, glyph, (Vector2) { center + depth, top + depth + 1 }, origin, turn,
-                size, 0, layer);
-        }
-        DrawTextPro(
-            font, glyph, (Vector2) { center + 1, top + 1 }, origin, turn, size, 0, rgb(48, 55, 66));
-        DrawTextPro(
-            font, glyph, (Vector2) { center, top - 1 }, origin, turn, size, 0, rgb(255, 252, 224));
-        DrawTextPro(font, glyph, (Vector2) { center, top }, origin, turn, size, 0, face);
-        cursor += widths[i] + 1;
-    }
+    return (int)roundf(MeasureTextEx(font, text, 16, 0).x);
 }
 
-static void draw_logo(double time)
+static void draw_text(Font font, const char *text, int x, int y, Color ink)
 {
-    int bob = (int)round(1.5 * sin(time * 2.1));
-    draw_bent_text(
-        "WAKE VELOCITY", 7 + bob, 30, rgb(255, 239, 177), rgb(234, 133, 92), rgb(22, 50, 76));
+    int top = font.glyphs[GetGlyphIndex(font, 'A')].offsetY;
+    DrawTextEx(font, text, (Vector2) { (float)x, (float)(y - top) }, 16, 0, ink);
+}
+
+// Native bitmap wordmark: common cap height, stroke width and optical spacing.
+static void draw_logo(const Title *t)
+{
+    DrawTexture(t->wordmark, (WIDTH - t->wordmark.width) / 2, 20, WHITE);
+    Font ui = t->ui;
     const char *credit = "A PROTEUS GAME";
-    DrawText(credit, (WIDTH - MeasureText(credit, 10)) / 2 + 1, 64, 10, rgb(25, 63, 79));
-    DrawText(credit, (WIDTH - MeasureText(credit, 10)) / 2, 63, 10, rgb(255, 248, 216));
+    int x = (WIDTH - text_width(ui, credit)) / 2;
+    draw_text(ui, credit, x, 50, rgb(174, 245, 238));
+    DrawLine(x - 37, 53, x - 5, 53, rgb(118, 203, 211));
+    DrawLine(WIDTH - x + 5, 53, WIDTH - x + 37, 53, rgb(118, 203, 211));
+}
+
+static void crosshair(int x, int y, Color ink)
+{
+    DrawLine(x - 4, y, x + 5, y, ink);
+    DrawLine(x, y - 4, x, y + 5, ink);
+    DrawPixel(x, y, rgb(188, 255, 243));
 }
 
 static int row_count(const Title *t)
@@ -251,7 +243,9 @@ static int row_count(const Title *t)
 
 static Rectangle row_bounds(const Title *t, int row)
 {
-    int top = 92 + (5 - row_count(t)) * ROW_HEIGHT / 2; // Centred on five rows' space.
+    if (t->panel == PANEL_MAIN)
+        return (Rectangle) { 70, (float)(123 + row * 14), 118, 13 };
+    int top = 86 + (5 - row_count(t)) * ROW_HEIGHT / 2; // Centred on five rows' space.
     return (Rectangle) { 45, (float)(top + row * ROW_HEIGHT), 230, ROW_HEIGHT - 2 };
 }
 
@@ -264,9 +258,9 @@ static void upper(char *out, size_t size, const char *text)
 }
 
 // The tail of a long value, so the cursor end stays visible.
-static const char *fit(const char *text, int width)
+static const char *fit(Font font, const char *text, int width)
 {
-    while (*text && MeasureText(text, 10) > width)
+    while (*text && text_width(font, text) > width)
         ++text;
     return text;
 }
@@ -419,31 +413,56 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
 {
     Rectangle first = row_bounds(t, 0), last = row_bounds(t, row_count(t) - 1);
     int top = (int)first.y - 5, height = (int)(last.y + last.height - first.y) + 10;
-    DrawRectangle(37, top, 246, height, rgb(13, 45, 67));
-    DrawRectangleLines(37, top, 246, height, rgb(140, 210, 199));
+    bool main = t->panel == PANEL_MAIN;
+    int left = main ? 66 : 37, width = main ? 126 : 246;
+    Color cyan = rgb(142, 224, 226), dim = rgb(61, 133, 157);
+    DrawRectangle(left, top, width, height, (Color) { 8, 32, 54, 228 });
+    // Fine rules with brighter open corner brackets.
+    DrawRectangleLines(left, top, width, height, dim);
+    for (int side = 0; side < 2; ++side)
+        for (int end = 0; end < 2; ++end) {
+            int x = left + side * (width - 1), y = top + end * (height - 1);
+            DrawRectangle(side ? x - 4 : x, y, 5, 1, cyan);
+            DrawRectangle(x, end ? y - 4 : y, 1, 5, cyan);
+        }
+    if (main) {
+        DrawLine(left - 6, top - 3, left - 6, top + height + 4, dim);
+        DrawLine(left - 9, top + height + 3, left + width + 9, top + height + 3, dim);
+        for (int y = top + 7; y < top + height; y += 7)
+            DrawLine(left - 7, y, left - 4, y, dim);
+        crosshair(left - 6, top - 3, cyan);
+        crosshair(left + width + 6, top + height + 3, cyan);
+    }
     for (int i = 0; i < row_count(t); ++i) {
         Rectangle row = row_bounds(t, i);
         bool active = i == t->selected;
+        int label_x = main ? 84 : 72;
+        if (main)
+            DrawLine(71, (int)row.y + 13, 187, (int)row.y + 13, dim);
         if (active) {
-            DrawRectangleRec(row, rgb(241, 184, 99));
-            DrawRectangleLinesEx(row, 1, rgb(255, 232, 168));
-            int tick = (int)round(sin(t->time * 4.0));
-            DrawText("(*)", 50, (int)row.y + 2 + tick, 10, rgb(33, 55, 66));
+            Rectangle highlight = row;
+            highlight.x = row.x;
+            highlight.width = row.x + row.width - highlight.x;
+            DrawRectangleRec(highlight, rgb(156, 241, 231));
+            int x = main ? 74 : 51, y = (int)row.y + 4;
+            for (int j = 0; j < 3; ++j)
+                DrawLine(x + j, y + j, x + j, y + 5 - j, rgb(231, 128, 105));
         }
-        Color ink = active ? rgb(29, 52, 68) : rgb(229, 241, 220);
+        Color ink = active ? rgb(11, 40, 62) : rgb(190, 242, 235);
         const char *label;
         char value[96];
         row_text(t, s, i, &label, value, sizeof(value));
-        DrawText(label, 72, (int)row.y + 2, 10, ink);
+        // The web's longer BACK TO LAUNCHER label also fits the compact main panel.
+        draw_text(t->ui, label, label_x, (int)row.y + 3, ink);
         if (value[0]) {
             int value_x = t->panel == PANEL_JOIN && i == ROW_ADDRESS ? 122
                 : t->panel == PANEL_SETTINGS && i == ROW_MUSIC       ? 154
                                                                      : 142;
-            const char *shown = fit(value, 268 - value_x);
-            DrawText(shown, value_x, (int)row.y + 2, 10, ink);
+            const char *shown = fit(t->ui, value, 268 - value_x);
+            draw_text(t->ui, shown, value_x, (int)row.y + 3, ink);
             bool typing = t->editing && active;
             if (typing && fmod(t->time, .8) < .5)
-                DrawRectangle(value_x + 1 + MeasureText(shown, 10), (int)row.y + 2, 5, 9, ink);
+                DrawRectangle(value_x + 1 + text_width(t->ui, shown), (int)row.y + 3, 3, 7, ink);
         }
     }
     const char *hint = status;
@@ -495,29 +514,37 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         }
     }
     if (hint) {
-        const char *shown = fit(hint, WIDTH - 12);
-        int x = (WIDTH - MeasureText(shown, 10)) / 2, y = top + height + 3;
-        DrawRectangle(x - 3, y - 1, MeasureText(shown, 10) + 6, 12, (Color) { 10, 38, 57, 200 });
-        DrawText(shown, x, y + 1, 10, status ? rgb(255, 236, 175) : rgb(255, 196, 150));
+        const char *shown = fit(t->small, hint, WIDTH - 12);
+        int x = (WIDTH - text_width(t->small, shown)) / 2;
+        int y = main ? top - 15 : top + height + 3;
+        DrawRectangle(
+            x - 3, y - 1, text_width(t->small, shown) + 6, 9, (Color) { 10, 38, 57, 200 });
+        draw_text(t->small, shown, x, y + 1, status ? rgb(255, 236, 175) : rgb(255, 196, 150));
     }
 }
 
-static void draw_footer_text(const char *label, int x)
+static void draw_footer_text(Font font, const char *label, int x)
 {
-    DrawText(label, x + 1, 191, 7, (Color) { 10, 45, 65, 130 });
-    DrawText(label, x, 190, 7, (Color) { 162, 197, 199, 190 });
+    draw_text(font, label, x + 1, 191, (Color) { 10, 45, 65, 130 });
+    draw_text(font, label, x, 190, rgb(162, 219, 217));
 }
 
 static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *status)
 {
     BeginTextureMode(t->target);
     DrawTexture(t->backdrop, 0, 0, WHITE);
-    DrawRectangle(0, 0, WIDTH, 88, (Color) { 9, 43, 70, 75 });
-    draw_logo(t->time);
+    draw_logo(t);
+    crosshair(22, 32, rgb(118, 203, 211));
+    crosshair(297, 32, rgb(118, 203, 211));
     draw_menu(t, s, status);
     const char *map_credit = "MAP: OSM CONTRIBUTORS";
-    draw_footer_text("PROTEUS  2026", 8);
-    draw_footer_text(map_credit, WIDTH - 9 - MeasureText(map_credit, 7));
+    draw_footer_text(t->small, PROTEUS_VERSION, 8);
+    if (t->panel == PANEL_SETTINGS) {
+        draw_footer_text(t->small, map_credit, WIDTH - 9 - text_width(t->small, map_credit));
+        const char *fonts = "FONTS: DANIEL LINSSEN";
+        draw_text(
+            t->small, fonts, (WIDTH - text_width(t->small, fonts)) / 2, 60, rgb(142, 224, 226));
+    }
     EndTextureMode();
 }
 
@@ -540,31 +567,83 @@ static void present(Title *t)
     EndDrawing();
 }
 
+static Font load_title_font(const char *asset)
+{
+    char path[4096];
+    if (!boat_asset_path(path, sizeof(path), asset))
+        return (Font) { 0 };
+    Font font = LoadFont(path);
+    // LoadFont falls back to raylib's default when a required bitmap asset is missing.
+    if (font.texture.id == GetFontDefault().texture.id)
+        return (Font) { 0 };
+    if (IsTextureValid(font.texture))
+        SetTextureFilter(font.texture, TEXTURE_FILTER_POINT);
+    return font;
+}
+
 static bool open_title(Title *t)
 {
     char path[4096];
     *t = (Title) { 0 };
     if (!boat_asset_path(path, sizeof(path), "title/river-backdrop.png"))
         return false;
-    t->backdrop = LoadTexture(path);
+    // Grade the captured river once at load, preserving its exact geometry and pixel grid.
+    // This is a title palette, not a gameplay time-of-day or world-lighting model.
+    Image image = LoadImage(path);
+    if (!IsImageValid(image))
+        return false;
+    ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    Color *pixels = image.data;
+    for (int y = 0; y < image.height; ++y)
+        for (int x = 0; x < image.width; ++x) {
+            Color *p = &pixels[y * image.width + x];
+            bool water = y >= 87;
+            p->r = (unsigned char)(p->r * (water ? .43f : .22f));
+            p->g = (unsigned char)(p->g * (water ? .73f : .37f));
+            p->b = (unsigned char)(p->b * (water ? .91f : .58f));
+        }
+    // A few occupied windows in this fixed 320x200 river composition, not a star field.
+    static const Vector2 windows[] = { { 1, 76 }, { 4, 79 }, { 8, 76 }, { 13, 82 }, { 17, 79 },
+        { 21, 76 }, { 28, 81 }, { 31, 78 }, { 35, 82 }, { 229, 82 }, { 238, 81 }, { 244, 80 },
+        { 248, 83 }, { 255, 81 }, { 263, 82 }, { 271, 80 }, { 278, 83 }, { 285, 81 }, { 292, 80 },
+        { 299, 82 }, { 306, 79 }, { 313, 82 } };
+    if (image.width == WIDTH && image.height == HEIGHT)
+        for (unsigned i = 0; i < sizeof(windows) / sizeof(windows[0]); ++i)
+            pixels[(int)windows[i].y * WIDTH + (int)windows[i].x]
+                = i % 3 ? rgb(205, 181, 119) : rgb(140, 165, 154);
+    t->backdrop = LoadTextureFromImage(image);
+    UnloadImage(image);
     t->target = LoadRenderTexture(WIDTH, HEIGHT);
-    if (!IsTextureValid(t->backdrop) || !IsRenderTextureValid(t->target)) {
+    if (!boat_asset_path(path, sizeof(path), "title/wake-velocity.png"))
+        return false;
+    t->wordmark = LoadTexture(path);
+    t->ui = load_title_font("fonts/m5x7.fnt");
+    t->small = load_title_font("fonts/m3x6.fnt");
+    if (!IsTextureValid(t->backdrop) || !IsTextureValid(t->wordmark)
+        || !IsRenderTextureValid(t->target) || !IsFontValid(t->ui) || !IsTextureValid(t->ui.texture)
+        || !IsFontValid(t->small) || !IsTextureValid(t->small.texture)) {
         fprintf(stderr, "Cannot load the title screen (%s).\n", path);
         return false;
     }
     SetTextureFilter(t->backdrop, TEXTURE_FILTER_POINT);
+    SetTextureFilter(t->wordmark, TEXTURE_FILTER_POINT);
     SetTextureFilter(t->target.texture, TEXTURE_FILTER_POINT);
-    SetTextureFilter(GetFontDefault().texture, TEXTURE_FILTER_POINT);
     return true;
 }
 
 static void close_title(Title *t)
 {
     stop_search(t);
+    if (t->ui.glyphs)
+        UnloadFont(t->ui);
+    if (t->small.glyphs)
+        UnloadFont(t->small);
     if (IsRenderTextureValid(t->target))
         UnloadRenderTexture(t->target);
     if (IsTextureValid(t->backdrop))
         UnloadTexture(t->backdrop);
+    if (IsTextureValid(t->wordmark))
+        UnloadTexture(t->wordmark);
 }
 
 static void begin_edit(Title *t, char *field)
