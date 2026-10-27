@@ -170,11 +170,13 @@ arc, reaching about 50 m on calm water. It sits on a low deck mounting foot; the
 leaving its narrow opening.
 Sustained cannon hits build recoverable heel pressure, strongest against a broadside, and can
 capsize a boat without hull damage. The cannon overheats after four seconds and cools on release.
-Grenades splash after 0.3 s, detonate after 1 s and recharge in 8 s; their physical wave can
-also capsize the thrower. Each life starts with 100 hull health and three 40-damage torpedoes;
+Grenades splash after 0.3 s, detonate after 1 s and recharge in 8 s. Their 4 m peak wave
+propagates at 10 m/s for 7 s, fading out at 70 m; it can also capsize the thrower. Each life starts with 100 hull health and three 40-damage torpedoes;
 torpedoes arm after 0.25 s and reload in 1.5 s. Bottom instruments show hull, heel pressure,
 cannon heat, grenade readiness and torpedo ammunition. Numbers above opponents show only your
-confirmed hull damage, never their health. Spawn protection blocks launches and direct hits for
+confirmed hull damage, never their health. A rearview mirror at the top of the screen shows
+pursuers, the stern grenade and its wave while you keep steering forward. Press **V** to toggle
+it in deathmatch; it starts hidden. Starboard appears on the mirror's right. Spawn protection blocks launches and direct hits for
 two seconds. Kills include hull destruction and capsizes; defeats respawn after three seconds.
 `boat_bot --hunt` uses all three weapons.
 [Rules and verification](docs/DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27).
@@ -450,7 +452,7 @@ from neutral to full in 0.25 seconds, with separately smoothed engine response. 
 unassigned. R does nothing. Hold Backspace for one second, with a visible progress bar, or
 choose the explicit reset/restart/request action in the Escape menu. A short tap does nothing;
 release, help/menu, loss of focus or replay cancels progress. Each hold triggers at most once.
-Space operates the water cannon in deathmatch, E drops a stern wave grenade, and Q launches a torpedo; Space is unassigned in free/race play; replay/menu controls retain their existing use.
+Space operates the water cannon in deathmatch, E drops a stern wave grenade, Q launches a torpedo, and V toggles the rearview mirror; Space is unassigned in free/race play; replay/menu controls retain their existing use.
 Press `M` to capture the mouse for steering, or launch with `--mouse-steering`. The pointer
 is hidden and horizontal movement accumulates wheel angle: move right/left to turn the wheel,
 then stop moving to hold that setting. About 300 mouse pixels moves the requested wheel from

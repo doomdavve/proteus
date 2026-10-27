@@ -15,7 +15,7 @@ The [HUD/control owner](BOAT_HUD.md) describes current behavior; the
 - Keyboard steering still springs back, mouse steering still holds its target, and air yaw
   remains. The wheel no longer commands an aerial roll or suppresses upright recovery.
   Existing wet assistance, inversion fade and physical capsize rules remain.
-- R is inactive; Space operates the deathmatch water cannon; E drops a stern wave grenade; Q launches a torpedo. Free/race play leaves Space unused. Reset is explicit in the menu or
+- R is inactive; Space operates the deathmatch water cannon; E drops a stern wave grenade; Q launches a torpedo; V toggles the rearview mirror (hidden by default). Free/race play leaves Space unused. Reset is explicit in the menu or
   requires a one-second Backspace hold with progress. Release/help/menu/focus loss/replay
   cancels progress; a fired hold stays latched until release. Replay keeps Space pause,
   with Escape > RESTART RUN to leave playback. Room reset restrictions remain authoritative.

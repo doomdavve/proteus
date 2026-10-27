@@ -5,6 +5,7 @@
 #include "boat_hud.h"
 #include "boat_music.h"
 #include "boat_profile.h"
+#include "boat_rearview.h"
 #include "boat_replay.h"
 #include "boat_reset_hold.h"
 #include "boat_session.h"
@@ -130,6 +131,7 @@ static void draw_help(bool course, bool mapped, bool voyage, bool deathmatch, bo
         deathmatch ? "Space: water | E: stern wave | Q: torpedo | Tab: scores"
             : race ? "Hold Tab: race standings"
                    : "",
+        deathmatch ? "V: toggle rearview mirror (starts hidden)" : "",
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
 #if defined(__EMSCRIPTEN__)
@@ -565,6 +567,7 @@ static int study(int argc, char **argv)
     Renderer3D renderer = { 0 };
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     BoatGpu gpu = { 0 };
+    BoatRearview mirror = { 0 };
     Texture2D texture = { 0 };
     RenderTexture2D frame_target = { 0 };
     bool window_ready = false, window_owned = false, mouse_captured = false;
@@ -934,6 +937,10 @@ static int study(int argc, char **argv)
             profiler_visible = !profiler_visible;
             next_snapshot_time = 0;
         }
+#ifdef PROTEUS_BOAT_NET
+        if (active && net && net_study_deathmatch(net) && IsKeyPressed(KEY_V))
+            mirror.enabled = !mirror.enabled;
+#endif
         if (active) {
             float dt = fminf(GetFrameTime(), 0.1f);
             int zoom = (IsKeyDown(KEY_MINUS) || IsKeyDown(KEY_KP_SUBTRACT))
@@ -1179,9 +1186,12 @@ static int study(int argc, char **argv)
             ghost_opacity = 1;
         }
         BoatRivals rivals = { 0 };
+        bool mirror_visible = false;
 #ifdef PROTEUS_BOAT_NET
-        if (net)
+        if (net) {
             net_study_rivals(net, live_view.time, &rivals);
+            mirror_visible = mirror.enabled && net_study_deathmatch(net) && net->own_visible;
+        }
 #endif
         if (course && !session.runs.playing && session.runs.ghost_visible
             && session.runs.opponent.complete) {
@@ -1214,6 +1224,12 @@ static int study(int argc, char **argv)
         }
         if (!gpu_enabled)
             UpdateTexture(texture, pixels);
+        if (mirror_visible
+            && !boat_rearview_update(
+                &mirror, gpu_enabled ? &gpu : NULL, view, view_presentation, view_world, &rivals)) {
+            result = 1;
+            break;
+        }
         metrics.snapshot_render_ms = (float)((boat_profile_time(true) - scene_started_at) * 1000.0);
         if (profiler_visible && current_frame_started_at >= next_snapshot_time) {
             snapshot = profiler_snapshot(&profiler, (float)live_view.time, size, destination);
@@ -1244,12 +1260,16 @@ static int study(int argc, char **argv)
             net_study_combat_hud(
                 net, WIDTH, HEIGHT, view, view_presentation, view_world, camera_settings);
 #endif
+        if (mirror_visible)
+            boat_rearview_draw(&mirror, WIDTH);
+        int hint_top = mirror_visible ? BOAT_REARVIEW_BOTTOM + 12 : 4;
         if (mouse_driving && !menu.open)
-            DrawText(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4, 4, 10,
-                (Color) { 218, 223, 202, 255 });
+            DrawText(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4, hint_top,
+                10, (Color) { 218, 223, 202, 255 });
 #if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
-            DrawText("MOUSE UNAVAILABLE / USE A/D", 4, 4, 10, (Color) { 218, 223, 202, 255 });
+            DrawText(
+                "MOUSE UNAVAILABLE / USE A/D", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #endif
         EndTextureMode();
         BeginDrawing();
@@ -1286,8 +1306,11 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_NET
             DrawText(net_study_status(net), 12, (int)destination.y + (HEIGHT - 48) * scale - 16, 12,
                 SKYBLUE);
-            int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, 12);
-            net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
+            int match_top
+                = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
+            int roster_top = mirror_visible ? match_top + 28 : 12;
+            int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, roster_top);
+            net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
             net_study_draw_race(net, GetScreenWidth(), GetScreenHeight(), feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
@@ -1368,6 +1391,7 @@ cleanup:
         if (mouse_captured)
             EnableCursor();
 #endif
+        boat_rearview_destroy(&mirror);
         if (frame_target.id)
             UnloadRenderTexture(frame_target);
         if (gpu_enabled)

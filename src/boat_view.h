@@ -14,6 +14,7 @@ typedef struct {
     float distance; // Horizontal distance behind the boat, 8..48 world units.
     float height; // Height above the water, 4..36 world units.
     bool fixed_fov; // Disable the modest speed lens for a constant 55-degree vertical view.
+    bool rear_view; // Stern-mounted, level aft view; independent of chase-camera smoothing.
 } BoatCamera;
 
 // Project a world point with the same camera as the scene. False behind the near plane.

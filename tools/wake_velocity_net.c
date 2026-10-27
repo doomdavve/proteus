@@ -507,7 +507,8 @@ static void draw_scoreboard(const BoatNetClient *c, int width, int height, doubl
     }
 }
 
-void net_study_draw_match(const NetStudy *net, int width, int height, int feed_top, bool scoreboard)
+void net_study_draw_match(
+    const NetStudy *net, int width, int height, int header_top, int feed_top, bool scoreboard)
 {
     if (!net_study_deathmatch(net))
         return;
@@ -522,7 +523,7 @@ void net_study_draw_match(const NetStudy *net, int width, int height, int feed_t
         : m->phase == BOAT_MATCH_INTERMISSION
         ? TextFormat("ROUND %u OVER / NEXT IN %s", (unsigned)m->round, clock_text(left))
         : "WARMUP / WAITING FOR ANOTHER PLAYER";
-    backed_text(top, (width - MeasureText(top, 20)) / 2, 12, 20,
+    backed_text(top, (width - MeasureText(top, 20)) / 2, header_top, 20,
         m->phase == BOAT_MATCH_PLAYING && left < 30 ? ORANGE : RAYWHITE);
     draw_feed(c, width - 12, feed_top, now);
     if (scoreboard || m->phase == BOAT_MATCH_INTERMISSION)

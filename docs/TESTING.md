@@ -558,7 +558,8 @@ changes; the preceding default switch has its own capture/desktop evidence.
 `boat_combat` verifies cannon ascent/apex/descent, water landing, three-dimensional descending
 hits/overhead misses and trajectory replay, the shared muzzle attachment on a pitched/rolled
 boat, 10 m/45 m capsize targets, progressive capsizes/recovery, torpedo ammo/arming/serial wrap,
-actual damage/overkill, rearward grenades, deterministic cadence, overheating/release cooling, grace,
+actual damage/overkill, rearward grenades with a 4 m peak/70 m range/seven-second lifetime
+and four-player ring reuse at recharge, deterministic cadence, overheating/release cooling, grace,
 numbered throws and replay, pool limits, fuses, relative moving-hull sweeps, water blocking,
 life fences, one lethal defeat, respawn, radial derivatives and physical self-waves. It also
 round-trips combat checkpoints and checks malformed pages and the 1100-byte ceiling.
@@ -572,15 +573,23 @@ production radial shader recipes against CPU height/gradient/vertical velocity.
 ./build/boat_combat_review --time 2.3 --screenshot build/combat-cpu.png
 ./build/boat_combat_review --gpu --play --screenshot build/combat-gpu.png
 ./build/boat_combat_review --gpu --close --time 1.025 --screenshot build/cannon-close.png
+./build/boat_combat_review --gpu --mirror --play --screenshot build/rearview.png
+./build/boat_combat_review --gpu --torpedo --time 1 --screenshot build/torpedo.png
 ./build/boat_server --scripted --mode deathmatch --boats 4 --ticks 7200
 ```
 
 `boat_fleet_render` also probes the actual transformed hull triangles beneath every corner
 of the cannon mounting foot on all skins and checks that the housing overlaps that foot.
-This guards against the skin mesh's normalization cancelling the hull pose scale.
+This guards against the skin mesh's normalization cancelling the hull pose scale. The same
+gate renders the aft camera at three headings, checks that only trailing boats appear, verifies
+starboard placement after mirroring and confirms read-only fleet state.
 
 The review fixture captures the shared scene at 320×200. CPU screenshots are display-free;
 GPU and `--play` require a desktop and include the production weapon HUD and procedural audio.
+`--mirror` adds a pursuing boat, rear grenade/wave and the production mirror (initially shown;
+V toggles it during `--play`, whereas the game defaults to hidden); it also requires
+a graphics context for HUD compositing when the scene renderer is CPU.
+`--torpedo` is a close presentation view that hides the HUD so the nose and tail are visible.
 For a display-free WebGL2 comparison of both production radial shader recipes:
 
 ```sh

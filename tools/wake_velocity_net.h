@@ -70,10 +70,10 @@ bool net_study_race(const NetStudy *net);
 void net_study_race_view(const NetStudy *net, BoatViewState *view);
 void net_study_combat_hud(const NetStudy *net, int width, int height, const BoatViewState *view,
     const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera);
-// Deathmatch HUD at window resolution: round clock and own score at the top centre, a kill feed
+// Deathmatch HUD at window resolution: round clock and own score at HEADER_TOP, a kill feed
 // below FEED_TOP at the right, and the scoreboard while SCOREBOARD is held or between rounds.
 void net_study_draw_match(
-    const NetStudy *net, int width, int height, int feed_top, bool scoreboard);
+    const NetStudy *net, int width, int height, int header_top, int feed_top, bool scoreboard);
 // Race HUD at window resolution: phase, clock, live position and next gate at the top centre,
 // a large countdown, finishes and retirements below FEED_TOP at the right, and the standings
 // while BOARD is held or during results.

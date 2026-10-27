@@ -9,6 +9,15 @@ Implemented and [locally captured](evidence/deathmatch-arsenal/gpu-hud.png); hum
 The [deathmatch plan](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) owns arsenal verification
 and the next playtest. The controls record below describes its original branch handoff.
 
+Deathmatch rearview mirror (2026-10-27): a 112×40 stern view sits at the scene's top centre
+inside matching metal trim. V toggles it during deathmatch play; it starts hidden each session
+and keeps its setting through respawns. It renders only while shown;
+free/race retain their existing view. It shows pursuers, stern grenades and their physical waves,
+with mirror-style left/right orientation. The round header/roster and mouse hint move clear of
+its frame. It uses the same 320×200 compositing and nearest integer scaling as these instruments.
+The [deathmatch plan](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) owns its verification
+and pending human review.
+
 Historical controls status, 2026-10-26: the `controls-pedals-stability` branch implements pedal thrust, Shift
 precision, automatic aerial stabilization, and safe reset, based on `2b55994`. It is isolated
 for later integration and has not been merged or user-played. The existing captured/held-wheel

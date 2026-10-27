@@ -43,6 +43,19 @@ static void box(Renderer3D *renderer, Vector3 position, Vector3 scale, Color col
 static View3D boat_camera(const Boat *boat, const BoatPresentation *presentation,
     const BoatWorldDefinition *definition, BoatCamera camera_settings)
 {
+    if (camera_settings.rear_view) {
+        Vector3 aft = { sinf(boat->heading), 0, cosf(boat->heading) };
+        Vector3 eye = { -boat->position.x + aft.x * 2.4f, boat->height + 2.4f,
+            boat->position.y + aft.z * 2.4f };
+        Vector3 target = Vector3Add(eye, Vector3Scale(aft, 40));
+        target.y = boat->height + .3f;
+        return (View3D) { .position = eye,
+            .target = target,
+            .up = { 0, 1, 0 },
+            .vertical_fov = 50 * DEG2RAD,
+            .near_plane = .15f,
+            .far_plane = fminf(200, definition->far_plane) };
+    }
     // A small, bounded lens change accompanies forward travel. Derive it from recorded
     // pose/velocity so seeking a replay gives the same view without hidden camera history.
     // Ground speed matches scenery passing the camera; reverse/docking retain the base lens.
@@ -323,6 +336,32 @@ static void cannon_visit(const Boat *boat, BoatCourseBoxDraw draw, void *context
     draw(context, part, (Color) { 91, 191, 215, 255 });
 }
 
+static void torpedo_visit(const BoatCombatObject *t, BoatCourseBoxDraw draw, void *context)
+{
+    // Overlapping cross-sections round off the body and nose without a needle-like tip.
+    static const struct {
+        float along;
+        Vector3 size;
+        Color color;
+    } parts[] = {
+        { -.05f, { .40f, .30f, 1.05f }, { 221, 166, 91, 255 } },
+        { -.05f, { .48f, .20f, 1.05f }, { 221, 166, 91, 255 } },
+        { .54f, { .36f, .24f, .24f }, { 239, 193, 122, 255 } },
+        { .69f, { .22f, .16f, .18f }, { 239, 193, 122, 255 } },
+        { -.65f, { .25f, .22f, .20f }, { 56, 78, 80, 255 } },
+        { -.73f, { .70f, .07f, .28f }, { 56, 78, 80, 255 } },
+        { -.73f, { .07f, .40f, .28f }, { 56, 78, 80, 255 } },
+    };
+    for (unsigned i = 0; i < sizeof(parts) / sizeof(parts[0]); ++i) {
+        Vector2 p = Vector2Add(t->position, Vector2Scale(t->direction, parts[i].along));
+        draw(context,
+            (Transform3D) { .position = { -p.x, t->height, p.y },
+                .rotation = { 0, -atan2f(t->direction.x, -t->direction.y), 0 },
+                .scale = parts[i].size },
+            parts[i].color);
+    }
+}
+
 // Cosmetic pieces use the same boxes, depth testing and integer-scaled target on CPU/GPU.
 static void combat_visit(
     const BoatViewState *view, const BoatWorld *world, BoatCourseBoxDraw draw, void *context)
@@ -361,11 +400,7 @@ static void combat_visit(
         if (!t->born || tick < t->born)
             continue;
         if (t->active) {
-            draw(context,
-                (Transform3D) { .position = { -t->position.x, t->height, t->position.y },
-                    .rotation = { 0, -atan2f(t->direction.x, -t->direction.y), 0 },
-                    .scale = { .4f, .25f, 1.6f } },
-                (Color) { 221, 166, 91, 255 });
+            torpedo_visit(t, draw, context);
             for (unsigned j = 1; j <= 8; ++j) {
                 Vector2 p
                     = Vector2Subtract(t->position, Vector2Scale(t->direction, (float)j * .65f));

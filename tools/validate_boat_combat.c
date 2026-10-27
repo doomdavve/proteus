@@ -96,6 +96,9 @@ static void grenades(void)
     boat_fleet_restore(&f, &saved);
     advance(1000);
     assert(boat_fleet_hash(&f.state) == hash && f.state.combat.players[0].next_grenade == cooldown);
+    // The stronger self-wave may flip the idle thrower. Recover only the hull here so
+    // this cooldown/serial test retains the original combat life and request history.
+    boat_reset(&f.state.slots[0].boat);
     inputs[0].grenade = 2;
     advance(1);
     assert(f.state.combat.players[0].next_grenade > cooldown);
@@ -119,6 +122,47 @@ static void grenades(void)
     puts(
         "combat: one numbered throw, fuse, pool reservations, replay, departure and round cleanup");
 }
+static void grenade_reach(void)
+{
+    setup();
+    f.state.combat.rules.grace_ticks = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        Boat boat;
+        boat_reset(&boat);
+        boat.position.x = (float)i * 15;
+        boat_fleet_place(&f, i, boat);
+        inputs[i].grenade = 1;
+    }
+    f.state.tick = f.state.wakes.tick = 1;
+    boat_combat_advance(&f, inputs);
+    f.state.tick = f.state.wakes.tick = 121;
+    boat_combat_advance(&f, inputs);
+    for (unsigned i = 0; i < 4; ++i) {
+        const BoatRadialWave *w = &f.state.combat.waves[i];
+        assert(w->active && w->height == 4 && w->range == 70);
+        double born = boat_tick_seconds(w->born);
+        assert(boat_water_radial_query(*w, w->centre, born).height == 4);
+        Vector2 far = { w->centre.x + 50, w->centre.y };
+        assert(boat_water_radial_query(*w, far, born + 5).height > .3f);
+        assert(!boat_water_radial_query(*w, far, born + 7).height);
+    }
+    // All four reserved rings remain live until immediately before the eight-second recharge.
+    f.state.tick = f.state.wakes.tick = 960;
+    boat_combat_advance(&f, inputs);
+    for (unsigned i = 0; i < 4; ++i)
+        assert(f.state.combat.waves[i].active);
+    f.state.tick = f.state.wakes.tick = 961;
+    for (unsigned i = 0; i < 4; ++i)
+        inputs[i].grenade = 2;
+    boat_combat_advance(&f, inputs);
+    for (unsigned i = 0; i < 4; ++i) {
+        assert(!f.state.combat.waves[i].active && f.state.combat.grenades[i].active);
+        assert(f.state.combat.players[i].next_grenade == 1921);
+    }
+    puts("combat: four-metre grenade crest, 50m reach after 5s, seven-second lifetime and "
+         "full-pool recharge");
+}
+
 static void target(void)
 {
     setup();
@@ -434,7 +478,11 @@ static void attribution(void)
 
 static void wave(void)
 {
-    BoatRadialWave w = { .active = true, .height = 2, .speed = 10, .range = 30 };
+    BoatCombatRules rules = boat_combat_default_rules();
+    BoatRadialWave w = { .active = true,
+        .height = rules.wave_height,
+        .speed = rules.wave_speed,
+        .range = rules.wave_range };
     Vector2 p = { 8.5f, 0 };
     double t = .8, dt = 1e-4;
     BoatStormSample a = boat_water_radial_query(w, p, t);
@@ -445,12 +493,14 @@ static void wave(void)
                    - boat_water_radial_query(w, p, t - dt).height)
         / (float)(2 * dt);
     assert(fabsf(a.gradient.x - dx) < .001f && fabsf(a.vertical_velocity - dy) < .002f);
-    assert(!boat_water_radial_query(w, (Vector2) { 30, 0 }, 3).height);
+    assert(!boat_water_radial_query(w, (Vector2) { 70, 0 }, 7).height);
     setup();
     f.state.combat.rules.grace_ticks = 0;
-    f.state.combat.waves[0] = (BoatRadialWave) {
-        .active = true, .centre = { 0, 5 }, .height = 2, .speed = 10, .range = 30
-    };
+    f.state.combat.waves[0] = (BoatRadialWave) { .active = true,
+        .centre = { 0, 5 },
+        .height = rules.wave_height,
+        .speed = rules.wave_speed,
+        .range = rules.wave_range };
     advance(120);
     assert(f.state.slots[0].boat.height > .3f || f.state.slots[0].boat.landings > 0);
     puts("combat: analytic radial derivatives, finite support and physical self-wave");
@@ -543,6 +593,7 @@ int main(void)
     assert(boat_world_resources_init(&resources, boat_location(BOAT_LOCATION_BASIN)));
     gun();
     grenades();
+    grenade_reach();
     hits();
     cannon();
     cannon_arc();
