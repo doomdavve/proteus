@@ -6,7 +6,9 @@
  * untouched. */
 #include "boat_fleet.h"
 #include "boat_gpu.h"
+#include "boat_rearview.h"
 #include "boat_test_world.h"
+#include "raymath.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -126,6 +128,53 @@ static int cannon_attachment(Formation *f)
     return 0;
 }
 
+static int rearview(Formation *f)
+{
+    enum { W = BOAT_REARVIEW_WIDTH, H = BOAT_REARVIEW_HEIGHT };
+    static Color baseline[W * H], front[W * H], behind[W * H];
+    Renderer3D renderer = { 0 };
+    BoatCpuView cpu = { 0 };
+    BoatWorld world = boat_fleet_world(&f->fleet);
+    uint64_t hash = boat_fleet_hash(&f->fleet.state);
+    BoatCamera rear = { .rear_view = true };
+    BoatPresentation presentation = { .camera_heading = 1.2f };
+    for (unsigned turn = 0; turn < 3; ++turn) {
+        float heading = (float)turn * 1.1f;
+        BoatViewState own = { .boat = { .heading = heading }, .time = 3 };
+        Vector2 forward = { sinf(heading), -cosf(heading) };
+        Vector2 starboard = { cosf(heading), sinf(heading) };
+        BoatRivals rivals = { .count = 1 };
+        rivals.boats[0].view = own;
+        rivals.boats[0].view.skin = BOAT_SKIN_DENMARK;
+        CHECK(boat_draw_scene(&renderer, &cpu, baseline, W, H, &own, &presentation, &world, rear,
+            NULL, NULL, NULL, 0));
+        rivals.boats[0].view.boat.position
+            = Vector2Add(Vector2Scale(forward, 16), Vector2Scale(starboard, 4));
+        CHECK(boat_draw_scene(&renderer, &cpu, front, W, H, &own, &presentation, &world, rear,
+            &rivals, NULL, NULL, 0));
+        CHECK(memcmp(baseline, front, sizeof(front)) == 0); // A boat ahead is outside the mirror.
+        rivals.boats[0].view.boat.position
+            = Vector2Add(Vector2Scale(forward, -16), Vector2Scale(starboard, 4));
+        CHECK(boat_draw_scene(&renderer, &cpu, behind, W, H, &own, &presentation, &world, rear,
+            &rivals, NULL, NULL, 0));
+        unsigned changed = 0, mirrored_x = 0;
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+                if (memcmp(&behind[y * W + x], &baseline[y * W + x], sizeof(Color))) {
+                    ++changed;
+                    mirrored_x += (unsigned)(W - 1 - x);
+                }
+        CHECK(changed > 8);
+        CHECK(mirrored_x > changed * W / 2); // Starboard pursuer appears on the mirrored right.
+        CHECK(boat_fleet_hash(&f->fleet.state) == hash);
+    }
+    boat_cpu_view_destroy(&cpu);
+    renderer3d_destroy(&renderer);
+    puts("rearview: aft boats visible, forward boats excluded, starboard orientation and read-only "
+         "state");
+    return 0;
+}
+
 static int check(void)
 {
     static Formation f, copy;
@@ -147,6 +196,7 @@ static int check(void)
         CHECK(changed[skip] > 40);
     }
     CHECK(cannon_attachment(&f) == 0);
+    CHECK(rearview(&f) == 0);
     boat_cpu_view_destroy(&cpu_view);
     renderer3d_destroy(&renderer);
     printf("fleet render: three rivals each drew %u/%u/%u pixels; repeat identical; fleet and "

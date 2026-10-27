@@ -268,7 +268,7 @@ static void player_wake(const BoatWater *water, Vector2 p, double time, float *h
 }
 
 // Compact smooth crest: q=1-((distance-radius)/2)^2, height=A*q^2.
-// The radius envelope and its time derivative both vanish at the 30 m limit.
+// The radius envelope and its time derivative both vanish at the configured range limit.
 BoatStormSample boat_water_radial_query(BoatRadialWave w, Vector2 position, double time)
 {
     BoatStormSample out = { 0 };

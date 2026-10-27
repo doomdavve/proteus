@@ -4,6 +4,7 @@
 #include "boat_fleet.h"
 #include "boat_gpu.h"
 #include "boat_hud.h"
+#include "boat_rearview.h"
 #include "wake_velocity_net.h"
 #include <math.h>
 #include <stdio.h>
@@ -12,7 +13,8 @@
 
 int main(int argc, char **argv)
 {
-    bool gpu_enabled = false, play = false, close = false;
+    bool gpu_enabled = false, play = false, close = false, mirror_enabled = false,
+         torpedo_view = false;
     const char *path = "build/combat.png";
     double at = 2.3;
     for (int i = 1; i < argc; ++i) {
@@ -22,6 +24,10 @@ int main(int argc, char **argv)
             play = true;
         else if (!strcmp(argv[i], "--close"))
             close = true;
+        else if (!strcmp(argv[i], "--mirror"))
+            mirror_enabled = true;
+        else if (!strcmp(argv[i], "--torpedo"))
+            torpedo_view = true;
         else if (!strcmp(argv[i], "--time") && i + 1 < argc)
             at = atof(argv[++i]);
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc)
@@ -29,7 +35,7 @@ int main(int argc, char **argv)
         else
             return 2;
     }
-    if (gpu_enabled || play) {
+    if (gpu_enabled || play || mirror_enabled) {
         if (!play)
             SetConfigFlags(FLAG_WINDOW_HIDDEN);
         InitWindow(960, 600, "Deathmatch weapons presentation fixture");
@@ -53,6 +59,7 @@ int main(int argc, char **argv)
     rival.position = (Vector2) { 7, 0 };
     boat_fleet_place(f, 1, rival);
     BoatGpu gpu = { 0 };
+    BoatRearview mirror = { .enabled = mirror_enabled };
     Renderer3D cpu = { 0 };
     BoatCpuView cpu_view = { 0 };
     if (gpu_enabled && !boat_gpu_init(&gpu, false))
@@ -62,22 +69,29 @@ int main(int argc, char **argv)
     if (play)
         boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
     RenderTexture2D target = { 0 };
-    if (gpu_enabled || play)
+    if (gpu_enabled || play || mirror_enabled)
         target = LoadRenderTexture(320, 200);
     Color pixels[320 * 200] = { 0 };
     Texture2D texture = { 0 };
-    if (gpu_enabled || play)
+    if (gpu_enabled || play || mirror_enabled)
         texture = LoadTextureFromImage(
             (Image) { pixels, 320, 200, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 });
-    for (unsigned frame = 0;
-        frame < (play ? 480u : 1u) && ((!gpu_enabled && !play) || !WindowShouldClose()); ++frame) {
+    for (unsigned frame = 0; frame < (play ? 480u : 1u)
+        && ((!gpu_enabled && !play && !mirror_enabled) || !WindowShouldClose());
+        ++frame) {
+        if (play && mirror_enabled && IsKeyPressed(KEY_V))
+            mirror.enabled = !mirror.enabled;
+        bool show_mirror = mirror_enabled && mirror.enabled;
         double time = play ? (double)frame / 60 : at;
         uint64_t tick = (uint64_t)llround(time * BOAT_TICK_HZ);
         f->state.tick = f->state.wakes.tick = tick;
         BoatCombat *c = &f->state.combat;
-        c->waves[0] = (BoatRadialWave) {
-            .active = true, .born = 180, .height = 2, .speed = 10, .range = 30, .centre = { 0, 0 }
-        };
+        c->waves[0] = (BoatRadialWave) { .active = true,
+            .born = 180,
+            .height = c->rules.wave_height,
+            .speed = c->rules.wave_speed,
+            .range = c->rules.wave_range,
+            .centre = { 0, 0 } };
         c->grenades[1] = (BoatCombatObject) { .active = tick >= 240 && tick < 420,
             .born = 240,
             .position = { 7, -9 },
@@ -101,6 +115,10 @@ int main(int argc, char **argv)
             .position = { 3, 3 },
             .height = .2f,
             .direction = { 0, -1 } };
+        if (torpedo_view) {
+            c->torpedoes[0].position = (Vector2) { 1, 25 };
+            c->torpedoes[0].direction = (Vector2) { .70710678f, .70710678f };
+        }
         c->players[0].damage[1] = 40;
         c->players[0].damage_tick[1] = tick > 20 ? tick - 20 : 0;
         c->players[0].damage_life[1] = f->state.slots[1].life;
@@ -115,15 +133,34 @@ int main(int argc, char **argv)
         rivals.boats[0].view.boat.position = (Vector2) { 7, 0 };
         if (time > 4)
             rivals.boats[0].view.boat.height -= fminf(4, (float)(time - 4) * 1.5f);
+        if (mirror_enabled) {
+            rivals.count = 2;
+            rivals.boats[1].view = (BoatViewState) { .boat = b, .time = time, .skin = 2 };
+            rivals.boats[1].view.boat.position = (Vector2) { 4 + sinf((float)time), 29 };
+            c->grenades[2] = (BoatCombatObject) { .active = tick >= 120 && tick < 240,
+                .born = 120,
+                .position = { 0, 22 },
+                .direction = { 0, 1 },
+                .height = .65f };
+            c->waves[1] = (BoatRadialWave) { .active = true,
+                .born = 240,
+                .height = c->rules.wave_height,
+                .speed = c->rules.wave_speed,
+                .range = c->rules.wave_range,
+                .centre = { 0, 22 } };
+        }
+
         BoatCamera camera = close ? (BoatCamera) { .distance = 10, .height = 7 }
                                   : (BoatCamera) { .distance = 26, .height = 20 };
+        if (torpedo_view)
+            camera = (BoatCamera) { .rear_view = true };
         if (gpu_enabled)
             boat_gpu_draw_scene(&gpu, &view, &presentation, &world, camera, &rivals, NULL, NULL, 0);
         else {
             if (!boat_draw_scene(&cpu, &cpu_view, pixels, 320, 200, &view, &presentation, &world,
                     camera, &rivals, NULL, NULL, 0))
                 return 1;
-            if (!play) {
+            if (!play && !mirror_enabled) {
                 Image image = { pixels, 320, 200, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
                 bool ok = ExportImage(image, path);
                 boat_cpu_view_destroy(&cpu_view);
@@ -133,12 +170,20 @@ int main(int argc, char **argv)
             }
             UpdateTexture(texture, pixels);
         }
+        if (show_mirror
+            && !boat_rearview_update(
+                &mirror, gpu_enabled ? &gpu : NULL, &view, &presentation, &world, &rivals))
+            return 1;
         BeginTextureMode(target);
         DrawTexturePro(gpu_enabled ? gpu.target.texture : texture,
             (Rectangle) { 0, 0, gpu_enabled ? -320 : 320, gpu_enabled ? -200 : 200 },
             (Rectangle) { 0, 0, 320, 200 }, (Vector2) { 0 }, 0, WHITE);
-        boat_hud_draw((BoatHudTelemetry) { .speed_mps = 12, .thrust = .5f }, 320, 200);
-        net_study_combat_hud(&net, 320, 200, &view, &presentation, &world, camera);
+        if (!torpedo_view) {
+            boat_hud_draw((BoatHudTelemetry) { .speed_mps = 12, .thrust = .5f }, 320, 200);
+            net_study_combat_hud(&net, 320, 200, &view, &presentation, &world, camera);
+            if (show_mirror)
+                boat_rearview_draw(&mirror, 320);
+        }
         EndTextureMode();
         if (play) {
             boat_audio_update(&audio,
@@ -158,6 +203,7 @@ int main(int argc, char **argv)
     UnloadImage(image);
     if (play)
         boat_audio_destroy(&audio);
+    boat_rearview_destroy(&mirror);
     UnloadTexture(texture);
     UnloadRenderTexture(target);
     if (gpu_enabled)

@@ -468,9 +468,10 @@ static int lifecycle(void)
     const Script scripts[] = {
         { basin, waves, { 0 }, BOAT_CAMERA_DEFAULT, 1, true },
         { river, gentle, { .player_wake_enabled = true }, BOAT_CAMERA_DEFAULT, 1, false },
-        { river, { .player_wake_enabled = true }, gentle, { 30, 22, true }, -1, false },
-        { &harbor, gentle, gentle, { 12, 6, false }, .5f, false },
-        { basin, { 0 }, waves, { 40, 30, true }, -.5f, true },
+        { river, { .player_wake_enabled = true }, gentle,
+            { .distance = 30, .height = 22, .fixed_fov = true }, -1, false },
+        { &harbor, gentle, gentle, { .distance = 12, .height = 6 }, .5f, false },
+        { basin, { 0 }, waves, { .distance = 40, .height = 30, .fixed_fov = true }, -.5f, true },
     };
     enum { SCRIPTS = sizeof(scripts) / sizeof(scripts[0]) };
     static Participant solo, slots[3];

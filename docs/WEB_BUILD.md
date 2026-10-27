@@ -122,7 +122,7 @@ and close only their own browser client.
 
 The isolated `controls-pedals-stability` branch replaces stepped/scroll thrust with held W/S
 (or Up/Down) forward/reverse pedals, neutral on release and Shift precision. R is inactive;
-Space operates the water cannon in deathmatch; E drops a stern wave grenade; Q launches a torpedo. Space stays unused in free/race play. Backspace is prevented from browser navigation while
+Space operates the water cannon in deathmatch; E drops a stern wave grenade; Q launches a torpedo; V toggles the rearview mirror (hidden by default). Space stays unused in free/race play. Backspace is prevented from browser navigation while
 the canvas is focused and resets only after a one-second active hold. Escape also offers an
 explicit reset/restart/request. Captured mouse wheel hold remains, with automatic aerial
 stabilization instead of steering rolls. [Current controls and integration evidence](CONTROLS_PEDALS_HANDOFF.md).

@@ -11,17 +11,35 @@ machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
 | Control | Current behavior |
 | --- | --- |
 | Hold Space | Water cannon: 70 m maximum travel, about 50 m calm-water reach; 94 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
-| Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; unchanged 2 m crest, 10 m/s propagation, 30 m range |
+| Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; 4 m peak crest, 10 m/s propagation, 70 m range, 7 s wave lifetime |
 | Press Q | Straight torpedo: three per life, 40 hull damage, 32 m/s, 160 m range, 0.25 s arming, 1.5 s reload; no homing |
 
 Water packets add 0.1 pressure per broadside hit, scaled down to 20% end-on. Pressure recovers
 at 0.22/s. Hits push and roll the hull; accumulated pressure of 1 latches a capsize, with
 cannon attribution under the existing five-second credit rule. The cannon never damages hulls.
-Torpedoes follow the water surface, stop at scenery, and break harmlessly on unarmed hull
+Torpedoes have a fuller amber body, a short stepped blunt nose and dark tail fins, drawn
+from shared boxes in CPU/GPU views. This shape is presentation-only. They follow the water
+surface, stop at scenery, and break harmlessly on unarmed hull
 contact. Swept hull collision, spawn grace and projectile birth/life fences apply. Repeated
 nonzero grenade/torpedo requests, including rejected requests, are consumed once per life;
 rejection consumes neither ammo nor cooldown. Respawn restores hull, ammunition and cooldowns.
 Grenade waves remain dangerous to their thrower.
+
+Deathmatch also has a toggleable 112×40 rearview mirror at the top centre, composited into
+the same integer-scaled scene. **V** shows/hides it during active play; it starts hidden in
+each session and keeps its setting through respawns. The key is inactive in menus/help and
+outside deathmatch. A level stern camera shows pursuers, the rear grenade and its
+wave while the main camera remains forward. The image is mirrored so a starboard pursuer
+appears on the right; its heading follows the hull directly rather than chase-camera smoothing.
+The round clock/score, roster and mouse hint move clear while it is shown and return to their
+original layout when hidden. Free/race have no mirror.
+
+The mirror samples virtual world time at up to 30 Hz, uses a 200 m far limit and nearest
+filtering, and never steps physics. GPU rendering reuses the live scene resources with a small
+separate target and restores the main targets, supersampling and statistics after the pass.
+CPU rendering owns a separate small renderer/cache/texture. Resources are allocated on first
+use and released with the game session. Hidden mirrors do not render or upload frames. The
+mirror itself does not change physics or protocol.
 
 The bottom control panel gains matching hull/heel and weapon instruments only in deathmatch.
 Opponent numbers show authority-confirmed damage dealt by the viewer, merge hits within 0.75 s,
@@ -57,13 +75,16 @@ water packets replace 64 bullets. Combat remains four pages per snapshot, now 37
 free/race omit combat. Rebuild native/browser peers together. See the
 [wire layout](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint).
 
-Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments;
+Completed: arsenal, authoritative state/prediction, input, bots, damage feedback, instruments
+and the deathmatch rearview mirror;
 water-cannon cubes expand from a compact starboard housing and follow an extended ballistic
 arc (2026-10-27 user requests).
 User acceptance (2026-10-27): after the actual-hull attachment fix, the user reported
 “Looks much better! Water cannon feels great now.” The current water cannon appearance and
-feel are accepted. This feedback covers the cannon; wider arsenal balance remains open.
-Next: torpedo evasion and rear-grenade timing playtests, then platform/browser qualification;
+feel are accepted. The user subsequently accepted the stronger grenade (“Great, I like the
+grenade”). Mirror-toggle use and the latest torpedo nose remain pending user review.
+Next: human review of the mirror toggle and rounded torpedo nose, torpedo evasion/balance,
+then platform/browser qualification;
 Windows/Linux, browser requalification and public deployment remain pending.
 No user acceptance or public deployment is implied by local verification.
 
@@ -153,6 +174,53 @@ eight-second GPU demo. Previous attachment claims and captures above are superse
 geometry check. The user subsequently accepted the seated cannon's appearance and feel
 (see current acceptance above). Next: continue the wider arsenal balance playtests;
 browser/Windows/Linux qualification remains pending.
+
+Initial mirror verification, before the V toggle and stronger grenade (2026-10-27, macOS/Apple Silicon Debug): warning-clean build
+and all 230 enabled CTests pass (13 retired cases disabled; GPU-context CTests off).
+`boat_fleet_render` tests three headings: trailing boats change the rear image, forward boats
+are excluded, a starboard boat appears on the mirrored right, and fleet state remains unchanged.
+Inspected matching [CPU](evidence/deathmatch-arsenal/rearview-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/rearview-gpu.png) captures at 1.7 s, including a pursuer and
+rear grenade, plus the [detonated wave](evidence/deathmatch-arsenal/rearview-wave-gpu.png) at
+2.3 s. Completed the eight-second GPU mirror fixture demo. A windowed 1200-frame native river deathmatch hosted a hunting bot for 5 s; host and bot
+exited zero, with two accepted joins, no decode errors/resyncs and no server output faults.
+The bot's wake-birth diagnostic saw nine transient mismatches/eight repairs (maximum 34.6 ms)
+and quit with a wake digest still awaiting births; this smoke verifies presentation/lifecycle,
+not complete wake synchronization. The deterministic multiplayer checks above remain the
+synchronization evidence. Human mirror acceptance and browser/Windows/Linux qualification
+remain pending. The previously accepted cannon behavior is unchanged.
+
+Mirror toggle and stronger grenade (2026-10-27): V now toggles the mirror, hidden by default,
+with no mirror update cost while hidden. The fixture's explicit `--mirror` starts it shown and
+also accepts V during `--play`. Grenades now use a 4 m peak crest and 70 m range instead of
+2 m/30 m; propagation stays 10 m/s, extending the active wave from 3 s to 7 s. Fuse/recharge
+stay 1 s/8 s. The wave is physical and dangerous to its thrower. The expanded ring expires
+exactly as recharge finishes, so four simultaneous throws can all recharge without blocking
+the next four. These new rule values change the content fingerprint; rebuild host/clients
+together, with v7 byte layouts unchanged.
+
+Verification (macOS/Apple Silicon Debug): warning-clean build and all 230 enabled CTests
+pass (13 retired cases disabled; GPU-context CTests off). New combat checks cover the 4 m
+peak, a crest reaching 50 m after 5 s, seven-second expiration, and four-player ring reuse at
+recharge; derivative, physical self-wave, replay and impaired prediction checks pass. The
+legacy serial/cooldown test restores the idle hull after the stronger self-wave capsizes it,
+retaining its combat life/request history. Inspected stronger-wave
+[CPU](evidence/deathmatch-arsenal/strong-grenade-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/strong-grenade-gpu.png) captures at 3.5 s and completed the
+eight-second GPU mirror/combat demo. A 360-frame verbose native river host run started with
+the mirror hidden, allocated no 112×40 mirror target, and exited cleanly. The user subsequently accepted the stronger grenade. Human V-key/pursuit review and
+browser/Windows/Linux qualification remain pending. Next: try V during pursuit and review
+the rounded torpedo nose.
+
+Torpedo nose follow-up (2026-10-27, macOS/Apple Silicon Debug): replaced the long box silhouette
+with a fuller stepped body, a short blunt nose and dark tail fins; trajectory, hit envelopes,
+damage, ammunition and arming are unchanged. Added `boat_combat_review --torpedo` for a nearby
+three-quarter view without HUD occlusion. Warning-clean build and all 230 enabled CTests pass
+(13 retired cases disabled; GPU-context CTests off). Inspected
+[CPU](evidence/deathmatch-arsenal/torpedo-rounded-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/torpedo-rounded-gpu.png) close-ups at 1 s and completed the
+eight-second GPU torpedo fixture demo. User acceptance of the new nose and V-key behavior,
+plus browser/Windows/Linux qualification, remain pending; next is that visual/control review.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 
