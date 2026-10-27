@@ -2178,6 +2178,7 @@ livery (white, dark blue hull band, "Stena Line" and a green wave).
     keep the look and replace the name, so the hull now reads "VINGA LINE", a made-up line
     named after the adventure's goal. The colours (white, navy band, green stripes) stay
     close to the real ferries; the stripes are two plain slanted bars, not Stena's logo.
+    The user, seeing the captures: "VINGA LINE is excellent!"
   - No manual playback or user acceptance. The quay side (lines, bollards) was not captured;
     it faces the bank.
   - No ramp, terminal building or linkspan; the gap to the curved bank is open water too
