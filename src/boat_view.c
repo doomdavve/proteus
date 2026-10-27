@@ -298,6 +298,23 @@ static void storm_visit(
     }
 }
 
+// The body and inset opening share the physical muzzle attachment, including hull roll/pitch.
+static void cannon_visit(const Boat *boat, BoatCourseBoxDraw draw, void *context)
+{
+    Transform3D part = boat_pose_hull(boat);
+    part.position = boat_pose_attachment(
+        boat, (Vector3) { 0, BOAT_CANNON_MUZZLE_HEIGHT, -BOAT_CANNON_MUZZLE_FORWARD + .55f });
+    part.scale = (Vector3) { .85f, .65f, 1.0f };
+    draw(context, part, (Color) { 129, 159, 161, 255 });
+    part.position = boat_pose_attachment(
+        boat, (Vector3) { 0, BOAT_CANNON_MUZZLE_HEIGHT, -BOAT_CANNON_MUZZLE_FORWARD + .04f });
+    part.scale = (Vector3) { .65f, .52f, .04f };
+    draw(context, part, (Color) { 24, 50, 61, 255 });
+    part.position = boat_combat_cannon_muzzle(boat);
+    part.scale = (Vector3) { .55f, .42f, .03f };
+    draw(context, part, (Color) { 91, 191, 215, 255 });
+}
+
 // Cosmetic pieces use the same boxes, depth testing and integer-scaled target on CPU/GPU.
 static void combat_visit(
     const BoatViewState *view, const BoatWorld *world, BoatCourseBoxDraw draw, void *context)
@@ -539,6 +556,8 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     frame->player_water = world->water;
     WaterfrontPlayerState *p = &frame->player;
     boat_player_pose(view, &presentation->flag, p);
+    if (world->combat && world->combat->enabled)
+        cannon_visit(boat, basin_box, frame);
     if (world->definition->mapped)
         waterfront_boating_gulls(
             time, p->hull.position, (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, frame);
@@ -572,6 +591,9 @@ void boat_scene_rivals(
     const BoatRivals *rivals, const BoatWorld *world, double time, WaterfrontSceneFrame *frame)
 {
     frame->rival_count = pose_rivals(rivals, world, time, frame->rivals);
+    if (world->combat && world->combat->enabled)
+        for (unsigned i = 0; rivals && i < rivals->count && i < WATERFRONT_RIVALS; ++i)
+            cannon_visit(&rivals->boats[i].view.boat, basin_box, frame);
 }
 
 void boat_cpu_view_destroy(BoatCpuView *cpu)
@@ -694,6 +716,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     player = (WaterfrontPlayerState) { 0 };
     boat_player_pose(view, &presentation->flag, &player);
     draw_skinned_boat(renderer, &player);
+    if (world->combat && world->combat->enabled)
+        cannon_visit(&view->boat, environment_draw, renderer);
     for (int i = 0; i < other_count; ++i) {
         const WaterfrontRivalState *r = &others[i];
         player.hull = r->hull;
@@ -702,6 +726,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         player.skin = r->skin;
         player.flag = r->flag;
         draw_skinned_boat(renderer, &player);
+        if (world->combat && world->combat->enabled)
+            cannon_visit(&rivals->boats[i].view.boat, environment_draw, renderer);
     }
     if (ghost && opacity > 0) {
         boat_player_pose(ghost, ghost_flag, &player);

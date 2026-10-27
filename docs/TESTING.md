@@ -556,7 +556,8 @@ changes; the preceding default switch has its own capture/desktop evidence.
 ## Deathmatch weapons (protocol v7)
 
 `boat_combat` verifies cannon ascent/apex/descent, water landing, three-dimensional descending
-hits/overhead misses and trajectory replay, progressive capsizes/recovery, torpedo ammo/arming/serial wrap,
+hits/overhead misses and trajectory replay, the shared muzzle attachment on a pitched/rolled
+boat, 10 m/45 m capsize targets, progressive capsizes/recovery, torpedo ammo/arming/serial wrap,
 actual damage/overkill, rearward grenades, deterministic cadence, overheating/release cooling, grace,
 numbered throws and replay, pool limits, fuses, relative moving-hull sweeps, water blocking,
 life fences, one lethal defeat, respawn, radial derivatives and physical self-waves. It also

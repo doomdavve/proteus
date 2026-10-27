@@ -271,15 +271,17 @@ static void cannon(void)
     m.phase_end = 10000;
     boat_match_observe(&m, &f, &out);
     assert(out.count == 1 && out.events[0].cause == BOAT_MATCH_CANNON && m.rows[0].score == 1);
-    // Production tick path: a stationary broadside target can be capsized within one tank.
-    target();
-    f.state.combat.rules.grace_ticks = 0;
-    f.state.slots[0].boat.heading = PI / 2;
-    f.state.slots[1].boat.position = (Vector2) { 10, 0 };
-    inputs[0].gun = true;
-    for (unsigned t = 0; t < 480 && f.state.slots[1].boat.motion_state != BOAT_CAPSIZED; ++t)
-        advance(1);
-    assert(f.state.slots[1].boat.motion_state == BOAT_CAPSIZED);
+    // Production ticks: both nearby and distant broadside targets capsize within one tank.
+    for (unsigned distance = 10; distance <= 45; distance += 35) {
+        target();
+        f.state.combat.rules.grace_ticks = 0;
+        f.state.slots[0].boat.heading = PI / 2;
+        f.state.slots[1].boat.position = (Vector2) { (float)distance, 0 };
+        inputs[0].gun = true;
+        for (unsigned t = 0; t < 480 && f.state.slots[1].boat.motion_state != BOAT_CAPSIZED; ++t)
+            advance(1);
+        assert(f.state.slots[1].boat.motion_state == BOAT_CAPSIZED);
+    }
     target();
     f.state.combat.players[1].pressure = .7f;
     advance(400);
@@ -295,23 +297,40 @@ static void cannon_arc(void)
     inputs[0].gun = false;
     BoatCombatObject *b = &f.state.combat.bullets[0];
     float speed = f.state.combat.rules.bullet_speed;
-    assert(fabsf(b->height - (.65f + boat_combat_cannon_rise(BOAT_STEP))) < 1e-5f);
-    advance(36);
+    assert(fabsf(b->height - (BOAT_CANNON_MUZZLE_HEIGHT + boat_combat_cannon_rise(BOAT_STEP)))
+        < 1e-5f);
+    advance(21);
     float peak = b->height;
-    assert(b->active && peak > 1.4f && peak < 1.45f);
+    assert(b->active && peak > 1.5f && peak < 1.55f);
     advance(15);
     assert(b->active && b->height < peak);
-    assert(fabsf(b->height - (.65f + boat_combat_cannon_rise(52 * BOAT_STEP))) < 1e-5f);
-    assert(fabsf(b->position.y - (-2.1f - speed * 52 * BOAT_STEP)) < 1e-4f);
+    assert(fabsf(b->height - (BOAT_CANNON_MUZZLE_HEIGHT + boat_combat_cannon_rise(37 * BOAT_STEP)))
+        < 1e-5f);
+    assert(fabsf(b->position.y - (-BOAT_CANNON_MUZZLE_FORWARD - speed * 37 * BOAT_STEP)) < 1e-4f);
     BoatFleetState saved;
     boat_fleet_save(&f, &saved);
     advance(60);
     uint64_t hash = boat_fleet_hash(&f.state);
     assert(!b->active && b->ended && b->height <= BOAT_CANNON_RADIUS + .02f);
-    assert(b->position.y > -24 && b->position.y < -20); // Water contact before the range limit.
+    assert(b->position.y > -55 && b->position.y < -50); // Water contact before the range limit.
     boat_fleet_restore(&f, &saved);
     advance(60);
     assert(boat_fleet_hash(&f.state) == hash);
+    // A tilted moving boat launches from the same full-pose attachment used by the housing.
+    setup();
+    f.state.combat.rules.grace_ticks = 0;
+    Boat *boat = &f.state.slots[0].boat;
+    boat->position = (Vector2) { 4, 5 };
+    boat->heading = .7f;
+    boat->pitch = .15f;
+    boat->roll = -.2f;
+    boat->height = .3f;
+    Vector3 muzzle = boat_combat_cannon_muzzle(boat);
+    boat_combat_advance(&f, (BoatInput[4]) { { .gun = true } });
+    b = &f.state.combat.bullets[0];
+    assert(fabsf(b->position.x + muzzle.x) < 1e-6f);
+    assert(fabsf(b->position.y - muzzle.z) < 1e-6f && fabsf(b->height - muzzle.y) < 1e-6f);
+    assert(fabsf(b->height - (boat->height + BOAT_CANNON_MUZZLE_HEIGHT)) > .01f);
     // A descending cube crosses the hull's top within one tick; an overhead cube misses.
     target();
     Boat before[4];
