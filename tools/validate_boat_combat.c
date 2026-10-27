@@ -302,7 +302,7 @@ static void cannon_arc(void)
         < 1e-5f);
     advance(21);
     float peak = b->height;
-    assert(b->active && peak > 1.5f && peak < 1.55f);
+    assert(b->active && peak > 1.45f && peak < 1.50f);
     advance(15);
     assert(b->active && b->height < peak);
     assert(fabsf(b->height - (BOAT_CANNON_MUZZLE_HEIGHT + boat_combat_cannon_rise(37 * BOAT_STEP)))

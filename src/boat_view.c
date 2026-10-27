@@ -303,6 +303,11 @@ static void storm_visit(
 static void cannon_visit(const Boat *boat, BoatCourseBoxDraw draw, void *context)
 {
     Transform3D part = boat_pose_hull(boat);
+    // A low flange overlaps both the foredeck and the housing instead of leaving an air gap.
+    part.position = boat_pose_attachment(
+        boat, (Vector3) { BOAT_CANNON_MUZZLE_SIDE, 1.08f, -BOAT_CANNON_MUZZLE_FORWARD + .25f });
+    part.scale = (Vector3) { .40f, .10f, .50f };
+    draw(context, part, (Color) { 39, 56, 63, 255 });
     part.position = boat_pose_attachment(boat,
         (Vector3) { BOAT_CANNON_MUZZLE_SIDE, BOAT_CANNON_MUZZLE_HEIGHT,
             -BOAT_CANNON_MUZZLE_FORWARD + .25f });

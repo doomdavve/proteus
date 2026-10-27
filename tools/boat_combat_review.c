@@ -12,7 +12,7 @@
 
 int main(int argc, char **argv)
 {
-    bool gpu_enabled = false, play = false;
+    bool gpu_enabled = false, play = false, close = false;
     const char *path = "build/combat.png";
     double at = 2.3;
     for (int i = 1; i < argc; ++i) {
@@ -20,6 +20,8 @@ int main(int argc, char **argv)
             gpu_enabled = true;
         else if (!strcmp(argv[i], "--play"))
             play = true;
+        else if (!strcmp(argv[i], "--close"))
+            close = true;
         else if (!strcmp(argv[i], "--time") && i + 1 < argc)
             at = atof(argv[++i]);
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc)
@@ -113,7 +115,8 @@ int main(int argc, char **argv)
         rivals.boats[0].view.boat.position = (Vector2) { 7, 0 };
         if (time > 4)
             rivals.boats[0].view.boat.height -= fminf(4, (float)(time - 4) * 1.5f);
-        BoatCamera camera = { .distance = 26, .height = 20 };
+        BoatCamera camera = close ? (BoatCamera) { .distance = 10, .height = 7 }
+                                  : (BoatCamera) { .distance = 26, .height = 20 };
         if (gpu_enabled)
             boat_gpu_draw_scene(&gpu, &view, &presentation, &world, camera, &rivals, NULL, NULL, 0);
         else {

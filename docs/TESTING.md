@@ -571,6 +571,7 @@ production radial shader recipes against CPU height/gradient/vertical velocity.
 ./build/validate_boat_combat
 ./build/boat_combat_review --time 2.3 --screenshot build/combat-cpu.png
 ./build/boat_combat_review --gpu --play --screenshot build/combat-gpu.png
+./build/boat_combat_review --gpu --close --time 1.025 --screenshot build/cannon-close.png
 ./build/boat_server --scripted --mode deathmatch --boats 4 --ticks 7200
 ```
 
