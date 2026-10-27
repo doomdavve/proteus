@@ -1,5 +1,6 @@
 #include "boat_combat.h"
 #include "boat_fleet.h"
+#include "boat_pose.h"
 #include "raymath.h"
 #include "waterfront_harbor.h"
 #include "waterfront_traffic.h"
@@ -12,8 +13,8 @@ BoatCombatRules boat_combat_default_rules(void)
 {
     return (BoatCombatRules) { .health = 100,
         .damage = 0,
-        .bullet_speed = 28,
-        .bullet_range = 28,
+        .bullet_speed = 84,
+        .bullet_range = 70,
         .grenade_distance = 7,
         .wave_height = 2,
         .wave_speed = 10,
@@ -38,6 +39,12 @@ BoatCombatRules boat_combat_default_rules(void)
 float boat_combat_cannon_rise(float age)
 {
     return BOAT_CANNON_LIFT * age - .5f * BOAT_CANNON_GRAVITY * age * age;
+}
+
+Vector3 boat_combat_cannon_muzzle(const Boat *boat)
+{
+    return boat_pose_attachment(
+        boat, (Vector3) { 0, BOAT_CANNON_MUZZLE_HEIGHT, -BOAT_CANNON_MUZZLE_FORWARD });
 }
 
 void boat_combat_bind(BoatFleet *f)
@@ -169,6 +176,9 @@ void boat_combat_advance(BoatFleet *f, const BoatInput inputs[BOAT_COMBAT_PLAYER
             BoatCombatObject *b = available(c->bullets, BOAT_COMBAT_BULLETS);
             if (b) {
                 *b = object;
+                Vector3 muzzle = boat_combat_cannon_muzzle(&s->boat);
+                b->position = (Vector2) { -muzzle.x, muzzle.z };
+                b->height = muzzle.y;
                 p->next_fire = tick + r->fire_ticks;
             }
         }

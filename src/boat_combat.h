@@ -8,12 +8,16 @@
 #define BOAT_COMBAT_GRENADES 4
 #define BOAT_COMBAT_WAVES 4
 #define BOAT_COMBAT_PLAYERS 4
-#define BOAT_CANNON_LIFT 5.0f // Initial upward speed, m/s.
+#define BOAT_CANNON_LIFT 3.0f // Initial upward speed, m/s.
 #define BOAT_CANNON_GRAVITY 16.0f // Downward acceleration, m/s squared.
 #define BOAT_CANNON_RADIUS .275f // Half the visible water cube's side.
+#define BOAT_CANNON_MUZZLE_HEIGHT 1.25f
+#define BOAT_CANNON_MUZZLE_FORWARD 2.55f
 
 // Vertical displacement from launch, shared with deterministic presentation fixtures.
 float boat_combat_cannon_rise(float age);
+// Renderer-space opening position, attached to the boat's full pitch/roll/heading pose.
+Vector3 boat_combat_cannon_muzzle(const Boat *boat);
 
 typedef struct {
     float health, damage, bullet_speed, bullet_range;

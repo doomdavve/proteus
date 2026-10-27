@@ -10,7 +10,7 @@ machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
 
 | Control | Current behavior |
 | --- | --- |
-| Hold Space | Water cannon: 28 m maximum travel, about 21 m calm-water reach; 28 m/s forward, 5 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
+| Hold Space | Water cannon: 70 m maximum travel, about 52 m calm-water reach; 84 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
 | Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; unchanged 2 m crest, 10 m/s propagation, 30 m range |
 | Press Q | Straight torpedo: three per life, 40 hull damage, 32 m/s, 160 m range, 0.25 s arming, 1.5 s reload; no homing |
 
@@ -29,12 +29,16 @@ float for 1 s, and are fenced by target life and connection generation. No oppon
 is drawn. Cannon contact uses a cyan hit marker and visible hull heel instead of damage numbers.
 Shared CPU/GPU boxes draw cyan 0.55 m water cubes, surface torpedoes, bubble trails and impact
 splashes. Water cubes briefly brighten at launch and break into smaller cubes on impact.
-Cannon cubes follow a parabola: the default 0.65 m launch height rises to about 1.43 m, then
-the bottom of the cube touches calm water after about 0.69 s. Height advances in the core,
+A small rectangular housing on each deathmatch boat's bow has a dark face and cyan opening.
+Cubes originate at that opening, using the same full pitch/roll/heading attachment in the core
+and both renderers. The local muzzle is 2.55 m forward and 1.25 m above the boat origin.
+Cannon cubes follow a parabola: the default 1.25 m launch height rises to about 1.53 m, then
+the bottom of the cube touches calm water after about 0.58 s. The roughly 52 m reach is about
+2.4 times the initial arc's 21 m reach, including the muzzle's distance from the boat centre. Height advances in the core,
 including curved scenery probes and three-dimensional moving-hull sweeps with the cube radius;
 rendering reads that same committed height. Spawn height and waves affect the landing point.
 The procedural weapon sound is a water wash, with low splashes for torpedo launches/impacts.
-Hunting bots use the cannon nearby, torpedoes ahead, and grenades against trailing targets.
+Hunting bots use the cannon out to 52 m, torpedoes ahead, and grenades against trailing targets.
 
 Protocol **v7** repurposes the command's reserved byte for a torpedo request serial. Combat
 checkpoints include pressure, ammo, recent damage bursts and eight torpedoes; 40 short-lived
@@ -43,8 +47,8 @@ free/race omit combat. Rebuild native/browser peers together. See the
 [wire layout](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint).
 
 Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments;
-water-cannon cubes replace the elongated packets and follow a ballistic arc (2026-10-27 user requests).
-Next: human balance playtest, especially cannon recovery/roll strength, torpedo evasion and
+water-cannon cubes follow a ballistic arc from a bow housing with extended reach (2026-10-27 user requests).
+Next: human balance playtest, especially extended cannon reach/recovery/roll strength, torpedo evasion and
 rear-grenade timing; browser/Windows/Linux qualification and public deployment remain pending.
 No user acceptance or public deployment is implied by local verification.
 
@@ -69,7 +73,7 @@ CTests off. Inspected matching [CPU](evidence/deathmatch-arsenal/water-cubes-cpu
 eight-second windowed GPU fixture demo. This changes presentation only; human visual acceptance
 and browser/Windows/Linux review remain pending. Next task remains the balance playtest above.
 
-Cannon-arc verification (2026-10-27, macOS/Apple Silicon Debug): warning-clean build and all
+Initial cannon-arc verification, before extended reach and bow housing (2026-10-27, macOS/Apple Silicon Debug): warning-clean build and all
 230 enabled CTests pass (13 retired cases disabled, GPU-context CTests off). Added deterministic
 checks for ascent, apex, descent, water landing before maximum range, a descending hull-top
 crossing, an overhead miss and exact save/restore replay. Existing production-tick cannon
@@ -83,6 +87,18 @@ and human feel acceptance remain pending. Next: playtest the lower effective ran
 The protocol-v7 wire layout is unchanged. The launch lift, gravity and cube radius now join
 the forward-speed rules in the content fingerprint, so all peers must rebuild together;
 a straight-flight build cannot join an arc build.
+
+Mounted-cannon follow-up (2026-10-27, macOS/Apple Silicon Debug): warning-clean build and
+all 230 enabled CTests pass (13 retired cases disabled; GPU-context CTests off). Production
+ticks capsize broadside targets at both 10 m and 45 m before overheating. The arc test checks
+calm-water contact 50–55 m from the boat centre, plus a tilted boat launching from the exact
+shared muzzle attachment. Existing trajectory replay and impaired four-client tests pass.
+Inspected [CPU](evidence/deathmatch-arsenal/cannon-mounted-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/cannon-mounted-gpu.png) captures at 1.05 s, showing the
+housing on the local and rival boat, and completed the eight-second native GPU demo. Earlier
+captures above retain their original short-range/unmounted presentation. Human feel acceptance
+and browser/Windows/Linux qualification remain pending; next is the extended-range playtest.
+The wire layout stays v7; muzzle height/forward offset now also enter the content fingerprint.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 

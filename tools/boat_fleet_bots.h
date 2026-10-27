@@ -70,7 +70,7 @@ static inline BoatInput boat_fleet_bot_hunt_input(
     uint16_t grenade = (uint16_t)(fleet->state.tick / (8 * BOAT_TICK_HZ) + 1);
     return (BoatInput) { .steering_rate = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
         .throttle_rate = boat_fleet_bot_throttle_rate(boat->throttle, nearest < 35 ? .35f : 1),
-        .gun = fabsf(error) < .1f && nearest < 28,
+        .gun = fabsf(error) < .1f && nearest < 52,
         .torpedo = fabsf(error) < .08f && nearest > 10 && nearest < 120
             ? (uint8_t)(fleet->state.tick / (2 * BOAT_TICK_HZ) % 255 + 1)
             : 0,

@@ -1098,6 +1098,8 @@ uint64_t boat_net_content_digest(void)
     digest_float(&d, BOAT_CANNON_LIFT);
     digest_float(&d, BOAT_CANNON_GRAVITY);
     digest_float(&d, BOAT_CANNON_RADIUS);
+    digest_float(&d, BOAT_CANNON_MUZZLE_HEIGHT);
+    digest_float(&d, BOAT_CANNON_MUZZLE_FORWARD);
     digest_bytes(&d, "proteus-boat-net", 16);
     for (int id = 0; id < BOAT_LOCATION_COUNT; ++id) {
         const BoatWorldDefinition *definition = boat_location(id);
