@@ -27,7 +27,8 @@ The bottom control panel gains matching hull/heel and weapon instruments only in
 Opponent numbers show authority-confirmed damage dealt by the viewer, merge hits within 0.75 s,
 float for 1 s, and are fenced by target life and connection generation. No opponent health bar
 is drawn. Cannon contact uses a cyan hit marker and visible hull heel instead of damage numbers.
-Shared CPU/GPU boxes draw water packets, surface torpedoes, bubble trails and impact splashes.
+Shared CPU/GPU boxes draw cyan 0.55 m water cubes, surface torpedoes, bubble trails and impact
+splashes. Water cubes briefly brighten at launch and break into smaller cubes on impact.
 The procedural weapon sound is a water wash, with low splashes for torpedo launches/impacts.
 Hunting bots use the cannon nearby, torpedoes ahead, and grenades against trailing targets.
 
@@ -37,7 +38,8 @@ water packets replace 64 bullets. Combat remains four pages per snapshot, now 37
 free/race omit combat. Rebuild native/browser peers together. See the
 [wire layout](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint).
 
-Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments.
+Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments;
+water-cannon cube presentation replaces the elongated packets (2026-10-27 user request).
 Next: human balance playtest, especially cannon recovery/roll strength, torpedo evasion and
 rear-grenade timing; browser/Windows/Linux qualification and public deployment remain pending.
 No user acceptance or public deployment is implied by local verification.
@@ -55,6 +57,13 @@ Inspected [GPU HUD/damage feedback](evidence/deathmatch-arsenal/gpu-hud.png),
 An eight-second native GPU fixture demo completed and the audio device initialized/closed
 successfully; this is an agent-run demo, not a human listening or balance acceptance check.
 Browser, Windows/Linux, coordinated deployment and human play are unverified for this revision.
+
+Water-cube follow-up verification (2026-10-27, macOS/Apple Silicon Debug): warning-clean
+build; all 230 enabled CTests pass, with the same 13 retired cases disabled and GPU-context
+CTests off. Inspected matching [CPU](evidence/deathmatch-arsenal/water-cubes-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/water-cubes-gpu.png) captures at 1 s and completed the
+eight-second windowed GPU fixture demo. This changes presentation only; human visual acceptance
+and browser/Windows/Linux review remain pending. Next task remains the balance playtest above.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 

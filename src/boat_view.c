@@ -314,13 +314,9 @@ static void combat_visit(
             draw(context,
                 (Transform3D) { .position = { -b->position.x, b->height, b->position.y },
                     .rotation = { 0, -atan2f(b->direction.x, -b->direction.y), 0 },
-                    .scale = { .18f, .18f, 1.5f } },
-                (Color) { 142, 220, 240, 255 });
-            if (tick - b->born < 4)
-                draw(context,
-                    (Transform3D) { .position = { -b->position.x, b->height, b->position.y },
-                        .scale = { .35f, .3f, .35f } },
-                    (Color) { 218, 244, 250, 255 });
+                    .scale = { .55f, .55f, .55f } },
+                tick - b->born < 4 ? (Color) { 218, 244, 250, 255 }
+                                   : (Color) { 142, 220, 240, 255 });
         } else if (b->ended && tick - b->ended < 27) {
             // Brief deterministic impact sparkle/splash at the terminal point.
             float age = (float)(tick - b->ended) * BOAT_STEP;
@@ -329,7 +325,7 @@ static void combat_visit(
                     draw(context,
                         (Transform3D) { .position = { -b->position.x + ((float)k - 1) * age,
                                             b->height + age * (float)(k + 1), b->position.y },
-                            .scale = { .1f, .18f, .1f } },
+                            .scale = { .14f, .14f, .14f } },
                         (Color) { 230, 239, 222, 255 });
         }
     }
