@@ -82,7 +82,7 @@ int main(int argc, char **argv)
             .direction = { 0, -1 },
             .height = .6f };
         c->bullets[0] = (BoatCombatObject) { .active = true,
-            .born = tick > 3 ? tick - 3 : 0,
+            .born = tick > 6 ? tick - 6 : 0,
             .position = { -2, 8 - (float)fmod(time * 30, 25) },
             .height = .65f,
             .direction = { 0, -1 } };
