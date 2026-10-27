@@ -20,8 +20,9 @@ static const Vector3 dock_center = { -20, 0, 182 };
 // authored berth on the quay facing the crane, not the real terminal, clear of the race start
 // and the traffic circuits, 2-7 m off the mapped bank (its bollards stand 12 m off the hull's
 // quay side to reach land). Size and draught are Stena Danica's (154.89 x 28.04 m, 6.31 m); the
-// height, decks and livery are read from photos. The bow points upstream, so the river side
-// shows the name reading from bow to stern, as in the user's photo.
+// height, decks and colours are read from photos. The name is a made-up line's, so the real
+// company's name and logo are not reproduced. The bow points upstream, so the river side shows
+// the name reading from bow to stern, as in the user's photo.
 static const WaterfrontFerry ferry = { { 237, 0, -376 }, 2.865f, 155, 28, 6.3f, 34 };
 static const Color timber = { 154, 123, 84, 255 };
 static const Color rubber = { 44, 52, 55, 255 };
@@ -53,10 +54,10 @@ BoatModelSpec waterfront_harbor_spec(int index)
 static const char *glyph(char c)
 {
     switch (c) {
-    case 'S':
-        return "###|#..|###|..#|###";
-    case 'T':
-        return "###|.#.|.#.|.#.|.#.";
+    case 'V':
+        return "#...#|#...#|.#.#.|.#.#.|..#..";
+    case 'G':
+        return "###|#..|#.#|#.#|###";
     case 'E':
         return "###|#..|##.|#..|###";
     case 'N':
@@ -138,7 +139,7 @@ static void build_ferry(BoatModel *m)
     // The car deck's stern door, and the name in navy on both sides with the green wave aft.
     boat_model_box(m, (Vector3) { 0, 7, l * .5f + .05f }, (Vector3) { 16, 6, .14f }, glass);
     for (int side = -1; side <= 1; side += 2) {
-        lettering(m, "STENA LINE", side, side > 0 ? -38 : 22, 10.2f, 1.2f, navy);
+        lettering(m, "VINGA LINE", side, side > 0 ? -38 : 22, 10.2f, 1.2f, navy);
         for (int stripe = 0; stripe < 2; ++stripe) {
             float z = 26 + stripe * 2.4f;
             boat_model_beam(m, (Vector3) { side * (b * .5f + .08f), 4.6f, z },

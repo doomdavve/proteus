@@ -2143,9 +2143,9 @@ livery (white, dark blue hull band, "Stena Line" and a green wave).
   22 m clear of the race start and grid. A first berth lay square to a bank corner 15–30 m off
   the quay; the harbour test's bollard check caught it.
 - **Model:** built in [`waterfront_harbor.c`](../src/waterfront_harbor.c) from `boat_model`
-  boxes, 712 triangles under the 1,024 cap: antifouling, navy band and white topsides, a
+  boxes, 736 triangles under the 1,024 cap: antifouling, navy band and white topsides, a
   stepped bow, the stern door, three superstructure tiers with window bands, bridge wings,
-  lifeboats, funnel and mast, "STENA LINE" in five-row pixel letters and two green wave
+  lifeboats, funnel and mast, the name in five-row pixel letters and two green wave
   stripes on both sides. Height 34 m to the masthead; decks, colours and proportions are by
   eye from the photo. The letters are one panel per run of lit cells through a new
   `boat_model_quad`; a box per cell overflowed the cap and silently dropped the whole hull.
@@ -2174,9 +2174,10 @@ livery (white, dark blue hull band, "Stena Line" and a green wave).
   passed all 230 active tests (13 retired disabled); with `PROTEUS_GPU_TESTS=ON` the 27
   GPU-labelled tests passed.
 - **Limitations:**
-  - **Name and livery:** "Stena Line" and its wave are a real company's. Kept at the user's
-    request for this playground; a public release should use the look without the name. Not
-    yet decided by the user.
+  - **Name (decided 2026-10-27):** the first version read "STENA LINE". The user chose to
+    keep the look and replace the name, so the hull now reads "VINGA LINE", a made-up line
+    named after the adventure's goal. The colours (white, navy band, green stripes) stay
+    close to the real ferries; the stripes are two plain slanted bars, not Stena's logo.
   - No manual playback or user acceptance. The quay side (lines, bollards) was not captured;
     it faces the bank.
   - No ramp, terminal building or linkspan; the gap to the curved bank is open water too
