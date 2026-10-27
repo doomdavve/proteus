@@ -124,7 +124,7 @@ static unsigned host_location(const BoatTitleSettings *s)
 }
 
 typedef struct {
-    Texture2D backdrop;
+    Texture2D backdrop, wordmark;
     Font ui, small; // m5x7 labels/values; m3x6 hints/footer, baked at their native 16 px em.
     RenderTexture2D target;
     Panel panel; // The multiplayer or settings panel replaces the main rows.
@@ -213,61 +213,16 @@ static void draw_text(Font font, const char *text, int x, int y, Color ink)
     DrawTextEx(font, text, (Vector2) { (float)x, (float)(y - top) }, 16, 0, ink);
 }
 
-// Broad two-cell strokes and square counters are intentional: this is a wordmark,
-// independent of the compact UI fonts. Outline the joined bitmap, not each source cell.
-static void draw_logo(Font ui)
+// Native bitmap wordmark: common cap height, stroke width and optical spacing.
+static void draw_logo(const Title *t)
 {
-    static const struct {
-        char letter;
-        int width;
-        unsigned char rows[9];
-    } glyphs[] = {
-        { 'W', 7, { 99, 99, 99, 99, 107, 107, 127, 127, 54 } },
-        { 'A', 7, { 127, 127, 99, 99, 127, 127, 99, 99, 99 } },
-        { 'K', 7, { 99, 103, 110, 124, 120, 124, 110, 103, 99 } },
-        { 'E', 7, { 127, 127, 96, 96, 126, 126, 96, 127, 127 } },
-        { 'V', 7, { 99, 99, 99, 99, 99, 99, 119, 62, 28 } },
-        { 'L', 6, { 48, 48, 48, 48, 48, 48, 48, 63, 63 } },
-        { 'O', 7, { 127, 127, 99, 99, 99, 99, 99, 127, 127 } },
-        { 'C', 7, { 127, 127, 96, 96, 96, 96, 96, 127, 127 } },
-        { 'I', 5, { 31, 31, 14, 14, 14, 14, 14, 31, 31 } },
-        { 'T', 7, { 127, 127, 28, 28, 28, 28, 28, 28, 28 } },
-        { 'Y', 7, { 99, 99, 99, 119, 62, 28, 28, 28, 28 } },
-    };
-    enum { LOGO_WIDTH = 278, LOGO_HEIGHT = 29, LEFT = 21, TOP = 18 };
-    bool mask[LOGO_HEIGHT][LOGO_WIDTH] = { 0 };
-    int cursor = 1;
-    for (const char *c = "WAKE VELOCITY"; *c; ++c) {
-        if (*c == ' ') {
-            cursor += 9;
-            continue;
-        }
-        for (unsigned g = 0; g < sizeof(glyphs) / sizeof(glyphs[0]); ++g) {
-            if (glyphs[g].letter != *c)
-                continue;
-            for (int y = 0; y < 27; ++y)
-                for (int x = 0; x < glyphs[g].width * 3; ++x)
-                    mask[y + 1][cursor + x]
-                        = (glyphs[g].rows[y / 3] & (1 << (glyphs[g].width - 1 - x / 3))) != 0;
-            cursor += glyphs[g].width * 3 + 2;
-        }
-    }
-    for (int y = 1; y < LOGO_HEIGHT - 1; ++y)
-        for (int x = 1; x < LOGO_WIDTH - 1; ++x)
-            if (mask[y][x])
-                DrawPixel(LEFT + x + 2, TOP + y + 2, rgb(231, 128, 105));
-    for (int y = 1; y < LOGO_HEIGHT - 1; ++y)
-        for (int x = 1; x < LOGO_WIDTH - 1; ++x) {
-            if (!mask[y][x])
-                continue;
-            bool inside = mask[y - 1][x] && mask[y + 1][x] && mask[y][x - 1] && mask[y][x + 1];
-            DrawPixel(LEFT + x, TOP + y, inside ? rgb(12, 45, 72) : rgb(174, 245, 238));
-        }
+    DrawTexture(t->wordmark, (WIDTH - t->wordmark.width) / 2, 20, WHITE);
+    Font ui = t->ui;
     const char *credit = "A PROTEUS GAME";
     int x = (WIDTH - text_width(ui, credit)) / 2;
-    draw_text(ui, credit, x, 57, rgb(174, 245, 238));
-    DrawLine(x - 37, 60, x - 5, 60, rgb(118, 203, 211));
-    DrawLine(WIDTH - x + 5, 60, WIDTH - x + 37, 60, rgb(118, 203, 211));
+    draw_text(ui, credit, x, 50, rgb(174, 245, 238));
+    DrawLine(x - 37, 53, x - 5, 53, rgb(118, 203, 211));
+    DrawLine(WIDTH - x + 5, 53, WIDTH - x + 37, 53, rgb(118, 203, 211));
 }
 
 static void crosshair(int x, int y, Color ink)
@@ -289,7 +244,7 @@ static int row_count(const Title *t)
 static Rectangle row_bounds(const Title *t, int row)
 {
     if (t->panel == PANEL_MAIN)
-        return (Rectangle) { 70, (float)(123 + row * 14), 154, 13 };
+        return (Rectangle) { 70, (float)(123 + row * 14), 118, 13 };
     int top = 86 + (5 - row_count(t)) * ROW_HEIGHT / 2; // Centred on five rows' space.
     return (Rectangle) { 45, (float)(top + row * ROW_HEIGHT), 230, ROW_HEIGHT - 2 };
 }
@@ -459,7 +414,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     Rectangle first = row_bounds(t, 0), last = row_bounds(t, row_count(t) - 1);
     int top = (int)first.y - 5, height = (int)(last.y + last.height - first.y) + 10;
     bool main = t->panel == PANEL_MAIN;
-    int left = main ? 66 : 37, width = main ? 162 : 246;
+    int left = main ? 66 : 37, width = main ? 126 : 246;
     Color cyan = rgb(142, 224, 226), dim = rgb(61, 133, 157);
     DrawRectangle(left, top, width, height, (Color) { 8, 32, 54, 228 });
     // Fine rules with brighter open corner brackets.
@@ -481,20 +436,15 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     for (int i = 0; i < row_count(t); ++i) {
         Rectangle row = row_bounds(t, i);
         bool active = i == t->selected;
-        int label_x = main ? 99 : 72;
-        if (main) {
-            char number[8];
-            snprintf(number, sizeof(number), "%02d", i + 1);
-            draw_text(t->ui, number, 72, (int)row.y + 3, cyan);
-            DrawLine(88, (int)row.y + 2, 88, (int)row.y + 11, dim);
-            DrawLine(71, (int)row.y + 13, 223, (int)row.y + 13, dim);
-        }
+        int label_x = main ? 84 : 72;
+        if (main)
+            DrawLine(71, (int)row.y + 13, 187, (int)row.y + 13, dim);
         if (active) {
             Rectangle highlight = row;
-            highlight.x = main ? 87 : row.x;
+            highlight.x = row.x;
             highlight.width = row.x + row.width - highlight.x;
             DrawRectangleRec(highlight, rgb(156, 241, 231));
-            int x = main ? 90 : 51, y = (int)row.y + 4;
+            int x = main ? 74 : 51, y = (int)row.y + 4;
             for (int j = 0; j < 3; ++j)
                 DrawLine(x + j, y + j, x + j, y + 5 - j, rgb(231, 128, 105));
         }
@@ -583,9 +533,9 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
 {
     BeginTextureMode(t->target);
     DrawTexture(t->backdrop, 0, 0, WHITE);
-    draw_logo(t->ui);
-    crosshair(12, 37, rgb(118, 203, 211));
-    crosshair(307, 37, rgb(118, 203, 211));
+    draw_logo(t);
+    crosshair(22, 32, rgb(118, 203, 211));
+    crosshair(297, 32, rgb(118, 203, 211));
     draw_menu(t, s, status);
     const char *map_credit = "MAP: OSM CONTRIBUTORS";
     draw_footer_text(t->small, PROTEUS_VERSION, 8);
@@ -593,7 +543,7 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
         draw_footer_text(t->small, map_credit, WIDTH - 9 - text_width(t->small, map_credit));
         const char *fonts = "FONTS: DANIEL LINSSEN";
         draw_text(
-            t->small, fonts, (WIDTH - text_width(t->small, fonts)) / 2, 66, rgb(142, 224, 226));
+            t->small, fonts, (WIDTH - text_width(t->small, fonts)) / 2, 60, rgb(142, 224, 226));
     }
     EndTextureMode();
 }
@@ -664,15 +614,19 @@ static bool open_title(Title *t)
     t->backdrop = LoadTextureFromImage(image);
     UnloadImage(image);
     t->target = LoadRenderTexture(WIDTH, HEIGHT);
+    if (!boat_asset_path(path, sizeof(path), "title/wake-velocity.png"))
+        return false;
+    t->wordmark = LoadTexture(path);
     t->ui = load_title_font("fonts/m5x7.fnt");
     t->small = load_title_font("fonts/m3x6.fnt");
-    if (!IsTextureValid(t->backdrop) || !IsRenderTextureValid(t->target) || !IsFontValid(t->ui)
-        || !IsTextureValid(t->ui.texture) || !IsFontValid(t->small)
-        || !IsTextureValid(t->small.texture)) {
+    if (!IsTextureValid(t->backdrop) || !IsTextureValid(t->wordmark)
+        || !IsRenderTextureValid(t->target) || !IsFontValid(t->ui) || !IsTextureValid(t->ui.texture)
+        || !IsFontValid(t->small) || !IsTextureValid(t->small.texture)) {
         fprintf(stderr, "Cannot load the title screen (%s).\n", path);
         return false;
     }
     SetTextureFilter(t->backdrop, TEXTURE_FILTER_POINT);
+    SetTextureFilter(t->wordmark, TEXTURE_FILTER_POINT);
     SetTextureFilter(t->target.texture, TEXTURE_FILTER_POINT);
     return true;
 }
@@ -688,6 +642,8 @@ static void close_title(Title *t)
         UnloadRenderTexture(t->target);
     if (IsTextureValid(t->backdrop))
         UnloadTexture(t->backdrop);
+    if (IsTextureValid(t->wordmark))
+        UnloadTexture(t->wordmark);
 }
 
 static void begin_edit(Title *t, char *field)

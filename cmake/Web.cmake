@@ -44,6 +44,7 @@ foreach(font IN LISTS WEB_FONTS)
   set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/${font}")
 endforeach()
+configure_file(assets/title/wake-velocity.png "${WEB_ASSETS}/title/wake-velocity.png" COPYONLY)
 configure_file(assets/title/river-backdrop.png "${WEB_ASSETS}/title/river-backdrop.png" COPYONLY)
 configure_file(assets/music/a-little-boat.xm "${WEB_ASSETS}/music/a-little-boat.xm" COPYONLY)
 configure_file(assets/music/acid-wake.xm "${WEB_ASSETS}/music/acid-wake.xm" COPYONLY)
@@ -69,6 +70,7 @@ target_link_options(wake_velocity PRIVATE
 set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   ${WEB_SHADERS} ${WEB_TEXTURES}
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/title/river-backdrop.png"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/title/wake-velocity.png"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"

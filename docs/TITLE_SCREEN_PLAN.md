@@ -2,16 +2,18 @@
 
 Status: revised 2026-10-27. This document owns the title, menu and promotion of
 **Wake Velocity**. The user selected the cyan workstation mock-up (B): straight outlined
-lettering, restrained coral depth, numbered rows, open corner brackets and a dusk river.
-The redesign is implemented on `title-dusk-console`; the user requested broader title
-lettering and compact m5x7/m3x6 UI fonts after the initial implementation. That refinement
-is implemented; visual acceptance remains pending.
+lettering, restrained coral depth, open corner brackets and a dusk river. The latest
+revision removes menu numbers and the indistinct center boat, and uses consistent
+geometric title letters.
+The redesign is implemented on `title-dusk-console`. Compact m5x7/m3x6 UI fonts remain
+in use; the earlier coarse title lettering was rejected. The geometric replacement and
+clean river capture are implemented; visual acceptance remains pending.
 The shared title retains single-player setup, public/LAN/address joining, hosting and saved
 settings. The main screen's only credit is **A PROTEUS GAME**; the build version is at lower
 left and the retained OSM map credit is in SETTINGS. Next: user review of the implemented
 title and distributed native/browser builds. Gameplay sunset is planned separately in
 [the sunset plan](SUNSET_PLAN.md); the title palette does not implement world lighting.
-Volume settings, title music and a live boat-and-gulls backdrop remain deferred.
+Volume settings, title music and a live river backdrop remain deferred.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
 ## Cyan workstation redesign, 2026-10-27
@@ -22,13 +24,13 @@ Native review capture (development build version shown):
 
 Completed: replace the bowed/bobbing logo with a title-owned, outlined bitmap wordmark;
 keep coral offset depth and a small centered A PROTEUS GAME. The main menu is compact,
-left of center over the water, with 01–04 rows, a cyan reverse-video selection, coral
+left of center over the water, with plain option labels, a cyan reverse-video selection, coral
 chevron, fine dividers, bracket corners and sparse registration marks. Text stays fixed
 when selection changes. Submenus retain their wider value/editing space with the same
 cyan selection and framing; hints have dedicated room above the footer. Rendering stays
 320×200, nearest-neighbour and integer-scaled, including browser BACK TO LAUNCHER.
 
-The existing real river capture is graded once when loaded, with a deeper blue sky,
+The scenery-only river capture is graded once when loaded, with a deeper blue sky,
 cooler water and a few authored occupied-window pixels anchored to its fixed facades.
 No generated mock-up art is shipped. Gameplay scenery, physics, replay and network
 content are unchanged. A live sunset requires the shared renderer work in the sunset plan.
@@ -38,6 +40,41 @@ The lower-left version follows the web packager's Git convention:
 Reconfigure after changing revisions to refresh it. Source archives/release builds may
 supply `-DPROTEUS_VERSION=v0.0.19`; absent Git metadata and an override, it says `unknown`.
 The old PROTEUS 2026 footer is removed; SETTINGS retains MAP: OSM CONTRIBUTORS.
+
+## Geometric lettering and clean river, 2026-10-27
+
+User feedback: the first two custom alphabets still looked uneven compared with mock-up B;
+menu row numbers and the small center boat were unnecessary. Completed: replace the
+coarse alphabet with a separately generated native bitmap wordmark. All letters share a
+24 px cap height and 6 px stems/bars; diagonal strokes are drawn at final pixel resolution,
+with consistent spacing and no oversized I serifs. The one-pixel cyan edge, dark fill and
+two-pixel coral depth follow B. `tools/generate_title_wordmark.py` owns the geometric source;
+[asset notes and regeneration](../assets/title/README.md) document both graphics.
+
+The main menu now has only the four option labels and selection chevron; the number gutter
+is removed and the panel fits the shorter rows, including browser BACK TO LAUNCHER. A fresh
+scenery-only river render removes the player boat and its wake while preserving the bridge
+composition. `title_backdrop` uses the existing GPU renderer, a fixed camera/time and no
+player layer; gameplay rendering is untouched. Native/browser packaging includes the
+wordmark and native relocation workflows check its presence.
+
+Verification, 2026-10-27, Apple Silicon/macOS: Debug build and all 256 enabled CTests
+passed with GPU tests ON (62.50 s; 15 retired cases disabled). Native all-panel captures,
+row-center hit checks and 120 windowed title frames passed; captures were inspected.
+A temporary bitmap audit found twelve connected glyphs sharing the same top/baseline,
+6 px stems and 3/10 px letter/word gaps. Wordmark regeneration produced identical bytes.
+
+Emscripten MinSizeRel packaging, Chrome/SwiftShader title/settings persistence, repeated
+sessions and audio-context checks passed. A pointer check entered Settings/Multiplayer,
+returned and exited to the launcher. Native and 4× browser captures were compared with B.
+A local ad-hoc-signed macOS ZIP was extracted outside the checkout; its title capture
+loaded the new wordmark and clean river and was inspected. Chrome retained its existing
+ScriptProcessorNode/ReadPixels warnings. C formatting, Python syntax, changed local links
+and diff checks passed. Next: user visual review. Physical input/listening, Finder launch,
+Windows/Linux runtime and Firefox/Safari remain unverified for this revision; passing
+checks do not establish acceptance of the lettering.
+
+## Initial redesign verification (historical)
 
 Initial implementation verification, 2026-10-27 (before the font refinement below),
 Apple Silicon/macOS: Debug configure/build passed, with no
@@ -61,7 +98,7 @@ Safari/Firefox or packaged-binary review. The temporary title harness was agent-
 not a human playtest. Mock-up B was user-selected; implementation acceptance remains
 pending. Next: user visual review and physical playback, then the sunset lighting-frame step.
 
-## Compact fonts and broader title, 2026-10-27
+## First compact-font refinement, 2026-10-27 (lettering/layout superseded)
 
 User feedback: the generated B mock-up's title and font looked better than the first
 implementation. Completed: replace the narrow 5×7 title alphabet with a separately
@@ -131,10 +168,10 @@ resets. Current behavior, verification and next task: [controls handoff](CONTROL
 workstation direction above supersedes the original bowed cream/coral logo and bouncing
 `(*)` selection. Keep **A PROTEUS GAME** as the small demo-group credit.
 
-The backdrop remains the game's real GPU river sample, just past Älvsborgsbron looking
-back from boat-local `(641.115, -842.196)` with a 32 m / 4 m camera. Its deterministic
-route time was 73.350 s. The title-only dusk grade preserves this composition and the
-320×200 pixel grid. A later live title scene may show a slowly passing boat and gulls,
+The backdrop is a scenery-only GPU river sample, just past Älvsborgsbron looking
+back from boat-local `(641.115, -842.196)` with a 32 m / 4 m camera and fixed 62° lens.
+Its explicit scene time is 73.350 s; it preserves the original sample's composition without
+the player layer. The title-only dusk grade preserves the 320×200 pixel grid. A later live title scene may show a slowly passing boat and gulls,
 driven by its own presentation clock without advancing a player's session or wakes.
 
 Earlier comparisons included Watercraft and GBG/Gothenburg names. BUOY! was superseded

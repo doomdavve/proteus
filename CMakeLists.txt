@@ -234,6 +234,11 @@ add_custom_target(proteus_assets
           $<TARGET_FILE_DIR:wake_velocity>/assets
 )
 
+# Reproducible, scenery-only title sample at the original bridge-lookback camera.
+add_executable(title_backdrop tools/title_backdrop.c)
+target_link_libraries(title_backdrop PRIVATE proteus_gpu)
+target_compile_options(title_backdrop PRIVATE ${PROTEUS_WARNINGS})
+
 add_executable(gpu_fixture tools/gpu_fixture.c)
 target_include_directories(gpu_fixture PRIVATE ${raylib_SOURCE_DIR}/src)
 target_link_libraries(gpu_fixture PRIVATE proteus_gpu)
@@ -327,6 +332,7 @@ target_compile_options(validate_boat_audio PRIVATE
 add_test(NAME boat_audio_is_valid COMMAND validate_boat_audio)
 
 add_dependencies(wake_velocity proteus_assets)
+add_dependencies(title_backdrop proteus_assets)
 add_dependencies(boat_race_trial proteus_assets)
 add_test(NAME boat_race_trial COMMAND boat_race_trial --check)
 set_tests_properties(boat_race_trial PROPERTIES

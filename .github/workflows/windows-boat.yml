@@ -96,6 +96,10 @@ jobs:
                 throw "Packaged menu font is missing: $fontPath"
               }
             }
+            $wordmark = Join-Path (Split-Path $exe) assets/title/wake-velocity.png
+            if (-not (Test-Path $wordmark -PathType Leaf)) {
+              throw "Packaged title wordmark is missing: $wordmark"
+            }
             $backdrop = Join-Path (Split-Path $exe) assets/title/river-backdrop.png
             if (-not (Test-Path $backdrop -PathType Leaf)) {
               throw "Packaged title backdrop is missing: $backdrop"
