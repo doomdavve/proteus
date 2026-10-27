@@ -123,7 +123,9 @@ is calm and clear of both boats. See the
 `./build/wake_velocity` without options (and the packaged macOS app and Windows `launch.bat`)
 opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT.
 Its cyan workstation interface sits over a dusk river capture, with A PROTEUS GAME beneath
-the outlined title and the build version at lower left. SETTINGS retains the map credit.
+the chunky bitmap title and the build version at lower left. Menu text uses Daniel
+Linssen's m5x7 font, with m3x6 for compact hints and footer data; SETTINGS retains the
+map and font credits. [Font sources and regeneration](assets/fonts/README.md).
 This dusk palette is title-only; [gameplay sunset is planned](docs/SUNSET_PLAN.md).
 The version is resolved at CMake configure time (reconfigure to refresh it); source archives
 can set `-DPROTEUS_VERSION=v0.0.19`. Up/Down or

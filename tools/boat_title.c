@@ -125,6 +125,7 @@ static unsigned host_location(const BoatTitleSettings *s)
 
 typedef struct {
     Texture2D backdrop;
+    Font ui, small; // m5x7 labels/values; m3x6 hints/footer, baked at their native 16 px em.
     RenderTexture2D target;
     Panel panel; // The multiplayer or settings panel replaces the main rows.
     int selected;
@@ -199,28 +200,41 @@ static Color rgb(unsigned char r, unsigned char g, unsigned char b)
     return (Color) { r, g, b, 255 };
 }
 
-// Deliberately small, title-owned block alphabet. Expand first, then outline the joined
-// silhouette so adjoining cells do not acquire seams. No filtered/scaled font atlas.
-static void draw_logo(void)
+// The TTF em square is 16 px; visible capitals are seven/six pixels high. Draw the
+// native atlas 1:1 and align its capital top, rather than shrinking it to a nominal 7 px.
+static int text_width(Font font, const char *text)
+{
+    return (int)roundf(MeasureTextEx(font, text, 16, 0).x);
+}
+
+static void draw_text(Font font, const char *text, int x, int y, Color ink)
+{
+    int top = font.glyphs[GetGlyphIndex(font, 'A')].offsetY;
+    DrawTextEx(font, text, (Vector2) { (float)x, (float)(y - top) }, 16, 0, ink);
+}
+
+// Broad two-cell strokes and square counters are intentional: this is a wordmark,
+// independent of the compact UI fonts. Outline the joined bitmap, not each source cell.
+static void draw_logo(Font ui)
 {
     static const struct {
         char letter;
         int width;
-        unsigned char rows[7];
+        unsigned char rows[9];
     } glyphs[] = {
-        { 'W', 5, { 17, 17, 17, 21, 21, 31, 10 } },
-        { 'A', 5, { 14, 27, 17, 31, 17, 17, 17 } },
-        { 'K', 5, { 17, 19, 22, 28, 22, 19, 17 } },
-        { 'E', 5, { 31, 16, 16, 30, 16, 16, 31 } },
-        { 'V', 5, { 17, 17, 17, 17, 27, 14, 4 } },
-        { 'L', 4, { 8, 8, 8, 8, 8, 8, 15 } },
-        { 'O', 5, { 14, 27, 17, 17, 17, 27, 14 } },
-        { 'C', 5, { 15, 24, 16, 16, 16, 24, 15 } },
-        { 'I', 3, { 7, 2, 2, 2, 2, 2, 7 } },
-        { 'T', 5, { 31, 4, 4, 4, 4, 4, 4 } },
-        { 'Y', 5, { 17, 17, 27, 14, 4, 4, 4 } },
+        { 'W', 7, { 99, 99, 99, 99, 107, 107, 127, 127, 54 } },
+        { 'A', 7, { 127, 127, 99, 99, 127, 127, 99, 99, 99 } },
+        { 'K', 7, { 99, 103, 110, 124, 120, 124, 110, 103, 99 } },
+        { 'E', 7, { 127, 127, 96, 96, 126, 126, 96, 127, 127 } },
+        { 'V', 7, { 99, 99, 99, 99, 99, 99, 119, 62, 28 } },
+        { 'L', 6, { 48, 48, 48, 48, 48, 48, 48, 63, 63 } },
+        { 'O', 7, { 127, 127, 99, 99, 99, 99, 99, 127, 127 } },
+        { 'C', 7, { 127, 127, 96, 96, 96, 96, 96, 127, 127 } },
+        { 'I', 5, { 31, 31, 14, 14, 14, 14, 14, 31, 31 } },
+        { 'T', 7, { 127, 127, 28, 28, 28, 28, 28, 28, 28 } },
+        { 'Y', 7, { 99, 99, 99, 119, 62, 28, 28, 28, 28 } },
     };
-    enum { LOGO_WIDTH = 274, LOGO_HEIGHT = 30, LEFT = 23, TOP = 20 };
+    enum { LOGO_WIDTH = 278, LOGO_HEIGHT = 29, LEFT = 21, TOP = 18 };
     bool mask[LOGO_HEIGHT][LOGO_WIDTH] = { 0 };
     int cursor = 1;
     for (const char *c = "WAKE VELOCITY"; *c; ++c) {
@@ -231,11 +245,11 @@ static void draw_logo(void)
         for (unsigned g = 0; g < sizeof(glyphs) / sizeof(glyphs[0]); ++g) {
             if (glyphs[g].letter != *c)
                 continue;
-            for (int y = 0; y < 28; ++y)
-                for (int x = 0; x < glyphs[g].width * 4; ++x)
+            for (int y = 0; y < 27; ++y)
+                for (int x = 0; x < glyphs[g].width * 3; ++x)
                     mask[y + 1][cursor + x]
-                        = (glyphs[g].rows[y / 4] & (1 << (glyphs[g].width - 1 - x / 4))) != 0;
-            cursor += glyphs[g].width * 4 + 3;
+                        = (glyphs[g].rows[y / 3] & (1 << (glyphs[g].width - 1 - x / 3))) != 0;
+            cursor += glyphs[g].width * 3 + 2;
         }
     }
     for (int y = 1; y < LOGO_HEIGHT - 1; ++y)
@@ -250,10 +264,10 @@ static void draw_logo(void)
             DrawPixel(LEFT + x, TOP + y, inside ? rgb(12, 45, 72) : rgb(174, 245, 238));
         }
     const char *credit = "A PROTEUS GAME";
-    int x = (WIDTH - MeasureText(credit, 10)) / 2;
-    DrawText(credit, x, 57, 10, rgb(174, 245, 238));
-    DrawLine(x - 37, 61, x - 5, 61, rgb(118, 203, 211));
-    DrawLine(WIDTH - x + 5, 61, WIDTH - x + 37, 61, rgb(118, 203, 211));
+    int x = (WIDTH - text_width(ui, credit)) / 2;
+    draw_text(ui, credit, x, 57, rgb(174, 245, 238));
+    DrawLine(x - 37, 60, x - 5, 60, rgb(118, 203, 211));
+    DrawLine(WIDTH - x + 5, 60, WIDTH - x + 37, 60, rgb(118, 203, 211));
 }
 
 static void crosshair(int x, int y, Color ink)
@@ -289,9 +303,9 @@ static void upper(char *out, size_t size, const char *text)
 }
 
 // The tail of a long value, so the cursor end stays visible.
-static const char *fit(const char *text, int width)
+static const char *fit(Font font, const char *text, int width)
 {
-    while (*text && MeasureText(text, 10) > width)
+    while (*text && text_width(font, text) > width)
         ++text;
     return text;
 }
@@ -471,7 +485,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         if (main) {
             char number[8];
             snprintf(number, sizeof(number), "%02d", i + 1);
-            DrawText(number, 72, (int)row.y + 2, 10, cyan);
+            draw_text(t->ui, number, 72, (int)row.y + 3, cyan);
             DrawLine(88, (int)row.y + 2, 88, (int)row.y + 11, dim);
             DrawLine(71, (int)row.y + 13, 223, (int)row.y + 13, dim);
         }
@@ -489,16 +503,16 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         char value[96];
         row_text(t, s, i, &label, value, sizeof(value));
         // The web's longer BACK TO LAUNCHER label also fits the compact main panel.
-        DrawText(label, label_x, (int)row.y + 2, 10, ink);
+        draw_text(t->ui, label, label_x, (int)row.y + 3, ink);
         if (value[0]) {
             int value_x = t->panel == PANEL_JOIN && i == ROW_ADDRESS ? 122
                 : t->panel == PANEL_SETTINGS && i == ROW_MUSIC       ? 154
                                                                      : 142;
-            const char *shown = fit(value, 268 - value_x);
-            DrawText(shown, value_x, (int)row.y + 2, 10, ink);
+            const char *shown = fit(t->ui, value, 268 - value_x);
+            draw_text(t->ui, shown, value_x, (int)row.y + 3, ink);
             bool typing = t->editing && active;
             if (typing && fmod(t->time, .8) < .5)
-                DrawRectangle(value_x + 1 + MeasureText(shown, 10), (int)row.y + 2, 5, 9, ink);
+                DrawRectangle(value_x + 1 + text_width(t->ui, shown), (int)row.y + 3, 3, 7, ink);
         }
     }
     const char *hint = status;
@@ -550,32 +564,37 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         }
     }
     if (hint) {
-        const char *shown = fit(hint, WIDTH - 12);
-        int x = (WIDTH - MeasureText(shown, 10)) / 2;
+        const char *shown = fit(t->small, hint, WIDTH - 12);
+        int x = (WIDTH - text_width(t->small, shown)) / 2;
         int y = main ? top - 15 : top + height + 3;
-        DrawRectangle(x - 3, y - 1, MeasureText(shown, 10) + 6, 12, (Color) { 10, 38, 57, 200 });
-        DrawText(shown, x, y + 1, 10, status ? rgb(255, 236, 175) : rgb(255, 196, 150));
+        DrawRectangle(
+            x - 3, y - 1, text_width(t->small, shown) + 6, 9, (Color) { 10, 38, 57, 200 });
+        draw_text(t->small, shown, x, y + 1, status ? rgb(255, 236, 175) : rgb(255, 196, 150));
     }
 }
 
-static void draw_footer_text(const char *label, int x)
+static void draw_footer_text(Font font, const char *label, int x)
 {
-    DrawText(label, x + 1, 191, 7, (Color) { 10, 45, 65, 130 });
-    DrawText(label, x, 190, 7, (Color) { 162, 197, 199, 190 });
+    draw_text(font, label, x + 1, 191, (Color) { 10, 45, 65, 130 });
+    draw_text(font, label, x, 190, rgb(162, 219, 217));
 }
 
 static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *status)
 {
     BeginTextureMode(t->target);
     DrawTexture(t->backdrop, 0, 0, WHITE);
-    draw_logo();
+    draw_logo(t->ui);
     crosshair(12, 37, rgb(118, 203, 211));
     crosshair(307, 37, rgb(118, 203, 211));
     draw_menu(t, s, status);
     const char *map_credit = "MAP: OSM CONTRIBUTORS";
-    draw_footer_text(PROTEUS_VERSION, 8);
-    if (t->panel == PANEL_SETTINGS)
-        draw_footer_text(map_credit, WIDTH - 9 - MeasureText(map_credit, 7));
+    draw_footer_text(t->small, PROTEUS_VERSION, 8);
+    if (t->panel == PANEL_SETTINGS) {
+        draw_footer_text(t->small, map_credit, WIDTH - 9 - text_width(t->small, map_credit));
+        const char *fonts = "FONTS: DANIEL LINSSEN";
+        draw_text(
+            t->small, fonts, (WIDTH - text_width(t->small, fonts)) / 2, 66, rgb(142, 224, 226));
+    }
     EndTextureMode();
 }
 
@@ -596,6 +615,20 @@ static void present(Title *t)
         (Vector2) { 0 }, 0, WHITE);
     frame_pacer_wait(&t->pacer);
     EndDrawing();
+}
+
+static Font load_title_font(const char *asset)
+{
+    char path[4096];
+    if (!boat_asset_path(path, sizeof(path), asset))
+        return (Font) { 0 };
+    Font font = LoadFont(path);
+    // LoadFont falls back to raylib's default when a required bitmap asset is missing.
+    if (font.texture.id == GetFontDefault().texture.id)
+        return (Font) { 0 };
+    if (IsTextureValid(font.texture))
+        SetTextureFilter(font.texture, TEXTURE_FILTER_POINT);
+    return font;
 }
 
 static bool open_title(Title *t)
@@ -631,19 +664,26 @@ static bool open_title(Title *t)
     t->backdrop = LoadTextureFromImage(image);
     UnloadImage(image);
     t->target = LoadRenderTexture(WIDTH, HEIGHT);
-    if (!IsTextureValid(t->backdrop) || !IsRenderTextureValid(t->target)) {
+    t->ui = load_title_font("fonts/m5x7.fnt");
+    t->small = load_title_font("fonts/m3x6.fnt");
+    if (!IsTextureValid(t->backdrop) || !IsRenderTextureValid(t->target) || !IsFontValid(t->ui)
+        || !IsTextureValid(t->ui.texture) || !IsFontValid(t->small)
+        || !IsTextureValid(t->small.texture)) {
         fprintf(stderr, "Cannot load the title screen (%s).\n", path);
         return false;
     }
     SetTextureFilter(t->backdrop, TEXTURE_FILTER_POINT);
     SetTextureFilter(t->target.texture, TEXTURE_FILTER_POINT);
-    SetTextureFilter(GetFontDefault().texture, TEXTURE_FILTER_POINT);
     return true;
 }
 
 static void close_title(Title *t)
 {
     stop_search(t);
+    if (t->ui.glyphs)
+        UnloadFont(t->ui);
+    if (t->small.glyphs)
+        UnloadFont(t->small);
     if (IsRenderTextureValid(t->target))
         UnloadRenderTexture(t->target);
     if (IsTextureValid(t->backdrop))

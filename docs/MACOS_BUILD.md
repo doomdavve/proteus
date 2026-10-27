@@ -62,7 +62,8 @@ For example:
 "/Applications/Wake Velocity.app/Contents/MacOS/wake_velocity" --location river --gpu-aa
 ```
 
-Music, shaders, textures, the title river backdrop, map attribution, and dependency licenses
+Music, shaders, textures, the title river backdrop, bitmap menu fonts and their attribution,
+map attribution, and dependency licenses
 are inside the bundle. Personal bests remain in `~/Library/Application Support/Proteus/`.
 
 ## Build locally

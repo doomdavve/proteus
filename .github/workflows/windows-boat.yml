@@ -66,6 +66,7 @@ jobs:
           Copy-Item build-win/Release/assets/shaders "$package/assets" -Recurse
           Copy-Item build-win/Release/assets/textures "$package/assets" -Recurse
           Copy-Item build-win/Release/assets/title "$package/assets" -Recurse
+          Copy-Item build-win/Release/assets/fonts "$package/assets" -Recurse
           New-Item -ItemType Directory -Force -Path "$package/assets/music" | Out-Null
           Copy-Item build-win/Release/assets/music/a-little-boat.xm "$package/assets/music"
           New-Item -ItemType Directory -Force -Path "$package/assets/geometry/river" | Out-Null
@@ -89,6 +90,12 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Relocated Wake Velocity failed: $LASTEXITCODE" }
             & $exe --serve --scripted --ticks 240
             if ($LASTEXITCODE -ne 0) { throw "Relocated boat server failed: $LASTEXITCODE" }
+            foreach ($fontAsset in @("m5x7.fnt", "m5x7.png", "m3x6.fnt", "m3x6.png")) {
+              $fontPath = Join-Path (Split-Path $exe) "assets/fonts/$fontAsset"
+              if (-not (Test-Path $fontPath -PathType Leaf)) {
+                throw "Packaged menu font is missing: $fontPath"
+              }
+            }
             $backdrop = Join-Path (Split-Path $exe) assets/title/river-backdrop.png
             if (-not (Test-Path $backdrop -PathType Leaf)) {
               throw "Packaged title backdrop is missing: $backdrop"

@@ -3,7 +3,9 @@
 Status: revised 2026-10-27. This document owns the title, menu and promotion of
 **Wake Velocity**. The user selected the cyan workstation mock-up (B): straight outlined
 lettering, restrained coral depth, numbered rows, open corner brackets and a dusk river.
-The redesign is implemented on `title-dusk-console`; implementation acceptance is pending.
+The redesign is implemented on `title-dusk-console`; the user requested broader title
+lettering and compact m5x7/m3x6 UI fonts after the initial implementation. That refinement
+is implemented; visual acceptance remains pending.
 The shared title retains single-player setup, public/LAN/address joining, hosting and saved
 settings. The main screen's only credit is **A PROTEUS GAME**; the build version is at lower
 left and the retained OSM map credit is in SETTINGS. Next: user review of the implemented
@@ -18,7 +20,7 @@ Native review capture (development build version shown):
 
 ![Cyan workstation title over the dusk river](title/cyan-workstation.png)
 
-Completed: replace the bowed/bobbing logo with a title-owned, outlined block alphabet;
+Completed: replace the bowed/bobbing logo with a title-owned, outlined bitmap wordmark;
 keep coral offset depth and a small centered A PROTEUS GAME. The main menu is compact,
 left of center over the water, with 01–04 rows, a cyan reverse-video selection, coral
 chevron, fine dividers, bracket corners and sparse registration marks. Text stays fixed
@@ -37,7 +39,8 @@ Reconfigure after changing revisions to refresh it. Source archives/release buil
 supply `-DPROTEUS_VERSION=v0.0.19`; absent Git metadata and an override, it says `unknown`.
 The old PROTEUS 2026 footer is removed; SETTINGS retains MAP: OSM CONTRIBUTORS.
 
-Verification, 2026-10-27, Apple Silicon/macOS: Debug configure/build passed, with no
+Initial implementation verification, 2026-10-27 (before the font refinement below),
+Apple Silicon/macOS: Debug configure/build passed, with no
 project-source warnings (raylib's bundled stb_vorbis emits its existing pointer-comparison
 warning on the first build). Full CTest with `PROTEUS_GPU_TESTS=ON`: all 256 enabled tests
 passed (63.58 s); 15 retired wake-field/prototype cases disabled. A temporary, uncommitted review
@@ -57,6 +60,41 @@ Limits: no physical keyboard/mouse play, listening acceptance, Windows/Linux run
 Safari/Firefox or packaged-binary review. The temporary title harness was agent-run,
 not a human playtest. Mock-up B was user-selected; implementation acceptance remains
 pending. Next: user visual review and physical playback, then the sunset lighting-frame step.
+
+## Compact fonts and broader title, 2026-10-27
+
+User feedback: the generated B mock-up's title and font looked better than the first
+implementation. Completed: replace the narrow 5×7 title alphabet with a separately
+authored 7×9 bitmap wordmark using broad two-cell strokes, square counters, a cyan edge
+and coral depth. Menu labels, values, row numbers and A PROTEUS GAME now use Daniel
+Linssen's **m5x7**; hints and footer data use **m3x6**. Both fonts are credited in SETTINGS
+and in [the bundled font notes](../assets/fonts/README.md). Existing gameplay HUD and
+in-game Escape menu fonts remain outside this title-menu refinement.
+
+The supplied TTFs are retained as source assets. The first runtime-TTF experiment was
+superseded: raylib's ascent-to-descent sizing produced uneven 7×9 / 4×8 capitals at its
+nominal 16 px height. `tools/generate_menu_fonts.py` now bakes BMFont metrics/atlases at
+the author's intended 16 px em size using Pillow/FreeType. The shipped atlases have true
+5×7 / 3×6 capitals, integral advances and binary coverage; title-owned fonts load/unload
+with the title and draw 1:1 with point filtering. Width fitting and edit cursors use the
+same font metrics as drawing. Native/macOS/Windows and browser packaging include the
+fonts and attribution. No TTF rasterization happens at runtime.
+
+Verification, 2026-10-27, Apple Silicon/macOS: Debug build and all 256 enabled CTests
+passed with GPU tests ON (62.67 s; 15 retired cases disabled). The temporary native
+review captured every panel/selected row and completed 120 windowed title frames;
+font glyphs were checked for binary coverage, native capital size and integral advances.
+Captures were inspected at 1× and integer scale. Atlas regeneration with Pillow 13.0.0
+produced identical file hashes. A locally ad-hoc-signed macOS ZIP was extracted outside
+the checkout; its title capture loaded the packaged fonts and was inspected.
+
+Emscripten MinSizeRel packaging, Chrome/SwiftShader title/settings persistence, repeated
+solo sessions and audio-context checks passed. A separate pointer check entered Settings,
+returned, entered Multiplayer and returned to the launcher; captures were inspected.
+Chrome reported the existing ScriptProcessorNode deprecation and ReadPixels warnings.
+Changed local documentation links, Python syntax, C formatting and diff checks passed.
+Next: user visual review of this capture. Physical input/listening, Finder launch,
+Windows/Linux runtime and Firefox/Safari remain unverified for this refinement.
 
 ## Browser parity, 2026-10-25
 
