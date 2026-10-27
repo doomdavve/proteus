@@ -127,7 +127,7 @@ static void draw_help(bool course, bool mapped, bool voyage, bool deathmatch, bo
         "Release thrust keys: neutral / coast",
         "Hold Shift: low-power maneuvering",
         voyage ? "Hold Backspace 1 s: back to last shelter" : "Hold Backspace 1 s: reset / restart",
-        deathmatch ? "Space: gun | E: wave grenade | Tab: scores"
+        deathmatch ? "Space: water | E: stern wave | Q: torpedo | Tab: scores"
             : race ? "Hold Tab: race standings"
                    : "",
         "+/-: zoom | PgUp/PgDn: height",
@@ -1145,6 +1145,13 @@ static int study(int argc, char **argv)
                 if (b->owner == net->client.slot && b->born > audio_input.gun_tick)
                     audio_input.gun_tick = b->born;
             }
+            for (unsigned i = 0; i < BOAT_COMBAT_TORPEDOES; ++i) {
+                const BoatCombatObject *t = &c->torpedoes[i];
+                if (t->born > audio_input.grenade_tick)
+                    audio_input.grenade_tick = t->born;
+                if (t->ended > audio_input.grenade_tick)
+                    audio_input.grenade_tick = t->ended;
+            }
             for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i)
                 if (c->waves[i].born > audio_input.grenade_tick)
                     audio_input.grenade_tick = c->waves[i].born;
@@ -1234,7 +1241,8 @@ static int study(int argc, char **argv)
             WIDTH, HEIGHT);
 #ifdef PROTEUS_BOAT_NET
         if (net)
-            net_study_combat_hud(net, WIDTH);
+            net_study_combat_hud(
+                net, WIDTH, HEIGHT, view, view_presentation, view_world, camera_settings);
 #endif
         if (mouse_driving && !menu.open)
             DrawText(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4, 4, 10,

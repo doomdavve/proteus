@@ -3,7 +3,8 @@
 
 #include "boat.h"
 
-#define BOAT_COMBAT_BULLETS 64
+#define BOAT_COMBAT_BULLETS 40 // Short-lived water packets.
+#define BOAT_COMBAT_TORPEDOES 8
 #define BOAT_COMBAT_GRENADES 4
 #define BOAT_COMBAT_WAVES 4
 #define BOAT_COMBAT_PLAYERS 4
@@ -11,6 +12,8 @@
 typedef struct {
     float health, damage, bullet_speed, bullet_range;
     float grenade_distance, wave_height, wave_speed, wave_range;
+    float cannon_pressure, pressure_recovery, torpedo_damage, torpedo_speed, torpedo_range;
+    uint32_t torpedo_ticks, arming_ticks, torpedo_ammo;
     uint32_t fire_ticks, heat_ticks, cool_ticks, grenade_ticks, splash_ticks, fuse_ticks,
         grace_ticks;
 } BoatCombatRules;
@@ -24,7 +27,13 @@ typedef struct {
 } BoatCombatObject;
 
 typedef struct {
-    float health, heat;
+    float health, heat, pressure;
+    uint64_t next_torpedo, pressure_tick;
+    uint32_t torpedo_request, ammo, pressure_owner, pressure_generation;
+    // Recent damage bursts, addressed by target and fenced by target life/generation.
+    float damage[BOAT_COMBAT_PLAYERS];
+    uint64_t damage_tick[BOAT_COMBAT_PLAYERS];
+    uint32_t damage_life[BOAT_COMBAT_PLAYERS], damage_generation[BOAT_COMBAT_PLAYERS];
     uint64_t life_start, next_fire, next_grenade, defeated, hit_tick;
     uint32_t generation, request, hit_serial, killer;
     bool overheated;
@@ -35,10 +44,11 @@ typedef struct BoatCombat {
     BoatCombatRules rules;
     BoatCombatPlayer players[BOAT_COMBAT_PLAYERS];
     BoatCombatObject bullets[BOAT_COMBAT_BULLETS], grenades[BOAT_COMBAT_GRENADES];
+    BoatCombatObject torpedoes[BOAT_COMBAT_TORPEDOES];
     BoatRadialWave waves[BOAT_COMBAT_WAVES];
 } BoatCombat;
 
-#define BOAT_COMBAT_BYTES 4052
+#define BOAT_COMBAT_BYTES 3716
 // Canonical big-endian checkpoint representation, including rules; no padding on wire.
 void boat_combat_encode(const BoatCombat *combat, uint8_t bytes[BOAT_COMBAT_BYTES]);
 bool boat_combat_decode(BoatCombat *combat, const uint8_t bytes[BOAT_COMBAT_BYTES], uint64_t tick);

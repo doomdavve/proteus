@@ -93,7 +93,7 @@ static int validate_core(void)
     BoatSession boat;
     physics_session(&boat, BOAT_LOCATION_BASIN);
     for (int tick = 0; tick < 240; ++tick) {
-        boat_session_step(&boat, (BoatInput) { 1, 0, 0, 0 });
+        boat_session_step(&boat, (BoatInput) { .steering_rate = 1 });
         CHECK(boat.boat.turn_roll_load == 0 && fabsf(boat.boat.roll) < .000001f
             && fabsf(boat.boat.roll_velocity) < .000001f);
     }
@@ -228,8 +228,8 @@ static int validate_free(void)
             banking_fixture_input(&repeat.boat, scenario, tick);
             CHECK(open_water(&boat.boat));
             BoatSession before = boat;
-            boat_session_step(&boat, (BoatInput) { wheel, 0, 0, 0 });
-            boat_session_step(&repeat, (BoatInput) { wheel, 0, 0, 0 });
+            boat_session_step(&boat, (BoatInput) { .steering_rate = wheel });
+            boat_session_step(&repeat, (BoatInput) { .steering_rate = wheel });
             CHECK(same_state(&boat, &repeat));
             CHECK(open_water(&boat.boat));
             float load
@@ -509,8 +509,8 @@ static int validate_transitions(void)
         float wheel = tick < 480 ? 1 : -1;
         BoatSession before = a;
         CHECK(open_water(&a.boat) && open_water(&b.boat));
-        boat_session_step(&a, (BoatInput) { wheel, 0, 0, 0 });
-        boat_session_step(&b, (BoatInput) { -wheel, 0, 0, 0 });
+        boat_session_step(&a, (BoatInput) { .steering_rate = wheel });
+        boat_session_step(&b, (BoatInput) { .steering_rate = -wheel });
         CHECK(open_water(&a.boat) && open_water(&b.boat));
         CHECK(fabsf(a.boat.roll + b.boat.roll) < .00002f);
         CHECK(fabsf(a.boat.roll_velocity + b.boat.roll_velocity) < .00005f);
@@ -654,8 +654,8 @@ static int wave_turn(int trial)
         static BoatSession before;
         if (report)
             before = boat;
-        boat_session_step(&boat, (BoatInput) { wheel, 0, 0, 0 });
-        boat_session_step(&repeat, (BoatInput) { wheel, 0, 0, 0 });
+        boat_session_step(&boat, (BoatInput) { .steering_rate = wheel });
+        boat_session_step(&repeat, (BoatInput) { .steering_rate = wheel });
         CHECK(same_state(&boat, &repeat) && finite_state(&boat.boat));
         CHECK(open_water(&boat.boat));
         CHECK(fabsf(boat.boat.roll) < 30 * DEG2RAD);
@@ -736,8 +736,10 @@ static int validate_long_transitions(void)
     float peak = 0, peak_rate = 0;
     for (int tick = 0; tick < 14400; ++tick) {
         float wheel = sinf(tick * .005f), throttle_change = sinf(tick * .001f);
-        boat_session_step(&boat, (BoatInput) { wheel, throttle_change, 0, 0 });
-        boat_session_step(&repeat, (BoatInput) { wheel, throttle_change, 0, 0 });
+        boat_session_step(
+            &boat, (BoatInput) { .steering_rate = wheel, .throttle_rate = throttle_change });
+        boat_session_step(
+            &repeat, (BoatInput) { .steering_rate = wheel, .throttle_rate = throttle_change });
         CHECK(same_state(&boat, &repeat) && finite_state(&boat.boat));
         CHECK(footprint_clear(&boat));
         CHECK(fabsf(boat.boat.roll) < 30 * DEG2RAD);

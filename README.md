@@ -163,19 +163,24 @@ only the room:
 ./build/boat_server --bind 0.0.0.0 --mode deathmatch --location river
 ```
 
-Deathmatch enables both weapons: hold **Space** for the bow machine gun and press **E** to
-lob a wave grenade. Each life has 100 hull health. The gun fires eight 8-damage shots per
-second, overheats after two seconds and cools on release. Grenades recharge in eight seconds
-and detonate after 1.5 seconds, making physical waves that can also capsize the thrower. Spawn
-protection blocks firing/bullet damage for two seconds. Kills include hull destruction and
-capsizes; defeats respawn after three seconds. `boat_bot --hunt` uses both weapons.
-[Rules, verification and pending balance acceptance](docs/DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26).
+Deathmatch has three weapons: hold **Space** for a short-range water cannon, press **E**
+to drop a wave grenade 7 m astern, and press **Q** to launch a straight-running torpedo.
+Sustained cannon hits build recoverable heel pressure, strongest against a broadside, and can
+capsize a boat without hull damage. The cannon overheats after four seconds and cools on release.
+Grenades splash after 0.3 s, detonate after 1 s and recharge in 8 s; their physical wave can
+also capsize the thrower. Each life starts with 100 hull health and three 40-damage torpedoes;
+torpedoes arm after 0.25 s and reload in 1.5 s. Bottom instruments show hull, heel pressure,
+cannon heat, grenade readiness and torpedo ammunition. Numbers above opponents show only your
+confirmed hull damage, never their health. Spawn protection blocks launches and direct hits for
+two seconds. Kills include hull destruction and capsizes; defeats respawn after three seconds.
+`boat_bot --hunt` uses all three weapons.
+[Rules and verification](docs/DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27).
 
 `wake_velocity --serve` accepts every `boat_server` option, so a package needs only the game.
 
 Clients join through the title or `--connect HOST:24680` and automatically load the server's
 location, scenery and water. Multiplayer starts are out in the river, about 60 m apart, with
-shoreline/boat/wake checks for safe resets. Protocol v6 requires rebuilt server and clients;
+shoreline/boat/wake checks for safe resets. Protocol v7 requires rebuilt server and clients;
 older packages are rejected with a version mismatch.
 
 The server runs until Ctrl+C, `--seconds` or `--ticks`. `--waves` gives the room gentle waves,
@@ -445,7 +450,7 @@ from neutral to full in 0.25 seconds, with separately smoothed engine response. 
 unassigned. R does nothing. Hold Backspace for one second, with a visible progress bar, or
 choose the explicit reset/restart/request action in the Escape menu. A short tap does nothing;
 release, help/menu, loss of focus or replay cancels progress. Each hold triggers at most once.
-Space fires the gun in deathmatch and E throws a wave grenade; Space is unassigned in free/race play; replay/menu controls retain their existing use.
+Space operates the water cannon in deathmatch, E drops a stern wave grenade, and Q launches a torpedo; Space is unassigned in free/race play; replay/menu controls retain their existing use.
 Press `M` to capture the mouse for steering, or launch with `--mouse-steering`. The pointer
 is hidden and horizontal movement accumulates wheel angle: move right/left to turn the wheel,
 then stop moving to hold that setting. About 300 mouse pixels moves the requested wheel from

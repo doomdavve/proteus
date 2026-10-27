@@ -255,8 +255,16 @@ void boat_match_observe(BoatMatch *m, const BoatFleet *fleet, BoatMatchOutput *o
             continue;
         const BoatCombat *c = &fleet->state.combat;
         bool destroyed = c->enabled && c->players[i].health <= 0;
+        const BoatCombatPlayer *p = &c->players[i];
+        if (c->enabled && !s->out && p->pressure_tick && p->pressure_tick <= tick
+            && tick - p->pressure_tick <= m->rules.credit_ticks
+            && p->pressure_owner < BOAT_FLEET_SLOTS
+            && p->pressure_generation == c->players[p->pressure_owner].generation
+            && m->slots[p->pressure_owner].present && !in_grace(m, i, tick)
+            && p->pressure_tick >= s->touch.tick)
+            touch(m, i, p->pressure_owner, BOAT_MATCH_CANNON, p->pressure_tick);
         if (!s->out && destroyed && c->players[i].killer < BOAT_FLEET_SLOTS)
-            touch(m, i, c->players[i].killer, BOAT_MATCH_GUN, tick);
+            touch(m, i, c->players[i].killer, BOAT_MATCH_TORPEDO, tick);
         if (!s->out && (destroyed || f->boat.motion_state == BOAT_CAPSIZED))
             capsize(m, i, f->life, tick, false,
                 destroyed ? BOAT_MATCH_DEFEAT_HULL : BOAT_MATCH_DEFEAT_CAPSIZE, out);

@@ -10,8 +10,9 @@
 typedef struct {
     float steering_rate;
     float throttle_rate;
-    bool gun;
+    bool gun; // Held water cannon (legacy member name).
     uint16_t grenade; // Nonzero request serial; held/replayed requests are consumed once.
+    uint8_t torpedo; // Nonzero request serial, wraps from 255 to 1.
 } BoatInput;
 
 #endif

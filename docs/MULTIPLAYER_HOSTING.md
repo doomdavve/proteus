@@ -3,7 +3,9 @@
 The Winterfell deployment uses released **v0.0.18**, commit
 `2f9433565d59506607634fbb69a916593779864e`, with the optional WebRTC transport enabled.
 It hosts one shared four-player river deathmatch room for native and browser players.
-The room includes the released machine gun and wave grenade (Space and E). A round starts
+The deployed room includes the released protocol-v6 machine gun and wave grenade (Space and E).
+The protocol-v7 [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) requires a coordinated
+server/client upgrade and has not been deployed by that implementation change. A round starts
 when two players join. There is no room token, allowing the native and browser title screens
 to join directly. There are no player accounts.
 

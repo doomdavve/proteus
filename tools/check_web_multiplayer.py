@@ -107,7 +107,7 @@ try:
         page.bring_to_front()
         page.evaluate("""() => {
             window.spawnRequests = 0;
-            window.combatCounters = { gun: 0, grenades: new Set(), pages: 0 };
+            window.combatCounters = { gun: 0, grenades: new Set(), torpedoes: new Set(), pages: 0 };
             const poll = Module['boatRtc'].poll;
             Module['boatRtc'].poll = () => {
                 const event = poll();
@@ -123,6 +123,7 @@ try:
                         if (data[at + 2] & 2) ++combatCounters.gun;
                         const grenade = (data[at + 3] << 8) | data[at + 4];
                         if (grenade) combatCounters.grenades.add(grenade);
+                        if (data[at + 5]) combatCounters.torpedoes.add(data[at + 5]);
                     }
                 }
                 return original(channel, data);
@@ -130,16 +131,17 @@ try:
         }""")
         if args.mode == 'deathmatch':
             page.keyboard.down('Space')
-            page.wait_for_timeout(2300)
-            page.screenshot(path=str(args.output / 'gun-overheat.png'))
+            page.wait_for_timeout(4300)
+            page.screenshot(path=str(args.output / 'cannon-overheat.png'))
             page.keyboard.up('Space')
             page.keyboard.press('e', delay=80)
             page.wait_for_timeout(300)
             page.screenshot(path=str(args.output / 'grenade-flight.png'))
+            page.keyboard.press('q')
             page.wait_for_timeout(1400)
             page.screenshot(path=str(args.output / 'grenade-burst.png'))
-            counters = page.evaluate('({gun:combatCounters.gun,grenades:combatCounters.grenades.size,pages:combatCounters.pages})')
-            assert counters['gun'] > 0 and counters['grenades'] > 0 and counters['pages'] >= 4, counters
+            counters = page.evaluate('({gun:combatCounters.gun,grenades:combatCounters.grenades.size,torpedoes:combatCounters.torpedoes.size,pages:combatCounters.pages})')
+            assert counters['gun'] > 0 and counters['grenades'] > 0 and counters['torpedoes'] > 0 and counters['pages'] >= 4, counters
             print('COMBAT', counters, flush=True)
         page.keyboard.down('w')
         page.wait_for_timeout(1500)

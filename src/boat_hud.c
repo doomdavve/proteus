@@ -3,6 +3,7 @@
 #include "raylib.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -68,7 +69,8 @@ static void label(Panel p, const char *text, int x, int y, Color color)
         { '+', "02720" }, { '-', "00700" }, { 'C', "74447" }, { 'D', "65556" }, { 'E', "74647" },
         { 'F', "74644" }, { 'H', "55755" }, { 'I', "72227" }, { 'K', "55655" }, { 'O', "75557" },
         { 'N', "57775" }, { 'P', "75544" }, { 'R', "75655" }, { 'S', "74717" }, { 'T', "72222" },
-        { 'U', "55557" } };
+        { 'U', "55557" }, { 'A', "25755" }, { 'B', "65656" }, { 'M', "57755" }, { 'V', "55552" },
+        { 'W', "55577" }, { 'Y', "55222" }, { 'Q', "75573" } };
     int left = x - ((int)strlen(text) * 4 - 1) / 2;
     for (const char *c = text; *c; ++c, left += 4) {
         for (size_t i = 0; i < sizeof(glyphs) / sizeof(glyphs[0]); ++i) {
@@ -153,4 +155,45 @@ void boat_hud_draw(BoatHudTelemetry telemetry, int width, int height)
         box(p, 47, -13, 72, 2, muted);
         box(p, 47, -13, (int)roundf(72 * progress), 2, amber);
     }
+}
+
+static void instrument(Panel p)
+{
+    box(p, 1, 2, 54, 44, (Color) { 4, 11, 15, 110 });
+    box(p, 0, 0, 54, 44, (Color) { 56, 74, 77, 130 });
+    box(p, 1, 1, 52, 1, (Color) { 153, 166, 157, 255 });
+    box(p, 2, 3, 50, 38, face);
+    box(p, 4, 5, 2, 2, muted);
+    box(p, 48, 37, 2, 2, muted);
+}
+
+void boat_hud_combat_draw(BoatHudCombat combat, int width, int height)
+{
+    if (width < 286 || height < 80)
+        return;
+    Panel hull = { (width - 166) / 2 - 58, height - 46 };
+    Panel weapons = { (width - 166) / 2 + 170, height - 46 };
+    instrument(hull);
+    instrument(weapons);
+    label(hull, "HULL", 27, 7, muted);
+    float health = bounded(combat.hull, 0, 100);
+    Color color = health <= 30 ? amber : ahead;
+    char text[24];
+    snprintf(text, sizeof(text), "%.0f", health);
+    label(hull, text, 27, 17, color);
+    for (int i = 0; i < 10; ++i)
+        box(hull, 8 + i * 4, 25, 3, 4, health >= (float)(i + 1) * 10 ? color : muted);
+    label(hull, "HEEL", 19, 34, muted);
+    box(hull, 32, 34, 13, 4, muted);
+    box(hull, 32, 34, (int)(13 * bounded(combat.pressure, 0, 1)), 4, amber);
+    label(weapons, combat.overheated ? "COOL" : "SPACE", 27, 7, combat.overheated ? amber : muted);
+    box(weapons, 8, 15, 38, 3, muted);
+    box(weapons, 8, 15, (int)(38 * bounded(combat.heat, 0, 1)), 3, amber);
+    if (combat.grenade_seconds > 0)
+        snprintf(text, sizeof(text), "E %.1f", combat.grenade_seconds);
+    else
+        snprintf(text, sizeof(text), "E READY");
+    label(weapons, text, 27, 23, combat.grenade_seconds > 0 ? muted : ahead);
+    snprintf(text, sizeof(text), "Q %u", combat.torpedoes);
+    label(weapons, text, 27, 33, combat.torpedoes && combat.torpedo_seconds <= 0 ? ahead : amber);
 }

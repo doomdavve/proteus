@@ -75,10 +75,12 @@ static int check_drive(void)
     for (int tick = 0; tick < 360; ++tick) {
         float steering = tick > 80 && tick < 250 ? .4f : 0;
         float throttle = tick < 180 ? 1 : 0;
-        boat_session_step(&plain_session, (BoatInput) { steering, throttle, 0, 0 });
+        boat_session_step(
+            &plain_session, (BoatInput) { .steering_rate = steering, .throttle_rate = throttle });
         BoatFrameMetrics frame = { 0 };
         double started = boat_profile_time(false);
-        boat_session_step(&measured_session, (BoatInput) { steering, throttle, 0, 0 });
+        boat_session_step(&measured_session,
+            (BoatInput) { .steering_rate = steering, .throttle_rate = throttle });
         frame.physics_ms = (float)((boat_profile_time(false) - started) * 1000.0);
         frame.physics_max_ms = frame.physics_ms;
         frame.simulation_ms = frame.physics_ms;

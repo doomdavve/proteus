@@ -416,7 +416,7 @@ and `boat_server --mode deathmatch|race --round-seconds S` remain available for 
 `boat_net` also runs four predicted clients in the mapped river: shoreline-safe spawns,
 a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
 a snapshot outside the former basin coordinate envelope, a local loading pause, reset and exact
-mirrors at a birth-batch snapshot. The protocol-v6 codec rejects invalid map IDs and reserved
+mirrors at a birth-batch snapshot. The protocol-v7 codec rejects invalid map IDs and reserved
 bytes and checks the RaceState/RaceEvent rules; a race room on the in-memory transport checks
 predicted holds released at GO, ferry-exact mirrors, a mid-race joiner and results, and a
 prediction replay through GO matches the authority; discovery uses the complete compiled-map bundle digest.
@@ -553,9 +553,10 @@ run also completed before the suite policy changed, so its all-98 result remains
 historical evidence. New manual motion/audio review was unnecessary for these test-only
 changes; the preceding default switch has its own capture/desktop evidence.
 
-## Deathmatch weapons (protocol v6)
+## Deathmatch weapons (protocol v7)
 
-`boat_combat` verifies deterministic weapon cadence, overheating/release cooling, grace,
+`boat_combat` verifies progressive cannon capsizes/recovery, torpedo ammo/arming/serial wrap,
+actual damage/overkill, rearward grenades, deterministic cadence, overheating/release cooling, grace,
 numbered throws and replay, pool limits, fuses, relative moving-hull sweeps, water blocking,
 life fences, one lethal defeat, respawn, radial derivatives and physical self-waves. It also
 round-trips combat checkpoints and checks malformed pages and the 1100-byte ceiling.

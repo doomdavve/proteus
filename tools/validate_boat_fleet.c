@@ -44,9 +44,9 @@ static BoatInput loop_input(const Boat *boat, unsigned tick)
 {
     float throttle = tick < 1440 ? 1 : 0;
     float wheel = tick >= 420 && tick < 1440 ? 1 : 0;
-    return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1), 0,
-        0 };
+    return (BoatInput) { .steering_rate = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
+        .throttle_rate
+        = Clamp((throttle - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
 }
 
 static bool track(
@@ -145,8 +145,8 @@ static int pair_equivalence(void)
         boat_fleet_place(&f, 1, fixtures[k][1]);
         unsigned contacts = 0;
         for (unsigned tick = 0; tick < 720; ++tick) {
-            BoatInput inputs[BOAT_FLEET_SLOTS]
-                = { { 0, tick < 240 ? 1 : 0, 0, 0 }, { k ? .3f : 0, tick < 240 ? 1 : 0, 0, 0 } };
+            BoatInput inputs[BOAT_FLEET_SLOTS] = { { .throttle_rate = tick < 240 ? 1 : 0 },
+                { .steering_rate = k ? .3f : 0, .throttle_rate = tick < 240 ? 1 : 0 } };
             CHECK(reference_step(&r, inputs, 2));
             CHECK(boat_fleet_step(&f, inputs));
             contacts += f.stats.contacts;
@@ -685,7 +685,7 @@ static int rejects(void)
     BoatFleet g = f;
     boat_fleet_place(&f, 0, boat_at((Vector2) { 0, 0 }, 0, (Vector2) { 0, -3 }));
     boat_fleet_place(&g, 0, boat_at((Vector2) { 0, 0 }, 0, (Vector2) { 0, -3 }));
-    BoatInput bad[BOAT_FLEET_SLOTS] = { { NAN, INFINITY, 0, 0 } };
+    BoatInput bad[BOAT_FLEET_SLOTS] = { { .steering_rate = NAN, .throttle_rate = INFINITY } };
     CHECK(boat_fleet_step(&f, bad) && boat_fleet_step(&g, none));
     CHECK(boat_fleet_hash(&f.state) == boat_fleet_hash(&g.state));
     return 0;

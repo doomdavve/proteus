@@ -92,20 +92,20 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e5400060d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e5400070d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
-    input.input.commands[0] = boat_net_command((BoatInput) { 1, -1, 0, 0 }, 0);
-    input.input.commands[1]
-        = boat_net_command((BoatInput) { 0, 0, 0, 0 }, BOAT_NET_COMMAND_INACTIVE);
+    input.input.commands[0] = boat_net_command(
+        (BoatInput) { .steering_rate = 1, .throttle_rate = -1, .torpedo = 255 }, 0);
+    input.input.commands[1] = boat_net_command((BoatInput) { 0 }, BOAT_NET_COMMAND_INACTIVE);
     size = encode(input, bytes);
     CHECK(size == 60);
     CHECK(same_bytes(bytes, size,
-        "50424e54000609000000000900000000000000000000"
+        "50424e54000709000000000900000000000000000000"
         "00c8001c000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
-        "7f8100000000" // Steering +1, throttle -1.
+        "7f81000000ff" // Steering +1, throttle -1.
         "000001000000")); // Zero rates, inactive.
     BoatNetMessage hello = { .header = { .type = BOAT_NET_HELLO },
         .hello = { .physics_revision = 6,
@@ -176,7 +176,7 @@ static int golden(void)
     // Snapshot layout: sizes and a pinned digest of a hand-built state's bytes.
     BoatFleetState state = { .tick = 1000, .next_request = 5 };
     BoatNetSlotInput records[BOAT_FLEET_SLOTS]
-        = { { .tick = 999, .state = 1, .used = { 127, -64, 1, 0 } } };
+        = { { .tick = 999, .state = 1, .used = { 127, -64, 1, 0, 17 } } };
     state.slots[0] = (BoatFleetSlot) { .requested = 3, .life = 2, .request = 1, .active = true };
     state.slots[0].boat.position = (Vector2) { 12.5f, -3.25f };
     state.slots[0].boat.heading = 1.5f;
@@ -206,15 +206,17 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0x7aa25c376fac8ec5));
+    CHECK(digest == UINT64_C(0x818226576068a7dd));
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
-        BoatInput back
-            = boat_net_command_input(boat_net_command((BoatInput) { value, value, 0, 0 }, 0));
+        BoatInput back = boat_net_command_input(
+            boat_net_command((BoatInput) { .steering_rate = value, .throttle_rate = value }, 0));
         CHECK(back.steering_rate == value && back.throttle_rate == value);
     }
-    CHECK(boat_net_command((BoatInput) { NAN, 2, 0, 0 }, 0).steering == 0);
-    CHECK(boat_net_command((BoatInput) { NAN, 2, 0, 0 }, 0).throttle == 127);
+    CHECK(boat_net_command((BoatInput) { .steering_rate = NAN, .throttle_rate = 2 }, 0).steering
+        == 0);
+    CHECK(boat_net_command((BoatInput) { .steering_rate = NAN, .throttle_rate = 2 }, 0).throttle
+        == 127);
     CHECK(boat_net_sequence_newer(0, UINT32_MAX) && !boat_net_sequence_newer(UINT32_MAX, 0));
     CHECK(!boat_net_sequence_newer(5, 5) && !boat_net_sequence_newer(UINT32_C(0x80000000), 0));
     CHECK(boat_net_sequence_newer(UINT32_C(0x7fffffff), 0));
@@ -417,7 +419,7 @@ static int codec(void)
         size_t at;
         uint8_t value;
     } field_faults[] = { { 8, 36, 0 }, { 8, 36, BOAT_NET_MAX_COMMANDS + 1 }, { 8, 50, 4 },
-        { 8, 53, 1 }, { 10, 32, BOAT_NET_MAX_BIRTHS + 1 }, { 10, 36, 200 }, { 5, 36, 6 },
+        { 8, 37, 1 }, { 10, 32, BOAT_NET_MAX_BIRTHS + 1 }, { 10, 36, 200 }, { 5, 36, 6 },
         { 4, 40, 7 }, { 2, 32, 0 }, { 2, 32, BOAT_NET_REJECT_LIMIT }, { 0, 44, 0x01 },
         { 0, 46, 0x7f }, { 0, 44, 17 }, { 1, 32, BOAT_FLEET_SLOTS }, { 1, 33, 2 }, { 1, 41, 0 },
         { 3, 32 + 19, 3 }, { 3, 32 + 20, 17 }, { 3, 32 + 21 + 15, 'x' }, { 14, 32, 3 },
@@ -477,7 +479,7 @@ static int checkpoints(void)
     for (int waves = 0; waves < 2; ++waves) {
         busy_fleet(&fleet, 2400, waves);
         boat_fleet_request_spawn(&fleet, 2); // A pending reset is part of the checkpoint.
-        BoatNetSlotInput records[BOAT_FLEET_SLOTS] = { { 2399, 1, { 127, 0, 0, 0 } } };
+        BoatNetSlotInput records[BOAT_FLEET_SLOTS] = { { 2399, 1, { 127, 0, 0, 0, 0 } } };
         uint64_t go = waves ? 4321 : 0, go_back = 1;
         size_t size = boat_net_checkpoint_encode(&fleet.state, records, go, bytes, sizeof(bytes));
         CHECK(size > 0 && size <= BOAT_NET_MAX_CHECKPOINT);
@@ -742,13 +744,14 @@ static void room_step(Room *room, double dt)
             input = boat_fleet_bot_hunt_input(&room->bots[i], boat_net_client_view(c), c->slot);
             input.gun = true;
             input.grenade = (uint16_t)(room->server.fleet.state.tick / 960 + 1);
+            input.torpedo = (uint8_t)(room->server.fleet.state.tick / 240 % 255 + 1);
         }
         const BoatNetRaceRow *row = &c->race.slots[c->slot];
         if (own && room->race && c->race_valid && row->current) {
             const BoatFleet *view = boat_net_client_view(c);
             if (view->state.slots[c->slot].held)
-                input = (BoatInput) { 0,
-                    boat_throttle_rate(view->state.slots[c->slot].boat.throttle, 1), 0, 0 };
+                input = (BoatInput) { .throttle_rate
+                    = boat_throttle_rate(view->state.slots[c->slot].boat.throttle, 1) };
             else if (c->race.phase >= BOAT_RACE_RACING)
                 input = boat_fleet_bot_race_input(view, boat_race_river_course(), row->gates,
                     row->status != BOAT_RACE_RUNNING, c->slot);
@@ -891,7 +894,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c5100010006"));
+    CHECK(same_bytes(query, 8, "50424c5100010007"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -1257,7 +1260,8 @@ static int prediction_release(void)
     stuck = p;
     stuck.fleet.world.water.objects = &stuck.fleet.state.wakes;
     stuck.release_tick = 0;
-    BoatNetCommand full = boat_net_command((BoatInput) { .3f, 1, 0, 0 }, 0);
+    BoatNetCommand full
+        = boat_net_command((BoatInput) { .steering_rate = .3f, .throttle_rate = 1 }, 0);
     BoatInput steps[BOAT_FLEET_SLOTS] = { boat_net_command_input(full) };
     for (uint64_t t = start + 1; t <= start + 30; ++t) {
         boat_prediction_record(&p, t, authority.state.slots[0].life, full);
@@ -1311,8 +1315,8 @@ static int prediction_owners(void)
     }
     uint64_t start = authority[0].state.tick;
     for (uint64_t t = start + 1; t <= start + 30; ++t) {
-        BoatNetCommand command
-            = boat_net_command((BoatInput) { t % 20 < 10 ? .4f : -.4f, 1, 0, 0 }, 0);
+        BoatNetCommand command = boat_net_command(
+            (BoatInput) { .steering_rate = t % 20 < 10 ? .4f : -.4f, .throttle_rate = 1 }, 0);
         BoatInput steps[BOAT_FLEET_SLOTS] = { boat_net_command_input(command) };
         for (int r = 0; r < (t <= start + 15 ? 2 : 1); ++r) {
             boat_prediction_record(&p[r], t, authority[r].state.slots[0].life, command);
@@ -1382,9 +1386,9 @@ static int authority_rules(void)
     uint64_t target = s->fleet.state.tick + 10;
     BoatNetMessage batch = { .header = { .type = BOAT_NET_INPUT_BATCH, .tick = target },
         .input = { .life = life, .count = 1 } };
-    batch.input.commands[0] = boat_net_command((BoatInput) { 1, 0, 0, 0 }, 0);
+    batch.input.commands[0] = boat_net_command((BoatInput) { .steering_rate = 1 }, 0);
     inject(&room, i, batch);
-    batch.input.commands[0] = boat_net_command((BoatInput) { -1, 0, 0, 0 }, 0);
+    batch.input.commands[0] = boat_net_command((BoatInput) { .steering_rate = -1 }, 0);
     inject(&room, i, batch); // Same tick, other command: ignored.
     BoatNetServerStats before = s->stats;
     room_step(&room, 1 / 480.0);

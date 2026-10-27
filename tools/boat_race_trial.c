@@ -72,8 +72,8 @@ static BoatInput pilot(const Boat *boat, Vector2 target, float thrust)
 {
     float error = remainderf(heading_to(boat->position, target) - boat->heading, 2 * PI);
     float wheel = Clamp(1.5f * error - .8f * boat->yaw_velocity, -.6f, .6f);
-    return (BoatInput) { Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
-        boat_throttle_rate(boat->throttle, thrust), 0, 0 };
+    return (BoatInput) { .steering_rate = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
+        .throttle_rate = boat_throttle_rate(boat->throttle, thrust) };
 }
 
 static void advance_target(const Boat *boat, unsigned *next)
@@ -668,11 +668,12 @@ int main(int argc, char **argv)
                 : 0;
             accumulator += fmin(GetFrameTime(), .1);
             while (accumulator >= BOAT_TICK_SECONDS) {
-                BoatInput input = play
-                    ? (BoatInput) { (float)(IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT))
-                              - (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)),
-                          boat_throttle_rate(session.boat.throttle, target_thrust), 0, 0 }
-                    : pilot(&session.boat, preview_target(next, skill), next <= targets ? 1 : 0);
+                BoatInput input = play ? (BoatInput) { .steering_rate
+                    = (float)(IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT))
+                        - (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)),
+                    .throttle_rate = boat_throttle_rate(session.boat.throttle, target_thrust) }
+                                       : pilot(&session.boat, preview_target(next, skill),
+                                             next <= targets ? 1 : 0);
                 Vector2 previous = session.boat.position;
                 timed_boat_step(&session, input, NULL, NULL, &objects);
                 preview_advance(&session.boat, previous, &next, skill);
