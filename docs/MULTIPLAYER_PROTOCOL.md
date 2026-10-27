@@ -46,6 +46,10 @@ v7 (2026-10-27) replaces gun gameplay with a water cannon, reverses the grenade,
 torpedoes, recoverable pressure and per-attacker damage bursts. The command/slot reserved byte
 becomes a u8 torpedo serial. Combat checkpoint layout changes; MatchEvent adds cannon (5) and
 torpedo (6) causes. Message/slot sizes stay unchanged. Rebuild all peers; v1–v6 are incompatible.
+The cannon-arc follow-up preserves v7 byte layouts but fingerprints launch lift, gravity and
+cube radius as well as encoded rules; straight-flight and arcing builds reject each other by
+content digest. Projectile height is the committed current height, advanced ballistically for
+cannon cubes; birth ticks supply vertical velocity, so no extra checkpoint fields are needed.
 
 ## Conventions
 

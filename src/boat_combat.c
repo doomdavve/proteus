@@ -12,7 +12,7 @@ BoatCombatRules boat_combat_default_rules(void)
 {
     return (BoatCombatRules) { .health = 100,
         .damage = 0,
-        .bullet_speed = 60,
+        .bullet_speed = 28,
         .bullet_range = 28,
         .grenade_distance = 7,
         .wave_height = 2,
@@ -33,6 +33,11 @@ BoatCombatRules boat_combat_default_rules(void)
         .splash_ticks = 36,
         .fuse_ticks = 120,
         .grace_ticks = 240 };
+}
+
+float boat_combat_cannon_rise(float age)
+{
+    return BOAT_CANNON_LIFT * age - .5f * BOAT_CANNON_GRAVITY * age * age;
 }
 
 void boat_combat_bind(BoatFleet *f)
@@ -200,20 +205,21 @@ void boat_combat_advance(BoatFleet *f, const BoatInput inputs[BOAT_COMBAT_PLAYER
 }
 
 // Slab sweep in the moving hull's relative frame. Slots break exact ties deterministically.
-static float hull_hit(Vector2 a, Vector2 b, float height, const Boat *old, const Boat *now)
+static float hull_hit(Vector2 a, Vector2 b, float height, float end_height, float radius,
+    const Boat *old, const Boat *now)
 {
-    if (height < fminf(old->height, now->height) - .5f
-        || height > fmaxf(old->height, now->height) + 1.3f)
-        return INFINITY;
     Vector2 right = { cosf(now->heading), sinf(now->heading) };
     Vector2 forward = { sinf(now->heading), -cosf(now->heading) };
     a = Vector2Subtract(a, old->position);
     b = Vector2Subtract(b, now->position);
-    float start[] = { Vector2DotProduct(a, right), Vector2DotProduct(a, forward) };
-    float end[] = { Vector2DotProduct(b, right), Vector2DotProduct(b, forward) };
-    float low[] = { -.85f, -1.8f }, high[] = { .85f, 2.1f };
+    float start[]
+        = { Vector2DotProduct(a, right), Vector2DotProduct(a, forward), height - old->height };
+    float end[]
+        = { Vector2DotProduct(b, right), Vector2DotProduct(b, forward), end_height - now->height };
+    float low[] = { -.85f - radius, -1.8f - radius, -.5f - radius };
+    float high[] = { .85f + radius, 2.1f + radius, 1.3f + radius };
     float enter = 0, leave = 1;
-    for (unsigned j = 0; j < 2; ++j) {
+    for (unsigned j = 0; j < 3; ++j) {
         float d = end[j] - start[j];
         if (fabsf(d) < 1e-8f) {
             if (start[j] < low[j] || start[j] > high[j])
@@ -264,9 +270,14 @@ void boat_combat_hits(BoatFleet *f, const Boat before[BOAT_COMBAT_PLAYERS])
             continue;
         }
         Vector2 end = Vector2Add(b->position, Vector2Scale(b->direction, speed * BOAT_STEP));
+        float age = (float)(tick - b->born) * BOAT_STEP;
+        float rise = boat_combat_cannon_rise(age);
+        float end_height = torpedo
+            ? boat_water_query_borrowed(&f->world.water, end, time).height + .2f
+            : b->height + boat_combat_cannon_rise(age + BOAT_STEP) - rise;
         float first = INFINITY;
         unsigned victim = BOAT_COMBAT_PLAYERS;
-        // Conservative 5 cm scenery sweep. At 100 m/s this is at most 17 probes/tick.
+        // Sample the curved path against scenery at intervals no longer than 5 cm.
         unsigned steps = (unsigned)ceilf(speed * BOAT_STEP / .05f);
         for (unsigned j = 0; j <= steps; ++j) {
             float t = (float)j / (float)steps;
@@ -274,8 +285,8 @@ void boat_combat_hits(BoatFleet *f, const Boat before[BOAT_COMBAT_PLAYERS])
             // Torpedoes follow the surface; scenery still stops them, including before arming.
             float height = torpedo
                 ? boat_water_query_borrowed(&f->world.water, at, time).height + .2f
-                : b->height;
-            if (blocked(f, at, height, time)) {
+                : b->height + boat_combat_cannon_rise(age + t * BOAT_STEP) - rise;
+            if (blocked(f, at, height - (torpedo ? 0 : BOAT_CANNON_RADIUS), time)) {
                 first = t;
                 break;
             }
@@ -289,10 +300,8 @@ void boat_combat_hits(BoatFleet *f, const Boat before[BOAT_COMBAT_PLAYERS])
                 continue;
             if (s->pending || s->boat.motion_state == BOAT_CAPSIZED)
                 continue;
-            float height = torpedo
-                ? boat_water_query_borrowed(&f->world.water, end, time).height + .2f
-                : b->height;
-            float t = hull_hit(b->position, end, height, &before[i], &s->boat);
+            float t = hull_hit(b->position, end, b->height, end_height,
+                torpedo ? 0 : BOAT_CANNON_RADIUS, &before[i], &s->boat);
             if (t < first) {
                 first = t;
                 victim = i;
@@ -300,6 +309,9 @@ void boat_combat_hits(BoatFleet *f, const Boat before[BOAT_COMBAT_PLAYERS])
         }
         if (first <= 1) {
             b->position = Vector2Lerp(b->position, end, first);
+            b->height = torpedo
+                ? b->height + (end_height - b->height) * first
+                : b->height + boat_combat_cannon_rise(age + first * BOAT_STEP) - rise;
             b->active = false;
             b->ended = tick;
             if (victim < BOAT_COMBAT_PLAYERS) {
@@ -349,8 +361,7 @@ void boat_combat_hits(BoatFleet *f, const Boat before[BOAT_COMBAT_PLAYERS])
             }
         } else {
             b->position = end;
-            if (torpedo)
-                b->height = boat_water_query_borrowed(&f->world.water, end, time).height + .2f;
+            b->height = end_height;
         }
     }
 }

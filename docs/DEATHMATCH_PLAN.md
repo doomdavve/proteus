@@ -10,7 +10,7 @@ machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
 
 | Control | Current behavior |
 | --- | --- |
-| Hold Space | Water cannon: 28 m range, 60 m/s packets at 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
+| Hold Space | Water cannon: 28 m maximum travel, about 21 m calm-water reach; 28 m/s forward, 5 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
 | Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; unchanged 2 m crest, 10 m/s propagation, 30 m range |
 | Press Q | Straight torpedo: three per life, 40 hull damage, 32 m/s, 160 m range, 0.25 s arming, 1.5 s reload; no homing |
 
@@ -29,6 +29,10 @@ float for 1 s, and are fenced by target life and connection generation. No oppon
 is drawn. Cannon contact uses a cyan hit marker and visible hull heel instead of damage numbers.
 Shared CPU/GPU boxes draw cyan 0.55 m water cubes, surface torpedoes, bubble trails and impact
 splashes. Water cubes briefly brighten at launch and break into smaller cubes on impact.
+Cannon cubes follow a parabola: the default 0.65 m launch height rises to about 1.43 m, then
+the bottom of the cube touches calm water after about 0.69 s. Height advances in the core,
+including curved scenery probes and three-dimensional moving-hull sweeps with the cube radius;
+rendering reads that same committed height. Spawn height and waves affect the landing point.
 The procedural weapon sound is a water wash, with low splashes for torpedo launches/impacts.
 Hunting bots use the cannon nearby, torpedoes ahead, and grenades against trailing targets.
 
@@ -39,7 +43,7 @@ free/race omit combat. Rebuild native/browser peers together. See the
 [wire layout](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint).
 
 Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments;
-water-cannon cube presentation replaces the elongated packets (2026-10-27 user request).
+water-cannon cubes replace the elongated packets and follow a ballistic arc (2026-10-27 user requests).
 Next: human balance playtest, especially cannon recovery/roll strength, torpedo evasion and
 rear-grenade timing; browser/Windows/Linux qualification and public deployment remain pending.
 No user acceptance or public deployment is implied by local verification.
@@ -58,12 +62,27 @@ An eight-second native GPU fixture demo completed and the audio device initializ
 successfully; this is an agent-run demo, not a human listening or balance acceptance check.
 Browser, Windows/Linux, coordinated deployment and human play are unverified for this revision.
 
-Water-cube follow-up verification (2026-10-27, macOS/Apple Silicon Debug): warning-clean
+Earlier water-cube presentation verification, before ballistic motion (2026-10-27, macOS/Apple Silicon Debug): warning-clean
 build; all 230 enabled CTests pass, with the same 13 retired cases disabled and GPU-context
 CTests off. Inspected matching [CPU](evidence/deathmatch-arsenal/water-cubes-cpu.png) and
 [GPU](evidence/deathmatch-arsenal/water-cubes-gpu.png) captures at 1 s and completed the
 eight-second windowed GPU fixture demo. This changes presentation only; human visual acceptance
 and browser/Windows/Linux review remain pending. Next task remains the balance playtest above.
+
+Cannon-arc verification (2026-10-27, macOS/Apple Silicon Debug): warning-clean build and all
+230 enabled CTests pass (13 retired cases disabled, GPU-context CTests off). Added deterministic
+checks for ascent, apex, descent, water landing before maximum range, a descending hull-top
+crossing, an overhead miss and exact save/restore replay. Existing production-tick cannon
+capsize and impaired four-client combat checks pass. Inspected matching
+[CPU](evidence/deathmatch-arsenal/cannon-arc-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/cannon-arc-gpu.png) stream captures at 1 s; the eight-second
+windowed GPU fixture demo completed. The fixture now samples the production launch cadence
+and height equation instead of moving one constant-height cube. Browser/Windows/Linux review
+and human feel acceptance remain pending. Next: playtest the lower effective range and arc.
+
+The protocol-v7 wire layout is unchanged. The launch lift, gravity and cube radius now join
+the forward-speed rules in the content fingerprint, so all peers must rebuild together;
+a straight-flight build cannot join an arc build.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 
