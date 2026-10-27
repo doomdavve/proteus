@@ -5,7 +5,8 @@
 Implemented in the isolated `web-parity` worktree, 2026-10-25: the browser enters the shared
 Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER opens PLACE (River, Basin,
 Basin trial), WAVES, SMOOTHING and START. SETTINGS remembers name, single-player boat livery,
-steering and soundtrack. Escape opens the shared in-game menu; BACK TO TITLE returns to setup
+steering, soundtrack and smoothing. The saved smoothing setting applies to single-player and
+multiplayer. Escape opens the shared in-game menu; BACK TO TITLE returns to setup
 without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The small HTML launcher
 retains fullscreen selection, remembered separately in browser storage. Gameplay/title settings
 use the native `title.txt` format through the existing IndexedDB mount; older saves get the new
@@ -35,6 +36,36 @@ Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/late
 suspension, measure memory/runtime budgets, and complete internet-play acceptance of the
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
+
+## Multiplayer anti-aliasing, 2026-10-27
+
+Implemented on `web-antialiasing`: title-launched multiplayer now passes the saved
+`smooth_edges` setting to the shared GPU renderer, just as single-player does. SMOOTHING
+is also available in SETTINGS before joining a room; the SINGLE PLAYER control edits the
+same saved setting. New profiles default to ON, and existing OFF preferences are preserved.
+The existing 1280×800 scene and 4×4 box downsample still produce a 320×200 image with integer,
+nearest-neighbour presentation. Native JOIN/HOST uses the same launch path.
+
+The optional browser check exercises SETTINGS and joins a compatible test room twice with
+fresh browser profiles, once with smoothing ON and once OFF. It checks actual WebGL render
+viewports, captures settings/gameplay and rejects runtime or shader errors:
+
+```sh
+python3 tools/check_web_aa.py --url http://127.0.0.1:8000/ \
+  --room-url ws://127.0.0.1:24443 --output build-web/aa-review
+```
+
+Verification on 2026-10-27, Apple Silicon/macOS: Debug configure/build and all 256 enabled
+CTests pass with `PROTEUS_GPU_TESTS=ON` (74.28 s; 15 retired field checks disabled).
+Emscripten MinSizeRel packaging and the matching optional native WebRTC endpoint build.
+Chrome/SwiftShader joins a local basin room with smoothing ON and OFF; actual scene viewports
+include 1280×800 only when ON. Settings and gameplay captures in `build-web/aa-review/`
+were inspected. The existing `check_web_title.py` title/persistence/repeated-session check
+also passes. A windowed native river `--gpu-aa --demo --frames 120` run exits cleanly.
+The software-rendered AA capture shows a transient STALE network indicator; this check
+qualifies AA selection/rendering, not multiplayer performance or input responsiveness.
+Next: qualify physical-device performance and Firefox/Safari; human play acceptance remains
+outstanding. The initial sandboxed GPU suite was stopped and rerun with desktop access.
 
 ## Deathmatch weapons verification, 2026-10-26
 
