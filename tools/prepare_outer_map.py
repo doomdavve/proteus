@@ -53,10 +53,11 @@ RIVER_GROUND_COLORS = {(135, 139, 144), (94, 102, 114)}
 PAINT = {(83, 89, 99): .03, (72, 105, 79): .08}
 PAINT_GRID = .01  # metres
 TINY_EDGE = .001  # metres; open land edges this short are tolerated (check_watertight)
-# The river kit's streets and harbour (x0, z0, x1, z1): the runtime raises their cars, lamps,
-# gangway and quay props by the land surface sampled here every GROUND_STEP metres.
-GROUND_AREA = (-120.0, -90.0, 130.0, 430.0)
-GROUND_STEP = 2.0
+# The river kit (x0, z0, x1, z1: the river crop): the runtime sets its crane, bridge deck, cafe,
+# street furniture, frontages, quay fittings, cars, lamps and harbour on the land surface
+# sampled here every GROUND_STEP metres.
+GROUND_AREA = survey.RIVER_CROP
+GROUND_STEP = 4.0
 
 
 def river_overlay():
@@ -517,8 +518,9 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "kit_ground": stats.get("ground") and {
             "area": list(GROUND_AREA), "step_m": GROUND_STEP,
             "columns": stats["ground"]["columns"], "rows": stats["ground"]["rows"],
-            "use": "waterfront_outer_ground: the river kit's street cars and lamps, gangway "
-                   "and quay gear stand on the baked land surface"},
+            "use": "waterfront_outer_ground: the river kit (crane, bridge deck, cafe, "
+                   "street furniture, frontages, quay fittings, cars, lamps and harbour) stands "
+                   "on the baked land surface"},
         "geometry_sha256": hashlib.sha256(content.encode()).hexdigest(),
     }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")

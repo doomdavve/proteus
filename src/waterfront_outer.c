@@ -28,3 +28,8 @@ float waterfront_outer_ground(float x, float z)
 }
 
 const BoatMapDescription waterfront_outer_map = { &outer, outer_bridge_first_triangle };
+
+WaterfrontGround waterfront_kit_ground(const BoatMapDescription *map)
+{
+    return map == &waterfront_outer_map ? waterfront_outer_ground : NULL;
+}

@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`; A3.5 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d and A3.5e are [proposed](#landmark-backlog-2026-10-27); A3.5 is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1498,6 +1498,9 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.4 | A3.3 | Långedrag shelter destination, checkpoint recovery and the exposed-water encounter | Complete 2026-10-26; [result](#a34-result-2026-10-26) |
 | A3.5a | A3.4 | Dressing beyond the river crop, pulled ahead of A3.5 by the [first playtest](#a34-playtest-2026-10-26): the corridor's buildings on the terrain, the container cranes and port masts, channel marks and a tree scatter | Complete 2026-10-26; [result](#a35a-result-2026-10-26) |
 | A3.5b | A3.5a | Göteborg's laser-scanned Höjdmodell 2022 for all of the outer map's land, the river crop included (user request); the river's houses, trees and street life moved onto it | Complete 2026-10-27; [result](#a35b-result-2026-10-27) |
+| A3.5c | A3.5b | The river kit in `outer` (user request): the Eriksberg crane, the bridge deck, cafe, street furniture, frontages, quay fittings and forecourts, laid out as in the river and set on the terrain | Complete 2026-10-27; [result](#a35c-result-2026-10-27) |
+| A3.5d | A3.5c | Göteborg landmarks from OSM in the bake (user request, [backlog](#landmark-backlog-2026-10-27)): towers, masts, chimneys and cranes, `building:part` heights and bridge outlines; needs the corridor re-extracted with those tags | Proposed |
+| A3.5e | A3.5c | Signature landmarks by hand (user request, [backlog](#landmark-backlog-2026-10-27)): blockouts in the map and far skyline silhouettes beyond it, from the user's priority list | Proposed |
 | A3.5 | A3.5a | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
 
 ### A3.1 result, 2026-10-26
@@ -1600,7 +1603,8 @@ yet merged; it was later rebased and merged into `main` (pull request #7).
   start, current and wake-test placement are the river's; the camera is the river's close view
   with a 4,500 m far plane. No new renderer code: both renderers already bound any mapped
   description (A1.4), and `outer` takes the tiled land culling and indexed water of A2.
-- **Scenery, harbor and traffic (decision):** the river kit (cafe, street furniture, crane,
+- **Scenery, harbor and traffic (decision; the river kit part superseded by
+  [A3.5c](#a35c-result-2026-10-27)):** the river kit (cafe, street furniture, crane,
   bridge deck) stays river-only, so `outer` has none yet; quays, frontages and forecourts are
   derived from the map as for any mapped location. The moored fleet, travelling craft and
   gulls are authored in the river's frame and keep running unchanged inside the river part of
@@ -1901,8 +1905,9 @@ need to be moved on top of the terrain." That retires A3.3's flat 3.5 m river cr
   facade triangles. Älvsborgsbron and its approaches are unchanged.
 - **Street life and harbour:** the river kit's cars, lamps, gangway and quay gear are authored at
   3.5 m. The bake now also emits a 2 m lattice of the baked land surface over the kit's
-  streets and dock (126 × 261 points). `waterfront_outer_ground()` reads it, and
-  `BoatWorldDefinition.kit_ground` attaches it to `outer` only. `waterfront_scene_evaluate_ground`
+  streets and dock (126 × 261 points; as of A3.5b, A3.5c widened it to the river crop at 4 m).
+  `waterfront_outer_ground()` reads it, and `BoatWorldDefinition.kit_ground` attaches it to
+  `outer` only (as of A3.5b; A3.5c moved it to `waterfront_kit_ground(map)`). `waterfront_scene_evaluate_ground`
   and `waterfront_harbor_evaluate_ground` lift each car, lamp, the gangway's shore end, the quay
   gear (new `WaterfrontHarborFrame.quay` transform) and the quay mooring anchors by the
   ground less 3.5 m. NULL, as for the river and basin, gives the old frames exactly (the
@@ -1942,7 +1947,7 @@ need to be moved on top of the terrain." That retires A3.3's flat 3.5 m river cr
   - **GPU unverified** (captures and GPU tests). No manual playback or user acceptance.
   - **The derived corner kit is gone inside the outer crop.** `waterfront_corner.c` finds
     frontages, quay fittings (fenders, ladders) and forecourts on flat 3.5 m ground, which the
-    crop no longer has. The river location keeps them.
+    crop no longer has. The river location keeps them. (Resolved by A3.5c.)
   - The bridge approaches are unchanged; where they meet the terrain was not examined.
   - Solids moved as wholes. A building on a slope stands on its lowest corner, so its uphill
     side is buried, and its foundation is not extended down to the ground. Moved trees and
@@ -1952,6 +1957,77 @@ need to be moved on top of the terrain." That retires A3.3's flat 3.5 m river cr
   - The multiplayer content digest changes with the mesh, so an outer room needs matching
     builds.
   - Vinga is covered by neither city product; the Lantmäteriet order is still pending.
+
+### A3.5c result, 2026-10-27
+
+Branch `outer-river-kit`, cut from `worktree-hojdmodell-terrain` (A3.5b, pull request #23,
+not yet merged). The user, after A3.5b: "I miss the Eriksberg crane, the bridge inside of
+Eriksberg and other details." They chose this step first from a three-step landmark plan
+([backlog](#landmark-backlog-2026-10-27)).
+
+- **Kit (decision):** the authored river kit was river-only (A3.2), switched by map identity.
+  `waterfront_kit_ground(map)` (in [`waterfront_outer.h`](../src/waterfront_outer.h)) now names
+  the land under the kit: `waterfront_outer_ground` for the outer map, NULL otherwise. A map
+  with a kit ground carries the kit, and the scene frame (cars, lamps, harbour) reads the same
+  function, so `BoatWorldDefinition.kit_ground` from A3.5b is gone.
+- **Layout and placement:** on the outer map the scenery is laid out from the river map, so its
+  placement rules (flat 3.5 m ground, no roofs, roads or planting) give exactly the river's
+  7,944 boxes: cafe, street furniture, entrances and shop fronts, quay paving, rails, fenders
+  and ladders, forecourts. Each vertex is then set on the ground under it: above the river's
+  3.5 m it rises by the ground less 3.5 m, between the water and 3.5 m it stretches so that
+  fittings still reach the water, and below the water it stays. A first version moved each
+  placement by the ground at its origin; 228 of 2,651 ground-standing boxes then had a corner
+  more than 0.5 m off the ground (up to 3.8 m buried, 1.6 m floating, mostly large slabs on
+  slopes), so it was replaced by the per-vertex rule.
+- **Crane and bridge deck:** each of the crane's four feet stands on its own ground (about 4.3 m
+  on one side, 1.3–1.5 m on the other); the sills follow, and the gantry, boom and lights keep
+  their authored heights. The bridge deck is unchanged at 7 m, above its ends' ground (1.4 m
+  and 3.9 m). The cafe's GPU light rises with the cafe.
+- **Ground lattice:** now the whole river crop at 4 m (613 × 601 points; `geometry.h` 33.4 MB,
+  up 1.9 MB). The terrain mesh is unchanged.
+- **Tests:** `city_dressing` binds the outer map and checks that it gets the river's boxes,
+  colours and plan positions with every vertex settled by the rule above; the river's pinned
+  box digest is unchanged. `boat_outer_map` checks that only the outer map has a kit ground.
+- **Captures (agent review, 2026-10-27, macOS arm64, CPU renderer, 2 s scripted drive):**
+  [crane](adventure/outer-kit-crane-cpu.png) (`--start 0,-200,180`, camera 48/30),
+  [east, with the bridge deck](adventure/outer-kit-east-cpu.png) and
+  [west](adventure/outer-kit-west-cpu.png) (`--start 0,150,270` and `0,150,90`, camera 30/24).
+  Close views of the cafe frontage and a quay edge matched the river location's. Street
+  furniture on slopes is too small to judge at 320 × 200; the per-vertex rule is checked by
+  the test, not by eye. **No GPU capture:** no display in this session.
+- **Measured cost (Debug, M1 Max, CPU renderer, 3 s scripted screenshot, two runs each):** peak
+  resident memory 245 MB against 236 MB for A3.5b's build; wall time 0.8 s both.
+- **Verification (2026-10-27, macOS arm64, Debug, `PROTEUS_GPU_TESTS=OFF`):** build
+  warning-free; `ctest --preset full` passed all 230 active tests (13 retired disabled). The
+  GPU-labelled tests did not run.
+- **Limitations:**
+  - **GPU unverified**; no manual playback or user acceptance.
+  - Draped slabs and cars follow the slope, but furniture parts are sheared slightly on steep
+    ground, and a kit item in front of a building whose base sits lower (buildings stand on
+    their lowest corner) meets the wall above its base. Not examined closely.
+  - The kit covers what it covered in the river: central Eriksberg/Masthugget, not the crop's
+    edges or anything outside it.
+  - The bridge deck's ends against the terrain were looked at only from a distance.
+
+### Landmark backlog, 2026-10-27
+
+The user asked how to import "all the cool Gbg landmarks" and liked all three proposed steps:
+A3.5c (above), then A3.5d and A3.5e, which they asked not to forget.
+
+- **A3.5d, landmarks from OSM in the bake:** man-made towers, masts, chimneys and cranes,
+  building and `building:part` heights or levels, and bridge outlines, raised at their mapped
+  heights like A3.5a's container cranes. The pinned corridor extract dropped many tags, so it
+  needs re-extracting with those kept. Höjdmodell 2022 is a ground model and cannot give
+  building or bridge heights.
+- **A3.5e, signature landmarks by hand:** blockouts like the Eriksberg crane at real positions.
+  In the map: Ramberget's TV mast, a proper Nya Älvsborg fortress, the Arendal and Skandia port,
+  the Stena terminals. Beyond the map, upstream, as far skyline silhouettes: Läppstiftet, the
+  Opera, Barken Viking, Masthuggskyrkan, Gothia Towers. Ask the user for their priority list
+  first.
+- **Sources:** no open Göteborg 3D city model was found (the open-data front page is a blank
+  server page and the data portal needs a login; the check was not exhaustive). A classified
+  laser point cloud, for instance Lantmäteriet's, could give real building and bridge heights;
+  its terms were not checked.
 
 **Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
 

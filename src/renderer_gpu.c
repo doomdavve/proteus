@@ -1,6 +1,7 @@
 #include "renderer_gpu.h"
 #include "boat_clock.h"
 #include "boat_water_mesh.h"
+#include "waterfront_city.h"
 #include "waterfront_corner.h"
 
 #include "raymath.h"
@@ -545,7 +546,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     }
     // The compiled river has every surface class; another map needs only its water.
     if (water_builder.count == 0
-        || (scenery->river
+        || (scenery->map == &waterfront_city_river_map
             && (!builder_vertices(&builders[CITY_SURFACE_FLAT])
                 || !builder_vertices(&builders[CITY_SURFACE_FACADE])
                 || !builder_vertices(&builders[CITY_SURFACE_ROOF])
@@ -616,17 +617,21 @@ static Vector3 crane_point(float x, float y, float z)
     return (Vector3) { x * cosf(angle) - z * sinf(angle), y, x * sinf(angle) + z * cosf(angle) };
 }
 
-static bool build_crane(Mesh *mesh)
+// Each foot stands on the kit's ground; the gantry keeps its authored height.
+static bool build_crane(Mesh *mesh, const WaterfrontScenery *scenery)
 {
     MeshBuilder builder = { 0 };
     for (int side = -1; side <= 1; side += 2) {
+        float sill = 1.5f;
         for (int face = -1; face <= 1; face += 2) {
-            if (!builder_box(&builder, crane_point(side * 49, 3.5f, face * 5),
-                    crane_point(side * 45, 73, face * 3), 3, 3))
+            Vector3 foot = crane_point(side * 49.0f, 0, face * 5.0f);
+            foot.y = waterfront_scenery_ground(scenery, foot.x, foot.z);
+            sill += foot.y * .5f;
+            if (!builder_box(&builder, foot, crane_point(side * 45, 73, face * 3), 3, 3))
                 goto failed;
         }
         if (!builder_box(
-                &builder, crane_point(side * 49, 5, -5), crane_point(side * 49, 5, 5), 4, 4)
+                &builder, crane_point(side * 49, sill, -5), crane_point(side * 49, sill, 5), 4, 4)
             || !builder_box(
                 &builder, crane_point(side * 47, 35, -4), crane_point(side * 47, 35, 4), 2, 2))
             goto failed;
@@ -814,6 +819,7 @@ static void unbind_map(WaterfrontGpuScene *scene)
     unload_mesh(&scene->crane);
     scene->map = NULL;
     scene->river = false;
+    scene->cafe_lift = 0;
 }
 
 bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScenery *scenery)
@@ -826,12 +832,14 @@ bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScener
     if (!build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
             &scene->water, &scene->corner, &scene->corner_emissive)
         || !build_windows(scenery, &scene->windows)
-        || (scenery->river && !build_crane(&scene->crane))) {
+        || (scenery->river && !build_crane(&scene->crane, scenery))) {
         unbind_map(scene);
         return false;
     }
     scene->map = scenery->map;
     scene->river = scenery->river;
+    Vector3 cafe = waterfront_corner_position(-2.8f, 0, -6);
+    scene->cafe_lift = waterfront_scenery_ground(scenery, cafe.x, cafe.z) - 3.5f;
     return true;
 }
 
@@ -1027,7 +1035,8 @@ static void select_local_lights(WaterfrontGpuScene *scene, const WaterfrontScene
     // The cafe and crane fixtures are authored for the river crop.
     if (scene->river) {
         add_light_candidate(candidates, &candidate_count, 40,
-            (WaterfrontGpuLight) { .position = waterfront_corner_position(-2.8f, 3.1f, -6),
+            (WaterfrontGpuLight) {
+                .position = waterfront_corner_position(-2.8f, 3.1f + scene->cafe_lift, -6),
                 .direction = { 0, -1, 0 },
                 .color = { 255, 197, 119, 255 },
                 .radius = 12,

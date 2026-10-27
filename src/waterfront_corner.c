@@ -111,6 +111,14 @@ static WaterfrontCornerBox *new_box(Builder *k)
     return &s->boxes[s->count++];
 }
 
+// The river kit stands on 3.5 m ground with the water at 0. On GROUND (the land under the
+// point), what is above the old ground rises with it and what spans the quay wall stretches,
+// so fittings still reach the water. Applied per vertex, slabs follow the slope.
+static float settle(float y, float ground)
+{
+    return y >= 3.5f ? y + ground - 3.5f : y > 0 ? y * ground / 3.5f : y;
+}
+
 static void box(Builder *k, Vector3 p, Vector3 size, Color color, bool emissive)
 {
     WaterfrontCornerBox *b = new_box(k);
@@ -732,12 +740,17 @@ bool waterfront_scenery_init_tiled(
         *scenery = (WaterfrontScenery) { 0 };
         return false;
     }
-    scenery->river = map == &waterfront_city_river_map;
+    scenery->ground = waterfront_kit_ground(map);
+    scenery->river = map == &waterfront_city_river_map || scenery->ground;
     Builder builder = { .out = scenery,
         .origin = { -71.82f, 3.5f, 105.9f },
         .axis_u = { .99284f, 0, .11952f },
         .axis_v = { -.11952f, 0, .99284f } };
     Builder *k = &builder;
+    // On a kit ground the layout comes from the river map, whose flat 3.5 m ground the kit's
+    // placement rules read; the boxes are set on the ground afterwards.
+    if (scenery->ground)
+        city = waterfront_city_river_map.mesh;
     k->surfaces = calloc(city->triangle_count, sizeof(*k->surfaces));
     if (!k->surfaces)
         goto failed;
@@ -765,6 +778,11 @@ bool waterfront_scenery_init_tiled(
     surface_grid_destroy(k);
     if (k->overflow)
         goto failed;
+    for (size_t i = 0; scenery->ground && i < scenery->count; ++i)
+        for (int j = 0; j < 8; ++j) {
+            Vector3 *p = &scenery->boxes[i].vertices[j];
+            p->y = settle(p->y, scenery->ground(p->x, p->z));
+        }
     scenery->bounds = malloc((scenery->count ? scenery->count : 1) * sizeof(*scenery->bounds));
     if (!scenery->bounds)
         goto failed;
@@ -798,6 +816,11 @@ void waterfront_scenery_destroy(WaterfrontScenery *scenery)
     free(scenery->bounds);
     boat_map_tiles_destroy(&scenery->tiles);
     *scenery = (WaterfrontScenery) { 0 };
+}
+
+float waterfront_scenery_ground(const WaterfrontScenery *scenery, float x, float z)
+{
+    return scenery->ground ? scenery->ground(x, z) : 3.5f;
 }
 
 bool waterfront_scenery_bind(WaterfrontScenery *scenery, const BoatMapDescription *map)
