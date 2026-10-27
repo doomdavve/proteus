@@ -60,8 +60,11 @@ free/race omit combat. Rebuild native/browser peers together. See the
 Completed: arsenal, authoritative state/prediction, input, bots, damage feedback and instruments;
 water-cannon cubes expand from a compact starboard housing and follow an extended ballistic
 arc (2026-10-27 user requests).
-Next: human balance playtest, especially extended cannon reach/recovery/roll strength, torpedo evasion and
-rear-grenade timing; browser/Windows/Linux qualification and public deployment remain pending.
+User acceptance (2026-10-27): after the actual-hull attachment fix, the user reported
+“Looks much better! Water cannon feels great now.” The current water cannon appearance and
+feel are accepted. This feedback covers the cannon; wider arsenal balance remains open.
+Next: torpedo evasion and rear-grenade timing playtests, then platform/browser qualification;
+Windows/Linux, browser requalification and public deployment remain pending.
 No user acceptance or public deployment is implied by local verification.
 
 Verification (macOS/Apple Silicon, Debug, 2026-10-27): deterministic combat checks cover gradual
@@ -147,8 +150,9 @@ disabled; GPU-context CTests off), including the existing 10 m/45 m capsize chec
 close-up [CPU](evidence/deathmatch-arsenal/cannon-seated-cpu.png) and
 [GPU](evidence/deathmatch-arsenal/cannon-seated-gpu.png) captures at 1.09 s and completed the
 eight-second GPU demo. Previous attachment claims and captures above are superseded by this
-geometry check. Next: user review of the seated mount, then continued arsenal balancing;
-manual user acceptance and browser/Windows/Linux qualification remain pending.
+geometry check. The user subsequently accepted the seated cannon's appearance and feel
+(see current acceptance above). Next: continue the wider arsenal balance playtests;
+browser/Windows/Linux qualification remains pending.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 
