@@ -121,7 +121,12 @@ is calm and clear of both boats. See the
 ### Title screen
 
 `./build/wake_velocity` without options (and the packaged macOS app and Windows `launch.bat`)
-opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT. Up/Down or
+opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT.
+Its cyan workstation interface sits over a dusk river capture, with A PROTEUS GAME beneath
+the outlined title and the build version at lower left. SETTINGS retains the map credit.
+This dusk palette is title-only; [gameplay sunset is planned](docs/SUNSET_PLAN.md).
+The version is resolved at CMake configure time (reconfigure to refresh it); source archives
+can set `-DPROTEUS_VERSION=v0.0.19`. Up/Down or
 W/S select and Enter/Space or a click activates. SETTINGS holds NAME, BOAT, STEERING and SOUNDTRACK: Enter on
 NAME starts typing (Enter keeps, Esc cancels), Left/Right change BOAT, and Left/Right or Enter
 switch STEERING between KEYBOARD and MOUSE. Sessions start in that mode; switching in game (M
