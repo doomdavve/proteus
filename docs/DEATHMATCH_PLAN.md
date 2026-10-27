@@ -10,7 +10,7 @@ machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
 
 | Control | Current behavior |
 | --- | --- |
-| Hold Space | Water cannon: 70 m maximum travel, about 51 m calm-water reach; 84 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
+| Hold Space | Water cannon: 70 m maximum travel, about 50 m calm-water reach; 84 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
 | Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; unchanged 2 m crest, 10 m/s propagation, 30 m range |
 | Press Q | Straight torpedo: three per life, 40 hull damage, 32 m/s, 160 m range, 0.25 s arming, 1.5 s reload; no homing |
 
@@ -32,12 +32,14 @@ splashes. Water cubes briefly brighten at launch, visually expand from 0.14 m to
 ten ticks (about 7 m), and break into smaller cubes on impact. This growth is presentation-only;
 the existing fixed combat envelope remains. A compact graphite rectangular housing on each
 deathmatch boat's starboard foredeck has a dark face and narrow cyan opening. Its body is
-0.30 × 0.25 × 0.45 m, replacing the earlier 0.85 × 0.65 × 1 m central housing.
+0.30 × 0.25 × 0.45 m, replacing the earlier 0.85 × 0.65 × 1 m central housing. A low
+0.40 × 0.10 × 0.50 m mounting flange overlaps the deck and housing; the housing bottom sits
+slightly inside the deck rather than above it.
 Cubes originate at that opening, using the same full pitch/roll/heading attachment in the core
-and both renderers. The local muzzle is 1.8 m forward, 0.75 m starboard and 1.25 m above
+and both renderers. The local muzzle is 1.8 m forward, 0.55 m starboard and 1.20 m above
 the boat origin.
-Cannon cubes follow a parabola: the default 1.25 m launch height rises to about 1.53 m, then
-the bottom of the cube touches calm water after about 0.58 s. The roughly 51 m reach is about
+Cannon cubes follow a parabola: the default 1.20 m launch height rises to about 1.48 m, then
+the bottom of the cube touches calm water after about 0.58 s. The roughly 50 m reach is about
 2.4 times the initial arc's 21 m reach, including the muzzle's distance from the boat centre.
 Height advances in the core,
 including curved scenery probes and three-dimensional moving-hull sweeps with the cube radius;
@@ -106,7 +108,7 @@ captures above retain their original short-range/unmounted presentation. Human f
 and browser/Windows/Linux qualification remain pending; next is the extended-range playtest.
 The wire layout stays v7; muzzle height/forward offset now also enter the content fingerprint.
 
-Compact side-mount follow-up (2026-10-27, macOS/Apple Silicon Debug): warning-clean build
+Earlier compact side-mount follow-up, before the deck attachment adjustment (2026-10-27, macOS/Apple Silicon Debug): warning-clean build
 and all 230 enabled CTests pass (13 retired cases disabled, GPU-context CTests off), including
 10 m/45 m capsize checks and exact sideways muzzle position with trajectory replay. Inspected
 [CPU](evidence/deathmatch-arsenal/cannon-small-cpu.png) and
@@ -115,6 +117,16 @@ eight-second windowed GPU fixture demo. These supersede the central-housing visu
 The side offset also enters the content fingerprint; the v7 layout stays unchanged. Human
 visual/feel acceptance and browser/Windows/Linux review remain pending. Next: play the compact
 side mount and extended reach together.
+
+Deck attachment adjustment (2026-10-27, macOS/Apple Silicon Debug): moved the compact housing
+0.20 m inboard and 0.05 m down, and added a low flange that intersects both the deck and the
+housing. The body remains small and starboard-mounted, with the same full-pose muzzle
+attachment. Added `boat_combat_review --close` for close-up attachment review. Warning-clean
+build and all 230 enabled CTests pass (13 retired cases disabled; GPU-context CTests off).
+Inspected close-up [CPU](evidence/deathmatch-arsenal/cannon-foot-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/cannon-foot-gpu.png) captures at 1.025 s and completed the
+eight-second windowed GPU demo. Human acceptance of the new mounting and browser/Windows/Linux
+review remain pending. Next: review the attachment in play, then continue arsenal balancing.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 
