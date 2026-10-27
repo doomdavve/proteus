@@ -63,8 +63,10 @@ and moved the river's houses, trees and street life onto it, at the user's reque
 unverified, not yet played). A3.5c (2026-10-27) brought the river kit into `outer` on that
 terrain: the Eriksberg crane, the bridge deck, the cafe, street furniture, frontages and quay
 fittings ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35c-result-2026-10-27); CPU only).
-Göteborg landmarks from OSM (A3.5d) and by hand (A3.5e) are proposed at the user's request
-([backlog](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#landmark-backlog-2026-10-27)).
+Göteborg landmarks are planned at the user's request: a docked Stena ferry at Eriksberg (A3.5e),
+the map extended upstream past Hisingsbron (A3.5f), Karlatornet, Lilla Bommen and Hisingsbron
+(A3.5g) and OSM landmarks (A3.5d)
+([plan](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#must-have-landmarks-plan-2026-10-27)).
 **Next: A3.5, the local weather transition and bounded per-region detailed-asset loading.**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short
@@ -322,7 +324,7 @@ A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance c
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
 (a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1 (A1.1–A1.5)
 completed 2026-10-25. A2 is in progress: A2.1 (counters) and A2.2 (tile catalogue and indexed
-collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5d/A3.5e (landmarks) are proposed and A3.5 is next.
+collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5d–A3.5g (landmarks) are planned and A3.5 is next.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |
