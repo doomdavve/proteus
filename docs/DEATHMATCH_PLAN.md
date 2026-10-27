@@ -10,7 +10,7 @@ machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
 
 | Control | Current behavior |
 | --- | --- |
-| Hold Space | Water cannon: 70 m maximum travel, about 50 m calm-water reach; 84 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
+| Hold Space | Water cannon: 70 m maximum travel, about 50 m calm-water reach; 94 m/s forward, 3 m/s upward, gravity 16 m/s²; 8 Hz, four-second overheat, release cooling over 3 s; unlock below 30% |
 | Press E | Wave grenade: 7 m astern, splash after 0.3 s, detonation after 1 s, recharge 8 s; unchanged 2 m crest, 10 m/s propagation, 30 m range |
 | Press Q | Straight torpedo: three per life, 40 hull damage, 32 m/s, 160 m range, 0.25 s arming, 1.5 s reload; no homing |
 
@@ -33,13 +33,17 @@ ten ticks (about 7 m), and break into smaller cubes on impact. This growth is pr
 the existing fixed combat envelope remains. A compact graphite rectangular housing on each
 deathmatch boat's starboard foredeck has a dark face and narrow cyan opening. Its body is
 0.30 × 0.25 × 0.45 m, replacing the earlier 0.85 × 0.65 × 1 m central housing. A low
-0.40 × 0.10 × 0.50 m mounting flange overlaps the deck and housing; the housing bottom sits
-slightly inside the deck rather than above it.
+0.40 × 0.10 × 0.50 m mounting flange overlaps the deck and housing; the housing bottom extends
+into the deck rather than above it. Attachment coordinates use the actual rendered hull:
+`boat_skin_generate()` divides hull vertices by 1.4, cancelling `boat_pose_parts()`'s scale.
+The effective foredeck is about 0.78 m high, and its tapered bow is narrower than the earlier
+uncancelled-scale assumption. `boat_fleet_render` now checks the entire mounting footprint
+against those transformed hull triangles for every skin.
 Cubes originate at that opening, using the same full pitch/roll/heading attachment in the core
-and both renderers. The local muzzle is 1.8 m forward, 0.55 m starboard and 1.20 m above
+and both renderers. The local muzzle is 1.45 m forward, 0.28 m starboard and 0.92 m above
 the boat origin.
-Cannon cubes follow a parabola: the default 1.20 m launch height rises to about 1.48 m, then
-the bottom of the cube touches calm water after about 0.58 s. The roughly 50 m reach is about
+Cannon cubes follow a parabola: the default 0.92 m launch height rises to about 1.20 m, then
+the bottom of the cube touches calm water after about 0.53 s. The roughly 50 m reach is about
 2.4 times the initial arc's 21 m reach, including the muzzle's distance from the boat centre.
 Height advances in the core,
 including curved scenery probes and three-dimensional moving-hull sweeps with the cube radius;
@@ -118,7 +122,7 @@ The side offset also enters the content fingerprint; the v7 layout stays unchang
 visual/feel acceptance and browser/Windows/Linux review remain pending. Next: play the compact
 side mount and extended reach together.
 
-Deck attachment adjustment (2026-10-27, macOS/Apple Silicon Debug): moved the compact housing
+Earlier deck attachment attempt (superseded: incorrect scaled-hull assumption; 2026-10-27, macOS/Apple Silicon Debug): moved the compact housing
 0.20 m inboard and 0.05 m down, and added a low flange that intersects both the deck and the
 housing. The body remains small and starboard-mounted, with the same full-pose muzzle
 attachment. Added `boat_combat_review --close` for close-up attachment review. Warning-clean
@@ -127,6 +131,24 @@ Inspected close-up [CPU](evidence/deathmatch-arsenal/cannon-foot-cpu.png) and
 [GPU](evidence/deathmatch-arsenal/cannon-foot-gpu.png) captures at 1.025 s and completed the
 eight-second windowed GPU demo. Human acceptance of the new mounting and browser/Windows/Linux
 review remain pending. Next: review the attachment in play, then continue arsenal balancing.
+
+Actual-hull attachment fix (2026-10-27, macOS/Apple Silicon Debug): the previous changes
+mistakenly treated the hull pose's 1.4 scale as a net enlargement; the skin mesh already
+normalizes it away. The foot was outside the bow outline and above the real deck. Corrected
+the mount using actual model dimensions: local muzzle 0.28 m starboard, 1.45 m forward,
+0.92 m high; foot centre 0.78 m high. Increased horizontal water speed to 94 m/s to preserve
+roughly 50 m reach with the lower muzzle.
+
+Added a regression gate to `boat_fleet_render`: every corner of the scene's actual mounting
+foot must intersect the transformed hull surface on all five skins, and the housing must
+overlap the foot. Confirmed that this fails the previous implementation (`isfinite(deck)`),
+then passes the fix. Warning-clean build and all 230 enabled CTests pass (13 retired cases
+disabled; GPU-context CTests off), including the existing 10 m/45 m capsize checks. Inspected
+close-up [CPU](evidence/deathmatch-arsenal/cannon-seated-cpu.png) and
+[GPU](evidence/deathmatch-arsenal/cannon-seated-gpu.png) captures at 1.09 s and completed the
+eight-second GPU demo. Previous attachment claims and captures above are superseded by this
+geometry check. Next: user review of the seated mount, then continued arsenal balancing;
+manual user acceptance and browser/Windows/Linux qualification remain pending.
 
 ## Weapon milestone — 2026-10-26 (superseded rules; historical evidence)
 

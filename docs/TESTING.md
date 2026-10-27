@@ -575,6 +575,10 @@ production radial shader recipes against CPU height/gradient/vertical velocity.
 ./build/boat_server --scripted --mode deathmatch --boats 4 --ticks 7200
 ```
 
+`boat_fleet_render` also probes the actual transformed hull triangles beneath every corner
+of the cannon mounting foot on all skins and checks that the housing overlaps that foot.
+This guards against the skin mesh's normalization cancelling the hull pose scale.
+
 The review fixture captures the shared scene at 320×200. CPU screenshots are display-free;
 GPU and `--play` require a desktop and include the production weapon HUD and procedural audio.
 For a display-free WebGL2 comparison of both production radial shader recipes:
