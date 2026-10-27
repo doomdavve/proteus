@@ -801,8 +801,10 @@ cache the previous HTML after a deployment.
 A desktop browser with WebAssembly, WebGL 2, and a keyboard is required. The canvas uses
 nearest-neighbour scaling in multiples of the 320x200 scene, with a 320x200 minimum.
 Press **PLAY** to start audio and open the shared Wake Velocity title. The page's small
-**Settings** toggle remembers fullscreen; in-game SETTINGS remembers name, livery, steering
-and soundtrack. SINGLE PLAYER selects River, Basin or Basin trial, waves and smoothing.
+**Settings** toggle remembers fullscreen; in-game SETTINGS remembers name, livery, steering,
+soundtrack and smoothing. SMOOTHING defaults to ON and applies the same 4×4 supersampling
+to single-player and multiplayer, including WebRTC rooms. Turn it OFF in SETTINGS on slower
+devices. SINGLE PLAYER selects River, Basin or Basin trial, waves and the same smoothing setting.
 The launcher disappears during play; the game uses integer scaling. Press `?` for controls
 and Escape for the in-game menu (the browser may also leave fullscreen). BACK TO TITLE
 returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;

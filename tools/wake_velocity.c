@@ -1428,6 +1428,8 @@ static int title_join(BoatTitleSettings *settings, bool host)
     }
     if (settings->mouse_steering)
         arguments[count++] = "--mouse-steering";
+    if (settings->smooth_edges)
+        arguments[count++] = "--gpu-aa";
     net_study.failure[0] = 0;
     study_mouse_steering = settings->mouse_steering;
     int result = study(count, arguments);

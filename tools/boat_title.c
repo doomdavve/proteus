@@ -90,7 +90,15 @@ typedef enum {
 } JoinRow;
 #endif
 typedef enum { ROW_MODE, ROW_PLACE, ROW_WATER, ROW_START, ROW_HOST_BACK, HOST_ROWS } HostRow;
-typedef enum { ROW_NAME, ROW_BOAT, ROW_MOUSE, ROW_MUSIC, ROW_DONE, SETTINGS_ROWS } SettingsRow;
+typedef enum {
+    ROW_NAME,
+    ROW_BOAT,
+    ROW_MOUSE,
+    ROW_MUSIC,
+    ROW_EDGES,
+    ROW_DONE,
+    SETTINGS_ROWS
+} SettingsRow;
 typedef enum {
     ROW_SOLO_PLACE,
     ROW_SOLO_WATER,
@@ -285,7 +293,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     }
     if (t->panel == PANEL_SETTINGS) {
         static const char *labels[SETTINGS_ROWS]
-            = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "BACK" };
+            = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "SMOOTHING", "BACK" };
         *label = labels[row];
         if (row == ROW_NAME)
             snprintf(value, size, "%s", s->name);
@@ -297,6 +305,8 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             snprintf(value, size, "< %s >", s->mouse_steering ? "MOUSE" : "KEYBOARD");
         else if (row == ROW_MUSIC)
             snprintf(value, size, "%s", boat_music(s->soundtrack)->label);
+        else if (row == ROW_EDGES)
+            snprintf(value, size, "< %s >", s->smooth_edges ? "ON" : "OFF");
         return;
     }
     if (t->panel == PANEL_HOST) {
@@ -693,14 +703,17 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         }
         bool settings = t.panel == PANEL_SETTINGS && !t.editing;
         if (settings
-            && (t.selected == ROW_BOAT || t.selected == ROW_MOUSE || t.selected == ROW_MUSIC)) {
+            && (t.selected == ROW_BOAT || t.selected == ROW_MOUSE || t.selected == ROW_MUSIC
+                || t.selected == ROW_EDGES)) {
             int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
                 - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
             if (t.selected == ROW_BOAT)
                 s->skin = (s->skin + BOAT_SKIN_COUNT + turn) % BOAT_SKIN_COUNT;
             else if (t.selected == ROW_MUSIC)
                 s->soundtrack = (s->soundtrack + BOAT_MUSIC_COUNT + turn) % BOAT_MUSIC_COUNT;
-            else if (turn)
+            else if (t.selected == ROW_EDGES && turn)
+                s->smooth_edges = !s->smooth_edges;
+            else if (t.selected == ROW_MOUSE && turn)
                 s->mouse_steering = !s->mouse_steering;
             activate = false;
         }
