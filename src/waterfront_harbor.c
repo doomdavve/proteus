@@ -144,9 +144,20 @@ static void mooring(WaterfrontHarborFrame *frame, Vector3 a, Vector3 b)
 
 void waterfront_harbor_evaluate(BoatWater water, double time, WaterfrontHarborFrame *frame)
 {
+    waterfront_harbor_evaluate_ground(water, time, NULL, frame);
+}
+
+void waterfront_harbor_evaluate_ground(
+    BoatWater water, double time, float (*ground)(float x, float z), WaterfrontHarborFrame *frame)
+{
     *frame = (WaterfrontHarborFrame) { 0 };
     frame->pontoon = boat_water_pose(water, time, dock_center, 0, 37, 2.1f);
     Vector3 shore = { -34.1f, 3.57f, 182 };
+    // The quay gear stands around (50, 35); the river kit's ground is 3.5 m.
+    float quay_lift = ground ? ground(50, 35) - 3.5f : 0;
+    if (ground)
+        shore.y += ground(shore.x, shore.z) - 3.5f;
+    frame->quay = (Transform3D) { .position = { 0, quay_lift, 0 }, .scale = { 1, 1, 1 } };
     Vector3 landing = waterfront_harbor_attachment(frame->pontoon, (Vector3) { -1, .74f, 0 });
     frame->gangway = segment(shore, landing, 1.5f);
     frame->gangway.scale.y = .18f;
@@ -176,7 +187,7 @@ void waterfront_harbor_evaluate(BoatWater water, double time, WaterfrontHarborFr
                             : (Vector3) { 7.8f, 1.04f, -12 + (i / 2) * 12 });
             } else {
                 float z = 35 + end * 5;
-                anchor = (Vector3) { 47.27f - .099f * (z - 30), 4.02f, z };
+                anchor = (Vector3) { 47.27f - .099f * (z - 30), 4.02f + quay_lift, z };
             }
             mooring(frame, attachment, anchor);
         }

@@ -36,6 +36,9 @@ typedef struct {
     float camera_distance, camera_height;
     float far_plane;
     Color particle_water; // Base colour that foam and spray fade from.
+    // Land height under renderer X/Z for the river kit (its street cars and lamps, gangway and
+    // quay props), which was authored on the river's flat 3.5 m ground; NULL keeps that.
+    float (*kit_ground)(float x, float z);
 } BoatWorldDefinition;
 
 const BoatWorldDefinition *boat_location(BoatLocationId id);

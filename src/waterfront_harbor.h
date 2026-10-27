@@ -17,6 +17,7 @@ typedef struct {
     Transform3D boats[WATERFRONT_HARBOR_BOATS];
     Transform3D pontoon;
     Transform3D gangway;
+    Transform3D quay; // Places the quay mesh; identity on the river's 3.5 m ground.
     int line_count;
     Transform3D lines[WATERFRONT_HARBOR_LINES];
 } WaterfrontHarborFrame;
@@ -28,6 +29,10 @@ const Mesh3D *waterfront_harbor_pontoon_mesh(void);
 const Mesh3D *waterfront_harbor_quay_mesh(void);
 // Stateless shared pose/rope evaluation. Flat water stays still; waves use boat_water_query.
 void waterfront_harbor_evaluate(BoatWater water, double time, WaterfrontHarborFrame *frame);
+// The same with the gangway's shore end and the quay gear set on GROUND, the land height under
+// renderer X/Z, instead of the river's 3.5 m ground; NULL is waterfront_harbor_evaluate.
+void waterfront_harbor_evaluate_ground(
+    BoatWater water, double time, float (*ground)(float x, float z), WaterfrontHarborFrame *frame);
 Vector3 waterfront_harbor_attachment(Transform3D pose, Vector3 local);
 // Stationary conservative water-plane envelopes, including outboards and wave excursion.
 // Inputs/normal are simulation X/Z, as in boat_map_water_contact. True means blocked.

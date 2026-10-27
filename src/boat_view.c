@@ -482,7 +482,7 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     const Boat *boat = &view->boat;
     double time = view->time;
     _Static_assert(BOAT_WATER_PARTICLES <= WATERFRONT_PLAYER_PARTICLES, "Player particle capacity");
-    waterfront_scene_evaluate(time, world->water, frame);
+    waterfront_scene_evaluate_ground(time, world->water, world->definition->kit_ground, frame);
     frame->camera = boat_camera(boat, presentation, world->definition, camera);
     frame->player_active = true;
     if (!world->definition->mapped)
@@ -599,7 +599,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         waterfront_traffic_evaluate(world->water, time, &traffic);
         waterfront_draw_traffic(renderer, &traffic);
         WaterfrontHarborFrame harbor;
-        waterfront_harbor_evaluate(world->water, time, &harbor);
+        waterfront_harbor_evaluate_ground(
+            world->water, time, world->definition->kit_ground, &harbor);
         waterfront_draw_harbor(renderer, &harbor);
         WaterfrontSceneFrame birds = { 0 };
         waterfront_boating_gulls(time,

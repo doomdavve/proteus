@@ -12,29 +12,33 @@
   "license": "ODbL-1.0",
   "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
   "attribution": "Map data \u00a9 OpenStreetMap contributors",
-  "ground": "Baskarta contours and spot heights outside the river crop; flat 3.5 m inside it, blending over terrain_blend_m",
+  "ground": "H\u00f6jdmodell 2022 heights everywhere, the river crop included",
   "terrain": {
-    "source": "G\u00f6teborgs stad, Baskarta v2 (hojdkurvor, hojdpunkt)",
+    "source": "G\u00f6teborgs stad, H\u00f6jdmodell 2022 (markmodell, 0.5 m)",
     "licence": "CC0 1.0",
-    "source_file": "docs/adventure/sources/terrain-baskarta.json.gz",
-    "source_sha256": "7bc277652d4c03a044435942627c1cf93d0911009dcb17f4e9c64b9475b514e7",
-    "datum": "Not confirmed from the product description; assumed RH 2000 (RH 70 differs by well under half a metre in Gothenburg). Shore heights sit near 0 m.",
+    "survey": "airborne laser scanning, 9, 15 and 16 May 2022",
+    "source_file": "docs/adventure/sources/terrain-hojdmodell.bin.gz",
+    "source_sha256": "2144b4b9696dfe37912abd66d895dcaf7cf14da2448d7cab813b03f7480ec111",
+    "datum": "RH 2000 (product description). Heights are used as metres above the water at y = 0; the scanned water surface sits near -0.26 m.",
+    "grid_cell_m": 5.0,
     "cell_inland_m": 20.0,
     "cell_shore_m": 5.0,
     "shore_band_m": 20.0,
     "min_land_m": 1.0,
-    "interpolation": "linear over a Delaunay triangulation of contour vertices and spot heights; nearest sample outside its hull",
-    "holdout_vs_spot_heights": {
+    "interpolation": "bilinear between the centres of the grid's cell means",
+    "check_vs_baskarta_spot_heights": {
       "samples": 11529,
-      "rmse_m": 2.406,
-      "mean_abs_m": 0.728,
-      "p95_abs_m": 2.484,
-      "max_abs_m": 96.449
+      "rmse_m": 2.157,
+      "mean_abs_m": 0.27,
+      "median_m": 0.022,
+      "p95_abs_m": 0.438,
+      "max_abs_m": 96.31
     },
+    "tiny_open_edges": 3,
     "dropped_pieces": 0,
     "dropped_area_m2": 0,
     "height_min_m": 1.0,
-    "height_max_m": 50.48
+    "height_max_m": 56.62
   },
   "quay_bottom": -2.0,
   "region": {
@@ -90,12 +94,12 @@
   "playable_boundary_m": 5151.0,
   "route_length_m": 6016.9,
   "route_min_shore_clearance_m": 27.6,
-  "vertices": 195326,
-  "triangles": 306538,
+  "vertices": 220439,
+  "triangles": 386505,
   "water_triangles": 2738,
   "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3); outside it buildings, container cranes, port masts, channel marks and trees (A3.5a)",
   "dressing": {
-    "first_triangle": 240926,
+    "first_triangle": 320153,
     "buildings": 1956,
     "gabled": 1017,
     "skipped_small": 44,
@@ -103,18 +107,36 @@
     "container_cranes": 13,
     "lighting_masts": 60,
     "marks": 8,
-    "trees": 3050,
-    "triangles": 65612,
+    "trees": 3124,
+    "triangles": 66352,
     "marks_in_water": 7,
     "assumptions": "Footprints, crane, mast and mark positions and tagged heights are OSM. Untagged heights: houses 5.5 m eaves with a gable roof on near-rectangular footprints, sheds and garages 2.8 m, tanks 14 m, other buildings 8-14 m by area. Walls sink 0.6 m below the lowest corner. Container cranes are a raised-boom blockout at the mapped 118 m (also used where untagged), boom toward the nearest water; lighting masts 30 m; marks are 3.5-4.5 m piles in their mapped colour on a 1.5 m carved rock where they stand in water. Buildings within 150 m of Nya \u00c4lvsborg are stone. Trees are an authored scatter (11 m lattice, 80 m value noise) on ground at least 3 m high and under 24 degrees, 6 m from shore and clear of buildings, roads and the port; not mapped vegetation. Colours are authored."
   },
   "river_overlay": {
     "source": "assets/geometry/river/geometry.h",
-    "triangles": 70940,
+    "triangles": 35508,
     "bridge_triangles": 4388,
-    "ground_m": 3.5,
-    "terrain_blend_m": 200.0
+    "river_ground_m": 3.5,
+    "placement": "roads and garden beds paint the terrain; each other solid moves by the lowest terrain under it less river_ground_m; the bridge is unchanged",
+    "solids": 1474,
+    "paint_source_triangles": 35432,
+    "painted_land_triangles": 66930,
+    "lift_min_m": -2.5,
+    "lift_max_m": 51.83,
+    "lift_median_m": 11.82
   },
-  "land_triangles": 118992,
-  "geometry_sha256": "50f6d30ff476158c06ea27530693f10ddb5b808c41169f9f842e5ad4288d36ba"
+  "land_triangles": 232991,
+  "kit_ground": {
+    "area": [
+      -120.0,
+      -90.0,
+      130.0,
+      430.0
+    ],
+    "step_m": 2.0,
+    "columns": 126,
+    "rows": 261,
+    "use": "waterfront_outer_ground: the river kit's street cars and lamps, gangway and quay gear stand on the baked land surface"
+  },
+  "geometry_sha256": "98d6cf32a5264fd276e88f3ca46b9e49dc96789d44bbeae6fa4c9ceb33e79131"
 }

@@ -105,10 +105,12 @@ synthetic two-tile land shapefile with a hole, a filtered distant polygon and a 
   areas such as the river and lakes, so A0.3 must combine both layers. That is a layer
   difference, not a conflict.
 - **Terrain.** A0.2 did not acquire Lantmäteriet's 1 m Markhöjdmodell (it needs an
-  authenticated Geotorget STAC account; none was available or created). Since A3.1b the first
-  slice uses Göteborg's CC0 [Baskarta](#terrain-baskarta-a31b-2026-10-26) contours and spot
-  heights instead. An order for the Lantmäteriet model was placed on 2026-10-26 and is
-  pending; it is still needed for Vinga, which Baskarta does not cover.
+  authenticated Geotorget STAC account; none was available or created). A3.1b gave the first
+  slice heights from Göteborg's CC0 [Baskarta](#terrain-baskarta-a31b-2026-10-26) contours, and
+  A3.5b replaced them with Göteborg's CC0 laser-scanned
+  [Höjdmodell 2022](#terrain-höjdmodell-2022-a35b-2026-10-27). An order for the Lantmäteriet
+  model was placed on 2026-10-26 and is pending; it is still needed for Vinga, which neither
+  city product covers.
 - **Weather.** Vinga A (71380, 10 m mast) recorded a 29.7 m/s gust at 2026-10-25T07:00Z,
   a 23.0 m/s 10-minute mean in the same hour (23.5 m/s maximum 3-hour mean), from
   154–171° during 03–08Z. All retained values carry quality code G. These are station
@@ -238,7 +240,7 @@ parameter, not a runtime or bake format.
 
 - **Terrain:** not acquired when A0.3 ran (authenticated Geotorget account needed); the map
   footer and `summary.json` repeat that historical state. A3.1b later added Baskarta heights
-  for the first slice only.
+  for the first slice only, and A3.5b replaced them with Höjdmodell 2022.
 - **Depth:** no bathymetry. The rock counts above come from OSM seamark/natural tags only.
   Saltholmen's exit passes five awash rocks within 50 m.
 - **Overhead:** only Älvsborgsbron crosses a route. Its `maxheight:marine=45` tag is unverified.
@@ -270,7 +272,51 @@ runtime paths changed, so no gameplay or audio check was needed.
 | `coverage.svg` | `cb6f69f5191abb97d0c3056910cef9bab5fcf4cdcb5fb9f6262a410ffccf12d9` |
 | `coverage.png` | `89fc967ea8afa0953f68a0296eb0722c3075cc819f93a852e310cfa0da8a9e5c` |
 
+## Terrain: Höjdmodell 2022 (A3.5b, 2026-10-27)
+
+Since A3.5b the outer map's land heights come from Göteborgs stad's *Höjdmodell 2022*
+([product page](https://opengeodata.goteborg.se/files/hojdmodell/2022/hojdmodell_2022.html)), the
+ground model (markmodell) from airborne laser scanning on 9, 15 and 16 May 2022 at about 10
+points/m², **CC0 1.0**, EPSG:3007 (SWEREF 99 12 00), heights in **RH 2000**. It replaces
+[Baskarta](#terrain-baskarta-a31b-2026-10-26), which is kept as an independent check.
+
+[`terrain-hojdmodell.bin.gz`](sources/terrain-hojdmodell.bin.gz) (1.7 MB) holds a 5 m grid
+over the slice window (W −5600 to E 1250 m, S −4200 to N 1100 m from the crane origin; 1,371 ×
+1,061 cells) as int16 centimetres after a one-line JSON header. That header records the frame,
+the cell rule, the 48 tiles read and the SHA-256 of each input zip.
+`tools/prepare_terrain_dem.py ZIP...` regenerates it from the downloaded zips (read in place,
+in name order, so the result does not depend on the argument order); `--self-test` needs no
+input. It needs `tifffile` and `imagecodecs` from `requirements.txt`.
+
+- **Obtained:** downloaded by hand by the user from the product page, 2026-10-27:
+  `hojdmodell_2022_639_13.zip` (`9d3f3bb8…`) and `hojdmodell_2022_639_14.zip` (`1a525430…`),
+  together the 1 km tiles E 138–145 km, N 6393–6398 km. Not committed.
+- **Format:** each tile is a 2000 × 2000 float32 GeoTIFF at 0.5 m (LZW, 256 × 256 blocks, nodata
+  −9999). The tool checks each tile's EPSG key, pixel size and tie point, and places edge tiles
+  (some are narrower) by their tie points.
+- **Water:** the scan flattens water to about −0.26 m (5th–95th percentile −0.34 to −0.18 m).
+  A cell is the mean of its pixels above 0.2 m, so quay edges are not pulled down by the
+  water beside them; the 397,523 cells with no such pixel take the nearest land cell. The
+  outer bake uses its own water polygons and floors land at 1 m, as before.
+- **Agreement with Baskarta:** on the 11,529 Baskarta spot heights on land, the baked model's
+  median difference is +0.02 m, mean absolute 0.27 m and 95th percentile 0.44 m (the Baskarta
+  contour model managed 0.73 m and 2.48 m). The maximum, 96 m, and the 2.2 m RMSE come from
+  Baskarta spot heights on Älvsborgsbron's towers and deck over water and one 0 m spot, not
+  from the ground. The bake records this check in the outer manifest.
+- **WCS and WMS (reviewed 2026-10-27):** the city's WCS
+  (`https://opengeodata.goteborg.se/services/hojdmodell/wcs/v1`, coverage
+  `hojdmodell-v2__hojdgrid`, axes E and N) returns the same float32 values as the files and
+  can resample on the server (`scalefactor`, `scalesize`). The WMS serves only rendered images,
+  which are no use for heights. The zips are kept as the bake input because their hashes pin
+  the bake; the WCS is an option for larger or later areas.
+- **Coverage:** these two zips cover only the first slice. Vinga is outside Höjdmodell 2022
+  as well, so A4 still needs the Lantmäteriet model (ordered 2026-10-26).
+
 ## Terrain: Baskarta (A3.1b, 2026-10-26)
+
+**Superseded as the bake source by A3.5b.** Only the spot heights are still read, by
+`tools/outer_terrain.py`, to check the Höjdmodell surface. The notes below describe the A3.1b
+extract.
 
 [`terrain-baskarta.json.gz`](sources/terrain-baskarta.json.gz) holds the contours and spot
 heights of Göteborgs stad's *Baskarta v2* (Stadsbyggnadsförvaltningen, published 2020-06-30,

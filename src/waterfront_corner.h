@@ -49,4 +49,13 @@ bool waterfront_scenery_clear(const WaterfrontScenery *scenery, Vector3 position
 // Authored cafe frame (river crop coordinates), used for its light.
 Vector3 waterfront_corner_position(float u, float height, float v);
 
+// Imported building walls and roofs, by their bake colours (tools/prepare_waterfront.py). The
+// renderers measure facades and windows from a wall's own base, so a building may stand on
+// terrain at any height (the outer map) as well as on the river's 3.5 m ground.
+bool waterfront_building_wall(Color color);
+bool waterfront_building_roof(Color color);
+// A generated wall triangle a,c,b (base corners a and b, c above b) of an imported building,
+// tall enough for windows. Window rows start 1.5 m above a.
+bool waterfront_window_wall(Color color, Vector3 a, Vector3 c, Vector3 b);
+
 #endif
