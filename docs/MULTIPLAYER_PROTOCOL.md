@@ -30,6 +30,10 @@ version bump: Accept's location byte is valid up to 2 and the content digest now
 the outer definition and its mesh, so a build without it fails the digest check at Hello.
 Race rooms still require the river.
 
+A3.5e (2026-10-27) adds the harbour obstacles to the content digest, without a version bump:
+the docked ferry joined the harbour contact, and moored hulls already block boats and
+projectiles, so builds that differ there must not share a room.
+
 Handling revision 9 (2026-10-26, isolated controls branch) increases commanded-thrust travel
 to 4 units/s and removes steering-commanded aerial roll. Protocol v5 bytes are unchanged;
 old handling revisions are rejected. Pedals/Shift become ordinary target-derived rate inputs,
@@ -151,7 +155,10 @@ half-width; the four grid points; and the ferry source's origin, direction, star
 speed, height, duration, lifetime, wavelength, spread and half-width. The local-storm extension
 also hashes storm centre X/Z at GO, radius, height, start offset, velocity X/Z (floats), then
 the storm recipe revision (u64, currently 3: irregular directional crests), then the ferry
-recipe revision (u64, currently 2: centred crest with a tapered three-wave packet). This changes
+recipe revision (u64, currently 2: centred crest with a tapered three-wave packet). Last
+(A3.5e) come the harbour obstacles: each moored berth's kind (u64), X, Z and heading; the docked
+ferry's X, Z, heading, length, beam, draught and height; then the harbour contact recipe
+revision (u64, currently 1). This changes
 compatibility without changing message bytes;
 rebuild server and clients together. Storm settings are compiled course data; GO anchors their
 clock in both the authority and prediction. Cloud, rain, lightning and rough water move

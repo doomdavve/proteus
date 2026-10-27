@@ -175,6 +175,7 @@ void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
 {
     renderer3d_draw_mesh(r, waterfront_harbor_quay_mesh(), frame->quay);
     renderer3d_draw_mesh(r, waterfront_harbor_pontoon_mesh(), frame->pontoon);
+    renderer3d_draw_mesh(r, waterfront_harbor_ferry_mesh(), frame->ferry);
     renderer3d_draw_box(r, frame->gangway, (Color) { 154, 123, 84, 255 });
     for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i)
         renderer3d_draw_mesh(r, waterfront_harbor_boat_mesh(i), frame->boats[i]);

@@ -115,6 +115,36 @@ int main(void)
             }
         CHECK(waterfront_harbor_contact((Vector2) { -pose.position.x, pose.position.z }, 0, NULL));
     }
+    // The docked ferry: one mesh under the model cap, its hull afloat on both river maps with
+    // room for its fenders, a solid contact inside and open water just off its river side.
+    const WaterfrontFerry *ferry = waterfront_harbor_ferry();
+    const Mesh3D *ferry_mesh = waterfront_harbor_ferry_mesh();
+    CHECK(valid_mesh(ferry_mesh) && ferry_mesh->triangle_count < BOAT_MODEL_MAX_TRIANGLES);
+    Vector2 across = { cosf(ferry->heading), -sinf(ferry->heading) };
+    Vector2 along = { sinf(ferry->heading), cosf(ferry->heading) };
+    for (int u = -2; u <= 2; ++u)
+        for (int v = -10; v <= 10; ++v) {
+            float x = u * ferry->beam * .25f, z = v * ferry->length * .05f;
+            Vector2 sim = { -(ferry->position.x + across.x * x + along.x * z),
+                ferry->position.z + across.y * x + along.y * z };
+            CHECK(test_river_water(sim, 1));
+            CHECK(boat_map_water(&test_world(BOAT_LOCATION_OUTER)->map, sim, 1));
+            CHECK(waterfront_harbor_contact(sim, 0, NULL));
+            CHECK(!waterfront_harbor_contact_height(
+                sim, 0, ferry->height + 1, INFINITY, (BoatWater) { 0 }, 0, NULL));
+        }
+    for (int v = -10; v <= 10; ++v) {
+        float x = ferry->beam * .5f + 4, z = v * ferry->length * .05f;
+        Vector2 sim = { -(ferry->position.x + across.x * x + along.x * z),
+            ferry->position.z + across.y * x + along.y * z };
+        CHECK(test_river_water(sim, 1));
+        CHECK(!waterfront_harbor_contact(sim, 0, NULL));
+    }
+    CHECK(!waterfront_harbor_camera_clear(ferry->position, 0));
+    CHECK(!waterfront_harbor_camera_clear(
+        Vector3Add(ferry->position, (Vector3) { 0, ferry->height - 1, 0 }), 0));
+    CHECK(waterfront_harbor_camera_clear(
+        Vector3Add(ferry->position, (Vector3) { 0, ferry->height + 2, 0 }), 0));
     for (int z = -100; z <= 275; z += 5) {
         CHECK(test_river_water((Vector2) { -12, z }, 3));
         CHECK(!waterfront_harbor_contact((Vector2) { -12, z }, 3, NULL));
@@ -129,6 +159,19 @@ int main(void)
         waterfront_harbor_evaluate(boat_water_gentle(), time, &again);
         CHECK(!memcmp(&waves, &again, sizeof(waves)));
         CHECK(waves.line_count == WATERFRONT_HARBOR_LINES);
+        CHECK(fabsf(waves.ferry.position.y) < .22f);
+        for (int i = 0; i < WATERFRONT_FERRY_LINES; ++i) {
+            // Ferry lines run from the quay-side deck edge down to bollards ashore.
+            Vector3 deck = waterfront_harbor_attachment(
+                waves.ferry, (Vector3) { -ferry->beam * .5f + 1, 11.2f, 0 });
+            Vector3 top = waterfront_harbor_attachment(
+                waves.lines[6 + WATERFRONT_HARBOR_BOATS * 4 + i * 2], (Vector3) { 0, 0, -.5f });
+            CHECK(fabsf(top.y - deck.y) < .5f);
+            Vector3 bollard = waterfront_harbor_attachment(
+                waves.lines[7 + WATERFRONT_HARBOR_BOATS * 4 + i * 2], (Vector3) { 0, 0, .5f });
+            CHECK(fabsf(bollard.y - 3.9f) < .01f);
+            CHECK(!test_river_water((Vector2) { -bollard.x, bollard.z }, 0));
+        }
         for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
             CHECK(fabsf(waves.boats[i].position.y) < .22f);
             CHECK(isfinite(waves.boats[i].rotation.x) && isfinite(waves.boats[i].rotation.z));
@@ -162,9 +205,11 @@ int main(void)
         }
     }
     // Real simulation contacts: approach the workboat and pontoon, then back away.
-    const Vector2 starts[] = { { -34, 35 }, { 0, 182 } };
-    const float headings[] = { -PI / 2, PI / 2 };
-    for (int test = 0; test < 2; ++test) {
+    // The third run heads at the ferry's river side from 30 m out.
+    Vector2 off = { -(ferry->position.x + across.x * 30), ferry->position.z + across.y * 30 };
+    const Vector2 starts[] = { { -34, 35 }, { 0, 182 }, off };
+    const float headings[] = { -PI / 2, PI / 2, atan2f(across.x, across.y) };
+    for (int test = 0; test < 3; ++test) {
         BoatSession boat;
         boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
         boat.boat.position = starts[test];
@@ -185,8 +230,9 @@ int main(void)
         }
         CHECK(Vector2Distance(contact, boat.boat.position) > 3);
     }
-    printf("boat_models=%d variants=%d preset_triangles=%zu harbor_geometry=ok\n",
-        BOAT_MODEL_KIND_COUNT, BOAT_MODEL_KIND_COUNT * 5, triangles);
+    printf(
+        "boat_models=%d variants=%d preset_triangles=%zu ferry_triangles=%zu harbor_geometry=ok\n",
+        BOAT_MODEL_KIND_COUNT, BOAT_MODEL_KIND_COUNT * 5, triangles, ferry_mesh->triangle_count);
     test_worlds_close();
     return 0;
 }

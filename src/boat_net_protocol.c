@@ -1,4 +1,5 @@
 #include "boat_net_protocol.h"
+#include "waterfront_harbor.h"
 
 #include <assert.h>
 #include <float.h>
@@ -1167,6 +1168,20 @@ uint64_t boat_net_content_digest(void)
         digest_float(&d, storm[i]);
     digest_u64(&d, 3); // Local storm recipe revision (CPU and production GLSL).
     digest_u64(&d, 2); // Ferry recipe revision: centred crest and tapered three-wave packet.
+    // Harbour obstacles on the mapped river locations: moored berths and the docked ferry.
+    const WaterfrontBerth *berths = waterfront_harbor_berths();
+    for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
+        digest_u64(&d, (uint64_t)berths[i].kind);
+        digest_float(&d, berths[i].position.x);
+        digest_float(&d, berths[i].position.z);
+        digest_float(&d, berths[i].heading);
+    }
+    const WaterfrontFerry *ferry = waterfront_harbor_ferry();
+    const float hull[] = { ferry->position.x, ferry->position.z, ferry->heading, ferry->length,
+        ferry->beam, ferry->draft, ferry->height };
+    for (size_t i = 0; i < sizeof(hull) / sizeof(*hull); ++i)
+        digest_float(&d, hull[i]);
+    digest_u64(&d, 1); // Harbour contact recipe revision: berth hulls, dock and ferry boxes.
     cached = d.value;
     ready = true;
     return cached;
