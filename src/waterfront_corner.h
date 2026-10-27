@@ -4,6 +4,7 @@
 #include "boat_map.h"
 #include "boat_map_tiles.h"
 #include "renderer3d.h"
+#include "waterfront_outer.h"
 
 // Static city dressing: the authored cafe at OSM way 282574767 and a map-constrained
 // kit distributed along streets, exterior facades, and quays. Placements are artistic.
@@ -17,13 +18,16 @@ typedef struct {
 
 // One scene's map-bound scenery, built from the description it borrows (NULL: the basin, which
 // has none). Frontages, quays and forecourts are derived from the map. The authored river kit
-// (cafe, street furniture, crane and bridge deck) belongs only to the compiled river crop, so
-// RIVER is set only for waterfront_city_river_map. Each CPU/GPU view owns one. Never copy an
-// initialized scenery; borrow it by pointer. TILES is the map's land-only catalogue at
-// TILE_SIZE, which both renderers cull by; it is empty for the basin.
+// (cafe, street furniture, crane and bridge deck) belongs to the maps that hold the river crop:
+// RIVER is set for waterfront_city_river_map and for a map with a kit ground (the outer map).
+// There GROUND is that ground, and the whole kit, the derived frontages, quays and forecourts
+// included, is laid out exactly as on the river map and then set on GROUND. Each CPU/GPU view
+// owns one. Never copy an initialized scenery; borrow it by pointer. TILES is the map's
+// land-only catalogue at TILE_SIZE, which both renderers cull by; it is empty for the basin.
 typedef struct {
     const BoatMapDescription *map;
     bool ready, river;
+    WaterfrontGround ground;
     WaterfrontCornerBox *boxes;
     BoundingBox *bounds; // Per-box world bounds for clearance queries.
     size_t count;
@@ -44,6 +48,8 @@ bool waterfront_scenery_init_tiled(
 void waterfront_scenery_destroy(WaterfrontScenery *scenery);
 // Keep a ready scenery of MAP, or rebuild it for MAP.
 bool waterfront_scenery_bind(WaterfrontScenery *scenery, const BoatMapDescription *map);
+// The kit's ground under renderer X/Z: GROUND, or the river's 3.5 m without one.
+float waterfront_scenery_ground(const WaterfrontScenery *scenery, float x, float z);
 // An unready scenery is never clear.
 bool waterfront_scenery_clear(const WaterfrontScenery *scenery, Vector3 position, float clearance);
 // Authored cafe frame (river crop coordinates), used for its light.

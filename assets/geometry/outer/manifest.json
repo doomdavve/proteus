@@ -128,15 +128,15 @@
   "land_triangles": 232991,
   "kit_ground": {
     "area": [
-      -120.0,
-      -90.0,
-      130.0,
-      430.0
+      -1500.0,
+      -1600.0,
+      950.0,
+      800.0
     ],
-    "step_m": 2.0,
-    "columns": 126,
-    "rows": 261,
-    "use": "waterfront_outer_ground: the river kit's street cars and lamps, gangway and quay gear stand on the baked land surface"
+    "step_m": 4.0,
+    "columns": 613,
+    "rows": 601,
+    "use": "waterfront_outer_ground: the river kit (crane, bridge deck, cafe, street furniture, frontages, quay fittings, cars, lamps and harbour) stands on the baked land surface"
   },
-  "geometry_sha256": "98d6cf32a5264fd276e88f3ca46b9e49dc96789d44bbeae6fa4c9ceb33e79131"
+  "geometry_sha256": "638076d3114a8c2c9638bad4d6c03376cc524c2e345ee8c574f2296054d18b82"
 }

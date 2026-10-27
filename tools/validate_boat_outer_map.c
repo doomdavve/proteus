@@ -81,9 +81,11 @@ int main(void)
     CHECK(lowest_top >= .99f);
     CHECK(mesh->triangle_count > 200000);
 
-    // The river kit's cars, lamps and harbour stand on the baked ground: real land heights on
-    // the dock's shore and both streets, and the river's 3.5 m outside the lattice.
-    CHECK(outer->kit_ground == waterfront_outer_ground);
+    // The river kit stands on the baked ground: real land heights on the dock's shore and both
+    // streets, and the river's 3.5 m outside the river crop. Only the outer map has a kit ground.
+    CHECK(waterfront_kit_ground(outer->map) == waterfront_outer_ground);
+    CHECK(!waterfront_kit_ground(boat_location(BOAT_LOCATION_RIVER)->map));
+    CHECK(!waterfront_kit_ground(NULL));
     static const Vector2 kit[] = { { -34.1f, 182 }, { -73.9f, 53.6f }, { 92.7f, 167.2f } };
     for (int i = 0; i < 3; ++i) {
         float ground = waterfront_outer_ground(kit[i].x, kit[i].y);
@@ -91,6 +93,7 @@ int main(void)
     }
     CHECK(waterfront_outer_ground(-2000, 60) == 3.5f);
     CHECK(waterfront_outer_ground(0, 2000) == 3.5f);
+    CHECK(waterfront_outer_ground(-1400, -1500) != 3.5f); // The crop's far corner is covered.
 
     size_t legs = 0;
     for (int i = 0; i < ROUTE_POINTS; ++i) {

@@ -50,15 +50,19 @@ static void beam(Renderer3D *r, Vector3 a, Vector3 b, float width, float depth)
     renderer3d_draw_mesh(r, &mesh, (Transform3D) { .scale = { 1, 1, 1 } });
 }
 
-static void crane(Renderer3D *r)
+// Each foot stands on the kit's ground; the gantry keeps its authored height.
+static void crane(Renderer3D *r, const WaterfrontScenery *scenery)
 {
     for (int side = -1; side <= 1; side += 2) {
-        float x = (float)side;
+        float x = (float)side, sill = 1.5f;
         for (int face = -1; face <= 1; face += 2) {
             float z = (float)face;
-            beam(r, crane_point(x * 49, 3.5f, z * 5), crane_point(x * 45, 73, z * 3), 3, 3);
+            Vector3 foot = crane_point(x * 49, 0, z * 5);
+            foot.y = waterfront_scenery_ground(scenery, foot.x, foot.z);
+            sill += foot.y * .5f;
+            beam(r, foot, crane_point(x * 45, 73, z * 3), 3, 3);
         }
-        beam(r, crane_point(x * 49, 5, -5), crane_point(x * 49, 5, 5), 4, 4);
+        beam(r, crane_point(x * 49, sill, -5), crane_point(x * 49, sill, 5), 4, 4);
         beam(r, crane_point(x * 47, 35, -4), crane_point(x * 47, 35, 4), 2, 2);
     }
     beam(r, crane_point(-55, 76, 0), crane_point(55, 76, 0), 8, 6);
@@ -220,6 +224,6 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
             windows(r, scenery->map, &tiles->land[tile->land_first], tile->land_count);
     }
     if (scenery->river)
-        crane(r);
+        crane(r, scenery);
     return true;
 }

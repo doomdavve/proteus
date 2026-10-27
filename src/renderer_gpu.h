@@ -86,6 +86,7 @@ typedef struct {
 typedef struct {
     const BoatMapDescription *map; // Bound map; NULL: unbound, which draws only basin frames.
     bool river; // The bound map carries the authored river crane, bridge deck and fixtures.
+    float cafe_lift; // The kit ground at the cafe less the river's 3.5 m, for its light.
     // Per-tile map classes, each culled against every pass's view volume.
     WaterfrontGpuTiled city;
     WaterfrontGpuTiled facades;
