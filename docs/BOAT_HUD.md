@@ -76,7 +76,7 @@ display-free review mode, 3× nearest): [outer corner at the dock](adventure/min
 [review commands](#review-commands).
 
 Verification (2026-10-28, macOS arm64, Debug): build warning-free; `ctest --preset full`
-passed all 257 active tests (15 disabled), including the quick `boat_minimap`. Rooms with the
+passed all 258 active tests (15 disabled; rerun after rebasing on main, 2026-10-28), including the quick `boat_minimap`. Rooms with the
 map open were not run (no room session or capture).
 
 Limitations: the user reported a good first impression of the first version (2026-10-28); the
