@@ -651,7 +651,8 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
         draw_credits(t);
     else
         draw_menu(t, s, status);
-    draw_footer_text(t->panel == PANEL_CREDITS ? t->ui : t->small, PROTEUS_VERSION, 8);
+    if (t->panel != PANEL_CREDITS)
+        draw_footer_text(t->small, PROTEUS_VERSION, 8);
     EndTextureMode();
 }
 

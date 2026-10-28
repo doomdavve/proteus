@@ -37,11 +37,19 @@ User acceptance remains pending.
 
 ## Credits screen, 2026-10-28
 
+Version-footer cleanup, 2026-10-28: the user requested no version in credits. Completed:
+only non-credits panels draw the existing small-font version footer. Native Debug and web
+MinSizeRel rebuilds passed; all 230 enabled CTests passed again (13 retired cases disabled,
+GPU test lane off). Chrome/SwiftShader captures confirmed no credits footer and the retained
+main-menu version after Escape return. These scripted captures were inspected; physical
+navigation and human acceptance remain pending. Next: the physical/browser qualification
+listed below.
+
 Completed: add CREDITS before EXIT / BACK TO LAUNCHER and move the Proteus, font and map
 credits out of the title/settings/help into this panel. Five main rows retain the existing
 panel width and bottom edge. Settings keeps its six control rows and contextual hints.
-Following user review, credits now use **m5x7 throughout**, including headings, names, BACK
-and the version footer. A centred movie-style roll scrolls vertically over the retained,
+Following user review, credits now use **m5x7 throughout**, including headings, names and BACK. The credits version footer was removed on
+2026-10-28; the main menu keeps its small-font version. A centred movie-style roll scrolls vertically over the retained,
 user-liked rippling water grid. The initial mixed-font card and horizontal sine scroller
 are superseded. All animation uses the title presentation clock. Credits and presentation
 retain their integer pixel grid; the background water now uses fractional positions and
