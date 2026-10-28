@@ -53,11 +53,11 @@ after resolving the failure. Existing tags pointing elsewhere are rejected. This
 does not merge PRs or replace human package/input/audio review. Update the release and hosting
 guides and the hosting repository's evidence after completion.
 
-Preparation, 2026-10-28: v0.0.21 collects the merged mobile browser controls and adaptive
+Preparation evidence, 2026-10-28: v0.0.21 collects the merged mobile browser controls and adaptive
 viewport work since v0.0.20. Release orchestration and offline archive/pin guards implemented;
 Debug build and all 233 enabled CPU CTests passed (13 retired cases disabled, GPU tests off).
-The CPU river capture was inspected. Publication and hosted cutover are pending at this
-preparation commit. The macOS CI build directory is now ignored so generated build output
+The CPU river capture was inspected. Publication and hosted cutover subsequently completed
+as recorded below. The macOS CI build directory is now ignored so generated build output
 does not falsely mark packaged source as modified.
 
 ### Tag or UI publication
@@ -145,7 +145,33 @@ provided token. No personal access token or additional secret is needed.
 
 ## Status and verification
 
-Current status, 2026-10-28: **[v0.0.20](https://github.com/doomdavve/proteus/releases/tag/v0.0.20)**
+Current status, 2026-10-28: **[v0.0.21](https://github.com/doomdavve/proteus/releases/tag/v0.0.21)**
+is published at `0cb1921224149ddeb4707e818dd2069096bc9e3d`, after
+[PR #38](https://github.com/doomdavve/proteus/pull/38) passed macOS, Windows and Linux CI.
+The [native release](https://github.com/doomdavve/proteus/actions/runs/40685734545) and
+[Pages](https://github.com/doomdavve/proteus/actions/runs/40685734544) workflows succeeded.
+The new release command completed publication, both downloaded ZIP checksum/integrity and
+version/commit checks, then the required Winterfell authority/browser cutover through
+`davve-srv` pin `e6d0871`. Both services are active on the matching tag; public metadata is
+protocol 7 / physics 9. The full deployment repeat reported `changed=0 failed=0`.
+Both live browser sites passed named joining/driving; a matching native bot received 150
+snapshots, repaired eight mismatches and finished consistent with zero decode errors.
+The Mac ZIP reports `Uncommitted changes: False`. Neither downloaded package was launched
+locally; CI performed relocation checks. Android-emulated mobile touch, tilt, fullscreen and
+portrait/landscape checks passed against Pages. iPhone-style emulation passed against Winterfell,
+including connected touch/tilt commands and leaving the room. Representative desktop/mobile
+captures were inspected. Physical device/audio/human acceptance remain
+open. [Hosting evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) owns
+deployment limits. Next: physical phone and native package play, then wider multiplayer
+qualification. Local evidence: `build/release/verification.json` and browser logs/captures in
+the release worktree; orchestration log `/private/tmp/proteus-release-v0.0.21.log`.
+
+The merged release commit also passed Debug configure/build and all 233 enabled CPU tests
+(`ctest --preset full`, GPU off, 13 retired cases disabled). CPU river/outer captures were
+inspected and a 120-frame windowed GPU river demo completed. The two offline archive/pin
+tests and eight existing publisher tests passed. No new human playback is claimed.
+
+Earlier publication evidence, 2026-10-28: **[v0.0.20](https://github.com/doomdavve/proteus/releases/tag/v0.0.20)**
 is published at commit `2f9adfc`, after [PR #34](https://github.com/doomdavve/proteus/pull/34)
 passed macOS, Windows and Linux CI. The
 [native release run](https://github.com/doomdavve/proteus/actions/runs/40668366272)

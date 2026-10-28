@@ -1,6 +1,6 @@
 # Documentation and current plans
 
-Current status reconciled on 2026-10-27. The main program is the boating game `wake_velocity`
+Current status reconciled on 2026-10-28. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
 Acid Wake techno or Off. It provides free boating in the basin and on the river, a basin time
@@ -11,7 +11,7 @@ history.
 
 ## Current work
 
-Released internet hosting: [v0.0.20](RELEASES.md#status-and-verification) is published and
+Released internet hosting: [v0.0.21](RELEASES.md#status-and-verification) is published and
 Winterfell's matching native/browser room is deployed (2026-10-28), with protocol 7 / physics 9.
 The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) owns deployment,
 client-check evidence and limits. Every release includes this hosted cutover through
@@ -38,7 +38,7 @@ and broader network/platform qualification remain open.
 | [macOS app builds](MACOS_BUILD.md) | Apple Silicon action, relocatable app bundle, preferred river launch, ad-hoc signing, ZIP/checksum; title backdrop packaging fix added | Verify macOS packaging CI and launch the downloaded app from Finder; macOS 13 execution pending |
 | [Windows builds](WINDOWS_BUILD.md) | Portable x64 action; reversal and basin impact-bound corrections, bundled music, relocated CPU check; ENet/`boat_server` MSVC build and packaged server passed CI (run 40083439355, 2026-10-24); title backdrop packaging fix added, pending CI | Verify the current Windows workflow and launch the downloaded app; then physical mouse/scroll, GPU/audio and connected controls |
 | [Linux builds](LINUX_BUILD.md) | Native Wayland enabled with X11 compatibility; Weston/Xvfb CI checks configured; bundled GLFW no-seat startup crash backport implemented | Rerun Linux CI to verify the Weston crash fix and X11 startup, review CPU screenshots; GNOME/KDE physical input, display scaling, audio and connected play pending |
-| [Automated releases](RELEASES.md) | Release command coordinates tag publication, verified downloads and required Winterfell cutover; version-tag/UI workflow reuses platform builds | v0.0.21 automation prepared; publication/cutover pending. v0.0.20 remains deployed; human package review open ([status](RELEASES.md#status-and-verification)) |
+| [Automated releases](RELEASES.md) | Release command coordinates tag publication, verified downloads and required Winterfell cutover; version-tag/UI workflow reuses platform builds | v0.0.21 published and deployed; ZIP verification, live browser/native joins and idempotent deployment passed (2026-10-28); physical phone/package/audio review open ([status](RELEASES.md#status-and-verification)) |
 | [Browser boating](WEB_BUILD.md) | Shared title, saved setup/settings (including multiplayer smoothing), Escape/return-to-title; optional WebRTC client and native endpoint alongside ENet; [mobile overlay touch/tilt controls, adaptive portrait viewport and Home Screen presentation](WEB_BUILD.md#mobile-controls-and-iphone-presentation-2026-10-28) | Chrome/SwiftShader title/persistence/repeated-session and mixed native/browser free/deathmatch/race automation pass (2026-10-25); iPhone landscape overlay accepted; Android-emulated controls/fullscreen checked; next: physical portrait/tilt/Android/Home Screen review, real impairment, other physical devices, Firefox/Safari, tab suspension and public WSS/ICE/TURN qualification; [status and limits](WEB_BUILD.md#webrtc-rooms) |
 
 These are separate work tracks, not a single execution queue. A next task in one plan

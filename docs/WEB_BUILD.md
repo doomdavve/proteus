@@ -178,14 +178,14 @@ so deployment can update compatibility metadata without republishing Pages. The 
 launcher includes public STUN on every host, including Pages.
 
 Both features were introduced as `v0.0.17-server-directory`; Winterfell now serves the exact
-v0.0.20 client, built on the server by the `davve-srv` baseline role. The public directory
+v0.0.21 client, built on the server by the `davve-srv` baseline role. The public directory
 and launcher at `wake.davve.net` report protocol 7 / physics 9 and use
 `wss://wake.davve.net/room`. On 2026-10-26, a fresh Chrome/SwiftShader run of the published
 Pages build fetched Winterfell, joined that room and drove without local-network permission.
 First the test overrode only the launcher URL; after PR #14 merged and Pages run
 [40391231764](https://github.com/doomdavve/proteus/actions/runs/40391231764) completed,
 a fresh Chrome run against the actual published URL also fetched the list, joined and drove.
-The live launcher and hosted room were upgraded together to v0.0.20 on 2026-10-28;
+The live launcher and hosted room were upgraded together to v0.0.21 on 2026-10-28;
 [current evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) owns the
 verification limits. Every release includes a server cutover through the
 [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native clients

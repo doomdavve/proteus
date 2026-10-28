@@ -1,7 +1,7 @@
 # Winterfell internet room
 
-The Winterfell deployment uses released **v0.0.20**, commit
-`2f9adfce312c115b8e262ba64a436fb58e3dcfb5`, with the optional WebRTC transport enabled.
+The Winterfell deployment uses released **v0.0.21**, commit
+`0cb1921224149ddeb4707e818dd2069096bc9e3d`, with the optional WebRTC transport enabled.
 It hosts one shared four-player river deathmatch room for native and browser players.
 The deployed protocol-v7 [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
 provides the water cannon (hold Space), stern wave grenade (E), torpedo (Q) and optional
@@ -10,7 +10,7 @@ no player account requirement.
 
 ## Join
 
-- Native: use v0.0.20, choose MULTIPLAYER and select WINTERFELL, or enter
+- Native: use v0.0.21, choose MULTIPLAYER and select WINTERFELL, or enter
   `wake.davve.net:24680`.
 - Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/) or
   [GitHub Pages](https://doomdavve.github.io/proteus/), press PLAY, choose MULTIPLAYER,
@@ -18,8 +18,8 @@ no player account requirement.
   URL / CONNECT remain available for manual joining.
 - On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
 
-The native server and hosted browser client are built from the same v0.0.20 tag by the
-`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.20 and uses
+The native server and hosted browser client are built from the same v0.0.21 tag by the
+`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.21 and uses
 the same public directory and signaling endpoint. The directory reports protocol 7 / physics 9.
 Both launchers include public STUN. The public `wake.davve.net` hostname avoids the VPN's
 private `*.winterfell.davve.net` DNS override. Native v0.0.20 includes the connection fix;
@@ -45,7 +45,7 @@ The controller needs no Proteus checkout, local Emscripten, release artifacts or
 Both builds finish before service/nginx configuration is switched. Upgrades briefly disconnect
 players; repeat deployments reuse the builds and leave a healthy room running.
 
-The v0.0.20 cutover passed through that exact wrapper on 2026-10-28, followed by a complete
+The v0.0.21 cutover passed through that exact wrapper on 2026-10-28, followed by a complete
 `changed=0` rerun. `davve-srv/docs/wake-velocity.md` owns operator commands and deployment
 evidence; [current verification](#status-and-verification--2026-10-28) records the client checks
 and their limits. Do not alternate the baseline role with the standalone Proteus playbook:
@@ -252,6 +252,27 @@ receive snapshots and play alongside a native client, then leave and rejoin. Ins
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
 
 ## Status and verification — 2026-10-28
+
+The release command in [the release guide](RELEASES.md#release-command) upgraded Winterfell
+to v0.0.21 through committed/pushed `davve-srv` pin `e6d0871`. Native and browser builds
+completed on Winterfell before the switch. The ordinary wrapper finished with
+`ok=44 changed=9 failed=0 unreachable=0`; a full repeat returned
+`ok=41 changed=0 failed=0 unreachable=0`. Room and relay are active; the room reports
+v0.0.21, `NRestarts=0`, active since 2026-10-28 13:17:48 CET. The service-account checkout
+identifies exact tagged commit `0cb1921224149ddeb4707e818dd2069096bc9e3d`.
+Both live browser sites report v0.0.21 and passed Chrome/SwiftShader named joining/driving
+without page errors. The public directory reports protocol 7 / physics 9. A matching native
+bot received 150 snapshots, repaired eight mismatches, finished consistent and reported zero
+decode errors. Android-emulated Pages touch/tilt/fullscreen/orientation checks passed;
+iPhone-style Winterfell emulation also passed, including connected touch/tilt commands and
+leaving. Representative desktop/mobile captures were inspected.
+These are automated checks on this controller: physical phones, human gameplay/audio,
+restrictive networks, long soaks and independent external-network/TURN qualification remain
+open. Logs/captures are under the release worktree's `build/release/`; deployment logs are
+`/private/tmp/proteus-release-v0.0.21.log` and `/private/tmp/proteus-v21-hosting-repeat.log`.
+Next: physical-device and human package play, then broader multiplayer qualification.
+
+### Earlier v0.0.20 cutover
 
 The required v0.0.20 release cutover ran through `davve-srv` commit `2cf0974` using
 `scripts/ansible-run.sh --limit winterfell --tags wake_velocity`. Ansible completed with
