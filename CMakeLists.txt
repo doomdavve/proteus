@@ -80,7 +80,7 @@ option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)"
 add_library(proteus_render STATIC
   src/boat_ui.c src/boat_ui.h
   src/boat_hud.c src/boat_hud.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
-  src/boat_voyage_view.c src/boat_voyage_view.h
+  src/boat_voyage_view.c src/boat_voyage_view.h src/boat_minimap.c src/boat_minimap.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
   src/waterfront_scene.c)
@@ -514,6 +514,12 @@ target_link_libraries(validate_boat_voyage PRIVATE proteus_boat_session)
 target_compile_options(validate_boat_voyage PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_voyage COMMAND validate_boat_voyage)
 set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage=ok")
+# Solo minimap: baked chart, projection, markers and trim; --screenshot writes review captures.
+add_executable(validate_boat_minimap tools/validate_boat_minimap.c)
+target_link_libraries(validate_boat_minimap PRIVATE proteus_render)
+target_compile_options(validate_boat_minimap PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_minimap COMMAND validate_boat_minimap)
+set_tests_properties(boat_minimap PROPERTIES PASS_REGULAR_EXPRESSION "boat_minimap=ok")
 # Adventure A2.2: in-memory tile catalogue and indexed collision, exact against the full scan.
 add_executable(validate_boat_map_index tools/validate_boat_map_index.c)
 target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_core)

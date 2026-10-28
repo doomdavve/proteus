@@ -261,6 +261,12 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   and checks that points outside the region and on the quay are not water. Since A3.1b it
   also requires real relief: land tops never below 1 m, hills between 60 and 100 m, and at
   least 100,000 triangles.
+- `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `river` and
+  `outer` and none for the basin, checks that both frames fit the 320×200 scene (the chart
+  above the instruments), that the spawn, every voyage shelter and the destination are water
+  pixels and inland Hisingen is not, that composition marks the boat and destination without
+  touching the trim, and the N cycle. With arguments it writes review captures
+  ([HUD guide](BOAT_HUD.md#review-commands)).
 - `boat_voyage` runs `validate_boat_voyage` (adventure A3.4, under 1 s in Debug). It checks that
   the outer voyage's shelters and harbour are navigable, that the exposed patch crosses the A0.3
   route's southern leg while a coastal line, the shelters and the harbour stay outside it, the

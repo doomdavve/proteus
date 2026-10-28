@@ -2187,6 +2187,23 @@ livery (white, dark blue hull band, "Stena Line" and a green wave).
 
 **Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
 
+### Minimap, 2026-10-28
+
+Branch `minimap`, from `main` after pull request #29. The user asked for a mini-map, unsure of
+the details: maybe not always visible if it takes too much space, probably not in deathmatch,
+"adventure mode would be great", and enough to see where in the river you are and how close to
+the ocean, with landmarks as highlighted dots.
+
+- **Decisions (agent, for review):** a north-up overview of the whole map rather than a
+  rotating close-up, so distance to the sea reads at a glance; `N` cycles a small corner map,
+  a larger labelled chart and off; solo mapped play only (rooms of every mode have none);
+  shown from the start on the `outer` voyage, hidden on `river`.
+- **Result:** the [HUD guide](BOAT_HUD.md#solo-minimap-2026-10-28) owns the layout, markers,
+  captures and limitations. The voyage's shelters, destination and exposed water come from
+  its route; the crane, ferry and bridge are a fixed landmark table in the crane-origin frame.
+- **Verification (2026-10-28, macOS arm64, Debug):** see the HUD guide; no human play or user
+  acceptance yet.
+
 ## Verification and handoff template
 
 Every implementation handoff runs the repository's required commands:

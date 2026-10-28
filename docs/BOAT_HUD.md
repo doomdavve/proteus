@@ -13,6 +13,40 @@ The [title plan](TITLE_SCREEN_PLAN.md#warm-daylight-alternative-and-shared-game-
 owns verification and next review. Instrument geometry and semantic needle colours remain
 the same; standalone primitive reviews without UI assets keep built-in 3×5 fallback labels.
 
+## Solo minimap, 2026-10-28
+
+Solo play on a mapped location (`river`, `outer`) shows a north-up chart of the whole map,
+baked once from the map's water triangles (4×4 samples per pixel, a pale line on land pixels
+that touch water) and composed each frame on the CPU at scene resolution, then uploaded and
+drawn before integer scaling. It marks the boat (white wedge along its heading), the Eriksberg
+crane, the docked ferry and Älvsborgsbron (muted dots) and, on an `outer` voyage, the shelters
+(sea-green; the current recovery point filled), the destination (amber square, filled once
+arrived) and the exposed water (dashed amber circle at the exposure boundary).
+
+`N` cycles three states: **corner**, a 96×68-or-smaller frame in the top-right corner without
+labels (about 73 m per pixel on `outer`); **chart**, a larger frame centred above the
+instruments with labels, a 1 km (or 500 m) scale bar and a north mark (about 39 m per pixel on
+`outer`); and **off**. An `outer` voyage starts in the corner state; `river` starts off. Rooms
+(free, race and deathmatch) have no map. Help lists `N` when a map is available. Code:
+[`boat_minimap.c`](../src/boat_minimap.c); the HUD's 3×5 lettering is now shared through
+`boat_hud_glyph` (with G, J, X and Z added).
+
+Review captures (agent review, 2026-10-28, macOS arm64, CPU scene, composed by the
+display-free review mode, 3× nearest): [outer corner at the dock](adventure/minimap-outer-corner.png),
+[outer chart at the dock](adventure/minimap-outer-chart.png),
+[outer chart near the east shore](adventure/minimap-outer-chart-east-shore.png) and
+[river corner](adventure/minimap-river-corner.png). Commands are under
+[review commands](#review-commands).
+
+Verification (2026-10-28, macOS arm64, Debug): build warning-free; `ctest --preset full`
+passed all 257 active tests (15 disabled), including the new quick `boat_minimap`.
+
+Limitations: not played by a human, and no in-window capture (the review mode reproduces the
+composition; a 120-frame windowed `outer` demo ran without error). The chart covers the middle
+of the view while shown. Labels are authored offsets for these two maps, so a new landmark
+or location may need its own. The voyage panel is drawn in window pixels and can overlap the
+chart's top edge in windows smaller than 3× scale.
+
 Current deathmatch extension (2026-10-27): matching 54×44 side cases flank the central
 controls. Port shows hull health/segments and recoverable heel pressure; starboard shows
 Space/cannon heat (COOL when overheated), E/grenade readiness and Q/remaining torpedoes
@@ -272,6 +306,16 @@ telemetry onto a background at 320x200, then nearest-scales the combined frame:
 
 `--voyage shelter|exposed|slow|arrived|recovered` adds the outer location's destination panel
 (adventure A3.4) in window pixels, as `wake_velocity` draws it, from fixed fixture states.
+
+The solo minimap's review mode needs no window. `--at X,Z,HEADING` places the boat (simulation
+X/Z, radians), `--shelter N` picks the current recovery shelter and `--scale N` nearest-scales:
+
+```sh
+./build/wake_velocity --renderer cpu --location outer --time 3 --screenshot build/minimap-outer.png
+./build/validate_boat_minimap --mode corner --background build/minimap-outer.png --scale 3 --screenshot build/minimap-corner.png
+./build/validate_boat_minimap --mode chart --at 3300,-2100,2.4 --shelter 2 --scale 3 --screenshot build/minimap-chart.png
+./build/validate_boat_minimap --location river --mode corner --scale 3 --screenshot build/minimap-river.png
+```
 
 The review tool requires a graphics context. Default output is 960x600 (3x), compact
 320x200 (1x), large 1280x800 (4x); all use the same layout and pixel grid. Omit
