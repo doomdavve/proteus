@@ -576,7 +576,7 @@ static int study(int argc, char **argv)
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     BoatGpu gpu = { 0 };
     BoatRearview mirror = { 0 };
-    // Solo mapped play only; shown from the start on an adventure voyage.
+    // Every mapped location, solo or room; hidden until N.
     BoatMinimap minimap = { 0 };
     Texture2D minimap_textures[BOAT_MINIMAP_MODES] = { 0 };
     BoatMinimapMode minimap_mode = BOAT_MINIMAP_HIDDEN;
@@ -792,14 +792,13 @@ static int study(int argc, char **argv)
     if (!IsRenderTextureValid(frame_target))
         goto cleanup;
     SetTextureFilter(frame_target.texture, TEXTURE_FILTER_POINT);
-    if (!networked && boat_minimap_init(&minimap, location)) {
+    if (boat_minimap_init(&minimap, location)) {
         for (int mode = BOAT_MINIMAP_CORNER; mode < BOAT_MINIMAP_MODES; ++mode) {
             minimap_textures[mode] = LoadTextureFromImage(minimap.layers[mode].frame);
             if (!IsTextureValid(minimap_textures[mode]))
                 goto cleanup;
             SetTextureFilter(minimap_textures[mode], TEXTURE_FILTER_POINT);
         }
-        minimap_mode = session.voyage.route ? BOAT_MINIMAP_CORNER : BOAT_MINIMAP_HIDDEN;
     }
     boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
     char music_path[4096];
@@ -1229,7 +1228,9 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_NET
         if (net) {
             net_study_rivals(net, live_view.time, &rivals);
-            mirror_visible = mirror.enabled && net_study_deathmatch(net) && net->own_visible;
+            // The large chart takes the mirror's place while it is open.
+            mirror_visible = mirror.enabled && net_study_deathmatch(net) && net->own_visible
+                && minimap_mode != BOAT_MINIMAP_CHART;
         }
 #endif
         if (course && !session.runs.playing && session.runs.ghost_visible
@@ -1294,10 +1295,11 @@ static int study(int argc, char **argv)
                 .precision = precision,
                 .reset_progress = reset_hold.seconds / BOAT_RESET_HOLD_SECONDS },
             WIDTH, HEIGHT);
-        const Image *chart = boat_minimap_compose(
-            &minimap, minimap_mode, &session.voyage, view->boat.position, view->boat.heading);
+        const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
+            networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
+        Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, WIDTH, HEIGHT);
         if (chart) {
-            Rectangle bounds = boat_minimap_bounds(&minimap, minimap_mode, WIDTH, HEIGHT);
+            Rectangle bounds = minimap_bounds;
             UpdateTexture(minimap_textures[minimap_mode], chart->data);
             DrawTexture(minimap_textures[minimap_mode], (int)bounds.x, (int)bounds.y, WHITE);
         }
@@ -1361,6 +1363,9 @@ static int study(int argc, char **argv)
             int match_top
                 = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
             int roster_top = mirror_visible ? match_top + 28 : 12;
+            if (minimap_mode == BOAT_MINIMAP_CORNER) // The roster continues below the map.
+                roster_top = (int)fmaxf((float)roster_top,
+                    destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale);
             int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, roster_top);
             net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
                 active && IsKeyDown(KEY_TAB));

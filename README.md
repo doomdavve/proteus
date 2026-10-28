@@ -450,13 +450,12 @@ voyage. `--start X,Z[,DEGREES]` places the boat anywhere in a
 mapped location (simulation X/Z; heading 0 faces -Z), for example
 `--location outer --start 1980,-1196,75` on the open leg of the route.
 
-Solo play on a mapped location has a north-up map of the whole map: water, shoreline, the boat
-as a white wedge pointing its heading, and the Eriksberg crane, the docked ferry and
-Älvsborgsbron as small dots. On `outer` it also marks the voyage's shelters (the current
-recovery point filled), Långedrag's harbour in amber and the exposed water as a dashed amber
-circle, and starts in the top-right corner; on `river` it starts hidden. `N` cycles corner, a
-larger labelled chart with a 1 km scale bar, and off. Rooms (free, race and deathmatch) have
-no map ([HUD guide](docs/BOAT_HUD.md#solo-minimap-2026-10-28)).
+Every mapped location (`river`, `outer`, solo or in a room) has a north-up map of the whole
+map: water, shoreline, the boat as a white wedge pointing its heading, and the Eriksberg crane,
+the docked ferry and Älvsborgsbron as small dots. On the solo `outer` voyage it also marks the
+shelters (the current recovery point filled), Långedrag's harbour in amber and the exposed
+water as a dashed amber circle. It starts hidden; `N` cycles a corner map, a larger labelled
+chart with a 1 km scale bar, and off ([HUD guide](docs/BOAT_HUD.md#minimap-2026-10-28)).
 
 `--location river` is a 2,450 × 2,400 m waterfront with an Älvsborgsbron blockout. Start in the
 dock, leave it, and follow the river southwest to sail under the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy

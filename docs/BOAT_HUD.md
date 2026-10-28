@@ -13,9 +13,9 @@ The [title plan](TITLE_SCREEN_PLAN.md#warm-daylight-alternative-and-shared-game-
 owns verification and next review. Instrument geometry and semantic needle colours remain
 the same; standalone primitive reviews without UI assets keep built-in 3×5 fallback labels.
 
-## Solo minimap, 2026-10-28
+## Minimap, 2026-10-28
 
-Solo play on a mapped location (`river`, `outer`) shows a north-up chart of the whole map,
+Every mapped location (`river`, `outer`), solo or in a room, has a north-up chart of the whole map,
 baked once from the map's water triangles (4×4 samples per pixel, a pale line on land pixels
 that touch water) and composed each frame on the CPU at scene resolution, then uploaded and
 drawn before integer scaling. It marks the boat (white wedge along its heading), the Eriksberg
@@ -26,8 +26,11 @@ arrived) and the exposed water (dashed amber circle at the exposure boundary).
 `N` cycles three states: **corner**, a 96×68-or-smaller frame in the top-right corner without
 labels (about 73 m per pixel on `outer`); **chart**, a larger frame centred above the
 instruments with labels, a 1 km (or 500 m) scale bar and a north mark (about 39 m per pixel on
-`outer`); and **off**. An `outer` voyage starts in the corner state; `river` starts off. Rooms
-(free, race and deathmatch) have no map. Help lists `N` when a map is available. Code:
+`outer`); and **off**. It always starts off; Help lists `N` when a map is available. The
+user first saw a version that opened in the corner on the `outer` voyage and was solo-only, then
+asked (2026-10-28) for it to be available on `N` everywhere with off as the default. In rooms
+the map shows only the own boat and landmarks (no rivals, no voyage); the roster moves below
+the corner map, and the deathmatch rearview mirror is hidden while the chart is open. Code:
 [`boat_minimap.c`](../src/boat_minimap.c); the HUD's 3×5 lettering is now shared through
 `boat_hud_glyph` (with G, J, X and Z added).
 
@@ -39,9 +42,10 @@ display-free review mode, 3× nearest): [outer corner at the dock](adventure/min
 [review commands](#review-commands).
 
 Verification (2026-10-28, macOS arm64, Debug): build warning-free; `ctest --preset full`
-passed all 257 active tests (15 disabled), including the new quick `boat_minimap`.
+passed all 257 active tests (15 disabled), including the new quick `boat_minimap`. Rooms
+with the map open were not run (no room session or capture).
 
-Limitations: not played by a human, and no in-window capture (the review mode reproduces the
+Limitations: the user reported a good first impression (2026-10-28); no longer play, and no in-window capture (the review mode reproduces the
 composition; a 120-frame windowed `outer` demo ran without error). The chart covers the middle
 of the view while shown. Labels are authored offsets for these two maps, so a new landmark
 or location may need its own. The voyage panel is drawn in window pixels and can overlap the

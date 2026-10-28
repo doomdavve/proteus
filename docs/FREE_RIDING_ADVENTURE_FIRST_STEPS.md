@@ -2196,9 +2196,10 @@ the ocean, with landmarks as highlighted dots.
 
 - **Decisions (agent, for review):** a north-up overview of the whole map rather than a
   rotating close-up, so distance to the sea reads at a glance; `N` cycles a small corner map,
-  a larger labelled chart and off; solo mapped play only (rooms of every mode have none);
-  shown from the start on the `outer` voyage, hidden on `river`.
-- **Result:** the [HUD guide](BOAT_HUD.md#solo-minimap-2026-10-28) owns the layout, markers,
+  a larger labelled chart and off. First version: solo only, open in the corner on the
+  `outer` voyage. The user's first impression was good; they then asked for it on `N`
+  everywhere, default off ("people will learn"), so rooms have it too and it starts hidden.
+- **Result:** the [HUD guide](BOAT_HUD.md#minimap-2026-10-28) owns the layout, markers,
   captures and limitations. The voyage's shelters, destination and exposed water come from
   its route; the crane, ferry and bridge are a fixed landmark table in the crane-origin frame.
 - **Verification (2026-10-28, macOS arm64, Debug):** see the HUD guide; no human play or user
