@@ -67,6 +67,7 @@ typedef struct {
     double replay_time;
     int replay_speed_index; // 0..4: quarter, half, normal, double, quadruple speed.
     bool paused, ghost_visible, finished;
+    bool practice; // Latched for the attempt after altered live time; no best/save/export.
     bool save_best, export_last, report_finish; // The pending finish request.
     char best_path[2048];
     const char *export_path;

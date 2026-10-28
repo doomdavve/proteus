@@ -604,6 +604,28 @@ int main(int argc, char **argv)
     boat_replay_runs_reset(&session);
     CHECK(!session.recording.count && session.best.splits[3] == retained);
     CHECK(session.last.complete);
+    // Altered-time attempts keep last replayable but cannot replace or export a best.
+    char practice_path[2048];
+    CHECK(snprintf(practice_path, sizeof(practice_path), "%s/practice.run", argv[1]) > 0);
+    remove(practice_path);
+    BoatReplayRuns practice = { .practice = true, .export_path = practice_path };
+    CHECK(route(NULL, &practice, 360, false) == 0);
+    CHECK(practice.last.complete && !practice.best.complete);
+    CHECK(!practice.save_best && !practice.export_last);
+    boat_replay_runs_reset(&practice);
+    CHECK(!practice.practice);
+    CHECK(route(NULL, &practice, 480, false) == 0);
+    CHECK(practice.best.complete);
+    boat_replay_runs_flush(&practice);
+    double normal_best = practice.best.splits[3];
+    boat_replay_runs_reset(&practice);
+    practice.practice = true;
+    CHECK(route(NULL, &practice, 300, false) == 0);
+    CHECK(practice.last.splits[3] < normal_best && practice.best.splits[3] == normal_best);
+    CHECK(!practice.save_best && !practice.export_last);
+    boat_replay_runs_flush(&practice);
+    CHECK(boat_replay_load(&loaded, practice_path) && loaded.splits[3] == normal_best);
+    boat_replay_runs_destroy(&practice);
     // Save failure keeps a playable best in memory.
     snprintf(session.best_path, sizeof(session.best_path), "%s/missing/best.run", fixture);
     CHECK(route(NULL, &session, 300, false) == 0);
