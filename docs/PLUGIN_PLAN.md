@@ -3,8 +3,8 @@
 Status, 2026-10-28: **P0 and P1 implemented. A bounded Lua descriptor loader decodes the
 Långedrag voyage identically to the compiled route. Native solo `outer` sessions can take it
 from a plugin (`--plugin`), reload on save or F5, undo, and apply route or water changes with
-an explicit restart. No human has authored with it yet; there is no behavioral API or in-game
-agent.** The agreed direction is
+an explicit restart. The user's first native try went well (2026-10-28); there is no
+behavioral API or in-game agent.** The agreed direction is
 embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering
 and networking. Hot reload is a requirement of the first playable slice. This document owns the
 plugin boundary, authoring workflow and staged implementation; [the plugin API](PLUGIN_API.md)
@@ -14,8 +14,8 @@ acceptance. [All plans](README.md).
 Completed task: **P1**, see the [P1 result](#p1-result-2026-10-28). It adds the session route
 seam, the revision host with reload policies and Undo, the `--plugin` launch option with save
 polling, F5/F6/F7 and an authoring panel, and native packaging of the plugin and Lua's notice.
-P0 is recorded in the [P0 result](#p0-result-2026-10-28). **Next: human authoring acceptance of
-P1** (edit, reload and recover in a real session), then **P2, river course authoring**. The milestones
+P0 is recorded in the [P0 result](#p0-result-2026-10-28). The user's first native try of P1
+went well. **Next task: P2, river course authoring.** The milestones
 below are this plan's P0–P6, independent of similarly named foundation tasks. The planning
 change's existing-C build/test evidence and limitations are recorded at the end.
 
@@ -691,8 +691,11 @@ Verification, 2026-10-28, M1 Max/macOS 26.6.2, Debug (`PROTEUS_GPU_TESTS=OFF`):
   another directory. A MinSizeRel Emscripten 6.0.12 build of `wake_velocity` succeeded, with no
   plugin host linked.
 
-Limits: no human has played or authored with P1 yet, and that acceptance is owed: edit, reload,
-drive and recover with real keys. Rooms, the course/replays, recordings and the browser keep
+User check, 2026-10-28: after this run the user tried the P1 branch natively and reported
+"Seems to work well!" Which edits, keys and recoveries they exercised was not recorded, so treat
+this as a positive first human check rather than a full acceptance record.
+
+Limits: rooms, the course/replays, recordings and the browser keep
 the compiled voyage. Windows and Linux are left to CI, including the packaged-plugin frame on
 Windows. Polling reads both files (at most 68 KiB) every 0.25 s; that cost was not measured
 separately. Undo does not restore the files on disk, and F5 after Undo stages the files
