@@ -17,7 +17,7 @@ Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtrack
 ## App icon, 2026-10-28
 
 Completed: replace the generic boat icon with a compact interpretation of the menu's
-Älvsborgsbron backdrop. One dark bridge tower and level cream-edged deck sit above blue
+Älvsborgsbron backdrop. Two dark bridge towers and a level cream-edged deck sit above blue
 water, with a low quay, two block clouds and short horizontal reflections. Six flat
 colours retain the daylight scene's feel at Home Screen and favicon sizes. The opaque
 square has no baked-in rounded corners. This supersedes the original dark boat icon.
@@ -40,13 +40,22 @@ open networking sockets; the full rerun passed. Packaging the existing mobile Wa
 with the current launcher copied all four icon assets byte-for-byte. This checks icon
 packaging, not a fresh Emscripten compilation. Changed local documentation links passed.
 
-Bridge framing correction, 2026-10-28: the user found the rising deck inconsistent with
-this broadside framing. The current artwork uses a horizontal deck and recomputed vertical
+Earlier deck correction, 2026-10-28 (before the two-tower framing): the user found the rising deck inconsistent with
+this broadside framing. That revision used a horizontal deck and recomputed vertical
 hangers meeting the suspension curve. All exports and the size-review image were regenerated.
 Inspected the updated 16–180 px and rounded previews; all desktop icon representations decoded,
 and web packaging copied the revised assets exactly. Debug build and the full CTest preset
 passed again: 234 enabled tests in 11.74 s, 13 retired cases disabled, GPU tests off with local
-socket access. User review of this correction and physical-device review remain pending.
+socket access. The two-tower framing below supersedes this single-tower composition.
+
+Two-tower framing, 2026-10-28: the user found the cable ambiguous with its second support
+just outside the image. The current wider composition brings the right-hand tower fully into
+view and redraws the main suspension curve between the two visible supports, retaining the
+level deck. Hangers were recomputed and the second tower has a short water reflection.
+All exports and previews were regenerated. Updated 16–180 px and rounded previews were
+inspected; every desktop representation decoded, and packaged web icons matched the sources.
+Debug build and `ctest --preset full` passed: 234 enabled tests in 11.69 s, 13 retired cases
+disabled, GPU tests off with local socket access. Design and physical-device review remain open.
 
 Next: user design review, then physical iOS/Android Home Screen review and native packaging
 integration/qualification. No installed-device or Finder/Windows shell acceptance is claimed.

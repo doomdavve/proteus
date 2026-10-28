@@ -1,7 +1,7 @@
 # Wake Velocity app icon
 
 The editable source is [`web/icon.svg`](../../web/icon.svg). It reduces the daylight
-menu's Älvsborgsbron river view to one bridge tower, a level deck, blue water, blocky
+menu's Älvsborgsbron river view to two visible bridge towers, a level deck, blue water, blocky
 clouds and short reflections. Six flat colours and broad shapes keep it legible at small
 sizes. There is no lettering or baked-in corner mask; iOS applies its own shape.
 

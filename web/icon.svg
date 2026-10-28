@@ -5,16 +5,18 @@
   <!-- A low, compact quay leaves the bridge and open river dominant. -->
   <path fill="#c5c9a3" d="M0 91h18v-7h13v9h14v10H0zM135 96h10v-8h14v5h21v10h-45z"/>
   <path fill="#348db4" d="M0 102h180v78H0z"/>
-  <!-- One tower, a level deck and the long suspended span of the menu view. -->
+  <!-- Two visible towers anchor the suspension curve above a level deck. -->
   <g fill="none" stroke="#174b63">
-    <path stroke-width="3" d="M-8 76Q25 70 63 40Q118 79 188 40"/>
-    <path stroke-width="2" d="M18 67.89V79 M39 56.86V79 M84 51.82V79 M107 58.38V79 M130 59.17V79 M153 54.90V79 M172 47.98V79"/>
+    <path stroke-width="3" d="M-8 76Q25 70 63 40Q108 86 153 40Q174 62 190 68"/>
+    <path stroke-width="2" d="M18 67.89V79 M39 56.86V79 M84 56.46V79 M107 62.99V79 M130 57.50V79 M172 57.43V79"/>
   </g>
   <path fill="#174b63" d="M0 79h180v8H0z"/>
   <path fill="#edf4df" d="M0 78h180v3H0z"/>
   <path fill="#174b63" d="M54 38h18v67h-6V48h-6v57h-6z"/>
   <path fill="#edf4df" d="M54 38h4v67h-4zM58 38h14v5H58z"/>
+  <path fill="#174b63" d="M144 38h18v67h-6V48h-6v57h-6z"/>
+  <path fill="#edf4df" d="M144 38h4v67h-4zM148 38h14v5h-14z"/>
   <!-- Short horizontal reflections retain the game's low-resolution rhythm. -->
-  <path fill="#28769b" d="M54 110h18v5H54zM57 121h19v4H57zM49 131h15v4H49zM0 107h27v4H0zM149 107h31v4h-31z"/>
+  <path fill="#28769b" d="M54 110h18v5H54zM57 121h19v4H57zM49 131h15v4H49zM0 107h27v4H0zM144 110h18v5h-18zM147 121h17v4h-17zM149 107h31v4h-31z"/>
   <path fill="#86c9e8" d="M89 119h38v4H89zM111 139h42v4h-42zM17 150h32v4H17zM66 163h28v4H66z"/>
 </svg>
