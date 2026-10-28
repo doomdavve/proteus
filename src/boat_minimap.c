@@ -479,8 +479,8 @@ static void ring(BoatMinimapLayer *layer, int x, int y, int radius, Color color)
         }
 }
 
-// ECDIS own ship: two concentric rings with a heading line from them, on a paper halo, distinct
-// from the single ring of a conspicuous landmark.
+// ECDIS own ship: two concentric rings with a heading line from them, distinct from the single
+// ring of a conspicuous landmark. No halo: the chart shows through between the strokes.
 static void own_ship(BoatMinimapLayer *layer, Vector2 centre, float heading, float length)
 {
     // Simulation forward (sin, -cos) is map (-sin, -cos): east is -X, north is +Z; rows run south.
@@ -488,12 +488,6 @@ static void own_ship(BoatMinimapLayer *layer, Vector2 centre, float heading, flo
     int x = (int)floorf(centre.x), y = (int)floorf(centre.y);
     Vector2 from = { (float)x + .5f, (float)y + .5f };
     Vector2 to = { from.x + forward.x * length, from.y + forward.y * length };
-    for (int dy = -1; dy <= 1; ++dy)
-        for (int dx = -1; dx <= 1; ++dx)
-            if (dx || dy)
-                line(layer, (Vector2) { from.x + dx, from.y + dy },
-                    (Vector2) { to.x + dx, to.y + dy }, paper);
-    square(layer, x, y, 4, paper);
     ring(layer, x, y, 3, ink);
     ring(layer, x, y, 1, ink);
     line(layer, from, to, ink);
@@ -614,7 +608,6 @@ const Image *boat_minimap_compose(BoatMinimap *minimap, BoatMinimapMode mode,
         if (!inside(layer, x, y))
             continue;
         // Conspicuous object: a ring with its position dot.
-        square(layer, x, y, 2, paper);
         ring(layer, x, y, 2, ink);
         dot(layer, x, y, ink);
         if (chart)
@@ -634,7 +627,6 @@ const Image *boat_minimap_compose(BoatMinimap *minimap, BoatMinimapMode mode,
         for (unsigned i = 0; i < destination; ++i) {
             Vector2 p = project_map(layer, to_map(route->shelters[i].position));
             int x = (int)floorf(p.x), y = (int)floorf(p.y);
-            square(layer, x, y, 3, paper);
             symbol(layer, anchor, x, y, i == voyage->shelter ? magenta : pale_magenta);
         }
         // The destination as a route waypoint: a magenta ring, filled once arrived.

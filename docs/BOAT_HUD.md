@@ -48,7 +48,7 @@ after INT 1 and the S-52 day palette:
   origin 57.6973921 N, 11.9089495 E; SWEREF 99 12 00 grid within 0.1° of true north). The chart
   carries a compass rose and a scale bar in **nautical miles**, divided into cables (1 NM, or
   0.5 NM where a mile would be wider than 80 pixels, as on `river`).
-- **Own ship:** the ECDIS symbol, two concentric rings with a heading line, on a paper halo,
+- **Own ship:** the ECDIS symbol, two concentric rings with a heading line, without a halo (the user asked for no white box around symbols),
   distinct from the single ring of a landmark.
 - **Landmarks (black):** conspicuous-object rings at the Eriksberg crane and Nya Älvsborg, the
   docked ferry's hull at its length and beam, and Älvsborgsbron as a double line along its deck
