@@ -5,13 +5,13 @@
   <!-- A low, compact quay leaves the bridge and open river dominant. -->
   <path fill="#c5c9a3" d="M0 91h18v-7h13v9h14v10H0zM135 96h10v-8h14v5h21v10h-45z"/>
   <path fill="#348db4" d="M0 102h180v78H0z"/>
-  <!-- One tower, a rising deck and the long suspended span of the menu view. -->
+  <!-- One tower, a level deck and the long suspended span of the menu view. -->
   <g fill="none" stroke="#174b63">
-    <path stroke-width="3" d="M-8 84Q25 75 63 40Q118 79 188 40"/>
-    <path stroke-width="2" d="M18 75v10m21-21v18m45-30v23m23-14v10m23-9v6m23-13v10m19-16v13"/>
+    <path stroke-width="3" d="M-8 76Q25 70 63 40Q118 79 188 40"/>
+    <path stroke-width="2" d="M18 67.89V79 M39 56.86V79 M84 51.82V79 M107 58.38V79 M130 59.17V79 M153 54.90V79 M172 47.98V79"/>
   </g>
-  <path fill="#174b63" d="m0 86 180-27v8L0 94z"/>
-  <path fill="#edf4df" d="m0 85 180-27v3L0 88z"/>
+  <path fill="#174b63" d="M0 79h180v8H0z"/>
+  <path fill="#edf4df" d="M0 78h180v3H0z"/>
   <path fill="#174b63" d="M54 38h18v67h-6V48h-6v57h-6z"/>
   <path fill="#edf4df" d="M54 38h4v67h-4zM58 38h14v5H58z"/>
   <!-- Short horizontal reflections retain the game's low-resolution rhythm. -->

@@ -17,7 +17,7 @@ Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtrack
 ## App icon, 2026-10-28
 
 Completed: replace the generic boat icon with a compact interpretation of the menu's
-Älvsborgsbron backdrop. One dark bridge tower and rising cream-edged deck sit above blue
+Älvsborgsbron backdrop. One dark bridge tower and level cream-edged deck sit above blue
 water, with a low quay, two block clouds and short horizontal reflections. Six flat
 colours retain the daylight scene's feel at Home Screen and favicon sizes. The opaque
 square has no baked-in rounded corners. This supersedes the original dark boat icon.
@@ -30,7 +30,7 @@ select these files.
 
 ![App icon and small-size review](title/app-icon.png)
 
-Verification, 2026-10-28, Apple Silicon/macOS: inspected the generated icon at 16–180 px,
+Initial icon verification, 2026-10-28, Apple Silicon/macOS: inspected the generated icon at 16–180 px,
 the 1024 px artwork and a rounded Home Screen preview. Pillow decoded every ICO/ICNS
 representation and confirmed the web PNG sizes and opaque RGB format. A second export
 reproduced all generated outputs byte-for-byte. Debug configure/build
@@ -39,6 +39,14 @@ with local socket access (13 retired cases disabled). The first sandboxed run co
 open networking sockets; the full rerun passed. Packaging the existing mobile Wasm build
 with the current launcher copied all four icon assets byte-for-byte. This checks icon
 packaging, not a fresh Emscripten compilation. Changed local documentation links passed.
+
+Bridge framing correction, 2026-10-28: the user found the rising deck inconsistent with
+this broadside framing. The current artwork uses a horizontal deck and recomputed vertical
+hangers meeting the suspension curve. All exports and the size-review image were regenerated.
+Inspected the updated 16–180 px and rounded previews; all desktop icon representations decoded,
+and web packaging copied the revised assets exactly. Debug build and the full CTest preset
+passed again: 234 enabled tests in 11.74 s, 13 retired cases disabled, GPU tests off with local
+socket access. User review of this correction and physical-device review remain pending.
 
 Next: user design review, then physical iOS/Android Home Screen review and native packaging
 integration/qualification. No installed-device or Finder/Windows shell acceptance is claimed.
