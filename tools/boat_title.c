@@ -535,7 +535,38 @@ static void draw_footer_text(Font font, const char *label, int x)
         font, label, x, 190, (PROTEUS_WARM_MENU ? boat_ui_palette().edge : rgb(162, 219, 217)));
 }
 
-// Presentation-only animation: integer pixel geometry, no session or random state.
+// Coverage antialiasing for the credits water only. Keep fractional positions until
+// rasterization so slow movement fades between pixels instead of jumping whole rows.
+static void credits_water_line(Vector2 a, Vector2 b, Color ink)
+{
+    bool steep = fabsf(b.y - a.y) > fabsf(b.x - a.x);
+    if (steep) {
+        a = (Vector2) { a.y, a.x };
+        b = (Vector2) { b.y, b.x };
+    }
+    if (a.x > b.x) {
+        Vector2 swap = a;
+        a = b;
+        b = swap;
+    }
+    if (b.x <= a.x)
+        return;
+    float slope = (b.y - a.y) / (b.x - a.x);
+    int first = (int)fmaxf(0, ceilf(a.x));
+    int limit = (int)fminf(steep ? HEIGHT : WIDTH, ceilf(b.x));
+    for (int x = first; x < limit; ++x) {
+        float y = a.y + (x - a.x) * slope;
+        int base = (int)floorf(y);
+        float fraction = y - base;
+        Color lower = ink, upper = ink;
+        lower.a = (unsigned char)roundf(ink.a * (1 - fraction));
+        upper.a = (unsigned char)roundf(ink.a * fraction);
+        DrawPixel(steep ? base : x, steep ? x : base, lower);
+        DrawPixel(steep ? base + 1 : x, steep ? x : base + 1, upper);
+    }
+}
+
+// Presentation-only animation: no session or random state.
 static void draw_credits(const Title *t)
 {
     BoatUiPalette p = boat_ui_palette();
@@ -545,16 +576,18 @@ static void draw_credits(const Title *t)
     // A receding water grid, with travelling crests instead of a space/star effect.
     for (int z = 0; z < 13; ++z) {
         float depth = (float)fmod(z + elapsed * .6, 13.0) / 13;
-        int y = 73 + (int)(depth * depth * 111);
+        float y = 73 + depth * depth * 111;
         Color ink = Fade(p.border, .25f + depth * .3f);
-        for (int x = 0; x < WIDTH - 4; x += 4) {
-            int dy = (int)roundf(sinf(x * .035f + phase * 1.8f + z) * depth * 3);
-            int next = (int)roundf(sinf((x + 4) * .035f + phase * 1.8f + z) * depth * 3);
-            DrawLine(x, y + dy, x + 4, y + next, ink);
+        for (int x = 0; x < WIDTH; x += 4) {
+            float dy = sinf(x * .035f + phase * 1.8f + z) * depth * 3;
+            float next = sinf((x + 4) * .035f + phase * 1.8f + z) * depth * 3;
+            credits_water_line(
+                (Vector2) { (float)x, y + dy }, (Vector2) { (float)x + 4, y + next }, ink);
         }
     }
     for (int x = -320; x <= 640; x += 64)
-        DrawLine(160 + (x - 160) / 8, 73, x, 185, Fade(p.border, .2f));
+        credits_water_line((Vector2) { 160 + (x - 160) / 8.0f, 73 }, (Vector2) { (float)x, 185 },
+            Fade(p.border, .2f));
     const char *heading = "CREDITS";
     DrawRectangle(119, 49, 82, 14, p.panel);
     draw_text(t->ui, heading, (WIDTH - text_width(t->ui, heading)) / 2, 52, p.selected);

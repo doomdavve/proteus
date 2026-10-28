@@ -21,7 +21,10 @@ panel width and bottom edge. Settings keeps its six control rows and contextual 
 Following user review, credits now use **m5x7 throughout**, including headings, names, BACK
 and the version footer. A centred movie-style roll scrolls vertically over the retained,
 user-liked rippling water grid. The initial mixed-font card and horizontal sine scroller
-are superseded. All motion uses the title presentation clock and integral pixels.
+are superseded. All animation uses the title presentation clock. Credits and presentation
+retain their integer pixel grid; the background water now uses fractional positions and
+coverage antialiasing. Both travelling crests and perspective rays blend between neighbouring
+pixels, softening their edges and slow movement while leaving foreground text crisp.
 
 The roll begins with **THANKS TO**, **bjoto**, **w**, then lists **FONTS** (Daniel
 Linssen, m5x7/m3x6), **MAP DATA** (OpenStreetMap contributors, ODbL 1.0), **LIBRARIES**
@@ -37,10 +40,11 @@ reopening restarts the roll. Both compile-time palettes share the screen.
 
 Verification, 2026-10-28, Apple Silicon/macOS: Debug builds passed for both menu palettes
 without project warnings; the first raylib build reported its bundled stb_vorbis warning.
-After the vertical-roll revision, `ctest --preset full` passed all 230 enabled tests in
-11.77 s, with 13 retired cases disabled and `PROTEUS_GPU_TESTS=OFF`, using local socket
-access. The initial implementation also passed its full run (12.06 s) after sandbox
-socket restrictions were removed; that evidence applies to the superseded sine scroller.
+After the wave-antialiasing revision, `ctest --preset full` passed all 230 enabled tests in
+12.38 s, with 13 retired cases disabled and `PROTEUS_GPU_TESTS=OFF`, using local socket
+access. A temporary before/after capture check found 10,448 changed background pixels and
+confirmed 3,566 foreground ink pixels stayed exact; pixels outside the water area also
+matched. The antialiasing is local to the credits water and adds no render targets or assets.
 A temporary, uncommitted title harness presented 195 windowed frames in each palette and
 checked keyboard entry, Enter/click/Escape return, main-row reselection, reopening and Exit.
 Main/settings/credits captures and vertical-roll samples through 1000 simulated seconds
