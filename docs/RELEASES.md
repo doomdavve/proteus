@@ -27,6 +27,41 @@ Actions artifacts and are not subject to their 30-day retention policy.
 
 ## Publish a version
 
+### Release command
+
+From a clean, pushed worktree at the reviewed `origin/main` commit, after the Debug build
+and full CTest preset pass, run:
+
+```sh
+python3 tools/cut_release.py v0.0.21 \
+  --hosting-repo /path/to/clean-pushed-davve-srv-worktree \
+  --browser-python /path/to/playwright-venv/bin/python
+```
+
+The hosting worktree needs its normal controller/vault setup. For a temporary worktree,
+set `ANSIBLE_VAULT_PASSWORD_FILE` to the existing controller's vault password file; do not copy
+or commit the password. Install Playwright in the chosen Python environment and have Google
+Chrome available at the browser check's default macOS path. Build `build/boat_bot` first.
+
+The command creates and pushes the immutable tag, waits for native publication and Pages,
+downloads both ZIPs, checks SHA-256, ZIP integrity and embedded version/commit, then commits
+and pushes the hosting version pin and runs the ordinary Winterfell role. It checks service
+health/version, both browser versions, named browser joins on both sites, directory protocol/
+physics and a matching native join. Evidence is saved under `build/release/verification.json`
+with browser logs/captures. A failed step stops the command; rerun from the same commit/tag
+after resolving the failure. Existing tags pointing elsewhere are rejected. This command
+does not merge PRs or replace human package/input/audio review. Update the release and hosting
+guides and the hosting repository's evidence after completion.
+
+Preparation, 2026-10-28: v0.0.21 collects the merged mobile browser controls and adaptive
+viewport work since v0.0.20. Release orchestration and offline archive/pin guards implemented;
+Debug build and all 233 enabled CPU CTests passed (13 retired cases disabled, GPU tests off).
+The CPU river capture was inspected. Publication and hosted cutover are pending at this
+preparation commit. The macOS CI build directory is now ignored so generated build output
+does not falsely mark packaged source as modified.
+
+### Tag or UI publication
+
 After the release workflow changes are committed and pushed, create and push a
 version tag on the commit you want to ship. For example, using a new version:
 

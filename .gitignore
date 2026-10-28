@@ -1,4 +1,5 @@
 build/
+build-mac/
 build-profile/
 build-web/
 build-web-directory/
