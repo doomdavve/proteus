@@ -22,7 +22,11 @@ playground for iterating on effects, timing, audio, and presentation.
 - `src/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
 - `src/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
 - `src/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
-- `src/waterfront_city.[ch]`: the compiled river map crop shared by shoreline queries and renderers.
+- `src/waterfront_city.[ch]`: the compiled river map crop's water, shared by shoreline queries and
+  renderers.
+- `src/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
+  `assets/geometry/<map>/scenery.bin` (written by `tools/map_pack.py`) and checks it against the
+  compiled water in `water.h`. Collision and the server need only the compiled water.
 - Boating code builds as static libraries in `CMakeLists.txt`. `proteus_boat_core` (physics, water
   queries, wakes, course crossing, contacts and geometry data) must not draw, read input, open
   windows or audio, or touch files; `tools/check_core_boundary.py` enforces this in CTest. See

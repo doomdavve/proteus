@@ -195,7 +195,7 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
     // order within a tile. Windows below follow the same tiles. Window quads stand 3.5 cm
     // off their wall, so the test grows each tile's box by more than that.
     const BoatMapTiles *tiles = &scenery->tiles;
-    const Mesh3D *city = scenery->map->mesh;
+    const Mesh3D *city = scenery->full->mesh;
     if (!omit_water) {
         Mesh3D water = *city;
         water.triangle_count = tiles->water_count;
@@ -222,7 +222,7 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
         if (tile->land_count
             && renderer3d_box_visible(
                 r, Vector3Subtract(tile->land_min, grow), Vector3Add(tile->land_max, grow)))
-            windows(r, scenery->map, &tiles->land[tile->land_first], tile->land_count);
+            windows(r, scenery->full, &tiles->land[tile->land_first], tile->land_count);
     }
     if (scenery->river)
         crane(r, scenery);

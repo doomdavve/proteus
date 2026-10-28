@@ -1,4 +1,5 @@
 /* Finite scripted wake-return workload; no window, audio, replay or timed I/O. */
+#include "boat_test_scenery.h"
 #include "boat_test_world.h"
 #include "wake_velocity_state.h"
 #include <errno.h>
@@ -37,6 +38,7 @@ static bool count(const char *s, unsigned *out)
 }
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     unsigned warmup = 120, frames = 1800;
     const char *output = NULL;
     bool presentation = true; // Cosmetics on by default, as in the P3a baseline.

@@ -75,6 +75,14 @@ target_include_directories(proteus_boat_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/
 target_link_libraries(proteus_boat_core PUBLIC raylib)
 target_compile_options(proteus_boat_core PRIVATE ${PROTEUS_WARNINGS})
 
+# Scenery packs: each mapped location's whole bake (assets/geometry/<location>/scenery.bin), loaded
+# at run time for presentation. The core keeps only the compiled water, so it never reads them.
+add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h)
+target_link_libraries(proteus_boat_scenery PUBLIC proteus_boat_core)
+# Validators and review tools load the packs from the source tree (tools/boat_test_scenery.h).
+target_compile_definitions(proteus_boat_scenery INTERFACE PROTEUS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_options(proteus_boat_scenery PRIVATE ${PROTEUS_WARNINGS})
+
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
@@ -84,7 +92,7 @@ add_library(proteus_render STATIC
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
   src/waterfront_scene.c)
-target_link_libraries(proteus_render PUBLIC proteus_boat_core)
+target_link_libraries(proteus_render PUBLIC proteus_boat_core proteus_boat_scenery)
 target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROTEUS_WARM_MENU}>)
 target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
 
@@ -501,12 +509,12 @@ target_compile_options(validate_boat_core PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_core COMMAND validate_boat_core)
 # Adventure A1.1: explicit map descriptions and independently owned collision caches.
 add_executable(validate_boat_map tools/validate_boat_map.c)
-target_link_libraries(validate_boat_map PRIVATE proteus_boat_core)
+target_link_libraries(validate_boat_map PRIVATE proteus_boat_scenery)
 target_compile_options(validate_boat_map PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_map validate_boat_map LABELS core cpu)
 # Adventure A3.1: the baked first outer-river slice answers the A0.3 route and shelter queries.
 add_executable(validate_boat_outer_map tools/validate_boat_outer_map.c)
-target_link_libraries(validate_boat_outer_map PRIVATE proteus_boat_core)
+target_link_libraries(validate_boat_outer_map PRIVATE proteus_boat_scenery)
 target_compile_options(validate_boat_outer_map PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_outer_map COMMAND validate_boat_outer_map)
 set_tests_properties(boat_outer_map PROPERTIES PASS_REGULAR_EXPRESSION "boat_outer_map=ok")
@@ -522,6 +530,16 @@ target_compile_options(validate_boat_voyage PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_voyage COMMAND validate_boat_voyage)
 set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage=ok")
 # Solo minimap: baked chart, projection, markers and trim; --screenshot writes review captures.
+# Adventure A3.5i: scenery packs load once, match the compiled water and reject bad input.
+add_executable(validate_boat_scenery tools/validate_boat_scenery.c)
+target_link_libraries(validate_boat_scenery PRIVATE proteus_render)
+target_compile_options(validate_boat_scenery PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_scenery COMMAND validate_boat_scenery)
+set_tests_properties(boat_scenery PROPERTIES PASS_REGULAR_EXPRESSION "boat_scenery=ok")
+add_test(NAME map_pack COMMAND ${Python3_EXECUTABLE} -I
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/map_pack.py --self-test)
+set_tests_properties(map_pack PROPERTIES PASS_REGULAR_EXPRESSION "map pack fixtures OK")
+
 add_executable(validate_boat_minimap tools/validate_boat_minimap.c)
 target_link_libraries(validate_boat_minimap PRIVATE proteus_render)
 target_compile_options(validate_boat_minimap PRIVATE ${PROTEUS_WARNINGS})
@@ -529,7 +547,7 @@ add_test(NAME boat_minimap COMMAND validate_boat_minimap)
 set_tests_properties(boat_minimap PROPERTIES PASS_REGULAR_EXPRESSION "boat_minimap=ok")
 # Adventure A2.2: in-memory tile catalogue and indexed collision, exact against the full scan.
 add_executable(validate_boat_map_index tools/validate_boat_map_index.c)
-target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_core)
+target_link_libraries(validate_boat_map_index PRIVATE proteus_boat_scenery)
 target_compile_options(validate_boat_map_index PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_map_index validate_boat_map_index LABELS core cpu)
 # Adventure A2.5: the local view's queries, tiles and water do not grow with distant map.
@@ -928,6 +946,7 @@ set(PROTEUS_SLOW_TESTS
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
+  boat_scenery
   boat_river_benchmark_options boat_river_route boat_river_wave_route boat_voyage
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors

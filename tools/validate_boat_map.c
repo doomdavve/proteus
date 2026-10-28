@@ -7,6 +7,7 @@
 #include "boat_fleet_bots.h"
 #include "boat_map.h"
 #include "boat_test_cases.h"
+#include "boat_test_scenery.h"
 #include "waterfront_city.h"
 
 #include <inttypes.h>
@@ -54,7 +55,7 @@ static void mix(uint64_t *hash, const void *data, size_t size)
 // Clearance/normal answers over the crop's bounds plus a 40 m margin, in simulation X/Z.
 static uint64_t river_digest(const BoatMap *map, int *water)
 {
-    const Mesh3D *mesh = waterfront_city_river_map.mesh;
+    const Mesh3D *mesh = test_scenery(&waterfront_city_river_map)->mesh;
     float lo_x = 1e9f, hi_x = -1e9f, lo_z = 1e9f, hi_z = -1e9f;
     for (size_t i = 0; i < mesh->triangle_count; ++i)
         for (int j = 0; j < 3; ++j) {
@@ -94,10 +95,17 @@ static int definitions(void)
     const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
     CHECK(!basin->mapped && !basin->map);
     CHECK(river->mapped && river->map == &waterfront_city_river_map);
-    size_t bridge = river->map->bridge_first_triangle;
-    CHECK(bridge > 0 && bridge < river->map->mesh->triangle_count);
-    CHECK(!boat_map_is_bridge_triangle(river->map, bridge - 1));
-    CHECK(boat_map_is_bridge_triangle(river->map, bridge));
+    // The compiled map is the water alone; its scenery pack holds the same water, then the land
+    // and the bridge.
+    const Mesh3D *water = river->map->mesh;
+    CHECK(boat_map_leading_water(water) == water->triangle_count);
+    CHECK(river->map->bridge_first_triangle == water->triangle_count);
+    const BoatMapDescription *scenery = test_scenery(river->map);
+    CHECK(scenery && boat_map_leading_water(scenery->mesh) == water->triangle_count);
+    size_t bridge = scenery->bridge_first_triangle;
+    CHECK(bridge > water->triangle_count && bridge < scenery->mesh->triangle_count);
+    CHECK(!boat_map_is_bridge_triangle(scenery, bridge - 1));
+    CHECK(boat_map_is_bridge_triangle(scenery, bridge));
     return 0;
 }
 

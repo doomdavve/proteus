@@ -7,6 +7,7 @@
  * [--background SCENE.png] [--at X,Z,HEADING] [--shelter N] [--scale N] writes one composition,
  * over a 320x200 scene capture when given and nearest-scaled N times, without opening a window. */
 #include "boat_minimap.h"
+#include "boat_test_scenery.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,6 +106,7 @@ static int review(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     SetTraceLogLevel(LOG_WARNING);
     if (argc > 1)
         return review(argc, argv);

@@ -1,8 +1,9 @@
 #include "waterfront_city.h"
 
-#include "../assets/geometry/river/geometry.h"
+#include "../assets/geometry/river/water.h"
 
-static const Mesh3D river
-    = { river_vertices, river_triangles, sizeof(river_triangles) / sizeof(river_triangles[0]) };
+static const Mesh3D river = { river_water_vertices, river_water_triangles,
+    sizeof(river_water_triangles) / sizeof(river_water_triangles[0]) };
 
-const BoatMapDescription waterfront_city_river_map = { &river, river_bridge_first_triangle };
+const BoatMapDescription waterfront_city_river_map
+    = { &river, sizeof(river_water_triangles) / sizeof(river_water_triangles[0]) };

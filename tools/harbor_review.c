@@ -1,4 +1,5 @@
 // Repeatable CPU/GPU berth views; all poses come from the same shared snapshot as playback.
+#include "boat_test_scenery.h"
 #include "boat_water_mesh.h"
 #include "renderer_gpu.h"
 #include "waterfront.h"
@@ -68,6 +69,7 @@ static View3D follow_vessel(View3D camera, const char *view, double time)
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     const char *view = "marina", *screenshot = NULL;
     bool gpu = true, waves = false;
     double time = 0;

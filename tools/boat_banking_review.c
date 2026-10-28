@@ -1,6 +1,7 @@
 // Deterministic banking presentation audit, sharing free-drive inputs with the dynamics validator.
 #include "boat_banking_fixture.h"
 #include "boat_gpu.h"
+#include "boat_test_scenery.h"
 #include "boat_test_session.h"
 #include "raymath.h"
 
@@ -136,6 +137,7 @@ static int capture(BoatGpu *gpu, Renderer3D *cpu, BoatCpuView *cpu_view, const B
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     bool gpu_enabled = false;
     const char *output = NULL;
     for (int i = 1; i < argc; ++i) {

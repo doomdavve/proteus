@@ -37,6 +37,14 @@ def main():
         name = f"wake_velocity-{digest}.{suffix}"
         (site / name).write_bytes(content)
         files[original] = name
+    # Packs the page fetches on demand, by their asset path (web/scenery_loader.js).
+    lazy = args.build_dir / "web-lazy"
+    for path in sorted(lazy.glob("geometry/*/scenery.bin")):
+        content = path.read_bytes()
+        digest = hashlib.sha256(content).hexdigest()[:16]
+        name = f"scenery-{path.parent.name}-{digest}.bin"
+        (site / name).write_bytes(content)
+        files[path.relative_to(lazy).as_posix()] = name
     template = (root / "web/index.html").read_text()
     version = args.version if args.version is not None else build_version(root)
     page = template.replace("@WEB_FILES@", json.dumps(files))
@@ -49,12 +57,17 @@ def main():
     (site / ".nojekyll").touch()
     shutil.copyfile(args.raylib_license, site / "raylib-LICENSE.txt")
     # Remove outputs from earlier builds only, never unrelated files.
-    for pattern in ("wake_velocity-*.js", "wake_velocity-*.wasm", "wake_velocity-*.data"):
+    for pattern in ("wake_velocity-*.js", "wake_velocity-*.wasm", "wake_velocity-*.data",
+                    "scenery-*.bin"):
         for path in site.glob(pattern):
             if path.name not in files.values():
                 path.unlink()
-    total = sum((site / name).stat().st_size for name in files.values())
-    print(f"Web build: {site} / {version} ({total:,} bytes before HTTP compression)")
+    initial = sum((site / name).stat().st_size for key, name in files.items()
+                  if key.startswith("wake_velocity."))
+    later = sum((site / name).stat().st_size for key, name in files.items()
+                if not key.startswith("wake_velocity."))
+    print(f"Web build: {site} / {version} ({initial:,} bytes before HTTP compression, "
+          f"{later:,} more fetched on demand)")
 
 
 if __name__ == "__main__":

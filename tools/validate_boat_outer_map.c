@@ -4,6 +4,7 @@
  * water. The route is copied from docs/adventure/survey.py (SLICE_ROUTE) in map east/north metres,
  * which the queries take as simulation X = -east, Z = north. */
 #include "boat_map.h"
+#include "boat_test_scenery.h"
 #include "boat_world.h"
 #include "waterfront_outer.h"
 
@@ -39,15 +40,19 @@ int main(void)
     CHECK(boat_map_init(&map, &waterfront_outer_map));
     CHECK(boat_map_leading_water(waterfront_outer_map.mesh) == WATER_TRIANGLES);
     CHECK(map.water_count == WATER_TRIANGLES);
+    // A3.5i: the compiled map is that water alone. The scenery pack holds the same water, then
+    // the rest of the bake.
+    CHECK(waterfront_outer_map.mesh->triangle_count == WATER_TRIANGLES);
+    CHECK(waterfront_outer_map.bridge_first_triangle == WATER_TRIANGLES);
+    const BoatMapDescription *scenery = test_scenery(&waterfront_outer_map);
+    CHECK(scenery && boat_map_leading_water(scenery->mesh) == WATER_TRIANGLES);
     // A3.3: the river's bridge triangles start the authored range, which the A3.5a dressing
     // (buildings, cranes, marks and trees beyond the crop) completes.
-    CHECK(waterfront_outer_map.bridge_first_triangle < waterfront_outer_map.mesh->triangle_count);
-    CHECK(waterfront_outer_map.mesh->triangle_count - waterfront_outer_map.bridge_first_triangle
+    CHECK(scenery->bridge_first_triangle < scenery->mesh->triangle_count);
+    CHECK(scenery->mesh->triangle_count - scenery->bridge_first_triangle
         == BRIDGE_TRIANGLES + DRESSING_TRIANGLES);
-    CHECK(!boat_map_is_bridge_triangle(
-        &waterfront_outer_map, waterfront_outer_map.bridge_first_triangle - 1));
-    CHECK(boat_map_is_bridge_triangle(
-        &waterfront_outer_map, waterfront_outer_map.bridge_first_triangle));
+    CHECK(!boat_map_is_bridge_triangle(scenery, scenery->bridge_first_triangle - 1));
+    CHECK(boat_map_is_bridge_triangle(scenery, scenery->bridge_first_triangle));
 
     // A3.2: the `outer` location binds this map; its spawn and fleet start share the river's
     // frame and lie in navigable water, and a world prepared from it answers collision queries.
@@ -66,7 +71,7 @@ int main(void)
     // above the water, never below the 1 m floor on its top surface, with hills that rise tens
     // of metres. The river's bridge (A3.3) reaches its 107.6 m tower tops and the container
     // cranes (A3.5a) their raised booms at the mapped 118 m above the quay. Water stays at 0.
-    const Mesh3D *mesh = waterfront_outer_map.mesh;
+    const Mesh3D *mesh = scenery->mesh;
     float highest = 0, lowest_top = INFINITY;
     for (size_t i = WATER_TRIANGLES; i < mesh->triangle_count; ++i) {
         const Triangle3D *t = &mesh->triangles[i];

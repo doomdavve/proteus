@@ -1,11 +1,11 @@
 #include "waterfront_outer.h"
 
-#include "../assets/geometry/outer/geometry.h"
+#include "../assets/geometry/outer/water.h"
 
 #include <math.h>
 
-static const Mesh3D outer
-    = { outer_vertices, outer_triangles, sizeof(outer_triangles) / sizeof(outer_triangles[0]) };
+static const Mesh3D outer = { outer_water_vertices, outer_water_triangles,
+    sizeof(outer_water_triangles) / sizeof(outer_water_triangles[0]) };
 
 _Static_assert(sizeof(outer_ground_cm) / sizeof(outer_ground_cm[0])
         == (size_t)outer_ground_columns * outer_ground_rows,
@@ -27,7 +27,8 @@ float waterfront_outer_ground(float x, float z)
     return (south + (north - south) * fv) * .01f;
 }
 
-const BoatMapDescription waterfront_outer_map = { &outer, outer_bridge_first_triangle };
+const BoatMapDescription waterfront_outer_map
+    = { &outer, sizeof(outer_water_triangles) / sizeof(outer_water_triangles[0]) };
 
 WaterfrontGround waterfront_kit_ground(const BoatMapDescription *map)
 {

@@ -1,5 +1,6 @@
 // Regenerate the title's fixed river view without a player boat or player wake.
 #include "boat_gpu.h"
+#include "boat_test_scenery.h"
 #include "boat_world.h"
 #include "raymath.h"
 
@@ -7,6 +8,7 @@
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     if (argc != 2) {
         fprintf(stderr, "Usage: title_backdrop OUTPUT.png (requires desktop graphics)\n");
         return 2;
