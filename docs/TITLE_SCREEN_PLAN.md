@@ -8,10 +8,41 @@ The shared title retains single-player setup, public/LAN/address joining, hostin
 settings, plus a dedicated animated Credits screen. Volume settings, title music and a
 live river backdrop remain deferred.
 The user approved the marine blue/yellow visual direction on 2026-10-28.
+A compact bridge/river app icon now follows that backdrop; icon review is pending.
 Next: physical input/playback review; native/browser
 package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## App icon, 2026-10-28
+
+Completed: replace the generic boat icon with a compact interpretation of the menu's
+Älvsborgsbron backdrop. One dark bridge tower and rising cream-edged deck sit above blue
+water, with a low quay, two block clouds and short horizontal reflections. Six flat
+colours retain the daylight scene's feel at Home Screen and favicon sizes. The opaque
+square has no baked-in rounded corners. This supersedes the original dark boat icon.
+
+[`web/icon.svg`](../web/icon.svg) owns the artwork. The existing launcher and manifest
+consume regenerated 180/192/512 px PNGs. A 1024 px master, multi-size Windows ICO and macOS
+ICNS are available in [`assets/icons`](../assets/icons/README.md), with a shared SVG export
+command. Desktop package integration is a future step; existing native packages do not yet
+select these files.
+
+![App icon and small-size review](title/app-icon.png)
+
+Verification, 2026-10-28, Apple Silicon/macOS: inspected the generated icon at 16–180 px,
+the 1024 px artwork and a rounded Home Screen preview. Pillow decoded every ICO/ICNS
+representation and confirmed the web PNG sizes and opaque RGB format. A second export
+reproduced all generated outputs byte-for-byte. Debug configure/build
+passed with GPU tests off. `ctest --preset full` passed all 234 enabled tests in 11.71 s
+with local socket access (13 retired cases disabled). The first sandboxed run could not
+open networking sockets; the full rerun passed. Packaging the existing mobile Wasm build
+with the current launcher copied all four icon assets byte-for-byte. This checks icon
+packaging, not a fresh Emscripten compilation. Changed local documentation links passed.
+
+Next: user design review, then physical iOS/Android Home Screen review and native packaging
+integration/qualification. No installed-device or Finder/Windows shell acceptance is claimed.
+The scene, gameplay, animation and audio are unchanged; no manual gameplay demo was needed.
 
 ## Credits screen, 2026-10-28
 
