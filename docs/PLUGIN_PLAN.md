@@ -692,8 +692,10 @@ Verification, 2026-10-28, M1 Max/macOS 26.6.2, Debug (`PROTEUS_GPU_TESTS=OFF`):
   plugin host linked.
 
 User check, 2026-10-28: after this run the user tried the P1 branch natively and reported
-"Seems to work well!" Which edits, keys and recoveries they exercised was not recorded, so treat
-this as a positive first human check rather than a full acceptance record.
+"Seems to work well!" They drove out to Långedrag, entered the squall for a while, and found the
+voyage hints looking as they used to. This is human play of the route (arrival, exposure and
+HUD unchanged). The report does not say whether the plugin was edited during play or whether
+F5–F7 or recovery were used, so live editing by a human is not yet recorded.
 
 Limits: rooms, the course/replays, recordings and the browser keep
 the compiled voyage. Windows and Linux are left to CI, including the packaged-plugin frame on
