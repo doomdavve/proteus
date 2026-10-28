@@ -93,14 +93,25 @@ provided token. No personal access token or additional secret is needed.
 
 ## Status and verification
 
-Current release preparation, 2026-10-28: **v0.0.20** collects the changes since
-v0.0.19: outer-map Höjdmodell terrain and river scenery, expanded deathmatch weapons
-and optional rearview, multiplayer smoothing, the docked VINGA LINE ferry, marine
-menus and scrolling credits (including erik), solo time controls through 8x, and the
-optional nautical minimap (`N`). The release branch starts at `9de7f81` and carries
-the outstanding local credits addition. Next: pass PR CI, merge, push the new tag,
-then verify native publication, Pages deployment and downloaded archive checksums.
-Release publication does not upgrade Winterfell; its deployment remains separately owned.
+Current status, 2026-10-28: **[v0.0.20](https://github.com/doomdavve/proteus/releases/tag/v0.0.20)**
+is published at commit `2f9adfc`, after [PR #34](https://github.com/doomdavve/proteus/pull/34)
+passed macOS, Windows and Linux CI. The
+[native release run](https://github.com/doomdavve/proteus/actions/runs/40668366272)
+and [Pages deployment](https://github.com/doomdavve/proteus/actions/runs/40668366195)
+both succeeded. Both published native ZIPs were downloaded and passed SHA-256 and
+ZIP-integrity checks; both `build.txt` files identify v0.0.20 and the tagged commit.
+The Mac metadata also reports `Uncommitted changes: True`; the workflow's generated
+`build-mac/` directory is not ignored by the current packaging status check.
+Neither downloaded package was launched locally; CI performed package relocation checks.
+
+This release collects the changes since v0.0.19: outer-map Höjdmodell terrain and river
+scenery, expanded deathmatch weapons and optional rearview, multiplayer smoothing, the
+docked VINGA LINE ferry, marine menus and scrolling credits (including erik), solo time
+controls through 8x, and the optional nautical minimap (`N`). Multiplayer uses protocol v7;
+hosts and clients should use compatible versions. Release publication does not upgrade
+Winterfell; its v0.0.18 deployment remains separately owned. Next: human package/input/audio
+review and matching-version multiplayer qualification; any room upgrade follows the
+[routine deployment workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
 
 Local verification, 2026-10-28, Apple Silicon/macOS: Debug configure/build passed;
 `ctest --preset full` passed all 232 enabled tests, with 13 retired cases disabled
