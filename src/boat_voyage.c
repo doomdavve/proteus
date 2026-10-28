@@ -9,6 +9,8 @@
 // destination. The exposure lies over the open fjord west of the direct route's southern leg
 // (east -3850): the direct line crosses its eastern flank, the east shore stays nearly calm and
 // the middle of the fjord is the full patch. It is an authored encounter, not observed weather.
+// It grows over a minute once the boat is 2.5 km off, on the fjord past Älvsborgsbron, so it
+// builds while the boat crosses toward it (A3.5).
 const BoatVoyageRoute boat_voyage_outer = {
     .shelters = { { "DOCK", { -12, 60 }, 0, 60 }, { "BRIDGE", { 650, -850 }, 1.33f, 150 },
         { "EAST SHORE", { 3250, -2000 }, .86f, 200 },
@@ -17,8 +19,9 @@ const BoatVoyageRoute boat_voyage_outer = {
     .arrival_centre = { 3595, -3370 },
     .arrival_radius = 75,
     .arrival_speed = 6,
-    .exposure = { .centre = { 4300, -2650 }, .radius = 700, .height = 1.6f },
+    .exposure = { .centre = { 4300, -2650 }, .radius = 700, .height = 1.6f, .build = 60 },
     .exposed_fraction = .8f,
+    .weather_range = 2500,
 };
 
 static void notify(BoatVoyage *voyage, BoatVoyageEvent event, unsigned shelter, double time)
@@ -47,6 +50,18 @@ void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, do
             notify(voyage, BOAT_VOYAGE_SHELTER, i, time);
         }
     BoatStorm storm = route->exposure;
+    if (!voyage->weather
+        && (route->weather_range <= 0
+            || Vector2Distance(position, boat_water_storm_centre(storm, time))
+                <= route->weather_range)) {
+        voyage->weather = true;
+        voyage->weather_started = time;
+        if (!voyage->observed || route->weather_range <= 0)
+            voyage->weather_started -= storm.build; // Already grown when first seen.
+        else
+            notify(voyage, BOAT_VOYAGE_WEATHER, voyage->shelter, time);
+    }
+    voyage->observed = true;
     bool exposed = storm.radius > 0
         && Vector2Distance(position, boat_water_storm_centre(storm, time))
             < storm.radius * route->exposed_fraction;
@@ -67,6 +82,15 @@ void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, do
         voyage->shelter = destination; // Back at the destination after leaving it.
         notify(voyage, BOAT_VOYAGE_SHELTER, destination, time);
     }
+}
+
+BoatStorm boat_voyage_weather(const BoatVoyage *voyage)
+{
+    if (!voyage->route || !voyage->weather)
+        return (BoatStorm) { 0 };
+    BoatStorm storm = voyage->route->exposure;
+    storm.started = voyage->weather_started;
+    return storm;
 }
 
 void boat_voyage_recover(BoatVoyage *voyage, Boat *boat, double time)

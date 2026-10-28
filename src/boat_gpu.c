@@ -250,6 +250,12 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     }
     BeginTextureMode(target);
     waterfront_gpu_scene_draw(&gpu->scene, &frame, target.texture.width, target.texture.height);
+    float overcast = boat_view_overcast(view, world);
+    if (overcast > 0) {
+        Color tint = BOAT_VIEW_STORM_LIGHT;
+        tint.a = (unsigned char)(overcast * 255 + .5f);
+        DrawRectangle(0, 0, target.texture.width, target.texture.height, tint);
+    }
     EndTextureMode();
 restore_water:
     if ((world->water.objects || world->water.traffic_objects) && !gpu->scene.object_wakes.id)

@@ -75,6 +75,15 @@ int main(int argc, char **argv)
                 voyage.event = BOAT_VOYAGE_ARRIVED;
                 voyage.event_shelter = voyage.shelter;
                 voyage.event_time = voyage_time - 1;
+            } else if (!strcmp(name, "weather")) {
+                boat.position = (Vector2) { 2300, -1600 };
+                boat.heading = 1.08f;
+                voyage.shelter = 1;
+                voyage.weather = true;
+                voyage.weather_started = voyage_time - 1;
+                voyage.event = BOAT_VOYAGE_WEATHER;
+                voyage.event_shelter = 1;
+                voyage.event_time = voyage_time - 1;
             } else if (!strcmp(name, "recovered")) {
                 voyage.event = BOAT_VOYAGE_RECOVERED;
                 voyage.event_shelter = 2;
@@ -87,7 +96,7 @@ int main(int argc, char **argv)
             fprintf(stderr,
                 "Usage: boat_hud_review [--background PNG] [--screenshot PNG] "
                 "[--case neutral|docking|reverse-docking|cruise|reverse|full|reset] "
-                "[--compact|--large] [--voyage shelter|exposed|slow|arrived|recovered] "
+                "[--compact|--large] [--voyage shelter|exposed|slow|arrived|recovered|weather] "
                 "[--frames N]\n");
             return 1;
         }

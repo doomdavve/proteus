@@ -184,11 +184,11 @@ void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
 }
 
 bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Color *pixels,
-    int width, int height, View3D camera, bool omit_water)
+    int width, int height, View3D camera, bool omit_water, WaterfrontSquall squall)
 {
     if (!scenery->ready || !scenery->map)
         return false;
-    waterfront_sky_draw(pixels, width, height, camera);
+    waterfront_sky_draw_squall(pixels, width, height, camera, squall);
     if (!renderer3d_begin(r, pixels, width, height, camera, waterfront_sun_direction()))
         return false;
     // Flat water first, then the land of each tile in view; land triangles keep their index

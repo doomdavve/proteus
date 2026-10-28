@@ -17,6 +17,15 @@ typedef struct {
     bool rear_view; // Stern-mounted, level aft view; independent of chase-camera smoothing.
 } BoatCamera;
 
+// A3.5 weather transition: the fraction (0..BOAT_VIEW_OVERCAST) by which a view of WORLD is
+// blended toward BOAT_VIEW_STORM_LIGHT as the boat nears a grown weather patch. Both renderers
+// apply it over the finished 3D frame; the HUD is drawn after it.
+#define BOAT_VIEW_OVERCAST .45f
+#define BOAT_VIEW_STORM_LIGHT ((Color) { 46, 56, 66, 255 })
+float boat_view_overcast(const BoatViewState *view, const BoatWorld *world);
+// The sky's cloud and rain for WORLD's weather patch at TIME; none for the race's squall.
+WaterfrontSquall boat_view_squall(const BoatWorld *world, double time);
+
 // Project a world point with the same camera as the scene. False behind the near plane.
 bool boat_view_project(const BoatViewState *view, const BoatPresentation *presentation,
     const BoatWorld *world, BoatCamera settings, Vector3 point, int width, int height,

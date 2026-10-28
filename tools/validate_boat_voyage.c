@@ -2,7 +2,8 @@
  * baked map; the exposed rough water crosses the direct route's southern leg while the east shore
  * and every shelter stay outside it; the voyage reaches shelters, reports exposure, arrives only
  * at controlled speed and recovers to the last shelter; the bearing cue turns the way right
- * steering turns the boat; and an autopiloted boat from the east shore arrives at Långedrag. */
+ * steering turns the boat; and an autopiloted boat from the east shore arrives at Långedrag.
+ * A3.5: the exposure is calm until the boat comes within range, then grows smoothly. */
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
@@ -165,17 +166,66 @@ int main(void)
     CHECK(Vector2Distance(route->arrival_centre, storm.centre)
         > storm.radius + route->arrival_radius);
 
-    // The free-boating water carries the patch: rough at its centre, untouched at the harbour.
+    // The free-boating water carries the grown patch: rough at its centre, untouched at the
+    // harbour.
     BoatWater water = boat_world_test_water(outer, false, false, false);
     water.storm = storm;
     float low = INFINITY, high = -INFINITY;
     for (int i = 0; i < 200; ++i) {
-        BoatWaterSample s = boat_water_query(water, storm.centre, i * .1);
+        double t = storm.build + i * .1;
+        BoatWaterSample s = boat_water_query(water, storm.centre, t);
         low = fminf(low, s.height);
         high = fmaxf(high, s.height);
-        CHECK(boat_water_query(water, route->arrival_centre, i * .1).height == 0);
+        CHECK(boat_water_query(water, route->arrival_centre, t).height == 0);
     }
     CHECK(high - low > 1.5f);
+
+    // A3.5: the patch grows from flat water over BUILD seconds. Growth is smooth, its height
+    // rate includes the growth, and the shaders get the grown height.
+    CHECK(storm.build >= 30 && route->weather_range > storm.radius * 2);
+    float rate;
+    CHECK(boat_water_storm_grown(storm, -1, &rate) == 0 && rate == 0);
+    CHECK(boat_water_storm_grown(storm, storm.build * .5, &rate) == .5f && rate > 0);
+    CHECK(boat_water_storm_grown(storm, storm.build + 1, &rate) == 1 && rate == 0);
+    CHECK(boat_water_query(water, storm.centre, -1).height == 0);
+    float uniforms[12];
+    boat_water_storm_uniforms(storm, storm.build * .5, uniforms);
+    CHECK(uniforms[3] == storm.height * .5f);
+    Vector2 flank = Vector2Add(storm.centre, (Vector2) { 120, -80 });
+    float worst = 0, rising = 0;
+    for (int i = 1; i < 600; ++i) {
+        double t = i * .1, h = 1e-3;
+        float above = boat_water_query(water, flank, t + h).height;
+        float below = boat_water_query(water, flank, t - h).height;
+        float expected = (float)((above - below) / (2 * h));
+        float actual = boat_water_query(water, flank, t).velocity.y;
+        worst = fmaxf(worst, fabsf(actual - expected));
+        rising = fmaxf(rising, fabsf(boat_water_query(water, flank, t).height));
+        if (t < storm.build * .05)
+            CHECK(fabsf(boat_water_query(water, flank, t).height) < .02f * storm.height);
+    }
+    CHECK(worst < .02f && rising > .5f);
+
+    // The weather begins once the boat comes within range, with a notice, and then stays.
+    BoatVoyage weather;
+    boat_voyage_start(&weather, route, 0);
+    CHECK(boat_voyage_weather(&weather).radius == 0);
+    boat_voyage_step(&weather, route->shelters[0].position, (Vector2) { 0 }, 1);
+    boat_voyage_step(&weather, route->shelters[1].position, (Vector2) { 0 }, 40);
+    CHECK(!weather.weather && boat_voyage_weather(&weather).radius == 0);
+    Vector2 onset = Vector2Add(storm.centre, (Vector2) { -route->weather_range + 10, 0 });
+    boat_voyage_step(&weather, onset, (Vector2) { 0 }, 100);
+    CHECK(weather.weather && weather.weather_started == 100);
+    CHECK(weather.event == BOAT_VOYAGE_WEATHER && !weather.exposed);
+    BoatStorm grown = boat_voyage_weather(&weather);
+    CHECK(grown.started == 100 && grown.radius == storm.radius && grown.height == storm.height);
+    boat_voyage_step(&weather, route->shelters[1].position, (Vector2) { 0 }, 140);
+    CHECK(weather.weather && weather.weather_started == 100);
+    // A boat first seen in range (a --start placement) finds the patch already grown.
+    boat_voyage_start(&weather, route, 0);
+    boat_voyage_step(&weather, storm.centre, (Vector2) { 0 }, 2);
+    CHECK(weather.weather && weather.weather_started == 2 - storm.build);
+    CHECK(weather.event == BOAT_VOYAGE_EXPOSED);
 
     // State machine on synthetic positions.
     BoatVoyage voyage;
@@ -216,12 +266,14 @@ int main(void)
     boat_session_init(&session, &world, water);
     session.presentation_enabled = false;
     CHECK(session.voyage.route == route && session.voyage.shelter == 0);
+    CHECK(session.world.water.storm.radius == 0); // Calm until the weather begins.
     float start_heading = session.boat.heading;
     for (int tick = 0; tick < 360; ++tick)
         boat_session_step(&session,
             (BoatInput) { .steering_rate = 1,
                 .throttle_rate = boat_throttle_rate(session.boat.throttle, .5f) });
     CHECK(remainderf(session.boat.heading - start_heading, 2 * PI) > .2f);
+    CHECK(session.world.water.storm.radius == 0 && !session.voyage.weather);
 
     // Recovery returns to the latest shelter with a reset boat; the clock continues.
     session.voyage.shelter = 1;

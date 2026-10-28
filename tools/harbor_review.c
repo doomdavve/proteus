@@ -231,8 +231,8 @@ int main(int argc, char **argv)
             EndShaderMode();
             EndTextureMode();
         } else {
-            if (!waterfront_draw_boating(
-                    &cpu, &scenery, pixels, 320, height, frame.camera, waves)) {
+            if (!waterfront_draw_boating(&cpu, &scenery, pixels, 320, height, frame.camera, waves,
+                    (WaterfrontSquall) { 0 })) {
                 result = 1;
                 break;
             }
