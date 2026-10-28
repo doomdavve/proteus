@@ -157,7 +157,7 @@ def wait_for_publication(root, tag, commit, timeout):
 def build_and_test(root, output):
     run('cmake', '-S', root, '-B', root / 'build', '-DCMAKE_BUILD_TYPE=Debug',
         '-DPROTEUS_GPU_TESTS=OFF', cwd=root, log=output / 'configure.log', timeout=1800)
-    run('cmake', '--build', root / 'build', '--parallel', cwd=root,
+    run('cmake', '--build', root / 'build', '--parallel', str(min(8, os.cpu_count() or 1)), cwd=root,
         log=output / 'build.log', timeout=1800)
     run('ctest', '--preset', 'full', cwd=root, log=output / 'tests.log', timeout=1800)
 
