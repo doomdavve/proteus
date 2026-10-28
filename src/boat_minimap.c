@@ -24,6 +24,8 @@ static const Color pale_magenta = { 214, 140, 192, 255 };
 #define STARBOARD_GREEN { 32, 140, 72, 255 }
 #define WHITE_MARK { 250, 250, 246, 255 }
 #define BLACK_MARK { 36, 38, 40, 255 }
+// Own ship: a high-visibility orange used by nothing else on the chart.
+static const Color own_ship_color = { 255, 112, 0, 255 };
 static const Color hull = { 150, 154, 160, 255 };
 static const Color hatch = { 204, 198, 184, 255 }; // Outside every map triangle.
 #define NEAR_SHORE 50.0f
@@ -480,7 +482,8 @@ static void ring(BoatMinimapLayer *layer, int x, int y, int radius, Color color)
 }
 
 // ECDIS own ship: two concentric rings with a heading line from them, distinct from the single
-// ring of a conspicuous landmark. No halo: the chart shows through between the strokes.
+// ring of a conspicuous landmark, in orange to stand out from the chart. No halo: the chart
+// shows through between the strokes.
 static void own_ship(BoatMinimapLayer *layer, Vector2 centre, float heading, float length)
 {
     // Simulation forward (sin, -cos) is map (-sin, -cos): east is -X, north is +Z; rows run south.
@@ -488,10 +491,10 @@ static void own_ship(BoatMinimapLayer *layer, Vector2 centre, float heading, flo
     int x = (int)floorf(centre.x), y = (int)floorf(centre.y);
     Vector2 from = { (float)x + .5f, (float)y + .5f };
     Vector2 to = { from.x + forward.x * length, from.y + forward.y * length };
-    ring(layer, x, y, 3, ink);
-    ring(layer, x, y, 1, ink);
-    line(layer, from, to, ink);
-    dot(layer, x, y, ink);
+    ring(layer, x, y, 3, own_ship_color);
+    ring(layer, x, y, 1, own_ship_color);
+    line(layer, from, to, own_ship_color);
+    dot(layer, x, y, own_ship_color);
 }
 
 static void bridge(BoatMinimapLayer *layer, bool chart)

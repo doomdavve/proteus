@@ -24,7 +24,7 @@
 #define HEIGHT 200
 #define INSTRUMENTS_TOP (HEIGHT - 46)
 #define TRIM BOAT_MINIMAP_TRIM
-#define INK ((Color) { 30, 32, 36, 255 })
+#define OWN_SHIP ((Color) { 255, 112, 0, 255 })
 #define CHART_MAGENTA ((Color) { 172, 34, 132, 255 })
 
 static Color pixel(const Image *image, Vector2 p)
@@ -167,12 +167,12 @@ int main(int argc, char **argv)
                         CHECK(same(pixel(frame, (Vector2) { (float)x, (float)y }),
                             pixel(&trim, (Vector2) { (float)x, (float)y })));
             UnloadImage(trim);
-            // The own-ship ring is ink; heading 0 points south, so its heading line runs down
+            // The own ship is orange; heading 0 points south, so its heading line runs down
             // the frame past the ring.
             Vector2 boat = boat_minimap_project(&minimap, mode, location->spawn);
-            CHECK(same(pixel(frame, boat), INK));
-            CHECK(same(pixel(frame, (Vector2) { boat.x, boat.y + 4 }), INK));
-            CHECK(!same(pixel(frame, (Vector2) { boat.x + 4, boat.y + 4 }), INK));
+            CHECK(same(pixel(frame, boat), OWN_SHIP));
+            CHECK(same(pixel(frame, (Vector2) { boat.x, boat.y + 4 }), OWN_SHIP));
+            CHECK(!same(pixel(frame, (Vector2) { boat.x + 4, boat.y + 4 }), OWN_SHIP));
             if (location->voyage) {
                 const BoatVoyageRoute *route = location->voyage;
                 Vector2 goal = boat_minimap_project(&minimap, mode, route->arrival_centre);

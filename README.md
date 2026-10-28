@@ -454,7 +454,7 @@ Every mapped location (`river`, `outer`, solo or in a room) has a north-up nauti
 the whole map, drawn in paper-chart style. Land is buff, with built-up areas darker; there is a
 black coastline. Water is white, with blue tints near the shore (distance from shore, not
 depth). The frame is graduated in minutes of latitude and longitude, and there is a scale in
-nautical miles. Your boat is the ECDIS own-ship symbol (two rings with a heading line). The
+nautical miles. Your boat is the ECDIS own-ship symbol (two rings with a heading line) in orange. The
 chart also shows the Eriksberg crane, Nya Älvsborg, the docked ferry, Älvsborgsbron with its
 45 m clearance, and the outer map's red/green channel marks and lights. On the solo `outer`
 voyage it overprints in magenta: shelters as anchorages, Långedrag as a waypoint and the exposed
