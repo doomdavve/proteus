@@ -2274,8 +2274,9 @@ adventure mode out to Vinga." The plan's next step, A3.5, was split: the weather
   600-frame windowed GPU run near the squall (`--location outer --start 2300,-1600,62 --frames
   600`) exited cleanly; the window was not focused, so it ran only 119 ticks.
 - **Limitations:**
-  - **No manual playback or user acceptance.** The 60 s build, the 2.5 km onset, the cloud's
-    size and the darkness are agent choices from captures.
+  - **User reaction (2026-10-28), after the handoff:** "Yes, I like the fog and stormy feel!"
+    It was not stated whether this came from play or from the captures, so the 60 s build, the
+    2.5 km onset and the cloud's size are still agent choices without a recorded playtest.
   - The squall cannot be seen from the river or under Älvsborgsbron: the onset range (about
     3.5 km from BRIDGE) is out in the fjord, and before the onset there is no cloud at all. A
     visible distant build-up from the river would need the cloud before the waves.

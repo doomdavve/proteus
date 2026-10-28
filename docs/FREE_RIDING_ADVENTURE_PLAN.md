@@ -72,8 +72,8 @@ ferry docked across the river from the crane, completed 2026-10-27
 2026-10-28: A3.5h, the local weather transition, completed that day. The outer fjord's rough
 water is calm until the boat comes within 2.5 km of it, then grows over a minute, seen as a
 squall cloud with rain painted into the sky on both renderers, and the light dims near it
-([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35h-result-2026-10-28); captures and tests only,
-not yet played).
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35h-result-2026-10-28); captures and tests; the user
+liked "the fog and stormy feel", no recorded playtest).
 **Next: A3.5i, bounded per-region detailed-asset loading** (and the bake out of the generated
 header, which the upstream extension A3.5f needs).
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
