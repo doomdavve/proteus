@@ -392,7 +392,7 @@ static int check_gpu_lifecycle(void)
     static BoatSession sessions[VIEWS];
     static BoatWakeObjects arcade;
     BoatGpu a = { 0 }, b = { 0 };
-    Image reference[VIEWS] = { 0 }, frame = { 0 };
+    Image reference[VIEWS] = { 0 }, frame = { 0 }, resize_reference = { 0 };
     int result = 1, ready = 0, arcade_patch = 0, patch = 0;
 #define EXPECT(test)                                                                               \
     do {                                                                                           \
@@ -442,6 +442,25 @@ static int check_gpu_lifecycle(void)
         EXPECT(!a.scene.map && !a.scenery.ready && !a.water_mesh.patches[0].count);
     }
     EXPECT(MATCHES(&b, 1));
+    // A phone rotates without recreating shaders or scenery. Returning to the original
+    // viewport must reproduce exactly the same frame, with and without supersampling.
+    for (int aa = 0; aa < 2; ++aa) {
+        EXPECT(boat_gpu_init(&a, aa != 0) && gpu_frame(&a, &sessions[3], &resize_reference));
+        const int sizes[][2] = { { 320, 693 }, { 444, 200 }, { 320, 200 } };
+        for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i) {
+            EXPECT(boat_gpu_resize(&a, sizes[i][0], sizes[i][1]));
+            EXPECT(!boat_gpu_resize(&a, 0, 200) && !boat_gpu_resize(&a, 320, 2049));
+            EXPECT(gpu_frame(&a, &sessions[3], &frame));
+            EXPECT(frame.width == sizes[i][0] && frame.height == sizes[i][1]);
+            if (i == 2)
+                EXPECT(same_image(resize_reference, frame));
+            UnloadImage(frame);
+            frame = (Image) { 0 };
+        }
+        UnloadImage(resize_reference);
+        resize_reference = (Image) { 0 };
+        boat_gpu_destroy(&a);
+    }
 #undef MATCHES
 #undef EXPECT
     printf("gpu_lifecycle=ok views=river-a,river-b-arcade,harbor,basin cycles=%d "
@@ -449,6 +468,8 @@ static int check_gpu_lifecycle(void)
         CYCLES, patch, arcade_patch);
     result = 0;
 cleanup:
+    if (resize_reference.data)
+        UnloadImage(resize_reference);
     if (frame.data)
         UnloadImage(frame);
     for (int i = 0; i < VIEWS; ++i)

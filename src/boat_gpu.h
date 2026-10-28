@@ -26,6 +26,9 @@ typedef struct {
 
 // Map meshes are built on the first draw of a mapped world and rebuilt when its map changes.
 bool boat_gpu_init(BoatGpu *gpu, bool aa);
+// Reallocate only the render targets, retaining scenery, shaders and water caches.
+// Failure leaves the existing targets valid. Dimensions are bounded to 1..2048.
+bool boat_gpu_resize(BoatGpu *gpu, int width, int height);
 void boat_gpu_draw(BoatGpu *gpu, const BoatViewState *view, const BoatPresentation *presentation,
     const BoatWorld *world, BoatCamera camera);
 void boat_gpu_destroy(BoatGpu *gpu);

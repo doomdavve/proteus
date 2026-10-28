@@ -66,6 +66,7 @@ target_link_options(wake_velocity PRIVATE
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js\""
+  "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mobile_controls.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js\"")
 set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   ${WEB_SHADERS} ${WEB_TEXTURES}
@@ -76,6 +77,7 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js"
+  "${CMAKE_CURRENT_SOURCE_DIR}/web/mobile_controls.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js")
 
 # Only this directory is served/deployed. Content hashes keep JS, Wasm and data in sync.
