@@ -292,7 +292,7 @@ released native and browser room. A standalone Linux server package remains part
 For browser play, open [Winterfell](https://wake.davve.net/), press PLAY and
 choose MULTIPLAYER → WINTERFELL. The browser fetches a known-server list, so the common
 join needs no address entry. Manual URL / CONNECT remain available. The deployed client
-and room now run v0.0.18 with both deathmatch weapons; the public host stays outside the
+and room now run v0.0.20 with the protocol-v7 water cannon, stern wave grenade and torpedo; the public host stays outside the
 VPN's private Winterfell DNS override. Native clients fetch the same directory and use its
 native addresses, alongside LAN discovery and manual joining. Routine hosting updates are
 owned by `davve-srv`
