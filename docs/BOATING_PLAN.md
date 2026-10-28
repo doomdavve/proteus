@@ -488,9 +488,9 @@ R resets both the boat and attempt; focus loss pauses both. Free boating is stil
 Completed runs are recorded as poses at 120 Hz with interpolated START/FINISH samples and gate
 splits. The fastest run persists across launches and becomes a non-colliding cyan ghost on retry;
 calm water and gentle waves have separate bests. G toggles the ghost. Before START or after FINISH,
-P/B replays the last/best run; Space pauses, Enter restarts, and R returns to racing. A retry discards
+P/B replays the last/best run; Space pauses, Enter restarts, and hold Backspace 1 s returns to racing. A retry discards
 only the unfinished recording. Replay omits water particles and allows the usual camera controls. Left/Right seek one second
-(Shift: five seconds), Home/End jump to START/FINISH, and brackets select 0.25× through 4× playback.
+(Shift: five seconds), Home/End jump to START/FINISH, and brackets select 0.25× through 8× playback; backslash restores 1×.
 A clickable timeline marks gate splits; clicking/dragging seeks and pauses. Finish pauses playback;
 Space starts again from the beginning. Seeking and speed changes preserve the recording and best.
 Portable, versioned run files can be exported with `--save-run`, watched with `--replay`, or selected
@@ -907,3 +907,49 @@ then qualify browser and packaged macOS/Windows playback. Human musical acceptan
 physical menu input, connected audio and focus/replay listening are pending; successful
 decoding and scripted input do not establish these. The browser changes have not been
 compiled or played in this Fedora session (no Emscripten SDK installed).
+
+## Play-testing time controls — 2026-10-28
+
+Implemented in `playtest-time-controls`: `[` / `]` extend the existing replay speed mapping
+to live solo play (¼×, ½×, 1×, 2×, 4×, 8×); backslash restores 1× in either context. Live and replay
+rates are independent, start at 1×, and live rate survives boat resets. Camera zoom retains
+`+` / `−`. The scene displays an amber multiplier while altered and PRACTICE for affected courses.
+
+The application scales the capped real frame delta before accumulating fixed 1/120-second ticks.
+Boat parameters, integrator step and protocol/replay revisions are unchanged. Water, traffic,
+wakes, voyage and course clocks follow simulation time. Camera adjustment, menu, reset hold,
+profiler and audio use real time; music and engine pitch are not time-stretched. Multiplayer
+ignores local time controls. Help, Escape menu and focus loss retain solo pause behavior.
+
+Any course attempt simulated at an altered rate is latched as practice, including before START.
+It can become the last replay but cannot update bests or export files; returning to 1× alone does
+not clear practice. Restart at 1× for an eligible run. A completed eligible run is not invalidated
+by changing time after FINISH. Existing saved bests and pinned ghosts remain available.
+
+Completed task: implementation, help/CLI and controls documentation, deterministic rate/physics
+and practice-persistence checks. Automated verification, 2026-10-28 on macOS/Apple Silicon,
+Debug: build passed; `ctest --preset full` passed all 231 enabled tests (13 retired cases disabled).
+The first sandboxed quick run had four socket-access failures; the full run with network/graphics
+access passed. The original `boat_time_control` check used 24 virtual ticks in the quick lane.
+A temporary instrumented app used raylib key events in a 240-frame windowed basin/waves/course
+run (`--no-vsync`) to check ¼×/4×, normal-time restore, ignored menu time keys and a real-time
+Backspace reset clearing practice at 1×. Its captures at 4×, ¼× and after reset were inspected;
+the time label was moved below course panels after the first capture exposed overlap. This is
+automated windowed coverage, not human input or audio acceptance. The final production binary
+also completed a windowed river/waves demo (`--location river --waves --demo --no-vsync
+--frames 180`); no human audio assessment was performed.
+
+Follow-up, 2026-10-28: the user reports 4× felt fine and requested 8×. The live and replay
+controls now include 8× as the highest step; backslash still restores 1×. The deterministic
+rate check now compares 32 virtual ticks at all six rates; the replay check includes 8× and
+its upper clamp. Follow-up verification on macOS/Apple Silicon, Debug: build passed and
+`ctest --preset full` passed all 231 enabled tests (13 retired cases disabled). The temporary
+240-frame windowed raylib key-event check passed at 8×, including repeated faster input at
+the limit, normal-time restore, ignored menu keys and practice reset; the 8× indicator capture
+was inspected. The final production binary completed the 180-frame river/waves demo again.
+User acceptance, 2026-10-28: after trying the 8× extension, the user reported “Works great!”
+The time-control feature is play-tested and accepted; specific locations, input devices and
+audio scenarios were not reported. Next task: integrate the PR after CI checks; additional
+platform qualification remains separate. Known limits: fast-forward increases physics CPU
+work; audio plays at its normal rate, and the existing stall clamp still discards real time
+above 0.1 s per frame. Browser/Windows verification remains pending.

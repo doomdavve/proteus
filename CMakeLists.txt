@@ -503,6 +503,11 @@ target_link_libraries(validate_boat_outer_map PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_outer_map PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_outer_map COMMAND validate_boat_outer_map)
 set_tests_properties(boat_outer_map PROPERTIES PASS_REGULAR_EXPRESSION "boat_outer_map=ok")
+# Play-testing rates preserve fixed-tick physics.
+add_executable(validate_boat_time_control tools/validate_boat_time_control.c)
+target_link_libraries(validate_boat_time_control PRIVATE proteus_boat_session)
+target_compile_options(validate_boat_time_control PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_time_control COMMAND validate_boat_time_control)
 # Adventure A3.4: the outer voyage's shelters, exposed water, arrival and recovery.
 add_executable(validate_boat_voyage tools/validate_boat_voyage.c)
 target_link_libraries(validate_boat_voyage PRIVATE proteus_boat_session)

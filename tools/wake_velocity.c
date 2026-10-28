@@ -11,6 +11,7 @@
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
+#include "boat_time_control.h"
 #include "boat_ui.h"
 #include "boat_voyage_view.h"
 #include "wake_velocity_drive.h"
@@ -81,7 +82,9 @@ static void usage(void)
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"
         "G: ghost on/off | P/B: replay last/best | Space: pause replay | Enter: restart replay\n"
-        "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed 0.25x..4x\n"
+        "Solo: [ / ] slower/faster (0.25x..8x) | backslash: normal time; altered runs are "
+        "practice\n"
+        "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed | backslash: 1x\n"
         "Click/drag the replay timeline to seek and pause; Space resumes.\n"
         "--replay FILE: watch a saved course run (also supports --screenshot --time)\n"
         "--ghost FILE: race a compatible saved run | --save-run FILE: export each finish\n"
@@ -114,7 +117,7 @@ static BoatWater study_water(
     return water;
 }
 
-static void draw_help(bool course, bool voyage, bool deathmatch, bool race)
+static void draw_help(bool course, bool voyage, bool deathmatch, bool race, bool networked)
 {
     int width = GetScreenWidth(), height = GetScreenHeight();
     const char *lines[] = {
@@ -135,6 +138,8 @@ static void draw_help(bool course, bool voyage, bool deathmatch, bool race)
         deathmatch ? "V: toggle rearview mirror (starts hidden)" : "",
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
+        networked ? "" : "[ / ]: time 0.25x..8x | backslash: 1x",
+        course ? "Altered live time: practice, no best/export" : "",
 #if defined(__EMSCRIPTEN__)
         "Esc: menu / leave fullscreen | Back to title: setup",
 #endif
@@ -801,6 +806,7 @@ static int study(int argc, char **argv)
         }
     }
     double accumulator = 0;
+    int time_speed_index = BOAT_TIME_NORMAL;
     int frames = 0, demo_tick = 0;
     bool replay_dragging = false;
     bool help_visible = false;
@@ -1021,6 +1027,17 @@ static int study(int argc, char **argv)
                 }
             }
         }
+        if (active && !networked) {
+            if (session.runs.playing) {
+                if (IsKeyPressed(KEY_BACKSLASH))
+                    session.runs.replay_speed_index = BOAT_TIME_NORMAL;
+            } else {
+                int direction = IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
+                time_speed_index = boat_time_speed_step(time_speed_index, direction);
+                if (IsKeyPressed(KEY_BACKSLASH))
+                    time_speed_index = BOAT_TIME_NORMAL;
+            }
+        }
         metrics.course_replay_ms
             += (float)((boat_profile_time(true) - course_input_started_at) * 1000.0);
         reset_requested |= boat_reset_hold_update(
@@ -1090,7 +1107,9 @@ static int study(int argc, char **argv)
             double raw_active_delta = GetFrameTime();
             metrics.discarded_active_ms
                 = boat_profile_discarded_seconds(raw_active_delta, true) * 1000.0f;
-            accumulator += fmin(raw_active_delta, 0.1);
+            if (course && time_speed_index != BOAT_TIME_NORMAL && !session.runs.finished)
+                session.runs.practice = true;
+            accumulator += boat_time_frame_seconds(raw_active_delta, time_speed_index);
             while (accumulator >= BOAT_TICK_SECONDS) {
                 if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
@@ -1273,6 +1292,12 @@ static int study(int argc, char **argv)
             boat_ui_text(
                 "MOUSE UNAVAILABLE / USE A/D", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #endif
+        if (!networked && !session.runs.playing
+            && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {
+            const char *time_label = TextFormat("TIME %.2gx%s", boat_time_rate(time_speed_index),
+                session.runs.practice ? " / PRACTICE" : "");
+            boat_ui_text(time_label, 4, HEIGHT - 64, 10, (Color) { 233, 180, 104, 255 });
+        }
         EndTextureMode();
         BeginDrawing();
         ClearBackground((Color) { 14, 23, 32, 255 });
@@ -1333,7 +1358,7 @@ static int study(int argc, char **argv)
             deathmatch = networked && net_study_deathmatch(net);
             race = networked && net_study_race(net);
 #endif
-            draw_help(course, !networked && session.voyage.route, deathmatch, race);
+            draw_help(course, !networked && session.voyage.route, deathmatch, race, networked);
         }
         frame_pacer_wait(&pacer);
         EndDrawing();

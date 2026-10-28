@@ -1,5 +1,6 @@
 #include "boat_replay.h"
 #include "boat_pose.h"
+#include "boat_time_control.h"
 #include "raymath.h"
 
 #include <ctype.h>
@@ -378,17 +379,14 @@ void boat_replay_seek(BoatReplayRuns *runs, double at)
 
 float boat_replay_speed(const BoatReplayRuns *runs)
 {
-    static const float speeds[] = { .25f, .5f, 1, 2, 4 };
-    int index = runs->replay_speed_index;
-    return speeds[index < 0 ? 0 : index > 4 ? 4 : index];
+    return boat_time_rate(runs->replay_speed_index);
 }
 
 void boat_replay_speed_step(BoatReplayRuns *runs, int direction)
 {
     if (!runs->playing)
         return;
-    int index = runs->replay_speed_index + (direction > 0) - (direction < 0);
-    runs->replay_speed_index = index < 0 ? 0 : index > 4 ? 4 : index;
+    runs->replay_speed_index = boat_time_speed_step(runs->replay_speed_index, direction);
 }
 
 void boat_replay_advance(BoatReplayRuns *runs, double seconds, bool focused)
@@ -415,6 +413,7 @@ void boat_replay_runs_reset(BoatReplayRuns *runs)
     runs->replay_speed_index = 2;
     runs->paused = false;
     runs->finished = false;
+    runs->practice = false;
     boat_replay_destroy(&runs->recording);
     const BoatReplay *source = runs->reference.complete ? &runs->reference : &runs->best;
     if (!boat_replay_copy(&runs->opponent, source)) {
@@ -438,16 +437,19 @@ void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatRe
     runs->last = runs->recording;
     runs->recording = (BoatReplay) { 0 };
     runs->finished = true;
-    bool faster = !runs->best.complete
-        || runs->last.splits[BOAT_COURSE_GATES - 1] < runs->best.splits[BOAT_COURSE_GATES - 1];
-    runs->notice = faster ? "New personal best!" : "Run recorded";
+    bool faster = !runs->practice
+        && (!runs->best.complete
+            || runs->last.splits[BOAT_COURSE_GATES - 1] < runs->best.splits[BOAT_COURSE_GATES - 1]);
+    runs->notice = runs->practice ? "Practice recorded; best and export preserved"
+        : faster                  ? "New personal best!"
+                                  : "Run recorded";
     if (faster) {
         if (!boat_replay_copy(&runs->best, &runs->last))
             runs->notice = "Run recorded; could not allocate personal best";
         else
             runs->save_best = true;
     }
-    runs->export_last = runs->export_path != NULL;
+    runs->export_last = !runs->practice && runs->export_path != NULL;
     runs->report_finish = true;
 }
 

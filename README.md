@@ -341,7 +341,7 @@ A deliberate reset abandons an unfinished attempt while preserving your last com
   racing. Backspace reset is inactive during replay. Finishing pauses playback; `Space` then plays again from the beginning.
 - `Left`/`Right` seek one second backward/forward; hold `Shift` for five seconds. `Home`/`End` jump
   to START/FINISH. Seeking preserves pause state; jumping to FINISH pauses.
-- `[`/`]` select 0.25×, 0.5×, 1×, 2×, or 4× playback. Selecting another recording starts at 1×.
+- `[`/`]` select 0.25×, 0.5×, 1×, 2×, 4×, or 8× playback; `\` restores 1×. Selecting another recording starts at 1×.
 - Click or drag the replay timeline to seek and pause; press `Space` to continue. The timeline marks
   START, both buoy gates, and FINISH. Camera controls remain available. Losing focus pauses playback
   without advancing the clock.
@@ -365,7 +365,8 @@ cannot replace your recorded best.
 ./build/wake_velocity --renderer cpu --replay build/my-run.run --time 5 --screenshot build/replay.png
 ```
 
-`--save-run FILE` exports each completed attempt, including slower runs, to that path.
+`--save-run FILE` exports each completed normal-time attempt, including slower runs, to that path.
+Altered-time practice attempts remain replayable as the last run but do not replace bests or exports.
 `--replay FILE` and `--ghost FILE` imply course mode. Replay selects the recording's water preset;
 an imported ghost must match your selected water preset (`--waves` for a wave run).
 An imported ghost stays selected across retries while your personal best is tracked separately.
@@ -479,6 +480,17 @@ from neutral to full in 0.25 seconds, with separately smoothed engine response. 
 unassigned. R does nothing. Hold Backspace for one second, with a visible progress bar, or
 choose the explicit reset/restart/request action in the Escape menu. A short tap does nothing;
 release, help/menu, loss of focus or replay cancels progress. Each hold triggers at most once.
+For single-player testing, `[` slows time and `]` speeds it up through ¼×, ½×, 1×, 2×, 4× and 8×;
+`\` (backslash) returns to 1×. The same keys control replay speed while watching a replay.
+The current multiplier appears above the scene when altered. Boat physics still uses fixed
+120 Hz simulated ticks; water, traffic, wakes and voyage progress follow simulation time.
+Camera adjustments, reset holds, menus and audio keep their normal real-time rate. Fast-forward
+requires more physics work per frame. The selected live rate survives boat resets and is separate
+from replay speed; returning to the title starts the next session at 1×. Help/menu/focus loss pause
+solo simulation. Multiplayer uses the server clock and ignores these shortcuts.
+A course attempt that uses altered time is marked PRACTICE for the rest of that attempt,
+including after returning to 1×. It remains replayable with P but cannot replace a personal best
+or `--save-run` export. Return to 1× and restart the run to regain eligibility.
 Space operates the water cannon in deathmatch, E drops a stern wave grenade, Q launches a torpedo, and V toggles the rearview mirror; Space is unassigned in free/race play; replay/menu controls retain their existing use.
 Press `M` to capture the mouse for steering, or launch with `--mouse-steering`. The pointer
 is hidden and horizontal movement accumulates wheel angle: move right/left to turn the wheel,
