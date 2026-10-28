@@ -64,6 +64,12 @@ EM_JS(int, boat_web_mouse_state, (int wanted, int available),
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
 EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
 EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
+EM_JS(void, boat_web_scenery_start, (const char *name, const char *path),
+    { Module['boatScenery'].start(UTF8ToString(name), UTF8ToString(path)); })
+EM_JS(int, boat_web_scenery_state, (const char *name),
+    { return Module['boatScenery'].state(UTF8ToString(name)); })
+EM_JS(float, boat_web_scenery_progress, (const char *name),
+    { return Module['boatScenery'].progress(UTF8ToString(name)); })
 #endif
 
 static void usage(void)
@@ -138,6 +144,36 @@ static bool load_scenery(const char *assets)
 #else
     return boat_scenery_load_all(assets);
 #endif
+}
+
+// LOCATION's scenery, loaded now if it is not yet. The browser first fetches the pack, drawing
+// its progress until it arrives; false if it cannot be fetched or loaded.
+static bool scenery_ready(const BoatWorldDefinition *location, const char *assets)
+{
+    if (!location->mapped || boat_scenery_of(location->map))
+        return true;
+#if defined(__EMSCRIPTEN__)
+    char path[4096];
+    if (!boat_scenery_path(location, assets, path, sizeof(path)))
+        return false;
+    boat_web_scenery_start(location->name, path);
+    while (boat_web_scenery_state(location->name) == 1 && !WindowShouldClose()) {
+        char text[64];
+        snprintf(text, sizeof(text), "LOADING %s %d%%",
+            location->id == BOAT_LOCATION_OUTER ? "OUTER RIVER" : "MAP",
+            (int)(100 * boat_web_scenery_progress(location->name)));
+        int scale = GetScreenHeight() / 200 > 1 ? GetScreenHeight() / 200 : 1;
+        BoatUiPalette palette = boat_ui_palette();
+        BeginDrawing();
+        ClearBackground(palette.panel);
+        boat_ui_text(text, (GetScreenWidth() - boat_ui_width(text, 8 * scale)) / 2,
+            GetScreenHeight() / 2 - 4 * scale, 8 * scale, palette.text);
+        EndDrawing(); // Yields to the page, which receives the pack meanwhile.
+    }
+    if (boat_web_scenery_state(location->name) != 2)
+        return false;
+#endif
+    return boat_scenery_load_location(location, assets);
 }
 
 static BoatWater study_water(
@@ -794,6 +830,10 @@ static int study(int argc, char **argv)
         goto cleanup;
 #if defined(__EMSCRIPTEN__)
     SetTargetFPS(60);
+    if (!scenery_ready(location, assets)) {
+        fprintf(stderr, "Cannot load the %s scenery.\n", location->name);
+        goto cleanup;
+    }
 #else
     if (!vsync)
         ClearWindowState(FLAG_VSYNC_HINT);
@@ -1333,6 +1373,12 @@ static int study(int argc, char **argv)
         }
         metrics.course_replay_ms += (float)((boat_profile_time(true) - ghost_started_at) * 1000.0);
         double scene_started_at = boat_profile_time(true);
+        // A joined room may select a location whose pack the browser has not fetched yet.
+        if (!scenery_ready(view_world->definition, assets)) {
+            fprintf(stderr, "Cannot load the %s scenery.\n", view_world->definition->name);
+            result = 1;
+            break;
+        }
         if (gpu_enabled) {
             boat_gpu_draw_scene(&gpu, view, view_presentation, view_world, camera_settings, &rivals,
                 ghost_view, ghost_view_flag, ghost_opacity);
