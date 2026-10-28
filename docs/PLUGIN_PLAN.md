@@ -694,8 +694,10 @@ Verification, 2026-10-28, M1 Max/macOS 26.6.2, Debug (`PROTEUS_GPU_TESTS=OFF`):
 User check, 2026-10-28: after this run the user tried the P1 branch natively and reported
 "Seems to work well!" They drove out to Långedrag, entered the squall for a while, and found the
 voyage hints looking as they used to. This is human play of the route (arrival, exposure and
-HUD unchanged). The report does not say whether the plugin was edited during play or whether
-F5–F7 or recovery were used, so live editing by a human is not yet recorded.
+HUD unchanged). The user then renamed a shelter in `main.lua` while playing, and the save
+reloaded automatically and applied the new name. This is the first human live edit (the
+rename policy, through save polling). F5–F7, a held route or water restart, Undo and a
+broken save have not been tried by a human yet.
 
 Limits: rooms, the course/replays, recordings and the browser keep
 the compiled voyage. Windows and Linux are left to CI, including the packaged-plugin frame on
