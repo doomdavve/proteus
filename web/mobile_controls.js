@@ -22,17 +22,17 @@ function installBoatMobileControls(module, canvas, document, window) {
   canvas.addEventListener('pointercancel', () => { touchStart = tap = null; });
   let session = false, active = false, menu = false, tilt = false, pending = false;
   let rotationBlocked = false;
-  let center = null, angle = null, target = 0, last = null;
+  let center = null, angle = null, target = 0, last = null, receivedAt = null, startedAt = 0;
   const now = () => window.performance.now();
   const mobile = () => window.matchMedia('(pointer: coarse)').matches;
   function clear() { pointers.clear(); target = 0; last = null; }
-  function message(text) { status.textContent = text; }
+  function message(text) { if (status.textContent !== text) status.textContent = text; }
   function stopTilt(text) {
     tilt = false; center = null; clear();
     tiltButton.textContent = 'Enable tilt'; recenter.hidden = true; message(text);
   }
   function calibrate() {
-    clear(); center = null; angle = null;
+    clear(); center = null; angle = null; receivedAt = null; startedAt = now();
     message('Hold comfortably; waiting for tilt…');
   }
   tiltButton.addEventListener('click', () => {
@@ -56,6 +56,7 @@ function installBoatMobileControls(module, canvas, document, window) {
       .finally(() => { pending = false; });
   });
   recenter.addEventListener('click', () => { canvas.focus(); rotationBlocked = false; calibrate(); });
+  root.addEventListener('contextmenu', event => event.preventDefault());
   root.querySelectorAll('[data-hold]').forEach(button => {
     button.addEventListener('pointerdown', event => {
       event.preventDefault(); canvas.focus();
@@ -71,8 +72,9 @@ function installBoatMobileControls(module, canvas, document, window) {
   });
   window.addEventListener('deviceorientation', event => {
     if (!tilt || rotationBlocked || !Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return;
-    const screenAngle = window.screen.orientation ? window.screen.orientation.angle
-      : (window.orientation || 0);
+    receivedAt = now();
+    const screenAngle = Number.isFinite(window.screen.orientation?.angle)
+      ? window.screen.orientation.angle : (window.orientation || 0);
     const radians = screenAngle * Math.PI / 180;
     // Project gravity onto the screen's horizontal and vertical axes. Unlike raw
     // beta/gamma selection this remains continuous across Euler angle wrapping.
@@ -84,7 +86,8 @@ function installBoatMobileControls(module, canvas, document, window) {
       angle = null; target = 0; message('Raise phone slightly for tilt steering.'); return;
     }
     angle = Math.atan2(horizontal, Math.abs(vertical)) * 180 / Math.PI;
-    if (center === null) { center = angle; message('Tilt steering on'); }
+    if (center === null) center = angle;
+    message('Tilt steering on');
     const delta = angle - center;
     const requested = Math.sign(delta) * Math.min(1, Math.max(0, Math.abs(delta) - 3) / 22);
     const time = now();
@@ -103,6 +106,7 @@ function installBoatMobileControls(module, canvas, document, window) {
   window.addEventListener('blur', cancel);
   document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); });
   module['boatMobile'] = {
+    'cancel': cancel,
     'click': () => {
       const value = tap; tap = null;
       return value || (touchInput ? false : null);
@@ -117,6 +121,8 @@ function installBoatMobileControls(module, canvas, document, window) {
       if (!active) clear();
       else tap = null;
       root.querySelectorAll('[data-hold]').forEach(button => { button.disabled = !active; });
+      if (tilt && !rotationBlocked && active && now() - (receivedAt ?? startedAt) > 2000)
+        message('No tilt readings. Use touch or check motion settings.');
       const held = name => active && [...pointers.values()].includes(name);
       const fresh = tilt && !rotationBlocked && angle !== null && last !== null && now() - last < 1000;
       module['boatMobileTarget'] = active && !held('left') && !held('right') && fresh ? target : NaN;

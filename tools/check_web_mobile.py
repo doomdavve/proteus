@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--url', default='http://127.0.0.1:8765/')
 parser.add_argument('--output', type=Path, required=True)
+parser.add_argument('--android', action='store_true', help='Emulate a recent Android phone and implicit sensor permission.')
 parser.add_argument('--room-url', help='Optional matching local WebRTC room (ws://localhost is allowed).')
 parser.add_argument('--executable', default='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 args = parser.parse_args()
@@ -15,27 +16,47 @@ args.output.mkdir(parents=True, exist_ok=True)
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=args.executable,
                                args=['--use-gl=angle', '--use-angle=swiftshader'])
-    page = browser.new_page(viewport={'width': 844, 'height': 390},
-                            has_touch=True, is_mobile=True, device_scale_factor=1)
+    phone = {'width': 915, 'height': 412} if args.android else {'width': 844, 'height': 390}
+    options = dict(viewport=phone, has_touch=True, is_mobile=True, device_scale_factor=1)
+    if args.android:
+        options['user_agent'] = ('Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 '
+                                 '(KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36')
+    page = browser.new_page(**options)
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('console', lambda msg: print(msg.text, flush=True) if 'Joined as slot' in msg.text or msg.type == 'error' else None)
     page.add_init_script('''
+      window.testAudioContexts = [];
+      const OriginalAudioContext = window.AudioContext;
+      window.AudioContext = class extends OriginalAudioContext {
+        constructor(...args) { super(...args); testAudioContexts.push(this); }
+      };
       window.DeviceOrientationEvent = class extends Event {
         static requestPermission() { return Promise.resolve('granted'); }
       };
     ''')
+    if args.android:
+        page.add_init_script('delete window.DeviceOrientationEvent.requestPermission;')
     page.goto(args.url)
     page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
     page.locator('#settings').evaluate('(e) => e.open = true')
-    page.uncheck('#fullscreen')
+    if not args.android:
+        page.uncheck('#fullscreen')
     page.locator('#play').tap()
     page.wait_for_timeout(1600)
+    if args.android:
+        page.wait_for_function('document.fullscreenElement !== null')
+        page.wait_for_function('testAudioContexts.some(c => c.state === "running")')
+        page.evaluate('document.exitFullscreen()')
+        page.wait_for_function('document.fullscreenElement === null')
+        page.wait_for_timeout(300)
 
     def tap_scene(x, y):
         box = page.locator('#canvas').bounding_box()
-        page.touchscreen.tap(box['x'] + x * box['width'] / 320,
-                             box['y'] + y * box['height'] / 200)
+        buffer = page.locator('#canvas').evaluate('(c) => ({width: c.width, height: c.height})')
+        # Menus remain a centred 320x200 layout inside the adaptive game viewport.
+        page.touchscreen.tap(box['x'] + box['width'] / 2 + (x - 160) * box['width'] / (buffer['width'] / 3),
+                             box['y'] + box['height'] / 2 + (y - 100) * box['height'] / (buffer['height'] / 3))
         page.wait_for_timeout(450)
 
     tap_scene(120, 115)  # SINGLE PLAYER
@@ -61,6 +82,12 @@ with sync_playwright() as p:
             && Math.abs(box.height - viewport.height) < 1;
         }""")
         canvas_box = page.locator('#canvas').bounding_box()
+        buffer = page.locator('#canvas').evaluate('(c) => ({width: c.width, height: c.height})')
+        assert abs(canvas_box['width'] / buffer['width'] - canvas_box['height'] / buffer['height']) < .001
+        forward = page.locator('[data-hold=forward]').bounding_box()
+        reverse = page.locator('[data-hold=reverse]').bounding_box()
+        assert forward['y'] + forward['height'] <= reverse['y']
+        assert abs(forward['x'] - reverse['x']) < 1
         for selector in ['#mobile-menu', '[data-hold=left]', '[data-hold=forward]']:
             button = page.locator(selector).bounding_box()
             assert button['x'] >= canvas_box['x'] - 1
@@ -83,6 +110,20 @@ with sync_playwright() as p:
     page.wait_for_function('(mobileAudit.buttons & 15) === 5')
     cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
     page.wait_for_function('(mobileAudit.buttons & 15) === 0')
+    if args.android:
+        # Android normally exposes sensors without the iPhone permission method.
+        assert page.evaluate('typeof DeviceOrientationEvent.requestPermission') == 'undefined'
+        page.locator('#screen-button').tap()
+        page.wait_for_function('document.fullscreenElement !== null')
+        assert_overlay_layout()
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart',
+                                             'touchPoints': [point('[data-hold=forward]', 1)]})
+        page.wait_for_function('(mobileAudit.buttons & 1) !== 0')
+        page.evaluate('document.exitFullscreen()')  # System Back/escape releases held controls.
+        page.wait_for_function('document.fullscreenElement === null && (mobileAudit.buttons & 15) === 0')
+        cdp.send('Input.dispatchTouchEvent', {'type': 'touchCancel', 'touchPoints': []})
+        assert_overlay_layout()
+        page.screenshot(path=str(args.output / 'fullscreen-return.png'))
     page.locator('#tilt').tap()
     page.wait_for_function("document.getElementById('tilt').textContent === 'Use touch'")
     def orientation(beta, gamma):
@@ -100,7 +141,7 @@ with sync_playwright() as p:
     page.screenshot(path=str(args.output / 'menu.png'))
     tap_scene(160, 115)  # RESET BOAT, row 3
     page.wait_for_function("!document.querySelector('[data-hold=forward]').disabled")
-    page.set_viewport_size({'width': 390, 'height': 844})
+    page.set_viewport_size({'width': phone['height'], 'height': phone['width']})
     page.wait_for_timeout(500)
     assert_overlay_layout()
     page.screenshot(path=str(args.output / 'portrait.png'))

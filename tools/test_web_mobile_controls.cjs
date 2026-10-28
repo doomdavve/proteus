@@ -101,9 +101,13 @@ const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve()
     denied.buttons.right.emit('pointerdown'); assert.equal(denied.sample(), 8);
     assert.match(denied.elements['tilt-status'].textContent, /denied|unavailable/);
   }
+  s.buttons.forward.emit('pointerdown'); s.mobile.cancel(); assert.equal(s.sample(), 0);
   const implicit = setup(); delete implicit.window.DeviceOrientationEvent.requestPermission;
   implicit.elements.tilt.emit('click'); await settle();
+  implicit.tick(2001); implicit.sample();
+  assert.match(implicit.elements['tilt-status'].textContent, /No tilt readings/);
   implicit.orientation(45, 0); implicit.sample(); assert.equal(implicit.mobile.target(), 0);
+  assert.equal(implicit.elements['tilt-status'].textContent, 'Tilt steering on');
   implicit.elements.tilt.emit('click'); implicit.sample(); assert(Number.isNaN(implicit.mobile.target()));
   console.log('web_mobile_controls=ok');
 })().catch(error => { console.error(error); process.exitCode = 1; });

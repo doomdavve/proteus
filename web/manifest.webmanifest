@@ -1,7 +1,33 @@
 {
-  "name": "Wake Velocity", "short_name": "Wake Velocity", "id": "./",
-  "start_url": "./", "scope": "./", "display": "standalone",
-  "background_color": "#101e25", "theme_color": "#101e25",
-  "icons": [{"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
-    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"}]
+  "name": "Wake Velocity",
+  "short_name": "Wake Velocity",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101e25",
+  "theme_color": "#101e25",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "orientation": "any"
 }

@@ -21,7 +21,13 @@ fullscreenOption.disabled = !canFullscreen;
 const screenButton = document.getElementById('screen-button');
 screenButton.hidden = !canFullscreen;
 function enterFullscreen() {
-  if (canFullscreen) stage.requestFullscreen().catch(() => {});
+  if (canFullscreen) {
+    try {
+      const request = document.fullscreenElement
+        ? document.exitFullscreen() : stage.requestFullscreen({ navigationUI: 'hide' });
+      Promise.resolve(request).catch(() => {});
+    } catch (_) {} // Fullscreen refusal leaves touch play available in the tab.
+  }
   canvas.focus();
 }
 screenButton.addEventListener('click', enterFullscreen);
@@ -50,6 +56,13 @@ Module['onRuntimeInitialized'] = () => {
   statusLine.textContent = '';
 };
 
+let viewportSize = {width: 320, height: 200};
+let candidateSize = viewportSize, candidateSince = 0;
+Module['boatViewportSize'] = () => {
+  // Avoid reallocating GPU targets at every animation frame of browser-bar movement.
+  if (performance.now() - candidateSince >= 150) viewportSize = candidateSize;
+  return viewportSize;
+};
 function fitCanvas() {
   const viewport = window.visualViewport;
   stage.style.width = (viewport ? viewport.width : innerWidth) + 'px';
@@ -63,11 +76,22 @@ function fitCanvas() {
     - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   const scale = Math.max(1, Math.floor(Math.min(availableWidth / 320, availableHeight / 200)));
   const mobile = window.matchMedia('(pointer: coarse)').matches;
-  // Mobile fills the visible viewport with controls over the game. Stretch the
-  // presentation instead of cropping the HUD or reserving space for controls.
-  // Desktop retains whole scene-pixel scales for the 320x200 scene.
-  const width = mobile ? (viewport ? viewport.width : innerWidth) : 320 * scale;
-  const height = mobile ? (viewport ? viewport.height : innerHeight) : 200 * scale;
+  const viewportWidth = viewport ? viewport.width : innerWidth;
+  const viewportHeight = viewport ? viewport.height : innerHeight;
+  // Keep at least 320x200 logical pixels so menus and instruments fit naturally.
+  // Cap the long side to bound memory and supersampling cost on mobile GPUs.
+  const aspect = Math.max(1 / 3, Math.min(3, viewportWidth / viewportHeight));
+  const next = mobile ? (aspect >= 1.6
+    ? {width: Math.round(200 * aspect), height: 200}
+    : {width: 320, height: Math.round(320 / aspect)}) : {width: 320, height: 200};
+  if (next.width !== candidateSize.width || next.height !== candidateSize.height) {
+    candidateSize = next;
+    candidateSince = performance.now();
+  }
+  // Preserve proportions even while a resize is settling, and on the fixed-size title.
+  const mobileScale = Math.min(viewportWidth / canvas.width, viewportHeight / canvas.height);
+  const width = mobile ? canvas.width * mobileScale : 320 * scale;
+  const height = mobile ? canvas.height * mobileScale : 200 * scale;
   canvas.style.width = width + 'px';
   canvas.style.height = height + 'px';
 }
@@ -92,12 +116,17 @@ canvas.addEventListener('keydown', event => {
   if (['Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3'].includes(event.key))
     event.preventDefault();
 });
+Module['boatFitCanvas'] = fitCanvas;
 window.addEventListener('resize', fitCanvas);
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitCanvas);
   window.visualViewport.addEventListener('scroll', fitCanvas);
 }
-document.addEventListener('fullscreenchange', fitCanvas);
+document.addEventListener('fullscreenchange', () => {
+  screenButton.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+  Module['boatMobile']['cancel']();
+  fitCanvas();
+});
 Module['onExit'] = code => {
   document.body.classList.remove('playing');
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});

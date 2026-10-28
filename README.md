@@ -859,15 +859,16 @@ URLs, with no service worker; reload to load the deployed version. GitHub's CDN 
 cache the previous HTML after a deployment.
 
 A browser with WebAssembly and WebGL 2 is required. Desktop supports keyboard/mouse;
-mobile supports basic boating with touch controls and optional tilt steering. The canvas uses
-nearest-neighbour scaling in multiples of the 320x200 scene, with a 320x200 minimum.
+mobile supports basic boating with touch controls and optional tilt steering. Desktop uses
+nearest-neighbour scaling in multiples of the 320x200 scene.
+Mobile adapts the scene’s aspect ratio to the viewport without stretching.
 Press **PLAY** to start audio and open the shared Wake Velocity title. The page's small
 **Settings** toggle remembers fullscreen; in-game SETTINGS remembers name, livery, steering,
 soundtrack and smoothing. SMOOTHING defaults to ON and applies the same 4×4 supersampling
 to single-player and multiplayer, including WebRTC rooms. Turn it OFF in SETTINGS on slower
 devices. SINGLE PLAYER selects River, Basin or Basin trial, waves and the same smoothing setting.
-The launcher disappears during play. Desktop uses integer scaling; mobile fills the viewport
-with touch controls overlaid on the scene. Press `?` for controls
+The launcher disappears during play. Desktop uses integer scaling; mobile renders to the
+viewport’s aspect ratio with touch controls overlaid on the scene. Forward is above Reverse. Press `?` for controls
 and Escape for the in-game menu (the browser may also leave fullscreen). BACK TO TITLE
 returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;
 release selects neutral and Shift selects precision power. Scrolling is unassigned. After help or RESUME, click the canvas to recapture. If capture
@@ -878,6 +879,6 @@ can be lost when storage is cleared or unavailable, and do not sync with native 
 Local recording import/export and native screenshot/profiling commands are not exposed by
 the page. On mobile, hold Forward/Reverse for thrust and use left/right buttons or Enable tilt to steer.
 Menu provides reset and return to title. Tilt needs HTTPS and permission; Recenter after rotating.
-Landscape is recommended. For more screen space on iPhone, use Safari’s Share → Add to Home
+For more screen space on iPhone, use Safari’s Share → Add to Home
 Screen → Open as Web App, then launch from its icon. Mobile weapons/replay/text editing are deferred. See [web build details and verification](docs/WEB_BUILD.md)
 for the implementation trade-offs and remaining browser checks.

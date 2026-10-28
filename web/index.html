@@ -44,7 +44,7 @@
     #version { display: block; margin-bottom: 6px; }
     a { color: inherit; text-underline-offset: 3px; }
     #stage { display: none; background: #000; position: fixed; inset: 0; align-items: center; justify-content: center; }
-    body.playing { overflow: hidden; background: #000; }
+    body.playing { overflow: hidden; overscroll-behavior: none; background: #000; }
     body.playing #launcher { display: none; }
     body.playing #stage { display: flex; }
     [hidden] { display: none !important; }
@@ -60,7 +60,7 @@
     #tilt-status { flex-basis: 100%; font-size: 11px; text-shadow: 0 1px 3px #000; }
     .mobile-bottom { position: absolute; bottom: max(8px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
     .mobile-left { left: max(8px, env(safe-area-inset-left)); }
-    .mobile-right { right: max(8px, env(safe-area-inset-right)); }
+    .mobile-right { flex-direction: column-reverse; right: max(8px, env(safe-area-inset-right)); }
     #mobile-controls, #canvas { touch-action: none; user-select: none; -webkit-user-select: none; }
     #iphone-tip { max-width: 52ch; color: #afc2c4; }
     canvas { display: block; image-rendering: pixelated; }
@@ -99,7 +99,7 @@
       <p id="status" role="status">Loading…</p>
       <p id="storage" role="status"></p>
       <p id="iphone-tip" hidden>iPhone: for more screen space, use Safari’s Share → Add to Home Screen
-        → Open as Web App, then launch from its icon. Landscape works best. Tilt is enabled separately after starting.</p>
+        → Open as Web App, then launch from its icon. Tilt is enabled separately after starting.</p>
     </main>
     <footer><span id="version">Version @WEB_VERSION@</span>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> · ODbL</footer>
   </div>
@@ -109,7 +109,7 @@
       <div class="mobile-top">
         <button id="mobile-menu">Menu</button><button id="tilt">Enable tilt</button>
         <button id="recenter" hidden>Recenter</button><button id="screen-button" hidden>Fullscreen</button>
-        <span id="tilt-status" role="status">Touch steering · landscape works best</span>
+        <span id="tilt-status" role="status">Touch steering</span>
       </div>
       <div class="mobile-bottom mobile-left">
         <button data-hold="left" aria-label="Steer left">◀</button>

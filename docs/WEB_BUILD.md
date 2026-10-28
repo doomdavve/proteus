@@ -59,11 +59,14 @@ are unavailable. Tilt requires HTTPS (localhost is suitable for desktop automati
 is requested from its own button, separately from PLAY and audio initialization.
 
 On mobile the game fills the visible viewport, with translucent controls over the scene and
-inside safe areas. The 320×200 scene stretches to the viewport aspect ratio so the HUD stays
-visible without surrounding black space; nearest-neighbour filtering remains. Desktop retains
-whole scene-pixel scales. Browser-bar changes and rotation resize the presentation. Landscape
-is recommended. Fullscreen is feature-detected; supported
-mobile browsers have a retry button. iPhone Safari does not reliably offer element fullscreen:
+inside safe areas. The GPU scene adapts to the viewport aspect ratio, keeping geometry, instruments
+and centred menus proportional in portrait and landscape. The browser uses a low-resolution
+viewport of at least 320×200, bounded to a 3:1 aspect range, and retains nearest-neighbour
+filtering. Browser-bar changes settle for 150 ms before target reallocation, retaining shaders
+and scenery caches. Desktop retains its original 320×200 scene and integer scaling. Forward
+is stacked above Reverse on the right; portrait instruments sit above the bottom steering buttons. Fullscreen is feature-detected; supported
+mobile browsers have a Fullscreen/Exit fullscreen button. Fullscreen requests prefer hidden
+navigation UI and clear held touch input on entry/exit. iPhone Safari does not reliably offer element fullscreen:
 use **Share → Add to Home Screen → Open as Web App**, then launch from its icon for more screen
 space. Relative manifest/icon URLs support repository subpaths. This adds no service worker or
 offline-play promise. See [Apple's instructions](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios)
@@ -74,7 +77,19 @@ Automated checks:
 ```sh
 node tools/test_web_mobile_controls.cjs
 python3 tools/check_web_mobile.py --url http://127.0.0.1:8000/ --output build-web/mobile-review
+python3 tools/check_web_mobile.py --url http://127.0.0.1:8000/ --android --output build-web/android-review
 ```
+
+Android review: Chrome-style orientation access is enabled by the same explicit Tilt button;
+when `requestPermission` is absent, the browser listens directly rather than treating that as
+an error. HTTPS and device sensor/site settings still govern access. Touch controls work if
+sensors are blocked. Pointer capture, cancellation, blur, tab backgrounding and fullscreen
+transitions release held controls. Orientation is not locked. The manifest permits either
+orientation and includes 192px/512px raster icons for Android installation, alongside the SVG
+and iPhone icon. Long-press context menus and page overscroll are suppressed during play.
+See [orientation access](https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Detecting_device_orientation),
+[fullscreen behavior](https://fullscreen.spec.whatwg.org/) and
+[manifest guidance](https://web.dev/articles/add-manifest).
 
 The Node contract test is also registered in native CTest when Node is available. The optional
 Chrome/SwiftShader check drives touch-only setup, simultaneous steering/throttle, simulated
@@ -83,24 +98,33 @@ tilt, menu/reset, portrait resizing and return to title against the actual Wasm 
 steering/throttle commands and leaving the room.
 Physical iPhone tilt permission, steering feel, audio playback, Safari bars and Home Screen behavior
 still require manual review. Automated emulation is not physical-device or user acceptance.
-Verification on 2026-10-28, Apple Silicon/macOS: native Debug build and full CTest preset
-passed against current main (233 enabled tests; 13 retired wake-field checks disabled), as did the Emscripten
-MinSizeRel web package. Chrome/SwiftShader mobile automation passed solo setup, simultaneous
-touches, simulated tilt, reset and return to title; portrait/landscape/menu captures were
-inspected. The matching optional native WebRTC endpoint built; mobile automation joined a
-local basin room, verified nonzero tilt steering and forward thrust in outgoing InputBatch
-commands, and left through the touch menu. Existing desktop mouse-control and title/persistence/repeated-session checks passed.
-The title regression check now accounts for the existing Credits row when returning to the
-launcher. An agent-run native GPU river demo (`--demo --frames 120`) exited cleanly.
-User iPhone review over LAN HTTP found the original integer-scaled mobile scene too small
-with controls around it. Mobile presentation now fills the viewport with overlaid controls;
-physical-device acceptance of this revision is pending. The browser check asserts full-viewport
-canvas bounds and overlaid buttons in both orientations. The revised native build/full CTest
-(233 passed, 13 disabled), web package and mobile browser check pass on macOS; revised
-landscape/portrait/menu captures were inspected.
-The first sandboxed full suite could not open local sockets; the full rerun with socket access
-passed. Next: physical-iPhone/Safari/Home Screen and human steering/audio acceptance; no such
-acceptance is inferred from the automated checks.
+Verification on 2026-10-28, Apple Silicon/macOS: the initial native Debug build and full CTest
+preset passed against current main (233 enabled tests; 13 retired wake-field checks disabled),
+as did the Emscripten MinSizeRel package. Chrome/SwiftShader mobile automation passed solo
+setup, simultaneous touches, simulated tilt, reset and return to title. The matching optional
+native WebRTC endpoint built; local-room automation verified outgoing tilt/throttle commands
+and touch-menu leave. Existing desktop mouse and title/persistence/repeated-session checks
+passed. The title regression check now accounts for the existing Credits row.
+
+The user rejected the original small centred mobile presentation, then accepted landscape
+with controls over the game on iPhone via LAN HTTP. Portrait was reported stretched, and
+Forward above Reverse was requested. The current revision renders to the viewport aspect
+ratio, removes the landscape recommendation and stacks the pedals. Both phone-emulated
+portrait/landscape/menu captures were inspected. The Android-emulated check also passes
+implicit orientation access, default fullscreen launch with a running audio context,
+fullscreen entry/exit, cancellation of a held pedal on exit,
+proportional portrait layout and touch-menu navigation. Android install icons are packaged.
+No physical Android device was available.
+
+The revised native full suite with `PROTEUS_GPU_TESTS=ON` passed (259 enabled tests, 15 retired
+wake-field checks disabled); GPU resize round-trip coverage additionally checks exact frame
+parity after portrait/landscape/default resizing with smoothing off and on. The native GPU
+river demo (`--demo --frames 120`) is an agent-run startup/playback smoke check. Physical-device
+acceptance of the new portrait layout and vertical pedals, real Android/iPhone tilt permissions,
+Home Screen installation, performance and human audio/steering review remain pending.
+Next: collect that physical-device feedback. Automated emulation does not establish hardware
+or user acceptance. The first sandboxed full suite could not open local sockets; rerunning
+with socket access passed.
 
 ## Multiplayer anti-aliasing, 2026-10-27
 
@@ -254,11 +278,12 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
   shader precision. Shader bodies are shared except the disabled native wake sampler; source assets are never overwritten.
   WebGL 2 supports the renderer's depth textures, derivatives, integer operations, and
   texel fetches. Antialiasing is optional because it shades sixteen times as many pixels.
-- **Window:** the browser keeps a fixed 960x600 drawing buffer, containing the 320x200 scene,
-  and scales it to whole scene-pixel multiples. This avoids raylib's web resize handler,
-  which otherwise takes over canvas sizing. The launcher hides before the game starts;
-  the canvas then fits the full viewport. Fullscreen is selected before launch. Escape opens
-  the in-game menu (and may leave fullscreen); title and sessions share the window.
+- **Window:** desktop retains a 960×600 drawing buffer containing a 320×200 scene and
+  whole scene-pixel presentation scales. Mobile gameplay adapts the logical scene and drawing
+  buffer to the visible viewport's aspect ratio; CSS scales it uniformly with nearest-neighbour
+  filtering. The title retains its centred 320×200 layout. Page code owns CSS sizing rather
+  than raylib's web resize handler. Fullscreen can be selected before launch or toggled during
+  mobile play. Escape/Menu opens the shared in-game menu; title and sessions share the window.
 - **Assets:** preload both game XM tracks, the title backdrop, bitmap menu fonts and
   their attribution, textures and used shaders into `/assets`.
   `boat_asset_path()` already resolves that path under Wasm. Geometry is compiled from C

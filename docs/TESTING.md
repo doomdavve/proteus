@@ -61,6 +61,9 @@ a fleet on a surviving owner continues like one restored onto a fresh owner, and
 private river owners (one with an arcade world, so both patch caches build), the harbor and the
 basin. Shared views must reproduce the fresh-view references interleaved, after the first
 owner and its view are destroyed, and over three view recreate cycles with the context alive.
+It also resizes a view through portrait, wide and default targets with smoothing off/on;
+returning to the default target must reproduce the exact original pixels. Invalid dimensions
+must leave the existing renderable targets intact.
 `tile_culling` (`boat_water_review --check-culling`, `gpu`, about 9 s; adventure A2.3)
 renders 144 river poses (512 m and 1 km tiles, six route stops, four headings, default, close
 and overview cameras) culled and unculled, on the GPU with waves and on the CPU on flat water.
