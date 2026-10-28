@@ -4,10 +4,14 @@
 #include "boat_location.h"
 #include "boat_voyage.h"
 
-// North-up chart of a mapped location for solo play: the whole map baked once from its water
-// triangles, then composed with the boat, landmarks and any voyage's shelters, destination and
-// exposed water. Everything is drawn on the CPU into scene-pixel images, which callers upload and
-// composite at scene resolution before integer scaling.
+// North-up nautical chart of a mapped location: the whole map baked once in paper-chart colours
+// (buff land, built-up tint, black coastline, white water with a blue nearshore band) inside a
+// neat line graduated in minutes of latitude and longitude, then composed with the own-ship
+// symbol, landmarks, charted marks and any voyage's anchorages, destination and caution area.
+// Everything is drawn on the CPU into scene-pixel images, which callers upload and composite at
+// scene resolution before integer scaling.
+#define BOAT_MINIMAP_TRIM 3 // Neat line, graduation band and inner line, in pixels.
+
 typedef enum {
     BOAT_MINIMAP_HIDDEN,
     BOAT_MINIMAP_CORNER, // Small overview in the scene's top-right corner, without labels.

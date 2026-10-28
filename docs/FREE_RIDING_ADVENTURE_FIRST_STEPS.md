@@ -2201,7 +2201,15 @@ the ocean, with landmarks as highlighted dots.
   everywhere, default off ("people will learn"), so rooms have it too and it starts hidden.
 - **Result:** the [HUD guide](BOAT_HUD.md#minimap-2026-10-28) owns the layout, markers,
   captures and limitations. The voyage's shelters, destination and exposed water come from
-  its route; the crane, ferry and bridge are a fixed landmark table in the crane-origin frame.
+  its route; the crane, fort, ferry, bridge and channel marks are fixed tables in the
+  crane-origin frame.
+- **Nautical chart review (2026-10-28):** the user, "sold on the current solution", asked for a
+  review as a nautical chart engineer so that it feels nautical while meshing with the game. The
+  chart now uses paper-chart colours (with built-up tint), a black coastline and blue
+  distance-from-shore water tints. The neat line is graduated in minutes and the scale bar is in
+  nautical miles. The boat is drawn as the ECDIS own ship, the bridge carries its clearance, the
+  outer dressing's eight IALA A marks are charted with light flares, the voyage is overprinted in
+  magenta, and areas outside the survey are hatched. Details are in the HUD guide.
 - **Verification (2026-10-28, macOS arm64, Debug):** see the HUD guide; no human play or user
   acceptance yet.
 

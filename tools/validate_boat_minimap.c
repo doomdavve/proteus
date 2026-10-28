@@ -1,7 +1,7 @@
 /* Solo minimap: mapped locations bake a chart and the basin has none; both layers fit their
  * screen areas; every voyage shelter and the destination project onto water pixels inside the
- * frame while the inland ground does not; composing marks the boat, destination and exposed
- * water without touching the trim; and the N cycle runs corner, chart, hidden.
+ * frame while the inland ground does not; composing marks the own ship and destination without
+ * touching the neat line; and the N cycle runs corner, chart, hidden.
  *
  * Review: --screenshot FILE [--mode corner|chart] [--location river|outer]
  * [--background SCENE.png] [--at X,Z,HEADING] [--shelter N] [--scale N] writes one composition,
@@ -23,6 +23,9 @@
 #define WIDTH 320
 #define HEIGHT 200
 #define INSTRUMENTS_TOP (HEIGHT - 46)
+#define TRIM BOAT_MINIMAP_TRIM
+#define INK ((Color) { 30, 32, 36, 255 })
+#define CHART_MAGENTA ((Color) { 172, 34, 132, 255 })
 
 static Color pixel(const Image *image, Vector2 p)
 {
@@ -31,8 +34,9 @@ static Color pixel(const Image *image, Vector2 p)
 
 static bool same(Color a, Color b) { return a.r == b.r && a.g == b.g && a.b == b.b; }
 
-// Water pixels are bluer than they are green; land, shore and trim are not.
-static bool watery(Color c) { return c.b > c.g; }
+// Chart water is white or blue-tinted; buff land, built-up land and the black coastline are
+// distinctly redder than blue.
+static bool watery(Color c) { return c.r > 100 && c.r < c.b + 40; }
 
 static bool contains(Rectangle outer, Rectangle inner)
 {
@@ -134,16 +138,16 @@ int main(int argc, char **argv)
             const BoatMinimapLayer *layer = &minimap.layers[mode];
             // The spawn lies in water; inland Hisingen, north of the crane, does not.
             Vector2 spawn = boat_minimap_project(&minimap, mode, location->spawn);
-            CHECK(watery(pixel(&layer->base, (Vector2) { spawn.x - 2, spawn.y - 2 })));
+            CHECK(watery(pixel(&layer->base, (Vector2) { spawn.x - TRIM, spawn.y - TRIM })));
             Vector2 inland = boat_minimap_project(&minimap, mode, (Vector2) { 0, 700 });
-            CHECK(!watery(pixel(&layer->base, (Vector2) { inland.x - 2, inland.y - 2 })));
+            CHECK(!watery(pixel(&layer->base, (Vector2) { inland.x - TRIM, inland.y - TRIM })));
             if (location->voyage) {
                 const BoatVoyageRoute *route = location->voyage;
                 for (unsigned i = 0; i < route->shelter_count; ++i) {
                     Vector2 p = boat_minimap_project(&minimap, mode, route->shelters[i].position);
-                    CHECK(p.x >= 2 && p.y >= 2 && p.x < layer->frame.width - 2
-                        && p.y < layer->frame.height - 2);
-                    CHECK(watery(pixel(&layer->base, (Vector2) { p.x - 2, p.y - 2 })));
+                    CHECK(p.x >= TRIM && p.y >= TRIM && p.x < layer->frame.width - TRIM
+                        && p.y < layer->frame.height - TRIM);
+                    CHECK(watery(pixel(&layer->base, (Vector2) { p.x - TRIM, p.y - TRIM })));
                 }
             }
         }
@@ -158,18 +162,21 @@ int main(int argc, char **argv)
             // Marks never cover the trim.
             for (int y = 0; y < frame->height; ++y)
                 for (int x = 0; x < frame->width; ++x)
-                    if (x < 2 || y < 2 || x >= frame->width - 2 || y >= frame->height - 2)
+                    if (x < TRIM || y < TRIM || x >= frame->width - TRIM
+                        || y >= frame->height - TRIM)
                         CHECK(same(pixel(frame, (Vector2) { (float)x, (float)y }),
                             pixel(&trim, (Vector2) { (float)x, (float)y })));
             UnloadImage(trim);
-            // The boat is white; heading 0 points south, down the frame.
+            // The own-ship ring is ink; heading 0 points south, so its heading line runs down
+            // the frame past the ring.
             Vector2 boat = boat_minimap_project(&minimap, mode, location->spawn);
-            CHECK(same(pixel(frame, boat), WHITE));
-            CHECK(same(pixel(frame, (Vector2) { boat.x, boat.y + 2 }), WHITE));
+            CHECK(same(pixel(frame, boat), INK));
+            CHECK(same(pixel(frame, (Vector2) { boat.x, boat.y + 4 }), INK));
+            CHECK(!same(pixel(frame, (Vector2) { boat.x + 4, boat.y + 4 }), INK));
             if (location->voyage) {
                 const BoatVoyageRoute *route = location->voyage;
                 Vector2 goal = boat_minimap_project(&minimap, mode, route->arrival_centre);
-                CHECK(same(pixel(frame, goal), ((Color) { 233, 180, 104, 255 })));
+                CHECK(same(pixel(frame, goal), CHART_MAGENTA));
             }
         }
         boat_minimap_destroy(&minimap);

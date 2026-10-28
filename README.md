@@ -450,12 +450,16 @@ voyage. `--start X,Z[,DEGREES]` places the boat anywhere in a
 mapped location (simulation X/Z; heading 0 faces -Z), for example
 `--location outer --start 1980,-1196,75` on the open leg of the route.
 
-Every mapped location (`river`, `outer`, solo or in a room) has a north-up map of the whole
-map: water, shoreline, the boat as a white wedge pointing its heading, and the Eriksberg crane,
-the docked ferry and Älvsborgsbron as small dots. On the solo `outer` voyage it also marks the
-shelters (the current recovery point filled), Långedrag's harbour in amber and the exposed
-water as a dashed amber circle. It starts hidden; `N` cycles a corner map, a larger labelled
-chart with a 1 km scale bar, and off ([HUD guide](docs/BOAT_HUD.md#minimap-2026-10-28)).
+Every mapped location (`river`, `outer`, solo or in a room) has a north-up nautical chart of
+the whole map, drawn in paper-chart style. Land is buff, with built-up areas darker; there is a
+black coastline. Water is white, with blue tints near the shore (distance from shore, not
+depth). The frame is graduated in minutes of latitude and longitude, and there is a scale in
+nautical miles. Your boat is the ECDIS own-ship symbol (two rings with a heading line). The
+chart also shows the Eriksberg crane, Nya Älvsborg, the docked ferry, Älvsborgsbron with its
+45 m clearance, and the outer map's red/green channel marks and lights. On the solo `outer`
+voyage it overprints in magenta: shelters as anchorages, Långedrag as a waypoint and the exposed
+water as a dashed caution limit. It starts hidden; `N` cycles a corner map, a larger labelled
+chart, and off ([HUD guide](docs/BOAT_HUD.md#minimap-2026-10-28)).
 
 `--location river` is a 2,450 × 2,400 m waterfront with an Älvsborgsbron blockout. Start in the
 dock, leave it, and follow the river southwest to sail under the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy
