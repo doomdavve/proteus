@@ -947,7 +947,9 @@ its upper clamp. Follow-up verification on macOS/Apple Silicon, Debug: build pas
 240-frame windowed raylib key-event check passed at 8×, including repeated faster input at
 the limit, normal-time restore, ignored menu keys and practice reset; the 8× indicator capture
 was inspected. The final production binary completed the 180-frame river/waves demo again.
-Next task: human review of handling/performance at 8× and binding convenience. The reported
-4× playtest does not establish acceptance of 8×. Known limits: fast-forward increases physics CPU work; audio plays at its normal rate,
-and the existing stall clamp still discards real time above 0.1 s per frame. Browser/Windows
-verification and human acceptance of 8× are pending.
+User acceptance, 2026-10-28: after trying the 8× extension, the user reported “Works great!”
+The time-control feature is play-tested and accepted; specific locations, input devices and
+audio scenarios were not reported. Next task: integrate the PR after CI checks; additional
+platform qualification remains separate. Known limits: fast-forward increases physics CPU
+work; audio plays at its normal rate, and the existing stall clamp still discards real time
+above 0.1 s per frame. Browser/Windows verification remains pending.
