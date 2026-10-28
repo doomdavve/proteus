@@ -6,7 +6,8 @@ Implemented in the isolated `web-parity` worktree, 2026-10-25: the browser enter
 Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER opens PLACE (River, Basin,
 Basin trial), WAVES, SMOOTHING and START. SETTINGS remembers name, single-player boat livery,
 steering, soundtrack and smoothing. The saved smoothing setting applies to single-player and
-multiplayer. Escape opens the shared in-game menu; BACK TO TITLE returns to setup
+multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
+but the browser may leave fullscreen. BACK TO TITLE returns to setup
 without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The small HTML launcher
 retains fullscreen selection, remembered separately in browser storage. Gameplay/title settings
 use the native `title.txt` format through the existing IndexedDB mount; older saves get the new
@@ -317,7 +318,8 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
   buffer to the visible viewport's aspect ratio; CSS scales it uniformly with nearest-neighbour
   filtering. The title retains its centred 320×200 layout. Page code owns CSS sizing rather
   than raylib's web resize handler. Fullscreen can be selected before launch or toggled during
-  mobile play. Escape/Menu opens the shared in-game menu; title and sessions share the window.
+  mobile play. P/Escape or the mobile Menu button opens the shared in-game menu
+  (P preserves fullscreen); title and sessions share the window.
 - **Assets:** preload both game XM tracks, the title backdrop, bitmap menu fonts and
   their attribution, textures and used shaders into `/assets`.
   `boat_asset_path()` already resolves that path under Wasm. Geometry is compiled from C
