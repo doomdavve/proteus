@@ -62,11 +62,15 @@ def main():
         (assets / "geometry" / name).mkdir(parents=True)
         for file in ("manifest.json", "scenery.bin"):
             shutil.copy2(root / "assets/geometry" / name / file, assets / "geometry" / name)
+    # The reference Lua voyage plugin (--plugin); authors copy it somewhere writable to edit.
+    shutil.copytree(root / "plugins/langedrag", assets / "plugins/langedrag")
     shutil.copy2(raylib / "LICENSE", resources / "raylib-LICENSE.txt")
     shutil.copy2(raylib / "src/external/glfw/LICENSE.md", resources / "glfw-LICENSE.md")
     shutil.copy2(root / "third_party/jsmn/LICENSE", resources / "jsmn-LICENSE.txt")
     # wake_velocity links ENet for --connect (multiplayer M3).
     shutil.copy2(build / "_deps/enet-src/LICENSE", resources / "enet-LICENSE.txt")
+    # wake_velocity links Lua 5.4 for --plugin; CMake extracts its notice from lua.h.
+    shutil.copy2(build / "lua-LICENSE.txt", resources / "lua-LICENSE.txt")
     (resources / "build.txt").write_text(
         f"Version: {args.version}\nCommit: {commit}\n"
         f"Uncommitted changes: {dirty}\nArchitecture: {architectures}\n"

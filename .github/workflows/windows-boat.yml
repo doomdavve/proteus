@@ -74,6 +74,9 @@ jobs:
             Copy-Item "assets/geometry/$map/manifest.json" "$package/assets/geometry/$map"
             Copy-Item "assets/geometry/$map/scenery.bin" "$package/assets/geometry/$map"
           }
+          # The reference Lua voyage plugin (--plugin assets/plugins/langedrag), copied to edit.
+          New-Item -ItemType Directory -Force -Path "$package/assets/plugins" | Out-Null
+          Copy-Item plugins/langedrag "$package/assets/plugins/langedrag" -Recurse
           Copy-Item tools/windows/launch.bat $package
           Copy-Item tools/windows/host.bat $package
           Copy-Item tools/windows/README.txt $package
@@ -81,6 +84,7 @@ jobs:
           Copy-Item build-win/_deps/raylib-src/src/external/glfw/LICENSE.md "$package/glfw-LICENSE.md"
           Copy-Item build-win/_deps/enet-src/LICENSE "$package/enet-LICENSE.txt"
           Copy-Item third_party/jsmn/LICENSE "$package/jsmn-LICENSE.txt"
+          Copy-Item build-win/lua-LICENSE.txt "$package/lua-LICENSE.txt"
           Copy-Item "$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/share/curl/copyright" "$package/curl-LICENSE.txt"
           Set-Content -Path "$package/build.txt" -Value "Version: $env:PACKAGE_VERSION`nCommit: $env:GITHUB_SHA" -Encoding utf8
 
@@ -91,6 +95,9 @@ jobs:
           try {
             & $exe --renderer cpu --location river --time 3 --screenshot boat-portable.png
             if ($LASTEXITCODE -ne 0) { throw "Relocated Wake Velocity failed: $LASTEXITCODE" }
+            $plugin = Join-Path (Split-Path $exe) assets/plugins/langedrag
+            & $exe --renderer cpu --plugin $plugin --time 3 --screenshot boat-plugin.png
+            if ($LASTEXITCODE -ne 0) { throw "Packaged voyage plugin failed: $LASTEXITCODE" }
             & $exe --serve --scripted --ticks 240
             if ($LASTEXITCODE -ne 0) { throw "Relocated boat server failed: $LASTEXITCODE" }
             foreach ($fontAsset in @("m5x7.fnt", "m5x7.png", "m3x6.fnt", "m3x6.png")) {

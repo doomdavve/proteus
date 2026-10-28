@@ -1715,6 +1715,9 @@ Branch `adventure-a3-4`, cut from `adventure-a3-2` after the A3.3 commit was reb
 - **Voyage (core):** [`src/boat_voyage.[ch]`](../src/boat_voyage.h) holds a pointer-free
   `BoatVoyage` and the authored `boat_voyage_outer` route, which `BoatWorldDefinition.voyage`
   attaches to `outer` only. `BoatSession` observes it after every step; it never moves the boat.
+  *Later (Lua plugin P1, 2026-10-28):* this compiled route stays the default and parity
+  reference; `BoatSession.voyage_route` lets a native solo session begin a plugin-owned route
+  instead ([plugin API](PLUGIN_API.md#playing-and-live-authoring-p1)).
   `boat_session_recover` puts a reset boat at the latest shelter and keeps the clock, water and
   progress. Coordinates are simulation X = -east, Z = north:
   - **Shelters:** DOCK (the spawn), BRIDGE (650, -850; the river past Älvsborgsbron), EAST SHORE

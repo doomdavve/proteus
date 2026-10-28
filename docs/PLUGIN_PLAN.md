@@ -1,17 +1,21 @@
 # Lua gameplay plugins and live authoring
 
-Status, 2026-10-28: **P0 implemented: a bounded, headless Lua descriptor loader decodes the
-Långedrag voyage to owned native data identical to the compiled route. The game does not load
-plugins; there is no hot reload, behavioral API or in-game agent yet.** The agreed direction is
+Status, 2026-10-28: **P0 and P1 implemented. A bounded Lua descriptor loader decodes the
+Långedrag voyage identically to the compiled route. Native solo `outer` sessions can take it
+from a plugin (`--plugin`), reload on save or F5, undo, and apply route or water changes with
+an explicit restart. No human has authored with it yet; there is no behavioral API or in-game
+agent.** The agreed direction is
 embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering
 and networking. Hot reload is a requirement of the first playable slice. This document owns the
 plugin boundary, authoring workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract; the existing gameplay plans continue to own their features and
 acceptance. [All plans](README.md).
 
-Completed task: **P0**, see the [P0 result](#p0-result-2026-10-28). It pins Lua 5.4.9, adds the
-restricted loader and voyage decoder, the reference package and the `boat_plugin` CTest cases,
-and passes a Wasm/Node preflight. **Next task: P1, live Långedrag authoring.** The milestones
+Completed task: **P1**, see the [P1 result](#p1-result-2026-10-28). It adds the session route
+seam, the revision host with reload policies and Undo, the `--plugin` launch option with save
+polling, F5/F6/F7 and an authoring panel, and native packaging of the plugin and Lua's notice.
+P0 is recorded in the [P0 result](#p0-result-2026-10-28). **Next: human authoring acceptance of
+P1** (edit, reload and recover in a real session), then **P2, river course authoring**. The milestones
 below are this plan's P0–P6, independent of similarly named foundation tasks. The planning
 change's existing-C build/test evidence and limitations are recorded at the end.
 
@@ -559,7 +563,11 @@ Instruction budgets do not bound C library work; the omitted functions are the m
 This is not hostile-code containment. No visual, audio or manual check applies to this
 headless step.
 
-### P1 — Långedrag live authoring (next)
+After merge (PR #48), the user play-tested the native game on 2026-10-28 and confirmed the
+voyage still works. P0 does not change gameplay, so this was a no-regression check, not
+acceptance of plugin authoring.
+
+### P1 — Långedrag live authoring (implemented 2026-10-28)
 
 **Deliverable:** run solo `outer` with the Lua-authored current voyage; edit, reload and undo
 without rebuilding C. Preserve existing C arrival/recovery/exposure behavior.
@@ -594,6 +602,101 @@ The example ships in native/web asset packaging as appropriate, with plugin mode
 rooms and legacy recording modes until their compatibility work exists. Update the adventure
 owner's description of where route data lives, launch/control guides and the index. First
 human authoring acceptance is a separate recorded result, not inferred from screenshots.
+
+#### P1 result, 2026-10-28
+
+Implemented on branch `plugin-p1`, cut from `main` at `3de5035` (P0 merged). The contract,
+keys and policy table are in [the plugin API](PLUGIN_API.md#playing-and-live-authoring-p1).
+
+- **Session seam:** `BoatSession.voyage_route` is the route that init and restarts begin. It
+  defaults to the definition's compiled `boat_voyage_outer`; `boat_location` is untouched.
+  `boat_session_rebind_voyage` swaps the borrowed route and keeps progress.
+  `boat_session_restart_voyage` begins a route at the current time. It uses the new
+  `boat_voyage_restart`, which keeps the weather already met (`observed`, `weather`,
+  `weather_started`), so the physical water does not change under a voyage restart.
+- **Host:** `src/boat_plugin_host.[ch]` (in `proteus_plugins`, no I/O or clock) owns revisions in
+  fixed slots: the active one, eight for Undo and one held candidate. Staging is load, then the
+  map check, then `boat_plugin_classify`. The map check (`boat_plugin_check_location`, moved from
+  the P0 validator) takes the session's location and compiled water. A commit is refused if its
+  base revision is no longer active. Strings are copied into native storage before the Lua
+  state closes (P0), and a slot is reused only after the session was rebound away from it.
+- **Policies:** comments/layout only is unchanged; names only applies at once. Ordered IDs,
+  shelter geometry, arrival or `exposed_fraction` restart the voyage on F7. `exposure` or
+  `weather_range` restart the session on F7, through the game's existing full-restart path. A
+  different id/kind/location/API is refused. Every restart begins at shelter 0, so no old index
+  survives a changed route.
+- **Game:** `--plugin DIR` (native only), implemented in `tools/wake_velocity_plugin.[ch]`. It
+  selects the manifest's location and is refused with rooms, `--course`, `--replay` and
+  `--ghost`. Saves are polled every 0.25 s and staged once they have been unchanged for 0.3 s.
+  The keys are F5 reload, F6 undo/discard and F7 apply. A bottom-left panel shows the revision
+  and the outcome, which is also printed to stderr. Definitions change in the frame loop before
+  that frame's ticks, never inside `timed_boat_step`, so source and wake order are unchanged. At
+  launch the plugin route is installed at tick 0, before the screenshot drive or the first
+  windowed tick. Both paths therefore activate it in the same order without moving it into
+  `wake_velocity_drive`. The browser game does not link the plugin host.
+- **Packaging:** configure extracts Lua's notice from `lua.h` to `build/lua-LICENSE.txt`. The
+  macOS app and Windows zip ship it beside the other notices, with the reference package at
+  `assets/plugins/langedrag`. The Windows workflow renders a frame from the packaged plugin in
+  its relocated-executable check. `CMP0156` is set so that Apple's linker does not see
+  `proteus_json` twice.
+- **Decisions made at this gate:**
+  - F5/F6/F7 rather than one key, so that a restart is never one keypress away from a reload.
+  - An incompatible save is held, not applied, even with polling.
+  - Undo holds revisions, not source text; there is no Redo.
+  - The browser has no plugin mode until P4's import.
+  - The first shelter must still be the location's spawn.
+
+Verification, 2026-10-28, M1 Max/macOS 26.6.2, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- `cmake --build build -j` built with no project warnings. `ctest --preset full` passed
+  **264/264 active tests** in 13.6 s, with 13 retired wake-field tests disabled. That includes
+  the eleven new `boat_plugin_session.*` cases, the five new `wake_velocity_plugin_*` launch
+  tests, `boat_voyage`, `test_time` and both boundary checks.
+- `validate_boat_plugin_session` (`tools/validate_boat_plugin_session.c`):
+  - `compiled_parity` drives a compiled and a plugin session with identical inputs from the
+    fjord turn through the exposed flank to Långedrag, with a forced recovery. Over 15 505 ticks
+    the boat, storm and every voyage field (arrival 129.21 s, 3 298 exposed ticks, recovery,
+    events) are equal at every tick. It is labelled slow at about 0.19 s.
+  - The other ten cases are quick and take about 37 ms together:
+    - classification of sixteen edits and an identical copy;
+    - the location check, with field paths for a moved start, a shelter ashore and an arrival
+      against the harbour edge;
+    - a rename keeping progress and weather;
+    - voyage restarts inside a shelter, while exposed, after arrival, and when the route loses
+      a shelter the boat had reached;
+    - a session restart;
+    - five broken stages that leave the active revision byte-identical and leak nothing;
+    - Undo/Discard and 24 revisions over the eight-deep history, never writing the borrowed slot;
+    - the save poller on a virtual clock;
+    - 96 reload cycles;
+    - `game_controls`, which runs the game's F5/F6/F7/polling glue on files in a build-tree
+      scratch directory.
+- Frames: CPU and GPU `--screenshot --time 3` at `outer` with `--plugin plugins/langedrag`
+  are byte-identical to `--location outer` (CPU also from the packaged app). An edited exposure
+  (moved, 3 m, `weather_range = 0`) renders rain, a dark sky and rough water at the same
+  `--start` where the compiled route is calm, so authored data reaches the renderer.
+- **Windowed agent run:** a 1 500-frame GPU window on a scratch copy of the package, edited by a
+  script while it ran:
+  - a rename applied at once (R2, progress kept);
+  - `radius = 0` was refused with `voyage.arrival.radius` and R2 kept;
+  - a fixed save with a new arrival radius was held for F7;
+  - a truncated file was refused with `main.lua:2` and R2 kept;
+  - restoring the reference applied as a rename.
+
+  In-game captures (a temporary capture hook, not committed) showed the panel's two lines
+  legible at 960x600 for each state. No keys were pressed, so the F5–F7 paths were exercised
+  only by `game_controls`, not in a window. The boat was not driven.
+- Packaging: `tools/macos/package.py --version p1-check` built a signed scratch app containing
+  `lua-LICENSE.txt` and `assets/plugins/langedrag`. Its executable loaded the bundled plugin from
+  another directory. A MinSizeRel Emscripten 6.0.12 build of `wake_velocity` succeeded, with no
+  plugin host linked.
+
+Limits: no human has played or authored with P1 yet, and that acceptance is owed: edit, reload,
+drive and recover with real keys. Rooms, the course/replays, recordings and the browser keep
+the compiled voyage. Windows and Linux are left to CI, including the packaged-plugin frame on
+Windows. Polling reads both files (at most 68 KiB) every 0.25 s; that cost was not measured
+separately. Undo does not restore the files on disk, and F5 after Undo stages the files
+again.
 
 ### P2 — river course authoring through the same path
 

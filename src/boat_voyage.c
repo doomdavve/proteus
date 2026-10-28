@@ -36,6 +36,15 @@ void boat_voyage_start(BoatVoyage *voyage, const BoatVoyageRoute *route, double 
     *voyage = (BoatVoyage) { .route = route, .started = time, .event_time = time };
 }
 
+void boat_voyage_restart(BoatVoyage *voyage, const BoatVoyageRoute *route, double time)
+{
+    BoatVoyage previous = *voyage;
+    boat_voyage_start(voyage, route, time);
+    voyage->observed = previous.observed;
+    voyage->weather = previous.weather;
+    voyage->weather_started = previous.weather_started;
+}
+
 void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, double time)
 {
     const BoatVoyageRoute *route = voyage->route;

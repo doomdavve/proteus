@@ -378,3 +378,78 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
     *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
     return BOAT_PLUGIN_OK;
 }
+
+// Staging -------------------------------------------------------------------------------------
+
+static bool same_point(Vector2 a, Vector2 b) { return a.x == b.x && a.y == b.y; }
+
+BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    const char *file = voyage->manifest.entry;
+    if (strcmp(voyage->manifest.location, location->name) != 0)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "is \"%s\"; this session is at \"%s\"", voyage->manifest.location, location->name);
+    const BoatVoyageRoute *route = &voyage->route;
+    if (!same_point(route->shelters[0].position, location->spawn))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "voyage.shelters[1]",
+            "must be the location's start, x = %g, z = %g", location->spawn.x, location->spawn.y);
+    // Room for the hull at a shelter, and more for arriving and turning in the harbour.
+    for (unsigned i = 0; i < route->shelter_count; ++i)
+        if (!boat_map_water(map, route->shelters[i].position, 8)) {
+            char at[32];
+            snprintf(at, sizeof(at), "voyage.shelters[%u]", i + 1);
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, at,
+                "is not open water of the %s map with 8 m clear", location->name);
+        }
+    if (!boat_map_water(map, route->arrival_centre, 20))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "voyage.arrival",
+            "is not open water of the %s map with 20 m clear", location->name);
+    BoatPluginCost cost = d->cost;
+    *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
+    return BOAT_PLUGIN_OK;
+}
+
+const char *boat_plugin_change_name(BoatPluginChange change)
+{
+    static const char *const names[]
+        = { "unchanged", "renamed", "restart voyage", "restart session", "incompatible" };
+    return (unsigned)change < sizeof(names) / sizeof(names[0]) ? names[change] : "unknown";
+}
+
+static bool same_storm(BoatStorm a, BoatStorm b)
+{
+    return same_point(a.centre, b.centre) && same_point(a.velocity, b.velocity)
+        && a.radius == b.radius && a.height == b.height && a.started == b.started
+        && a.build == b.build;
+}
+
+BoatPluginChange boat_plugin_classify(
+    const BoatPluginVoyage *active, const BoatPluginVoyage *candidate)
+{
+    const BoatPluginManifest *m = &active->manifest, *n = &candidate->manifest;
+    if (strcmp(m->id, n->id) || strcmp(m->kind, n->kind) || strcmp(m->location, n->location)
+        || m->api != n->api || m->state_version != n->state_version)
+        return BOAT_PLUGIN_INCOMPATIBLE;
+    const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
+    if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
+        return BOAT_PLUGIN_RESTART_SESSION;
+    bool same = a->shelter_count == b->shelter_count
+        && same_point(a->arrival_centre, b->arrival_centre)
+        && a->arrival_radius == b->arrival_radius && a->arrival_speed == b->arrival_speed
+        && a->exposed_fraction == b->exposed_fraction;
+    for (unsigned i = 0; same && i < a->shelter_count; ++i) {
+        const BoatVoyageShelter *s = &a->shelters[i], *t = &b->shelters[i];
+        same = !strcmp(active->shelter_ids[i], candidate->shelter_ids[i])
+            && same_point(s->position, t->position) && s->heading == t->heading
+            && s->radius == t->radius;
+    }
+    if (!same)
+        return BOAT_PLUGIN_RESTART_VOYAGE;
+    bool renamed = strcmp(m->name, n->name) != 0;
+    for (unsigned i = 0; i < a->shelter_count; ++i)
+        renamed |= strcmp(active->shelter_names[i], candidate->shelter_names[i]) != 0;
+    return renamed ? BOAT_PLUGIN_RENAMED : BOAT_PLUGIN_UNCHANGED;
+}

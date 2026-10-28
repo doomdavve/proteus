@@ -18,6 +18,9 @@
 #include "boat_voyage_view.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
+#ifdef PROTEUS_BOAT_PLUGINS
+#include "wake_velocity_plugin.h"
+#endif
 #ifdef PROTEUS_BOAT_NET
 #include "boat_server.h"
 #if !defined(__EMSCRIPTEN__)
@@ -106,6 +109,8 @@ static void usage(void)
         "  adds the baked run to Langedrag: a destination cue, rough exposed water in the outer\n"
         "  fjord, and hold Backspace 1 s to return to the last shelter reached)\n"
         "--start X,Z[,DEGREES]: place the boat in a mapped location (simulation X/Z, heading)\n"
+        "--plugin DIR: solo voyage from a Lua plugin, e.g. plugins/langedrag (native)\n"
+        "  Saves reload | F5: reload | F6: undo | F7: apply a held restart\n"
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"
@@ -185,7 +190,7 @@ static BoatWater study_water(
 }
 
 static void draw_help(
-    bool course, bool voyage, bool minimap, bool deathmatch, bool race, bool networked)
+    bool course, bool voyage, bool minimap, bool deathmatch, bool race, bool networked, bool plugin)
 {
     int width = GetScreenWidth(), height = GetScreenHeight();
     const char *lines[] = {
@@ -200,6 +205,7 @@ static void draw_help(
         "Release thrust keys: neutral / coast",
         "Hold Shift: low-power maneuvering",
         voyage ? "Hold Backspace 1 s: back to last shelter" : "Hold Backspace 1 s: reset / restart",
+        plugin ? "F5: reload plugin | F6: undo | F7: apply" : "",
         deathmatch ? "Space: water | E: stern wave | Q: torpedo | Tab: scores"
             : race ? "Hold Tab: race standings"
                    : "",
@@ -327,6 +333,7 @@ static int study(int argc, char **argv)
     bool start_set = false;
     Vector3 start = { 0 }; // --start: simulation X, Z and heading in degrees.
     long host_port = 0; // --port: the hosted room's UDP port.
+    const char *plugin_path = NULL; // --plugin: the solo voyage's Lua package.
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
 #endif
@@ -419,6 +426,8 @@ static int study(int argc, char **argv)
                 goto invalid;
             start = (Vector3) { values[0], values[1], values[2] };
             start_set = true;
+        } else if (strcmp(argv[i], "--plugin") == 0 && i + 1 < argc) {
+            plugin_path = argv[++i];
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -549,6 +558,28 @@ static int study(int argc, char **argv)
     }
     if ((!course && (data_dir || export_path)) || (replay_path && ghost_path))
         goto invalid;
+    if (plugin_path) {
+#ifdef PROTEUS_BOAT_PLUGINS
+        // Rooms and course recordings keep compiled definitions until they can carry revisions.
+        if (connect_to || course || replay_path || ghost_path) {
+            fprintf(stderr,
+                "--plugin is solo free boating; it cannot join or host a room or use the "
+                "course, replay or ghost.\n");
+            goto invalid;
+        }
+        const BoatWorldDefinition *named = wake_plugin_location(plugin_path);
+        if (!named)
+            return 1;
+        if (location_set && named != location) {
+            fprintf(stderr, "--plugin %s belongs to --location %s.\n", plugin_path, named->name);
+            goto invalid;
+        }
+        location = named;
+#else
+        fprintf(stderr, "--plugin is only available in native builds.\n");
+        goto invalid;
+#endif
+    }
     if (start_set && (!location->mapped || course || replay_path || ghost_path || connect_to)) {
         fprintf(stderr, "--start places the boat in a mapped location's free boating.\n");
         goto invalid;
@@ -683,6 +714,12 @@ static int study(int argc, char **argv)
     if (objects)
         object_study_reset(objects, &session, object_crossing, object_life, object_height);
     int result = 1;
+#ifdef PROTEUS_BOAT_PLUGINS
+    // Owns the revisions the session borrows, so it outlives the session (static, like WORLDS).
+    static WakePlugin plugin;
+    if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, GetTime()))
+        goto cleanup;
+#endif
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };
 #ifdef PROTEUS_BOAT_NET
 #if !defined(__EMSCRIPTEN__)
@@ -1185,6 +1222,13 @@ static int study(int argc, char **argv)
             += (float)((boat_profile_time(true) - course_input_started_at) * 1000.0);
         reset_requested |= boat_reset_hold_update(
             &reset_hold, IsKeyDown(KEY_BACKSPACE), active && !session.runs.playing, GetFrameTime());
+        // A plugin revision changes between this frame's ticks; a new exposure restarts below.
+        bool plugin_restart = false;
+#ifdef PROTEUS_BOAT_PLUGINS
+        if (plugin_path)
+            plugin_restart = wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
+                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), GetTime());
+#endif
         if (reset_requested) {
             thrust_target = 0;
             mouse_wheel = 0;
@@ -1217,12 +1261,12 @@ static int study(int argc, char **argv)
                 mouse_wheel = 0;
             }
 #endif
-        } else if (reset_requested && session.voyage.route) {
+        } else if (reset_requested && session.voyage.route && !plugin_restart) {
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
             boat_session_recover(&session);
             accumulator = 0;
-        } else if (reset_requested) {
+        } else if (reset_requested || plugin_restart) {
             thrust_target = 0;
             boat_session_restart(
                 &session, study_water(location, waves, current, crossing_wake, player_wake));
@@ -1475,6 +1519,10 @@ static int study(int argc, char **argv)
         boat_course_hud(&view->course, view->boat.position, GetScreenWidth());
         if (!networked)
             boat_voyage_hud(&session.voyage, &session.boat, live_view.time, GetScreenWidth());
+#ifdef PROTEUS_BOAT_PLUGINS
+        if (plugin_path)
+            wake_plugin_draw(&plugin, 12, (int)destination.y + (height - 48) * scale - 20);
+#endif
         if (notice)
             boat_ui_text(notice, 12, 36, 20, ORANGE);
         else if (view->boat.motion_state == BOAT_CAPSIZED)
@@ -1521,7 +1569,7 @@ static int study(int argc, char **argv)
             race = networked && net_study_race(net);
 #endif
             draw_help(course, !networked && session.voyage.route, boat_minimap_ready(&minimap),
-                deathmatch, race, networked);
+                deathmatch, race, networked, plugin_path != NULL);
         }
         frame_pacer_wait(&pacer);
         EndDrawing();

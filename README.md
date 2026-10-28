@@ -462,6 +462,15 @@ voyage. `--start X,Z[,DEGREES]` places the boat anywhere in a
 mapped location (simulation X/Z; heading 0 faces -Z), for example
 `--location outer --start 1980,-1196,75` on the open leg of the route.
 
+The voyage can also come from a Lua plugin you edit while playing (native builds,
+[plugin API](docs/PLUGIN_API.md#playing-and-live-authoring-p1)):
+`./build/wake_velocity --plugin plugins/langedrag` starts at `outer` with the same route. Saving
+`plugins/langedrag/main.lua` reloads it. Renamed shelters apply at once and keep your progress;
+a moved shelter or arrival waits for F7, which restarts the voyage, and a changed squall waits
+for F7 to restart the session. F5 reloads now and F6 undoes or discards. A broken save is
+reported with its file, line or field, and the running voyage stays. Packaged builds include
+the plugin under `assets/plugins/langedrag`; copy it somewhere writable to edit it.
+
 Every mapped location (`river`, `outer`, solo or in a room) has a north-up nautical chart of
 the whole map, drawn in paper-chart style. Land is buff, with built-up areas darker; there is a
 black coastline. Water is white, with blue tints near the shore (distance from shore, not

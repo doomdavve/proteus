@@ -64,6 +64,9 @@ extern const BoatVoyageRoute boat_voyage_outer;
 
 // At the start shelter at world time TIME. A NULL route disables the voyage.
 void boat_voyage_start(BoatVoyage *voyage, const BoatVoyageRoute *route, double time);
+// Begin ROUTE again at the start shelter at TIME, keeping the weather the boat has already met.
+// ROUTE's exposure and weather range must equal the current route's: the water is unchanged.
+void boat_voyage_restart(BoatVoyage *voyage, const BoatVoyageRoute *route, double time);
 // Observe the boat after a tick at TIME.
 void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, double time);
 // The exposure as the location's water carries it now: flat until the weather begins.

@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
+# Link each static library once where the linker resolves them in any order (Apple ld warns
+# about repeats, e.g. proteus_json from both the game and the plugin host).
+if(POLICY CMP0156)
+  cmake_policy(SET CMP0156 NEW)
+endif()
 project(proteus LANGUAGES C)
 
 set(CMAKE_C_STANDARD 17)
@@ -101,6 +106,16 @@ FetchContent_Declare(
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(lua)
+# Lua's MIT notice, from the end of lua.h, for the native packages (lua-LICENSE.txt).
+file(READ ${lua_SOURCE_DIR}/src/lua.h PROTEUS_LUA_HEADER)
+string(REGEX MATCH "\\* Copyright \\(C\\)[^\n]*\n(\\*[^\n]*\n)*" PROTEUS_LUA_NOTICE
+  "${PROTEUS_LUA_HEADER}")
+string(REGEX REPLACE "(^|\n)\\*+ ?" "\\1" PROTEUS_LUA_NOTICE "${PROTEUS_LUA_NOTICE}")
+string(STRIP "${PROTEUS_LUA_NOTICE}" PROTEUS_LUA_NOTICE)
+if(NOT PROTEUS_LUA_NOTICE MATCHES "^Copyright \\(C\\) 1994-[0-9]+ Lua.org, PUC-Rio\\..*NONINFRINGEMENT")
+  message(FATAL_ERROR "Cannot find Lua's license notice in lua.h")
+endif()
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lua-LICENSE.txt "${PROTEUS_LUA_NOTICE}\n")
 set(PROTEUS_LUA_SOURCES lapi lcode lctype ldebug ldo ldump lfunc lgc llex lmem lobject lopcodes
   lparser lstate lstring ltable ltm lundump lvm lzio lauxlib lbaselib lstrlib ltablib lmathlib)
 list(TRANSFORM PROTEUS_LUA_SOURCES PREPEND ${lua_SOURCE_DIR}/src/)
@@ -118,7 +133,8 @@ endif()
 # The plugin host: manifest, restricted Lua evaluation and voyage decoding over immutable bytes,
 # plus boat_plugin_io for reading a package directory. Core and net never link it.
 add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
-  src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h)
+  src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
+  src/boat_plugin_host.h)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 
@@ -278,6 +294,12 @@ if(EMSCRIPTEN)
   include(cmake/Web.cmake)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
+
+# Lua plugin P1: native solo sessions take an opt-in voyage plugin (--plugin). The browser game
+# does not link the plugin host yet.
+target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h)
+target_link_libraries(wake_velocity PRIVATE proteus_plugins)
+target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_PLUGINS=1)
 
 add_custom_target(proteus_assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -580,6 +602,19 @@ target_compile_definitions(validate_boat_plugin PRIVATE
   BOAT_PLUGIN_TEST_DIR="${BOAT_PLUGIN_TEST_DIR}")
 proteus_add_case_tests(boat_plugin validate_boat_plugin LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# Lua plugins P1: staging against the map, reload policies on a live session, Undo, save polling
+# on a virtual clock, and tick-for-tick parity with the compiled voyage.
+# Its game_controls case drives wake_velocity's --plugin glue on files in a scratch directory.
+add_executable(validate_boat_plugin_session tools/validate_boat_plugin_session.c
+  tools/wake_velocity_plugin.c)
+target_link_libraries(validate_boat_plugin_session PRIVATE proteus_plugins proteus_boat_session)
+target_compile_options(validate_boat_plugin_session PRIVATE ${PROTEUS_WARNINGS})
+set(BOAT_PLUGIN_SESSION_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-session-test")
+file(MAKE_DIRECTORY "${BOAT_PLUGIN_SESSION_DIR}")
+target_compile_definitions(validate_boat_plugin_session PRIVATE
+  BOAT_PLUGIN_SESSION_DIR="${BOAT_PLUGIN_SESSION_DIR}")
+proteus_add_case_tests(boat_plugin_session validate_boat_plugin_session LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # Solo minimap: baked chart, projection, markers and trim; --screenshot writes review captures.
 # Adventure A3.5i: scenery packs load once, match the compiled water and reject bad input.
 add_executable(validate_boat_scenery tools/validate_boat_scenery.c)
@@ -748,6 +783,22 @@ set_tests_properties(boat_flag_cpu PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_
 add_test(NAME boat_profile_records COMMAND validate_boat_profile)
 proteus_add_case_tests(boat_environment validate_boat_environment LABELS cpu)
 proteus_add_case_tests(boat_world_isolation validate_boat_world LABELS cpu)
+# Lua plugin P1: the reference plugin's outing at the outer location, and the modes it refuses.
+add_test(NAME wake_velocity_plugin_screenshot COMMAND wake_velocity --renderer cpu
+  --plugin plugins/langedrag --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-plugin.png)
+add_test(NAME wake_velocity_plugin_location_rejected COMMAND wake_velocity
+  --plugin plugins/langedrag --location river)
+add_test(NAME wake_velocity_plugin_course_rejected COMMAND wake_velocity
+  --plugin plugins/langedrag --course)
+add_test(NAME wake_velocity_plugin_room_rejected COMMAND wake_velocity
+  --plugin plugins/langedrag --connect 127.0.0.1:24680)
+add_test(NAME wake_velocity_plugin_missing_rejected COMMAND wake_velocity
+  --plugin plugins/missing --renderer cpu --time 1 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-missing.png)
+set_tests_properties(wake_velocity_plugin_location_rejected wake_velocity_plugin_course_rejected
+  wake_velocity_plugin_room_rejected wake_velocity_plugin_missing_rejected PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(wake_velocity_plugin_screenshot wake_velocity_plugin_location_rejected
+  wake_velocity_plugin_course_rejected wake_velocity_plugin_room_rejected
+  wake_velocity_plugin_missing_rejected PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME boat_player_wake_screenshot COMMAND wake_velocity --renderer cpu --player-wake --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-player-wake.png)
 add_test(NAME boat_player_wake_course_rejected COMMAND wake_velocity --player-wake --course)
