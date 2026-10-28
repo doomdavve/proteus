@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27), and [A3.5e](#a35e-result-2026-10-27) (the docked Stena ferry across from the crane, in `river` and `outer`; CPU and GPU captures) completed 2026-10-27 on branch `stena-ferry`. A3.5 was split into [A3.5h](#a35h-result-2026-10-28) (the weather transition: the outer squall grows once the boat heads out and is seen in the sky on both renderers; captures and tests, unplayed), completed 2026-10-28 on branch `adventure-a3-5h`, and A3.5i (bounded loading), which is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27), and [A3.5e](#a35e-result-2026-10-27) (the docked Stena ferry across from the crane, in `river` and `outer`; CPU and GPU captures) completed 2026-10-27 on branch `stena-ferry`. A3.5 was split into [A3.5h](#a35h-result-2026-10-28) (the weather transition: the outer squall grows once the boat heads out and is seen in the sky on both renderers; captures and tests, unplayed), completed 2026-10-28 on branch `adventure-a3-5h`, and [A3.5i](#a35i-result-2026-10-28) (the bake out of the binary into scenery packs, the browser fetching the outer map on demand; tile residency deferred), completed 2026-10-28 on branch `adventure-a3-5i`. A3.5f (upstream) is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1504,7 +1504,7 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Proposed |
 | A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Proposed |
 | A3.5h | A3.5a | The local weather transition, the first half of A3.5: the exposure grows from calm water once the boat heads out, is seen from afar as a squall in the sky, and dims the light near it | Complete 2026-10-28; [result](#a35h-result-2026-10-28) |
-| A3.5i | A3.5h | The rest of A3.5: bounded per-region detailed-asset loading (the bake out of the 33 MB header first, as A3.5f needs); cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
+| A3.5i | A3.5h | The rest of A3.5: bounded per-region detailed-asset loading (the bake out of the 33 MB header first, as A3.5f needs); cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Bake out of the binary and browser loading per location done 2026-10-28 ([result](#a35i-result-2026-10-28)); tile residency deferred |
 
 ### A3.1 result, 2026-10-26
 
@@ -2100,7 +2100,8 @@ The map work that the three tall landmarks need.
   at them; the deck and towers overhead have no collision, as for Älvsborgsbron. The old
   Götaälvbron is gone (replaced in 2021) and is not drawn, whatever an older extract still holds.
 - **Size and loading:** the generated header is already 33 MB. Before adding 3 km of city, move
-  the bake to a binary asset or take A3.5's bounded per-region loading first. The river kit and
+  the bake to a binary asset or take A3.5's bounded per-region loading first (2026-10-28: done in
+  [A3.5i](#a35i-result-2026-10-28); the bake is now `scenery.bin`). The river kit and
   street life stay where they are; the new area has no authored kit.
 - Checks: route and collision tests extended to the new water, terrain spot checks there,
   captures along the new stretch, memory and frame time on both renderers.
@@ -2292,7 +2293,74 @@ adventure mode out to Vinga." The plan's next step, A3.5, was split: the weather
     painted into the sky.
 
 **Next: A3.5i**, bounded per-region detailed-asset loading, which A3.5f's upstream extension
-also needs.
+also needs (2026-10-28: [done](#a35i-result-2026-10-28)).
+
+### A3.5i result, 2026-10-28
+
+Branch `adventure-a3-5i`, from `main` after pull request #42. The user asked how the web version
+would work, whether it could lazy load, and whether more data sources (Ortofoto 2017, the
+Höjdmodell grid) were needed, and chose: on the web, lazy loading per location; natively, a pack
+plus a tile cache; Ortofoto later, for colours only.
+
+- **Scenery packs:** each mapped location's whole bake (water, land, buildings, bridge, kit and
+  dressing) is now `assets/geometry/<map>/scenery.bin`: a 32-byte little-endian header (magic
+  `PSCN`, version 1, vertex and triangle counts, leading water count, bridge range, payload and
+  packed sizes) and one raw DEFLATE stream of float32 vertices and indexed coloured triangles.
+  `tools/map_pack.py` writes and reads them, and both generators now use it (neither was rerun:
+  shapely is not installed here). The 33 MB `outer/geometry.h` and 6.9 MB `river/geometry.h` are
+  gone; the converted packs were compared triangle for triangle with them (no vertex, colour or
+  index difference; the outer ground lattice identical).
+- **Water stays compiled:** each map keeps a small `water.h` with only its leading water
+  triangles, renumbered, which is what collision, water patches, the dedicated server and the
+  multiplayer content digest read. Outer has 2,738 water triangles, the river 547. The server and
+  the core still read no files. The digest therefore changed: builds before and after A3.5i do
+  not join each other ([protocol note](MULTIPLAYER_PROTOCOL.md)); the hosted room needs the next
+  release.
+- **Loading:** `src/boat_scenery.[ch]` (outside the core) loads a pack, validates every count,
+  range and index, and requires its water to equal the compiled water exactly, then hands the
+  renderers and minimap the full description (`WaterfrontScenery.full`). Native builds load all
+  packs at start, in under 0.1 s. Packaging (macOS, Windows) ships both packs.
+- **Web:** the river pack is in the preloaded `.data`; the outer pack is served beside it as
+  `scenery-outer-<hash>.bin` and fetched the first time an outer session (solo or a room) starts,
+  behind a LOADING OUTER RIVER line with its progress. Before this branch the page downloaded
+  14.87 MB (about 6.3 MB gzipped, 5.1 MB of it wasm) before play; now 4.98 MB (about 2.9 MB
+  gzipped: wasm 0.89 MB, data 1.96 MB), plus 3.45 MB (3.29 MB gzipped) for the outer river on
+  demand. River and basin players never fetch it. See the
+  [web guide](WEB_BUILD.md#on-demand-scenery-2026-10-28).
+- **Sizes:** packs 3,450,563 bytes outer (8.83 MB decoded) and 852,701 bytes river (2.01 MB).
+  Debug native `wake_velocity` 15.4 MB → 4.5 MB, `boat_server` 13.6 MB → 2.8 MB.
+- **Tile residency deferred:** the approved plan had a byte-capped native tile cache next. It was
+  not built: peak resident memory on short CPU captures was 30.5 MB basin, 222 MB river and
+  236 MB outer, so the outer map's land costs about 14 MB beyond the river, far inside the
+  256 MiB budget, and the cache would mean rewriting the GPU scene binding while GPU runs could
+  not be checked here. The cold-load, rapid-turn and recovery tests belong with that cache. It is
+  worth building when A3.5f or Vinga makes resident land measurably expensive.
+- **Data sources:** A3.5i needed none. A3.5f still needs an OSM re-extract east of 11.9585° E and
+  Höjdmodell tile `640_14`. Ortofoto 2017 is for a later colour-sampling step (roofs, parks,
+  rock), not a runtime texture; its licence is unchecked, and it predates Karlatornet and
+  Hisingsbron.
+- **Verification (2026-10-28, macOS arm64, Debug):**
+  - After the first commit (packs, native loading): build warning-free; `ctest --preset full`
+    passed all 262 active tests with `PROTEUS_GPU_TESTS=ON`. Nine CPU and GPU review captures
+    (basin, river and outer views) were byte-identical to `main`.
+  - After the web commit: `ctest --preset full` passed the 237 CPU tests; the 25 GPU tests could
+    not start ("Failed to initialize platform": no display for this session), so GPU runs after
+    that commit are unverified. GPU resident memory was not measured.
+  - New tests `boat_scenery` and `map_pack` pass.
+  - Web (Emscripten MinSizeRel, headless Chrome with SwiftShader):
+    `tools/check_web_scenery.py` passed: no outer pack request before an outer session, one
+    fetch when it starts, the Långedrag HUD drawn, and no second fetch on a second session; a
+    throttled run captured the loading line with its percentage.
+- **Limitations:**
+  - No tile streaming, so memory grows with the whole map; native loads the packs
+    synchronously at start.
+  - A failed web fetch stops the game with a console error; reloading the page retries. There
+    is no retry button.
+  - The generators were not rerun end to end.
+  - Unplayed by a person.
+
+**Next: A3.5f**, extending the map upstream to Karlatornet, Lilla Bommen and Hisingsbron, with
+A3.5d's OSM re-extract and Höjdmodell `640_14`.
 
 ## Verification and handoff template
 

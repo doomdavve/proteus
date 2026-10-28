@@ -38,6 +38,29 @@ suspension, measure memory/runtime budgets, and complete internet-play acceptanc
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
 
+## On-demand scenery, 2026-10-28
+
+Since A3.5i the maps' land is in scenery packs rather than the wasm
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35i-result-2026-10-28)). The river pack is
+preloaded in `.data`. The outer pack is copied to `build-web/web-lazy/geometry/outer/` and
+packaged as `scenery-outer-<hash>.bin`. `web/scenery_loader.js` fetches it the first time an
+outer session (solo or a room) starts and writes it into the in-memory file system, while the
+game shows LOADING OUTER RIVER with its percentage. A second outer session reuses it.
+`tools/package_web.py` prints the initial and on-demand bytes. Before A3.5i the page downloaded
+about 6.3 MB gzipped before play; now about 2.9 MB, plus 3.3 MB for the outer river.
+
+Check it against a served build (Playwright and Chrome; the script is optional and not in CTest):
+
+```sh
+python3 -m http.server 8000 --directory build-web/site &
+python3 tools/check_web_scenery.py --output build/web-scenery
+python3 tools/check_web_scenery.py --output build/web-scenery-slow --throttle-kbps 200
+```
+
+Verified 2026-10-28 on macOS arm64, headless Chrome with SwiftShader: one outer fetch, only at
+the outer start; the outer map drawn; no re-fetch. A failed fetch stops the game with a console
+error (reloading retries); there is no offline cache beyond the browser's own HTTP cache.
+
 ## Mobile controls and iPhone presentation, 2026-10-28
 
 Basic mobile boating is implemented on `mobile-web-controls`. Touch devices with a coarse
