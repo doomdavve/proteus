@@ -598,6 +598,7 @@ static void draw_credits(const Title *t)
         bool heading;
     } lines[] = {
         { "THANKS TO", true },
+        { "erik", false },
         { "bjoto", false },
         { "w", false },
         { "", false },

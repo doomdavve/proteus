@@ -23,8 +23,8 @@ room, HTTPS signaling and private TURN relay, including current verification lim
 For internet play on that room, launch the pinned client at
 `https://wake.davve.net/` or [GitHub Pages](https://doomdavve.github.io/proteus/) and choose
 MULTIPLAYER → WINTERFELL. Both use the public `wake.davve.net` directory and WebSocket
-endpoint, outside the VPN's private Winterfell DNS override. The Pages launcher publishes
-independently from tagged game releases; its manual workflow can republish a selected
+endpoint, outside the VPN's private Winterfell DNS override. Tag pushes deploy Pages; release completion also requires the matching Winterfell cutover.
+The manual Pages workflow can republish a selected
 published release with a changed server-directory URL without changing the game version.
 
 The existing Emscripten/WebGL 2 build, click-to-start audio, IndexedDB bests, content-hashed
@@ -81,7 +81,7 @@ steering/throttle commands and leaving the room.
 Physical iPhone permission, steering feel, audio playback, Safari bars and Home Screen behavior
 still require manual review. Automated emulation is not physical-device or user acceptance.
 Verification on 2026-10-28, Apple Silicon/macOS: native Debug build and full CTest preset
-passed (231 enabled tests; 13 retired wake-field checks disabled), as did the Emscripten
+passed against current main (233 enabled tests; 13 retired wake-field checks disabled), as did the Emscripten
 MinSizeRel web package. Chrome/SwiftShader mobile automation passed solo setup, simultaneous
 touches, simulated tilt, reset and return to title; portrait/landscape/menu captures were
 inspected. The matching optional native WebRTC endpoint built; mobile automation joined a
@@ -145,14 +145,16 @@ so deployment can update compatibility metadata without republishing Pages. The 
 launcher includes public STUN on every host, including Pages.
 
 Both features were introduced as `v0.0.17-server-directory`; Winterfell now serves the exact
-v0.0.18 client, built on the server by the `davve-srv` baseline role. The public directory
-and launcher at `wake.davve.net` report protocol 6 / physics 9 and use
+v0.0.20 client, built on the server by the `davve-srv` baseline role. The public directory
+and launcher at `wake.davve.net` report protocol 7 / physics 9 and use
 `wss://wake.davve.net/room`. On 2026-10-26, a fresh Chrome/SwiftShader run of the published
 Pages build fetched Winterfell, joined that room and drove without local-network permission.
 First the test overrode only the launcher URL; after PR #14 merged and Pages run
 [40391231764](https://github.com/doomdavve/proteus/actions/runs/40391231764) completed,
 a fresh Chrome run against the actual published URL also fetched the list, joined and drove.
-The live launcher remains v0.0.18. Routine server updates use the
+The live launcher and hosted room were upgraded together to v0.0.20 on 2026-10-28;
+[current evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) owns the
+verification limits. Every release includes a server cutover through the
 [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native clients
 also fetch the directory for native addresses and retain LAN/manual joining. Human gameplay
 and wider browser/platform checks remain.

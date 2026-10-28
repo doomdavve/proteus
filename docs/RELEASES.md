@@ -8,15 +8,15 @@ title's HOST A ROOM, Windows `host.bat`), so packages carry one executable. M6 w
 identity, native cross-platform checks and a separate Linux headless-server distribution to
 release documentation. A future native multiplayer release need not imply browser multiplayer parity.
 
-The [Winterfell room](MULTIPLAYER_HOSTING.md) now runs v0.0.18 with the optional WebRTC
-transport, serving native and browser players. Routine upgrades are owned by the `wake_velocity`
-role in `davve-srv`: pin a published version, commit/push, then run the ordinary Ansible wrapper.
-Both native and browser builds run on Winterfell. This remains separate from release packaging;
-there is still no downloadable Linux server distribution.
+Every release includes upgrading the [Winterfell room](MULTIPLAYER_HOSTING.md) and its
+matching hosted browser client. The `wake_velocity` role in `../davve-srv/ansible` owns
+this required step: pin the published version, commit/push, then run the ordinary Ansible
+wrapper. Native and browser builds run on Winterfell with the optional WebRTC transport.
+There is still no downloadable Linux server distribution.
 
 The earlier `v0.0.17-server-directory` UI backport is historical. v0.0.18 includes the directory,
 STUN defaults and protocol-v6 weapons; its release/Pages publication and server cutover have
-completed. Future publications do not automatically upgrade the room: follow the
+completed. Tag publication does not automatically upgrade the room. Complete each release with the
 [routine deployment workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). The public
 directory reports the deployed server's compatibility to Pages and Winterfell clients.
 
@@ -62,6 +62,23 @@ fails, rerun the failed jobs from the release workflow's Actions page. Reruns re
 the existing release and replace assets with the same names. A new release remains
 in draft if its uploads fail. Do not move an already published version tag.
 
+## Required Winterfell cutover
+
+After native publication and Pages deployment succeed:
+
+1. In `../davve-srv`, set `wake_velocity_version` in
+   `ansible/host_vars/winterfell/main.yml` to the newly published tag, then commit and push.
+2. From that repository run `scripts/ansible-run.sh --limit winterfell --tags wake_velocity`.
+   This builds the authority and matching browser client before switching the room and nginx;
+   players briefly disconnect during the room restart.
+3. Verify the running release, active room and relay, hosted browser version, public directory
+   protocol/physics, and matching native/browser joins. Record results and limits in this
+   document, the [hosting guide](MULTIPLAYER_HOSTING.md) and `davve-srv/docs/wake-velocity.md`.
+
+A release remains incomplete until the hosted cutover is verified or its blocker is reported.
+Use the [routine role](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv), not the legacy
+standalone playbook. Keep the server and hosted browser client on the same release.
+
 ## Downloads and trust
 
 | Asset | Contents |
@@ -93,7 +110,37 @@ provided token. No personal access token or additional secret is needed.
 
 ## Status and verification
 
-Current status, 2026-10-26: **v0.0.18** is published at commit `2f94335`. The
+Current status, 2026-10-28: **[v0.0.20](https://github.com/doomdavve/proteus/releases/tag/v0.0.20)**
+is published at commit `2f9adfc`, after [PR #34](https://github.com/doomdavve/proteus/pull/34)
+passed macOS, Windows and Linux CI. The
+[native release run](https://github.com/doomdavve/proteus/actions/runs/40668366272)
+and [Pages deployment](https://github.com/doomdavve/proteus/actions/runs/40668366195)
+both succeeded. Both published native ZIPs were downloaded and passed SHA-256 and
+ZIP-integrity checks; both `build.txt` files identify v0.0.20 and the tagged commit.
+The Mac metadata also reports `Uncommitted changes: True`; the workflow's generated
+`build-mac/` directory is not ignored by the current packaging status check.
+Neither downloaded package was launched locally; CI performed package relocation checks.
+
+This release collects the changes since v0.0.19: outer-map Höjdmodell terrain and river
+scenery, expanded deathmatch weapons and optional rearview, multiplayer smoothing, the
+docked VINGA LINE ferry, marine menus and scrolling credits (including erik), solo time
+controls through 8x, and the optional nautical minimap (`N`). Multiplayer uses protocol v7;
+hosts and clients should use compatible versions. The required Winterfell cutover to v0.0.20
+completed on 2026-10-28 through `davve-srv` commit `2cf0974`: matching authority and hosted
+browser built, room/relay active, public metadata protocol 7 / physics 9, full repeat
+`changed=0`. Hosted browser and live Pages named join/drive/weapon input/leave/rejoin
+passed alongside a matching native bot; [hosting evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28)
+owns client verification and its limits. Next: human package/input/audio review and wider
+multiplayer qualification.
+
+Local verification, 2026-10-28, Apple Silicon/macOS: Debug configure/build passed;
+`ctest --preset full` passed all 232 enabled tests, with 13 retired cases disabled
+and `PROTEUS_GPU_TESTS=OFF`. CPU basin, river and outer captures and the GPU title
+capture were inspected; a 120-frame windowed river GPU demo completed. The build
+reported only raylib's existing bundled stb_vorbis pointer-comparison warning.
+Human input/listening, downloaded-app execution and user acceptance are not claimed.
+
+Earlier publication evidence, 2026-10-26: **v0.0.18** was published at commit `2f94335`. The
 [release run](https://github.com/doomdavve/proteus/actions/runs/40371176253) passed macOS,
 Windows and publication; [Pages](https://github.com/doomdavve/proteus/actions/runs/40371176205)
 also built and deployed successfully. Both native ZIPs were downloaded and passed SHA-256

@@ -26,7 +26,7 @@ retain their integer pixel grid; the background water now uses fractional positi
 coverage antialiasing. Both travelling crests and perspective rays blend between neighbouring
 pixels, softening their edges and slow movement while leaving foreground text crisp.
 
-The roll begins with **THANKS TO**, **bjoto**, **w**, then lists **FONTS** (Daniel
+The roll begins with **THANKS TO**, **erik**, **bjoto**, **w**, then lists **FONTS** (Daniel
 Linssen, m5x7/m3x6), **MAP DATA** (OpenStreetMap contributors, ODbL 1.0), **LIBRARIES**
 (raylib, ENet, libcurl), and **A PROTEUS GAME**. Specific contributor roles are omitted
 on screen as requested. For source provenance: [bjoto](https://github.com/bjoto) contributed
@@ -50,7 +50,11 @@ checked keyboard entry, Enter/click/Escape return, main-row reselection, reopeni
 Main/settings/credits captures and vertical-roll samples through 1000 simulated seconds
 were inspected. These are scripted agent graphics/navigation checks.
 
-Next: user review of the vertical roll and physical navigation; browser/package qualification.
+Release follow-up, 2026-10-28: v0.0.20 includes the outstanding erik acknowledgement.
+Native packaging and Pages deployment passed; both native ZIPs passed checksum, integrity
+and version/commit checks. See [release evidence](RELEASES.md#status-and-verification).
+
+Next: user review of the vertical roll and physical navigation; human package qualification.
 The user liked the initial background waves, but final roll acceptance is pending.
 No physical input/listening, browser/Windows/Linux run or GPU CTest lane is claimed.
 Title music remains deferred.

@@ -1,5 +1,12 @@
 # Test workflow and timing
 
+`boat_time_control` advances the same 32 simulated ticks at all six live time rates and
+compares the tick count and complete physical boat state with a fixed-tick reference; it also
+checks rate bounds and the real-frame stall clamp before scaling. `boat_replay` covers practice
+finishes with/without an existing best, preserved export files, replayable last runs and eligibility
+after restart. All clocks are virtual. The [boating plan](BOATING_PLAN.md#play-testing-time-controls--2026-10-28)
+owns implementation status and manual review limits.
+
 The Linux, macOS and Windows Actions builds run on pull requests and pushes to `main`, skipping
 events that change only Markdown files. Any non-Markdown change runs the normal builds and tests,
 including on mixed documentation and code pull requests. Manual workflow runs and the macOS and
@@ -254,6 +261,12 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   and checks that points outside the region and on the quay are not water. Since A3.1b it
   also requires real relief: land tops never below 1 m, hills between 60 and 100 m, and at
   least 100,000 triangles.
+- `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `river` and
+  `outer` and none for the basin, checks that both frames fit the 320×200 scene (the chart
+  above the instruments), that the spawn, every voyage shelter and the destination are water
+  pixels and inland Hisingen is not, that composition marks the boat and destination without
+  touching the trim, and the N cycle. With arguments it writes review captures
+  ([HUD guide](BOAT_HUD.md#review-commands)).
 - `boat_voyage` runs `validate_boat_voyage` (adventure A3.4, under 1 s in Debug). It checks that
   the outer voyage's shelters and harbour are navigable, that the exposed patch crosses the A0.3
   route's southern leg while a coastal line, the shelters and the harbour stay outside it, the

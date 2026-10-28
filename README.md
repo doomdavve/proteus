@@ -292,7 +292,7 @@ released native and browser room. A standalone Linux server package remains part
 For browser play, open [Winterfell](https://wake.davve.net/), press PLAY and
 choose MULTIPLAYER → WINTERFELL. The browser fetches a known-server list, so the common
 join needs no address entry. Manual URL / CONNECT remain available. The deployed client
-and room now run v0.0.18 with both deathmatch weapons; the public host stays outside the
+and room now run v0.0.20 with the protocol-v7 water cannon, stern wave grenade and torpedo; the public host stays outside the
 VPN's private Winterfell DNS override. Native clients fetch the same directory and use its
 native addresses, alongside LAN discovery and manual joining. Routine hosting updates are
 owned by `davve-srv`
@@ -341,7 +341,7 @@ A deliberate reset abandons an unfinished attempt while preserving your last com
   racing. Backspace reset is inactive during replay. Finishing pauses playback; `Space` then plays again from the beginning.
 - `Left`/`Right` seek one second backward/forward; hold `Shift` for five seconds. `Home`/`End` jump
   to START/FINISH. Seeking preserves pause state; jumping to FINISH pauses.
-- `[`/`]` select 0.25×, 0.5×, 1×, 2×, or 4× playback. Selecting another recording starts at 1×.
+- `[`/`]` select 0.25×, 0.5×, 1×, 2×, 4×, or 8× playback; `\` restores 1×. Selecting another recording starts at 1×.
 - Click or drag the replay timeline to seek and pause; press `Space` to continue. The timeline marks
   START, both buoy gates, and FINISH. Camera controls remain available. Losing focus pauses playback
   without advancing the clock.
@@ -365,7 +365,8 @@ cannot replace your recorded best.
 ./build/wake_velocity --renderer cpu --replay build/my-run.run --time 5 --screenshot build/replay.png
 ```
 
-`--save-run FILE` exports each completed attempt, including slower runs, to that path.
+`--save-run FILE` exports each completed normal-time attempt, including slower runs, to that path.
+Altered-time practice attempts remain replayable as the last run but do not replace bests or exports.
 `--replay FILE` and `--ghost FILE` imply course mode. Replay selects the recording's water preset;
 an imported ghost must match your selected water preset (`--waves` for a wave run).
 An imported ghost stays selected across retries while your personal best is tracked separately.
@@ -449,6 +450,17 @@ voyage. `--start X,Z[,DEGREES]` places the boat anywhere in a
 mapped location (simulation X/Z; heading 0 faces -Z), for example
 `--location outer --start 1980,-1196,75` on the open leg of the route.
 
+Every mapped location (`river`, `outer`, solo or in a room) has a north-up nautical chart of
+the whole map, drawn in paper-chart style. Land is buff, with built-up areas darker; there is a
+black coastline. Water is white, with blue tints near the shore (distance from shore, not
+depth). The frame is graduated in minutes of latitude and longitude, and there is a scale in
+nautical miles. Your boat is the ECDIS own-ship symbol (two rings with a heading line) in orange. The
+chart also shows the Eriksberg crane, Nya Älvsborg, the docked ferry, Älvsborgsbron with its
+45 m clearance, and the outer map's red/green channel marks and lights. On the solo `outer`
+voyage it overprints in magenta: shelters as anchorages, Långedrag as a waypoint and the exposed
+water as a dashed caution limit. It starts hidden; `N` cycles a corner map, a larger labelled
+chart, and off ([HUD guide](docs/BOAT_HUD.md#minimap-2026-10-28)).
+
 `--location river` is a 2,450 × 2,400 m waterfront with an Älvsborgsbron blockout. Start in the
 dock, leave it, and follow the river southwest to sail under the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy
 embankments, with concrete abutments connecting the deck to the land. The approaches follow mapped
@@ -479,6 +491,17 @@ from neutral to full in 0.25 seconds, with separately smoothed engine response. 
 unassigned. R does nothing. Hold Backspace for one second, with a visible progress bar, or
 choose the explicit reset/restart/request action in the Escape menu. A short tap does nothing;
 release, help/menu, loss of focus or replay cancels progress. Each hold triggers at most once.
+For single-player testing, `[` slows time and `]` speeds it up through ¼×, ½×, 1×, 2×, 4× and 8×;
+`\` (backslash) returns to 1×. The same keys control replay speed while watching a replay.
+The current multiplier appears above the scene when altered. Boat physics still uses fixed
+120 Hz simulated ticks; water, traffic, wakes and voyage progress follow simulation time.
+Camera adjustments, reset holds, menus and audio keep their normal real-time rate. Fast-forward
+requires more physics work per frame. The selected live rate survives boat resets and is separate
+from replay speed; returning to the title starts the next session at 1×. Help/menu/focus loss pause
+solo simulation. Multiplayer uses the server clock and ignores these shortcuts.
+A course attempt that uses altered time is marked PRACTICE for the rest of that attempt,
+including after returning to 1×. It remains replayable with P but cannot replace a personal best
+or `--save-run` export. Return to 1× and restart the run to regain eligibility.
 Space operates the water cannon in deathmatch, E drops a stern wave grenade, Q launches a torpedo, and V toggles the rearview mirror; Space is unassigned in free/race play; replay/menu controls retain their existing use.
 Press `M` to capture the mouse for steering, or launch with `--mouse-steering`. The pointer
 is hidden and horizontal movement accumulates wheel angle: move right/left to turn the wheel,
