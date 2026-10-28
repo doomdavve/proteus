@@ -6,6 +6,7 @@
 #include "boat_net_protocol.h"
 #include "boat_replay.h"
 #include "boat_skin.h"
+#include "boat_ui.h"
 #include "boat_version.h"
 #include "frame_pacer.h"
 #include "raylib.h"
@@ -220,16 +221,18 @@ static void draw_logo(const Title *t)
     Font ui = t->ui;
     const char *credit = "A PROTEUS GAME";
     int x = (WIDTH - text_width(ui, credit)) / 2;
-    draw_text(ui, credit, x, 50, rgb(174, 245, 238));
-    DrawLine(x - 37, 53, x - 5, 53, rgb(118, 203, 211));
-    DrawLine(WIDTH - x + 5, 53, WIDTH - x + 37, 53, rgb(118, 203, 211));
+    draw_text(ui, credit, x, 50, (PROTEUS_WARM_MENU ? boat_ui_palette().text : rgb(174, 245, 238)));
+    DrawLine(
+        x - 37, 53, x - 5, 53, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
+    DrawLine(WIDTH - x + 5, 53, WIDTH - x + 37, 53,
+        (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
 }
 
 static void crosshair(int x, int y, Color ink)
 {
     DrawLine(x - 4, y, x + 5, y, ink);
     DrawLine(x, y - 4, x, y + 5, ink);
-    DrawPixel(x, y, rgb(188, 255, 243));
+    DrawPixel(x, y, (PROTEUS_WARM_MENU ? boat_ui_palette().text : rgb(188, 255, 243)));
 }
 
 static int row_count(const Title *t)
@@ -415,8 +418,8 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     int top = (int)first.y - 5, height = (int)(last.y + last.height - first.y) + 10;
     bool main = t->panel == PANEL_MAIN;
     int left = main ? 66 : 37, width = main ? 126 : 246;
-    Color cyan = rgb(142, 224, 226), dim = rgb(61, 133, 157);
-    DrawRectangle(left, top, width, height, (Color) { 8, 32, 54, 228 });
+    Color cyan = boat_ui_palette().edge, dim = boat_ui_palette().border;
+    DrawRectangle(left, top, width, height, boat_ui_palette().panel);
     // Fine rules with brighter open corner brackets.
     DrawRectangleLines(left, top, width, height, dim);
     for (int side = 0; side < 2; ++side)
@@ -443,12 +446,12 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
             Rectangle highlight = row;
             highlight.x = row.x;
             highlight.width = row.x + row.width - highlight.x;
-            DrawRectangleRec(highlight, rgb(156, 241, 231));
+            DrawRectangleRec(highlight, boat_ui_palette().selected);
             int x = main ? 74 : 51, y = (int)row.y + 4;
             for (int j = 0; j < 3; ++j)
-                DrawLine(x + j, y + j, x + j, y + 5 - j, rgb(231, 128, 105));
+                DrawLine(x + j, y + j, x + j, y + 5 - j, boat_ui_palette().accent);
         }
-        Color ink = active ? rgb(11, 40, 62) : rgb(190, 242, 235);
+        Color ink = active ? boat_ui_palette().selected_text : boat_ui_palette().text;
         const char *label;
         char value[96];
         row_text(t, s, i, &label, value, sizeof(value));
@@ -517,16 +520,16 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         const char *shown = fit(t->small, hint, WIDTH - 12);
         int x = (WIDTH - text_width(t->small, shown)) / 2;
         int y = main ? top - 15 : top + height + 3;
-        DrawRectangle(
-            x - 3, y - 1, text_width(t->small, shown) + 6, 9, (Color) { 10, 38, 57, 200 });
-        draw_text(t->small, shown, x, y + 1, status ? rgb(255, 236, 175) : rgb(255, 196, 150));
+        DrawRectangle(x - 3, y - 1, text_width(t->small, shown) + 6, 9, boat_ui_palette().shadow);
+        draw_text(t->small, shown, x, y + 1, status ? rgb(255, 236, 175) : boat_ui_palette().hint);
     }
 }
 
 static void draw_footer_text(Font font, const char *label, int x)
 {
     draw_text(font, label, x + 1, 191, (Color) { 10, 45, 65, 130 });
-    draw_text(font, label, x, 190, rgb(162, 219, 217));
+    draw_text(
+        font, label, x, 190, (PROTEUS_WARM_MENU ? boat_ui_palette().edge : rgb(162, 219, 217)));
 }
 
 static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *status)
@@ -534,8 +537,8 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
     BeginTextureMode(t->target);
     DrawTexture(t->backdrop, 0, 0, WHITE);
     draw_logo(t);
-    crosshair(22, 32, rgb(118, 203, 211));
-    crosshair(297, 32, rgb(118, 203, 211));
+    crosshair(22, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
+    crosshair(297, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
     draw_menu(t, s, status);
     const char *map_credit = "MAP: OSM CONTRIBUTORS";
     draw_footer_text(t->small, PROTEUS_VERSION, 8);
@@ -543,7 +546,7 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
         draw_footer_text(t->small, map_credit, WIDTH - 9 - text_width(t->small, map_credit));
         const char *fonts = "FONTS: DANIEL LINSSEN";
         draw_text(
-            t->small, fonts, (WIDTH - text_width(t->small, fonts)) / 2, 60, rgb(142, 224, 226));
+            t->small, fonts, (WIDTH - text_width(t->small, fonts)) / 2, 60, boat_ui_palette().edge);
     }
     EndTextureMode();
 }
@@ -560,7 +563,7 @@ static void present(Title *t)
     Rectangle destination = { (float)((GetScreenWidth() - WIDTH * k) / 2),
         (float)((GetScreenHeight() - HEIGHT * k) / 2), (float)(WIDTH * k), (float)(HEIGHT * k) };
     BeginDrawing();
-    ClearBackground(rgb(10, 38, 57));
+    ClearBackground(boat_ui_palette().shadow);
     DrawTexturePro(t->target.texture, (Rectangle) { 0, 0, WIDTH, -HEIGHT }, destination,
         (Vector2) { 0 }, 0, WHITE);
     frame_pacer_wait(&t->pacer);
@@ -593,6 +596,7 @@ static bool open_title(Title *t)
     if (!IsImageValid(image))
         return false;
     ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+#if !PROTEUS_WARM_MENU
     Color *pixels = image.data;
     for (int y = 0; y < image.height; ++y)
         for (int x = 0; x < image.width; ++x) {
@@ -611,12 +615,24 @@ static bool open_title(Title *t)
         for (unsigned i = 0; i < sizeof(windows) / sizeof(windows[0]); ++i)
             pixels[(int)windows[i].y * WIDTH + (int)windows[i].x]
                 = i % 3 ? rgb(205, 181, 119) : rgb(140, 165, 154);
+#endif
     t->backdrop = LoadTextureFromImage(image);
     UnloadImage(image);
     t->target = LoadRenderTexture(WIDTH, HEIGHT);
     if (!boat_asset_path(path, sizeof(path), "title/wake-velocity.png"))
         return false;
-    t->wordmark = LoadTexture(path);
+    Image wordmark = LoadImage(path);
+    if (!IsImageValid(wordmark))
+        return false;
+#if PROTEUS_WARM_MENU
+    // Keep the authored silhouette, stems and spacing with one sunny yellow ink
+    // inside a strong navy edge and offset shadow.
+    ImageColorReplace(&wordmark, rgb(174, 245, 238), rgb(19, 40, 62));
+    ImageColorReplace(&wordmark, rgb(231, 128, 105), rgb(19, 40, 62));
+    ImageColorReplace(&wordmark, rgb(12, 45, 72), boat_ui_palette().selected);
+#endif
+    t->wordmark = LoadTextureFromImage(wordmark);
+    UnloadImage(wordmark);
     t->ui = load_title_font("fonts/m5x7.fnt");
     t->small = load_title_font("fonts/m3x6.fnt");
     if (!IsTextureValid(t->backdrop) || !IsTextureValid(t->wordmark)

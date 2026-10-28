@@ -76,13 +76,16 @@ target_link_libraries(proteus_boat_core PUBLIC raylib)
 target_compile_options(proteus_boat_core PRIVATE ${PROTEUS_WARNINGS})
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
+option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
+  src/boat_ui.c src/boat_ui.h
   src/boat_hud.c src/boat_hud.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
   src/boat_voyage_view.c src/boat_voyage_view.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
   src/waterfront_scene.c)
 target_link_libraries(proteus_render PUBLIC proteus_boat_core)
+target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROTEUS_WARM_MENU}>)
 target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
 
 # GPU renderers, linked only by graphics executables.

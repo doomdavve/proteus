@@ -1,5 +1,11 @@
 # Marine boat instruments
 
+Typography update (2026-10-28): gameplay instrument labels use the title’s compact m3x6
+font; overlays/help use m5x7. The Escape menu follows the compile-time warm/cyan palette.
+The [title plan](TITLE_SCREEN_PLAN.md#warm-daylight-alternative-and-shared-game-typography-2026-10-28)
+owns verification and next review. Instrument geometry and semantic needle colours remain
+the same; standalone primitive reviews without UI assets keep built-in 3×5 fallback labels.
+
 Current deathmatch extension (2026-10-27): matching 54×44 side cases flank the central
 controls. Port shows hull health/segments and recoverable heel pressure; starboard shows
 Space/cannon heat (COOL when overheated), E/grenade readiness and Q/remaining torpedoes

@@ -122,11 +122,21 @@ is calm and clear of both boats. See the
 
 `./build/wake_velocity` without options (and the packaged macOS app and Windows `launch.bat`)
 opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT.
-Its cyan workstation interface sits over a boat-free dusk river capture, with A PROTEUS GAME beneath
-the chunky bitmap title and the build version at lower left. Menu text uses Daniel
-Linssen's m5x7 font, with m3x6 for compact hints and footer data; SETTINGS retains the
-map and font credits. [Font sources and regeneration](assets/fonts/README.md).
-This dusk palette is title-only; [gameplay sunset is planned](docs/SUNSET_PLAN.md).
+The default cartoon daylight interface uses marine blue panels, sunny yellow selection,
+cream text and a single yellow title ink over the boat-free daylight river capture. The backdrop placement and geometric title are shared with the retained
+cyan dusk version. Select the palette at compile time, then rebuild:
+
+```sh
+cmake -S . -B build -DPROTEUS_WARM_MENU=ON   # Cartoon daylight (default)
+cmake --build build -j
+# Use -DPROTEUS_WARM_MENU=OFF for the original cyan dusk title.
+```
+
+The Escape menu shares the selected palette and fixed selection chevron. Menu and gameplay
+overlay text use Daniel Linssen's m5x7; title hints/footer and in-game instrument labels use
+m3x6. Both stay on the integer pixel grid. SETTINGS retains map/font credits.
+[Font sources and regeneration](assets/fonts/README.md). These title grades do not change
+world lighting; [gameplay sunset is planned](docs/SUNSET_PLAN.md).
 The version is resolved at CMake configure time (reconfigure to refresh it); source archives
 can set `-DPROTEUS_VERSION=v0.0.19`. Up/Down or
 W/S select and Enter/Space or a click activates. SETTINGS holds NAME, BOAT, STEERING and SOUNDTRACK: Enter on

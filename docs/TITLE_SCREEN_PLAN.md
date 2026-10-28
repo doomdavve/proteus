@@ -1,20 +1,61 @@
 # Boating game title screen and main-program plan
 
-Status: revised 2026-10-27. This document owns the title, menu and promotion of
-**Wake Velocity**. The user selected the cyan workstation mock-up (B): straight outlined
-lettering, restrained coral depth, open corner brackets and a dusk river. The latest
-revision removes menu numbers and the indistinct center boat, and uses consistent
-geometric title letters.
-The redesign is implemented on `title-dusk-console`. Compact m5x7/m3x6 UI fonts remain
-in use; the earlier coarse title lettering was rejected. The geometric replacement and
-clean river capture are implemented; visual acceptance remains pending.
+Status: revised 2026-10-28. This document owns the title, menu and promotion of
+**Wake Velocity**. Two compile-time palettes now share the same backdrop placement, geometric
+wordmark, m5x7/m3x6 fonts and menu flows. Marine cartoon daylight is the default; configure with
+`-DPROTEUS_WARM_MENU=OFF` to retain the user-selected cyan dusk design from 2026-10-27.
 The shared title retains single-player setup, public/LAN/address joining, hosting and saved
-settings. The main screen's only credit is **A PROTEUS GAME**; the build version is at lower
-left and the retained OSM map credit is in SETTINGS. Next: user review of the implemented
-title and distributed native/browser builds. Gameplay sunset is planned separately in
-[the sunset plan](SUNSET_PLAN.md); the title palette does not implement world lighting.
-Volume settings, title music and a live river backdrop remain deferred.
+settings. Volume settings, title music and a live river backdrop remain deferred.
+The user approved the marine blue/yellow visual direction on 2026-10-28.
+Next: physical input/playback review; native/browser
+package qualification remains outstanding. Gameplay sunset is owned by the
+[sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## Warm daylight alternative and shared game typography, 2026-10-28
+
+Completed: `PROTEUS_WARM_MENU=ON` (default) uses the fixed river capture's bright original
+daylight colours, marine blue panels, cream text and sunny yellow selection. The title's
+interior uses one yellow ink, with a dark navy edge and offset shadow.
+The user liked the initial daylight direction but found its brown panels/title grade too
+brown; the supplied Super Mario World reference inspired the brighter cartoon palette.
+The user liked the cartoon feeling but found green panels and a multicolour title too
+close to the reference. Marine blue panels and a single yellow title supersede that
+intermediate version and the earlier brown/terracotta treatment. The user then approved the
+marine blue/yellow palette: “Wow, that just felt right!” (2026-10-28). This records visual
+palette acceptance only. OFF retains the original
+cyan title/dusk grade and occupied windows. Both use
+exactly the same captured river geometry, logo silhouette, fonts, title placement and row
+bounds. No new generated art or asset changes are required. There is no runtime theme setting.
+
+The Escape menu uses the selected palette, m5x7 and a fixed chevron in place of the older
+bobbing `(*)`. Gameplay overlays/help/scoreboard text use the same m5x7, scaled only by whole
+integers; instrument labels use m3x6. `src/boat_ui.[ch]` owns shared colours and the game font
+lifetime, loaded only after a graphics context exists and released before it closes.
+Standalone instrument primitive review tools retain their built-in fallback lettering when
+UI fonts have not been loaded. Core/session simulation and world lighting are unchanged.
+
+Review captures:
+
+![Warm daylight title](title/warm-daylight.png)
+
+![Warm pause menu and matching instrument type](title/warm-pause.png)
+
+Verification, 2026-10-28, Apple Silicon/macOS: Debug builds passed for both ON and OFF.
+Final `ctest --preset full`: all 230 enabled tests passed (14.46 s), with 15 retired
+experiments disabled and `PROTEUS_GPU_TESTS=OFF`. The initial sandboxed run could not bind
+local test sockets; the full run with socket access passed. No project warnings; the first
+raylib build reported its existing bundled stb_vorbis pointer-comparison warning.
+
+A temporary uncommitted harness captured all five warm panels plus the pause menu with
+instrument labels; these and the retained cyan title capture were inspected at native size.
+It presented 120 title frames, and a separate river `--demo --frames 120` windowed run
+completed cleanly. Formatting, changed local link targets and `git diff --check` passed.
+These are agent-run graphics/demo checks, not physical input or listening acceptance.
+No browser/package builds, Windows/Linux runtime, physical input/listening, course/voyage
+playthrough, or GPU CTest lane were verified for this revision. Next: hands-on navigation/playback, then browser/package qualification. The marine
+blue/yellow palette is user-approved; input/listening acceptance remains outstanding. The dated 2026-10-27
+sections below describe the retained cyan variant.
 
 ## Cyan workstation redesign, 2026-10-27
 

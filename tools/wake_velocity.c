@@ -11,6 +11,7 @@
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
+#include "boat_ui.h"
 #include "boat_voyage_view.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
@@ -156,7 +157,7 @@ static void draw_help(bool course, bool mapped, bool voyage, bool deathmatch, bo
     for (int i = 0; i < count; ++i) {
         if (!lines[i][0])
             continue;
-        DrawText(lines[i], (width - MeasureText(lines[i], font)) / 2, y, font, RAYWHITE);
+        boat_ui_text(lines[i], (width - boat_ui_width(lines[i], font)) / 2, y, font, RAYWHITE);
         y += spacing;
     }
 }
@@ -172,18 +173,18 @@ static void course_runs_hud(
     DrawRectangle(8, 72, width > 460 ? 440 : width - 16, runs->playing ? 120 : 84,
         (Color) { 14, 23, 32, 245 });
     if (runs->best.complete)
-        DrawText(TextFormat("BEST %.2fs", runs->best.splits[BOAT_COURSE_GATES - 1]), 16, 76, 16,
+        boat_ui_text(TextFormat("BEST %.2fs", runs->best.splits[BOAT_COURSE_GATES - 1]), 16, 76, 16,
             (Color) { 90, 240, 255, 255 });
     if (!runs->playing && runs->opponent.complete && view->course.next_gate > 1) {
         int gate = view->course.next_gate - 1;
-        DrawText(
+        boat_ui_text(
             TextFormat("Split %+.2fs", view->course.splits[gate] - runs->opponent.splits[gate]), 16,
             96, 16, RAYWHITE);
     }
     if (runs->playing) {
         double duration = runs->playing->splits[BOAT_COURSE_GATES - 1];
-        DrawText(TextFormat("REPLAY %s %.2gx  %.2f / %.2fs", runs->paused ? "PAUSED" : "",
-                     boat_replay_speed(runs), runs->replay_time, duration),
+        boat_ui_text(TextFormat("REPLAY %s %.2gx  %.2f / %.2fs", runs->paused ? "PAUSED" : "",
+                         boat_replay_speed(runs), runs->replay_time, duration),
             16, 116, 16, (Color) { 90, 240, 255, 255 });
         Rectangle bar = replay_timeline(width);
         DrawRectangleRec(bar, (Color) { 40, 58, 68, 255 });
@@ -193,7 +194,7 @@ static void course_runs_hud(
         for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
             int x = (int)(bar.x + bar.width * (float)(runs->playing->splits[i] / duration));
             DrawLine(x, (int)bar.y - 2, x, (int)(bar.y + bar.height), LIGHTGRAY);
-            DrawText(i == 0                      ? "S"
+            boat_ui_text(i == 0                  ? "S"
                     : i == BOAT_COURSE_GATES - 1 ? "F"
                                                  : TextFormat("%d", i),
                 x - 3, (int)(bar.y + bar.height + 3), 10, LIGHTGRAY);
@@ -201,7 +202,7 @@ static void course_runs_hud(
         DrawCircle((int)playhead, (int)(bar.y + bar.height / 2), 3, (Color) { 90, 240, 255, 255 });
     } else {
         if (runs->notice)
-            DrawText(runs->notice, 16, 138, 12, RAYWHITE);
+            boat_ui_text(runs->notice, 16, 138, 12, RAYWHITE);
     }
     if (ghost && width >= 368) {
         int left = width - 128;
@@ -738,6 +739,8 @@ static int study(int argc, char **argv)
         SetWindowMinSize(WIDTH, HEIGHT);
     }
     window_ready = true;
+    if (!boat_ui_load())
+        goto cleanup;
 #if defined(__EMSCRIPTEN__)
     SetTargetFPS(60);
 #else
@@ -1264,11 +1267,11 @@ static int study(int argc, char **argv)
             boat_rearview_draw(&mirror, WIDTH);
         int hint_top = mirror_visible ? BOAT_REARVIEW_BOTTOM + 12 : 4;
         if (mouse_driving && !menu.open)
-            DrawText(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4, hint_top,
-                10, (Color) { 218, 223, 202, 255 });
+            boat_ui_text(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4,
+                hint_top, 10, (Color) { 218, 223, 202, 255 });
 #if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
-            DrawText(
+            boat_ui_text(
                 "MOUSE UNAVAILABLE / USE A/D", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #endif
         EndTextureMode();
@@ -1290,22 +1293,22 @@ static int study(int argc, char **argv)
         if (!networked)
             boat_voyage_hud(&session.voyage, &session.boat, live_view.time, GetScreenWidth());
         if (notice)
-            DrawText(notice, 12, 36, 20, ORANGE);
+            boat_ui_text(notice, 12, 36, 20, ORANGE);
         else if (view->boat.motion_state == BOAT_CAPSIZED)
-            DrawText("CAPSIZED / HOLD BACKSPACE 1s", 12, 36, 20, ORANGE);
+            boat_ui_text("CAPSIZED / HOLD BACKSPACE 1s", 12, 36, 20, ORANGE);
         else if (view->boat.motion_state == BOAT_AIRBORNE)
-            DrawText("AIRBORNE", 12, 36, 16, SKYBLUE);
+            boat_ui_text("AIRBORNE", 12, 36, 16, SKYBLUE);
         else if (view->boat.motion_state == BOAT_LANDING)
-            DrawText("LANDING", 12, 36, 16, SKYBLUE);
+            boat_ui_text("LANDING", 12, 36, 16, SKYBLUE);
         if (wake)
-            DrawText(TextFormat("WAKE FIELD / REVIEW %d", BOAT_WAKE_SOURCE_REVISION), 12,
+            boat_ui_text(TextFormat("WAKE FIELD / REVIEW %d", BOAT_WAKE_SOURCE_REVISION), 12,
                 (int)destination.y + (HEIGHT - 48) * scale - 16, 12, SKYBLUE);
         if (course)
             course_runs_hud(&session.runs, view, ghost_view, GetScreenWidth());
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
-            DrawText(net_study_status(net), 12, (int)destination.y + (HEIGHT - 48) * scale - 16, 12,
-                SKYBLUE);
+            boat_ui_text(net_study_status(net), 12, (int)destination.y + (HEIGHT - 48) * scale - 16,
+                12, SKYBLUE);
             int match_top
                 = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
             int roster_top = mirror_visible ? match_top + 28 : 12;
@@ -1316,7 +1319,7 @@ static int study(int argc, char **argv)
                 active && IsKeyDown(KEY_TAB));
 #endif
         } else if (!IsWindowFocused() && !menu.open)
-            DrawText("PAUSED", 12, 12, 20, RAYWHITE);
+            boat_ui_text("PAUSED", 12, 12, 20, RAYWHITE);
         if (profiler_visible)
             profiler_draw(&profiler, &snapshot, size);
         if (profiler_visible)
@@ -1385,6 +1388,7 @@ cleanup:
     boat_session_flush(&session);
     boat_session_destroy(&session);
     if (window_ready) {
+        boat_ui_unload();
 #if defined(__EMSCRIPTEN__)
         boat_web_mouse_state(0, 0);
 #else
