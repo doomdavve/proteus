@@ -58,11 +58,8 @@ static void circle(Panel p, int x, int y, int radius, Color color)
     }
 }
 
-// Three-by-five lettering: each row is a three-bit mask. Every stroke is one scene pixel.
-static void label(Panel p, const char *text, int x, int y, Color color)
+const char *boat_hud_glyph(char character)
 {
-    if (boat_ui_compact(text, p.x + x, p.y + y, color))
-        return;
     static const struct {
         char character;
         const char *rows;
@@ -73,18 +70,27 @@ static void label(Panel p, const char *text, int x, int y, Color color)
         { 'F', "74644" }, { 'H', "55755" }, { 'I', "72227" }, { 'K', "55655" }, { 'O', "75557" },
         { 'N', "57775" }, { 'P', "75544" }, { 'R', "75655" }, { 'S', "74717" }, { 'T', "72222" },
         { 'U', "55557" }, { 'A', "25755" }, { 'B', "65656" }, { 'M', "57755" }, { 'V', "55552" },
-        { 'W', "55577" }, { 'Y', "55222" }, { 'Q', "75573" } };
+        { 'W', "55577" }, { 'Y', "55222" }, { 'Q', "75573" }, { 'G', "74557" }, { 'X', "55255" },
+        { 'J', "11157" }, { 'Z', "71247" } };
+    for (size_t i = 0; i < sizeof(glyphs) / sizeof(glyphs[0]); ++i)
+        if (glyphs[i].character == character)
+            return glyphs[i].rows;
+    return NULL;
+}
+
+// The compact UI font when loaded; otherwise the three-by-five lettering, one scene pixel per
+// stroke.
+static void label(Panel p, const char *text, int x, int y, Color color)
+{
+    if (boat_ui_compact(text, p.x + x, p.y + y, color))
+        return;
     int left = x - ((int)strlen(text) * 4 - 1) / 2;
     for (const char *c = text; *c; ++c, left += 4) {
-        for (size_t i = 0; i < sizeof(glyphs) / sizeof(glyphs[0]); ++i) {
-            if (glyphs[i].character != *c)
-                continue;
-            for (int row = 0; row < 5; ++row)
-                for (int col = 0; col < 3; ++col)
-                    if ((glyphs[i].rows[row] - '0') & (4 >> col))
-                        box(p, left + col, y + row, 1, 1, color);
-            break;
-        }
+        const char *rows = boat_hud_glyph(*c);
+        for (int row = 0; rows && row < 5; ++row)
+            for (int col = 0; col < 3; ++col)
+                if ((rows[row] - '0') & (4 >> col))
+                    box(p, left + col, y + row, 1, 1, color);
     }
 }
 

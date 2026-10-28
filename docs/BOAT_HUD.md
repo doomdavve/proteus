@@ -13,6 +13,82 @@ The [title plan](TITLE_SCREEN_PLAN.md#warm-daylight-alternative-and-shared-game-
 owns verification and next review. Instrument geometry and semantic needle colours remain
 the same; standalone primitive reviews without UI assets keep built-in 3×5 fallback labels.
 
+## Minimap, 2026-10-28
+
+Every mapped location (`river`, `outer`), solo or in a room, has a north-up nautical chart of
+the whole map. It is baked once from the map triangles (4×4 samples per pixel) and composed each
+frame on the CPU at scene resolution, then uploaded and drawn before integer scaling. Baking
+both layers of both maps takes about 40 ms in Debug.
+
+`N` cycles three states: **corner**, a 96×68-or-smaller frame in the top-right corner without
+labels (about 73 m per pixel on `outer`); **chart**, a larger frame centred above the
+instruments with labels, a scale bar and a compass rose (about 39 m per pixel on `outer`); and
+**off**. It always starts off; Help lists `N` when a map is available. The user first saw a
+version that opened in the corner on the `outer` voyage and was solo-only, then asked
+(2026-10-28) for it to be available on `N` everywhere with off as the default. In rooms the
+map shows only the own boat and landmarks (no rivals, no voyage); the roster moves below the
+corner map, and the deathmatch rearview mirror is hidden while the chart is open.
+
+### Chart conventions (2026-10-28)
+
+The user asked for a review "from the point of view of a nautical chart engineer" so that it
+feels nautical while serving the game. The first version (olive land, steel-blue water,
+teal/amber game markers, a white wedge for the boat) was replaced by paper-chart symbology
+after INT 1 and the S-52 day palette:
+
+- **Land and water:** buff land; darker buff where roofs (flat, non-green triangles at least
+  4 m above the lowest land in their pixel, smoothed over 3×3 pixels) cover a fifth of the
+  area, as charts tint built-up areas; a black coastline on land pixels beside water. Water is
+  paper white offshore, light blue within 150 m of land and darker blue within 50 m. The game
+  has no soundings, so these tints show **distance from shore, not depth**.
+- **Limits of the survey:** pixels outside every map triangle are hatched grey and carry no
+  coastline, so open sea cut by the map edge (toward Vinga, south-west) does not show a false shore.
+- **Neat line:** a black frame with a band of alternating black and white **minutes of
+  latitude (sides) and longitude (top and bottom)**, placed from the map's georeference (crane
+  origin 57.6973921 N, 11.9089495 E; SWEREF 99 12 00 grid within 0.1° of true north). The chart
+  carries a compass rose and a scale bar in **nautical miles**, divided into cables (1 NM, or
+  0.5 NM where a mile would be wider than 80 pixels, as on `river`).
+- **Own ship:** the ECDIS symbol, two concentric rings with a heading line, in high-visibility orange (no other chart symbol uses it) and without a halo (the user asked for no white box around symbols, then for a stand-out colour),
+  distinct from the single ring of a landmark.
+- **Landmarks (black):** conspicuous-object rings at the Eriksberg crane and Nya Älvsborg, the
+  docked ferry's hull at its length and beam, and Älvsborgsbron as a double line along its deck
+  (from the river map's bridge geometry) labelled **VCL 45**, its vertical clearance in metres from
+  OpenStreetMap.
+- **Aids to navigation:** the eight channel marks the outer dressing builds, at their baked
+  positions and OpenStreetMap colours (IALA A: red port and green starboard laterals, white
+  minor lights, a black isolated danger), each with a magenta light flare where it is lit. River buoys
+  that OpenStreetMap lists but the game does not build are not charted.
+- **Voyage overprint (magenta):** shelters as anchorage symbols (the current recovery point
+  full magenta, the others pale), Långedrag as a route waypoint ring (filled once arrived), and
+  the exposed water as a dashed caution-area limit labelled EXPOSED.
+- **Lettering:** the HUD's 3×5 capitals, black for land features and magenta for the
+  overprint, knocked out of a paper halo. Diacritics are dropped (ALVSBORGSBRON, LANGEDRAG).
+
+Code: [`boat_minimap.c`](../src/boat_minimap.c); the HUD's 3×5 lettering is shared through
+`boat_hud_glyph` (with G, J, X and Z added).
+
+Review captures (agent review, 2026-10-28, macOS arm64, CPU scene, composed by the
+display-free review mode, 3× nearest): [outer corner at the dock](adventure/minimap-outer-corner.png),
+[outer chart at the dock](adventure/minimap-outer-chart.png),
+[outer chart near the east shore](adventure/minimap-outer-chart-east-shore.png),
+[river corner](adventure/minimap-river-corner.png) and
+[river chart](adventure/minimap-river-chart.png). Commands are under
+[review commands](#review-commands).
+
+Verification (2026-10-28, macOS arm64, Debug): build warning-free; `ctest --preset full`
+passed all 258 active tests (15 disabled; rerun after rebasing on main, 2026-10-28), including the quick `boat_minimap`. Rooms with the
+map open were not run (no room session or capture).
+
+Limitations: the user reported a good first impression of the first version (2026-10-28); the
+chart symbology has not been seen in play. No in-window capture: the review mode reproduces the
+composition. The chart covers the middle of the view while shown. Mark positions, the bridge
+deck and the label offsets are authored for these two maps, so a new map region or landmark
+needs its own; labels can still meet the own-ship symbol near the dock. Built-up detection
+misses small detached houses outside the river crop. The voyage panel is drawn in window pixels
+and can overlap the chart's top edge in windows smaller than 3× scale.
+
+## Deathmatch instruments and mirror
+
 Current deathmatch extension (2026-10-27): matching 54×44 side cases flank the central
 controls. Port shows hull health/segments and recoverable heel pressure; starboard shows
 Space/cannon heat (COOL when overheated), E/grenade readiness and Q/remaining torpedoes
@@ -272,6 +348,16 @@ telemetry onto a background at 320x200, then nearest-scales the combined frame:
 
 `--voyage shelter|exposed|slow|arrived|recovered` adds the outer location's destination panel
 (adventure A3.4) in window pixels, as `wake_velocity` draws it, from fixed fixture states.
+
+The solo minimap's review mode needs no window. `--at X,Z,HEADING` places the boat (simulation
+X/Z, radians), `--shelter N` picks the current recovery shelter and `--scale N` nearest-scales:
+
+```sh
+./build/wake_velocity --renderer cpu --location outer --time 3 --screenshot build/minimap-outer.png
+./build/validate_boat_minimap --mode corner --background build/minimap-outer.png --scale 3 --screenshot build/minimap-corner.png
+./build/validate_boat_minimap --mode chart --at 3300,-2100,2.4 --shelter 2 --scale 3 --screenshot build/minimap-chart.png
+./build/validate_boat_minimap --location river --mode corner --scale 3 --screenshot build/minimap-river.png
+```
 
 The review tool requires a graphics context. Default output is 960x600 (3x), compact
 320x200 (1x), large 1280x800 (4x); all use the same layout and pixel grid. Omit

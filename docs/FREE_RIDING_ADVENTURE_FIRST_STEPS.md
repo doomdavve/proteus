@@ -2187,6 +2187,32 @@ livery (white, dark blue hull band, "Stena Line" and a green wave).
 
 **Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
 
+### Minimap, 2026-10-28
+
+Branch `minimap`, from `main` after pull request #29. The user asked for a mini-map, unsure of
+the details: maybe not always visible if it takes too much space, probably not in deathmatch,
+"adventure mode would be great", and enough to see where in the river you are and how close to
+the ocean, with landmarks as highlighted dots.
+
+- **Decisions (agent, for review):** a north-up overview of the whole map rather than a
+  rotating close-up, so distance to the sea reads at a glance; `N` cycles a small corner map,
+  a larger labelled chart and off. First version: solo only, open in the corner on the
+  `outer` voyage. The user's first impression was good; they then asked for it on `N`
+  everywhere, default off ("people will learn"), so rooms have it too and it starts hidden.
+- **Result:** the [HUD guide](BOAT_HUD.md#minimap-2026-10-28) owns the layout, markers,
+  captures and limitations. The voyage's shelters, destination and exposed water come from
+  its route; the crane, fort, ferry, bridge and channel marks are fixed tables in the
+  crane-origin frame.
+- **Nautical chart review (2026-10-28):** the user, "sold on the current solution", asked for a
+  review as a nautical chart engineer so that it feels nautical while meshing with the game. The
+  chart now uses paper-chart colours (with built-up tint), a black coastline and blue
+  distance-from-shore water tints. The neat line is graduated in minutes and the scale bar is in
+  nautical miles. The boat is drawn as the ECDIS own ship, the bridge carries its clearance, the
+  outer dressing's eight IALA A marks are charted with light flares, the voyage is overprinted in
+  magenta, and areas outside the survey are hatched. Details are in the HUD guide.
+- **Verification (2026-10-28, macOS arm64, Debug):** see the HUD guide; no human play or user
+  acceptance yet.
+
 ## Verification and handoff template
 
 Every implementation handoff runs the repository's required commands:
