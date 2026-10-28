@@ -35,7 +35,7 @@ attribution files remain bundled.
 
 Verification, 2026-10-28, Apple Silicon/macOS: Debug builds passed for both menu palettes
 without project warnings; raylib retains its bundled stb_vorbis pointer-comparison warning.
-`ctest --preset full` passed all 230 enabled tests in 12.06 s, with 15 retired cases disabled
+`ctest --preset full` passed all 230 enabled tests in 12.06 s, with 13 retired cases disabled
 and `PROTEUS_GPU_TESTS=OFF`. The first sandboxed run failed socket-dependent tests; the full
 rerun with local socket access passed. A temporary, uncommitted title harness presented 195
 windowed frames and checked keyboard entry, Enter/click/Escape return, main-row reselection,
