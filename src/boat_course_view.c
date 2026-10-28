@@ -1,4 +1,5 @@
 #include "boat_course_view.h"
+#include "boat_ui.h"
 
 #include <math.h>
 
@@ -56,20 +57,20 @@ void boat_course_hud(const BoatCourse *course, Vector2 position, int width)
         return;
     int centiseconds = (int)(course->elapsed * 100);
     DrawRectangle(8, 8, 224, 62, (Color) { 14, 23, 32, 245 });
-    DrawText(TextFormat("S COURSE  %02d:%02d.%02d", centiseconds / 6000, centiseconds / 100 % 60,
-                 centiseconds % 100),
+    boat_ui_text(TextFormat("S COURSE  %02d:%02d.%02d", centiseconds / 6000,
+                     centiseconds / 100 % 60, centiseconds % 100),
         16, 14, 20, RAYWHITE);
     const char *status = course->next_gate == 0  ? "Cross START to begin"
         : course->next_gate == BOAT_COURSE_GATES ? "FINISHED!"
         : course->next_gate == BOAT_COURSE_GATES - 1
         ? "Next: FINISH"
         : TextFormat("Next: buoy gate %d / 2", course->next_gate);
-    DrawText(status, 16, 42, 16, (Color) { 255, 216, 93, 255 });
+    boat_ui_text(status, 16, 42, 16, (Color) { 255, 216, 93, 255 });
     int left = width - 128;
     if (left < 240)
         return;
     DrawRectangle(left, 8, 120, 148, (Color) { 14, 23, 32, 245 });
-    DrawText("S COURSE", left + 8, 14, 12, RAYWHITE);
+    boat_ui_text("S COURSE", left + 8, 14, 12, RAYWHITE);
     for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
         BoatCourseGate gate = boat_course_gates[i];
         int x = left + 60 + (int)gate.centre.x;
@@ -79,9 +80,9 @@ void boat_course_hud(const BoatCourse *course, Vector2 position, int width)
             DrawLine(left + 60 + (int)last.x, 38 + (int)(last.y + 60), x, y, DARKGRAY);
         }
         DrawLine(x - (int)gate.half_width, y, x + (int)gate.half_width, y, gate_color(course, i));
-        DrawText(i == 0  ? "S"
-                : i == 3 ? "F"
-                         : TextFormat("%d", i),
+        boat_ui_text(i == 0 ? "S"
+                : i == 3    ? "F"
+                            : TextFormat("%d", i),
             x + 15, y - 4, 10, gate_color(course, i));
     }
     int x = left + 60 + (int)fmaxf(-54, fminf(54, position.x));

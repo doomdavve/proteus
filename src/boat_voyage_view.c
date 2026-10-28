@@ -1,4 +1,5 @@
 #include "boat_voyage_view.h"
+#include "boat_ui.h"
 #include "raylib.h"
 
 #include <math.h>
@@ -59,7 +60,7 @@ void boat_voyage_hud(const BoatVoyage *voyage, const Boat *boat, double time, in
         headline = TextFormat("%s  %d M", name, (int)distance);
     else
         headline = TextFormat("%s  %.1f KM", name, distance / 1000);
-    DrawText(headline, left + 56, top + 8, 20, RAYWHITE);
+    boat_ui_text(headline, left + 56, top + 8, 20, RAYWHITE);
     bool alert = voyage->too_fast || voyage->exposed;
-    DrawText(notice(voyage, time), left + 56, top + 32, 12, alert ? warning : accent);
+    boat_ui_text(notice(voyage, time), left + 56, top + 32, 12, alert ? warning : accent);
 }

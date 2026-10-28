@@ -1,5 +1,6 @@
 #include "boat_hud.h"
 #include "boat_throttle.h"
+#include "boat_ui.h"
 #include "raylib.h"
 
 #include <math.h>
@@ -60,6 +61,8 @@ static void circle(Panel p, int x, int y, int radius, Color color)
 // Three-by-five lettering: each row is a three-bit mask. Every stroke is one scene pixel.
 static void label(Panel p, const char *text, int x, int y, Color color)
 {
+    if (boat_ui_compact(text, p.x + x, p.y + y, color))
+        return;
     static const struct {
         char character;
         const char *rows;

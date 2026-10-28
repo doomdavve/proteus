@@ -1,6 +1,7 @@
 #include "wake_velocity_net.h"
 #include "boat_hud.h"
 #include "boat_skin.h"
+#include "boat_ui.h"
 #include "raylib.h"
 #include "raymath.h"
 #include <inttypes.h>
@@ -386,9 +387,9 @@ int net_study_draw_roster(const NetStudy *net, int right, int top)
             continue;
         const char *line = TextFormat("%s %s%s", c->roster.slots[i].name,
             TextToUpper(boat_skin_name(net_study_skin(i))), i == c->slot ? " (YOU)" : "");
-        int x = right - MeasureText(line, 12);
+        int x = right - boat_ui_width(line, 12);
         DrawRectangle(x - 4, top - 2, right - x + 8, 15, Fade(BLACK, .45f));
-        DrawText(line, x, top, 12, i == c->slot ? RAYWHITE : LIGHTGRAY);
+        boat_ui_text(line, x, top, 12, i == c->slot ? RAYWHITE : LIGHTGRAY);
         top += 14;
     }
     return top;
@@ -415,8 +416,8 @@ static const char *clock_text(double seconds)
 
 static void backed_text(const char *text, int x, int y, int size, Color color)
 {
-    DrawRectangle(x - 6, y - 3, MeasureText(text, size) + 12, size + 6, Fade(BLACK, .45f));
-    DrawText(text, x, y, size, color);
+    DrawRectangle(x - 6, y - 3, boat_ui_width(text, size) + 12, size + 6, Fade(BLACK, .45f));
+    boat_ui_text(text, x, y, size, color);
 }
 
 static const char *feed_text(const BoatNetFeedEntry *e)
@@ -451,9 +452,9 @@ static void draw_feed(const BoatNetClient *c, int right, int top, double now)
             : v->attacker == c->slot       ? (Color) { 120, 220, 140, 255 }
                                            : LIGHTGRAY;
         const char *line = feed_text(e);
-        int x = right - MeasureText(line, 12);
+        int x = right - boat_ui_width(line, 12);
         DrawRectangle(x - 4, top - 2, right - x + 8, 15, Fade(BLACK, .45f));
-        DrawText(line, x, top, 12, color);
+        boat_ui_text(line, x, top, 12, color);
         top += 14;
     }
 }
@@ -483,11 +484,11 @@ static void draw_scoreboard(const BoatNetClient *c, int width, int height, doubl
               clock_text(((double)m->phase_end - server_tick) / BOAT_TICK_HZ))
         : m->phase == BOAT_MATCH_PLAYING ? TextFormat("ROUND %u", (unsigned)m->round)
                                          : "WARMUP";
-    DrawText(title, x, y, font, RAYWHITE);
+    boat_ui_text(title, x, y, font, RAYWHITE);
     y += line + line / 2;
     const char *headings[] = { "#", "PLAYER", "SCORE", "KILLS", "DEATHS", "SELF" };
     for (unsigned k = 0; k < 6; ++k)
-        DrawText(headings[k], x + columns[k] * font, y, font, GRAY);
+        boat_ui_text(headings[k], x + columns[k] * font, y, font, GRAY);
     y += line;
     for (unsigned n = 0; n < count; ++n, y += line) {
         unsigned i = order[n];
@@ -503,7 +504,7 @@ static void draw_scoreboard(const BoatNetClient *c, int width, int height, doubl
         snprintf(cells[4], sizeof(cells[4]), "%u", (unsigned)row->capsized);
         snprintf(cells[5], sizeof(cells[5]), "%u", (unsigned)row->self);
         for (unsigned k = 0; k < 6; ++k)
-            DrawText(cells[k], x + columns[k] * font, y, font, color);
+            boat_ui_text(cells[k], x + columns[k] * font, y, font, color);
     }
 }
 
@@ -523,7 +524,7 @@ void net_study_draw_match(
         : m->phase == BOAT_MATCH_INTERMISSION
         ? TextFormat("ROUND %u OVER / NEXT IN %s", (unsigned)m->round, clock_text(left))
         : "WARMUP / WAITING FOR ANOTHER PLAYER";
-    backed_text(top, (width - MeasureText(top, 20)) / 2, header_top, 20,
+    backed_text(top, (width - boat_ui_width(top, 20)) / 2, header_top, 20,
         m->phase == BOAT_MATCH_PLAYING && left < 30 ? ORANGE : RAYWHITE);
     draw_feed(c, width - 12, feed_top, now);
     if (scoreboard || m->phase == BOAT_MATCH_INTERMISSION)
@@ -594,9 +595,9 @@ static void draw_race_feed(const BoatNetClient *c, int right, int top, double no
         if (!line || now - e->at > 5)
             continue;
         Color color = v->slot == c->slot ? RAYWHITE : LIGHTGRAY;
-        int x = right - MeasureText(line, 12);
+        int x = right - boat_ui_width(line, 12);
         DrawRectangle(x - 4, top - 2, right - x + 8, 15, Fade(BLACK, .45f));
-        DrawText(line, x, top, 12, color);
+        boat_ui_text(line, x, top, 12, color);
         top += 14;
     }
 }
@@ -628,11 +629,11 @@ static void draw_race_board(
         ? TextFormat("RACE %u RESULTS / NEXT IN %s", (unsigned)s->round,
               clock_text(((double)s->phase_end - server_tick) / BOAT_TICK_HZ))
         : TextFormat("RACE %u STANDINGS", (unsigned)s->round);
-    DrawText(title, x, y, font, RAYWHITE);
+    boat_ui_text(title, x, y, font, RAYWHITE);
     y += line + line / 2;
     const char *headings[] = { "#", "PLAYER", "TIME", "STATUS" };
     for (unsigned k = 0; k < 4; ++k)
-        DrawText(headings[k], x + columns[k] * font, y, font, GRAY);
+        boat_ui_text(headings[k], x + columns[k] * font, y, font, GRAY);
     y += line;
     for (unsigned n = 0; n < count; ++n, y += line) {
         unsigned i = order[n];
@@ -650,7 +651,7 @@ static void draw_race_board(
                 ? "DNF"
                 : TextFormat("%u/%u LINES", row->gates, race->course.gate_count));
         for (unsigned k = 0; k < 4; ++k)
-            DrawText(cells[k], x + columns[k] * font, y, font, color);
+            boat_ui_text(cells[k], x + columns[k] * font, y, font, color);
     }
 }
 
@@ -699,12 +700,12 @@ void net_study_draw_race(const NetStudy *net, int width, int height, int feed_to
         top = TextFormat("%s   CLOSES IN %.0f", top, ceil(fmax(0, left)));
         color = left < 5 ? ORANGE : color;
     }
-    backed_text(top, (width - MeasureText(top, 20)) / 2, 12, 20, color);
+    backed_text(top, (width - boat_ui_width(top, 20)) / 2, 12, 20, color);
     // Countdown: 3, 2, 1 before GO, then GO! for a second.
     if (own->current && s->phase != BOAT_RACE_WAITING && to_go > -1 && to_go <= 3) {
         const char *big = to_go > 0 ? TextFormat("%.0f", ceil(to_go)) : "GO!";
         int size = height / 5;
-        DrawText(big, (width - MeasureText(big, size)) / 2, height / 3 - size / 2, size,
+        boat_ui_text(big, (width - boat_ui_width(big, size)) / 2, height / 3 - size / 2, size,
             to_go > 0 ? RAYWHITE : (Color) { 255, 216, 93, 255 });
     }
     draw_race_feed(c, width - 12, feed_top, now);
@@ -791,10 +792,11 @@ void net_study_combat_hud(const NetStudy *net, int width, int height, const Boat
                 (Vector3) { -pose.position.x, pose.height + 2 + age, pose.position.y }, width,
                 height, &screen)) {
             const char *text = TextFormat("%.0f", confirmed->damage[i]);
-            DrawText(text, (int)screen.x - MeasureText(text, 10) / 2, (int)screen.y, 10, YELLOW);
+            boat_ui_text(
+                text, (int)screen.x - boat_ui_width(text, 10) / 2, (int)screen.y, 10, YELLOW);
         }
     }
     if (confirmed->hit_tick && c->fleet.state.tick >= confirmed->hit_tick
         && c->fleet.state.tick - confirmed->hit_tick < 18)
-        DrawText("+", width / 2 - 3, 70, 10, (Color) { 164, 228, 239, 255 });
+        boat_ui_text("+", width / 2 - 3, 70, 10, (Color) { 164, 228, 239, 255 });
 }
