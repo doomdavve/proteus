@@ -341,7 +341,7 @@ A deliberate reset abandons an unfinished attempt while preserving your last com
   racing. Backspace reset is inactive during replay. Finishing pauses playback; `Space` then plays again from the beginning.
 - `Left`/`Right` seek one second backward/forward; hold `Shift` for five seconds. `Home`/`End` jump
   to START/FINISH. Seeking preserves pause state; jumping to FINISH pauses.
-- `[`/`]` select 0.25×, 0.5×, 1×, 2×, or 4× playback; `\` restores 1×. Selecting another recording starts at 1×.
+- `[`/`]` select 0.25×, 0.5×, 1×, 2×, 4×, or 8× playback; `\` restores 1×. Selecting another recording starts at 1×.
 - Click or drag the replay timeline to seek and pause; press `Space` to continue. The timeline marks
   START, both buoy gates, and FINISH. Camera controls remain available. Losing focus pauses playback
   without advancing the clock.
@@ -480,7 +480,7 @@ from neutral to full in 0.25 seconds, with separately smoothed engine response. 
 unassigned. R does nothing. Hold Backspace for one second, with a visible progress bar, or
 choose the explicit reset/restart/request action in the Escape menu. A short tap does nothing;
 release, help/menu, loss of focus or replay cancels progress. Each hold triggers at most once.
-For single-player testing, `[` slows time and `]` speeds it up through ¼×, ½×, 1×, 2× and 4×;
+For single-player testing, `[` slows time and `]` speeds it up through ¼×, ½×, 1×, 2×, 4× and 8×;
 `\` (backslash) returns to 1×. The same keys control replay speed while watching a replay.
 The current multiplier appears above the scene when altered. Boat physics still uses fixed
 120 Hz simulated ticks; water, traffic, wakes and voyage progress follow simulation time.

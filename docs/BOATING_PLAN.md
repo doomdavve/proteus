@@ -490,7 +490,7 @@ splits. The fastest run persists across launches and becomes a non-colliding cya
 calm water and gentle waves have separate bests. G toggles the ghost. Before START or after FINISH,
 P/B replays the last/best run; Space pauses, Enter restarts, and hold Backspace 1 s returns to racing. A retry discards
 only the unfinished recording. Replay omits water particles and allows the usual camera controls. Left/Right seek one second
-(Shift: five seconds), Home/End jump to START/FINISH, and brackets select 0.25× through 4× playback; backslash restores 1×.
+(Shift: five seconds), Home/End jump to START/FINISH, and brackets select 0.25× through 8× playback; backslash restores 1×.
 A clickable timeline marks gate splits; clicking/dragging seeks and pauses. Finish pauses playback;
 Space starts again from the beginning. Seeking and speed changes preserve the recording and best.
 Portable, versioned run files can be exported with `--save-run`, watched with `--replay`, or selected
@@ -911,7 +911,7 @@ compiled or played in this Fedora session (no Emscripten SDK installed).
 ## Play-testing time controls — 2026-10-28
 
 Implemented in `playtest-time-controls`: `[` / `]` extend the existing replay speed mapping
-to live solo play (¼×, ½×, 1×, 2×, 4×); backslash restores 1× in either context. Live and replay
+to live solo play (¼×, ½×, 1×, 2×, 4×, 8×); backslash restores 1× in either context. Live and replay
 rates are independent, start at 1×, and live rate survives boat resets. Camera zoom retains
 `+` / `−`. The scene displays an amber multiplier while altered and PRACTICE for affected courses.
 
@@ -930,7 +930,7 @@ Completed task: implementation, help/CLI and controls documentation, determinist
 and practice-persistence checks. Automated verification, 2026-10-28 on macOS/Apple Silicon,
 Debug: build passed; `ctest --preset full` passed all 231 enabled tests (13 retired cases disabled).
 The first sandboxed quick run had four socket-access failures; the full run with network/graphics
-access passed. `boat_time_control` uses 24 virtual ticks and remains in the quick lane.
+access passed. The original `boat_time_control` check used 24 virtual ticks in the quick lane.
 A temporary instrumented app used raylib key events in a 240-frame windowed basin/waves/course
 run (`--no-vsync`) to check ¼×/4×, normal-time restore, ignored menu time keys and a real-time
 Backspace reset clearing practice at 1×. Its captures at 4×, ¼× and after reset were inspected;
@@ -938,6 +938,16 @@ the time label was moved below course panels after the first capture exposed ove
 automated windowed coverage, not human input or audio acceptance. The final production binary
 also completed a windowed river/waves demo (`--location river --waves --demo --no-vsync
 --frames 180`); no human audio assessment was performed.
-Next task: human review of binding convenience and handling at ¼× and 4×. Known limits: fast-forward increases physics CPU work; audio plays at its normal rate,
-and the existing stall clamp still discards real time above 0.1 s per frame. Browser/Windows and
-user acceptance are pending.
+
+Follow-up, 2026-10-28: the user reports 4× felt fine and requested 8×. The live and replay
+controls now include 8× as the highest step; backslash still restores 1×. The deterministic
+rate check now compares 32 virtual ticks at all six rates; the replay check includes 8× and
+its upper clamp. Follow-up verification on macOS/Apple Silicon, Debug: build passed and
+`ctest --preset full` passed all 231 enabled tests (13 retired cases disabled). The temporary
+240-frame windowed raylib key-event check passed at 8×, including repeated faster input at
+the limit, normal-time restore, ignored menu keys and practice reset; the 8× indicator capture
+was inspected. The final production binary completed the 180-frame river/waves demo again.
+Next task: human review of handling/performance at 8× and binding convenience. The reported
+4× playtest does not establish acceptance of 8×. Known limits: fast-forward increases physics CPU work; audio plays at its normal rate,
+and the existing stall clamp still discards real time above 0.1 s per frame. Browser/Windows
+verification and human acceptance of 8× are pending.

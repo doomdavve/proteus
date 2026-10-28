@@ -225,11 +225,11 @@ static int playback_controls(const BoatReplay *run)
     memcpy(first, &run->samples[0], sizeof(first));
     memcpy(last, &run->samples[run->count - 1], sizeof(last));
     // Every speed advances in course seconds, with no dependence on render frame count.
-    const float speeds[] = { .25f, .5f, 1, 2, 4 };
+    const float speeds[] = { .25f, .5f, 1, 2, 4, 8 };
     boat_replay_speed_step(&runs, -1);
     boat_replay_speed_step(&runs, -1);
     boat_replay_speed_step(&runs, -1);
-    for (int i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < sizeof(speeds) / sizeof(speeds[0]); ++i) {
         CHECK(boat_replay_speed(&runs) == speeds[i]);
         boat_replay_seek(&runs, 0);
         for (int frame = 0; frame < 60; ++frame)
@@ -246,7 +246,7 @@ static int playback_controls(const BoatReplay *run)
         CHECK(fabs(runs.replay_time - sixty) < .000001);
         boat_replay_speed_step(&runs, 1);
     }
-    CHECK(boat_replay_speed(&runs) == 4); // Clamp at both ends of the speed range.
+    CHECK(boat_replay_speed(&runs) == 8); // Clamp at both ends of the speed range.
     double before = runs.replay_time;
     boat_replay_advance(&runs, .1, false);
     CHECK(runs.replay_time == before && !runs.paused);
@@ -276,7 +276,7 @@ static int playback_controls(const BoatReplay *run)
     boat_replay_advance(&runs, -1, true);
     CHECK(runs.replay_time == 0);
     boat_replay_advance(&runs, 10, true);
-    CHECK(fabs(runs.replay_time - .4) < .000001); // Long frames match the live time cap.
+    CHECK(fabs(runs.replay_time - .8) < .000001); // Real-time cap is scaled at 8x.
     boat_replay_seek(&runs, finish - .01);
     boat_replay_advance(&runs, .1, true);
     CHECK(runs.replay_time == finish && runs.paused);

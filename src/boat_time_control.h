@@ -4,18 +4,19 @@
 #include <math.h>
 
 #define BOAT_TIME_NORMAL 2
+#define BOAT_TIME_MAX_INDEX 5
 
-// Live play and replay share the same five rates. The physical tick stays at 1/120 s.
+// Live play and replay share the same six rates. The physical tick stays at 1/120 s.
 static inline float boat_time_rate(int index)
 {
-    static const float rates[] = { .25f, .5f, 1, 2, 4 };
-    return rates[index < 0 ? 0 : index > 4 ? 4 : index];
+    static const float rates[] = { .25f, .5f, 1, 2, 4, 8 };
+    return rates[index < 0 ? 0 : index > BOAT_TIME_MAX_INDEX ? BOAT_TIME_MAX_INDEX : index];
 }
 
 static inline int boat_time_speed_step(int index, int direction)
 {
     index += (direction > 0) - (direction < 0);
-    return index < 0 ? 0 : index > 4 ? 4 : index;
+    return index < 0 ? 0 : index > BOAT_TIME_MAX_INDEX ? BOAT_TIME_MAX_INDEX : index;
 }
 
 // Clamp real frame stalls before scaling; clamping afterwards would truncate fast-forward.

@@ -1,6 +1,6 @@
 # Test workflow and timing
 
-`boat_time_control` advances the same 24 simulated ticks at all five live time rates and
+`boat_time_control` advances the same 32 simulated ticks at all six live time rates and
 compares the tick count and complete physical boat state with a fixed-tick reference; it also
 checks rate bounds and the real-frame stall clamp before scaling. `boat_replay` covers practice
 finishes with/without an existing best, preserved export files, replayable last runs and eligibility

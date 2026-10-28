@@ -82,7 +82,7 @@ static void usage(void)
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"
         "G: ghost on/off | P/B: replay last/best | Space: pause replay | Enter: restart replay\n"
-        "Solo: [ / ] slower/faster (0.25x..4x) | backslash: normal time; altered runs are "
+        "Solo: [ / ] slower/faster (0.25x..8x) | backslash: normal time; altered runs are "
         "practice\n"
         "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed | backslash: 1x\n"
         "Click/drag the replay timeline to seek and pause; Space resumes.\n"
@@ -138,7 +138,7 @@ static void draw_help(bool course, bool voyage, bool deathmatch, bool race, bool
         deathmatch ? "V: toggle rearview mirror (starts hidden)" : "",
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
-        networked ? "" : "[ / ]: time 0.25x..4x | backslash: 1x",
+        networked ? "" : "[ / ]: time 0.25x..8x | backslash: 1x",
         course ? "Altered live time: practice, no best/export" : "",
 #if defined(__EMSCRIPTEN__)
         "Esc: menu / leave fullscreen | Back to title: setup",

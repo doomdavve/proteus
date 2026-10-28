@@ -1,6 +1,6 @@
 # Marine boat instruments
 
-Single-player time controls (2026-10-28): `[` / `]` step through ¼×, ½×, 1×, 2×, 4×;
+Single-player time controls (2026-10-28): `[` / `]` step through ¼×, ½×, 1×, 2×, 4×, 8×;
 `\` restores 1×. These extend the existing replay bracket mapping and leave camera zoom on
 `+` / `−`. An amber TIME multiplier appears at scene resolution above the instruments whenever
 live time is altered; a scaled course attempt retains PRACTICE until restarted, even at 1×.

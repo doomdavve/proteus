@@ -16,9 +16,10 @@
 int main(void)
 {
     CHECK(boat_time_speed_step(0, -1) == 0);
-    CHECK(boat_time_speed_step(4, 1) == 4);
+    CHECK(boat_time_speed_step(4, 1) == 5);
+    CHECK(boat_time_speed_step(5, 1) == 5);
     CHECK(boat_time_speed_step(BOAT_TIME_NORMAL, 0) == BOAT_TIME_NORMAL);
-    CHECK(boat_time_frame_seconds(1, 4) == .4);
+    CHECK(boat_time_frame_seconds(1, 5) == .8);
     CHECK(boat_time_frame_seconds(-1, 4) == 0);
     CHECK(boat_time_frame_seconds(NAN, 4) == 0);
     CHECK(boat_time_frame_seconds(INFINITY, 4) == 0);
@@ -27,15 +28,15 @@ int main(void)
     boat_session_init(
         &reference, test_world(BOAT_LOCATION_BASIN), boat_water_test(true, false, false));
     reference.presentation_enabled = false;
-    for (int i = 0; i < 24; ++i)
+    for (int i = 0; i < 32; ++i)
         CHECK(boat_session_step(&reference, input));
-    for (int index = 0; index <= 4; ++index) {
+    for (int index = 0; index <= BOAT_TIME_MAX_INDEX; ++index) {
         BoatSession scaled;
         boat_session_init(
             &scaled, test_world(BOAT_LOCATION_BASIN), boat_water_test(true, false, false));
         scaled.presentation_enabled = false;
         double accumulator = 0;
-        int frames = (int)(12 / boat_time_rate(index));
+        int frames = (int)(16 / boat_time_rate(index));
         for (int frame = 0; frame < frames; ++frame) {
             accumulator += boat_time_frame_seconds(1.0 / 60, index);
             while (accumulator >= BOAT_TICK_SECONDS) {
