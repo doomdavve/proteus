@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27), and [A3.5e](#a35e-result-2026-10-27) (the docked Stena ferry across from the crane, in `river` and `outer`; CPU and GPU captures) completed 2026-10-27 on branch `stena-ferry`; A3.5 is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27), and [A3.5e](#a35e-result-2026-10-27) (the docked Stena ferry across from the crane, in `river` and `outer`; CPU and GPU captures) completed 2026-10-27 on branch `stena-ferry`. A3.5 was split into [A3.5h](#a35h-result-2026-10-28) (the weather transition: the outer squall grows once the boat heads out and is seen in the sky on both renderers; captures and tests, unplayed), completed 2026-10-28 on branch `adventure-a3-5h`, and A3.5i (bounded loading), which is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1503,7 +1503,8 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.5e | A3.5c | A docked Stena Line ro-pax ferry across the river from the Eriksberg crane (user must-have; [plan](#a35e--the-stena-ferry-at-eriksberg)) | Complete 2026-10-27; [result](#a35e-result-2026-10-27) |
 | A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Proposed |
 | A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Proposed |
-| A3.5 | A3.5a | Local weather transition and bounded per-region detailed-asset loading; cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
+| A3.5h | A3.5a | The local weather transition, the first half of A3.5: the exposure grows from calm water once the boat heads out, is seen from afar as a squall in the sky, and dims the light near it | Complete 2026-10-28; [result](#a35h-result-2026-10-28) |
+| A3.5i | A3.5h | The rest of A3.5: bounded per-region detailed-asset loading (the bake out of the 33 MB header first, as A3.5f needs); cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Proposed |
 
 ### A3.1 result, 2026-10-26
 
@@ -2125,7 +2126,8 @@ assumptions.
 
 **Proposed order:** A3.5e (the ferry; independent), then A3.5f with A3.5d's re-extraction, then
 A3.5g, then A3.5d for the rest of the OSM landmarks. A3.5, the weather transition and bounded
-loading, may be needed before A3.5f for size.
+loading, may be needed before A3.5f for size (2026-10-28: the weather transition is A3.5h,
+done; the loading is A3.5i).
 
 ### A3.5e result, 2026-10-27
 
@@ -2185,7 +2187,8 @@ livery (white, dark blue hull band, "Stena Line" and a green wave).
     narrow to enter (the contact pads it).
   - The ferry never sails. It is static content, not part of the traffic circuits.
 
-**Next: A3.5**, the local weather transition and bounded per-region detailed-asset loading.
+**Next (as of 2026-10-27): A3.5**, the local weather transition and bounded per-region
+detailed-asset loading; split on 2026-10-28 into A3.5h (done, below) and A3.5i.
 
 ### Minimap, 2026-10-28
 
@@ -2212,6 +2215,81 @@ the ocean, with landmarks as highlighted dots.
   magenta, and areas outside the survey are hatched. Details are in the HUD guide.
 - **Verification (2026-10-28, macOS arm64, Debug):** see the HUD guide; no human play or user
   acceptance yet.
+
+### A3.5h result, 2026-10-28
+
+Branch `adventure-a3-5h`, from `main` after pull request #39. The user: "Continue work on the
+adventure mode out to Vinga." The plan's next step, A3.5, was split: the weather transition
+(this step) and bounded loading (A3.5i, next).
+
+- **Growth (core):** `BoatStorm.build` grows a patch from flat water at `started` to its height
+  over that many seconds (smoothstep). The hull sees the growth too: the surface's vertical
+  velocity includes the growth rate times the full-height surface. The shaders get the grown
+  height through the existing uniform, so CPU/GPU parity is unchanged. The race's squall has
+  `build` 0 and is unchanged, as is its digest.
+- **Onset (voyage):** `boat_voyage_outer` gives the exposure a 60 s build and a 2.5 km
+  `weather_range`. The patch is calm until the boat first comes within that range of its
+  centre (on the open fjord, about 1.9 km before the exposed zone), then grows, with the
+  notice SQUALL BUILDING OFFSHORE. A boat first observed in range (a `--start` placement)
+  finds it grown. Recovery keeps it; a restart begins calm. The solo session sets its water's
+  storm from the voyage after each step (`boat_voyage_weather`); `wake_velocity` no longer
+  seeds it. Rooms are unchanged: calm water.
+- **The squall in the sky (both renderers):** `WaterfrontSquall` paints the patch into the sky
+  pass, behind all geometry. It is a cloud column 1.2 × the patch radius from 200 m to at most
+  520 m, its sides narrowing and billowing upward, dark at the base and lit toward the tops,
+  with rain shafts below (the rain is evaluated once per ray; the cloud is marched in 16 steps
+  above the base). Its height and cover grow with the patch; rain starts at 30% growth. It reads
+  from the onset range, and under it the sky goes to rain grey. The GPU's water also reflects
+  it. The race's compact squall (radius under 400 m) keeps its box cloud and does not use it;
+  the weather patch drops those boxes but keeps the rain streaks and lightning near the boat.
+  The A3.4 box-cloud attempt and an intermediate box deck tried here (it read as a hovering
+  structure on pillars) are superseded.
+- **Light:** `boat_view_overcast` blends the finished 3D frame toward slate (46, 56, 66) by up
+  to 45%. The blend fades in from 1.8 km outside the patch to half its radius and scales with
+  growth. The CPU applies it per pixel and the GPU as one alpha-blended quad; the HUD is drawn
+  after it.
+- **Tests:** `boat_voyage` checks growth (zero before the start, half at half time, full after,
+  and the shader height). It checks the vertical velocity against a central difference of the
+  height on the patch's flank through the whole build (worst error under 0.02 m/s), the onset,
+  notice and persistence, the pre-grown `--start` case, and that the session's water is calm
+  until the onset. The A3.4 autopilots start in range, so they run in the grown patch as
+  before: coastal 97.6 s, direct 109.2 s with 27.5 s exposed, no capsizes. `gpu_fixture`'s sky
+  check (`gpu_surface_materials`) adds a squall view, which must change at least a fifth of the
+  pixels, and compares CPU and GPU skies with the existing tolerance. `boat_hud_review` has
+  `--voyage weather`.
+- **Captures (agent review, 2026-10-28, macOS arm64, 3 s scripted drive):** from the onset
+  range, grown, [CPU](adventure/weather-far-cpu.png) and [GPU](adventure/weather-far-gpu.png)
+  (`--location outer --start 2300,-1600,62`); [building, about a third grown, no rain
+  yet](adventure/weather-building-cpu.png) (the same view with the voyage's pre-growth
+  temporarily shortened in a local build); [at the edge, under the
+  base](adventure/weather-edge-cpu.png) (`--start 3700,-2300,60`); inside,
+  [CPU](adventure/weather-inside-cpu.png) and [GPU](adventure/weather-inside-gpu.png)
+  (`--start 4300,-2650,90`); the [notice](adventure/weather-hud.png). The scripted drive turns
+  and stops, so a capture sequence of the growth while approaching was not possible with it.
+- **Measured cost (Debug, M1 Max, CPU sky alone, 320 × 200, 50 frames):** 1.1 ms plain, 3.3 ms
+  under the squall looking ahead. A first version that marched the whole ray took 14.5 ms; the
+  rain was made analytic. GPU sky cost was not measured.
+- **Verification (2026-10-28, macOS arm64, Debug, `PROTEUS_GPU_TESTS=ON`):** build
+  warning-free; `ctest --preset full` passed all 259 active tests (15 retired disabled). A
+  600-frame windowed GPU run near the squall (`--location outer --start 2300,-1600,62 --frames
+  600`) exited cleanly; the window was not focused, so it ran only 119 ticks.
+- **Limitations:**
+  - **No manual playback or user acceptance.** The 60 s build, the 2.5 km onset, the cloud's
+    size and the darkness are agent choices from captures.
+  - The squall cannot be seen from the river or under Älvsborgsbron: the onset range (about
+    3.5 km from BRIDGE) is out in the fjord, and before the onset there is no cloud at all. A
+    visible distant build-up from the river would need the cloud before the waves.
+  - No wind: the flag, spray and audio do not change in the squall, and there is no rain or
+    wind sound. Gusts and a wind vector (the plan's weather recipe) are not implemented.
+  - The overcast blend is a flat tint toward slate, not lighting: the sun direction and
+    shadows are unchanged, and the GPU's distance fog stays sky blue under it.
+  - A single fixed patch; it never moves, decays or comes back. Weather is still authored,
+    not observed (the Vinga A storm data is unused).
+  - Objects beyond the cloud (more than about 4 km off) are drawn in front of it, since it is
+    painted into the sky.
+
+**Next: A3.5i**, bounded per-region detailed-asset loading, which A3.5f's upstream extension
+also needs.
 
 ## Verification and handoff template
 

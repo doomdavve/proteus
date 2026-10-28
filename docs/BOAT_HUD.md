@@ -346,8 +346,9 @@ telemetry onto a background at 320x200, then nearest-scales the combined frame:
 ./build/boat_hud_review --voyage exposed --screenshot build/hud-voyage-exposed.png
 ```
 
-`--voyage shelter|exposed|slow|arrived|recovered` adds the outer location's destination panel
-(adventure A3.4) in window pixels, as `wake_velocity` draws it, from fixed fixture states.
+`--voyage shelter|exposed|slow|arrived|recovered|weather` adds the outer location's destination
+panel (adventure A3.4; `weather` is A3.5h's SQUALL BUILDING OFFSHORE notice) in window pixels, as
+`wake_velocity` draws it, from fixed fixture states.
 
 The solo minimap's review mode needs no window. `--at X,Z,HEADING` places the boat (simulation
 X/Z, radians), `--shelter N` picks the current recovery shelter and `--scale N` nearest-scales:

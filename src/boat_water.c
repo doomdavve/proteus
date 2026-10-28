@@ -312,13 +312,31 @@ Vector2 boat_water_storm_centre(BoatStorm storm, double time)
         storm.centre.y + (float)(storm.velocity.y * age) };
 }
 
+float boat_water_storm_grown(BoatStorm storm, double time, float *rate)
+{
+    if (rate)
+        *rate = 0;
+    if (storm.build <= 0)
+        return 1;
+    double age = time - storm.started;
+    if (age <= 0)
+        return 0;
+    if (age >= storm.build)
+        return 1;
+    float u = (float)(age / storm.build);
+    if (rate)
+        *rate = 6 * u * (1 - u) / storm.build;
+    return u * u * (3 - 2 * u);
+}
+
 void boat_water_storm_uniforms(BoatStorm storm, double time, float parameters[12])
 {
     Vector2 centre = boat_water_storm_centre(storm, time);
     parameters[0] = -centre.x;
     parameters[1] = centre.y;
     parameters[2] = storm.radius;
-    parameters[3] = storm.height;
+    // The shaders take the grown height; its growth rate only matters to hull physics.
+    parameters[3] = storm.height * boat_water_storm_grown(storm, time, NULL);
     parameters[4] = boat_phase(3.2f, time - storm.started);
     parameters[5] = boat_phase(3.75f, time - storm.started);
     parameters[6] = boat_phase(2.45f, time - storm.started);
@@ -332,7 +350,9 @@ void boat_water_storm_uniforms(BoatStorm storm, double time, float parameters[12
 BoatStormSample boat_water_storm_query(BoatStorm storm, Vector2 position, double time)
 {
     BoatStormSample sample = { 0 };
-    if (storm.radius <= 0 || storm.height <= 0)
+    float rate;
+    float grown = boat_water_storm_grown(storm, time, &rate);
+    if (storm.radius <= 0 || storm.height <= 0 || (grown <= 0 && rate <= 0))
         return sample;
     Vector2 p = Vector2Subtract(position, boat_water_storm_centre(storm, time));
     float r2 = Vector2LengthSqr(p) / (storm.radius * storm.radius);
@@ -366,6 +386,12 @@ BoatStormSample boat_water_storm_query(BoatStorm storm, Vector2 position, double
     // Translating the compact envelope and its local crests also moves the surface at a
     // fixed world point. Include that term in the physical vertical velocity.
     sample.vertical_velocity -= Vector2DotProduct(sample.gradient, storm.velocity);
+    // A growing patch also lifts its crests: d(grown * h)/dt adds rate * h.
+    if (grown < 1) {
+        sample.vertical_velocity = grown * sample.vertical_velocity + rate * sample.height;
+        sample.height *= grown;
+        sample.gradient = Vector2Scale(sample.gradient, grown);
+    }
     return sample;
 }
 

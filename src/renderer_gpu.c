@@ -1643,8 +1643,8 @@ static void restore_render_target(RenderTargetState state)
     rlSetMatrixModelview(state.modelview);
 }
 
-static void draw_sky(
-    const WaterfrontGpuScene *scene, View3D camera, int width, int height, float aspect)
+static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontSquall squall,
+    int width, int height, float aspect)
 {
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
@@ -1655,6 +1655,12 @@ static void draw_sky(
     SetShaderValue(shader, GetShaderLocation(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, GetShaderLocation(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, GetShaderLocation(shader, "skyScale"), scale, SHADER_UNIFORM_VEC2);
+    SetShaderValue(
+        shader, GetShaderLocation(shader, "skyEye"), &camera.position, SHADER_UNIFORM_VEC3);
+    float area[] = { squall.centre.x, squall.centre.y, squall.radius, squall.grown };
+    float heights[] = { squall.base, squall.top };
+    SetShaderValue(shader, GetShaderLocation(shader, "squallArea"), area, SHADER_UNIFORM_VEC4);
+    SetShaderValue(shader, GetShaderLocation(shader, "squallHeight"), heights, SHADER_UNIFORM_VEC2);
     if (counting)
         ++counting->sky_quads;
     BeginShaderMode(shader);
@@ -1726,8 +1732,8 @@ static void render_reflection(
     sky_camera.up = camera.up;
     sky_camera.vertical_fov = camera.fovy * DEG2RAD;
     // The fixed-size texture stores this wider frustum, independent of its pixel aspect.
-    draw_sky(scene, sky_camera, scene->reflection.texture.width, scene->reflection.texture.height,
-        aspect);
+    draw_sky(scene, sky_camera, frame->squall, scene->reflection.texture.width,
+        scene->reflection.texture.height, aspect);
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(
         camera.fovy * DEG2RAD, aspect, frame->camera.near_plane, frame->camera.far_plane));
@@ -1891,7 +1897,7 @@ static void draw_scene(
     counting_pass = WATERFRONT_GPU_PASS_MAIN;
     set_atmosphere_uniforms(scene, frame->camera.position);
     ClearBackground(BLACK);
-    draw_sky(scene, frame->camera, width, height, (float)width / height);
+    draw_sky(scene, frame->camera, frame->squall, width, height, (float)width / height);
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(frame->camera.vertical_fov,
         (float)width / (float)height, frame->camera.near_plane, frame->camera.far_plane));

@@ -133,9 +133,7 @@ static BoatWater study_water(
 {
     BoatWater water = boat_world_test_water(location, waves, current, crossing);
     water.player_wake_enabled = player;
-    if (location->voyage)
-        water.storm = location->voyage->exposure; // Single player only; rooms keep calm water.
-    return water;
+    return water; // A solo session's voyage adds its exposure; rooms keep calm water.
 }
 
 static void draw_help(

@@ -106,6 +106,78 @@ Image waterfront_sky_image(void)
 
 void waterfront_sky_draw(Color *pixels, int width, int height, View3D camera)
 {
+    waterfront_sky_draw_squall(pixels, width, height, camera, (WaterfrontSquall) { 0 });
+}
+
+// The cloud's edge at height fraction H (0 at the base, 1 at the tops), relative to the radius:
+// full width low down, narrowing and billowing upward.
+static float squall_edge(float angle, float h)
+{
+    return 1 - .5f * h * h + .07f * sinf(5 * angle + 7 * h) + .05f * sinf(13 * angle + 3);
+}
+
+Color waterfront_squall_sky(Color sky, Vector3 eye, Vector3 ray, WaterfrontSquall q)
+{
+    if (q.grown <= 0 || q.radius <= 0)
+        return sky;
+    float horizontal = fmaxf(sqrtf(ray.x * ray.x + ray.z * ray.z), 1e-4f);
+    Vector2 direction = { ray.x / horizontal, ray.z / horizontal };
+    float slope = ray.y / horizontal; // Height gained per horizontal metre.
+    Vector2 to = { q.centre.x - eye.x, q.centre.y - eye.z };
+    float along = to.x * direction.x + to.y * direction.y;
+    float miss = to.x * to.x + to.y * to.y - along * along;
+    if (miss >= q.radius * q.radius)
+        return sky;
+    float half = sqrtf(q.radius * q.radius - miss);
+    float near = fmaxf(along - half, 0), far = along + half;
+    if (far <= 0)
+        return sky;
+    // Below the base: rain over the inner disk, its shafts taken at the middle of the path.
+    float rain = 0;
+    float base = slope > 0 ? (q.base - eye.y) / slope : INFINITY; // Distance to the base.
+    float inner = q.radius * q.radius * .85f * .85f;
+    if (miss < inner) {
+        float chord = sqrtf(inner - miss);
+        float from = fmaxf(along - chord, 0), to = fminf(along + chord, base);
+        if (to > from) {
+            float t = (from + to) * .5f;
+            Vector2 p
+                = { eye.x + direction.x * t - q.centre.x, eye.z + direction.y * t - q.centre.y };
+            float shafts = .5f
+                + .5f * sinf(5 * atan2f(p.y, p.x) + 4 * sqrtf(p.x * p.x + p.y * p.y) / q.radius);
+            float showers = Clamp((q.grown - .3f) / .4f, 0, 1);
+            rain = 1.6f * (to - from) / q.radius * showers * (.35f + .65f * shafts);
+        }
+    }
+    // Above it: march the cloud between the base and its billowing edge.
+    float ceiling = q.base + (q.top - q.base) * q.grown;
+    float from = fmaxf(near, base == INFINITY ? far : base);
+    const int steps = 16;
+    float step = (far - from) / steps;
+    for (int i = 0; i < steps && step > 0; ++i) {
+        float t = from + step * ((float)i + .5f);
+        Vector2 p = { eye.x + direction.x * t - q.centre.x, eye.z + direction.y * t - q.centre.y };
+        float h = (eye.y + slope * t - q.base) / fmaxf(ceiling - q.base, 1);
+        if (h > 1)
+            break; // Rising away above the tops.
+        float reach = sqrtf(p.x * p.x + p.y * p.y) / q.radius;
+        float edge = squall_edge(atan2f(p.y, p.x), h);
+        if (reach > edge)
+            continue;
+        // Dark underneath, lit toward the tops; soft at the rim.
+        float lit = Clamp(h, 0, 1);
+        float cover = Clamp((edge - reach) * 8, 0, 1) * Clamp(q.grown * 3, 0, 1);
+        Color cloud = { (unsigned char)(64 + 92 * lit), (unsigned char)(72 + 90 * lit),
+            (unsigned char)(84 + 86 * lit), 255 };
+        sky = ColorLerp(sky, cloud, cover);
+        break;
+    }
+    return ColorLerp(sky, (Color) { 98, 108, 120, 255 }, fminf(rain, .85f));
+}
+
+void waterfront_sky_draw_squall(
+    Color *pixels, int width, int height, View3D camera, WaterfrontSquall squall)
+{
     Image sky = waterfront_sky_image();
     const Color *colors = sky.data;
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
@@ -120,7 +192,8 @@ void waterfront_sky_draw(Color *pixels, int width, int height, View3D camera)
             float u = atan2f(ray.x, ray.z) / (2 * PI) + .5f;
             int sx = (int)(u * sky.width) % sky.width;
             int sy = (int)Clamp((1 - ray.y) * .5f * sky.height, 0, sky.height - 1);
-            pixels[y * width + x] = colors[sy * sky.width + sx];
+            pixels[y * width + x]
+                = waterfront_squall_sky(colors[sy * sky.width + sx], camera.position, ray, squall);
         }
     }
 }

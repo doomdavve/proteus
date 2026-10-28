@@ -443,9 +443,13 @@ water. Arrive by entering the harbour basin at 6 m/s or less; the panel then sho
 since the start. The dock, the river past the bridge and the outer fjord's east shore are
 shelters: passing one makes it the recovery point, and holding Backspace for 1 s (or RECOVER
 BOAT in the Esc menu) returns the boat there while the clock and water keep running. West of
-the direct line down the outer fjord lies a fixed patch of rough water with rain. The direct
+the direct line down the outer fjord lies a patch of rough water with rain. The direct
 line crosses its flank, the east shore stays calm, and its middle has swells of several
-metres. The patch is authored, not observed weather. Rooms on `outer` keep calm water and no
+metres. It is calm until you first come within about 2.5 km of it out on the fjord; then a
+squall builds there over a minute (SQUALL BUILDING OFFSHORE), with a dark cloud and rain shafts
+you can see from afar, and the light dims as you near it
+([A3.5h](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35h-result-2026-10-28)). A `--start` placement
+within that range finds it already built. The weather is authored, not observed. Rooms on `outer` keep calm water and no
 voyage. `--start X,Z[,DEGREES]` places the boat anywhere in a
 mapped location (simulation X/Z; heading 0 faces -Z), for example
 `--location outer --start 1980,-1196,75` on the open leg of the route.
