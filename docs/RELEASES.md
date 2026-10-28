@@ -96,7 +96,12 @@ configure/build and all 234 enabled CPU CTests passed on Apple Silicon/macOS, wi
 and 13 retired cases disabled. The expanded offline release guards passed 17 tests, including
 real temporary Git history checks and virtual-clock workflow polling; the final focused
 CTest rerun passed. Changed documentation file links and whitespace were checked. This
-hardening has not published another release or redeployed Winterfell. The next release will
+hardening has not published another release or redeployed Winterfell.
+[PR #40](https://github.com/doomdavve/proteus/pull/40) passed macOS, Windows and Linux CI.
+The merged `bb8e7c8` command passed live `v0.0.22 --check` using the existing controller,
+Playwright environment, vault file and noninteractive SSH/sudo setup. No v0.0.22 tag or
+release output directory was created, and the hosting worktree remained clean.
+The next release will
 qualify the revised complete command against live publication/deployment; physical-device,
 human package/input/audio and wider network review remain open. v0.0.21 remains the deployed
 release; its live evidence below belongs to the earlier command.
