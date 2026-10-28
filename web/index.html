@@ -65,6 +65,10 @@
     #iphone-tip { max-width: 52ch; color: #afc2c4; }
     canvas { display: block; image-rendering: pixelated; }
     #canvas:focus { outline: none; }
+    @media (pointer: coarse) {
+      #stage { padding: 0; }
+      #mobile-controls { z-index: 1; }
+    }
     @media (max-width: 540px) {
       #launcher { padding: 20px; }
       .preview { aspect-ratio: 4 / 3; }

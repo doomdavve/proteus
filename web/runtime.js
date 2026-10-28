@@ -62,9 +62,12 @@ function fitCanvas() {
   const availableWidth = (viewport ? viewport.width : innerWidth)
     - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   const scale = Math.max(1, Math.floor(Math.min(availableWidth / 320, availableHeight / 200)));
-  // The fixed 960x600 buffer contains a 320x200 scene. Use whole scene-pixel scales.
-  const width = 320 * scale;
-  const height = 200 * scale;
+  const mobile = window.matchMedia('(pointer: coarse)').matches;
+  // Mobile fills the visible viewport with controls over the game. Stretch the
+  // presentation instead of cropping the HUD or reserving space for controls.
+  // Desktop retains whole scene-pixel scales for the 320x200 scene.
+  const width = mobile ? (viewport ? viewport.width : innerWidth) : 320 * scale;
+  const height = mobile ? (viewport ? viewport.height : innerHeight) : 200 * scale;
   canvas.style.width = width + 'px';
   canvas.style.height = height + 'px';
 }

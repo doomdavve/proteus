@@ -53,6 +53,22 @@ with sync_playwright() as p:
       };
     }''')
     page.wait_for_function('mobileAudit.frames > 2')
+    def assert_overlay_layout():
+        page.wait_for_function("""() => {
+          const box = document.getElementById('canvas').getBoundingClientRect();
+          const viewport = window.visualViewport;
+          return Math.abs(box.width - viewport.width) < 1
+            && Math.abs(box.height - viewport.height) < 1;
+        }""")
+        canvas_box = page.locator('#canvas').bounding_box()
+        for selector in ['#mobile-menu', '[data-hold=left]', '[data-hold=forward]']:
+            button = page.locator(selector).bounding_box()
+            assert button['x'] >= canvas_box['x'] - 1
+            assert button['y'] >= canvas_box['y'] - 1
+            assert button['x'] + button['width'] <= canvas_box['x'] + canvas_box['width'] + 1
+            assert button['y'] + button['height'] <= canvas_box['y'] + canvas_box['height'] + 1
+
+    assert_overlay_layout()
     page.screenshot(path=str(args.output / 'landscape.png'))
     # CDP sends real simultaneous touch contacts through browser pointer dispatch.
     cdp = page.context.new_cdp_session(page)
@@ -86,6 +102,7 @@ with sync_playwright() as p:
     page.wait_for_function("!document.querySelector('[data-hold=forward]').disabled")
     page.set_viewport_size({'width': 390, 'height': 844})
     page.wait_for_timeout(500)
+    assert_overlay_layout()
     page.screenshot(path=str(args.output / 'portrait.png'))
     assert page.locator('[data-hold=forward]').bounding_box()['x'] >= 0
     page.locator('#mobile-menu').tap()

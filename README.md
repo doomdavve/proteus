@@ -866,7 +866,8 @@ Press **PLAY** to start audio and open the shared Wake Velocity title. The page'
 soundtrack and smoothing. SMOOTHING defaults to ON and applies the same 4×4 supersampling
 to single-player and multiplayer, including WebRTC rooms. Turn it OFF in SETTINGS on slower
 devices. SINGLE PLAYER selects River, Basin or Basin trial, waves and the same smoothing setting.
-The launcher disappears during play; the game uses integer scaling. Press `?` for controls
+The launcher disappears during play. Desktop uses integer scaling; mobile fills the viewport
+with touch controls overlaid on the scene. Press `?` for controls
 and Escape for the in-game menu (the browser may also leave fullscreen). BACK TO TITLE
 returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;
 release selects neutral and Shift selects precision power. Scrolling is unassigned. After help or RESUME, click the canvas to recapture. If capture

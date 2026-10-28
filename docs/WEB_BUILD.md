@@ -58,8 +58,11 @@ slightly. Touch steering remains available when permission is denied, readings s
 are unavailable. Tilt requires HTTPS (localhost is suitable for desktop automation); permission
 is requested from its own button, separately from PLAY and audio initialization.
 
-The game fits the visible viewport, browser-bar changes and safe areas while retaining whole
-320×200 scene-pixel scales. Landscape is recommended. Fullscreen is feature-detected; supported
+On mobile the game fills the visible viewport, with translucent controls over the scene and
+inside safe areas. The 320×200 scene stretches to the viewport aspect ratio so the HUD stays
+visible without surrounding black space; nearest-neighbour filtering remains. Desktop retains
+whole scene-pixel scales. Browser-bar changes and rotation resize the presentation. Landscape
+is recommended. Fullscreen is feature-detected; supported
 mobile browsers have a retry button. iPhone Safari does not reliably offer element fullscreen:
 use **Share → Add to Home Screen → Open as Web App**, then launch from its icon for more screen
 space. Relative manifest/icon URLs support repository subpaths. This adds no service worker or
@@ -78,7 +81,7 @@ Chrome/SwiftShader check drives touch-only setup, simultaneous steering/throttle
 tilt, menu/reset, portrait resizing and return to title against the actual Wasm build. Add
 `--room-url ws://127.0.0.1:24443` for a matching local WebRTC room; this also checks emitted
 steering/throttle commands and leaving the room.
-Physical iPhone permission, steering feel, audio playback, Safari bars and Home Screen behavior
+Physical iPhone tilt permission, steering feel, audio playback, Safari bars and Home Screen behavior
 still require manual review. Automated emulation is not physical-device or user acceptance.
 Verification on 2026-10-28, Apple Silicon/macOS: native Debug build and full CTest preset
 passed against current main (233 enabled tests; 13 retired wake-field checks disabled), as did the Emscripten
@@ -89,6 +92,12 @@ local basin room, verified nonzero tilt steering and forward thrust in outgoing 
 commands, and left through the touch menu. Existing desktop mouse-control and title/persistence/repeated-session checks passed.
 The title regression check now accounts for the existing Credits row when returning to the
 launcher. An agent-run native GPU river demo (`--demo --frames 120`) exited cleanly.
+User iPhone review over LAN HTTP found the original integer-scaled mobile scene too small
+with controls around it. Mobile presentation now fills the viewport with overlaid controls;
+physical-device acceptance of this revision is pending. The browser check asserts full-viewport
+canvas bounds and overlaid buttons in both orientations. The revised native build/full CTest
+(233 passed, 13 disabled), web package and mobile browser check pass on macOS; revised
+landscape/portrait/menu captures were inspected.
 The first sandboxed full suite could not open local sockets; the full rerun with socket access
 passed. Next: physical-iPhone/Safari/Home Screen and human steering/audio acceptance; no such
 acceptance is inferred from the automated checks.
