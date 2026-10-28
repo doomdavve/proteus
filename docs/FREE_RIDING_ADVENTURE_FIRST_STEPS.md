@@ -1502,7 +1502,7 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.5d | A3.5f | Göteborg landmarks from OSM in the bake (user request, [backlog](#landmark-backlog-2026-10-27)): towers, masts, chimneys and cranes, `building:part` heights and bridge outlines, over the extended map | Proposed |
 | A3.5e | A3.5c | A docked Stena Line ro-pax ferry across the river from the Eriksberg crane (user must-have; [plan](#a35e--the-stena-ferry-at-eriksberg)) | Complete 2026-10-27; [result](#a35e-result-2026-10-27) |
 | A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Complete 2026-10-28; [result](#a35f-result-2026-10-28) |
-| A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Proposed |
+| A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Complete 2026-10-28; [result](#a35g-result-2026-10-28) |
 | A3.5j | A3.5g | The upstream city brought to life (user request, 2026-10-28): Älvsnabben-style river ferries between the piers, Hisingsbron's span lifting for a tall ship, trams and cars on the bridge and streets, Barken Viking, a marina and gulls at Lilla Bommen | Proposed |
 | A3.5h | A3.5a | The local weather transition, the first half of A3.5: the exposure grows from calm water once the boat heads out, is seen from afar as a squall in the sky, and dims the light near it | Complete 2026-10-28; [result](#a35h-result-2026-10-28) |
 | A3.5i | A3.5h | The rest of A3.5: bounded per-region detailed-asset loading (the bake out of the 33 MB header first, as A3.5f needs); cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Bake out of the binary and browser loading per location done 2026-10-28 ([result](#a35i-result-2026-10-28)); tile residency deferred |
@@ -2428,6 +2428,63 @@ at Lilla Bommen (A3.5j), all on this branch with a commit per step.
     really is. No `building:part`s, roofs or churches are modelled.
   - The A0.3 survey's coverage figures predate the wider corridor and were not regenerated.
   - The web build was not rebuilt for this step.
+
+### A3.5g result, 2026-10-28
+
+Same branch, the next commit after A3.5f.
+
+- **Generator:** [`tools/outer_landmarks.py`](../tools/outer_landmarks.py) builds the three
+  blockouts into the authored range, after A3.5a's dressing. The OSM footprints of Karlatornet
+  (`r/17090257`) and Lilla Bommen (`w/175648796`) are left out of the building extrusion. The
+  assumptions are recorded in the manifest (`dressing.landmarks`).
+- **Karlatornet** (424 triangles): its mapped footprint's rectangle, 246 m in slabs of three
+  floors. Each slab is a pale spandrel band under dark glass, and the slabs turn up to 24°
+  above 70 m and narrow a little at the crown. A thin mast tops it, at 255 m above the water.
+  A brown 15-floor hotel wing stands on its north-east side. The twist, colours and the wing's
+  place are by eye.
+- **Lilla Bommen** (1,353 triangles): the mapped footprint in 22 red-and-white floor bands to
+  77 m, then a dark observation deck, a red cap and a white roof at 86 m. The low-rise wing is
+  not built.
+- **Hisingsbron** (1,076 triangles): the deck's axis is the mean of the two carriageways' ends
+  (438 m, the stated main bridge's 440 m). The deck is 40 m wide, level over the channel with a
+  12 m underside, and ramps to the ground at both ends. A 90 m lift span is centred on the 215 m
+  stretch over water, with a 44 m white lift tower and machinery house on either side of the
+  deck at each end of the span. Pairs of piers stand every 50 m beyond the span, and lamp posts
+  line the deck. OSM maps no supports, so the towers and piers are carved out of the water
+  (3,731 water triangles) and boats meet them. The deck and the span have no collision, as on
+  Älvsborgsbron. The span is closed for now; A3.5j lifts it.
+- **Channel marks:** the dressing no longer builds fixed yellow-and-white passage lights as
+  piles. Two such lights near Hisingsbron are mapped in the river, one of them on a line 69 m
+  off the bridge and parallel to it, apparently where the old Götaälvbron stood. Fourteen marks
+  are built (16 in A3.5f).
+- **Minimap ([HUD guide](BOAT_HUD.md#minimap-2026-10-28)):** Karlatornet and Lilla Bommen are
+  conspicuous objects, Hisingsbron is a bridge labelled VCL 12, and the six upstream marks are
+  charted. The chart now draws labels before symbols, so rings and bridges stay visible where
+  the upstream labels crowd them; this moves 63 pixels of the river chart, around Eriksberg.
+- **Tests:** `boat_outer_map` checks the new counts and Karlatornet's height (highest point
+  250–260 m). The four tower footprints are not water, and the channel under the lift span is
+  water with the 8 m envelope. The upstream route passes between the piers.
+  `outer_landmarks.self_test()` checks the lift span's placement on the water, the piers clear
+  of it, the deck profile, the obstacle count and Karlatornet's height and footprint.
+- **Captures (agent review, 2026-10-28, macOS arm64, 2 s scripted screenshot):**
+  [Karlatornet GPU](adventure/landmark-karlatornet-gpu.png) and
+  [CPU](adventure/landmark-karlatornet-cpu.png) (`--start -2500,1000,119`, 790 m off);
+  [Hisingsbron GPU](adventure/landmark-hisingsbron-gpu.png) and
+  [CPU](adventure/landmark-hisingsbron-cpu.png) (`--start -3400,1820,224`);
+  [Lilla Bommen with the bridge beyond](adventure/landmark-lilla-bommen-gpu.png)
+  (`--start -3200,1650,225`); the [upstream chart](adventure/minimap-outer-upstream.png). From
+  mid-river at Eriksberg (`--start -15,-180,229`), Karlatornet stands out 1.9 km away.
+- **Verification (2026-10-28, macOS arm64, Debug):** build warning-free; `ctest --preset quick`
+  passed 146 of 146; `boat_outer_map` and `boat_minimap` passed. Generator self-tests passed.
+- **Limitations:**
+  - **Karlatornet is not visible from the outer fjord:** the outer location's far plane is
+    4,500 m and the fjord lies about 5 km from the tower. Raising the far plane would change
+    fog and every outer view, and would draw more objects in front of A3.5h's squall, so it was
+    left for the user to decide.
+  - Shapes are by eye; Karlatornet's real facade, Lilla Bommen's top and Hisingsbron's tower
+    form and colour were not checked against photos in this session.
+  - The follow camera can pass through the deck when it is raised high under the bridge.
+  - Unplayed.
 
 ## Verification and handoff template
 

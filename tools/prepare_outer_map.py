@@ -35,6 +35,7 @@ from shapely.ops import unary_union  # noqa: E402
 
 import map_pack  # noqa: E402
 import outer_dressing  # noqa: E402
+import outer_landmarks  # noqa: E402
 import outer_terrain  # noqa: E402
 from prepare_waterfront import GROUND, polygons, triangulate  # noqa: E402
 
@@ -530,6 +531,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
 
 def self_test():
     outer_dressing.self_test()
+    outer_landmarks.self_test()
     outer_terrain.self_test()
     # Water stays below a raised shelf; land is the region less water; an island hole survives.
     region = box(0, 0, 100, 100)
@@ -594,9 +596,14 @@ def main():
     crop = box(*survey.RIVER_CROP)
     water, carved = outer_dressing.carve_marks(
         water, outer_dressing.marks(osm, frame, region, crop))
-    route = check(geo, region, water)
     header, heights = outer_terrain.load_grid()
     model = outer_terrain.GridModel(header, heights)
+    # A3.5g: Karlatornet, Lilla Bommen and Hisingsbron; the bridge's piers and lift towers
+    # stand in the river, so they leave the water before the route checks.
+    landmarks, obstacles, landmark_stats = outer_landmarks.landmarks(
+        osm, frame, survey.multipolygon, water, model)
+    water = water.difference(obstacles)
+    route = check(geo, region, water)
     terrain = {
         "source": header["source"], "licence": header["licence"], "survey": header["survey"],
         "source_file": "docs/adventure/sources/terrain-hojdmodell.bin.gz",
@@ -617,8 +624,10 @@ def main():
                 if m["label"] == "Nya Älvsborg")
     buildings, dressing, dressed = outer_dressing.dress(osm, frame, region, crop, water,
                                              geo_land(region, water), model, fort,
-                                             survey.multipolygon)
-    dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS)
+                                             survey.multipolygon, outer_landmarks.SKIP)
+    dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS,
+                   landmarks=landmark_stats)
+    dressing = dressing + landmarks
     vertices, triangles, stats = bake(water, region, model, (objects + buildings, bridge, paint),
                                       dressing)
     stats["dressing"] = dressed

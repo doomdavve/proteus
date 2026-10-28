@@ -53,8 +53,11 @@ after INT 1 and the S-52 day palette:
 - **Landmarks (black):** conspicuous-object rings at the Eriksberg crane and Nya Älvsborg, the
   docked ferry's hull at its length and beam, and Älvsborgsbron as a double line along its deck
   (from the river map's bridge geometry) labelled **VCL 45**, its vertical clearance in metres from
-  OpenStreetMap.
-- **Aids to navigation:** the eight channel marks the outer dressing builds, at their baked
+  OpenStreetMap. Since A3.5g (2026-10-28) also Karlatornet and Lilla Bommen, and Hisingsbron
+  labelled **VCL 12** (its lift span down), upstream on `outer`. Labels are drawn before the
+  symbols, so rings and bridge lines stay visible where the upstream labels crowd them.
+- **Aids to navigation:** the channel marks the outer dressing builds (eight; since A3.5f/g also
+  six upstream: Skeppsbron's light, a light near Hisingsbron and four special-purpose beacons), at their baked
   positions and OpenStreetMap colours (IALA A: red port and green starboard laterals, white
   minor lights, a black isolated danger), each with a magenta light flare where it is lit. River buoys
   that OpenStreetMap lists but the game does not build are not charted.
@@ -72,7 +75,9 @@ display-free review mode, 3× nearest): [outer corner at the dock](adventure/min
 [outer chart at the dock](adventure/minimap-outer-chart.png),
 [outer chart near the east shore](adventure/minimap-outer-chart-east-shore.png),
 [river corner](adventure/minimap-river-corner.png) and
-[river chart](adventure/minimap-river-chart.png). Commands are under
+[river chart](adventure/minimap-river-chart.png); since A3.5g the two charts are recaptured and
+the [outer chart upstream](adventure/minimap-outer-upstream.png) (`--at -3150,1550,4.0`) is added
+(2026-10-28). Commands are under
 [review commands](#review-commands).
 
 Verification (2026-10-28, macOS arm64, Debug): build warning-free; `ctest --preset full`
