@@ -122,6 +122,10 @@ xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
 
 ## Cutting a release
 
+- Use `tools/cut_release.py` from the separate, reviewed source worktree; see the
+  [release command](docs/RELEASES.md#release-command) for preflight, controller setup and retries.
+  It builds/tests, publishes, verifies downloads, updates the private hosting baseline and
+  deploys/verifies Winterfell. Use `--check` to check prerequisites without publishing/deploying.
 - A release includes upgrading the hosted Winterfell room and its matching browser client.
   Publishing native packages and GitHub Pages alone does not complete a release.
 - After publication succeeds, update `wake_velocity_version` in

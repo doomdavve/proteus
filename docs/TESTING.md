@@ -1,5 +1,12 @@
 # Test workflow and timing
 
+`release_command` runs `tools/test_cut_release.py` in the full CPU suite on every platform.
+It uses temporary local Git repositories and mocked external commands to check immutable
+tags, detached worktrees, hosting baseline/push recovery, archive identity/integrity and
+failure gates. Workflow polling uses a virtual clock. These tests never publish a release,
+contact Winterfell or require controller/browser credentials. The
+[release guide](RELEASES.md#release-command) owns the real operator command and live evidence.
+
 `boat_time_control` advances the same 32 simulated ticks at all six live time rates and
 compares the tick count and complete physical boat state with a fixed-tick reference; it also
 checks rate bounds and the real-frame stall clamp before scaling. `boat_replay` covers practice
