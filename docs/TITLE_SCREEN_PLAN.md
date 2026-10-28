@@ -26,7 +26,7 @@ retain their integer pixel grid; the background water now uses fractional positi
 coverage antialiasing. Both travelling crests and perspective rays blend between neighbouring
 pixels, softening their edges and slow movement while leaving foreground text crisp.
 
-The roll begins with **THANKS TO**, **bjoto**, **w**, then lists **FONTS** (Daniel
+The roll begins with **THANKS TO**, **erik**, **bjoto**, **w**, then lists **FONTS** (Daniel
 Linssen, m5x7/m3x6), **MAP DATA** (OpenStreetMap contributors, ODbL 1.0), **LIBRARIES**
 (raylib, ENet, libcurl), and **A PROTEUS GAME**. Specific contributor roles are omitted
 on screen as requested. For source provenance: [bjoto](https://github.com/bjoto) contributed

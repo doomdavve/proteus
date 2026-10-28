@@ -93,7 +93,23 @@ provided token. No personal access token or additional secret is needed.
 
 ## Status and verification
 
-Current status, 2026-10-26: **v0.0.18** is published at commit `2f94335`. The
+Current release preparation, 2026-10-28: **v0.0.20** collects the changes since
+v0.0.19: outer-map Höjdmodell terrain and river scenery, expanded deathmatch weapons
+and optional rearview, multiplayer smoothing, the docked VINGA LINE ferry, marine
+menus and scrolling credits (including erik), solo time controls through 8x, and the
+optional nautical minimap (`N`). The release branch starts at `9de7f81` and carries
+the outstanding local credits addition. Next: pass PR CI, merge, push the new tag,
+then verify native publication, Pages deployment and downloaded archive checksums.
+Release publication does not upgrade Winterfell; its deployment remains separately owned.
+
+Local verification, 2026-10-28, Apple Silicon/macOS: Debug configure/build passed;
+`ctest --preset full` passed all 232 enabled tests, with 13 retired cases disabled
+and `PROTEUS_GPU_TESTS=OFF`. CPU basin, river and outer captures and the GPU title
+capture were inspected; a 120-frame windowed river GPU demo completed. The build
+reported only raylib's existing bundled stb_vorbis pointer-comparison warning.
+Human input/listening, downloaded-app execution and user acceptance are not claimed.
+
+Earlier publication evidence, 2026-10-26: **v0.0.18** was published at commit `2f94335`. The
 [release run](https://github.com/doomdavve/proteus/actions/runs/40371176253) passed macOS,
 Windows and publication; [Pages](https://github.com/doomdavve/proteus/actions/runs/40371176205)
 also built and deployed successfully. Both native ZIPs were downloaded and passed SHA-256
