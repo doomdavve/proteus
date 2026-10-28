@@ -98,7 +98,8 @@ with sync_playwright() as p:
     key('Enter')
     shot('settings-after-reload')
     key('Escape')
-    key('ArrowDown')
+    key('ArrowDown')  # Credits
+    key('ArrowDown')  # Back to launcher
     key('Enter')
     page.wait_for_function("!document.getElementById('play').disabled && !document.body.classList.contains('playing')", timeout=20000)
     assert not errors, errors

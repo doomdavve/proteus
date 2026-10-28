@@ -32,10 +32,66 @@ packaging and `v*` Pages deployment workflow remain in use. Both music tracks an
 title backdrop are bundled. One browser audio device starts during PLAY and remains alive
 across title/session transitions; Off disables the soundtrack, retaining engine/water sound.
 
+Basic mobile controls and iPhone setup are described [below](#mobile-controls-and-iphone-presentation-2026-10-28).
 Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/latency and tab
 suspension, measure memory/runtime budgets, and complete internet-play acceptance of the
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
+
+## Mobile controls and iPhone presentation, 2026-10-28
+
+Basic mobile boating is implemented on `mobile-web-controls`. Touch devices with a coarse
+primary pointer show left/right steering, hold-to-go Forward/Reverse, and Menu during a
+session. Releasing the pedals selects neutral; pressing both also selects neutral. Menu
+provides reset/recovery and return to title. Title choices and gameplay menus accept completed
+touch taps, including taps shorter than a rendered frame. Keyboard and mouse remain available
+on desktop. Mobile weapon, camera, replay and text-editing controls are deferred; the existing
+player name is usable for joining a listed room.
+
+Tap **Enable tilt**, allow orientation access, and hold the phone comfortably to calibrate.
+Tilt left/right to steer; **Recenter** resets the holding position and **Use touch** disables
+sensors. Both landscape directions and portrait are supported. Rotation neutralizes steering
+until Recenter. Touch steering overrides tilt, and keyboard steering overrides mobile steering.
+The initial tuning uses a 3-degree dead zone, full lock at 25 degrees and 100 ms smoothing.
+Flat-on-a-table positions do not provide a useful gravity-based screen roll; raise the phone
+slightly. Touch steering remains available when permission is denied, readings stop or sensors
+are unavailable. Tilt requires HTTPS (localhost is suitable for desktop automation); permission
+is requested from its own button, separately from PLAY and audio initialization.
+
+The game fits the visible viewport, browser-bar changes and safe areas while retaining whole
+320×200 scene-pixel scales. Landscape is recommended. Fullscreen is feature-detected; supported
+mobile browsers have a retry button. iPhone Safari does not reliably offer element fullscreen:
+use **Share → Add to Home Screen → Open as Web App**, then launch from its icon for more screen
+space. Relative manifest/icon URLs support repository subpaths. This adds no service worker or
+offline-play promise. See [Apple's instructions](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios)
+and the [WebKit fullscreen issue](https://bugs.webkit.org/show_bug.cgi?id=206854).
+
+Automated checks:
+
+```sh
+node tools/test_web_mobile_controls.cjs
+python3 tools/check_web_mobile.py --url http://127.0.0.1:8000/ --output build-web/mobile-review
+```
+
+The Node contract test is also registered in native CTest when Node is available. The optional
+Chrome/SwiftShader check drives touch-only setup, simultaneous steering/throttle, simulated
+tilt, menu/reset, portrait resizing and return to title against the actual Wasm build. Add
+`--room-url ws://127.0.0.1:24443` for a matching local WebRTC room; this also checks emitted
+steering/throttle commands and leaving the room.
+Physical iPhone permission, steering feel, audio playback, Safari bars and Home Screen behavior
+still require manual review. Automated emulation is not physical-device or user acceptance.
+Verification on 2026-10-28, Apple Silicon/macOS: native Debug build and full CTest preset
+passed (231 enabled tests; 13 retired wake-field checks disabled), as did the Emscripten
+MinSizeRel web package. Chrome/SwiftShader mobile automation passed solo setup, simultaneous
+touches, simulated tilt, reset and return to title; portrait/landscape/menu captures were
+inspected. The matching optional native WebRTC endpoint built; mobile automation joined a
+local basin room, verified nonzero tilt steering and forward thrust in outgoing InputBatch
+commands, and left through the touch menu. Existing desktop mouse-control and title/persistence/repeated-session checks passed.
+The title regression check now accounts for the existing Credits row when returning to the
+launcher. An agent-run native GPU river demo (`--demo --frames 120`) exited cleanly.
+The first sandboxed full suite could not open local sockets; the full rerun with socket access
+passed. Next: physical-iPhone/Safari/Home Screen and human steering/audio acceptance; no such
+acceptance is inferred from the automated checks.
 
 ## Multiplayer anti-aliasing, 2026-10-27
 
@@ -340,7 +396,7 @@ scrolling, help/reacquisition, browser-initiated unlock and keyboard fallback, s
 and `results.json`. If the engine refuses capture it records `web_controls_fallback=ok` and
 checks keyboard/scroll fallback instead of claiming mouse support. Movement and scroll totals
 use deterministic DOM events; this does not certify physical mouse/trackpad feel. A tested
-WebKit build is not the shipping Safari application. Touch remains unsupported.
+WebKit build is not the shipping Safari application. Touch was unsupported at this historical checkpoint; basic mobile controls were added on 2026-10-28.
 
 Next: physical-device and shipping Safari checks; native Windows/Linux qualification after
 CI runs, plus connected multiplayer HUD/control review. No deployment was performed.
@@ -389,7 +445,8 @@ SDK installation were temporary verification tools, not new project dependencies
 Remaining limits: the GitHub workflow/deployment itself has not run; Linux-hosted Emscripten
 CI, Safari, Firefox, physical GPU browser performance, long sessions, browser audio latency,
 private-mode/quota behavior beyond a denied-storage check, and human gameplay/listening
-acceptance are unverified. No touch controls or recording import/export UI is provided.
+acceptance were unverified at this checkpoint. Touch controls were absent then; basic mobile
+controls were added on 2026-10-28. Recording import/export UI remains unavailable.
 
 ### Tag deployment follow-up — 2026-10-19
 
@@ -433,7 +490,8 @@ All 70 native CTests passed, including 18 GPU checks, with desktop graphics acce
 The initial sandboxed run was stopped at its first GPU check; the full desktop rerun passed.
 No user acceptance of this redesign yet.
 Next: deploy with the normal version-tag/manual workflow and review the new launch page.
-Limitations: keyboard required; reload is the way back to setup; browser-specific fullscreen
+Historical limitations (superseded by shared-title and mobile work): keyboard required;
+reload was the way back to setup; browser-specific fullscreen
 restrictions may fall back to ordinary full-window play.
 
 ## Compact technical launcher — 2026-10-20

@@ -2,11 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101e25">
   <meta name="description" content="Proteus Boating — WebGL 2 boating game.">
   <title>Wake Velocity</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <style>
     :root { color-scheme: dark; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; background: #101e25; color: #edf2eb; }
     * { box-sizing: border-box; }
@@ -43,6 +47,22 @@
     body.playing { overflow: hidden; background: #000; }
     body.playing #launcher { display: none; }
     body.playing #stage { display: flex; }
+    [hidden] { display: none !important; }
+    #stage { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+    #mobile-controls { position: absolute; inset: 0; pointer-events: none; }
+    #mobile-controls button { pointer-events: auto; min-width: 52px; min-height: 48px;
+      border: 1px solid #afc2c4; border-radius: 8px; background: #14262fcc; color: #edf2eb; }
+    #mobile-controls button:active { background: #426779; }
+    #mobile-controls button:disabled { opacity: .35; }
+    .mobile-top { position: absolute; top: max(8px, env(safe-area-inset-top));
+      left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right));
+      display: flex; gap: 8px; align-items: start; flex-wrap: wrap; }
+    #tilt-status { flex-basis: 100%; font-size: 11px; text-shadow: 0 1px 3px #000; }
+    .mobile-bottom { position: absolute; bottom: max(8px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+    .mobile-left { left: max(8px, env(safe-area-inset-left)); }
+    .mobile-right { right: max(8px, env(safe-area-inset-right)); }
+    #mobile-controls, #canvas { touch-action: none; user-select: none; -webkit-user-select: none; }
+    #iphone-tip { max-width: 52ch; color: #afc2c4; }
     canvas { display: block; image-rendering: pixelated; }
     #canvas:focus { outline: none; }
     @media (max-width: 540px) {
@@ -74,11 +94,27 @@
       </div>
       <p id="status" role="status">Loading…</p>
       <p id="storage" role="status"></p>
+      <p id="iphone-tip" hidden>iPhone: for more screen space, use Safari’s Share → Add to Home Screen
+        → Open as Web App, then launch from its icon. Landscape works best. Tilt is enabled separately after starting.</p>
     </main>
     <footer><span id="version">Version @WEB_VERSION@</span>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> · ODbL</footer>
   </div>
   <div id="stage">
     <canvas id="canvas" width="960" height="600" tabindex="0" aria-label="Boating game. Press question mark for controls. Escape opens the menu; return to the title to change settings."></canvas>
+    <div id="mobile-controls" hidden aria-label="Mobile boating controls">
+      <div class="mobile-top">
+        <button id="mobile-menu">Menu</button><button id="tilt">Enable tilt</button>
+        <button id="recenter" hidden>Recenter</button><button id="screen-button" hidden>Fullscreen</button>
+        <span id="tilt-status" role="status">Touch steering · landscape works best</span>
+      </div>
+      <div class="mobile-bottom mobile-left">
+        <button data-hold="left" aria-label="Steer left">◀</button>
+        <button data-hold="right" aria-label="Steer right">▶</button>
+      </div>
+      <div class="mobile-bottom mobile-right">
+        <button data-hold="reverse">Reverse</button><button data-hold="forward">Forward</button>
+      </div>
+    </div>
   </div>
   <script>
     const webFiles = @WEB_FILES@;

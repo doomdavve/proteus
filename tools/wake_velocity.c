@@ -23,6 +23,7 @@
 #include "wake_velocity_net.h"
 #endif
 #include "boat_title.h"
+#include "boat_web_touch.h"
 #include "frame_pacer.h"
 #include "profiler.h"
 #include "raymath.h"
@@ -36,6 +37,20 @@
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
 
+EM_JS(int, boat_web_touch_click, (float *position), {
+    const tap = Module['boatMobile']['click']();
+    if (Object.is(tap, null))
+        return 0;
+    if (Object.is(tap, false))
+        return -1;
+    HEAPF32[position >> 2] = tap.x;
+    HEAPF32[(position >> 2) + 1] = tap.y;
+    return 1;
+})
+EM_JS(void, boat_web_mobile_session, (int enabled), { Module['boatMobile']['session'](enabled); })
+EM_JS(int, boat_web_mobile_menu, (void), { return Module['boatMobile']['menu'](); })
+EM_JS(int, boat_web_mobile_sample, (int active), { return Module['boatMobile']['sample'](active); })
+EM_JS(float, boat_web_mobile_target, (void), { return Module['boatMobile']['target'](); })
 EM_JS(int, boat_web_mouse_state, (int wanted, int available),
     { return Module['boatMouse']['state'](wanted, available); })
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
@@ -820,6 +835,7 @@ static int study(int argc, char **argv)
     float mouse_wheel = session.boat.wheel;
 #if defined(__EMSCRIPTEN__)
     bool mouse_unavailable = false;
+    boat_web_mobile_session(1);
 #endif
     SetExitKey(KEY_NULL);
     Profiler profiler = { 0 };
@@ -843,7 +859,11 @@ static int study(int argc, char **argv)
         // Escape never changes the steering mode: it opens the menu, which releases capture.
         bool reset_requested = false;
         bool menu_was_open = menu.open;
-        if (IsKeyPressed(KEY_ESCAPE)) {
+        bool menu_pressed = IsKeyPressed(KEY_ESCAPE);
+#if defined(__EMSCRIPTEN__)
+        menu_pressed |= boat_web_mobile_menu() != 0;
+#endif
+        if (menu_pressed) {
             if (help_visible)
                 help_visible = false;
             else if (menu.open)
@@ -895,10 +915,19 @@ static int study(int argc, char **argv)
             if (mouse_steering)
                 mouse_wheel = session.boat.wheel;
         }
-        bool mouse_driving = mouse_steering && !demo && !session.runs.playing;
+        float mobile_target = NAN;
+        int mobile_buttons = 0;
+#if defined(__EMSCRIPTEN__)
+        mobile_buttons = boat_web_mobile_sample(active && !demo && !session.runs.playing);
+        mobile_target = boat_web_mobile_target();
+#endif
+        bool keyboard_steering
+            = IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A);
+        bool mobile_driving = (mobile_buttons & 16) || isfinite(mobile_target);
+        bool mouse_driving = mouse_steering && !demo && !session.runs.playing && !mobile_driving;
 #if defined(__EMSCRIPTEN__)
         int browser_mouse = boat_web_mouse_state(
-            active && mouse_driving, active && !demo && !session.runs.playing);
+            active && mouse_driving, active && !demo && !session.runs.playing && !mobile_driving);
         if (browser_mouse & 4) {
             // Denied or missing capture falls back to the keyboard.
             mouse_unavailable = true;
@@ -934,7 +963,13 @@ static int study(int argc, char **argv)
             mouse_wheel = boat_mouse_wheel(mouse_wheel, mouse_delta);
         if (!active && networked)
             mouse_wheel = 0; // The authority neutralizes inactive controls too.
-        float steering_target = mouse_driving ? mouse_wheel : NAN;
+        float steering_target = mouse_driving ? mouse_wheel
+            : !keyboard_steering              ? mobile_target
+                                              : NAN;
+        float steering_rate = keyboard_steering
+            ? (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
+                  - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)))
+            : (float)(((mobile_buttons & 8) != 0) - ((mobile_buttons & 4) != 0));
         if (active && IsKeyPressed(KEY_F3)) {
             profiler_visible = !profiler_visible;
             next_snapshot_time = 0;
@@ -958,8 +993,8 @@ static int study(int argc, char **argv)
         bool precision = active && !demo && !session.runs.playing
             && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
         thrust_target = active && !demo && !session.runs.playing
-            ? boat_pedal_target(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W),
-                  IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S), precision)
+            ? boat_pedal_target(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) || (mobile_buttons & 1),
+                  IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S) || (mobile_buttons & 2), precision)
             : 0;
         bool replay_adjusted = false;
         if (!active)
@@ -1036,8 +1071,7 @@ static int study(int argc, char **argv)
             BoatInput input = { 0 };
             if (active)
                 input = (BoatInput) {
-                    .steering_rate = (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-                        - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))),
+                    .steering_rate = steering_rate,
                 };
             // No multiplayer pause: the room keeps running while help or focus is away.
             uint32_t previous_life = net->own_life;
@@ -1084,8 +1118,7 @@ static int study(int argc, char **argv)
                 += (float)((boat_profile_time(true) - course_started_at) * 1000.0);
         } else if (active) {
             BoatInput input = {
-                .steering_rate = (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-                    - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))),
+                .steering_rate = steering_rate,
             };
             double raw_active_delta = GetFrameTime();
             metrics.discarded_active_ms
@@ -1095,7 +1128,7 @@ static int study(int argc, char **argv)
                 if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
                 else {
-                    if (mouse_driving)
+                    if (isfinite(steering_target))
                         input.steering_rate
                             = boat_steering_rate(session.boat.wheel, steering_target);
                     input.throttle_rate = boat_throttle_rate(session.boat.throttle, thrust_target);
@@ -1389,6 +1422,7 @@ cleanup:
         boat_ui_unload();
 #if defined(__EMSCRIPTEN__)
         boat_web_mouse_state(0, 0);
+        boat_web_mobile_session(0);
 #else
         if (mouse_captured)
             EnableCursor();

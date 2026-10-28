@@ -835,7 +835,8 @@ generated files stay out of Git. Deployments use content-hashed JavaScript, Wasm
 URLs, with no service worker; reload to load the deployed version. GitHub's CDN can briefly
 cache the previous HTML after a deployment.
 
-A desktop browser with WebAssembly, WebGL 2, and a keyboard is required. The canvas uses
+A browser with WebAssembly and WebGL 2 is required. Desktop supports keyboard/mouse;
+mobile supports basic boating with touch controls and optional tilt steering. The canvas uses
 nearest-neighbour scaling in multiples of the 320x200 scene, with a 320x200 minimum.
 Press **PLAY** to start audio and open the shared Wake Velocity title. The page's small
 **Settings** toggle remembers fullscreen; in-game SETTINGS remembers name, livery, steering,
@@ -851,5 +852,8 @@ WebRTC room URL; browser hosting and LAN discovery are unavailable. Browser thro
 can affect animation/audio in background tabs. Bests are local to this browser and site,
 can be lost when storage is cleared or unavailable, and do not sync with native saves.
 Local recording import/export and native screenshot/profiling commands are not exposed by
-the page. Touch controls are not implemented. See [web build details and verification](docs/WEB_BUILD.md)
+the page. On mobile, hold Forward/Reverse for thrust and use left/right buttons or Enable tilt to steer.
+Menu provides reset and return to title. Tilt needs HTTPS and permission; Recenter after rotating.
+Landscape is recommended. For more screen space on iPhone, use Safari’s Share → Add to Home
+Screen → Open as Web App, then launch from its icon. Mobile weapons/replay/text editing are deferred. See [web build details and verification](docs/WEB_BUILD.md)
 for the implementation trade-offs and remaining browser checks.

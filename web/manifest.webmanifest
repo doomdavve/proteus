@@ -1,0 +1,7 @@
+{
+  "name": "Wake Velocity", "short_name": "Wake Velocity", "id": "./",
+  "start_url": "./", "scope": "./", "display": "standalone",
+  "background_color": "#101e25", "theme_color": "#101e25",
+  "icons": [{"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml"}]
+}

@@ -1,5 +1,6 @@
 #include "wake_velocity_menu.h"
 #include "boat_ui.h"
+#include "boat_web_touch.h"
 
 enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
 
@@ -29,13 +30,20 @@ BoatMenuChoice boat_menu_update(BoatMenu *menu, Camera2D camera, float dt)
     menu->selected = (menu->selected + step + count) % count;
     bool activate
         = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE);
-    Vector2 point = GetScreenToWorld2D(GetMousePosition(), camera);
+    Vector2 pointer = GetMousePosition();
+    bool pointer_pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+#if defined(__EMSCRIPTEN__)
+    int touch_click = boat_web_touch_click(&pointer.x);
+    if (touch_click)
+        pointer_pressed = touch_click > 0;
+#endif
+    Vector2 point = GetScreenToWorld2D(pointer, camera);
     Vector2 moved = GetMouseDelta();
     for (int i = 0; i < count; ++i)
         if (CheckCollisionPointRec(point, row_bounds(menu, i))) {
             if (moved.x || moved.y)
                 menu->selected = i;
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (pointer_pressed) {
                 menu->selected = i;
                 activate = true;
             }

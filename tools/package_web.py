@@ -44,6 +44,8 @@ def main():
     (site / "index.html").write_text(page)
     shutil.copyfile(root / "web/river.png", site / "river.png")
     shutil.copyfile(root / "web/servers.json", site / "servers.json")
+    for name in ("manifest.webmanifest", "icon.svg", "apple-touch-icon.png"):
+        shutil.copyfile(root / "web" / name, site / name)
     (site / ".nojekyll").touch()
     shutil.copyfile(args.raylib_license, site / "raylib-LICENSE.txt")
     # Remove outputs from earlier builds only, never unrelated files.

@@ -13,9 +13,20 @@ fullscreenOption.addEventListener('change', () => {
   try { localStorage.setItem('wake-velocity-fullscreen', fullscreenOption.checked ? 'on' : 'off'); } catch (_) {}
 });
 installBoatMouseControls(Module, canvas, document, window);
+installBoatMobileControls(Module, canvas, document, window);
 installBoatRtcTransport(Module);
 installBoatServerDirectory(Module).refresh();
-document.getElementById('fullscreen').disabled = !stage.requestFullscreen;
+const canFullscreen = !!stage.requestFullscreen && document.fullscreenEnabled !== false;
+fullscreenOption.disabled = !canFullscreen;
+const screenButton = document.getElementById('screen-button');
+screenButton.hidden = !canFullscreen;
+function enterFullscreen() {
+  if (canFullscreen) stage.requestFullscreen().catch(() => {});
+  canvas.focus();
+}
+screenButton.addEventListener('click', enterFullscreen);
+document.getElementById('iphone-tip').hidden = !(/iPhone|iPod/.test(navigator.userAgent))
+  || window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
 Module['preRun'] = Module['preRun'] || [];
 Module['preRun'].push(() => {
@@ -40,8 +51,17 @@ Module['onRuntimeInitialized'] = () => {
 };
 
 function fitCanvas() {
-  const availableHeight = innerHeight;
-  const scale = Math.max(1, Math.floor(Math.min(innerWidth / 320, availableHeight / 200)));
+  const viewport = window.visualViewport;
+  stage.style.width = (viewport ? viewport.width : innerWidth) + 'px';
+  stage.style.height = (viewport ? viewport.height : innerHeight) + 'px';
+  stage.style.left = (viewport ? viewport.offsetLeft : 0) + 'px';
+  stage.style.top = (viewport ? viewport.offsetTop : 0) + 'px';
+  const style = getComputedStyle(stage);
+  const availableHeight = (viewport ? viewport.height : innerHeight)
+    - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  const availableWidth = (viewport ? viewport.width : innerWidth)
+    - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const scale = Math.max(1, Math.floor(Math.min(availableWidth / 320, availableHeight / 200)));
   // The fixed 960x600 buffer contains a 320x200 scene. Use whole scene-pixel scales.
   const width = 320 * scale;
   const height = 200 * scale;
@@ -56,9 +76,7 @@ playButton.addEventListener('click', () => {
   playButton.disabled = true;
   document.body.classList.add('playing');
   fitCanvas();
-  if (document.getElementById('fullscreen').checked && stage.requestFullscreen) {
-    stage.requestFullscreen().catch(() => canvas.focus());
-  }
+  if (fullscreenOption.checked) enterFullscreen();
   canvas.focus();
   // Audio initialization and PlayMusicStream happen inside this user gesture.
   callMain([]);
@@ -72,6 +90,10 @@ canvas.addEventListener('keydown', event => {
     event.preventDefault();
 });
 window.addEventListener('resize', fitCanvas);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitCanvas);
+  window.visualViewport.addEventListener('scroll', fitCanvas);
+}
 document.addEventListener('fullscreenchange', fitCanvas);
 Module['onExit'] = code => {
   document.body.classList.remove('playing');

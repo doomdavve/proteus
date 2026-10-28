@@ -456,6 +456,10 @@ if(PROTEUS_NODE_EXECUTABLE)
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_rtc_transport.cjs)
   set_tests_properties(web_rtc_transport PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_rtc_transport=ok")
+  add_test(NAME web_mobile_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mobile_controls.cjs)
+  set_tests_properties(web_mobile_controls PROPERTIES LABELS "cpu"
+    PASS_REGULAR_EXPRESSION "web_mobile_controls=ok")
   add_test(NAME web_mouse_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mouse_controls.cjs)
   set_tests_properties(web_mouse_controls PROPERTIES LABELS "cpu"
