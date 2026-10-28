@@ -1,0 +1,682 @@
+# Lua gameplay plugins and live authoring
+
+Status, 2026-10-28: **planning complete; no Lua runtime, plugin API or in-game agent is
+implemented.** The agreed direction is embedded Lua for gameplay authoring, with C retaining
+physics, collisions, wake math, rendering and networking. Hot reload is a requirement of the
+first playable slice. This document owns the plugin boundary, authoring workflow and staged
+implementation; the existing gameplay plans continue to own their features and acceptance.
+[All plans](README.md).
+
+Completed planning task: review the existing owners and gameplay plans, select the Långedrag
+voyage as the first conversion, specify reload/failure behavior, and separate near-term
+authoring from multiplayer and the eventual agent. **Next task: P0, a bounded descriptor
+loader and headless validation**, followed by P1, live Långedrag authoring. The milestones
+below are this plan's P0–P6, independent of similarly named foundation tasks. Existing-C
+build/test evidence and planning limitations are recorded at the end.
+
+## Intended experience and scope
+
+A player or an LLM should be able to change a destination, create a course or add a small
+objective, save a short Lua file, and see the result in the running game. The game should
+explain an invalid edit with its file and offending field, plus a source line where available,
+while retaining the last working revision. A reload must not silently lose voyage progress or leave half a new course
+in the world. There should be a short path from an idea to a repeatable headless test, a
+screenshot and a live preview.
+
+Start by expressing existing content in Lua. The first plugin authors the current Långedrag
+route, its shelters, controlled-speed arrival and existing exposed-water recipe. C still
+evaluates `BoatVoyage`. Then express the river sprint's course and rules through the same
+loading/reload pipeline, with `BoatRace` still deciding crossings, placement and results.
+Only after these small examples work should Lua callbacks introduce new objective logic.
+
+The longer-term goal is an in-game creative workbench: “put a rescue stop beyond the bridge,”
+“make a slalom through these wakes,” or “give this evening voyage a delivery objective.”
+An assistant can inspect supported capabilities, author a plugin, test it, show the change
+and apply it live. Claude with the user's API key is a possible provider; the tool protocol
+must work with other providers and with an external coding agent. No model call belongs in
+the simulation tick, and no plugin receives an API key.
+
+| C owns | Lua may author through an explicit capability |
+| --- | --- |
+| Fixed-step boat motion, hull/shore contacts, safe placement, handling classes | Select supported rules/presets; request supported recovery or actor actions |
+| Water queries, derivatives, wake emission, storm evaluation, CPU/GPU parity | Describe validated weather/source parameters and their scheduled changes |
+| Course crossings, the existing voyage/race/match engines | Supply their definitions; later compose objectives and react to their events |
+| Actor geometry, route evaluation, collision envelopes and resource lifetime | Select supported actor recipes and routes once a native adapter exists |
+| Scene evaluation, draw submission, fonts, audio devices and asset decoding | Produce bounded HUD descriptions and request registered cues/palettes |
+| Authority, transport, checkpointing, prediction and replay formats | Produce validated commands/state at host-controlled ticks |
+
+This is a small gameplay layer over concrete owners. It does not require an ECS, arbitrary
+native extensions, a general engine rewrite, a package dependency resolver, or moving every
+existing game rule to Lua. It follows the concrete-ownership recommendation in the dated
+[architecture review](ARCHITECTURE_REVIEW.md). A feature that needs a new physical primitive
+first needs a C implementation and its usual verification; a script cannot manufacture that
+capability by inventing an API name.
+
+## Reviewed capability inventory
+
+“Present” here means present in this checkout, not a claim that every package, platform or
+historical worktree has shipped the same revision. The linked owning plans distinguish
+implementation, automated checks, manual playback and user acceptance. Older entries retain
+superseded proposals; the source interfaces below are the integration reference.
+
+| Area and grounded reference | Present foundation | Suitable plugin work and remaining native work |
+| --- | --- | --- |
+| [Voyage/adventure plan](FREE_RIDING_ADVENTURE_PLAN.md), [A3.4 result and playtest](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a34-result-2026-10-26), [`boat_voyage.h`](../src/boat_voyage.h) and [implementation](../src/boat_voyage.c) | `outer` has the Långedrag destination, four shelters, controlled-speed arrival, recovery and a fixed exposed rough-water patch. The route is a compiled `BoatVoyageRoute`; `BoatSession` owns progress. Later terrain, dressing and the docked ferry are implemented, with qualification limits in the adventure ledger. | Best first slice: move route data to Lua while retaining C behavior. Optional errands, multiple destinations and weather progression can follow. Vinga coverage, regional exposure/weather transitions, further landmarks and bounded detailed-asset loading are separate unfinished adventure work. |
+| [River race](RACE_PLAN.md), [`boat_race.h`](../src/boat_race.h), [`boat_race.c`](../src/boat_race.c) | Shortened river sprint, authored gates/grid, crossing ferry, moving storm, authoritative phases, recoveries, DNF, results and network race support. `BoatRaceCourse` and `BoatRaceRules` are already separate data types. | Second descriptor slice: edit gates, durations and supported ferry/storm parameters. Keep swept crossings, tie rules and recovery in C. The full downtown start, further race improvements and some pacing/platform review remain open. Do not confuse this course with the basin's distinct four-gate [`BoatCourse`](../src/boat_course.h). |
+| [Living city](LIVING_CITY_PLAN.md), [`waterfront_scene.h`](../src/waterfront_scene.h) | Shared explicit-time scene snapshots, city dressing, cars/lamps, travelling vessels and reactive gulls; CPU/GPU consume shared evaluated actors. | Later schedule and orchestrate exposed actors. Pedestrians/cyclists, richer road interactions, building activity, perched gulls and final polish remain planned. There is no generic spawnable NPC registry, navigation system or conversation engine to bind today. |
+| [Harbor boats](HARBOR_BOATS.md), [traffic](HARBOR_TRAFFIC.md), [`waterfront_harbor.h`](../src/waterfront_harbor.h), [`waterfront_traffic.h`](../src/waterfront_traffic.h) | Generated boat recipes, fixed berths, shared wave poses, mooring/contact envelopes, four travelling vessels on authored routes, and the docked large ferry. Ordinary traffic is kinematic; optional trial traffic wakes use a separate bounded pool. | A route/actor capability must add caller-owned descriptors and keep physical contacts, visible poses and wakes in agreement. Existing fixed functions are not a runtime actor editor. Do not allocate NPCs out of the four player slots or promise unlimited physical wake sources. |
+| [Gameplay sunset](SUNSET_PLAN.md), [`waterfront_scene.c`](../src/waterfront_scene.c), [`renderer_gpu.c`](../src/renderer_gpu.c) | Daytime gameplay and a title-only dusk preview. The shared lighting frame and gameplay sunset remain proposed. | Expose fixed lighting presets/phase only after the sunset plan supplies and verifies the native shared frame/cache behavior. A Lua `sunset` name must not imply an implemented sun, window-light or day/night system. |
+| [Deathmatch](DEATHMATCH_PLAN.md), [`boat_match.h`](../src/boat_match.h), [`boat_combat.h`](../src/boat_combat.h) | C match attribution, scores/rounds, water cannon, stern wave grenade, torpedoes, damage feedback and rearview presentation. Current protocol is v7. | Later author supported match parameters, objective/scoring variants and announcements. Projectile integration, hit/credit rules, pressure, capsizes and prediction remain C. New weapons need native work; balance and broader browser/platform qualification are unfinished. |
+| [Multiplayer](MULTIPLAYER_PLAN.md), [protocol](MULTIPLAYER_PROTOCOL.md), [`boat_net_server.c`](../src/boat_net_server.c), [`boat_prediction.h`](../src/boat_prediction.h) | Four-player authority, ENet/native and optional browser transport, content checks, snapshots, input replay, wake reconciliation and remote views. The server currently initializes the compiled river course. | Authority can eventually own gameplay scripts, but script/config/state hashes and timed commands are not in today's wire contract. M5 impairment/resource/soak work and broader platform qualification remain. Scripted worlds must be explicitly rejected by existing clients until P5. |
+| [Boating recordings](BOATING_PLAN.md#first-timed-course), [`boat_replay.h`](../src/boat_replay.h), [`boat_fleet.h`](../src/boat_fleet.h) | Basin runs record sampled poses and course splits for bests, ghosts and playback; fleet checkpoints support future-affecting C state and client input replay. | These are different systems. Neither is a general plugin-state/session recorder. Plugin provenance, commands, migrations and authored HUD playback need a deliberate new format/extension; keep existing recordings readable. |
+| [Physics](BOAT_PHYSICS_PLAN.md), [wake rewrite](WAKE_REWRITE_PLAN.md), [arcade implementation](WAKE_ARCADE_IMPLEMENTATION.md), [`boat_wake_objects.h`](../src/boat_wake_objects.h) | Fixed-step physical handling and bounded arcade wake objects, jumps/landings/capsizes, native CPU/GPU water recipes. Physical-field research is retained as history and is disabled in the routine suite. | Expose supported presets and capped source recipes after validation. Do not put per-hull water sampling, wake math or a new physical-field solver in Lua. Preserve accepted feel; wake readability, tuning and platform/fleet costs retain their own gates. |
+| [Foundations](BOATING_FOUNDATIONS_PLAN.md), [adventure ownership/tiling ledger](FREE_RIDING_ADVENTURE_FIRST_STEPS.md), [`boat_world.h`](../src/boat_world.h), [`boat_session.h`](../src/boat_session.h) | A 120 Hz integer clock, explicit physical-map resources, session/fleet ownership, view-owned caches and enforced core boundaries. A1/A2 provide important mapped-world work beyond the older foundation ledger. | Add a caller-owned plugin host around these owners. Never point a borrowed native definition at Lua memory. Full foundation workload/renderer qualification and larger-world measurements remain separate work. |
+| [HUD](BOAT_HUD.md), [skins](BOAT_SKINS.md), [music](BOATING_PLAN.md#selectable-soundtracks--2026-10-24), [title](TITLE_SCREEN_PLAN.md) | Native marine instruments and shared bitmap UI, voyage/race/combat HUD, selectable XM tracks, Nordic skins and the explorer, title/settings/credits. Explorer selection also chooses a faster handling class in solo free boating. | Start with existing voyage labels, then a small objective/notice/marker vocabulary rendered by C. Later select registered cues and appearance presets. Arbitrary meshes, shader code, audio decoders, title replacement, a palette editor and title music are not initial APIs. Keep skin presentation separate from explicitly authorized handling selection. |
+| [Browser build](WEB_BUILD.md), [`cmake/Web.cmake`](../cmake/Web.cmake) | Emscripten/WebGL 2, packaged assets, browser persistence, shared title and an optional WebRTC client. Browser hosting is unavailable. | Compile the same Lua interpreter and descriptor checks; browser reload needs imported/staged bytes rather than desktop filesystem watching. Physical-device, browser, tab-suspension and networking qualification are still needed. A browser provider/API-key flow is a separate agent-platform decision. |
+
+## Native integration and ownership
+
+Keep the first addition small: a `proteus_plugins` static library with a private Lua dependency,
+a host owner, a bounded source/manifest loader and typed descriptor decoders. Proposed file
+names are `src/boat_plugin.[ch]`, `src/boat_plugin_lua.c` and
+`src/boat_plugin_io.[ch]`; add state/command files only when P3 needs them. Those names describe
+planned files, not existing interfaces.
+
+`proteus_boat_core` and `proteus_boat_net` must continue to have no filesystem, socket, window,
+input or audio access. They must not acquire a dependency on Lua or the plugin host. Extend
+their existing plain C descriptor interfaces only as needed. The application/drive owner
+loads bytes outside simulation, installs validated C values between ticks, and invokes the
+existing C rules. A later room host follows the same pattern around the authority rather
+than embedding a VM or file watcher in the protocol codec.
+
+```text
+editor / imported bundle / future agent
+              | immutable candidate bytes; no live-world writes
+       application plugin host ---- diagnostics / inspection / preview tools
+              | stage, validate, choose commit tick
+       owned C descriptors and later typed command/state transactions
+              | boundary before the next fixed step
+       BoatSession / BoatFleet + C voyage/race/match engines
+              | committed snapshots and ordered events
+       shared scene, native HUD/audio adapters, network/replay adapters
+```
+
+The first voyage needs a narrow ownership change. Today `BoatWorldDefinition.voyage` points
+to process-lifetime data, `BoatVoyage` borrows that route, and free-boating water takes its
+exposure from it. Add an explicit session override whose **native owner** stores the route
+and copied names; do not mutate the global location record or replace the map owner merely
+to change a destination. `BoatVoyage` must be rebound while its replacement owner is alive.
+Keep the compiled route as the no-plugin reference through parity review. Replay/view
+borrowers must not retain retired pointers. The plugin owner outlives all consumers, and
+retired owners are released only after the tick/render boundary no longer borrows them.
+
+The outer map's metre coordinates use simulation `x = -east`, `z = north`; heading is radians
+with forward `(sin(heading), -cos(heading))`. Bindings should use named `x`/`z` fields and
+units in schema/help, not expose ambiguous `Vector2.y` or renderer transforms. Use source
+coordinates in the first example. A few explicitly authored landmark IDs can come later;
+there is no current named-place catalog or semantic map index.
+
+## Proposed package and API surface
+
+Everything in this section is **proposed syntax**, not an available command or loadable
+plugin. P0 pins one reviewed Lua release/source checksum/build configuration after native
+and Emscripten feasibility checks. Use the portable interpreter initially; no JIT or native
+module ABI is needed. The [Lua manual](https://www.lua.org/manual/5.4/manual.html) is a
+reference for the embedding interfaces, not a decision to pin that particular release.
+Include the selected distribution's copyright/license in packages, following
+[Lua's license](https://www.lua.org/license.html).
+
+One directory, one inert bounded manifest, and one text entry point are enough initially:
+
+```text
+plugins/langedrag/
+  plugin.json
+  main.lua
+  README.md
+```
+
+```json
+{
+  "id": "proteus.langedrag",
+  "name": "Langedrag voyage",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["voyage.define"],
+  "state_version": 1
+}
+```
+
+Manifest capabilities request access; the host's policy grants it. A package cannot enlarge
+its own limits or grant itself networking. API major, state schema and content revision are
+separate: `api` selects the supported interface, `state_version` describes explicit future
+script state, and the host computes a bundle hash over the normalized manifest and exact
+source/assets. Include decoded gameplay-definition hashes for semantic comparisons. The
+initial entry file list is fixed; later module/assets must be explicitly listed and bounded.
+No dependency resolution or user-supplied bytecode is required.
+
+The P1 `main.lua` can be just the existing data, with stable authored shelter IDs added for
+diagnostics and later migration. The adapter copies these values into a `BoatVoyageRoute`;
+the IDs belong to its sidecar metadata, not a claim that the current C struct contains IDs.
+
+```lua
+return {
+  voyage = {
+    shelters = {
+      { id = "dock", name = "DOCK", x = -12, z = 60, heading = 0, radius = 60 },
+      { id = "bridge", name = "BRIDGE", x = 650, z = -850, heading = 1.33, radius = 150 },
+      { id = "east_shore", name = "EAST SHORE", x = 3250, z = -2000,
+        heading = 0.86, radius = 200 },
+      { id = "langedrag", name = "LANGEDRAG", x = 3600, z = -3370,
+        heading = 1.57, radius = 0 }
+    },
+    arrival = { x = 3595, z = -3370, radius = 75, max_speed = 6 },
+    exposure = { x = 4300, z = -2650, radius = 700, height = 1.6 },
+    exposed_fraction = 0.8
+  }
+}
+```
+
+Validate count, order, unique IDs, finite values, reasonable coordinate/radius/speed limits,
+native capacity, string length/font support, and safe recovery placements against the
+selected map and existing contact queries. The current last shelter is the destination;
+the first is the initial recovery point. Do not silently clamp an invalid authored definition.
+Return a field path such as `voyage.shelters[3].heading` plus the violated constraint.
+
+After P3, the bounded vocabulary may grow as follows. Each row is a separate capability;
+implement only the rows a milestone uses.
+
+| Proposed interface | Contract |
+| --- | --- |
+| `voyage.define`, `race.define` | Typed data decoded once; existing C engines retain progress/rules |
+| `observe` | Copied, read-only snapshots of approved player/objective fields and stable handles; no C pointers or whole-world arbitrary queries |
+| `update(context, state)` | One deterministic transition with a batch of ordered events; returns replacement serializable state and typed commands |
+| `migrate(context, old_version, state)` | Pure bounded conversion; return a validated new state or explicitly reject |
+| `hud.set`, `notice.emit` | Named objective rows, counters, bearing/marker hints and finite-duration messages; C chooses typography/layout and reserves the native instruments |
+| `weather.set`, `actor.route`, `audio.cue` | Later adapters for implemented native recipes only; validation, ownership and effective ticks required |
+
+Avoid arbitrary `draw`, `raylib`, `spawn_anything`, `set_boat_memory`, filesystem, HTTP and
+shell bindings. Use small descriptions, enums and stable IDs. Queries, timers, commands and
+diagnostics must have documented units, capacities, ordering, failure codes and examples.
+Generate human reference and a machine-readable capability/schema description from the
+binding registry when that registry exists; do not maintain an LLM-only API in parallel.
+
+## Hot reload is the normal development path
+
+P1 must include the whole edit → stage → error/commit loop. Start with an explicit Reload
+action; add native save detection with a small debounced poll outside the tick, driven by
+injected time in tests. A watcher is convenience, not the correctness mechanism. Read a
+consistent immutable bundle, coalesce rapid saves and retain the latest candidate. Avoid
+combining a new entry file with an old manifest. A host/agent publish action may use a
+temporary bundle plus atomic replacement; manual multi-file saves require a consistency
+check before staging. Browser import produces the same immutable bytes.
+
+1. **Acquire:** normalize paths, reject traversal/symlink escapes, enforce byte/file limits,
+   and calculate the candidate revision. Retain the active revision independently of disk.
+2. **Stage:** create a separate Lua state, compile text, evaluate the definition with no
+   live-world mutators, copy it into native candidate storage, validate it and reserve every
+   required native resource. The data-only VM can then be destroyed.
+3. **Classify:** compare old/new semantic definitions, ownership and progress compatibility.
+   Show what will be preserved and what requires an objective/session restart. A syntax,
+   resource or validation failure leaves the active revision untouched.
+4. **Commit:** at a declared fixed-tick boundary, verify that the base revision is still
+   active, then atomically replace the native descriptor/bindings and any approved progress
+   changes. No allocation or fallible asset creation belongs in the commit section.
+5. **Retire:** release old native storage after its borrowers have stopped using it. Report
+   the installed revision, effective tick and policy. Keep bounded prior source revisions for
+   Undo; failed candidates remain inspectable without becoming active.
+
+P1 needs explicit, small compatibility rules, not general state migration:
+
+| Edit | Initial live policy |
+| --- | --- |
+| Display names only; identical ordered IDs and gameplay fields | Preserve boat, clock, water/wakes and all `BoatVoyage` progress; rebind names safely |
+| Destination/shelter geometry, order, membership, arrival speed/radius or exposure-status threshold | Require the selected **restart voyage** policy: retain the boat/world when physical water is unchanged, reset native voyage progress/timing/recoveries to the new definition, and identify its validated initial recovery shelter |
+| Physical exposure/water recipe | Stage successfully, then apply through an explicit **restart session** policy that resets the dependent native world/wake state together; preserving old physical history is not promised in P1 |
+| Different location/map, unsupported capabilities, or a required restart while policy is preserve-only | Keep the current revision; show the required action or unsupported field |
+
+Changing route geometry cannot universally preserve what “already reached” means. Do not
+infer progress from an old array index, count a crossing retroactively, or claim that stable
+IDs alone prove semantic compatibility. After a voyage restart, observations begin at the
+new commit tick; normal C arrival rules may complete the new objective on a subsequent tick
+if the boat is already inside its area at controlled speed. For a future race reload, hold
+the candidate until the next round/start or explicitly restart the run; never move a gate
+under a racing boat and reinterpret the preceding segment as a new crossing.
+
+An author's selected automatic-reload policy may apply compatible changes immediately.
+An incompatible save should not silently reset the session. Restart choices are concrete
+gameplay actions in the authoring UI, not a general approval workflow for every edit.
+P1's Undo reinstalls an older descriptor through these same rules; it does not rewind the
+boat or erase elapsed time. Full state/checkpoint rollback belongs to later milestones.
+
+## Stateful gameplay after the descriptor slices
+
+P3 introduces a small transition model, not an arbitrary mutable VM attached to every actor.
+Use one active gameplay plugin initially. A typical callback could count visits reported by
+the native engine and update a native-rendered objective row:
+
+```lua
+-- Proposed P3 API; not part of the descriptor-only P1 loader.
+return {
+  init = function(context)
+    return { visits = 0 }
+  end,
+  update = function(context, state)
+    for _, event in ipairs(context.events) do
+      if event.kind == "voyage.shelter_reached" then
+        state.visits = state.visits + 1
+      end
+    end
+    return state, {
+      { kind = "hud.set", id = "visits", label = "STOPS", value = state.visits }
+    }
+  end
+}
+```
+
+The committed state is host-owned serialized data: booleans, bounded strings, finite numeric
+values, dense arrays and string-keyed records with canonical ordering. Reject cycles, shared
+reference graphs, functions, threads, userdata, metatables, nonfinite numbers and excessive
+depth/size. Define numeric representation and rounding at the binding boundary. IDs, event
+sequence numbers, deadlines and RNG state use an explicitly supported integer representation;
+do not lose wide ticks through a JavaScript/JSON number conversion. Native rule state remains
+native and is checkpointed separately; scripts cannot edit a `BoatVoyage`/`BoatRace` struct.
+
+**VM memory is not the save format.** For the initial stateful implementation, use a fresh
+bounded execution instance per callback batch, loading the accepted immutable program and
+decoding a copy of the committed explicit state. Top-level code may create helper closures,
+but its globals, upvalues and module tables disappear after the call. Only the validated
+returned data persists. This makes a failed callback's hidden mutations discardable without
+pretending that a protected Lua call rolls back tables. Measure this simple approach at a
+modest callback rate before considering pooled VMs; a persistent-VM optimization must prove
+equivalent reset/isolation rather than rely on an author convention about upvalues.
+
+The transition is atomic across **script state, RNG/timers, event acknowledgment and native
+command intents**. Decode all output into native staging, validate every field, check owner
+rights/conflicts/capacity, reserve resources, then commit the whole batch at its effective
+tick. If any part fails, publish none of it and discard the execution instance. A command
+that may partially fail while applying is not a supported transactional command until its
+adapter has a staging/commit contract. External effects such as playing a sound are queued
+after commit with unique effect IDs; an audio failure reports an outcome, not a rollback of
+already simulated boats. Repeated delivery must not play the same cue twice.
+
+On a runtime error or exhausted budget, quarantine that plugin's callbacks and show a bounded
+diagnostic. Retain its last committed definition/state and let the existing C boat/rule
+engine continue; do not restart the process, apply partial commands or automatically remove
+physical obstacles. Mark script objectives as suspended. A future mode that cannot continue
+without script decisions must define its native pause/end-round policy before shipping.
+Keep the failing event batch for inspection. Bounded event backlog overflow requires an
+explicit resync/restart policy rather than silent loss of objective events or endless retry.
+
+Reload migration runs against a copy of the last committed state in the candidate execution
+instance. Validate the new state, native progress mapping and resource diff before swapping
+anything. Equal state schema versions permit copying only when the definition's compatibility
+rules also permit it; changed meaning may require migration or reset even with equal IDs.
+Candidate failure keeps the active program and native resources. Preserve a bounded previous
+revision and pre-commit checkpoint for an immediate development rollback. After ticks have
+advanced, “Undo code” reapplies old code to current state through migration/reset; “rewind
+preview” restores a complete compatible checkpoint and replays recorded inputs/commands.
+Do not restore old objective state beside a boat/world that has continued moving.
+
+### Virtual time, events and commands
+
+The authoritative clock remains [`BOAT_TICK_HZ = 120`](../src/boat_clock.h). Start script
+updates at 10 Hz, every 12 simulation ticks, with an ordered batch of native events since
+the last dispatch. No render-frame callbacks are necessary. At boundary T, build the input
+snapshot from committed native state through T, run due transitions, and install accepted
+commands for T+1 before stepping C physics. Native outcomes from that step become input to
+a later script dispatch. This explicit one-way staging prevents callback recursion inside
+collision/race processing; any future low-latency capability must specify its own phase.
+
+Timers use due ticks, never wall time. A paused solo session does not advance them; room
+time follows its authority. Order events by tick, native event sequence and stable entity
+identity/life; order simultaneous plugin work by a recorded host order. Bound every queue
+and define overflow as a visible failure. `BoatVoyage` currently exposes only its most recent
+event, so a lossless voyage event adapter needs a small native output-list extension; it
+cannot assume that field retains every transition within one tick. Existing race/match
+output lists are useful models.
+
+Supply a host-specified deterministic RNG stream per plugin, with seed/counter in the
+transaction/checkpoint. Failed transitions must not consume its committed sequence. Disable
+uncontrolled randomness, wall clocks, unordered iteration as an authority ordering source,
+and access to render interpolation. Pin the interpreter configuration and API semantics;
+make same-input tests compare canonical state/command hashes. Do not claim cross-platform
+bit equality for arbitrary Lua floating-point/transcendental expressions. Keep authoritative
+physics in C and replicate its accepted effects; any script prediction path needs separate
+native/web equivalence evidence.
+
+### Ownership and composition
+
+Each created objective, timer, HUD item and future actor carries `(plugin_id, local_id)` and a
+host generation. Use native validated handles, never addresses. Compatible reload can retain
+logical resources by ID; removed resources are retired by the host even if plugin cleanup
+throws or never runs. Stale generations fail visibly. C owns destruction and the safe removal
+policy for physical resources; unloading is not a way to bypass contacts or collision safety.
+
+Start with one gameplay owner of a session's voyage/course/rules. Reject a second claimant.
+Later allow bounded additive HUD/cosmetic contributors in assigned slots. Global weather,
+lighting and music require an explicit host-selected owner or documented composition rule;
+load order must not decide who wins. Validate a resource/command diff for the whole plugin
+transaction. No plugin may delete another owner's resources, claim player slots for traffic,
+or silently override input/help/network status. Resource limits apply to the total host as
+well as each plugin, including active, staged and retained rollback revisions.
+
+## Restrictions, budgets and responsiveness
+
+Construct an allowlisted environment rather than opening all standard libraries. No `io`,
+`os`, `debug`, package/native loading, process execution, filesystem-based `require`, network,
+dynamic `load`, user bytecode or unrestricted coroutine scheduler. A later module loader may
+read only manifested text already acquired by the host. Keep traceback generation on the
+host side and sanitize/truncate diagnostics. Protect native allocations and cleanup across
+Lua errors; do not let interpreter error unwinding skip ownership cleanup.
+
+Initial **proposed limits to validate in P0/P3**, not measured guarantees: one gameplay
+plugin, 4 KiB manifest, 64 KiB total Lua text, 2 MiB per execution instance, 16 KiB canonical
+state, depth 16, 32 output commands, 64 delivered events per callback and 8 HUD items with
+short bounded text. Reuse stricter native capacities, such as four voyage shelters and eight
+river gates. Set a host total ceiling that includes staging and old revisions. Choose and
+record separate instruction/work budgets for module initialization, update and migration;
+do not let a plugin increase them in its manifest.
+
+Lua supplies allocator and instruction-hook interfaces, but instruction-count hooks cover
+Lua execution, not arbitrary work in C calls. Protected calls report errors; they are not a
+world transaction. See the primary references for
+[allocation](https://www.lua.org/manual/5.4/manual.html#lua_newstate),
+[hooks](https://www.lua.org/manual/5.4/manual.html#lua_sethook) and
+[protected calls](https://www.lua.org/manual/5.4/manual.html#lua_pcall).
+The host therefore must also bound compiler input/complexity, native API query work, decoder
+depth, string/library operations, asset bytes, command count, resource allocation and total
+callback work. Omit expensive library operations until their worst case has a bound.
+An instruction hook alone does not make parsing, migration or a C binding preemptible.
+
+P0/P1 may stage small trusted local edits in a visible authoring pause outside simulation;
+measure compilation/validation cost and report that limit. Do not advertise uninterrupted
+motion or hostile-code containment on this basis. Before opening arbitrary imported bundles
+or background live authoring, establish cancellable/isolated staging or proven parser/work
+bounds; native workers must never touch live game/graphics state, and a web Worker or a
+bounded pause needs its own feasibility check. Runtime watchdogs are failure deadlines,
+not gameplay clocks. Automated tests inject time and workload, with no sleeping. An in-process
+allowlist protects engine capabilities but is not an OS security boundary against an
+interpreter/native memory bug.
+
+## Multiplayer, prediction and recording
+
+P0–P4 are solo/local authoring. Existing rooms continue using their compiled content. Reject
+plugin gameplay in connected/hosted modes until the protocol integration is implemented;
+having Lua on both machines does not establish compatibility.
+
+P5 must add a bounded content contract: API and interpreter/build identity, bundle and decoded
+definition hashes, active revision/generation, effective tick, required native capabilities,
+and serialized state/command checkpoint versions. Define exact encoding and size/page limits
+in the [protocol owner](MULTIPLAYER_PROTOCOL.md), advance compatibility deliberately, and
+test mismatched/missing content before any world is installed. A numeric API version alone
+does not identify changed course geometry or gameplay source. Initially require installed,
+trusted matching packages; receiving a room name must not execute downloaded code.
+
+The authority runs gameplay callbacks and decides scores, objectives, spawns and weather.
+Clients may render approved HUD/presentation data. Replicate accepted, tick-stamped native
+configuration/commands and objective state rather than making clients trust local scripts
+for authority decisions. Pure score/HUD updates need no speculative Lua. A command that
+changes collision, water or held/released boats also affects prediction: schedule/distribute
+it with sufficient lead time, store it with checkpoints and reapply it during input replay,
+or hold prediction until it is known. Arbitrary surprise actor/weather changes are not safe
+to add to today's predictor. Reconcile life/generation fences and duplicate/out-of-order
+delivery along with the existing wake rules.
+
+Begin room reload at a lobby/round boundary. Authority stages, verifies required client
+readiness/content, announces a commit tick and activates one revision for everyone. Timeout
+or a client mismatch aborts or follows an explicit resync/disconnect policy. There is no
+unilateral mid-race client reload. Seamless mid-round editing is a later experiment that
+needs atomic content/state bootstrap, prediction-history repair and late-join tests.
+
+Distinguish a future **session recording** from today's pose-based basin `.run` files and
+from short-lived client input replay. Record source/content provenance, definition/initial
+state, native checkpoints, seed/RNG state, input and accepted-command chronology, plus reload
+and migration boundaries. Viewing a recording should use recorded outcomes without rerunning
+untrusted source by default; diagnostic re-simulation can explicitly use the exact pinned
+bundle. Checkpoint/seek must reconstruct objective HUD and revision as well as boats. Give
+plugin courses separate best/ghost compatibility keys and preserve legacy files unchanged.
+
+## Milestones and acceptance
+
+Each milestone is independently reviewable in a separate worktree/PR. Complete the requested
+step and its documentation; the roadmap is not authorization to implement every later track.
+Use existing C fixtures as the parity oracle. Keep native gameplay unchanged with plugins
+disabled and retain a straightforward no-plugin launch. Every implementation handoff runs
+the Debug build and full CTest preset, plus the focused checks below; report unavailable GPU,
+browser, physical input or human-play evidence explicitly.
+
+P0 → P1 → P2 establishes the two descriptor slices; P3 adds behavior and P4 makes the
+authoring tools practical. **P5 and P6 can branch independently from P4:** a solo in-game
+agent does not need to wait for multiplayer, prediction or session-recording qualification.
+P6 uses the already tested local staging/preview/undo path. Only shared-room agent editing
+depends on P5's authority and content contract.
+
+### P0 — bounded descriptor loader and contract (next)
+
+**Deliverable:** a tiny headless loader can evaluate the proposed voyage example, decode it
+to owned native data and reject bad packages. No game-loop integration or behavioral VM yet.
+
+1. Select/pin the Lua release, source checksum, compile options and license packaging. Add a
+   private static target in [CMake](../CMakeLists.txt); keep Lua out of the core/net dependency
+   graph. Do a small Emscripten compile/load preflight using [Web.cmake](../cmake/Web.cmake),
+   not a browser qualification project.
+2. Add `boat_plugin` ownership/status/diagnostics, the restricted Lua loader, bounded manifest
+   parsing and the `BoatVoyageRoute` decoder. Input is immutable bytes; filesystem acquisition
+   belongs to `boat_plugin_io`. One file and one capability suffice. Decide exact version,
+   invalid-field, allocation and text-only loading behavior in a short API reference.
+3. Add a proposed `tools/validate_boat_plugin.c` and minimal fixtures. Exercise valid data,
+   syntax errors, forbidden facilities, bad coordinates/counts/IDs, malformed/deep data,
+   memory/instruction exhaustion and a nonterminating top-level script. Test cleanup and
+   repeated failed loads; add the library to relevant boundary checks without weakening them.
+4. Compare the decoded example field by field with `boat_voyage_outer`, including float
+   conversion and copied name lifetime. Print a deterministic definition digest and structured
+   errors. Profile compiler/native decoder work separately from Lua instruction work.
+
+**Acceptance:** unchanged existing build/tests; validated reference definition equals the C
+baseline; failures leave a supplied last-good descriptor intact, leak no resources and do
+not call I/O from core. Test failure deadlines must return on the expected event, never wait
+for a chosen duration. P0's web result is compile/load feasibility only. Update this plan,
+the index and the new API guide; no visual acceptance is needed for this headless step.
+
+### P1 — Långedrag live authoring
+
+**Deliverable:** run solo `outer` with the Lua-authored current voyage; edit, reload and undo
+without rebuilding C. Preserve existing C arrival/recovery/exposure behavior.
+
+1. Add the explicit route override/lifetime seam in [`boat_session.[ch]`](../src/boat_session.h)
+   and the application water setup in [`wake_velocity.c`](../tools/wake_velocity.c). Keep
+   `boat_location`'s compiled default untouched. Use the drive's shared tick boundary
+   ([`wake_velocity_drive.h`](../tools/wake_velocity_drive.h)) so screenshots and the windowed
+   application activate definitions in the same order. Preserve source/wake ordering.
+2. Add the shipped example directory and opt-in launch/reload selection. Flag/key names are
+   implementation choices, not commands available today. Start with Reload, then add the
+   debounced native save poll. Show active/candidate revision, success/error and reset policy
+   in a small authoring panel. Syntax errors include file/line; schema errors always include
+   field path, with source line only when actually available.
+3. Implement native candidate staging, compatible pointer rebinding, restart-voyage versus
+   restart-session policy and safe retirement. Invalid file saves do not remove the voyage.
+   Copy descriptor strings before destroying Lua. Undo follows the same transaction path.
+4. Extend [`validate_boat_voyage.c`](../tools/validate_boat_voyage.c) or its fixtures to drive
+   the compiled and Lua definitions with identical input/virtual time, comparing progress,
+   recovery, arrival and physical traces. Exercise reload while inside a shelter/arrival
+   radius, while exposed and after arrival; changed ordered IDs must never retain an invalid
+   shelter index. Check failed staging, reset, repeated reload and shutdown lifetimes.
+5. Capture and inspect equivalent CPU `outer` frames at useful voyage states, and the error/
+   reload UI. Add GPU captures when presentation changes and a windowed edit/reload/recovery
+   demo for motion/input/lifetime behavior. Record a real author edit and distinguish scripted
+   navigation from human play. Reuse the existing route autopilot; do not wait minutes in tests.
+
+**Acceptance:** the reference plugin reproduces the current outing; editing a display name
+preserves boat/progress, a gameplay edit follows its chosen reset policy, a broken file leaves
+the running revision usable, and unloading/reloading has no dangling names or route pointers.
+The example ships in native/web asset packaging as appropriate, with plugin mode rejected in
+rooms and legacy recording modes until their compatibility work exists. Update the adventure
+owner's description of where route data lives, launch/control guides and the index. First
+human authoring acceptance is a separate recorded result, not inferred from screenshots.
+
+### P2 — river course authoring through the same path
+
+**Deliverable:** a second small example defines the existing `BoatRaceCourse` and
+`BoatRaceRules`, demonstrating that this API supports more than one voyage.
+
+Add bounded race decoding with the existing eight-gate/four-slot capacities and native
+validation. Extend [`boat_race_trial.c`](../tools/boat_race_trial.c) and
+[`validate_boat_race.c`](../tools/validate_boat_race.c) to use an owned candidate definition;
+keep the C race engine and compiled fixture as reference. A local trial or headless fleet
+is sufficient: production network races remain compiled until P5. Expose a preview of gates,
+the ferry and the existing storm, with source clearance and reasonable world-envelope checks.
+Validate whole routes, not merely each finite coordinate.
+
+Course changes commit at a new run/round with progress reset. A label-only revision can retain
+progress if the gameplay digest is unchanged. Compare scripted four-boat results, crossings,
+recovery, DNF/deadlines and native hashes with the baseline; inspect CPU/GPU gate/ferry/storm
+frames and run a windowed trial. Verify rejects for impossible counts, degenerate gates,
+invalid source geometry and unsafe recovery arrangements. Update [the race plan](RACE_PLAN.md)
+and authoring examples. Do not generalize the basin trial/replay engine merely to reuse an
+API name; that is a later separate adapter if wanted.
+
+### P3 — small stateful objectives, transactions and inspection
+
+**Deliverable:** add one optional objective to a supported voyage, such as visiting two
+shelters before arrival, with explicit serialized Lua state and a native HUD row. Keep the
+underlying voyage completeable independently while testing the extension.
+
+Implement the fresh-instance transition, canonical state codec, virtual-time/RNG/event bridge,
+native command staging, ownership and quarantine contracts above. Start with objective/HUD
+commands; physical actor mutation is unnecessary. Add one migration and a reset path, state
+inspection, event/command trace, deterministic step/seek in the review harness and rollback of
+an isolated preview checkpoint. Test “change state + queue valid command + queue invalid
+command + error”: no state, RNG, acknowledgment or native command may partially commit.
+Test hidden closure mutation, resource conflicts, stale handles, event overflow, budget failure
+and reload during pending timers. Compare repeated and resumed runs by canonical hashes.
+Inspect native-resolution HUD frames and motion; measure callback/staging cost before enabling
+continuous background reload. This milestone owns the first real behavior scripting API.
+
+### P4 — practical authoring on native and browser
+
+**Deliverable:** a human and an external LLM can discover the supported API, author either
+example, validate it, inspect state, capture a frame and apply/undo a revision using the same
+bounded host operations. Add small schemas/examples and structured errors, not a second game
+engine or a bespoke script IDE.
+
+Provide a focused validator/preview CLI and optional local tool bridge: list capabilities,
+inspect the selected world/owner, read/write the selected plugin workspace, validate a
+candidate, run a bounded virtual scenario, capture a frame, stage/apply and revert. Pin each
+request to a bundle/base revision and return test evidence with artifact/revision IDs. A
+hand-authored handful of map anchors and camera bookmarks can make prompts useful without a
+semantic-map project. Developer inspection must not become permanent clutter in normal play.
+
+Compile the same runtime into Emscripten, bundle example text, and provide import/reload/export
+with the same transactions. Browser source/state persistence is host-owned and must handle
+storage denial; plugins do not get filesystem APIs. Verify package paths after relocation,
+native load/reload and browser repeated sessions, source edits, errors and cleanup. Check
+memory/compiler/callback costs on physical devices; declare unsupported capabilities rather
+than silently changing behavior. Native shell/file-watching assumptions must not leak into
+the common API. Browser agent connectivity can remain deferred.
+
+### P5 — authority, prediction and recorded revisions
+
+**Deliverable:** one already proven authored scenario works in a room and can be recorded or
+reconstructed with its revision/state. Implement the explicit content, command/checkpoint,
+compatibility and round-boundary reload contract above in the owning multiplayer/protocol
+and recording code. Add client rejection/readiness, late join/reconnect, loss/reordering,
+duplicate effects, stale revisions, failed room reload and prediction replay checks under
+virtual time. Verify mixed native/browser clients with matching content and explicit rejection
+of old clients. Recheck resource/page limits and four-player load; human multiplayer play is
+its own acceptance gate. Seamless mid-round source swaps are not required for this milestone.
+
+### P6 — in-game asynchronous agent
+
+**Deliverable:** an optional in-game conversation can use the proven P4 authoring tools to
+make and test a supported change, show its result and apply it under the current authoring
+policy. Begin in a solo development session; shared/public-room editing is a separate host
+permission and protocol feature.
+
+Keep a provider adapter and tool dispatcher outside Lua and outside the fixed tick. The
+adapter handles asynchronous requests, streaming UI, cancellation, bounded retries, token/
+cost limits and offline/provider errors. Start with Claude if desired while keeping requests,
+tools and artifacts provider-independent. Model latency never pauses simulation or becomes
+simulation time. A completed request supplies candidate bytes; the existing staging pipeline
+chooses the commit tick. Discard responses for stale session/base revisions unless rebased
+and tested explicitly.
+
+Credentials belong to the native host's appropriate credential storage or an explicit
+session-only path, never `plugin.json`, Lua globals, tool transcripts, screenshots or exported
+bundles. Browser support must choose session-only direct access where feasible or a trusted
+relay; do not bake a secret into the published Wasm/site. Provider-specific authentication,
+SDK, billing and browser/CORS support are implementation-time checks, not assumed facts here.
+
+The model receives capability/schema docs, selected state, logs and artifacts. Tool access is
+limited to the chosen plugin workspace and host operations, with no arbitrary shell, raw
+engine memory or secret reads. Treat plugin/log text as untrusted input to the assistant, not
+instructions that grant more tools. Keep a visible change/test history, cancellation, undo
+and an easy “return to last working revision.” If the requested feature needs an unavailable
+native primitive, explain the gap and produce a concrete C work item or external worktree/PR
+proposal instead of pretending the Lua API can do it.
+
+## Longer-term creative roadmap
+
+Grow capabilities when a playable example needs them, preserving the existing owning plans:
+
+- **Voyage episodes:** optional deliveries, rescue encounters, visiting landmarks and choosing
+  sheltered routes, built over the adventure's real map expansion and weather work. Cargo,
+  rescue actors and more destinations need native resource/rule support before Lua orchestration.
+- **Living waterfront:** ferry timetables, small craft routes, local events and gull reactions;
+  later pedestrians/cyclists and building activity once the city plan implements those actors.
+  Share scene snapshots and bounded activation by gameplay region, not a script-owned crowd.
+- **Evening journeys:** scripted fixed lighting or gradual dusk, weather events and restrained
+  audio cues after the sunset/weather owners provide consistent physical/presentation recipes.
+  Presentation phase stays distinct from water and race clocks.
+- **New competitions:** authored slalom, time trials, team objectives and supported combat
+  variants using C course/match primitives. New projectiles, collision rules or boat classes
+  remain native features with deterministic and network tests.
+- **Creative collaboration:** save/share a small versioned scenario bundle, branch a preview,
+  compare two candidates at identical inputs/time, and invite an agent to iterate against an
+  explicit goal. Later support host-controlled multiplayer authoring and curated distribution.
+  Package trust, signing, dependencies and an online catalog should wait for demonstrated need.
+
+The most valuable early improvement is a short, observable edit/test/reload cycle. A large
+framework, universal mod compatibility, open-ended agent autonomy and comprehensive world
+generation are not prerequisites for that loop.
+
+## Decisions to resolve at their implementation gates
+
+| Gate | Decision and recommended starting point |
+| --- | --- |
+| P0 | Exact Lua release/build, source acquisition/vendor policy and manifest parser: pin a small portable C build, bounded inert manifest, one entry file; record native/web feasibility and license packaging. |
+| P0/P1 | Initial budgets and staging responsiveness: measure the descriptor case, permit a visible authoring pause first, then decide whether background compilation is justified. Do not call an instruction limit a compiler deadline. |
+| P1 | Reload UX and distribution: choose a key/menu action and opt-in launch selection, preserve-only default with explicit restart policy for incompatible edits; retain compiled defaults until parity and authoring review. |
+| P2/P3 | Supported rule extension depth: keep voyage/race/match engines in C and add orchestration first. Move no mature rule engine merely to make a larger Lua example. |
+| P3 | Serializable state numeric contract, callback cadence and total budgets: choose deterministic representations and measure the disposable-instance approach before optimizing. |
+| P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
+| P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
+| P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |
+
+## Verification and known limits of this planning change
+
+Reviewed on 2026-10-28: the [documentation index](README.md), the plans/guides and source
+interfaces linked in the inventory, CMake library boundaries, the application/drive tick path,
+voyage/session ownership, race/match outputs, fleet/prediction checkpoints, recording types,
+and browser packaging. The primary Lua embedding references above were checked; the exact
+runtime version is intentionally undecided. Local links and document consistency are checked
+as part of handoff, with no source implementation implied by the proposed examples.
+
+Existing-C baseline verification, 2026-10-28, macOS 26.6.2 arm64: Debug configure reused the
+existing pinned raylib/ENet source checkouts; `cmake --build build -j` succeeded without
+project warnings (one bundled `stb_vorbis` tautological-pointer warning). With local socket
+access, `ctest --preset full` passed **230/230 active tests**, with **13 retired wake-field
+tests disabled** and `PROTEUS_GPU_TESTS=OFF`. The first sandbox-only run failed ten
+socket-dependent cases; the full unrestricted rerun passed. Logs are local artifacts at
+`/private/tmp/proteus-plugin-plan-configure.log`,
+`/private/tmp/proteus-plugin-plan-build.log` and
+`/private/tmp/proteus-plugin-plan-ctest-unrestricted.log`.
+
+This verifies the existing C baseline for a documentation-only change. There are no Lua
+tests, implemented bindings, plugin performance results, browser-plugin results or in-game
+agent results to report. No new audiovisual run was needed or performed; GPU checks and
+manual authoring/play acceptance are not claimed. Exact budgets, safe background staging,
+native/web behavior equality and migration semantics need implementation evidence at their
+gates. Older plan summaries contain dated worktree/next-task language; the inventory links
+those owners and current source rather than treating every historical proposal as delivered.
