@@ -1,3 +1,4 @@
+#include "boat_test_scenery.h"
 #include "external/glad.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -448,50 +449,78 @@ static bool verify_sky_targets(WaterfrontGpuScene *scene)
             .vertical_fov = 55 * DEG2RAD,
             .near_plane = .3f,
             .far_plane = 25 };
-        waterfront_sky_draw(reference, width, height, frame.camera);
-        for (int passes = 0; ok && passes < 4; ++passes) {
-            waterfront_gpu_scene_set_shadows_enabled(scene, (passes & 1) != 0);
-            waterfront_gpu_scene_set_reflections_enabled(scene, (passes & 2) != 0);
-            // A second frame catches state inherited from the preceding presentation.
-            for (int tick = 0; ok && tick < 2; ++tick) {
-                BeginTextureMode(target);
-                waterfront_gpu_scene_draw(scene, &frame, width, height);
-                // A 2D overlay must also retain the caller's projection after the scene draw.
-                DrawRectangle(width - 8, height - 8, 8, 8, MAGENTA);
-                EndTextureMode();
-                Image image = LoadImageFromTexture(target.texture);
-                if (!image.data) {
+        // The plain panorama, then an A3.5 squall's cloud and rain ahead, high above the map.
+        for (int squall = 0; ok && squall < 2; ++squall) {
+            if (squall) {
+                frame.camera.target = (Vector3) { 60, 2012, -75 };
+                frame.squall = (WaterfrontSquall) { .centre = { 1300, -1600 },
+                    .radius = 800,
+                    .base = 1960,
+                    .top = 2400,
+                    .grown = .8f };
+            }
+            waterfront_sky_draw_squall(reference, width, height, frame.camera, frame.squall);
+            if (squall) {
+                // The case must show the squall: compare with the plain panorama.
+                Color *plain = malloc((size_t)width * height * sizeof(*plain));
+                int changed = 0;
+                if (plain) {
+                    waterfront_sky_draw(plain, width, height, frame.camera);
+                    for (int i = 0; i < width * height; ++i)
+                        changed += abs(plain[i].r - reference[i].r) > 12;
+                    free(plain);
+                }
+                if (changed < width * height / 5) {
+                    fprintf(stderr, "Sky squall case shows too little cloud: %d of %d\n", changed,
+                        width * height);
                     ok = false;
                     break;
                 }
-                ImageFlipVertical(&image);
-                Color marker = GetImageColor(image, width - 4, height - 4);
-                if (marker.r != 255 || marker.g != 0 || marker.b != 255)
-                    ok = false;
-                ImageFlipHorizontal(&image);
-                int probes = 0, mismatches = 0;
-                for (int y = 8; y < height - 8; y += 7)
-                    for (int x = 8; x < width - 8; x += 7) {
-                        Color expected = reference[y * width + x];
-                        Color actual = GetImageColor(image, x, y);
-                        // Allow a few panorama-texel boundary differences from float precision.
-                        if (abs(actual.r - expected.r) > 3 || abs(actual.g - expected.g) > 3
-                            || abs(actual.b - expected.b) > 3 || actual.a != 255)
-                            ++mismatches;
-                        ++probes;
+            }
+            for (int passes = 0; ok && passes < 4; ++passes) {
+                waterfront_gpu_scene_set_shadows_enabled(scene, (passes & 1) != 0);
+                waterfront_gpu_scene_set_reflections_enabled(scene, (passes & 2) != 0);
+                // A second frame catches state inherited from the preceding presentation.
+                for (int tick = 0; ok && tick < 2; ++tick) {
+                    BeginTextureMode(target);
+                    waterfront_gpu_scene_draw(scene, &frame, width, height);
+                    // A 2D overlay must also retain the caller's projection after the scene draw.
+                    DrawRectangle(width - 8, height - 8, 8, 8, MAGENTA);
+                    EndTextureMode();
+                    Image image = LoadImageFromTexture(target.texture);
+                    if (!image.data) {
+                        ok = false;
+                        break;
                     }
-                if (mismatches > probes / 100)
-                    ok = false;
-                if (!ok)
-                    fprintf(stderr,
-                        "Sky target check failed: %dx%d passes=%d frame=%d "
-                        "mismatches=%d/%d overlay=%u,%u,%u\n",
-                        width, height, passes, tick, mismatches, probes, marker.r, marker.g,
-                        marker.b);
-                UnloadImage(image);
-                BeginDrawing();
-                ClearBackground(BLACK);
-                EndDrawing();
+                    ImageFlipVertical(&image);
+                    Color marker = GetImageColor(image, width - 4, height - 4);
+                    if (marker.r != 255 || marker.g != 0 || marker.b != 255)
+                        ok = false;
+                    ImageFlipHorizontal(&image);
+                    int probes = 0, mismatches = 0;
+                    for (int y = 8; y < height - 8; y += 7)
+                        for (int x = 8; x < width - 8; x += 7) {
+                            Color expected = reference[y * width + x];
+                            Color actual = GetImageColor(image, x, y);
+                            // Allow a few panorama-texel boundary differences from float precision.
+                            if (abs(actual.r - expected.r) > 3 || abs(actual.g - expected.g) > 3
+                                || abs(actual.b - expected.b) > 3 || actual.a != 255)
+                                ++mismatches;
+                            ++probes;
+                        }
+                    if (mismatches > probes / 100)
+                        ok = false;
+                    if (!ok)
+                        fprintf(stderr,
+                            "Sky target check failed: %dx%d squall=%d passes=%d frame=%d "
+                            "mismatches=%d/%d overlay=%u,%u,%u\n",
+                            width, height, squall, passes, tick, mismatches, probes, marker.r,
+                            marker.g, marker.b);
+                    UnloadImage(image);
+                    BeginDrawing();
+                    ClearBackground(BLACK);
+                    EndDrawing();
+                }
             }
         }
         free(reference);
@@ -788,6 +817,7 @@ static void present_target(RenderTexture2D target, FixtureOptions options)
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     FixtureOptions options;
     if (!parse_options(argc, argv, &options)) {
         print_usage(argv[0]);

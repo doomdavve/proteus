@@ -6,6 +6,7 @@
  * per-operation times. Times are a report, never a gate: only counts and equality are asserted. */
 #include "boat_map.h"
 #include "boat_map_tiles.h"
+#include "boat_test_scenery.h"
 #include "boat_water_mesh.h"
 #include "waterfront_city.h"
 
@@ -66,7 +67,7 @@ static double now(void)
 // The stride is a whole number of tiles so every copy has the river's tile grid.
 static void measure(void)
 {
-    const Mesh3D *river = waterfront_city_river_map.mesh;
+    const Mesh3D *river = test_scenery(&waterfront_city_river_map)->mesh;
     Vector2 lo = { INFINITY, INFINITY }, hi = { -INFINITY, -INFINITY };
     for (size_t i = 0; i < river->triangle_count; ++i)
         for (int j = 0; j < 3; ++j) {
@@ -84,9 +85,9 @@ static void measure(void)
 // copy's land, then every copy's bridge.
 static bool corridor_init(Corridor *c, int count)
 {
-    const Mesh3D *river = waterfront_city_river_map.mesh;
+    const Mesh3D *river = test_scenery(&waterfront_city_river_map)->mesh;
     size_t water = boat_map_leading_water(river);
-    size_t bridge = waterfront_city_river_map.bridge_first_triangle;
+    size_t bridge = test_scenery(&waterfront_city_river_map)->bridge_first_triangle;
     size_t vertices = 0;
     for (size_t i = 0; i < river->triangle_count; ++i)
         for (int j = 0; j < 3; ++j)
@@ -187,7 +188,7 @@ static size_t water_cache_bytes(const BoatWaterMeshCache *c)
 // are moved up to 40 m so that shores and land are covered.
 static void make_samples(void)
 {
-    const Mesh3D *river = waterfront_city_river_map.mesh;
+    const Mesh3D *river = test_scenery(&waterfront_city_river_map)->mesh;
     size_t water = boat_map_leading_water(river);
     unsigned int seed = 12345;
     for (int i = 0; i < SAMPLES; ++i) {

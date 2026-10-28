@@ -1,4 +1,6 @@
 #include "waterfront_corner.h"
+
+#include "boat_scenery.h"
 #include "waterfront_city.h"
 #include "waterfront_scene.h"
 
@@ -734,9 +736,10 @@ bool waterfront_scenery_init_tiled(
     }
     if (!map)
         return true; // The basin: no map-derived or authored river scenery.
-    const Mesh3D *city = map->mesh;
+    scenery->full = boat_scenery_drawn(map);
+    const Mesh3D *city = scenery->full ? scenery->full->mesh : NULL;
     if (!city || !city->triangle_count
-        || !boat_map_tiles_init_land(&scenery->tiles, map, tile_size)) {
+        || !boat_map_tiles_init_land(&scenery->tiles, scenery->full, tile_size)) {
         *scenery = (WaterfrontScenery) { 0 };
         return false;
     }
@@ -749,8 +752,12 @@ bool waterfront_scenery_init_tiled(
     Builder *k = &builder;
     // On a kit ground the layout comes from the river map, whose flat 3.5 m ground the kit's
     // placement rules read; the boxes are set on the ground afterwards.
-    if (scenery->ground)
-        city = waterfront_city_river_map.mesh;
+    if (scenery->ground) {
+        const BoatMapDescription *river = boat_scenery_of(&waterfront_city_river_map);
+        if (!river)
+            goto failed;
+        city = river->mesh;
+    }
     k->surfaces = calloc(city->triangle_count, sizeof(*k->surfaces));
     if (!k->surfaces)
         goto failed;

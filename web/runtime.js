@@ -13,9 +13,26 @@ fullscreenOption.addEventListener('change', () => {
   try { localStorage.setItem('wake-velocity-fullscreen', fullscreenOption.checked ? 'on' : 'off'); } catch (_) {}
 });
 installBoatMouseControls(Module, canvas, document, window);
+installBoatMobileControls(Module, canvas, document, window);
 installBoatRtcTransport(Module);
 installBoatServerDirectory(Module).refresh();
-document.getElementById('fullscreen').disabled = !stage.requestFullscreen;
+const canFullscreen = !!stage.requestFullscreen && document.fullscreenEnabled !== false;
+fullscreenOption.disabled = !canFullscreen;
+const screenButton = document.getElementById('screen-button');
+screenButton.hidden = !canFullscreen;
+function enterFullscreen() {
+  if (canFullscreen) {
+    try {
+      const request = document.fullscreenElement
+        ? document.exitFullscreen() : stage.requestFullscreen({ navigationUI: 'hide' });
+      Promise.resolve(request).catch(() => {});
+    } catch (_) {} // Fullscreen refusal leaves touch play available in the tab.
+  }
+  canvas.focus();
+}
+screenButton.addEventListener('click', enterFullscreen);
+document.getElementById('iphone-tip').hidden = !(/iPhone|iPod/.test(navigator.userAgent))
+  || window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
 Module['preRun'] = Module['preRun'] || [];
 Module['preRun'].push(() => {
@@ -39,12 +56,42 @@ Module['onRuntimeInitialized'] = () => {
   statusLine.textContent = '';
 };
 
+let viewportSize = {width: 320, height: 200};
+let candidateSize = viewportSize, candidateSince = 0;
+Module['boatViewportSize'] = () => {
+  // Avoid reallocating GPU targets at every animation frame of browser-bar movement.
+  if (performance.now() - candidateSince >= 150) viewportSize = candidateSize;
+  return viewportSize;
+};
 function fitCanvas() {
-  const availableHeight = innerHeight;
-  const scale = Math.max(1, Math.floor(Math.min(innerWidth / 320, availableHeight / 200)));
-  // The fixed 960x600 buffer contains a 320x200 scene. Use whole scene-pixel scales.
-  const width = 320 * scale;
-  const height = 200 * scale;
+  const viewport = window.visualViewport;
+  stage.style.width = (viewport ? viewport.width : innerWidth) + 'px';
+  stage.style.height = (viewport ? viewport.height : innerHeight) + 'px';
+  stage.style.left = (viewport ? viewport.offsetLeft : 0) + 'px';
+  stage.style.top = (viewport ? viewport.offsetTop : 0) + 'px';
+  const style = getComputedStyle(stage);
+  const availableHeight = (viewport ? viewport.height : innerHeight)
+    - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  const availableWidth = (viewport ? viewport.width : innerWidth)
+    - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const scale = Math.max(1, Math.floor(Math.min(availableWidth / 320, availableHeight / 200)));
+  const mobile = window.matchMedia('(pointer: coarse)').matches;
+  const viewportWidth = viewport ? viewport.width : innerWidth;
+  const viewportHeight = viewport ? viewport.height : innerHeight;
+  // Keep at least 320x200 logical pixels so menus and instruments fit naturally.
+  // Cap the long side to bound memory and supersampling cost on mobile GPUs.
+  const aspect = Math.max(1 / 3, Math.min(3, viewportWidth / viewportHeight));
+  const next = mobile ? (aspect >= 1.6
+    ? {width: Math.round(200 * aspect), height: 200}
+    : {width: 320, height: Math.round(320 / aspect)}) : {width: 320, height: 200};
+  if (next.width !== candidateSize.width || next.height !== candidateSize.height) {
+    candidateSize = next;
+    candidateSince = performance.now();
+  }
+  // Preserve proportions even while a resize is settling, and on the fixed-size title.
+  const mobileScale = Math.min(viewportWidth / canvas.width, viewportHeight / canvas.height);
+  const width = mobile ? canvas.width * mobileScale : 320 * scale;
+  const height = mobile ? canvas.height * mobileScale : 200 * scale;
   canvas.style.width = width + 'px';
   canvas.style.height = height + 'px';
 }
@@ -56,9 +103,7 @@ playButton.addEventListener('click', () => {
   playButton.disabled = true;
   document.body.classList.add('playing');
   fitCanvas();
-  if (document.getElementById('fullscreen').checked && stage.requestFullscreen) {
-    stage.requestFullscreen().catch(() => canvas.focus());
-  }
+  if (fullscreenOption.checked) enterFullscreen();
   canvas.focus();
   // Audio initialization and PlayMusicStream happen inside this user gesture.
   callMain([]);
@@ -71,8 +116,17 @@ canvas.addEventListener('keydown', event => {
   if (['Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3'].includes(event.key))
     event.preventDefault();
 });
+Module['boatFitCanvas'] = fitCanvas;
 window.addEventListener('resize', fitCanvas);
-document.addEventListener('fullscreenchange', fitCanvas);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitCanvas);
+  window.visualViewport.addEventListener('scroll', fitCanvas);
+}
+document.addEventListener('fullscreenchange', () => {
+  screenButton.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+  Module['boatMobile']['cancel']();
+  fitCanvas();
+});
 Module['onExit'] = code => {
   document.body.classList.remove('playing');
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});

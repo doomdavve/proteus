@@ -8,6 +8,8 @@ static void reset(BoatSession *session)
     session->tick = 0;
     session->course = (BoatCourse) { 0 };
     boat_voyage_start(&session->voyage, session->world.definition->voyage, 0);
+    if (session->voyage.route)
+        session->world.water.storm = boat_voyage_weather(&session->voyage);
     session->runs = (BoatReplayRuns) { 0 };
     session->record_runs = false;
 }
@@ -90,6 +92,8 @@ bool boat_session_step(BoatSession *session, BoatInput input)
         session->course.enabled ? &boat_handling_speedboat : session->handling);
     boat_course_step(&session->course, previous, session->boat.position, BOAT_TICK_SECONDS);
     boat_voyage_step(&session->voyage, session->boat.position, session->boat.velocity, now);
+    if (session->voyage.route)
+        session->world.water.storm = boat_voyage_weather(&session->voyage);
     if (session->presentation_enabled)
         boat_presentation_step(&session->presentation, &session->boat, &session->world, now);
     if (record)

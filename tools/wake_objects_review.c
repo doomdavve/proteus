@@ -1,6 +1,7 @@
 /* Arcade wake contracts, actual hull jumps, bounded stress and complete GPU timing. */
 #include "boat_gpu.h"
 #include "boat_test_cases.h"
+#include "boat_test_scenery.h"
 #include "boat_test_session.h"
 #include "external/glad.h"
 #include "raymath.h"
@@ -808,6 +809,7 @@ static const TestCase cases[] = {
 // cases are separate CTest entries.
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     SetTraceLogLevel(LOG_WARNING);
     bool visible = argc == 2 && strcmp(argv[1], "--desktop") == 0;
     int result = 0;

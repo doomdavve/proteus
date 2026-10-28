@@ -20,6 +20,10 @@ typedef struct {
 // Matching side instruments around the existing controls, deathmatch callers only.
 void boat_hud_combat_draw(BoatHudCombat combat, int width, int height);
 
+// Three-by-five scene-pixel lettering: five rows of three-bit masks as the digits '0'..'7', the
+// highest bit leftmost. NULL for a character without a glyph, which callers leave blank.
+const char *boat_hud_glyph(char character);
+
 // Draw at scene resolution (320x200) in a render texture, then present with the scene
 // destination and nearest filtering. Composite over the scene before scaling so case
 // transparency blends correctly. Anchored to the bottom edge. No retained state.

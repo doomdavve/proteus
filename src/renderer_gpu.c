@@ -490,7 +490,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     WaterfrontGpuTiled *facades, WaterfrontGpuTiled *roofs, WaterfrontGpuTiled *quay, Mesh *water,
     WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_emissive)
 {
-    const Mesh3D *city = scenery->map->mesh;
+    const Mesh3D *city = scenery->full->mesh;
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
     TiledBuilder builders[4] = { 0 };
     MeshBuilder water_builder = { 0 };
@@ -511,7 +511,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         bool planting = (triangle->color.r == 72 && triangle->color.g == 105)
             || (triangle->color.r == 61 && triangle->color.g == 91);
         // Authored bridge beams retain their flat steel/concrete colors.
-        bool bridge = boat_map_is_bridge_triangle(scenery->map, i);
+        bool bridge = boat_map_is_bridge_triangle(scenery->full, i);
         CitySurface surface
             = planting || bridge ? CITY_SURFACE_FLAT : city_surface(a, b, c, triangle->color);
         Vector3 normal
@@ -570,7 +570,7 @@ failed:
 // Windows join the tile of the wall triangle they are derived from.
 static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *mesh)
 {
-    const BoatMapDescription *map = scenery->map;
+    const BoatMapDescription *map = scenery->full;
     const Mesh3D *city = map->mesh;
     TiledBuilder tiled = { 0 };
     if (!tiled_builder_init(&tiled, boat_map_tiles_count(&scenery->tiles)))
@@ -1643,8 +1643,8 @@ static void restore_render_target(RenderTargetState state)
     rlSetMatrixModelview(state.modelview);
 }
 
-static void draw_sky(
-    const WaterfrontGpuScene *scene, View3D camera, int width, int height, float aspect)
+static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontSquall squall,
+    int width, int height, float aspect)
 {
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
@@ -1655,6 +1655,12 @@ static void draw_sky(
     SetShaderValue(shader, GetShaderLocation(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, GetShaderLocation(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, GetShaderLocation(shader, "skyScale"), scale, SHADER_UNIFORM_VEC2);
+    SetShaderValue(
+        shader, GetShaderLocation(shader, "skyEye"), &camera.position, SHADER_UNIFORM_VEC3);
+    float area[] = { squall.centre.x, squall.centre.y, squall.radius, squall.grown };
+    float heights[] = { squall.base, squall.top };
+    SetShaderValue(shader, GetShaderLocation(shader, "squallArea"), area, SHADER_UNIFORM_VEC4);
+    SetShaderValue(shader, GetShaderLocation(shader, "squallHeight"), heights, SHADER_UNIFORM_VEC2);
     if (counting)
         ++counting->sky_quads;
     BeginShaderMode(shader);
@@ -1726,8 +1732,8 @@ static void render_reflection(
     sky_camera.up = camera.up;
     sky_camera.vertical_fov = camera.fovy * DEG2RAD;
     // The fixed-size texture stores this wider frustum, independent of its pixel aspect.
-    draw_sky(scene, sky_camera, scene->reflection.texture.width, scene->reflection.texture.height,
-        aspect);
+    draw_sky(scene, sky_camera, frame->squall, scene->reflection.texture.width,
+        scene->reflection.texture.height, aspect);
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(
         camera.fovy * DEG2RAD, aspect, frame->camera.near_plane, frame->camera.far_plane));
@@ -1891,7 +1897,7 @@ static void draw_scene(
     counting_pass = WATERFRONT_GPU_PASS_MAIN;
     set_atmosphere_uniforms(scene, frame->camera.position);
     ClearBackground(BLACK);
-    draw_sky(scene, frame->camera, width, height, (float)width / height);
+    draw_sky(scene, frame->camera, frame->squall, width, height, (float)width / height);
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(frame->camera.vertical_fov,
         (float)width / (float)height, frame->camera.near_plane, frame->camera.far_plane));

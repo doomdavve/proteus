@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 static const float CAMERA_BASE_FOV = 55 * DEG2RAD;
 static const float CAMERA_SPEED_FOV = 7 * DEG2RAD;
@@ -266,6 +267,22 @@ static void storm_rain_drop(const BoatViewState *view, BoatStorm storm, double c
             brightness, (unsigned char)(brightness + 17), (unsigned char)(brightness + 30), 255 });
 }
 
+// Weather systems, unlike the race's compact travelling squall, are seen from afar.
+#define WEATHER_RADIUS 400.0f
+
+WaterfrontSquall boat_view_squall(const BoatWorld *world, double time)
+{
+    BoatStorm storm = world->water.storm;
+    if (storm.radius < WEATHER_RADIUS || storm.height <= 0)
+        return (WaterfrontSquall) { 0 };
+    Vector2 centre = boat_water_storm_centre(storm, time);
+    return (WaterfrontSquall) { .centre = { -centre.x, centre.y },
+        .radius = storm.radius * 1.2f,
+        .base = 200,
+        .top = 520,
+        .grown = boat_water_storm_grown(storm, time, NULL) };
+}
+
 // A travelling world-space squall: its cloud, rain curtain and bolts advertise the physical
 // patch from outside it. All animation is a function of the shared race clock.
 static void storm_visit(
@@ -274,13 +291,15 @@ static void storm_visit(
     BoatStorm storm = world->water.storm;
     storm.centre = boat_water_storm_centre(storm, view->time);
     if (storm.radius <= 0 || storm.height <= 0
+        || boat_water_storm_grown(storm, view->time, NULL) <= 0
         || Vector2Distance(view->boat.position, storm.centre) > storm.radius + 350)
         return;
     double clock = view->time - storm.started;
     bool flash = fmod(fmax(0, clock), 9.0) < .16 && clock > 1;
     const float cloud_height = 180;
     Color cloud = flash ? (Color) { 168, 182, 193, 255 } : (Color) { 48, 60, 73, 255 };
-    for (int z = -1; z <= 1; ++z)
+    // A weather patch's cloud is in the sky (boat_view_squall).
+    for (int z = -1; z <= 1 && storm.radius < WEATHER_RADIUS; ++z)
         for (int x = -1; x <= 1; ++x)
             draw(context,
                 (Transform3D) { .position = { -storm.centre.x + (float)x * 52,
@@ -601,6 +620,7 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     else
         environment_visit(view, world, basin_box, frame);
     frame->player_water = world->water;
+    frame->squall = boat_view_squall(world, time);
     WaterfrontPlayerState *p = &frame->player;
     boat_player_pose(view, &presentation->flag, p);
     if (world->combat && world->combat->enabled)
@@ -666,6 +686,19 @@ bool boat_draw_with_ghost(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels,
         camera_settings, NULL, ghost, ghost_flag, opacity);
 }
 
+float boat_view_overcast(const BoatViewState *view, const BoatWorld *world)
+{
+    BoatStorm storm = world->water.storm;
+    if (storm.radius < WEATHER_RADIUS || storm.height <= 0)
+        return 0;
+    float distance
+        = Vector2Distance(view->boat.position, boat_water_storm_centre(storm, view->time));
+    float near = storm.radius * .5f, far = storm.radius + 1800;
+    float t = Clamp((far - distance) / (far - near), 0, 1);
+    return BOAT_VIEW_OVERCAST * boat_water_storm_grown(storm, view->time, NULL) * t * t
+        * (3 - 2 * t);
+}
+
 static bool water_visible(void *renderer, Vector3 min, Vector3 max)
 {
     return renderer3d_box_visible(renderer, min, max);
@@ -685,7 +718,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     if (world->definition->mapped) {
         if (!waterfront_scenery_bind(&cpu->scenery, world->definition->map)
             || !waterfront_draw_boating(renderer, &cpu->scenery, pixels, width, height, camera,
-                boat_world_displaced(world)))
+                boat_world_displaced(world), boat_view_squall(world, time)))
             return false;
     } else {
         if (!renderer3d_begin(renderer, pixels, width, height, camera, (Vector3) { -1, 3, 2 }))
@@ -782,6 +815,18 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         renderer->ghost_opacity = opacity;
         draw_skinned_boat(renderer, &player);
         renderer->ghost_opacity = 0;
+    }
+    // The same blend toward the storm light as the GPU's alpha-blended full-frame quad.
+    float overcast = boat_view_overcast(view, world);
+    if (overcast > 0) {
+        int alpha = (int)(overcast * 255 + .5f);
+        Color tint = BOAT_VIEW_STORM_LIGHT;
+        for (int i = 0; i < width * height; ++i) {
+            Color *c = &pixels[i];
+            c->r = (unsigned char)(c->r + ((tint.r - c->r) * alpha + 127) / 255);
+            c->g = (unsigned char)(c->g + ((tint.g - c->g) * alpha + 127) / 255);
+            c->b = (unsigned char)(c->b + ((tint.b - c->b) * alpha + 127) / 255);
+        }
     }
     return true;
 }

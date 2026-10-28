@@ -24,8 +24,8 @@ room, HTTPS signaling and private TURN relay, including current verification lim
 For internet play on that room, launch the pinned client at
 `https://wake.davve.net/` or [GitHub Pages](https://doomdavve.github.io/proteus/) and choose
 MULTIPLAYER → WINTERFELL. Both use the public `wake.davve.net` directory and WebSocket
-endpoint, outside the VPN's private Winterfell DNS override. The Pages launcher publishes
-independently from tagged game releases; its manual workflow can republish a selected
+endpoint, outside the VPN's private Winterfell DNS override. Tag pushes deploy Pages; release completion also requires the matching Winterfell cutover.
+The manual Pages workflow can republish a selected
 published release with a changed server-directory URL without changing the game version.
 
 The existing Emscripten/WebGL 2 build, click-to-start audio, IndexedDB bests, content-hashed
@@ -33,10 +33,132 @@ packaging and `v*` Pages deployment workflow remain in use. Both music tracks an
 title backdrop are bundled. One browser audio device starts during PLAY and remains alive
 across title/session transitions; Off disables the soundtrack, retaining engine/water sound.
 
+Basic mobile controls and iPhone setup are described [below](#mobile-controls-and-iphone-presentation-2026-10-28).
 Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/latency and tab
 suspension, measure memory/runtime budgets, and complete internet-play acceptance of the
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
+
+## Shared app icon, 2026-10-28
+
+The launcher SVG, iOS 180 px Home Screen PNG and Android 192/512 px manifest PNGs now use
+a compact bridge-and-river scene drawn from the daylight menu backdrop. They share one
+editable SVG with 1024 px PNG, Windows ICO and macOS ICNS exports. See the
+[asset guide](../assets/icons/README.md) for regeneration and the
+[title plan](TITLE_SCREEN_PLAN.md#app-icon-2026-10-28) for design and verification status.
+Existing installed Home Screen icons may need removal and re-adding to refresh their cached
+artwork. Physical device review remains pending.
+
+## On-demand scenery, 2026-10-28
+
+Since A3.5i the maps' land is in scenery packs rather than the wasm
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35i-result-2026-10-28)). The river pack is
+preloaded in `.data`. The outer pack is copied to `build-web/web-lazy/geometry/outer/` and
+packaged as `scenery-outer-<hash>.bin`. `web/scenery_loader.js` fetches it the first time an
+outer session (solo or a room) starts and writes it into the in-memory file system, while the
+game shows LOADING OUTER RIVER with its percentage. A second outer session reuses it.
+`tools/package_web.py` prints the initial and on-demand bytes. Before A3.5i the page downloaded
+about 6.3 MB gzipped before play; now about 2.9 MB, plus 3.3 MB for the outer river.
+
+Check it against a served build (Playwright and Chrome; the script is optional and not in CTest):
+
+```sh
+python3 -m http.server 8000 --directory build-web/site &
+python3 tools/check_web_scenery.py --output build/web-scenery
+python3 tools/check_web_scenery.py --output build/web-scenery-slow --throttle-kbps 200
+```
+
+Verified 2026-10-28 on macOS arm64, headless Chrome with SwiftShader: one outer fetch, only at
+the outer start; the outer map drawn; no re-fetch. A failed fetch stops the game with a console
+error (reloading retries); there is no offline cache beyond the browser's own HTTP cache.
+
+## Mobile controls and iPhone presentation, 2026-10-28
+
+Basic mobile boating is implemented on `mobile-web-controls`. Touch devices with a coarse
+primary pointer show left/right steering, hold-to-go Forward/Reverse, and Menu during a
+session. Releasing the pedals selects neutral; pressing both also selects neutral. Menu
+provides reset/recovery and return to title. Title choices and gameplay menus accept completed
+touch taps, including taps shorter than a rendered frame. Keyboard and mouse remain available
+on desktop. Mobile weapon, camera, replay and text-editing controls are deferred; the existing
+player name is usable for joining a listed room.
+
+Tap **Enable tilt**, allow orientation access, and hold the phone comfortably to calibrate.
+Tilt left/right to steer; **Recenter** resets the holding position and **Use touch** disables
+sensors. Both landscape directions and portrait are supported. Rotation neutralizes steering
+until Recenter. Touch steering overrides tilt, and keyboard steering overrides mobile steering.
+The initial tuning uses a 3-degree dead zone, full lock at 25 degrees and 100 ms smoothing.
+Flat-on-a-table positions do not provide a useful gravity-based screen roll; raise the phone
+slightly. Touch steering remains available when permission is denied, readings stop or sensors
+are unavailable. Tilt requires HTTPS (localhost is suitable for desktop automation); permission
+is requested from its own button, separately from PLAY and audio initialization.
+
+On mobile the game fills the visible viewport, with translucent controls over the scene and
+inside safe areas. The GPU scene adapts to the viewport aspect ratio, keeping geometry, instruments
+and centred menus proportional in portrait and landscape. The browser uses a low-resolution
+viewport of at least 320×200, bounded to a 3:1 aspect range, and retains nearest-neighbour
+filtering. Browser-bar changes settle for 150 ms before target reallocation, retaining shaders
+and scenery caches. Desktop retains its original 320×200 scene and integer scaling. Forward
+is stacked above Reverse on the right; portrait instruments sit above the bottom steering buttons. Fullscreen is feature-detected; supported
+mobile browsers have a Fullscreen/Exit fullscreen button. Fullscreen requests prefer hidden
+navigation UI and clear held touch input on entry/exit. iPhone Safari does not reliably offer element fullscreen:
+use **Share → Add to Home Screen → Open as Web App**, then launch from its icon for more screen
+space. Relative manifest/icon URLs support repository subpaths. This adds no service worker or
+offline-play promise. See [Apple's instructions](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios)
+and the [WebKit fullscreen issue](https://bugs.webkit.org/show_bug.cgi?id=206854).
+
+Automated checks:
+
+```sh
+node tools/test_web_mobile_controls.cjs
+python3 tools/check_web_mobile.py --url http://127.0.0.1:8000/ --output build-web/mobile-review
+python3 tools/check_web_mobile.py --url http://127.0.0.1:8000/ --android --output build-web/android-review
+```
+
+Android review: Chrome-style orientation access is enabled by the same explicit Tilt button;
+when `requestPermission` is absent, the browser listens directly rather than treating that as
+an error. HTTPS and device sensor/site settings still govern access. Touch controls work if
+sensors are blocked. Pointer capture, cancellation, blur, tab backgrounding and fullscreen
+transitions release held controls. Orientation is not locked. The manifest permits either
+orientation and includes 192px/512px raster icons for Android installation, alongside the SVG
+and iPhone icon. Long-press context menus and page overscroll are suppressed during play.
+See [orientation access](https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events/Detecting_device_orientation),
+[fullscreen behavior](https://fullscreen.spec.whatwg.org/) and
+[manifest guidance](https://web.dev/articles/add-manifest).
+
+The Node contract test is also registered in native CTest when Node is available. The optional
+Chrome/SwiftShader check drives touch-only setup, simultaneous steering/throttle, simulated
+tilt, menu/reset, portrait resizing and return to title against the actual Wasm build. Add
+`--room-url ws://127.0.0.1:24443` for a matching local WebRTC room; this also checks emitted
+steering/throttle commands and leaving the room.
+Physical iPhone tilt permission, steering feel, audio playback, Safari bars and Home Screen behavior
+still require manual review. Automated emulation is not physical-device or user acceptance.
+Verification on 2026-10-28, Apple Silicon/macOS: the initial native Debug build and full CTest
+preset passed against current main (233 enabled tests; 13 retired wake-field checks disabled),
+as did the Emscripten MinSizeRel package. Chrome/SwiftShader mobile automation passed solo
+setup, simultaneous touches, simulated tilt, reset and return to title. The matching optional
+native WebRTC endpoint built; local-room automation verified outgoing tilt/throttle commands
+and touch-menu leave. Existing desktop mouse and title/persistence/repeated-session checks
+passed. The title regression check now accounts for the existing Credits row.
+
+The user rejected the original small centred mobile presentation, then accepted landscape
+with controls over the game on iPhone via LAN HTTP. Portrait was reported stretched, and
+Forward above Reverse was requested. The current revision renders to the viewport aspect
+ratio, removes the landscape recommendation and stacks the pedals. Both phone-emulated
+portrait/landscape/menu captures were inspected. The Android-emulated check also passes
+implicit orientation access, default fullscreen launch with a running audio context,
+fullscreen entry/exit, cancellation of a held pedal on exit,
+proportional portrait layout and touch-menu navigation. Android install icons are packaged.
+No physical Android device was available.
+
+The revised native full suite with `PROTEUS_GPU_TESTS=ON` passed (259 enabled tests, 15 retired
+wake-field checks disabled); GPU resize round-trip coverage additionally checks exact frame
+parity after portrait/landscape/default resizing with smoothing off and on. The native GPU
+river demo (`--demo --frames 120`) is an agent-run startup/playback smoke check. Physical-device
+acceptance of the new portrait layout and vertical pedals, real Android/iPhone tilt permissions,
+Home Screen installation, performance and human audio/steering review remain pending.
+Next: collect that physical-device feedback. Automated emulation does not establish hardware
+or user acceptance. The first sandboxed full suite could not open local sockets; rerunning
+with socket access passed.
 
 ## Multiplayer anti-aliasing, 2026-10-27
 
@@ -90,14 +212,16 @@ so deployment can update compatibility metadata without republishing Pages. The 
 launcher includes public STUN on every host, including Pages.
 
 Both features were introduced as `v0.0.17-server-directory`; Winterfell now serves the exact
-v0.0.18 client, built on the server by the `davve-srv` baseline role. The public directory
-and launcher at `wake.davve.net` report protocol 6 / physics 9 and use
+v0.0.21 client, built on the server by the `davve-srv` baseline role. The public directory
+and launcher at `wake.davve.net` report protocol 7 / physics 9 and use
 `wss://wake.davve.net/room`. On 2026-10-26, a fresh Chrome/SwiftShader run of the published
 Pages build fetched Winterfell, joined that room and drove without local-network permission.
 First the test overrode only the launcher URL; after PR #14 merged and Pages run
 [40391231764](https://github.com/doomdavve/proteus/actions/runs/40391231764) completed,
 a fresh Chrome run against the actual published URL also fetched the list, joined and drove.
-The live launcher remains v0.0.18. Routine server updates use the
+The live launcher and hosted room were upgraded together to v0.0.21 on 2026-10-28;
+[current evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) owns the
+verification limits. Every release includes a server cutover through the
 [davve-srv workflow](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv). Native clients
 also fetch the directory for native addresses and retain LAN/manual joining. Human gameplay
 and wider browser/platform checks remain.
@@ -188,12 +312,13 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
   shader precision. Shader bodies are shared except the disabled native wake sampler; source assets are never overwritten.
   WebGL 2 supports the renderer's depth textures, derivatives, integer operations, and
   texel fetches. Antialiasing is optional because it shades sixteen times as many pixels.
-- **Window:** the browser keeps a fixed 960x600 drawing buffer, containing the 320x200 scene,
-  and scales it to whole scene-pixel multiples. This avoids raylib's web resize handler,
-  which otherwise takes over canvas sizing. The launcher hides before the game starts;
-  the canvas then fits the full viewport. Fullscreen is selected before launch. P opens/closes
-  the in-game menu while staying fullscreen (Escape may leave fullscreen); title and sessions
-  share the window.
+- **Window:** desktop retains a 960×600 drawing buffer containing a 320×200 scene and
+  whole scene-pixel presentation scales. Mobile gameplay adapts the logical scene and drawing
+  buffer to the visible viewport's aspect ratio; CSS scales it uniformly with nearest-neighbour
+  filtering. The title retains its centred 320×200 layout. Page code owns CSS sizing rather
+  than raylib's web resize handler. Fullscreen can be selected before launch or toggled during
+  mobile play. P/Escape or the mobile Menu button opens the shared in-game menu
+  (P preserves fullscreen); title and sessions share the window.
 - **Assets:** preload both game XM tracks, the title backdrop, bitmap menu fonts and
   their attribution, textures and used shaders into `/assets`.
   `boat_asset_path()` already resolves that path under Wasm. Geometry is compiled from C
@@ -342,7 +467,7 @@ scrolling, help/reacquisition, browser-initiated unlock and keyboard fallback, s
 and `results.json`. If the engine refuses capture it records `web_controls_fallback=ok` and
 checks keyboard/scroll fallback instead of claiming mouse support. Movement and scroll totals
 use deterministic DOM events; this does not certify physical mouse/trackpad feel. A tested
-WebKit build is not the shipping Safari application. Touch remains unsupported.
+WebKit build is not the shipping Safari application. Touch was unsupported at this historical checkpoint; basic mobile controls were added on 2026-10-28.
 
 Next: physical-device and shipping Safari checks; native Windows/Linux qualification after
 CI runs, plus connected multiplayer HUD/control review. No deployment was performed.
@@ -391,7 +516,8 @@ SDK installation were temporary verification tools, not new project dependencies
 Remaining limits: the GitHub workflow/deployment itself has not run; Linux-hosted Emscripten
 CI, Safari, Firefox, physical GPU browser performance, long sessions, browser audio latency,
 private-mode/quota behavior beyond a denied-storage check, and human gameplay/listening
-acceptance are unverified. No touch controls or recording import/export UI is provided.
+acceptance were unverified at this checkpoint. Touch controls were absent then; basic mobile
+controls were added on 2026-10-28. Recording import/export UI remains unavailable.
 
 ### Tag deployment follow-up — 2026-10-19
 
@@ -435,7 +561,8 @@ All 70 native CTests passed, including 18 GPU checks, with desktop graphics acce
 The initial sandboxed run was stopped at its first GPU check; the full desktop rerun passed.
 No user acceptance of this redesign yet.
 Next: deploy with the normal version-tag/manual workflow and review the new launch page.
-Limitations: keyboard required; reload is the way back to setup; browser-specific fullscreen
+Historical limitations (superseded by shared-title and mobile work): keyboard required;
+reload was the way back to setup; browser-specific fullscreen
 restrictions may fall back to ordinary full-window play.
 
 ## Compact technical launcher — 2026-10-20

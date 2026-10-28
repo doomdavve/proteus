@@ -22,6 +22,8 @@ static const char *notice(const BoatVoyage *voyage, double time)
             return TextFormat("ARRIVED AT %s", shelter);
         case BOAT_VOYAGE_RECOVERED:
             return TextFormat("RECOVERED AT %s", shelter);
+        case BOAT_VOYAGE_WEATHER:
+            return "SQUALL BUILDING OFFSHORE";
         case BOAT_VOYAGE_NONE:
             break;
         }

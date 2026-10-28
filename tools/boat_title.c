@@ -8,6 +8,7 @@
 #include "boat_skin.h"
 #include "boat_ui.h"
 #include "boat_version.h"
+#include "boat_web_touch.h"
 #include "frame_pacer.h"
 #include "raylib.h"
 #include <stdio.h>
@@ -597,6 +598,7 @@ static void draw_credits(const Title *t)
         bool heading;
     } lines[] = {
         { "THANKS TO", true },
+        { "erik", false },
         { "bjoto", false },
         { "w", false },
         { "", false },
@@ -826,6 +828,13 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             settled = true;
             continue;
         }
+        Vector2 pointer = GetMousePosition();
+        bool pointer_pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+#if defined(__EMSCRIPTEN__)
+        int touch_click = boat_web_touch_click(&pointer.x);
+        if (touch_click)
+            pointer_pressed = touch_click > 0;
+#endif
         bool activate = false, back = IsKeyPressed(KEY_ESCAPE);
         int step = 0;
         if (t.editing) {
@@ -843,7 +852,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             activate
                 = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) || IsKeyPressed(KEY_SPACE);
             int k = scale();
-            Vector2 mouse = GetMousePosition();
+            Vector2 mouse = pointer;
             Vector2 point = { (mouse.x - (GetScreenWidth() - WIDTH * k) / 2) / k,
                 (mouse.y - (GetScreenHeight() - HEIGHT * k) / 2) / k };
             Vector2 moved = GetMouseDelta();
@@ -851,7 +860,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 if (CheckCollisionPointRec(point, row_bounds(&t, i))) {
                     if (moved.x || moved.y)
                         t.selected = i;
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (pointer_pressed) {
                         t.selected = i;
                         activate = true;
                     }

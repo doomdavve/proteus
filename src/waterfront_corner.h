@@ -16,8 +16,10 @@ typedef struct {
     bool waterline; // Wall fittings also drawn by the software reference.
 } WaterfrontCornerBox;
 
-// One scene's map-bound scenery, built from the description it borrows (NULL: the basin, which
-// has none). Frontages, quays and forecourts are derived from the map. The authored river kit
+// One scene's map-bound scenery, built for the description it borrows (NULL: the basin, which
+// has none). MAP is the location's compiled description; FULL is what is drawn for it
+// (boat_scenery_drawn: its loaded scenery pack), and every mesh read uses FULL. Frontages, quays
+// and forecourts are derived from the map. The authored river kit
 // (cafe, street furniture, crane and bridge deck) belongs to the maps that hold the river crop:
 // RIVER is set for waterfront_city_river_map and for a map with a kit ground (the outer map).
 // There GROUND is that ground, and the whole kit, the derived frontages, quays and forecourts
@@ -26,6 +28,7 @@ typedef struct {
 // land-only catalogue at TILE_SIZE, which both renderers cull by; it is empty for the basin.
 typedef struct {
     const BoatMapDescription *map;
+    const BoatMapDescription *full; // Water, land, buildings, bridge; NULL for the basin.
     bool ready, river;
     WaterfrontGround ground;
     WaterfrontCornerBox *boxes;
@@ -38,8 +41,9 @@ typedef struct {
 // Default render tile edge, in metres: chosen over 512 m by the A2.3 matrix.
 #define WATERFRONT_TILE_SIZE 1024.0f
 
-// Fails, leaving the scenery zeroed, for a missing or empty mesh, allocation failure or more than
-// 16384 boxes. A NULL map succeeds without allocation.
+// Fails, leaving the scenery zeroed, for a missing or empty mesh, a compiled map whose scenery is
+// not loaded (on the outer map, the river's too, which lays out the kit), allocation failure or
+// more than 16384 boxes. A NULL map succeeds without allocation.
 bool waterfront_scenery_init(WaterfrontScenery *scenery, const BoatMapDescription *map);
 // The same with a chosen positive render tile size, for comparisons. Rebinding keeps the size.
 bool waterfront_scenery_init_tiled(

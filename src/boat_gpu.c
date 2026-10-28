@@ -31,6 +31,39 @@ void boat_gpu_destroy(BoatGpu *gpu)
     *gpu = (BoatGpu) { 0 };
 }
 
+bool boat_gpu_resize(BoatGpu *gpu, int width, int height)
+{
+    if (width < 1 || height < 1 || width > 2048 || height > 2048)
+        return false;
+    if (gpu->target.texture.width == width && gpu->target.texture.height == height)
+        return true;
+    RenderTexture2D target = LoadRenderTexture(width, height);
+    RenderTexture2D supersampled = { 0 };
+    if (!IsRenderTextureValid(target)) {
+        if (target.id)
+            UnloadRenderTexture(target);
+        return false;
+    }
+    SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
+    if (gpu->downsample.id) {
+        supersampled = LoadRenderTexture(width * 4, height * 4);
+        if (!IsRenderTextureValid(supersampled)) {
+            if (supersampled.id)
+                UnloadRenderTexture(supersampled);
+            UnloadRenderTexture(target);
+            return false;
+        }
+        SetTextureFilter(supersampled.texture, TEXTURE_FILTER_POINT);
+    }
+    if (gpu->target.id)
+        UnloadRenderTexture(gpu->target);
+    if (gpu->supersampled.id)
+        UnloadRenderTexture(gpu->supersampled);
+    gpu->target = target;
+    gpu->supersampled = supersampled;
+    return true;
+}
+
 bool boat_gpu_init(BoatGpu *gpu, bool aa)
 {
     char shader_path[1024];
@@ -40,20 +73,15 @@ bool boat_gpu_init(BoatGpu *gpu, bool aa)
     }
     if (!waterfront_gpu_scene_init(&gpu->scene, shader_path))
         goto failed;
-    gpu->target = LoadRenderTexture(320, 200);
-    if (!IsRenderTextureValid(gpu->target))
-        goto failed;
-    SetTextureFilter(gpu->target.texture, TEXTURE_FILTER_POINT);
     if (aa) {
-        gpu->supersampled = LoadRenderTexture(1280, 800);
-        if (!IsRenderTextureValid(gpu->supersampled))
-            goto failed;
         if (!boat_asset_path(shader_path, sizeof(shader_path), "shaders/gpu_downsample.fs"))
             goto failed;
         gpu->downsample = LoadShader(NULL, shader_path);
         if (!IsShaderValid(gpu->downsample) || gpu->downsample.id == rlGetShaderIdDefault())
             goto failed;
     }
+    if (!boat_gpu_resize(gpu, 320, 200))
+        goto failed;
     return true;
 failed:
     boat_gpu_destroy(gpu);
@@ -222,6 +250,12 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     }
     BeginTextureMode(target);
     waterfront_gpu_scene_draw(&gpu->scene, &frame, target.texture.width, target.texture.height);
+    float overcast = boat_view_overcast(view, world);
+    if (overcast > 0) {
+        Color tint = BOAT_VIEW_STORM_LIGHT;
+        tint.a = (unsigned char)(overcast * 255 + .5f);
+        DrawRectangle(0, 0, target.texture.width, target.texture.height, tint);
+    }
     EndTextureMode();
 restore_water:
     if ((world->water.objects || world->water.traffic_objects) && !gpu->scene.object_wakes.id)
@@ -236,8 +270,10 @@ restore_water:
         BeginTextureMode(gpu->target);
         ClearBackground(BLACK);
         BeginShaderMode(gpu->downsample);
-        DrawTexturePro(target.texture, (Rectangle) { 0, 0, 1280, -800 },
-            (Rectangle) { 0, 0, 320, 200 }, (Vector2) { 0 }, 0, WHITE);
+        DrawTexturePro(target.texture,
+            (Rectangle) { 0, 0, target.texture.width, -target.texture.height },
+            (Rectangle) { 0, 0, gpu->target.texture.width, gpu->target.texture.height },
+            (Vector2) { 0 }, 0, WHITE);
         EndShaderMode();
         EndTextureMode();
     }

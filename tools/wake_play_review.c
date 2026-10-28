@@ -1,5 +1,6 @@
 /* Complete opt-in workload: real boat/stern queries, field, audit, upload and GL completion. */
 #include "boat_gpu.h"
+#include "boat_test_scenery.h"
 #include "boat_test_session.h"
 #include "external/glad.h"
 #include "rlgl.h"
@@ -199,6 +200,7 @@ static void shader_queries(const BoatSession *session, const BoatGpu *gpu)
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     if (argc > 1 && strcmp(argv[1], "--crossing") == 0) {
         crossing();
         return 0;

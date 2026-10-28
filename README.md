@@ -292,7 +292,7 @@ released native and browser room. A standalone Linux server package remains part
 For browser play, open [Winterfell](https://wake.davve.net/), press PLAY and
 choose MULTIPLAYER → WINTERFELL. The browser fetches a known-server list, so the common
 join needs no address entry. Manual URL / CONNECT remain available. The deployed client
-and room now run v0.0.18 with both deathmatch weapons; the public host stays outside the
+and room now run v0.0.21 with the protocol-v7 water cannon, stern wave grenade and torpedo; the public host stays outside the
 VPN's private Winterfell DNS override. Native clients fetch the same directory and use its
 native addresses, alongside LAN discovery and manual joining. Routine hosting updates are
 owned by `davve-srv`
@@ -341,7 +341,7 @@ A deliberate reset abandons an unfinished attempt while preserving your last com
   racing. Backspace reset is inactive during replay. Finishing pauses playback; `Space` then plays again from the beginning.
 - `Left`/`Right` seek one second backward/forward; hold `Shift` for five seconds. `Home`/`End` jump
   to START/FINISH. Seeking preserves pause state; jumping to FINISH pauses.
-- `[`/`]` select 0.25×, 0.5×, 1×, 2×, or 4× playback. Selecting another recording starts at 1×.
+- `[`/`]` select 0.25×, 0.5×, 1×, 2×, 4×, or 8× playback; `\` restores 1×. Selecting another recording starts at 1×.
 - Click or drag the replay timeline to seek and pause; press `Space` to continue. The timeline marks
   START, both buoy gates, and FINISH. Camera controls remain available. Losing focus pauses playback
   without advancing the clock.
@@ -365,7 +365,8 @@ cannot replace your recorded best.
 ./build/wake_velocity --renderer cpu --replay build/my-run.run --time 5 --screenshot build/replay.png
 ```
 
-`--save-run FILE` exports each completed attempt, including slower runs, to that path.
+`--save-run FILE` exports each completed normal-time attempt, including slower runs, to that path.
+Altered-time practice attempts remain replayable as the last run but do not replace bests or exports.
 `--replay FILE` and `--ghost FILE` imply course mode. Replay selects the recording's water preset;
 an imported ghost must match your selected water preset (`--waves` for a wave run).
 An imported ghost stays selected across retries while your personal best is tracked separately.
@@ -442,12 +443,27 @@ water. Arrive by entering the harbour basin at 6 m/s or less; the panel then sho
 since the start. The dock, the river past the bridge and the outer fjord's east shore are
 shelters: passing one makes it the recovery point, and holding Backspace for 1 s (or RECOVER
 BOAT in the Esc menu) returns the boat there while the clock and water keep running. West of
-the direct line down the outer fjord lies a fixed patch of rough water with rain. The direct
+the direct line down the outer fjord lies a patch of rough water with rain. The direct
 line crosses its flank, the east shore stays calm, and its middle has swells of several
-metres. The patch is authored, not observed weather. Rooms on `outer` keep calm water and no
+metres. It is calm until you first come within about 2.5 km of it out on the fjord; then a
+squall builds there over a minute (SQUALL BUILDING OFFSHORE), with a dark cloud and rain shafts
+you can see from afar, and the light dims as you near it
+([A3.5h](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35h-result-2026-10-28)). A `--start` placement
+within that range finds it already built. The weather is authored, not observed. Rooms on `outer` keep calm water and no
 voyage. `--start X,Z[,DEGREES]` places the boat anywhere in a
 mapped location (simulation X/Z; heading 0 faces -Z), for example
 `--location outer --start 1980,-1196,75` on the open leg of the route.
+
+Every mapped location (`river`, `outer`, solo or in a room) has a north-up nautical chart of
+the whole map, drawn in paper-chart style. Land is buff, with built-up areas darker; there is a
+black coastline. Water is white, with blue tints near the shore (distance from shore, not
+depth). The frame is graduated in minutes of latitude and longitude, and there is a scale in
+nautical miles. Your boat is the ECDIS own-ship symbol (two rings with a heading line) in orange. The
+chart also shows the Eriksberg crane, Nya Älvsborg, the docked ferry, Älvsborgsbron with its
+45 m clearance, and the outer map's red/green channel marks and lights. On the solo `outer`
+voyage it overprints in magenta: shelters as anchorages, Långedrag as a waypoint and the exposed
+water as a dashed caution limit. It starts hidden; `N` cycles a corner map, a larger labelled
+chart, and off ([HUD guide](docs/BOAT_HUD.md#minimap-2026-10-28)).
 
 `--location river` is a 2,450 × 2,400 m waterfront with an Älvsborgsbron blockout. Start in the
 dock, leave it, and follow the river southwest to sail under the bridge and continue beyond it. Both bridge ends meet descending approach roads on grassy
@@ -479,6 +495,17 @@ from neutral to full in 0.25 seconds, with separately smoothed engine response. 
 unassigned. R does nothing. Hold Backspace for one second, with a visible progress bar, or
 choose the explicit reset/restart/request action in the Escape menu. A short tap does nothing;
 release, help/menu, loss of focus or replay cancels progress. Each hold triggers at most once.
+For single-player testing, `[` slows time and `]` speeds it up through ¼×, ½×, 1×, 2×, 4× and 8×;
+`\` (backslash) returns to 1×. The same keys control replay speed while watching a replay.
+The current multiplier appears above the scene when altered. Boat physics still uses fixed
+120 Hz simulated ticks; water, traffic, wakes and voyage progress follow simulation time.
+Camera adjustments, reset holds, menus and audio keep their normal real-time rate. Fast-forward
+requires more physics work per frame. The selected live rate survives boat resets and is separate
+from replay speed; returning to the title starts the next session at 1×. Help/menu/focus loss pause
+solo simulation. Multiplayer uses the server clock and ignores these shortcuts.
+A course attempt that uses altered time is marked PRACTICE for the rest of that attempt,
+including after returning to 1×. It remains replayable with P but cannot replace a personal best
+or `--save-run` export. Return to 1× and restart the run to regain eligibility.
 Space operates the water cannon in deathmatch, E drops a stern wave grenade, Q launches a torpedo, and V toggles the rearview mirror; Space is unassigned in free/race play; replay/menu controls retain their existing use.
 Press `M` to capture the mouse for steering, or launch with `--mouse-steering`. The pointer
 is hidden and horizontal movement accumulates wheel angle: move right/left to turn the wheel,
@@ -835,21 +862,27 @@ generated files stay out of Git. Deployments use content-hashed JavaScript, Wasm
 URLs, with no service worker; reload to load the deployed version. GitHub's CDN can briefly
 cache the previous HTML after a deployment.
 
-A desktop browser with WebAssembly, WebGL 2, and a keyboard is required. The canvas uses
-nearest-neighbour scaling in multiples of the 320x200 scene, with a 320x200 minimum.
+A browser with WebAssembly and WebGL 2 is required. Desktop supports keyboard/mouse;
+mobile supports basic boating with touch controls and optional tilt steering. Desktop uses
+nearest-neighbour scaling in multiples of the 320x200 scene.
+Mobile adapts the scene’s aspect ratio to the viewport without stretching.
 Press **PLAY** to start audio and open the shared Wake Velocity title. The page's small
 **Settings** toggle remembers fullscreen; in-game SETTINGS remembers name, livery, steering,
 soundtrack and smoothing. SMOOTHING defaults to ON and applies the same 4×4 supersampling
 to single-player and multiplayer, including WebRTC rooms. Turn it OFF in SETTINGS on slower
 devices. SINGLE PLAYER selects River, Basin or Basin trial, waves and the same smoothing setting.
-The launcher disappears during play; the game uses integer scaling. Press `?` for controls
-and **P** for the in-game menu while staying fullscreen (Escape also opens it, but the browser
-may leave fullscreen). BACK TO TITLE returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;
+The launcher disappears during play. Desktop uses integer scaling; mobile renders to the
+viewport’s aspect ratio with touch controls overlaid on the scene. Forward is above Reverse. Press `?` for controls
+and **P** for the in-game menu while staying fullscreen (Escape may leave fullscreen). BACK TO TITLE
+returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;
 release selects neutral and Shift selects precision power. Scrolling is unassigned. After help or RESUME, click the canvas to recapture. If capture
 is unavailable, keyboard steering stays available. MULTIPLAYER joins an operator-provided
 WebRTC room URL; browser hosting and LAN discovery are unavailable. Browser throttling
 can affect animation/audio in background tabs. Bests are local to this browser and site,
 can be lost when storage is cleared or unavailable, and do not sync with native saves.
 Local recording import/export and native screenshot/profiling commands are not exposed by
-the page. Touch controls are not implemented. See [web build details and verification](docs/WEB_BUILD.md)
+the page. On mobile, hold Forward/Reverse for thrust and use left/right buttons or Enable tilt to steer.
+Menu provides reset and return to title. Tilt needs HTTPS and permission; Recenter after rotating.
+For more screen space on iPhone, use Safari’s Share → Add to Home
+Screen → Open as Web App, then launch from its icon. Mobile weapons/replay/text editing are deferred. See [web build details and verification](docs/WEB_BUILD.md)
 for the implementation trade-offs and remaining browser checks.

@@ -1,5 +1,19 @@
 # Test workflow and timing
 
+`release_command` runs `tools/test_cut_release.py` in the full CPU suite on every platform.
+It uses temporary local Git repositories and mocked external commands to check immutable
+tags, detached worktrees, hosting baseline/push recovery, archive identity/integrity and
+failure gates. Workflow polling uses a virtual clock. These tests never publish a release,
+contact Winterfell or require controller/browser credentials. The
+[release guide](RELEASES.md#release-command) owns the real operator command and live evidence.
+
+`boat_time_control` advances the same 32 simulated ticks at all six live time rates and
+compares the tick count and complete physical boat state with a fixed-tick reference; it also
+checks rate bounds and the real-frame stall clamp before scaling. `boat_replay` covers practice
+finishes with/without an existing best, preserved export files, replayable last runs and eligibility
+after restart. All clocks are virtual. The [boating plan](BOATING_PLAN.md#play-testing-time-controls--2026-10-28)
+owns implementation status and manual review limits.
+
 The Linux, macOS and Windows Actions builds run on pull requests and pushes to `main`, skipping
 events that change only Markdown files. Any non-Markdown change runs the normal builds and tests,
 including on mixed documentation and code pull requests. Manual workflow runs and the macOS and
@@ -54,6 +68,9 @@ a fleet on a surviving owner continues like one restored onto a fresh owner, and
 private river owners (one with an arcade world, so both patch caches build), the harbor and the
 basin. Shared views must reproduce the fresh-view references interleaved, after the first
 owner and its view are destroyed, and over three view recreate cycles with the context alive.
+It also resizes a view through portrait, wide and default targets with smoothing off/on;
+returning to the default target must reproduce the exact original pixels. Invalid dimensions
+must leave the existing renderable targets intact.
 `tile_culling` (`boat_water_review --check-culling`, `gpu`, about 9 s; adventure A2.3)
 renders 144 river poses (512 m and 1 km tiles, six route stops, four headings, default, close
 and overview cameras) culled and unculled, on the GPU with waves and on the CPU on flat water.
@@ -254,6 +271,21 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   and checks that points outside the region and on the quay are not water. Since A3.1b it
   also requires real relief: land tops never below 1 m, hills between 60 and 100 m, and at
   least 100,000 triangles.
+- `boat_scenery` runs `validate_boat_scenery` (adventure A3.5i, about 0.3 s in Debug, `slow`). It
+  checks the scenery packs under `assets/geometry/`: nothing is drawn before a load; cut packs,
+  wrong magic or version, wrong counts, a moved bridge range and the river pack offered as
+  `outer` are all refused; a good pack loads once with water identical to the compiled
+  `water.h`; `outer` needs the river pack for its kit ground; and unload clears them all. The
+  map validators and review tools load the packs from the source tree
+  (`tools/boat_test_scenery.h`).
+- `map_pack` runs `tools/map_pack.py --self-test` (quick): float32 rounding, the leading-water
+  count and a pack round trip.
+- `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `river` and
+  `outer` and none for the basin, checks that both frames fit the 320×200 scene (the chart
+  above the instruments), that the spawn, every voyage shelter and the destination are water
+  pixels and inland Hisingen is not, that composition marks the boat and destination without
+  touching the trim, and the N cycle. With arguments it writes review captures
+  ([HUD guide](BOAT_HUD.md#review-commands)).
 - `boat_voyage` runs `validate_boat_voyage` (adventure A3.4, under 1 s in Debug). It checks that
   the outer voyage's shelters and harbour are navigable, that the exposed patch crosses the A0.3
   route's southern leg while a coastal line, the shelters and the harbour stay outside it, the

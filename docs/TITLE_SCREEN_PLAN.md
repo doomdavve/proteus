@@ -8,6 +8,7 @@ The shared title retains single-player setup, public/LAN/address joining, hostin
 settings, plus a dedicated animated Credits screen. Volume settings, title music and a
 live river backdrop remain deferred.
 The user approved the marine blue/yellow visual direction on 2026-10-28.
+The compact two-tower bridge/river app icon is user-approved on 2026-10-28.
 Next: physical input/playback review; native/browser
 package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
@@ -31,9 +32,77 @@ and P dismissed help. Gameplay, menu and help captures were inspected under
 `build/menu-review/`; no page errors occurred. These are scripted agent checks, not human
 physical input or listening review. The bundled stb_vorbis compiler warning remains.
 
+Integration verification, 2026-10-28: merged `origin/main` at `8a3169c`. Kept the newer
+mobile Menu input, time controls, adaptive viewport, scenery loading, icon and release docs;
+P joins the same menu-input path as Escape and the mobile button. Native Debug and web
+MinSizeRel rebuilds passed; all 236 enabled CTests passed in 16.86 s (13 retired cases
+disabled, GPU lane off, local sockets enabled). The 120-frame native demo completed.
+Chrome/SwiftShader fullscreen P/capture and credits checks passed again, as did the existing
+Android-emulated mobile controls/fullscreen/menu check. Updated desktop credits and mobile
+menu captures were inspected. Physical devices, listening and live multiplayer were not
+reviewed in this integration pass.
+
 Next: physical input review and Firefox/Safari fullscreen qualification. Live multiplayer
 menu behavior was not rerun; it uses the same existing menu activation and neutral-input path.
 User acceptance remains pending.
+
+## App icon, 2026-10-28
+
+Completed: replace the generic boat icon with a compact interpretation of the menu's
+Älvsborgsbron backdrop. Two dark bridge towers and a level cream-edged deck sit above blue
+water, with a low quay, two block clouds and short horizontal reflections. Six flat
+colours retain the daylight scene's feel at Home Screen and favicon sizes. The opaque
+square has no baked-in rounded corners. This supersedes the original dark boat icon.
+
+[`web/icon.svg`](../web/icon.svg) owns the artwork. The existing launcher and manifest
+consume regenerated 180/192/512 px PNGs. A 1024 px master, multi-size Windows ICO and macOS
+ICNS are available in [`assets/icons`](../assets/icons/README.md), with a shared SVG export
+command. Desktop package integration is a future step; existing native packages do not yet
+select these files.
+
+![App icon and small-size review](title/app-icon.png)
+
+Initial icon verification, 2026-10-28, Apple Silicon/macOS: inspected the generated icon at 16–180 px,
+the 1024 px artwork and a rounded Home Screen preview. Pillow decoded every ICO/ICNS
+representation and confirmed the web PNG sizes and opaque RGB format. A second export
+reproduced all generated outputs byte-for-byte. Debug configure/build
+passed with GPU tests off. `ctest --preset full` passed all 234 enabled tests in 11.71 s
+with local socket access (13 retired cases disabled). The first sandboxed run could not
+open networking sockets; the full rerun passed. Packaging the existing mobile Wasm build
+with the current launcher copied all four icon assets byte-for-byte. This checks icon
+packaging, not a fresh Emscripten compilation. Changed local documentation links passed.
+
+Earlier deck correction, 2026-10-28 (before the two-tower framing): the user found the rising deck inconsistent with
+this broadside framing. That revision used a horizontal deck and recomputed vertical
+hangers meeting the suspension curve. All exports and the size-review image were regenerated.
+Inspected the updated 16–180 px and rounded previews; all desktop icon representations decoded,
+and web packaging copied the revised assets exactly. Debug build and the full CTest preset
+passed again: 234 enabled tests in 11.74 s, 13 retired cases disabled, GPU tests off with local
+socket access. The two-tower framing below supersedes this single-tower composition.
+
+Two-tower framing, 2026-10-28: the user found the cable ambiguous with its second support
+just outside the image. The current wider composition brings the right-hand tower fully into
+view and redraws the main suspension curve between the two visible supports, retaining the
+level deck. Hangers were recomputed and the second tower has a short water reflection.
+All exports and previews were regenerated. Updated 16–180 px and rounded previews were
+inspected; every desktop representation decoded, and packaged web icons matched the sources.
+Debug build and `ctest --preset full` passed: 234 enabled tests in 11.69 s, 13 retired cases
+disabled, GPU tests off with local socket access.
+
+User acceptance, 2026-10-28: “Let's go with this!” approves the final two-tower icon design.
+This accepts the artwork; physical Home Screen and native package qualification remain open.
+
+Integration verification, 2026-10-28: merged `origin/main` at `bd3cec3` and resolved the
+index/browser-guide conflicts by retaining both the scenery-loading updates and accepted
+icon documentation. Artwork is unchanged. Debug configure/build passed without compiler
+warnings; `ctest --preset full` passed all 236 enabled tests in 12.95 s (13 retired cases
+disabled, GPU tests off, local socket access enabled). Changed local documentation links
+and conflict-marker checks passed. No additional visual or physical-device review was needed
+for these documentation resolutions.
+
+Next: physical iOS/Android Home Screen review and native packaging
+integration/qualification. No installed-device or Finder/Windows shell acceptance is claimed.
+The scene, gameplay, animation and audio are unchanged; no manual gameplay demo was needed.
 
 ## Credits screen, 2026-10-28
 
@@ -56,7 +125,7 @@ retain their integer pixel grid; the background water now uses fractional positi
 coverage antialiasing. Both travelling crests and perspective rays blend between neighbouring
 pixels, softening their edges and slow movement while leaving foreground text crisp.
 
-The roll begins with **THANKS TO**, **bjoto**, **w**, then lists **FONTS** (Daniel
+The roll begins with **THANKS TO**, **erik**, **bjoto**, **w**, then lists **FONTS** (Daniel
 Linssen, m5x7/m3x6), **MAP DATA** (OpenStreetMap contributors, ODbL 1.0), **LIBRARIES**
 (raylib, ENet, libcurl), and **A PROTEUS GAME**. Specific contributor roles are omitted
 on screen as requested. For source provenance: [bjoto](https://github.com/bjoto) contributed
@@ -80,7 +149,11 @@ checked keyboard entry, Enter/click/Escape return, main-row reselection, reopeni
 Main/settings/credits captures and vertical-roll samples through 1000 simulated seconds
 were inspected. These are scripted agent graphics/navigation checks.
 
-Next: user review of the vertical roll and physical navigation; browser/package qualification.
+Release follow-up, 2026-10-28: v0.0.20 includes the outstanding erik acknowledgement.
+Native packaging and Pages deployment passed; both native ZIPs passed checksum, integrity
+and version/commit checks. See [release evidence](RELEASES.md#status-and-verification).
+
+Next: user review of the vertical roll and physical navigation; human package qualification.
 The user liked the initial background waves, but final roll acceptance is pending.
 No physical input/listening, browser/Windows/Linux run or GPU CTest lane is claimed.
 Title music remains deferred.

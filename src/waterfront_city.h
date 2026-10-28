@@ -6,10 +6,11 @@
 
 #include <stdbool.h>
 
-// Compiled river map crop: water triangles first, then land, buildings and the bridge.
-// Immutable process-lifetime data, borrowed by the river location's definition. Shoreline
-// queries, water meshes and both renderers reach it only through an explicit owner or binding;
-// its authored bridge/approach triangles use flat materials and have no facade windows.
+// Compiled river map crop: its water triangles alone, which collision, the server and the
+// multiplayer content digest use. Immutable process-lifetime data, borrowed by the river
+// location's definition. Its land, buildings and bridge are presentation data in the river's
+// scenery pack (boat_scenery_of), whose leading water is exactly this; the authored
+// bridge/approach triangles there use flat materials and have no facade windows.
 extern const BoatMapDescription waterfront_city_river_map;
 
 #endif

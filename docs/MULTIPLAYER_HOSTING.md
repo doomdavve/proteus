@@ -1,37 +1,37 @@
 # Winterfell internet room
 
-The Winterfell deployment uses released **v0.0.18**, commit
-`2f9433565d59506607634fbb69a916593779864e`, with the optional WebRTC transport enabled.
+The Winterfell deployment uses released **v0.0.21**, commit
+`0cb1921224149ddeb4707e818dd2069096bc9e3d`, with the optional WebRTC transport enabled.
 It hosts one shared four-player river deathmatch room for native and browser players.
-The deployed room includes the released protocol-v6 machine gun and wave grenade (Space and E).
-The protocol-v7 [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) requires a coordinated
-server/client upgrade and has not been deployed by that implementation change. A round starts
-when two players join. There is no room token, allowing the native and browser title screens
-to join directly. There are no player accounts.
+The deployed protocol-v7 [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
+provides the water cannon (hold Space), stern wave grenade (E), torpedo (Q) and optional
+rearview mirror (V). A round starts when two players join. There is no room token and
+no player account requirement.
 
 ## Join
 
-- Native: v0.0.18 has the connection bug described below. Build its source with the native
-  connection fix, then choose MULTIPLAYER and enter `wake.davve.net:24680`.
-- Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/), press PLAY,
-  choose MULTIPLAYER, then the selected **SERVER: WINTERFELL** row. No address entry is needed.
+- Native: use v0.0.21, choose MULTIPLAYER and select WINTERFELL, or enter
+  `wake.davve.net:24680`.
+- Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/) or
+  [GitHub Pages](https://doomdavve.github.io/proteus/), press PLAY, choose MULTIPLAYER,
+  then the selected **SERVER: WINTERFELL** row. No address entry is needed.
   URL / CONNECT remain available for manual joining.
 - On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
 
-The native server and hosted browser client are built from the same v0.0.18 tag by the
-`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.18 and uses the
-same public directory and signaling endpoint. Both launchers include public STUN for internet
-address discovery. The public `wake.davve.net` hostname avoids the VPN's private
-`*.winterfell.davve.net` DNS override.
-
-The v0.0.18 Pages launcher was republished from the selected published tag after PR #14 merged.
-On 2026-10-26 the live page returned the public directory, and fresh Chrome joined its listed
-room through `wss://wake.davve.net/room` without local-network permission. The game release
-and compiled client were unchanged.
+The native server and hosted browser client are built from the same v0.0.21 tag by the
+`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.21 and uses
+the same public directory and signaling endpoint. The directory reports protocol 7 / physics 9.
+Both launchers include public STUN. The public `wake.davve.net` hostname avoids the VPN's
+private `*.winterfell.davve.net` DNS override. Native v0.0.20 includes the connection fix;
+the v0.0.18 connection limitation described in the historical notes no longer applies.
 
 ## Routine deployments (davve-srv)
 
-`davve-srv` now owns normal deployment. Pin `wake_velocity_version` in
+Every release must include this hosted cutover after native publication and Pages succeed.
+The [release command](RELEASES.md#release-command) automates the version-pin commit, pushes
+the private hosting baseline and executes/verifies this routine role. Its preflight mode
+checks prerequisites before publication. The manual steps below remain the fallback.
+`davve-srv` owns normal deployment. Pin `wake_velocity_version` in
 `ansible/host_vars/winterfell/main.yml`, commit and push, then run from that repository:
 
 ```sh
@@ -48,12 +48,12 @@ The controller needs no Proteus checkout, local Emscripten, release artifacts or
 Both builds finish before service/nginx configuration is switched. Upgrades briefly disconnect
 players; repeat deployments reuse the builds and leave a healthy room running.
 
-The v0.0.18 cutover passed through that exact wrapper on 2026-10-26, followed by a complete
-`changed=0` rerun. Native/browser joining and gun/grenade input plus combat-page checks passed;
-no human balance/audio acceptance is inferred. `davve-srv/docs/wake-velocity.md` owns the
-current operator commands and detailed deployment evidence. Do not alternate the baseline
-role with the standalone Proteus playbook: they manage the same service names and ports.
-The standalone commands below remain a legacy/reference path, not the routine workflow.
+The v0.0.21 cutover passed through that exact wrapper on 2026-10-28, followed by a complete
+`changed=0` rerun. `davve-srv/docs/wake-velocity.md` owns operator commands and deployment
+evidence; [current verification](#status-and-verification--2026-10-28) records the client checks
+and their limits. Do not alternate the baseline role with the standalone Proteus playbook:
+they manage the same service names and ports. The standalone commands below are historical
+reference, not the routine workflow.
 
 ## Known-server directory
 
@@ -246,7 +246,7 @@ backports only the UI and removes the newer outer-location title row unavailable
 For a native connection check using a client built from the matching release:
 
 ```sh
-./build/boat_bot --connect winterfell.davve.net:24680 --seconds 15 --predict
+./build/boat_bot --connect wake.davve.net:24680 --seconds 15 --predict
 ```
 
 Use `10.0.21.3:24680` for the LAN check. A development build with newer handling may correctly
@@ -254,9 +254,49 @@ be rejected; use the release checkout's bot instead. Browser testing must reach 
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
 
-## Status and verification — 2026-10-26
+## Status and verification — 2026-10-28
 
-Current: v0.0.18 is deployed by `davve-srv` main commit `dc206f9`, with protocol 6 / handling 9.
+The release command in [the release guide](RELEASES.md#release-command) upgraded Winterfell
+to v0.0.21 through committed/pushed `davve-srv` pin `e6d0871`. Native and browser builds
+completed on Winterfell before the switch. The ordinary wrapper finished with
+`ok=44 changed=9 failed=0 unreachable=0`; a full repeat returned
+`ok=41 changed=0 failed=0 unreachable=0`. Room and relay are active; the room reports
+v0.0.21, `NRestarts=0`, active since 2026-10-28 13:17:48 CET. The service-account checkout
+identifies exact tagged commit `0cb1921224149ddeb4707e818dd2069096bc9e3d`.
+Both live browser sites report v0.0.21 and passed Chrome/SwiftShader named joining/driving
+without page errors. The public directory reports protocol 7 / physics 9. A matching native
+bot received 150 snapshots, repaired eight mismatches, finished consistent and reported zero
+decode errors. Android-emulated Pages touch/tilt/fullscreen/orientation checks passed;
+iPhone-style Winterfell emulation also passed, including connected touch/tilt commands and
+leaving. Representative desktop/mobile captures were inspected.
+These are automated checks on this controller: physical phones, human gameplay/audio,
+restrictive networks, long soaks and independent external-network/TURN qualification remain
+open. Logs/captures are under the release worktree's `build/release/`; deployment logs are
+`/private/tmp/proteus-release-v0.0.21.log` and `/private/tmp/proteus-v21-hosting-repeat.log`.
+Next: physical-device and human package play, then broader multiplayer qualification.
+
+### Earlier v0.0.20 cutover
+
+The required v0.0.20 release cutover ran through `davve-srv` commit `2cf0974` using
+`scripts/ansible-run.sh --limit winterfell --tags wake_velocity`. Ansible completed with
+`failed=0`, then `changed=0` on a full repeat. The running executable resolves to
+`/srv/wake-velocity/releases/v0.0.20/build-server/boat_server`; the source commit matches
+`2f9adfc`. Room and relay are active; the room has `NRestarts=0` and its active timestamp
+is 2026-10-28 11:11:51 CET. Public HTTPS metadata reports protocol 7 / physics 9.
+
+Chrome/SwiftShader verified both the hosted browser and live GitHub Pages v0.0.20 clients:
+named join, driving and weapon-key input, leaving and rejoining alongside a matching native
+bot. Both directory/gameplay captures were inspected, and neither browser reported a
+JavaScript page error. A separate native run completed 100 snapshots, all consistent,
+with zero decode errors and a consistent final state. Test clients exited. These are automated transport,
+input and rendering checks. Human gameplay/audio, weapon balance, restrictive-network and
+long-session qualification remain open. This controller check does not requalify a separate
+external network or prove TURN relay use. Next: human play and broader qualification.
+
+## Historical status and verification — 2026-10-26
+
+
+At that check, v0.0.18 was deployed by `davve-srv` main commit `dc206f9`, with protocol 6 / handling 9.
 The native server and browser were built on Winterfell; both services are active. A complete
 wrapper rerun reported no changes and preserved the room's active timestamp. A 90-second
 matching native bot run ended consistent with zero decode errors; Chrome/SwiftShader named
@@ -337,6 +377,9 @@ machine and connection. After switching to the Winterfell launcher, the user con
 audio acceptance remain separate.
 
 ## Native directory client, 2026-10-26
+
+Historical implementation evidence: the v0.0.18 workaround and live-join limitation below
+are superseded by the matched v0.0.20 deployment and native/browser checks above.
 
 Follow-up, 2026-10-26: fixed the native game client checking an unset transport flag after
 creating its ENet connection, which caused an empty `Cannot connect:` message for every

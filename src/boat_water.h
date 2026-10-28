@@ -18,6 +18,9 @@ typedef struct {
     Vector2 centre, velocity; // Centre at STARTED, travel in simulation metres/second.
     float radius, height;
     double started;
+    // Seconds over which the patch grows smoothly from flat water at STARTED to HEIGHT; zero
+    // is full height at once. Before STARTED the water is flat.
+    float build;
 } BoatStorm;
 
 typedef struct {
@@ -26,6 +29,8 @@ typedef struct {
 } BoatStormSample;
 
 Vector2 boat_water_storm_centre(BoatStorm storm, double time);
+// The fraction of HEIGHT grown by TIME, 0..1, and its rate per second in RATE (may be NULL).
+float boat_water_storm_grown(BoatStorm storm, double time, float *rate);
 BoatStormSample boat_water_storm_query(BoatStorm storm, Vector2 position, double time);
 void boat_water_storm_uniforms(BoatStorm storm, double time, float parameters[12]);
 

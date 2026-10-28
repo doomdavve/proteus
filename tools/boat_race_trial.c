@@ -3,6 +3,7 @@
 #include "boat_map.h"
 #include "boat_race.h"
 #include "boat_reset_hold.h"
+#include "boat_test_scenery.h"
 #include "boat_test_world.h"
 #include "boat_throttle.h"
 #include "raymath.h"
@@ -540,6 +541,7 @@ static void preview_advance(const Boat *boat, Vector2 previous, unsigned *next, 
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     bool check = false, gpu_check = false, gpu_enabled = true, play = false, source = true;
     bool skill = false;
     const char *output = NULL;

@@ -63,6 +63,15 @@ typedef struct {
     Vector3 lens;
 } WaterfrontLampState;
 
+// A3.5: a weather patch painted into the sky behind all geometry: a cloud column of RADIUS
+// metres over CENTRE (renderer X/Z) from BASE up to lumpy tops at most TOP, and rain beneath
+// it, both scaled by GROWN (0..1; zero draws nothing). Shared by the CPU sky and the GPU sky
+// shader, which must stay in step with waterfront_squall_sky.
+typedef struct {
+    Vector2 centre;
+    float radius, base, top, grown;
+} WaterfrontSquall;
+
 // Owned snapshot: no simulation state or pointers into mutable actor storage.
 // Evaluate once and share it across colour, reflection, shadow, and lighting passes.
 typedef struct {
@@ -83,6 +92,7 @@ typedef struct {
     Transform3D ghost_hull, ghost_cabin, ghost_engine;
     BoatFlagSurface ghost_flag;
     double time; // World seconds; GPU uploads only reduced float phases and bounded clocks.
+    WaterfrontSquall squall; // Drawn in the sky pass only.
     Transform3D bridge;
     Color bridge_color;
     WaterfrontCarState cars[WATERFRONT_CAR_COUNT];
@@ -125,5 +135,10 @@ Vector3 waterfront_scene_street_position(
 Vector3 waterfront_sun_direction(void);
 Image waterfront_sky_image(void);
 void waterfront_sky_draw(Color *pixels, int width, int height, View3D camera);
+// The sky with SQUALL over it, seen from the camera.
+void waterfront_sky_draw_squall(
+    Color *pixels, int width, int height, View3D camera, WaterfrontSquall squall);
+// SKY along the unit RAY from EYE, behind SQUALL's cloud and rain.
+Color waterfront_squall_sky(Color sky, Vector3 eye, Vector3 ray, WaterfrontSquall squall);
 
 #endif

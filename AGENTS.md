@@ -22,7 +22,11 @@ playground for iterating on effects, timing, audio, and presentation.
 - `src/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
 - `src/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
 - `src/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
-- `src/waterfront_city.[ch]`: the compiled river map crop shared by shoreline queries and renderers.
+- `src/waterfront_city.[ch]`: the compiled river map crop's water, shared by shoreline queries and
+  renderers.
+- `src/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
+  `assets/geometry/<map>/scenery.bin` (written by `tools/map_pack.py`) and checks it against the
+  compiled water in `water.h`. Collision and the server need only the compiled water.
 - Boating code builds as static libraries in `CMakeLists.txt`. `proteus_boat_core` (physics, water
   queries, wakes, course crossing, contacts and geometry data) must not draw, read input, open
   windows or audio, or touch files; `tools/check_core_boundary.py` enforces this in CTest. See
@@ -119,6 +123,23 @@ xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
   summaries instead of appending contradictory updates. Editor autosaves are not planning sources.
 - Check changed local links and command examples. Report unresolved documentation uncertainty and
   verification limits before handoff; documentation-only changes need no new audiovisual review.
+
+## Cutting a release
+
+- Use `tools/cut_release.py` from the separate, reviewed source worktree; see the
+  [release command](docs/RELEASES.md#release-command) for preflight, controller setup and retries.
+  It builds/tests, publishes, verifies downloads, updates the private hosting baseline and
+  deploys/verifies Winterfell. Use `--check` to check prerequisites without publishing/deploying.
+- A release includes upgrading the hosted Winterfell room and its matching browser client.
+  Publishing native packages and GitHub Pages alone does not complete a release.
+- After publication succeeds, update `wake_velocity_version` in
+  `../davve-srv/ansible/host_vars/winterfell/main.yml`, commit and push in `davve-srv`, then
+  run `scripts/ansible-run.sh --limit winterfell --tags wake_velocity` from that repository.
+  Use its existing vault/controller setup and the routine role, not the legacy Proteus playbook.
+- Verify the running release, room/relay health, hosted browser version, directory compatibility
+  metadata and matching native/browser joins. Record deployment evidence and any limits in
+  `docs/RELEASES.md`, `docs/MULTIPLAYER_HOSTING.md` and `davve-srv/docs/wake-velocity.md`.
+  See [the hosting guide](docs/MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
 
 ## Before handing off
 

@@ -48,6 +48,13 @@ configure_file(assets/title/wake-velocity.png "${WEB_ASSETS}/title/wake-velocity
 configure_file(assets/title/river-backdrop.png "${WEB_ASSETS}/title/river-backdrop.png" COPYONLY)
 configure_file(assets/music/a-little-boat.xm "${WEB_ASSETS}/music/a-little-boat.xm" COPYONLY)
 configure_file(assets/music/acid-wake.xm "${WEB_ASSETS}/music/acid-wake.xm" COPYONLY)
+# The river's scenery pack is preloaded with the page. The outer pack is served next to it and
+# fetched only when a session needs it (web/scenery_loader.js), so river and basin players never
+# download it.
+configure_file(assets/geometry/river/scenery.bin "${WEB_ASSETS}/geometry/river/scenery.bin"
+  COPYONLY)
+configure_file(assets/geometry/outer/scenery.bin
+  "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/outer/scenery.bin" COPYONLY)
 
 set_target_properties(wake_velocity PROPERTIES SUFFIX ".js")
 # Asyncify is raylib's supported way to yield from its existing synchronous loop.
@@ -66,6 +73,8 @@ target_link_options(wake_velocity PRIVATE
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js\""
+  "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mobile_controls.js\""
+  "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/scenery_loader.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js\"")
 set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   ${WEB_SHADERS} ${WEB_TEXTURES}
@@ -73,9 +82,12 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/title/wake-velocity.png"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/river/scenery.bin"
+  "${CMAKE_CURRENT_SOURCE_DIR}/web/scenery_loader.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js"
+  "${CMAKE_CURRENT_SOURCE_DIR}/web/mobile_controls.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js")
 
 # Only this directory is served/deployed. Content hashes keep JS, Wasm and data in sync.

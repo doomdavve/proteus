@@ -3,14 +3,17 @@
 #include "boat_course_view.h"
 #include "boat_gpu.h"
 #include "boat_hud.h"
+#include "boat_minimap.h"
 #include "boat_music.h"
 #include "boat_profile.h"
 #include "boat_rearview.h"
 #include "boat_replay.h"
 #include "boat_reset_hold.h"
+#include "boat_scenery.h"
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
+#include "boat_time_control.h"
 #include "boat_ui.h"
 #include "boat_voyage_view.h"
 #include "wake_velocity_drive.h"
@@ -23,6 +26,7 @@
 #include "wake_velocity_net.h"
 #endif
 #include "boat_title.h"
+#include "boat_web_touch.h"
 #include "frame_pacer.h"
 #include "profiler.h"
 #include "raymath.h"
@@ -36,11 +40,36 @@
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
 
+EM_JS(int, boat_web_viewport_size, (int axis), {
+    const size = Module['boatViewportSize']();
+    return axis ? size.height : size.width;
+})
+EM_JS(void, boat_web_fit_canvas, (void), { Module['boatFitCanvas'](); })
+EM_JS(int, boat_web_touch_click, (float *position), {
+    const tap = Module['boatMobile']['click']();
+    if (Object.is(tap, null))
+        return 0;
+    if (Object.is(tap, false))
+        return -1;
+    HEAPF32[position >> 2] = tap.x;
+    HEAPF32[(position >> 2) + 1] = tap.y;
+    return 1;
+})
+EM_JS(void, boat_web_mobile_session, (int enabled), { Module['boatMobile']['session'](enabled); })
+EM_JS(int, boat_web_mobile_menu, (void), { return Module['boatMobile']['menu'](); })
+EM_JS(int, boat_web_mobile_sample, (int active), { return Module['boatMobile']['sample'](active); })
+EM_JS(float, boat_web_mobile_target, (void), { return Module['boatMobile']['target'](); })
 EM_JS(int, boat_web_mouse_state, (int wanted, int available),
     { return Module['boatMouse']['state'](wanted, available); })
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
 EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
 EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
+EM_JS(void, boat_web_scenery_start, (const char *name, const char *path),
+    { Module['boatScenery'].start(UTF8ToString(name), UTF8ToString(path)); })
+EM_JS(int, boat_web_scenery_state, (const char *name),
+    { return Module['boatScenery'].state(UTF8ToString(name)); })
+EM_JS(float, boat_web_scenery_progress, (const char *name),
+    { return Module['boatScenery'].progress(UTF8ToString(name)); })
 #endif
 
 static void usage(void)
@@ -81,7 +110,9 @@ static void usage(void)
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"
         "G: ghost on/off | L/B: replay last/best | Space: pause replay | Enter: restart replay\n"
-        "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed 0.25x..4x\n"
+        "Solo: [ / ] slower/faster (0.25x..8x) | backslash: normal time; altered runs are "
+        "practice\n"
+        "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed | backslash: 1x\n"
         "Click/drag the replay timeline to seek and pause; Space resumes.\n"
         "--replay FILE: watch a saved course run (also supports --screenshot --time)\n"
         "--ghost FILE: race a compatible saved run | --save-run FILE: export each finish\n"
@@ -104,17 +135,57 @@ static void usage(void)
         "--serve [boat_server options]: run only a room, as boat_server does (--serve --help)");
 }
 
+// Native builds load every mapped location's scenery pack at start. The browser loads only the
+// river's, bundled with the page; the outer pack is fetched when a session there needs it.
+static bool load_scenery(const char *assets)
+{
+#if defined(__EMSCRIPTEN__)
+    return boat_scenery_load_location(boat_location(BOAT_LOCATION_RIVER), assets);
+#else
+    return boat_scenery_load_all(assets);
+#endif
+}
+
+// LOCATION's scenery, loaded now if it is not yet. The browser first fetches the pack, drawing
+// its progress until it arrives; false if it cannot be fetched or loaded.
+static bool scenery_ready(const BoatWorldDefinition *location, const char *assets)
+{
+    if (!location->mapped || boat_scenery_of(location->map))
+        return true;
+#if defined(__EMSCRIPTEN__)
+    char path[4096];
+    if (!boat_scenery_path(location, assets, path, sizeof(path)))
+        return false;
+    boat_web_scenery_start(location->name, path);
+    while (boat_web_scenery_state(location->name) == 1 && !WindowShouldClose()) {
+        char text[64];
+        snprintf(text, sizeof(text), "LOADING %s %d%%",
+            location->id == BOAT_LOCATION_OUTER ? "OUTER RIVER" : "MAP",
+            (int)(100 * boat_web_scenery_progress(location->name)));
+        int scale = GetScreenHeight() / 200 > 1 ? GetScreenHeight() / 200 : 1;
+        BoatUiPalette palette = boat_ui_palette();
+        BeginDrawing();
+        ClearBackground(palette.panel);
+        boat_ui_text(text, (GetScreenWidth() - boat_ui_width(text, 8 * scale)) / 2,
+            GetScreenHeight() / 2 - 4 * scale, 8 * scale, palette.text);
+        EndDrawing(); // Yields to the page, which receives the pack meanwhile.
+    }
+    if (boat_web_scenery_state(location->name) != 2)
+        return false;
+#endif
+    return boat_scenery_load_location(location, assets);
+}
+
 static BoatWater study_water(
     const BoatWorldDefinition *location, bool waves, bool current, bool crossing, bool player)
 {
     BoatWater water = boat_world_test_water(location, waves, current, crossing);
     water.player_wake_enabled = player;
-    if (location->voyage)
-        water.storm = location->voyage->exposure; // Single player only; rooms keep calm water.
-    return water;
+    return water; // A solo session's voyage adds its exposure; rooms keep calm water.
 }
 
-static void draw_help(bool course, bool voyage, bool deathmatch, bool race)
+static void draw_help(
+    bool course, bool voyage, bool minimap, bool deathmatch, bool race, bool networked)
 {
     int width = GetScreenWidth(), height = GetScreenHeight();
     const char *lines[] = {
@@ -133,8 +204,11 @@ static void draw_help(bool course, bool voyage, bool deathmatch, bool race)
             : race ? "Hold Tab: race standings"
                    : "",
         deathmatch ? "V: toggle rearview mirror (starts hidden)" : "",
+        minimap ? "N: map in corner / large chart / off" : "",
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
+        networked ? "" : "[ / ]: time 0.25x..8x | backslash: 1x",
+        course ? "Altered live time: practice, no best/export" : "",
 #if defined(__EMSCRIPTEN__)
         "P: menu in fullscreen | Back to title: setup",
 #endif
@@ -548,8 +622,8 @@ static int study(int argc, char **argv)
         camera_settings.height = camera_default.height;
 
     SetTraceLogLevel(verbose ? LOG_INFO : LOG_WARNING);
-    enum { WIDTH = 320, HEIGHT = 200 };
-    Color *pixels = malloc(WIDTH * HEIGHT * sizeof(*pixels));
+    int width = 320, height = 200;
+    Color *pixels = malloc(width * height * sizeof(*pixels));
     if (!pixels)
         return 1;
     // Every location's physical resources: a joined room picks its own. Sessions, fleets and
@@ -564,10 +638,24 @@ static int study(int argc, char **argv)
             free(pixels);
             return 1;
         }
+    // The mapped locations' scenery packs, which every view draws (the core uses only their
+    // compiled water). The browser fetches the outer pack the first time it is needed.
+    char assets[4096];
+    if (!boat_asset_path(assets, sizeof(assets), "") || !load_scenery(assets)) {
+        fprintf(stderr, "Cannot load the map scenery from %sgeometry/.\n", assets);
+        for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
+            boat_world_resources_destroy(&worlds[i]);
+        free(pixels);
+        return 1;
+    }
     Renderer3D renderer = { 0 };
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     BoatGpu gpu = { 0 };
     BoatRearview mirror = { 0 };
+    // Every mapped location, solo or room; hidden until N.
+    BoatMinimap minimap = { 0 };
+    Texture2D minimap_textures[BOAT_MINIMAP_MODES] = { 0 };
+    BoatMinimapMode minimap_mode = BOAT_MINIMAP_HIDDEN;
     Texture2D texture = { 0 };
     RenderTexture2D frame_target = { 0 };
     bool window_ready = false, window_owned = false, mouse_captured = false;
@@ -714,11 +802,11 @@ static int study(int argc, char **argv)
         ghost_opacity = .5f;
     }
     if (!gpu_enabled
-        && !boat_draw_with_ghost(&renderer, &cpu_view, pixels, WIDTH, HEIGHT, view,
+        && !boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
             view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
             ghost_opacity))
         goto cleanup;
-    Image image = { pixels, WIDTH, HEIGHT, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    Image image = { pixels, width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
     if (screenshot && !gpu_enabled) {
         result = ExportImage(image, screenshot) ? 0 : 1;
         goto cleanup;
@@ -726,22 +814,26 @@ static int study(int argc, char **argv)
 
     if (!IsWindowReady()) {
 #if defined(__EMSCRIPTEN__)
-        // The page scales a fixed 8:5 canvas; raylib's web resize fills the entire viewport.
+        // CSS sizing belongs to the page; mobile gameplay adapts the drawing buffer below.
         SetConfigFlags(0);
 #else
         SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 #endif
-        InitWindow(WIDTH * 3, HEIGHT * 3, "Wake Velocity");
+        InitWindow(width * 3, height * 3, "Wake Velocity");
         if (!IsWindowReady())
             goto cleanup;
         window_owned = true;
-        SetWindowMinSize(WIDTH, HEIGHT);
+        SetWindowMinSize(width, height);
     }
     window_ready = true;
     if (!boat_ui_load())
         goto cleanup;
 #if defined(__EMSCRIPTEN__)
     SetTargetFPS(60);
+    if (!scenery_ready(location, assets)) {
+        fprintf(stderr, "Cannot load the %s scenery.\n", location->name);
+        goto cleanup;
+    }
 #else
     if (!vsync)
         ClearWindowState(FLAG_VSYNC_HINT);
@@ -776,10 +868,18 @@ static int study(int argc, char **argv)
             goto cleanup;
     }
     SetTextureFilter(texture, TEXTURE_FILTER_POINT);
-    frame_target = LoadRenderTexture(WIDTH, HEIGHT);
+    frame_target = LoadRenderTexture(width, height);
     if (!IsRenderTextureValid(frame_target))
         goto cleanup;
     SetTextureFilter(frame_target.texture, TEXTURE_FILTER_POINT);
+    if (boat_minimap_init(&minimap, location)) {
+        for (int mode = BOAT_MINIMAP_CORNER; mode < BOAT_MINIMAP_MODES; ++mode) {
+            minimap_textures[mode] = LoadTextureFromImage(minimap.layers[mode].frame);
+            if (!IsTextureValid(minimap_textures[mode]))
+                goto cleanup;
+            SetTextureFilter(minimap_textures[mode], TEXTURE_FILTER_POINT);
+        }
+    }
     boat_audio_init(&audio, BOAT_ENGINE_DEFAULT);
     char music_path[4096];
     const BoatMusic *track = boat_music(soundtrack);
@@ -801,6 +901,7 @@ static int study(int argc, char **argv)
         }
     }
     double accumulator = 0;
+    int time_speed_index = BOAT_TIME_NORMAL;
     int frames = 0, demo_tick = 0;
     bool replay_dragging = false;
     bool help_visible = false;
@@ -820,17 +921,42 @@ static int study(int argc, char **argv)
     float mouse_wheel = session.boat.wheel;
 #if defined(__EMSCRIPTEN__)
     bool mouse_unavailable = false;
+    boat_web_mobile_session(1);
 #endif
     SetExitKey(KEY_NULL);
     Profiler profiler = { 0 };
     BoatProfile boat_profile = { 0 };
     BoatProfileSnapshot boat_snapshot = { 0 };
     ProfilerSnapshot snapshot = { 0 };
-    VirtualSize size = { WIDTH, HEIGHT };
+    VirtualSize size = { width, height };
     double frame_started_at = boat_profile_time(true);
     double next_snapshot_time = 0;
     result = 0;
     while (!WindowShouldClose() && (!frame_limit || frames < frame_limit)) {
+#if defined(__EMSCRIPTEN__)
+        // The browser supplies a bounded low-resolution viewport after resizing settles.
+        int next_width = boat_web_viewport_size(0);
+        int next_height = boat_web_viewport_size(1);
+        if (gpu_enabled && (next_width != width || next_height != height)) {
+            RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
+            if (!IsRenderTextureValid(next_frame)
+                || !boat_gpu_resize(&gpu, next_width, next_height)) {
+                if (next_frame.id)
+                    UnloadRenderTexture(next_frame);
+                result = 1;
+                break;
+            }
+            UnloadRenderTexture(frame_target);
+            frame_target = next_frame;
+            SetTextureFilter(frame_target.texture, TEXTURE_FILTER_POINT);
+            width = next_width;
+            height = next_height;
+            texture = gpu.target.texture;
+            size = (VirtualSize) { width, height };
+            SetWindowSize(width * 3, height * 3);
+            boat_web_fit_canvas();
+        }
+#endif
         double current_frame_started_at = boat_profile_time(true);
         frame_started_at = current_frame_started_at;
         BoatFrameMetrics metrics = { 0 }; // Reset once before any tick in this frame.
@@ -843,7 +969,11 @@ static int study(int argc, char **argv)
         // Menu shortcuts release capture without changing steering mode. P preserves fullscreen.
         bool reset_requested = false;
         bool menu_was_open = menu.open;
-        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P)) {
+        bool menu_pressed = IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P);
+#if defined(__EMSCRIPTEN__)
+        menu_pressed |= boat_web_mobile_menu() != 0;
+#endif
+        if (menu_pressed) {
             if (help_visible)
                 help_visible = false;
             else if (menu.open)
@@ -851,14 +981,16 @@ static int study(int argc, char **argv)
             else
                 boat_menu_open(&menu);
         }
-        int scale = GetScreenWidth() / WIDTH < GetScreenHeight() / HEIGHT
-            ? GetScreenWidth() / WIDTH
-            : GetScreenHeight() / HEIGHT;
+        int scale = GetScreenWidth() / width < GetScreenHeight() / height
+            ? GetScreenWidth() / width
+            : GetScreenHeight() / height;
         if (scale < 1)
             scale = 1;
-        Rectangle destination = { (GetScreenWidth() - WIDTH * scale) / 2,
-            (GetScreenHeight() - HEIGHT * scale) / 2, WIDTH * scale, HEIGHT * scale };
-        Camera2D menu_camera = { .offset = { destination.x, destination.y }, .zoom = scale };
+        Rectangle destination = { (GetScreenWidth() - width * scale) / 2,
+            (GetScreenHeight() - height * scale) / 2, width * scale, height * scale };
+        Camera2D menu_camera = { .offset = { destination.x + (width - 320) * scale / 2,
+                                     destination.y + (height - 200) * scale / 2 },
+            .zoom = scale };
         if (menu.open && menu_was_open && !help_visible && IsWindowFocused()) {
             BoatMenuChoice choice = boat_menu_update(&menu, menu_camera, GetFrameTime());
             if (choice == BOAT_MENU_RESUME)
@@ -895,10 +1027,19 @@ static int study(int argc, char **argv)
             if (mouse_steering)
                 mouse_wheel = session.boat.wheel;
         }
-        bool mouse_driving = mouse_steering && !demo && !session.runs.playing;
+        float mobile_target = NAN;
+        int mobile_buttons = 0;
+#if defined(__EMSCRIPTEN__)
+        mobile_buttons = boat_web_mobile_sample(active && !demo && !session.runs.playing);
+        mobile_target = boat_web_mobile_target();
+#endif
+        bool keyboard_steering
+            = IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A);
+        bool mobile_driving = (mobile_buttons & 16) || isfinite(mobile_target);
+        bool mouse_driving = mouse_steering && !demo && !session.runs.playing && !mobile_driving;
 #if defined(__EMSCRIPTEN__)
         int browser_mouse = boat_web_mouse_state(
-            active && mouse_driving, active && !demo && !session.runs.playing);
+            active && mouse_driving, active && !demo && !session.runs.playing && !mobile_driving);
         if (browser_mouse & 4) {
             // Denied or missing capture falls back to the keyboard.
             mouse_unavailable = true;
@@ -934,11 +1075,19 @@ static int study(int argc, char **argv)
             mouse_wheel = boat_mouse_wheel(mouse_wheel, mouse_delta);
         if (!active && networked)
             mouse_wheel = 0; // The authority neutralizes inactive controls too.
-        float steering_target = mouse_driving ? mouse_wheel : NAN;
+        float steering_target = mouse_driving ? mouse_wheel
+            : !keyboard_steering              ? mobile_target
+                                              : NAN;
+        float steering_rate = keyboard_steering
+            ? (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
+                  - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)))
+            : (float)(((mobile_buttons & 8) != 0) - ((mobile_buttons & 4) != 0));
         if (active && IsKeyPressed(KEY_F3)) {
             profiler_visible = !profiler_visible;
             next_snapshot_time = 0;
         }
+        if (active && boat_minimap_ready(&minimap) && IsKeyPressed(KEY_N))
+            minimap_mode = boat_minimap_next(minimap_mode);
 #ifdef PROTEUS_BOAT_NET
         if (active && net && net_study_deathmatch(net) && IsKeyPressed(KEY_V))
             mirror.enabled = !mirror.enabled;
@@ -958,8 +1107,8 @@ static int study(int argc, char **argv)
         bool precision = active && !demo && !session.runs.playing
             && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
         thrust_target = active && !demo && !session.runs.playing
-            ? boat_pedal_target(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W),
-                  IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S), precision)
+            ? boat_pedal_target(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) || (mobile_buttons & 1),
+                  IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S) || (mobile_buttons & 2), precision)
             : 0;
         bool replay_adjusted = false;
         if (!active)
@@ -1021,6 +1170,17 @@ static int study(int argc, char **argv)
                 }
             }
         }
+        if (active && !networked) {
+            if (session.runs.playing) {
+                if (IsKeyPressed(KEY_BACKSLASH))
+                    session.runs.replay_speed_index = BOAT_TIME_NORMAL;
+            } else {
+                int direction = IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
+                time_speed_index = boat_time_speed_step(time_speed_index, direction);
+                if (IsKeyPressed(KEY_BACKSLASH))
+                    time_speed_index = BOAT_TIME_NORMAL;
+            }
+        }
         metrics.course_replay_ms
             += (float)((boat_profile_time(true) - course_input_started_at) * 1000.0);
         reset_requested |= boat_reset_hold_update(
@@ -1036,8 +1196,7 @@ static int study(int argc, char **argv)
             BoatInput input = { 0 };
             if (active)
                 input = (BoatInput) {
-                    .steering_rate = (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-                        - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))),
+                    .steering_rate = steering_rate,
                 };
             // No multiplayer pause: the room keeps running while help or focus is away.
             uint32_t previous_life = net->own_life;
@@ -1084,18 +1243,19 @@ static int study(int argc, char **argv)
                 += (float)((boat_profile_time(true) - course_started_at) * 1000.0);
         } else if (active) {
             BoatInput input = {
-                .steering_rate = (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-                    - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))),
+                .steering_rate = steering_rate,
             };
             double raw_active_delta = GetFrameTime();
             metrics.discarded_active_ms
                 = boat_profile_discarded_seconds(raw_active_delta, true) * 1000.0f;
-            accumulator += fmin(raw_active_delta, 0.1);
+            if (course && time_speed_index != BOAT_TIME_NORMAL && !session.runs.finished)
+                session.runs.practice = true;
+            accumulator += boat_time_frame_seconds(raw_active_delta, time_speed_index);
             while (accumulator >= BOAT_TICK_SECONDS) {
                 if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
                 else {
-                    if (mouse_driving)
+                    if (isfinite(steering_target))
                         input.steering_rate
                             = boat_steering_rate(session.boat.wheel, steering_target);
                     input.throttle_rate = boat_throttle_rate(session.boat.throttle, thrust_target);
@@ -1192,7 +1352,9 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_NET
         if (net) {
             net_study_rivals(net, live_view.time, &rivals);
-            mirror_visible = mirror.enabled && net_study_deathmatch(net) && net->own_visible;
+            // The large chart takes the mirror's place while it is open.
+            mirror_visible = mirror.enabled && net_study_deathmatch(net) && net->own_visible
+                && minimap_mode != BOAT_MINIMAP_CHART;
         }
 #endif
         if (course && !session.runs.playing && session.runs.ghost_visible
@@ -1211,6 +1373,12 @@ static int study(int argc, char **argv)
         }
         metrics.course_replay_ms += (float)((boat_profile_time(true) - ghost_started_at) * 1000.0);
         double scene_started_at = boat_profile_time(true);
+        // A joined room may select a location whose pack the browser has not fetched yet.
+        if (!scenery_ready(view_world->definition, assets)) {
+            fprintf(stderr, "Cannot load the %s scenery.\n", view_world->definition->name);
+            result = 1;
+            break;
+        }
         if (gpu_enabled) {
             boat_gpu_draw_scene(&gpu, view, view_presentation, view_world, camera_settings, &rivals,
                 ghost_view, ghost_view_flag, ghost_opacity);
@@ -1218,7 +1386,7 @@ static int study(int argc, char **argv)
                 result = 1;
                 break;
             }
-        } else if (!boat_draw_scene(&renderer, &cpu_view, pixels, WIDTH, HEIGHT, view,
+        } else if (!boat_draw_scene(&renderer, &cpu_view, pixels, width, height, view,
                        view_presentation, view_world, camera_settings, &rivals, ghost_view,
                        ghost_view_flag, ghost_opacity)) {
             result = 1;
@@ -1248,22 +1416,30 @@ static int study(int argc, char **argv)
         BeginTextureMode(frame_target);
         ClearBackground((Color) { 14, 23, 32, 255 });
         DrawTexturePro(texture,
-            (Rectangle) { 0, 0, gpu_enabled ? -WIDTH : WIDTH, gpu_enabled ? -HEIGHT : HEIGHT },
-            (Rectangle) { 0, 0, WIDTH, HEIGHT }, (Vector2) { 0 }, 0, WHITE);
+            (Rectangle) { 0, 0, gpu_enabled ? -width : width, gpu_enabled ? -height : height },
+            (Rectangle) { 0, 0, width, height }, (Vector2) { 0 }, 0, WHITE);
         boat_hud_draw(
             (BoatHudTelemetry) { .speed_mps = hypotf(view->boat.velocity.x, view->boat.velocity.y),
                 .thrust = view->boat.throttle,
                 .steering = view->boat.wheel,
                 .precision = precision,
                 .reset_progress = reset_hold.seconds / BOAT_RESET_HOLD_SECONDS },
-            WIDTH, HEIGHT);
+            width, height > width ? height - 80 : height);
+        const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
+            networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
+        Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, width, height);
+        if (chart) {
+            Rectangle bounds = minimap_bounds;
+            UpdateTexture(minimap_textures[minimap_mode], chart->data);
+            DrawTexture(minimap_textures[minimap_mode], (int)bounds.x, (int)bounds.y, WHITE);
+        }
 #ifdef PROTEUS_BOAT_NET
         if (net)
             net_study_combat_hud(
-                net, WIDTH, HEIGHT, view, view_presentation, view_world, camera_settings);
+                net, width, height, view, view_presentation, view_world, camera_settings);
 #endif
         if (mirror_visible)
-            boat_rearview_draw(&mirror, WIDTH);
+            boat_rearview_draw(&mirror, width);
         int hint_top = mirror_visible ? BOAT_REARVIEW_BOTTOM + 12 : 4;
         if (mouse_driving && !menu.open)
             boat_ui_text(mouse_captured ? "MOUSE / P: MENU" : "MOUSE / CLICK TO CAPTURE", 4,
@@ -1275,10 +1451,16 @@ static int study(int argc, char **argv)
             boat_ui_text(
                 "MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #endif
+        if (!networked && !session.runs.playing
+            && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {
+            const char *time_label = TextFormat("TIME %.2gx%s", boat_time_rate(time_speed_index),
+                session.runs.practice ? " / PRACTICE" : "");
+            boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
+        }
         EndTextureMode();
         BeginDrawing();
         ClearBackground((Color) { 14, 23, 32, 255 });
-        DrawTexturePro(frame_target.texture, (Rectangle) { 0, 0, WIDTH, -HEIGHT }, destination,
+        DrawTexturePro(frame_target.texture, (Rectangle) { 0, 0, width, -height }, destination,
             (Vector2) { 0 }, 0, WHITE);
         const char *notice = NULL;
 #ifdef PROTEUS_BOAT_NET
@@ -1303,16 +1485,19 @@ static int study(int argc, char **argv)
             boat_ui_text("LANDING", 12, 36, 16, SKYBLUE);
         if (wake)
             boat_ui_text(TextFormat("WAKE FIELD / REVIEW %d", BOAT_WAKE_SOURCE_REVISION), 12,
-                (int)destination.y + (HEIGHT - 48) * scale - 16, 12, SKYBLUE);
+                (int)destination.y + (height - 48) * scale - 16, 12, SKYBLUE);
         if (course)
             course_runs_hud(&session.runs, view, ghost_view, GetScreenWidth());
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
-            boat_ui_text(net_study_status(net), 12, (int)destination.y + (HEIGHT - 48) * scale - 16,
+            boat_ui_text(net_study_status(net), 12, (int)destination.y + (height - 48) * scale - 16,
                 12, SKYBLUE);
             int match_top
                 = mirror_visible ? (int)destination.y + (BOAT_REARVIEW_BOTTOM + 2) * scale : 12;
             int roster_top = mirror_visible ? match_top + 28 : 12;
+            if (minimap_mode == BOAT_MINIMAP_CORNER) // The roster continues below the map.
+                roster_top = (int)fmaxf((float)roster_top,
+                    destination.y + (minimap_bounds.y + minimap_bounds.height + 2) * scale);
             int feed_top = net_study_draw_roster(net, GetScreenWidth() - 12, roster_top);
             net_study_draw_match(net, GetScreenWidth(), GetScreenHeight(), match_top, feed_top + 8,
                 active && IsKeyDown(KEY_TAB));
@@ -1335,7 +1520,8 @@ static int study(int argc, char **argv)
             deathmatch = networked && net_study_deathmatch(net);
             race = networked && net_study_race(net);
 #endif
-            draw_help(course, !networked && session.voyage.route, deathmatch, race);
+            draw_help(course, !networked && session.voyage.route, boat_minimap_ready(&minimap),
+                deathmatch, race, networked);
         }
         frame_pacer_wait(&pacer);
         EndDrawing();
@@ -1391,11 +1577,15 @@ cleanup:
         boat_ui_unload();
 #if defined(__EMSCRIPTEN__)
         boat_web_mouse_state(0, 0);
+        boat_web_mobile_session(0);
 #else
         if (mouse_captured)
             EnableCursor();
 #endif
         boat_rearview_destroy(&mirror);
+        for (int mode = 0; mode < BOAT_MINIMAP_MODES; ++mode)
+            if (minimap_textures[mode].id)
+                UnloadTexture(minimap_textures[mode]);
         if (frame_target.id)
             UnloadRenderTexture(frame_target);
         if (gpu_enabled)
@@ -1405,9 +1595,11 @@ cleanup:
         if (window_owned)
             CloseWindow();
     }
+    boat_minimap_destroy(&minimap);
     boat_cpu_view_destroy(&cpu_view);
     for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
         boat_world_resources_destroy(&worlds[i]);
+    boat_scenery_unload(); // After every view that borrowed it.
     renderer3d_destroy(&renderer);
     free(pixels);
     return result;

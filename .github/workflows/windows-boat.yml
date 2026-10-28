@@ -69,8 +69,11 @@ jobs:
           Copy-Item build-win/Release/assets/fonts "$package/assets" -Recurse
           New-Item -ItemType Directory -Force -Path "$package/assets/music" | Out-Null
           Copy-Item build-win/Release/assets/music/a-little-boat.xm "$package/assets/music"
-          New-Item -ItemType Directory -Force -Path "$package/assets/geometry/river" | Out-Null
-          Copy-Item assets/geometry/river/manifest.json "$package/assets/geometry/river"
+          foreach ($map in "river", "outer") {
+            New-Item -ItemType Directory -Force -Path "$package/assets/geometry/$map" | Out-Null
+            Copy-Item "assets/geometry/$map/manifest.json" "$package/assets/geometry/$map"
+            Copy-Item "assets/geometry/$map/scenery.bin" "$package/assets/geometry/$map"
+          }
           Copy-Item tools/windows/launch.bat $package
           Copy-Item tools/windows/host.bat $package
           Copy-Item tools/windows/README.txt $package

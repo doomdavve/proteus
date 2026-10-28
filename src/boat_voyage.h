@@ -24,9 +24,14 @@ typedef struct BoatVoyageRoute {
     float arrival_radius;
     float arrival_speed; // Arrive inside the area at or below this ground speed (m/s).
     // Stationary rough water carried by the location's free-boating water. Inside
-    // exposed_fraction of its radius the boat counts as exposed.
+    // exposed_fraction of its radius the boat counts as exposed. Its CENTRE, RADIUS, HEIGHT
+    // and BUILD are authored; the voyage sets STARTED.
     BoatStorm exposure;
     float exposed_fraction;
+    // A3.5 weather transition: the patch is flat until the boat first comes within this many
+    // metres of its centre, then grows over EXPOSURE.BUILD seconds. A boat first observed in
+    // range finds it grown. Zero: grown from the start.
+    float weather_range;
 } BoatVoyageRoute;
 
 typedef enum {
@@ -36,6 +41,7 @@ typedef enum {
     BOAT_VOYAGE_SHELTERED, // Left it again.
     BOAT_VOYAGE_ARRIVED, // Arrived at the destination; SHELTER is its shelter.
     BOAT_VOYAGE_RECOVERED, // Placed at SHELTER.
+    BOAT_VOYAGE_WEATHER, // The exposure began to grow.
 } BoatVoyageEvent;
 
 // Pointer-free apart from the borrowed route; assignment copies it.
@@ -44,6 +50,9 @@ typedef struct {
     unsigned shelter; // The most recently reached shelter, where recovery places the boat.
     bool exposed, arrived;
     bool too_fast; // Inside the arrival area above the arrival speed, not yet arrived.
+    bool observed; // Stepped at least once since the start.
+    bool weather; // The exposure has begun to grow, from WEATHER_STARTED.
+    double weather_started;
     double started, arrival; // World seconds; ARRIVAL is meaningful once arrived.
     unsigned recoveries;
     BoatVoyageEvent event; // The latest event, at EVENT_TIME, about EVENT_SHELTER.
@@ -57,6 +66,8 @@ extern const BoatVoyageRoute boat_voyage_outer;
 void boat_voyage_start(BoatVoyage *voyage, const BoatVoyageRoute *route, double time);
 // Observe the boat after a tick at TIME.
 void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, double time);
+// The exposure as the location's water carries it now: flat until the weather begins.
+BoatStorm boat_voyage_weather(const BoatVoyage *voyage);
 // Put a reset BOAT at the most recently reached shelter.
 void boat_voyage_recover(BoatVoyage *voyage, Boat *boat, double time);
 // Metres to the arrival area's centre and the bearing to it relative to HEADING, in radians,

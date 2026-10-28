@@ -3,9 +3,9 @@
 file I/O.
 
 Sources: every quoted include must be another core header (or raylib.h/raymath.h for vector
-types and math, or compiled map geometry), system headers come from a short allowlist without
-<stdio.h>, raylib-style PascalCase calls must be raymath, and C library I/O/process calls are
-rejected. Archives (when nm is given): every undefined symbol is defined in one of the archives or is
+types and math, or a map's compiled water, water.h), system headers come from a short
+allowlist without <stdio.h>, raylib-style PascalCase calls must be raymath, and C library
+I/O/process calls are rejected. Archives (when nm is given): every undefined symbol is defined in one of the archives or is
 raymath, libm, libc memory/sort/assert, clock(), or the Accelerate DFT backend.
 
 Run with --self-test to confirm each rule rejects a known violation.
@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 ALLOWED_QUOTED = {"raylib.h", "raymath.h"}
-GEOMETRY_INCLUDE = re.compile(r"\.\./assets/geometry/[a-z]+/geometry\.h")
+GEOMETRY_INCLUDE = re.compile(r"\.\./assets/geometry/[a-z]+/water\.h")
 ALLOWED_SYSTEM = {
     "assert.h", "float.h", "limits.h", "math.h", "stdbool.h", "stddef.h", "stdint.h",
     "stdlib.h", "string.h", "time.h", "Accelerate/Accelerate.h",
