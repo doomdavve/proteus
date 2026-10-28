@@ -84,6 +84,44 @@ target_link_libraries(proteus_boat_scenery PUBLIC proteus_boat_core)
 target_compile_definitions(proteus_boat_scenery INTERFACE PROTEUS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_options(proteus_boat_scenery PRIVATE ${PROTEUS_WARNINGS})
 
+# Strict, bounded JSON over the vendored jsmn tokenizer (MIT, third_party/jsmn/LICENSE): the
+# server directory and plugin manifests.
+add_library(proteus_json STATIC src/boat_json.c src/boat_json.h)
+target_include_directories(proteus_json PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(proteus_json PRIVATE ${PROTEUS_WARNINGS})
+
+# Lua plugins P0 (docs/PLUGIN_PLAN.md, docs/PLUGIN_API.md). Lua 5.4.9 (MIT; notice at the end of
+# lua.h), pinned by lua.org's published SHA-256. Only the VM and the base, string, table and math
+# libraries are compiled: io, os, debug, package/require, coroutine and utf8 do not exist. A fixed
+# string-hash seed keeps table traversal, and so diagnostics, identical from run to run.
+FetchContent_Declare(
+  lua
+  URL https://www.lua.org/ftp/lua-5.4.9.tar.gz
+  URL_HASH SHA256=2335b6c582a52654f94612bf10d2f4672805d05329aa6568b1d8cd9e5c6fb8e6
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(lua)
+set(PROTEUS_LUA_SOURCES lapi lcode lctype ldebug ldo ldump lfunc lgc llex lmem lobject lopcodes
+  lparser lstate lstring ltable ltm lundump lvm lzio lauxlib lbaselib lstrlib ltablib lmathlib)
+list(TRANSFORM PROTEUS_LUA_SOURCES PREPEND ${lua_SOURCE_DIR}/src/)
+list(TRANSFORM PROTEUS_LUA_SOURCES APPEND .c)
+add_library(proteus_lua STATIC ${PROTEUS_LUA_SOURCES})
+target_include_directories(proteus_lua SYSTEM PUBLIC ${lua_SOURCE_DIR}/src)
+set_target_properties(proteus_lua PROPERTIES C_STANDARD 99)
+target_compile_options(proteus_lua PRIVATE
+  $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-w;-include;${CMAKE_CURRENT_SOURCE_DIR}/cmake/proteus_lua.h>
+  $<$<C_COMPILER_ID:MSVC>:/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/proteus_lua.h>)
+if(NOT MSVC)
+  target_link_libraries(proteus_lua PRIVATE m)
+endif()
+
+# The plugin host: manifest, restricted Lua evaluation and voyage decoding over immutable bytes,
+# plus boat_plugin_io for reading a package directory. Core and net never link it.
+add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
+  src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h)
+target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
+target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
+
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
@@ -215,9 +253,10 @@ if(NOT EMSCRIPTEN)
   find_package(CURL REQUIRED)
   find_package(Threads REQUIRED)
   target_sources(wake_velocity PRIVATE tools/boat_directory.c tools/boat_directory.h)
-  target_link_libraries(wake_velocity PRIVATE CURL::libcurl Threads::Threads)
+  target_link_libraries(wake_velocity PRIVATE CURL::libcurl Threads::Threads proteus_json)
   add_executable(validate_boat_directory tools/validate_boat_directory.c tools/boat_directory.c)
-  target_link_libraries(validate_boat_directory PRIVATE proteus_boat_net_enet CURL::libcurl Threads::Threads)
+  target_link_libraries(validate_boat_directory PRIVATE proteus_boat_net_enet CURL::libcurl
+    Threads::Threads proteus_json)
   target_compile_options(validate_boat_directory PRIVATE ${PROTEUS_WARNINGS})
   add_test(NAME boat_directory COMMAND validate_boat_directory)
   set_tests_properties(boat_directory PROPERTIES LABELS "cpu;quick")
@@ -530,6 +569,17 @@ target_link_libraries(validate_boat_voyage PRIVATE proteus_boat_session)
 target_compile_options(validate_boat_voyage PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_voyage COMMAND validate_boat_voyage)
 set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage=ok")
+# Lua plugins P0: manifest, restricted evaluation, voyage decoding and parity with the compiled
+# route; its file cases work in a scratch directory under the build tree.
+add_executable(validate_boat_plugin tools/validate_boat_plugin.c)
+target_link_libraries(validate_boat_plugin PRIVATE proteus_plugins)
+target_compile_options(validate_boat_plugin PRIVATE ${PROTEUS_WARNINGS})
+set(BOAT_PLUGIN_TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-test")
+file(MAKE_DIRECTORY "${BOAT_PLUGIN_TEST_DIR}")
+target_compile_definitions(validate_boat_plugin PRIVATE
+  BOAT_PLUGIN_TEST_DIR="${BOAT_PLUGIN_TEST_DIR}")
+proteus_add_case_tests(boat_plugin validate_boat_plugin LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # Solo minimap: baked chart, projection, markers and trim; --screenshot writes review captures.
 # Adventure A3.5i: scenery packs load once, match the compiled water and reject bad input.
 add_executable(validate_boat_scenery tools/validate_boat_scenery.c)
@@ -681,6 +731,13 @@ add_test(NAME boat_net_boundary COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_core_boundary.py --root ${CMAKE_CURRENT_SOURCE_DIR}
   ${BOAT_NET_BOUNDARY_NM} ${PROTEUS_BOAT_CORE_SOURCES} ${PROTEUS_BOAT_NET_SOURCES})
 set_tests_properties(boat_net_boundary PROPERTIES PASS_REGULAR_EXPRESSION "core_boundary=ok")
+# Neither boundary library may link Lua or the plugin host (docs/PLUGIN_PLAN.md).
+foreach(target proteus_boat_core proteus_boat_net)
+  get_target_property(links ${target} LINK_LIBRARIES)
+  if(links MATCHES "proteus_lua|proteus_plugins")
+    message(FATAL_ERROR "${target} must not link Lua or the plugin host")
+  endif()
+endforeach()
 proteus_add_case_tests(boat_handling validate_boat LABELS cpu)
 proteus_add_case_tests(boat_banking validate_boat_banking LABELS cpu)
 add_test(NAME boat_turn_entry COMMAND validate_boat_turn_entry)

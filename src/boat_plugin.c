@@ -1,0 +1,380 @@
+#include "boat_plugin.h"
+
+#include "boat_json.h"
+#include "boat_plugin_lua.h"
+#include "raymath.h"
+
+#include <math.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+const BoatPluginLimits boat_plugin_default_limits = {
+    .manifest_bytes = BOAT_PLUGIN_MANIFEST_MAX,
+    .source_bytes = BOAT_PLUGIN_SOURCE_MAX,
+    .memory_bytes = 2u << 20,
+    .instructions = 1000000,
+};
+
+// Authored bounds (docs/PLUGIN_API.md): coordinates and ranges in metres, speeds in m/s.
+#define COORDINATE_MAX 20000.0
+#define SHELTER_RADIUS_MAX 1000.0
+#define ARRIVAL_SPEED_MAX 50.0
+#define EXPOSURE_RADIUS_MAX 5000.0
+#define EXPOSURE_HEIGHT_MAX 5.0
+#define EXPOSURE_BUILD_MAX 600.0
+#define TAU 6.283185307179586
+
+const char *boat_plugin_status_name(BoatPluginStatus status)
+{
+    static const char *const names[]
+        = { "ok", "limit", "io", "manifest", "syntax", "runtime", "memory", "budget", "schema" };
+    return (unsigned)status < sizeof(names) / sizeof(names[0]) ? names[status] : "unknown";
+}
+
+static BoatPluginStatus diagnose(BoatPluginDiagnostic *d, BoatPluginStatus status, const char *file,
+    const char *field, const char *format, ...)
+{
+    if (!d)
+        return status;
+    d->status = status;
+    d->line = 0;
+    snprintf(d->file, sizeof(d->file), "%s", file);
+    snprintf(d->field, sizeof(d->field), "%s", field);
+    va_list arguments;
+    va_start(arguments, format);
+    vsnprintf(d->message, sizeof(d->message), format, arguments);
+    va_end(arguments);
+    return status;
+}
+
+static const BoatPluginLimits *bounded(const BoatPluginLimits *limits)
+{
+    return limits ? limits : &boat_plugin_default_limits;
+}
+
+// Manifest ------------------------------------------------------------------------------------
+
+static const char *const MANIFEST_KEYS[]
+    = { "id", "name", "api", "kind", "entry", "location", "capabilities", "state_version" };
+#define MANIFEST_KEY_COUNT (sizeof(MANIFEST_KEYS) / sizeof(MANIFEST_KEYS[0]))
+
+static bool identifier(const char *id)
+{
+    if (!(*id >= 'a' && *id <= 'z'))
+        return false;
+    for (; *id; ++id)
+        if (!((*id >= 'a' && *id <= 'z') || (*id >= '0' && *id <= '9') || strchr("._-", *id)))
+            return false;
+    return true;
+}
+
+// A plain file name in the package directory: no separators, no leading dot, no "..".
+static bool plain_file(const char *name)
+{
+    return *name && *name != '.' && !strpbrk(name, "/\\:") && !strstr(name, "..");
+}
+
+BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
+    const BoatPluginLimits *limits, BoatPluginManifest *out, BoatPluginDiagnostic *d)
+{
+    const char *file = "plugin.json";
+    limits = bounded(limits);
+    if (d)
+        *d = (BoatPluginDiagnostic) { 0 };
+    if (size > limits->manifest_bytes || size > BOAT_PLUGIN_MANIFEST_MAX)
+        return diagnose(d, BOAT_PLUGIN_LIMIT, file, "", "is %zu bytes; the limit is %zu", size,
+            limits->manifest_bytes < BOAT_PLUGIN_MANIFEST_MAX ? limits->manifest_bytes
+                                                              : (size_t)BOAT_PLUGIN_MANIFEST_MAX);
+    jsmntok_t tokens[64];
+    int count = boat_json_parse(json, size, tokens, 64);
+    if (count < 0)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "", "is not one well-formed JSON object");
+    // Every member is known and appears once.
+    for (int i = 1; i < count; i = boat_json_next(tokens, count, i + 1)) {
+        char key[32];
+        if (!boat_json_text(json, &tokens[i], key, sizeof(key)))
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "", "has an unreadable field name");
+        bool known = false;
+        for (size_t k = 0; k < MANIFEST_KEY_COUNT; ++k)
+            known |= !strcmp(key, MANIFEST_KEYS[k]);
+        if (!known)
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, key, "is not a known field");
+        if (boat_json_member(json, tokens, count, 0, key) == -2)
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, key, "appears more than once");
+    }
+    int at[MANIFEST_KEY_COUNT];
+    for (size_t k = 0; k < MANIFEST_KEY_COUNT; ++k)
+        if ((at[k] = boat_json_member(json, tokens, count, 0, MANIFEST_KEYS[k])) < 0)
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, MANIFEST_KEYS[k], "is missing");
+    BoatPluginManifest m = { 0 };
+    int api, state;
+    if (!boat_json_text(json, &tokens[at[0]], m.id, sizeof(m.id)) || !identifier(m.id))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "id",
+            "must be 1-63 characters of a-z, 0-9, '.', '_' or '-', starting with a letter");
+    if (!boat_json_text(json, &tokens[at[1]], m.name, sizeof(m.name)))
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, file, "name", "must be 1-63 printable ASCII characters");
+    if (!boat_json_int(json, &tokens[at[2]], &api) || api != BOAT_PLUGIN_API)
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, file, "api", "must be %d, the supported API", BOAT_PLUGIN_API);
+    if (!boat_json_text(json, &tokens[at[3]], m.kind, sizeof(m.kind)) || strcmp(m.kind, "voyage"))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "kind", "must be \"voyage\"");
+    if (!boat_json_text(json, &tokens[at[4]], m.entry, sizeof(m.entry)) || !plain_file(m.entry)
+        || strcmp(m.entry, "main.lua"))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "entry", "must be \"main.lua\"");
+    if (!boat_json_text(json, &tokens[at[5]], m.location, sizeof(m.location))
+        || strcmp(m.location, "outer"))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location",
+            "must be \"outer\", the only location with a voyage");
+    const jsmntok_t *capabilities = &tokens[at[6]];
+    if (capabilities->type != JSMN_ARRAY || capabilities->size != 1)
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, file, "capabilities", "must be [\"voyage.define\"]");
+    char capability[32];
+    if (!boat_json_text(json, &tokens[at[6] + 1], capability, sizeof(capability))
+        || strcmp(capability, "voyage.define"))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]",
+            "is not granted; this host grants only \"voyage.define\"");
+    if (!boat_json_int(json, &tokens[at[7]], &state) || state != BOAT_PLUGIN_STATE_VERSION)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "state_version", "must be %d",
+            BOAT_PLUGIN_STATE_VERSION);
+    m.api = (unsigned)api;
+    m.state_version = (unsigned)state;
+    *out = m;
+    return BOAT_PLUGIN_OK;
+}
+
+// Voyage ---------------------------------------------------------------------------------------
+
+typedef struct {
+    BoatPluginDiagnostic *diagnostic;
+    const char *file;
+} Check;
+
+static bool finite_in(
+    Check *c, const char *path, double value, double low, double high, const char *units)
+{
+    if (isfinite(value) && value >= low && value <= high)
+        return true;
+    if (!isfinite(value))
+        diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, path, "must be a finite number");
+    else
+        diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, path,
+            "is %g; it must be from %g to %g %s", value, low, high, units);
+    return false;
+}
+
+static bool coordinates(Check *c, const char *path, double x, double z)
+{
+    char at[64];
+    snprintf(at, sizeof(at), "%s.x", path);
+    if (!finite_in(c, at, x, -COORDINATE_MAX, COORDINATE_MAX, "m"))
+        return false;
+    snprintf(at, sizeof(at), "%s.z", path);
+    return finite_in(c, at, z, -COORDINATE_MAX, COORDINATE_MAX, "m");
+}
+
+static bool shelter_name(const char *name)
+{
+    size_t n = strlen(name);
+    if (name[0] == ' ' || name[n - 1] == ' ')
+        return false;
+    for (; *name; ++name)
+        if (!((*name >= 'A' && *name <= 'Z') || (*name >= '0' && *name <= '9')
+                || strchr(" .-'", *name)))
+            return false;
+    return true;
+}
+
+static bool validate(Check *c, const BoatPluginVoyageData *v)
+{
+    char at[64];
+    unsigned last = v->shelter_count - 1;
+    for (unsigned i = 0; i < v->shelter_count; ++i) {
+        const BoatPluginShelterData *s = &v->shelters[i];
+        char path[48];
+        snprintf(path, sizeof(path), "voyage.shelters[%u]", i + 1);
+        snprintf(at, sizeof(at), "%s.id", path);
+        if (!identifier(s->id) || strchr(s->id, '.') || strchr(s->id, '-')) {
+            diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
+                "must be a-z, 0-9 or '_', starting with a letter");
+            return false;
+        }
+        for (unsigned j = 0; j < i; ++j)
+            if (!strcmp(s->id, v->shelters[j].id)) {
+                diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
+                    "repeats voyage.shelters[%u].id \"%s\"", j + 1, s->id);
+                return false;
+            }
+        snprintf(at, sizeof(at), "%s.name", path);
+        if (!shelter_name(s->name)) {
+            diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
+                "must be upper-case A-Z, 0-9, space, '.', '-' or ''' for the HUD font");
+            return false;
+        }
+        if (!coordinates(c, path, s->x, s->z))
+            return false;
+        snprintf(at, sizeof(at), "%s.heading", path);
+        if (!finite_in(c, at, s->heading, -TAU, TAU, "radians"))
+            return false;
+        snprintf(at, sizeof(at), "%s.radius", path);
+        if (i == last ? s->radius != 0 : !(s->radius > 0)) {
+            diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
+                i == last ? "must be 0: the destination's shelter is reached only by arriving"
+                          : "must be greater than 0");
+            return false;
+        }
+        if (!finite_in(c, at, s->radius, 0, SHELTER_RADIUS_MAX, "m"))
+            return false;
+    }
+    if (!coordinates(c, "voyage.arrival", v->arrival.x, v->arrival.z)
+        || !finite_in(c, "voyage.arrival.radius", v->arrival.radius, 1, SHELTER_RADIUS_MAX, "m")
+        || !finite_in(
+            c, "voyage.arrival.max_speed", v->arrival.max_speed, 0.5, ARRIVAL_SPEED_MAX, "m/s"))
+        return false;
+    const BoatPluginShelterData *end = &v->shelters[last];
+    if (hypot(end->x - v->arrival.x, end->z - v->arrival.z) > v->arrival.radius) {
+        snprintf(at, sizeof(at), "voyage.shelters[%u]", last + 1);
+        diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
+            "is the destination's shelter and must lie inside voyage.arrival");
+        return false;
+    }
+    if (!coordinates(c, "voyage.exposure", v->exposure.x, v->exposure.z)
+        || !finite_in(c, "voyage.exposure.radius", v->exposure.radius, 0, EXPOSURE_RADIUS_MAX, "m")
+        || !finite_in(c, "voyage.exposure.height", v->exposure.height, 0, EXPOSURE_HEIGHT_MAX, "m")
+        || !finite_in(c, "voyage.exposure.build", v->exposure.build, 0, EXPOSURE_BUILD_MAX, "s")
+        || !finite_in(c, "voyage.exposed_fraction", v->exposed_fraction, 0.05, 1, "")
+        || !finite_in(c, "voyage.weather_range", v->weather_range, 0, COORDINATE_MAX, "m"))
+        return false;
+    // Recovery must not place the boat in the exposed water.
+    double exposed = v->exposure.radius * v->exposed_fraction;
+    for (unsigned i = 0; i < v->shelter_count; ++i)
+        if (hypot(v->shelters[i].x - v->exposure.x, v->shelters[i].z - v->exposure.z) < exposed) {
+            snprintf(at, sizeof(at), "voyage.shelters[%u]", i + 1);
+            diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
+                "lies inside the exposed water, %.0f m from its centre", exposed);
+            return false;
+        }
+    return true;
+}
+
+static void bind(BoatPluginVoyage *voyage)
+{
+    for (unsigned i = 0; i < BOAT_VOYAGE_SHELTERS; ++i)
+        voyage->route.shelters[i].name
+            = i < voyage->route.shelter_count ? voyage->shelter_names[i] : NULL;
+}
+
+void boat_plugin_voyage_copy(BoatPluginVoyage *destination, const BoatPluginVoyage *source)
+{
+    if (destination == source)
+        return;
+    *destination = *source;
+    bind(destination);
+}
+
+static void fold(uint64_t *hash, const void *bytes, size_t size)
+{
+    const unsigned char *p = bytes;
+    for (size_t i = 0; i < size; ++i) {
+        *hash ^= p[i];
+        *hash *= 1099511628211ull;
+    }
+}
+
+static void value(uint64_t *hash, const char *name, float number)
+{
+    fold(hash, name, strlen(name));
+    uint32_t bits;
+    memcpy(&bits, &number, sizeof(bits));
+    unsigned char bytes[4] = { (unsigned char)bits, (unsigned char)(bits >> 8),
+        (unsigned char)(bits >> 16), (unsigned char)(bits >> 24) };
+    fold(hash, bytes, sizeof(bytes));
+}
+
+uint64_t boat_plugin_route_digest(const BoatVoyageRoute *route)
+{
+    uint64_t hash = 14695981039346656037ull;
+    unsigned char count = (unsigned char)route->shelter_count;
+    fold(&hash, "shelters", 8);
+    fold(&hash, &count, 1);
+    for (unsigned i = 0; i < route->shelter_count; ++i) {
+        const BoatVoyageShelter *s = &route->shelters[i];
+        fold(&hash, "name", 4);
+        fold(&hash, s->name, strlen(s->name) + 1);
+        value(&hash, "x", s->position.x);
+        value(&hash, "z", s->position.y);
+        value(&hash, "heading", s->heading);
+        value(&hash, "radius", s->radius);
+    }
+    value(&hash, "arrival.x", route->arrival_centre.x);
+    value(&hash, "arrival.z", route->arrival_centre.y);
+    value(&hash, "arrival.radius", route->arrival_radius);
+    value(&hash, "arrival.speed", route->arrival_speed);
+    value(&hash, "exposure.x", route->exposure.centre.x);
+    value(&hash, "exposure.z", route->exposure.centre.y);
+    value(&hash, "exposure.velocity.x", route->exposure.velocity.x);
+    value(&hash, "exposure.velocity.z", route->exposure.velocity.y);
+    value(&hash, "exposure.radius", route->exposure.radius);
+    value(&hash, "exposure.height", route->exposure.height);
+    value(&hash, "exposure.started", (float)route->exposure.started);
+    value(&hash, "exposure.build", route->exposure.build);
+    value(&hash, "exposed_fraction", route->exposed_fraction);
+    value(&hash, "weather_range", route->weather_range);
+    return hash;
+}
+
+BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginVoyage *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    limits = bounded(limits);
+    BoatPluginManifest manifest;
+    BoatPluginStatus status
+        = boat_plugin_parse_manifest(bundle->manifest, bundle->manifest_size, limits, &manifest, d);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    if (bundle->source_size > limits->source_bytes || bundle->source_size > BOAT_PLUGIN_SOURCE_MAX)
+        return diagnose(d, BOAT_PLUGIN_LIMIT, manifest.entry, "", "is %zu bytes; the limit is %zu",
+            bundle->source_size,
+            limits->source_bytes < BOAT_PLUGIN_SOURCE_MAX ? limits->source_bytes
+                                                          : (size_t)BOAT_PLUGIN_SOURCE_MAX);
+    BoatPluginVoyageData data;
+    status = boat_plugin_lua_voyage(
+        bundle->source, bundle->source_size, manifest.entry, limits, &data, d);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    Check check = { d, manifest.entry };
+    if (!validate(&check, &data))
+        return BOAT_PLUGIN_SCHEMA;
+
+    BoatPluginVoyage candidate = { .manifest = manifest };
+    BoatVoyageRoute *route = &candidate.route;
+    route->shelter_count = data.shelter_count;
+    for (unsigned i = 0; i < data.shelter_count; ++i) {
+        const BoatPluginShelterData *s = &data.shelters[i];
+        memcpy(candidate.shelter_ids[i], s->id, sizeof(s->id));
+        memcpy(candidate.shelter_names[i], s->name, sizeof(s->name));
+        route->shelters[i].position = (Vector2) { (float)s->x, (float)s->z };
+        route->shelters[i].heading = (float)s->heading;
+        route->shelters[i].radius = (float)s->radius;
+    }
+    bind(&candidate);
+    route->arrival_centre = (Vector2) { (float)data.arrival.x, (float)data.arrival.z };
+    route->arrival_radius = (float)data.arrival.radius;
+    route->arrival_speed = (float)data.arrival.max_speed;
+    // Stationary rough water; the voyage sets STARTED.
+    route->exposure = (BoatStorm) { .centre = { (float)data.exposure.x, (float)data.exposure.z },
+        .radius = (float)data.exposure.radius,
+        .height = (float)data.exposure.height,
+        .build = (float)data.exposure.build };
+    route->exposed_fraction = (float)data.exposed_fraction;
+    route->weather_range = (float)data.weather_range;
+    candidate.digest = boat_plugin_route_digest(route);
+    boat_plugin_voyage_copy(out, &candidate);
+    BoatPluginCost cost = d->cost;
+    *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
+    return BOAT_PLUGIN_OK;
+}
