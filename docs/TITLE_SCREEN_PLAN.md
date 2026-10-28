@@ -6,7 +6,8 @@ wordmark, m5x7/m3x6 fonts and menu flows. Marine cartoon daylight is the default
 `-DPROTEUS_WARM_MENU=OFF` to retain the user-selected cyan dusk design from 2026-10-27.
 The shared title retains single-player setup, public/LAN/address joining, hosting and saved
 settings. Volume settings, title music and a live river backdrop remain deferred.
-Next: user review of the marine blue/yellow refinement and physical input/playback review; native/browser
+The user approved the marine blue/yellow visual direction on 2026-10-28.
+Next: physical input/playback review; native/browser
 package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
@@ -20,7 +21,9 @@ The user liked the initial daylight direction but found its brown panels/title g
 brown; the supplied Super Mario World reference inspired the brighter cartoon palette.
 The user liked the cartoon feeling but found green panels and a multicolour title too
 close to the reference. Marine blue panels and a single yellow title supersede that
-intermediate version and the earlier brown/terracotta treatment. OFF retains the original
+intermediate version and the earlier brown/terracotta treatment. The user then approved the
+marine blue/yellow palette: “Wow, that just felt right!” (2026-10-28). This records visual
+palette acceptance only. OFF retains the original
 cyan title/dusk grade and occupied windows. Both use
 exactly the same captured river geometry, logo silhouette, fonts, title placement and row
 bounds. No new generated art or asset changes are required. There is no runtime theme setting.
@@ -50,8 +53,8 @@ It presented 120 title frames, and a separate river `--demo --frames 120` window
 completed cleanly. Formatting, changed local link targets and `git diff --check` passed.
 These are agent-run graphics/demo checks, not physical input or listening acceptance.
 No browser/package builds, Windows/Linux runtime, physical input/listening, course/voyage
-playthrough, or GPU CTest lane were verified for this revision. Next: user comparison and
-hands-on navigation/playback, then browser/package qualification. The dated 2026-10-27
+playthrough, or GPU CTest lane were verified for this revision. Next: hands-on navigation/playback, then browser/package qualification. The marine
+blue/yellow palette is user-approved; input/listening acceptance remains outstanding. The dated 2026-10-27
 sections below describe the retained cyan variant.
 
 ## Cyan workstation redesign, 2026-10-27
