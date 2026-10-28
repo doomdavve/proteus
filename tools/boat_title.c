@@ -596,15 +596,8 @@ static bool open_title(Title *t)
     if (!IsImageValid(image))
         return false;
     ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+#if !PROTEUS_WARM_MENU
     Color *pixels = image.data;
-#if PROTEUS_WARM_MENU
-    for (int i = 0; i < image.width * image.height; ++i) {
-        Color *p = &pixels[i];
-        p->r = (unsigned char)(p->r * .90f + 25);
-        p->g = (unsigned char)(p->g * .85f + 18);
-        p->b = (unsigned char)(p->b * .74f + 12);
-    }
-#else
     for (int y = 0; y < image.height; ++y)
         for (int x = 0; x < image.width; ++x) {
             Color *p = &pixels[y * image.width + x];
@@ -632,10 +625,25 @@ static bool open_title(Title *t)
     if (!IsImageValid(wordmark))
         return false;
 #if PROTEUS_WARM_MENU
-    // Preserve the exact title silhouette and spacing; only swap its three inks.
-    ImageColorReplace(&wordmark, rgb(174, 245, 238), rgb(255, 235, 190));
-    ImageColorReplace(&wordmark, rgb(12, 45, 72), rgb(75, 47, 33));
-    ImageColorReplace(&wordmark, rgb(231, 128, 105), rgb(184, 91, 53));
+    // Keep the authored silhouette, stems and spacing; give each glyph a bright
+    // cartoon ink inside a strong navy edge and offset shadow.
+    ImageFormat(&wordmark, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    ImageColorReplace(&wordmark, rgb(174, 245, 238), rgb(19, 47, 55));
+    ImageColorReplace(&wordmark, rgb(231, 128, 105), rgb(19, 47, 55));
+    static const int starts[] = { 0, 29, 50, 71, 99, 122, 143, 162, 183, 204, 213, 234 };
+    static const Color inks[] = { { 247, 91, 76, 255 }, { 88, 202, 234, 255 },
+        { 255, 218, 83, 255 }, { 112, 207, 76, 255 } };
+    Color *letters = wordmark.data;
+    for (int y = 0; y < wordmark.height; ++y)
+        for (int x = 0; x < wordmark.width; ++x) {
+            Color *pixel = &letters[y * wordmark.width + x];
+            if (pixel->r != 12 || pixel->g != 45 || pixel->b != 72)
+                continue;
+            unsigned glyph = 0;
+            while (glyph + 1 < sizeof(starts) / sizeof(starts[0]) && x >= starts[glyph + 1])
+                ++glyph;
+            *pixel = inks[glyph % (sizeof(inks) / sizeof(inks[0]))];
+        }
 #endif
     t->wordmark = LoadTextureFromImage(wordmark);
     UnloadImage(wordmark);

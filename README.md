@@ -122,12 +122,12 @@ is calm and clear of both boats. See the
 
 `./build/wake_velocity` without options (and the packaged macOS app and Windows `launch.bat`)
 opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT.
-The default warm daylight interface uses cream text, amber selection and brown panels over the
-boat-free river capture. The backdrop placement and geometric title are shared with the retained
+The default cartoon daylight interface uses grassy green panels, sunny yellow selection,
+cream text and colourful title inks over the boat-free daylight river capture. The backdrop placement and geometric title are shared with the retained
 cyan dusk version. Select the palette at compile time, then rebuild:
 
 ```sh
-cmake -S . -B build -DPROTEUS_WARM_MENU=ON   # Warm daylight (default)
+cmake -S . -B build -DPROTEUS_WARM_MENU=ON   # Cartoon daylight (default)
 cmake --build build -j
 # Use -DPROTEUS_WARM_MENU=OFF for the original cyan dusk title.
 ```

@@ -4,8 +4,8 @@
 `tools/generate_title_wordmark.py`: every glyph shares a 24 px cap height, 6 px stems/bars,
 3 px letter spacing and a 10 px word space. Diagonals are rasterized directly at the final
 pixel grid. A one-pixel cyan edge and two-pixel coral depth complete the 256×26 RGBA image.
-The warm build remaps its three inks to cream, brown and terracotta at load; the cyan build
-uses the original inks. Shapes, dimensions and placement are identical. The title draws it 1:1; the window's final integer scaling enlarges the whole screen.
+The warm/cartoon build remaps the title interior per letter to red, blue, yellow and green,
+with a dark navy edge and shadow; the cyan build uses the original inks. Shapes, dimensions and placement are identical. The title draws it 1:1; the window's final integer scaling enlarges the whole screen.
 
 Regenerate the wordmark using a Python environment with Pillow installed:
 
@@ -18,7 +18,7 @@ sample's bridge-lookback composition: local boat/camera anchor `(641.115, -842.1
 heading `0.850 + pi`, horizontal distance/height `32/4` m, fixed 62° vertical field of view,
 scene time 73.350 s. No player layer or player wake is drawn. The native GPU renderer
 renders at 1280×800 and downsamples to 320×200 using the ordinary game shader. The title
-uses a warm daylight grade by default. `-DPROTEUS_WARM_MENU=OFF` retains the original dusk
+uses the original bright daylight colours by default. `-DPROTEUS_WARM_MENU=OFF` retains the original dusk
 grade and occupied-window pixels. Both load the same source without moving the backdrop.
 
 Regenerate from the repository root with a working desktop graphics context:
