@@ -293,7 +293,7 @@ software renderer for window-free captures; GPU captures need a desktop graphics
 `--gpu-aa` only enables supersampling and does not select a renderer or location.
 Buildings and quays remain static, with no overhead structure collisions or camera
 occlusion handling near buildings. It does not include the
-rest of Gothenburg or the archipelago. Source attribution is retained in the help modal and README.
+rest of Gothenburg or the archipelago. Source attribution is retained in the title Credits screen and README.
 
 The [generated boat and berth foundation](HARBOR_BOATS.md) adds six leisure boats at a
 west-bank pontoon and a working east-bank berth in the river location. Moored

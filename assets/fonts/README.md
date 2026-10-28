@@ -5,7 +5,7 @@ Fonts by **Daniel Linssen** (managore), supplied by the user from the author's d
 - [m5x7](https://managore.itch.io/m5x7), `m5x7.ttf`: menu labels, values and the Proteus credit.
   The author lists CC0 and appreciates attribution.
 - [m3x6](https://managore.itch.io/m3x6), `m3x6.ttf`: hints, version and map credit.
-  The author permits use with attribution. The title's Settings screen credits Daniel Linssen.
+  The author permits use with attribution. The title's Credits screen credits Daniel Linssen.
 
 Source pages checked 2026-10-27. The `.fnt` metrics and `.png` atlases are generated from
 these original TTFs with `tools/generate_menu_fonts.py`. Regenerate from the repository root

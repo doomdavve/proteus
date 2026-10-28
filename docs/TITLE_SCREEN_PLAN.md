@@ -5,12 +5,55 @@ Status: revised 2026-10-28. This document owns the title, menu and promotion of
 wordmark, m5x7/m3x6 fonts and menu flows. Marine cartoon daylight is the default; configure with
 `-DPROTEUS_WARM_MENU=OFF` to retain the user-selected cyan dusk design from 2026-10-27.
 The shared title retains single-player setup, public/LAN/address joining, hosting and saved
-settings. Volume settings, title music and a live river backdrop remain deferred.
+settings, plus a dedicated animated Credits screen. Volume settings, title music and a
+live river backdrop remain deferred.
 The user approved the marine blue/yellow visual direction on 2026-10-28.
 Next: physical input/playback review; native/browser
 package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## Credits screen, 2026-10-28
+
+Completed: add CREDITS before EXIT / BACK TO LAUNCHER and move the Proteus, font and map
+credits out of the title/settings/help into this panel. Five main rows retain the existing
+panel width and bottom edge. Settings keeps its six control rows and contextual hints.
+Following user review, credits now use **m5x7 throughout**, including headings, names, BACK
+and the version footer. A centred movie-style roll scrolls vertically over the retained,
+user-liked rippling water grid. The initial mixed-font card and horizontal sine scroller
+are superseded. All animation uses the title presentation clock. Credits and presentation
+retain their integer pixel grid; the background water now uses fractional positions and
+coverage antialiasing. Both travelling crests and perspective rays blend between neighbouring
+pixels, softening their edges and slow movement while leaving foreground text crisp.
+
+The roll begins with **THANKS TO**, **bjoto**, **w**, then lists **FONTS** (Daniel
+Linssen, m5x7/m3x6), **MAP DATA** (OpenStreetMap contributors, ODbL 1.0), **LIBRARIES**
+(raylib, ENet, libcurl), and **A PROTEUS GAME**. Specific contributor roles are omitted
+on screen as requested. For source provenance: [bjoto](https://github.com/bjoto) contributed
+Acid Wake, and w supplied the
+[Gothenburg height-data source link](https://goteborg.se/wps/portal?uri=gbglnk%3A2015816171319546).
+Existing packaged licenses and source attribution files remain bundled. The roll loops;
+Enter/Space, Escape or clicking BACK returns to CREDITS selected on the main menu, and
+reopening restarts the roll. Both compile-time palettes share the screen.
+
+![Movie-style credits roll over the water grid](title/credits.png)
+
+Verification, 2026-10-28, Apple Silicon/macOS: Debug builds passed for both menu palettes
+without project warnings; the first raylib build reported its bundled stb_vorbis warning.
+After the wave-antialiasing revision, `ctest --preset full` passed all 230 enabled tests in
+12.38 s, with 13 retired cases disabled and `PROTEUS_GPU_TESTS=OFF`, using local socket
+access. A temporary before/after capture check found 10,448 changed background pixels and
+confirmed 3,566 foreground ink pixels stayed exact; pixels outside the water area also
+matched. The antialiasing is local to the credits water and adds no render targets or assets.
+A temporary, uncommitted title harness presented 195 windowed frames in each palette and
+checked keyboard entry, Enter/click/Escape return, main-row reselection, reopening and Exit.
+Main/settings/credits captures and vertical-roll samples through 1000 simulated seconds
+were inspected. These are scripted agent graphics/navigation checks.
+
+Next: user review of the vertical roll and physical navigation; browser/package qualification.
+The user liked the initial background waves, but final roll acceptance is pending.
+No physical input/listening, browser/Windows/Linux run or GPU CTest lane is claimed.
+Title music remains deferred.
 
 ## Warm daylight alternative and shared game typography, 2026-10-28
 
@@ -80,7 +123,8 @@ The lower-left version follows the web packager's Git convention:
 `git describe --tags --match 'v[0-9]*' --always --dirty`, resolved at CMake configure time.
 Reconfigure after changing revisions to refresh it. Source archives/release builds may
 supply `-DPROTEUS_VERSION=v0.0.19`; absent Git metadata and an override, it says `unknown`.
-The old PROTEUS 2026 footer is removed; SETTINGS retains MAP: OSM CONTRIBUTORS.
+The old PROTEUS 2026 footer is removed. Map/font credits were in SETTINGS at this
+historical checkpoint; the Credits screen above supersedes that placement.
 
 ## Geometric lettering and clean river, 2026-10-27
 
@@ -145,7 +189,7 @@ User feedback: the generated B mock-up's title and font looked better than the f
 implementation. Completed: replace the narrow 5×7 title alphabet with a separately
 authored 7×9 bitmap wordmark using broad two-cell strokes, square counters, a cyan edge
 and coral depth. Menu labels, values, row numbers and A PROTEUS GAME now use Daniel
-Linssen's **m5x7**; hints and footer data use **m3x6**. Both fonts are credited in SETTINGS
+Linssen's **m5x7**; hints and footer data use **m3x6**. At this historical checkpoint both fonts were credited in SETTINGS (now CREDITS)
 and in [the bundled font notes](../assets/fonts/README.md). Existing gameplay HUD and
 in-game Escape menu fonts remain outside this title-menu refinement.
 
@@ -207,7 +251,7 @@ resets. Current behavior, verification and next task: [controls handoff](CONTROL
 
 **Wake Velocity** remains the user-selected name (2026-10-23). The 2026-10-27 cyan
 workstation direction above supersedes the original bowed cream/coral logo and bouncing
-`(*)` selection. Keep **A PROTEUS GAME** as the small demo-group credit.
+`(*)` selection. **A PROTEUS GAME** now appears in the dedicated Credits screen as the demo-group credit.
 
 The backdrop is a scenery-only GPU river sample, just past Älvsborgsbron looking
 back from boat-local `(641.115, -842.196)` with a 32 m / 4 m camera and fixed 62° lens.
@@ -226,7 +270,8 @@ they do not describe the current logo, footer or selected-row appearance.
 | --- | --- | --- |
 | Single Player | Opens River, Basin or Basin trial plus waves/smoothing setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
 | Multiplayer | Public server selection, native LAN/host flow and manual address joining; browser WebRTC joining. | Broader platform/network qualification remains owned by the multiplayer plans. |
-| Settings | Name, boat, steering, soundtrack and smoothing, with retained map credit. | Volume and display controls remain deferred. |
+| Settings | Name, boat, steering, soundtrack and smoothing. | Volume and display controls remain deferred. |
+| Credits | Vertical roll: Thanks to, fonts, map data, libraries and Proteus, over an animated water grid; BACK or Escape returns to the main menu. | Physical navigation and browser qualification remain open. |
 | Exit | Close the native program. | On the web, replace with “Back to launcher” if the page launcher remains; browser tabs cannot be closed reliably by game code. |
 
 Up/Down or W/S moves one row; Enter/Space activates; mouse hover/click also works.
@@ -363,7 +408,7 @@ time and has no effect on deterministic sessions or replay compatibility.
 
 ## Acceptance and verification
 
-- Logo and all four rows read clearly in a 320×200 capture; selected state is clear in
+- Logo and all five rows read clearly in a 320×200 capture; selected state is clear in
   still frames and motion, with no menu text hidden by water or window scaling.
 - A fresh normal launch reaches the title. Single Player reaches each location; returning
   to title and starting again produces a fresh session. Multiplayer offers server selection
