@@ -113,7 +113,7 @@
     "assumptions": "Footprints, crane, mast and mark positions and tagged heights are OSM. Untagged heights: houses 5.5 m eaves with a gable roof on near-rectangular footprints, sheds and garages 2.8 m, tanks 14 m, other buildings 8-14 m by area. Walls sink 0.6 m below the lowest corner. Container cranes are a raised-boom blockout at the mapped 118 m (also used where untagged), boom toward the nearest water; lighting masts 30 m; marks are 3.5-4.5 m piles in their mapped colour on a 1.5 m carved rock where they stand in water. Buildings within 150 m of Nya \u00c4lvsborg are stone. Trees are an authored scatter (11 m lattice, 80 m value noise) on ground at least 3 m high and under 24 degrees, 6 m from shore and clear of buildings, roads and the port; not mapped vegetation. Colours are authored."
   },
   "river_overlay": {
-    "source": "assets/geometry/river/geometry.h",
+    "source": "assets/geometry/river/scenery.bin",
     "triangles": 35508,
     "bridge_triangles": 4388,
     "river_ground_m": 3.5,
@@ -138,5 +138,6 @@
     "rows": 601,
     "use": "waterfront_outer_ground: the river kit (crane, bridge deck, cafe, street furniture, frontages, quay fittings, cars, lamps and harbour) stands on the baked land surface"
   },
-  "geometry_sha256": "638076d3114a8c2c9638bad4d6c03376cc524c2e345ee8c574f2296054d18b82"
+  "scenery_sha256": "f6ba3a72025a855af79194168f535ef6cb06561489ea87955efab1f127608f32",
+  "water_sha256": "32fbf800ecf6005b4c10a3c4f56e7d005f0b42212201ce80f638c69e22670f0c"
 }

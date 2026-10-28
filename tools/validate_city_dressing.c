@@ -1,4 +1,5 @@
 #include "boat_test_maps.h"
+#include "boat_test_scenery.h"
 #include "waterfront_city.h"
 #include "waterfront_corner.h"
 #include "waterfront_outer.h"
@@ -58,7 +59,7 @@ static uint64_t clear_digest(const WaterfrontScenery *s)
 // including the submerged ladder ends. A relaxed global Y bound alone misses floating props.
 static bool near_quay(Vector3 p)
 {
-    const Mesh3D *city = waterfront_city_river_map.mesh;
+    const Mesh3D *city = test_scenery(&waterfront_city_river_map)->mesh;
     for (size_t i = 0; i < city->triangle_count; ++i) {
         const Triangle3D *t = &city->triangles[i];
         Vector3 a = city->vertices[t->vertices[0]], c = city->vertices[t->vertices[1]];
@@ -158,6 +159,7 @@ static int owners(const WaterfrontScenery *river)
 
 int main(void)
 {
+    test_scenery_load();
     WaterfrontScenery river = { 0 };
     if (!waterfront_scenery_init(&river, &waterfront_city_river_map) || !river.river) {
         fprintf(stderr, "Cannot build the river scenery\n");

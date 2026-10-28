@@ -32,7 +32,8 @@ typedef struct {
     BoatMinimapLayer layers[BOAT_MINIMAP_MODES]; // Index BOAT_MINIMAP_HIDDEN is unused.
 } BoatMinimap;
 
-// Fails for an unmapped location or on allocation failure, leaving the minimap zeroed.
+// Draws the location's loaded scenery (boat_scenery_drawn). Fails for an unmapped location, one
+// whose scenery is not loaded, or on allocation failure, leaving the minimap zeroed.
 bool boat_minimap_init(BoatMinimap *minimap, const BoatWorldDefinition *location);
 // Safe on a zeroed, failed or already destroyed minimap.
 void boat_minimap_destroy(BoatMinimap *minimap);

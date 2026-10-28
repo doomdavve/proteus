@@ -74,8 +74,12 @@ water is calm until the boat comes within 2.5 km of it, then grows over a minute
 squall cloud with rain painted into the sky on both renderers, and the light dims near it
 ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35h-result-2026-10-28); captures and tests; the user
 played out through the storm and liked "the fog and stormy feel").
-**Next: A3.5i, bounded per-region detailed-asset loading** (and the bake out of the generated
-header, which the upstream extension A3.5f needs).
+A3.5i, completed 2026-10-28, moved the bake out of the binary: each map's land is a scenery
+pack loaded at start, with only the water compiled in for collision and the server, and the
+browser fetches the outer pack only when an outer session starts
+([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35i-result-2026-10-28); the native tile cache was
+deferred as unneeded at the measured memory).
+**Next: A3.5f, the map upstream to Karlatornet, Lilla Bommen and Hisingsbron.**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short
 extension beyond Älvsborgsbron with one sheltered destination and one exposed-water encounter.
@@ -238,6 +242,11 @@ Never silently reinterpret missing data as open ocean. Reset/teleport prepares i
 before resuming ticks. Ship a manifest and tile packs through native packaging; qualify a
 separate bounded download/cache strategy for the browser after the native slice works.
 
+Status, 2026-10-28 (A3.5i): the collision-resident split exists. Only the water is compiled in;
+the land is a per-map scenery pack loaded at start, and the browser fetches the outer pack per
+location. Tiles are not streamed yet: the whole outer map's land costs about 14 MB, so the
+byte-capped cache waits until a larger map needs it.
+
 ## Keeping the frame rate stable
 
 World extent should principally increase installed data, not work performed each frame.
@@ -332,7 +341,7 @@ A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance c
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
 (a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1 (A1.1–A1.5)
 completed 2026-10-25. A2 is in progress: A2.1 (counters) and A2.2 (tile catalogue and indexed
-collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5e (the Stena ferry, 2026-10-27) and A3.5h (the weather transition, 2026-10-28) are complete, A3.5d, A3.5f and A3.5g (landmarks) are planned and A3.5i (bounded loading) is next.
+collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5e (the Stena ferry, 2026-10-27) and A3.5h (the weather transition, 2026-10-28) are complete, A3.5i (scenery packs and on-demand browser loading, 2026-10-28) is complete; A3.5d, A3.5f and A3.5g (landmarks) are planned and A3.5f is next.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |

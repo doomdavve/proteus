@@ -1,3 +1,4 @@
+#include "boat_test_scenery.h"
 #include "external/glad.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -816,6 +817,7 @@ static void present_target(RenderTexture2D target, FixtureOptions options)
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     FixtureOptions options;
     if (!parse_options(argc, argv, &options)) {
         print_usage(argv[0]);

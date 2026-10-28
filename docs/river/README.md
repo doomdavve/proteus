@@ -105,7 +105,8 @@ Generate the separate runtime assets offline with the existing pyproj/shapely de
 python tools/prepare_waterfront.py --area river
 ```
 
-Output is `assets/geometry/river/geometry.h` and `manifest.json`. Normal builds do not
+Output is `assets/geometry/river/scenery.bin` (the whole map, loaded at start), `water.h` (its
+water, compiled in for collision) and `manifest.json`. Normal builds do not
 run Python. Incomplete building relations are omitted and listed in the manifest;
 `height=0` is treated as missing and its fallback is recorded. Bridge support parents
 are excluded from normal building extrusion. Only the four mapped legs cut the water;

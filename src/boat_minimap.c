@@ -1,5 +1,6 @@
 #include "boat_minimap.h"
 #include "boat_hud.h"
+#include "boat_scenery.h"
 #include "waterfront_harbor.h"
 
 #include <float.h>
@@ -331,9 +332,11 @@ static bool bake(BoatMinimapLayer *layer, const Mesh3D *mesh, size_t water_count
 bool boat_minimap_init(BoatMinimap *minimap, const BoatWorldDefinition *location)
 {
     *minimap = (BoatMinimap) { 0 };
-    if (!location || !location->mapped || !location->map || !location->map->mesh)
+    const BoatMapDescription *map
+        = location && location->mapped ? boat_scenery_drawn(location->map) : NULL;
+    if (!map || !map->mesh)
         return false;
-    const Mesh3D *mesh = location->map->mesh;
+    const Mesh3D *mesh = map->mesh;
     size_t water_count = boat_map_leading_water(mesh);
     if (!water_count)
         return false;

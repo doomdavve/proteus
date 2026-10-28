@@ -5,6 +5,7 @@
 #include "boat_map.h"
 #include "boat_test_cases.h"
 #include "boat_test_maps.h"
+#include "boat_test_scenery.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
 #include "raymath.h"
@@ -563,6 +564,7 @@ static const TestCase cases[] = {
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     SetTraceLogLevel(LOG_WARNING);
     int result = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     if (!result && argc == 1)

@@ -271,6 +271,15 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   and checks that points outside the region and on the quay are not water. Since A3.1b it
   also requires real relief: land tops never below 1 m, hills between 60 and 100 m, and at
   least 100,000 triangles.
+- `boat_scenery` runs `validate_boat_scenery` (adventure A3.5i, about 0.3 s in Debug, `slow`). It
+  checks the scenery packs under `assets/geometry/`: nothing is drawn before a load; cut packs,
+  wrong magic or version, wrong counts, a moved bridge range and the river pack offered as
+  `outer` are all refused; a good pack loads once with water identical to the compiled
+  `water.h`; `outer` needs the river pack for its kit ground; and unload clears them all. The
+  map validators and review tools load the packs from the source tree
+  (`tools/boat_test_scenery.h`).
+- `map_pack` runs `tools/map_pack.py --self-test` (quick): float32 rounding, the leading-water
+  count and a pack round trip.
 - `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `river` and
   `outer` and none for the basin, checks that both frames fit the 320×200 scene (the chart
   above the instruments), that the spawn, every voyage shelter and the destination are water

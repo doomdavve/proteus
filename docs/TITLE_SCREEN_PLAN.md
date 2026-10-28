@@ -60,6 +60,14 @@ disabled, GPU tests off with local socket access.
 User acceptance, 2026-10-28: “Let's go with this!” approves the final two-tower icon design.
 This accepts the artwork; physical Home Screen and native package qualification remain open.
 
+Integration verification, 2026-10-28: merged `origin/main` at `bd3cec3` and resolved the
+index/browser-guide conflicts by retaining both the scenery-loading updates and accepted
+icon documentation. Artwork is unchanged. Debug configure/build passed without compiler
+warnings; `ctest --preset full` passed all 236 enabled tests in 12.95 s (13 retired cases
+disabled, GPU tests off, local socket access enabled). Changed local documentation links
+and conflict-marker checks passed. No additional visual or physical-device review was needed
+for these documentation resolutions.
+
 Next: physical iOS/Android Home Screen review and native packaging
 integration/qualification. No installed-device or Finder/Windows shell acceptance is claimed.
 The scene, gameplay, animation and audio are unchanged; no manual gameplay demo was needed.
