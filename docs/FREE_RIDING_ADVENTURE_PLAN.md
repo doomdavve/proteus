@@ -88,7 +88,12 @@ Bommen after the landmarks. A3.5g, completed the same day, built Karlatornet, Li
 and Hisingsbron (piers carved out of the water, 12 m clearance) at their mapped places and charts
 them ([result](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35g-result-2026-10-28); captures, unplayed;
 Karlatornet is beyond the far plane from the outer fjord).
-**Next: A3.5j, the living city upstream.**
+A3.5j's river-traffic slice is implemented and user-accepted for merge on 2026-10-28:
+three ferries, a schooner and Hisingsbron's animated lift, shared by CPU/GPU with player
+contacts in `outer` ([result and limits](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35j-river-traffic-result-2026-10-28)).
+The same playtest accepts the upstream map and landmark work, superseding their unplayed
+status above. Street and moored life remain.
+**Next: the remaining A3.5j street and moored life.**
 That handoff details A0's offline route/data survey and measured baseline, followed by A1's
 mapped ownership tasks, all now complete. The proposed first playable is a short
 extension beyond Älvsborgsbron with one sheltered destination and one exposed-water encounter.
@@ -350,7 +355,7 @@ A0/A1 task ledger, proposed interfaces, exact existing commands and acceptance c
 A0 is complete: inventory, coastal sources, route survey and the controlled river baseline
 (a review-tool benchmark only). Runtime map ownership changes began with A1.1; A1 (A1.1–A1.5)
 completed 2026-10-25. A2 is in progress: A2.1 (counters) and A2.2 (tile catalogue and indexed
-collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5e (the Stena ferry, 2026-10-27) and A3.5h (the weather transition, 2026-10-28) are complete, A3.5i (scenery packs and on-demand browser loading, 2026-10-28) and A3.5f (upstream past Hisingsbron) and A3.5g (Karlatornet, Lilla Bommen, Hisingsbron), both 2026-10-28, are complete; A3.5d (the rest of the OSM landmarks) and A3.5j (the living city upstream) are planned and A3.5j is next.
+collision) and A2.3 (per-tile land culling) completed 2026-10-25 and A2.4 (indexed water) and A2.5 (same-view scaling) 2026-10-26, completing A2; A3.1 (baked first-slice map) and A3.1b (its land heights), both 2026-10-26, A3.2 (the `outer` location) and A3.3 (the river's buildings and bridge baked in) and A3.4 (destination, shelters and recovery, exposed water) and A3.5a (dressing past the bridge, after the first playtest) and A3.5b (Höjdmodell 2022 terrain for the whole outer map, 2026-10-27) and A3.5c (the river kit in `outer`, 2026-10-27) are complete; A3.5e (the Stena ferry, 2026-10-27) and A3.5h (the weather transition, 2026-10-28) are complete, A3.5i (scenery packs and on-demand browser loading, 2026-10-28) and A3.5f (upstream past Hisingsbron) and A3.5g (Karlatornet, Lilla Bommen, Hisingsbron), both 2026-10-28, are complete; A3.5d (the rest of the OSM landmarks) and the remaining A3.5j street and moored life are planned; A3.5j river traffic is implemented and user-accepted, and the rest of A3.5j is next.
 
 | Step | Deliverable | Gate before expanding further |
 | --- | --- | --- |

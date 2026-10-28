@@ -157,7 +157,7 @@ then the name (≤16), room token (≤32) and build label (≤32) strings.
 
 The content digest is FNV-1a 64 over every compiled location in ID order: identity, mapped
 flag, basin half-extents, single-player spawn, multiplayer start centre, current centre and
-crossing offset; for each mapped location,
+crossing offset and upstream-traffic enable flag (u64, A3.5j); for each mapped location,
 the compiled map's triangle count, then every triangle's three vertex indices and referenced
 XYZ coordinates. Since A3.5i the compiled map is the water alone; the scenery packs are not
 hashed. It then hashes the fleet/wake contract: tick rate, slots, solver passes, spawn

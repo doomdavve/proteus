@@ -26,7 +26,7 @@
 #define WATER_TRIANGLES 3731 // The manifest's water_triangles.
 #define BRIDGE_TRIANGLES 4388 // The manifest's river_overlay.bridge_triangles.
 #define DRESSING_TRIANGLES 66764 // The manifest's dressing.triangles (cranes, masts, marks, trees).
-#define LANDMARK_TRIANGLES 2853 // A3.5g: the manifest's dressing.landmarks triangles, summed.
+#define LANDMARK_TRIANGLES 2773 // A3.5j: baked landmarks, excluding the runtime lift span.
 static const Vector2 route[] = { { 12, 60 }, { 24, -70 }, { 15, -180 }, { -250, -500 },
     { -650, -850 }, { -1100, -960 }, { -3300, -1550 }, { -3850, -2400 }, { -3850, -3150 },
     { -3700, -3310 }, { -3620, -3380 } };
