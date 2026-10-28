@@ -8,10 +8,69 @@ The shared title retains single-player setup, public/LAN/address joining, hostin
 settings, plus a dedicated animated Credits screen. Volume settings, title music and a
 live river backdrop remain deferred.
 The user approved the marine blue/yellow visual direction on 2026-10-28.
+The compact two-tower bridge/river app icon is user-approved on 2026-10-28.
 Next: physical input/playback review; native/browser
 package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## App icon, 2026-10-28
+
+Completed: replace the generic boat icon with a compact interpretation of the menu's
+Älvsborgsbron backdrop. Two dark bridge towers and a level cream-edged deck sit above blue
+water, with a low quay, two block clouds and short horizontal reflections. Six flat
+colours retain the daylight scene's feel at Home Screen and favicon sizes. The opaque
+square has no baked-in rounded corners. This supersedes the original dark boat icon.
+
+[`web/icon.svg`](../web/icon.svg) owns the artwork. The existing launcher and manifest
+consume regenerated 180/192/512 px PNGs. A 1024 px master, multi-size Windows ICO and macOS
+ICNS are available in [`assets/icons`](../assets/icons/README.md), with a shared SVG export
+command. Desktop package integration is a future step; existing native packages do not yet
+select these files.
+
+![App icon and small-size review](title/app-icon.png)
+
+Initial icon verification, 2026-10-28, Apple Silicon/macOS: inspected the generated icon at 16–180 px,
+the 1024 px artwork and a rounded Home Screen preview. Pillow decoded every ICO/ICNS
+representation and confirmed the web PNG sizes and opaque RGB format. A second export
+reproduced all generated outputs byte-for-byte. Debug configure/build
+passed with GPU tests off. `ctest --preset full` passed all 234 enabled tests in 11.71 s
+with local socket access (13 retired cases disabled). The first sandboxed run could not
+open networking sockets; the full rerun passed. Packaging the existing mobile Wasm build
+with the current launcher copied all four icon assets byte-for-byte. This checks icon
+packaging, not a fresh Emscripten compilation. Changed local documentation links passed.
+
+Earlier deck correction, 2026-10-28 (before the two-tower framing): the user found the rising deck inconsistent with
+this broadside framing. That revision used a horizontal deck and recomputed vertical
+hangers meeting the suspension curve. All exports and the size-review image were regenerated.
+Inspected the updated 16–180 px and rounded previews; all desktop icon representations decoded,
+and web packaging copied the revised assets exactly. Debug build and the full CTest preset
+passed again: 234 enabled tests in 11.74 s, 13 retired cases disabled, GPU tests off with local
+socket access. The two-tower framing below supersedes this single-tower composition.
+
+Two-tower framing, 2026-10-28: the user found the cable ambiguous with its second support
+just outside the image. The current wider composition brings the right-hand tower fully into
+view and redraws the main suspension curve between the two visible supports, retaining the
+level deck. Hangers were recomputed and the second tower has a short water reflection.
+All exports and previews were regenerated. Updated 16–180 px and rounded previews were
+inspected; every desktop representation decoded, and packaged web icons matched the sources.
+Debug build and `ctest --preset full` passed: 234 enabled tests in 11.69 s, 13 retired cases
+disabled, GPU tests off with local socket access.
+
+User acceptance, 2026-10-28: “Let's go with this!” approves the final two-tower icon design.
+This accepts the artwork; physical Home Screen and native package qualification remain open.
+
+Integration verification, 2026-10-28: merged `origin/main` at `bd3cec3` and resolved the
+index/browser-guide conflicts by retaining both the scenery-loading updates and accepted
+icon documentation. Artwork is unchanged. Debug configure/build passed without compiler
+warnings; `ctest --preset full` passed all 236 enabled tests in 12.95 s (13 retired cases
+disabled, GPU tests off, local socket access enabled). Changed local documentation links
+and conflict-marker checks passed. No additional visual or physical-device review was needed
+for these documentation resolutions.
+
+Next: physical iOS/Android Home Screen review and native packaging
+integration/qualification. No installed-device or Finder/Windows shell acceptance is claimed.
+The scene, gameplay, animation and audio are unchanged; no manual gameplay demo was needed.
 
 ## Credits screen, 2026-10-28
 

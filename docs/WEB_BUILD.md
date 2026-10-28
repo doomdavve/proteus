@@ -38,6 +38,16 @@ suspension, measure memory/runtime budgets, and complete internet-play acceptanc
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
 
+## Shared app icon, 2026-10-28
+
+The launcher SVG, iOS 180 px Home Screen PNG and Android 192/512 px manifest PNGs now use
+a compact bridge-and-river scene drawn from the daylight menu backdrop. They share one
+editable SVG with 1024 px PNG, Windows ICO and macOS ICNS exports. See the
+[asset guide](../assets/icons/README.md) for regeneration and the
+[title plan](TITLE_SCREEN_PLAN.md#app-icon-2026-10-28) for design and verification status.
+Existing installed Home Screen icons may need removal and re-adding to refresh their cached
+artwork. Physical device review remains pending.
+
 ## On-demand scenery, 2026-10-28
 
 Since A3.5i the maps' land is in scenery packs rather than the wasm
