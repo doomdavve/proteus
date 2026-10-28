@@ -9,6 +9,7 @@
 #include "boat_rearview.h"
 #include "boat_replay.h"
 #include "boat_reset_hold.h"
+#include "boat_scenery.h"
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
@@ -126,6 +127,17 @@ static void usage(void)
         "  this program in --serve mode) and join it; --location and --waves set its water,\n"
         "  --port its UDP port (default 24680). The room closes when you leave it.\n"
         "--serve [boat_server options]: run only a room, as boat_server does (--serve --help)");
+}
+
+// Native builds load every mapped location's scenery pack at start. The browser loads only the
+// river's, bundled with the page; the outer pack is fetched when a session there needs it.
+static bool load_scenery(const char *assets)
+{
+#if defined(__EMSCRIPTEN__)
+    return boat_scenery_load_location(boat_location(BOAT_LOCATION_RIVER), assets);
+#else
+    return boat_scenery_load_all(assets);
+#endif
 }
 
 static BoatWater study_water(
@@ -590,6 +602,16 @@ static int study(int argc, char **argv)
             free(pixels);
             return 1;
         }
+    // The mapped locations' scenery packs, which every view draws (the core uses only their
+    // compiled water). The browser fetches the outer pack the first time it is needed.
+    char assets[4096];
+    if (!boat_asset_path(assets, sizeof(assets), "") || !load_scenery(assets)) {
+        fprintf(stderr, "Cannot load the map scenery from %sgeometry/.\n", assets);
+        for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
+            boat_world_resources_destroy(&worlds[i]);
+        free(pixels);
+        return 1;
+    }
     Renderer3D renderer = { 0 };
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     BoatGpu gpu = { 0 };
@@ -1529,6 +1551,7 @@ cleanup:
     boat_cpu_view_destroy(&cpu_view);
     for (int i = 0; i < BOAT_LOCATION_COUNT; ++i)
         boat_world_resources_destroy(&worlds[i]);
+    boat_scenery_unload(); // After every view that borrowed it.
     renderer3d_destroy(&renderer);
     free(pixels);
     return result;

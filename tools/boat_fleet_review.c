@@ -7,6 +7,7 @@
 #include "boat_fleet.h"
 #include "boat_gpu.h"
 #include "boat_rearview.h"
+#include "boat_test_scenery.h"
 #include "boat_test_world.h"
 #include "raymath.h"
 
@@ -207,6 +208,7 @@ static int check(void)
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     const char *screenshot = NULL;
     bool gpu = false, waves = false;
     float time = 3;

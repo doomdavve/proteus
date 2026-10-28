@@ -55,6 +55,8 @@ jobs:
           test -s relocated.png
           "$app/Contents/MacOS/wake_velocity" --serve --scripted --ticks 240
           test -s "$app/Contents/Resources/assets/music/a-little-boat.xm"
+          test -s "$app/Contents/Resources/assets/geometry/river/scenery.bin"
+          test -s "$app/Contents/Resources/assets/geometry/outer/scenery.bin"
           test -s "$app/Contents/Resources/assets/shaders/waterfront_city.fs"
           test -s "$app/Contents/Resources/assets/title/river-backdrop.png"
           test -s "$app/Contents/Resources/assets/title/wake-velocity.png"

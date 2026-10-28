@@ -7,6 +7,7 @@
 #include "boat_map.h"
 #include "boat_map_tiles.h"
 #include "boat_test_cases.h"
+#include "boat_test_scenery.h"
 #include "raymath.h"
 #include "waterfront_city.h"
 
@@ -45,7 +46,7 @@ static Parity parity;
 // Map east/Z bounds of the whole description (land included).
 static void bounds(Vector2 *lo, Vector2 *hi)
 {
-    const Mesh3D *mesh = waterfront_city_river_map.mesh;
+    const Mesh3D *mesh = test_scenery(&waterfront_city_river_map)->mesh;
     *lo = (Vector2) { INFINITY, INFINITY };
     *hi = (Vector2) { -INFINITY, -INFINITY };
     for (size_t i = 0; i < mesh->triangle_count; ++i)
@@ -264,7 +265,9 @@ static bool listed(const unsigned int *list, unsigned int first, unsigned int co
 
 static int tiles(void)
 {
-    const BoatMapDescription *river = &waterfront_city_river_map;
+    // The whole bake, land included: collision prepares from its leading water, which is the
+    // compiled map's.
+    const BoatMapDescription *river = test_scenery(&waterfront_city_river_map);
     BoatMap map;
     CHECK(boat_map_init(&map, river));
     const Mesh3D *mesh = river->mesh;

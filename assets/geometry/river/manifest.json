@@ -20,7 +20,8 @@
   ],
   "vertices": 63035,
   "triangles": 78612,
-  "geometry_sha256": "1a992cc9df07338b573edbf1cf58efd26668cc6be114f46c9557dbc0d28e60a1",
+  "scenery_sha256": "eacde313ea10c6edabd49bedd13a12f2e2a63c09c2e49e191190590f511286e6",
+  "water_sha256": "f0dc521fd2e657cbe0b615a9e14a6cebf96d039553767575bc979ad82b68cf4c",
   "buildings": [
     {
       "osm": "relation/942382",

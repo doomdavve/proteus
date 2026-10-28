@@ -57,8 +57,11 @@ def main():
         shutil.copytree(build / "assets" / directory, assets / directory)
     (assets / "music").mkdir()
     shutil.copy2(build / "assets/music/a-little-boat.xm", assets / "music")
-    (assets / "geometry/river").mkdir(parents=True)
-    shutil.copy2(root / "assets/geometry/river/manifest.json", assets / "geometry/river")
+    # The mapped locations' scenery packs, which the game loads at start (A3.5i).
+    for name in ("river", "outer"):
+        (assets / "geometry" / name).mkdir(parents=True)
+        for file in ("manifest.json", "scenery.bin"):
+            shutil.copy2(root / "assets/geometry" / name / file, assets / "geometry" / name)
     shutil.copy2(raylib / "LICENSE", resources / "raylib-LICENSE.txt")
     shutil.copy2(raylib / "src/external/glfw/LICENSE.md", resources / "glfw-LICENSE.md")
     shutil.copy2(root / "third_party/jsmn/LICENSE", resources / "jsmn-LICENSE.txt")

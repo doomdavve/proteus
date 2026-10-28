@@ -34,6 +34,12 @@ A3.5e (2026-10-27) adds the harbour obstacles to the content digest, without a v
 the docked ferry joined the harbour contact, and moored hulls already block boats and
 projectiles, so builds that differ there must not share a room.
 
+A3.5i (2026-10-28) moves each map's land, buildings, bridge and dressing out of the binary into
+a scenery pack that only presentation loads. The compiled map, and so the content digest, now
+holds just the water triangles, with their vertices renumbered. Builds before and after A3.5i
+fail the digest check at Hello. Land never reached physics, so builds that differ only in
+scenery now share a room. Message bytes are unchanged and there is no version bump.
+
 Handling revision 9 (2026-10-26, isolated controls branch) increases commanded-thrust travel
 to 4 units/s and removes steering-commanded aerial roll. Protocol v5 bytes are unchanged;
 old handling revisions are rejected. Pedals/Shift become ordinary target-derived rate inputs,
@@ -147,8 +153,9 @@ then the name (≤16), room token (≤32) and build label (≤32) strings.
 The content digest is FNV-1a 64 over every compiled location in ID order: identity, mapped
 flag, basin half-extents, single-player spawn, multiplayer start centre, current centre and
 crossing offset; for each mapped location,
-the crop's triangle count, then every triangle's three vertex indices and referenced XYZ
-coordinates. It then hashes the fleet/wake contract: tick rate, slots, solver passes, spawn
+the compiled map's triangle count, then every triangle's three vertex indices and referenced
+XYZ coordinates. Since A3.5i the compiled map is the water alone; the scenery packs are not
+hashed. It then hashes the fleet/wake contract: tick rate, slots, solver passes, spawn
 retry, emitter slots, emission cadence, maximum lifetime, mass and restitution. Finally (v4) it
 hashes the river race course: gate count; the start and every gate's centre, direction and
 half-width; the four grid points; and the ferry source's origin, direction, start offset,

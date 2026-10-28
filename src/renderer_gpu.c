@@ -490,7 +490,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     WaterfrontGpuTiled *facades, WaterfrontGpuTiled *roofs, WaterfrontGpuTiled *quay, Mesh *water,
     WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_emissive)
 {
-    const Mesh3D *city = scenery->map->mesh;
+    const Mesh3D *city = scenery->full->mesh;
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
     TiledBuilder builders[4] = { 0 };
     MeshBuilder water_builder = { 0 };
@@ -511,7 +511,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         bool planting = (triangle->color.r == 72 && triangle->color.g == 105)
             || (triangle->color.r == 61 && triangle->color.g == 91);
         // Authored bridge beams retain their flat steel/concrete colors.
-        bool bridge = boat_map_is_bridge_triangle(scenery->map, i);
+        bool bridge = boat_map_is_bridge_triangle(scenery->full, i);
         CitySurface surface
             = planting || bridge ? CITY_SURFACE_FLAT : city_surface(a, b, c, triangle->color);
         Vector3 normal
@@ -570,7 +570,7 @@ failed:
 // Windows join the tile of the wall triangle they are derived from.
 static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *mesh)
 {
-    const BoatMapDescription *map = scenery->map;
+    const BoatMapDescription *map = scenery->full;
     const Mesh3D *city = map->mesh;
     TiledBuilder tiled = { 0 };
     if (!tiled_builder_init(&tiled, boat_map_tiles_count(&scenery->tiles)))

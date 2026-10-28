@@ -1,4 +1,5 @@
 // Deterministic boat-level water audit. Uses the playable simulation, not a camera spline.
+#include "boat_test_scenery.h"
 #include "external/glad.h"
 
 #include "boat_gpu.h"
@@ -895,6 +896,7 @@ cleanup:
 
 int main(int argc, char **argv)
 {
+    test_scenery_load();
     const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
     float tile_size = 0;
     bool no_cull = false;
