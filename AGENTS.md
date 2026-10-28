@@ -120,6 +120,19 @@ xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
 - Check changed local links and command examples. Report unresolved documentation uncertainty and
   verification limits before handoff; documentation-only changes need no new audiovisual review.
 
+## Cutting a release
+
+- A release includes upgrading the hosted Winterfell room and its matching browser client.
+  Publishing native packages and GitHub Pages alone does not complete a release.
+- After publication succeeds, update `wake_velocity_version` in
+  `../davve-srv/ansible/host_vars/winterfell/main.yml`, commit and push in `davve-srv`, then
+  run `scripts/ansible-run.sh --limit winterfell --tags wake_velocity` from that repository.
+  Use its existing vault/controller setup and the routine role, not the legacy Proteus playbook.
+- Verify the running release, room/relay health, hosted browser version, directory compatibility
+  metadata and matching native/browser joins. Record deployment evidence and any limits in
+  `docs/RELEASES.md`, `docs/MULTIPLAYER_HOSTING.md` and `davve-srv/docs/wake-velocity.md`.
+  See [the hosting guide](docs/MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
+
 ## Before handing off
 
 Run the build and the full CTest preset above. Capture and inspect representative frames when visual effects

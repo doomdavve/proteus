@@ -11,20 +11,13 @@ history.
 
 ## Current work
 
-Released internet hosting: the [Winterfell operator guide](MULTIPLAYER_HOSTING.md) owns the
-v0.0.18 native/browser room deployment and its verification status (2026-10-26). This hosting
-slice is pulled forward from M6; native/browser play and browser reconnect passed over a
-separate internet path. Both weapons are now deployed through the `davve-srv` baseline
-role; named joining, weapon inputs and combat pages passed automation. Human weapons play
-and full internet-play qualification remain pending.
-The browser and native clients fetch the known-server list and default to its public rooms;
-see the [hosting guide](MULTIPLAYER_HOSTING.md#native-directory-client-2026-10-26). The public
-`wake.davve.net` endpoint is deployed. PR #14's release-pinned workflow republished the
-v0.0.18 Pages launcher; a fresh Chrome browser joined from the live Pages URL without
-local-network permission. Human gameplay and broader browser/network qualification remain open.
-The native client connection check is fixed locally; a live server handshake now reports a
-map/content mismatch for this checkout, so a compatible live join remains to be verified.
-Details and current verification limits stay in the guide.
+Released internet hosting: [v0.0.20](RELEASES.md#status-and-verification) is published and
+Winterfell's matching native/browser room is deployed (2026-10-28), with protocol 7 / physics 9.
+The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) owns deployment,
+client-check evidence and limits. Every release includes this hosted cutover through
+`../davve-srv/ansible`; package publication and Pages alone do not complete it. The public
+`wake.davve.net` endpoint and shared known-server directory remain in use. Human gameplay/audio
+and broader network/platform qualification remain open.
 
 | Area and owning document | Implemented | Remaining / next task |
 | --- | --- | --- |
@@ -45,7 +38,7 @@ Details and current verification limits stay in the guide.
 | [macOS app builds](MACOS_BUILD.md) | Apple Silicon action, relocatable app bundle, preferred river launch, ad-hoc signing, ZIP/checksum; title backdrop packaging fix added | Verify macOS packaging CI and launch the downloaded app from Finder; macOS 13 execution pending |
 | [Windows builds](WINDOWS_BUILD.md) | Portable x64 action; reversal and basin impact-bound corrections, bundled music, relocated CPU check; ENet/`boat_server` MSVC build and packaged server passed CI (run 40083439355, 2026-10-24); title backdrop packaging fix added, pending CI | Verify the current Windows workflow and launch the downloaded app; then physical mouse/scroll, GPU/audio and connected controls |
 | [Linux builds](LINUX_BUILD.md) | Native Wayland enabled with X11 compatibility; Weston/Xvfb CI checks configured; bundled GLFW no-seat startup crash backport implemented | Rerun Linux CI to verify the Weston crash fix and X11 startup, review CPU screenshots; GNOME/KDE physical input, display scaling, audio and connected play pending |
-| [Automated releases](RELEASES.md) | Version-tag/UI release workflow reuses both platform builds, uploads ZIPs/checksums, then publishes; offline publication tests passed | `v0.0.20` published: platform PR CI, native release and Pages passed; both downloaded ZIP checksums, integrity and version/commit verified (2026-10-28); human package review next; Winterfell deployment remains separate ([status](RELEASES.md#status-and-verification)) |
+| [Automated releases](RELEASES.md) | Version-tag/UI release workflow reuses both platform builds, uploads ZIPs/checksums, then publishes; offline publication tests passed | `v0.0.20` published: platform PR CI, native release and Pages passed; both downloaded ZIP checksums, integrity and version/commit verified (2026-10-28); Winterfell v0.0.20 cutover and idempotent rerun passed; human package review next ([status](RELEASES.md#status-and-verification)) |
 | [Browser boating](WEB_BUILD.md) | Shared title, saved setup/settings (including multiplayer smoothing), Escape/return-to-title; optional WebRTC client and native endpoint alongside ENet | Chrome/SwiftShader title/persistence/repeated-session and mixed native/browser free/deathmatch/race automation pass (2026-10-25); next: real impairment, physical devices, Firefox/Safari, tab suspension and public WSS/ICE/TURN qualification; [status and limits](WEB_BUILD.md#webrtc-rooms) |
 
 These are separate work tracks, not a single execution queue. A next task in one plan
