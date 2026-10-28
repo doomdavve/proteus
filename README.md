@@ -121,7 +121,7 @@ is calm and clear of both boats. See the
 ### Title screen
 
 `./build/wake_velocity` without options (and the packaged macOS app and Windows `launch.bat`)
-opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT.
+opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS, CREDITS and EXIT.
 The default cartoon daylight interface uses marine blue panels, sunny yellow selection,
 cream text and a single yellow title ink over the boat-free daylight river capture. The backdrop placement and geometric title are shared with the retained
 cyan dusk version. Select the palette at compile time, then rebuild:
@@ -134,7 +134,10 @@ cmake --build build -j
 
 The Escape menu shares the selected palette and fixed selection chevron. Menu and gameplay
 overlay text use Daniel Linssen's m5x7; title hints/footer and in-game instrument labels use
-m3x6. Both stay on the integer pixel grid. SETTINGS retains map/font credits.
+m3x6. Both stay on the integer pixel grid. CREDITS gathers the game, music, font, map
+and library credits, with a sine-wave scroller over an animated water grid. Readable fixed
+credits include bjoto (Acid Wake) and wistrand (height map data help). Escape, Enter/Space
+or clicking BACK returns to the main menu.
 [Font sources and regeneration](assets/fonts/README.md). These title grades do not change
 world lighting; [gameplay sunset is planned](docs/SUNSET_PLAN.md).
 The version is resolved at CMake configure time (reconfigure to refresh it); source archives

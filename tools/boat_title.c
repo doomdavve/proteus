@@ -69,7 +69,7 @@ static void public_server_text(int index, int field, char *out, int size)
 
 enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
 
-typedef enum { ROW_SINGLE, ROW_MULTI, ROW_SETTINGS, ROW_EXIT, MAIN_ROWS } MainRow;
+typedef enum { ROW_SINGLE, ROW_MULTI, ROW_SETTINGS, ROW_CREDITS, ROW_EXIT, MAIN_ROWS } MainRow;
 #if defined(__EMSCRIPTEN__)
 typedef enum {
     ROW_PUBLIC_SERVER,
@@ -109,7 +109,14 @@ typedef enum {
     ROW_SOLO_BACK,
     SOLO_ROWS
 } SoloRow;
-typedef enum { PANEL_MAIN, PANEL_SINGLE, PANEL_JOIN, PANEL_HOST, PANEL_SETTINGS } Panel;
+typedef enum {
+    PANEL_MAIN,
+    PANEL_SINGLE,
+    PANEL_JOIN,
+    PANEL_HOST,
+    PANEL_SETTINGS,
+    PANEL_CREDITS
+} Panel;
 
 static const char *const host_modes[BOAT_TITLE_HOST_MODES] = { "free", "deathmatch", "race" };
 
@@ -132,7 +139,7 @@ typedef struct {
     int selected;
     char *editing; // The text field being typed into, if any.
     char before[64]; // Its value when editing started, restored by Escape.
-    double time;
+    double time, credits_started;
     // LAN search while the multiplayer panel is open (native builds).
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     BoatNetLan *lan;
@@ -218,14 +225,6 @@ static void draw_text(Font font, const char *text, int x, int y, Color ink)
 static void draw_logo(const Title *t)
 {
     DrawTexture(t->wordmark, (WIDTH - t->wordmark.width) / 2, 20, WHITE);
-    Font ui = t->ui;
-    const char *credit = "A PROTEUS GAME";
-    int x = (WIDTH - text_width(ui, credit)) / 2;
-    draw_text(ui, credit, x, 50, (PROTEUS_WARM_MENU ? boat_ui_palette().text : rgb(174, 245, 238)));
-    DrawLine(
-        x - 37, 53, x - 5, 53, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
-    DrawLine(WIDTH - x + 5, 53, WIDTH - x + 37, 53,
-        (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
 }
 
 static void crosshair(int x, int y, Color ink)
@@ -237,7 +236,8 @@ static void crosshair(int x, int y, Color ink)
 
 static int row_count(const Title *t)
 {
-    return t->panel == PANEL_SINGLE  ? SOLO_ROWS
+    return t->panel == PANEL_CREDITS ? 1
+        : t->panel == PANEL_SINGLE   ? SOLO_ROWS
         : t->panel == PANEL_JOIN     ? JOIN_ROWS
         : t->panel == PANEL_HOST     ? HOST_ROWS
         : t->panel == PANEL_SETTINGS ? SETTINGS_ROWS
@@ -246,8 +246,10 @@ static int row_count(const Title *t)
 
 static Rectangle row_bounds(const Title *t, int row)
 {
+    if (t->panel == PANEL_CREDITS)
+        return (Rectangle) { 127, 171, 66, 14 };
     if (t->panel == PANEL_MAIN)
-        return (Rectangle) { 70, (float)(123 + row * 14), 118, 13 };
+        return (Rectangle) { 70, (float)(109 + row * 14), 118, 13 };
     int top = 86 + (5 - row_count(t)) * ROW_HEIGHT / 2; // Centred on five rows' space.
     return (Rectangle) { 45, (float)(top + row * ROW_HEIGHT), 230, ROW_HEIGHT - 2 };
 }
@@ -373,7 +375,8 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
 #endif
         return;
     }
-    static const char *labels[MAIN_ROWS] = { "SINGLE PLAYER", "MULTIPLAYER", "SETTINGS", "EXIT" };
+    static const char *labels[MAIN_ROWS]
+        = { "SINGLE PLAYER", "MULTIPLAYER", "SETTINGS", "CREDITS", "EXIT" };
     *label = labels[row];
 #if defined(__EMSCRIPTEN__)
     if (row == ROW_EXIT)
@@ -532,6 +535,68 @@ static void draw_footer_text(Font font, const char *label, int x)
         font, label, x, 190, (PROTEUS_WARM_MENU ? boat_ui_palette().edge : rgb(162, 219, 217)));
 }
 
+// Presentation-only animation: integer pixel geometry, no session or random state.
+static void draw_credits(const Title *t)
+{
+    BoatUiPalette p = boat_ui_palette();
+    double elapsed = t->time - t->credits_started;
+    float phase = (float)elapsed;
+    DrawRectangle(0, 58, WIDTH, 129, p.shadow);
+    // A receding water grid, with travelling crests instead of a space/star effect.
+    for (int z = 0; z < 13; ++z) {
+        float depth = (float)fmod(z + elapsed * .6, 13.0) / 13;
+        int y = 73 + (int)(depth * depth * 111);
+        Color ink = Fade(p.border, .25f + depth * .3f);
+        for (int x = 0; x < WIDTH - 4; x += 4) {
+            int dy = (int)roundf(sinf(x * .035f + phase * 1.8f + z) * depth * 3);
+            int next = (int)roundf(sinf((x + 4) * .035f + phase * 1.8f + z) * depth * 3);
+            DrawLine(x, y + dy, x + 4, y + next, ink);
+        }
+    }
+    for (int x = -320; x <= 640; x += 64)
+        DrawLine(160 + (x - 160) / 8, 73, x, 185, Fade(p.border, .2f));
+    // Solid backing keeps attribution readable at every point in the animation.
+    Color backing = p.panel;
+    backing.a = 255;
+    DrawRectangle(22, 58, 276, 77, backing);
+    DrawRectangleLines(22, 58, 276, 77, p.border);
+    const char *heading = "CREDITS / A PROTEUS GAME";
+    draw_text(t->ui, heading, (WIDTH - text_width(t->ui, heading)) / 2, 64, p.selected);
+    static const char *const labels[]
+        = { "ACID WAKE", "HEIGHT MAP DATA HELP", "M5X7 / M3X6 FONTS", "MAP DATA", "BUILT WITH" };
+    static const char *const names[] = { "bjoto", "wistrand", "Daniel Linssen",
+        "OpenStreetMap contributors / ODbL", "raylib / ENet / libcurl" };
+    for (int i = 0; i < 5; ++i) {
+        draw_text(t->small, labels[i], 30, 79 + i * 10, p.hint);
+        draw_text(i == 3 ? t->small : t->ui, names[i], 151, 78 + i * 10, p.text);
+    }
+    // Classic sine scroller, clipped in the native render target rather than window space.
+    static const char message[]
+        = "WAKE VELOCITY   //   A PROTEUS GAME   //   "
+          "ACID WAKE BY BJOTO   //   HEIGHT MAP DATA HELP BY WISTRAND   //   "
+          "FONTS BY DANIEL LINSSEN   //   MAP DATA: OPENSTREETMAP CONTRIBUTORS (ODbL)   //   "
+          "BUILT WITH RAYLIB, ENET AND LIBCURL   //   GREETINGS FROM THE GOTHENBURG WATERFRONT!   "
+          "//   ";
+    int period = text_width(t->ui, message);
+    int origin = 16 - (int)fmod(elapsed * 34, period + 64);
+    for (int copy = 0; copy < 2; ++copy) {
+        int x = origin + copy * (period + 64);
+        for (size_t i = 0; message[i]; ++i) {
+            char letter[2] = { message[i], 0 };
+            if (x >= 5 && x < WIDTH - 10) {
+                int y = 147 + (int)roundf(sinf(x * .04f + phase * 2) * 6);
+                draw_text(t->ui, letter, x + 1, y + 1, p.shadow);
+                draw_text(t->ui, letter, x, y, i % 24 < 12 ? p.selected : p.text);
+            }
+            x += text_width(t->ui, letter);
+        }
+    }
+    DrawLine(8, 138, 312, 138, p.border);
+    DrawLine(8, 165, 312, 165, p.border);
+    DrawRectangleRec(row_bounds(t, 0), p.selected);
+    draw_text(t->ui, "< BACK", 142, 175, p.selected_text);
+}
+
 static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *status)
 {
     BeginTextureMode(t->target);
@@ -539,15 +604,11 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
     draw_logo(t);
     crosshair(22, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
     crosshair(297, 32, (PROTEUS_WARM_MENU ? boat_ui_palette().border : rgb(118, 203, 211)));
-    draw_menu(t, s, status);
-    const char *map_credit = "MAP: OSM CONTRIBUTORS";
+    if (t->panel == PANEL_CREDITS)
+        draw_credits(t);
+    else
+        draw_menu(t, s, status);
     draw_footer_text(t->small, PROTEUS_VERSION, 8);
-    if (t->panel == PANEL_SETTINGS) {
-        draw_footer_text(t->small, map_credit, WIDTH - 9 - text_width(t->small, map_credit));
-        const char *fonts = "FONTS: DANIEL LINSSEN";
-        draw_text(
-            t->small, fonts, (WIDTH - text_width(t->small, fonts)) / 2, 60, boat_ui_palette().edge);
-    }
     EndTextureMode();
 }
 
@@ -814,7 +875,9 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         }
         if (activate) {
             s->message[0] = 0;
-            if (t.panel == PANEL_SETTINGS) {
+            if (t.panel == PANEL_CREDITS) {
+                back = true;
+            } else if (t.panel == PANEL_SETTINGS) {
                 if (t.selected == ROW_NAME)
                     begin_edit(&t, s->name);
                 else
@@ -868,6 +931,10 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             } else if (t.selected == ROW_SETTINGS) {
                 t.panel = PANEL_SETTINGS;
                 t.selected = ROW_MOUSE;
+            } else if (t.selected == ROW_CREDITS) {
+                t.panel = PANEL_CREDITS;
+                t.selected = 0;
+                t.credits_started = t.time;
             } else if (t.selected == ROW_EXIT)
                 chosen = true;
         }
@@ -887,6 +954,9 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             boat_title_save(s);
             t.panel = PANEL_MAIN;
             t.selected = ROW_SETTINGS;
+        } else if (back && t.panel == PANEL_CREDITS) {
+            t.panel = PANEL_MAIN;
+            t.selected = ROW_CREDITS;
         } else if (back)
             chosen = true;
         char status[128];

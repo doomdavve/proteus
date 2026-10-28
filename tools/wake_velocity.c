@@ -114,7 +114,7 @@ static BoatWater study_water(
     return water;
 }
 
-static void draw_help(bool course, bool mapped, bool voyage, bool deathmatch, bool race)
+static void draw_help(bool course, bool voyage, bool deathmatch, bool race)
 {
     int width = GetScreenWidth(), height = GetScreenHeight();
     const char *lines[] = {
@@ -144,7 +144,6 @@ static void draw_help(bool course, bool mapped, bool voyage, bool deathmatch, bo
         course ? "Home/End: start/end | [ / ]: speed" : "",
         course ? "Click/drag timeline: seek and pause" : "",
         "? or Esc: dismiss help",
-        mapped ? "Map: OpenStreetMap contributors (ODbL)" : "",
     };
     DrawRectangle(0, 0, width, height, (Color) { 8, 15, 22, 220 });
     int font = height < 300 ? 8 : width < 600 || height < 500 ? 10 : 20;
@@ -1334,8 +1333,7 @@ static int study(int argc, char **argv)
             deathmatch = networked && net_study_deathmatch(net);
             race = networked && net_study_race(net);
 #endif
-            draw_help(
-                course, location->mapped, !networked && session.voyage.route, deathmatch, race);
+            draw_help(course, !networked && session.voyage.route, deathmatch, race);
         }
         frame_pacer_wait(&pacer);
         EndDrawing();
