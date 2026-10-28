@@ -15,235 +15,47 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #endif
-#define JSMN_STATIC
-#define JSMN_STRICT
-#include "../third_party/jsmn/jsmn.h"
+#include "boat_json.h"
 
 #define DIRECTORY_URL "https://wake.davve.net/servers.json"
 enum { TOKENS_MAX = 2048 };
-
-static int next_token(const jsmntok_t *tokens, int count, int index)
-{
-    int end = tokens[index].end;
-    ++index;
-    while (index < count && tokens[index].start < end)
-        ++index;
-    return index;
-}
-
-static int member(const char *json, const jsmntok_t *tokens, int count, int object, const char *key)
-{
-    int found = -1;
-    for (int i = object + 1; i < count && tokens[i].start < tokens[object].end;) {
-        int value = i + 1;
-        if (tokens[i].type != JSMN_STRING || value >= count
-            || tokens[value].start >= tokens[object].end)
-            return -2;
-        if ((size_t)(tokens[i].end - tokens[i].start) == strlen(key)
-            && !memcmp(json + tokens[i].start, key, strlen(key))) {
-            if (found >= 0)
-                return -2;
-            found = value;
-        }
-        i = next_token(tokens, count, value);
-    }
-    return found;
-}
-
-static bool read_text(const char *json, const jsmntok_t *t, char *out, size_t capacity)
-{
-    if (t->type != JSMN_STRING)
-        return false;
-    size_t n = 0;
-    for (int i = t->start; i < t->end; ++i) {
-        unsigned char c = (unsigned char)json[i];
-        if (c == '\\') {
-            if (++i >= t->end)
-                return false;
-            c = (unsigned char)json[i];
-            if (c == 'u') {
-                if (i + 4 >= t->end || json[i + 1] != '0' || json[i + 2] != '0')
-                    return false;
-                char hex[3] = { json[i + 3], json[i + 4], 0 }, *end;
-                long value = strtol(hex, &end, 16);
-                if (*end || end != hex + 2)
-                    return false;
-                c = (unsigned char)value;
-                i += 4;
-            } else if (c != '"' && c != '\\' && c != '/')
-                return false;
-        }
-        if (c < 32 || c > 126 || n + 1 >= capacity)
-            return false;
-        out[n++] = (char)c;
-    }
-    out[n] = 0;
-    return n != 0;
-}
-
-static bool read_int(const char *json, const jsmntok_t *t, int *out)
-{
-    if (t->type != JSMN_PRIMITIVE || t->end <= t->start || t->end - t->start > 9)
-        return false;
-    int n = 0;
-    for (int i = t->start; i < t->end; ++i) {
-        if (json[i] < '0' || json[i] > '9')
-            return false;
-        n = n * 10 + json[i] - '0';
-    }
-    *out = n;
-    return true;
-}
-
-// jsmn tokenizes strings and nesting but deliberately does not enforce separators.
-static void whitespace(const char *json, size_t length, size_t *pos)
-{
-    while (*pos < length && strchr(" \t\r\n", json[*pos]))
-        ++*pos;
-}
-static bool json_value(const char *json, size_t length, size_t *pos, unsigned depth)
-{
-    whitespace(json, length, pos);
-    if (*pos >= length || depth > 32)
-        return false;
-    char c = json[(*pos)++];
-    if (c == '"') {
-        while (*pos < length) {
-            c = json[(*pos)++];
-            if (c == '"')
-                return true;
-            if ((unsigned char)c < 32)
-                return false;
-            if (c == '\\') {
-                if (*pos >= length || !strchr("\"\\/bfnrtu", json[*pos]))
-                    return false;
-                c = json[(*pos)++];
-                if (c == 'u') {
-                    for (int i = 0; i < 4; ++i)
-                        if (*pos >= length || !strchr("0123456789abcdefABCDEF", json[(*pos)++]))
-                            return false;
-                }
-            }
-        }
-        return false;
-    }
-    if (c == '{' || c == '[') {
-        bool object = c == '{';
-        char close = object ? '}' : ']';
-        whitespace(json, length, pos);
-        if (*pos < length && json[*pos] == close) {
-            ++*pos;
-            return true;
-        }
-        for (;;) {
-            whitespace(json, length, pos);
-            if (object) {
-                if (*pos >= length || json[*pos] != '"'
-                    || !json_value(json, length, pos, depth + 1))
-                    return false;
-                whitespace(json, length, pos);
-                if (*pos >= length || json[(*pos)++] != ':')
-                    return false;
-            }
-            if (!json_value(json, length, pos, depth + 1))
-                return false;
-            whitespace(json, length, pos);
-            if (*pos >= length)
-                return false;
-            c = json[(*pos)++];
-            if (c == close)
-                return true;
-            if (c != ',')
-                return false;
-        }
-    }
-    --*pos;
-    size_t start = *pos;
-    while (*pos < length && !strchr(" \t\r\n,}]", json[*pos]))
-        ++*pos;
-    size_t n = *pos - start;
-    if ((n == 4 && !memcmp(json + start, "true", n)) || (n == 4 && !memcmp(json + start, "null", n))
-        || (n == 5 && !memcmp(json + start, "false", n)))
-        return true;
-    // Unknown numerical fields must still have JSON number syntax.
-    size_t i = start;
-    if (i < *pos && json[i] == '-')
-        ++i;
-    if (i >= *pos)
-        return false;
-    if (json[i] == '0')
-        ++i;
-    else {
-        if (json[i] < '1' || json[i] > '9')
-            return false;
-        while (i < *pos && json[i] >= '0' && json[i] <= '9')
-            ++i;
-    }
-    if (i < *pos && json[i] == '.') {
-        ++i;
-        size_t first = i;
-        while (i < *pos && json[i] >= '0' && json[i] <= '9')
-            ++i;
-        if (i == first)
-            return false;
-    }
-    if (i < *pos && (json[i] == 'e' || json[i] == 'E')) {
-        ++i;
-        if (i < *pos && (json[i] == '+' || json[i] == '-'))
-            ++i;
-        size_t first = i;
-        while (i < *pos && json[i] >= '0' && json[i] <= '9')
-            ++i;
-        if (i == first)
-            return false;
-    }
-    return i == *pos;
-}
 
 bool boat_directory_parse(const char *json, size_t length, BoatDirectoryList *out)
 {
     if (!json || !out || length > BOAT_DIRECTORY_BODY_MAX || memchr(json, 0, length))
         return false;
-    size_t pos = 0;
-    if (!json_value(json, length, &pos, 0))
-        return false;
-    whitespace(json, length, &pos);
-    if (pos != length)
-        return false;
     jsmntok_t tokens[TOKENS_MAX];
-    jsmn_parser parser;
-    jsmn_init(&parser);
-    int count = jsmn_parse(&parser, json, length, tokens, TOKENS_MAX);
-    if (count < 1 || tokens[0].type != JSMN_OBJECT || next_token(tokens, count, 0) != count)
+    int count = boat_json_parse(json, length, tokens, TOKENS_MAX);
+    if (count < 0)
         return false;
-    int version = member(json, tokens, count, 0, "version");
-    int servers = member(json, tokens, count, 0, "servers"), v;
-    if (version < 0 || servers < 0 || !read_int(json, &tokens[version], &v) || v != 1
+    int version = boat_json_member(json, tokens, count, 0, "version");
+    int servers = boat_json_member(json, tokens, count, 0, "servers"), v;
+    if (version < 0 || servers < 0 || !boat_json_int(json, &tokens[version], &v) || v != 1
         || tokens[servers].type != JSMN_ARRAY || tokens[servers].size > BOAT_DIRECTORY_MAX)
         return false;
     BoatDirectoryList list = { 0 };
     for (int i = servers + 1; i < count && tokens[i].start < tokens[servers].end;
-        i = next_token(tokens, count, i)) {
+        i = boat_json_next(tokens, count, i)) {
         if (tokens[i].type != JSMN_OBJECT)
             return false;
-        int name = member(json, tokens, count, i, "name");
-        int desc = member(json, tokens, count, i, "description");
-        int native = member(json, tokens, count, i, "native");
-        int protocol = member(json, tokens, count, i, "protocol");
-        int physics = member(json, tokens, count, i, "physics");
+        int name = boat_json_member(json, tokens, count, i, "name");
+        int desc = boat_json_member(json, tokens, count, i, "description");
+        int native = boat_json_member(json, tokens, count, i, "native");
+        int protocol = boat_json_member(json, tokens, count, i, "protocol");
+        int physics = boat_json_member(json, tokens, count, i, "physics");
         if (name < 0 || desc < 0 || native == -2 || protocol < 0 || physics < 0)
             return false;
         BoatDirectoryEntry entry = { 0 };
-        if (!read_text(json, &tokens[name], entry.name, sizeof(entry.name))
-            || !read_text(json, &tokens[desc], entry.description, sizeof(entry.description))
-            || !read_int(json, &tokens[protocol], &entry.protocol)
-            || !read_int(json, &tokens[physics], &entry.physics))
+        if (!boat_json_text(json, &tokens[name], entry.name, sizeof(entry.name))
+            || !boat_json_text(json, &tokens[desc], entry.description, sizeof(entry.description))
+            || !boat_json_int(json, &tokens[protocol], &entry.protocol)
+            || !boat_json_int(json, &tokens[physics], &entry.physics))
             return false;
         if (native < 0)
             continue;
         char host[64];
         uint16_t port;
-        if (!read_text(json, &tokens[native], entry.address, sizeof(entry.address))
+        if (!boat_json_text(json, &tokens[native], entry.address, sizeof(entry.address))
             || !boat_net_parse_endpoint(entry.address, host, sizeof(host), &port)
             || strspn(host, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
                 != strlen(host))

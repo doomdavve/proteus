@@ -135,6 +135,8 @@ def self_test():
     violations = {
         "drawing header": '#include "renderer3d.h"\n',
         "scene header": '#include "waterfront_scene.h"\n',
+        "lua header": '#include "lua.h"\n',
+        "plugin header": '#include "boat_plugin.h"\n',
         "stdio": "#include <stdio.h>\n",
         "drawing call": "void f(void) { DrawCube(p, 1, 1, 1, RED); }\n",
         "input": "bool f(void) { return IsKeyDown(KEY_UP); }\n",

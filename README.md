@@ -41,8 +41,9 @@ four-on-the-floor drums, bass, minor chords, and a small lead motif.
 
 ## Build and run
 
-The first configure downloads the pinned raylib source and, for native builds, the pinned
-ENet networking library. Native builds also require libcurl development files; macOS uses
+The first configure downloads the pinned raylib source, the checksummed Lua 5.4.9 source for
+the [plugin host](docs/PLUGIN_API.md) and, for native builds, the pinned ENet networking
+library. Native builds also require libcurl development files; macOS uses
 the system library, Linux setup is linked below, and Windows uses static libcurl through
 vcpkg (`x64-windows-static`). Later builds are offline.
 

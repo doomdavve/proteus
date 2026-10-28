@@ -243,6 +243,16 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
 `render` labels. The `core` checks are also
 `cpu`:
 - `boat_core` runs `validate_boat_core`, which links only the boating core library.
+- `boat_plugin` runs `validate_boat_plugin` (Lua plugins P0, twelve quick cases, about 0.5 s
+  together in Debug). The reference package `plugins/langedrag` must decode field for field and
+  bit for bit to `boat_voyage_outer`, with the same digest. It also checks a definition computed
+  with the allowed libraries, syntax, runtime and bytecode rejection, and every forbidden
+  facility. Invalid fields must report their path, as must bad manifests and host limits.
+  Memory and instruction exhaustion must stop with zero leaked bytes, and repeated failures
+  must leave a last good definition unchanged with identical diagnostics. Package files are
+  read from a build-tree scratch directory, where missing files, an escaping entry, a symbolic
+  link, a directory and oversized input are refused. Finally the decoded shelters must lie in
+  the outer map's water. Instruction budgets are counted by a hook, never timed.
 - `boat_map` runs `validate_boat_map` (adventure A1.1/A1.2). It checks explicit map
   descriptions, caller-owned collision caches, failed/zeroed preparation, two river owners and a
   synthetic map alive together, and destroy/recreate. It also matches a river query digest
@@ -477,6 +487,12 @@ Presentation, GPU, session/replay and the wake_velocity drive/profile code live 
 Network codec, session and in-memory transport sources go in `PROTEUS_BOAT_NET_SOURCES` and
 obey the same rules (`boat_net_boundary`); only `src/boat_net_enet.c` may use ENet and sockets.
 The script accepts `--archive` more than once and resolves symbols across the listed archives.
+
+The Lua plugin host (`proteus_plugins`, [plugin API](PLUGIN_API.md)) and the pinned interpreter
+(`proteus_lua`) sit outside both boundaries. Configure fails if `proteus_boat_core` or
+`proteus_boat_net` links either of them. The self-test also rejects a core `#include "lua.h"`
+or `"boat_plugin.h"`, and the archive check rejects any `lua_*` reference. Strict JSON reading
+for the server directory and plugin manifests lives in `proteus_json` (`src/boat_json.c`).
 
 ## Long-session clock gate
 

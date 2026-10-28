@@ -1,18 +1,19 @@
 # Lua gameplay plugins and live authoring
 
-Status, 2026-10-28: **planning complete; no Lua runtime, plugin API or in-game agent is
-implemented.** The agreed direction is embedded Lua for gameplay authoring, with C retaining
-physics, collisions, wake math, rendering and networking. Hot reload is a requirement of the
-first playable slice. This document owns the plugin boundary, authoring workflow and staged
-implementation; the existing gameplay plans continue to own their features and acceptance.
-[All plans](README.md).
+Status, 2026-10-28: **P0 implemented: a bounded, headless Lua descriptor loader decodes the
+Långedrag voyage to owned native data identical to the compiled route. The game does not load
+plugins; there is no hot reload, behavioral API or in-game agent yet.** The agreed direction is
+embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering
+and networking. Hot reload is a requirement of the first playable slice. This document owns the
+plugin boundary, authoring workflow and staged implementation; [the plugin API](PLUGIN_API.md)
+owns the current contract; the existing gameplay plans continue to own their features and
+acceptance. [All plans](README.md).
 
-Completed planning task: review the existing owners and gameplay plans, select the Långedrag
-voyage as the first conversion, specify reload/failure behavior, and separate near-term
-authoring from multiplayer and the eventual agent. **Next task: P0, a bounded descriptor
-loader and headless validation**, followed by P1, live Långedrag authoring. The milestones
-below are this plan's P0–P6, independent of similarly named foundation tasks. Existing-C
-build/test evidence and planning limitations are recorded at the end.
+Completed task: **P0**, see the [P0 result](#p0-result-2026-10-28). It pins Lua 5.4.9, adds the
+restricted loader and voyage decoder, the reference package and the `boat_plugin` CTest cases,
+and passes a Wasm/Node preflight. **Next task: P1, live Långedrag authoring.** The milestones
+below are this plan's P0–P6, independent of similarly named foundation tasks. The planning
+change's existing-C build/test evidence and limitations are recorded at the end.
 
 ## Intended experience and scope
 
@@ -118,9 +119,11 @@ there is no current named-place catalog or semantic map index.
 
 ## Proposed package and API surface
 
-Everything in this section is **proposed syntax**, not an available command or loadable
-plugin. P0 pins one reviewed Lua release/source checksum/build configuration after native
-and Emscripten feasibility checks. Use the portable interpreter initially; no JIT or native
+This section records the proposal as planned. Since P0 (2026-10-28), the manifest and voyage
+descriptor below are implemented, with the additions and exact rules in
+[the plugin API](PLUGIN_API.md); everything after them is still **proposed syntax**, and the
+game cannot load a plugin yet. P0 pinned Lua 5.4.9 after native and Emscripten feasibility
+checks. Use the portable interpreter initially; no JIT or native
 module ABI is needed. The [Lua manual](https://www.lua.org/manual/5.4/manual.html) is a
 reference for the embedding interfaces, not a decision to pin that particular release.
 Include the selected distribution's copyright/license in packages, following
@@ -157,7 +160,8 @@ initial entry file list is fixed; later module/assets must be explicitly listed 
 No dependency resolution or user-supplied bytecode is required.
 
 The P1 `main.lua` can be just the existing data, with stable authored shelter IDs added for
-diagnostics and later migration. The adapter copies these values into a `BoatVoyageRoute`;
+diagnostics and later migration. (The implemented reference also carries the route's
+`exposure.build` and `weather_range`, which this proposal omitted.) The adapter copies these values into a `BoatVoyageRoute`;
 the IDs belong to its sidecar metadata, not a claim that the current C struct contains IDs.
 
 ```lua
@@ -453,7 +457,7 @@ agent does not need to wait for multiplayer, prediction or session-recording qua
 P6 uses the already tested local staging/preview/undo path. Only shared-room agent editing
 depends on P5's authority and content contract.
 
-### P0 — bounded descriptor loader and contract (next)
+### P0 — bounded descriptor loader and contract (implemented 2026-10-28)
 
 **Deliverable:** a tiny headless loader can evaluate the proposed voyage example, decode it
 to owned native data and reject bad packages. No game-loop integration or behavioral VM yet.
@@ -480,7 +484,82 @@ not call I/O from core. Test failure deadlines must return on the expected event
 for a chosen duration. P0's web result is compile/load feasibility only. Update this plan,
 the index and the new API guide; no visual acceptance is needed for this headless step.
 
-### P1 — Långedrag live authoring
+#### P0 result, 2026-10-28
+
+Implemented on branch `plugin-p0`:
+
+- **Runtime:** Lua 5.4.9, fetched by `FetchContent` with lua.org's published SHA-256
+  (`2335b6c5…6fb8e6`). It builds as the private static `proteus_lua` from the VM plus the
+  base, string, table and math libraries only. `io`, `os`, `debug`, `package`, `coroutine` and
+  `utf8` are not compiled, and a force-included header fixes the string-hash seed.
+  `proteus_boat_core` and `proteus_boat_net` do not link it, and configure fails if they do.
+  The boundary self-test also rejects a core `lua.h` or `boat_plugin.h` include.
+- **Host:** `src/boat_plugin.[ch]` holds the manifest, voyage validation, owned
+  `BoatPluginVoyage`, copy/rebind and FNV-1a digest. `src/boat_plugin_lua.[ch]` is the
+  restricted state: counting allocator, 100-instruction count hook, text-only load, raw-access
+  decoder and a protected setup, so allocation failures never panic. `src/boat_plugin_io.[ch]`
+  does the only file reads, with `O_NOFOLLOW`, regular files only and reads bounded by the
+  limit. The manifest uses the vendored jsmn through helpers moved from the server directory
+  into `src/boat_json.[ch]` (`proteus_json`); `boat_directory` still passes. Contract, schema,
+  allowlist, limits and diagnostics: [plugin API](PLUGIN_API.md).
+- **Reference package:** [`plugins/langedrag`](../plugins/langedrag/), the proposed example plus
+  the two fields the C route has, `exposure.build = 60` and `weather_range = 2500`. It is not
+  yet packaged into native or web assets (P1).
+- **Decisions made at this gate:**
+  - Lua 5.4 rather than the newer 5.5 line.
+  - Manifest values are fixed by host policy, and packages cannot change limits.
+  - Diagnostics carry the file, Lua's own line for syntax, runtime and budget errors, and the
+    field path for schema and manifest errors.
+  - Validation stops at the first error; there is no clamping.
+  - Out-parameters are written only on success.
+  - `pcall`, metatables, string patterns and `table.move` are omitted, because the hook cannot
+    bound their C work or catching would defeat the budget.
+  - The last shelter must have radius 0 and lie inside the arrival area, and no shelter may lie
+    in exposed water.
+  - Map-water checks live in the validator for now.
+
+Verification, 2026-10-28, M1 Max/macOS 26.6.2, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- `cmake --build build -j` built with no project warnings, only the existing bundled
+  `stb_vorbis` warning. `ctest --preset full` passed **248/248 active tests** in 18.4 s, with
+  13 retired wake-field tests disabled. That includes the new twelve `boat_plugin.*` cases
+  (quick lane, about 0.5 s together), `boat_directory`, `test_time` and both boundary checks.
+- `validate_boat_plugin --case reference_matches_compiled` prints
+  `digest=e8509272172cb7c4 compiled=e8509272172cb7c4 instructions<100 peak_bytes=17409
+  fields=35`. All shelter, arrival, exposure, fraction and range floats compare bit-equal, and
+  names survive freeing the source bytes and scribbling over the original after a copy.
+- Rejections exercised:
+  - syntax errors with lines, bytecode, compiler nesting overflow and runtime errors;
+  - 26 forbidden facilities;
+  - 27 invalid-field variants, each with its path;
+  - shelter counts of 1 and 5, gaps and deep data;
+  - 13 bad manifests and both size limits;
+  - memory exhaustion, including too little heap to start;
+  - three nonterminating loops stopped by the budget at its exact step, and deep recursion;
+  - package files: missing, escaping, symbolic link, directory, one byte over the limit, and
+    exactly at the limit.
+
+  Every failure left a preloaded definition byte-identical and reported zero leaked bytes;
+  48 repeated failed/valid loads gave identical diagnostics.
+- A separate ASan/UBSan build (`-fsanitize=address,undefined`) ran all cases with no reports.
+  macOS ASan has no leak detector; leaks are covered by the allocator's live-byte count.
+- **Web preflight:** with Emscripten 6.0.12 and Node 24.2.0, `validate_boat_plugin.js`
+  (`-sENVIRONMENT=node -sNODERAWFS=1`) passed every case, file cases included, with the same
+  digest (peak 13 473 bytes with 32-bit pointers). This shows compile/load feasibility only;
+  the browser game does not link the plugin host, and no browser run was made.
+- **Cost:** the reference load evaluates in under 100 Lua instructions with a 17 KiB peak heap
+  and 35 decoded fields; a whole load takes about 0.2 ms in Debug (case timer, reported only). A
+  load that exhausts the 1 M-instruction budget takes about 10 ms in Debug. Compile/decode work
+  is bounded by input size and heap rather than separately timed.
+
+Limits: there is no game-loop integration, reload, session override, packaging or user-visible
+authoring, so P1 owns all of that. The Windows (MSVC) and Linux (GCC) builds are left to CI.
+The file-case tests are POSIX-only, so the Windows reparse-point path is untested locally.
+Instruction budgets do not bound C library work; the omitted functions are the mitigation.
+This is not hostile-code containment. No visual, audio or manual check applies to this
+headless step.
+
+### P1 — Långedrag live authoring (next)
 
 **Deliverable:** run solo `outer` with the Lua-authored current voyage; edit, reload and undo
 without rebuilding C. Preserve existing C arrival/recovery/exposure behavior.
@@ -645,7 +724,7 @@ generation are not prerequisites for that loop.
 
 | Gate | Decision and recommended starting point |
 | --- | --- |
-| P0 | Exact Lua release/build, source acquisition/vendor policy and manifest parser: pin a small portable C build, bounded inert manifest, one entry file; record native/web feasibility and license packaging. |
+| P0 | **Resolved 2026-10-28** ([P0 result](#p0-result-2026-10-28)): Lua 5.4.9 via checksummed `FetchContent`, VM plus base/string/table/math only; strict jsmn manifest with host-fixed values; one text entry; native and Wasm/Node feasibility recorded; license packaging deferred to P1, when Lua first ships. |
 | P0/P1 | Initial budgets and staging responsiveness: measure the descriptor case, permit a visible authoring pause first, then decide whether background compilation is justified. Do not call an instruction limit a compiler deadline. |
 | P1 | Reload UX and distribution: choose a key/menu action and opt-in launch selection, preserve-only default with explicit restart policy for incompatible edits; retain compiled defaults until parity and authoring review. |
 | P2/P3 | Supported rule extension depth: keep voyage/race/match engines in C and add orchestration first. Move no mature rule engine merely to make a larger Lua example. |
@@ -654,7 +733,7 @@ generation are not prerequisites for that loop.
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
 | P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |
 
-## Verification and known limits of this planning change
+## Verification and known limits of this planning change (history)
 
 Reviewed on 2026-10-28: the [documentation index](README.md), the plans/guides and source
 interfaces linked in the inventory, CMake library boundaries, the application/drive tick path,

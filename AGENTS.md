@@ -36,6 +36,9 @@ playground for iterating on effects, timing, audio, and presentation.
   `proteus_boat_net` obeys the core boundary (`boat_net_boundary`); only `boat_net_enet.c` uses
   ENet and sockets. `tools/boat_server.c` and `tools/boat_bot.c` are the server and scripted
   client; `docs/MULTIPLAYER_PROTOCOL.md` owns the byte layout.
+- `src/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (P0: bounded, data-only voyage descriptors
+  over a pinned Lua 5.4.9 in `proteus_lua`) and reference packages; core and net never link it.
+  `docs/PLUGIN_API.md` owns the contract and `docs/PLUGIN_PLAN.md` the roadmap.
 - `src/profiler.c`: rolling frame statistics and the F3 overlay.
 - `src/xm_audio.c`: XM-specific playback helpers layered over raylib's bundled decoder.
 - `assets/music/`: XM music for the boating game and the dance study.
@@ -46,8 +49,8 @@ playground for iterating on effects, timing, audio, and presentation.
 
 ## Build and verify
 
-The first configure fetches pinned raylib 6.0 sources (and, for native builds, ENet v1.3.18) and
-therefore needs network access.
+The first configure fetches pinned raylib 6.0 and Lua 5.4.9 sources (and, for native builds, ENet
+v1.3.18) and therefore needs network access.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug

@@ -1,0 +1,10 @@
+{
+  "id": "proteus.langedrag",
+  "name": "Langedrag voyage",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["voyage.define"],
+  "state_version": 1
+}
