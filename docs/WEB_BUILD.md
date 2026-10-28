@@ -57,7 +57,8 @@ packaged as `scenery-outer-<hash>.bin`. `web/scenery_loader.js` fetches it the f
 outer session (solo or a room) starts and writes it into the in-memory file system, while the
 game shows LOADING OUTER RIVER with its percentage. A second outer session reuses it.
 `tools/package_web.py` prints the initial and on-demand bytes. Before A3.5i the page downloaded
-about 6.3 MB gzipped before play; now about 2.9 MB, plus 3.3 MB for the outer river.
+about 6.3 MB gzipped before play; now about 2.9 MB, plus 3.3 MB for the outer river (5.3 MB
+since A3.5f extended it upstream past Hisingsbron; the pack is already DEFLATE-compressed).
 
 Check it against a served build (Playwright and Chrome; the script is optional and not in CTest):
 

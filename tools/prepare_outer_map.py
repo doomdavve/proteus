@@ -59,6 +59,14 @@ TINY_EDGE = .001  # metres; open land edges this short are tolerated (check_wate
 # sampled here every GROUND_STEP metres.
 GROUND_AREA = survey.RIVER_CROP
 GROUND_STEP = 4.0
+# A3.5f: Göta älv upstream of the river crop, past Lindholmen, Stenpiren, Lilla Bommen and
+# Hisingsbron (x0, z0, x1, z1). The Höjdmodell window (prepare_terrain_dem.DEM_WINDOW) and the
+# OSM envelope (prepare_adventure_sources.ENVELOPE) cover it with a margin.
+UPSTREAM = (950.0, -300.0, 4200.0, 2300.0)
+# Dock to the river's exit past Hisingsbron, through the middle of the channel (east/north m).
+UPSTREAM_ROUTE = survey.RIVER[:3] + [(400, 40), (900, 380), (1500, 560), (2000, 750),
+                                     (2500, 1000), (2800, 1250), (3200, 1650), (3450, 1950),
+                                     (3700, 2100), (3950, 2230)]
 
 
 def river_overlay():
@@ -196,9 +204,9 @@ def drape_objects(objects, model):
 
 
 def region_shape():
-    """The river crop joined to the first slice, in crane-origin east/north metres."""
+    """The river crop joined to the first slice and the river upstream (crane east/north m)."""
     crop = box(*survey.RIVER_CROP)
-    return unary_union([crop, Polygon(survey.FIRST_SLICE)])
+    return unary_union([crop, Polygon(survey.FIRST_SLICE), box(*UPSTREAM)])
 
 
 def clean(shape):
@@ -442,6 +450,7 @@ def check(geo, region, water):
     corridor = water.buffer(-ROUTE_CLEARANCE)
     route = LineString(survey.SLICE_ROUTE)
     assert corridor.covers(route), "slice route leaves the baked water envelope"
+    assert corridor.covers(LineString(UPSTREAM_ROUTE)), "upstream route leaves the water envelope"
     assert connected.contains(Point(survey.DETOUR[-1])), "baked water does not reach the shelter"
     assert region.buffer(1e-6).covers(water)
     return route
@@ -480,6 +489,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "terrain": terrain,
         "quay_bottom": QUAY_BOTTOM,
         "region": {"river_crop": list(survey.RIVER_CROP), "first_slice": survey.FIRST_SLICE,
+                   "upstream": list(UPSTREAM),
                    "area_km2": round(region.area / 1e6, 3)},
         "simplify_m": SIMPLIFY,
         "water_area_km2": round(water.area / 1e6, 3),
@@ -491,7 +501,8 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
         "water_triangles": stats["water_triangles"],
         "contents": "water, land surface and quay walls; inside the river crop also the river "
                     "bake's buildings, roads, gardens, trees and bridge (A3.3); outside it "
-                    "buildings, container cranes, port masts, channel marks and trees (A3.5a)",
+                    "buildings (A3.5a; since A3.5f before the authored range, with windows), container "
+                    "cranes, port masts, channel marks and trees (A3.5a)",
         "dressing": stats.get("dressing") and {
             "first_triangle": stats["dressing_first"], **stats["dressing"]},
         "river_overlay": {"source": "assets/geometry/river/scenery.bin",
@@ -604,11 +615,12 @@ def main():
     objects, lifts = drape_objects(objects, model)
     fort = next(Point(m["east_north"]) for m in survey.features(osm, frame)[1]
                 if m["label"] == "Nya Älvsborg")
-    dressing, dressed = outer_dressing.dress(osm, frame, region, crop, water,
+    buildings, dressing, dressed = outer_dressing.dress(osm, frame, region, crop, water,
                                              geo_land(region, water), model, fort,
                                              survey.multipolygon)
     dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS)
-    vertices, triangles, stats = bake(water, region, model, (objects, bridge, paint), dressing)
+    vertices, triangles, stats = bake(water, region, model, (objects + buildings, bridge, paint),
+                                      dressing)
     stats["dressing"] = dressed
     values = sorted(lifts.values())
     stats["draped"] = {"solids": len(values), "paint_source_triangles": sum(len(p) for p, _ in paint),

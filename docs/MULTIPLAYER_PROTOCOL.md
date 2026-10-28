@@ -40,6 +40,11 @@ holds just the water triangles, with their vertices renumbered. Builds before an
 fail the digest check at Hello. Land never reached physics, so builds that differ only in
 scenery now share a room. Message bytes are unchanged and there is no version bump.
 
+A3.5f (2026-10-28) extends the outer map's water upstream past Hisingsbron (2,738 → 3,703
+water triangles). The content digest covers every location in one hash, so builds before
+and after A3.5f fail the digest check at Hello in any room, the river's included. No version
+bump.
+
 Handling revision 9 (2026-10-26, isolated controls branch) increases commanded-thrust travel
 to 4 units/s and removes steering-commanded aerial roll. Protocol v5 bytes are unchanged;
 old handling revisions are rejected. Pedals/Shift become ordinary target-derived rate inputs,

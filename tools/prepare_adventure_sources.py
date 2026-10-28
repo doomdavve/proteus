@@ -34,7 +34,7 @@ OCOBS_DIR = DOWNLOADS / "smhi-ocobs"
 
 # The `osmium extract --bbox` envelope, west/south/east/north. Land polygons are clipped to
 # the same box so A0.3 can distinguish source boundaries from real shoreline.
-ENVELOPE = (11.5702598, 57.6141283, 11.9585149, 57.7225589)
+ENVELOPE = (11.5702598, 57.6141283, 11.9900000, 57.7225589)
 VINGA_A = (11.6048, 57.6322)
 ORIGIN = (11.9089495, 57.6973921)
 WEATHER_FROM = "2026-10-24T00:00:00Z"
@@ -44,6 +44,8 @@ MAJOR_HIGHWAYS = {
     "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified",
     "residential", "living_street", "pedestrian", "service", "busway", "road",
 }
+# Since A3.5f: tram and rail lines, for the upstream street life.
+RAILWAYS = {"tram", "rail", "light_rail"}
 LANDMARK_MAN_MADE = {"lighthouse", "beacon", "pier", "breakwater", "bridge", "groyne",
                      "quay", "mast", "tower", "crane", "chimney", "water_tower"}
 LANDMARK_NATURAL = {"coastline", "water", "rock", "bare_rock", "stone", "beach", "wetland",
@@ -70,6 +72,8 @@ def keep_feature(tags):
             or tags.get("landuse") in {"harbour", "port", "industrial"}
             or tags.get("leisure") == "marina" or tags.get("amenity") == "ferry_terminal"
             or tags.get("tourism") in {"attraction", "viewpoint", "museum"}):
+        return True
+    if tags.get("railway") in RAILWAYS:
         return True
     return tags.get("highway") in MAJOR_HIGHWAYS
 

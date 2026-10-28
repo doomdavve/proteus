@@ -378,10 +378,16 @@ def carve_marks(water, mark_list):
 
 
 def dress(osm, frame, region, crop, water, land, model, fort, multipolygon):
-    """Triangles ((three (x, y, z)), colour) and manifest stats for the outer dressing."""
+    """(buildings, other) triangles ((three (x, y, z)), colour) and manifest stats.
+
+    Since A3.5f the buildings are returned apart: the bake puts them before the authored
+    range, like the river's own buildings, so the renderers give their walls facades and
+    windows. Cranes, masts, marks and trees stay authored, in flat colours.
+    """
+    houses = Builder()
     builder = Builder()
     outside = land.difference(crop)
-    stats, solids, port = add_buildings(builder, osm, frame, outside, model, fort,
+    stats, solids, port = add_buildings(houses, osm, frame, outside, model, fort,
                                          multipolygon)
     port_zone = [port.buffer(40)]
     cranes = masts = 0
@@ -414,8 +420,8 @@ def dress(osm, frame, region, crop, water, land, model, fort, multipolygon):
     keep_out = unary_union([solids.buffer(3), unary_union(roads), *port_zone])
     trees = add_trees(builder, outside, keep_out, model)
     stats.update(container_cranes=cranes, lighting_masts=masts, marks=placed, trees=trees,
-                 triangles=len(builder.triangles))
-    return builder.triangles, stats
+                 building_triangles=len(houses.triangles), triangles=len(builder.triangles))
+    return houses.triangles, builder.triangles, stats
 
 
 def self_test():

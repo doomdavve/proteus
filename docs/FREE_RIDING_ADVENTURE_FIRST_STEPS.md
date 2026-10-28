@@ -1501,8 +1501,9 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.5c | A3.5b | The river kit in `outer` (user request): the Eriksberg crane, the bridge deck, cafe, street furniture, frontages, quay fittings and forecourts, laid out as in the river and set on the terrain | Complete 2026-10-27; [result](#a35c-result-2026-10-27) |
 | A3.5d | A3.5f | Göteborg landmarks from OSM in the bake (user request, [backlog](#landmark-backlog-2026-10-27)): towers, masts, chimneys and cranes, `building:part` heights and bridge outlines, over the extended map | Proposed |
 | A3.5e | A3.5c | A docked Stena Line ro-pax ferry across the river from the Eriksberg crane (user must-have; [plan](#a35e--the-stena-ferry-at-eriksberg)) | Complete 2026-10-27; [result](#a35e-result-2026-10-27) |
-| A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Proposed |
+| A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Complete 2026-10-28; [result](#a35f-result-2026-10-28) |
 | A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Proposed |
+| A3.5j | A3.5g | The upstream city brought to life (user request, 2026-10-28): Älvsnabben-style river ferries between the piers, Hisingsbron's span lifting for a tall ship, trams and cars on the bridge and streets, Barken Viking, a marina and gulls at Lilla Bommen | Proposed |
 | A3.5h | A3.5a | The local weather transition, the first half of A3.5: the exposure grows from calm water once the boat heads out, is seen from afar as a squall in the sky, and dims the light near it | Complete 2026-10-28; [result](#a35h-result-2026-10-28) |
 | A3.5i | A3.5h | The rest of A3.5: bounded per-region detailed-asset loading (the bake out of the 33 MB header first, as A3.5f needs); cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Bake out of the binary and browser loading per location done 2026-10-28 ([result](#a35i-result-2026-10-28)); tile residency deferred |
 
@@ -2360,7 +2361,73 @@ plus a tile cache; Ortofoto later, for colours only.
   - Unplayed by a person.
 
 **Next: A3.5f**, extending the map upstream to Karlatornet, Lilla Bommen and Hisingsbron, with
-A3.5d's OSM re-extract and Höjdmodell `640_14`.
+A3.5d's OSM re-extract and Höjdmodell `640_14` (2026-10-28: [done](#a35f-result-2026-10-28);
+`640_14` was not needed).
+
+### A3.5f result, 2026-10-28
+
+Branch `adventure-a3-5f`, from `main` after pull request #44. The user: "Continue with the
+adventure! I'm excited about being able to explore upstream too! We should use all the tricks in
+the book to make the city feel as alive as possible." They chose, for after the geography and
+the three landmarks, river ferries with the Hisingsbron lift, trams and cars, and moored life
+at Lilla Bommen (A3.5j), all on this branch with a commit per step.
+
+- **Tooling:** the pinned `requirements.txt` installed into `build/adventure-venv` (Python
+  3.14.2). Before any change, a re-bake of the A3.5i map gave the same water triangles and
+  route. 2 of 386,505 triangles and 1 cm values in about 40 kit-ground rows differed, because since
+  A3.5i the river overlay is read from the pack's float32 values instead of the old header's
+  0.1 mm decimals (A3.5i noted that the generators had not been rerun).
+- **Sources:** the OSM corridor's east edge moved from 11.9585149 to 11.99° E and tram and rail
+  lines are kept. The new extract comes from the same Sweden PBF, so it is the same snapshot,
+  and `--check` passes ([source notes](adventure/README.md#coastal-sources-a02-2026-10-25)). The
+  Höjdmodell grid's window grew to E 4,500 and N 2,400 m from the same two zips (81 tiles, 3.4
+  MB). `640_14` was not needed: `639_14` reaches N 6400 km, about 2,417 m north of the crane,
+  as computed with pyproj.
+- **Region:** `UPSTREAM` = E 950–4,200 m, N −300–2,300 m, joined to the river crop and the slice
+  (24.97 km², up from 16.52). The water is still the part connected to the dock: Göta älv past
+  Lindholmen, Stenpiren, Lilla Bommen and Hisingsbron to the region's north edge, and the
+  Frihamnen and Lindholmen basins. The Vallgraven moat and Stora Hamnkanalen are connected too,
+  so they are navigable. Where the river and the moat leave the region the water ends at a
+  playable boundary (5,165 m in all; the crop's old east edge across the river is now
+  interior). No bridge supports are mapped on Hisingsbron, so nothing is carved there yet
+  (A3.5g).
+- **Buildings with windows:** the dressing's buildings (A3.5a's and about 2,800 new upstream ones,
+  4,768 in all) now come before the authored range, like the river's own. The renderers
+  therefore give their walls in the city tints facades, windows and roofs on both CPU and GPU;
+  houses keep their colours. This also changes A3.5a's buildings downstream of the crop. Mapped
+  heights are used as before, so Lilla Bommen stands at 86 m (Karlatornet, 246 m, is above the
+  200 m cap and still a placeholder; A3.5g builds both). Museum ships at Maritiman and Barken
+  Viking are mapped as `building=ship` in the water and are not drawn.
+- **Output:** 609,186 triangles (386,505), 355,304 vertices, 3,703 water triangles (2,738), pack
+  5,298,326 bytes (3,450,563). Heights up to 111.5 m. Bake about 66 s.
+- **Tests:** `boat_outer_map` adds an upstream route (dock to the river's exit past
+  Hisingsbron, 13 waypoints, every 10 m with the 8 m envelope) and the generator asserts it too.
+  Indexed and exhaustive queries were compared on 20,000 points over the extended region, with
+  no water past the upstream edge.
+- **Captures (agent review, 2026-10-28, macOS arm64, 2 s scripted screenshot):** toward Lilla
+  Bommen from mid-river, [GPU](adventure/upstream-lilla-bommen-gpu.png) and
+  [CPU](adventure/upstream-lilla-bommen-cpu.png) (`--location outer --start -3150,1550,270`).
+  Upstream from Lindholmen, [GPU](adventure/upstream-lindholmen-gpu.png) and
+  [CPU](adventure/upstream-lindholmen-cpu.png) (`--start -2000,750,240`). The `--start` heading
+  is the compass bearing less 180°. The upstream city reads as blocks with windows in brick and
+  plaster tints, with Lilla Bommen's tower on the south bank.
+- **Measured cost (Debug, M1 Max):** GPU scene submission (CPU time, not GPU completion) over 400
+  windowed, unpaced frames, through a temporary uncommitted exit print of the existing profiler
+  history: p95 3.8–4.0 ms at Lilla Bommen and Lindholmen, against 3.7 ms for the river
+  location's dock view in the same session. Peak resident memory of a 3 s CPU capture at the
+  outer dock was 254 MB (A3.5i: 236 MB), against 239 MB for the river location. The native tile
+  cache stays deferred: memory is within the 256 MiB scenery target.
+- **Verification (2026-10-28, macOS arm64, Debug, `PROTEUS_GPU_TESTS=ON`, display available):**
+  build warning-free; `ctest --preset full` passed 261 of 262 active tests. The failure,
+  `boat_outer_map`, was its pinned dressing count after the buildings moved; it passed after the
+  update. The three generators' self-tests passed.
+- **Limitations:**
+  - Unplayed. Only the views above were captured. The moat and canals, the region's north
+    edge and the Frihamnen basins were not examined in game.
+  - Untagged central buildings use A3.5a's guesses (8–14 m), so the old town is lower than it
+    really is. No `building:part`s, roofs or churches are modelled.
+  - The A0.3 survey's coverage figures predate the wider corridor and were not regenerated.
+  - The web build was not rebuilt for this step.
 
 ## Verification and handoff template
 

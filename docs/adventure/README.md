@@ -29,7 +29,17 @@ never fetch or read these sources.
 
 The envelope is the river crop united with SMHI's Vinga A position, expanded by 2 km in
 EPSG:3007: longitude 11.5702598…11.9585149, latitude 57.6141283…57.7225589. It is a
-first source box, not the playable boundary.
+first source box, not the playable boundary. **A3.5f (2026-10-28)** moved its east edge to
+11.99° E (about 4,830 m east of the crane) so the corridor covers Göta älv upstream past
+Lindholmen, Stenpiren, Lilla Bommen and Hisingsbron, and kept tram and rail lines
+(`railway=tram|rail|light_rail`) as well. It was re-extracted offline from the same pinned
+Sweden PBF (same snapshot) with the command below; `--check` passes against the new hashes.
+The extract keeps every tag of a selected element, so A3.5d's heights, levels, `building:part`,
+bridge outlines and ferry routes are present. 102,306 ways, 2,705 points and 2,163 relations
+were retained (35.3 MB uncompressed, 7.4 MB gzipped). The four newly incomplete relations are
+Sweden's and the EU's boundaries and the Säveån and Mölndalsån waterway routes, none of them
+water areas. The A0.3 survey artifacts were made from the A0.2 corridor and were not
+regenerated.
 
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright),
 [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/); land polygons processed by
@@ -71,7 +81,7 @@ Installed and used on 2026-10-25 (macOS arm64): osmium-tool 1.19.1 from Homebrew
 [`requirements.txt`](requirements.txt); see the [survey section](#route-and-coverage-survey-a03-2026-10-25).
 
 ```sh
-osmium extract --bbox 11.5702598,57.6141283,11.9585149,57.7225589 \
+osmium extract --bbox 11.5702598,57.6141283,11.99,57.7225589 \
   --strategy smart -S types=multipolygon --set-bounds \
   build/adventure/downloads/sweden-261024.osm.pbf \
   -o build/adventure/downloads/gothenburg-vinga-261024.osm.pbf
@@ -280,17 +290,22 @@ ground model (markmodell) from airborne laser scanning on 9, 15 and 16 May 2022 
 points/m², **CC0 1.0**, EPSG:3007 (SWEREF 99 12 00), heights in **RH 2000**. It replaces
 [Baskarta](#terrain-baskarta-a31b-2026-10-26), which is kept as an independent check.
 
-[`terrain-hojdmodell.bin.gz`](sources/terrain-hojdmodell.bin.gz) (1.7 MB) holds a 5 m grid
-over the slice window (W −5600 to E 1250 m, S −4200 to N 1100 m from the crane origin; 1,371 ×
-1,061 cells) as int16 centimetres after a one-line JSON header. That header records the frame,
-the cell rule, the 48 tiles read and the SHA-256 of each input zip.
+[`terrain-hojdmodell.bin.gz`](sources/terrain-hojdmodell.bin.gz) (3.4 MB) holds a 5 m grid
+over the terrain window (W −5600 to E 4500 m, S −4200 to N 2400 m from the crane origin; 2,021 ×
+1,321 cells) as int16 centimetres after a one-line JSON header. That header records the frame,
+the cell rule, the 81 tiles read and the SHA-256 of each input zip. A3.5f (2026-10-28) widened
+the window east and north from the slice's (E 1250, N 1100 m; 48 tiles, 1.7 MB) to cover the
+river upstream past Hisingsbron, from the same two zips: `639_14` reaches N 6400 km, about
+2,417 m north of the crane, and E 150 km, so `640_14` was not needed. Cells inside the old
+window are unchanged; heights now reach 111.5 m (Ramberget and the hills above Masthugget).
 `tools/prepare_terrain_dem.py ZIP...` regenerates it from the downloaded zips (read in place,
 in name order, so the result does not depend on the argument order); `--self-test` needs no
 input. It needs `tifffile` and `imagecodecs` from `requirements.txt`.
 
 - **Obtained:** downloaded by hand by the user from the product page, 2026-10-27:
   `hojdmodell_2022_639_13.zip` (`9d3f3bb8…`) and `hojdmodell_2022_639_14.zip` (`1a525430…`),
-  together the 1 km tiles E 138–145 km, N 6393–6398 km. Not committed.
+  together the 1 km tiles E 130–149 km, N 6390–6399 km (the bake reads the 81 that touch the
+  window). Not committed.
 - **Format:** each tile is a 2000 × 2000 float32 GeoTIFF at 0.5 m (LZW, 256 × 256 blocks, nodata
   −9999). The tool checks each tile's EPSG key, pixel size and tie point, and places edge tiles
   (some are narrower) by their tie points.
@@ -309,7 +324,8 @@ input. It needs `tifffile` and `imagecodecs` from `requirements.txt`.
   can resample on the server (`scalefactor`, `scalesize`). The WMS serves only rendered images,
   which are no use for heights. The zips are kept as the bake input because their hashes pin
   the bake; the WCS is an option for larger or later areas.
-- **Coverage:** these two zips cover only the first slice. Vinga is outside Höjdmodell 2022
+- **Coverage:** these two zips cover the first slice and the river up to N 6400 km (about
+  z = +2,417 m; A3.5f's region stops at +2,300 m). Vinga is outside Höjdmodell 2022
   as well, so A4 still needs the Lantmäteriet model (ordered 2026-10-26).
 
 ## Terrain: Baskarta (A3.1b, 2026-10-26)
