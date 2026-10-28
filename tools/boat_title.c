@@ -555,44 +555,54 @@ static void draw_credits(const Title *t)
     }
     for (int x = -320; x <= 640; x += 64)
         DrawLine(160 + (x - 160) / 8, 73, x, 185, Fade(p.border, .2f));
-    // Solid backing keeps attribution readable at every point in the animation.
-    Color backing = p.panel;
-    backing.a = 255;
-    DrawRectangle(22, 58, 276, 77, backing);
-    DrawRectangleLines(22, 58, 276, 77, p.border);
-    const char *heading = "CREDITS / A PROTEUS GAME";
-    draw_text(t->ui, heading, (WIDTH - text_width(t->ui, heading)) / 2, 64, p.selected);
-    static const char *const labels[]
-        = { "ACID WAKE", "HEIGHT MAP DATA HELP", "M5X7 / M3X6 FONTS", "MAP DATA", "BUILT WITH" };
-    static const char *const names[] = { "bjoto", "wistrand", "Daniel Linssen",
-        "OpenStreetMap contributors / ODbL", "raylib / ENet / libcurl" };
-    for (int i = 0; i < 5; ++i) {
-        draw_text(t->small, labels[i], 30, 79 + i * 10, p.hint);
-        draw_text(i == 3 ? t->small : t->ui, names[i], 151, 78 + i * 10, p.text);
-    }
-    // Classic sine scroller, clipped in the native render target rather than window space.
-    static const char message[]
-        = "WAKE VELOCITY   //   A PROTEUS GAME   //   "
-          "ACID WAKE BY BJOTO   //   HEIGHT MAP DATA HELP BY WISTRAND   //   "
-          "FONTS BY DANIEL LINSSEN   //   MAP DATA: OPENSTREETMAP CONTRIBUTORS (ODbL)   //   "
-          "BUILT WITH RAYLIB, ENET AND LIBCURL   //   GREETINGS FROM THE GOTHENBURG WATERFRONT!   "
-          "//   ";
-    int period = text_width(t->ui, message);
-    int origin = 16 - (int)fmod(elapsed * 34, period + 64);
-    for (int copy = 0; copy < 2; ++copy) {
-        int x = origin + copy * (period + 64);
-        for (size_t i = 0; message[i]; ++i) {
-            char letter[2] = { message[i], 0 };
-            if (x >= 5 && x < WIDTH - 10) {
-                int y = 147 + (int)roundf(sinf(x * .04f + phase * 2) * 6);
-                draw_text(t->ui, letter, x + 1, y + 1, p.shadow);
-                draw_text(t->ui, letter, x, y, i % 24 < 12 ? p.selected : p.text);
-            }
-            x += text_width(t->ui, letter);
+    const char *heading = "CREDITS";
+    DrawRectangle(119, 49, 82, 14, p.panel);
+    draw_text(t->ui, heading, (WIDTH - text_width(t->ui, heading)) / 2, 52, p.selected);
+    // A movie-style roll: one font, centred lines and a quiet gap between sections.
+    static const struct {
+        const char *text;
+        bool heading;
+    } lines[] = {
+        { "THANKS TO", true },
+        { "bjoto", false },
+        { "w", false },
+        { "", false },
+        { "", false },
+        { "FONTS", true },
+        { "Daniel Linssen", false },
+        { "m5x7 / m3x6", false },
+        { "", false },
+        { "", false },
+        { "MAP DATA", true },
+        { "OpenStreetMap contributors", false },
+        { "ODbL 1.0", false },
+        { "", false },
+        { "", false },
+        { "LIBRARIES", true },
+        { "raylib", false },
+        { "ENet", false },
+        { "libcurl", false },
+        { "", false },
+        { "", false },
+        { "A PROTEUS GAME", true },
+    };
+    int count = (int)(sizeof(lines) / sizeof(lines[0]));
+    int period = count * 14 + 112;
+    int origin = 98 - (int)fmod(elapsed * 10, period);
+    DrawLine(24, 64, 296, 64, p.border);
+    DrawLine(24, 165, 296, 165, p.border);
+    // Scissor coordinates are in the title's native 320x200 render target.
+    BeginScissorMode(24, 66, 272, 97);
+    for (int copy = 0; copy < 2; ++copy)
+        for (int i = 0; i < count; ++i) {
+            int y = origin + copy * period + i * 14;
+            if (y < 59 || y >= 163 || !lines[i].text[0])
+                continue;
+            int x = (WIDTH - text_width(t->ui, lines[i].text)) / 2;
+            draw_text(t->ui, lines[i].text, x + 1, y + 1, p.shadow);
+            draw_text(t->ui, lines[i].text, x, y, lines[i].heading ? p.selected : p.text);
         }
-    }
-    DrawLine(8, 138, 312, 138, p.border);
-    DrawLine(8, 165, 312, 165, p.border);
+    EndScissorMode();
     DrawRectangleRec(row_bounds(t, 0), p.selected);
     draw_text(t->ui, "< BACK", 142, 175, p.selected_text);
 }
@@ -608,7 +618,7 @@ static void draw_screen(const Title *t, const BoatTitleSettings *s, const char *
         draw_credits(t);
     else
         draw_menu(t, s, status);
-    draw_footer_text(t->small, PROTEUS_VERSION, 8);
+    draw_footer_text(t->panel == PANEL_CREDITS ? t->ui : t->small, PROTEUS_VERSION, 8);
     EndTextureMode();
 }
 
