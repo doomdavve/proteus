@@ -9,6 +9,8 @@
 #include <string.h>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#define NOGDI // raylib's Rectangle, CloseWindow and ShowCursor.
+#define NOUSER
 #include <windows.h>
 #else
 #include <fcntl.h>

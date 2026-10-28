@@ -40,7 +40,7 @@ jobs:
 
       - name: Build Wake Velocity, room server and validators
         run: |
-          $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net', 'validate_boat_directory'
+          $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net', 'validate_boat_directory', 'validate_boat_plugin', 'validate_boat_plugin_session'
           cmake --build build-win --config Release --target $targets --parallel 2>&1 |
             Tee-Object -FilePath build-win/build.log
           if ($LASTEXITCODE -ne 0) {
@@ -56,7 +56,7 @@ jobs:
       - name: Run boat CPU and multiplayer checks
         run: >-
           ctest --test-dir build-win -C Release --output-on-failure
-          -R '^(boat_handling\..*|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_net\..*|boat_net_enet\..*|boat_net_process|boat_host|boat_directory)$'
+          -R '^(boat_handling\..*|boat_screenshot|boat_river_screenshot|boat_server_scripted|wake_velocity_serve_scripted|boat_net\..*|boat_net_enet\..*|boat_net_process|boat_host|boat_directory|boat_plugin\..*|boat_plugin_session\..*|wake_velocity_plugin_.*)$'
 
       - name: Package portable Wake Velocity
         run: |
