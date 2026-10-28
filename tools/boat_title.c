@@ -625,25 +625,11 @@ static bool open_title(Title *t)
     if (!IsImageValid(wordmark))
         return false;
 #if PROTEUS_WARM_MENU
-    // Keep the authored silhouette, stems and spacing; give each glyph a bright
-    // cartoon ink inside a strong navy edge and offset shadow.
-    ImageFormat(&wordmark, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-    ImageColorReplace(&wordmark, rgb(174, 245, 238), rgb(19, 47, 55));
-    ImageColorReplace(&wordmark, rgb(231, 128, 105), rgb(19, 47, 55));
-    static const int starts[] = { 0, 29, 50, 71, 99, 122, 143, 162, 183, 204, 213, 234 };
-    static const Color inks[] = { { 247, 91, 76, 255 }, { 88, 202, 234, 255 },
-        { 255, 218, 83, 255 }, { 112, 207, 76, 255 } };
-    Color *letters = wordmark.data;
-    for (int y = 0; y < wordmark.height; ++y)
-        for (int x = 0; x < wordmark.width; ++x) {
-            Color *pixel = &letters[y * wordmark.width + x];
-            if (pixel->r != 12 || pixel->g != 45 || pixel->b != 72)
-                continue;
-            unsigned glyph = 0;
-            while (glyph + 1 < sizeof(starts) / sizeof(starts[0]) && x >= starts[glyph + 1])
-                ++glyph;
-            *pixel = inks[glyph % (sizeof(inks) / sizeof(inks[0]))];
-        }
+    // Keep the authored silhouette, stems and spacing with one sunny yellow ink
+    // inside a strong navy edge and offset shadow.
+    ImageColorReplace(&wordmark, rgb(174, 245, 238), rgb(19, 40, 62));
+    ImageColorReplace(&wordmark, rgb(231, 128, 105), rgb(19, 40, 62));
+    ImageColorReplace(&wordmark, rgb(12, 45, 72), boat_ui_palette().selected);
 #endif
     t->wordmark = LoadTextureFromImage(wordmark);
     UnloadImage(wordmark);

@@ -2,11 +2,11 @@
 
 Status: revised 2026-10-28. This document owns the title, menu and promotion of
 **Wake Velocity**. Two compile-time palettes now share the same backdrop placement, geometric
-wordmark, m5x7/m3x6 fonts and menu flows. Cartoon daylight is the default; configure with
+wordmark, m5x7/m3x6 fonts and menu flows. Marine cartoon daylight is the default; configure with
 `-DPROTEUS_WARM_MENU=OFF` to retain the user-selected cyan dusk design from 2026-10-27.
 The shared title retains single-player setup, public/LAN/address joining, hosting and saved
 settings. Volume settings, title music and a live river backdrop remain deferred.
-Next: user comparison of both palettes and physical input/playback review; native/browser
+Next: user review of the marine blue/yellow refinement and physical input/playback review; native/browser
 package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
@@ -14,11 +14,14 @@ Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtrack
 ## Warm daylight alternative and shared game typography, 2026-10-28
 
 Completed: `PROTEUS_WARM_MENU=ON` (default) uses the fixed river capture's bright original
-daylight colours, grassy green panels, cream text and sunny yellow selection. The title's
-interiors alternate red, blue, yellow and green, with a dark navy edge and offset shadow.
+daylight colours, marine blue panels, cream text and sunny yellow selection. The title's
+interior uses one yellow ink, with a dark navy edge and offset shadow.
 The user liked the initial daylight direction but found its brown panels/title grade too
 brown; the supplied Super Mario World reference inspired the brighter cartoon palette.
-That earlier brown/terracotta treatment is superseded. OFF retains the original cyan title/dusk grade and occupied windows. Both use
+The user liked the cartoon feeling but found green panels and a multicolour title too
+close to the reference. Marine blue panels and a single yellow title supersede that
+intermediate version and the earlier brown/terracotta treatment. OFF retains the original
+cyan title/dusk grade and occupied windows. Both use
 exactly the same captured river geometry, logo silhouette, fonts, title placement and row
 bounds. No new generated art or asset changes are required. There is no runtime theme setting.
 
@@ -36,7 +39,7 @@ Review captures:
 ![Warm pause menu and matching instrument type](title/warm-pause.png)
 
 Verification, 2026-10-28, Apple Silicon/macOS: Debug builds passed for both ON and OFF.
-Final `ctest --preset full`: all 230 enabled tests passed (14.79 s), with 15 retired
+Final `ctest --preset full`: all 230 enabled tests passed (14.46 s), with 15 retired
 experiments disabled and `PROTEUS_GPU_TESTS=OFF`. The initial sandboxed run could not bind
 local test sockets; the full run with socket access passed. No project warnings; the first
 raylib build reported its existing bundled stb_vorbis pointer-comparison warning.

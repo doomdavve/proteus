@@ -122,8 +122,8 @@ is calm and clear of both boats. See the
 
 `./build/wake_velocity` without options (and the packaged macOS app and Windows `launch.bat`)
 opens the **Wake Velocity** title: SINGLE PLAYER, MULTIPLAYER, SETTINGS and EXIT.
-The default cartoon daylight interface uses grassy green panels, sunny yellow selection,
-cream text and colourful title inks over the boat-free daylight river capture. The backdrop placement and geometric title are shared with the retained
+The default cartoon daylight interface uses marine blue panels, sunny yellow selection,
+cream text and a single yellow title ink over the boat-free daylight river capture. The backdrop placement and geometric title are shared with the retained
 cyan dusk version. Select the palette at compile time, then rebuild:
 
 ```sh
