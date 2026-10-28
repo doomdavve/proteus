@@ -53,5 +53,6 @@ BoatWater boat_world_test_water(
     BoatWater water = boat_water_test(waves, current, crossing);
     water.current_center = definition->current_center;
     water.wake_offset = definition->wake_offset;
+    water.upstream = definition->upstream;
     return water;
 }

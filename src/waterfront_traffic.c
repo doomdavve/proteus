@@ -1,6 +1,7 @@
 #include "waterfront_traffic.h"
 
 #include "raymath.h"
+#include "waterfront_upstream.h"
 
 #include <math.h>
 
@@ -13,7 +14,9 @@ static bool initialized;
 
 BoatModelSpec waterfront_traffic_spec(int index)
 {
-    if (index < 0 || index >= WATERFRONT_TRAFFIC_VESSELS)
+    if (index >= WATERFRONT_TRAFFIC_VESSELS)
+        return waterfront_upstream_spec(index - WATERFRONT_TRAFFIC_VESSELS);
+    if (index < 0)
         return (BoatModelSpec) { 0 };
     BoatModelSpec spec = boat_model_preset(kinds[index]);
     if (index == 0) {
@@ -25,7 +28,9 @@ BoatModelSpec waterfront_traffic_spec(int index)
 
 const Mesh3D *waterfront_traffic_mesh(int index)
 {
-    if (index < 0 || index >= WATERFRONT_TRAFFIC_VESSELS)
+    if (index >= WATERFRONT_TRAFFIC_VESSELS)
+        return waterfront_upstream_mesh(index - WATERFRONT_TRAFFIC_VESSELS);
+    if (index < 0)
         return NULL;
     if (!initialized) {
         for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i)
@@ -37,6 +42,8 @@ const Mesh3D *waterfront_traffic_mesh(int index)
 
 double waterfront_traffic_period(int index)
 {
+    if (index >= WATERFRONT_TRAFFIC_VESSELS && index < WATERFRONT_TRAFFIC_ALL)
+        return WATERFRONT_UPSTREAM_PERIOD;
     if (index < 0 || index >= WATERFRONT_TRAFFIC_VESSELS)
         return 0;
     return index == 0 ? (260 + 28 * (double)PI) / dock_speed : index == 3 ? 320 : 260;
@@ -50,8 +57,10 @@ static double wrapped(double value, double period)
 
 WaterfrontVesselMotion waterfront_traffic_motion(int index, double time)
 {
+    if (index >= WATERFRONT_TRAFFIC_VESSELS)
+        return waterfront_upstream_motion(index - WATERFRONT_TRAFFIC_VESSELS, time);
     WaterfrontVesselMotion out = { 0 };
-    if (index < 0 || index >= WATERFRONT_TRAFFIC_VESSELS || !isfinite(time))
+    if (index < 0 || !isfinite(time))
         return out;
     Vector2 p, v, a = { 0 };
     if (index == 0) {
@@ -103,7 +112,10 @@ static Vector3 wake_point(int index, double time, float age, int side, bool phys
 {
     BoatModelSpec spec = waterfront_traffic_spec(index);
     WaterfrontVesselMotion motion = waterfront_traffic_motion(index, time - age);
-    Vector3 forward = Vector3Normalize(motion.velocity);
+    // Upstream ferries stop at their piers, so their trails follow the heading.
+    Vector3 forward = index < WATERFRONT_TRAFFIC_VESSELS
+        ? Vector3Normalize(motion.velocity)
+        : (Vector3) { -sinf(motion.heading), 0, -cosf(motion.heading) };
     Vector3 right = { -forward.z, 0, forward.x };
     return Vector3Add(Vector3Subtract(motion.position, Vector3Scale(forward, spec.length * .54f)),
         Vector3Scale(right, side * (physical ? .9f + age * 2.4f : spec.beam * .42f + age * .38f)));
@@ -149,7 +161,8 @@ bool waterfront_traffic_wakes_step(BoatWakeObjects *wakes, double time)
 void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame)
 {
     *frame = (WaterfrontTrafficFrame) { 0 };
-    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
+    frame->vessel_count = water.upstream ? WATERFRONT_TRAFFIC_ALL : WATERFRONT_TRAFFIC_VESSELS;
+    for (int i = 0; i < frame->vessel_count; ++i) {
         BoatModelSpec spec = waterfront_traffic_spec(i);
         WaterfrontVesselState *vessel = &frame->vessels[i];
         vessel->id = 3000 + i;
@@ -160,35 +173,47 @@ void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTraffic
             vessel->lights[light] = boat_model_point(vessel->pose,
                 (Vector3) { light == 2 ? 0 : (light ? 1 : -1) * spec.beam * .42f,
                     spec.freeboard + .32f, light == 2 ? spec.length * .42f : -spec.length * .12f });
+        // Upstream vessels keep the visual trails, longer and fading out as they stop.
+        bool upstream = i >= WATERFRONT_TRAFFIC_VESSELS;
+        bool physical = water.traffic_objects && !upstream;
+        int segments = physical ? 16 : WATERFRONT_TRAFFIC_WAKE_SEGMENTS;
+        float step = upstream ? 1.2f : .7f;
         for (int side = -1; side <= 1; side += 2)
-            for (int j = 0; j < (water.traffic_objects ? 16 : WATERFRONT_TRAFFIC_WAKE_SEGMENTS);
-                ++j) {
-                float age = j * .7f;
-                Vector3 a = wake_point(i, time, age, side, water.traffic_objects != NULL);
-                Vector3 b = wake_point(i, time, age + .7f, side, water.traffic_objects != NULL);
+            for (int j = 0; j < segments; ++j) {
+                float age = j * step, strength = 1;
+                if (upstream) {
+                    strength = Vector3Length(waterfront_traffic_motion(i, time - age).velocity) / 3;
+                    if (strength < .1f)
+                        continue;
+                }
+                Vector3 a = wake_point(i, time, age, side, physical);
+                Vector3 b = wake_point(i, time, age + step, side, physical);
                 Vector3 center = Vector3Scale(Vector3Add(a, b), .5f);
                 float length = Vector3Distance(a, b);
                 Vector3 direction = Vector3Subtract(b, a);
                 float yaw = atan2f(-direction.x, -direction.z);
-                float width = water.traffic_objects ? .65f + .035f * age : i == 3 ? .48f : .22f;
+                float width = physical ? .65f + .035f * age
+                    : upstream         ? (spec.mast_height > 0 ? .4f : .62f) * fminf(strength, 1)
+                    : i == 3           ? .48f
+                                       : .22f;
                 Transform3D pose = boat_water_pose(water, time, center, yaw, length, width);
                 pose.position.y += .035f;
                 pose.scale = (Vector3) { width, 1, length };
-                if (water.traffic_objects) {
+                if (physical) {
                     float variation = sinf((float)remainder(time - age, 16) * 2.3f + i * 1.7f);
                     pose.scale.x *= .65f + .35f * variation * variation;
                     pose.scale.z *= .65f; // Broken patches instead of solid lines across the river.
                 }
-                float fade
-                    = (1
-                          - (j + .5f)
-                              / (water.traffic_objects ? 16 : WATERFRONT_TRAFFIC_WAKE_SEGMENTS))
-                    * (i == 2 ? .65f : 1);
+                float fade = (1 - (j + .5f) / segments) * (i == 2 ? .65f : 1);
                 frame->wakes[frame->wake_count++] = (WaterfrontTrafficWake) { .pose = pose,
                     .color
                     = { (unsigned char)Lerp(45, 188, fade), (unsigned char)Lerp(79, 207, fade),
                         (unsigned char)Lerp(104, 202, fade), 255 } };
             }
+    }
+    if (water.upstream) {
+        frame->lift = true;
+        frame->lift_pose = waterfront_upstream_span_pose(time);
     }
     if (water.vessel.height > 0) {
         BoatVesselWake w = water.vessel;
@@ -265,10 +290,12 @@ bool waterfront_traffic_contact_height(Vector2 position, float heading, float bo
     Vector2 forward = { sinf(heading), -cosf(heading) }, right = { cosf(heading), sinf(heading) };
     float mid = (bow - stern) * .5f;
     Vector2 center = Vector2Add(position, Vector2Scale(forward, mid));
-    for (int i = 0; i <= WATERFRONT_TRAFFIC_VESSELS; ++i) {
+    for (int i = 0; i <= WATERFRONT_TRAFFIC_ALL; ++i) {
+        if (i >= WATERFRONT_TRAFFIC_VESSELS && i < WATERFRONT_TRAFFIC_ALL && !water.upstream)
+            continue;
         // The opt-in race trial has its own authored source, separate from scenery traffic.
         // Its conservative box agrees with the shared CPU/GPU trial ferry presentation.
-        bool trial = i == WATERFRONT_TRAFFIC_VESSELS;
+        bool trial = i == WATERFRONT_TRAFFIC_TRIAL;
         Vector2 source;
         if (trial && !boat_vessel_wake_position(water.vessel, time, &source))
             continue;

@@ -4,10 +4,14 @@
 #include "boat_model.h"
 #include "boat_water.h"
 
-#define WATERFRONT_TRAFFIC_VESSELS 4
+#define WATERFRONT_TRAFFIC_VESSELS 4 // The river's circuits, on every mapped location.
+// A3.5j: the outer map's upstream ferries and schooner (waterfront_upstream.h) follow them at
+// indices WATERFRONT_TRAFFIC_VESSELS and up, active only where BoatWater.upstream is set.
+#define WATERFRONT_TRAFFIC_ALL (WATERFRONT_TRAFFIC_VESSELS + 4)
+#define WATERFRONT_TRAFFIC_TRIAL WATERFRONT_TRAFFIC_ALL // Contact index of the race trial ferry.
 #define WATERFRONT_TRAFFIC_WAKE_SEGMENTS 8
 #define WATERFRONT_TRAFFIC_WAKES (WATERFRONT_TRAFFIC_VESSELS * WATERFRONT_TRAFFIC_WAKE_SEGMENTS * 2)
-#define WATERFRONT_TRAFFIC_WAKE_CAPACITY (WATERFRONT_TRAFFIC_VESSELS * 16 * 2 + 32)
+#define WATERFRONT_TRAFFIC_WAKE_CAPACITY (WATERFRONT_TRAFFIC_ALL * 16 * 2 + 32)
 #define WATERFRONT_TRAFFIC_LIGHTS 3
 
 typedef struct {
@@ -28,7 +32,10 @@ typedef struct {
 } WaterfrontTrafficWake;
 
 typedef struct {
-    WaterfrontVesselState vessels[WATERFRONT_TRAFFIC_VESSELS];
+    int vessel_count; // WATERFRONT_TRAFFIC_VESSELS, or WATERFRONT_TRAFFIC_ALL upstream.
+    WaterfrontVesselState vessels[WATERFRONT_TRAFFIC_ALL];
+    bool lift; // Upstream: Hisingsbron's lift span, at LIFT_POSE (waterfront_upstream.h).
+    Transform3D lift_pose;
     int wake_count;
     WaterfrontTrafficWake wakes[WATERFRONT_TRAFFIC_WAKE_CAPACITY];
 } WaterfrontTrafficFrame;
@@ -39,6 +46,8 @@ typedef struct {
     float penetration;
 } WaterfrontTrafficContact;
 
+// INDEX runs to WATERFRONT_TRAFFIC_ALL; the upstream vessels' entries are valid everywhere,
+// but only upstream worlds evaluate, draw and collide with them.
 BoatModelSpec waterfront_traffic_spec(int index);
 const Mesh3D *waterfront_traffic_mesh(int index);
 // Closed authored routes; negative time supports wakes across the start and lap boundary.
@@ -51,7 +60,8 @@ bool waterfront_traffic_wakes_init(BoatWakeObjects *wakes, double time);
 bool waterfront_traffic_wakes_step(BoatWakeObjects *wakes, double time);
 // Full rectangle SAT against moving, padded traffic hulls. Traffic follows its route;
 // only the player responds. No basin traffic or traffic AI. The height-aware variant also
-// checks WATER's opt-in authored ferry hull.
+// checks WATER's opt-in authored ferry hull (vessel WATERFRONT_TRAFFIC_TRIAL) and, where
+// WATER.upstream is set, the upstream vessels.
 bool waterfront_traffic_contact(Vector2 position, float heading, float bow, float stern,
     float half_beam, double time, WaterfrontTrafficContact *contact);
 bool waterfront_traffic_contact_height(Vector2 position, float heading, float bow, float stern,

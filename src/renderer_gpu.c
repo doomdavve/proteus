@@ -3,6 +3,7 @@
 #include "boat_water_mesh.h"
 #include "waterfront_city.h"
 #include "waterfront_corner.h"
+#include "waterfront_upstream.h"
 
 #include "raymath.h"
 #include "rlgl.h"
@@ -883,9 +884,11 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
             || !build_source_mesh(
                 &scene->player_engine[skin], boat_skin_mesh(skin, BOAT_SKIN_ENGINE)))
             goto failed;
-    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i)
+    for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
         if (!build_source_mesh(&scene->traffic_boats[i], waterfront_traffic_mesh(i)))
             goto failed;
+    if (!build_source_mesh(&scene->lift_span, waterfront_upstream_span_mesh()))
+        goto failed;
     for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i)
         if (!build_source_mesh(&scene->harbor_boats[i], waterfront_harbor_boat_mesh(i)))
             goto failed;
@@ -1464,15 +1467,17 @@ static void draw_traffic(const WaterfrontGpuScene *scene, Material material,
     const WaterfrontTrafficFrame *traffic = &frame->traffic;
     bool lights = material.shader.id != scene->shadow_shader.id;
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
-    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
+    for (int i = 0; i < traffic->vessel_count; ++i) {
         const WaterfrontVesselState *vessel = &traffic->vessels[i];
         draw_colored_mesh(scene->traffic_boats[i], material, vessel->pose, WHITE, false);
-        float size = i == 3 ? .32f : .18f;
+        float size = i >= 3 ? .32f : .18f;
         for (int light = 0; lights && light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
             draw_colored_mesh(scene->cube, material,
                 (Transform3D) { .position = vessel->lights[light], .scale = { size, size, size } },
                 colors[light], true);
     }
+    if (traffic->lift)
+        draw_colored_mesh(scene->lift_span, material, traffic->lift_pose, WHITE, false);
     for (int i = 0; foam && i < traffic->wake_count; ++i)
         draw_colored_mesh(
             scene->plane, material, traffic->wakes[i].pose, traffic->wakes[i].color, false);
@@ -1995,9 +2000,11 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
             UnloadMesh(scene->gull[part]);
     if (scene->cube.vaoId != 0)
         UnloadMesh(scene->cube);
-    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i)
+    for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
         if (scene->traffic_boats[i].vaoId)
             UnloadMesh(scene->traffic_boats[i]);
+    if (scene->lift_span.vaoId)
+        UnloadMesh(scene->lift_span);
     for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i)
         if (scene->harbor_boats[i].vaoId)
             UnloadMesh(scene->harbor_boats[i]);

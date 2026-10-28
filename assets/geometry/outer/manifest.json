@@ -100,8 +100,8 @@
   "playable_boundary_m": 5165.3,
   "route_length_m": 6016.9,
   "route_min_shore_clearance_m": 27.6,
-  "vertices": 357084,
-  "triangles": 612253,
+  "vertices": 357048,
+  "triangles": 612173,
   "water_triangles": 3731,
   "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3); outside it buildings (A3.5a; since A3.5f before the authored range, with windows), container cranes, port masts, channel marks and trees (A3.5a)",
   "dressing": {
@@ -128,7 +128,7 @@
         "top_m": 87.6
       },
       "hisingsbron": {
-        "triangles": 1076,
+        "triangles": 996,
         "axis_north": [
           3381.92,
           2144.23
@@ -147,7 +147,8 @@
           330.3
         ],
         "piers": 6,
-        "clearance_m": 12.0
+        "clearance_m": 12.0,
+        "lift_span": "runtime waterfront_upstream.c; omitted from scenery"
       },
       "assumptions": "Footprints, the bridge line and the towers' heights are OSM (Karlatornet 246 m, Lilla Bommen 86 m) or Swedish Wikipedia (Hisingsbron: 12 m clearance, 13 m deck, 28 m lifted). Authored by eye: Karlatornet's pale facade with dark glass bands, a 24 degree turn of its upper floors above 70 m, and a brown 15-floor hotel wing on its north-east side; Lilla Bommen's red and white floor bands, dark observation deck and red cap, with no low-rise wing; Hisingsbron's 40 m deck, 90 m lift span on the channel, four 44 m white lift towers, piers every 50 m (carved out of the water) and lamp posts. Colours are authored."
     }
@@ -178,6 +179,6 @@
     "rows": 601,
     "use": "waterfront_outer_ground: the river kit (crane, bridge deck, cafe, street furniture, frontages, quay fittings, cars, lamps and harbour) stands on the baked land surface"
   },
-  "scenery_sha256": "d638bef346265e7e329f9e27b7981b16c18f2b028992670fa43d823413bec71f",
+  "scenery_sha256": "0821ac3940a27de8630c06c3194cf48d5774f99b7ddd147464ff99c52a221325",
   "water_sha256": "633e1beabec9938b3eeb6bb20297c19cadbbd8caab96691b0153726577d71cef"
 }

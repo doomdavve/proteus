@@ -30,6 +30,9 @@ typedef struct {
     // Authored current/crossing-source placement for opt-in water tests.
     float current_center;
     Vector2 wake_offset;
+    // A3.5j: river life upstream of the river crop (ferries, a schooner, Hisingsbron's lift),
+    // which the player collides with; copied into the world's water (BoatWater.upstream).
+    bool upstream;
     // Single-player adventure destination, shelters and exposed water; NULL for none.
     const struct BoatVoyageRoute *voyage;
     // Presentation companion values; physics never reads these.
