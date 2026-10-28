@@ -1,5 +1,6 @@
-/* A3.1: the baked first outer-river slice. Every waypoint and sampled leg of the A0.3 slice route
- * (dock to the Långedrag old harbour) must be water with the survey's 8 m envelope, the indexed
+/* A3.1: the baked first outer-river slice, and since A3.5f the river upstream past Hisingsbron. Every waypoint and sampled leg of the A0.3 slice route
+ * (dock to the Långedrag old harbour) and of the upstream route (UPSTREAM_ROUTE in
+ * tools/prepare_outer_map.py, dock to the river's exit past Hisingsbron) must be water with the survey's 8 m envelope, the indexed
  * queries must equal the exhaustive scan, and points outside the region or over land must not be
  * water. The route is copied from docs/adventure/survey.py (SLICE_ROUTE) in map east/north metres,
  * which the queries take as simulation X = -east, Z = north. */
@@ -22,17 +23,42 @@
     } while (0)
 
 #define ENVELOPE 8.0f
-#define WATER_TRIANGLES 2738 // The manifest's water_triangles.
+#define WATER_TRIANGLES 3731 // The manifest's water_triangles.
 #define BRIDGE_TRIANGLES 4388 // The manifest's river_overlay.bridge_triangles.
-#define DRESSING_TRIANGLES 66352 // The manifest's dressing.triangles.
+#define DRESSING_TRIANGLES 66764 // The manifest's dressing.triangles (cranes, masts, marks, trees).
+#define LANDMARK_TRIANGLES 2773 // A3.5j: baked landmarks, excluding the runtime lift span.
 static const Vector2 route[] = { { 12, 60 }, { 24, -70 }, { 15, -180 }, { -250, -500 },
     { -650, -850 }, { -1100, -960 }, { -3300, -1550 }, { -3850, -2400 }, { -3850, -3150 },
     { -3700, -3310 }, { -3620, -3380 } };
 #define ROUTE_POINTS ((int)(sizeof(route) / sizeof(route[0])))
+static const Vector2 upstream[] = { { 12, 60 }, { 24, -70 }, { 15, -180 }, { 400, 40 },
+    { 900, 380 }, { 1500, 560 }, { 2000, 750 }, { 2500, 1000 }, { 2800, 1250 }, { 3200, 1650 },
+    { 3450, 1950 }, { 3700, 2100 }, { 3950, 2230 } };
+#define UPSTREAM_POINTS ((int)(sizeof(upstream) / sizeof(upstream[0])))
 
 static Vector2 sim(Vector2 east_north) { return (Vector2) { -east_north.x, east_north.y }; }
 
 static float unit(void) { return (float)rand() / (float)RAND_MAX; }
+
+// Every waypoint and a sample every 10 m along each leg is water with the envelope.
+static bool route_water(const BoatMap *map, const Vector2 *points, int count, size_t *legs)
+{
+    for (int i = 0; i < count; ++i) {
+        if (!boat_map_water(map, sim(points[i]), ENVELOPE))
+            return false;
+        if (i == 0)
+            continue;
+        Vector2 a = points[i - 1], b = points[i];
+        int steps = (int)ceilf(hypotf(b.x - a.x, b.y - a.y) / 10.0f);
+        for (int s = 1; s < steps; ++s, ++*legs) {
+            float t = (float)s / (float)steps;
+            Vector2 p = { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
+            if (!boat_map_water(map, sim(p), ENVELOPE))
+                return false;
+        }
+    }
+    return true;
+}
 
 int main(void)
 {
@@ -47,10 +73,12 @@ int main(void)
     const BoatMapDescription *scenery = test_scenery(&waterfront_outer_map);
     CHECK(scenery && boat_map_leading_water(scenery->mesh) == WATER_TRIANGLES);
     // A3.3: the river's bridge triangles start the authored range, which the A3.5a dressing
-    // (buildings, cranes, marks and trees beyond the crop) completes.
+    // (cranes, masts, marks and trees beyond the crop) and A3.5g's landmarks complete. Since
+    // A3.5f the dressing's buildings come before it, with the river's, so the renderers give
+    // them windows.
     CHECK(scenery->bridge_first_triangle < scenery->mesh->triangle_count);
     CHECK(scenery->mesh->triangle_count - scenery->bridge_first_triangle
-        == BRIDGE_TRIANGLES + DRESSING_TRIANGLES);
+        == BRIDGE_TRIANGLES + DRESSING_TRIANGLES + LANDMARK_TRIANGLES);
     CHECK(!boat_map_is_bridge_triangle(scenery, scenery->bridge_first_triangle - 1));
     CHECK(boat_map_is_bridge_triangle(scenery, scenery->bridge_first_triangle));
 
@@ -69,8 +97,9 @@ int main(void)
 
     // The land is Höjdmodell 2022 terrain everywhere, the river crop included: real relief
     // above the water, never below the 1 m floor on its top surface, with hills that rise tens
-    // of metres. The river's bridge (A3.3) reaches its 107.6 m tower tops and the container
-    // cranes (A3.5a) their raised booms at the mapped 118 m above the quay. Water stays at 0.
+    // of metres. The river's bridge (A3.3) reaches its 107.6 m tower tops, the container
+    // cranes (A3.5a) their raised booms at the mapped 118 m above the quay, and Karlatornet
+    // (A3.5g) 246 m above its ground, with its mast. Water stays at 0.
     const Mesh3D *mesh = scenery->mesh;
     float highest = 0, lowest_top = INFINITY;
     for (size_t i = WATER_TRIANGLES; i < mesh->triangle_count; ++i) {
@@ -82,7 +111,7 @@ int main(void)
         if (flo >= .99f) // Land top: every corner at or above the floor.
             lowest_top = fminf(lowest_top, flo);
     }
-    CHECK(highest > 118.0f && highest < 125.0f);
+    CHECK(highest > 250.0f && highest < 260.0f);
     CHECK(lowest_top >= .99f);
     CHECK(mesh->triangle_count > 200000);
 
@@ -101,17 +130,27 @@ int main(void)
     CHECK(waterfront_outer_ground(-1400, -1500) != 3.5f); // The crop's far corner is covered.
 
     size_t legs = 0;
-    for (int i = 0; i < ROUTE_POINTS; ++i) {
-        CHECK(boat_map_water(&map, sim(route[i]), ENVELOPE));
-        if (i == 0)
-            continue;
-        Vector2 a = route[i - 1], b = route[i];
-        int steps = (int)ceilf(hypotf(b.x - a.x, b.y - a.y) / 10.0f);
-        for (int s = 1; s < steps; ++s, ++legs) {
-            float t = (float)s / (float)steps;
-            Vector2 p = { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
-            CHECK(boat_map_water(&map, sim(p), ENVELOPE));
+    CHECK(route_water(&map, route, ROUTE_POINTS, &legs));
+    CHECK(route_water(&map, upstream, UPSTREAM_POINTS, &legs));
+
+    // A3.5g: Hisingsbron's lift towers stand in the river beside the lift span, which stays
+    // open water. Its axis runs from the manifest's axis_north to axis_south; the span covers
+    // stations 177.6 to 267.6 m and the towers stand 23 m either side of the axis at its ends.
+    {
+        const Vector2 north = { 3381.92f, 2144.23f }, south = { 3626.84f, 1780.81f };
+        float length = hypotf(south.x - north.x, south.y - north.y);
+        Vector2 u = { (south.x - north.x) / length, (south.y - north.y) / length };
+        Vector2 v = { -u.y, u.x };
+        for (int end = 0; end < 2; ++end) {
+            float s = end ? 267.6f : 177.6f;
+            for (int side = -1; side <= 1; side += 2) {
+                Vector2 tower = { north.x + u.x * s + v.x * 23.0f * (float)side,
+                    north.y + u.y * s + v.y * 23.0f * (float)side };
+                CHECK(!boat_map_water(&map, sim(tower), 0));
+            }
         }
+        Vector2 channel = { north.x + u.x * 222.6f, north.y + u.y * 222.6f };
+        CHECK(boat_map_water(&map, sim(channel), ENVELOPE));
     }
 
     // Indexed queries equal the exhaustive scan over the region and its surroundings.
@@ -119,7 +158,7 @@ int main(void)
     srand(3);
     size_t wet = 0, dry = 0;
     for (int i = 0; i < 20000; ++i) {
-        Vector2 p = { -6500.0f + 8000.0f * unit(), -4500.0f + 5500.0f * unit() };
+        Vector2 p = { -6500.0f + 11000.0f * unit(), -4500.0f + 7300.0f * unit() };
         float clearance = clearances[i % 3];
         Vector2 na = { 0, 0 }, nb = { 0, 0 };
         bool a = boat_map_water_contact(&map, p, clearance, &na);
@@ -130,10 +169,11 @@ int main(void)
     }
     CHECK(wet > 100 && dry > 1000);
 
-    // Beyond the region's south-west and north-east corners there is no water, and the quay
-    // north of the dock is land.
+    // Beyond the region's south-west and north-east corners there is no water, nor beyond the
+    // upstream edge where the river leaves it; the quay north of the dock is land.
     CHECK(!boat_map_water(&map, sim((Vector2) { -9000, -6000 }), 0));
     CHECK(!boat_map_water(&map, sim((Vector2) { 3000, 3000 }), 0));
+    CHECK(!boat_map_water(&map, sim((Vector2) { 4300, 2350 }), 0));
     CHECK(!boat_map_water(&map, sim((Vector2) { 12, 60 + 400 }), 0));
 
     printf("boat_outer_map=ok water=%zu edges=%zu leg_samples=%zu wet=%zu dry=%zu bytes=%zu\n",

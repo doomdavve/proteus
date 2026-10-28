@@ -1116,6 +1116,7 @@ uint64_t boat_net_content_digest(void)
         digest_float(&d, definition->current_center);
         digest_float(&d, definition->wake_offset.x);
         digest_float(&d, definition->wake_offset.y);
+        digest_u64(&d, definition->upstream);
         if (!definition->mapped)
             continue;
         // The definition-bound description, in its canonical triangle order.

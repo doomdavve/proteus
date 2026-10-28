@@ -36,6 +36,7 @@ static const BoatWorldDefinition locations[BOAT_LOCATION_COUNT] = {
         .fleet_spawn = { -50, -290 },
         .current_center = -12,
         .wake_offset = { -140, -220 },
+        .upstream = true,
         .voyage = &boat_voyage_outer,
         .camera_distance = 12,
         .camera_height = 6,

@@ -5,7 +5,7 @@
     "wsen_epsg4326": [
       11.5702598,
       57.6141283,
-      11.9585149,
+      11.99,
       57.7225589
     ],
     "origin_epsg4326": [
@@ -14,7 +14,7 @@
     ],
     "origin_crs": "EPSG:3007 (crane origin used by tools/prepare_waterfront.py)",
     "derivation": "Union of the river crop (east -1500..+950 m, north -1600..+800 m from the crane origin) and SMHI Vinga A (57.6322 N, 11.6048 E; about east -18179, north -7195 m), expanded by 2 km in EPSG:3007, converted to a longitude/latitude box. Recomputation with pyproj 3.8.0 agrees within about 0.5 m on the west/south edges.",
-    "status": "Initial source envelope, not a playable boundary; A0.3 may expand it."
+    "status": "Source envelope, not a playable boundary. A3.5f (2026-10-28) moved the east edge from 11.9585149 to 11.99 E (about 4,830 m east of the crane) to cover Göta älv upstream past Hisingsbron and Lilla Bommen; the other edges are A0.2's."
   },
   "acquisition": {
     "osm_sweden": {
@@ -35,12 +35,12 @@
     "osm_corridor": {
       "status": "derived locally",
       "local_path": "build/adventure/downloads/gothenburg-vinga-261024.osm.pbf",
-      "command": "osmium extract --bbox 11.5702598,57.6141283,11.9585149,57.7225589 --strategy smart -S types=multipolygon --set-bounds build/adventure/downloads/sweden-261024.osm.pbf -o build/adventure/downloads/gothenburg-vinga-261024.osm.pbf",
+      "command": "osmium extract --bbox 11.5702598,57.6141283,11.99,57.7225589 --strategy smart -S types=multipolygon --set-bounds build/adventure/downloads/sweden-261024.osm.pbf -o build/adventure/downloads/gothenburg-vinga-261024.osm.pbf",
       "tool": "osmium-tool 1.19.1 (Homebrew)",
-      "bytes": 11423789,
-      "sha256": "2a2b68ffa733ca8c1a8b6655994e892e5d8fa0afa145e38b997d4d72478a3b38",
-      "reproduced": "2026-10-25: a second extraction produced identical bytes",
-      "contents": "1,488,406 nodes, 234,289 ways, 3,866 relations; smart strategy completes multipolygon relations, so data extends beyond the box (10.14..12.81 E, 54.32..58.94 N)"
+      "bytes": 13935378,
+      "sha256": "057e956281706f57d4b91e07e155754076b5b60286c53dd4b8275087ff2058dc",
+      "reproduced": "2026-10-25: a second extraction produced identical bytes (A0.2 envelope); 2026-10-28 (A3.5f): re-extracted from the same Sweden PBF with the east edge at 11.99 E",
+      "contents": "1,711,134 nodes, 272,000 ways, 4,740 relations (A3.5f extract); smart strategy completes multipolygon relations, so data extends beyond the box"
     },
     "land_polygons": {
       "status": "acquired",
@@ -167,19 +167,19 @@
       "proj": "9.8.1"
     },
     "inputs": {
-      "gothenburg-vinga-261024.osm.pbf": "2a2b68ffa733ca8c1a8b6655994e892e5d8fa0afa145e38b997d4d72478a3b38",
+      "gothenburg-vinga-261024.osm.pbf": "057e956281706f57d4b91e07e155754076b5b60286c53dd4b8275087ff2058dc",
       "land-polygons-split-4326.zip": "5911e273096f9585425a17c30a8a98785cc33ed2718ff88987768933b8a327f7"
     },
     "outputs": {
       "osm-corridor.json.gz": {
-        "content_sha256": "ae52e40e644b41196051bb013c5ad819a3bb2f03fa36c9b4ce05aed5f8d273c5",
-        "content_bytes": 30504145,
-        "gzip_sha256": "9f7f988350b12a408b637f64ee7414c9044b8fc99cf7a04b0d61c5845b7064fb"
+        "content_sha256": "8bbf98b1ed84c15d8e4ffbcda23aba63d8757353301867e8634eafe2e96e9d38",
+        "content_bytes": 35295361,
+        "gzip_sha256": "62eb86663e8ad29ddd7a077efd738873882207f828f83ddea7dbba48f989e42d"
       },
       "land-polygons.json.gz": {
-        "content_sha256": "ecd08139d0228739e28208e37ca62fc4b352c4412dec11228706408357cbb495",
-        "content_bytes": 1983958,
-        "gzip_sha256": "740f7de86f187c1a6067e2c132ab3314ed542dc8851476090799a99372de6ffb"
+        "content_sha256": "32728825855ed39da902cae7bc6d7ce295c5933be1cfc5f1b6496c8a964318ce",
+        "content_bytes": 1983943,
+        "gzip_sha256": "3cefe47dcd38d7b76d96cc88a9d14b09aa342eee7ddf6962e2d3479edd4d4660"
       },
       "weather-2026-10-25.json": {
         "content_sha256": "428b4ea46aa42a878716a397ddcd1dd3fde9650641aeb9da3f28130e5f96ec06",
@@ -187,29 +187,32 @@
       }
     },
     "osm": {
-      "ways": 88932,
-      "points": 2454,
-      "relations": 1854,
+      "ways": 102306,
+      "points": 2705,
+      "relations": 2163,
       "coastline_ways": 2396,
-      "water_ways": 577,
-      "building_ways": 54223,
-      "bridge_ways": 553,
-      "road_ways": 24648,
-      "seamark_points": 1586,
-      "incomplete_members": 150,
+      "water_ways": 711,
+      "building_ways": 60639,
+      "bridge_ways": 759,
+      "road_ways": 29445,
+      "seamark_points": 1650,
+      "incomplete_members": 463,
       "incomplete_relations": [
+        52822,
         945627,
+        2668952,
         3177973,
         3177974,
         8927408,
+        8929009,
         9560280,
         9638589,
         10745542,
+        10745553,
         10747018,
-        16200737,
-        18700379
+        16200737
       ],
-      "ways_extending_beyond_envelope": 1025
+      "ways_extending_beyond_envelope": 1101
     },
     "land": {
       "polygons": 1495,

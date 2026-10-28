@@ -40,6 +40,11 @@ holds just the water triangles, with their vertices renumbered. Builds before an
 fail the digest check at Hello. Land never reached physics, so builds that differ only in
 scenery now share a room. Message bytes are unchanged and there is no version bump.
 
+A3.5f (2026-10-28) extends the outer map's water upstream past Hisingsbron (2,738 → 3,703
+water triangles). The content digest covers every location in one hash, so builds before
+and after A3.5f fail the digest check at Hello in any room, the river's included. No version
+bump.
+
 Handling revision 9 (2026-10-26, isolated controls branch) increases commanded-thrust travel
 to 4 units/s and removes steering-commanded aerial roll. Protocol v5 bytes are unchanged;
 old handling revisions are rejected. Pedals/Shift become ordinary target-derived rate inputs,
@@ -152,7 +157,7 @@ then the name (≤16), room token (≤32) and build label (≤32) strings.
 
 The content digest is FNV-1a 64 over every compiled location in ID order: identity, mapped
 flag, basin half-extents, single-player spawn, multiplayer start centre, current centre and
-crossing offset; for each mapped location,
+crossing offset and upstream-traffic enable flag (u64, A3.5j); for each mapped location,
 the compiled map's triangle count, then every triangle's three vertex indices and referenced
 XYZ coordinates. Since A3.5i the compiled map is the water alone; the scenery packs are not
 hashed. It then hashes the fleet/wake contract: tick rate, slots, solver passes, spawn

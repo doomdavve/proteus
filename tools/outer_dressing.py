@@ -205,14 +205,18 @@ def footprints(osm, frame, multipolygon):
     return out
 
 
-def add_buildings(builder, osm, frame, area, model, fort, multipolygon):
-    """Extrude the corridor's buildings inside AREA on the terrain. Returns manifest stats."""
+def add_buildings(builder, osm, frame, area, model, fort, multipolygon, skip=()):
+    """Extrude the corridor's buildings inside AREA on the terrain. Returns manifest stats.
+
+    Footprints whose key ("w/ID" or "r/ID") is in SKIP are left out: hand-built landmarks
+    (tools/outer_landmarks.py) stand there instead.
+    """
     prepare(area)
     stats = {"buildings": 0, "gabled": 0, "skipped_small": 0, "stone": 0}
     solids = []
     port = []
     for key, tags, shape in sorted(footprints(osm, frame, multipolygon), key=lambda e: e[0]):
-        if not area.intersects(shape):
+        if key in skip or not area.intersects(shape):
             continue
         shape = shape.intersection(area).simplify(.25, preserve_topology=True)
         for part in _parts(shape):
@@ -362,6 +366,10 @@ def marks(osm, frame, region, crop):
         kind = t.get("seamark:type", "")
         if not (kind.startswith("beacon") or kind == "light_minor"):
             continue
+        # Fixed yellow-and-white passage lights hang on a bridge; around Hisingsbron they
+        # are mapped in the river, apparently where the old Götaälvbron stood. Not piles.
+        if t.get("seamark:light:1:colour") == "yellow":
+            continue
         x, z = frame.xy([n["coord"]])[0]
         if not region.contains(Point(x, z)) or crop.contains(Point(x, z)):
             continue
@@ -377,12 +385,18 @@ def carve_marks(water, mark_list):
     return water.difference(unary_union(islands)) if islands else water, len(islands)
 
 
-def dress(osm, frame, region, crop, water, land, model, fort, multipolygon):
-    """Triangles ((three (x, y, z)), colour) and manifest stats for the outer dressing."""
+def dress(osm, frame, region, crop, water, land, model, fort, multipolygon, skip=()):
+    """(buildings, other) triangles ((three (x, y, z)), colour) and manifest stats.
+
+    Since A3.5f the buildings are returned apart: the bake puts them before the authored
+    range, like the river's own buildings, so the renderers give their walls facades and
+    windows. Cranes, masts, marks and trees stay authored, in flat colours.
+    """
+    houses = Builder()
     builder = Builder()
     outside = land.difference(crop)
-    stats, solids, port = add_buildings(builder, osm, frame, outside, model, fort,
-                                         multipolygon)
+    stats, solids, port = add_buildings(houses, osm, frame, outside, model, fort,
+                                         multipolygon, skip)
     port_zone = [port.buffer(40)]
     cranes = masts = 0
     for n in sorted(osm["points"], key=lambda n: n["id"]):
@@ -414,8 +428,8 @@ def dress(osm, frame, region, crop, water, land, model, fort, multipolygon):
     keep_out = unary_union([solids.buffer(3), unary_union(roads), *port_zone])
     trees = add_trees(builder, outside, keep_out, model)
     stats.update(container_cranes=cranes, lighting_masts=masts, marks=placed, trees=trees,
-                 triangles=len(builder.triangles))
-    return builder.triangles, stats
+                 building_triangles=len(houses.triangles), triangles=len(builder.triangles))
+    return houses.triangles, builder.triangles, stats
 
 
 def self_test():

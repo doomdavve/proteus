@@ -70,6 +70,9 @@ typedef struct {
     const BoatRadialWave *radial; // Borrowed combat pool, independent of ordinary wakes.
     BoatStorm storm; // Localised physical rough water; no player wake slots.
     BoatVesselWake vessel; // Opt-in race trial; independent bounded source, no player slot.
+    // A3.5j: the outer map's upstream ferries, schooner and Hisingsbron lift join the traffic
+    // (waterfront_upstream.h). Set from the location (boat_world_test_water).
+    bool upstream;
 } BoatWater;
 
 typedef struct {

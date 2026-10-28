@@ -1,7 +1,7 @@
 # Free-riding adventure: first implementation tasks for Sol
 
 Prepared 2026-10-25 against `7165ba5` and the uncommitted adventure-planning documents.
-**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27), and [A3.5e](#a35e-result-2026-10-27) (the docked Stena ferry across from the crane, in `river` and `outer`; CPU and GPU captures) completed 2026-10-27 on branch `stena-ferry`. A3.5 was split into [A3.5h](#a35h-result-2026-10-28) (the weather transition: the outer squall grows once the boat heads out and is seen in the sky on both renderers; captures and tests, unplayed), completed 2026-10-28 on branch `adventure-a3-5h`, and [A3.5i](#a35i-result-2026-10-28) (the bake out of the binary into scenery packs, the browser fetching the outer map on demand; tile residency deferred), completed 2026-10-28 on branch `adventure-a3-5i`. A3.5f (upstream) is next.**
+**Status: A0 (A0.1–A0.4) completed 2026-10-25; [A0 decision](#a0-decision-record--2026-10-25) recorded; [A1.1](#a11--explicit-map-data-and-collision-cache-construction), [A1.2](#a12--wire-physical-map-ownership-through-all-callers), [A1.3](#a13-result-2026-10-25), [A1.4](#a14-result-2026-10-25) and [A1.5](#a15-result-2026-10-25) completed 2026-10-25, [completing A1](#a1-completion--2026-10-25). [A2](#a2--tiled-current-river) began with [A2.1](#a21-result-2026-10-25) (application submission and triangle counters) and [A2.2](#a22-result-2026-10-25) (in-memory tile catalogue and indexed collision, exact against the full scan), both completed 2026-10-25, and [A2.3](#a23-result-2026-10-25) (per-tile land culling on both renderers, 1 km default tiles) completed 2026-10-25, and [A2.4](#a24-result-2026-10-26) (indexed water patches and a view-bounded CPU water surface) completed 2026-10-26 on branch `adventure-a2-4`, and [A2.5](#a25-result-2026-10-26) (same-view scaling against synthetic corridors up to 25 km; lazy CPU water tessellation) completed 2026-10-26 on branch `adventure-a2-5`, completing A2. [A3.1](#a31-result-2026-10-26) (offline bake of the first slice's water and land, route proven against collision) completed 2026-10-26 on branch `adventure-a3-1`, and [A3.1b](#a31b-result-2026-10-26) (real land heights from Baskarta, 20 m inland and 5 m near the shore) the same day. [A3.2](#a32-result-2026-10-26) (a mapped `outer` location that loads the baked slice, both renderers; GPU and CPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-2`. [A3.3](#a33-result-2026-10-26) (the river's buildings, roads, gardens and bridge baked into the outer map; CPU/GPU captures and the full suite passed) completed 2026-10-26 on branch `adventure-a3-3`. [A3.4](#a34-result-2026-10-26) (the Långedrag destination, shelters with recovery and a fixed exposed rough-water patch, solo `outer` only) completed 2026-10-26 on branch `adventure-a3-4`. [A3.5a](#a35a-result-2026-10-26) (dressing past the bridge) completed 2026-10-26, and [A3.5b](#a35b-result-2026-10-27) (Höjdmodell 2022 terrain for the whole outer map, the river crop's houses and street life moved onto it; CPU only, GPU unverified) 2026-10-27 on branch `worktree-hojdmodell-terrain`, and [A3.5c](#a35c-result-2026-10-27) (the river kit, Eriksberg crane and bridge deck included, in `outer` on the terrain; CPU only) 2026-10-27 on branch `outer-river-kit`. Landmark tasks A3.5d–A3.5g (the user's must-haves: the Stena ferry, Karlatornet, Lilla Bommen, Hisingsbron, with the map extended upstream) are [planned](#must-have-landmarks-plan-2026-10-27), and [A3.5e](#a35e-result-2026-10-27) (the docked Stena ferry across from the crane, in `river` and `outer`; CPU and GPU captures) completed 2026-10-27 on branch `stena-ferry`. A3.5 was split into [A3.5h](#a35h-result-2026-10-28) (the weather transition: the outer squall grows once the boat heads out and is seen in the sky on both renderers; captures and tests, unplayed), completed 2026-10-28 on branch `adventure-a3-5h`, and [A3.5i](#a35i-result-2026-10-28) (the bake out of the binary into scenery packs, the browser fetching the outer map on demand; tile residency deferred), completed 2026-10-28 on branch `adventure-a3-5i`. [A3.5f](#a35f-result-2026-10-28) (upstream), [A3.5g](#a35g-result-2026-10-28) (landmarks), and [A3.5j river traffic](#a35j-river-traffic-result-2026-10-28) are implemented. The user play-tested this worktree and accepted it for merge on 2026-10-28. The remaining A3.5j street and moored life is next.**
 The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns the larger direction and budgets;
 this document owns the detailed A0, A1 and A2 task ledgers. The
 [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership) owns the
@@ -1501,8 +1501,9 @@ Steps after A3.1 are proposals, to be revised from what the earlier steps find.
 | A3.5c | A3.5b | The river kit in `outer` (user request): the Eriksberg crane, the bridge deck, cafe, street furniture, frontages, quay fittings and forecourts, laid out as in the river and set on the terrain | Complete 2026-10-27; [result](#a35c-result-2026-10-27) |
 | A3.5d | A3.5f | Göteborg landmarks from OSM in the bake (user request, [backlog](#landmark-backlog-2026-10-27)): towers, masts, chimneys and cranes, `building:part` heights and bridge outlines, over the extended map | Proposed |
 | A3.5e | A3.5c | A docked Stena Line ro-pax ferry across the river from the Eriksberg crane (user must-have; [plan](#a35e--the-stena-ferry-at-eriksberg)) | Complete 2026-10-27; [result](#a35e-result-2026-10-27) |
-| A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Proposed |
-| A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Proposed |
+| A3.5f | A3.5c | The outer map extended upstream past Hisingsbron: water, quays, terrain and OSM buildings; the corridor re-extracted with A3.5d's tags ([plan](#a35f--upstream-to-lilla-bommen)) | Complete 2026-10-28; [result](#a35f-result-2026-10-28) |
+| A3.5g | A3.5f | The user's must-have landmarks modelled at their real positions: Karlatornet, Lilla Bommen (Läppstiftet) and Hisingsbron ([plan](#a35g--karlatornet-lilla-bommen-and-hisingsbron)) | Complete 2026-10-28; [result](#a35g-result-2026-10-28) |
+| A3.5j | A3.5g | The upstream city brought to life (user request, 2026-10-28): Älvsnabben-style river ferries between the piers, Hisingsbron's span lifting for a tall ship, trams and cars on the bridge and streets, Barken Viking, a marina and gulls at Lilla Bommen | River ferries, schooner and lift implemented and user-accepted 2026-10-28; [result](#a35j-river-traffic-result-2026-10-28). Street and moored life remain |
 | A3.5h | A3.5a | The local weather transition, the first half of A3.5: the exposure grows from calm water once the boat heads out, is seen from afar as a squall in the sky, and dims the light near it | Complete 2026-10-28; [result](#a35h-result-2026-10-28) |
 | A3.5i | A3.5h | The rest of A3.5: bounded per-region detailed-asset loading (the bake out of the 33 MB header first, as A3.5f needs); cold-load, rapid-turn and recovery tests; clear/storm performance and memory targets | Bake out of the binary and browser loading per location done 2026-10-28 ([result](#a35i-result-2026-10-28)); tile residency deferred |
 
@@ -2360,7 +2361,130 @@ plus a tile cache; Ortofoto later, for colours only.
   - Unplayed by a person.
 
 **Next: A3.5f**, extending the map upstream to Karlatornet, Lilla Bommen and Hisingsbron, with
-A3.5d's OSM re-extract and Höjdmodell `640_14`.
+A3.5d's OSM re-extract and Höjdmodell `640_14` (2026-10-28: [done](#a35f-result-2026-10-28);
+`640_14` was not needed).
+
+### A3.5f result, 2026-10-28
+
+Branch `adventure-a3-5f`, from `main` after pull request #44. The user: "Continue with the
+adventure! I'm excited about being able to explore upstream too! We should use all the tricks in
+the book to make the city feel as alive as possible." They chose, for after the geography and
+the three landmarks, river ferries with the Hisingsbron lift, trams and cars, and moored life
+at Lilla Bommen (A3.5j), all on this branch with a commit per step.
+
+- **Tooling:** the pinned `requirements.txt` installed into `build/adventure-venv` (Python
+  3.14.2). Before any change, a re-bake of the A3.5i map gave the same water triangles and
+  route. 2 of 386,505 triangles and 1 cm values in about 40 kit-ground rows differed, because since
+  A3.5i the river overlay is read from the pack's float32 values instead of the old header's
+  0.1 mm decimals (A3.5i noted that the generators had not been rerun).
+- **Sources:** the OSM corridor's east edge moved from 11.9585149 to 11.99° E and tram and rail
+  lines are kept. The new extract comes from the same Sweden PBF, so it is the same snapshot,
+  and `--check` passes ([source notes](adventure/README.md#coastal-sources-a02-2026-10-25)). The
+  Höjdmodell grid's window grew to E 4,500 and N 2,400 m from the same two zips (81 tiles, 3.4
+  MB). `640_14` was not needed: `639_14` reaches N 6400 km, about 2,417 m north of the crane,
+  as computed with pyproj.
+- **Region:** `UPSTREAM` = E 950–4,200 m, N −300–2,300 m, joined to the river crop and the slice
+  (24.97 km², up from 16.52). The water is still the part connected to the dock: Göta älv past
+  Lindholmen, Stenpiren, Lilla Bommen and Hisingsbron to the region's north edge, and the
+  Frihamnen and Lindholmen basins. The Vallgraven moat and Stora Hamnkanalen are connected too,
+  so they are navigable. Where the river and the moat leave the region the water ends at a
+  playable boundary (5,165 m in all; the crop's old east edge across the river is now
+  interior). No bridge supports are mapped on Hisingsbron, so nothing is carved there yet
+  (A3.5g).
+- **Buildings with windows:** the dressing's buildings (A3.5a's and about 2,800 new upstream ones,
+  4,768 in all) now come before the authored range, like the river's own. The renderers
+  therefore give their walls in the city tints facades, windows and roofs on both CPU and GPU;
+  houses keep their colours. This also changes A3.5a's buildings downstream of the crop. Mapped
+  heights are used as before, so Lilla Bommen stands at 86 m (Karlatornet, 246 m, is above the
+  200 m cap and still a placeholder; A3.5g builds both). Museum ships at Maritiman and Barken
+  Viking are mapped as `building=ship` in the water and are not drawn.
+- **Output:** 609,186 triangles (386,505), 355,304 vertices, 3,703 water triangles (2,738), pack
+  5,298,326 bytes (3,450,563). Heights up to 111.5 m. Bake about 66 s.
+- **Tests:** `boat_outer_map` adds an upstream route (dock to the river's exit past
+  Hisingsbron, 13 waypoints, every 10 m with the 8 m envelope) and the generator asserts it too.
+  Indexed and exhaustive queries were compared on 20,000 points over the extended region, with
+  no water past the upstream edge.
+- **Captures (agent review, 2026-10-28, macOS arm64, 2 s scripted screenshot):** toward Lilla
+  Bommen from mid-river, [GPU](adventure/upstream-lilla-bommen-gpu.png) and
+  [CPU](adventure/upstream-lilla-bommen-cpu.png) (`--location outer --start -3150,1550,270`).
+  Upstream from Lindholmen, [GPU](adventure/upstream-lindholmen-gpu.png) and
+  [CPU](adventure/upstream-lindholmen-cpu.png) (`--start -2000,750,240`). The `--start` heading
+  is the compass bearing less 180°. The upstream city reads as blocks with windows in brick and
+  plaster tints, with Lilla Bommen's tower on the south bank.
+- **Measured cost (Debug, M1 Max):** GPU scene submission (CPU time, not GPU completion) over 400
+  windowed, unpaced frames, through a temporary uncommitted exit print of the existing profiler
+  history: p95 3.8–4.0 ms at Lilla Bommen and Lindholmen, against 3.7 ms for the river
+  location's dock view in the same session. Peak resident memory of a 3 s CPU capture at the
+  outer dock was 254 MB (A3.5i: 236 MB), against 239 MB for the river location. The native tile
+  cache stays deferred: memory is within the 256 MiB scenery target.
+- **Verification (2026-10-28, macOS arm64, Debug, `PROTEUS_GPU_TESTS=ON`, display available):**
+  build warning-free; `ctest --preset full` passed 261 of 262 active tests. The failure,
+  `boat_outer_map`, was its pinned dressing count after the buildings moved; it passed after the
+  update. The three generators' self-tests passed.
+- **Limitations:**
+  - Unplayed. Only the views above were captured. The moat and canals, the region's north
+    edge and the Frihamnen basins were not examined in game.
+  - Untagged central buildings use A3.5a's guesses (8–14 m), so the old town is lower than it
+    really is. No `building:part`s, roofs or churches are modelled.
+  - The A0.3 survey's coverage figures predate the wider corridor and were not regenerated.
+  - The web build was not rebuilt for this step.
+
+### A3.5g result, 2026-10-28
+
+Same branch, the next commit after A3.5f.
+
+- **Generator:** [`tools/outer_landmarks.py`](../tools/outer_landmarks.py) builds the three
+  blockouts into the authored range, after A3.5a's dressing. The OSM footprints of Karlatornet
+  (`r/17090257`) and Lilla Bommen (`w/175648796`) are left out of the building extrusion. The
+  assumptions are recorded in the manifest (`dressing.landmarks`).
+- **Karlatornet** (424 triangles): its mapped footprint's rectangle, 246 m in slabs of three
+  floors. Each slab is a pale spandrel band under dark glass, and the slabs turn up to 24°
+  above 70 m and narrow a little at the crown. A thin mast tops it, at 255 m above the water.
+  A brown 15-floor hotel wing stands on its north-east side. The twist, colours and the wing's
+  place are by eye.
+- **Lilla Bommen** (1,353 triangles): the mapped footprint in 22 red-and-white floor bands to
+  77 m, then a dark observation deck, a red cap and a white roof at 86 m. The low-rise wing is
+  not built.
+- **Hisingsbron** (1,076 triangles): the deck's axis is the mean of the two carriageways' ends
+  (438 m, the stated main bridge's 440 m). The deck is 40 m wide, level over the channel with a
+  12 m underside, and ramps to the ground at both ends. A 90 m lift span is centred on the 215 m
+  stretch over water, with a 44 m white lift tower and machinery house on either side of the
+  deck at each end of the span. Pairs of piers stand every 50 m beyond the span, and lamp posts
+  line the deck. OSM maps no supports, so the towers and piers are carved out of the water
+  (3,731 water triangles) and boats meet them. The deck and the span have no collision, as on
+  Älvsborgsbron. The span is closed for now; A3.5j lifts it.
+- **Channel marks:** the dressing no longer builds fixed yellow-and-white passage lights as
+  piles. Two such lights near Hisingsbron are mapped in the river, one of them on a line 69 m
+  off the bridge and parallel to it, apparently where the old Götaälvbron stood. Fourteen marks
+  are built (16 in A3.5f).
+- **Minimap ([HUD guide](BOAT_HUD.md#minimap-2026-10-28)):** Karlatornet and Lilla Bommen are
+  conspicuous objects, Hisingsbron is a bridge labelled VCL 12, and the six upstream marks are
+  charted. The chart now draws labels before symbols, so rings and bridges stay visible where
+  the upstream labels crowd them; this moves 63 pixels of the river chart, around Eriksberg.
+- **Tests:** `boat_outer_map` checks the new counts and Karlatornet's height (highest point
+  250–260 m). The four tower footprints are not water, and the channel under the lift span is
+  water with the 8 m envelope. The upstream route passes between the piers.
+  `outer_landmarks.self_test()` checks the lift span's placement on the water, the piers clear
+  of it, the deck profile, the obstacle count and Karlatornet's height and footprint.
+- **Captures (agent review, 2026-10-28, macOS arm64, 2 s scripted screenshot):**
+  [Karlatornet GPU](adventure/landmark-karlatornet-gpu.png) and
+  [CPU](adventure/landmark-karlatornet-cpu.png) (`--start -2500,1000,119`, 790 m off);
+  [Hisingsbron GPU](adventure/landmark-hisingsbron-gpu.png) and
+  [CPU](adventure/landmark-hisingsbron-cpu.png) (`--start -3400,1820,224`);
+  [Lilla Bommen with the bridge beyond](adventure/landmark-lilla-bommen-gpu.png)
+  (`--start -3200,1650,225`); the [upstream chart](adventure/minimap-outer-upstream.png). From
+  mid-river at Eriksberg (`--start -15,-180,229`), Karlatornet stands out 1.9 km away.
+- **Verification (2026-10-28, macOS arm64, Debug):** build warning-free; `ctest --preset quick`
+  passed 146 of 146; `boat_outer_map` and `boat_minimap` passed. Generator self-tests passed.
+- **Limitations:**
+  - **Karlatornet is not visible from the outer fjord:** the outer location's far plane is
+    4,500 m and the fjord lies about 5 km from the tower. Raising the far plane would change
+    fog and every outer view, and would draw more objects in front of A3.5h's squall, so it was
+    left for the user to decide.
+  - Shapes are by eye; Karlatornet's real facade, Lilla Bommen's top and Hisingsbron's tower
+    form and colour were not checked against photos in this session.
+  - The follow camera can pass through the deck when it is raised high under the bridge.
+  - Unplayed.
 
 ## Verification and handoff template
 
@@ -2410,3 +2534,41 @@ Checked 24 local links/anchors across the two plans and their owner references;
 the proposed benchmark interface is labelled unimplemented. These checks verify the current
 application/documentation, not execution of A0/A1. No new audiovisual review was performed
 or required for this documentation-only change.
+
+
+### A3.5j river traffic result, 2026-10-28
+
+Implemented the first part of the upstream living city on `adventure-a3-5f`, together with
+A3.5f/g. The user play-tested this worktree and accepted it for merge on 2026-10-28; further
+polish is not required for this first pass. This acceptance supersedes the earlier unplayed
+status for the upstream map and landmarks above.
+
+- Two Älvsnabben-style ferries visit Stenpiren, Lindholmspiren and Eriksberg; a smaller ferry
+  visits Stenpiren and Frihamnen. They dwell at their piers and accelerate/decelerate smoothly.
+- A two-masted schooner makes a loop under Hisingsbron. Its two passages raise the 90 m span
+  from 12 m to 28 m clearance with a smooth ramp. The scenery pack omits the fixed span;
+  CPU and GPU draw the same runtime mesh and pose, including GPU shadows/reflections.
+- Motion is a pure function of simulation time on a 1,200 s timetable. The outer location
+  enables these four extra vessels and their player contacts; the original river traffic
+  remains on both mapped locations. New trails are visual; existing physical traffic wakes
+  retain their original sources. The content digest includes the location's upstream switch.
+
+Verification on macOS, 2026-10-28: Debug configure/build and `ctest --preset full` passed
+(all 262 enabled tests, including GPU/network checks; 15 retired experiments disabled).
+The extended `validate_traffic`
+checks a full timetable, periodic position/velocity, 2 m hull-corner shore clearance, stopped
+ferries, bounded motion, outer-only contacts and schooner clearance under the raised span.
+The offline map rebake ran its Python fixtures and left compiled water unchanged.
+CPU/GPU review frames were captured and inspected with an ad hoc local harness at the pier
+and at the bridge down/raised; a 180-frame GPU `outer` demo completed successfully.
+Representative frames: [ferry CPU](adventure/upstream-ferry-cpu.png),
+[ferry GPU](adventure/upstream-ferry-gpu.png),
+[raised bridge CPU](adventure/upstream-lift-cpu.png),
+[raised bridge GPU](adventure/upstream-lift-gpu.png).
+
+Known limits: authored scenery routes have no vessel-to-vessel avoidance and may overlap
+at the shared berth or crossings. Camera avoidance still covers the original river fleet.
+No new browser/Windows manual playtest or performance profile was performed.
+
+**Next:** the remaining A3.5j street and moored life (trams/cars, Barken Viking, marina and
+gulls at Lilla Bommen), then the A3.5d OSM landmark backlog and wider adventure milestones.

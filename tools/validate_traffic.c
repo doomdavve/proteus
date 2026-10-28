@@ -3,6 +3,7 @@
 #include "boat_view.h"
 #include "waterfront_harbor.h"
 #include "waterfront_traffic.h"
+#include "waterfront_upstream.h"
 
 #include "raymath.h"
 
@@ -125,6 +126,8 @@ static int check_long_session(void)
             WaterfrontTrafficContact contact;
             CHECK(waterfront_traffic_contact((Vector2) { -m.position.x, m.position.z }, m.heading,
                 2, 1.6f, .75f, time, &contact));
+            if (contact.vessel != i)
+                fprintf(stderr, "contact i=%d actual=%d\n", i, contact.vessel);
             CHECK(contact.vessel == i);
         }
         for (int j = 0; j < frame.wake_count; ++j)
@@ -205,9 +208,76 @@ static int check_gulls(void)
     return 0;
 }
 
+// Drive a full timetable with virtual time: hulls stay in water, stopping remains smooth,
+// the raised bridge clears both schooner passages, and contacts are outer-only.
+static int check_upstream(void)
+{
+    const BoatMap *map = &test_world(BOAT_LOCATION_OUTER)->map;
+    Vector2 axis = Vector2Normalize(
+        Vector2Subtract(WATERFRONT_HISINGSBRON_SOUTH, WATERFRONT_HISINGSBRON_NORTH));
+    int passages = 0;
+    for (int i = WATERFRONT_TRAFFIC_VESSELS; i < WATERFRONT_TRAFFIC_ALL; ++i) {
+        BoatModelSpec spec = waterfront_traffic_spec(i);
+        const Mesh3D *mesh = waterfront_traffic_mesh(i);
+        CHECK(mesh && mesh->triangle_count > 0);
+        WaterfrontVesselMotion previous = waterfront_traffic_motion(i, -1);
+        bool stopped = false;
+        for (int tick = 0; tick <= (int)WATERFRONT_UPSTREAM_PERIOD; ++tick) {
+            double t = tick;
+            WaterfrontVesselMotion m = waterfront_traffic_motion(i, t);
+            WaterfrontVesselMotion repeat
+                = waterfront_traffic_motion(i, t + WATERFRONT_UPSTREAM_PERIOD);
+            CHECK(near(m.position, repeat.position, .01f));
+            CHECK(near(m.velocity, repeat.velocity, .01f));
+            CHECK(Vector3Distance(m.position, previous.position) < 6.1f);
+            CHECK(Vector3Distance(m.velocity, previous.velocity) < 1.7f);
+            stopped |= Vector3Length(m.velocity) < .001f;
+            Transform3D pose
+                = { .position = m.position, .rotation = { 0, m.heading, 0 }, .scale = { 1, 1, 1 } };
+            for (int corner = 0; corner < 4; ++corner) {
+                Vector3 p = boat_model_point(pose,
+                    (Vector3) { (corner & 1 ? 1 : -1) * spec.beam * .5f, 0,
+                        (corner & 2 ? 1 : -1) * spec.length * .5f });
+                CHECK(boat_map_water(map, (Vector2) { -p.x, p.z }, 2));
+            }
+            if (i == WATERFRONT_TRAFFIC_VESSELS + WATERFRONT_UPSTREAM_SCHOONER) {
+                Vector2 d = { m.position.x - WATERFRONT_HISINGSBRON_NORTH.x,
+                    m.position.z - WATERFRONT_HISINGSBRON_NORTH.y };
+                float across = axis.x * d.y - axis.y * d.x;
+                // Include half the hull and the width of the deck in the clearance check.
+                if (fabsf(across) < spec.length * .5f + WATERFRONT_LIFT_SPAN_WIDTH * .5f) {
+                    CHECK(WATERFRONT_LIFT_UNDERSIDE + waterfront_upstream_lift(t)
+                        > spec.mast_height + 1);
+                    ++passages;
+                }
+            }
+            previous = m;
+        }
+        CHECK(stopped == (i < WATERFRONT_TRAFFIC_ALL - 1));
+        WaterfrontVesselMotion m = waterfront_traffic_motion(i, 300);
+        Vector2 p = { -m.position.x, m.position.z };
+        WaterfrontTrafficContact contact;
+        CHECK(!waterfront_traffic_contact_height(
+            p, 0, 2, 1.6f, .75f, -.4f, 2, (BoatWater) { 0 }, 300, NULL));
+        CHECK(waterfront_traffic_contact_height(
+            p, 0, 2, 1.6f, .75f, -.4f, 2, (BoatWater) { .upstream = true }, 300, &contact));
+        CHECK(contact.vessel == i);
+    }
+    CHECK(passages > 0);
+    WaterfrontTrafficFrame frame;
+    waterfront_traffic_evaluate((BoatWater) { .upstream = true }, 300, &frame);
+    CHECK(frame.vessel_count == WATERFRONT_TRAFFIC_ALL && frame.lift);
+    CHECK(frame.wake_count <= WATERFRONT_TRAFFIC_WAKE_CAPACITY);
+    waterfront_traffic_evaluate((BoatWater) { 0 }, 300, &frame);
+    CHECK(frame.vessel_count == WATERFRONT_TRAFFIC_VESSELS && !frame.lift);
+    puts("upstream=ok timetable=1200s hull_clearance=2m contacts=outer_only lift_clearance=ok");
+    return 0;
+}
+
 int main(void)
 {
     CHECK(check_vertical_contacts() == 0);
+    CHECK(check_upstream() == 0);
     if (check_gulls() || check_long_session())
         return 1;
     for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {

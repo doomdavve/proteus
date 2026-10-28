@@ -46,9 +46,12 @@ NODATA = -9999.0
 WATER_MAX = 0.2
 TILE_NAME = re.compile(r"(?:^|/)(\d{4})_(\d{3})\.tif$")
 EPSG_KEY = 3072  # ProjectedCSTypeGeoKey
+# The Baskarta window widened upstream past Hisingsbron and Lilla Bommen (A3.5f). The 639_14
+# tiles stop at N 6400 km, about 2,417 m north of the crane, and E 150 km, about 5,429 m east.
+DEM_WINDOW = (WINDOW[0], WINDOW[1], 4500.0, 2400.0)
 
 
-def grid_frame(ox, oy, window=WINDOW, cell=CELL):
+def grid_frame(ox, oy, window=DEM_WINDOW, cell=CELL):
     """(west, north, columns, rows) of a CELL-aligned EPSG:3007 grid covering the window."""
     west = math.floor((ox + window[0]) / cell) * cell
     south = math.floor((oy + window[1]) / cell) * cell
@@ -208,7 +211,7 @@ def main():
         "survey": "airborne laser scanning, 9, 15 and 16 May 2022",
         "crs": "EPSG:3007 offsets from the crane origin; heights in metres, RH 2000",
         "origin_epsg4326": list(ORIGIN),
-        "window_wsen": list(WINDOW),
+        "window_wsen": list(DEM_WINDOW),
         "cell_m": CELL,
         # Edges of the grid relative to the crane origin; row 0 is the northernmost.
         "west_m": round(west - ox, 4), "north_m": round(north - oy, 4),

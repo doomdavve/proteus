@@ -58,11 +58,24 @@ typedef struct {
 static const Landmark landmarks[] = {
     { "ERIKSBERG", { 0, 0 }, 0, -9 },
     { "NYA ALVSBORG", { -4177, -1314 }, 0, -9 },
+    { "KARLATORNET", { 1811, 1385 }, -10, 8 }, // A3.5g: the outer map's upstream landmarks.
+    { "LILLA BOMMEN", { 3495, 1765 }, 0, 8 },
 };
 
-// Älvsborgsbron's deck (the river map's authored bridge above 40 m) and its charted vertical
-// clearance from OpenStreetMap (seamark:bridge:clearance_height).
-static const Vector2 bridge_ends[2] = { { -614, -197 }, { -261, -1261 } };
+// Bridge decks and their vertical clearance in metres: Älvsborgsbron (the river map's authored
+// bridge above 40 m; OpenStreetMap's seamark:bridge:clearance_height) and Hisingsbron with its
+// lift span down (A3.5g's axis; 12 m, 28 m lifted). The chart label sits at the deck's middle
+// plus (label_dx, label_dy).
+typedef struct {
+    const char *name, *clearance;
+    Vector2 ends[2];
+    int label_dx, label_dy;
+} Bridge;
+
+static const Bridge bridges[] = {
+    { "ALVSBORGSBRON", "VCL 45", { { -614, -197 }, { -261, -1261 } }, 35, 12 },
+    { "HISINGSBRON", "VCL 12", { { 3382, 2144 }, { 3627, 1781 } }, -30, -3 },
+};
 
 // Channel marks as the outer dressing places them (OpenStreetMap seamarks, IALA A).
 typedef struct {
@@ -80,6 +93,12 @@ static const ChartMark chart_marks[] = {
     { { -1611, -1203 }, WHITE_MARK, true }, // Fl(2) minor light.
     { { -3708, -2773 }, BLACK_MARK, false }, // Polismästaren, isolated danger.
     { { -5267, -2935 }, WHITE_MARK, false }, // Skalskären, isolated danger.
+    { { 2572, 728 }, WHITE_MARK, true }, // A3.5f upstream: Skeppsbron, Fl minor light.
+    { { 2958, 1444 }, BLACK_MARK, false }, // Nr 7744, special-purpose beacon.
+    { { 3123, 1529 }, BLACK_MARK, false }, // Nr 7743.
+    { { 3471, 1888 }, WHITE_MARK, true }, // F minor light near Hisingsbron.
+    { { 3703, 2143 }, BLACK_MARK, false }, // Nr 7746.
+    { { 3915, 2190 }, BLACK_MARK, false }, // Nr 7745.
 };
 
 static Vector2 to_map(Vector2 position) { return (Vector2) { -position.x, position.y }; }
@@ -500,22 +519,27 @@ static void own_ship(BoatMinimapLayer *layer, Vector2 centre, float heading, flo
     dot(layer, x, y, own_ship_color);
 }
 
-static void bridge(BoatMinimapLayer *layer, bool chart)
+// A bridge's two deck lines, or with LABEL its chart name and clearance. Labels are drawn
+// first, so the upstream symbols, a few pixels apart on the chart, stay visible over them.
+static void bridge(BoatMinimapLayer *layer, const Bridge *deck, bool label)
 {
-    Vector2 a = project_map(layer, bridge_ends[0]), b = project_map(layer, bridge_ends[1]);
+    Vector2 a = project_map(layer, deck->ends[0]), b = project_map(layer, deck->ends[1]);
     float length = hypotf(b.x - a.x, b.y - a.y);
     if (length < 1 || !inside(layer, (int)a.x, (int)a.y) || !inside(layer, (int)b.x, (int)b.y))
         return;
+    if (label) {
+        // Älvsborgsbron's sits on the south-east bank, clear of the river's symbols and the
+        // scale bar.
+        int x = (int)((a.x + b.x) / 2) + deck->label_dx;
+        int y = (int)((a.y + b.y) / 2) + deck->label_dy;
+        text(layer, deck->name, x, y, ink);
+        text(layer, deck->clearance, x, y + 6, ink);
+        return;
+    }
     Vector2 side = { -(b.y - a.y) / length, (b.x - a.x) / length };
     for (int s = -1; s <= 1; s += 2)
         line(layer, (Vector2) { a.x + side.x * s, a.y + side.y * s },
             (Vector2) { b.x + side.x * s, b.y + side.y * s }, ink);
-    if (chart) {
-        // On the south-east bank, clear of the river's symbols and the scale bar.
-        int x = (int)((a.x + b.x) / 2) + 35, y = (int)((a.y + b.y) / 2) + 12;
-        text(layer, "ALVSBORGSBRON", x, y, ink);
-        text(layer, "VCL 45", x, y + 6, ink);
-    }
 }
 
 // Charted marks: a pile in the mark's colour outlined in black, with a magenta flare if lit.
@@ -605,7 +629,17 @@ const Image *boat_minimap_compose(BoatMinimap *minimap, BoatMinimapMode mode,
         memcpy(&frame[(y + TRIM) * layer->frame.width + TRIM], &base[y * layer->base.width],
             sizeof(Color) * (size_t)layer->base.width);
 
-    bridge(layer, chart);
+    for (size_t i = 0; chart && i < sizeof(bridges) / sizeof(bridges[0]); ++i)
+        bridge(layer, &bridges[i], true);
+    for (size_t i = 0; chart && i < sizeof(landmarks) / sizeof(landmarks[0]); ++i) {
+        Vector2 p = project_map(layer, landmarks[i].map);
+        int x = (int)floorf(p.x), y = (int)floorf(p.y);
+        if (inside(layer, x, y))
+            text(layer, landmarks[i].name, x + landmarks[i].label_dx, y + landmarks[i].label_dy,
+                ink);
+    }
+    for (size_t i = 0; i < sizeof(bridges) / sizeof(bridges[0]); ++i)
+        bridge(layer, &bridges[i], false);
     ferry(layer, chart);
     marks(layer);
     for (size_t i = 0; i < sizeof(landmarks) / sizeof(landmarks[0]); ++i) {
@@ -616,9 +650,6 @@ const Image *boat_minimap_compose(BoatMinimap *minimap, BoatMinimapMode mode,
         // Conspicuous object: a ring with its position dot.
         ring(layer, x, y, 2, ink);
         dot(layer, x, y, ink);
-        if (chart)
-            text(layer, landmarks[i].name, x + landmarks[i].label_dx, y + landmarks[i].label_dy,
-                ink);
     }
     const BoatVoyageRoute *route = voyage ? voyage->route : NULL;
     if (route) {

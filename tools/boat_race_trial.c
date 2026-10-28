@@ -196,7 +196,7 @@ static void contracts(void)
     WaterfrontTrafficContact contact;
     CHECK(waterfront_traffic_contact_height(
         ship, 0, 2, 2, 1, -1, 1, (BoatWater) { .vessel = w }, 0, &contact));
-    CHECK(contact.vessel == WATERFRONT_TRAFFIC_VESSELS);
+    CHECK(contact.vessel == WATERFRONT_TRAFFIC_TRIAL);
     CHECK(!waterfront_traffic_contact_height(
         ship, 0, 2, 2, 1, 30, 32, (BoatWater) { .vessel = w }, 0, &contact));
 }

@@ -436,6 +436,13 @@ the mapped buildings, the container cranes of the port, channel marks and scatte
 are no roads there yet. Where the region cuts open water the water ends at the horizon and collision keeps
 the boat inside.
 
+The outer map also extends upstream past Lindholmen, Stenpiren, Lilla Bommen and Hisingsbron,
+with Karlatornet and Läppstiftet at their mapped positions. Three river ferries stop at piers;
+a schooner passes under Hisingsbron's lifting span. These vessels have player collision and
+visual trails, on a repeating simulation-time timetable. See the
+[upstream traffic record](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a35j-river-traffic-result-2026-10-28)
+for current limits and remaining city life.
+
 Solo `outer` outings are a small voyage
 ([A3.4](docs/FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a34-result-2026-10-26)). A panel at the top
 shows an arrow (the way to steer) and the distance to Långedrag's old harbour, about 6 km by
