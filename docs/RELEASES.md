@@ -29,29 +29,77 @@ Actions artifacts and are not subject to their 30-day retention policy.
 
 ### Release command
 
-From a clean, pushed worktree at the reviewed `origin/main` commit, after the Debug build
-and full CTest preset pass, run:
+Use Python 3.11+ from a clean, separate source worktree at the reviewed `origin/main`
+commit. A detached source worktree is supported. Prepare a separate `davve-srv` worktree
+on a branch tracking `origin/main`; fetch the hosting baseline first. Keep its existing
+controller vault file in place and pass its path rather than copying it.
+
+For the next version (replace the tag and paths as appropriate), check prerequisites first:
 
 ```sh
-python3 tools/cut_release.py v0.0.21 \
-  --hosting-repo /path/to/clean-pushed-davve-srv-worktree \
-  --browser-python /path/to/playwright-venv/bin/python
+python3 tools/cut_release.py v0.0.22 \
+  --hosting-repo /path/to/clean-davve-srv-worktree \
+  --vault-password-file /path/to/davve-srv/ansible/.vault_pass.txt \
+  --browser-python /path/to/playwright-venv/bin/python \
+  --check
 ```
 
-The hosting worktree needs its normal controller/vault setup. For a temporary worktree,
-set `ANSIBLE_VAULT_PASSWORD_FILE` to the existing controller's vault password file; do not copy
-or commit the password. Install Playwright in the chosen Python environment and have Google
-Chrome available at the browser check's default macOS path. Build `build/boat_bot` first.
+Repeat the command without `--check` to release. The command checks clean repositories,
+source/tag identity, hosting baseline ancestry, the vault file, required tools, Playwright,
+Chrome and noninteractive SSH/sudo access before publishing anything. `--check` fetches Git
+refs and checks access, but creates no tag, output directory or hosting change. Required tools:
+Git, GitHub CLI authenticated for this repository, CMake, CTest, curl, SSH and Ansible.
+Install Playwright in the chosen Python environment. Chrome defaults to the macOS application
+path; `--chrome` selects another installed executable. `--ssh-host` selects the Winterfell
+SSH alias. The vault path can also come from `ANSIBLE_VAULT_PASSWORD_FILE`, falling back to
+`ansible/.vault_pass.txt` in the hosting worktree. Vault contents are never printed.
 
-The command creates and pushes the immutable tag, waits for native publication and Pages,
-downloads both ZIPs, checks SHA-256, ZIP integrity and embedded version/commit, then commits
-and pushes the hosting version pin and runs the ordinary Winterfell role. It checks service
-health/version, both browser versions, named browser joins on both sites, directory protocol/
-physics and a matching native join. Evidence is saved under `build/release/verification.json`
-with browser logs/captures. A failed step stops the command; rerun from the same commit/tag
-after resolving the failure. Existing tags pointing elsewhere are rejected. This command
-does not merge PRs or replace human package/input/audio review. Update the release and hosting
-guides and the hosting repository's evidence after completion.
+A full run:
+
+1. Configures the source worktree's `build/` as Debug with GPU tests off, builds all targets
+   (including the matching native bot), and runs `ctest --preset full`.
+2. Creates/pushes the immutable tag, waits for native publication and Pages, downloads both
+   ZIPs and verifies SHA-256, ZIP integrity and embedded version/commit.
+3. Commits and pushes the hosting version pin, then fast-forwards its private remote baseline
+   (`main` by default, configurable with `--hosting-branch`) before running the ordinary
+   Winterfell role. Only pin changes may be ahead of that baseline; unrelated hosting work
+   must be merged first. Concurrent pushes fail without force or automatic rebasing.
+4. Verifies room/relay health, deployed source commit, both live browser versions and named
+   joins, directory protocol/physics, and native joining with a consistent final state and
+   zero decode errors.
+
+Logs, browser captures, checksums and `verification.json` go under
+`build/releases/<tag>/` by default (`--output` overrides this). Evidence records the current
+stage and failure or success, so a failed retry does not leave an earlier success record.
+`--timeout` bounds publication waiting (default one hour); build, deployment and client
+checks also have failure deadlines. The default output directory is ignored by Git; custom
+output should also be ignored or outside the source worktree.
+
+After a failure, inspect the stage log, resolve the issue and rerun the same command from the
+same source commit/tag. Retries accept an existing tag even after `origin/main` advances,
+but refuse to move a tag or deploy an unmerged source commit. An unpushed hosting pin commit
+from a failed push can be retried; unrelated unpushed commits are rejected. After a concurrent
+hosting baseline update, reconcile that worktree explicitly before retrying. Publication
+reruns remain governed by the immutable-tag rules below.
+
+For an already deployed release, add `--verify-only`: it rebuilds/tests the selected source,
+downloads/checks the existing release and verifies live services/clients, without pushing
+tags, changing pins or running Ansible. The source worktree must still match that tag.
+This command does not merge Proteus PRs, update narrative documentation, run mobile-device
+emulation, or replace human package/input/audio review. After success, update this guide,
+the hosting guide and `davve-srv/docs/wake-velocity.md` with evidence and remaining limits.
+
+Reusable-command hardening, 2026-10-28: detached source worktrees and retries after main
+advances are supported; local build/full CPU tests, hosting baseline promotion, controller
+preflight, verification-only mode and per-tag stage logs/evidence are implemented. Debug
+configure/build and all 234 enabled CPU CTests passed on Apple Silicon/macOS, with GPU off
+and 13 retired cases disabled. The expanded offline release guards passed 17 tests, including
+real temporary Git history checks and virtual-clock workflow polling; the final focused
+CTest rerun passed. Changed documentation file links and whitespace were checked. This
+hardening has not published another release or redeployed Winterfell. The next release will
+qualify the revised complete command against live publication/deployment; physical-device,
+human package/input/audio and wider network review remain open. v0.0.21 remains the deployed
+release; its live evidence below belongs to the earlier command.
 
 Preparation evidence, 2026-10-28: v0.0.21 collects the merged mobile browser controls and adaptive
 viewport work since v0.0.20. Release orchestration and offline archive/pin guards implemented;

@@ -385,6 +385,9 @@ proteus_add_case_tests(boat_clock validate_boat_clock LABELS cpu ARGS ${BOAT_CLO
 add_test(NAME boat_clock_soak_smoke
   COMMAND validate_boat_clock --soak 60 ${BOAT_CLOCK_TEST_DIR} --waves)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME release_command COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_cut_release.py)
+set_tests_properties(release_command PROPERTIES LABELS "cpu")
 add_test(NAME web_endpoint_configuration COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_configure_web_endpoint.py)
 set_tests_properties(web_endpoint_configuration PROPERTIES LABELS "cpu")
@@ -920,6 +923,7 @@ endforeach()
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
 # in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
+  release_command
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render

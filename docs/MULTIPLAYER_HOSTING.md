@@ -28,6 +28,9 @@ the v0.0.18 connection limitation described in the historical notes no longer ap
 ## Routine deployments (davve-srv)
 
 Every release must include this hosted cutover after native publication and Pages succeed.
+The [release command](RELEASES.md#release-command) automates the version-pin commit, pushes
+the private hosting baseline and executes/verifies this routine role. Its preflight mode
+checks prerequisites before publication. The manual steps below remain the fallback.
 `davve-srv` owns normal deployment. Pin `wake_velocity_version` in
 `ansible/host_vars/winterfell/main.yml`, commit and push, then run from that repository:
 
