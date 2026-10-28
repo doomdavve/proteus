@@ -8,7 +8,7 @@ The shared title retains single-player setup, public/LAN/address joining, hostin
 settings, plus a dedicated animated Credits screen. Volume settings, title music and a
 live river backdrop remain deferred.
 The user approved the marine blue/yellow visual direction on 2026-10-28.
-A compact bridge/river app icon now follows that backdrop; icon review is pending.
+The compact two-tower bridge/river app icon is user-approved on 2026-10-28.
 Next: physical input/playback review; native/browser
 package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
@@ -55,9 +55,12 @@ level deck. Hangers were recomputed and the second tower has a short water refle
 All exports and previews were regenerated. Updated 16–180 px and rounded previews were
 inspected; every desktop representation decoded, and packaged web icons matched the sources.
 Debug build and `ctest --preset full` passed: 234 enabled tests in 11.69 s, 13 retired cases
-disabled, GPU tests off with local socket access. Design and physical-device review remain open.
+disabled, GPU tests off with local socket access.
 
-Next: user design review, then physical iOS/Android Home Screen review and native packaging
+User acceptance, 2026-10-28: “Let's go with this!” approves the final two-tower icon design.
+This accepts the artwork; physical Home Screen and native package qualification remain open.
+
+Next: physical iOS/Android Home Screen review and native packaging
 integration/qualification. No installed-device or Finder/Windows shell acceptance is claimed.
 The scene, gameplay, animation and audio are unchanged; no manual gameplay demo was needed.
 
