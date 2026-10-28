@@ -4,7 +4,7 @@
 
 #include <stdbool.h>
 
-// The in-game Escape menu. It is drawn in the scene's 320x200 coordinates (through a Camera2D
+// The in-game P/Escape menu. It is drawn in the scene's 320x200 coordinates (through a Camera2D
 // matching the integer-scaled destination) and never changes a session itself: the study acts on
 // the returned choice. Solo play pauses while it is open; rooms keep running.
 typedef enum {
@@ -27,7 +27,7 @@ typedef struct {
 } BoatMenu;
 
 void boat_menu_open(BoatMenu *menu);
-// Keyboard and pointer input for one frame; Escape stays with the caller.
+// Keyboard and pointer input for one frame; P/Escape stay with the caller.
 BoatMenuChoice boat_menu_update(BoatMenu *menu, Camera2D camera, float dt);
 void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, bool networked);
 #endif

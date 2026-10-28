@@ -488,7 +488,7 @@ R resets both the boat and attempt; focus loss pauses both. Free boating is stil
 Completed runs are recorded as poses at 120 Hz with interpolated START/FINISH samples and gate
 splits. The fastest run persists across launches and becomes a non-colliding cyan ghost on retry;
 calm water and gentle waves have separate bests. G toggles the ghost. Before START or after FINISH,
-P/B replays the last/best run; Space pauses, Enter restarts, and hold Backspace 1 s returns to racing. A retry discards
+L/B replays the last/best run; Space pauses, Enter restarts, and hold Backspace 1 s returns to racing. A retry discards
 only the unfinished recording. Replay omits water particles and allows the usual camera controls. Left/Right seek one second
 (Shift: five seconds), Home/End jump to START/FINISH, and brackets select 0.25× through 8× playback; backslash restores 1×.
 A clickable timeline marks gate splits; clicking/dragging seeks and pauses. Finish pauses playback;

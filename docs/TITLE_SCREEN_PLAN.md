@@ -14,6 +14,38 @@ package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
+## Fullscreen menu shortcut, 2026-10-28
+
+Completed: P now opens/closes the in-game menu alongside Escape on native and web builds.
+P avoids the browser's Escape fullscreen-exit behavior; both keys dismiss help first when
+it is open. The shared menu retains solo pause and multiplayer idle/room-running behavior.
+The HUD advertises P, and the menu resume hint, controls guide and CLI help include it.
+The last-run replay shortcut moves from P to L; B still selects the best replay.
+
+Verification, 2026-10-28, Apple Silicon/macOS: native Debug and web MinSizeRel builds passed.
+The full native CTest preset passed all 230 enabled tests (13 retired cases disabled;
+`PROTEUS_GPU_TESTS=OFF`). A 120-frame native windowed demo completed. Chrome/SwiftShader
+Playwright checks used the actual built Wasm game: P opened, closed and reopened the menu
+with keyboard and captured mouse steering while `document.fullscreenElement` stayed set;
+menu entry released pointer lock and clicking after resume recaptured it. Enter resumed,
+and P dismissed help. Gameplay, menu and help captures were inspected under
+`build/menu-review/`; no page errors occurred. These are scripted agent checks, not human
+physical input or listening review. The bundled stb_vorbis compiler warning remains.
+
+Integration verification, 2026-10-28: merged `origin/main` at `8a3169c`. Kept the newer
+mobile Menu input, time controls, adaptive viewport, scenery loading, icon and release docs;
+P joins the same menu-input path as Escape and the mobile button. Native Debug and web
+MinSizeRel rebuilds passed; all 236 enabled CTests passed in 16.86 s (13 retired cases
+disabled, GPU lane off, local sockets enabled). The 120-frame native demo completed.
+Chrome/SwiftShader fullscreen P/capture and credits checks passed again, as did the existing
+Android-emulated mobile controls/fullscreen/menu check. Updated desktop credits and mobile
+menu captures were inspected. Physical devices, listening and live multiplayer were not
+reviewed in this integration pass.
+
+Next: physical input review and Firefox/Safari fullscreen qualification. Live multiplayer
+menu behavior was not rerun; it uses the same existing menu activation and neutral-input path.
+User acceptance remains pending.
+
 ## App icon, 2026-10-28
 
 Completed: replace the generic boat icon with a compact interpretation of the menu's
@@ -74,11 +106,19 @@ The scene, gameplay, animation and audio are unchanged; no manual gameplay demo 
 
 ## Credits screen, 2026-10-28
 
+Version-footer cleanup, 2026-10-28: the user requested no version in credits. Completed:
+only non-credits panels draw the existing small-font version footer. Native Debug and web
+MinSizeRel rebuilds passed; all 230 enabled CTests passed again (13 retired cases disabled,
+GPU test lane off). Chrome/SwiftShader captures confirmed no credits footer and the retained
+main-menu version after Escape return. These scripted captures were inspected; physical
+navigation and human acceptance remain pending. Next: the physical/browser qualification
+listed below.
+
 Completed: add CREDITS before EXIT / BACK TO LAUNCHER and move the Proteus, font and map
 credits out of the title/settings/help into this panel. Five main rows retain the existing
 panel width and bottom edge. Settings keeps its six control rows and contextual hints.
-Following user review, credits now use **m5x7 throughout**, including headings, names, BACK
-and the version footer. A centred movie-style roll scrolls vertically over the retained,
+Following user review, credits now use **m5x7 throughout**, including headings, names and BACK. The credits version footer was removed on
+2026-10-28; the main menu keeps its small-font version. A centred movie-style roll scrolls vertically over the retained,
 user-liked rippling water grid. The initial mixed-font card and horizontal sine scroller
 are superseded. All animation uses the title presentation clock. Credits and presentation
 retain their integer pixel grid; the background water now uses fractional positions and
