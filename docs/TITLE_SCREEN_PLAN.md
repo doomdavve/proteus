@@ -13,6 +13,28 @@ package qualification remains outstanding. Gameplay sunset is owned by the
 [sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
+## Fullscreen menu shortcut, 2026-10-28
+
+Completed: P now opens/closes the in-game menu alongside Escape on native and web builds.
+P avoids the browser's Escape fullscreen-exit behavior; both keys dismiss help first when
+it is open. The shared menu retains solo pause and multiplayer idle/room-running behavior.
+The HUD advertises P, and the menu resume hint, controls guide and CLI help include it.
+The last-run replay shortcut moves from P to L; B still selects the best replay.
+
+Verification, 2026-10-28, Apple Silicon/macOS: native Debug and web MinSizeRel builds passed.
+The full native CTest preset passed all 230 enabled tests (13 retired cases disabled;
+`PROTEUS_GPU_TESTS=OFF`). A 120-frame native windowed demo completed. Chrome/SwiftShader
+Playwright checks used the actual built Wasm game: P opened, closed and reopened the menu
+with keyboard and captured mouse steering while `document.fullscreenElement` stayed set;
+menu entry released pointer lock and clicking after resume recaptured it. Enter resumed,
+and P dismissed help. Gameplay, menu and help captures were inspected under
+`build/menu-review/`; no page errors occurred. These are scripted agent checks, not human
+physical input or listening review. The bundled stb_vorbis compiler warning remains.
+
+Next: physical input review and Firefox/Safari fullscreen qualification. Live multiplayer
+menu behavior was not rerun; it uses the same existing menu activation and neutral-input path.
+User acceptance remains pending.
+
 ## Credits screen, 2026-10-28
 
 Completed: add CREDITS before EXIT / BACK TO LAUNCHER and move the Proteus, font and map

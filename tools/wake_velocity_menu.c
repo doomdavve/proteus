@@ -85,7 +85,7 @@ void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, 
         : menu->selected == ROW_STEERING           ? "LEFT / RIGHT OR CLICK; M IN GAME"
         : networked && menu->room_hint             ? menu->room_hint
         : networked                                ? "THE ROOM KEEPS RUNNING; YOUR BOAT IDLES"
-                                                   : "ESC: RESUME";
+                                                   : "P / ESC: RESUME";
     int x = (WIDTH - boat_ui_width(hint, 10)) / 2, y = top + height + 3;
     DrawRectangle(x - 3, y - 1, boat_ui_width(hint, 10) + 6, 12, palette.shadow);
     boat_ui_text(hint, x, y + 1, 10, palette.hint);

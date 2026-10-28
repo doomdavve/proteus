@@ -57,16 +57,17 @@ no numeric readouts or units:
   to lock, independent of window size/frame time). Stopping movement holds the target;
   opposite movement unwinds it. Clamp the stored target at lock so excess movement does not
   cause windup. The existing turn-in/countersteering limits still apply. M switches
-  mouse/keyboard steering. Esc opens the in-game menu (owned by the
+  mouse/keyboard steering. P or Esc opens the in-game menu (owned by the
   [title plan](TITLE_SCREEN_PLAN.md#in-game-escape-menu-2026-10-25)) and releases capture
   without changing the mode; its STEERING row also switches it. Resuming recaptures.
   Help/focus loss releases capture; returning resumes it with capture-frame motion discarded.
   Solo pause retains the target; multiplayer inactivity neutralizes it. A deliberate reset/new life centres
   the target. Keyboard mode retains spring return. Demo/replay release capture and
-  retain their existing controls. The scene-pixel label shows `MOUSE / ESC: MENU`
+  retain their existing controls. Keyboard steering shows `P: MENU`; captured mouse steering
+  shows `MOUSE / P: MENU`
   (hidden while the menu is open). A browser unlock the game did not request (Escape,
   focus loss) opens the menu instead of switching to keyboard; denied capture still
-  falls back to keyboard with `MOUSE UNAVAILABLE / USE A/D`.
+  falls back to keyboard with `MOUSE UNAVAILABLE / A/D / P: MENU`.
   In object-wake flight steering retains yaw and automatic upright assistance, but cannot
   command a roll. Stopping the mouse still holds the wheel; it does not suppress recovery.
   Impacts and bad/inverted landings can still capsize the boat. See [stability](ARCADE_STABILITY.md).
@@ -211,7 +212,7 @@ Verification on Apple M1 Max / macOS:
   fallback passed. Deterministic DOM movement/scroll events test delivery; physical device
   feel is not inferred. No JavaScript errors. Captures were inspected.
 - WebKit (headed): this test engine refused/lacked pointer capture. Keyboard/scroll fallback
-  and the visible `MOUSE UNAVAILABLE / USE A/D` message passed; no JavaScript errors.
+  and the visible `MOUSE UNAVAILABLE / A/D / P: MENU` message passed; no JavaScript errors.
   This is **not** a captured-mouse pass or a shipping Safari check.
 - Native Debug configure/build passed without project warnings; all 103 active CTests passed
   in 86.97 s (GPU enabled, Node available; 15 retired cases disabled). Log:

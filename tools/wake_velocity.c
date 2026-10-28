@@ -56,7 +56,7 @@ static void usage(void)
         "Hold W/Up: forward | S/Down: reverse | release: neutral | Shift: precision\n"
         "M: capture/release mouse steering (move to turn; stop to hold) | --mouse-steering\n"
         "Arcade jumps: automatic aerial stabilization; steering retains yaw\n"
-        "Keyboard wheel springs to centre; mouse wheel holds. Hold Backspace 1 s: reset | Esc: "
+        "Keyboard wheel springs to centre; mouse wheel holds. Hold Backspace 1 s: reset | P/Esc: "
         "menu "
         "(steering, controls, leave; solo pauses, rooms keep running)\n"
         "+/-: closer/farther | PageUp/PageDown: raise/lower camera | C: reset view\n"
@@ -80,7 +80,7 @@ static void usage(void)
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"
-        "G: ghost on/off | P/B: replay last/best | Space: pause replay | Enter: restart replay\n"
+        "G: ghost on/off | L/B: replay last/best | Space: pause replay | Enter: restart replay\n"
         "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed 0.25x..4x\n"
         "Click/drag the replay timeline to seek and pause; Space resumes.\n"
         "--replay FILE: watch a saved course run (also supports --screenshot --time)\n"
@@ -123,7 +123,7 @@ static void draw_help(bool course, bool voyage, bool deathmatch, bool race)
         "M: toggle mouse / keyboard steering",
         "Mouse: move to turn; stop to hold wheel",
         "In air: automatic upright assistance",
-        "Esc: menu (steering, controls, leave)",
+        "P/Esc: menu (steering, controls, leave)",
         "Hold W/Up: forward | S/Down: reverse",
         "Release keyboard steering: centre wheel",
         "Release thrust keys: neutral / coast",
@@ -136,14 +136,14 @@ static void draw_help(bool course, bool voyage, bool deathmatch, bool race)
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
 #if defined(__EMSCRIPTEN__)
-        "Esc: menu / leave fullscreen | Back to title: setup",
+        "P: menu in fullscreen | Back to title: setup",
 #endif
-        course ? "G: ghost | P/B: replay last/best" : "",
+        course ? "G: ghost | L/B: replay last/best" : "",
         course ? "Replay: Space pause | Enter restart" : "",
         course ? "Left/Right: seek | Shift: 5 seconds" : "",
         course ? "Home/End: start/end | [ / ]: speed" : "",
         course ? "Click/drag timeline: seek and pause" : "",
-        "? or Esc: dismiss help",
+        "?, P or Esc: dismiss help",
     };
     DrawRectangle(0, 0, width, height, (Color) { 8, 15, 22, 220 });
     int font = height < 300 ? 8 : width < 600 || height < 500 ? 10 : 20;
@@ -840,10 +840,10 @@ static int study(int argc, char **argv)
             help_pressed |= character == '?';
         if (help_pressed)
             help_visible = !help_visible;
-        // Escape never changes the steering mode: it opens the menu, which releases capture.
+        // Menu shortcuts release capture without changing steering mode. P preserves fullscreen.
         bool reset_requested = false;
         bool menu_was_open = menu.open;
-        if (IsKeyPressed(KEY_ESCAPE)) {
+        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P)) {
             if (help_visible)
                 help_visible = false;
             else if (menu.open)
@@ -970,7 +970,7 @@ static int study(int argc, char **argv)
                 session.runs.ghost_visible = !session.runs.ghost_visible;
             if (session.course.next_gate == 0 || session.course.next_gate == BOAT_COURSE_GATES
                 || session.runs.playing) {
-                const BoatReplay *selected = IsKeyPressed(KEY_P) ? &session.runs.last
+                const BoatReplay *selected = IsKeyPressed(KEY_L) ? &session.runs.last
                     : IsKeyPressed(KEY_B)                        ? &session.runs.best
                                                                  : NULL;
                 if (selected && boat_replay_play(&session.runs, selected)) {
@@ -1266,12 +1266,14 @@ static int study(int argc, char **argv)
             boat_rearview_draw(&mirror, WIDTH);
         int hint_top = mirror_visible ? BOAT_REARVIEW_BOTTOM + 12 : 4;
         if (mouse_driving && !menu.open)
-            boat_ui_text(mouse_captured ? "MOUSE / ESC: MENU" : "MOUSE / CLICK TO CAPTURE", 4,
+            boat_ui_text(mouse_captured ? "MOUSE / P: MENU" : "MOUSE / CLICK TO CAPTURE", 4,
                 hint_top, 10, (Color) { 218, 223, 202, 255 });
+        else if (!menu.open)
+            boat_ui_text("P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
             boat_ui_text(
-                "MOUSE UNAVAILABLE / USE A/D", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
+                "MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #endif
         EndTextureMode();
         BeginDrawing();

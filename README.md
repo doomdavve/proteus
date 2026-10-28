@@ -335,7 +335,7 @@ The HUD shows your best time and the time difference at each gate (negative mean
 A deliberate reset abandons an unfinished attempt while preserving your last completed run and best.
 
 - `G`: show/hide the ghost.
-- `P`: watch the last completed run; `B`: watch your personal best. Available before START or after
+- `L`: watch the last completed run; `B`: watch your personal best. Available before START or after
   FINISH. Replays follow the recorded hull and camera heading; water particles are omitted.
 - During replay, `Space` pauses/resumes, `Enter` restarts at the selected speed, and Escape > RESTART RUN returns to
   racing. Backspace reset is inactive during replay. Finishing pauses playback; `Space` then plays again from the beginning.
@@ -485,12 +485,12 @@ is hidden and horizontal movement accumulates wheel angle: move right/left to tu
 then stop moving to hold that setting. About 300 mouse pixels moves the requested wheel from
 centre to full lock, independently of window size. Move back to straighten it; a deliberate reset centres the
 wheel and selects neutral thrust. The steering needle shows the actual wheel as it follows the target smoothly.
-M switches between mouse and keyboard steering. Esc never changes the steering mode: it opens
+M switches between mouse and keyboard steering. P or Esc keeps the steering mode and opens
 a menu and releases the pointer. Single player pauses while the menu is open; in a room the
 match keeps running and your boat idles (neutral thrust, centred wheel), as with help or focus
 loss. The menu offers RESUME, STEERING (mouse/keyboard), CONTROLS (the `?` guide) and BACK TO
 TITLE / LEAVE ROOM (QUIT when started with explicit options; no leave row in browsers).
-Esc or RESUME returns to play and recaptures the pointer in mouse mode.
+P, Esc or RESUME returns to play and recaptures the pointer in mouse mode.
 Help and focus loss release capture. Desktop builds resume capture on return. Browsers
 consume Escape themselves to unlock the pointer, so an unlock the game did not ask for (Escape
 or focus loss) opens the menu; after resuming, click the canvas to capture again. Browsers that deny or lack capture show a keyboard
@@ -508,7 +508,7 @@ The scene uses the full window with a compact [marine instrument panel](docs/BOA
 showing actual commanded thrust, a speed needle, and port/starboard steering as visual ranges
 without numbers or units. Its slightly translucent case sits at the bottom of the scene;
 all HUD pixels share the scene's 320x200 grid and integer scaling. Press `?` for a
-modal keyboard guide; `?` or Esc dismisses it. Boating and audio pause while help is open or the
+modal keyboard guide; `?`, P or Esc dismisses it. Boating and audio pause while help is open or the
 window loses focus. The view remains 320x200 with integer scaling and letterboxing as needed.
 Frames follow the display: vsync paces presentation, and an absolute-deadline cap just above
 the monitor's refresh rate holds hidden or occluded windows whose swaps stop blocking. The
@@ -843,8 +843,8 @@ soundtrack and smoothing. SMOOTHING defaults to ON and applies the same 4×4 sup
 to single-player and multiplayer, including WebRTC rooms. Turn it OFF in SETTINGS on slower
 devices. SINGLE PLAYER selects River, Basin or Basin trial, waves and the same smoothing setting.
 The launcher disappears during play; the game uses integer scaling. Press `?` for controls
-and Escape for the in-game menu (the browser may also leave fullscreen). BACK TO TITLE
-returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;
+and **P** for the in-game menu while staying fullscreen (Escape also opens it, but the browser
+may leave fullscreen). BACK TO TITLE returns to setup without reloading. M enables captured mouse steering. W/S or Up/Down apply forward/reverse thrust while held;
 release selects neutral and Shift selects precision power. Scrolling is unassigned. After help or RESUME, click the canvas to recapture. If capture
 is unavailable, keyboard steering stays available. MULTIPLAYER joins an operator-provided
 WebRTC room URL; browser hosting and LAN discovery are unavailable. Browser throttling
