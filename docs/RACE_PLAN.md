@@ -49,7 +49,9 @@ protocols remain compiled until plugin P5. Existing R3 pacing/acceptance tasks a
 The [P2 evidence](PLUGIN_PLAN.md#p2-result-2026-10-29) owns detailed verification and limits:
 reference/compiled digest and tick-for-tick four-boat parity, the existing race case suite
 with the Lua fixture, map/recovery rejection checks, CPU/GPU frames and a scripted edit run.
-No human P2 play is claimed. Next plugin work is P3; race pacing work retains its own gates.
+The user tried several spawn edits, saw updates or validation errors, and then drove the
+local course successfully (2026-10-29). Individual reload/Undo key paths were not specified.
+Next plugin work is P3; race pacing work retains its own gates.
 
 ## Direction
 
