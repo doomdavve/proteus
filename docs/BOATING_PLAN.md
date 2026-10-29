@@ -494,7 +494,7 @@ only the unfinished recording. Replay omits water particles and allows the usual
 A clickable timeline marks gate splits; clicking/dragging seeks and pauses. Finish pauses playback;
 Space starts again from the beginning. Seeking and speed changes preserve the recording and best.
 Portable, versioned run files can be exported with `--save-run`, watched with `--replay`, or selected
-as a ghost with `--ghost`; see the [README controls and storage notes](../README.md#boating-sketch).
+as a ghost with `--ghost`; see the [playing and storage guide](PLAYING.md).
 There is one saved best per water preset; a broader leaderboard is deferred. This small time trial
 was implemented ahead of the proposed minute-long scoring mode and remaining physics experiments.
 The time-trial foundation is now in place; it is not an outstanding prerequisite for physics D1.
@@ -651,8 +651,8 @@ These stages describe the design sequence; current implementation is recorded ex
    costs with a short sheltered/exposed outing, then expand through the approaches to Vinga.
    The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns data, technical stages and acceptance.
 
-`wake_velocity` reuses the scene and rendering foundation. Its controls and launch options live in
-the [README](../README.md#boating-sketch).
+`wake_velocity` reuses the scene and rendering foundation. Its controls live in the
+[playing guide](PLAYING.md); launch options live in the [command-line reference](COMMAND_LINE.md).
 
 ## Later water-physics experiments
 

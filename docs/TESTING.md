@@ -394,6 +394,20 @@ configuration; Windows timings have not been measured. GPU checks are opt-in thr
 `PROTEUS_GPU_TESTS=ON` and need a desktop context. A display-free suite with GPU checks
 off has less coverage; report that omission.
 
+## GPU checks
+
+GPU checks are opt-in and require a desktop graphics context. Configure and run the
+labelled cases on a machine that can create a raylib/OpenGL window:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=ON
+cmake --build build -j
+ctest --test-dir build -L gpu --output-on-failure
+```
+
+The default display-free suite omits these checks. Report that omission when recording
+verification. Fixture capture commands live in the [renderer guide](3D.md#gpu-review-captures).
+
 ## Network checks
 
 `boat_net` runs `validate_boat_net`, which links only the core and net libraries and takes
@@ -673,4 +687,4 @@ gradient and vertical speed. `check_web_multiplayer.py --mode deathmatch` also e
 numbered grenade commands, page reception and captures the weapon HUD and burst over WebRTC.
 
 Current automated/manual evidence and unavailable platform checks belong to the
-[deathmatch owner](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26).
+[deathmatch owner](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26-superseded-rules-historical-evidence).

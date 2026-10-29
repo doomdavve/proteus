@@ -79,7 +79,7 @@ performance is poor. OpenGL 3.3 support is required for GPU mode.
 The executable also accepts `--location river` for the bridge expansion, `--waves`
 for gentle waves, and `--course` for the basin time trial. Renderer defaults are the
 same as on macOS: use `--renderer cpu` explicitly for the software reference.
-See the [main controls and replay guide](../README.md#boating-sketch) for the full interface.
+See the [main controls and replay guide](PLAYING.md) for the full interface.
 Workflow build/CPU checks do not establish a successful human Windows playthrough.
 
 ## Connect an existing checkout to GitHub

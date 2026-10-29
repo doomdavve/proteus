@@ -7,7 +7,7 @@ links it for the diagnostic `--connect` mode, so the app bundle now carries
 `--scripted`. Since 2026-10-25 that copy is gone: the game serves rooms itself
 (`Contents/MacOS/wake_velocity --serve`, and the title's HOST A ROOM), so the bundle holds one
 executable and CI runs `wake_velocity --serve --scripted --ticks 240`; see
-[hosting from the game](../README.md#hosting-from-the-game). The 2026-10-24 notes follow. There is no
+[hosting from the game](PLAYING.md#hosting-from-the-game). The 2026-10-24 notes follow. There is no
 `boat_bot` and no Host control. Since 2026-10-24 the title's MULTIPLAYER entry joins a room by address (not yet
 re-run through the packaged app or CI). The plan's M6 owns server packaging, firewall guidance and a child-process Host
 option. The package script change was run locally on a Debug build; the CI workflow has not
@@ -53,7 +53,7 @@ network and joins one, or a typed HOST:PORT, with the chosen NAME. The single-pl
 ./build/wake_velocity --current --crossing-wake --location river --waves --gpu-aa --camera-distance 12 --camera-height 6
 ```
 
-See the [controls and replay guide](../README.md#boating-sketch). Supplying any
+See the [controls and replay guide](PLAYING.md). Supplying any
 explicit arguments to the bundle executable uses the usual CLI defaults (basin,
 without current/crossing wake/waves/antialiasing), then applies those arguments.
 For example:

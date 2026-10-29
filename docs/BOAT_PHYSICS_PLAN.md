@@ -77,7 +77,7 @@ passes remain kinematic and their foam adds no physical wake. The separate D1/D2
 source below supplies the physical test.
 
 Accepted direction: 2026-10-17. Parent design: [Boating playground](BOATING_PLAN.md).
-Public controls: [README](../README.md#boating-sketch). [All plans](README.md).
+Public controls: [playing guide](PLAYING.md). [All plans](README.md).
 
 ## Landing weight request — 2026-10-24
 

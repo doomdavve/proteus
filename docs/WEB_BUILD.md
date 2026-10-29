@@ -198,7 +198,7 @@ v7 adds the arsenal described in [deathmatch](DEATHMATCH_PLAN.md#arsenal-milesto
 native WebRTC endpoint builds; mixed Chrome/SwiftShader and native-hunter automation passes
 weapon commands, bounded combat page reception, rendered grenade/HUD, two resets and rejoin.
 Both production radial shader recipes pass independent WebGL2 float probes (2873 each,
-maximum absolute error 0.00001442). [Detailed evidence and captures](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26).
+maximum absolute error 0.00001442). [Detailed evidence and captures](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26-superseded-rules-historical-evidence).
 No native desktop graphics/audio, Firefox/Safari, physical-device or human balance pass is inferred.
 
 ## Known browser servers, 2026-10-26
@@ -266,10 +266,40 @@ checks both shortcut and menu reset messages explicitly before asserting two com
 
 ## Build and deployment
 
-The [README](../README.md#browser-build-and-github-pages) owns the SDK installation,
-build/serve commands, Pages setup, and browser controls. The toolchain is pinned in
+Install CMake 3.24+, Python 3 and the official Emscripten SDK. The toolchain is pinned in
 [web/emsdk-version](../web/emsdk-version); the workflow also pins the official SDK checkout.
-Keep SDK updates coordinated with browser smoke checks.
+Keep SDK updates coordinated with browser smoke checks. With an SDK checkout at `../emsdk`,
+run from the repository root:
+
+```sh
+../emsdk/emsdk install "$(cat web/emsdk-version)"
+../emsdk/emsdk activate "$(cat web/emsdk-version)"
+source ../emsdk/emsdk_env.sh
+emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=MinSizeRel
+cmake --build build-web --target web --parallel
+cmake --build build-web --target web-serve
+```
+
+Open **http://127.0.0.1:8000/** and press PLAY to enable audio and enter the title.
+Stop the server with Ctrl+C. Serve `build-web/site/` over HTTP; opening its HTML as a
+local file does not work. Keep native builds in `build/`. Browser play needs WebAssembly
+and WebGL 2; see [playing instructions](PLAYING.md) for controls and saved-run limits.
+
+### GitHub Pages setup
+
+The **Web boating / GitHub Pages** workflow deploys on `v*` tag pushes. Ordinary branch
+pushes do not update the site. Set up GitHub once:
+
+1. Under **Settings → Pages → Build and deployment**, select **GitHub Actions**.
+2. If the **github-pages** environment restricts deployment refs, allow **Tag** `v*`
+   and **Branch** `main` for manual deployments. A branch rule named `v*` does not allow tags.
+
+Use the [release command](RELEASES.md#release-command) for a complete release, including
+matching native packages and hosted room cutover. Manual workflow runs deploy from `main`
+or a `v*` tag; other refs only build. Only `build-web/site/` is published. Content-hashed
+JavaScript, Wasm and assets use no service worker; reload to load a new version. GitHub's
+CDN may briefly cache old HTML.
+
 
 The Pages and native release workflows run independently on the same pushed version tag;
 a failure in one does not roll back the other. Any matching tag, including prereleases,
