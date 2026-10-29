@@ -1074,8 +1074,11 @@ an emitter's tracked tick and verifies equality fails. Byte comparisons used to 
 untouched destination remain appropriate. This changes test comparisons only, not runtime
 state, physics or checkpoint storage. On Apple Silicon/macOS, the warning-clean Debug
 build and all 302 enabled full-preset tests passed (13.78 s; sockets enabled, GPU CTests off);
-all 20 session cases also passed with a 1 MB stack limit. The replacement Windows CI run is
-pending. No new audiovisual review was performed for this test-only fix.
+all 20 session cases also passed with a 1 MB stack limit. A separate Clang Release build
+with `-ftrivial-auto-var-init=pattern` passed all 20 session cases under the same stack limit
+(one bundled `stb_vorbis.c` warning). The [replacement Windows CI run](https://github.com/doomdavve/proteus/actions/runs/40915584973)
+remained in libcurl dependency setup at handoff; its MSVC result is pending. No new
+audiovisual review was performed for this test-only fix.
 
 **Next: P3 runtime qualification** — retained revision/total host memory accounting, separate
 callback/migration budgets and measured staging/background reload deadlines. Review checkpoint
