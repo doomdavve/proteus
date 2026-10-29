@@ -9,6 +9,27 @@ display-free captures. The four-minute Eriksberg demo (`proteus`), its soundtrac
 Eriksberg boating location and their plans were removed on 2026-10-25; they remain in the git
 history.
 
+## README and guide handoff — 2026-10-29
+
+The project README now introduces Wake Velocity with two existing gameplay screenshots,
+play/download links and a short developer entry point. Current player instructions and
+launch examples moved to the playing and command-line guides linked below; the browser
+build/deployment instructions now live in [Browser builds](WEB_BUILD.md#build-and-deployment).
+Duplicate, superseded experiment prose was removed from the introduction; historical
+research remains in its owning documents. No runtime behavior or feature status changed.
+
+Verification, 2026-10-29, Apple Silicon/macOS: Debug configure/build passed using the
+existing pinned dependency sources; `ctest --preset full` passed all 282 enabled tests
+(13 retired field tests disabled, GPU checks off). The first sandboxed run could not bind
+local sockets; the complete rerun with sockets enabled passed. The build emitted one
+upstream `stb_vorbis.c` warning. All 399 local links/anchors across the 12 affected Markdown
+files resolve, and no links remain to the removed README sections. Game/server/bot help
+was checked against the migrated options. GitHub-rendered README HTML was inspected in
+headless Chrome with both screenshot assets loaded, using a local stylesheet approximating
+GitHub's layout. No game playback or new audiovisual acceptance was performed; Windows,
+Linux, GPU checks and browser builds were not rerun. Next: review and merge the documentation
+PR; the native CI workflows skip Markdown-only changes.
+
 ## Current work
 
 Released internet hosting: [v0.0.21](RELEASES.md#status-and-verification) is published and
@@ -55,7 +76,9 @@ does not authorize advancing every plan. Use the requested track's scope and acc
   selected implementation sequence. These do not replace the gameplay plans.
 - [Lua plugin API](PLUGIN_API.md): pinned interpreter, package/manifest and voyage schema,
   allowed globals, limits, diagnostics and validator commands for P0 descriptors.
-- [Project README](../README.md): build, launch, controls, renderer options, course/replay storage.
+- [Project README](../README.md): game introduction, screenshots, play/download links and native build quickstart.
+- [Playing Wake Velocity](PLAYING.md): controls, modes, hosting/joining, course/replays and save storage.
+- [Command-line reference](COMMAND_LINE.md): launch options, water, rendering/captures and room commands.
 - [3D renderer and scene guide](3D.md): current scene evaluation, CPU API, GPU materials, geometry.
 - [Water review](WATER_REVIEW.md): dated 04e baseline followed by implemented 04f/04g records.
 - [Generated boats and berths](HARBOR_BOATS.md): visual parameters, mooring/wave evaluation,

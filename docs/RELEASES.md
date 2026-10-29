@@ -125,7 +125,7 @@ git push origin v0.1.0
 
 The same tag push also starts the separate **Web boating / GitHub Pages** workflow,
 which builds the browser game and updates the Pages site. Complete the one-time
-[Pages setup](../README.md#browser-build-and-github-pages), including allowing `v*` tags
+[Pages setup](WEB_BUILD.md#github-pages-setup), including allowing `v*` tags
 in the deployment environment, before the first web release. The tagged commit must
 contain the web workflow and build inputs. Web deployment and native ZIP publication
 run independently; either can succeed if the other fails. All `v*` tags, including
