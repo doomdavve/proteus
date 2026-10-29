@@ -2,6 +2,7 @@
 #include "boat_gpu.h"
 #include "boat_map.h"
 #include "boat_race.h"
+#include "boat_race_plugin.h"
 #include "boat_reset_hold.h"
 #include "boat_test_scenery.h"
 #include "boat_test_world.h"
@@ -26,6 +27,16 @@ void boat_vessel_wake_gpu_check(BoatVesselWake wake);
 void boat_water_storm_gpu_check(BoatStorm storm);
 void boat_water_radial_gpu_check(void);
 bool boat_vessel_wake_shadow_read(Texture2D texture, float *pixels);
+
+static RacePlugin plugin;
+static const char *plugin_path;
+static bool plugin_enabled;
+
+static const BoatRaceCourse *preview_course(void)
+{
+    return plugin_enabled ? &boat_plugin_host_active(&plugin.host)->race.course
+                          : boat_race_river_course();
+}
 
 static const Vector2 route[]
     = { { -180, -250 }, { -40, -360 }, { 220, -510 }, { 454, -678 }, { 600, -800 } };
@@ -513,15 +524,19 @@ static void preview_start(BoatSession *session, ObjectStudy *objects, bool sourc
     if (skill) {
         objects->traffic_enabled = false;
         session->world.water.traffic_objects = NULL;
-        session->world.water.vessel
-            = source ? boat_race_river_course()->source : (BoatVesselWake) { 0 };
-        session->world.water.storm = source ? boat_race_river_course()->storm : (BoatStorm) { 0 };
+        session->world.water.vessel = source ? preview_course()->source : (BoatVesselWake) { 0 };
+        session->world.water.storm = source ? preview_course()->storm : (BoatStorm) { 0 };
+        session->boat.position = preview_course()->start.centre;
+        Vector2 direction = preview_course()->start.direction;
+        session->boat.heading = atan2f(direction.x, -direction.y);
+        boat_presentation_reset(&session->presentation);
+        session->presentation.camera_heading = session->boat.heading;
     }
 }
 
 static Vector2 preview_target(unsigned next, bool skill)
 {
-    const BoatRaceCourse *course = boat_race_river_course();
+    const BoatRaceCourse *course = preview_course();
     if (skill)
         return course->gates[next <= course->gate_count ? next - 1 : course->gate_count - 1].centre;
     return route[next < ROUTE_COUNT ? next : ROUTE_COUNT - 1];
@@ -533,7 +548,7 @@ static void preview_advance(const Boat *boat, Vector2 previous, unsigned *next, 
         advance_target(boat, next);
         return;
     }
-    const BoatRaceCourse *course = boat_race_river_course();
+    const BoatRaceCourse *course = preview_course();
     while (*next <= course->gate_count
         && boat_race_cross(&course->gates[*next - 1], previous, boat->position) >= 0)
         ++*next;
@@ -553,7 +568,10 @@ int main(int argc, char **argv)
             check = true;
         else if (!strcmp(argv[i], "--gpu-check"))
             gpu_check = true;
-        else if (!strcmp(argv[i], "--skill-course"))
+        else if (!strcmp(argv[i], "--plugin") && i + 1 < argc) {
+            plugin_path = argv[++i];
+            skill = true;
+        } else if (!strcmp(argv[i], "--skill-course"))
             skill = true;
         else if (!strcmp(argv[i], "--play"))
             play = true;
@@ -584,17 +602,29 @@ int main(int argc, char **argv)
             frames = (int)value;
         } else {
             fprintf(stderr,
-                "Usage: boat_race_trial [--check] [--play] [--skill-course] [--no-source] "
+                "Usage: boat_race_trial [--check] [--play] [--skill-course] [--plugin DIR] "
+                "[--no-source] "
                 "[--wave-scale 0..4] [--renderer cpu|gpu] [--output FILE --time SECONDS] [--frames "
                 "COUNT]\n");
             return 2;
         }
     }
     SetTraceLogLevel(LOG_WARNING);
+    if (plugin_path && (check || gpu_check)) {
+        fprintf(stderr,
+            "--plugin is for local preview; use validate_boat_plugin_race for headless checks.\n");
+        return 2;
+    }
+    if (plugin_path
+        && !race_plugin_open(&plugin, plugin_path, test_world(BOAT_LOCATION_RIVER), GetTime())) {
+        test_worlds_close();
+        return 1;
+    }
+    plugin_enabled = plugin_path != NULL;
     if (gpu_check) {
         boat_water_radial_gpu_check();
         boat_vessel_wake_gpu_check(ferry());
-        boat_water_storm_gpu_check(boat_race_river_course()->storm);
+        boat_water_storm_gpu_check(preview_course()->storm);
         ferry_visibility();
         return 0;
     }
@@ -612,7 +642,7 @@ int main(int argc, char **argv)
         session.world.water.vessel.height *= wave_scale;
     }
     unsigned next = 1;
-    unsigned targets = skill ? boat_race_river_course()->gate_count : ROUTE_COUNT - 1;
+    unsigned targets = skill ? preview_course()->gate_count : ROUTE_COUNT - 1;
     if (output)
         for (unsigned t = 0; t < (unsigned)llround(seconds * BOAT_TICK_HZ); ++t) {
             Vector2 previous = session.boat.position;
@@ -649,16 +679,22 @@ int main(int argc, char **argv)
     }
     double accumulator = 0;
     unsigned frame = 0;
+    bool staged_previous_frame = false;
     float target_thrust = 0;
     BoatResetHold reset_hold = { 0 };
     while (output || !WindowShouldClose()) {
         if (!output) {
-            if (boat_reset_hold_update(
+            bool plugin_restart = plugin_enabled
+                && race_plugin_frame(&plugin, IsKeyPressed(KEY_F5), IsKeyPressed(KEY_F6),
+                    IsKeyPressed(KEY_F7), GetTime());
+            if (plugin_restart
+                || boat_reset_hold_update(
                     &reset_hold, IsKeyDown(KEY_BACKSPACE), IsWindowFocused(), GetFrameTime())) {
                 boat_session_destroy(&session);
                 preview_start(&session, &objects, source, skill);
                 session.world.water.storm.height *= wave_scale;
                 session.world.water.vessel.height *= wave_scale;
+                targets = skill ? preview_course()->gate_count : ROUTE_COUNT - 1;
                 next = 1;
                 target_thrust = 0;
                 accumulator = 0;
@@ -668,7 +704,11 @@ int main(int argc, char **argv)
                       IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN),
                       IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT))
                 : 0;
-            accumulator += fmin(GetFrameTime(), .1);
+            if (plugin_enabled && (plugin.staged || staged_previous_frame))
+                accumulator = 0;
+            else
+                accumulator += fmin(GetFrameTime(), .1);
+            staged_previous_frame = plugin_enabled && plugin.staged;
             while (accumulator >= BOAT_TICK_SECONDS) {
                 BoatInput input = play ? (BoatInput) { .steering_rate
                     = (float)(IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT))
@@ -683,6 +723,7 @@ int main(int argc, char **argv)
             }
         }
         BoatViewState view = boat_session_view(&session);
+        view.race.course = skill ? preview_course() : NULL;
         view.race.enabled = true; // The race room's start, checkpoint and finish lines.
         if (skill)
             view.race.next_gate = (uint8_t)(next - 1);
@@ -724,7 +765,7 @@ int main(int argc, char **argv)
         DrawTexturePro(gpu_enabled ? gpu.target.texture : texture,
             gpu_enabled ? (Rectangle) { 320, 200, -320, -200 } : (Rectangle) { 0, 0, 320, 200 },
             dest, (Vector2) { 0 }, 0, WHITE);
-        DrawRectangle(0, 0, GetScreenWidth(), 58, (Color) { 0, 0, 0, 180 });
+        DrawRectangle(0, 0, GetScreenWidth(), plugin_enabled ? 84 : 58, (Color) { 0, 0, 0, 180 });
         DrawText(
             TextFormat("%s  %.2f s   %u landings   %.1f m/s   target %u/%u",
                 skill ? "SKILL COURSE" : "R0 PROTOTYPE", view.time, session.boat.landings,
@@ -733,8 +774,10 @@ int main(int argc, char **argv)
         DrawText(play ? "Hold W/S: forward/reverse | Shift: precision | A/D steer | Esc exit"
                       : "Scripted route | Hold Backspace 1 s: restart | Esc exit",
             12, 34, 18, WHITE);
+        if (plugin_enabled)
+            DrawText(TextFormat("%.110s", plugin.notice), 12, 64, 16, YELLOW);
         if (play && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)))
-            DrawText("PRECISION", 12, 64, 14, (Color) { 118, 196, 178, 255 });
+            DrawText("PRECISION", 12, plugin_enabled ? 88 : 64, 14, (Color) { 118, 196, 178, 255 });
         if (reset_hold.seconds > 0) {
             DrawText("HOLD BACKSPACE: RESTART", 12, GetScreenHeight() - 32, 16, YELLOW);
             DrawRectangle(12, GetScreenHeight() - 12,

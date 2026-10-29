@@ -38,7 +38,7 @@ typedef struct {
     float half_width;
 } BoatRaceGate;
 
-typedef struct {
+typedef struct BoatRaceCourse {
     BoatRaceGate start; // Visible start line; progress and early recoveries measure from it.
     BoatRaceGate gates[BOAT_RACE_GATES];
     unsigned gate_count;
@@ -108,6 +108,10 @@ BoatRaceRules boat_race_default_rules(void);
 const BoatRaceCourse *boat_race_river_course(void);
 // False for invalid rules or course geometry.
 bool boat_race_init(BoatRace *race, const BoatRaceRules *rules, const BoatRaceCourse *course);
+// Native recovery/parking candidate 0..13; false when outside the gate width or capacity.
+// Shared with descriptor staging so validation follows the actual placement recipe.
+bool boat_race_recovery_candidate(
+    const BoatRaceGate *gate, bool finished, unsigned index, Boat *boat);
 // A player joins SLOT. While waiting they boat freely from an ordinary fleet spawn; otherwise
 // they stay unplaced until the next grid. False for an invalid or occupied slot.
 bool boat_race_join(BoatRace *race, BoatFleet *fleet, unsigned slot);

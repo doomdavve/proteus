@@ -1,23 +1,18 @@
 # Lua gameplay plugins and live authoring
 
-Status, 2026-10-28: **P0 and P1 implemented. A bounded Lua descriptor loader decodes the
-Långedrag voyage identically to the compiled route. Native solo `outer` sessions can take it
-from a plugin (`--plugin`), reload on save or F5, undo, and apply route or water changes with
-an explicit restart. The user's first native try went well (2026-10-28); there is no
-behavioral API or in-game agent.** The agreed direction is
-embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering
-and networking. Hot reload is a requirement of the first playable slice. This document owns the
-plugin boundary, authoring workflow and staged implementation; [the plugin API](PLUGIN_API.md)
-owns the current contract; the existing gameplay plans continue to own their features and
-acceptance. [All plans](README.md).
+Status, 2026-10-29: **P0, P1 and P2 implemented.** Native solo `outer` sessions load and
+live-edit the Långedrag voyage; the local river trial now loads race descriptors through the
+same restricted evaluator and revision host. The compiled race remains the network default.
+There is no behavioral API or in-game agent. The agreed direction is embedded Lua for gameplay
+authoring, with C retaining physics, collisions, wake math, rendering and networking.
+This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
+owns the current contract. [All plans](README.md).
 
-Completed task: **P1**, see the [P1 result](#p1-result-2026-10-28). It adds the session route
-seam, the revision host with reload policies and Undo, the `--plugin` launch option with save
-polling, F5/F6/F7 and an authoring panel, and native packaging of the plugin and Lua's notice.
-P0 is recorded in the [P0 result](#p0-result-2026-10-28). The user's first native try of P1
-went well. **Next task: P2, river course authoring.** The milestones
-below are this plan's P0–P6, independent of similarly named foundation tasks. The planning
-change's existing-C build/test evidence and limitations are recorded at the end.
+Completed task: **P2, river course authoring**, see the [P2 result](#p2-result-2026-10-29).
+Earlier results remain recorded under [P0](#p0-result-2026-10-28) and
+[P1](#p1-result-2026-10-28), including the user's native voyage play and live rename.
+**Next task: P3, small stateful objectives, transactions and inspection.** The milestones
+below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
 
@@ -705,7 +700,7 @@ Windows. Polling reads both files (at most 68 KiB) every 0.25 s; that cost was n
 separately. Undo does not restore the files on disk, and F5 after Undo stages the files
 again.
 
-### P2 — river course authoring through the same path
+### P2 — river course authoring through the same path (implemented 2026-10-29)
 
 **Deliverable:** a second small example defines the existing `BoatRaceCourse` and
 `BoatRaceRules`, demonstrating that this API supports more than one voyage.
@@ -725,6 +720,66 @@ frames and run a windowed trial. Verify rejects for impossible counts, degenerat
 invalid source geometry and unsafe recovery arrangements. Update [the race plan](RACE_PLAN.md)
 and authoring examples. Do not generalize the basin trial/replay engine merely to reuse an
 API name; that is a later separate adapter if wanted.
+
+#### P2 result, 2026-10-29
+
+Implemented on `plugin-p2`, based on merged P1 PR #49 (`be15608`):
+
+- `plugins/river-sprint` describes the current seven gates, four grid positions, ferry,
+  travelling storm and all `BoatRaceRules`. The bounded `race.define` decoder uses the same
+  Lua setup, protected evaluation, budgets and diagnostics as P0/P1. Definitions are native,
+  pointer-free and copied only on successful decoding.
+- The existing revision host selects voyage or race at startup. Race label changes preserve
+  the run; every gameplay change is held for an explicit new run. F6 Undo uses the same policy;
+  invalid candidates leave the active descriptor intact. An Undo now clears obsolete errors.
+- Staging checks the river map, gate openings, ordered approach lanes, grid spacing/hull
+  clearance, ferry footprint along its complete crossing, and recovery/parking candidates.
+  `boat_race_recovery_candidate` shares the actual native placement recipe with validation;
+  placement order and live recovery behavior are unchanged.
+- `boat_race_trial --plugin plugins/river-sprint [--play]` previews authored gates, ferry and
+  storm, reloads saves/F5, undoes/discards on F6 and applies gameplay on F7 with a full preview
+  reset. Shared application glue accepts injected time/input. Staging discards simulation
+  delta across its frame boundary. A frame-borrowed `BoatViewState.race.course` override feeds
+  both renderers; NULL keeps the compiled course. Production rooms, browser, basin runs and
+  replay formats are unchanged.
+- `boat_race_plugin.*` runs the existing native race cases using the Lua fixture.
+  `boat_plugin_race.*` adds decoding/rejection, revision/lifetime, real-file trial controls,
+  and physical parity checks. Windows CI builds and runs the new targets.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug with GPU tests enabled:
+
+- Debug build is warning-clean. Before the final panel/control refinements, the full suite
+  passed **308/308 enabled tests**, including
+  all 26 enabled GPU checks; 15 retired wake-field experiments remained disabled. The first sandboxed
+  attempt could not open sockets/graphics; the first desktop-enabled attempt had transient
+  monitor-initialization failures. A complete desktop-enabled retry passed.
+  After the final panel/control refinements, the Debug build and full CPU preset passed
+  **282/282 enabled tests** in 13.84 s (`PROTEUS_GPU_TESTS=OFF`), with 13 retired field
+  cases disabled. Final GPU recapture could not initialize a monitor; the earlier complete
+  GPU run is scoped to its pre-refinement revision rather than inferred for the final panel.
+- All 16 focused plugin/race case tests passed under ASan/UBSan. No sanitizer reports occurred;
+  macOS ASan has no leak detector, so Lua allocator live-byte checks remain the leak evidence.
+- The reference gameplay digest equals the compiled course/rules: `66dd02070a95d104`.
+  Four real boats finished after 9276 ticks, with identical fleet hashes, phase/deadline state,
+  entrant progress and events at every tick; final hash `6426c932d3225d32`.
+  The reused native suite covers crossings, ties, recovery, parking, leavers/DNF, grid holds,
+  deadlines, checkpoint restoration and a second round.
+- CPU reference and compiled-course frames at 18 s are byte-identical. Inspected CPU/GPU
+  frames show the ferry and authored gate-width edit; an edited stationary storm is also
+  captured on both renderers. A scripted 480-frame GPU window applied a manifest rename,
+  retained R2 after a bad `race.source.speed`, then held a gate-width edit as R3 for F7.
+  Temporary in-game capture instrumentation showed the error and held-restart panels;
+  it was removed. That review prompted a darker panel background and omission of unknown
+  source-line zero. Final panel recapture was blocked by macOS monitor initialization.
+
+Limits: this is a local course/source preview, not a new production race mode. The preview
+has no countdown/standings/results HUD; authored rules are exercised headlessly through the
+native engine. No human P2 play, physical keypresses, Windows/Linux execution or browser P2
+qualification is claimed. F5/F6/F7 and save polling are exercised through the same trial
+adapter on real files with virtual time. Conservative sampled map clearance does not prove
+all driving lines or guarantee an immediately free recovery among moving boats. The new
+example lives in the source tree; standard native game packages continue shipping the P1
+voyage example. P3 remains unstarted.
 
 ### P3 — small stateful objectives, transactions and inspection
 

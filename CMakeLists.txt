@@ -134,7 +134,7 @@ endif()
 # plus boat_plugin_io for reading a package directory. Core and net never link it.
 add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
   src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
-  src/boat_plugin_host.h)
+  src/boat_plugin_host.h src/boat_plugin_race.c)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 
@@ -201,9 +201,10 @@ configure_file(cmake/boat_version.h.in generated/boat_version.h @ONLY)
 target_include_directories(wake_velocity PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 # Race R0: measured shortened river route, source contracts, captures and playable trial.
-add_executable(boat_race_trial tools/boat_race_trial.c tools/boat_vessel_wake_gpu.c)
+add_executable(boat_race_trial tools/boat_race_trial.c tools/boat_vessel_wake_gpu.c
+  tools/boat_race_plugin.c tools/boat_race_plugin.h)
 target_include_directories(boat_race_trial PRIVATE ${raylib_SOURCE_DIR}/src)
-target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu)
+target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu proteus_plugins)
 target_compile_options(boat_race_trial PRIVATE ${PROTEUS_WARNINGS})
 
 # Shared multiplayer codec, authority/client sessions, prediction and memory/multiplexed
@@ -407,6 +408,14 @@ add_test(NAME boat_audio_is_valid COMMAND validate_boat_audio)
 add_dependencies(wake_velocity proteus_assets)
 add_dependencies(title_backdrop proteus_assets)
 add_dependencies(boat_race_trial proteus_assets)
+add_test(NAME boat_race_plugin_preview COMMAND boat_race_trial
+  --plugin plugins/river-sprint --renderer cpu --output ${CMAKE_CURRENT_BINARY_DIR}/race-plugin.png --time 3)
+set_tests_properties(boat_race_plugin_preview PROPERTIES
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} LABELS "cpu;render;slow")
+add_test(NAME boat_race_plugin_voyage_rejected COMMAND boat_race_trial
+  --plugin plugins/langedrag --renderer cpu --output ${CMAKE_CURRENT_BINARY_DIR}/race-invalid.png)
+set_tests_properties(boat_race_plugin_voyage_rejected PROPERTIES WILL_FAIL TRUE
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} LABELS "cpu;quick")
 add_test(NAME boat_race_trial COMMAND boat_race_trial --check)
 set_tests_properties(boat_race_trial PROPERTIES
   PASS_REGULAR_EXPRESSION "boat_race_trial=ok" LABELS "core;cpu")
@@ -653,6 +662,22 @@ set_tests_properties(boat_combat PROPERTIES PASS_REGULAR_EXPRESSION "boat_combat
 add_executable(validate_boat_match tools/validate_boat_match.c)
 target_link_libraries(validate_boat_match PRIVATE proteus_boat_core)
 # River sprint rules: gates, grid hold, places, recovery, deadlines and a four-bot ferry race.
+# P2: the native race-rule suite also runs against the owned Lua reference.
+add_executable(validate_boat_race_plugin tools/validate_boat_race.c)
+target_compile_definitions(validate_boat_race_plugin PRIVATE BOAT_RACE_PLUGIN_FIXTURE=1)
+target_link_libraries(validate_boat_race_plugin PRIVATE proteus_plugins)
+target_compile_options(validate_boat_race_plugin PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_race_plugin validate_boat_race_plugin LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_executable(validate_boat_plugin_race tools/validate_boat_plugin_race.c tools/boat_race_plugin.c)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/race-plugin-test")
+target_compile_definitions(validate_boat_plugin_race PRIVATE
+  BOAT_RACE_PLUGIN_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/race-plugin-test")
+target_link_libraries(validate_boat_plugin_race PRIVATE proteus_plugins)
+target_compile_options(validate_boat_plugin_race PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_plugin_race validate_boat_plugin_race LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_executable(validate_boat_race tools/validate_boat_race.c)
 target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the

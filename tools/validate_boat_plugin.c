@@ -334,7 +334,7 @@ static int manifests(void)
           "\"main.lua\", \"location\": \"outer\", \"capabilities\": [\"voyage.define\"], "
           "\"state_version\": 1}",
             "api" },
-        { "{\"id\": \"a\", \"name\": \"N\", \"api\": 1, \"kind\": \"race\", \"entry\": "
+        { "{\"id\": \"a\", \"name\": \"N\", \"api\": 1, \"kind\": \"unsupported\", \"entry\": "
           "\"main.lua\", \"location\": \"outer\", \"capabilities\": [\"voyage.define\"], "
           "\"state_version\": 1}",
             "kind" },

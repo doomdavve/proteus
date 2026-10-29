@@ -153,7 +153,7 @@ static void vessel_box(BoatCourseBoxDraw draw, void *context, Vector2 position, 
 static void race_visit(
     const BoatViewState *view, const BoatMap *map, BoatCourseBoxDraw draw, void *context)
 {
-    const BoatRaceCourse *course = boat_race_river_course();
+    const BoatRaceCourse *course = view->race.course ? view->race.course : boat_race_river_course();
     for (unsigned k = 0; k <= course->gate_count; ++k) {
         const BoatRaceGate *gate = k ? &course->gates[k - 1] : &course->start;
         Vector2 across = { -gate->direction.y, gate->direction.x };

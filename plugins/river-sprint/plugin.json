@@ -1,0 +1,10 @@
+{
+  "id": "proteus.river-sprint",
+  "name": "River sprint",
+  "api": 1,
+  "kind": "race",
+  "entry": "main.lua",
+  "location": "river",
+  "capabilities": ["race.define"],
+  "state_version": 1
+}

@@ -31,6 +31,26 @@ then assess pacing, missed-gate recovery and turn/wave overlap before extending 
 downtown coverage remains outside the current map. See the [R2 implementation](#r2-network-race--2026-10-24),
 the [R1 core](#r1-race-core--2026-10-24) and the [R0 evidence](#r0-prototype--2026-10-24).
 
+## Local Lua course authoring — 2026-10-29
+
+[Plugin P2](PLUGIN_PLAN.md#p2-result-2026-10-29) adds the river sprint's gates, grid, ferry,
+storm and rules as [`plugins/river-sprint`](../plugins/river-sprint/). Run the local preview:
+
+```sh
+./build/boat_race_trial --plugin plugins/river-sprint --play
+```
+
+Save/F5 reloads; F6 undoes or discards; F7 starts a new preview run for gameplay edits.
+Only a manifest display-name edit preserves the current run. Broken edits retain the active
+revision. This preview displays authored course/source geometry; race rounds, countdown,
+standings and results remain in the headless native fixture. Production room courses and
+protocols remain compiled until plugin P5. Existing R3 pacing/acceptance tasks above remain open.
+
+The [P2 evidence](PLUGIN_PLAN.md#p2-result-2026-10-29) owns detailed verification and limits:
+reference/compiled digest and tick-for-tick four-boat parity, the existing race case suite
+with the Lua fixture, map/recovery rejection checks, CPU/GPU frames and a scripted edit run.
+No human P2 play is claimed. Next plugin work is P3; race pacing work retains its own gates.
+
 ## Direction
 
 The user requested the next multiplayer mode, **race**: a high-paced downstream sprint

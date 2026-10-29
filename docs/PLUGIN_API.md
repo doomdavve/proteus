@@ -1,7 +1,8 @@
-# Lua plugin API (voyage descriptors and live authoring)
+# Lua plugin API (voyage and race descriptors)
 
-Status, 2026-10-28: **P1 live authoring implemented** (branch `plugin-p1`) on top of the P0
-loader. A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
+Status, 2026-10-29: **P1 voyage and P2 local race authoring implemented** on top of the P0
+loader. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
+A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
 when the file is saved or on F5, undo, and apply route or water changes with an explicit
 restart. Rooms, the course and replays, and the browser game keep the compiled voyage. The
 [plugin plan](PLUGIN_PLAN.md) owns the staged roadmap; this guide owns the current contract.
@@ -38,10 +39,10 @@ rejected. Strings are non-empty printable ASCII.
 | `id` | 1–63 characters of `a-z 0-9 . _ -`, starting with a letter, e.g. `proteus.langedrag` |
 | `name` | 1–63 printable ASCII characters |
 | `api` | `1` |
-| `kind` | `"voyage"` |
+| `kind` | `"voyage"` or `"race"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
-| `location` | `"outer"`, the only location with a voyage |
-| `capabilities` | `["voyage.define"]`; the host grants nothing else |
+| `location` | `"outer"` for voyage; `"river"` for race |
+| `capabilities` | Exactly `["voyage.define"]` for voyage or `["race.define"]` for race |
 | `state_version` | `1` (reserved for P3 script state) |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -119,6 +120,71 @@ Staging also checks a decoded definition against the session's location
 shelter must be the location's spawn, every shelter must be open water with 8 m clear and the
 arrival centre with 20 m clear (`boat_map_water` on the compiled water). These errors carry
 the field path, such as `voyage.shelters[2]`, and no line.
+
+## River race authoring (P2)
+
+The second reference package is [`plugins/river-sprint`](../plugins/river-sprint/). Its
+`main.lua` returns `{ race = { start, gates, grid, source, storm, rules } }`; see the
+[complete example](../plugins/river-sprint/main.lua). All fields are required. Records reject
+unknown keys; lists must be dense. This uses the same restricted Lua evaluator, limits,
+diagnostics, save poller and revision/Undo host as the voyage.
+
+| Record | Fields and units |
+| --- | --- |
+| `start`, each `gates` entry | `x`, `z`, `dx`, `dz`, `half_width`; simulation metres, approximately unit travel direction (length within 0.01 of 1), width 4–500 m |
+| `gates` | 1–8 ordered entries; final entry is the finish |
+| `grid` | Exactly four `{ x, z }` positions, behind the start and at least 13 m apart |
+| `source` | `x`, `z`, `dx`, `dz`, `started`, `speed`, `height`, `duration`, `lifetime`, `wavelength`, `spread`, `half_width`; the existing native ferry wake recipe |
+| `storm` | `x`, `z`, `vx`, `vz`, `radius`, `height`, `started`, `build`; metres, m/s and seconds |
+| `rules` | `grid_ticks`, `countdown_ticks`, `results_ticks`, `after_winner_ticks`, `cap_ticks`, `recovery_ticks`, `skip_ticks`, `park_ticks`, `min_players` |
+
+Coordinates are finite within ±20000 m. Gate directions are normalized by `boat_race_init`,
+as for compiled courses. Source direction must satisfy the native squared-length tolerance
+of 0.0001; it is not silently normalized. Ferry speed is 0.1–30 m/s, height 0.001–5 m,
+duration/lifetime 1–60 s, wavelength 2–40 m, spread 1–10 m/s, half-width 2–80 m.
+Source/storm `started` is within ±600 s relative to GO. Storm velocity components are within
+±50 m/s, radius 0–5000 m, height 0–5 m and build 0–600 s. Zero storm radius or height disables
+it. Rules are integer 120 Hz ticks, at most 432000 (one hour); countdown, cap and
+after-winner window must be positive, `skip_ticks <= recovery_ticks`, and `min_players` is 1–4.
+
+Staging validates the selected river map: gate openings, forward nondegenerate segments
+(20–5000 m), centre and outer approach lanes sampled at no more than 5 m, grid water and hull
+clearance, and the full ferry path's corner clearance sampled at no more than 5 m. Every
+anchor must have a usable candidate from the native recovery/finish-parking recipe. These
+are conservative authored-route checks, not a proof that every possible driving line or
+moving fleet will always have an immediately available recovery point.
+
+```sh
+./build/boat_race_trial --plugin plugins/river-sprint --play
+./build/boat_race_trial --plugin plugins/river-sprint --renderer cpu --output build/race.png --time 18
+./build/validate_boat_plugin_race
+./build/validate_boat_race_plugin
+```
+
+The trial is a local course/source preview, with scripted steering unless `--play` is set.
+It displays authored gates, ferry and storm. It has no native round countdown, standings or
+results HUD; the headless fixture exercises the rules, crossings, recovery, deadlines and
+four-boat races through the real C engine. `--plugin` is refused with historical `--check`
+and `--gpu-check` modes. A voyage package belongs in `wake_velocity`, not this trial.
+
+Saves settle through P1's injected-time poller. F5 stages explicitly; F6 undoes or discards;
+F7 commits gameplay edits and restarts the preview's boat, clock, water and wakes. Only a
+manifest `name` change applies immediately without resetting progress. Other gameplay edits
+remain held. Incompatible identities require relaunch. Undo uses the same rules and does
+not modify files. Synchronous staging discards simulation delta rather than catching up.
+The trial panel shows active/staged revision and errors; stderr retains the full diagnostic.
+
+`BoatPluginRace` owns a pointer-free `BoatRaceCourse`, `BoatRaceRules`, manifest and gameplay
+digest. `boat_plugin_load_race` writes output only on success; `boat_plugin_race_check_location`
+checks a decoded descriptor against the map. The shared `BoatPluginHost` selects its kind at
+startup and retains eight prior revisions. Race renames compare gameplay digests; gameplay
+changes classify as `BOAT_PLUGIN_RESTART_SESSION`. The digest folds explicit native fields as
+little-endian IEEE double values (float fields promoted exactly), excluding manifest labels
+and padding. `BoatViewState.race.course` is an optional frame-borrowed rendering override;
+NULL retains the compiled river course. No plugin dependency enters core or net.
+
+Production network rooms and browser clients remain compiled-content modes. P2 introduces no
+wire-format, replay-format or browser-import changes; P5 owns network content compatibility.
 
 ## Playing and live authoring (P1)
 

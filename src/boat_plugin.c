@@ -118,24 +118,26 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
     if (!boat_json_int(json, &tokens[at[2]], &api) || api != BOAT_PLUGIN_API)
         return diagnose(
             d, BOAT_PLUGIN_MANIFEST, file, "api", "must be %d, the supported API", BOAT_PLUGIN_API);
-    if (!boat_json_text(json, &tokens[at[3]], m.kind, sizeof(m.kind)) || strcmp(m.kind, "voyage"))
-        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "kind", "must be \"voyage\"");
+    if (!boat_json_text(json, &tokens[at[3]], m.kind, sizeof(m.kind))
+        || (strcmp(m.kind, "voyage") && strcmp(m.kind, "race")))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "kind", "must be voyage or race");
     if (!boat_json_text(json, &tokens[at[4]], m.entry, sizeof(m.entry)) || !plain_file(m.entry)
         || strcmp(m.entry, "main.lua"))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "entry", "must be \"main.lua\"");
     if (!boat_json_text(json, &tokens[at[5]], m.location, sizeof(m.location))
-        || strcmp(m.location, "outer"))
+        || strcmp(m.location, !strcmp(m.kind, "race") ? "river" : "outer"))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location",
-            "must be \"outer\", the only location with a voyage");
+            "must match kind: outer for voyage, river for race");
+    const char *grant = !strcmp(m.kind, "race") ? "race.define" : "voyage.define";
     const jsmntok_t *capabilities = &tokens[at[6]];
     if (capabilities->type != JSMN_ARRAY || capabilities->size != 1)
-        return diagnose(
-            d, BOAT_PLUGIN_MANIFEST, file, "capabilities", "must be [\"voyage.define\"]");
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
+            "must contain exactly the kind's define capability");
     char capability[32];
     if (!boat_json_text(json, &tokens[at[6] + 1], capability, sizeof(capability))
-        || strcmp(capability, "voyage.define"))
-        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]",
-            "is not granted; this host grants only \"voyage.define\"");
+        || strcmp(capability, grant))
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]", "is not granted for this kind");
     if (!boat_json_int(json, &tokens[at[7]], &state) || state != BOAT_PLUGIN_STATE_VERSION)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "state_version", "must be %d",
             BOAT_PLUGIN_STATE_VERSION);
@@ -336,6 +338,8 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
         = boat_plugin_parse_manifest(bundle->manifest, bundle->manifest_size, limits, &manifest, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
+    if (strcmp(manifest.kind, "voyage"))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "kind", "requires a voyage host");
     if (bundle->source_size > limits->source_bytes || bundle->source_size > BOAT_PLUGIN_SOURCE_MAX)
         return diagnose(d, BOAT_PLUGIN_LIMIT, manifest.entry, "", "is %zu bytes; the limit is %zu",
             bundle->source_size,
