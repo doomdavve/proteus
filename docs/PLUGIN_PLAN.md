@@ -779,10 +779,14 @@ Verification, 2026-10-29, Apple Silicon/macOS, Debug with GPU tests enabled:
   buoy row, and a validated edit to `x = -206.3, z = -256.0` moves it about 5 m back.
   A later 120-frame windowed `--play` startup/exit check passed; no human input is claimed.
 
+User check, 2026-10-29: after the spawn correction and grid-offset instructions, the user
+reported "Works well!" This confirms the corrected spawn/offset workflow in the local preview;
+it does not establish broader race or control acceptance.
+
 Limits: this is a local course/source preview, not a new production race mode. The preview
 has no countdown/standings/results HUD; authored rules are exercised headlessly through the
-native engine. No human P2 play, physical keypresses, Windows/Linux execution or browser P2
-qualification is claimed. F5/F6/F7 and save polling are exercised through the same trial
+native engine. Human feedback covers the corrected spawn/offset workflow; broader human
+race/control review, Windows/Linux execution and browser P2 qualification are not claimed. F5/F6/F7 and save polling are exercised through the same trial
 adapter on real files with virtual time. Conservative sampled map clearance does not prove
 all driving lines or guarantee an immediately free recovery among moving boats. The new
 example lives in the source tree; standard native game packages continue shipping the P1
