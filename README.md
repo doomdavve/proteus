@@ -1,9 +1,7 @@
 # Wake Velocity
 
-Take a speedboat out on Gothenburg's waterways. Carve a turn past the docks, jump a
-ferry's wake, or head out towards Långedrag and watch a squall build over the fjord.
-Wake Velocity brings together lively boat handling, chunky low-resolution scenery,
-and an original tracker soundtrack.
+Navigate Gothenburg’s waterways by boat. Wake Velocity is a low-fi indie game featuring responsive
+boat handling, chunky low-resolution scenery, and an original tracker soundtrack.
 
 **[Play in your browser](https://doomdavve.github.io/proteus/)** ·
 **[Download for macOS or Windows](https://github.com/doomdavve/proteus/releases/latest)**
