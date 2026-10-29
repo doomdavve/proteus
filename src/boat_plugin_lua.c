@@ -525,3 +525,48 @@ BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const cha
         *out = data;
     return status;
 }
+
+BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
+    const BoatPluginLimits *limits, int (*callback)(lua_State *), void *context,
+    BoatPluginDiagnostic *diagnostic)
+{
+    Vm vm = {
+        .limit = limits->memory_bytes, .budget = limits->instructions, .diagnostic = diagnostic
+    };
+    lua_State *L = lua_newstate(allocate, &vm);
+    int status = LUA_ERRMEM;
+    if (L) {
+        lua_pushcfunction(L, setup);
+        status = lua_pcall(L, 0, 0, 0);
+        if (status == LUA_OK)
+            status = luaL_loadbufferx(L, source, size, "=main.lua", "t");
+        if (status != LUA_OK)
+            failure(diagnostic, status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY : BOAT_PLUGIN_SYNTAX,
+                "main.lua",
+                lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string Lua error");
+        else {
+            lua_sethook(L, count, LUA_MASKCOUNT, BOAT_PLUGIN_HOOK_STEP);
+            status = lua_pcall(L, 0, 1, 0);
+            if (status == LUA_OK) {
+                lua_pushcfunction(L, callback);
+                lua_pushlightuserdata(L, context);
+                lua_pushvalue(L, 1);
+                status = lua_pcall(L, 2, 0, 0);
+            }
+            lua_sethook(L, NULL, 0, 0);
+            if (status != LUA_OK)
+                failure(diagnostic,
+                    vm.exhausted               ? BOAT_PLUGIN_BUDGET
+                        : status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY
+                                               : BOAT_PLUGIN_RUNTIME,
+                    "main.lua",
+                    lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string Lua error");
+        }
+        lua_close(L);
+    } else
+        failure(diagnostic, BOAT_PLUGIN_MEMORY, "main.lua", "not enough memory for a Lua state");
+    diagnostic->cost = (BoatPluginCost) {
+        .instructions = vm.instructions, .peak_bytes = vm.peak, .leaked_bytes = vm.live
+    };
+    return status == LUA_OK ? BOAT_PLUGIN_OK : diagnostic->status;
+}

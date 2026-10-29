@@ -3,16 +3,19 @@
 Status, 2026-10-29: **P0, P1 and P2 implemented.** Native solo `outer` sessions load and
 live-edit the Långedrag voyage; the local river trial now loads race descriptors through the
 same restricted evaluator and revision host. The compiled race remains the network default.
-There is no behavioral API or in-game agent. The agreed direction is embedded Lua for gameplay
-authoring, with C retaining physics, collisions, wake math, rendering and networking.
+P3.1 now provides an experimental headless objective transition harness; it is not yet a
+package capability or live gameplay behavior. There is no in-game agent. The agreed direction
+is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P2, river course authoring**, see the [P2 result](#p2-result-2026-10-29).
+Completed task: **P3.1, isolated objective transactions**, see the
+[P3.1 result](#p31-result-2026-10-29). P2 river authoring remains recorded in its
+[P2 result](#p2-result-2026-10-29).
 Earlier results remain recorded under [P0](#p0-result-2026-10-28) and
 [P1](#p1-result-2026-10-28), including the user's native voyage play and live rename.
-**Next task: P3, small stateful objectives, transactions and inspection.** The milestones
-below are this plan's P0–P6, independent of similarly named foundation tasks.
+**Next task: P3.2, lossless native voyage events and a live optional objective/HUD adapter.**
+The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
 
@@ -794,7 +797,7 @@ qualification are not claimed. F5/F6/F7 and save polling are exercised through t
 adapter on real files with virtual time. Conservative sampled map clearance does not prove
 all driving lines or guarantee an immediately free recovery among moving boats. The new
 example lives in the source tree; standard native game packages continue shipping the P1
-voyage example. P3 remains unstarted.
+voyage example. This completes P2; subsequent P3 work is recorded below.
 
 ### P3 — small stateful objectives, transactions and inspection
 
@@ -812,6 +815,66 @@ Test hidden closure mutation, resource conflicts, stale handles, event overflow,
 and reload during pending timers. Compare repeated and resumed runs by canonical hashes.
 Inspect native-resolution HUD frames and motion; measure callback/staging cost before enabling
 continuous background reload. This milestone owns the first real behavior scripting API.
+
+#### P3.1 result, 2026-10-29
+
+P3 is split into reviewable steps. **P3.1 implements the isolated transaction foundation** in
+[`boat_plugin_state.[ch]`](../src/boat_plugin_state.h), exercised by
+[`validate_boat_plugin_state`](../tools/validate_boat_plugin_state.c). P3 as a whole remains
+in progress; no new manifest capability or gameplay callback is enabled.
+
+- Every transition evaluates immutable source and runs one callback in a fresh restricted Lua
+  instance, using the existing allocator, libraries, diagnostics and instruction hook. Setup,
+  compilation, callback, checkpoint decoding and native output staging are protected. The
+  initial combined module/callback budget is 1 M instructions and 2 MiB Lua heap, reducible by
+  the host; it is not a compiler deadline. Separate migration/update budgets remain future work.
+- The canonical state codec permits booleans, byte strings, signed 64-bit integers, dense
+  arrays and sorted string-keyed records. Floating-point state is deliberately unsupported in
+  this first step. Limits are 16 KiB, depth 16, 256 tables, 256 entries/table, 1024 bytes/string
+  and 63 bytes/key. Cycles, shared tables, mixed/sparse keys, metatables and other values fail.
+  Checkpoint input is bounds-checked and re-encoded to reject noncanonical or trailing bytes.
+- One caller-owned objective checkpoint owns eight bounded HUD rows. `hud.set` carries its
+  local ID and host generation; unknown fields/kinds, duplicate writes, stale generations and
+  total capacity failure reject the batch. The harness does not render these rows or claim
+  resources in an actual game session yet.
+- Callback state, xorshift32 RNG, ordered event acknowledgment, tick and HUD output commit
+  together after validation. Failed updates suspend callbacks, preserve the committed data,
+  and allow explicit reset or successful migration. Candidate migration failure leaves even
+  quarantine unchanged. Updates require increasing boundaries divisible by 12 (10 Hz at the
+  native 120 Hz clock). Up to 64 events carry exact integer ticks/sequences and bounded text.
+  Overflow suspends visibly rather than acknowledging loss; the caller retains the batch.
+- Tests cover repeated/resumed runs, an isolated checkpoint restore/replay, hidden closure
+  mutation, state/RNG mutation followed by valid/invalid command construction and error,
+  invalid commands after a valid intent, conflicts, stale handles, migration failure/reset,
+  malformed checkpoints, integer extremes, ticks beyond 2^53, event overflow/order, HUD limits
+  and instruction/memory exhaustion. Digests encode fields explicitly, excluding padding and
+  quarantine; no native floating-point physics or network format changes.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
+
+- Warning-clean project rebuild and full CTest preset: **288/288 enabled tests passed**, with
+  13 retired field tests disabled. The initial sandboxed run failed ten socket-dependent
+  existing tests; the full rerun with local socket access passed; the final rerun completed in 13.81 s.
+- All six new state cases passed under ASan/UBSan, with no sanitizer findings. Lua live-byte
+  accounting is zero after every execution. macOS ASan does not provide leak detection.
+- The repeated/resumed fixture hash is `72dc362096aebd83`. The 100-update fixture runs twice,
+  plus init and a discarded preview step, in about 14–16 ms total in the unsanitized Debug
+  validator. The final callback's Lua heap peak is 17,304 bytes. This is a small headless
+  fixture measurement, not a worst-case staging deadline or a live game performance result.
+- Windows CI builds and selects the new cases; Windows/Linux execution is pending CI.
+  No visual, input, audio, asset-loading or live session path changed, so no new frame or
+  windowed playback review was performed. GPU, browser and human acceptance are not claimed.
+
+**Next: P3.2** adds a lossless `BoatVoyage` output list and native integration for an optional
+“visit two shelters” objective, with its HUD row and source/state revision ownership. Preserve
+independent native voyage completion, use exact boundary T/T+1 staging, and test the adapter
+with a virtual clock before enabling callbacks or reload in play. Then **P3.3** completes
+pending-timer/reload semantics, schema-aware revision migration and removed-resource retirement,
+state/trace inspection and deterministic scenario seek with a complete native preview checkpoint.
+The current isolated state copy does not rewind a moving world. Timer commands, live resource
+composition/second-owner rejection, retained revision/total host memory accounting, background
+reload qualification and visual/manual review remain unimplemented. Callers supply the accepted
+source and pending events; this harness is not a source revision manager or a distribution API.
 
 ### P4 — practical authoring on native and browser
 
@@ -908,7 +971,7 @@ generation are not prerequisites for that loop.
 | P0/P1 | Initial budgets and staging responsiveness: measure the descriptor case, permit a visible authoring pause first, then decide whether background compilation is justified. Do not call an instruction limit a compiler deadline. |
 | P1 | Reload UX and distribution: choose a key/menu action and opt-in launch selection, preserve-only default with explicit restart policy for incompatible edits; retain compiled defaults until parity and authoring review. |
 | P2/P3 | Supported rule extension depth: keep voyage/race/match engines in C and add orchestration first. Move no mature rule engine merely to make a larger Lua example. |
-| P3 | Serializable state numeric contract, callback cadence and total budgets: choose deterministic representations and measure the disposable-instance approach before optimizing. |
+| P3 | P3.1 resolves initial state numbers to signed 64-bit integers and measures disposable instances at 10 Hz; live adapter, timers and total host budgets remain at P3.2/P3.3. |
 | P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
 | P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |

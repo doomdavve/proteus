@@ -134,7 +134,7 @@ endif()
 # plus boat_plugin_io for reading a package directory. Core and net never link it.
 add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
   src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
-  src/boat_plugin_host.h src/boat_plugin_race.c)
+  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 
@@ -610,6 +610,12 @@ file(MAKE_DIRECTORY "${BOAT_PLUGIN_TEST_DIR}")
 target_compile_definitions(validate_boat_plugin PRIVATE
   BOAT_PLUGIN_TEST_DIR="${BOAT_PLUGIN_TEST_DIR}")
 proteus_add_case_tests(boat_plugin validate_boat_plugin LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# P3.1: isolated objective transitions; no new package capability or game integration yet.
+add_executable(validate_boat_plugin_state tools/validate_boat_plugin_state.c)
+target_link_libraries(validate_boat_plugin_state PRIVATE proteus_plugins)
+target_compile_options(validate_boat_plugin_state PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_plugin_state validate_boat_plugin_state LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # Lua plugins P1: staging against the map, reload policies on a live session, Undo, save polling
 # on a virtual clock, and tick-for-tick parity with the compiled voyage.

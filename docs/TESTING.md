@@ -1,5 +1,11 @@
 # Test workflow and timing
 
+P3.1 `boat_plugin_state.*` covers fresh-instance objective callbacks, canonical integer state,
+atomic state/RNG/event/HUD commit, quarantine/reset, candidate migration, isolated checkpoint
+replay, resource/event limits and budget failures. These are headless harness checks; they do
+not assert a live objective or HUD integration. See the
+[experimental API](PLUGIN_API.md#experimental-objective-harness-p31).
+
 P2 plugin checks: `boat_plugin_race.*` covers descriptor parity/rejections, revision/Undo,
 real-file trial controls with virtual time, and tick-for-tick four-boat fleet/event parity.
 `boat_race_plugin.*` runs the existing eleven native race cases against the loaded Lua
