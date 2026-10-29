@@ -937,6 +937,19 @@ voyage through arrival. The report does not specify intermediate shelter visits 
 objective row, so complete/missed tour outcomes, recovery and live reload/Undo remain covered
 by automated/scripted checks rather than separately confirmed human use.
 
+Windows CI follow-up, 2026-10-29: [PR #52's Windows run](https://github.com/doomdavve/proteus/actions/runs/40902213742)
+compiled successfully but crashed in 16 plugin session/race/preview checks. Large aggregate
+initializers in `boat_plugin_host_start` and `wake_plugin_open` could duplicate the fixed
+revision history on the stack, exceeding Windows' default 1 MB stack. Both owners now clear
+their storage in place before assigning launch fields. Revision ownership and Undo limits
+are unchanged. On Apple Silicon/macOS Debug, `live_objective` reproduced the crash with
+`ulimit -s 1024` before the fix; all 27 session/race/preview/native-plugin checks passed under
+that limit afterward. Configure and warning-clean build passed, followed by **293/293 enabled
+tests** in `ctest --preset full` with local socket access and `PROTEUS_GPU_TESTS=OFF`;
+13 retired wake-field tests remained disabled. No new manual playback check was performed.
+Windows execution remains pending the pushed CI run; a limited-stack macOS run does not
+establish MSVC behavior.
+
 **Next: P3.3** — timers and pending-timer reload policy, schema-aware live migration, resource
 composition/retirement, state/command inspection and deterministic scenario seek with a complete
 native preview checkpoint. Continuous background reload/callback cost is not qualified as a

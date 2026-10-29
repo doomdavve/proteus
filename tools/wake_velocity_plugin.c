@@ -138,7 +138,9 @@ void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
 
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now)
 {
-    *plugin = (WakePlugin) { .directory = directory };
+    // Keep the large revision history out of temporary stack storage on Windows.
+    memset(plugin, 0, sizeof(*plugin));
+    plugin->directory = directory;
     uint64_t key;
     bool read = read_package(plugin, &key) == BOAT_PLUGIN_OK;
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);

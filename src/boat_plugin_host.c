@@ -54,7 +54,10 @@ static BoatPluginChange classify(
 bool boat_plugin_host_start(BoatPluginHost *host, const BoatWorldDefinition *location,
     const BoatMap *map, const BoatPluginBundle *bundle)
 {
-    *host = (BoatPluginHost) { .location = location, .map = map };
+    // Clear in place: a compound literal duplicates the revision history on the stack.
+    memset(host, 0, sizeof(*host));
+    host->location = location;
+    host->map = map;
     BoatPluginManifest manifest;
     if (boat_plugin_parse_manifest(
             bundle->manifest, bundle->manifest_size, NULL, &manifest, &host->diagnostic)
