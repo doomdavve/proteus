@@ -36,6 +36,10 @@ typedef struct {
     unsigned trace_count;
 } WakePlugin;
 
+// Persistent native owner (all revision slots, file buffers, state/pending output, events,
+// diagnostics and traces) plus one 2 MiB Lua heap. C stack and native world/view are separate.
+_Static_assert(sizeof(WakePlugin) <= (1u << 20), "plugin native owner exceeds 1 MiB");
+
 // The location DIRECTORY's manifest names, or NULL with the reason printed.
 const BoatWorldDefinition *wake_plugin_location(const char *directory);
 // Read DIRECTORY, check it against SESSION's location and begin its voyage instead of the

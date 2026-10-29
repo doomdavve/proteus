@@ -444,7 +444,45 @@ static int schema_timer_retirement(void)
     return 0;
 }
 
+static int independent_budgets(void)
+{
+    // Entry spends more than a callback is allowed, without borrowing its allowance.
+    const char *source = "local n=0; for i=1,60000 do n=n+1 end; return {"
+                         "init=function(c) return {},{} end,"
+                         "update=function(c,s) for i=1,60000 do n=n+1 end; return s,{} end,"
+                         "migrate=function(c,s) for i=1,60000 do n=n+1 end; return s,{} end}";
+    BoatPluginObjective o = fresh();
+    CHECK(step(&o, source, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(diagnostic.cost.entry_instructions > BOAT_PLUGIN_CALLBACK_INSTRUCTIONS);
+    CHECK(diagnostic.cost.callback_instructions < BOAT_PLUGIN_CALLBACK_INSTRUCTIONS);
+    BoatPluginObjective before = o;
+    CHECK(step(&o, source, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0) == BOAT_PLUGIN_BUDGET);
+    CHECK(diagnostic.cost.callback_instructions
+        <= BOAT_PLUGIN_CALLBACK_INSTRUCTIONS + BOAT_PLUGIN_HOOK_STEP);
+    CHECK(boat_plugin_objective_digest(&o) == boat_plugin_objective_digest(&before));
+    CHECK(o.quarantined);
+    o = before;
+    CHECK(step(&o, source, BOAT_PLUGIN_OBJECTIVE_MIGRATE, 12, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(diagnostic.cost.callback_instructions > BOAT_PLUGIN_CALLBACK_INSTRUCTIONS);
+    CHECK(diagnostic.cost.instructions
+        == diagnostic.cost.entry_instructions + diagnostic.cost.callback_instructions);
+    before = o;
+    CHECK(step(&o, "return {migrate=function(c,s) while true do end end}",
+              BOAT_PLUGIN_OBJECTIVE_MIGRATE, 12, NULL, 0)
+        == BOAT_PLUGIN_BUDGET);
+    CHECK(!memcmp(&o, &before, sizeof(o)));
+    CHECK(diagnostic.cost.callback_instructions
+        <= BOAT_PLUGIN_MIGRATION_INSTRUCTIONS + BOAT_PLUGIN_HOOK_STEP);
+    CHECK(step(&o, "while true do end", BOAT_PLUGIN_OBJECTIVE_MIGRATE, 12, NULL, 0)
+        == BOAT_PLUGIN_BUDGET);
+    CHECK(diagnostic.cost.entry_instructions > boat_plugin_default_limits.instructions);
+    CHECK(!diagnostic.cost.callback_instructions && !diagnostic.cost.leaked_bytes);
+    CHECK(!memcmp(&o, &before, sizeof(o)));
+    return 0;
+}
+
 static const TestCase cases[] = {
+    TEST_CASE(independent_budgets),
     TEST_CASE(schema_timer_retirement),
     TEST_CASE(timer_capabilities),
     TEST_CASE(timers_delivery),

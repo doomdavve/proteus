@@ -300,7 +300,9 @@ the time (`GetTime()` in the game, a virtual clock in tests) and keys each read 
 | Manifest | 4 KiB | Also the hard capacity |
 | Entry text | 64 KiB | Also the hard capacity |
 | Lua heap | 2 MiB | Counting allocator, compiler and libraries included. Exceeding it is `BOAT_PLUGIN_MEMORY`. |
-| Instructions | 1 000 000 | Count hook every 100 VM instructions while the entry runs. Exceeding it is `BOAT_PLUGIN_BUDGET`, deterministically and without a clock. After exhaustion every instruction fails, so nothing can resume. |
+| Entry instructions | 1 000 000 | Count hook every 100 VM instructions while the entry runs. Exceeding it is `BOAT_PLUGIN_BUDGET`, deterministically and without a clock. After exhaustion every instruction fails, so nothing can resume. |
+| Init/reset/update callback instructions | 100 000 | Separate allowance after entry evaluation; also capped by native `limits.instructions`. |
+| Migration callback instructions | 500 000 | Separate allowance after entry evaluation; also capped by native `limits.instructions`. |
 
 The instruction budget covers Lua execution only. Compiling is bounded by text size and heap,
 and the remaining library calls are linear in heap-bounded data. This is containment for
@@ -403,16 +405,20 @@ sorted key bytes followed by values; arrays store values in order. Limits: 16 Ki
 The HUD command is `hud.set`: exact fields `kind`, `generation`, `id`, `label`, `value`, with
 1–23 printable ASCII characters in ID/label and an integer value. All commands are staged
 before commit. Duplicate IDs within one resource kind in a batch are conflicts, and eight rows/32 commands are
-host limits. Rows persist until overwritten or reset. The live adapter has one plugin owner and native generation; a voyage restart retires all
-its rows. Composition with other owners and per-row retirement remain future work.
+host limits. Rows persist until overwritten, removed or reset. The live adapter has one plugin
+owner and native generation; a voyage restart retires all its rows. P3.3b adds explicit removal
+and bounded native composition; see the [resource contract](#live-migration-and-review-p33b).
 
 A callback, budget, schema, event overflow or update scheduling failure quarantines updates
 without changing the committed checkpoint. Explicit reset or a successful migration clears
 quarantine. A failed candidate migration preserves the complete current checkpoint. Source,
-state and error costs use the existing 64 KiB/2 MiB/1 M host ceilings; callbacks may request
-lower native test limits, never raise them. The combined Lua budget spans module evaluation
-and callback, and does not bound compiler or C-library wall time. Compiler/parser isolation,
-continuous background reload and imported code trust remain unqualified.
+state and error costs retain the 64 KiB source and 2 MiB heap ceilings; callbacks may request
+lower native test limits, never raise them. Entry evaluation has its own 1 M instruction
+allowance; init/reset/update callbacks have 100,000 and migration has 500,000. Each callback
+allowance is additionally capped by the supplied native `limits.instructions`. Entry work
+cannot consume the callback allowance or borrow from it. One 2 MiB heap covers both phases.
+These limits do not bound compiler or C-library wall time. See the
+[runtime qualification](#native-runtime-qualification-p34) for measurements and staging policy.
 
 `boat_plugin_objective_digest` hashes state, HUD rows, RNG, acknowledgment, tick, generation
 and initialization field-by-field; the timer grant adds a tagged timer-count/ID/deadline extension,
@@ -437,7 +443,8 @@ The standard packaged `langedrag` example remains a descriptor without callbacks
 Request `["voyage.define", "objective.hud"]` in `plugin.json`. Return `voyage`, `init` and
 `update` from the same `main.lua`; both callbacks are required and must be functions. Without
 the capability, callbacks are rejected. The source executes afresh for every callback and
-therefore reconstructs the descriptor too, within the same transaction budget. Init is probed
+therefore reconstructs the descriptor too, within the entry budget before the separate
+callback budget. Init is probed
 while staging, then runs at the actual native restart tick with a fresh nonzero generation
 and RNG seed 12345. A candidate can explicitly migrate current state with the [P3.3b contract](#live-migration-and-review-p33b).
 
@@ -464,7 +471,9 @@ policy](#live-migration-and-review-p33b). Route gameplay changes still restart t
 water edits restart the session. F6 Undo applies old code to current state under that same
 policy. A new voyage/session clears queued events, pending output, quarantine, timers and rows.
 A rejected candidate leaves active source, state, generation and route intact. Browser/room
-behavior and background reload performance qualification remain open. This API is experimental.
+behavior remain unqualified. Native synchronous staging is measured in
+[P3.4](#native-runtime-qualification-p34); background isolation/cancellation remains a P4 gate.
+This API is experimental.
 
 ### Deterministic timers (P3.3a)
 
@@ -585,3 +594,57 @@ this is a solo review checkpoint, not a whole application save, recording format
 rewind. Camera/window/audio/effect playback is outside this display-free harness. Allocate
 these large bounded checkpoint/revision histories off the stack. Interactive seek controls,
 source-edit timelines and persisted replay provenance remain future authoring work.
+
+### Native runtime qualification (P3.4)
+
+`boat_plugin_bench` measures the trusted native authoring path without rendering:
+
+```sh
+./build/boat_plugin_bench plugins/shelter-tour
+./build/boat_plugin_review plugins/shelter-tour 120 360
+```
+
+The benchmark takes 100 synchronous samples per case and reports elapsed UTC milliseconds
+(p50/p95/maximum), last-call status, Lua peak, entry/callback instructions and live bytes
+remaining after close. It exercises reference/read-and-stage reload, padded and dense 64 KiB
+sources, compiler rejection, callback/migration/entry exhaustion, heap rejection and a
+successful expensive entry plus callback. It requires an objective package and 128 bytes of
+source headroom for generated variants. It does not edit the package. Run it without other
+heavy workloads; UTC clock adjustments can distort measurements. This is an explicit experiment,
+not a CTest timing assertion or an enforced deadline.
+
+`BoatPluginCost.instructions` sums the entry and callback phases. Their separate counters
+are hook quanta of 100, with less than one additional quantum of uncounted work per successful
+phase. The existing exhaustion hook rejects after the allowance (at most 100 extra counted
+instructions). Descriptor loads use only the entry counter. Host staging aggregates descriptor
+and init-probe instruction/field counts and the maximum of their sequential Lua peaks, including
+when location validation fails. Every VM closes on success or failure.
+
+`boat_plugin_host_memory` reports the fixed native host reservation, reachable revision count
+and retained source payload. History and a distinct held candidate count once; held Undo is
+already in history. At most nine committed revisions plus one held candidate retain source:
+589,824 and 655,360 bytes respectively at full capacity. Discard/eviction makes payload
+unreachable; stale bytes still occupy fixed slots and remain included in the reservation.
+Payload is a subset of the reservation, so adding the two would double count it.
+
+Native inspection and the benchmark report the complete `WakePlugin` reservation (all ten
+revision slots, files, state/pending output, events, diagnostics and trace) plus the single
+allowed Lua heap as `owned_ceiling`. A compile-time assertion keeps the native owner within
+1 MiB; Lua adds at most 2 MiB. This is owned storage, excluding allocator metadata, C stack,
+borrowed directory/map/world/view resources and process RSS. Stack scratch includes candidate
+revisions, transaction copies and recursive state decoding; the validators also run under a
+1 MiB stack limit. Preview checkpoints own another full plugin/session/wake copy; their
+`sizeof` is reported separately and each caller-requested checkpoint adds that amount.
+There is no retained VM per revision or background worker heap.
+
+**Staging policy:** trusted native edits continue synchronously outside the fixed step;
+simulation delta during staging is discarded. Save polling uses that same authoring pause.
+The local experiment targets 100 ms per stage and one 8.33 ms native tick for a reference
+update, as review thresholds rather than promises or runtime deadlines. The measured sample
+set meets those thresholds; expensive permitted module evaluation can still hitch a tick.
+This qualifies the existing local workflow and does not enable uninterrupted background
+compilation. Before arbitrary imports or background live authoring, P4 must establish isolated,
+cancellable staging and qualify its failure deadline on each target. An instruction hook
+cannot cancel compilation or a C library call. Native Windows/Linux timing, browser/worker
+costs, human migration/Undo/recovery acceptance and an exhaustive hostile-input bound remain
+unqualified. See the [measured result](PLUGIN_PLAN.md#p34-result-2026-10-29).

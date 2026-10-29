@@ -1312,7 +1312,51 @@ static int preview_seek(void)
     return 0;
 }
 
+static int memory_accounting(void)
+{
+    BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/shelter-tour", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginHost *host = calloc(1, sizeof(*host));
+    CHECK(host);
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    CHECK(boat_plugin_host_start(host, boat_location(BOAT_LOCATION_OUTER), &outer()->map, &bundle));
+    for (unsigned i = 0; i < 32; ++i) {
+        char source[BOAT_PLUGIN_SOURCE_MAX];
+        int size = snprintf(source, sizeof(source), "%.*s\n-- revision %u\n",
+            (int)files.source_size, files.source, i);
+        CHECK(size > 0 && (size_t)size < sizeof(source));
+        memset(source + size, ' ', sizeof(source) - (size_t)size);
+        bundle.source = source;
+        bundle.source_size = sizeof(source);
+        CHECK(boat_plugin_host_stage(host, &bundle) && host->held);
+        CHECK(host->diagnostic.cost.peak_bytes > 0 && !host->diagnostic.cost.leaked_bytes);
+        BoatPluginHostMemory m = boat_plugin_host_memory(host);
+        CHECK(m.reserved_bytes == sizeof(*host));
+        CHECK(m.retained_revisions == host->depth + 1);
+        size_t expected = bundle.source_size;
+        for (unsigned j = 0; j < host->depth; ++j)
+            expected += host->slots[host->history[j]].source_size;
+        CHECK(m.retained_source_bytes == expected);
+        CHECK(boat_plugin_host_commit(host));
+    }
+    CHECK(host->depth == BOAT_PLUGIN_UNDO + 1);
+    BoatPluginHostMemory m = boat_plugin_host_memory(host);
+    CHECK(boat_plugin_host_undo(host));
+    CHECK(boat_plugin_host_memory(host).retained_source_bytes == m.retained_source_bytes);
+    CHECK(boat_plugin_host_memory(host).retained_revisions == m.retained_revisions);
+    CHECK(boat_plugin_host_commit(host));
+    CHECK(boat_plugin_host_memory(host).retained_revisions == BOAT_PLUGIN_UNDO);
+    bundle.source = "invalid !";
+    bundle.source_size = strlen(bundle.source);
+    CHECK(!boat_plugin_host_stage(host, &bundle));
+    CHECK(boat_plugin_host_memory(host).retained_revisions == BOAT_PLUGIN_UNDO);
+    free(host);
+    return 0;
+}
+
 static const TestCase cases[] = {
+    TEST_CASE(memory_accounting),
     TEST_CASE(live_migration),
     TEST_CASE(resource_composition),
     TEST_CASE(preview_seek),

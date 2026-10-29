@@ -40,6 +40,14 @@ typedef struct {
     BoatPluginDiagnostic diagnostic;
 } BoatPluginHost;
 
+// Fixed native reservation includes all ten revision slots, whether live or retired. Payload
+// counts only reachable history and a distinct held candidate; Undo never counts a slot twice.
+typedef struct {
+    size_t reserved_bytes, retained_source_bytes;
+    unsigned retained_revisions;
+} BoatPluginHostMemory;
+BoatPluginHostMemory boat_plugin_host_memory(const BoatPluginHost *host);
+
 // Load, check and activate BUNDLE as revision 1 for LOCATION. False with DIAGNOSTIC filled.
 bool boat_plugin_host_start(BoatPluginHost *host, const BoatWorldDefinition *location,
     const BoatMap *map, const BoatPluginBundle *bundle);

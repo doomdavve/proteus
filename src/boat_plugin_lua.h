@@ -49,7 +49,7 @@ BoatPluginStatus boat_plugin_lua_voyage(const char *source, size_t size, const c
 // setup, state decoding and output staging) remains inside a protected call and allocator.
 typedef struct lua_State lua_State;
 BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
-    const BoatPluginLimits *limits, int (*callback)(lua_State *), void *context,
-    BoatPluginDiagnostic *diagnostic);
+    const BoatPluginLimits *limits, uint64_t callback_budget, int (*callback)(lua_State *),
+    void *context, BoatPluginDiagnostic *diagnostic);
 
 #endif

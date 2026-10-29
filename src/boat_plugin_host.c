@@ -8,22 +8,32 @@ static bool load_revision(
     BoatPluginHost *host, const BoatPluginBundle *bundle, BoatPluginRevision *revision)
 {
     BoatPluginDiagnostic *d = &host->diagnostic;
-    if (host->racing)
-        return boat_plugin_load_race(bundle, NULL, &revision->race, d) == BOAT_PLUGIN_OK
-            && boat_plugin_race_check_location(&revision->race, host->location, host->map, d)
-            == BOAT_PLUGIN_OK;
-    if (boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d) != BOAT_PLUGIN_OK
-        || boat_plugin_check_location(&revision->voyage, host->location, host->map, d)
-            != BOAT_PLUGIN_OK)
+    BoatPluginStatus status = host->racing
+        ? boat_plugin_load_race(bundle, NULL, &revision->race, d)
+        : boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d);
+    if (status != BOAT_PLUGIN_OK)
         return false;
-    if (revision->voyage.manifest.objective) {
+    BoatPluginCost cost = d->cost;
+    status = host->racing
+        ? boat_plugin_race_check_location(&revision->race, host->location, host->map, d)
+        : boat_plugin_check_location(&revision->voyage, host->location, host->map, d);
+    d->cost = cost; // Location validation clears diagnostics, but did not undo the Lua work.
+    if (status != BOAT_PLUGIN_OK)
+        return false;
+    if (!host->racing && revision->voyage.manifest.objective) {
         BoatPluginObjective probe = { .generation = 1,
             .rng = 12345,
             .timers_enabled = revision->voyage.manifest.timers,
             .state_version = revision->voyage.manifest.state_version };
-        if (boat_plugin_objective_step(&probe, bundle->source, bundle->source_size,
-                BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, d)
-            != BOAT_PLUGIN_OK)
+        status = boat_plugin_objective_step(&probe, bundle->source, bundle->source_size,
+            BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, d);
+        d->cost.instructions += cost.instructions;
+        d->cost.entry_instructions += cost.entry_instructions;
+        d->cost.fields += cost.fields;
+        d->cost.leaked_bytes += cost.leaked_bytes;
+        if (cost.peak_bytes > d->cost.peak_bytes)
+            d->cost.peak_bytes = cost.peak_bytes;
+        if (status != BOAT_PLUGIN_OK)
             return false;
         memcpy(revision->source, bundle->source, bundle->source_size);
         revision->source_size = bundle->source_size;
@@ -78,6 +88,21 @@ bool boat_plugin_host_start(BoatPluginHost *host, const BoatWorldDefinition *loc
     host->slots[0].number = host->numbered = 1;
     host->depth = 1;
     return true;
+}
+
+BoatPluginHostMemory boat_plugin_host_memory(const BoatPluginHost *host)
+{
+    BoatPluginHostMemory memory = { .reserved_bytes = sizeof(*host) };
+    for (unsigned slot = 0; slot < SLOTS; ++slot) {
+        bool live = host->held && slot == host->held_slot;
+        for (unsigned i = 0; i < host->depth; ++i)
+            live |= host->history[i] == slot;
+        if (live) {
+            ++memory.retained_revisions;
+            memory.retained_source_bytes += host->slots[slot].source_size;
+        }
+    }
+    return memory;
 }
 
 static unsigned active_slot(const BoatPluginHost *host) { return host->history[host->depth - 1]; }
