@@ -630,6 +630,10 @@ target_compile_definitions(validate_boat_plugin_session PRIVATE
   BOAT_PLUGIN_SESSION_DIR="${BOAT_PLUGIN_SESSION_DIR}")
 proteus_add_case_tests(boat_plugin_session validate_boat_plugin_session LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# P3.3b display-free objective inspection and native checkpoint/seek review.
+add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)
+target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_boat_session)
+target_compile_options(boat_plugin_review PRIVATE ${PROTEUS_WARNINGS})
 # Solo minimap: baked chart, projection, markers and trim; --screenshot writes review captures.
 # Adventure A3.5i: scenery packs load once, match the compiled water and reject bad input.
 add_executable(validate_boat_scenery tools/validate_boat_scenery.c)

@@ -356,7 +356,7 @@ static int manifests(void)
             "capabilities[2]" },
         { "{\"id\": \"a\", \"name\": \"N\", \"api\": 1, \"kind\": \"voyage\", \"entry\": "
           "\"main.lua\", \"location\": \"outer\", \"capabilities\": [\"voyage.define\"], "
-          "\"state_version\": 2}",
+          "\"state_version\": 0}",
             "state_version" },
     };
     const BoatPluginFiles *files = reference();

@@ -15,7 +15,7 @@ _Static_assert(sizeof(lua_Integer) == sizeof(int64_t), "objective state requires
 typedef struct {
     BoatPluginObjective next;
     const BoatPluginEvent *events;
-    unsigned event_count;
+    unsigned event_count, previous_version;
     BoatPluginTransition transition;
     const void *seen[BOAT_PLUGIN_STATE_TABLES];
     unsigned seen_count;
@@ -257,6 +257,8 @@ static void commands(lua_State *L, Transition *t, int list)
     }
     if (entries != count)
         invalid(L, t, "command list has gaps");
+    t->next.command_count = (unsigned)count;
+    memset(t->next.commands, 0, sizeof(t->next.commands));
     char touched[BOAT_PLUGIN_COMMANDS][BOAT_PLUGIN_TEXT];
     bool timer_touched[BOAT_PLUGIN_COMMANDS];
     for (unsigned i = 0; i < count; ++i) {
@@ -268,10 +270,14 @@ static void commands(lua_State *L, Transition *t, int list)
         const char *kind = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "";
         bool set = !strcmp(kind, "timer.set"), cancel = !strcmp(kind, "timer.cancel");
         bool timer = set || cancel;
-        if (lua_rawlen(L, -1) != strlen(kind) || (!timer && strcmp(kind, "hud.set")))
+        bool remove = !strcmp(kind, "hud.remove");
+        if (lua_rawlen(L, -1) != strlen(kind) || (!timer && !remove && strcmp(kind, "hud.set")))
             invalid(L, t, "unsupported command kind");
         if (timer && !t->next.timers_enabled)
             invalid(L, t, "timer commands require objective.timers");
+        BoatPluginCommand *intent = &t->next.commands[i];
+        snprintf(intent->kind, sizeof(intent->kind), "%s", kind);
+        intent->generation = t->next.generation;
         lua_pop(L, 1);
         lua_pushnil(L);
         while (lua_next(L, command)) {
@@ -280,7 +286,7 @@ static void commands(lua_State *L, Transition *t, int list)
             if (lua_rawlen(L, -1) != strlen(key)
                 || (strcmp(key, "kind") && strcmp(key, "id") && strcmp(key, "generation")
                     && (timer ? (!set || strcmp(key, "tick"))
-                              : (strcmp(key, "label") && strcmp(key, "value")))))
+                              : (remove || (strcmp(key, "label") && strcmp(key, "value"))))))
                 invalid(L, t, "unknown command field");
         }
         lua_getfield(L, command, "generation");
@@ -292,6 +298,7 @@ static void commands(lua_State *L, Transition *t, int list)
         for (unsigned j = 0; j < i; ++j)
             if (timer_touched[j] == timer && !strcmp(touched[j], hud.id))
                 invalid(L, t, "conflicting commands for one resource id");
+        memcpy(intent->id, hud.id, sizeof(hud.id));
         memcpy(touched[i], hud.id, sizeof(hud.id));
         timer_touched[i] = timer;
         if (timer) {
@@ -301,6 +308,7 @@ static void commands(lua_State *L, Transition *t, int list)
                 if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) <= t->next.tick)
                     invalid(L, t, "timer tick must be an integer after the current tick");
                 due = lua_tointeger(L, -1);
+                intent->value = due;
                 lua_pop(L, 1);
             }
             unsigned slot = 0;
@@ -332,11 +340,26 @@ static void commands(lua_State *L, Transition *t, int list)
             lua_pop(L, 1);
             continue;
         }
+        if (remove) {
+            unsigned slot = 0;
+            while (slot < t->next.hud_count && strcmp(t->next.hud[slot].id, hud.id))
+                ++slot;
+            if (slot < t->next.hud_count) {
+                --t->next.hud_count;
+                memmove(t->next.hud + slot, t->next.hud + slot + 1,
+                    (t->next.hud_count - slot) * sizeof(t->next.hud[0]));
+                memset(t->next.hud + t->next.hud_count, 0, sizeof(t->next.hud[0]));
+            }
+            lua_pop(L, 1);
+            continue;
+        }
         command_text(L, t, command, "label", hud.label);
         lua_getfield(L, command, "value");
         if (!lua_isinteger(L, -1))
             invalid(L, t, "HUD value must be an integer");
         hud.value = lua_tointeger(L, -1);
+        intent->value = hud.value;
+        memcpy(intent->label, hud.label, sizeof(hud.label));
         lua_pop(L, 1);
         unsigned slot = 0;
         while (slot < t->next.hud_count && strcmp(t->next.hud[slot].id, hud.id))
@@ -364,6 +387,9 @@ static int transition(lua_State *L)
     lua_newtable(L);
     integer_field(L, "tick", t->next.tick);
     integer_field(L, "generation", t->next.generation);
+    integer_field(L, "state_version", t->next.state_version ? t->next.state_version : 1);
+    if (t->transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE)
+        integer_field(L, "previous_state_version", t->previous_version);
     lua_pushlightuserdata(L, t);
     lua_pushcclosure(L, random_integer, 1);
     lua_setfield(L, -2, "random");
@@ -443,9 +469,9 @@ static bool valid_timers(const BoatPluginObjective *o)
     return true;
 }
 
-BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, const char *source,
-    size_t size, BoatPluginTransition action, int64_t tick, const BoatPluginEvent *events,
-    unsigned event_count, const BoatPluginLimits *limits, BoatPluginDiagnostic *diagnostic)
+static BoatPluginStatus step(BoatPluginObjective *objective, const char *source, size_t size,
+    BoatPluginTransition action, int64_t tick, const BoatPluginEvent *events, unsigned event_count,
+    const BoatPluginLimits *limits, BoatPluginDiagnostic *diagnostic, unsigned previous_version)
 {
     BoatPluginDiagnostic local = { 0 };
     if (!diagnostic)
@@ -462,9 +488,10 @@ BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, cons
         || limits->instructions > boat_plugin_default_limits.instructions)
         error = "transition budgets cannot exceed host limits";
     else if (action < BOAT_PLUGIN_OBJECTIVE_INIT || action > BOAT_PLUGIN_OBJECTIVE_RESET || tick < 0
-        || !objective->generation || !objective->rng || objective->hud_count > BOAT_PLUGIN_HUD
-        || !valid_timers(objective) || objective->state.size > BOAT_PLUGIN_STATE_BYTES
-        || objective->acknowledged < 0 || objective->tick < 0)
+        || objective->state_version > 65535 || !objective->generation || !objective->rng
+        || objective->hud_count > BOAT_PLUGIN_HUD || !valid_timers(objective)
+        || objective->state.size > BOAT_PLUGIN_STATE_BYTES || objective->acknowledged < 0
+        || objective->tick < 0)
         error = "invalid checkpoint or transition";
     else if ((!init && !reset && !objective->initialized) || (init && objective->initialized))
         error = "transition requires the appropriate initialized state";
@@ -498,9 +525,11 @@ BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, cons
             objective->quarantined = true;
         return diagnostic->status;
     }
-    Transition t = {
-        .next = *objective, .events = events, .event_count = event_count, .transition = action
-    };
+    Transition t = { .next = *objective,
+        .events = events,
+        .event_count = event_count,
+        .transition = action,
+        .previous_version = previous_version };
     t.next.tick = tick;
     if (init || reset) {
         t.next.state = (BoatPluginState) { 0 };
@@ -517,6 +546,42 @@ BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, cons
         *objective = t.next;
     else if (action != BOAT_PLUGIN_OBJECTIVE_MIGRATE)
         objective->quarantined = true;
+    return status;
+}
+
+BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, const char *source,
+    size_t size, BoatPluginTransition action, int64_t tick, const BoatPluginEvent *events,
+    unsigned event_count, const BoatPluginLimits *limits, BoatPluginDiagnostic *diagnostic)
+{
+    return step(objective, source, size, action, tick, events, event_count, limits, diagnostic,
+        objective && objective->state_version ? objective->state_version : 1);
+}
+
+BoatPluginStatus boat_plugin_objective_migrate(BoatPluginObjective *objective, const char *source,
+    size_t size, unsigned version, unsigned generation, bool timers, int64_t tick,
+    BoatPluginDiagnostic *diagnostic)
+{
+    if (!objective || !version || version > 65535 || generation <= objective->generation) {
+        if (diagnostic) {
+            *diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_SCHEMA };
+            snprintf(diagnostic->message, sizeof(diagnostic->message),
+                "invalid migration schema or generation");
+        }
+        return BOAT_PLUGIN_SCHEMA;
+    }
+    BoatPluginObjective next = *objective;
+    unsigned previous = next.state_version ? next.state_version : 1;
+    next.state_version = version;
+    next.generation = generation;
+    next.timers_enabled = timers;
+    if (!timers) {
+        next.timer_count = 0;
+        memset(next.timers, 0, sizeof(next.timers));
+    }
+    BoatPluginStatus status = step(&next, source, size, BOAT_PLUGIN_OBJECTIVE_MIGRATE, tick, NULL,
+        0, NULL, diagnostic, previous);
+    if (status == BOAT_PLUGIN_OK)
+        *objective = next;
     return status;
 }
 
@@ -557,6 +622,8 @@ uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
     hash_integer(&hash, objective->rng);
     hash_integer(&hash, (uint64_t)objective->acknowledged);
     hash_integer(&hash, (uint64_t)objective->tick);
+    if (objective->state_version > 1)
+        hash_integer(&hash, objective->state_version);
     hash_integer(&hash, objective->generation);
     hash_integer(&hash, objective->initialized);
     if (objective->timers_enabled) {
@@ -568,4 +635,35 @@ uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
         }
     }
     return hash;
+}
+
+bool boat_plugin_hud_compose(const BoatPluginHudOwner *owners, unsigned owner_count,
+    BoatPluginHudRow *rows, unsigned capacity, unsigned *count)
+{
+    unsigned total = 0;
+    if (!count || owner_count > BOAT_PLUGIN_HUD || (owner_count && !owners))
+        return false;
+    for (unsigned i = 0; i < owner_count; ++i) {
+        const BoatPluginHudOwner *o = &owners[i];
+        if (!o->owner || !o->owner[0] || strlen(o->owner) >= sizeof(rows[0].owner) || !o->objective
+            || o->objective->hud_count > BOAT_PLUGIN_HUD
+            || o->objective->hud_count > capacity - total)
+            return false;
+        for (unsigned j = 0; j < i; ++j)
+            if (!strcmp(o->owner, owners[j].owner))
+                return false;
+        total += o->objective->hud_count;
+    }
+    if (total && !rows)
+        return false;
+    total = 0;
+    for (unsigned i = 0; i < owner_count; ++i)
+        for (unsigned j = 0; j < owners[i].objective->hud_count; ++j) {
+            BoatPluginHudRow *row = &rows[total++];
+            memset(row, 0, sizeof(*row));
+            snprintf(row->owner, sizeof(row->owner), "%s", owners[i].owner);
+            row->row = owners[i].objective->hud[j];
+        }
+    *count = total;
+    return true;
 }

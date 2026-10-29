@@ -17,8 +17,10 @@ static bool load_revision(
             != BOAT_PLUGIN_OK)
         return false;
     if (revision->voyage.manifest.objective) {
-        BoatPluginObjective probe
-            = { .generation = 1, .rng = 12345, .timers_enabled = revision->voyage.manifest.timers };
+        BoatPluginObjective probe = { .generation = 1,
+            .rng = 12345,
+            .timers_enabled = revision->voyage.manifest.timers,
+            .state_version = revision->voyage.manifest.state_version };
         if (boat_plugin_objective_step(&probe, bundle->source, bundle->source_size,
                 BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, d)
             != BOAT_PLUGIN_OK)
@@ -48,8 +50,11 @@ static BoatPluginChange classify(
     if (!host->racing && change < BOAT_PLUGIN_RESTART_VOYAGE
         && (a->voyage.manifest.objective != b->voyage.manifest.objective
             || a->voyage.manifest.timers != b->voyage.manifest.timers
+            || a->voyage.manifest.state_version != b->voyage.manifest.state_version
             || a->source_size != b->source_size || memcmp(a->source, b->source, a->source_size)))
-        change = BOAT_PLUGIN_RESTART_VOYAGE;
+        change = a->voyage.manifest.objective && b->voyage.manifest.objective && b->voyage.migrates
+            ? BOAT_PLUGIN_MIGRATE
+            : BOAT_PLUGIN_RESTART_VOYAGE;
     return change;
 }
 

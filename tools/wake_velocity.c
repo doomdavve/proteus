@@ -110,7 +110,7 @@ static void usage(void)
         "  fjord, and hold Backspace 1 s to return to the last shelter reached)\n"
         "--start X,Z[,DEGREES]: place the boat in a mapped location (simulation X/Z, heading)\n"
         "--plugin DIR: solo voyage from a Lua plugin, e.g. plugins/langedrag (native)\n"
-        "  Saves reload | F5: reload | F6: undo | F7: apply a held restart\n"
+        "  Saves reload | F5: reload | F6: undo | F7: apply a held migration/restart\n"
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"

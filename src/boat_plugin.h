@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 #define BOAT_PLUGIN_API 1
-#define BOAT_PLUGIN_STATE_VERSION 1
+#define BOAT_PLUGIN_STATE_VERSION 1 // Descriptor schema; objectives author their own 1..65535.
 // Host capacities. Limits passed to a load may be lower, never higher.
 #define BOAT_PLUGIN_MANIFEST_MAX 4096
 #define BOAT_PLUGIN_SOURCE_MAX 65536
@@ -76,6 +76,7 @@ typedef struct {
 // boat_plugin_voyage_copy.
 typedef struct BoatPluginVoyage {
     BoatPluginManifest manifest;
+    bool migrates; // Optional explicit migrate callback.
     BoatVoyageRoute route;
     char shelter_ids[BOAT_VOYAGE_SHELTERS][BOAT_PLUGIN_TEXT];
     char shelter_names[BOAT_VOYAGE_SHELTERS][BOAT_PLUGIN_TEXT];
@@ -118,6 +119,7 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
 typedef enum {
     BOAT_PLUGIN_UNCHANGED, // Identical: nothing to install.
     BOAT_PLUGIN_RENAMED, // Only display names differ: rebind them and keep all progress.
+    BOAT_PLUGIN_MIGRATE, // Compatible native route; explicit migration on Apply.
     BOAT_PLUGIN_RESTART_VOYAGE, // Route gameplay differs and the water does not.
     BOAT_PLUGIN_RESTART_SESSION, // The exposure or its weather range differs.
     BOAT_PLUGIN_INCOMPATIBLE, // Another plugin, kind, location or API: relaunch to use it.
