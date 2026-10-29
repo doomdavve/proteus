@@ -10,6 +10,7 @@ from pathlib import Path
 import stat
 import struct
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -182,7 +183,11 @@ def main():
         if args.operation == "export":
             if not args.directory:
                 raise ValueError("export requires a plugin directory")
-            print(json.dumps(export_bundle(args.directory), ensure_ascii=False, indent=2))
+            encoded = (json.dumps(export_bundle(args.directory), ensure_ascii=False, indent=2)
+                       + "\n").encode("utf-8")
+            if len(encoded) > 200000:
+                raise ValueError("bundle exceeds the 200000-byte import limit")
+            sys.stdout.buffer.write(encoded)
             return 0
         if not args.directory:
             raise ValueError(f"{args.operation} requires a plugin directory")

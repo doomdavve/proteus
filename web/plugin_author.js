@@ -19,6 +19,11 @@
       throw Error('Expected a Wake Velocity version 1 plugin bundle');
     return bundle(data.manifest, data.source);
   }
+  function encode(data) {
+    const text = JSON.stringify(data, null, 2) + '\n';
+    if (encoder.encode(text).length > 200000) throw Error('Bundle exceeds the 200 KB import limit');
+    return text;
+  }
   function frame(data) {
     const m = encoder.encode(data.manifest), s = encoder.encode(data.source);
     const result = new Uint8Array(8 + m.length + s.length), view = new DataView(result.buffer);
@@ -143,7 +148,7 @@
       cancel(); const request = sequence, pin = base();
       let id = 0;
       try {
-        const data = current(), bytes = frame(data);
+        const data = current(), encoded = encode(data), bytes = frame(data);
         id = pending = transport.start(bytes, pin);
         stage.disabled = true; show('Validating voyage…');
         const result = await transport.wait(id);
@@ -161,7 +166,7 @@
         else play.disabled = false;
         show(Module.boatGameStarted ? 'Validated; offering revision to the live voyage…'
           : 'Voyage staged. Play the staged voyage, or export the source bundle.');
-        try { window.localStorage.setItem(STORAGE, JSON.stringify(data)); storage.textContent = ''; }
+        try { window.localStorage.setItem(STORAGE, encoded); storage.textContent = ''; }
         catch (_) { storage.textContent = 'Browser storage unavailable; export to keep your source.'; }
       } catch (error) { if (request === sequence) show('Rejected: ' + error.message + '. Previous voyage kept.'); }
       finally {
@@ -178,7 +183,7 @@
     };
     get('plugin-export').onclick = () => {
       try {
-        const url = URL.createObjectURL(new Blob([JSON.stringify(current(), null, 2) + '\n'],
+        const url = URL.createObjectURL(new Blob([encode(current())],
           {type: 'application/json'}));
         const link = document.createElement('a'); link.href = url;
         link.download = 'voyage.wake-plugin.json'; link.click(); URL.revokeObjectURL(url);
@@ -221,5 +226,5 @@
     return transport;
   }
   root.installBoatPluginAuthor = install;
-  if (typeof module === 'object') module.exports = {bundle, decode, frame, Transport, message, install};
+  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install};
 })(globalThis);

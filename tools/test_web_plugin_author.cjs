@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 const assert = require('node:assert/strict');
-const {bundle, decode, frame, Transport, message} = require('../web/plugin_author.js');
+const {bundle, decode, encode, frame, Transport, message} = require('../web/plugin_author.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -27,7 +27,8 @@ async function main() {
   const root = path.resolve(__dirname, '..');
   const original = bundle(fs.readFileSync(path.join(root, 'plugins/langedrag/plugin.json'), 'utf8'),
     fs.readFileSync(path.join(root, 'plugins/langedrag/main.lua'), 'utf8'));
-  assert.deepEqual(decode(JSON.stringify(original)), original);
+  assert.deepEqual(decode(encode(original)), original);
+  assert.throws(() => encode(bundle('', '\u0001'.repeat(65536))));
   const framed = frame(original), view = new DataView(framed.buffer);
   assert.equal(view.getUint32(0), Buffer.byteLength(original.manifest));
   assert.equal(view.getUint32(4), Buffer.byteLength(original.source));

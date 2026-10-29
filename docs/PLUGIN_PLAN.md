@@ -1320,7 +1320,8 @@ execution contract to browser imports.
   ships the Lua notice, and removes obsolete generated assets. A PR-only browser build workflow
   checks the event contract and packaged Wasm build without publishing a site. Windows CI now
   builds/runs the disposable authoring/staging checks; its initial constant-NaN fixture compile
-  error was corrected to the portable `NAN` macro.
+  error was corrected to the portable `NAN` macro. The reference parity check now compares
+  each storm field's bits instead of unspecified struct padding exposed by MSVC.
 
 Verification, 2026-10-29, Apple Silicon/macOS: native Debug build and full CPU CTest pass
 **307/307 enabled tests** (14.84 s), local loopback enabled, GPU CTests off; 13 retired field
