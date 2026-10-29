@@ -50,6 +50,8 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory);
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);
 // Cancel/reap any pending staging job at session shutdown.
 void wake_plugin_close(WakePlugin *plugin);
+// Browser authoring controls pause solo input while the opt-in panel is open.
+bool wake_plugin_editing(void);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision
 // on UNDO (or discard a held one), and commit a held migration/restart on APPLY. A rename applies
 // at once. True when the caller must restart the session for a new exposure; SESSION's voyage route

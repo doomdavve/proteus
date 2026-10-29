@@ -1,0 +1,45 @@
+name: Browser plugin authoring
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'cmake/Web.cmake'
+      - 'src/boat_plugin*'
+      - 'tools/*plugin*'
+      - 'tools/package_web.py'
+      - 'CMakeLists.txt'
+      - '.github/workflows/web-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check browser authoring contracts
+        run: node tools/test_web_plugin_author.cjs
+      - name: Check out official Emscripten SDK
+        uses: actions/checkout@v6
+        with:
+          repository: emscripten-core/emsdk
+          ref: 3b3963d86a5c97adaf6eaa845cdfe0b811c2f960
+          path: .emsdk
+          persist-credentials: false
+      - name: Build packaged game and isolated descriptor worker
+        shell: bash
+        run: |
+          version=$(cat web/emsdk-version)
+          .emsdk/emsdk install "$version"
+          .emsdk/emsdk activate "$version"
+          source .emsdk/emsdk_env.sh
+          emcmake cmake -S . -B build-web -DCMAKE_BUILD_TYPE=MinSizeRel
+          cmake --build build-web --target web --parallel 2
+          test -s build-web/site/index.html
+          test -s build-web/site/lua-LICENSE.txt

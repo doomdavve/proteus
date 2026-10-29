@@ -54,6 +54,7 @@ Module['onRuntimeInitialized'] = () => {
   playButton.disabled = false;
   playButton.textContent = 'PLAY';
   statusLine.textContent = '';
+  if (Module.boatPluginAuthorReady) Module.boatPluginAuthorReady();
 };
 
 let viewportSize = {width: 320, height: 200};
@@ -96,7 +97,7 @@ function fitCanvas() {
   canvas.style.height = height + 'px';
 }
 
-playButton.addEventListener('click', () => {
+function startSession(args) {
   if (started) return;
   started = true;
   Module['boatGameStarted'] = true;
@@ -106,14 +107,16 @@ playButton.addEventListener('click', () => {
   if (fullscreenOption.checked) enterFullscreen();
   canvas.focus();
   // Audio initialization and PlayMusicStream happen inside this user gesture.
-  callMain([]);
+  callMain(args);
   fitCanvas();
-});
+}
+playButton.addEventListener('click', () => startSession([]));
+installBoatPluginAuthor(Module, Module.boatWebFiles, () => FS, startSession, document, window);
 
 canvas.addEventListener('click', () => canvas.focus());
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 canvas.addEventListener('keydown', event => {
-  if (['Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3'].includes(event.key))
+  if (['Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3', 'F5', 'F6', 'F7'].includes(event.key))
     event.preventDefault();
 });
 Module['boatFitCanvas'] = fitCanvas;

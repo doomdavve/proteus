@@ -20,7 +20,7 @@ SOURCE_MAX = 65536
 
 
 def capabilities():
-    return {"protocol": 1, "operations": ["capabilities", "schema", "validate", "preview"],
+    return {"protocol": 1, "operations": ["capabilities", "schema", "validate", "preview", "export"],
             "kinds": {"voyage": "outer", "race": "river"},
             "capabilities": ["voyage.define", "race.define", "objective.hud", "objective.timers"],
             "limits": {"manifest_bytes": MANIFEST_MAX, "source_bytes": SOURCE_MAX,
@@ -30,7 +30,9 @@ def capabilities():
                 "plugins/river-sprint", "plugins/shelter-tour"],
             "isolation": "disposable process; restricted Lua; no OS security sandbox",
             "preview": {"max_ticks": 72000, "fixtures": ["voyage-calm-steer-v1", "race-four-grid-v1"]},
-            "unsupported": ["capture", "apply", "undo", "browser", "tool_bridge"]}
+            "browser": {"capabilities": ["voyage.define"], "location": "outer",
+                        "bundle_format": "wake-velocity-plugin", "bundle_version": 1},
+            "unsupported": ["capture", "apply", "undo", "tool_bridge"]}
 
 
 def read_regular(path, limit):
@@ -53,6 +55,13 @@ def snapshot(directory):
     manifest = read_regular(directory / "plugin.json", MANIFEST_MAX)
     source = read_regular(directory / "main.lua", SOURCE_MAX)
     return struct.pack(">II", len(manifest), len(source)) + manifest + source
+
+
+def export_bundle(directory):
+    directory = Path(directory)
+    return {"format": "wake-velocity-plugin", "version": 1,
+            "manifest": read_regular(directory / "plugin.json", MANIFEST_MAX).decode("utf-8"),
+            "source": read_regular(directory / "main.lua", SOURCE_MAX).decode("utf-8")}
 
 
 class ValidationJob:
@@ -153,7 +162,7 @@ class ValidationJob:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["capabilities", "schema", "validate", "preview"])
+    parser.add_argument("operation", choices=["capabilities", "schema", "validate", "preview", "export"])
     parser.add_argument("directory", nargs="?")
     parser.add_argument("--worker", type=Path, default=Path(__file__).resolve().parent.parent
                         / "build" / ("boat_plugin_worker.exe" if os.name == "nt" else "boat_plugin_worker"))
@@ -170,6 +179,11 @@ def main():
         return 0
     job = None
     try:
+        if args.operation == "export":
+            if not args.directory:
+                raise ValueError("export requires a plugin directory")
+            print(json.dumps(export_bundle(args.directory), ensure_ascii=False, indent=2))
+            return 0
         if not args.directory:
             raise ValueError(f"{args.operation} requires a plugin directory")
         job = ValidationJob(args.worker, snapshot(args.directory), args.base_revision,
@@ -179,7 +193,7 @@ def main():
             time.sleep(.01)
     except KeyboardInterrupt:
         result = job.cancel() if job else {"status": "cancelled"}
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, UnicodeError) as error:
         result = {"protocol": 1, "status": "input_error", "message": str(error)}
     finally:
         if job:

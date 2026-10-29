@@ -370,6 +370,44 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
   Pages subpath. There is no service worker or preload cache. Only the generated `site/`
   directory is published; raylib's license is included. SDK/build/cache files stay local.
 
+## Plugin source bundles (P4.3)
+
+Development browser builds now include the opt-in **PLUGIN VOYAGE** panel. It imports/exports
+version-1 JSON source bundles, loads the Långedrag example, validates in a disposable Web Worker
+and launches a solo `outer` voyage. Live edits use Stage/reload, explicit Apply and Undo;
+opening the panel pauses solo input. Normal PLAY still opens the shared title.
+
+Only `voyage.define` descriptors are supported. Objectives/timers and race imports are
+explicitly unavailable; no imported Lua executes on the game thread. A completed receipt is
+bound to exact bytes and the current revision/commit epoch before native schema/map checks.
+Cancellation/deadline/late results cannot install a revision. Each UI and game reload lane
+owns at most one job; the browser transport caps total entries at two. See the
+[API contract](PLUGIN_API.md#browser-source-bundles-p43) for bundle bytes, transactions and limits.
+
+Source persistence uses localStorage, separately from existing IndexedDB game settings/bests.
+Denied/corrupt storage leaves import, validation, play and export usable and reports the loss
+of persistence. Saved source always requires revalidation after reload. No world progress,
+callback state or Undo history is persisted. Example/worker JS/Wasm URLs are content-addressed
+and lazy; the packaged site now includes `lua-LICENSE.txt`. Deploy the complete `site/` output.
+
+```sh
+python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
+node tools/test_web_plugin_author.cjs
+# With a built site served on port 8000 and Playwright installed:
+python3 tools/check_web_plugin_author.py --url http://127.0.0.1:8000/ \
+  --output build-web/plugin-browser-check
+```
+
+Verification, 2026-10-29: Emscripten 6.0.12 MinSizeRel game/worker packaging passes on Apple
+Silicon/macOS. The Node contract and local Chrome/SwiftShader check pass export/import,
+objective/race rejection, real worker launch, live rename, syntax rejection, held water
+Apply/Undo, stale results across Undo, cancellation/late completion, restored source/new
+sessions and denied source storage. Gameplay and authoring captures were inspected. The
+[plugin plan](PLUGIN_PLAN.md#p43-result-2026-10-29) owns detailed evidence and next work.
+Firefox/Safari, physical devices, tab suspension and peak memory/runtime remain unqualified;
+there is no human play acceptance or deployment claim. PR browser CI builds these artifacts
+without publishing them; the release/Pages deployment workflow retains its existing policy.
+
 ## WebRTC rooms
 
 The transport feasibility check first echoed C-codec PING bytes unchanged over all five

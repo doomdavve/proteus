@@ -3,6 +3,7 @@
 #endif
 #include "wake_velocity_plugin.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -142,7 +143,7 @@ int main(int argc, char **argv)
     CHECK(boat_plugin_objective_digest(&plugin->objective) == objective);
     boat_plugin_stage_close(job);
     CHECK(!boat_plugin_stage_start("/missing/worker", host, files, 0));
-    CHECK(!boat_plugin_stage_start(argv[0], host, files, 0.0 / 0.0));
+    CHECK(!boat_plugin_stage_start(argv[0], host, files, NAN));
     // Drive the actual live F5/async completion path through a relocated executable/package.
     CHECK(boat_plugin_read("plugins/shelter-tour", NULL, files, &d) == BOAT_PLUGIN_OK);
     FILE *output = fopen(BOAT_PLUGIN_STAGE_DIR "/plugin.json", "wb");

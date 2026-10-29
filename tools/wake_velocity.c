@@ -109,7 +109,7 @@ static void usage(void)
         "  adds the baked run to Langedrag: a destination cue, rough exposed water in the outer\n"
         "  fjord, and hold Backspace 1 s to return to the last shelter reached)\n"
         "--start X,Z[,DEGREES]: place the boat in a mapped location (simulation X/Z, heading)\n"
-        "--plugin DIR: solo voyage from a Lua plugin, e.g. plugins/langedrag (native)\n"
+        "--plugin DIR: solo voyage from a Lua plugin, e.g. plugins/langedrag\n"
         "  Saves reload | F5: reload | F6: undo | F7: apply a held migration/restart\n"
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
@@ -719,10 +719,12 @@ static int study(int argc, char **argv)
     static WakePlugin plugin;
     if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, GetTime()))
         goto cleanup;
+#if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
         GetFileName(argv[0]));
     plugin.stage_executable = stage_executable;
+#endif
 #endif
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };
 #ifdef PROTEUS_BOAT_NET
@@ -1059,6 +1061,10 @@ static int study(int argc, char **argv)
         }
         // A click that resumes play is not also a replay-timeline click.
         bool active = IsWindowFocused() && !help_visible && !menu.open && !menu_was_open;
+#ifdef PROTEUS_BOAT_PLUGINS
+        if (plugin_path && wake_plugin_editing())
+            active = false;
+#endif
 #if defined(__EMSCRIPTEN__)
         bool mouse_toggle_pressed = boat_web_mouse_toggle() != 0;
 #else
@@ -1743,7 +1749,7 @@ static int title_join(BoatTitleSettings *settings, bool host)
 // session. Explicit options enter their session directly, keeping scripted checks unchanged.
 int main(int argc, char **argv)
 {
-#ifdef PROTEUS_BOAT_PLUGINS
+#if defined(PROTEUS_BOAT_PLUGINS) && !defined(__EMSCRIPTEN__)
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
         return boat_plugin_stage_worker();
 #endif

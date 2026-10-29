@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, required=True)
     parser.add_argument("--raylib-license", type=Path, required=True)
+    parser.add_argument("--lua-license", type=Path)
     parser.add_argument("--version", help="Override the Git build version (e.g. source archives)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
@@ -37,6 +38,23 @@ def main():
         name = f"wake_velocity-{digest}.{suffix}"
         (site / name).write_bytes(content)
         files[original] = name
+    # Plugin compiler/validator is lazy and runs only in a disposable Web Worker.
+    for original in ("plugin_stage.js", "plugin_stage.wasm"):
+        content = (args.build_dir / original).read_bytes()
+        stem, suffix = original.rsplit(".", 1)
+        name = f"{stem}-{hashlib.sha256(content).hexdigest()[:16]}.{suffix}"
+        (site / name).write_bytes(content)
+        files[original] = name
+    worker = (root / "web/plugin_worker.js").read_bytes()
+    worker_name = f"plugin_worker-{hashlib.sha256(worker).hexdigest()[:16]}.js"
+    (site / worker_name).write_bytes(worker)
+    files["plugin_worker.js"] = worker_name
+    example = json.dumps({"format": "wake-velocity-plugin", "version": 1,
+        "manifest": (root / "plugins/langedrag/plugin.json").read_text(),
+        "source": (root / "plugins/langedrag/main.lua").read_text()}, sort_keys=True).encode()
+    example_name = f"plugin_example-{hashlib.sha256(example).hexdigest()[:16]}.json"
+    (site / example_name).write_bytes(example)
+    files["plugin_example.json"] = example_name
     # Packs the page fetches on demand, by their asset path (web/scenery_loader.js).
     lazy = args.build_dir / "web-lazy"
     for path in sorted(lazy.glob("geometry/*/scenery.bin")):
@@ -56,9 +74,11 @@ def main():
         shutil.copyfile(root / "web" / name, site / name)
     (site / ".nojekyll").touch()
     shutil.copyfile(args.raylib_license, site / "raylib-LICENSE.txt")
+    shutil.copyfile(args.lua_license or args.build_dir / "lua-LICENSE.txt", site / "lua-LICENSE.txt")
     # Remove outputs from earlier builds only, never unrelated files.
     for pattern in ("wake_velocity-*.js", "wake_velocity-*.wasm", "wake_velocity-*.data",
-                    "scenery-*.bin"):
+                    "scenery-*.bin", "plugin_stage-*.js", "plugin_stage-*.wasm",
+                    "plugin_worker-*.js", "plugin_example-*.json"):
         for path in site.glob(pattern):
             if path.name not in files.values():
                 path.unlink()

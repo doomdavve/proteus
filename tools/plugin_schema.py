@@ -88,7 +88,11 @@ def schema():
                         ("timer.set", {"tick": int64}), ("timer.cancel", {})):
         command_variants.append(record({"kind": {"const": kind}, **command_base, **extra}))
     commands = sequence({"oneOf": command_variants}, 0, 32)
-    definitions = {"manifest": manifest, "voyage": voyage, "race": race, "commands": commands}
+    bundle = record({"format": {"const": "wake-velocity-plugin"}, "version": {"const": 1},
+                     "manifest": {"type": "string", "maxLength": 4096},
+                     "source": {"type": "string", "maxLength": 65536}})
+    bundle["description"] = "UTF-8 source bundle, at most 200000 bytes; manifest/source byte caps apply after encoding"
+    definitions = {"bundle": bundle, "manifest": manifest, "voyage": voyage, "race": race, "commands": commands}
     for value in definitions.values():
         value["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     return {"protocol": 1, "api": 1, "schemas": definitions,

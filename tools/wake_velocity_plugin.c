@@ -2,6 +2,21 @@
 #include "boat_ui.h"
 #include "waterfront_traffic.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+EM_JS(void, browser_owner, (unsigned revision, unsigned low, unsigned high, const char *status), {
+    Module.boatPluginOwner = [ revision >>> 0, low >>> 0, high >>> 0 ];
+    if (Module.boatPluginNotice)
+        Module.boatPluginNotice(UTF8ToString(status));
+})
+EM_JS(bool, browser_editing, (void), { return !!Module.boatPluginEditing; })
+EM_JS(unsigned, browser_actions, (void), {
+    const flags = Module.boatPluginActions || 0;
+    Module.boatPluginActions = 0;
+    return flags;
+})
+#endif
+
 #include <limits.h>
 #include <math.h>
 #include <stdarg.h>
@@ -16,6 +31,12 @@ static void report(WakePlugin *plugin, bool alert, const char *detail, const cha
     va_end(arguments);
     snprintf(plugin->detail, sizeof(plugin->detail), "%s", detail);
     plugin->alert = alert;
+#ifdef __EMSCRIPTEN__
+    if (plugin->host.depth) {
+        browser_owner(boat_plugin_host_active(&plugin->host)->number, (unsigned)plugin->host.epoch,
+            (unsigned)(plugin->host.epoch >> 32), plugin->status);
+    }
+#endif
     fprintf(stderr, "Plugin %s: %s%s%s\n", plugin->directory, plugin->status,
         detail[0] ? " / " : "", detail);
 }
@@ -179,9 +200,23 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     uint64_t key;
     bool read = read_package(plugin, &key) == BOAT_PLUGIN_OK;
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);
-    if (!read
-        || !boat_plugin_host_start(
-            &plugin->host, session->world.definition, &session->world.resources->map, &bundle)) {
+#ifdef __EMSCRIPTEN__
+    (void)bundle;
+    // Only a completed, byte-matched browser-worker receipt may launch an imported voyage.
+    // Browser capabilities are descriptor-only: no callback ever executes on this thread.
+    plugin->host.location = session->world.definition;
+    plugin->host.map = &session->world.resources->map;
+    BoatPluginStageJob *launch
+        = read ? boat_plugin_stage_start(NULL, &plugin->host, &plugin->files, now) : NULL;
+    bool started = launch && boat_plugin_stage_poll(launch, &plugin->host, now) == 1;
+    boat_plugin_stage_close(launch);
+    plugin->stage_executable = "browser-worker";
+#else
+    bool started = read
+        && boat_plugin_host_start(
+            &plugin->host, session->world.definition, &session->world.resources->map, &bundle);
+#endif
+    if (!started) {
         const BoatPluginDiagnostic *d = &plugin->host.diagnostic;
         fprintf(stderr, "Plugin %s: %s error in %s%s%.0d %s: %s\n", directory,
             boat_plugin_status_name(d->status), d->file, d->line ? ":" : "", d->line, d->field,
@@ -191,15 +226,18 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
 #if !defined(__EMSCRIPTEN__)
     plugin->watching = true;
     boat_plugin_watch_start(&plugin->watch, key, now);
-#else
-    (void)now;
 #endif
     // At tick zero nothing has been observed, so this is the voyage's start.
     boat_session_restart_voyage(session, &boat_plugin_host_active(&plugin->host)->voyage.route);
     wake_plugin_reset_objective(plugin, session);
     const BoatPluginVoyage *voyage = &boat_plugin_host_active(&plugin->host)->voyage;
-    report(plugin, false, "F5 RELOAD / F6 UNDO / SAVES RELOAD", "%s R1 ACTIVE %016llx",
-        voyage->manifest.id, (unsigned long long)voyage->digest);
+    report(plugin, false,
+#ifdef __EMSCRIPTEN__
+        "PLUGIN PANEL: STAGE / APPLY / UNDO",
+#else
+        "F5 RELOAD / F6 UNDO / SAVES RELOAD",
+#endif
+        "%s R1 ACTIVE %016llx", voyage->manifest.id, (unsigned long long)voyage->digest);
     return true;
 }
 
@@ -340,9 +378,30 @@ void wake_plugin_close(WakePlugin *plugin)
     plugin->staging = NULL;
 }
 
+bool wake_plugin_editing(void)
+{
+#ifdef __EMSCRIPTEN__
+    return browser_editing();
+#else
+    return false;
+#endif
+}
+
 bool wake_plugin_frame(
     WakePlugin *plugin, BoatSession *session, bool reload, bool undo, bool apply, double now)
 {
+#ifdef __EMSCRIPTEN__
+    unsigned actions = browser_actions();
+    if ((actions & 8) && plugin->staging) {
+        wake_plugin_close(plugin);
+        boat_plugin_host_discard(&plugin->host);
+        report(plugin, false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
+        return false;
+    }
+    reload |= (actions & 1) != 0;
+    undo |= (actions & 2) != 0;
+    apply |= (actions & 4) != 0;
+#endif
     if (apply && !plugin->staging && boat_plugin_host_held(&plugin->host)) {
         wake_plugin_close(plugin);
         return commit(plugin, session);

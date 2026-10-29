@@ -60,7 +60,7 @@ set_target_properties(wake_velocity PROPERTIES SUFFIX ".js")
 # Asyncify is raylib's supported way to yield from its existing synchronous loop.
 # Keep optimization enabled for Asyncify even in a development build.
 foreach(target wake_velocity proteus_boat_core proteus_render proteus_gpu proteus_boat_session
-    proteus_boat_drive proteus_boat_net)
+    proteus_boat_drive proteus_boat_net proteus_plugins proteus_lua)
   target_compile_options(${target} PRIVATE -Os)
   target_compile_definitions(${target} PRIVATE _POSIX_C_SOURCE=200809L)
 endforeach()
@@ -75,6 +75,7 @@ target_link_options(wake_velocity PRIVATE
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/mobile_controls.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/scenery_loader.js\""
+  "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/plugin_author.js\""
   "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js\"")
 set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   ${WEB_SHADERS} ${WEB_TEXTURES}
@@ -88,14 +89,24 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_controls.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/mobile_controls.js"
-  "${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js")
+  "${CMAKE_CURRENT_SOURCE_DIR}/web/runtime.js"
+  "${CMAKE_CURRENT_SOURCE_DIR}/web/plugin_author.js")
+
+# Imported descriptors compile only inside a disposable browser Web Worker.
+add_executable(plugin_stage tools/boat_plugin_stage_worker.c)
+target_link_libraries(plugin_stage PRIVATE proteus_plugins)
+target_compile_options(plugin_stage PRIVATE -Os ${PROTEUS_WARNINGS})
+set_target_properties(plugin_stage PROPERTIES SUFFIX ".js")
+target_link_options(plugin_stage PRIVATE -Os -sMODULARIZE=1 -sEXPORT_ES6=1
+  -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sENVIRONMENT=worker -sALLOW_MEMORY_GROWTH=1
+  -sSTACK_SIZE=1048576 "-sEXPORTED_FUNCTIONS=['_main']")
 
 # Only this directory is served/deployed. Content hashes keep JS, Wasm and data in sync.
 add_custom_target(web ALL
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/package_web.py
     --build-dir ${CMAKE_CURRENT_BINARY_DIR}
-    --raylib-license ${raylib_SOURCE_DIR}/LICENSE
-  DEPENDS wake_velocity
+    --raylib-license ${raylib_SOURCE_DIR}/LICENSE --lua-license ${CMAKE_BINARY_DIR}/lua-LICENSE.txt
+  DEPENDS wake_velocity plugin_stage
   VERBATIM)
 add_custom_target(web-serve
   COMMAND ${Python3_EXECUTABLE} -m http.server 8000 --bind 127.0.0.1

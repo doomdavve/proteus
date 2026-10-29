@@ -40,6 +40,9 @@ starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSI
 ./build/wake_velocity --plugin plugins/langedrag
 ./build/boat_race_trial --plugin plugins/river-sprint --play
 ./build/boat_plugin_review plugins/shelter-tour 120 360
+python3 tools/plugin_author.py schema
+python3 tools/plugin_author.py preview plugins/shelter-tour --ticks 360
+python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
 ```
 
 `boat_plugin_review DIRECTORY [CHECKPOINT_TICK [SEEK_TICK]]` runs a display-free calm solo
@@ -47,7 +50,9 @@ fixture with player/traffic wakes, restores a complete compatible checkpoint and
 events and command traces. Ticks default to 120/360, within 0..72000. See the
 [migration/review contract](PLUGIN_API.md#live-migration-and-review-p33b) for inputs and limits.
 
-Voyage plugins select their own location and are native solo free-boating only. Saving
+CLI voyage packages select their own location and run in native solo free boating.
+The browser offers [descriptor source bundles](PLUGIN_API.md#browser-source-bundles-p43)
+through its PLUGIN VOYAGE panel. Saving
 reloads the package; F5 reloads now, F6 undoes/discards and F7 applies a pending migration or restart.
 Invalid edits leave the running descriptor intact. Packaged voyage examples live under
 `assets/plugins/`; copy one somewhere writable to edit it. The race tool previews local

@@ -119,6 +119,10 @@ recorded bests. See [import/export commands](COMMAND_LINE.md#courses-and-recordi
 Browser saves are local to the browser and site through IndexedDB. Clearing site data
 removes them, and they do not sync with native saves. Play still works if durable storage
 is unavailable. The browser page does not expose local recording import/export.
+Development browser builds also offer an opt-in [PLUGIN VOYAGE source-bundle panel](PLUGIN_API.md#browser-source-bundles-p43)
+for solo outer-map descriptors: import/edit source, stage it, then play; live route/water edits
+wait for Apply, with Undo available. Opening the panel pauses solo input. Export preserves
+source; storage denial is reported, and restored source requires validation before play.
 
 ## Multiplayer
 

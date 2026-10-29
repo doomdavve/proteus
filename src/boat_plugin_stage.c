@@ -9,7 +9,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef _WIN32
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#elif defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOGDI
 #define NOUSER
@@ -163,8 +165,21 @@ int boat_plugin_stage_worker(void)
         goto done;
     if (strcmp(m.kind, "voyage")) {
         d.status = BOAT_PLUGIN_MANIFEST;
+        snprintf(d.file, sizeof(d.file), "plugin.json");
+        snprintf(d.field, sizeof(d.field), "kind");
+        snprintf(d.message, sizeof(d.message), "this host supports voyage descriptors only");
         goto done;
     }
+#ifdef __EMSCRIPTEN__
+    if (m.objective || m.timers) {
+        d.status = BOAT_PLUGIN_MANIFEST;
+        snprintf(d.file, sizeof(d.file), "plugin.json");
+        snprintf(d.field, sizeof(d.field), "capabilities");
+        snprintf(d.message, sizeof(d.message),
+            "browser imports support voyage.define only; objective callbacks are unavailable");
+        goto done;
+    }
+#endif
     if (boat_plugin_lua_voyage(
             bundle.source, bundle.source_size, m.entry, &boat_plugin_default_limits, &data, &d)
             != BOAT_PLUGIN_OK
@@ -196,6 +211,8 @@ done:
     diagnostic(&out, &d);
     if (d.status == BOAT_PLUGIN_OK)
         data_wire(&out, &data);
+    if (fflush(stdout))
+        out.ok = false;
     boat_world_resources_destroy(&resources);
     free(f);
     return out.ok && d.status == BOAT_PLUGIN_OK ? 0 : 1;
@@ -208,12 +225,37 @@ struct BoatPluginStageJob {
     unsigned base;
     double deadline;
     bool running, finished;
-#ifdef _WIN32
+#if defined(__EMSCRIPTEN__)
+    unsigned browser_job;
+#elif defined(_WIN32)
     HANDLE process;
 #else
     pid_t pid;
 #endif
 };
+
+#ifdef __EMSCRIPTEN__
+EM_JS(unsigned, browser_start,
+    (const unsigned char *data, unsigned size, unsigned base, unsigned low, unsigned high), {
+        if (!Module.boatPluginStage)
+            return 0;
+        return Module.boatPluginStage.start(
+            HEAPU8.slice(data, data + size), [ base >>> 0, low >>> 0, high >>> 0 ]);
+    })
+EM_JS(int, browser_status, (unsigned job),
+    { return Module.boatPluginStage ? Module.boatPluginStage.status(job) : -1; })
+EM_JS(int, browser_read, (unsigned job, unsigned char *data), {
+    const bytes = Module.boatPluginStage.read(job);
+    if (!bytes || bytes.length > 4096)
+        return -1;
+    HEAPU8.set(bytes, data);
+    return bytes.length;
+})
+EM_JS(void, browser_close, (unsigned job), {
+    if (Module.boatPluginStage)
+        Module.boatPluginStage.close(job);
+})
+#endif
 
 _Static_assert(sizeof(BoatPluginStageJob) <= (80u << 10), "staging request exceeds 80 KiB");
 
@@ -221,7 +263,7 @@ size_t boat_plugin_stage_bytes(const BoatPluginStageJob *job) { return job ? siz
 
 static int failure(BoatPluginStageJob *j, BoatPluginHost *host, const char *reason)
 {
-    if (host->epoch == j->epoch && boat_plugin_host_active(host)->number == j->base)
+    if (host->depth && host->epoch == j->epoch && boat_plugin_host_active(host)->number == j->base)
         boat_plugin_host_discard(host);
     host->diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
     snprintf(host->diagnostic.message, sizeof(host->diagnostic.message), "%s", reason);
@@ -232,14 +274,19 @@ static int failure(BoatPluginStageJob *j, BoatPluginHost *host, const char *reas
 BoatPluginStageJob *boat_plugin_stage_start(
     const char *executable, const BoatPluginHost *host, const BoatPluginFiles *files, double now)
 {
+#ifdef __EMSCRIPTEN__
+    (void)executable;
+    if (!isfinite(now) || host->racing)
+#else
     if (!executable || !isfinite(now) || !host->depth || host->racing)
+#endif
         return NULL;
     BoatPluginStageJob *j = calloc(1, sizeof(*j));
     if (!j)
         return NULL;
     j->files = *files;
     j->epoch = host->epoch;
-    j->base = boat_plugin_host_active(host)->number;
+    j->base = host->depth ? boat_plugin_host_active(host)->number : 0;
     j->deadline = now + 5;
     j->input = tmpfile();
     j->output = tmpfile();
@@ -249,7 +296,19 @@ BoatPluginStageJob *boat_plugin_stage_start(
     if (!files_wire(&in, &j->files) || fflush(j->input))
         goto failed;
     rewind(j->input);
-#ifdef _WIN32
+#if defined(__EMSCRIPTEN__)
+    size_t size = 8 + j->files.manifest_size + j->files.source_size;
+    unsigned char *payload = malloc(size);
+    if (!payload)
+        goto failed;
+    bool read = fread(payload, 1, size, j->input) == size;
+    if (read)
+        j->browser_job = browser_start(
+            payload, (unsigned)size, j->base, (unsigned)j->epoch, (unsigned)(j->epoch >> 32));
+    free(payload);
+    if (!j->browser_job)
+        goto failed;
+#elif defined(_WIN32)
     // Inheritable copies only; parent CRT handles stay private.
     HANDLE input = NULL, output = NULL, current = GetCurrentProcess();
     if (!DuplicateHandle(current, (HANDLE)_get_osfhandle(_fileno(j->input)), current, &input, 0,
@@ -307,10 +366,24 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
         return -1;
     if (!isfinite(now) || now >= j->deadline)
         return failure(j, host, "isolated staging deadline");
-    if (host->epoch != j->epoch || boat_plugin_host_active(host)->number != j->base)
+    if (host->epoch != j->epoch
+        || (host->depth ? boat_plugin_host_active(host)->number : 0) != j->base)
         return failure(j, host, "stale staging base revision");
     bool success;
-#ifdef _WIN32
+#if defined(__EMSCRIPTEN__)
+    int status = browser_status(j->browser_job);
+    if (!status)
+        return 0;
+    if (status < 0)
+        return failure(j, host, "browser worker failed, canceled or stale");
+    unsigned char bytes[4096];
+    int size = browser_read(j->browser_job, bytes);
+    if (size <= 0 || fwrite(bytes, 1, (size_t)size, j->output) != (size_t)size)
+        return failure(j, host, "invalid browser worker response");
+    success = status == 1;
+    browser_close(j->browser_job);
+    j->browser_job = 0;
+#elif defined(_WIN32)
     DWORD code;
     if (!GetExitCodeProcess(j->process, &code))
         return failure(j, host, "worker poll failed");
@@ -357,6 +430,9 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
     bool ok = boat_plugin_parse_manifest(j->files.manifest, j->files.manifest_size, NULL, &m, &d)
             == BOAT_PLUGIN_OK
         && !strcmp(m.kind, "voyage")
+#ifdef __EMSCRIPTEN__
+        && !m.objective && !m.timers
+#endif
         && boat_plugin_decode_voyage(&m, &data, &r->voyage, &d) == BOAT_PLUGIN_OK
         && boat_plugin_check_location(&r->voyage, host->location, host->map, &d) == BOAT_PLUGIN_OK;
     if (ok && m.objective) {
@@ -365,7 +441,13 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
     }
     // A receipt belongs only to this request/host epoch; the public host never accepts a digest
     // or caller-supplied revision as evidence. No Lua runs in this completion path.
-    if (ok)
+    if (ok && !host->depth && !j->base && !j->epoch) {
+        // Browser launch consumes a prepared worker receipt; there is no launch-time Lua VM.
+        boat_plugin_voyage_copy(&host->slots[0].voyage, &r->voyage);
+        host->slots[0].source_size = r->source_size;
+        memcpy(host->slots[0].source, r->source, r->source_size);
+        host->slots[0].number = host->numbered = host->depth = 1;
+    } else if (ok)
         ok = boat_plugin_host_stage_decoded(host, r, j->base, j->epoch);
     else {
         boat_plugin_host_discard(host);
@@ -380,7 +462,9 @@ void boat_plugin_stage_close(BoatPluginStageJob *j)
     if (!j)
         return;
     if (j->running) {
-#ifdef _WIN32
+#if defined(__EMSCRIPTEN__)
+        browser_close(j->browser_job);
+#elif defined(_WIN32)
         TerminateProcess(j->process, 1);
         WaitForSingleObject(j->process, INFINITE);
         CloseHandle(j->process);
