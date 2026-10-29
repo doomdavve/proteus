@@ -4,15 +4,49 @@
 
 #define SLOTS (BOAT_PLUGIN_UNDO + 2)
 
+static bool load_revision(
+    BoatPluginHost *host, const BoatPluginBundle *bundle, BoatPluginRevision *revision)
+{
+    BoatPluginDiagnostic *d = &host->diagnostic;
+    if (host->racing)
+        return boat_plugin_load_race(bundle, NULL, &revision->race, d) == BOAT_PLUGIN_OK
+            && boat_plugin_race_check_location(&revision->race, host->location, host->map, d)
+            == BOAT_PLUGIN_OK;
+    return boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d) == BOAT_PLUGIN_OK
+        && boat_plugin_check_location(&revision->voyage, host->location, host->map, d)
+        == BOAT_PLUGIN_OK;
+}
+
+static void copy_revision(
+    BoatPluginHost *host, BoatPluginRevision *out, const BoatPluginRevision *in)
+{
+    if (host->racing)
+        out->race = in->race;
+    else
+        boat_plugin_voyage_copy(&out->voyage, &in->voyage);
+}
+
+static BoatPluginChange classify(
+    const BoatPluginHost *host, const BoatPluginRevision *a, const BoatPluginRevision *b)
+{
+    return host->racing ? boat_plugin_race_classify(&a->race, &b->race)
+                        : boat_plugin_classify(&a->voyage, &b->voyage);
+}
+
 bool boat_plugin_host_start(BoatPluginHost *host, const BoatWorldDefinition *location,
     const BoatMap *map, const BoatPluginBundle *bundle)
 {
     *host = (BoatPluginHost) { .location = location, .map = map };
-    BoatPluginVoyage voyage;
-    if (boat_plugin_load_voyage(bundle, NULL, &voyage, &host->diagnostic) != BOAT_PLUGIN_OK
-        || boat_plugin_check_location(&voyage, location, map, &host->diagnostic) != BOAT_PLUGIN_OK)
+    BoatPluginManifest manifest;
+    if (boat_plugin_parse_manifest(
+            bundle->manifest, bundle->manifest_size, NULL, &manifest, &host->diagnostic)
+        != BOAT_PLUGIN_OK)
         return false;
-    boat_plugin_voyage_copy(&host->slots[0].voyage, &voyage);
+    host->racing = !strcmp(manifest.kind, "race");
+    BoatPluginRevision revision = { 0 };
+    if (!load_revision(host, bundle, &revision))
+        return false;
+    copy_revision(host, &host->slots[0], &revision);
     host->slots[0].number = host->numbered = 1;
     host->depth = 1;
     return true;
@@ -46,26 +80,24 @@ static unsigned free_slot(const BoatPluginHost *host)
 
 bool boat_plugin_host_stage(BoatPluginHost *host, const BoatPluginBundle *bundle)
 {
-    BoatPluginVoyage voyage;
-    if (boat_plugin_load_voyage(bundle, NULL, &voyage, &host->diagnostic) != BOAT_PLUGIN_OK
-        || boat_plugin_check_location(&voyage, host->location, host->map, &host->diagnostic)
-            != BOAT_PLUGIN_OK) {
+    BoatPluginRevision candidate = { 0 };
+    if (!load_revision(host, bundle, &candidate)) {
         boat_plugin_host_discard(host);
         return false;
     }
     const BoatPluginRevision *active = boat_plugin_host_active(host);
-    host->change = boat_plugin_classify(&active->voyage, &voyage);
+    host->change = classify(host, active, &candidate);
     // A candidate identical to the one already held keeps its number.
     const BoatPluginRevision *held = boat_plugin_host_held(host);
-    bool repeated = held && !host->undo
-        && boat_plugin_classify(&held->voyage, &voyage) == BOAT_PLUGIN_UNCHANGED;
+    bool repeated
+        = held && !host->undo && classify(host, held, &candidate) == BOAT_PLUGIN_UNCHANGED;
     boat_plugin_host_discard(host);
     if (host->change == BOAT_PLUGIN_UNCHANGED || host->change == BOAT_PLUGIN_INCOMPATIBLE)
         return true;
     unsigned slot = free_slot(host);
     BoatPluginRevision *revision = &host->slots[slot];
     unsigned number = repeated ? held->number : ++host->numbered;
-    boat_plugin_voyage_copy(&revision->voyage, &voyage);
+    copy_revision(host, revision, &candidate);
     revision->number = number;
     host->held = true;
     host->held_slot = slot;
@@ -79,8 +111,8 @@ bool boat_plugin_host_undo(BoatPluginHost *host)
     if (host->depth < 2)
         return false;
     unsigned slot = host->history[host->depth - 2];
-    host->change
-        = boat_plugin_classify(&boat_plugin_host_active(host)->voyage, &host->slots[slot].voyage);
+    host->change = classify(host, boat_plugin_host_active(host), &host->slots[slot]);
+    host->diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK };
     host->held = host->undo = true;
     host->held_slot = slot;
     host->base = boat_plugin_host_active(host)->number;

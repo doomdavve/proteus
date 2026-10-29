@@ -6,6 +6,7 @@
 // data. Input is immutable bytes; nothing here touches files (boat_plugin_io.h acquires them).
 // Every load uses a fresh restricted Lua state that is closed before the call returns.
 #include "boat_location.h"
+#include "boat_race.h"
 #include "boat_voyage.h"
 
 #include <stddef.h>
@@ -79,6 +80,20 @@ typedef struct BoatPluginVoyage {
     uint64_t digest; // boat_plugin_route_digest(&route).
 } BoatPluginVoyage;
 
+// P2: pointer-free owned river race definition. DIGEST covers gameplay only; the manifest
+// name is the display label and can change without restarting a run.
+typedef struct {
+    BoatPluginManifest manifest;
+    BoatRaceCourse course;
+    BoatRaceRules rules;
+    uint64_t digest;
+} BoatPluginRace;
+BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_race_check_location(const BoatPluginRace *race,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
+uint64_t boat_plugin_race_digest(const BoatRaceCourse *course, const BoatRaceRules *rules);
+
 const char *boat_plugin_status_name(BoatPluginStatus status);
 // Parse and check a manifest against the host policy. OUT is written only on success; DIAGNOSTIC
 // (may be NULL) is always written.
@@ -106,6 +121,8 @@ typedef enum {
     BOAT_PLUGIN_INCOMPATIBLE, // Another plugin, kind, location or API: relaunch to use it.
 } BoatPluginChange;
 
+BoatPluginChange boat_plugin_race_classify(
+    const BoatPluginRace *active, const BoatPluginRace *candidate);
 const char *boat_plugin_change_name(BoatPluginChange change);
 // Shelter identity is by ordered ID: a renamed ID or a reordering restarts the voyage.
 BoatPluginChange boat_plugin_classify(

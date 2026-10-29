@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 static void report(WakePlugin *plugin, bool alert, const char *detail, const char *format, ...)
 {
@@ -46,6 +47,10 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory)
             != BOAT_PLUGIN_OK) {
         fprintf(stderr, "Plugin %s: %s error in %s %s: %s\n", directory,
             boat_plugin_status_name(d.status), d.file, d.field, d.message);
+        return NULL;
+    }
+    if (strcmp(manifest.kind, "voyage")) {
+        fprintf(stderr, "--plugin requires a voyage; use boat_race_trial for race plugins.\n");
         return NULL;
     }
     return boat_location_find(manifest.location);

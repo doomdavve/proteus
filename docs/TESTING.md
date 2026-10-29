@@ -1,5 +1,11 @@
 # Test workflow and timing
 
+P2 plugin checks: `boat_plugin_race.*` covers descriptor parity/rejections, revision/Undo,
+real-file trial controls with virtual time, and tick-for-tick four-boat fleet/event parity.
+`boat_race_plugin.*` runs the existing eleven native race cases against the loaded Lua
+reference. `boat_race_plugin_preview` renders a display-free CPU frame. See the
+[plugin API](PLUGIN_API.md#river-race-authoring-p2).
+
 `release_command` runs `tools/test_cut_release.py` in the full CPU suite on every platform.
 It uses temporary local Git repositories and mocked external commands to check immutable
 tags, detached worktrees, hosting baseline/push recovery, archive identity/integrity and

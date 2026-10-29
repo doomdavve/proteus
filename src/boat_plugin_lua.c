@@ -17,6 +17,7 @@ typedef struct {
     bool invalid; // The decoder rejected a value and filled the diagnostic.
     unsigned fields;
     BoatPluginVoyageData *data;
+    BoatPluginRaceData *race;
     BoatPluginDiagnostic *diagnostic;
 } Vm;
 
@@ -338,6 +339,96 @@ static void failure(
     text(d->message, sizeof(d->message), "%s", message ? message : "unknown error");
 }
 
+static const char *const RACE_ROOT[] = { "race", NULL };
+static const char *const RACE[] = { "start", "gates", "grid", "source", "storm", "rules", NULL };
+static const char *const GATE[] = { BOAT_PLUGIN_GATE_FIELDS, NULL };
+static const char *const POINT[] = { "x", "z", NULL };
+static const char *const SOURCE[] = { BOAT_PLUGIN_SOURCE_FIELDS, NULL };
+static const char *const STORM[] = { BOAT_PLUGIN_STORM_FIELDS, NULL };
+static const char *const RULES[] = { BOAT_PLUGIN_RULE_FIELDS, NULL };
+
+static bool numbers(
+    lua_State *L, Vm *vm, int table, const char *path, const char *const *keys, double *out)
+{
+    if (!only(L, vm, table, path, keys))
+        return false;
+    for (unsigned i = 0; keys[i]; ++i)
+        if (!number(L, vm, table, path, keys[i], &out[i]))
+            return false;
+    return true;
+}
+
+static bool numeric_record(
+    lua_State *L, Vm *vm, int parent, const char *key, const char *const *keys, double *out)
+{
+    char at[64];
+    int table = record(L, vm, parent, "race", key, keys, at);
+    if (!table || !numbers(L, vm, table, at, keys, out))
+        return false;
+    lua_pop(L, 1);
+    return true;
+}
+
+static bool numeric_list(lua_State *L, Vm *vm, int parent, const char *key, const char *const *keys,
+    double *out, unsigned stride, unsigned min, unsigned max, unsigned *count_out)
+{
+    char at[64];
+    if (field(L, parent, key, "race", at) != LUA_TTABLE)
+        return reject(vm, at, "must be a dense list");
+    int list = lua_absindex(L, -1);
+    size_t count = lua_rawlen(L, list), entries = 0;
+    if (count < min || count > max)
+        return reject(vm, at, "requires %u..%u entries", min, max);
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > count)
+            return reject(vm, at, "must be a dense list without extra keys");
+        ++entries;
+    }
+    if (entries != count)
+        return reject(vm, at, "must be a dense list without gaps");
+    for (unsigned i = 0; i < count; ++i) {
+        char path[64];
+        element(path, sizeof(path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table");
+        if (!numbers(L, vm, lua_absindex(L, -1), path, keys, out + i * stride))
+            return false;
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    *count_out = (unsigned)count;
+    return true;
+}
+
+static int decode_race(lua_State *L)
+{
+    Vm *vm = lua_touserdata(L, 1);
+    if (lua_type(L, 2) != LUA_TTABLE) {
+        reject(vm, "", "the entry must return a table");
+        return 0;
+    }
+    char at[64];
+    if (!only(L, vm, 2, "", RACE_ROOT))
+        return 0;
+    int race = record(L, vm, 2, "", "race", RACE, at);
+    BoatPluginRaceData *d = vm->race;
+    unsigned grid_count;
+    if (!race || !numeric_record(L, vm, race, "start", GATE, d->start)
+        || !numeric_list(
+            L, vm, race, "gates", GATE, &d->gates[0][0], 5, 1, BOAT_RACE_GATES, &d->gate_count)
+        || !numeric_list(L, vm, race, "grid", POINT, &d->grid[0][0], 2, BOAT_FLEET_SLOTS,
+            BOAT_FLEET_SLOTS, &grid_count)
+        || !numeric_record(L, vm, race, "source", SOURCE, d->source)
+        || !numeric_record(L, vm, race, "storm", STORM, d->storm)
+        || !numeric_record(L, vm, race, "rules", RULES, d->rules))
+        return 0;
+    return 0;
+}
+
 static BoatPluginStatus run(
     lua_State *L, Vm *vm, const char *source, size_t size, const char *chunk)
 {
@@ -368,7 +459,7 @@ static BoatPluginStatus run(
         return d->status;
     }
     int result = lua_gettop(L);
-    lua_pushcfunction(L, decode);
+    lua_pushcfunction(L, vm->race ? decode_race : decode);
     lua_pushlightuserdata(L, vm);
     lua_pushvalue(L, result);
     status = lua_pcall(L, 2, 0, 0);
@@ -390,6 +481,32 @@ BoatPluginStatus boat_plugin_lua_voyage(const char *source, size_t size, const c
     Vm vm = { .limit = limits->memory_bytes,
         .budget = limits->instructions,
         .data = &data,
+        .diagnostic = diagnostic };
+    BoatPluginStatus status;
+    lua_State *L = lua_newstate(allocate, &vm);
+    if (!L) {
+        failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
+        status = BOAT_PLUGIN_MEMORY;
+    } else {
+        status = run(L, &vm, source, size, chunk);
+        lua_close(L);
+    }
+    diagnostic->cost = (BoatPluginCost) { .instructions = vm.instructions,
+        .peak_bytes = vm.peak,
+        .leaked_bytes = vm.live,
+        .fields = vm.fields };
+    if (status == BOAT_PLUGIN_OK)
+        *out = data;
+    return status;
+}
+
+BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const char *chunk,
+    const BoatPluginLimits *limits, BoatPluginRaceData *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginRaceData data = { 0 };
+    Vm vm = { .limit = limits->memory_bytes,
+        .budget = limits->instructions,
+        .race = &data,
         .diagnostic = diagnostic };
     BoatPluginStatus status;
     lua_State *L = lua_newstate(allocate, &vm);

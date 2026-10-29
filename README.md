@@ -471,6 +471,12 @@ for F7 to restart the session. F5 reloads now and F6 undoes or discards. A broke
 reported with its file, line or field, and the running voyage stays. Packaged builds include
 the plugin under `assets/plugins/langedrag`; copy it somewhere writable to edit it.
 
+The river race also has a local [Lua authoring example](plugins/river-sprint/README.md):
+`./build/boat_race_trial --plugin plugins/river-sprint --play`. Saves reload, F6 undoes or
+discards, and F7 restarts the preview with changed gameplay. This preview displays authored
+gates/ferry/storm; race-rule validation is headless and network rooms retain the compiled course.
+
+
 Every mapped location (`river`, `outer`, solo or in a room) has a north-up nautical chart of
 the whole map, drawn in paper-chart style. Land is buff, with built-up areas darker; there is a
 black coastline. Water is white, with blue tints near the shore (distance from shore, not

@@ -1,10 +1,10 @@
 #ifndef PROTEUS_BOAT_PLUGIN_HOST_H
 #define PROTEUS_BOAT_PLUGIN_HOST_H
 
-// Lua plugin P1 (docs/PLUGIN_PLAN.md): the application's owner of one voyage plugin's revisions.
-// It stages a candidate from immutable bytes, classifies it against the active revision, holds
-// it until the application commits it between ticks, and keeps prior revisions for Undo. Nothing
-// here reads files or the clock: the application acquires bytes and passes the time.
+// Lua plugin P1 (docs/PLUGIN_PLAN.md): the application's owner of one voyage or race plugin's
+// revisions. It stages a candidate from immutable bytes, classifies it against the active revision,
+// holds it until the application commits it between ticks, and keeps prior revisions for Undo.
+// Nothing here reads files or the clock: the application acquires bytes and passes the time.
 #include "boat_plugin.h"
 #include "boat_plugin_io.h"
 
@@ -14,10 +14,12 @@
 
 typedef struct {
     BoatPluginVoyage voyage;
+    BoatPluginRace race; // Used instead of VOYAGE by a river race host.
     unsigned number; // 1 for the launch revision, then one more for each staged definition.
 } BoatPluginRevision;
 
 typedef struct {
+    bool racing; // One descriptor kind for the lifetime of this host.
     const BoatWorldDefinition *location;
     const BoatMap *map; // LOCATION's compiled water, for staging checks.
     // Revisions never move: the session borrows the active one's route until the next commit,

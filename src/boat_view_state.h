@@ -4,6 +4,8 @@
 #include "boat.h"
 #include "boat_course.h"
 
+struct BoatRaceCourse;
+
 // What a view shows: the live session boat, a replay sample or a ghost. Built per displayed
 // frame and never stepped; replay values are continuous-time interpolations of a recording.
 typedef struct {
@@ -15,6 +17,7 @@ typedef struct {
     // next uncleared gate (the gate count once finished).
     struct {
         bool enabled;
+        const struct BoatRaceCourse *course; // Optional frame-borrowed override; NULL uses river.
         unsigned char next_gate;
     } race;
 } BoatViewState;

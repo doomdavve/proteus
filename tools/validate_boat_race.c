@@ -16,6 +16,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -24,6 +25,15 @@
             return 1;                                                                              \
         }                                                                                          \
     } while (0)
+
+#ifdef BOAT_RACE_PLUGIN_FIXTURE
+#include "boat_plugin.h"
+#include "boat_plugin_io.h"
+static BoatPluginRace plugin_race;
+static const BoatRaceCourse *fixture_course(void) { return &plugin_race.course; }
+#else
+static const BoatRaceCourse *fixture_course(void) { return boat_race_river_course(); }
+#endif
 
 static BoatFleet fleet;
 static BoatRace race;
@@ -42,7 +52,7 @@ static bool fresh(BoatRaceRules rules)
 {
     return boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 },
                BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT)
-        && boat_race_init(&race, &rules, boat_race_river_course());
+        && boat_race_init(&race, &rules, fixture_course());
 }
 
 // Hand-set observation at TICK without stepping physics.
@@ -145,7 +155,7 @@ static int geometry(void)
 
 static int storm_surface(void)
 {
-    BoatStorm storm = boat_race_river_course()->storm;
+    BoatStorm storm = fixture_course()->storm;
     const float epsilon = .01f;
     float peak = 0;
     for (int z = -160; z <= 160; z += 17)
@@ -539,14 +549,14 @@ static int leavers(void)
 static int rejects(void)
 {
     BoatRaceRules rules = boat_race_default_rules();
-    BoatRaceCourse course = *boat_race_river_course();
+    BoatRaceCourse course = *fixture_course();
     CHECK(boat_race_init(&race, &rules, &course));
     course.storm.radius = NAN;
     CHECK(!boat_race_init(&race, &rules, &course));
-    course = *boat_race_river_course();
+    course = *fixture_course();
     course.storm.height = -1;
     CHECK(!boat_race_init(&race, &rules, &course));
-    course = *boat_race_river_course();
+    course = *fixture_course();
     rules.countdown_ticks = 0;
     CHECK(!boat_race_init(&race, &rules, &course));
     rules = boat_race_default_rules();
@@ -555,10 +565,10 @@ static int rejects(void)
     rules = boat_race_default_rules();
     course.gate_count = 0;
     CHECK(!boat_race_init(&race, &rules, &course));
-    course = *boat_race_river_course();
+    course = *fixture_course();
     course.gates[1].direction = (Vector2) { 1, 1 };
     CHECK(!boat_race_init(&race, &rules, &course));
-    course = *boat_race_river_course();
+    course = *fixture_course();
     course.source.speed = 0;
     CHECK(!boat_race_init(&race, &rules, &course));
     return 0;
@@ -601,7 +611,7 @@ static int hold(void)
     BoatWater water = { 0 };
     CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), water, BOAT_OBJECT_LIFE_TICKS,
         BOAT_OBJECT_DEFAULT_HEIGHT));
-    CHECK(boat_race_init(&race, &rules, boat_race_river_course()));
+    CHECK(boat_race_init(&race, &rules, fixture_course()));
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         CHECK(boat_race_join(&race, &fleet, i));
     while (race.phase != BOAT_RACE_GRID)
@@ -641,7 +651,7 @@ static int full_race(void)
     BoatRaceRules rules = boat_race_default_rules();
     CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 },
         BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
-    CHECK(boat_race_init(&race, &rules, boat_race_river_course()));
+    CHECK(boat_race_init(&race, &rules, fixture_course()));
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         CHECK(boat_race_join(&race, &fleet, i));
     Tally tally = { 0 };
@@ -717,6 +727,23 @@ static const TestCase cases[] = {
 
 int main(int argc, char **argv)
 {
+    if (argc == 2 && !strcmp(argv[1], "--list"))
+        return test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
+#ifdef BOAT_RACE_PLUGIN_FIXTURE
+    BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    if (boat_plugin_read("plugins/river-sprint", NULL, &files, &d) != BOAT_PLUGIN_OK)
+        return 1;
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    if (boat_plugin_load_race(&bundle, NULL, &plugin_race, &d) != BOAT_PLUGIN_OK
+        || boat_plugin_race_check_location(&plugin_race,
+               test_world(BOAT_LOCATION_RIVER)->definition, &test_world(BOAT_LOCATION_RIVER)->map,
+               &d)
+            != BOAT_PLUGIN_OK) {
+        fprintf(stderr, "%s: %s\n", d.field, d.message);
+        return 1;
+    }
+#endif
     int status = test_cases_main(cases, TEST_CASE_COUNT(cases), argc, argv);
     if (status == 0 && argc == 1)
         puts("boat_race=ok");
