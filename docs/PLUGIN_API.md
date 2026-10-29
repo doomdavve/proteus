@@ -1,7 +1,7 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-29: **P1 voyage, P2 local race authoring and P3.2 optional voyage objectives
-implemented** on top of the P0 loader and P3.1 transactions. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
+Status, 2026-10-29: **P1 voyage, P2 local race authoring, P3.2 optional voyage objectives
+and P3.3a timers implemented** on top of the P0 loader and P3.1 transactions. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
 A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
 when the file is saved or on F5, undo, and apply route or water changes with an explicit
 restart. Rooms, the course and replays, and the browser game keep the compiled voyage. The
@@ -42,7 +42,7 @@ rejected. Strings are non-empty printable ASCII.
 | `kind` | `"voyage"` or `"race"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
 | `location` | `"outer"` for voyage; `"river"` for race |
-| `capabilities` | `["voyage.define"]`, optionally followed by `"objective.hud"`; races use `["race.define"]` |
+| `capabilities` | `["voyage.define"]`, optionally followed by `"objective.hud"` and then `"objective.timers"`; races use `["race.define"]` |
 | `state_version` | `1` (reserved for P3 script state) |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -221,7 +221,7 @@ Staging never changes the running voyage. A candidate is compared with the activ
 | Change | Policy |
 | --- | --- |
 | Identical descriptor values (comments/layout ignored for descriptor-only packages) | Nothing happens; the panel shows UNCHANGED |
-| Any behavior source byte change or adding/removing `objective.hud` | Held for F7, restarting native voyage and objective together; comments/layout count for behavior packages |
+| Any behavior source byte change or adding/removing `objective.hud` or `objective.timers` | Held for F7, restarting native voyage and objective together; comments/layout count for behavior packages |
 | Display names only: manifest `name`, or shelter `name` in descriptor-only packages; ordered shelter IDs and every number identical | Applied at once. The boat, clock, water, wakes and all voyage progress are kept; the HUD shows the new names |
 | Shelter IDs, order, count, position, heading or radius; arrival; `exposed_fraction` | Held until F7, then **restart voyage**: progress, timing and recoveries begin again at the start shelter; the boat, clock, water and any weather already met continue. A boat already inside a shelter or the arrival area is observed by the ordinary rules on the next tick |
 | `exposure` or `weather_range` | Held until F7, then **restart session**: the same full restart as Backspace without a voyage (tick zero, the boat at the spawn, calm water until the weather begins) with the new revision |
@@ -388,7 +388,7 @@ synthetic events in the isolated validator; the live adapter below supplies nati
 `random()` returns
 the next unsigned 32-bit xorshift32 result represented exactly as a Lua integer. Failed batches
 discard draws along with state, HUD changes and event acknowledgment. This is deterministic
-scenario randomness, not a cryptographic stream. No timer command is implemented yet.
+scenario randomness, not a cryptographic stream. The optional timer grant is described below.
 
 State supports booleans, signed 64-bit integers, byte strings, dense arrays and string-keyed
 records. Even integral Lua floats such as `1.0` are rejected; use `1`. Empty tables encode as
@@ -399,9 +399,9 @@ sorted key bytes followed by values; arrays store values in order. Limits: 16 Ki
 16 nesting levels below the root, 256 tables, 256 entries per table, 1024 bytes per string and
 1–63 non-NUL bytes per key. The codec is experimental, not a persisted release save format.
 
-The only command is `hud.set`: exact fields `kind`, `generation`, `id`, `label`, `value`, with
+The HUD command is `hud.set`: exact fields `kind`, `generation`, `id`, `label`, `value`, with
 1–23 printable ASCII characters in ID/label and an integer value. All commands are staged
-before commit. Duplicate IDs within one batch are conflicts, and eight rows/32 commands are
+before commit. Duplicate IDs within one resource kind in a batch are conflicts, and eight rows/32 commands are
 host limits. Rows persist until overwritten or reset. The live adapter has one plugin owner and native generation; a voyage restart retires all
 its rows. Composition with other owners and per-row retirement remain future work.
 
@@ -414,7 +414,9 @@ and callback, and does not bound compiler or C-library wall time. Compiler/parse
 continuous background reload and imported code trust remain unqualified.
 
 `boat_plugin_objective_digest` hashes state, HUD rows, RNG, acknowledgment, tick, generation
-and initialization field-by-field; it excludes quarantine and C padding. Native checkpoint
+and initialization field-by-field; the timer grant adds a tagged timer-count/ID/deadline extension,
+including an empty timer list when granted. Timer-free package hashes remain unchanged.
+It excludes quarantine and C padding. Native checkpoint
 assignment supports an **isolated harness** restore/replay. It must not be used to restore old
 script state beside a world that kept advancing. There is no schema-version-aware revision
 manager, full native world rewind, human-facing state inspection or command trace yet.
@@ -447,20 +449,78 @@ Each has the exact native integer tick and a strictly increasing per-run sequenc
 event. Recovery is observed immediately at the current tick and never synthesizes a visit.
 
 After native tick T, when T is divisible by 12 and later than init/the previous update, a
-callback sees the queue through T. Successful state, RNG, acknowledgment and HUD output stay
+callback sees the queue through T. Successful state, RNG, timers, acknowledgment and HUD output stay
 staged until immediately before physics tick T+1. A recovery issued after dispatch at T
 stays queued for the next callback; committing T's output retires only acknowledged notices. Rendering between T and T+1 sees the previous
 committed HUD. The native panel renders the bounded rows above the instruments. Failures
-retain committed state/HUD and unacknowledged events, show `OBJECTIVE SUSPENDED`, and stop
+retain committed state/HUD/timers and unacknowledged events, show `OBJECTIVE SUSPENDED`, and stop
 callbacks; native physics, weather, recovery and arrival continue. A full 64-event queue
 suspends explicitly instead of overwriting an event or retrying endlessly.
 
 Accepted revisions own their source bytes, including Undo history. Manifest-only renames keep
 objective state and pending output. Any behavior source byte change, adding/removing the
-capability, or changing route gameplay is held for F7 to restart the native voyage and its
+capabilities, or changing route gameplay is held for F7 to restart the native voyage and its
 objective together; water edits restart the session too. F6 Undo follows that same policy;
 it restores old source with fresh state, never old script state beside a moving world.
-A new voyage/session clears queued events, pending output, quarantine and rows. A rejected
-candidate leaves active source, state, generation and route intact. Timers, schema-aware live
+A new voyage/session clears queued events, pending output, quarantine, timers and rows. A rejected
+candidate leaves active source, state, generation and route intact. Schema-aware live
 migration, world rewind/seek, multi-owner composition, browser/room behavior and background
 reload performance qualification remain P3.3 or later work. This API is experimental.
+
+
+### Deterministic timers (P3.3a)
+
+Voyages may request exactly `["voyage.define", "objective.hud", "objective.timers"]`.
+The host grants the last capability only alongside the objective callbacks. Timer commands
+without it fail the whole transaction. Existing examples do not request it.
+
+| Command | Exact fields beyond `kind`, `generation`, `id` | Behavior |
+| --- | --- | --- |
+| `timer.set` | `tick`: signed 64-bit integer strictly greater than `context.tick` | Create or replace the local timer with an absolute deadline in 120 Hz simulation ticks |
+| `timer.cancel` | None | Remove the timer; an absent ID succeeds without effect |
+
+IDs use 1–23 printable ASCII characters. A host generation owns at most 16 timers; HUD rows
+and timers have separate ID namespaces. The combined command list remains capped at 32.
+Commands stage in list order: cancel an existing timer before adding a new one when full.
+Writing one timer ID twice in a batch (including set followed by cancel) is a conflict.
+No wall clock or floating-point deadline participates; scripts should avoid overflowing integer
+arithmetic when constructing deadlines. The host rejects deadlines at/before the current tick.
+
+With the grant, `context.timers` is a dense list of due `{id, tick}` records sorted by deadline,
+then bytewise ID. `tick` is the authored deadline, even when it falls between callbacks or
+several update boundaries were skipped. Delivery occurs on the first successful update at/after
+that tick. These records are separate from `context.events`: native event sequence numbers and
+acknowledgment are unchanged. Init, reset and migration receive an empty timer list.
+
+Due timers leave the staged checkpoint before commands execute, allowing an update to re-arm
+the same ID with a later deadline. Delivery and timer commands commit atomically with state,
+RNG, native acknowledgment and HUD output; any failure retains all committed timers. In the
+live adapter this includes T/T+1 publication and cancellation of pending output on overflow.
+Quarantine stops updates without consuming due timers. A successful isolated migration retains
+pending timers unless its commands explicitly replace/cancel them; overdue timers deliver on
+the next successful update. A failed migration retains the complete checkpoint.
+
+For example, keep the `voyage` descriptor and add callbacks to the returned table:
+
+```lua
+init = function(c)
+  return { reminders = 0 }, {
+    { kind = "timer.set", generation = c.generation, id = "reminder", tick = c.tick + 1200 }
+  }
+end,
+update = function(c, s)
+  s.reminders = s.reminders + #c.timers
+  return s, {
+    { kind = "hud.set", generation = c.generation,
+      id = "reminders", label = "REMINDERS", value = s.reminders }
+  }
+end
+```
+
+A manifest-only display rename preserves pending timers and staged output. Behavior source or
+capability changes retain the explicit F7 native voyage/objective restart policy, as does Undo
+code. Restart retires every old timer and pending delivery before calling init with a fresh
+host generation at the current native tick. No timer from the old generation fires afterward.
+This is the pending-timer reload contract until schema-aware live migration is implemented.
+The checkpoint is caller-owned native data, not a persisted/network timer format or a full-world
+preview checkpoint. Timer resource composition across multiple plugin owners remains future work.

@@ -245,7 +245,176 @@ static int budgets_and_wide_time(void)
     return 0;
 }
 
+static int timer_capabilities(void)
+{
+    const char *caps[] = {
+        "\"voyage.define\",\"objective.hud\",\"objective.timers\"",
+        "\"voyage.define\",\"objective.timers\"",
+        "\"voyage.define\",\"objective.hud\",\"objective.hud\"",
+        "\"voyage.define\",\"objective.hud\",\"unknown\"",
+        "\"race.define\",\"objective.hud\",\"objective.timers\"",
+        "\"voyage.define\",\"objective.hud\",\"objective.timers\",\"objective.timers\"",
+    };
+    for (unsigned i = 0; i < sizeof(caps) / sizeof(caps[0]); ++i) {
+        char json[1024];
+        snprintf(json, sizeof(json),
+            "{\"id\":\"test.timers\",\"name\":\"Timers\",\"api\":1,\"kind\":\"%s\","
+            "\"entry\":\"main.lua\",\"location\":\"%s\",\"capabilities\":[%s],\"state_version\":1}",
+            i == 4 ? "race" : "voyage", i == 4 ? "river" : "outer", caps[i]);
+        BoatPluginManifest manifest = { 0 };
+        BoatPluginStatus status
+            = boat_plugin_parse_manifest(json, strlen(json), NULL, &manifest, &diagnostic);
+        CHECK(status == (i == 0 ? BOAT_PLUGIN_OK : BOAT_PLUGIN_MANIFEST));
+        if (!i)
+            CHECK(manifest.objective && manifest.timers);
+    }
+    return 0;
+}
+
+static const char TIMER_SCRIPT[]
+    = "return {init=function(c) return {fired=0}, {"
+      "{kind='timer.set',generation=c.generation,id='z',tick=c.tick+13},"
+      "{kind='timer.set',generation=c.generation,id='a',tick=c.tick+13}} end,"
+      "update=function(c,s) "
+      "if #c.timers>0 then assert(#c.timers==2 and c.timers[1].id=='a' "
+      "and c.timers[2].id=='z' and c.timers[1].tick==13); s.fired=s.fired+2 end;"
+      "return s, {{kind='hud.set',generation=c.generation,id='a',label='FIRED',value=s.fired}} end,"
+      "migrate=function(c,s) assert(#c.timers==0); return s,{} end}";
+
+static int timers_delivery(void)
+{
+    BoatPluginObjective a = fresh();
+    a.timers_enabled = true;
+    CHECK(step(&a, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(a.timer_count == 2 && !strcmp(a.timers[0].id, "a"));
+    CHECK(step(&a, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(a.timer_count == 2 && a.hud[0].value == 0);
+    BoatPluginObjective b = a;
+    // A migration preserves pending timers, even when their deadlines pass at its boundary.
+    CHECK(step(&a, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_MIGRATE, 13, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(a.timer_count == 2);
+    BoatPluginEvent e = { .tick = 20, .sequence = 1, .kind = "native" };
+    CHECK(step(&a, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_UPDATE, 24, &e, 1) == BOAT_PLUGIN_OK);
+    CHECK(step(&b, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_UPDATE, 24, &e, 1) == BOAT_PLUGIN_OK);
+    CHECK(a.timer_count == 0 && a.hud[0].value == 2 && a.acknowledged == 1);
+    CHECK(boat_plugin_objective_digest(&a) == boat_plugin_objective_digest(&b));
+    CHECK(step(&a, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_UPDATE, 36, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(a.hud[0].value == 2); // One shot; native acknowledgment is independent.
+    // Exact integer deadlines beyond double precision; dispatch after a skipped boundary.
+    a = fresh();
+    a.timers_enabled = true;
+    int64_t start = INT64_C(9007199254741008);
+    CHECK(step(&a, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_INIT, start, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(a.timers[0].tick == start + 13);
+    const char *wide = "return {update=function(c,s) assert(c.timers[1].tick==9007199254741021); "
+                       "return s,{} end}";
+    CHECK(step(&a, wide, BOAT_PLUGIN_OBJECTIVE_UPDATE, start + 24, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(!a.timer_count);
+    return 0;
+}
+
+static int timers_atomicity(void)
+{
+    BoatPluginObjective before = fresh(), o;
+    before.timers_enabled = true;
+    CHECK(step(&before, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_OK);
+    const char *bad[] = {
+        "{kind='timer.set',generation=7,id='new',tick=25},{kind='bad'}",
+        "{kind='timer.cancel',generation=7,id='z'},{kind='timer.set',generation=7,id='z',tick=25}",
+        "{kind='timer.set',generation=6,id='new',tick=25}",
+        "{kind='timer.set',generation=7,id='new',tick=24}",
+        "{kind='timer.set',generation=7,id='new',tick=25.0}",
+        "{kind='timer.set',generation=7,id='new',tick=-1}",
+        "{kind='timer.cancel',generation=7,id='z',tick=25}",
+        "{kind='timer.set',generation=7,id='new',tick=25,label='bad'}",
+    };
+    for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        o = before;
+        char source[1024];
+        snprintf(source, sizeof(source),
+            "return {update=function(c,s) s.fired=99; c.random(); return s,{%s} end}", bad[i]);
+        CHECK(step(&o, source, BOAT_PLUGIN_OBJECTIVE_UPDATE, 24, NULL, 0) == BOAT_PLUGIN_SCHEMA);
+        CHECK(o.quarantined && o.timer_count == 2);
+        CHECK(boat_plugin_objective_digest(&o) == boat_plugin_objective_digest(&before));
+    }
+    o = before;
+    CHECK(step(&o, "return {update=function(c,s) assert(#c.timers==2); error('after due') end}",
+              BOAT_PLUGIN_OBJECTIVE_UPDATE, 24, NULL, 0)
+        == BOAT_PLUGIN_RUNTIME);
+    CHECK(o.timer_count == 2);
+    CHECK(step(&o, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_MIGRATE, 24, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(o.timer_count == 2 && !o.quarantined);
+    CHECK(step(&o, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_UPDATE, 36, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(!o.timer_count && o.hud[0].value == 2);
+    // Reset retires every old timer before init constructs replacements.
+    o = before;
+    CHECK(step(&o, SCRIPT, BOAT_PLUGIN_OBJECTIVE_RESET, 24, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(!o.timer_count);
+    o = fresh();
+    CHECK(step(&o, TIMER_SCRIPT, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_SCHEMA);
+    CHECK(!o.timer_count && !o.initialized); // No capability grant.
+    return 0;
+}
+
+static int timers_capacity_and_checkpoint(void)
+{
+    const char *full
+        = "return {init=function(c) local cmds={} for i=1,16 do "
+          "cmds[i]={kind='timer.set',generation=c.generation,id=tostring(i),tick=120} end "
+          "return {},cmds end}";
+    BoatPluginObjective o = fresh();
+    o.timers_enabled = true;
+    CHECK(step(&o, full, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(o.timer_count == BOAT_PLUGIN_TIMERS);
+    BoatPluginObjective before = o;
+    CHECK(step(&o,
+              "return {update=function(c,s) return s, {"
+              "{kind='timer.set',generation=7,id='overflow',tick=120}} end}",
+              BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(boat_plugin_objective_digest(&o) == boat_plugin_objective_digest(&before));
+    o = before;
+    CHECK(step(&o,
+              "return {update=function(c,s) return s, {"
+              "{kind='timer.cancel',generation=7,id='1'},"
+              "{kind='timer.cancel',generation=7,id='absent'},"
+              "{kind='timer.set',generation=7,id='new',tick=100},"
+              "{kind='timer.set',generation=7,id='2',tick=101}} end}",
+              BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0)
+        == BOAT_PLUGIN_OK);
+    CHECK(o.timer_count == 16 && !strcmp(o.timers[0].id, "new") && o.timers[1].tick == 101);
+    // Re-arm a just-delivered timer in the same transaction.
+    CHECK(step(&o,
+              "return {update=function(c,s) assert(#c.timers==2); return s, {"
+              "{kind='timer.set',generation=7,id='new',tick=math.maxinteger}} end}",
+              BOAT_PLUGIN_OBJECTIVE_UPDATE, 108, NULL, 0)
+        == BOAT_PLUGIN_OK);
+    CHECK(o.timer_count == 15 && o.timers[14].tick == INT64_MAX);
+    for (unsigned i = 0; i < 6; ++i) {
+        o = before;
+        if (i == 0)
+            o.timer_count = BOAT_PLUGIN_TIMERS + 1;
+        if (i == 1)
+            o.timers_enabled = false;
+        if (i == 2)
+            o.timers[0].tick = 0;
+        if (i == 3)
+            memset(o.timers[0].id, 'a', sizeof(o.timers[0].id));
+        if (i == 4)
+            o.timers[1] = o.timers[0];
+        if (i == 5)
+            o.timers[0].tick = 121; // Unsorted checkpoint.
+        CHECK(!boat_plugin_objective_digest(&o));
+        CHECK(step(&o, SCRIPT, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0) == BOAT_PLUGIN_SCHEMA);
+    }
+    return 0;
+}
+
 static const TestCase cases[] = {
+    TEST_CASE(timer_capabilities),
+    TEST_CASE(timers_delivery),
+    TEST_CASE(timers_atomicity),
+    TEST_CASE(timers_capacity_and_checkpoint),
     TEST_CASE(deterministic_resume),
     TEST_CASE(atomic_failures),
     TEST_CASE(state_contract),

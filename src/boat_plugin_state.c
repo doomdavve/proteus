@@ -231,10 +231,10 @@ static void command_text(lua_State *L, Transition *t, int table, const char *key
     size_t size = 0;
     const char *value = lua_type(L, -1) == LUA_TSTRING ? lua_tolstring(L, -1, &size) : NULL;
     if (!value || !size || size >= BOAT_PLUGIN_TEXT)
-        invalid(L, t, "HUD id/label requires 1..23 printable ASCII characters");
+        invalid(L, t, "resource id/label requires 1..23 printable ASCII characters");
     for (size_t i = 0; i < size; ++i)
         if ((unsigned char)value[i] < 32 || (unsigned char)value[i] > 126)
-            invalid(L, t, "HUD text requires printable ASCII");
+            invalid(L, t, "resource text requires printable ASCII");
     memcpy(out, value, size);
     out[size] = 0;
     lua_pop(L, 1);
@@ -258,41 +258,86 @@ static void commands(lua_State *L, Transition *t, int list)
     if (entries != count)
         invalid(L, t, "command list has gaps");
     char touched[BOAT_PLUGIN_COMMANDS][BOAT_PLUGIN_TEXT];
+    bool timer_touched[BOAT_PLUGIN_COMMANDS];
     for (unsigned i = 0; i < count; ++i) {
         lua_rawgeti(L, list, i + 1);
         if (!lua_istable(L, -1))
             invalid(L, t, "command must be a record");
         int command = lua_absindex(L, -1);
+        lua_getfield(L, command, "kind");
+        const char *kind = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "";
+        bool set = !strcmp(kind, "timer.set"), cancel = !strcmp(kind, "timer.cancel");
+        bool timer = set || cancel;
+        if (lua_rawlen(L, -1) != strlen(kind) || (!timer && strcmp(kind, "hud.set")))
+            invalid(L, t, "unsupported command kind");
+        if (timer && !t->next.timers_enabled)
+            invalid(L, t, "timer commands require objective.timers");
+        lua_pop(L, 1);
         lua_pushnil(L);
         while (lua_next(L, command)) {
             lua_pop(L, 1);
             const char *key = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "";
             if (lua_rawlen(L, -1) != strlen(key)
-                || (strcmp(key, "kind") && strcmp(key, "id") && strcmp(key, "label")
-                    && strcmp(key, "value") && strcmp(key, "generation")))
+                || (strcmp(key, "kind") && strcmp(key, "id") && strcmp(key, "generation")
+                    && (timer ? (!set || strcmp(key, "tick"))
+                              : (strcmp(key, "label") && strcmp(key, "value")))))
                 invalid(L, t, "unknown command field");
         }
-        lua_getfield(L, command, "kind");
-        if (lua_type(L, -1) != LUA_TSTRING || lua_rawlen(L, -1) != 7
-            || strcmp(lua_tostring(L, -1), "hud.set"))
-            invalid(L, t, "unsupported command kind");
-        lua_pop(L, 1);
         lua_getfield(L, command, "generation");
         if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) != t->next.generation)
-            invalid(L, t, "stale HUD generation");
+            invalid(L, t, "stale resource generation");
         lua_pop(L, 1);
         BoatPluginHud hud = { 0 };
         command_text(L, t, command, "id", hud.id);
+        for (unsigned j = 0; j < i; ++j)
+            if (timer_touched[j] == timer && !strcmp(touched[j], hud.id))
+                invalid(L, t, "conflicting commands for one resource id");
+        memcpy(touched[i], hud.id, sizeof(hud.id));
+        timer_touched[i] = timer;
+        if (timer) {
+            int64_t due = 0;
+            if (set) {
+                lua_getfield(L, command, "tick");
+                if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) <= t->next.tick)
+                    invalid(L, t, "timer tick must be an integer after the current tick");
+                due = lua_tointeger(L, -1);
+                lua_pop(L, 1);
+            }
+            unsigned slot = 0;
+            while (slot < t->next.timer_count && strcmp(t->next.timers[slot].id, hud.id))
+                ++slot;
+            if (slot < t->next.timer_count) {
+                --t->next.timer_count;
+                memmove(t->next.timers + slot, t->next.timers + slot + 1,
+                    (t->next.timer_count - slot) * sizeof(t->next.timers[0]));
+            }
+            if (set) {
+                if (t->next.timer_count == BOAT_PLUGIN_TIMERS)
+                    invalid(L, t, "timer capacity exceeded");
+                // Canonical order defines simultaneous delivery, independent of command order.
+                slot = 0;
+                while (slot < t->next.timer_count
+                    && (t->next.timers[slot].tick < due
+                        || (t->next.timers[slot].tick == due
+                            && strcmp(t->next.timers[slot].id, hud.id) < 0)))
+                    ++slot;
+                memmove(t->next.timers + slot + 1, t->next.timers + slot,
+                    (t->next.timer_count - slot) * sizeof(t->next.timers[0]));
+                t->next.timers[slot] = (BoatPluginTimer) { .tick = due };
+                memcpy(t->next.timers[slot].id, hud.id, sizeof(hud.id));
+                ++t->next.timer_count;
+            }
+            memset(t->next.timers + t->next.timer_count, 0,
+                (BOAT_PLUGIN_TIMERS - t->next.timer_count) * sizeof(t->next.timers[0]));
+            lua_pop(L, 1);
+            continue;
+        }
         command_text(L, t, command, "label", hud.label);
         lua_getfield(L, command, "value");
         if (!lua_isinteger(L, -1))
             invalid(L, t, "HUD value must be an integer");
         hud.value = lua_tointeger(L, -1);
         lua_pop(L, 1);
-        for (unsigned j = 0; j < i; ++j)
-            if (!strcmp(touched[j], hud.id))
-                invalid(L, t, "conflicting commands for one HUD id");
-        memcpy(touched[i], hud.id, sizeof(hud.id));
         unsigned slot = 0;
         while (slot < t->next.hud_count && strcmp(t->next.hud[slot].id, hud.id))
             ++slot;
@@ -333,6 +378,24 @@ static int transition(lua_State *L)
         lua_rawseti(L, -2, i + 1);
     }
     lua_setfield(L, -2, "events");
+    if (t->next.timers_enabled) {
+        lua_newtable(L);
+        unsigned due = 0;
+        if (t->transition == BOAT_PLUGIN_OBJECTIVE_UPDATE)
+            while (due < t->next.timer_count && t->next.timers[due].tick <= t->next.tick) {
+                lua_newtable(L);
+                integer_field(L, "tick", t->next.timers[due].tick);
+                string_field(L, "id", t->next.timers[due].id);
+                lua_rawseti(L, -2, due + 1);
+                ++due;
+            }
+        lua_setfield(L, -2, "timers");
+        t->next.timer_count -= due;
+        memmove(
+            t->next.timers, t->next.timers + due, t->next.timer_count * sizeof(t->next.timers[0]));
+        memset(t->next.timers + t->next.timer_count, 0,
+            (BOAT_PLUGIN_TIMERS - t->next.timer_count) * sizeof(t->next.timers[0]));
+    }
     bool with_state = t->transition == BOAT_PLUGIN_OBJECTIVE_UPDATE
         || t->transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE;
     if (with_state) {
@@ -356,6 +419,30 @@ static int transition(lua_State *L)
     return 0;
 }
 
+static bool valid_timers(const BoatPluginObjective *o)
+{
+    if (o->timer_count > BOAT_PLUGIN_TIMERS || (!o->timers_enabled && o->timer_count))
+        return false;
+    for (unsigned i = 0; i < o->timer_count; ++i) {
+        const BoatPluginTimer *timer = &o->timers[i];
+        const char *end = memchr(timer->id, 0, sizeof(timer->id));
+        if (!end || end == timer->id || timer->tick <= 0)
+            return false;
+        for (const char *p = timer->id; p < end; ++p)
+            if ((unsigned char)*p < 32 || (unsigned char)*p > 126)
+                return false;
+        if (i
+            && (o->timers[i - 1].tick > timer->tick
+                || (o->timers[i - 1].tick == timer->tick
+                    && strcmp(o->timers[i - 1].id, timer->id) >= 0)))
+            return false;
+        for (unsigned j = 0; j < i; ++j)
+            if (!strcmp(o->timers[j].id, timer->id))
+                return false;
+    }
+    return true;
+}
+
 BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, const char *source,
     size_t size, BoatPluginTransition action, int64_t tick, const BoatPluginEvent *events,
     unsigned event_count, const BoatPluginLimits *limits, BoatPluginDiagnostic *diagnostic)
@@ -376,8 +463,8 @@ BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, cons
         error = "transition budgets cannot exceed host limits";
     else if (action < BOAT_PLUGIN_OBJECTIVE_INIT || action > BOAT_PLUGIN_OBJECTIVE_RESET || tick < 0
         || !objective->generation || !objective->rng || objective->hud_count > BOAT_PLUGIN_HUD
-        || objective->state.size > BOAT_PLUGIN_STATE_BYTES || objective->acknowledged < 0
-        || objective->tick < 0)
+        || !valid_timers(objective) || objective->state.size > BOAT_PLUGIN_STATE_BYTES
+        || objective->acknowledged < 0 || objective->tick < 0)
         error = "invalid checkpoint or transition";
     else if ((!init && !reset && !objective->initialized) || (init && objective->initialized))
         error = "transition requires the appropriate initialized state";
@@ -417,6 +504,8 @@ BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, cons
     t.next.tick = tick;
     if (init || reset) {
         t.next.state = (BoatPluginState) { 0 };
+        t.next.timer_count = 0;
+        memset(t.next.timers, 0, sizeof(t.next.timers));
         t.next.hud_count = 0;
         memset(t.next.hud, 0, sizeof(t.next.hud));
     }
@@ -450,7 +539,7 @@ static void hash_integer(uint64_t *hash, uint64_t value)
 uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
 {
     if (!objective || objective->state.size > BOAT_PLUGIN_STATE_BYTES
-        || objective->hud_count > BOAT_PLUGIN_HUD)
+        || objective->hud_count > BOAT_PLUGIN_HUD || !valid_timers(objective))
         return 0;
     for (unsigned i = 0; i < objective->hud_count; ++i)
         if (!memchr(objective->hud[i].id, 0, sizeof(objective->hud[i].id))
@@ -470,5 +559,13 @@ uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
     hash_integer(&hash, (uint64_t)objective->tick);
     hash_integer(&hash, objective->generation);
     hash_integer(&hash, objective->initialized);
+    if (objective->timers_enabled) {
+        hash_bytes(&hash, "timers", 6);
+        hash_integer(&hash, objective->timer_count);
+        for (unsigned i = 0; i < objective->timer_count; ++i) {
+            hash_bytes(&hash, objective->timers[i].id, strlen(objective->timers[i].id) + 1);
+            hash_integer(&hash, (uint64_t)objective->timers[i].tick);
+        }
+    }
     return hash;
 }

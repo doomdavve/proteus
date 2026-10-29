@@ -916,7 +916,100 @@ static int objective_tick_parity(void)
     return 0;
 }
 
+// Use the production revision host and T/T+1 adapter, including reload while a due
+// transition is staged. The source is immutable candidate bytes, exactly like a save.
+static int objective_timers_reload(void)
+{
+    static WakePlugin p;
+    static BoatPluginFiles files;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
+    files = p.files;
+    int n = snprintf(files.manifest, sizeof(files.manifest),
+        "{\"id\":\"proteus.shelter-tour\",\"name\":\"Timer test\",\"api\":1,"
+        "\"kind\":\"voyage\",\"entry\":\"main.lua\",\"location\":\"outer\","
+        "\"capabilities\":[\"voyage.define\",\"objective.hud\",\"objective.timers\"],"
+        "\"state_version\":1}");
+    CHECK(n > 0 && (size_t)n < sizeof(files.manifest));
+    files.manifest_size = (size_t)n;
+    n = snprintf(files.source, sizeof(files.source),
+        "local p=(function() %.*s\nend)(); "
+        "p.init=function(c) return {fired=0}, {{kind='timer.set',generation=c.generation,"
+        "id='reminder',tick=c.tick+13}} end; "
+        "p.update=function(c,s) s.fired=s.fired+#c.timers; return s, "
+        "{{kind='hud.set',generation=c.generation,id='timer',label='FIRED',value=s.fired}} end;"
+        "return p",
+        (int)p.files.source_size, p.files.source);
+    CHECK(n > 0 && (size_t)n < sizeof(files.source));
+    files.source_size = (size_t)n;
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    CHECK(boat_plugin_host_stage(&p.host, &bundle));
+    CHECK(p.host.change == BOAT_PLUGIN_RESTART_VOYAGE);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 1));
+    CHECK(p.objective.timers_enabled && p.objective.timer_count == 1);
+    const BoatVoyageRoute *route = s.voyage.route;
+    observe_objective(&p, &s, 12, route->shelters[0].position);
+    wake_plugin_before_tick(&p);
+    CHECK(p.objective.timer_count == 1 && p.objective.hud[0].value == 0);
+    observe_objective(&p, &s, 24, route->shelters[0].position);
+    CHECK(p.objective_pending && p.objective.timer_count == 1);
+    CHECK(!p.staged_objective.timer_count && p.staged_objective.hud[0].value == 1);
+    // Metadata rename preserves committed timers and their pending consumption.
+    char *name = strstr(files.manifest, "Timer test");
+    CHECK(name);
+    name[0] = 'R';
+    CHECK(boat_plugin_host_stage(&p.host, &bundle));
+    CHECK(p.host.change == BOAT_PLUGIN_RENAMED);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 2));
+    CHECK(p.objective_pending && p.objective.timer_count == 1);
+    wake_plugin_before_tick(&p);
+    CHECK(!p.objective.timer_count && p.objective.hud[0].value == 1);
+    // Behavior edit waits for explicit restart; native clock is already at 24.
+    files.source[files.source_size++] = ' ';
+    bundle = boat_plugin_bundle(&files);
+    CHECK(boat_plugin_host_stage(&p.host, &bundle));
+    CHECK(p.host.change == BOAT_PLUGIN_RESTART_VOYAGE);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 3));
+    CHECK(p.objective.timer_count == 1 && p.objective.timers[0].tick == 37);
+    unsigned generation = p.generation;
+    observe_objective(&p, &s, 48, s.voyage.route->shelters[0].position);
+    CHECK(p.objective_pending);
+    // Undo code restarts with a fresh generation, dropping the due pending output.
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 4));
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 5));
+    CHECK(p.generation == generation + 1 && !p.objective_pending);
+    CHECK(p.objective.timer_count == 1 && p.objective.timers[0].tick == 61);
+    CHECK(!p.objective.hud_count);
+    uint64_t before = boat_plugin_objective_digest(&p.objective);
+    // Failed init cannot replace the active timer or grant.
+    const char *failure = "return {init=function() error('timer candidate') end,"
+                          "update=function(c,s) return s,{} end}";
+    n = snprintf(files.source, sizeof(files.source),
+        "local p=(function() %.*s\nend)(); local q=(function() %s end)(); "
+        "p.init=q.init; return p",
+        (int)p.files.source_size, p.files.source, failure);
+    CHECK(n > 0 && (size_t)n < sizeof(files.source));
+    files.source_size = (size_t)n;
+    bundle = boat_plugin_bundle(&files);
+    CHECK(!boat_plugin_host_stage(&p.host, &bundle));
+    CHECK(boat_plugin_objective_digest(&p.objective) == before);
+    observe_objective(&p, &s, 72, s.voyage.route->shelters[0].position);
+    CHECK(p.objective_pending && !p.staged_objective.timer_count);
+    for (unsigned i = 0; i <= BOAT_PLUGIN_EVENTS; ++i) {
+        boat_session_recover(&s);
+        wake_plugin_after_tick(&p, &s);
+    }
+    CHECK(p.objective.quarantined && !p.objective_pending);
+    CHECK(p.objective.timer_count == 1 && boat_plugin_objective_digest(&p.objective) == before);
+    wake_plugin_before_tick(&p);
+    CHECK(p.objective.timer_count == 1); // Discarded staged output never consumes a due timer.
+    boat_session_destroy(&s);
+    return 0;
+}
+
 static const TestCase cases[] = {
+    TEST_CASE(objective_timers_reload),
     SLOW_CASE(objective_tick_parity),
     TEST_CASE(lossless_events),
     TEST_CASE(live_objective),
