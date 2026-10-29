@@ -43,4 +43,12 @@ BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const cha
 BoatPluginStatus boat_plugin_lua_voyage(const char *source, size_t size, const char *chunk,
     const BoatPluginLimits *limits, BoatPluginVoyageData *out, BoatPluginDiagnostic *diagnostic);
 
+// Private protected execution for the P3 transition decoder. CALLBACK receives the entry's
+// returned table at index 2 and CONTEXT as light userdata at index 1. All Lua work (including
+// setup, state decoding and output staging) remains inside a protected call and allocator.
+typedef struct lua_State lua_State;
+BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
+    const BoatPluginLimits *limits, int (*callback)(lua_State *), void *context,
+    BoatPluginDiagnostic *diagnostic);
+
 #endif

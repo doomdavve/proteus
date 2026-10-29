@@ -1,4 +1,4 @@
-# Lua plugin API (voyage and race descriptors)
+# Lua plugin API (voyage and race descriptors; experimental objective harness)
 
 Status, 2026-10-29: **P1 voyage and P2 local race authoring implemented** on top of the P0
 loader. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
@@ -337,3 +337,82 @@ Web preflight, using emsdk at `../emsdk` (README web section):
 cmake --build build-web --target validate_boat_plugin
 node build-web/validate_boat_plugin.js
 ```
+
+## Experimental objective harness (P3.1)
+
+[`boat_plugin_state.h`](../src/boat_plugin_state.h) exposes native review operations; **the
+manifest and live game do not grant behavior capabilities yet**. P1/P2 package contracts above
+are unchanged. The [P3.1 result](PLUGIN_PLAN.md#p31-result-2026-10-29) owns status and remaining
+integration work. Run the deterministic native checks with:
+
+```sh
+cmake --build build --target validate_boat_plugin_state
+./build/validate_boat_plugin_state
+ctest --test-dir build -R '^boat_plugin_state\.' --output-on-failure
+```
+
+The harness accepts bounded immutable source returning `init(context)`, `update(context,state)`
+and, when requested, `migrate(context,state)`. Each returns **state, commands**; both are
+required. A fresh Lua instance loads the source for every call, so hidden globals/closures do
+not persist. The caller retains accepted source, the native checkpoint and pending event batch.
+The native host supplies a nonzero RNG seed and generation before initialization. Update ticks
+increase on multiples of 12; migration/reset are explicit operations at a nondecreasing tick.
+
+```lua
+return {
+  init = function(context)
+    return { visits = 0 }, {}
+  end,
+  update = function(context, state)
+    for _, event in ipairs(context.events) do
+      if event.kind == "voyage.shelter_reached" then
+        state.visits = state.visits + 1
+      end
+    end
+    return state, {
+      { kind = "hud.set", generation = context.generation,
+        id = "visits", label = "STOPS", value = state.visits }
+    }
+  end,
+  migrate = function(context, state)
+    state.version = 2
+    return state, {}
+  end
+}
+```
+
+`context` holds integer `tick`, integer host `generation`, ordered `events` and `random()`.
+Events have integer `tick`/`sequence` and bounded `kind`/`id` strings. The example above consumes
+synthetic events in the validator; there is no live voyage event adapter yet. `random()` returns
+the next unsigned 32-bit xorshift32 result represented exactly as a Lua integer. Failed batches
+discard draws along with state, HUD changes and event acknowledgment. This is deterministic
+scenario randomness, not a cryptographic stream. No timer command is implemented yet.
+
+State supports booleans, signed 64-bit integers, byte strings, dense arrays and string-keyed
+records. Even integral Lua floats such as `1.0` are rejected; use `1`. Empty tables encode as
+records. Record keys sort lexicographically by bytes; graph aliases/cycles and metatables are
+forbidden. Canonical bytes use one-byte tags `f`, `t`, `i`, `s`, `a`, `r`, little-endian 64-bit
+integer bits, 16-bit string/container lengths, and one-byte record-key lengths. Records store
+sorted key bytes followed by values; arrays store values in order. Limits: 16 KiB total,
+16 nesting levels below the root, 256 tables, 256 entries per table, 1024 bytes per string and
+1–63 non-NUL bytes per key. The codec is experimental, not a persisted release save format.
+
+The only command is `hud.set`: exact fields `kind`, `generation`, `id`, `label`, `value`, with
+1–23 printable ASCII characters in ID/label and an integer value. All commands are staged
+before commit. Duplicate IDs within one batch are conflicts, and eight rows/32 commands are
+host limits. Rows persist until overwritten or reset. Removed-resource retirement and real
+session/plugin ownership remain later work; the isolated harness has a single native owner.
+
+A callback, budget, schema, event overflow or update scheduling failure quarantines updates
+without changing the committed checkpoint. Explicit reset or a successful migration clears
+quarantine. A failed candidate migration preserves the complete current checkpoint. Source,
+state and error costs use the existing 64 KiB/2 MiB/1 M host ceilings; callbacks may request
+lower native test limits, never raise them. The combined Lua budget spans module evaluation
+and callback, and does not bound compiler or C-library wall time. Compiler/parser isolation,
+continuous background reload and imported code trust remain unqualified.
+
+`boat_plugin_objective_digest` hashes state, HUD rows, RNG, acknowledgment, tick, generation
+and initialization field-by-field; it excludes quarantine and C padding. Native checkpoint
+assignment supports an **isolated harness** restore/replay. It must not be used to restore old
+script state beside a world that kept advancing. There is no schema-version-aware revision
+manager, full native world rewind, human-facing state inspection or command trace yet.
