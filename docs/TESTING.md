@@ -253,6 +253,18 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   read from a build-tree scratch directory, where missing files, an escaping entry, a symbolic
   link, a directory and oversized input are refused. Finally the decoded shelters must lie in
   the outer map's water. Instruction budgets are counted by a hook, never timed.
+- `boat_plugin_session` runs `validate_boat_plugin_session` (Lua plugins P1; ten quick cases
+  of about 37 ms together in Debug, plus a slow parity case of about 0.2 s). It covers staging
+  against the outer map with field paths, and the classification of renames, route changes,
+  water changes and other plugins. It applies each policy to a live `BoatSession`, including a
+  voyage restart inside a shelter, while exposed, after arrival and when a reached shelter is
+  removed. Broken stages must leave the active revision byte-identical, and Undo is checked
+  over the eight-deep history. The save poller runs on a virtual clock. `game_controls` drives
+  the game's `--plugin` F5/F6/F7 and polling glue on files in a build-tree scratch directory.
+  `compiled_parity` steps a compiled and a plugin session with identical input to Långedrag
+  and compares the boat, the water and every voyage field at each tick. The
+  `wake_velocity_plugin_*` tests render a CPU frame with the plugin and check that `--plugin`
+  is refused with a room, the course, another location or a missing package.
 - `boat_map` runs `validate_boat_map` (adventure A1.1/A1.2). It checks explicit map
   descriptions, caller-owned collision caches, failed/zeroed preparation, two river owners and a
   synthetic map alive together, and destroy/recreate. It also matches a river query digest

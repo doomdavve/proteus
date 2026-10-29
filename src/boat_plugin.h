@@ -5,6 +5,7 @@
 // evaluates one plugin's manifest and Lua entry text and decodes its voyage into owned native
 // data. Input is immutable bytes; nothing here touches files (boat_plugin_io.h acquires them).
 // Every load uses a fresh restricted Lua state that is closed before the call returns.
+#include "boat_location.h"
 #include "boat_voyage.h"
 
 #include <stddef.h>
@@ -90,5 +91,24 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
 void boat_plugin_voyage_copy(BoatPluginVoyage *destination, const BoatPluginVoyage *source);
 // FNV-1a over every field of ROUTE, names included, with float bits least significant first.
 uint64_t boat_plugin_route_digest(const BoatVoyageRoute *route);
+
+// P1 staging: VOYAGE belongs to LOCATION, starts at its spawn, and its shelters and arrival are
+// open water of MAP (LOCATION's compiled water). DIAGNOSTIC (may be NULL) is always written.
+BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
+
+// How a staged definition may replace the active one (docs/PLUGIN_API.md, reload policies).
+typedef enum {
+    BOAT_PLUGIN_UNCHANGED, // Identical: nothing to install.
+    BOAT_PLUGIN_RENAMED, // Only display names differ: rebind them and keep all progress.
+    BOAT_PLUGIN_RESTART_VOYAGE, // Route gameplay differs and the water does not.
+    BOAT_PLUGIN_RESTART_SESSION, // The exposure or its weather range differs.
+    BOAT_PLUGIN_INCOMPATIBLE, // Another plugin, kind, location or API: relaunch to use it.
+} BoatPluginChange;
+
+const char *boat_plugin_change_name(BoatPluginChange change);
+// Shelter identity is by ordered ID: a renamed ID or a reordering restarts the voyage.
+BoatPluginChange boat_plugin_classify(
+    const BoatPluginVoyage *active, const BoatPluginVoyage *candidate);
 
 #endif

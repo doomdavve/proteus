@@ -7,7 +7,7 @@ static void reset(BoatSession *session)
     session->presentation_enabled = true;
     session->tick = 0;
     session->course = (BoatCourse) { 0 };
-    boat_voyage_start(&session->voyage, session->world.definition->voyage, 0);
+    boat_voyage_start(&session->voyage, session->voyage_route, 0);
     if (session->voyage.route)
         session->world.water.storm = boat_voyage_weather(&session->voyage);
     session->runs = (BoatReplayRuns) { 0 };
@@ -17,6 +17,7 @@ static void reset(BoatSession *session)
 void boat_session_init(BoatSession *session, const BoatWorldResources *resources, BoatWater water)
 {
     boat_world_init(&session->world, resources, water);
+    session->voyage_route = session->world.definition->voyage;
     reset(session);
     session->handling = &boat_handling_speedboat;
 }
@@ -75,6 +76,21 @@ void boat_session_recover(BoatSession *session)
     }
     boat_voyage_recover(&session->voyage, &session->boat, boat_session_time(session));
     boat_presentation_reset(&session->presentation);
+}
+
+void boat_session_rebind_voyage(BoatSession *session, const BoatVoyageRoute *route)
+{
+    session->voyage_route = route;
+    if (session->voyage.route)
+        session->voyage.route = route;
+}
+
+void boat_session_restart_voyage(BoatSession *session, const BoatVoyageRoute *route)
+{
+    session->voyage_route = route;
+    boat_voyage_restart(&session->voyage, route, boat_session_time(session));
+    if (route)
+        session->world.water.storm = boat_voyage_weather(&session->voyage);
 }
 
 bool boat_session_step(BoatSession *session, BoatInput input)

@@ -19,6 +19,9 @@ typedef struct {
     // The definition's adventure destination and shelters, observed after every step; no
     // route outside the outer location. Restarts begin it again at the start shelter.
     BoatVoyage voyage;
+    // The route that init and restarts begin: the definition's compiled voyage unless the
+    // application replaced it (Lua plugin P1). Borrowed; its owner outlives every use.
+    const BoatVoyageRoute *voyage_route;
     // Recorded on course ticks while record_runs is set. A finish only updates memory; its
     // save/export waits for boat_session_flush() outside the tick loop.
     BoatReplayRuns runs;
@@ -52,6 +55,13 @@ void boat_session_respawn(BoatSession *session);
 // Return the boat to the voyage's most recently reached shelter with a reset presentation, or
 // respawn it without a voyage. The clock, water and voyage progress continue.
 void boat_session_recover(BoatSession *session);
+// Replace the route the voyage borrows, keeping its progress, for a ROUTE whose gameplay is the
+// current one's (only names differ). Later restarts begin ROUTE.
+void boat_session_rebind_voyage(BoatSession *session, const BoatVoyageRoute *route);
+// Begin ROUTE's voyage at the start shelter now: progress, timing and recoveries reset while the
+// boat, clock, water and weather continue, so ROUTE's exposure must be the current one's. A
+// boat already inside an area is observed on the next step. Later restarts begin ROUTE.
+void boat_session_restart_voyage(BoatSession *session, const BoatVoyageRoute *route);
 // Advance the clock once, step the boat at the new tick, sweep the course gates from its
 // previous position, observe the voyage, step its presentation when enabled and record course
 // runs when enabled.

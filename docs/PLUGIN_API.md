@@ -1,9 +1,11 @@
-# Lua plugin API (P0: voyage descriptors)
+# Lua plugin API (voyage descriptors and live authoring)
 
-Status, 2026-10-28: **P0 headless loader implemented**. A package can be validated and decoded
-by `proteus_plugins`. **The game does not load plugins yet**: P1 adds the launch option,
-reload and the session seam. The [plugin plan](PLUGIN_PLAN.md) owns the staged roadmap; this
-guide owns the current contract. [All plans](README.md).
+Status, 2026-10-28: **P1 live authoring implemented** (branch `plugin-p1`) on top of the P0
+loader. A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
+when the file is saved or on F5, undo, and apply route or water changes with an explicit
+restart. Rooms, the course and replays, and the browser game keep the compiled voyage. The
+[plugin plan](PLUGIN_PLAN.md) owns the staged roadmap; this guide owns the current contract.
+[All plans](README.md).
 
 ## Runtime
 
@@ -13,8 +15,8 @@ guide owns the current contract. [All plans](README.md).
 | Why 5.4 | It is the mature release line. 5.5 (2025-12) is newer; moving to it is a deliberate later choice, not a patch update. |
 | Compiled files | VM/compiler sources plus `lauxlib`, `lbaselib`, `lstrlib`, `ltablib`, `lmathlib` only (`proteus_lua`). `loadlib`, `liolib`, `loslib`, `ldblib`, `lcorolib`, `lutf8lib`, `linit` and the `lua`/`luac` programs are **not compiled**. |
 | Configuration | Unmodified sources; the portable default `luaconf.h` (no platform `LUA_USE_*`). `cmake/proteus_lua.h` is force-included to fix the string-hash seed, so table traversal and diagnostics are identical from run to run. The project-wide `-ffp-contract=off` applies. |
-| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser game does not link it yet. |
-| License | Lua is MIT-licensed ("Copyright © 1994–2026 Lua.org, PUC-Rio"); the notice is at the end of `lua.h` and in its `doc/readme.html`. Packages do not contain Lua yet. When P1 links it into `wake_velocity`, ship that notice as `lua-LICENSE.txt` beside the existing raylib/jsmn/ENet notices (`tools/macos/package.py`, the Windows workflow, `tools/package_web.py`). |
+| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser game does not link the plugin host: it has no `--plugin` and no files to edit (browser import is P4). |
+| License | Lua is MIT-licensed ("Copyright (C) 1994-2026 Lua.org, PUC-Rio"); the notice is at the end of `lua.h`. Configure extracts it to `build/lua-LICENSE.txt` and fails if it is missing. Native packages ship it as `lua-LICENSE.txt` beside the raylib/jsmn/ENet notices (`tools/macos/package.py`, `.github/workflows/windows-boat.yml`). The web site does not contain Lua, so `tools/package_web.py` is unchanged. |
 
 ## Package
 
@@ -112,9 +114,58 @@ own levels are walked. Lua doubles are narrowed to `float` exactly as C narrows 
 reference decodes bit for bit to `boat_voyage_outer`. The decoder sets exposure velocity and
 `started` to zero, so P0 supports only a stationary patch.
 
-The validator also checks a decoded definition against the map: shelters and arrival must be
-open water (`boat_map_water`), and the first shelter must be the location's spawn. That check
-lives in the validator; P1 moves it into staging.
+Staging also checks a decoded definition against the session's location
+(`boat_plugin_check_location`): the manifest's location must be the session's, the first
+shelter must be the location's spawn, every shelter must be open water with 8 m clear and the
+arrival centre with 20 m clear (`boat_map_water` on the compiled water). These errors carry
+the field path, such as `voyage.shelters[2]`, and no line.
+
+## Playing and live authoring (P1)
+
+Native builds only. From the repository root:
+
+```sh
+./build/wake_velocity --plugin plugins/langedrag
+```
+
+`--plugin DIR` selects the manifest's location (`outer`), so `--location` may be omitted; a
+different `--location` is refused. It cannot be combined with `--connect`, `--host`, `--course`,
+`--replay` or `--ghost`. Other solo options (`--start`, `--demo`, `--screenshot`, skins,
+renderers) work as before. If the package does not load at launch, the game prints the
+diagnostic and exits. The reference package is equal to the compiled route, so play is
+unchanged until it is edited. Packaged builds ship it at `assets/plugins/langedrag` (macOS:
+`Wake Velocity.app/Contents/Resources/assets/plugins/langedrag`); copy it somewhere writable
+and pass that directory.
+
+A small panel at the bottom left shows the active revision and the latest outcome; each
+outcome is also printed to stderr as `Plugin DIR: ...`.
+
+| Input | Effect |
+| --- | --- |
+| Save the files | Polled every 0.25 s. Once the package's bytes have stayed unchanged for 0.3 s they are staged once, so an editor's several writes (or a manifest and entry saved one after the other) become one candidate. The browser does not poll. |
+| F5 | Read and stage the package now |
+| F6 | Discard a held candidate; otherwise hold the previous revision (Undo) |
+| F7 | Apply a held candidate with its restart |
+
+Staging never changes the running voyage. A candidate is compared with the active revision
+(`boat_plugin_classify`):
+
+| Change | Policy |
+| --- | --- |
+| Identical values (comments and layout ignored) | Nothing happens; the panel shows UNCHANGED |
+| Display names only: shelter `name`, manifest `name`; ordered shelter IDs and every number identical | Applied at once. The boat, clock, water, wakes and all voyage progress are kept; the HUD shows the new names |
+| Shelter IDs, order, count, position, heading or radius; arrival; `exposed_fraction` | Held until F7, then **restart voyage**: progress, timing and recoveries begin again at the start shelter; the boat, clock, water and any weather already met continue. A boat already inside a shelter or the arrival area is observed by the ordinary rules on the next tick |
+| `exposure` or `weather_range` | Held until F7, then **restart session**: the same full restart as Backspace without a voyage (tick zero, the boat at the spawn, calm water until the weather begins) with the new revision |
+| Manifest `id`, `kind`, `location`, `api` or `state_version` | Not applied; relaunch to use another plugin |
+
+A failed stage (I/O, manifest, syntax, runtime, memory, budget, schema or map check) keeps the
+active revision and drops any held candidate; the panel shows the file, line when Lua gave
+one, field path and message. Revisions are numbered R1 (launch), R2, ... in the order they are
+staged; a held candidate staged again unchanged keeps its number. Undo keeps the eight
+previous revisions. It reinstalls a revision through the same rules and does not rewind the
+boat or the clock; a rename is undone at once, a route or water change is held for F7. A new
+revision after an Undo discards the undone ones (no Redo). Progress is never inferred from an
+old shelter index: every restart begins at shelter 0.
 
 ## Native interface
 
@@ -142,6 +193,35 @@ if (boat_plugin_read("plugins/langedrag", NULL, files, &d) == BOAT_PLUGIN_OK) {
 - `boat_plugin_route_digest` is FNV-1a over every route field with field names, float bits
   least significant byte first, and shelter names. The reference digest is `e8509272172cb7c4`,
   the same for the compiled route and on Wasm.
+
+### Session seam and host (P1)
+
+`BoatSession.voyage_route` is the route that init and restarts begin: the definition's compiled
+`boat_voyage_outer` unless the application replaces it. The global location record is never
+modified. `boat_session_rebind_voyage` swaps the borrowed route and keeps progress (renames);
+`boat_session_restart_voyage` begins a route at the current time and keeps the weather
+(`boat_voyage_restart`); a session restart begins whatever `voyage_route` names.
+
+`src/boat_plugin_host.h` owns one plugin's revisions and does no I/O and reads no clock:
+
+```c
+BoatPluginHost host; // Static or long-lived: the session borrows its active route.
+boat_plugin_host_start(&host, location, &resources->map, &bundle); // Revision 1, or false.
+boat_session_restart_voyage(&session, &boat_plugin_host_active(&host)->voyage.route);
+// Later, between ticks:
+if (boat_plugin_host_stage(&host, &candidate) && boat_plugin_host_held(&host)) {
+    // host.change says the policy; commit when it allows (renames) or the player asks.
+    const BoatPluginRevision *r = boat_plugin_host_commit(&host);
+    boat_session_rebind_voyage(&session, &r->voyage.route); // Or restart, per host.change.
+}
+```
+
+Revisions live in fixed slots and never move. A commit installs the held slot and the caller
+rebinds every borrower at once; a slot is reused only by a later stage, after the session has
+been rebound away from it. A commit is refused if the revision it was staged against is no
+longer active. `BoatPluginWatch` is the save poller's state machine; the application passes
+the time (`GetTime()` in the game, a virtual clock in tests) and keys each read with
+`boat_plugin_read_key`. The game's glue is `tools/wake_velocity_plugin.[ch]`.
 
 ### Limits
 
@@ -177,7 +257,9 @@ Validation stops at the first failure, and the order is deterministic.
 ```sh
 ./build/validate_boat_plugin                       # every case, from the repository root
 ./build/validate_boat_plugin --case reference_matches_compiled
+./build/validate_boat_plugin_session                # P1 staging, policies, Undo, polling, parity
 ctest --test-dir build -R boat_plugin --output-on-failure
+./build/wake_velocity --renderer cpu --plugin plugins/langedrag --time 3 --screenshot build/p.png
 ```
 
 Web preflight, using emsdk at `../emsdk` (README web section):

@@ -1,0 +1,3 @@
+# Plugin packages keep LF on every checkout, so their bytes, digests and diagnostic lines are the
+# same on Windows (validate_boat_plugin_session edits main.lua across lines).
+plugins/** text eol=lf
