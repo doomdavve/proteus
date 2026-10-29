@@ -931,10 +931,17 @@ Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
   the extended validator; execution
   on Windows/Linux and the complete GPU CTest lane remain unverified locally.
 
+User check, 2026-10-29: the user drove to Långedrag with P3.2 and reported
+“Works well! I went to langedrag and it worked fine!” This confirms a successful human
+voyage through arrival. The report does not specify intermediate shelter visits or the final
+objective row, so complete/missed tour outcomes, recovery and live reload/Undo remain covered
+by automated/scripted checks rather than separately confirmed human use.
+
 **Next: P3.3** — timers and pending-timer reload policy, schema-aware live migration, resource
 composition/retirement, state/command inspection and deterministic scenario seek with a complete
 native preview checkpoint. Continuous background reload/callback cost is not qualified as a
-deadline. Browser/rooms and human acceptance remain open.
+deadline. Browser/rooms and targeted human edge-case checks remain open; the trip through
+arrival has been user-playtested.
 
 ### P4 — practical authoring on native and browser
 
