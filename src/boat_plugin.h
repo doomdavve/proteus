@@ -68,6 +68,7 @@ typedef struct {
 typedef struct {
     char id[64], name[64], kind[16], entry[16], location[16];
     unsigned api, state_version;
+    bool objective; // Explicit objective.hud capability (voyages only).
 } BoatPluginManifest;
 
 // Owns its strings: ROUTE's shelter names point into SHELTER_NAMES, so copy it only with

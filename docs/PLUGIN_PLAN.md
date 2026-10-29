@@ -3,18 +3,18 @@
 Status, 2026-10-29: **P0, P1 and P2 implemented.** Native solo `outer` sessions load and
 live-edit the Långedrag voyage; the local river trial now loads race descriptors through the
 same restricted evaluator and revision host. The compiled race remains the network default.
-P3.1 now provides an experimental headless objective transition harness; it is not yet a
-package capability or live gameplay behavior. There is no in-game agent. The agreed direction
+P3.1 provides atomic objective transactions and P3.2 connects lossless native voyage events
+to an opt-in shelter-tour objective with a native HUD row. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P3.1, isolated objective transactions**, see the
-[P3.1 result](#p31-result-2026-10-29). P2 river authoring remains recorded in its
+Completed task: **P3.2, lossless voyage events and live optional objective/HUD**, see the
+[P3.2 result](#p32-result-2026-10-29). P2 river authoring remains recorded in its
 [P2 result](#p2-result-2026-10-29).
 Earlier results remain recorded under [P0](#p0-result-2026-10-28) and
 [P1](#p1-result-2026-10-28), including the user's native voyage play and live rename.
-**Next task: P3.2, lossless native voyage events and a live optional objective/HUD adapter.**
+**Next task: P3.3, timers/reload semantics, migration, resource retirement and inspection/seek.**
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -338,10 +338,10 @@ collision/race processing; any future low-latency capability must specify its ow
 Timers use due ticks, never wall time. A paused solo session does not advance them; room
 time follows its authority. Order events by tick, native event sequence and stable entity
 identity/life; order simultaneous plugin work by a recorded host order. Bound every queue
-and define overflow as a visible failure. `BoatVoyage` currently exposes only its most recent
-event, so a lossless voyage event adapter needs a small native output-list extension; it
-cannot assume that field retains every transition within one tick. Existing race/match
-output lists are useful models.
+and define overflow as a visible failure. P3.2 adds a bounded `BoatVoyageEvents` output list
+alongside the latest-event presentation field. The adapter consumes the complete output of
+each native observation/recovery; the presentation field does not retain every transition
+within one tick. Existing race/match output lists are useful models.
 
 Supply a host-specified deterministic RNG stream per plugin, with seed/counter in the
 transaction/checkpoint. Failed transitions must not consume its committed sequence. Disable
@@ -821,7 +821,8 @@ continuous background reload. This milestone owns the first real behavior script
 P3 is split into reviewable steps. **P3.1 implements the isolated transaction foundation** in
 [`boat_plugin_state.[ch]`](../src/boat_plugin_state.h), exercised by
 [`validate_boat_plugin_state`](../tools/validate_boat_plugin_state.c). P3 as a whole remains
-in progress; no new manifest capability or gameplay callback is enabled.
+in progress. At this historical step no manifest capability or gameplay callback was enabled;
+P3.2 below adds that integration.
 
 - Every transition evaluates immutable source and runs one callback in a fresh restricted Lua
   instance, using the existing allocator, libraries, diagnostics and instruction hook. Setup,
@@ -865,7 +866,7 @@ Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
   No visual, input, audio, asset-loading or live session path changed, so no new frame or
   windowed playback review was performed. GPU, browser and human acceptance are not claimed.
 
-**Next: P3.2** adds a lossless `BoatVoyage` output list and native integration for an optional
+**Next recorded at P3.1 (completed below): P3.2** adds a lossless `BoatVoyage` output list and native integration for an optional
 “visit two shelters” objective, with its HUD row and source/state revision ownership. Preserve
 independent native voyage completion, use exact boundary T/T+1 staging, and test the adapter
 with a virtual clock before enabling callbacks or reload in play. Then **P3.3** completes
@@ -873,8 +874,67 @@ pending-timer/reload semantics, schema-aware revision migration and removed-reso
 state/trace inspection and deterministic scenario seek with a complete native preview checkpoint.
 The current isolated state copy does not rewind a moving world. Timer commands, live resource
 composition/second-owner rejection, retained revision/total host memory accounting, background
-reload qualification and visual/manual review remain unimplemented. Callers supply the accepted
-source and pending events; this harness is not a source revision manager or a distribution API.
+reload qualification and visual/manual review remained unimplemented at P3.1. P3.2 below
+supersedes the live-adapter/source-ownership/visual-review limits. The isolated harness itself
+is not a source revision manager or a distribution API.
+
+#### P3.2 result, 2026-10-29
+
+**Implemented:** lossless voyage event output and a live optional shelter-tour objective.
+The [API](PLUGIN_API.md#live-optional-voyage-objective-p32) owns the current package contract.
+Run `./build/wake_velocity --plugin plugins/shelter-tour` from the repository root.
+
+- `boat_voyage_step_events` emits every shelter/weather/exposure/arrival transition in native
+  order, while retaining the old latest-event field. `BoatSession` exposes each step/recovery
+  output. The core remains free of Lua, drawing, file access and callback pointers.
+- Explicit `objective.hud` grants `init`/`update` alongside the voyage in the same bounded
+  source. Fresh-instance transactions use P3.1's canonical state/RNG/HUD command staging.
+  The example counts unique BRIDGE/EAST SHORE visits before arrival; dock, repeated visits
+  and recovery do not add progress. Native arrival succeeds with a completed or missed tour.
+- The adapter copies all native notices into a bounded queue with exact integer ticks,
+  per-run sequences and authored shelter IDs. It dispatches after T at 10 Hz and commits the
+  entire successful checkpoint immediately before physics T+1. A recovery after dispatch at T
+  remains queued through that commit for the next callback; only acknowledged notices retire.
+  Errors/overflow suspend visibly, preserving committed data and unacknowledged events;
+  native boating, weather and completion continue.
+- Revision slots own accepted source bytes for active/held/Undo revisions. Manifest-only
+  renames preserve state and pending output. Any behavior source byte change or capability
+  change is held for an explicit native voyage/objective restart; exposure edits restart
+  the session. Undo restores source with fresh state under the same policy. No old objective
+  checkpoint is restored beside an advancing native world. Reset clears rows and quarantine.
+- The native plugin panel renders up to eight bounded rows. Standard native packages keep the
+  descriptor-only Långedrag example; the new opt-in tour lives in the source tree.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
+
+- Project rebuild is warning-clean. Full CTest preset: **293/293 enabled tests passed**;
+  13 retired wake-field tests remain disabled. Socket-dependent tests ran with local socket
+  access. The expanded capability/init-rejection assertions also passed in Debug and ASan/UBSan.
+- All **22** objective/session cases passed under ASan/UBSan, with no reports. Lua live-byte
+  accounting remains zero; macOS ASan has no leak detector. The tests cover simultaneous
+  notices, T/T+1 staging, recovery after dispatch, overflow with pending output, source-only
+  reload/Undo, metadata renames preserving pending output, failed candidates and quarantine.
+- The new 1,200-tick repeated live-adapter fixture matches native boat/voyage/weather with
+  callbacks disabled at every tick, and repeats objective hash `ae172bad2f670749`. The sample's
+  200 dispatches take about **24 ms CPU total**; two launches including descriptor decoding
+  and init probes take about **1.5 ms CPU total** (reported measurements, no timing assertion).
+  Final callback Lua peak is **21,671 bytes**. This fixture does not establish worst-case
+  compilation/staging latency or a reload deadline. The fixed host is **667,328 bytes** and
+  complete adapter **776,992 bytes** on this platform, including ten bounded revision slots.
+- Inspected 960×600 GPU window captures show `TOUR COMPLETE: 2`, `TOUR MISSED: 0` and
+  `OBJECTIVE SUSPENDED`, alongside independent native arrival and unobscured instruments.
+  Three scripted 120-frame runs used temporary boat placement/error/capture instrumentation;
+  it was removed. An uninstrumented 120-frame GPU demo and display-free CPU tour capture
+  also completed. Artifacts are local under `build/p32-*`; no human input/playtest is claimed.
+- Changed local documentation links and command examples were checked; a stale deathmatch
+  milestone link in the affected testing guide was corrected. Windows CI already selects
+  the extended validator; execution
+  on Windows/Linux and the complete GPU CTest lane remain unverified locally.
+
+**Next: P3.3** — timers and pending-timer reload policy, schema-aware live migration, resource
+composition/retirement, state/command inspection and deterministic scenario seek with a complete
+native preview checkpoint. Continuous background reload/callback cost is not qualified as a
+deadline. Browser/rooms and human acceptance remain open.
 
 ### P4 — practical authoring on native and browser
 
@@ -971,7 +1031,7 @@ generation are not prerequisites for that loop.
 | P0/P1 | Initial budgets and staging responsiveness: measure the descriptor case, permit a visible authoring pause first, then decide whether background compilation is justified. Do not call an instruction limit a compiler deadline. |
 | P1 | Reload UX and distribution: choose a key/menu action and opt-in launch selection, preserve-only default with explicit restart policy for incompatible edits; retain compiled defaults until parity and authoring review. |
 | P2/P3 | Supported rule extension depth: keep voyage/race/match engines in C and add orchestration first. Move no mature rule engine merely to make a larger Lua example. |
-| P3 | P3.1 resolves initial state numbers to signed 64-bit integers and measures disposable instances at 10 Hz; live adapter, timers and total host budgets remain at P3.2/P3.3. |
+| P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. Timers, live migration, inspection/seek and background reload qualification remain P3.3. |
 | P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
 | P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |

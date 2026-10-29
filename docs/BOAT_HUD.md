@@ -394,3 +394,13 @@ Windows, Linux, browser compilation, manual keyboard play, interactive replay an
 multiplayer HUD checks remain unverified. Pre-existing course/replay overlays can occupy
 substantial screen space at the minimum window size; they are not redesigned here.
 Artifacts are in ignored `build/` and `/private/tmp/proteus-hud-*.log`.
+
+## Optional voyage objective, 2026-10-29
+
+Native solo `--plugin plugins/shelter-tour` adds a bounded objective row to the plugin panel
+above the instruments: `SHELTERS / 2`, then `TOUR COMPLETE` or `TOUR MISSED` at arrival.
+Only unique BRIDGE/EAST SHORE visits before arrival count. Native voyage completion remains
+independent. A callback or event-queue failure replaces the row with `OBJECTIVE SUSPENDED`
+and a diagnostic; native boating continues. The [plugin API](PLUGIN_API.md#live-optional-voyage-objective-p32)
+owns event timing and restart policy; [P3.2 evidence](PLUGIN_PLAN.md#p32-result-2026-10-29)
+distinguishes automated review from human playtesting.

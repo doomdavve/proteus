@@ -353,7 +353,7 @@ static int manifests(void)
         { "{\"id\": \"a\", \"name\": \"N\", \"api\": 1, \"kind\": \"voyage\", \"entry\": "
           "\"main.lua\", \"location\": \"outer\", \"capabilities\": [\"voyage.define\", "
           "\"voyage.define\"], \"state_version\": 1}",
-            "capabilities" },
+            "capabilities[2]" },
         { "{\"id\": \"a\", \"name\": \"N\", \"api\": 1, \"kind\": \"voyage\", \"entry\": "
           "\"main.lua\", \"location\": \"outer\", \"capabilities\": [\"voyage.define\"], "
           "\"state_version\": 2}",

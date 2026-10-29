@@ -19,6 +19,7 @@ typedef struct {
     // The definition's adventure destination and shelters, observed after every step; no
     // route outside the outer location. Restarts begin it again at the start shelter.
     BoatVoyage voyage;
+    BoatVoyageEvents voyage_events; // Output of the latest step or recovery.
     // The route that init and restarts begin: the definition's compiled voyage unless the
     // application replaced it (Lua plugin P1). Borrowed; its owner outlives every use.
     const BoatVoyageRoute *voyage_route;

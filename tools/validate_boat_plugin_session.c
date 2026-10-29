@@ -699,7 +699,229 @@ static int game_controls(void)
     return 0;
 }
 
+// Drive native observation at exact virtual ticks; physics placement is independent of this
+// adapter test. The production loop uses the identical before/after calls around each tick.
+static void observe_objective(WakePlugin *p, BoatSession *s, unsigned tick, Vector2 position)
+{
+    wake_plugin_before_tick(p);
+    boat_session_set_tick(s, tick);
+    boat_voyage_step_events(
+        &s->voyage, position, (Vector2) { 0 }, boat_session_time(s), &s->voyage_events);
+    wake_plugin_after_tick(p, s);
+}
+
+static int lossless_events(void)
+{
+    BoatVoyageRoute route = boat_voyage_outer;
+    route.shelters[1].position = route.shelters[2].position = route.arrival_centre;
+    route.exposure.centre = route.arrival_centre;
+    route.weather_range = 1;
+    BoatVoyage v;
+    boat_voyage_start(&v, &route, 0);
+    v.observed = true;
+    BoatVoyageEvents events;
+    boat_voyage_step_events(&v, route.arrival_centre, (Vector2) { 0 }, 1, &events);
+    CHECK(events.count == 5);
+    CHECK(events.items[0].kind == BOAT_VOYAGE_SHELTER && events.items[0].shelter == 1);
+    CHECK(events.items[1].kind == BOAT_VOYAGE_SHELTER && events.items[1].shelter == 2);
+    CHECK(events.items[2].kind == BOAT_VOYAGE_WEATHER);
+    CHECK(events.items[3].kind == BOAT_VOYAGE_EXPOSED);
+    CHECK(events.items[4].kind == BOAT_VOYAGE_ARRIVED && v.arrived);
+    CHECK(v.event == BOAT_VOYAGE_ARRIVED); // Retain the old latest-event presentation.
+    boat_voyage_step_events(&v, (Vector2) { -1000, -1000 }, (Vector2) { 0 }, 2, &events);
+    CHECK(events.count == 1 && events.items[0].kind == BOAT_VOYAGE_SHELTERED);
+    boat_voyage_step_events(&v, (Vector2) { -1000, -1000 }, (Vector2) { 0 }, 3, &events);
+    CHECK(!events.count);
+    return 0;
+}
+
+static int live_objective(void)
+{
+    static WakePlugin p;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
+    CHECK(p.objective.initialized && p.objective.hud[0].value == 0);
+    const BoatVoyageRoute *r = s.voyage.route;
+    observe_objective(&p, &s, 1, r->shelters[1].position);
+    observe_objective(&p, &s, 2, r->shelters[2].position);
+    observe_objective(&p, &s, 12, r->arrival_centre);
+    CHECK(s.voyage.arrived && p.objective_pending);
+    CHECK(p.objective.hud[0].value == 0 && p.objective.acknowledged == 0);
+    CHECK(p.staged_objective.hud[0].value == 2);
+    // A metadata-only rename at T keeps pending state/source ownership until T+1.
+    static BoatPluginFiles renamed;
+    renamed = p.files;
+    char *label = strstr(renamed.manifest, "Shelter tour");
+    CHECK(label);
+    label[0] = 'T';
+    BoatPluginBundle rename_bundle = boat_plugin_bundle(&renamed);
+    CHECK(boat_plugin_host_stage(&p.host, &rename_bundle));
+    CHECK(p.host.change == BOAT_PLUGIN_RENAMED);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 1));
+    CHECK(p.objective_pending && p.generation == 1);
+    // Recovery at T after dispatch must not publish before T+1 or retire its newer notice.
+    boat_session_recover(&s);
+    wake_plugin_after_tick(&p, &s);
+    CHECK(p.objective_pending && p.objective.hud[0].value == 0);
+    wake_plugin_before_tick(&p);
+    CHECK(!p.objective_pending && p.event_count == 1);
+    CHECK(p.objective.acknowledged == p.sequence - 1);
+    CHECK(!strcmp(p.objective.hud[0].label, "TOUR COMPLETE"));
+    CHECK(!strcmp(p.events[0].kind, "voyage.recovered") && p.events[0].tick == 12);
+    observe_objective(&p, &s, 24, r->arrival_centre);
+    wake_plugin_before_tick(&p);
+    CHECK(p.objective.acknowledged == p.sequence);
+    // A new native voyage resets objective state; arriving directly remains successful natively.
+    boat_session_restart_voyage(&s, r);
+    wake_plugin_reset_objective(&p, &s);
+    observe_objective(&p, &s, 36, r->arrival_centre);
+    wake_plugin_before_tick(&p);
+    CHECK(s.voyage.arrived && !strcmp(p.objective.hud[0].label, "TOUR MISSED"));
+    // Repeated shelter entries after arrival cannot retroactively complete the tour.
+    observe_objective(&p, &s, 37, r->shelters[1].position);
+    observe_objective(&p, &s, 48, r->shelters[2].position);
+    wake_plugin_before_tick(&p);
+    CHECK(p.objective.hud[0].value == 0);
+    boat_session_destroy(&s);
+    return 0;
+}
+
+static int objective_revision_failure(void)
+{
+    static WakePlugin p;
+    static BoatPluginFiles candidate;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
+    uint64_t initial = boat_plugin_objective_digest(&p.objective);
+    BoatPluginBundle denied = original();
+    denied.source = p.files.source;
+    denied.source_size = p.files.source_size;
+    CHECK(!boat_plugin_host_stage(&p.host, &denied)); // Callbacks without grant.
+    CHECK(p.host.diagnostic.status == BOAT_PLUGIN_SCHEMA);
+    denied = boat_plugin_bundle(&p.files);
+    denied.source = reference()->source;
+    denied.source_size = reference()->source_size;
+    CHECK(!boat_plugin_host_stage(&p.host, &denied)); // Grant without callbacks.
+    CHECK(p.host.diagnostic.status == BOAT_PLUGIN_SCHEMA);
+    candidate = p.files;
+    int failed_size = snprintf(candidate.source, sizeof(candidate.source),
+        "local p=(function() %.*s\nend)(); "
+        "p.init=function() error('candidate init failure') end; return p",
+        (int)p.files.source_size, p.files.source);
+    CHECK(failed_size > 0 && (size_t)failed_size < sizeof(candidate.source));
+    candidate.source_size = (size_t)failed_size;
+    BoatPluginBundle failed = boat_plugin_bundle(&candidate);
+    CHECK(!boat_plugin_host_stage(&p.host, &failed));
+    CHECK(p.host.diagnostic.status == BOAT_PLUGIN_RUNTIME);
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.generation == 1);
+    CHECK(boat_plugin_objective_digest(&p.objective) == initial);
+    candidate = p.files;
+    // Only update fails; staging exercises init without changing active source/state.
+    const char suffix[] = "\n-- new immutable behavior revision\n";
+    memcpy(candidate.source + candidate.source_size, suffix, sizeof(suffix) - 1);
+    candidate.source_size += sizeof(suffix) - 1;
+    BoatPluginBundle bundle = boat_plugin_bundle(&candidate);
+    CHECK(boat_plugin_host_stage(&p.host, &bundle));
+    CHECK(p.host.change == BOAT_PLUGIN_RESTART_VOYAGE);
+    const BoatPluginRevision *held = boat_plugin_host_held(&p.host);
+    CHECK(held && held->source_size == candidate.source_size);
+    memset(candidate.source, '!', candidate.source_size);
+    CHECK(held->source[0] == '-'); // Not borrowed from the read/staging scratch buffer.
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 1));
+    CHECK(p.generation == 2 && p.objective.hud[0].value == 0);
+    CHECK(boat_plugin_host_active(&p.host)->number == 2);
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 2));
+    CHECK(boat_plugin_host_held(&p.host));
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 3));
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && p.generation == 3);
+    // Inject a runtime failure into an accepted revision to exercise adapter quarantine.
+    BoatPluginRevision *active = &p.host.slots[p.host.history[p.host.depth - 1]];
+    const char bad[] = "return {init=function() return {},{} end, "
+                       "update=function(c,s) c.random(); error('adapter failure') end}";
+    memcpy(active->source, bad, sizeof(bad) - 1);
+    active->source_size = sizeof(bad) - 1;
+    uint64_t before = boat_plugin_objective_digest(&p.objective);
+    observe_objective(&p, &s, 12, s.voyage.route->arrival_centre);
+    CHECK(s.voyage.arrived && p.objective.quarantined && !p.objective_pending);
+    CHECK(boat_plugin_objective_digest(&p.objective) == before);
+    CHECK(p.event_count && p.objective.acknowledged == 0);
+    CHECK(strstr(p.objective_diagnostic.message, "adapter failure"));
+    boat_session_destroy(&s);
+    return 0;
+}
+
+static int objective_overflow(void)
+{
+    static WakePlugin p;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &s, 0));
+    observe_objective(&p, &s, 12, s.voyage.route->shelters[0].position);
+    CHECK(p.objective_pending);
+    for (unsigned i = 0; i <= BOAT_PLUGIN_EVENTS; ++i) {
+        boat_session_recover(&s);
+        wake_plugin_after_tick(&p, &s);
+    }
+    CHECK(p.objective.quarantined && p.event_count == BOAT_PLUGIN_EVENTS);
+    CHECK(p.objective.acknowledged == 0 && !p.objective_pending);
+    CHECK(strstr(p.objective_diagnostic.message, "overflow"));
+    observe_objective(&p, &s, 24, s.voyage.route->arrival_centre);
+    CHECK(s.voyage.arrived);
+    boat_session_destroy(&s);
+    return 0;
+}
+
+static int objective_tick_parity(void)
+{
+    static WakePlugin p, replay;
+    BoatSession a, b, repeated;
+    boat_session_init(&a, outer(), calm());
+    boat_session_init(&b, outer(), calm());
+    boat_session_init(&repeated, outer(), calm());
+    clock_t launch_started = clock();
+    CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &a, 0));
+    CHECK(wake_plugin_open(&replay, "plugins/shelter-tour", &repeated, 0));
+    clock_t launch_cost = clock() - launch_started, callback_cost = 0;
+    for (unsigned tick = 1; tick <= 1200; ++tick) {
+        BoatInput input = { .throttle_rate = tick < 120 ? 1 : 0 };
+        wake_plugin_before_tick(&p);
+        wake_plugin_before_tick(&replay);
+        CHECK(boat_session_step(&a, input));
+        CHECK(boat_session_step(&b, input));
+        CHECK(boat_session_step(&repeated, input));
+        clock_t callback_started = tick % 12 == 0 ? clock() : 0;
+        wake_plugin_after_tick(&p, &a);
+        wake_plugin_after_tick(&replay, &repeated);
+        if (tick % 12 == 0)
+            callback_cost += clock() - callback_started;
+        CHECK(same_boat(&a.boat, &b.boat));
+        CHECK(same_progress(a.voyage, b.voyage));
+        CHECK(same_storm(a.world.water.storm, b.world.water.storm));
+        CHECK(boat_plugin_objective_digest(&p.objective)
+            == boat_plugin_objective_digest(&replay.objective));
+        CHECK(p.objective_pending == replay.objective_pending);
+    }
+    printf("live_hash=%016llx lua_peak=%zu instructions=%llu host_bytes=%zu adapter_bytes=%zu\n",
+        (unsigned long long)boat_plugin_objective_digest(&p.objective),
+        p.objective_diagnostic.cost.peak_bytes,
+        (unsigned long long)p.objective_diagnostic.cost.instructions, sizeof(BoatPluginHost),
+        sizeof(WakePlugin));
+    printf("launch_pair_cpu_ms=%.3f callbacks_200_cpu_ms=%.3f\n",
+        1000.0 * launch_cost / CLOCKS_PER_SEC, 1000.0 * callback_cost / CLOCKS_PER_SEC);
+    boat_session_destroy(&a);
+    boat_session_destroy(&b);
+    boat_session_destroy(&repeated);
+    return 0;
+}
+
 static const TestCase cases[] = {
+    SLOW_CASE(objective_tick_parity),
+    TEST_CASE(lossless_events),
+    TEST_CASE(live_objective),
+    TEST_CASE(objective_revision_failure),
+    TEST_CASE(objective_overflow),
     TEST_CASE(classification),
     TEST_CASE(location_checks),
     TEST_CASE(rename_keeps_progress),
