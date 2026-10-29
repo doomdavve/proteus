@@ -538,8 +538,10 @@ static BoatPluginStatus step(BoatPluginObjective *objective, const char *source,
         t.next.hud_count = 0;
         memset(t.next.hud, 0, sizeof(t.next.hud));
     }
-    BoatPluginStatus status
-        = boat_plugin_lua_transition(source, size, limits, transition, &t, diagnostic);
+    BoatPluginStatus status = boat_plugin_lua_transition(source, size, limits,
+        action == BOAT_PLUGIN_OBJECTIVE_MIGRATE ? BOAT_PLUGIN_MIGRATION_INSTRUCTIONS
+                                                : BOAT_PLUGIN_CALLBACK_INSTRUCTIONS,
+        transition, &t, diagnostic);
     if (t.schema)
         status = diagnostic->status = BOAT_PLUGIN_SCHEMA;
     if (status == BOAT_PLUGIN_OK)

@@ -1,26 +1,24 @@
 # Lua gameplay plugins and live authoring
 
-Status, 2026-10-29: **P0, P1 and P2 implemented.** Native solo `outer` sessions load and
+Status, 2026-10-29: **P0–P3 implemented for trusted native solo authoring.** Native solo `outer` sessions load and
 live-edit the Långedrag voyage; the local river trial now loads race descriptors through the
 same restricted evaluator and revision host. The compiled race remains the network default.
 P3.1 provides atomic objective transactions and P3.2 connects lossless native voyage events
 to an opt-in shelter-tour objective with a native HUD row. P3.3a adds deterministic tick timers
 and their checkpoint/reload contract. P3.3b adds schema-aware native migration, explicit
 resource retirement/composition and a complete compatible solo checkpoint/inspection harness.
-There is no in-game agent. The agreed direction
+P3.4 accounts retained/native storage, separates instruction budgets and measures synchronous
+staging. Background/imported-code isolation remains a P4 gate. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P3.3b, live migration, resource retirement/composition and inspection/seek**,
-see the [P3.3b result](#p33b-result-2026-10-29). Timers are recorded in the
-[P3.3a result](#p33a-result-2026-10-29). P3.2 integration is recorded in the
-[P3.2 result](#p32-result-2026-10-29). P2 river authoring remains recorded in its
-[P2 result](#p2-result-2026-10-29).
-Earlier results remain recorded under [P0](#p0-result-2026-10-28) and
-[P1](#p1-result-2026-10-28), including the user's native voyage play and live rename.
-**Next task: P3 qualification — retained revision/total host memory accounting, separate
-callback/migration budgets and measured staging/background reload deadlines.**
+Completed task: **P3.4, native runtime qualification**, see the
+[P3.4 result](#p34-result-2026-10-29). Prior results retain their implementation,
+automated/manual verification and user-acceptance evidence below.
+**Next task: P4 — practical authoring tools and isolated imported/background staging**, then
+browser import/reload/export through the same host operations. Human P3 migration/Undo/recovery
+acceptance and broader platform timing remain separate qualification work.
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1014,7 +1012,8 @@ P3.2 voyage-through-arrival acceptance does not establish human acceptance of ti
 **Implemented:** schema-aware migration in the production solo adapter, explicit HUD/timer
 retirement and deterministic ownership/composition, plus native state/command inspection and
 checkpoint/seek review. The [P3.3b API](PLUGIN_API.md#live-migration-and-review-p33b) owns the
-exact compatibility and resource contracts. P3 remains open for runtime qualification.
+exact compatibility and resource contracts. Runtime qualification at this step remained open;
+P3.4 below records the native result.
 
 - Objective schemas are authored integers 1..65535. A candidate `migrate(context,state)`
   explicitly accepts the prior/target schema, including equal-version behavior edits. With
@@ -1080,12 +1079,88 @@ with `-ftrivial-auto-var-init=pattern` passed all 20 session cases under the sam
 remained in libcurl dependency setup at handoff; its MSVC result is pending. No new
 audiovisual review was performed for this test-only fix.
 
-**Next: P3 runtime qualification** — retained revision/total host memory accounting, separate
+**Next recorded at P3.3b (implemented below): P3 runtime qualification** — retained revision/total host memory accounting, separate
 callback/migration budgets and measured staging/background reload deadlines. Review checkpoint
 support deliberately excludes recordings/course playback, other physical boats, combat/radial
 and legacy wake fields; immutable resources/directory/handling must outlive checkpoints.
 Application camera/window/audio state and external effects are outside the display-free
 harness. Broader preview timelines and interactive inspection belong to later authoring work.
+
+#### P3.4 result, 2026-10-29
+
+**Implemented:** native retained-revision/owner storage accounting, separate entry/callback/
+migration instruction allowances, preserved staging cost diagnostics and a repeatable explicit
+benchmark. This completes P3's trusted native implementation and local runtime qualification;
+it does not establish hostile-input isolation, uninterrupted reload or human acceptance of
+migration/recovery. The [API](PLUGIN_API.md#native-runtime-qualification-p34) owns exact budgets,
+accounting exclusions, benchmark commands and synchronous staging policy.
+
+- Entry evaluation retains 1 M instructions; init/reset/update receives a fresh 100,000 and
+  migration 500,000, each reducible by the native caller. A single 2 MiB allocator covers both
+  phases. Tests distinguish expensive entry from callback failure, allow that callback under
+  migration's larger budget and verify failed entry/migration rollback without quarantine.
+- The host reports reachable source bytes and counts across history, a held candidate and
+  Undo without double counting. A 32-reload full-source test fills/evicts history and checks
+  staged, committed, Undo and failed-stage accounting. Ten 64 KiB slots are preallocated;
+  logical retirement does not free their physical reservation. Native inspection includes
+  all adapter-owned buffers, objective/pending state, events and trace. A static assertion
+  caps the persistent native owner at 1 MiB; its single Lua heap adds 2 MiB. Compiler/state
+  scratch stack, allocator metadata, borrowed world/view and extra preview copies are separate.
+- Location validation previously cleared successful Lua cost diagnostics. Staging now keeps
+  descriptor cost and aggregates the init probe, taking the maximum sequential heap peak.
+  The benchmark includes compile-heavy full-size sources and failure paths, outside CTest.
+
+Measured on Apple Silicon/macOS, Debug, 100 samples per case, GPU CTests off. Times are
+elapsed UTC milliseconds; p95/maximum are sample observations, not worst-case deadlines:
+
+| Case | p95 ms | Maximum ms |
+| --- | ---: | ---: |
+| Reference stage, descriptor plus init probe | 0.438 | 0.505 |
+| Read and stage reference | 0.250 | 0.382 |
+| Padded 64 KiB stage | 0.606 | 0.666 |
+| Dense 64 KiB table stage | 7.211 | 7.373 |
+| Nested-token compiler rejection | 0.044 | 0.047 |
+| Reference update | 0.128 | 0.175 |
+| 100,000-instruction callback exhaustion | 0.820 | 0.850 |
+| 500,000-instruction migration exhaustion | 3.727 | 3.789 |
+| 1 M-instruction entry exhaustion | 7.758 | 7.923 |
+| Heap rejection | 0.050 | 0.107 |
+| Successful expensive entry plus callback | 6.028 | 6.095 |
+
+The host reserves **667,344 bytes**; the entire native adapter reserves **824,968 bytes**.
+Including its allowed Lua heap gives **2,922,120 bytes** of owned storage, excluding native
+stack/allocator overhead/world/view. Each native preview checkpoint adds **859,464 bytes**.
+Dense staging peaks at **694,584 Lua bytes**, reference update at **21,757 bytes**; every
+reported execution closes with zero live Lua bytes. Committed full-source history uses
+589,824 payload bytes, within rather than additional to the fixed native reservation.
+
+**Decision:** retain synchronous authoring pauses for trusted local edits. The experiment
+meets local review thresholds of 100 ms per stage and 8.33 ms per reference update. These
+are measured review thresholds, not enforced wall-clock deadlines, real-time guarantees or
+exhaustive hostile-code bounds. Save polling also pauses synchronously; simulation delta is
+discarded. No background worker was added. P4 must establish isolation/cancellation before
+arbitrary imports or uninterrupted background authoring; parser/C-library work is outside
+the instruction hook. This explicitly resolves the earlier P3 staging/background question
+for the current local-only scope rather than claiming a worker deadline was tested.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug:
+
+- Project build and full `ctest --preset full` pass **304/304 enabled tests**, with local
+  sockets and `PROTEUS_GPU_TESTS=OFF` (14.34 s); 13 retired field cases stay disabled.
+  All 282 local links/anchors across the four changed Markdown files resolve; benchmark and
+  review command examples were exercised.
+- All **33 objective/session cases** pass under ASan/UBSan without findings and in a separate
+  unsanitized run with a 1 MiB stack limit. macOS ASan does not provide leak detection; Lua
+  allocator live-byte checks remain zero. Dependency builds emitted upstream raylib warnings;
+  the final project rebuild is warning-clean. The benchmark and review command above ran.
+- No rendering, motion/input, audio or asset-loading behavior changed; no new audiovisual
+  review or human migration/recovery playtest was performed. Windows/Linux execution and
+  timing await CI/target qualification; browser, isolated workers and hard wall-clock
+  cancellation remain unverified. No user acceptance is inferred from automated checks.
+
+**Next: P4**, beginning with focused capability/schema/validation/preview operations and the
+import/background staging isolation gate. Keep P3 human migration/Undo/recovery and target
+performance qualification visible alongside that work.
 
 ### P4 — practical authoring on native and browser
 
@@ -1182,7 +1257,7 @@ generation are not prerequisites for that loop.
 | P0/P1 | Initial budgets and staging responsiveness: measure the descriptor case, permit a visible authoring pause first, then decide whether background compilation is justified. Do not call an instruction limit a compiler deadline. |
 | P1 | Reload UX and distribution: choose a key/menu action and opt-in launch selection, preserve-only default with explicit restart policy for incompatible edits; retain compiled defaults until parity and authoring review. |
 | P2/P3 | Supported rule extension depth: keep voyage/race/match engines in C and add orchestration first. Move no mature rule engine merely to make a larger Lua example. |
-| P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. P3.3a adds deterministic tick timers and pending-timer reload policy. P3.3b adds live schema migration, resource retirement/composition and native inspection/seek. Memory/budget/deadline qualification remains open before P3 completion. |
+| P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. P3.3a adds deterministic tick timers and pending-timer reload policy. P3.3b adds live schema migration, resource retirement/composition and native inspection/seek. P3.4 adds native storage/budget/latency qualification and retains synchronous trusted edits; imported/background isolation is a P4 gate. |
 | P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
 | P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |

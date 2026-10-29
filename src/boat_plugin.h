@@ -12,6 +12,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define BOAT_PLUGIN_CALLBACK_INSTRUCTIONS 100000u
+#define BOAT_PLUGIN_MIGRATION_INSTRUCTIONS 500000u
+
 #define BOAT_PLUGIN_API 1
 #define BOAT_PLUGIN_STATE_VERSION 1 // Descriptor schema; objectives author their own 1..65535.
 // Host capacities. Limits passed to a load may be lower, never higher.
@@ -27,7 +30,7 @@ typedef enum {
     BOAT_PLUGIN_SYNTAX, // The entry text does not compile, or is not text.
     BOAT_PLUGIN_RUNTIME, // The entry raised an error while evaluating.
     BOAT_PLUGIN_MEMORY, // The Lua state exhausted its memory limit.
-    BOAT_PLUGIN_BUDGET, // The entry exhausted its instruction budget.
+    BOAT_PLUGIN_BUDGET, // Entry evaluation or a callback exhausted its instruction budget.
     BOAT_PLUGIN_SCHEMA, // The returned definition is not a valid voyage.
 } BoatPluginStatus;
 
@@ -38,11 +41,13 @@ typedef struct {
 } BoatPluginLimits;
 extern const BoatPluginLimits boat_plugin_default_limits; // 4 KiB, 64 KiB, 2 MiB, 1 M.
 
-// Measured work of one load; filled whether or not it succeeds.
+// Measured work of one load/transition; filled whether or not it succeeds.
+// Host staging sums sequential descriptor/init work and takes their maximum heap peak.
 typedef struct {
-    // Completed steps of BOAT_PLUGIN_HOOK_STEP instructions: the true count is below
-    // INSTRUCTIONS + BOAT_PLUGIN_HOOK_STEP.
+    // Sum of completed BOAT_PLUGIN_HOOK_STEP quanta. Each successful execution phase
+    // can additionally perform less than one uncounted quantum.
     uint64_t instructions;
+    uint64_t entry_instructions, callback_instructions; // Independent transition phases.
     size_t peak_bytes; // Largest Lua heap, compiler included.
     size_t leaked_bytes; // Still allocated after the state closed: always zero.
     unsigned fields; // Values the native decoder read.

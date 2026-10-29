@@ -507,6 +507,7 @@ BoatPluginStatus boat_plugin_lua_voyage(const char *source, size_t size, const c
         lua_close(L);
     }
     diagnostic->cost = (BoatPluginCost) { .instructions = vm.instructions,
+        .entry_instructions = vm.instructions,
         .peak_bytes = vm.peak,
         .leaked_bytes = vm.live,
         .fields = vm.fields };
@@ -533,6 +534,7 @@ BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const cha
         lua_close(L);
     }
     diagnostic->cost = (BoatPluginCost) { .instructions = vm.instructions,
+        .entry_instructions = vm.instructions,
         .peak_bytes = vm.peak,
         .leaked_bytes = vm.live,
         .fields = vm.fields };
@@ -542,14 +544,16 @@ BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const cha
 }
 
 BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
-    const BoatPluginLimits *limits, int (*callback)(lua_State *), void *context,
-    BoatPluginDiagnostic *diagnostic)
+    const BoatPluginLimits *limits, uint64_t callback_budget, int (*callback)(lua_State *),
+    void *context, BoatPluginDiagnostic *diagnostic)
 {
     Vm vm = {
         .limit = limits->memory_bytes, .budget = limits->instructions, .diagnostic = diagnostic
     };
     lua_State *L = lua_newstate(allocate, &vm);
     int status = LUA_ERRMEM;
+    uint64_t entry_instructions = 0;
+    bool callback_started = false;
     if (L) {
         lua_pushcfunction(L, setup);
         status = lua_pcall(L, 0, 0, 0);
@@ -562,7 +566,14 @@ BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
         else {
             lua_sethook(L, count, LUA_MASKCOUNT, BOAT_PLUGIN_HOOK_STEP);
             status = lua_pcall(L, 0, 1, 0);
+            entry_instructions = vm.instructions;
             if (status == LUA_OK) {
+                callback_started = true;
+                vm.instructions = 0;
+                vm.budget = callback_budget < limits->instructions ? callback_budget
+                                                                   : limits->instructions;
+                // Reset the hook counter so each phase gets its own instruction allowance.
+                lua_sethook(L, count, LUA_MASKCOUNT, BOAT_PLUGIN_HOOK_STEP);
                 lua_pushcfunction(L, callback);
                 lua_pushlightuserdata(L, context);
                 lua_pushvalue(L, 1);
@@ -580,8 +591,11 @@ BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
         lua_close(L);
     } else
         failure(diagnostic, BOAT_PLUGIN_MEMORY, "main.lua", "not enough memory for a Lua state");
-    diagnostic->cost = (BoatPluginCost) {
-        .instructions = vm.instructions, .peak_bytes = vm.peak, .leaked_bytes = vm.live
-    };
+    diagnostic->cost = (BoatPluginCost) { .instructions
+        = entry_instructions + (callback_started ? vm.instructions : 0),
+        .entry_instructions = entry_instructions,
+        .callback_instructions = callback_started ? vm.instructions : 0,
+        .peak_bytes = vm.peak,
+        .leaked_bytes = vm.live };
     return status == LUA_OK ? BOAT_PLUGIN_OK : diagnostic->status;
 }

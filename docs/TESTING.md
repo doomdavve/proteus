@@ -27,6 +27,14 @@ padding and checks that an actual emitter-state change still fails equality. The
 `boat_plugin_review` command exposes the same display-free checkpoint/inspection harness;
 see the [API](PLUGIN_API.md#live-migration-and-review-p33b) for its configuration and limits.
 
+P3.4 adds `boat_plugin_state.independent_budgets` and
+`boat_plugin_session.memory_accounting`: separate entry/callback/migration instruction ceilings,
+rollback/quarantine and full-source history/staging/Undo/eviction accounting. The explicit
+`./build/boat_plugin_bench plugins/shelter-tour` experiment reports 100-sample staging/update
+and failure-path costs; it is outside CTest and has no timing assertion. Native inspection
+reports fixed owner reservation, retained source payload and allowed Lua heap separately.
+See [runtime qualification](PLUGIN_API.md#native-runtime-qualification-p34) for commands and limits.
+
 P2 plugin checks: `boat_plugin_race.*` covers descriptor parity/rejections, revision/Undo,
 real-file trial controls with virtual time, and tick-for-tick four-boat fleet/event parity.
 `boat_race_plugin.*` runs the existing eleven native race cases against the loaded Lua

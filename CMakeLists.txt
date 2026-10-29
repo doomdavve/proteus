@@ -634,6 +634,10 @@ proteus_add_case_tests(boat_plugin_session validate_boat_plugin_session LABELS c
 add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)
 target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_boat_session)
 target_compile_options(boat_plugin_review PRIVATE ${PROTEUS_WARNINGS})
+# P3 runtime qualification: explicit measurements, never timing-sensitive CTest assertions.
+add_executable(boat_plugin_bench tools/boat_plugin_bench.c)
+target_link_libraries(boat_plugin_bench PRIVATE proteus_plugins proteus_boat_session)
+target_compile_options(boat_plugin_bench PRIVATE ${PROTEUS_WARNINGS})
 # Solo minimap: baked chart, projection, markers and trim; --screenshot writes review captures.
 # Adventure A3.5i: scenery packs load once, match the compiled water and reject bad input.
 add_executable(validate_boat_scenery tools/validate_boat_scenery.c)

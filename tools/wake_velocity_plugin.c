@@ -486,6 +486,13 @@ bool wake_plugin_preview_seek(const WakePluginPreview *c, WakePlugin *p, BoatSes
 
 void wake_plugin_inspect(const WakePlugin *p, FILE *output)
 {
+    BoatPluginHostMemory memory = boat_plugin_host_memory(&p->host);
+    fprintf(output,
+        "memory native=%zu host=%zu revisions=%u source=%zu lua_limit=%zu owned_ceiling=%zu "
+        "preview=%zu\n",
+        sizeof(*p), memory.reserved_bytes, memory.retained_revisions, memory.retained_source_bytes,
+        boat_plugin_default_limits.memory_bytes,
+        sizeof(*p) + boat_plugin_default_limits.memory_bytes, sizeof(WakePluginPreview));
     fprintf(output, "revision=%u schema=%u generation=%u tick=%lld pending=%u suspended=%u\n",
         boat_plugin_host_active(&p->host)->number, p->objective.state_version, p->generation,
         (long long)p->objective.tick, p->objective_pending, p->objective.quarantined);
