@@ -32,10 +32,18 @@ typedef struct {
     int64_t tick; // Absolute simulation tick; consumed by the first successful due update.
 } BoatPluginTimer;
 
+typedef struct {
+    char kind[16], id[BOAT_PLUGIN_TEXT], label[BOAT_PLUGIN_TEXT];
+    int64_t value; // HUD value or timer deadline; zero for removal.
+    unsigned generation;
+} BoatPluginCommand;
+
 // Caller-owned checkpoint. No Lua pointers; assignment copies the entire committed result.
 // One owner, generation fixed by host. Failed calls retain all fields except quarantine.
 typedef struct {
     BoatPluginState state;
+    BoatPluginCommand commands[BOAT_PLUGIN_COMMANDS]; // Last accepted batch, inspection only.
+    unsigned command_count;
     BoatPluginHud hud[BOAT_PLUGIN_HUD];
     unsigned hud_count;
     BoatPluginTimer timers[BOAT_PLUGIN_TIMERS]; // Sorted by (tick, id).
@@ -43,6 +51,7 @@ typedef struct {
     bool timers_enabled; // Host capability grant; scripts cannot change it.
     uint32_t rng;
     int64_t acknowledged, tick;
+    unsigned state_version; // Zero in older harness fixtures means schema 1.
     unsigned generation;
     bool initialized, quarantined;
 } BoatPluginObjective;
@@ -65,6 +74,23 @@ typedef enum {
 BoatPluginStatus boat_plugin_objective_step(BoatPluginObjective *objective, const char *source,
     size_t size, BoatPluginTransition transition, int64_t tick, const BoatPluginEvent *events,
     unsigned event_count, const BoatPluginLimits *limits, BoatPluginDiagnostic *diagnostic);
+// Candidate-only migration: success replaces generation/schema/grant atomically. Removing
+// the timer grant retires its timers; retained resources can be removed by migration commands.
+BoatPluginStatus boat_plugin_objective_migrate(BoatPluginObjective *objective, const char *source,
+    size_t size, unsigned version, unsigned generation, bool timers, int64_t tick,
+    BoatPluginDiagnostic *diagnostic);
+// Deterministic HUD composition in caller-selected owner order. Local IDs are namespaced by
+// OWNER; duplicate owners or insufficient capacity reject without writing output/count.
+typedef struct {
+    const char *owner;
+    const BoatPluginObjective *objective;
+} BoatPluginHudOwner;
+typedef struct {
+    char owner[64];
+    BoatPluginHud row;
+} BoatPluginHudRow;
+bool boat_plugin_hud_compose(const BoatPluginHudOwner *owners, unsigned owner_count,
+    BoatPluginHudRow *rows, unsigned capacity, unsigned *count);
 // Canonical hash of the complete committed checkpoint, excluding quarantine/struct padding.
 uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective);
 

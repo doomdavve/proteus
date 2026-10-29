@@ -410,7 +410,42 @@ static int timers_capacity_and_checkpoint(void)
     return 0;
 }
 
+static int schema_timer_retirement(void)
+{
+    BoatPluginObjective o = fresh();
+    o.state_version = 1;
+    o.timers_enabled = true;
+    const char *init = "return {init=function(c) return {n=1},"
+                       "{{kind='timer.set',generation=c.generation,id='keep',tick=24},"
+                       "{kind='timer.set',generation=c.generation,id='drop',tick=36}} end}";
+    CHECK(step(&o, init, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_OK);
+    const char *migrate
+        = "return {migrate=function(c,s) "
+          "assert(c.previous_state_version==1 and c.state_version==2 and #c.timers==0); "
+          "return s,{{kind='timer.cancel',generation=c.generation,id='drop'}} end}";
+    CHECK(boat_plugin_objective_migrate(&o, migrate, strlen(migrate), 2, 8, true, 12, &diagnostic)
+        == BOAT_PLUGIN_OK);
+    CHECK(o.timer_count == 1 && !strcmp(o.timers[0].id, "keep") && o.timers[0].tick == 24);
+    CHECK(o.generation == 8 && o.state_version == 2 && o.command_count == 1);
+    BoatPluginObjective before = o;
+    const char *bad = "return {migrate=function(c,s) c.random(); error('reject') end}";
+    CHECK(boat_plugin_objective_migrate(&o, bad, strlen(bad), 3, 9, false, 12, &diagnostic)
+        == BOAT_PLUGIN_RUNTIME);
+    CHECK(!memcmp(&o, &before, sizeof(o)));
+    const char *drop = "return {migrate=function(c,s) assert(c.previous_state_version==2 "
+                       "and c.state_version==3 and c.timers==nil); return s,{} end}";
+    CHECK(boat_plugin_objective_migrate(&o, drop, strlen(drop), 3, 9, false, 12, &diagnostic)
+        == BOAT_PLUGIN_OK);
+    CHECK(!o.timers_enabled && !o.timer_count && o.generation == 9 && o.state_version == 3);
+    before = o;
+    CHECK(boat_plugin_objective_migrate(&o, drop, strlen(drop), 0, 10, false, 12, &diagnostic)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!memcmp(&o, &before, sizeof(o)));
+    return 0;
+}
+
 static const TestCase cases[] = {
+    TEST_CASE(schema_timer_retirement),
     TEST_CASE(timer_capabilities),
     TEST_CASE(timers_delivery),
     TEST_CASE(timers_atomicity),

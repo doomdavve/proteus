@@ -1,7 +1,7 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
 Status, 2026-10-29: **P1 voyage, P2 local race authoring, P3.2 optional voyage objectives
-and P3.3a timers implemented** on top of the P0 loader and P3.1 transactions. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
+P3.3a timers and P3.3b migration/review implemented** on top of the P0 loader and P3.1 transactions. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
 A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
 when the file is saved or on F5, undo, and apply route or water changes with an explicit
 restart. Rooms, the course and replays, and the browser game keep the compiled voyage. The
@@ -43,7 +43,7 @@ rejected. Strings are non-empty printable ASCII.
 | `entry` | `"main.lua"`: a plain file name in the package directory |
 | `location` | `"outer"` for voyage; `"river"` for race |
 | `capabilities` | `["voyage.define"]`, optionally followed by `"objective.hud"` and then `"objective.timers"`; races use `["race.define"]` |
-| `state_version` | `1` (reserved for P3 script state) |
+| `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
 package's.
@@ -213,7 +213,7 @@ outcome is also printed to stderr as `Plugin DIR: ...`.
 | Save the files | Polled every 0.25 s. Once the package's bytes have stayed unchanged for 0.3 s they are staged once, so an editor's several writes (or a manifest and entry saved one after the other) become one candidate. The browser does not poll. |
 | F5 | Read and stage the package now |
 | F6 | Discard a held candidate; otherwise hold the previous revision (Undo) |
-| F7 | Apply a held candidate with its restart |
+| F7 | Apply a held migration or native restart |
 
 Staging never changes the running voyage. A candidate is compared with the active revision
 (`boat_plugin_classify`):
@@ -221,11 +221,12 @@ Staging never changes the running voyage. A candidate is compared with the activ
 | Change | Policy |
 | --- | --- |
 | Identical descriptor values (comments/layout ignored for descriptor-only packages) | Nothing happens; the panel shows UNCHANGED |
-| Any behavior source byte change or adding/removing `objective.hud` or `objective.timers` | Held for F7, restarting native voyage and objective together; comments/layout count for behavior packages |
+| Behavior bytes, objective schema or timer grant change, with unchanged native gameplay and `migrate` in the candidate | Held for F7 transactional migration; native progress kept; comments/layout count for behavior packages |
+| Behavior edit without candidate `migrate`, or adding/removing `objective.hud` | Held for F7, restarting native voyage and objective together |
 | Display names only: manifest `name`, or shelter `name` in descriptor-only packages; ordered shelter IDs and every number identical | Applied at once. The boat, clock, water, wakes and all voyage progress are kept; the HUD shows the new names |
 | Shelter IDs, order, count, position, heading or radius; arrival; `exposed_fraction` | Held until F7, then **restart voyage**: progress, timing and recoveries begin again at the start shelter; the boat, clock, water and any weather already met continue. A boat already inside a shelter or the arrival area is observed by the ordinary rules on the next tick |
 | `exposure` or `weather_range` | Held until F7, then **restart session**: the same full restart as Backspace without a voyage (tick zero, the boat at the spawn, calm water until the weather begins) with the new revision |
-| Manifest `id`, `kind`, `location`, `api` or `state_version` | Not applied; relaunch to use another plugin |
+| Manifest `id`, `kind`, `location` or `api` | Not applied; relaunch to use another plugin |
 
 A failed stage (I/O, manifest, syntax, runtime, memory, budget, schema or map check) keeps the
 active revision and drops any held candidate; the panel shows the file, line when Lua gave
@@ -438,7 +439,7 @@ Request `["voyage.define", "objective.hud"]` in `plugin.json`. Return `voyage`, 
 the capability, callbacks are rejected. The source executes afresh for every callback and
 therefore reconstructs the descriptor too, within the same transaction budget. Init is probed
 while staging, then runs at the actual native restart tick with a fresh nonzero generation
-and RNG seed 12345. State migrations are available only in the isolated harness for now.
+and RNG seed 12345. A candidate can explicitly migrate current state with the [P3.3b contract](#live-migration-and-review-p33b).
 
 Every native observation exposes a bounded ordered output list, retaining the old latest-event
 field for presentation. The adapter copies all notices, including several from the same tick,
@@ -458,15 +459,12 @@ callbacks; native physics, weather, recovery and arrival continue. A full 64-eve
 suspends explicitly instead of overwriting an event or retrying endlessly.
 
 Accepted revisions own their source bytes, including Undo history. Manifest-only renames keep
-objective state and pending output. Any behavior source byte change, adding/removing the
-capabilities, or changing route gameplay is held for F7 to restart the native voyage and its
-objective together; water edits restart the session too. F6 Undo follows that same policy;
-it restores old source with fresh state, never old script state beside a moving world.
-A new voyage/session clears queued events, pending output, quarantine, timers and rows. A rejected
-candidate leaves active source, state, generation and route intact. Schema-aware live
-migration, world rewind/seek, multi-owner composition, browser/room behavior and background
-reload performance qualification remain P3.3 or later work. This API is experimental.
-
+objective state and pending output. Behavior and schema edits use the [migration/restart
+policy](#live-migration-and-review-p33b). Route gameplay changes still restart the voyage;
+water edits restart the session. F6 Undo applies old code to current state under that same
+policy. A new voyage/session clears queued events, pending output, quarantine, timers and rows.
+A rejected candidate leaves active source, state, generation and route intact. Browser/room
+behavior and background reload performance qualification remain open. This API is experimental.
 
 ### Deterministic timers (P3.3a)
 
@@ -517,10 +515,73 @@ update = function(c, s)
 end
 ```
 
-A manifest-only display rename preserves pending timers and staged output. Behavior source or
-capability changes retain the explicit F7 native voyage/objective restart policy, as does Undo
-code. Restart retires every old timer and pending delivery before calling init with a fresh
-host generation at the current native tick. No timer from the old generation fires afterward.
-This is the pending-timer reload contract until schema-aware live migration is implemented.
-The checkpoint is caller-owned native data, not a persisted/network timer format or a full-world
-preview checkpoint. Timer resource composition across multiple plugin owners remains future work.
+A manifest-only display rename preserves pending timers and staged output. Explicit restart
+retires every old timer and pending delivery before init at the current native tick with a fresh
+host generation. Compatible migration retains timers unless canceled or their grant is removed;
+its exact boundary contract follows below. Timers are private to each objective owner and do not
+share a global timer namespace. This is caller-owned native data, not a persisted/network format.
+
+### Live migration and review (P3.3b)
+
+An objective package may return `migrate(context, state)` alongside `voyage`, `init` and
+`update`. Non-function migrations and migrations without init/update are rejected. Init is
+still probed under the candidate's schema when staging. `context.state_version` is the target
+manifest schema; migration additionally receives `context.previous_state_version`. Both are
+exact integers. Versions describe authored meaning, not interpreter versions. Equal versions
+do not silently copy edited behavior: a candidate migration must explicitly accept it.
+
+When native route gameplay is unchanged, a behavior/schema/timer-grant edit with a candidate
+migration is held for **F7 MIGRATE STATE**. It runs against a copy of the last committed
+objective, at the current native tick with a new generation. It receives no voyage events or
+due timers. The queued notices remain unacknowledged for the next update, including notices
+used by a pending old-code update. On success, source/schema/state/RNG/resources/generation
+swap together, pending old-code output is retired, quarantine clears, and the native boat,
+clock, voyage, presentation, water and wakes continue. No old staged command publishes later.
+Failure retains all of those values, including quarantine, queued events and pending output;
+the candidate stays held for retry or F6 discard. The panel and developer trace report failure.
+
+Retained HUD rows and timers belong to the new generation after migration. Use
+`{kind="hud.remove", generation=c.generation, id="old-row"}` to retire a row and
+`timer.cancel` to retire a timer. Removal is idempotent. HUD removal accepts exactly `kind`,
+`generation`, `id`; set/remove of the same ID in one batch conflicts. Missing IDs in an update
+are retained rather than implicitly removed. Removing the timer grant retires all its timers
+as part of the candidate transaction. A later invalid command rolls back retirement too.
+Adding/removing the entire objective, editing native route gameplay, or omitting `migrate`
+uses the explicit native restart policy. To select reset instead of migration, omit the
+candidate migration callback. Undo uses the destination revision's migration when available;
+otherwise it resets current native voyage/objective state. It never installs historical state
+beside the moving world.
+
+HUD composition uses `(owner plugin ID, local ID)` in caller-selected owner order, at most
+eight owners, with an explicit destination capacity. Duplicate owner IDs or capacity failure
+leave the destination untouched. Identical local IDs in different owners do not conflict.
+The native game still hosts one voyage plugin: opening a second owner on an already owned
+session is rejected before touching either owner. This composition primitive does not enable
+multiple live voyage owners or shared weather/music ownership.
+
+The developer-only review command accepts a package and optional absolute checkpoint/seek
+ticks (default 120/360, range 0..72000, checkpoint no later than seek):
+
+```sh
+./build/boat_plugin_review plugins/shelter-tour 120 360
+./build/validate_boat_plugin_session --case preview_seek
+```
+
+The calm solo fixture includes player and authored traffic wakes. It applies throttle for the
+first 120 ticks and alternates steering every 240 ticks. It saves a complete compatible native
+checkpoint, restores it, then replays the remaining authored inputs without polling saves or
+waiting for time. Inspection prints revision/schema/generation, canonical state bytes in hex,
+RNG/acknowledgment, pending-output digest, HUD/timers, queued events and the last 16 transitions
+with before/after canonical hashes and accepted command intents. Failed transitions contain no
+accepted commands. Command provenance is inspection data and excluded from the objective digest.
+
+`wake_plugin_preview_save/restore/seek` expose the same harness contract to native callers.
+The checkpoint owns all revision source/route strings, objective and pending output, event
+queue, diagnostics/trace, native boat/presentation/voyage/clock/water history and both wake
+pools. Restore rebinds internal pointers; immutable map resources, handling and directory stay
+borrowed and must outlive it. Review inputs also support recovery before a step. Unsupported
+recordings/course playback, other physical boats, combat/radial sources and legacy wake-field endpoints are rejected;
+this is a solo review checkpoint, not a whole application save, recording format or a room
+rewind. Camera/window/audio/effect playback is outside this display-free harness. Allocate
+these large bounded checkpoint/revision histories off the stack. Interactive seek controls,
+source-edit timelines and persisted replay provenance remain future authoring work.

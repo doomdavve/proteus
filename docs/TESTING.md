@@ -17,6 +17,16 @@ resume, exact wide deadlines, migration retention, cancellation/re-arm, rollback
 checkpoints. `boat_plugin_session.objective_timers_reload` drives production T/T+1 staging,
 metadata rename, explicit restart/Undo and queue overflow with due timers. All use virtual time.
 
+P3.3b adds `boat_plugin_state.schema_timer_retirement` and
+`boat_plugin_session.live_migration`, `resource_composition`, `preview_seek`. They verify
+schema/generation migration, candidate failure with pending output, HUD/timer retirement,
+second-owner rejection, atomic namespaced composition and native checkpoint seek against
+uninterrupted physics/presentation/player/traffic-wake and event/command traces. Seek equality
+compares declared fields, excluding C struct padding; the fixture deliberately changes wake
+padding and checks that an actual emitter-state change still fails equality. The developer
+`boat_plugin_review` command exposes the same display-free checkpoint/inspection harness;
+see the [API](PLUGIN_API.md#live-migration-and-review-p33b) for its configuration and limits.
+
 P2 plugin checks: `boat_plugin_race.*` covers descriptor parity/rejections, revision/Undo,
 real-file trial controls with virtual time, and tick-for-tick four-boat fleet/event parity.
 `boat_race_plugin.*` runs the existing eleven native race cases against the loaded Lua
@@ -276,7 +286,7 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   read from a build-tree scratch directory, where missing files, an escaping entry, a symbolic
   link, a directory and oversized input are refused. Finally the decoded shelters must lie in
   the outer map's water. Instruction budgets are counted by a hook, never timed.
-- `boat_plugin_session` runs `validate_boat_plugin_session` (Lua plugins P1/P3.2; fourteen quick cases
+- `boat_plugin_session` runs `validate_boat_plugin_session` (Lua plugins P1/P3; bounded quick cases
   of about 37 ms together in Debug, plus a slow parity case of about 0.2 s). It covers staging
   against the outer map with field paths, and the classification of renames, route changes,
   water changes and other plugins. It applies each policy to a live `BoatSession`, including a

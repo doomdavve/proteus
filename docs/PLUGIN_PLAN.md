@@ -5,18 +5,22 @@ live-edit the Långedrag voyage; the local river trial now loads race descriptor
 same restricted evaluator and revision host. The compiled race remains the network default.
 P3.1 provides atomic objective transactions and P3.2 connects lossless native voyage events
 to an opt-in shelter-tour objective with a native HUD row. P3.3a adds deterministic tick timers
-and their checkpoint/reload contract. There is no in-game agent. The agreed direction
+and their checkpoint/reload contract. P3.3b adds schema-aware native migration, explicit
+resource retirement/composition and a complete compatible solo checkpoint/inspection harness.
+There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P3.3a, deterministic timers and pending-timer reload policy**, see the
+Completed task: **P3.3b, live migration, resource retirement/composition and inspection/seek**,
+see the [P3.3b result](#p33b-result-2026-10-29). Timers are recorded in the
 [P3.3a result](#p33a-result-2026-10-29). P3.2 integration is recorded in the
 [P3.2 result](#p32-result-2026-10-29). P2 river authoring remains recorded in its
 [P2 result](#p2-result-2026-10-29).
 Earlier results remain recorded under [P0](#p0-result-2026-10-28) and
 [P1](#p1-result-2026-10-28), including the user's native voyage play and live rename.
-**Next task: P3.3b, schema-aware live migration, resource composition/retirement and inspection/seek.**
+**Next task: P3 qualification — retained revision/total host memory accounting, separate
+callback/migration budgets and measured staging/background reload deadlines.**
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -977,7 +981,8 @@ work. The [timer API](PLUGIN_API.md#deterministic-timers-p33a) owns the exact co
 - Manifest-only renames keep pending timers/output. Explicit behavior restart and Undo retire
   all old-generation timers and pending output before init creates new resources at the current
   native tick. Successful isolated migrations retain pending timers unless explicitly changed;
-  failed migrations preserve everything. Schema-aware live source migration is still unimplemented.
+  failed migrations preserve everything. At this historical step, schema-aware live source
+  migration was not implemented; P3.3b below supplies it.
 
 Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
 
@@ -997,12 +1002,90 @@ Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
   rendering code changed. Full GPU CTest, browser/rooms, background callback/reload deadlines
   and human timer reload/Undo checks remain unverified.
 
-**Next: P3.3b** — schema-aware live revision migration and removed-resource retirement,
+**Next recorded at P3.3a (implemented below): P3.3b** — schema-aware live revision migration and removed-resource retirement,
 resource composition/second-owner rejection, state/command trace inspection and deterministic
 scenario seek with a complete native preview checkpoint. Retained revision/total host memory
 accounting, separate callback/migration budgets, background staging deadline qualification,
 browser/room support and targeted human reload/recovery checks remain open. The existing
 P3.2 voyage-through-arrival acceptance does not establish human acceptance of timers.
+
+#### P3.3b result, 2026-10-29
+
+**Implemented:** schema-aware migration in the production solo adapter, explicit HUD/timer
+retirement and deterministic ownership/composition, plus native state/command inspection and
+checkpoint/seek review. The [P3.3b API](PLUGIN_API.md#live-migration-and-review-p33b) owns the
+exact compatibility and resource contracts. P3 remains open for runtime qualification.
+
+- Objective schemas are authored integers 1..65535. A candidate `migrate(context,state)`
+  explicitly accepts the prior/target schema, including equal-version behavior edits. With
+  unchanged native gameplay, F7 migrates committed state at the current native boundary with
+  a fresh generation. Native boat/voyage/water/wakes continue. Success retires pending old-code
+  output but retains its unacknowledged input; failure retains source, state, resources,
+  quarantine and pending output. Undo migrates current state with the destination code, or
+  explicitly restarts voyage/objective when that code has no migration. No stale historical
+  objective state is installed beside a moving boat.
+- `hud.remove` and `timer.cancel` retire resources transactionally; removing the timer grant
+  retires every timer on successful migration. Retained rows/timers transfer to the new
+  generation. HUD composition is bounded, namespaced by owner ID and ordered by the caller;
+  duplicate owners and capacity failure reject without partial writes. The game still hosts
+  one voyage owner and rejects a second owner before mutating either. This primitive is not
+  multi-voyage gameplay or shared weather/music ownership.
+- `boat_plugin_review DIRECTORY [CHECKPOINT_TICK [SEEK_TICK]]` runs a deterministic display-free
+  calm solo fixture with player/traffic wakes. Native checkpoint APIs capture revision source
+  and route strings, full objective/pending output and event queue, native clock/boat/voyage,
+  presentation/water/wake pools and diagnostics/trace. Restore rebinds internal pointers and
+  replays authored inputs/recovery without save polling. Inspection exposes canonical state
+  bytes, current HUD/timers, queued events, pending digest and the last 16 transition hashes
+  and accepted command batches. The fixed fixture is a review harness, not a persisted save,
+  interactive seek UI or recorded source-edit timeline.
+- Tests cover migration failure with pending T/T+1 output, schema migration/Undo after time
+  advances, invalid retirement after a valid intent, timer retention/cancel/grant removal,
+  composition conflicts/second-owner rejection and seek versus uninterrupted native stepping.
+  Seek compares boat/voyage/presentation, both wake pools, objective/pending hashes, event
+  sequence and command trace. A checkpoint survives the original owner being cleared and
+  restores prior revision/history after further edits and Undo.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
+
+- Project build is warning-clean. Full CTest preset passed **302/302 enabled tests** with
+  local socket access; 13 retired field cases remain disabled. The sandbox-only run blocked
+  the ten existing socket-dependent tests.
+- All **31 objective/session cases** passed under ASan/UBSan without findings; macOS ASan
+  does not provide leak detection. All objective/session cases passed with a 1 MB stack limit.
+  The sanitizer dependency build emitted upstream raylib warnings. These checks include the
+  additional Undo/history checkpoint coverage.
+- `boat_plugin_review plugins/shelter-tour 120 360` and the zero-tick boundary command ran.
+  A CPU `--time 3` plugin frame and a 1200-frame scripted GPU windowed demo completed; inspected
+  GPU HUD rows remain above unobscured instruments. Local artifacts live under this worktree's
+  `build/p33b-*`. CPU screenshot capture omits the authoring panel. No human keyboard driving,
+  migration/recovery playtest, audio listening or user acceptance is claimed.
+- All 302 local links/anchors in the six changed Markdown files resolve; new review command
+  examples and game help were exercised. Initial Linux/macOS CI passed; Windows CI exposed
+  the test-comparison issue recorded below; full GPU CTests, browser/rooms, deadline qualification and human
+  migration/Undo/recovery checks remain open.
+
+**Windows CI correction, 2026-10-29:** the [initial Windows run](https://github.com/doomdavve/proteus/actions/runs/40914390065)
+passed 123/124 selected checks; `boat_plugin_session.preview_seek` reached the wake-pool
+`memcmp` assertion and failed, rather than reporting a stack overflow. C struct assignment
+need not preserve padding. The seek validator now compares every declared wake/emitter,
+presentation/particle/flag and active trace/command field instead of their object bytes.
+It deliberately changes known wake padding and verifies equality still passes, then changes
+an emitter's tracked tick and verifies equality fails. Byte comparisons used to prove an
+untouched destination remain appropriate. This changes test comparisons only, not runtime
+state, physics or checkpoint storage. On Apple Silicon/macOS, the warning-clean Debug
+build and all 302 enabled full-preset tests passed (13.78 s; sockets enabled, GPU CTests off);
+all 20 session cases also passed with a 1 MB stack limit. A separate Clang Release build
+with `-ftrivial-auto-var-init=pattern` passed all 20 session cases under the same stack limit
+(one bundled `stb_vorbis.c` warning). The [replacement Windows CI run](https://github.com/doomdavve/proteus/actions/runs/40915584973)
+remained in libcurl dependency setup at handoff; its MSVC result is pending. No new
+audiovisual review was performed for this test-only fix.
+
+**Next: P3 runtime qualification** — retained revision/total host memory accounting, separate
+callback/migration budgets and measured staging/background reload deadlines. Review checkpoint
+support deliberately excludes recordings/course playback, other physical boats, combat/radial
+and legacy wake fields; immutable resources/directory/handling must outlive checkpoints.
+Application camera/window/audio state and external effects are outside the display-free
+harness. Broader preview timelines and interactive inspection belong to later authoring work.
 
 ### P4 — practical authoring on native and browser
 
@@ -1099,7 +1182,7 @@ generation are not prerequisites for that loop.
 | P0/P1 | Initial budgets and staging responsiveness: measure the descriptor case, permit a visible authoring pause first, then decide whether background compilation is justified. Do not call an instruction limit a compiler deadline. |
 | P1 | Reload UX and distribution: choose a key/menu action and opt-in launch selection, preserve-only default with explicit restart policy for incompatible edits; retain compiled defaults until parity and authoring review. |
 | P2/P3 | Supported rule extension depth: keep voyage/race/match engines in C and add orchestration first. Move no mature rule engine merely to make a larger Lua example. |
-| P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. P3.3a adds deterministic tick timers and pending-timer reload policy. Live migration, resource composition/retirement, inspection/seek and background reload qualification remain P3.3b or later. |
+| P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. P3.3a adds deterministic tick timers and pending-timer reload policy. P3.3b adds live schema migration, resource retirement/composition and native inspection/seek. Memory/budget/deadline qualification remains open before P3 completion. |
 | P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
 | P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |

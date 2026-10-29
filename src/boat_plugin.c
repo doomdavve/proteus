@@ -153,9 +153,10 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
                 "only objective.timers is granted after objective.hud");
         m.timers = true;
     }
-    if (!boat_json_int(json, &tokens[at[7]], &state) || state != BOAT_PLUGIN_STATE_VERSION)
-        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "state_version", "must be %d",
-            BOAT_PLUGIN_STATE_VERSION);
+    if (!boat_json_int(json, &tokens[at[7]], &state) || state < 1 || state > 65535
+        || (!m.objective && state != BOAT_PLUGIN_STATE_VERSION))
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, file, "state_version", "must be an integer in 1..65535");
     m.api = (unsigned)api;
     m.state_version = (unsigned)state;
     *out = m;
@@ -372,7 +373,7 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
     if (!validate(&check, &data))
         return BOAT_PLUGIN_SCHEMA;
 
-    BoatPluginVoyage candidate = { .manifest = manifest };
+    BoatPluginVoyage candidate = { .manifest = manifest, .migrates = data.migrates };
     BoatVoyageRoute *route = &candidate.route;
     route->shelter_count = data.shelter_count;
     for (unsigned i = 0; i < data.shelter_count; ++i) {
@@ -436,8 +437,8 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
 
 const char *boat_plugin_change_name(BoatPluginChange change)
 {
-    static const char *const names[]
-        = { "unchanged", "renamed", "restart voyage", "restart session", "incompatible" };
+    static const char *const names[] = { "unchanged", "renamed", "migrate objective",
+        "restart voyage", "restart session", "incompatible" };
     return (unsigned)change < sizeof(names) / sizeof(names[0]) ? names[change] : "unknown";
 }
 
@@ -453,7 +454,7 @@ BoatPluginChange boat_plugin_classify(
 {
     const BoatPluginManifest *m = &active->manifest, *n = &candidate->manifest;
     if (strcmp(m->id, n->id) || strcmp(m->kind, n->kind) || strcmp(m->location, n->location)
-        || m->api != n->api || m->state_version != n->state_version)
+        || m->api != n->api)
         return BOAT_PLUGIN_INCOMPATIBLE;
     const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)

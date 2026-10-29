@@ -4,6 +4,19 @@
 // polling and authoring panel. Definitions change only between ticks, through wake_plugin_frame.
 #include "boat_plugin_host.h"
 #include "boat_session.h"
+#include <stdio.h>
+
+#define WAKE_PLUGIN_TRACE 16
+
+typedef struct {
+    int64_t tick;
+    unsigned revision, events;
+    BoatPluginTransition transition;
+    BoatPluginStatus status;
+    uint64_t before, after;
+    BoatPluginCommand commands[BOAT_PLUGIN_COMMANDS];
+    unsigned command_count;
+} WakePluginTrace;
 
 typedef struct {
     const char *directory;
@@ -19,6 +32,8 @@ typedef struct {
     int64_t sequence;
     bool objective_pending;
     BoatPluginDiagnostic objective_diagnostic;
+    WakePluginTrace trace[WAKE_PLUGIN_TRACE]; // Oldest first; bounded inspection history.
+    unsigned trace_count;
 } WakePlugin;
 
 // The location DIRECTORY's manifest names, or NULL with the reason printed.
@@ -27,9 +42,9 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory);
 // compiled one. False with the diagnostic printed.
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision
-// on UNDO (or discard a held one), and commit a held restart on APPLY. A rename applies at once.
-// True when the caller must restart the session for a new exposure; SESSION's voyage route is
-// already the new revision's.
+// on UNDO (or discard a held one), and commit a held migration/restart on APPLY. A rename applies
+// at once. True when the caller must restart the session for a new exposure; SESSION's voyage route
+// is already the new revision's.
 bool wake_plugin_frame(
     WakePlugin *plugin, BoatSession *session, bool reload, bool undo, bool apply, double now);
 // Tick adapter: publish T's output before T+1; capture all output immediately after a step
@@ -37,6 +52,33 @@ bool wake_plugin_frame(
 void wake_plugin_before_tick(WakePlugin *plugin);
 void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session);
 void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session);
+// Isolated native solo review only. No recordings, borrowed combat/field/radial sources,
+// filesystem polling or live application effects. Resources/directory/handling remain borrowed
+// immutable inputs; source revisions, native progress, water history, wake pools, presentation,
+// queue, pending output, diagnostics and trace are owned by this complete checkpoint.
+typedef struct {
+    WakePlugin plugin;
+    BoatSession session;
+    BoatWakeObjects objects, traffic;
+    bool has_objects, has_traffic, valid;
+} WakePluginPreview;
+
+typedef struct {
+    BoatInput input;
+    bool recover; // Recovery at the pre-step boundary, before pending publication.
+} WakePluginReviewTick;
+
+bool wake_plugin_preview_save(
+    WakePluginPreview *checkpoint, const WakePlugin *plugin, const BoatSession *session);
+bool wake_plugin_preview_restore(const WakePluginPreview *checkpoint, WakePlugin *plugin,
+    BoatSession *session, BoatWakeObjects *objects, BoatWakeObjects *traffic);
+// Restore and deterministically replay COUNT inputs after the checkpoint. Never polls files.
+bool wake_plugin_preview_seek(const WakePluginPreview *checkpoint, WakePlugin *plugin,
+    BoatSession *session, BoatWakeObjects *objects, BoatWakeObjects *traffic,
+    const WakePluginReviewTick *ticks, unsigned count);
+// Developer inspection: canonical state bytes (hex), queued events, accepted commands and
+// transition hashes. No persistent UI in ordinary play.
+void wake_plugin_inspect(const WakePlugin *plugin, FILE *output);
 // The authoring panel, in screen pixels, with its last line ending above BOTTOM.
 void wake_plugin_draw(const WakePlugin *plugin, int x, int bottom);
 #endif
