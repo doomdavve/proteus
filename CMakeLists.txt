@@ -634,6 +634,17 @@ proteus_add_case_tests(boat_plugin_session validate_boat_plugin_session LABELS c
 add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)
 target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_boat_session)
 target_compile_options(boat_plugin_review PRIVATE ${PROTEUS_WARNINGS})
+# P4 native isolated authoring validator; intentionally absent from the browser runtime.
+if(NOT EMSCRIPTEN)
+  add_executable(boat_plugin_worker tools/boat_plugin_worker.c)
+  target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins)
+  target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
+  add_test(NAME boat_plugin_author COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
+    --worker $<TARGET_FILE:boat_plugin_worker>)
+  set_tests_properties(boat_plugin_author PROPERTIES LABELS "cpu" TIMEOUT 30)
+endif()
+
 # P3 runtime qualification: explicit measurements, never timing-sensitive CTest assertions.
 add_executable(boat_plugin_bench tools/boat_plugin_bench.c)
 target_link_libraries(boat_plugin_bench PRIVATE proteus_plugins proteus_boat_session)
@@ -1101,6 +1112,10 @@ set(PROTEUS_SLOW_TESTS
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_river_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
   boat_river_screenshot)
+
+if(TEST boat_plugin_author)
+  list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author)
+endif()
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
 # and cpu (everything else that runs without a display).
