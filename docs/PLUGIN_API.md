@@ -162,7 +162,9 @@ moving fleet will always have an immediately available recovery point.
 ```
 
 The trial is a local course/source preview, with scripted steering unless `--play` is set.
-It displays authored gates, ferry and storm. It has no native round countdown, standings or
+It displays authored gates, ferry and storm. It spawns at the first `grid` position,
+facing the start direction. Edit that position and restart with F7 to offset the boat
+without moving the start-line buoy row. It has no native round countdown, standings or
 results HUD; the headless fixture exercises the rules, crossings, recovery, deadlines and
 four-boat races through the real C engine. `--plugin` is refused with historical `--check`
 and `--gpu-check` modes. A voyage package belongs in `wake_velocity`, not this trial.

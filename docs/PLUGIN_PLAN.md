@@ -738,7 +738,9 @@ Implemented on `plugin-p2`, based on merged P1 PR #49 (`be15608`):
   placement order and live recovery behavior are unchanged.
 - `boat_race_trial --plugin plugins/river-sprint [--play]` previews authored gates, ferry and
   storm, reloads saves/F5, undoes/discards on F6 and applies gameplay on F7 with a full preview
-  reset. Shared application glue accepts injected time/input. Staging discards simulation
+  reset. The preview uses the first authored grid position, facing the start direction,
+  so moving that slot offsets the boat independently of the start-line buoys (corrected
+  after the user's overlapping-buoy report). Shared application glue accepts injected time/input. Staging discards simulation
   delta across its frame boundary. A frame-borrowed `BoatViewState.race.course` override feeds
   both renderers; NULL keeps the compiled course. Production rooms, browser, basin runs and
   replay formats are unchanged.
@@ -771,6 +773,11 @@ Verification, 2026-10-29, Apple Silicon/macOS, Debug with GPU tests enabled:
   Temporary in-game capture instrumentation showed the error and held-restart panels;
   it was removed. That review prompted a darker panel background and omission of unknown
   source-line zero. Final panel recapture was blocked by macOS monitor initialization.
+- Spawn correction after the user's buoy-overlap report: the preview now starts at `grid[1]`
+  rather than the start-line centre. A warning-clean rebuild and all 282 enabled CPU tests
+  passed again. Inspected CPU frames at time zero show the default grid spawn clear of the
+  buoy row, and a validated edit to `x = -206.3, z = -256.0` moves it about 5 m back.
+  A later 120-frame windowed `--play` startup/exit check passed; no human input is claimed.
 
 Limits: this is a local course/source preview, not a new production race mode. The preview
 has no countdown/standings/results HUD; authored rules are exercised headlessly through the

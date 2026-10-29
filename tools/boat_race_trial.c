@@ -526,7 +526,8 @@ static void preview_start(BoatSession *session, ObjectStudy *objects, bool sourc
         session->world.water.traffic_objects = NULL;
         session->world.water.vessel = source ? preview_course()->source : (BoatVesselWake) { 0 };
         session->world.water.storm = source ? preview_course()->storm : (BoatStorm) { 0 };
-        session->boat.position = preview_course()->start.centre;
+        // Start behind the buoy row at an authored grid slot, as a race entrant does.
+        session->boat.position = preview_course()->grid[0];
         Vector2 direction = preview_course()->start.direction;
         session->boat.heading = atan2f(direction.x, -direction.y);
         boat_presentation_reset(&session->presentation);

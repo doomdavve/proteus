@@ -16,6 +16,11 @@ Omit `--play` for scripted steering. Copy the directory to edit it. Saves reload
 F5 reloads explicitly, F6 undoes or discards a held candidate, and F7 installs gameplay changes
 with a new run (boat, clock, water and wakes reset). A manifest `name` edit applies immediately.
 Invalid edits retain the current revision and print a file/line or field diagnostic.
+
+The preview spawns at the first `grid` position, facing `start.dx`/`start.dz`. Edit
+`grid[1].x` and `grid[1].z` to move the boat independently of the start-line buoys.
+Save and press F7 to restart at the new position. Staging checks shore clearance and
+separation from the other three grid slots.
 Undo changes the active definition, not the files on disk; F5 stages the disk files again.
 
 Coordinates are simulation metres (`x = -east`, `z = north`), directions use named `dx`/`dz`,
