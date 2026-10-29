@@ -7,6 +7,7 @@
 // Nothing here reads files or the clock: the application acquires bytes and passes the time.
 #include "boat_plugin.h"
 #include "boat_plugin_io.h"
+#include "boat_plugin_state.h"
 
 #define BOAT_PLUGIN_UNDO 8 // Prior revisions that Undo can reinstall.
 #define BOAT_PLUGIN_POLL 0.25 // Seconds between save polls.
@@ -15,6 +16,8 @@
 typedef struct {
     BoatPluginVoyage voyage;
     BoatPluginRace race; // Used instead of VOYAGE by a river race host.
+    char source[BOAT_PLUGIN_SOURCE_MAX];
+    size_t source_size;
     unsigned number; // 1 for the launch revision, then one more for each staged definition.
 } BoatPluginRevision;
 

@@ -6,6 +6,7 @@ static void reset(BoatSession *session)
     boat_presentation_reset(&session->presentation);
     session->presentation_enabled = true;
     session->tick = 0;
+    session->voyage_events = (BoatVoyageEvents) { 0 };
     session->course = (BoatCourse) { 0 };
     boat_voyage_start(&session->voyage, session->voyage_route, 0);
     if (session->voyage.route)
@@ -75,6 +76,9 @@ void boat_session_recover(BoatSession *session)
         return;
     }
     boat_voyage_recover(&session->voyage, &session->boat, boat_session_time(session));
+    session->voyage_events
+        = (BoatVoyageEvents) { .items = { { BOAT_VOYAGE_RECOVERED, session->voyage.shelter } },
+              .count = 1 };
     boat_presentation_reset(&session->presentation);
 }
 
@@ -107,7 +111,8 @@ bool boat_session_step(BoatSession *session, BoatInput input)
     boat_step_handling(&session->boat, &session->world, now, input,
         session->course.enabled ? &boat_handling_speedboat : session->handling);
     boat_course_step(&session->course, previous, session->boat.position, BOAT_TICK_SECONDS);
-    boat_voyage_step(&session->voyage, session->boat.position, session->boat.velocity, now);
+    boat_voyage_step_events(&session->voyage, session->boat.position, session->boat.velocity, now,
+        &session->voyage_events);
     if (session->voyage.route)
         session->world.water.storm = boat_voyage_weather(&session->voyage);
     if (session->presentation_enabled)

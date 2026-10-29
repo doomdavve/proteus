@@ -1,7 +1,7 @@
-# Lua plugin API (voyage and race descriptors; experimental objective harness)
+# Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-29: **P1 voyage and P2 local race authoring implemented** on top of the P0
-loader. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
+Status, 2026-10-29: **P1 voyage, P2 local race authoring and P3.2 optional voyage objectives
+implemented** on top of the P0 loader and P3.1 transactions. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
 A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
 when the file is saved or on F5, undo, and apply route or water changes with an explicit
 restart. Rooms, the course and replays, and the browser game keep the compiled voyage. The
@@ -42,7 +42,7 @@ rejected. Strings are non-empty printable ASCII.
 | `kind` | `"voyage"` or `"race"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
 | `location` | `"outer"` for voyage; `"river"` for race |
-| `capabilities` | Exactly `["voyage.define"]` for voyage or `["race.define"]` for race |
+| `capabilities` | `["voyage.define"]`, optionally followed by `"objective.hud"`; races use `["race.define"]` |
 | `state_version` | `1` (reserved for P3 script state) |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -220,8 +220,9 @@ Staging never changes the running voyage. A candidate is compared with the activ
 
 | Change | Policy |
 | --- | --- |
-| Identical values (comments and layout ignored) | Nothing happens; the panel shows UNCHANGED |
-| Display names only: shelter `name`, manifest `name`; ordered shelter IDs and every number identical | Applied at once. The boat, clock, water, wakes and all voyage progress are kept; the HUD shows the new names |
+| Identical descriptor values (comments/layout ignored for descriptor-only packages) | Nothing happens; the panel shows UNCHANGED |
+| Any behavior source byte change or adding/removing `objective.hud` | Held for F7, restarting native voyage and objective together; comments/layout count for behavior packages |
+| Display names only: manifest `name`, or shelter `name` in descriptor-only packages; ordered shelter IDs and every number identical | Applied at once. The boat, clock, water, wakes and all voyage progress are kept; the HUD shows the new names |
 | Shelter IDs, order, count, position, heading or radius; arrival; `exposed_fraction` | Held until F7, then **restart voyage**: progress, timing and recoveries begin again at the start shelter; the boat, clock, water and any weather already met continue. A boat already inside a shelter or the arrival area is observed by the ordinary rules on the next tick |
 | `exposure` or `weather_range` | Held until F7, then **restart session**: the same full restart as Backspace without a voyage (tick zero, the boat at the spawn, calm water until the weather begins) with the new revision |
 | Manifest `id`, `kind`, `location`, `api` or `state_version` | Not applied; relaunch to use another plugin |
@@ -338,12 +339,12 @@ cmake --build build-web --target validate_boat_plugin
 node build-web/validate_boat_plugin.js
 ```
 
-## Experimental objective harness (P3.1)
+## Objective transactions (P3.1 / P3.2)
 
-[`boat_plugin_state.h`](../src/boat_plugin_state.h) exposes native review operations; **the
-manifest and live game do not grant behavior capabilities yet**. P1/P2 package contracts above
-are unchanged. The [P3.1 result](PLUGIN_PLAN.md#p31-result-2026-10-29) owns status and remaining
-integration work. Run the deterministic native checks with:
+[`boat_plugin_state.h`](../src/boat_plugin_state.h) exposes the transaction operations.
+P3.2 grants opt-in `objective.hud` for native solo voyages; race packages remain descriptors.
+The [P3.2 result](PLUGIN_PLAN.md#p32-result-2026-10-29) owns current integration status and limits.
+Run the deterministic native checks with:
 
 ```sh
 cmake --build build --target validate_boat_plugin_state
@@ -383,7 +384,8 @@ return {
 
 `context` holds integer `tick`, integer host `generation`, ordered `events` and `random()`.
 Events have integer `tick`/`sequence` and bounded `kind`/`id` strings. The example above consumes
-synthetic events in the validator; there is no live voyage event adapter yet. `random()` returns
+synthetic events in the isolated validator; the live adapter below supplies native events.
+`random()` returns
 the next unsigned 32-bit xorshift32 result represented exactly as a Lua integer. Failed batches
 discard draws along with state, HUD changes and event acknowledgment. This is deterministic
 scenario randomness, not a cryptographic stream. No timer command is implemented yet.
@@ -400,8 +402,8 @@ sorted key bytes followed by values; arrays store values in order. Limits: 16 Ki
 The only command is `hud.set`: exact fields `kind`, `generation`, `id`, `label`, `value`, with
 1–23 printable ASCII characters in ID/label and an integer value. All commands are staged
 before commit. Duplicate IDs within one batch are conflicts, and eight rows/32 commands are
-host limits. Rows persist until overwritten or reset. Removed-resource retirement and real
-session/plugin ownership remain later work; the isolated harness has a single native owner.
+host limits. Rows persist until overwritten or reset. The live adapter has one plugin owner and native generation; a voyage restart retires all
+its rows. Composition with other owners and per-row retirement remain future work.
 
 A callback, budget, schema, event overflow or update scheduling failure quarantines updates
 without changing the committed checkpoint. Explicit reset or a successful migration clears
@@ -416,3 +418,49 @@ and initialization field-by-field; it excludes quarantine and C padding. Native 
 assignment supports an **isolated harness** restore/replay. It must not be used to restore old
 script state beside a world that kept advancing. There is no schema-version-aware revision
 manager, full native world rewind, human-facing state inspection or command trace yet.
+
+### Live optional voyage objective (P3.2)
+
+```sh
+./build/wake_velocity --plugin plugins/shelter-tour
+```
+
+The source-tree example uses the compiled Långedrag route and adds an optional tour of
+`bridge` and `east_shore` before arrival. The dock and destination do not count. Repeated
+visits and recovery do not count twice. The row shows `SHELTERS / 2: 0..2`, then
+`TOUR COMPLETE: 2` or `TOUR MISSED: 0..1` at arrival. Arrival stays completeable independently.
+The standard packaged `langedrag` example remains a descriptor without callbacks.
+
+Request `["voyage.define", "objective.hud"]` in `plugin.json`. Return `voyage`, `init` and
+`update` from the same `main.lua`; both callbacks are required and must be functions. Without
+the capability, callbacks are rejected. The source executes afresh for every callback and
+therefore reconstructs the descriptor too, within the same transaction budget. Init is probed
+while staging, then runs at the actual native restart tick with a fresh nonzero generation
+and RNG seed 12345. State migrations are available only in the isolated harness for now.
+
+Every native observation exposes a bounded ordered output list, retaining the old latest-event
+field for presentation. The adapter copies all notices, including several from the same tick,
+into a queue with stable authored shelter IDs. Kinds are `voyage.shelter_reached`,
+`voyage.weather`, `voyage.exposed`, `voyage.sheltered`, `voyage.arrived` and `voyage.recovered`.
+Each has the exact native integer tick and a strictly increasing per-run sequence starting at
+1. Initial dock occupancy is not a visit; initial already-grown weather is not a weather-start
+event. Recovery is observed immediately at the current tick and never synthesizes a visit.
+
+After native tick T, when T is divisible by 12 and later than init/the previous update, a
+callback sees the queue through T. Successful state, RNG, acknowledgment and HUD output stay
+staged until immediately before physics tick T+1. A recovery issued after dispatch at T
+stays queued for the next callback; committing T's output retires only acknowledged notices. Rendering between T and T+1 sees the previous
+committed HUD. The native panel renders the bounded rows above the instruments. Failures
+retain committed state/HUD and unacknowledged events, show `OBJECTIVE SUSPENDED`, and stop
+callbacks; native physics, weather, recovery and arrival continue. A full 64-event queue
+suspends explicitly instead of overwriting an event or retrying endlessly.
+
+Accepted revisions own their source bytes, including Undo history. Manifest-only renames keep
+objective state and pending output. Any behavior source byte change, adding/removing the
+capability, or changing route gameplay is held for F7 to restart the native voyage and its
+objective together; water edits restart the session too. F6 Undo follows that same policy;
+it restores old source with fresh state, never old script state beside a moving world.
+A new voyage/session clears queued events, pending output, quarantine and rows. A rejected
+candidate leaves active source, state, generation and route intact. Timers, schema-aware live
+migration, world rewind/seek, multi-owner composition, browser/room behavior and background
+reload performance qualification remain P3.3 or later work. This API is experimental.

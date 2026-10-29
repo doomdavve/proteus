@@ -3,7 +3,7 @@
 
 #include "boat_plugin.h"
 
-// P3.1 experimental native transition harness. Not a granted package capability yet.
+// P3.1 transaction engine; P3.2 grants objective.hud for the native solo voyage adapter.
 #define BOAT_PLUGIN_STATE_BYTES 16384
 #define BOAT_PLUGIN_STATE_DEPTH 16
 #define BOAT_PLUGIN_STATE_TABLES 256

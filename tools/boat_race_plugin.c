@@ -1,6 +1,7 @@
 #include "boat_race_plugin.h"
 
 #include <stdio.h>
+#include <string.h>
 
 static void report(RacePlugin *plugin)
 {
@@ -30,7 +31,9 @@ static void report(RacePlugin *plugin)
 bool race_plugin_open(
     RacePlugin *plugin, const char *directory, const BoatWorldResources *resources, double now)
 {
-    *plugin = (RacePlugin) { .directory = directory };
+    // Clear in place: a compound literal duplicates the revision history on the stack.
+    memset(plugin, 0, sizeof(*plugin));
+    plugin->directory = directory;
     BoatPluginDiagnostic d;
     BoatPluginStatus status = boat_plugin_read(plugin->directory, NULL, &plugin->files, &d);
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);

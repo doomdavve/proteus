@@ -24,8 +24,11 @@ const BoatVoyageRoute boat_voyage_outer = {
     .weather_range = 2500,
 };
 
-static void notify(BoatVoyage *voyage, BoatVoyageEvent event, unsigned shelter, double time)
+static void notify(BoatVoyage *voyage, BoatVoyageEvent event, unsigned shelter, double time,
+    BoatVoyageEvents *events)
 {
+    if (events)
+        events->items[events->count++] = (BoatVoyageNotice) { event, shelter };
     voyage->event = event;
     voyage->event_shelter = shelter;
     voyage->event_time = time;
@@ -45,8 +48,11 @@ void boat_voyage_restart(BoatVoyage *voyage, const BoatVoyageRoute *route, doubl
     voyage->weather_started = previous.weather_started;
 }
 
-void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, double time)
+void boat_voyage_step_events(
+    BoatVoyage *voyage, Vector2 position, Vector2 velocity, double time, BoatVoyageEvents *events)
 {
+    if (events)
+        *events = (BoatVoyageEvents) { 0 };
     const BoatVoyageRoute *route = voyage->route;
     if (!route)
         return;
@@ -56,7 +62,7 @@ void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, do
             && Vector2Distance(position, route->shelters[i].position)
                 <= route->shelters[i].radius) {
             voyage->shelter = i;
-            notify(voyage, BOAT_VOYAGE_SHELTER, i, time);
+            notify(voyage, BOAT_VOYAGE_SHELTER, i, time, events);
         }
     BoatStorm storm = route->exposure;
     if (!voyage->weather
@@ -68,7 +74,7 @@ void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, do
         if (!voyage->observed || route->weather_range <= 0)
             voyage->weather_started -= storm.build; // Already grown when first seen.
         else
-            notify(voyage, BOAT_VOYAGE_WEATHER, voyage->shelter, time);
+            notify(voyage, BOAT_VOYAGE_WEATHER, voyage->shelter, time, events);
     }
     voyage->observed = true;
     bool exposed = storm.radius > 0
@@ -76,8 +82,8 @@ void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, do
             < storm.radius * route->exposed_fraction;
     if (exposed != voyage->exposed) {
         voyage->exposed = exposed;
-        notify(
-            voyage, exposed ? BOAT_VOYAGE_EXPOSED : BOAT_VOYAGE_SHELTERED, voyage->shelter, time);
+        notify(voyage, exposed ? BOAT_VOYAGE_EXPOSED : BOAT_VOYAGE_SHELTERED, voyage->shelter, time,
+            events);
     }
     bool inside = Vector2Distance(position, route->arrival_centre) <= route->arrival_radius;
     bool slow = Vector2Length(velocity) <= route->arrival_speed;
@@ -86,10 +92,10 @@ void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, do
         voyage->arrived = true;
         voyage->arrival = time;
         voyage->shelter = destination;
-        notify(voyage, BOAT_VOYAGE_ARRIVED, destination, time);
+        notify(voyage, BOAT_VOYAGE_ARRIVED, destination, time, events);
     } else if (inside && slow && voyage->shelter != destination) {
         voyage->shelter = destination; // Back at the destination after leaving it.
-        notify(voyage, BOAT_VOYAGE_SHELTER, destination, time);
+        notify(voyage, BOAT_VOYAGE_SHELTER, destination, time, events);
     }
 }
 
@@ -102,6 +108,11 @@ BoatStorm boat_voyage_weather(const BoatVoyage *voyage)
     return storm;
 }
 
+void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, double time)
+{
+    boat_voyage_step_events(voyage, position, velocity, time, NULL);
+}
+
 void boat_voyage_recover(BoatVoyage *voyage, Boat *boat, double time)
 {
     if (!voyage->route)
@@ -112,7 +123,7 @@ void boat_voyage_recover(BoatVoyage *voyage, Boat *boat, double time)
     boat->heading = shelter->heading;
     ++voyage->recoveries;
     voyage->too_fast = false;
-    notify(voyage, BOAT_VOYAGE_RECOVERED, voyage->shelter, time);
+    notify(voyage, BOAT_VOYAGE_RECOVERED, voyage->shelter, time, NULL);
 }
 
 float boat_voyage_bearing(

@@ -810,8 +810,13 @@ static int study(int argc, char **argv)
         view_presentation = &playback_presentation;
         view_world = &playback_world;
     } else if (screenshot) {
-        for (int tick = 0; tick < (int)round(time / BOAT_TICK_SECONDS); ++tick)
+        for (int tick = 0; tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
+            if (plugin_path)
+                wake_plugin_before_tick(&plugin);
             demo_step(&session, tick, NULL, wake, objects);
+            if (plugin_path)
+                wake_plugin_after_tick(&plugin, &session);
+        }
     }
     live_view = boat_session_view(&session);
     live_view.skin = skin;
@@ -1265,6 +1270,8 @@ static int study(int argc, char **argv)
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
             boat_session_recover(&session);
+            if (plugin_path)
+                wake_plugin_after_tick(&plugin, &session);
             accumulator = 0;
         } else if (reset_requested || plugin_restart) {
             thrust_target = 0;
@@ -1277,6 +1284,8 @@ static int study(int argc, char **argv)
             if (objects)
                 object_study_reset(objects, &session, object_crossing, object_life, object_height);
             accumulator = 0;
+            if (plugin_path)
+                wake_plugin_reset_objective(&plugin, &session);
             demo_tick = 0;
             replay_dragging = false;
         } else if (session.runs.playing) {
@@ -1296,6 +1305,8 @@ static int study(int argc, char **argv)
                 session.runs.practice = true;
             accumulator += boat_time_frame_seconds(raw_active_delta, time_speed_index);
             while (accumulator >= BOAT_TICK_SECONDS) {
+                if (plugin_path)
+                    wake_plugin_before_tick(&plugin);
                 if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
                 else {
@@ -1305,6 +1316,8 @@ static int study(int argc, char **argv)
                     input.throttle_rate = boat_throttle_rate(session.boat.throttle, thrust_target);
                     timed_boat_step(&session, input, &metrics, wake, objects);
                 }
+                if (plugin_path)
+                    wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;
             }
         } else {

@@ -13,6 +13,12 @@ typedef struct {
     bool watching; // Save polling; the browser has no files to watch.
     char status[96], detail[192];
     bool alert;
+    BoatPluginObjective objective, staged_objective;
+    BoatPluginEvent events[BOAT_PLUGIN_EVENTS];
+    unsigned event_count, generation;
+    int64_t sequence;
+    bool objective_pending;
+    BoatPluginDiagnostic objective_diagnostic;
 } WakePlugin;
 
 // The location DIRECTORY's manifest names, or NULL with the reason printed.
@@ -26,6 +32,11 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
 // already the new revision's.
 bool wake_plugin_frame(
     WakePlugin *plugin, BoatSession *session, bool reload, bool undo, bool apply, double now);
+// Tick adapter: publish T's output before T+1; capture all output immediately after a step
+// or recovery. Reset only alongside a new native voyage/session, never beside a moving world.
+void wake_plugin_before_tick(WakePlugin *plugin);
+void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session);
+void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session);
 // The authoring panel, in screen pixels, with its last line ending above BOTTOM.
 void wake_plugin_draw(const WakePlugin *plugin, int x, int bottom);
 #endif

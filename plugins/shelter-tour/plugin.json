@@ -1,0 +1,10 @@
+{
+  "id": "proteus.shelter-tour",
+  "name": "Shelter tour",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["voyage.define", "objective.hud"],
+  "state_version": 1
+}

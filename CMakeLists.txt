@@ -611,7 +611,7 @@ target_compile_definitions(validate_boat_plugin PRIVATE
   BOAT_PLUGIN_TEST_DIR="${BOAT_PLUGIN_TEST_DIR}")
 proteus_add_case_tests(boat_plugin validate_boat_plugin LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-# P3.1: isolated objective transitions; no new package capability or game integration yet.
+# P3.1: isolated objective transactions; P3.2 live adapter checks are in boat_plugin_session.
 add_executable(validate_boat_plugin_state tools/validate_boat_plugin_state.c)
 target_link_libraries(validate_boat_plugin_state PRIVATE proteus_plugins)
 target_compile_options(validate_boat_plugin_state PRIVATE ${PROTEUS_WARNINGS})

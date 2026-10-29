@@ -12,14 +12,27 @@ static bool load_revision(
         return boat_plugin_load_race(bundle, NULL, &revision->race, d) == BOAT_PLUGIN_OK
             && boat_plugin_race_check_location(&revision->race, host->location, host->map, d)
             == BOAT_PLUGIN_OK;
-    return boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d) == BOAT_PLUGIN_OK
-        && boat_plugin_check_location(&revision->voyage, host->location, host->map, d)
-        == BOAT_PLUGIN_OK;
+    if (boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d) != BOAT_PLUGIN_OK
+        || boat_plugin_check_location(&revision->voyage, host->location, host->map, d)
+            != BOAT_PLUGIN_OK)
+        return false;
+    if (revision->voyage.manifest.objective) {
+        BoatPluginObjective probe = { .generation = 1, .rng = 12345 };
+        if (boat_plugin_objective_step(&probe, bundle->source, bundle->source_size,
+                BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, d)
+            != BOAT_PLUGIN_OK)
+            return false;
+        memcpy(revision->source, bundle->source, bundle->source_size);
+        revision->source_size = bundle->source_size;
+    }
+    return true;
 }
 
 static void copy_revision(
     BoatPluginHost *host, BoatPluginRevision *out, const BoatPluginRevision *in)
 {
+    out->source_size = in->source_size;
+    memcpy(out->source, in->source, in->source_size);
     if (host->racing)
         out->race = in->race;
     else
@@ -29,14 +42,22 @@ static void copy_revision(
 static BoatPluginChange classify(
     const BoatPluginHost *host, const BoatPluginRevision *a, const BoatPluginRevision *b)
 {
-    return host->racing ? boat_plugin_race_classify(&a->race, &b->race)
-                        : boat_plugin_classify(&a->voyage, &b->voyage);
+    BoatPluginChange change = host->racing ? boat_plugin_race_classify(&a->race, &b->race)
+                                           : boat_plugin_classify(&a->voyage, &b->voyage);
+    if (!host->racing && change < BOAT_PLUGIN_RESTART_VOYAGE
+        && (a->voyage.manifest.objective != b->voyage.manifest.objective
+            || a->source_size != b->source_size || memcmp(a->source, b->source, a->source_size)))
+        change = BOAT_PLUGIN_RESTART_VOYAGE;
+    return change;
 }
 
 bool boat_plugin_host_start(BoatPluginHost *host, const BoatWorldDefinition *location,
     const BoatMap *map, const BoatPluginBundle *bundle)
 {
-    *host = (BoatPluginHost) { .location = location, .map = map };
+    // Clear in place: a compound literal duplicates the revision history on the stack.
+    memset(host, 0, sizeof(*host));
+    host->location = location;
+    host->map = map;
     BoatPluginManifest manifest;
     if (boat_plugin_parse_manifest(
             bundle->manifest, bundle->manifest_size, NULL, &manifest, &host->diagnostic)

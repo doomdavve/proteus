@@ -3,8 +3,13 @@
 P3.1 `boat_plugin_state.*` covers fresh-instance objective callbacks, canonical integer state,
 atomic state/RNG/event/HUD commit, quarantine/reset, candidate migration, isolated checkpoint
 replay, resource/event limits and budget failures. These are headless harness checks; they do
-not assert a live objective or HUD integration. See the
-[experimental API](PLUGIN_API.md#experimental-objective-harness-p31).
+not assert a live objective or HUD integration. P3.2 adds `boat_plugin_session.lossless_events`,
+`live_objective`, `objective_revision_failure`, `objective_overflow` and `objective_tick_parity`: simultaneous native
+notices, exact T/T+1 output staging, optional arrival success/miss, recovery, immutable revision
+source, source-only reload/Undo and quarantine/overflow without preventing native arrival.
+A 1,200-tick repeated run also checks objective hash determinism and native boat/voyage/weather
+parity with callbacks disabled. These use virtual ticks; HUD appearance needs a windowed review. See the
+[objective API](PLUGIN_API.md#objective-transactions-p31--p32).
 
 P2 plugin checks: `boat_plugin_race.*` covers descriptor parity/rejections, revision/Undo,
 real-file trial controls with virtual time, and tick-for-tick four-boat fleet/event parity.
@@ -265,7 +270,7 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   read from a build-tree scratch directory, where missing files, an escaping entry, a symbolic
   link, a directory and oversized input are refused. Finally the decoded shelters must lie in
   the outer map's water. Instruction budgets are counted by a hook, never timed.
-- `boat_plugin_session` runs `validate_boat_plugin_session` (Lua plugins P1; ten quick cases
+- `boat_plugin_session` runs `validate_boat_plugin_session` (Lua plugins P1/P3.2; fourteen quick cases
   of about 37 ms together in Debug, plus a slow parity case of about 0.2 s). It covers staging
   against the outer map with field paths, and the classification of renames, route changes,
   water changes and other plugins. It applies each policy to a live `BoatSession`, including a

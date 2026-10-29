@@ -130,7 +130,7 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             "must match kind: outer for voyage, river for race");
     const char *grant = !strcmp(m.kind, "race") ? "race.define" : "voyage.define";
     const jsmntok_t *capabilities = &tokens[at[6]];
-    if (capabilities->type != JSMN_ARRAY || capabilities->size != 1)
+    if (capabilities->type != JSMN_ARRAY || (capabilities->size != 1 && capabilities->size != 2))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
             "must contain exactly the kind's define capability");
     char capability[32];
@@ -138,6 +138,14 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         || strcmp(capability, grant))
         return diagnose(
             d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]", "is not granted for this kind");
+    if (capabilities->size == 2) {
+        if (strcmp(m.kind, "voyage")
+            || !boat_json_text(json, &tokens[at[6] + 2], capability, sizeof(capability))
+            || strcmp(capability, "objective.hud"))
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities[2]",
+                "only objective.hud is granted for voyages");
+        m.objective = true;
+    }
     if (!boat_json_int(json, &tokens[at[7]], &state) || state != BOAT_PLUGIN_STATE_VERSION)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "state_version", "must be %d",
             BOAT_PLUGIN_STATE_VERSION);
@@ -350,6 +358,9 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
         bundle->source, bundle->source_size, manifest.entry, limits, &data, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
+    if (data.callbacks != manifest.objective)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest.entry, "init/update",
+            "callbacks require objective.hud and that capability requires both callbacks");
     Check check = { d, manifest.entry };
     if (!validate(&check, &data))
         return BOAT_PLUGIN_SCHEMA;

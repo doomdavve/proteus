@@ -11,6 +11,7 @@ typedef struct {
 } BoatPluginShelterData;
 
 typedef struct {
+    bool callbacks;
     unsigned shelter_count;
     BoatPluginShelterData shelters[BOAT_VOYAGE_SHELTERS];
     struct {
