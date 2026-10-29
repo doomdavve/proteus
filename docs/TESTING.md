@@ -11,6 +11,12 @@ A 1,200-tick repeated run also checks objective hash determinism and native boat
 parity with callbacks disabled. These use virtual ticks; HUD appearance needs a windowed review. See the
 [objective API](PLUGIN_API.md#objective-transactions-p31--p32).
 
+P3.3a adds `boat_plugin_state.timer_capabilities`, `timers_delivery`, `timers_atomicity` and
+`timers_capacity_and_checkpoint`: grant rejection, deterministic due/ID ordering, checkpoint
+resume, exact wide deadlines, migration retention, cancellation/re-arm, rollback and malformed
+checkpoints. `boat_plugin_session.objective_timers_reload` drives production T/T+1 staging,
+metadata rename, explicit restart/Undo and queue overflow with due timers. All use virtual time.
+
 P2 plugin checks: `boat_plugin_race.*` covers descriptor parity/rejections, revision/Undo,
 real-file trial controls with virtual time, and tick-for-tick four-boat fleet/event parity.
 `boat_race_plugin.*` runs the existing eleven native race cases against the loaded Lua

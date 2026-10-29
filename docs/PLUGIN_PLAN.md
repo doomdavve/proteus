@@ -4,17 +4,19 @@ Status, 2026-10-29: **P0, P1 and P2 implemented.** Native solo `outer` sessions 
 live-edit the Långedrag voyage; the local river trial now loads race descriptors through the
 same restricted evaluator and revision host. The compiled race remains the network default.
 P3.1 provides atomic objective transactions and P3.2 connects lossless native voyage events
-to an opt-in shelter-tour objective with a native HUD row. There is no in-game agent. The agreed direction
+to an opt-in shelter-tour objective with a native HUD row. P3.3a adds deterministic tick timers
+and their checkpoint/reload contract. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P3.2, lossless voyage events and live optional objective/HUD**, see the
+Completed task: **P3.3a, deterministic timers and pending-timer reload policy**, see the
+[P3.3a result](#p33a-result-2026-10-29). P3.2 integration is recorded in the
 [P3.2 result](#p32-result-2026-10-29). P2 river authoring remains recorded in its
 [P2 result](#p2-result-2026-10-29).
 Earlier results remain recorded under [P0](#p0-result-2026-10-28) and
 [P1](#p1-result-2026-10-28), including the user's native voyage play and live rename.
-**Next task: P3.3, timers/reload semantics, migration, resource retirement and inspection/seek.**
+**Next task: P3.3b, schema-aware live migration, resource composition/retirement and inspection/seek.**
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -123,8 +125,8 @@ there is no current named-place catalog or semantic map index.
 
 This section records the proposal as planned. Since P0 (2026-10-28), the manifest and voyage
 descriptor below are implemented, with the additions and exact rules in
-[the plugin API](PLUGIN_API.md); everything after them is still **proposed syntax**, and the
-game cannot load a plugin yet. P0 pinned Lua 5.4.9 after native and Emscripten feasibility
+[the plugin API](PLUGIN_API.md). Later snippets in this proposal retain **proposed syntax**;
+the API and milestone results identify the currently implemented native loading and callbacks. P0 pinned Lua 5.4.9 after native and Emscripten feasibility
 checks. Use the portable interpreter initially; no JIT or native
 module ABI is needed. The [Lua manual](https://www.lua.org/manual/5.4/manual.html) is a
 reference for the embedding interfaces, not a decision to pin that particular release.
@@ -950,11 +952,57 @@ tests** in `ctest --preset full` with local socket access and `PROTEUS_GPU_TESTS
 Windows execution remains pending the pushed CI run; a limited-stack macOS run does not
 establish MSVC behavior.
 
-**Next: P3.3** — timers and pending-timer reload policy, schema-aware live migration, resource
+**Next recorded at P3.2 (timers completed below): P3.3** — timers and pending-timer reload policy, schema-aware live migration, resource
 composition/retirement, state/command inspection and deterministic scenario seek with a complete
 native preview checkpoint. Continuous background reload/callback cost is not qualified as a
 deadline. Browser/rooms and targeted human edge-case checks remain open; the trip through
 arrival has been user-playtested.
+
+#### P3.3a result, 2026-10-29
+
+**Implemented:** bounded deterministic timers in the objective transaction engine and native
+solo adapter. P3.3 is split into this timer step and the remaining live migration/inspection
+work. The [timer API](PLUGIN_API.md#deterministic-timers-p33a) owns the exact contract.
+
+- Explicit `objective.timers` follows `voyage.define` and `objective.hud`; races, duplicates,
+  unsupported ordering and timer commands without the host grant are rejected.
+- A checkpoint owns at most 16 timers with absolute signed 64-bit simulation deadlines and
+  printable local IDs. `timer.set` replaces an ID, `timer.cancel` retires it. Due records sort
+  by deadline/ID and appear in a separate `context.timers` list, preserving native event order,
+  sequence and acknowledgment. A timer due between 10 Hz callbacks retains its original tick.
+- Due consumption, new commands, state, RNG and HUD output commit together, including native
+  T/T+1 staging. Errors, malformed commands, capacity failures and queue overflow retain
+  committed timers. Due timers can be re-armed in their consuming update. Checkpoint assignment
+  and canonical hashing include the grant and sorted timers; timer-free hashes stay unchanged.
+- Manifest-only renames keep pending timers/output. Explicit behavior restart and Undo retire
+  all old-generation timers and pending output before init creates new resources at the current
+  native tick. Successful isolated migrations retain pending timers unless explicitly changed;
+  failed migrations preserve everything. Schema-aware live source migration is still unimplemented.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
+
+- Project rebuild passed without project warnings. Full `ctest --preset full` passed
+  **298/298 enabled tests** in 13.86 s with local socket access; 13 retired field tests stayed
+  disabled. The sandbox-only run failed the ten existing socket-dependent tests.
+- All **27** objective/session cases passed under ASan/UBSan without reports, and in an
+  unsanitized run with a 1 MB stack limit. Lua live-byte checks remained zero. macOS ASan does
+  not provide leak detection; the sanitizer dependency build emitted bundled raylib warnings.
+  Windows/Linux execution remains pending CI; limited-stack macOS is not MSVC qualification.
+- A temporary timer-enabled package ran in an uninstrumented 180-frame GPU windowed demo;
+  the inspected capture shows `TIMER FIRED: 1` above unobscured native instruments. A display-free
+  CPU capture completed too; that capture path does not render the authoring panel. Local
+  artifacts are `build/p33-timer-window.png` and `build/p33-timer.png`; the temporary package is
+  `build/p33-timer-demo`. No human input, audio listening or user acceptance is claimed.
+- Changed documentation links and command examples were checked. No new visual primitive or
+  rendering code changed. Full GPU CTest, browser/rooms, background callback/reload deadlines
+  and human timer reload/Undo checks remain unverified.
+
+**Next: P3.3b** — schema-aware live revision migration and removed-resource retirement,
+resource composition/second-owner rejection, state/command trace inspection and deterministic
+scenario seek with a complete native preview checkpoint. Retained revision/total host memory
+accounting, separate callback/migration budgets, background staging deadline qualification,
+browser/room support and targeted human reload/recovery checks remain open. The existing
+P3.2 voyage-through-arrival acceptance does not establish human acceptance of timers.
 
 ### P4 — practical authoring on native and browser
 
@@ -1051,7 +1099,7 @@ generation are not prerequisites for that loop.
 | P0/P1 | Initial budgets and staging responsiveness: measure the descriptor case, permit a visible authoring pause first, then decide whether background compilation is justified. Do not call an instruction limit a compiler deadline. |
 | P1 | Reload UX and distribution: choose a key/menu action and opt-in launch selection, preserve-only default with explicit restart policy for incompatible edits; retain compiled defaults until parity and authoring review. |
 | P2/P3 | Supported rule extension depth: keep voyage/race/match engines in C and add orchestration first. Move no mature rule engine merely to make a larger Lua example. |
-| P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. Timers, live migration, inspection/seek and background reload qualification remain P3.3. |
+| P3 | P3.1 resolves state numbers to signed 64-bit integers; P3.2 supplies lossless voyage events, source ownership and a live optional objective/HUD. P3.3a adds deterministic tick timers and pending-timer reload policy. Live migration, resource composition/retirement, inspection/seek and background reload qualification remain P3.3b or later. |
 | P4 | Imported-code trust/isolation, minimal landmark names and browser editing: begin with local authored examples and a few curated anchors; require the appropriate staging isolation before broader sharing. |
 | P5 | Room content distribution, recording format and physical command prediction: preinstall matching packages and reload between rounds first; define version/size/late-join behavior before public scripted rooms. |
 | P6 | Provider/key UX, native versus browser agent support and autonomy policy: use the same host tools and selected workspace; keep provider/secret work entirely outside plugins. |

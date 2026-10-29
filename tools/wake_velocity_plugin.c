@@ -63,6 +63,7 @@ void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
     plugin->sequence = 0;
     plugin->objective_pending = false;
     const BoatPluginRevision *r = boat_plugin_host_active(&plugin->host);
+    plugin->objective.timers_enabled = r->voyage.manifest.timers;
     if (r->voyage.manifest.objective) {
         if (session->tick > INT64_MAX || !plugin->generation) {
             plugin->objective.quarantined = true;
