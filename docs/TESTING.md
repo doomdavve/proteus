@@ -717,3 +717,11 @@ numbered grenade commands, page reception and captures the weapon HUD and burst 
 
 Current automated/manual evidence and unavailable platform checks belong to the
 [deathmatch owner](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26-superseded-rules-historical-evidence).
+
+
+`boat_plugin_author` (native, slow CPU lane) checks the P4.1 JSON validator and disposable
+worker: voyage/race/objective examples, descriptor/init evidence, malformed framing, restricted
+Lua failures and budgets, immutable snapshot pins, input type/size rejection, and virtual-time
+cancellation/deadline cleanup. Cancellation lifecycle and malformed output use a fake process; an intentionally stuck real
+process also verifies kill/reap at a virtual deadline. Normal validation uses the native worker. No test waits for wall-clock time to pass.
+See [native authoring tools](PLUGIN_API.md#native-authoring-tools-p41).

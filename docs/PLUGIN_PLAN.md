@@ -8,16 +8,17 @@ to an opt-in shelter-tour objective with a native HUD row. P3.3a adds determinis
 and their checkpoint/reload contract. P3.3b adds schema-aware native migration, explicit
 resource retirement/composition and a complete compatible solo checkpoint/inspection harness.
 P3.4 accounts retained/native storage, separates instruction budgets and measures synchronous
-staging. Background/imported-code isolation remains a P4 gate. There is no in-game agent. The agreed direction
+staging. P4.1 adds discovery and isolated native validation; integration of imported/background
+staging into the game remains a P4 gate. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P3.4, native runtime qualification**, see the
-[P3.4 result](#p34-result-2026-10-29). Prior results retain their implementation,
+Completed task: **P4.1, native discovery and disposable validation**, see the
+[P4.1 result](#p41-result-2026-10-29). Prior results retain their implementation,
 automated/manual verification and user-acceptance evidence below.
-**Next task: P4 — practical authoring tools and isolated imported/background staging**, then
-browser import/reload/export through the same host operations. Human P3 migration/Undo/recovery
+**Next task: P4.2 — schema discovery, bounded preview and live background staging integration**,
+then browser import/reload/export through the same host operations. Human P3 migration/Undo/recovery
 acceptance and broader platform timing remain separate qualification work.
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
@@ -1183,6 +1184,43 @@ native load/reload and browser repeated sessions, source edits, errors and clean
 memory/compiler/callback costs on physical devices; declare unsupported capabilities rather
 than silently changing behavior. Native shell/file-watching assumptions must not leak into
 the common API. Browser agent connectivity can remain deferred.
+
+#### P4.1 result, 2026-10-29
+
+Implemented the first native authoring slice: `tools/plugin_author.py capabilities` reports
+supported operations, kinds, capabilities, budgets, examples and explicitly unsupported work.
+`validate DIRECTORY` snapshots the two bounded regular package files and invokes a disposable
+`boat_plugin_worker` with immutable length-framed bytes. The worker uses the existing revision
+host, including location checks and the objective init probe. It returns bounded JSON errors,
+gameplay digest and cost evidence; the supervisor adds a SHA-256 bundle ID and caller-supplied
+base revision. An expected bundle ID rejects changed snapshots before starting a worker.
+
+The reusable `ValidationJob` offers nonblocking poll and explicit cancellation. Its caller
+supplies monotonic time; expiry/cancellation kills and reaps the worker and closes temporary
+handles. No source is evaluated in the supervisor or applied to a running session. This is
+process fault/deadline isolation over restricted Lua, **not an OS security sandbox**. Source
+acquisition still runs synchronously; regular local files are required. No game/background
+staging path, imported-candidate installation, full schema discovery, scenario preview,
+capture, tool bridge, relocation packaging or browser support is claimed.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug: build and full
+`ctest --preset full` pass **305/305 enabled tests** (18.96 s), with local sockets and
+`PROTEUS_GPU_TESTS=OFF`; 13 retired field cases remain disabled. The build emitted an upstream
+raylib/stb_vorbis warning; project sources are warning-clean. All 286 local links/anchors in
+the four changed guides resolve. Discovery and all three documented validation commands ran.
+The dedicated test's ten cases cover all
+three examples, structured Lua errors and budget rejection, framing limits, changed snapshot
+pins, oversized/link/FIFO rejection, virtual-time deadlines/cancellation/reaping and invalid
+worker output. An intentionally stuck real process is killed/reaped at a virtual deadline;
+native worker success also runs through the reusable supervisor. No visual,
+input, audio or game asset-loading behavior changes; no new audiovisual or human acceptance
+review is claimed. Windows/Linux execution awaits CI.
+
+**Next: P4.2.** Add machine-readable schema discovery and bounded scenario preview/evidence;
+connect isolated requests to live candidate staging with base-revision rejection and atomic
+commit/Undo. Do not treat the returned correlation revision or digest as permission to apply,
+or re-evaluate imported Lua on the game thread. Then qualify imported/background staging and
+browser import/export separately. P3 human recovery/migration and target timing remain open.
 
 ### P5 — authority, prediction and recorded revisions
 

@@ -635,7 +635,8 @@ borrowed directory/map/world/view resources and process RSS. Stack scratch inclu
 revisions, transaction copies and recursive state decoding; the validators also run under a
 1 MiB stack limit. Preview checkpoints own another full plugin/session/wake copy; their
 `sizeof` is reported separately and each caller-requested checkpoint adds that amount.
-There is no retained VM per revision or background worker heap.
+The game has no retained VM per revision or background worker heap. The separate
+[P4.1 validator](#native-authoring-tools-p41) owns a disposable worker process.
 
 **Staging policy:** trusted native edits continue synchronously outside the fixed step;
 simulation delta during staging is discarded. Save polling uses that same authoring pause.
@@ -648,3 +649,51 @@ cancellable staging and qualify its failure deadline on each target. An instruct
 cannot cancel compilation or a C library call. Native Windows/Linux timing, browser/worker
 costs, human migration/Undo/recovery acceptance and an exhaustive hostile-input bound remain
 unqualified. See the [measured result](PLUGIN_PLAN.md#p34-result-2026-10-29).
+
+
+## Native authoring tools (P4.1)
+
+Build normally, then run from the source root (Python 3.10+):
+
+```sh
+python3 tools/plugin_author.py capabilities
+python3 tools/plugin_author.py validate plugins/langedrag
+python3 tools/plugin_author.py validate plugins/shelter-tour --base-revision 3 --timeout 5
+python3 tools/plugin_author.py validate plugins/river-sprint
+```
+
+`--worker PATH` selects another native build's `boat_plugin_worker` executable (Windows defaults
+to `build/boat_plugin_worker.exe`). These are development tools; release packages do not yet
+include them. `capabilities` returns JSON with limits, supported operations and unsupported
+features. The existing API sections above remain the descriptor schema reference.
+
+Validation snapshots `plugin.json` (4 KiB) and `main.lua` (64 KiB) from regular local files.
+Links and special files are rejected; the native manifest parser remains authoritative.
+A snapshot captures the bytes actually read, not an atomic filesystem transaction spanning
+two editor saves. It is never reread during validation. Every job is identified by SHA-256
+over its framed snapshot and an unsigned `base_revision` (default 0 for offline validation).
+`--expect-bundle HEX` optionally pins that exact snapshot, rejecting a mismatch before execution.
+The base revision is correlation metadata; no live owner or stale-commit check exists here.
+
+The worker uses the production host to check the descriptor, compiled location and objective
+init. JSON output includes `protocol`, `operation`, `bundle_id`, `base_revision`, `status`
+and, after normal completion, `evidence` with native status, file/line/field/message,
+gameplay digest and cost counters. This tests init, not future updates/migrations or playability.
+Exit 0 means valid; exit 1 means rejected/input error/worker failure/deadline/cancellation;
+invalid CLI syntax exits 2. Worker failures never produce accepted evidence.
+
+The default deadline is 5 seconds, configurable in (0, 60]. Ctrl-C cancels the job. The
+reusable `ValidationJob` in the script starts a disposable worker, polls with caller-supplied
+monotonic time and kills/reaps it on expiry or cancellation. Close each job in `finally`.
+Temporary handles are closed at completion. Polling at/after the deadline discards the result.
+This bounds acceptance by the supervising caller's polling schedule; it is not a hard real-time
+guarantee. Input acquisition runs before that deadline and assumes responsive local storage.
+The worker receives only immutable bytes through stdin; its stdout is bounded structured JSON.
+Its private framing is two big-endian uint32 lengths followed by manifest then source, with
+no trailing bytes. Raw native structs and pointer values never cross the process boundary.
+
+Process isolation and the restricted Lua API protect responsiveness and separate worker faults;
+this is not an OS security sandbox against interpreter vulnerabilities. The game still stages
+trusted local edits synchronously. Live background/import staging, schema discovery, bounded
+scenario preview/frame capture, apply/Undo, tool bridge and browser import are follow-up work.
+See the [P4.1 result](PLUGIN_PLAN.md#p41-result-2026-10-29).
