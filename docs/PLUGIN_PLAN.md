@@ -8,18 +8,23 @@ to an opt-in shelter-tour objective with a native HUD row. P3.3a adds determinis
 and their checkpoint/reload contract. P3.3b adds schema-aware native migration, explicit
 resource retirement/composition and a complete compatible solo checkpoint/inspection harness.
 P3.4 accounts retained/native storage, separates instruction budgets and measures synchronous
-staging. P4.1 adds discovery and isolated native validation; integration of imported/background
-staging into the game remains a P4 gate. There is no in-game agent. The agreed direction
+staging. P4.1 adds discovery and isolated native validation; P4.2 adds machine-readable schemas,
+bounded isolated voyage/race previews and disposable-process live descriptor staging for trusted
+native edits. P4.3 adds browser source bundles and isolated descriptor-only import/reload/export; browser
+objectives and race imports remain explicitly unsupported. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.1, native discovery and disposable validation**, see the
-[P4.1 result](#p41-result-2026-10-29). Prior results retain their implementation,
+Completed task: **P4.3, browser descriptor import/reload/export**, following
+[P4.2 native tools/staging](#p42-result-2026-10-29); see the [P4.3 result](#p43-result-2026-10-29). Prior results retain their implementation,
 automated/manual verification and user-acceptance evidence below.
-**Next task: P4.2 — schema discovery, bounded preview and live background staging integration**,
-then browser import/reload/export through the same host operations. Human P3 migration/Undo/recovery
-acceptance and broader platform timing remain separate qualification work.
+**Next task: broader target/browser qualification and the remaining P4 authoring tools**
+(capture/workspace bridge/anchors), then objective import isolation before broadening browser
+capabilities. Native startup, objective updates and Apply-time init/migration still evaluate
+trusted Lua synchronously; browser imports support only `voyage.define` and never evaluate
+source on the game thread.
+Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1135,7 +1140,7 @@ Dense staging peaks at **694,584 Lua bytes**, reference update at **21,757 bytes
 reported execution closes with zero live Lua bytes. Committed full-source history uses
 589,824 payload bytes, within rather than additional to the fixed native reservation.
 
-**Decision:** retain synchronous authoring pauses for trusted local edits. The experiment
+**Decision recorded at P3.4 (main-game descriptor staging superseded by P4.2):** retain synchronous authoring pauses for trusted local edits. The experiment
 meets local review thresholds of 100 ms per stage and 8.33 ms per reference update. These
 are measured review thresholds, not enforced wall-clock deadlines, real-time guarantees or
 exhaustive hostile-code bounds. Save polling also pauses synchronously; simulation delta is
@@ -1216,11 +1221,127 @@ native worker success also runs through the reusable supervisor. No visual,
 input, audio or game asset-loading behavior changes; no new audiovisual or human acceptance
 review is claimed. Windows/Linux execution awaits CI.
 
-**Next: P4.2.** Add machine-readable schema discovery and bounded scenario preview/evidence;
+**Next recorded at P4.1 (native slice implemented below): P4.2.** Add machine-readable schema discovery and bounded scenario preview/evidence;
 connect isolated requests to live candidate staging with base-revision rejection and atomic
 commit/Undo. Do not treat the returned correlation revision or digest as permission to apply,
 or re-evaluate imported Lua on the game thread. Then qualify imported/background staging and
 browser import/export separately. P3 human recovery/migration and target timing remain open.
+
+#### P4.2 result, 2026-10-29
+
+Implemented native schema discovery, isolated bounded scenario evidence and live descriptor
+staging for the existing **trusted local** voyage workflow:
+
+- `plugin_author.py schema` returns JSON Schema projections for manifests, voyage/race data and
+  objective commands, plus callback/context/state descriptions and explicit native semantic
+  constraints. This describes Lua records, not executable functions or a second interpreter.
+  The native parser remains authoritative; automated tests exercise every advertised numeric
+  descriptor bound against that decoder.
+- `preview DIRECTORY --ticks N` snapshots the same immutable bytes as validation and runs in
+  a disposable worker (0..72000 virtual ticks, default 360). The voyage fixture uses the
+  complete checkpoint/seek harness, player/traffic wakes and objective HUD; the race fixture
+  drives four native entrants. Versioned fixture names, tick/position or fleet evidence,
+  committed/pending objective digests and a SHA-256 artifact ID accompany bundle/base pins.
+  Failed updates reject the preview instead of producing a success artifact. This is scenario
+  evidence, not course completion, playability, frame capture or performance qualification.
+- `wake_velocity --plugin` now stages settled saves/F5 through its own headless
+  `--plugin-stage-worker` process. It receives immutable framed bytes and returns a versioned,
+  bounded, fieldwise binary64/string descriptor plus diagnostics; no raw structs, pointers or
+  interpreter state cross the boundary. Completion uses the same native schema/map checks
+  and classification without re-evaluating the candidate Lua. F7 is ignored while staging;
+  F6 cancels/reaps it, and superseding reloads and shutdown also cancel/reap. The active
+  revision continues stepping. Worker errors/deadlines retain active source/state/world.
+- Every request pins the active revision and a monotonic commit epoch, including Undo.
+  Completion against a changed base is rejected, even if the active revision number has
+  returned to the same value. Successful candidates use the existing between-tick
+  rename/migration/restart and Undo transactions. An isolated completion is an internal
+  request receipt, not an externally installable digest or cache artifact.
+- A request owns one bounded source snapshot (native reservation capped at 80 KiB), two
+  temporary streams and one worker; there is no unbounded request queue. Inspection reports
+  request bytes separately from the game owner. Process RSS, C/stdio/OS overhead and the
+  worker's world/Lua allocations are separate. Cancellation/deadline acceptance follows the
+  caller's polls; this is process fault isolation, not an OS security sandbox.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`: build and full
+`ctest --preset full` pass **306/306 enabled tests** (14.33 s) with loopback access; 13 retired field
+cases remain disabled. All 311 local links/anchors in the five changed guides resolve.
+The sandbox-only run failed the ten socket-dependent cases; the
+unrestricted full run passed. Project sources are warning-clean (the clean initial build
+emitted the existing upstream stb_vorbis warning). The authoring tests cover schemas and all
+numeric descriptor bounds, repeatable voyage/race artifacts, callback rejection, framing,
+bundle pins and virtual-time supervisor cleanup. `boat_plugin_stage` covers live native
+stepping during staging, Apply/rebind, repeated holds, Undo with same-number/new-epoch stale
+rejection, virtual deadline against a stuck worker, cancellation, malformed/oversized output,
+syntax rejection and the actual F5/completion adapter. The 120-frame windowed GPU demo passed.
+A relocated executable/assets/package check in paths containing spaces verified save polling,
+worker startup and automatic rename commit during a 240-frame GPU demo. These are agent-run
+smoke checks; no human keyboard/migration/Undo/recovery acceptance or timing claim is made.
+
+**Limits and next recorded at P4.2 (browser descriptor subset implemented below):** the standalone race trial still stages synchronously. Native startup,
+objective updates and Apply-time init/migration retain the trusted synchronous execution
+contract; map/file acquisition and temporary-stream setup also remain synchronous. Isolated
+**descriptor staging** does not qualify arbitrary imports or uninterrupted objective execution.
+Before enabling browser imported gameplay, isolate those remaining evaluation paths (or limit
+and explicitly advertise the supported capability subset), qualify cancellation/storage
+failure/repeated sessions on that target, then add browser import/reload/export. Interactive
+preview controls, capture, workspace bridge, curated anchors and release-tool packaging also
+remain open. Windows/Linux process execution awaits CI; target timing and P3 human recovery
+qualification remain open.
+
+#### P4.3 result, 2026-10-29
+
+Implemented browser import/reload/export for an explicitly limited capability subset:
+**solo `outer` voyage descriptors (`voyage.define`, schema 1)**. Objectives/timers and race
+imports reject before entry evaluation; rooms and recordings retain compiled content.
+This resolves the import gate for descriptors without extending the trusted native callback
+execution contract to browser imports.
+
+- The opt-in **PLUGIN VOYAGE** panel loads the reference example, imports/exports a version-1
+  source bundle, edits the two text files, stages/reloads, launches the staged voyage and
+  applies/undoes held revisions. Opening it pauses solo input; editor keys do not drive the
+  boat. Normal play retains the shared title. `plugin_author.py export DIRECTORY` emits the
+  same portable JSON bundle; exports are source drafts, not validation or state receipts.
+- Each evaluation uses a disposable Web Worker running the same pinned Lua and native
+  manifest/schema/map checks. The game consumes the matching fieldwise receipt and rechecks
+  native data, including its capability subset, without evaluating imported source at launch,
+  reload, Apply, Undo or on a tick. The prepared receipt is consumed once and matched to exact
+  bytes and revision/commit epoch; a later source reload creates a fresh worker request.
+- The browser rejects changed bases, syntax/capability errors, bad framing/output and expired
+  or canceled requests while retaining the active voyage. UI validation and a native-triggered
+  reload each own at most one job (transport cap two), with five-second acceptance deadlines.
+  Late callbacks are inert; completion/cancel/page hide terminates workers and retires entries.
+  Tab scheduling can delay watchdog delivery; this is not a hard real-time deadline.
+- The bundle contains `format`, `version`, and UTF-8 `manifest`/`source` strings, with the
+  existing 4 KiB/64 KiB encoded-byte caps and a 200,000-byte wrapper cap. Source persistence is
+  host-owned localStorage, with visible nonfatal denial/corruption handling. Restored source
+  must revalidate before play. No native world progress, callback state or historical Undo
+  checkpoint is persisted/exported.
+- Browser packaging content-addresses the lazy worker wrapper/module/Wasm and example bundle,
+  ships the Lua notice, and removes obsolete generated assets. A PR-only browser build workflow
+  checks the event contract and packaged Wasm build without publishing a site. Windows CI now
+  builds/runs the disposable authoring/staging checks; its initial constant-NaN fixture compile
+  error was corrected to the portable `NAN` macro. The reference parity check now compares
+  each storm field's bits instead of unspecified struct padding exposed by MSVC.
+
+Verification, 2026-10-29, Apple Silicon/macOS: native Debug build and full CPU CTest pass
+**307/307 enabled tests** (14.84 s), local loopback enabled, GPU CTests off; 13 retired field
+cases disabled. Emscripten **6.0.12** MinSizeRel `web` builds and packages successfully; project
+sources are warning-clean, with the clean web build's upstream miniaudio/stb warnings retained.
+All 384 local links/anchors across the nine changed guides resolve.
+The Node contract covers bundle encoding/limits, independent immutable frames, bounded worker
+slots, one-use receipts, stale epochs, cancellation/late output, virtual deadlines and worker
+fault/exit/framing rejection. `check_web_plugin_author.py` passes in local Chrome with SwiftShader:
+export/import equality, objective/race rejection, real worker launch, live rename, syntax error,
+held water Apply/Undo, stale response across Undo, cancellation/late completion, source
+restore/revalidation/repeated sessions, and storage denial. Gameplay, staged/held/error and
+storage-denial captures were inspected. This is agent-run browser qualification, not user play
+acceptance; Firefox/Safari, physical devices, tab suspension, peak memory/runtime and imported
+objective/callback execution remain unqualified. No website/release was published.
+
+**Next:** target/browser qualification and remaining P4 capture/workspace/anchor tools. Before
+adding objectives to browser imports, isolate their init/update/migration/Undo evaluation and
+state persistence transactions. Browser race authoring needs its own native preview integration.
+The P3 human migration/Undo/recovery and target timing gates remain open.
 
 ### P5 — authority, prediction and recorded revisions
 

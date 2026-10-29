@@ -120,7 +120,16 @@ static int same_route(const BoatVoyageRoute *a, const BoatVoyageRoute *b)
     CHECK(!memcmp(&a->arrival_centre, &b->arrival_centre, sizeof(a->arrival_centre)));
     CHECK(!memcmp(&a->arrival_radius, &b->arrival_radius, sizeof(float)));
     CHECK(!memcmp(&a->arrival_speed, &b->arrival_speed, sizeof(float)));
-    CHECK(!memcmp(&a->exposure, &b->exposure, sizeof(a->exposure)));
+    // BoatStorm has trailing padding on MSVC. Compare every authored field's bits,
+    // never indeterminate struct padding against a static compiled definition.
+    CHECK(!memcmp(&a->exposure.centre.x, &b->exposure.centre.x, sizeof(float)));
+    CHECK(!memcmp(&a->exposure.centre.y, &b->exposure.centre.y, sizeof(float)));
+    CHECK(!memcmp(&a->exposure.velocity.x, &b->exposure.velocity.x, sizeof(float)));
+    CHECK(!memcmp(&a->exposure.velocity.y, &b->exposure.velocity.y, sizeof(float)));
+    CHECK(!memcmp(&a->exposure.radius, &b->exposure.radius, sizeof(float)));
+    CHECK(!memcmp(&a->exposure.height, &b->exposure.height, sizeof(float)));
+    CHECK(!memcmp(&a->exposure.started, &b->exposure.started, sizeof(double)));
+    CHECK(!memcmp(&a->exposure.build, &b->exposure.build, sizeof(float)));
     CHECK(!memcmp(&a->exposed_fraction, &b->exposed_fraction, sizeof(float)));
     CHECK(!memcmp(&a->weather_range, &b->weather_range, sizeof(float)));
     return 0;

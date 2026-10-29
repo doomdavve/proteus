@@ -3,6 +3,7 @@
 // Lua plugin P1: the solo session's opt-in voyage plugin (--plugin), its Reload/Undo keys, save
 // polling and authoring panel. Definitions change only between ticks, through wake_plugin_frame.
 #include "boat_plugin_host.h"
+#include "boat_plugin_stage.h"
 #include "boat_session.h"
 #include <stdio.h>
 
@@ -19,6 +20,8 @@ typedef struct {
 } WakePluginTrace;
 
 typedef struct {
+    const char *stage_executable; // Opt-in trusted native asynchronous reload; borrowed path.
+    BoatPluginStageJob *staging; // Never copied into a preview checkpoint.
     const char *directory;
     BoatPluginHost host;
     BoatPluginFiles files; // The latest read; staging copies what it keeps.
@@ -45,6 +48,10 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory);
 // Read DIRECTORY, check it against SESSION's location and begin its voyage instead of the
 // compiled one. False with the diagnostic printed.
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);
+// Cancel/reap any pending staging job at session shutdown.
+void wake_plugin_close(WakePlugin *plugin);
+// Browser authoring controls pause solo input while the opt-in panel is open.
+bool wake_plugin_editing(void);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision
 // on UNDO (or discard a held one), and commit a held migration/restart on APPLY. A rename applies
 // at once. True when the caller must restart the session for a new exposure; SESSION's voyage route

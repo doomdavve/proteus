@@ -366,18 +366,27 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
         bundle->source, bundle->source_size, manifest.entry, limits, &data, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
-    if (data.callbacks != manifest.objective)
-        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest.entry, "init/update",
+    return boat_plugin_decode_voyage(&manifest, &data, out, d);
+}
+
+BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
+    const BoatPluginVoyageData *data, BoatPluginVoyage *out, BoatPluginDiagnostic *d)
+{
+    if (data->shelter_count < 2 || data->shelter_count > BOAT_VOYAGE_SHELTERS)
+        return diagnose(
+            d, BOAT_PLUGIN_SCHEMA, manifest->entry, "voyage.shelters", "requires 2..4 shelters");
+    if (data->callbacks != manifest->objective)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
             "callbacks require objective.hud and that capability requires both callbacks");
-    Check check = { d, manifest.entry };
-    if (!validate(&check, &data))
+    Check check = { d, manifest->entry };
+    if (!validate(&check, data))
         return BOAT_PLUGIN_SCHEMA;
 
-    BoatPluginVoyage candidate = { .manifest = manifest, .migrates = data.migrates };
+    BoatPluginVoyage candidate = { .manifest = *manifest, .migrates = data->migrates };
     BoatVoyageRoute *route = &candidate.route;
-    route->shelter_count = data.shelter_count;
-    for (unsigned i = 0; i < data.shelter_count; ++i) {
-        const BoatPluginShelterData *s = &data.shelters[i];
+    route->shelter_count = data->shelter_count;
+    for (unsigned i = 0; i < data->shelter_count; ++i) {
+        const BoatPluginShelterData *s = &data->shelters[i];
         memcpy(candidate.shelter_ids[i], s->id, sizeof(s->id));
         memcpy(candidate.shelter_names[i], s->name, sizeof(s->name));
         route->shelters[i].position = (Vector2) { (float)s->x, (float)s->z };
@@ -385,16 +394,16 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
         route->shelters[i].radius = (float)s->radius;
     }
     bind(&candidate);
-    route->arrival_centre = (Vector2) { (float)data.arrival.x, (float)data.arrival.z };
-    route->arrival_radius = (float)data.arrival.radius;
-    route->arrival_speed = (float)data.arrival.max_speed;
+    route->arrival_centre = (Vector2) { (float)data->arrival.x, (float)data->arrival.z };
+    route->arrival_radius = (float)data->arrival.radius;
+    route->arrival_speed = (float)data->arrival.max_speed;
     // Stationary rough water; the voyage sets STARTED.
-    route->exposure = (BoatStorm) { .centre = { (float)data.exposure.x, (float)data.exposure.z },
-        .radius = (float)data.exposure.radius,
-        .height = (float)data.exposure.height,
-        .build = (float)data.exposure.build };
-    route->exposed_fraction = (float)data.exposed_fraction;
-    route->weather_range = (float)data.weather_range;
+    route->exposure = (BoatStorm) { .centre = { (float)data->exposure.x, (float)data->exposure.z },
+        .radius = (float)data->exposure.radius,
+        .height = (float)data->exposure.height,
+        .build = (float)data->exposure.build };
+    route->exposed_fraction = (float)data->exposed_fraction;
+    route->weather_range = (float)data->weather_range;
     candidate.digest = boat_plugin_route_digest(route);
     boat_plugin_voyage_copy(out, &candidate);
     BoatPluginCost cost = d->cost;

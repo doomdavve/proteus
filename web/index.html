@@ -75,6 +75,18 @@
       summary { padding: 0 14px; }
       summary span { display: none; }
     }
+    #plugin-tools { margin: 12px 32px; z-index: 3; }
+    #plugin-tools summary { min-height: 36px; }
+    #plugin-panel { padding: 16px; background: #14262f; max-height: 75vh; overflow: auto; }
+    #plugin-panel label { display: block; margin: 8px 0; }
+    #plugin-panel input { width: auto; height: auto; }
+    #plugin-panel textarea { display: block; width: 100%; min-height: 110px; background: #101e25;
+      color: #edf2eb; font: 12px/1.4 monospace; }
+    #plugin-source { min-height: 240px !important; }
+    #plugin-panel button { margin: 4px; padding: 6px; }
+    body.playing #plugin-tools { position: fixed; right: 4px; top: 4px; margin: 0;
+      width: min(640px, 95vw); }
+    body.playing:not(.plugin-session) #plugin-tools { display: none; }
   </style>
 </head>
 <body>
@@ -103,6 +115,24 @@
     </main>
     <footer><span id="version">Version @WEB_VERSION@</span>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> · ODbL</footer>
   </div>
+  <details id="plugin-tools">
+    <summary>PLUGIN VOYAGE</summary>
+    <div id="plugin-panel">
+      <p>Solo outer-map voyages. Import a source bundle or edit the example, then stage it.
+        Objectives and race imports are unavailable in the browser.</p>
+      <label>Import bundle <input id="plugin-import" type="file" accept=".json"></label>
+      <button id="plugin-example">Load example</button><button id="plugin-export">Export draft</button>
+      <label>plugin.json<textarea id="plugin-manifest" spellcheck="false"></textarea></label>
+      <label>main.lua<textarea id="plugin-source" spellcheck="false"></textarea></label>
+      <button id="plugin-stage" disabled>Stage / reload</button><button id="plugin-cancel">Cancel staging</button>
+      <button id="plugin-play" disabled>Play staged voyage</button>
+      <button id="plugin-apply">Apply held revision</button><button id="plugin-undo">Undo / discard</button>
+      <p id="plugin-status" role="status"></p>
+      <p id="plugin-storage" role="status"></p>
+      <p>Staging errors keep the current voyage. Route and water edits wait for Apply.
+        Source is saved when storage permits; export a bundle to keep or share it.</p>
+    </div>
+  </details>
   <div id="stage">
     <canvas id="canvas" width="960" height="600" tabindex="0" aria-label="Boating game. Press question mark for controls. Escape opens the menu; return to the title to change settings."></canvas>
     <div id="mobile-controls" hidden aria-label="Mobile boating controls">
@@ -125,6 +155,7 @@
     var Module = {
       canvas: document.getElementById('canvas'),
       noInitialRun: true,
+      boatWebFiles: webFiles,
       // Public address discovery is needed on Pages as well as operator-hosted clients.
       boatIceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
       // The operator publishes live compatibility metadata when upgrading the room.

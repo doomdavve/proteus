@@ -1,6 +1,12 @@
 // Private P4 worker: immutable framed bytes in, bounded JSON evidence out. No package paths.
 #include "boat_plugin_host.h"
+#include "boat_plugin_stage.h"
 #include "boat_world.h"
+#include "wake_velocity_plugin.h"
+#include "waterfront_traffic.h"
+#include <errno.h>
+#include <math.h>
+#include <string.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,14 +35,124 @@ static unsigned length(const unsigned char *p)
     return (unsigned)p[0] << 24 | (unsigned)p[1] << 16 | (unsigned)p[2] << 8 | p[3];
 }
 
-int main(void)
+// Fixed, versioned virtual fixture. No display, files, wall-clock waits or playback effects.
+static bool preview(WakePlugin *plugin, const BoatWorldResources *resources, unsigned ticks,
+    BoatPluginDiagnostic *d)
 {
+    BoatPluginHost *host = &plugin->host;
+    if (host->racing) {
+        BoatFleet *fleet = calloc(1, sizeof(*fleet));
+        BoatRace race;
+        bool ok = fleet
+            && boat_fleet_init(fleet, resources, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS,
+                BOAT_OBJECT_DEFAULT_HEIGHT)
+            && boat_race_init(&race, &boat_plugin_host_active(host)->race.rules,
+                &boat_plugin_host_active(host)->race.course);
+        for (unsigned i = 0; ok && i < BOAT_FLEET_SLOTS; ++i)
+            ok = boat_race_join(&race, fleet, i);
+        for (unsigned t = 0; ok && t < ticks; ++t) {
+            BoatInput inputs[BOAT_FLEET_SLOTS] = { 0 };
+            for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+                inputs[i].throttle_rate = t < 120 ? 1 : 0;
+            BoatRaceOutput output;
+            ok = boat_fleet_step(fleet, inputs);
+            boat_race_observe(&race, fleet, &output);
+        }
+        if (ok)
+            printf("\"preview\":{\"fixture\":\"race-four-grid-v1\",\"ticks\":%u,"
+                   "\"phase\":%u,\"round\":%u,\"fleet_digest\":\"%016llx\"}",
+                ticks, (unsigned)race.phase, race.round,
+                (unsigned long long)boat_fleet_hash(&fleet->state));
+        free(fleet);
+        if (!ok)
+            d->status = BOAT_PLUGIN_RUNTIME;
+        return ok;
+    }
+    BoatSession session;
+    boat_session_init(&session, resources, (BoatWater) { 0 });
+    BoatWakeObjects objects, traffic;
+    WakePluginPreview *origin = calloc(1, sizeof(*origin));
+    WakePluginPreview *checkpoint = calloc(1, sizeof(*checkpoint));
+    WakePluginReviewTick *inputs = calloc(ticks + 1, sizeof(*inputs));
+    bool ok = origin && checkpoint && inputs
+        && boat_wake_objects_init(&objects, BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT)
+        && waterfront_traffic_wakes_init(&traffic, 0);
+    if (!ok) {
+        d->status = BOAT_PLUGIN_MEMORY;
+        goto done;
+    }
+    session.world.water.objects = &objects;
+    session.world.water.traffic_objects = &traffic;
+    boat_session_restart_voyage(&session, &boat_plugin_host_active(host)->voyage.route);
+    wake_plugin_reset_objective(plugin, &session);
+    for (unsigned t = 0; t < ticks; ++t)
+        inputs[t].input = (BoatInput) { .throttle_rate = t < 120 ? 1 : 0,
+            .steering_rate = (t / 240) % 2 ? -.1f : .1f };
+    unsigned split = ticks / 2;
+    ok = wake_plugin_preview_save(origin, plugin, &session)
+        && wake_plugin_preview_seek(origin, plugin, &session, &objects, &traffic, inputs, split)
+        && wake_plugin_preview_save(checkpoint, plugin, &session)
+        && wake_plugin_preview_seek(
+            checkpoint, plugin, &session, &objects, &traffic, inputs + split, ticks - split);
+    if (plugin->objective.quarantined) {
+        *d = plugin->objective_diagnostic;
+        ok = false;
+    }
+    if (ok) {
+        printf("\"preview\":{\"fixture\":\"voyage-calm-steer-v1\",\"ticks\":%u,"
+               "\"checkpoint_tick\":%u,\"position\":[%.9g,%.9g],\"player_wakes\":%u,"
+               "\"traffic_wakes\":%u,\"objective_digest\":\"%016llx\","
+               "\"pending_digest\":\"%016llx\",\"pending\":%s,\"generation\":%u,\"hud\":[",
+            ticks, split, (double)session.boat.position.x, (double)session.boat.position.y,
+            objects.live, traffic.live,
+            (unsigned long long)boat_plugin_objective_digest(&plugin->objective),
+            (unsigned long long)(plugin->objective_pending
+                    ? boat_plugin_objective_digest(&plugin->staged_objective)
+                    : 0),
+            plugin->objective_pending ? "true" : "false", plugin->generation);
+        for (unsigned i = 0; i < plugin->objective.hud_count; ++i) {
+            if (i)
+                putchar(',');
+            printf("{\"id\":");
+            json_text(plugin->objective.hud[i].id);
+            printf(",\"label\":");
+            json_text(plugin->objective.hud[i].label);
+            // int64 JSON string avoids rounding in browser/tool consumers.
+            printf(",\"value\":\"%lld\"}", (long long)plugin->objective.hud[i].value);
+        }
+        printf("]}");
+    } else if (d->status == BOAT_PLUGIN_OK)
+        d->status = BOAT_PLUGIN_RUNTIME;
+done:
+    boat_session_destroy(&session);
+    free(inputs);
+    free(checkpoint);
+    free(origin);
+    return ok;
+}
+
+int main(int argc, char **argv)
+{
+    if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
+        return boat_plugin_stage_worker();
 #ifdef _WIN32
     _setmode(_fileno(stdin), _O_BINARY);
 #endif
+    unsigned ticks = 0;
+    bool run_preview = argc == 3 && !strcmp(argv[1], "--preview");
+    if (run_preview) {
+        char *end;
+        errno = 0;
+        unsigned long parsed = strtoul(argv[2], &end, 10);
+        if (errno || !argv[2][0] || *end || parsed > 72000)
+            return 2;
+        ticks = (unsigned)parsed;
+    } else if (argc != 1)
+        return 2;
     unsigned char header[8];
     BoatPluginFiles *files = calloc(1, sizeof(*files));
-    BoatPluginHost *host = calloc(1, sizeof(*host));
+    WakePlugin *plugin = calloc(1, sizeof(*plugin));
+    BoatPluginHost *host = plugin ? &plugin->host : NULL;
     BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
     BoatWorldResources resources = { 0 };
     uint64_t digest = 0;
@@ -68,7 +184,14 @@ int main(void)
         digest = host->racing ? revision->race.digest : revision->voyage.digest;
     }
 done:
-    printf("{\"status\":");
+    printf("{");
+    if (run_preview && d.status == BOAT_PLUGIN_OK) {
+        // Open a nested evidence member first; a failed scenario emits no success artifact.
+        printf("\"scenario\":{");
+        preview(plugin, &resources, ticks, &d);
+        printf("},");
+    }
+    printf("\"status\":");
     json_text(boat_plugin_status_name(d.status));
     printf(",\"file\":");
     json_text(d.file);
@@ -84,7 +207,7 @@ done:
         (unsigned long long)d.cost.callback_instructions, d.cost.peak_bytes, d.cost.leaked_bytes,
         d.cost.fields);
     boat_world_resources_destroy(&resources);
-    free(host);
+    free(plugin);
     free(files);
     return d.status == BOAT_PLUGIN_OK ? 0 : 1;
 }

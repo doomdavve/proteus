@@ -137,6 +137,7 @@ add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_
   src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
+target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h)
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
@@ -288,6 +289,11 @@ if(NOT EMSCRIPTEN)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
 endif()
 
+# Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
+target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h)
+target_link_libraries(wake_velocity PRIVATE proteus_plugins)
+target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_PLUGINS=1)
+
 if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
   target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_NET=1)
@@ -296,11 +302,6 @@ if(EMSCRIPTEN)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
 
-# Lua plugin P1: native solo sessions take an opt-in voyage plugin (--plugin). The browser game
-# does not link the plugin host yet.
-target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h)
-target_link_libraries(wake_velocity PRIVATE proteus_plugins)
-target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_PLUGINS=1)
 
 add_custom_target(proteus_assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -530,6 +531,10 @@ set_tests_properties(boat_fleet_render PROPERTIES LABELS "render;cpu"
   PASS_REGULAR_EXPRESSION "boat_fleet_render=ok")
 find_program(PROTEUS_NODE_EXECUTABLE node)
 if(PROTEUS_NODE_EXECUTABLE)
+  add_test(NAME web_plugin_author COMMAND ${PROTEUS_NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_plugin_author.cjs)
+  set_tests_properties(web_plugin_author PROPERTIES LABELS "cpu"
+    PASS_REGULAR_EXPRESSION "web_plugin_author=ok")
   add_test(NAME web_server_directory COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_server_directory.cjs)
   set_tests_properties(web_server_directory PROPERTIES LABELS "cpu"
@@ -636,9 +641,19 @@ target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_boat_se
 target_compile_options(boat_plugin_review PRIVATE ${PROTEUS_WARNINGS})
 # P4 native isolated authoring validator; intentionally absent from the browser runtime.
 if(NOT EMSCRIPTEN)
-  add_executable(boat_plugin_worker tools/boat_plugin_worker.c)
-  target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins)
+  add_executable(boat_plugin_worker tools/boat_plugin_worker.c tools/wake_velocity_plugin.c)
+  target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_boat_session)
   target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
+  add_executable(validate_boat_plugin_stage tools/validate_boat_plugin_stage.c
+    tools/wake_velocity_plugin.c)
+  target_link_libraries(validate_boat_plugin_stage PRIVATE proteus_plugins proteus_boat_session)
+  target_compile_options(validate_boat_plugin_stage PRIVATE ${PROTEUS_WARNINGS})
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-stage-test")
+  target_compile_definitions(validate_boat_plugin_stage PRIVATE
+    BOAT_PLUGIN_STAGE_DIR="${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-stage-test")
+  add_test(NAME boat_plugin_stage COMMAND validate_boat_plugin_stage)
+  set_tests_properties(boat_plugin_stage PROPERTIES LABELS "cpu"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
   add_test(NAME boat_plugin_author COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
     --worker $<TARGET_FILE:boat_plugin_worker>)
@@ -1114,7 +1129,7 @@ set(PROTEUS_SLOW_TESTS
   boat_river_screenshot)
 
 if(TEST boat_plugin_author)
-  list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author)
+  list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_stage)
 endif()
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)

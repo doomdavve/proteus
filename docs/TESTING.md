@@ -719,9 +719,27 @@ Current automated/manual evidence and unavailable platform checks belong to the
 [deathmatch owner](DEATHMATCH_PLAN.md#weapon-milestone--2026-10-26-superseded-rules-historical-evidence).
 
 
-`boat_plugin_author` (native, slow CPU lane) checks the P4.1 JSON validator and disposable
+`boat_plugin_author` (native, slow CPU lane) checks the P4.1/P4.2 JSON validator/preview tools and disposable
 worker: voyage/race/objective examples, descriptor/init evidence, malformed framing, restricted
 Lua failures and budgets, immutable snapshot pins, input type/size rejection, and virtual-time
 cancellation/deadline cleanup. Cancellation lifecycle and malformed output use a fake process; an intentionally stuck real
 process also verifies kill/reap at a virtual deadline. Normal validation uses the native worker. No test waits for wall-clock time to pass.
 See [native authoring tools](PLUGIN_API.md#native-authoring-tools-p41).
+
+P4.2 extends `boat_plugin_author` with JSON Schema discovery and every numeric descriptor
+bound checked against the native decoder, repeatable voyage/race scenario artifacts and
+preview callback rejection. `boat_plugin_stage` (native, slow CPU lane) checks checked-data
+handoff, native stepping during staging, held Apply/rebind, repeated candidates, same-number
+stale epochs after Undo, virtual deadlines against a stuck process, F6 cancellation,
+malformed/oversized output, syntax failure and the live F5/completion adapter. Its process
+completion loops await an external event; CTest supplies the failure deadline. No simulated
+clock is advanced to wait for a child. See [live descriptor staging](PLUGIN_API.md#live-descriptor-staging-p42).
+
+P4.3 adds `web_plugin_author` (Node, CPU quick lane): portable bundle/UTF-8 byte caps, immutable
+framing, bounded worker lanes, one-use receipts, stale epochs, virtual deadlines, cancellation,
+late output and worker/exit/framing faults. The opt-in
+`python3 tools/check_web_plugin_author.py --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
+drives an actual served Wasm build through bundle export/import, capability rejection, launch,
+live rename and syntax failure, held water Apply/Undo, stale output, cancellation, repeated
+source restore/revalidation and storage denial. It awaits application/worker conditions rather
+than fixed sleeps. The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.

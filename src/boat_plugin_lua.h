@@ -44,6 +44,10 @@ BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const cha
 BoatPluginStatus boat_plugin_lua_voyage(const char *source, size_t size, const char *chunk,
     const BoatPluginLimits *limits, BoatPluginVoyageData *out, BoatPluginDiagnostic *diagnostic);
 
+// Decode already evaluated data using the same checks, without opening a Lua VM.
+BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
+    const BoatPluginVoyageData *data, BoatPluginVoyage *out, BoatPluginDiagnostic *diagnostic);
+
 // Private protected execution for the P3 transition decoder. CALLBACK receives the entry's
 // returned table at index 2 and CONTEXT as light userdata at index 1. All Lua work (including
 // setup, state decoding and output staging) remains inside a protected call and allocator.

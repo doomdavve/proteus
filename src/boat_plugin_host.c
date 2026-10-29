@@ -138,19 +138,27 @@ bool boat_plugin_host_stage(BoatPluginHost *host, const BoatPluginBundle *bundle
         boat_plugin_host_discard(host);
         return false;
     }
+    return boat_plugin_host_stage_decoded(
+        host, &candidate, boat_plugin_host_active(host)->number, host->epoch);
+}
+
+bool boat_plugin_host_stage_decoded(
+    BoatPluginHost *host, const BoatPluginRevision *candidate, unsigned base, uint64_t epoch)
+{
+    if (host->epoch != epoch || boat_plugin_host_active(host)->number != base)
+        return false;
     const BoatPluginRevision *active = boat_plugin_host_active(host);
-    host->change = classify(host, active, &candidate);
+    host->change = classify(host, active, candidate);
     // A candidate identical to the one already held keeps its number.
     const BoatPluginRevision *held = boat_plugin_host_held(host);
-    bool repeated
-        = held && !host->undo && classify(host, held, &candidate) == BOAT_PLUGIN_UNCHANGED;
+    bool repeated = held && !host->undo && classify(host, held, candidate) == BOAT_PLUGIN_UNCHANGED;
     boat_plugin_host_discard(host);
     if (host->change == BOAT_PLUGIN_UNCHANGED || host->change == BOAT_PLUGIN_INCOMPATIBLE)
         return true;
     unsigned slot = free_slot(host);
     BoatPluginRevision *revision = &host->slots[slot];
     unsigned number = repeated ? held->number : ++host->numbered;
-    copy_revision(host, revision, &candidate);
+    copy_revision(host, revision, candidate);
     revision->number = number;
     host->held = true;
     host->held_slot = slot;
@@ -178,6 +186,7 @@ const BoatPluginRevision *boat_plugin_host_commit(BoatPluginHost *host)
         boat_plugin_host_discard(host);
         return NULL;
     }
+    ++host->epoch;
     if (host->undo) {
         --host->depth; // The previous revision is active again.
     } else {

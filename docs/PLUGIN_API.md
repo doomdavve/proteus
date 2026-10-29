@@ -1,10 +1,12 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-29: **P1 voyage, P2 local race authoring, P3.2 optional voyage objectives
-P3.3a timers and P3.3b migration/review implemented** on top of the P0 loader and P3.1 transactions. P2 adds `boat_race_trial --plugin plugins/river-sprint` and headless native race checks.
+Status, 2026-10-29: **P0–P3 native descriptors/objectives and P4.1–P4.3 authoring tools implemented**.
+Native tooling includes schema discovery, isolated validation/preview and live descriptor staging;
+the browser supports source bundles for solo voyage descriptors.
 A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
 when the file is saved or on F5, undo, and apply route or water changes with an explicit
-restart. Rooms, the course and replays, and the browser game keep the compiled voyage. The
+restart. Rooms, the course and replays keep compiled content. The browser offers an opt-in
+[descriptor-only import workflow](#browser-source-bundles-p43). The
 [plugin plan](PLUGIN_PLAN.md) owns the staged roadmap; this guide owns the current contract.
 [All plans](README.md).
 
@@ -16,8 +18,8 @@ restart. Rooms, the course and replays, and the browser game keep the compiled v
 | Why 5.4 | It is the mature release line. 5.5 (2025-12) is newer; moving to it is a deliberate later choice, not a patch update. |
 | Compiled files | VM/compiler sources plus `lauxlib`, `lbaselib`, `lstrlib`, `ltablib`, `lmathlib` only (`proteus_lua`). `loadlib`, `liolib`, `loslib`, `ldblib`, `lcorolib`, `lutf8lib`, `linit` and the `lua`/`luac` programs are **not compiled**. |
 | Configuration | Unmodified sources; the portable default `luaconf.h` (no platform `LUA_USE_*`). `cmake/proteus_lua.h` is force-included to fix the string-hash seed, so table traversal and diagnostics are identical from run to run. The project-wide `-ffp-contract=off` applies. |
-| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser game does not link the plugin host: it has no `--plugin` and no files to edit (browser import is P4). |
-| License | Lua is MIT-licensed ("Copyright (C) 1994-2026 Lua.org, PUC-Rio"); the notice is at the end of `lua.h`. Configure extracts it to `build/lua-LICENSE.txt` and fails if it is missing. Native packages ship it as `lua-LICENSE.txt` beside the raylib/jsmn/ENet notices (`tools/macos/package.py`, `.github/workflows/windows-boat.yml`). The web site does not contain Lua, so `tools/package_web.py` is unchanged. |
+| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser links the shared descriptor transactions and evaluates imported source only in a disposable Web Worker; its [P4.3 subset](#browser-source-bundles-p43) is solo voyage descriptors. |
+| License | Lua is MIT-licensed ("Copyright (C) 1994-2026 Lua.org, PUC-Rio"); the notice is at the end of `lua.h`. Configure extracts it to `build/lua-LICENSE.txt` and fails if it is missing. Native packages ship it as `lua-LICENSE.txt` beside the raylib/jsmn/ENet notices (`tools/macos/package.py`, `.github/workflows/windows-boat.yml`). The web package now ships `lua-LICENSE.txt` alongside its lazy Lua/Wasm descriptor worker (`tools/package_web.py`). |
 
 ## Package
 
@@ -212,7 +214,7 @@ outcome is also printed to stderr as `Plugin DIR: ...`.
 | --- | --- |
 | Save the files | Polled every 0.25 s. Once the package's bytes have stayed unchanged for 0.3 s they are staged once, so an editor's several writes (or a manifest and entry saved one after the other) become one candidate. The browser does not poll. |
 | F5 | Read and stage the package now |
-| F6 | Discard a held candidate; otherwise hold the previous revision (Undo) |
+| F6 | Cancel in-flight main-game staging and discard held output; otherwise discard a held candidate or hold the previous revision (Undo) |
 | F7 | Apply a held migration or native restart |
 
 Staging never changes the running voyage. A candidate is compared with the active revision
@@ -239,8 +241,8 @@ old shelter index: every restart begins at shelter 0.
 
 ## Native interface
 
-`src/boat_plugin.h` works on immutable bytes and does no I/O. `src/boat_plugin_io.h` is the only
-plugin code that touches files.
+`src/boat_plugin.h` works on immutable bytes and does no I/O. `src/boat_plugin_io.h` acquires package files;
+`src/boat_plugin_stage.[ch]` owns the private temporary-stream/worker transport.
 
 ```c
 BoatPluginFiles *files = malloc(sizeof(*files)); // About 68 KiB of bounded buffers.
@@ -425,8 +427,8 @@ and initialization field-by-field; the timer grant adds a tagged timer-count/ID/
 including an empty timer list when granted. Timer-free package hashes remain unchanged.
 It excludes quarantine and C padding. Native checkpoint
 assignment supports an **isolated harness** restore/replay. It must not be used to restore old
-script state beside a world that kept advancing. There is no schema-version-aware revision
-manager, full native world rewind, human-facing state inspection or command trace yet.
+script state beside a world that kept advancing. The [P3.3b adapter](#live-migration-and-review-p33b)
+now provides schema-aware migration, complete compatible solo review and developer inspection.
 
 ### Live optional voyage objective (P3.2)
 
@@ -470,9 +472,10 @@ objective state and pending output. Behavior and schema edits use the [migration
 policy](#live-migration-and-review-p33b). Route gameplay changes still restart the voyage;
 water edits restart the session. F6 Undo applies old code to current state under that same
 policy. A new voyage/session clears queued events, pending output, quarantine, timers and rows.
-A rejected candidate leaves active source, state, generation and route intact. Browser/room
-behavior remain unqualified. Native synchronous staging is measured in
-[P3.4](#native-runtime-qualification-p34); background isolation/cancellation remains a P4 gate.
+A rejected candidate leaves active source, state, generation and route intact. Browser objectives are explicitly unsupported; room
+behavior remains unqualified. Trusted native descriptor staging now uses the [P4.2 live
+worker](#live-descriptor-staging-p42); startup, updates and Apply-time init/migration remain
+synchronous under the [P3.4 qualification](#native-runtime-qualification-p34).
 This API is experimental.
 
 ### Deterministic timers (P3.3a)
@@ -635,17 +638,20 @@ borrowed directory/map/world/view resources and process RSS. Stack scratch inclu
 revisions, transaction copies and recursive state decoding; the validators also run under a
 1 MiB stack limit. Preview checkpoints own another full plugin/session/wake copy; their
 `sizeof` is reported separately and each caller-requested checkpoint adds that amount.
-The game has no retained VM per revision or background worker heap. The separate
-[P4.1 validator](#native-authoring-tools-p41) owns a disposable worker process.
+The game has no retained VM per revision. The [P4.1 validator](#native-authoring-tools-p41)
+and [P4.2 live staging](#live-descriptor-staging-p42) each use a separate disposable worker
+whose world, Lua heap and process overhead are outside the parent owner reservation.
 
-**Staging policy:** trusted native edits continue synchronously outside the fixed step;
-simulation delta during staging is discarded. Save polling uses that same authoring pause.
+**Historical P3.4 staging policy:** trusted native edits staged synchronously outside the fixed
+step, with simulation delta during staging discarded. P4.2 replaces descriptor staging in the
+main native game with the [live worker](#live-descriptor-staging-p42); the race trial, native
+startup and objective transitions keep their synchronous execution contract.
 The local experiment targets 100 ms per stage and one 8.33 ms native tick for a reference
 update, as review thresholds rather than promises or runtime deadlines. The measured sample
 set meets those thresholds; expensive permitted module evaluation can still hitch a tick.
-This qualifies the existing local workflow and does not enable uninterrupted background
-compilation. Before arbitrary imports or background live authoring, P4 must establish isolated,
-cancellable staging and qualify its failure deadline on each target. An instruction hook
+This qualifies the historical local workflow, not uninterrupted background execution. P4.2
+adds disposable-process descriptor staging, but arbitrary imports still require isolation of
+startup/updates/Apply-time evaluation and target-specific deadline qualification. An instruction hook
 cannot cancel compilation or a C library call. Native Windows/Linux timing, browser/worker
 costs, human migration/Undo/recovery acceptance and an exhaustive hostile-input bound remain
 unqualified. See the [measured result](PLUGIN_PLAN.md#p34-result-2026-10-29).
@@ -657,6 +663,10 @@ Build normally, then run from the source root (Python 3.10+):
 
 ```sh
 python3 tools/plugin_author.py capabilities
+python3 tools/plugin_author.py schema
+python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
+python3 tools/plugin_author.py preview plugins/shelter-tour --ticks 360 --base-revision 3
+python3 tools/plugin_author.py preview plugins/river-sprint --ticks 600
 python3 tools/plugin_author.py validate plugins/langedrag
 python3 tools/plugin_author.py validate plugins/shelter-tour --base-revision 3 --timeout 5
 python3 tools/plugin_author.py validate plugins/river-sprint
@@ -665,7 +675,10 @@ python3 tools/plugin_author.py validate plugins/river-sprint
 `--worker PATH` selects another native build's `boat_plugin_worker` executable (Windows defaults
 to `build/boat_plugin_worker.exe`). These are development tools; release packages do not yet
 include them. `capabilities` returns JSON with limits, supported operations and unsupported
-features. The existing API sections above remain the descriptor schema reference.
+features. `schema` returns JSON Schema projections for strict manifests, voyage/race records
+and objective commands plus callback/context/state descriptions and native-only constraints.
+It describes data values; Lua functions are not JSON values. Geometry, duplicate JSON keys,
+resource ownership and cross-field rules still require native validation.
 
 Validation snapshots `plugin.json` (4 KiB) and `main.lua` (64 KiB) from regular local files.
 Links and special files are rejected; the native manifest parser remains authoritative.
@@ -693,7 +706,101 @@ Its private framing is two big-endian uint32 lengths followed by manifest then s
 no trailing bytes. Raw native structs and pointer values never cross the process boundary.
 
 Process isolation and the restricted Lua API protect responsiveness and separate worker faults;
-this is not an OS security sandbox against interpreter vulnerabilities. The game still stages
-trusted local edits synchronously. Live background/import staging, schema discovery, bounded
-scenario preview/frame capture, apply/Undo, tool bridge and browser import are follow-up work.
-See the [P4.1 result](PLUGIN_PLAN.md#p41-result-2026-10-29).
+this is not an OS security sandbox against interpreter vulnerabilities.
+See the [P4.1 result](PLUGIN_PLAN.md#p41-result-2026-10-29) for historical evidence and
+[P4.2](PLUGIN_PLAN.md#p42-result-2026-10-29) for live descriptor staging and preview.
+
+`preview` uses the same deadline/cancellation/snapshot path with `--ticks 0..72000` (default
+360). Voyage fixture `voyage-calm-steer-v1` reproduces the complete native checkpoint/seek
+review, splitting at `ticks/2`, with player/traffic wakes, throttle for the first 120 ticks
+and steering alternating every 240. Its evidence includes position, wake counts, generation,
+committed/pending objective digests and current HUD rows (int64 values are decimal strings).
+Race fixture `race-four-grid-v1` joins all four native entrants, applies throttle for 120 ticks,
+and reports phase, round and the canonical fleet digest. Neither fixture promises to finish
+the authored route. A quarantined objective rejects the preview. Cost counters describe staging,
+not aggregate simulation work. Successful preview output adds `artifact_id`, SHA-256 over the
+bundle/base pins and canonical scenario evidence; it is evidence, never permission to install
+anything. No frame capture or application playback effects run in the worker.
+
+## Live descriptor staging (P4.2)
+
+Native `wake_velocity --plugin DIRECTORY` starts trusted packages as before, then runs settled
+save/F5 **descriptor staging** in a disposable child of that same executable, using its private
+`--plugin-stage-worker` mode before window/audio initialization. It needs no Python or separate
+worker binary, including after package relocation. The active native session keeps stepping.
+One request owns immutable bytes, a five-second poll-driven acceptance deadline and the current
+revision/commit epoch. F5 or a settled newer save cancels/reaps the previous request; F6 cancels
+it and discards held output. F7 does nothing while staging. Completion can auto-apply a display
+rename or offer the existing F7 migration/restart policy. Undo changes the commit epoch, so an
+old response cannot apply merely because its revision number reappears. A failed current
+request drops held output and preserves active source/state/world; stale responses retain the
+newer active/held revisions and report the stale-base diagnostic. Shutdown cancels/reaps. Preview checkpoint save/restore refuses an owner with
+an in-flight process.
+
+The private response is `PST2`, fieldwise network-order unsigned integers, IEEE binary64 data
+and bounded length-prefixed strings, at most 4096 bytes. Completion checks the version, exact
+framing, exit/status agreement and native schema/map constraints, then installs checked data
+without running the candidate Lua again **during staging**. The immutable request retains any
+objective source for the existing trusted callbacks. This channel is local to a matching worker
+and live host; a CLI artifact/digest is not an installation receipt. The standalone race trial
+keeps its synchronous staging path.
+
+The request's fixed native reservation is at most 80 KiB (reported as `staging_native` by
+inspection), plus temporary-stream/OS overhead and the separate child's world/Lua/process memory.
+Only one worker exists per owner; no request backlog accumulates. File acquisition, spawn and
+small temporary-stream writes still occur synchronously and assume responsive local storage.
+Native file reads reject FIFOs without waiting for a writer.
+
+**Trust boundary:** native startup, objective update callbacks and Apply-time init/migration
+still evaluate trusted Lua synchronously. Process isolation of descriptor staging does not
+qualify arbitrary imported code or guarantee uninterrupted objective execution. Browser
+import/reload/export must isolate those remaining paths or explicitly restrict its capability
+subset, and qualify storage failure, cancellation and repeated sessions on the target. The descriptor-only
+browser implementation below resolves this gate for that subset; frame capture, workspace
+bridge and human recovery acceptance remain open.
+
+
+## Browser source bundles (P4.3)
+
+In a built/served browser client, expand **PLUGIN VOYAGE** below the launcher. Load the example
+or import a `*.wake-plugin.json` source bundle, edit `plugin.json`/`main.lua`, then select
+**Stage / reload**. **Play staged voyage** enters solo `outer` directly. Normal PLAY still
+opens the shared title. During a plugin session the same panel appears above the canvas;
+opening it pauses solo input. Stage source edits, use **Apply held revision** for route/water
+restarts, and **Undo / discard** for the existing native revision policy. Undo while UI staging
+is in flight cancels that request first. **Export draft** downloads the editor's current source,
+including invalid drafts; exporting is not validation or permission to apply.
+
+The browser accepts exactly voyage kind, outer location, API/schema 1 and `["voyage.define"]`.
+It rejects objective/timer grants and race imports explicitly. All imported Lua evaluation
+happens in a disposable Web Worker; the game rechecks decoded data and never evaluates that
+source at startup, staging completion, Apply, Undo or a tick. Native trusted objectives keep
+their existing contract; this subset does not enable imported callbacks or browser races.
+
+Native authors can create the same source bundle with:
+
+```sh
+python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
+```
+
+The JSON wrapper has exactly `format: "wake-velocity-plugin"`, `version: 1`, `manifest` and
+`source` strings. Text is UTF-8, with at most 4096 and 65536 encoded bytes respectively;
+imports also cap the complete wrapper at 200000 bytes. The embedded manifest retains strict
+native JSON/duplicate-key rules. There are no paths or additional package files in a bundle.
+The schema operation describes this wrapper too. Native export checks source sizes/encoding,
+not Lua validity. Browser import loads a draft; staging must validate it before use.
+
+Successful staging saves source in host-owned localStorage where permitted. Storage denial
+or invalid saved source is visible and nonfatal; export remains available. A new page/session
+restores source only and requires validation again. Native world progress, callback state and
+Undo history are not exported/persisted. Reloading the page ends the plugin session.
+
+Every request pins its exact bytes and current native revision/commit epoch. A successful UI
+receipt can be consumed once by that owner; a changed base rejects it. UI validation and a
+native-triggered reload each own at most one request (transport cap two), and terminate/release
+workers on completion, cancellation, timeout or page hide. The five-second deadline follows
+browser scheduling; suspended tabs can delay its delivery. Worker code/module/Wasm/example
+URLs are content-addressed in the same package, loaded on demand, with a shipped Lua notice.
+
+Build/serve instructions and repeatable browser checks are in the [web guide](WEB_BUILD.md#plugin-source-bundles-p43).
+Current Chrome evidence and other-browser/device limits belong to the [P4.3 result](PLUGIN_PLAN.md#p43-result-2026-10-29).
