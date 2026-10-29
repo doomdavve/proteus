@@ -137,6 +137,9 @@ add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_
   src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
+if(NOT EMSCRIPTEN)
+  target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h)
+endif()
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
@@ -636,9 +639,19 @@ target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_boat_se
 target_compile_options(boat_plugin_review PRIVATE ${PROTEUS_WARNINGS})
 # P4 native isolated authoring validator; intentionally absent from the browser runtime.
 if(NOT EMSCRIPTEN)
-  add_executable(boat_plugin_worker tools/boat_plugin_worker.c)
-  target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins)
+  add_executable(boat_plugin_worker tools/boat_plugin_worker.c tools/wake_velocity_plugin.c)
+  target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_boat_session)
   target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
+  add_executable(validate_boat_plugin_stage tools/validate_boat_plugin_stage.c
+    tools/wake_velocity_plugin.c)
+  target_link_libraries(validate_boat_plugin_stage PRIVATE proteus_plugins proteus_boat_session)
+  target_compile_options(validate_boat_plugin_stage PRIVATE ${PROTEUS_WARNINGS})
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-stage-test")
+  target_compile_definitions(validate_boat_plugin_stage PRIVATE
+    BOAT_PLUGIN_STAGE_DIR="${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-stage-test")
+  add_test(NAME boat_plugin_stage COMMAND validate_boat_plugin_stage)
+  set_tests_properties(boat_plugin_stage PROPERTIES LABELS "cpu"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
   add_test(NAME boat_plugin_author COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
     --worker $<TARGET_FILE:boat_plugin_worker>)
@@ -1114,7 +1127,7 @@ set(PROTEUS_SLOW_TESTS
   boat_river_screenshot)
 
 if(TEST boat_plugin_author)
-  list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author)
+  list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_stage)
 endif()
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)

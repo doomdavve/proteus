@@ -40,7 +40,8 @@ Wake Velocity is in active development. Expect some rough edges; the
 
 The game is written in **C17 with raylib**. Boat physics, networking and presentation
 are separate, with a GPU renderer and a CPU reference renderer. Lua plugins let you
-edit voyages and preview race courses while playing.
+edit voyages and preview race courses while playing. The [authoring tools](docs/PLUGIN_API.md#native-authoring-tools-p41)
+provide machine-readable schemas and isolated, deterministic voyage/race previews.
 
 You'll need CMake 3.24+, a C compiler and native libcurl development files. Check the
 [Linux](docs/LINUX_BUILD.md), [macOS](docs/MACOS_BUILD.md) or

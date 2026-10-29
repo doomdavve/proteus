@@ -30,6 +30,7 @@ typedef struct {
     BoatPluginRevision slots[BOAT_PLUGIN_UNDO + 2];
     unsigned history[BOAT_PLUGIN_UNDO + 1]; // Slot indices, oldest first; the last is active.
     unsigned depth;
+    uint64_t epoch; // Monotonic commit identity, including Undo (prevents stale-base ABA).
     unsigned numbered; // The latest revision number given.
     // A staged definition waiting for its commit. CHANGE compares it with the revision active
     // when it was staged (BASE); an Undo candidate is the previous revision's own slot.
@@ -57,6 +58,10 @@ const BoatPluginRevision *boat_plugin_host_held(const BoatPluginHost *host);
 // candidate; the active revision is never touched. Success holds a renamed or restarting
 // candidate; an unchanged or incompatible one is not held. On success CHANGE says how it compares.
 bool boat_plugin_host_stage(BoatPluginHost *host, const BoatPluginBundle *bundle);
+// Internal isolated-worker completion only: checked decoded data, pinned to this commit epoch.
+// Callers must not treat external bytes/digests as this trusted receipt. No Lua is evaluated.
+bool boat_plugin_host_stage_decoded(
+    BoatPluginHost *host, const BoatPluginRevision *candidate, unsigned base, uint64_t epoch);
 // Hold the previous revision for reinstallation through the same rules. False without one.
 bool boat_plugin_host_undo(BoatPluginHost *host);
 void boat_plugin_host_discard(BoatPluginHost *host);

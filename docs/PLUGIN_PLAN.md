@@ -8,18 +8,20 @@ to an opt-in shelter-tour objective with a native HUD row. P3.3a adds determinis
 and their checkpoint/reload contract. P3.3b adds schema-aware native migration, explicit
 resource retirement/composition and a complete compatible solo checkpoint/inspection harness.
 P3.4 accounts retained/native storage, separates instruction budgets and measures synchronous
-staging. P4.1 adds discovery and isolated native validation; integration of imported/background
-staging into the game remains a P4 gate. There is no in-game agent. The agreed direction
+staging. P4.1 adds discovery and isolated native validation; P4.2 adds machine-readable schemas,
+bounded isolated voyage/race previews and disposable-process live descriptor staging for trusted
+native edits. Imported-code qualification and browser import/export remain the next P4 gate. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.1, native discovery and disposable validation**, see the
-[P4.1 result](#p41-result-2026-10-29). Prior results retain their implementation,
+Completed task: **P4.2, schema/preview tools and native live descriptor staging**, see the
+[P4.2 result](#p42-result-2026-10-29). Prior results retain their implementation,
 automated/manual verification and user-acceptance evidence below.
-**Next task: P4.2 — schema discovery, bounded preview and live background staging integration**,
-then browser import/reload/export through the same host operations. Human P3 migration/Undo/recovery
-acceptance and broader platform timing remain separate qualification work.
+**Next task: imported-code isolation qualification, then browser import/reload/export**.
+The native startup, objective updates and Apply-time init/migration still evaluate trusted Lua
+synchronously; descriptor staging isolation alone does not authorize arbitrary imported code.
+Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1216,11 +1218,72 @@ native worker success also runs through the reusable supervisor. No visual,
 input, audio or game asset-loading behavior changes; no new audiovisual or human acceptance
 review is claimed. Windows/Linux execution awaits CI.
 
-**Next: P4.2.** Add machine-readable schema discovery and bounded scenario preview/evidence;
+**Next recorded at P4.1 (native slice implemented below): P4.2.** Add machine-readable schema discovery and bounded scenario preview/evidence;
 connect isolated requests to live candidate staging with base-revision rejection and atomic
 commit/Undo. Do not treat the returned correlation revision or digest as permission to apply,
 or re-evaluate imported Lua on the game thread. Then qualify imported/background staging and
 browser import/export separately. P3 human recovery/migration and target timing remain open.
+
+#### P4.2 result, 2026-10-29
+
+Implemented native schema discovery, isolated bounded scenario evidence and live descriptor
+staging for the existing **trusted local** voyage workflow:
+
+- `plugin_author.py schema` returns JSON Schema projections for manifests, voyage/race data and
+  objective commands, plus callback/context/state descriptions and explicit native semantic
+  constraints. This describes Lua records, not executable functions or a second interpreter.
+  The native parser remains authoritative; automated tests exercise every advertised numeric
+  descriptor bound against that decoder.
+- `preview DIRECTORY --ticks N` snapshots the same immutable bytes as validation and runs in
+  a disposable worker (0..72000 virtual ticks, default 360). The voyage fixture uses the
+  complete checkpoint/seek harness, player/traffic wakes and objective HUD; the race fixture
+  drives four native entrants. Versioned fixture names, tick/position or fleet evidence,
+  committed/pending objective digests and a SHA-256 artifact ID accompany bundle/base pins.
+  Failed updates reject the preview instead of producing a success artifact. This is scenario
+  evidence, not course completion, playability, frame capture or performance qualification.
+- `wake_velocity --plugin` now stages settled saves/F5 through its own headless
+  `--plugin-stage-worker` process. It receives immutable framed bytes and returns a versioned,
+  bounded, fieldwise binary64/string descriptor plus diagnostics; no raw structs, pointers or
+  interpreter state cross the boundary. Completion uses the same native schema/map checks
+  and classification without re-evaluating the candidate Lua. F7 is ignored while staging;
+  F6 cancels/reaps it, and superseding reloads and shutdown also cancel/reap. The active
+  revision continues stepping. Worker errors/deadlines retain active source/state/world.
+- Every request pins the active revision and a monotonic commit epoch, including Undo.
+  Completion against a changed base is rejected, even if the active revision number has
+  returned to the same value. Successful candidates use the existing between-tick
+  rename/migration/restart and Undo transactions. An isolated completion is an internal
+  request receipt, not an externally installable digest or cache artifact.
+- A request owns one bounded source snapshot (native reservation capped at 80 KiB), two
+  temporary streams and one worker; there is no unbounded request queue. Inspection reports
+  request bytes separately from the game owner. Process RSS, C/stdio/OS overhead and the
+  worker's world/Lua allocations are separate. Cancellation/deadline acceptance follows the
+  caller's polls; this is process fault isolation, not an OS security sandbox.
+
+Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`: build and full
+`ctest --preset full` pass **306/306 enabled tests** (14.33 s) with loopback access; 13 retired field
+cases remain disabled. All 311 local links/anchors in the five changed guides resolve.
+The sandbox-only run failed the ten socket-dependent cases; the
+unrestricted full run passed. Project sources are warning-clean (the clean initial build
+emitted the existing upstream stb_vorbis warning). The authoring tests cover schemas and all
+numeric descriptor bounds, repeatable voyage/race artifacts, callback rejection, framing,
+bundle pins and virtual-time supervisor cleanup. `boat_plugin_stage` covers live native
+stepping during staging, Apply/rebind, repeated holds, Undo with same-number/new-epoch stale
+rejection, virtual deadline against a stuck worker, cancellation, malformed/oversized output,
+syntax rejection and the actual F5/completion adapter. The 120-frame windowed GPU demo passed.
+A relocated executable/assets/package check in paths containing spaces verified save polling,
+worker startup and automatic rename commit during a 240-frame GPU demo. These are agent-run
+smoke checks; no human keyboard/migration/Undo/recovery acceptance or timing claim is made.
+
+**Limits and next:** the standalone race trial still stages synchronously. Native startup,
+objective updates and Apply-time init/migration retain the trusted synchronous execution
+contract; map/file acquisition and temporary-stream setup also remain synchronous. Isolated
+**descriptor staging** does not qualify arbitrary imports or uninterrupted objective execution.
+Before enabling browser imported gameplay, isolate those remaining evaluation paths (or limit
+and explicitly advertise the supported capability subset), qualify cancellation/storage
+failure/repeated sessions on that target, then add browser import/reload/export. Interactive
+preview controls, capture, workspace bridge, curated anchors and release-tool packaging also
+remain open. Windows/Linux process execution awaits CI; target timing and P3 human recovery
+qualification remain open.
 
 ### P5 — authority, prediction and recorded revisions
 

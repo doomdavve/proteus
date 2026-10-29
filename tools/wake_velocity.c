@@ -719,6 +719,10 @@ static int study(int argc, char **argv)
     static WakePlugin plugin;
     if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, GetTime()))
         goto cleanup;
+    static char stage_executable[2048];
+    snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
+        GetFileName(argv[0]));
+    plugin.stage_executable = stage_executable;
 #endif
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };
 #ifdef PROTEUS_BOAT_NET
@@ -1632,6 +1636,10 @@ cleanup:
     net_host_stop(&net_host); // After leaving, so the room says goodbye to the others only.
 #endif
 #endif
+#ifdef PROTEUS_BOAT_PLUGINS
+    if (plugin_path)
+        wake_plugin_close(&plugin);
+#endif
     boat_session_flush(&session);
     boat_session_destroy(&session);
     if (window_ready) {
@@ -1735,6 +1743,10 @@ static int title_join(BoatTitleSettings *settings, bool host)
 // session. Explicit options enter their session directly, keeping scripted checks unchanged.
 int main(int argc, char **argv)
 {
+#ifdef PROTEUS_BOAT_PLUGINS
+    if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
+        return boat_plugin_stage_worker();
+#endif
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     if (argc > 1 && !strcmp(argv[1], "--serve"))
         return boat_server_main(argc - 1, argv + 1); // A hosted room: no window, audio or assets.

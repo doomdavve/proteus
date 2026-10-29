@@ -129,6 +129,70 @@ class Worker(unittest.TestCase):
             payload = struct.pack(">II", len(manifest), len(source)) + manifest + source
             self.assertEqual(self.run_worker(payload)[1]["status"], status)
 
+    def test_schema(self):
+        data = author.schema()
+        self.assertEqual(data["api"], 1)
+        for name in ("langedrag", "river-sprint", "shelter-tour"):
+            manifest = json.loads((ROOT / "plugins" / name / "plugin.json").read_text())
+            self.assertEqual(set(manifest), set(data["schemas"]["manifest"]["required"]))
+        self.assertEqual(data["schemas"]["race"]["properties"]["gates"]["maxItems"], 8)
+        self.assertIn("schema", author.capabilities()["operations"])
+        self.assertIn("preview", author.capabilities()["operations"])
+
+    def test_schema_native_bounds(self):
+        # Every advertised numeric descriptor bound is exercised against the native decoder.
+        def leaves(node, path):
+            if node.get("type") in ("number", "integer"):
+                yield path, node
+            for key, child in node.get("properties", {}).items():
+                yield from leaves(child, path + "." + key)
+            if "items" in node:
+                yield from leaves(node["items"], path + "[1]")
+
+        for kind, package in (("voyage", "langedrag"), ("race", "river-sprint")):
+            manifest = (ROOT / "plugins" / package / "plugin.json").read_bytes()
+            original = (ROOT / "plugins" / package / "main.lua").read_text()
+            for path, node in leaves(author.schema()["schemas"][kind], kind):
+                for bound, direction in (("minimum", -1), ("maximum", 1)):
+                    value = node[bound] + direction * max(1, abs(node[bound]) * .1)
+                    source = ("local p = (function()\n" + original + "\nend)(); p."
+                              + path + " = " + repr(value) + "; return p").encode()
+                    code, result = self.run_worker(struct.pack(">II", len(manifest), len(source))
+                                                   + manifest + source)
+                    self.assertEqual(code, 1, (path, bound, result))
+                    self.assertEqual(result["status"], "schema", (path, bound, result))
+                    self.assertEqual(result["field"], path, (bound, result))
+
+    def test_preview(self):
+        for name in ("langedrag", "shelter-tour", "river-sprint"):
+            payload = author.snapshot(ROOT / "plugins" / name)
+            evidence = []
+            for _ in range(2):
+                job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=360)
+                try:
+                    job.process.wait(timeout=10)  # Failure deadline, no simulation clock.
+                    self.assertEqual(job.poll(1)["status"], "ok", job.result)
+                    self.assertEqual(job.result["operation"], "preview")
+                    self.assertEqual(len(job.result["artifact_id"]), 64)
+                    evidence.append(job.result)
+                finally:
+                    job.close()
+            self.assertEqual(evidence[0], evidence[1])
+        for ticks in (-1, 72001, 1.5):
+            with self.assertRaises(ValueError):
+                author.ValidationJob(WORKER, b"", 0, 0, operation="preview", ticks=ticks)
+
+    def test_preview_callback_failure(self):
+        manifest = (ROOT / "plugins/shelter-tour/plugin.json").read_bytes()
+        source = (ROOT / "plugins/shelter-tour/main.lua").read_bytes()
+        source = source.replace(b"update = function(c, s)", b"update = function(c, s) error('preview update')")
+        self.assertIn(b"preview update", source)
+        run = subprocess.run([WORKER, "--preview", "120"],
+            input=struct.pack(">II", len(manifest), len(source)) + manifest + source,
+            capture_output=True, timeout=10)
+        self.assertEqual(run.returncode, 1)
+        self.assertEqual(json.loads(run.stdout)["status"], "runtime")
+
     def test_snapshot(self):
         with tempfile.TemporaryDirectory() as scratch:
             directory = Path(scratch)

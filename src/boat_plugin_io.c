@@ -46,7 +46,7 @@ static BoatPluginStatus slurp(const char *directory, const char *name, size_t li
         return failed(d, BOAT_PLUGIN_IO, name, "must be a regular file, not a link or directory");
     FILE *file = fopen(path, "rb");
 #else
-    int descriptor = open(path, O_RDONLY | O_NOFOLLOW);
+    int descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
     if (descriptor < 0)
         return failed(d, BOAT_PLUGIN_IO, name, "cannot be opened (or is a symbolic link)");
     struct stat status;
