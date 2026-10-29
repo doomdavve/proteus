@@ -1130,6 +1130,97 @@ static int resource_composition(void)
     return 0;
 }
 
+// Compare declared values only: C struct assignment need not preserve padding bytes (MSVC).
+static bool same_wakes(const BoatWakeObjects *a, const BoatWakeObjects *b)
+{
+    if (a->tick != b->tick || a->emitted != b->emitted || a->expired != b->expired
+        || a->life_ticks != b->life_ticks || a->live != b->live || a->peak_live != b->peak_live
+        || a->crest_height != b->crest_height)
+        return false;
+    for (unsigned i = 0; i < BOAT_OBJECT_CAPACITY; ++i) {
+        const BoatWakeObject *x = &a->objects[i], *y = &b->objects[i];
+        if (x->position.x != y->position.x || x->position.y != y->position.y
+            || x->direction.x != y->direction.x || x->direction.y != y->direction.y
+            || x->length != y->length || x->amplitude != y->amplitude
+            || x->inverse_speed != y->inverse_speed || x->born != y->born)
+            return false;
+    }
+    for (unsigned i = 0; i < BOAT_OBJECT_BOATS; ++i) {
+        const BoatWakeObjectEmitter *x = &a->emitters[i], *y = &b->emitters[i];
+        if (x->start.x != y->start.x || x->start.y != y->start.y || x->started != y->started
+            || x->tracked != y->tracked || x->next != y->next || x->strength != y->strength
+            || x->strength_sum != y->strength_sum || x->initialized != y->initialized)
+            return false;
+    }
+    return true;
+}
+
+static bool same_presentation(const BoatPresentation *a, const BoatPresentation *b)
+{
+    if (a->flag.flutter_phase != b->flag.flutter_phase || a->flag.initialized != b->flag.initialized
+        || a->camera_heading != b->camera_heading || a->next_particle != b->next_particle
+        || a->emission != b->emission || a->wake_emission != b->wake_emission
+        || a->wake_distance != b->wake_distance || a->spray_time != b->spray_time
+        || a->propeller_time != b->propeller_time || a->landing_strength != b->landing_strength
+        || a->landing_age != b->landing_age || a->landing_serial != b->landing_serial
+        || a->seen_landings != b->seen_landings || a->fall_speed != b->fall_speed)
+        return false;
+    for (unsigned i = 0; i < BOAT_FLAG_POINTS; ++i) {
+        Vector3 x = a->flag.surface.points[i], y = b->flag.surface.points[i];
+        Vector3 u = a->flag.previous[i], v = b->flag.previous[i];
+        if (x.x != y.x || x.y != y.y || x.z != y.z || u.x != v.x || u.y != v.y || u.z != v.z)
+            return false;
+    }
+    for (unsigned i = 0; i < BOAT_WATER_PARTICLES; ++i) {
+        const BoatWaterParticle *x = &a->water[i], *y = &b->water[i];
+        if (x->position.x != y->position.x || x->position.y != y->position.y
+            || x->velocity.x != y->velocity.x || x->velocity.y != y->velocity.y
+            || x->height != y->height || x->lift != y->lift || x->age != y->age
+            || x->lifetime != y->lifetime || x->size != y->size || x->spray != y->spray
+            || x->wash != y->wash || x->variation != y->variation)
+            return false;
+    }
+    return true;
+}
+
+static bool same_trace(const WakePlugin *a, const WakePlugin *b)
+{
+    if (a->trace_count != b->trace_count)
+        return false;
+    for (unsigned i = 0; i < a->trace_count; ++i) {
+        const WakePluginTrace *x = &a->trace[i], *y = &b->trace[i];
+        if (x->tick != y->tick || x->revision != y->revision || x->events != y->events
+            || x->transition != y->transition || x->status != y->status || x->before != y->before
+            || x->after != y->after || x->command_count != y->command_count)
+            return false;
+        for (unsigned j = 0; j < x->command_count; ++j) {
+            const BoatPluginCommand *u = &x->commands[j], *v = &y->commands[j];
+            if (strcmp(u->kind, v->kind) || strcmp(u->id, v->id) || strcmp(u->label, v->label)
+                || u->value != v->value || u->generation != v->generation)
+                return false;
+        }
+    }
+    return true;
+}
+
+// Deliberately change only known padding to exercise the Windows failure on every ABI that
+// has these gaps. Semantic differences must still fail the same equality check below.
+static void poison_wake_padding(BoatWakeObjects *w)
+{
+    for (unsigned i = 0; i < BOAT_OBJECT_CAPACITY; ++i) {
+        unsigned char *bytes = (unsigned char *)&w->objects[i];
+        for (size_t j = offsetof(BoatWakeObject, inverse_speed) + sizeof(float);
+            j < offsetof(BoatWakeObject, born); ++j)
+            bytes[j] ^= 0xff;
+    }
+    for (unsigned i = 0; i < BOAT_OBJECT_BOATS; ++i) {
+        unsigned char *bytes = (unsigned char *)&w->emitters[i];
+        for (size_t j = offsetof(BoatWakeObjectEmitter, initialized) + sizeof(bool);
+            j < sizeof(BoatWakeObjectEmitter); ++j)
+            bytes[j] ^= 0xff;
+    }
+}
+
 static int preview_seek(void)
 {
     static WakePlugin p, resumed;
@@ -1177,12 +1268,16 @@ static int preview_seek(void)
         wake_plugin_after_tick(&p, &s);
     }
     CHECK(same_boat(&s.boat, &replay.boat) && same_progress(s.voyage, replay.voyage));
-    CHECK(!memcmp(&objects, &restored, sizeof(objects)));
-    CHECK(!memcmp(&traffic, &restored_traffic, sizeof(traffic)));
+    poison_wake_padding(&restored);
+    CHECK(same_wakes(&objects, &restored));
+    ++restored.emitters[0].tracked;
+    CHECK(!same_wakes(&objects, &restored));
+    --restored.emitters[0].tracked;
+    CHECK(same_wakes(&traffic, &restored_traffic));
     CHECK(boat_plugin_objective_digest(&p.objective) == final_hash);
     CHECK(boat_plugin_objective_digest(&p.staged_objective) == staged_hash);
     CHECK(p.event_count == resumed.event_count && p.sequence == resumed.sequence);
-    CHECK(!memcmp(p.trace, resumed.trace, sizeof(p.trace)));
+    CHECK(same_trace(&p, &resumed));
     // Destroy source ownership before restore: checkpoint owns all revision source/strings.
     memset(&p, 0, sizeof(p));
     CHECK(wake_plugin_preview_seek(
@@ -1193,8 +1288,8 @@ static int preview_seek(void)
     CHECK(wake_plugin_preview_seek(
         &checkpoint, &resumed, &replay, &restored, &restored_traffic, ticks, 240));
     CHECK(same_boat(&final_boat, &replay.boat) && same_progress(final_voyage, replay.voyage));
-    CHECK(!memcmp(&final_presentation, &replay.presentation, sizeof(final_presentation)));
-    CHECK(!memcmp(&final_wakes, &restored, sizeof(restored)) && restored.tick == 252);
+    CHECK(same_presentation(&final_presentation, &replay.presentation));
+    CHECK(same_wakes(&final_wakes, &restored) && restored.tick == 252);
     CHECK(final_hash == boat_plugin_objective_digest(&resumed.objective));
     CHECK(staged_hash == boat_plugin_objective_digest(&resumed.staged_objective));
     CHECK(resumed.trace_count == WAKE_PLUGIN_TRACE && resumed.trace[15].command_count == 1);

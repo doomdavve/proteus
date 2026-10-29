@@ -21,7 +21,9 @@ P3.3b adds `boat_plugin_state.schema_timer_retirement` and
 `boat_plugin_session.live_migration`, `resource_composition`, `preview_seek`. They verify
 schema/generation migration, candidate failure with pending output, HUD/timer retirement,
 second-owner rejection, atomic namespaced composition and native checkpoint seek against
-uninterrupted physics/presentation/player/traffic-wake and event/command traces. The developer
+uninterrupted physics/presentation/player/traffic-wake and event/command traces. Seek equality
+compares declared fields, excluding C struct padding; the fixture deliberately changes wake
+padding and checks that an actual emitter-state change still fails equality. The developer
 `boat_plugin_review` command exposes the same display-free checkpoint/inspection harness;
 see the [API](PLUGIN_API.md#live-migration-and-review-p33b) for its configuration and limits.
 

@@ -1060,9 +1060,22 @@ Verification, 2026-10-29, Apple Silicon/macOS, Debug, `PROTEUS_GPU_TESTS=OFF`:
   `build/p33b-*`. CPU screenshot capture omits the authoring panel. No human keyboard driving,
   migration/recovery playtest, audio listening or user acceptance is claimed.
 - All 302 local links/anchors in the six changed Markdown files resolve; new review command
-  examples and game help were exercised. Windows/Linux
-  execution awaits CI; full GPU CTests, browser/rooms, deadline qualification and human
+  examples and game help were exercised. Initial Linux/macOS CI passed; Windows CI exposed
+  the test-comparison issue recorded below; full GPU CTests, browser/rooms, deadline qualification and human
   migration/Undo/recovery checks remain open.
+
+**Windows CI correction, 2026-10-29:** the [initial Windows run](https://github.com/doomdavve/proteus/actions/runs/40914390065)
+passed 123/124 selected checks; `boat_plugin_session.preview_seek` reached the wake-pool
+`memcmp` assertion and failed, rather than reporting a stack overflow. C struct assignment
+need not preserve padding. The seek validator now compares every declared wake/emitter,
+presentation/particle/flag and active trace/command field instead of their object bytes.
+It deliberately changes known wake padding and verifies equality still passes, then changes
+an emitter's tracked tick and verifies equality fails. Byte comparisons used to prove an
+untouched destination remain appropriate. This changes test comparisons only, not runtime
+state, physics or checkpoint storage. On Apple Silicon/macOS, the warning-clean Debug
+build and all 302 enabled full-preset tests passed (13.78 s; sockets enabled, GPU CTests off);
+all 20 session cases also passed with a 1 MB stack limit. The replacement Windows CI run is
+pending. No new audiovisual review was performed for this test-only fix.
 
 **Next: P3 runtime qualification** — retained revision/total host memory accounting, separate
 callback/migration budgets and measured staging/background reload deadlines. Review checkpoint
