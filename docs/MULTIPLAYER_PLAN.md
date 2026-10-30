@@ -1895,6 +1895,31 @@ reliable burst but does not by itself fix the ENet throttle interaction. The nex
 snapshot liveness/resync and compact combat delivery; human gameplay and deployment are not
 claimed.
 
+## Snapshot liveness and resync — 2026-10-30
+
+The client used to treat a missing fleet snapshot as a dead connection even while valid pongs,
+births, roster and match messages were still arriving. It now tracks `heard_at` for any valid
+matching-epoch message and `snapshot_at` for applied authoritative state:
+
+- five seconds without any server message closes the session (`no message from the server`);
+- ten seconds without applied authoritative state closes a session whose messages still arrive;
+- after one second of snapshot silence while the path is alive, the client sends the existing
+  reliable `RESYNC_REQUEST` (reason 2), which makes the authority send a complete checkpoint;
+- the stale HUD indicator remains based on `snapshot_at` (250 ms), not on transport liveness.
+
+`boat_net_client_failure()` distinguishes the no-message and no-state ceilings, and
+`BoatNetClientStats.snapshot_resyncs` records the stall-driven requests. A new
+`boat_net.snapshot_resync` test freezes the authority's tick clock so no snapshots are emitted,
+lets pings and pongs continue, and checks that the client requests a checkpoint and stays
+PLAYING.
+
+Verified on 2026-10-30 with the Debug build and the full CTest preset: **314/314 enabled tests
+passed** (13 retired wake-field cases disabled). Five live hosted `--connect --frames 1200`
+runs all stayed connected; they received 262–294 snapshots over ten seconds, with one
+stall-driven resync in one run. The remaining held prediction ticks show that unreliable combat
+page loss can still stall authoritative state; compact combat delivery is the next change.
+Human gameplay and deployment are not claimed.
+
 ## Exact first implementation task
 
 Begin with **foundations P2a: a display-free benchmark for the existing one-boat arcade loop**.

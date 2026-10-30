@@ -7,7 +7,8 @@
 
 #define BOAT_NET_PENDING_BIRTHS 64 // Births held until their tick's snapshot or the baseline.
 #define BOAT_NET_STALE 0.25 // Seconds without a snapshot before the view is marked stale.
-#define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of wake digest mismatch before a resync request.
+#define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of stall or digest mismatch before a resync request.
+#define BOAT_NET_SNAPSHOT_SILENCE 10.0 // Hard ceiling without an applied authoritative state.
 #define BOAT_NET_HOLD_INCOMPLETE 0.1 // Seconds a prediction correction waits for missing births.
 #define BOAT_NET_MATCH_FEED 6 // Recent deathmatch or race events kept for the feed.
 #define BOAT_NET_EARLY_BOOTSTRAP (BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES + 2)
@@ -48,6 +49,7 @@ typedef struct {
     uint64_t consistent, inconsistent; // Snapshots whose wake digest matched on arrival.
     uint64_t repaired; // Mismatches later cleared by births.
     double max_mismatch; // Longest repaired mismatch, seconds.
+    uint64_t snapshot_resyncs; // Resync requests sent because authoritative state stalled.
     uint64_t resets; // Own resets completed (a new life after a request).
     uint64_t
         resets_dropped; // Requests the authority never queued (rate limit), given up after 1 s.
@@ -100,7 +102,9 @@ typedef struct {
     double serviced_at, pong_after; // Exclude RTT samples spanning a local loading stall.
     BoatNetReject reject; // Valid when REJECTED.
     uint8_t leave; // Server's leave reason when CLOSED, zero for a transport close.
-    uint8_t timed_out; // 1: no handshake/world within 10 s, 2: no snapshot for 5 s.
+    // 1: no handshake/world within 10 s, 2: no server message for 5 s,
+    // 3: messages arrive but no authoritative state has applied for 10 s.
+    uint8_t timed_out;
     BoatNetAccept accept;
     uint32_t epoch;
     unsigned slot;
@@ -125,7 +129,7 @@ typedef struct {
     uint64_t previous_tick;
     uint64_t wake_digest; // Of the newest snapshot.
     bool wake_consistent;
-    double snapshot_at, mismatch_since, resync_at;
+    double heard_at, snapshot_at, mismatch_since, resync_at;
     BoatNetCombatSet combat_sets[BOAT_NET_COMBAT_SETS];
     // Bootstrap assembly.
     BoatNetWorldBegin begin;
