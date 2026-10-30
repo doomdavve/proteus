@@ -1028,6 +1028,7 @@ static int study(int argc, char **argv)
     }
     double accumulator = 0;
     int time_speed_index = BOAT_TIME_NORMAL;
+    bool net_ready_sent = !networked;
     int frames = 0, demo_tick = 0;
     bool plugin_reset_pending = false;
     bool replay_dragging = false;
@@ -1716,6 +1717,18 @@ static int study(int argc, char **argv)
         boat_profile_add(&boat_profile, metrics);
         profiler_add(&profiler, metrics.frame_ms, metrics.snapshot_render_ms, metrics.present_ms);
         ++frames;
+#ifdef PROTEUS_BOAT_NET
+        // Let the room spawn the boat only after the first frame has warmed up the renderer.
+        // READY makes the authority queue reliable spawn and roster traffic; it must not land
+        // during that first frame's shader and presentation work.
+        if (networked && !net_ready_sent) {
+            if (!net_study_ready(net)) {
+                result = 1;
+                break;
+            }
+            net_ready_sent = true;
+        }
+#endif
     }
 cleanup:
     study_mouse_steering = mouse_steering;

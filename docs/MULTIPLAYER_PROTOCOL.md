@@ -1,4 +1,4 @@
-# Multiplayer protocol v7
+# Multiplayer protocol v8
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -56,6 +56,12 @@ request, slot blocks gain that request, checkpoints optionally append the comple
 combat state, and CombatPage (type 21) carries bounded periodic correction pages. MatchEvent
 uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
 compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
+
+v8 (2026-10-30) replaces the fixed four-page combat snapshot with a compact 1–3 page payload.
+The reliable checkpoint keeps its 3716-byte combat section and rules. The compact payload omits
+rules, zero inactive slots and unchanged wide fields, and packs active/recent-echo projectiles
+and waves. Message/slot sizes stay unchanged; `BOAT_NET_VERSION` is 8. Rebuild all peers;
+v1–v7 are incompatible.
 
 v7 (2026-10-27) replaces gun gameplay with a water cannon, reverses the grenade, and adds
 torpedoes, recoverable pressure and per-attacker damage bursts. The command/slot reserved byte
@@ -294,23 +300,48 @@ held. A nonzero grenade or torpedo request is consumed once per life, including 
 redundancy, repetition and prediction replay cannot defer or repeat it. Pool exhaustion does
 not consume the weapon's cooldown.
 
-CombatPage (type 21, server to client, channel 3) uses the WorldPage payload: `u32` low bits of
-snapshot tick, `u16` page index, `u16` count, then data. Count is exactly four. Pages 0–2 have
-1024 data bytes, page 3 has 644; the largest whole packet is **1064 bytes**. Header tick is the
-full matching fleet snapshot tick; page ID must equal its low 32 bits. Wrong counts, indices,
-IDs or lengths are rejected. No transport fragmentation is needed.
+CombatPage (type 21, server to client, channel 3) carries the compact per-tick combat state
+using the WorldPage payload: `u32` low bits of snapshot tick, `u16` page index, `u16` count, then
+data. Count is **1–3**; every page before the last carries 1024 data bytes and the last carries
+the remainder. The largest whole packet is 1064 bytes. Header tick is the full matching fleet
+snapshot tick; page ID must equal its low 32 bits. Wrong counts, indices, IDs or lengths are
+rejected. No transport fragmentation is needed.
+
+The compact payload (format 1) is:
+
+| Section | Count × bytes | Fields in order |
+| --- | --- | --- |
+| Header | 10 | `u8` format 1; `u8` flags (bit 0 enabled, bit 1 firing); `u8` object bitmap[7] for 40 bullets, four grenades and eight torpedoes; `u8` wave bitmap |
+| Players | 4 × 137 | f32 health, heat, pressure; seven `i32` deltas from the header tick: life start, next fire, next grenade, next torpedo, defeated, hit, pressure tick; u32 generation, request, hit serial, killer, torpedo request, ammo, pressure owner/generation; `u8` overheated; four target records, each f32 damage, `i32` tick delta, u32 life/generation |
+| Projectiles | set × 33 | In bitmap order: f32 position x/z, direction x/z, height; `u16` birth age (0 means the header tick); `u16` end code (0 means not ended, otherwise age + 1); u32 generation, life; `u8` owner |
+| Waves | set × 31 | In bitmap order: f32 centre x/z; `u16` birth age; u32 generation, life; `u8` owner; f32 height, speed, range |
+
+A projectile's active identity is owner/generation/life/birth. Grenades store the landing point;
+presentation derives the flight from direction, lob distance, launch height and splash tick.
+Each grenade index reserves the same wave index until both have expired. Cannon commands are
+held. A nonzero grenade or torpedo request is consumed once per life, including rejected
+requests, so redundancy, repetition and prediction replay cannot defer or repeat it. Pool
+exhaustion does not consume the weapon's cooldown.
+
+The authority canonicalises inactive projectiles: a recent hit echo (less than 45 ticks old) is
+kept for presentation, older inactive slots are zero and omitted. Active projectiles always have
+an end code of zero. The compact payload takes the immutable rules from the installed reliable
+checkpoint; rules are never repeated per tick. A measured busy pool is 2365 bytes (2398 maximum)
+and takes three pages;
+an empty state is 558 bytes (one page). Typical play takes one or two pages.
 
 Deathmatch clients retain eight bounded in-flight sets indexed by snapshot sequence. A fleet
-snapshot and all four matching pages must arrive before correction. Older complete sets may
-apply while a newer set is partial; applying a newer complete set discards older incomplete
-sets. A lost page never blocks subsequent complete sets. Bootstrap/resync still uses the
-reliable complete checkpoint and its byte/fleet digests. Prediction restores and replays the
-whole combat state and physical waves; match scores/events remain authority-only.
+snapshot and all matching pages must arrive before correction. Older complete sets may apply
+while a newer set is partial; applying a newer complete set discards older incomplete sets. A
+lost page never blocks subsequent complete sets, and snapshot liveness/resync can recover a
+stalled world. Bootstrap/resync still uses the reliable complete checkpoint and its byte/fleet
+digests. Prediction restores and replays the whole combat state and physical waves; match
+scores/events remain authority-only.
 
-At 30 Hz, the four combat pages add 116280 application bytes/s/client to the 23040-byte/s fleet
-snapshots, before wakes/control/transport headers. This initial fixed-page design favors bounded
-correction correctness over bandwidth optimization. Native and browser transports use the same
-C codec and existing channel 3 delivery class.
+In the deterministic four-client combat room at 12% loss, compact pages plus snapshots measured
+**44.4 KiB/s/client** downstream, down from about 140 KiB/s for the fixed four-page design, before
+wakes/control/transport headers. Native and browser transports use the same C codec and channel 3
+delivery class.
 
 ### WakeBirths
 
@@ -496,7 +527,7 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v7 rejects every other version, v1–v6 included; there is no negotiation or
+  protocol version. v8 rejects every other version, v1–v7 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry or the
   fleet/wake contract changes the content digest. Either is rejected at Hello.
