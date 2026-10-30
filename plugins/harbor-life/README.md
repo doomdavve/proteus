@@ -4,7 +4,8 @@ A native solo `outer` package that keeps the Långedrag voyage and replaces the 
 dock furniture with two editable berths, a small pontoon and a gangway. It also adds a small
 passing craft on a ~25 s loop just north of the marina, retains one compiled upstream ferry with
 an edited Stenpiren dwell, the compiled river runabout and the compiled schooner whose passage
-raises the Hisingsbron lift.
+raises the Hisingsbron lift. One eight-bird gull flock circles just north of the slips, with a
+short feeding interval and alarm climb in the first ten seconds.
 
 The berths sit at simulation `(13, 167)` and `(13, 173)` facing east toward the small authored
 pontoon at `(20, 170)`. A gangway runs from land at `(34.1, 170)` to that pontoon.
@@ -50,6 +51,20 @@ remaining time. Authored hulls are sampled over the combined river timetable and
 compiled water, the marina entrance, berths, dock modules and compiled/retained traffic. Retaining
 `schooner` keeps its Hisingsbron passage and lift dependency; removing every bridge actor leaves
 the span down. Traffic wakes stay visual; no physical traffic wake recipe is exposed.
+
+`scene.gulls.flocks` is a 0–4 flock replacement with 1–8 birds each (32 total). Cue intervals use
+half-open 120 Hz ticks, for example:
+
+```lua
+gulls = { flocks = {
+  { id = "harbor", recipe = "gull", x = -4, z = 182, count = 8, seed = 3, phase = 0,
+    radius = 10, height = 6, rate = 0.3,
+    cues = { { kind = "alarm", start = 900, stop = 1200, fade = 80, amplitude = 1 } } }
+} }
+```
+
+Editing only cue timing/fade/amplitude keeps the session clock. Moving or resizing a flock is a
+layout edit and follows F7 restart/Undo.
 
 ## Verify
 

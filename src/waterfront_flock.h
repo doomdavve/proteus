@@ -23,6 +23,11 @@ typedef enum {
     WATERFRONT_FLOCK_CUE_KINDS
 } WaterfrontFlockCueKind;
 
+typedef enum {
+    WATERFRONT_FLOCK_GULL, // The only registered bird recipe for the first slice.
+    WATERFRONT_FLOCK_RECIPES
+} WaterfrontFlockRecipe;
+
 typedef struct {
     unsigned start_tick, end_tick; // Half-open [start, end), session 120 Hz ticks.
     unsigned fade_ticks;
@@ -32,9 +37,11 @@ typedef struct {
 
 typedef struct {
     char id[WATERFRONT_FLOCK_TEXT];
+    unsigned char recipe; // WaterfrontFlockRecipe
     float x, z; // Simulation metres; conversion to renderer X happens once at evaluation.
     unsigned count; // 1..WATERFRONT_FLOCK_BIRDS
     unsigned seed; // Stable per-bird phase offset.
+    float phase; // Seconds added to the circling phase only; cues stay on session time.
     float radius, height, rate; // Circling radius scale, base height, signed turns/second.
     int follow_actor; // Traffic actor index whose disturbed water attracts the flock, or -1.
     bool implicit_cues; // Compiled trigonometric feeding/alarm story; false uses CUES only.
@@ -63,6 +70,8 @@ bool waterfront_flock_validate(
 bool waterfront_flock_has_content(const WaterfrontFlockDefinition *flocks);
 uint64_t waterfront_flock_digest(const WaterfrontFlockDefinition *flocks);
 const char *waterfront_flock_cue_name(WaterfrontFlockCueKind kind);
+const char *waterfront_flock_recipe_name(WaterfrontFlockRecipe recipe);
+bool waterfront_flock_recipe_from_name(const char *name, WaterfrontFlockRecipe *recipe);
 
 // Evaluate every flock at TIME. PLAYER and VELOCITY use renderer coordinates like the rest of
 // the scene. TRAFFIC is the accepted route definition (NULL keeps compiled traffic). No hidden

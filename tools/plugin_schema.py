@@ -123,8 +123,21 @@ def schema():
                 "period": number(5, 86400, "seconds"),
                 "stops": sequence(stop, 0, 8)})]}
     traffic = object_schema({"vessels": sequence(vessel, 0, 8)}, required=("vessels",))
-    scene = object_schema({"version": {"const": 1}, "marina": marina, "traffic": traffic},
-        required=("version",))
+    cue = object_schema({"kind": {"enum": ["feeding", "alarm"]},
+                         "start": number(0, 0xffffffff, "120 Hz ticks", integer=True),
+                         "stop": number(0, 0xffffffff, "120 Hz ticks", integer=True),
+                         "fade": number(0, 0xffffffff, "120 Hz ticks", integer=True),
+                         "amplitude": number(0, 1, "scale")},
+        required=("kind", "start", "stop", "amplitude"))
+    flock = record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "recipe": {"enum": ["gull"]},
+                    **point, "count": number(1, 8, "birds", integer=True),
+                    "seed": number(0, 0xffffffff, "phase seed", integer=True),
+                    "phase": number(-86400, 86400, "seconds"),
+                    "radius": number(.5, 200, "metres"), "height": number(.5, 200, "metres"),
+                    "rate": number(-5, 5, "turns/second"), "cues": sequence(cue, 0, 16)})
+    gulls = object_schema({"flocks": sequence(flock, 0, 4)}, required=("flocks",))
+    scene = object_schema({"version": {"const": 1}, "marina": marina, "traffic": traffic,
+                           "gulls": gulls}, required=("version",))
     int64 = number(-(1 << 63), (1 << 63) - 1, integer=True)
     command_base = {"generation": number(1, 0xffffffff, integer=True), "id": text()}
     command_variants = []
@@ -160,6 +173,9 @@ def schema():
                     "authored entries select a registered route and recipe. Stop IDs must match",
                     "the preset in order; omitted dwell shares the period remainder",
                     "Hulls must clear the map, marina and scheduled craft",
+                    "scene.gulls.flocks is 0..4 with 1..8 birds each and at most 32 total",
+                    "Cues use half-open 120 Hz tick intervals, 0..1 amplitude and optional fade",
+                    "Alarm overrides feeding, which overrides circling; no timer callbacks",
                     "Ordinary traffic wakes stay visual; no authored route wake recipe exists",
                     "scene.define requires voyage.define and precedes objective grants"],
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",

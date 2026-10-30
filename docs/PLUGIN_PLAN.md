@@ -1780,10 +1780,11 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L4.1 are complete; next in this track: L4.2 flock
-descriptor and timed cues**; the first playable gate is L4.3. `scene.define` installs and stages
+failure cases and acceptance evidence. **L1.1–L4.2 are complete; next in this track: L4.3 first
+playable harbor qualification**; it is the first playable gate. `scene.define` installs and stages
 the two-berth harbor-life layout, its small pontoon and gangway, one authored passing craft, a
-retained ferry with an edited dwell, the retained schooner/lift dependency and compiled flocks.
+retained ferry with an edited dwell, the retained schooner/lift dependency and one authored flock
+with timed feeding/alarm cues.
 
 ### Coverage and delivery slices
 
@@ -2380,8 +2381,42 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 - No Lua field, worker payload or renderer change yet; L4.2 adds the descriptor. No visual or
   human acceptance is claimed, and building/terrain clipping remains a visual review item.
 
-**Next in this track: L4.2.** Expose bounded flock IDs, centres, counts, recipes, seeds/phases and
-cue intervals through `scene.gulls`, with restart classification and discovery.
+#### L4.2 result, 2026-10-30
+
+**Implemented:** `scene.gulls.flocks` exposes up to four authored flocks, with a registered
+`gull` recipe, centre/count/seed/phase, circling region and up to 16 cue intervals per flock.
+The harbor-life package replaces the compiled groups with one flock near the marina.
+
+- **Schema:** cue intervals are half-open 120 Hz tick ranges `[start, stop)`, with an optional
+  `fade` and 0–1 `amplitude`. Alarm outranks feeding, which outranks circling. No timer, spawn or
+  despawn state is created: cues are evaluated from the requested session time. Validation rejects
+  unknown recipes, duplicate IDs, bad counts (1–8 per flock, 32 total), non-finite centres,
+  invalid radius/height/rate/phase, too many cues, unknown cue kinds and malformed intervals.
+- **Classification:** a cue-only edit (timing, fade, amplitude) keeps the session clock and
+  applies as a compatible cosmetic revision. A flock count/centre/radius/height/rate edit remains
+  a physical layout change and follows the existing F7 restart policy; Undo mirrors it.
+- **Example:** `plugins/harbor-life` has one eight-bird `harbor` flock at simulation `(-4, 182)`,
+  with a feeding interval at 2–5 s and an alarm climb at 7.5–10 s. It replaces the compiled
+  groups because a present list is a full-collection replacement.
+- **Worker:** the scene wire is now `PST5` and carries flock fields/cues; the response bound is
+  32 KiB. Browser imports still reject `scene.define`.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build. Full `ctest --preset full` passed **322/322 enabled tests** (25.98 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_boat_plugin --case scene_traffic` checks the package flock/cues and rejects a wrong
+  recipe, count + 1, unknown cue kind and an empty interval.
+  `validate_boat_plugin_session --case harbor_life_scene` checks a cue-only Apply keeps the tick,
+  a flock move holds for restart and Undo restores the old cue. Stage round-trips the flock through
+  `PST5`; worker/author evidence reports `flocks: 1`.
+- CPU captures at 1/3/8/11 s from the marina approach were inspected: the flock is visible as
+  distant silhouettes at 320×200; the alarm interval lifts the group in the numeric checks but a
+  still frame does not prove motion clarity. Human acceptance and bird/building clipping review
+  remain pending for L4.3.
+
+**Next in this track: L4.3.** Combine the example into the first playable harbor qualification,
+run the worker/live bridge path, and record captures, motion and performance evidence.
 
 #### L2 — a small marina before a marina editor
 
@@ -2515,11 +2550,14 @@ Completed L3.4, 2026-10-30: bound tall-vessel passages and the Hisingsbron lift 
 group, retained the schooner in the example, and added a bridge review camera.
 Completed L4.1, 2026-10-30: extracted four bounded gull flocks, pure-time cues and accepted-traffic
 avoidance with compiled parity.
-Next task for this track: **L4.2**, flock descriptor and timed cues.
+Completed L4.2, 2026-10-30: exposed bounded `scene.gulls.flocks`, authored cue intervals and the
+marina flock; cue-only edits keep time while flock layout follows restart.
+Next task for this track: **L4.3**, first playable harbor qualification.
 Known limits: authored route geometry is selected from registered presets; no freeform route
 editor, freeform module mesh editor or physical traffic wake recipe; no boarding/passenger
-simulation; no tram closure interlock; depth is unverified; no flock Lua field yet; and no
-tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
+simulation; no tram closure interlock; depth is unverified; bird/building clipping is a visual
+review item; and no tram/seal recipes, gameplay dusk, building activity or human scene acceptance
+are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

@@ -398,7 +398,7 @@ void waterfront_boating_gulls_scene(const BoatSceneDefinition *scene, double tim
     _Static_assert(WATERFRONT_FLOCK_PARTS == WATERFRONT_GULL_PARTS,
         "flock and scene gull parts must agree");
     WaterfrontFlockFrame gulls;
-    waterfront_flock_evaluate(NULL,
+    waterfront_flock_evaluate(scene && scene->gulls_present ? &scene->gulls : NULL,
         scene && scene->traffic_present ? &scene->traffic : NULL, time, player, velocity, &gulls);
     frame->gull_count = gulls.count;
     memcpy(frame->gulls, gulls.birds, sizeof(gulls.birds));

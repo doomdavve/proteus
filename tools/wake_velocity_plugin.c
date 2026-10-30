@@ -889,12 +889,12 @@ void wake_plugin_inspect(const WakePlugin *p, FILE *output)
         p->objective_pending, p->objective.quarantined);
     fprintf(output,
         "scene present=%u version=%u digest=%016llx content=%u berths=%u modules=%u "
-        "entrance=%u vessels=%u\n",
+        "entrance=%u vessels=%u flocks=%u\n",
         active->voyage.has_scene, active->voyage.scene.version,
         (unsigned long long)active->voyage.scene_digest,
         boat_scene_has_content(&active->voyage.scene), active->voyage.scene.berth_count,
         active->voyage.scene.module_count, active->voyage.scene.entrance_present,
-        active->voyage.scene.traffic.actor_count);
+        active->voyage.scene.traffic.actor_count, active->voyage.scene.gulls.flock_count);
     fprintf(output, "rng=%u acknowledged=%lld queued=%u diagnostic=%s\n", p->objective.rng,
         (long long)p->objective.acknowledged, p->event_count, p->objective_diagnostic.message);
     if (p->objective_pending)

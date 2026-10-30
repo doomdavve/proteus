@@ -147,6 +147,57 @@ static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
     }
 }
 
+// L4.2: bounded flocks and cue intervals. Counts and enums are checked before array access.
+static void flock_wire(Wire *w, WaterfrontFlockDefinition *flocks)
+{
+    flocks->flock_count = (unsigned)integer(w, flocks->flock_count, 4);
+    if (flocks->flock_count > WATERFRONT_FLOCKS) {
+        w->ok = false;
+        return;
+    }
+    for (unsigned i = 0; i < flocks->flock_count; ++i) {
+        WaterfrontFlock *f = &flocks->flocks[i];
+        string(w, f->id, sizeof(f->id));
+        f->recipe = (unsigned char)integer(w, f->recipe, 1);
+        if (f->recipe >= WATERFRONT_FLOCK_RECIPES)
+            w->ok = false;
+        f->x = (float)number(w, f->x);
+        f->z = (float)number(w, f->z);
+        f->count = (unsigned)integer(w, f->count, 4);
+        f->seed = (unsigned)integer(w, f->seed, 4);
+        f->phase = (float)number(w, f->phase);
+        f->radius = (float)number(w, f->radius);
+        f->height = (float)number(w, f->height);
+        f->rate = (float)number(w, f->rate);
+        unsigned follow = (unsigned)integer(w, (unsigned)(f->follow_actor + 1), 1);
+        if (follow > WATERFRONT_ROUTE_ACTORS) {
+            w->ok = false;
+        } else
+            f->follow_actor = (int)follow - 1;
+        if (f->count > WATERFRONT_FLOCK_BIRDS)
+            w->ok = false;
+        unsigned implicit = (unsigned)integer(w, f->implicit_cues ? 1u : 0u, 1);
+        if (implicit > 1)
+            w->ok = false;
+        f->implicit_cues = implicit != 0;
+        f->cue_count = (unsigned)integer(w, f->cue_count, 4);
+        if (f->cue_count > WATERFRONT_FLOCK_CUES) {
+            w->ok = false;
+            return;
+        }
+        for (unsigned c = 0; c < f->cue_count; ++c) {
+            WaterfrontFlockCue *cue = &f->cues[c];
+            cue->start_tick = (unsigned)integer(w, cue->start_tick, 4);
+            cue->end_tick = (unsigned)integer(w, cue->end_tick, 4);
+            cue->fade_ticks = (unsigned)integer(w, cue->fade_ticks, 4);
+            cue->kind = (unsigned char)integer(w, cue->kind, 1);
+            if (cue->kind >= WATERFRONT_FLOCK_CUE_KINDS)
+                w->ok = false;
+            cue->amplitude = (float)number(w, cue->amplitude);
+        }
+    }
+}
+
 // The full pointer-free scene definition, so an isolated worker can return the same identity
 // the in-process decoder produces. Counts are checked before any array access.
 static void scene_wire(Wire *w, BoatSceneDefinition *s)
@@ -154,9 +205,10 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
     s->version = (unsigned)integer(w, s->version, 4);
     unsigned flags = (unsigned)integer(w,
         (s->entrance_present ? 1u : 0u) | (s->berths_present ? 2u : 0u)
-            | (s->modules_present ? 4u : 0u) | (s->traffic_present ? 8u : 0u),
+            | (s->modules_present ? 4u : 0u) | (s->traffic_present ? 8u : 0u)
+            | (s->gulls_present ? 16u : 0u),
         1);
-    if (flags > 15 || s->version > BOAT_SCENE_VERSION) {
+    if (flags > 31 || s->version > BOAT_SCENE_VERSION) {
         w->ok = false;
         return;
     }
@@ -164,6 +216,7 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
     s->berths_present = flags & 2u;
     s->modules_present = flags & 4u;
     s->traffic_present = flags & 8u;
+    s->gulls_present = flags & 16u;
     if (s->entrance_present) {
         s->entrance_x = (float)number(w, s->entrance_x);
         s->entrance_z = (float)number(w, s->entrance_z);
@@ -201,6 +254,8 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
     }
     if (s->traffic_present)
         traffic_wire(w, &s->traffic);
+    if (s->gulls_present)
+        flock_wire(w, &s->gulls);
 }
 
 static void data_wire(Wire *w, BoatPluginVoyageData *v)
@@ -322,7 +377,7 @@ int boat_plugin_stage_worker(void)
             d.cost.peak_bytes = cost.peak_bytes;
     }
 done:
-    integer(&out, 0x50535434, 4); // PST4: traffic routes extend PST3; other versions are refused.
+    integer(&out, 0x50535435, 4); // PST5: flock cues extend PST4; other versions are refused.
     diagnostic(&out, &d);
     if (d.status == BOAT_PLUGIN_OK)
         data_wire(&out, &data);
@@ -523,7 +578,7 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
         return failure(j, host, "worker output exceeds limit");
     rewind(j->output);
     Wire out = { j->output, true, true };
-    if (integer(&out, 0, 4) != 0x50535434)
+    if (integer(&out, 0, 4) != 0x50535435)
         out.ok = false;
     BoatPluginDiagnostic d = { 0 };
     diagnostic(&out, &d);

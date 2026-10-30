@@ -6,6 +6,7 @@
 // values. It never points at Lua, files or a plugin host. Simulation x/z coordinates and renderer
 // headings follow the voyage API; a renderer converts x once at its boundary.
 #include "boat_model.h"
+#include "waterfront_flock.h"
 #include "waterfront_route.h"
 
 #include <stdbool.h>
@@ -75,6 +76,9 @@ typedef struct BoatSceneDefinition {
     // L3.2: a present vessel list replaces all travelling craft. Count zero disables them.
     bool traffic_present;
     WaterfrontRouteDefinition traffic;
+    // L4.2: a present flock list replaces the compiled gull groups. Count zero disables them.
+    bool gulls_present;
+    WaterfrontFlockDefinition gulls;
 } BoatSceneDefinition;
 
 typedef struct {
@@ -87,6 +91,9 @@ typedef struct {
 bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *diagnostic);
 // True when any subsystem is authored. An envelope-only scene changes no runtime content.
 bool boat_scene_has_content(const BoatSceneDefinition *scene);
+// True when two scenes differ only in gull cue intervals: a compatible cosmetic change that
+// keeps the session clock, unlike a flock count/centre/layout edit.
+bool boat_scene_same_except_gull_cues(const BoatSceneDefinition *a, const BoatSceneDefinition *b);
 // FNV-1a over explicit fields only: presence, counts, IDs, recipes, positions and attachments.
 // Padding and the diagnostic are excluded.
 uint64_t boat_scene_digest(const BoatSceneDefinition *scene);

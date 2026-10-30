@@ -107,6 +107,9 @@ static int harbor_life_scene(void)
         && s.world.scene->traffic.actors[1].stops[0].dwell == 35);
     CHECK(!strcmp(s.world.scene->traffic.actors[3].id, "schooner")
         && waterfront_route_has_bridge(&s.world.scene->traffic));
+    CHECK(s.world.scene->gulls_present && s.world.scene->gulls.flock_count == 1);
+    CHECK(!strcmp(s.world.scene->gulls.flocks[0].id, "harbor")
+        && s.world.scene->gulls.flocks[0].cue_count == 2);
 
     // A berth edit is a physical scene change: held until F7, then the caller restarts.
     BoatPluginBundle moved = harbor_edit("x = 13, z = 173", "x = 13, z = 179");
@@ -172,12 +175,28 @@ static int harbor_life_scene(void)
     CHECK(boat_plugin_host_active(&p.host)->number == 1
         && s.world.scene->traffic.actors[1].stops[0].dwell == 35);
 
-    // An unsafe berth (ashore) is rejected and leaves R1 and its scene intact.
+    // A cue-only edit is cosmetic: Apply keeps the session clock, unlike a flock move.
+    uint64_t before_tick = s.tick;
+    BoatPluginBundle cue_edit = harbor_edit("start = 900", "start = 780");
+    CHECK(boat_plugin_host_stage(&p.host, &cue_edit));
+    CHECK(p.host.change == BOAT_PLUGIN_RENAMED);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 13));
+    CHECK(s.tick == before_tick);
+    CHECK(s.world.scene->gulls.flocks[0].cues[1].start_tick == 780);
+    BoatPluginBundle moved_flock = harbor_edit("x = -4, z = 182", "x = -8, z = 182");
+    CHECK(boat_plugin_host_stage(&p.host, &moved_flock));
+    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
+    CHECK(wake_plugin_frame(&p, &s, false, false, true, 14));
+    boat_session_restart(&s, calm());
+    CHECK(s.world.scene->gulls.flocks[0].x == -8);
+
+    // An unsafe berth (ashore) is rejected and leaves the active revision and scene intact.
+    unsigned active_before_bad = boat_plugin_host_active(&p.host)->number;
     BoatPluginBundle bad = harbor_edit("x = 13, z = 173", "x = 32, z = 173");
     CHECK(!boat_plugin_host_stage(&p.host, &bad));
     CHECK(p.host.diagnostic.status == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(p.host.diagnostic.field, "scene.marina.berths[2]"));
-    CHECK(boat_plugin_host_active(&p.host)->number == 1
+    CHECK(boat_plugin_host_active(&p.host)->number == active_before_bad
         && s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
     boat_session_destroy(&s);
     return 0;

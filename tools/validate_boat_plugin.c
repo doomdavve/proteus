@@ -327,6 +327,14 @@ static int scene_traffic(void)
     CHECK(!strcmp(voyage.scene.traffic.actors[3].id, "schooner")
         && voyage.scene.traffic.actors[3].retain == WATERFRONT_TRAFFIC_VESSELS + 3);
     CHECK(waterfront_route_has_bridge(&voyage.scene.traffic));
+    CHECK(voyage.scene.gulls_present && voyage.scene.gulls.flock_count == 1);
+    const WaterfrontFlock *flock = &voyage.scene.gulls.flocks[0];
+    CHECK(!strcmp(flock->id, "harbor") && flock->recipe == WATERFRONT_FLOCK_GULL);
+    CHECK(flock->count == 8 && flock->seed == 3 && flock->phase == 0);
+    CHECK(flock->cue_count == 2 && flock->cues[0].start_tick == 240
+        && flock->cues[0].kind == WATERFRONT_FLOCK_CUE_FEEDING
+        && flock->cues[1].kind == WATERFRONT_FLOCK_CUE_ALARM);
+    CHECK(flock->cues[1].end_tick == 1200 && flock->cues[1].amplitude == 1);
     CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
     WaterfrontVesselMotion start = waterfront_traffic_motion_routes(
         &voyage.scene.traffic, 0, passing->phase);
@@ -350,6 +358,10 @@ static int scene_traffic(void)
         { "{ id = \"stenpiren\", dwell = 35 }", "{ id = \"wrong_pier\", dwell = 35 }",
             "scene.traffic.vessels[2].stops[1]" },
         { "dwell = 35", "dwell = -1", "scene.traffic.vessels[2].stops[1].dwell" },
+        { "recipe = \"gull\"", "recipe = \"seal\"", "scene.gulls.flocks[1].recipe" },
+        { "count = 8", "count = 9", "scene.gulls.flocks[1].count" },
+        { "kind = \"alarm\"", "kind = \"storm\"", "scene.gulls.flocks[1].cues[2].kind" },
+        { "start = 900", "start = 1200", "scene.gulls.flocks[1].cues" },
     };
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         const char *source = harbor_variant(cases[i].from, cases[i].to);

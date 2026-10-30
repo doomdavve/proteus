@@ -7,10 +7,26 @@
 #include <string.h>
 
 static const char *const cue_names[WATERFRONT_FLOCK_CUE_KINDS] = { "feeding", "alarm" };
+static const char *const recipe_names[WATERFRONT_FLOCK_RECIPES] = { "gull" };
 
 const char *waterfront_flock_cue_name(WaterfrontFlockCueKind kind)
 {
     return kind < WATERFRONT_FLOCK_CUE_KINDS ? cue_names[kind] : "unknown";
+}
+
+const char *waterfront_flock_recipe_name(WaterfrontFlockRecipe recipe)
+{
+    return recipe < WATERFRONT_FLOCK_RECIPES ? recipe_names[recipe] : "unknown";
+}
+
+bool waterfront_flock_recipe_from_name(const char *name, WaterfrontFlockRecipe *recipe)
+{
+    for (unsigned i = 0; i < WATERFRONT_FLOCK_RECIPES; ++i)
+        if (!strcmp(name, recipe_names[i])) {
+            *recipe = (WaterfrontFlockRecipe)i;
+            return true;
+        }
+    return false;
 }
 
 static const WaterfrontFlock compiled[WATERFRONT_FLOCKS] = {
@@ -121,6 +137,11 @@ bool waterfront_flock_validate(
                 fail(diagnostic, at, "repeats an existing flock ID");
                 return false;
             }
+        if (f->recipe >= WATERFRONT_FLOCK_RECIPES) {
+            indexed_path(at, sizeof(at), "scene.gulls.flocks", i + 1, ".recipe");
+            fail(diagnostic, at, "is not a registered flock recipe");
+            return false;
+        }
         if (f->count < 1 || f->count > WATERFRONT_FLOCK_BIRDS) {
             indexed_path(at, sizeof(at), "scene.gulls.flocks", i + 1, ".count");
             fail(diagnostic, at, "must be 1..8 birds");
@@ -138,7 +159,8 @@ bool waterfront_flock_validate(
             return false;
         }
         if (!finite_in(f->radius, .5f, 200) || !finite_in(f->height, .5f, 200)
-            || !finite_in(f->rate, -5, 5) || f->rate == 0) {
+            || !finite_in(f->rate, -5, 5) || f->rate == 0
+            || !finite_in(f->phase, -86400, 86400)) {
             indexed_path(at, sizeof(at), "scene.gulls.flocks", i + 1, ".region");
             fail(diagnostic, at, "has an invalid radius, height or turn rate");
             return false;
@@ -194,10 +216,12 @@ uint64_t waterfront_flock_digest(const WaterfrontFlockDefinition *flocks)
     for (unsigned i = 0; i < flocks->flock_count && i < WATERFRONT_FLOCKS; ++i) {
         const WaterfrontFlock *f = &flocks->flocks[i];
         hash = fold(hash, f->id, strlen(f->id) + 1);
+        hash = fold(hash, &f->recipe, 1);
         hash = fold_float(hash, f->x);
         hash = fold_float(hash, f->z);
         hash = fold(hash, &f->count, sizeof(f->count));
         hash = fold(hash, &f->seed, sizeof(f->seed));
+        hash = fold_float(hash, f->phase);
         hash = fold_float(hash, f->radius);
         hash = fold_float(hash, f->height);
         hash = fold_float(hash, f->rate);
@@ -264,7 +288,7 @@ static Vector3 flock_path(const WaterfrontFlockDefinition *flocks, unsigned floc
     int phase_bird = bird + (int)flock->seed;
     double social_time = time - phase_bird * .21f;
     float circling = flock->rate;
-    float angle = boat_phase(circling, time) + phase_bird * (2 * PI / 8)
+    float angle = boat_phase(circling, time + flock->phase) + phase_bird * (2 * PI / 8)
         + .14f * sinf(boat_phase(.61f, social_time) + flock_index)
         + .18f * sinf(boat_phase(.23f, time) + phase_bird * 1.3f);
     float radius = flock->radius + (bird % 3) * 3.2f + 5 * feeding + 7 * *alarm
@@ -358,7 +382,6 @@ void waterfront_flock_evaluate(const WaterfrontFlockDefinition *flocks,
             float yaw = atan2f(-forward.z, forward.x);
             float pitch = asinf(Clamp(forward.y, -.8f, .8f));
             float bank = Clamp(-Vector3CrossProduct(incoming, outgoing).y * 22, -.65f, .65f);
-            int phase_bird = (int)bird + (int)flock->seed;
             float beat = boat_phase(BOAT_TWO_PI * (1.7f + (index % 5) * .09f), time);
             float phase = beat + index * 1.37f * 2 * PI;
             float effort = .5f + .5f * sinf(boat_phase(.72f, time) + index * 2.1f);

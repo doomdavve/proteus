@@ -55,6 +55,18 @@ return {
         -- The compiled schooner keeps its Hisingsbron passage and lift dependency.
         { id = "schooner", retain = "schooner" }
       }
+    },
+    -- One flock wheels just north of the slips, with a feeding pass early in the first
+    -- minute and a short alarm climb afterwards. Cue ticks use the 120 Hz session clock.
+    gulls = {
+      flocks = {
+        { id = "harbor", recipe = "gull", x = -4, z = 182, count = 8,
+          seed = 3, phase = 0, radius = 10, height = 6, rate = 0.3,
+          cues = {
+            { kind = "feeding", start = 240, stop = 600, fade = 60, amplitude = 0.8 },
+            { kind = "alarm", start = 900, stop = 1200, fade = 80, amplitude = 1.0 }
+          } }
+      }
     }
   }
 }

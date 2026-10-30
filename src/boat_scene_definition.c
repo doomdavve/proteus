@@ -159,6 +159,13 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
                 return fail(diagnostic, "scene.traffic.vessels",
                     "an authored craft needs a positive speed");
     }
+    if (!scene->gulls_present && scene->gulls.flock_count)
+        return fail(diagnostic, "scene.gulls.flocks", "is absent but has entries");
+    if (scene->gulls_present) {
+        WaterfrontFlockDiagnostic flock;
+        if (!waterfront_flock_validate(&scene->gulls, &flock))
+            return fail(diagnostic, flock.field, flock.message);
+    }
     for (unsigned i = 0; i < scene->module_count; ++i) {
         const BoatSceneModule *m = &scene->modules[i];
         indexed(path, sizeof(path), "scene.marina.modules", i + 1, "");
@@ -204,8 +211,9 @@ bool boat_scene_has_content(const BoatSceneDefinition *scene)
 {
     return scene
         && (scene->berths_present || scene->modules_present || scene->entrance_present
-            || scene->traffic_present || scene->berth_count || scene->module_count
-            || scene->traffic.actor_count);
+            || scene->traffic_present || scene->gulls_present || scene->berth_count
+            || scene->module_count || scene->traffic.actor_count
+            || scene->gulls.flock_count);
 }
 
 static void fold(uint64_t *hash, const void *bytes, size_t size)
@@ -283,7 +291,25 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
         count(&hash, "traffic.actors", scene->traffic.actor_count);
         fold(&hash, &traffic, sizeof(traffic));
     }
+    if (scene->gulls_present) {
+        uint64_t gulls = waterfront_flock_digest(&scene->gulls);
+        fold(&hash, "gulls", 6);
+        count(&hash, "gulls.flocks", scene->gulls.flock_count);
+        fold(&hash, &gulls, sizeof(gulls));
+    }
     return hash;
+}
+
+bool boat_scene_same_except_gull_cues(const BoatSceneDefinition *a, const BoatSceneDefinition *b)
+{
+    if (!a || !b || a->gulls_present != b->gulls_present)
+        return false;
+    BoatSceneDefinition ca = *a, cb = *b;
+    for (unsigned i = 0; i < WATERFRONT_FLOCKS; ++i) {
+        ca.gulls.flocks[i].cue_count = 0;
+        cb.gulls.flocks[i].cue_count = 0;
+    }
+    return boat_scene_digest(&ca) == boat_scene_digest(&cb);
 }
 
 const char *boat_scene_berth_recipe_name(BoatSceneBerthRecipe recipe)
