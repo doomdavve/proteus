@@ -18,8 +18,10 @@ From the repository root:
 ./build/wake_velocity --plugin plugins/harbor-life --start 2,170,90
 ```
 
-F5 reloads, F6 undoes, and F7 applies a held layout change with a session restart at the spawn.
-A saved edit stages once it has settled; an invalid edit keeps the running revision.
+F5 reloads, F6 undoes, and F7 applies a held layout change with a session restart at the
+compiled outer start dock. A layout edit therefore returns the boat to the start of the voyage;
+travel back to the marina to inspect it. A saved edit stages once it has settled; an invalid edit
+keeps the running revision.
 
 ## Edit
 
