@@ -800,7 +800,7 @@ WaterfrontVesselMotion waterfront_route_motion(
     } else {
         prepare(routes);
         const Route *route = &built_routes[index];
-        float speed, curvature;
+        float speed = 0, curvature = 0;
         Vector2 tangent;
         float s = travel(
             route, actor->accel, wrapped(time + actor->phase, actor->period), &speed);
