@@ -199,7 +199,8 @@ class Capture(unittest.TestCase):
 def bridge_reply(directory, request_id, session, **fields):
     lines = ["wake-velocity-bridge 1", f"id={request_id}", f"session={session}"]
     lines += [f"{key}={value}" for key, value in fields.items()]
-    (Path(directory) / f"response-{request_id}").write_text("\n".join(lines) + "\n")
+    # Bytes, not text: Windows text mode would write CRLF, which the protocol does not use.
+    (Path(directory) / f"response-{request_id}").write_bytes(("\n".join(lines) + "\n").encode())
 
 
 class BridgeLifecycle(unittest.TestCase):
@@ -208,8 +209,8 @@ class BridgeLifecycle(unittest.TestCase):
     def setUp(self):
         self.scratch = tempfile.TemporaryDirectory()
         self.directory = Path(self.scratch.name)
-        (self.directory / "session").write_text(
-            "wake-velocity-bridge 1\nsession=00aa\ntoken=" + "7" * 32 + "\npid=1\n")
+        (self.directory / "session").write_bytes(
+            b"wake-velocity-bridge 1\nsession=00aa\ntoken=" + b"7" * 32 + b"\npid=1\n")
 
     def tearDown(self):
         self.scratch.cleanup()
