@@ -77,8 +77,8 @@ def capabilities():
             "capabilities": ["voyage.define", "scene.define", "race.define", "objective.hud",
                              "objective.timers"],
             "scene": {"grant": "scene.define", "envelope_version": 1,
-                      "supported_subsystems": ["marina.berths"], "installed": True,
-                      "planned_subsystems": ["marina.modules"],
+                      "supported_subsystems": ["marina.berths", "marina.modules"],
+                      "installed": True, "planned_subsystems": [],
                       "limits": {"berths": 7, "modules": 4}, "depth": "unverified",
                       "recipes": ["skiff", "runabout", "sailboat", "cruiser", "speedboat",
                                   "sailboat_7m", "workboat"]},
@@ -100,7 +100,7 @@ def capabilities():
                          "apply": ["held_revision", "base_epoch"],
                          "undo": ["base_revision", "base_epoch"], "discard": ["base_epoch"]}},
             "unsupported": ["race_capture", "gpu_capture", "race_live", "browser_live",
-                            "network_bridge", "scene_modules", "browser_scene"]}
+                            "network_bridge", "browser_scene"]}
 
 
 def read_regular(path, limit):

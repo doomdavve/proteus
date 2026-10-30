@@ -233,9 +233,12 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 
 static const char *const ROOT[] = { "voyage", "scene", "init", "update", "migrate", NULL };
 static const char *const SCENE[] = { "version", "marina", NULL };
-static const char *const MARINA[] = { "entrance", "berths", NULL };
+static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
 static const char *const BERTH[] = { "id", "recipe", "x", "z", "heading", "mooring", NULL };
+static const char *const MODULE[] = { "id", "kind", "x", "z", "heading", NULL };
+static const char *const GANGWAY[] = { "id", "kind", "anchor", "attaches", NULL };
+static const char *const ANCHOR[] = { "x", "z", NULL };
 static const char *const VOYAGE[]
     = { "shelters", "arrival", "exposure", "exposed_fraction", "weather_range", NULL };
 static const char *const SHELTER[] = { "id", "name", "x", "z", "heading", "radius", NULL };
@@ -379,6 +382,99 @@ static bool scene_entrance(lua_State *L, Vm *vm, int marina, BoatSceneDefinition
     return true;
 }
 
+static bool scene_modules(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *s)
+{
+    char at[64];
+    int type = field(L, marina, "modules", "scene.marina", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int list = lua_absindex(L, -1);
+    lua_Unsigned length = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > length)
+            return reject(vm, at, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != length)
+        return reject(vm, at, "must be a list numbered from 1 without gaps");
+    if (length > BOAT_SCENE_MODULES)
+        return reject(vm, at, "must list 0 to %d modules, not %llu", BOAT_SCENE_MODULES,
+            (unsigned long long)length);
+    s->modules_present = true;
+    s->module_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        BoatSceneModule *m = &s->modules[i];
+        char path[64], kind[24];
+        element(path, sizeof(path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int entry = lua_absindex(L, -1);
+        char kind_path[64];
+        if (field(L, entry, "kind", path, kind_path) != LUA_TSTRING) {
+            reject(vm, kind_path, "must be a string");
+            return false;
+        }
+        size_t kind_size;
+        const char *kind_text = lua_tolstring(L, -1, &kind_size);
+        if (kind_size >= sizeof(kind)) {
+            reject(vm, kind_path, "is longer than %u characters", (unsigned)sizeof(kind) - 1);
+            return false;
+        }
+        memcpy(kind, kind_text, kind_size + 1);
+        lua_pop(L, 1);
+        BoatSceneModuleKind k;
+        if (!boat_scene_module_kind_from_name(kind, &k)) {
+            reject(vm, kind_path, "is not a registered module kind");
+            return false;
+        }
+        m->kind = (unsigned char)k;
+        if (k == BOAT_SCENE_MODULE_GANGWAY) {
+            if (!only(L, vm, entry, path, GANGWAY)
+                || !string(L, vm, entry, path, "id", m->id, sizeof(m->id))
+                || !string(L, vm, entry, path, "attaches", m->attaches, sizeof(m->attaches)))
+                return false;
+            char anchor_path[64];
+            int anchor_type = field(L, entry, "anchor", path, anchor_path);
+            if (anchor_type != LUA_TTABLE)
+                return reject(
+                    vm, anchor_path, "must be a table, not a %s", lua_typename(L, anchor_type));
+            int anchor = lua_absindex(L, -1);
+            double x, z;
+            if (!only(L, vm, anchor, anchor_path, ANCHOR)
+                || !number(L, vm, anchor, anchor_path, "x", &x)
+                || !number(L, vm, anchor, anchor_path, "z", &z))
+                return false;
+            m->anchor_x = (float)x;
+            m->anchor_z = (float)z;
+            m->x = (float)x;
+            m->z = (float)z;
+            m->heading = 0;
+            lua_pop(L, 1);
+        } else {
+            double x, z, heading;
+            if (!only(L, vm, entry, path, MODULE)
+                || !string(L, vm, entry, path, "id", m->id, sizeof(m->id))
+                || !number(L, vm, entry, path, "x", &x) || !number(L, vm, entry, path, "z", &z)
+                || !number(L, vm, entry, path, "heading", &heading))
+                return false;
+            m->x = (float)x;
+            m->z = (float)z;
+            m->heading = (float)heading;
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    return true;
+}
+
 static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
 {
     char at[64];
@@ -391,7 +487,7 @@ static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s
         return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
     int marina = lua_absindex(L, -1);
     if (!only(L, vm, marina, at, MARINA) || !scene_entrance(L, vm, marina, s)
-        || !scene_berths(L, vm, marina, s))
+        || !scene_berths(L, vm, marina, s) || !scene_modules(L, vm, marina, s))
         return false;
     lua_pop(L, 1);
     return true;

@@ -88,9 +88,12 @@ registered dock modules; authored quay mooring is not exposed.
 
 L2.2 (2026-10-30) wires the accepted scene into `BoatWorld` and `BoatViewState`, so the same
 berth list drives hull contacts, the CPU/GPU harbor pass and the shared scene frame. The first
-`plugins/harbor-life` package exposes two berths at the compiled pontoon; `scene.marina.berths`
-is validated against water, pairwise clearance, the entrance and restart shelters. The compiled
-pontoon, gangway, quay, ferry and bridge remain independent.
+`plugins/harbor-life` package exposes two berths; `scene.marina.berths` is validated against
+water, pairwise clearance, the entrance and restart shelters. L2.3 adds registered dock modules:
+a 14 m `pontoon_small`, the existing long pontoon and local quay recipe, and a gangway with a
+land anchor and named pontoon attachment. Authored berth ropes use the nearest authored pontoon;
+a present empty module list disables the compiled dock furniture. The ferry and bridge remain
+independent compiled actors.
 
 Player contacts reuse the shoreline's forgiving contact response with stationary, padded
 oriented envelopes for moored hulls, main pontoon, fingers, and gangway. Envelopes include

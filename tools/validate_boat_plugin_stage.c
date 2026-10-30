@@ -162,12 +162,7 @@ int main(int argc, char **argv)
     // host so the shelter-tour objective package remains an independent control.
     BoatPluginFiles *scene_files = calloc(1, sizeof(*scene_files));
     CHECK(scene_files
-        && boat_plugin_read("plugins/langedrag", NULL, scene_files, &d) == BOAT_PLUGIN_OK);
-    CHECK(replace_once(scene_files->manifest, &scene_files->manifest_size,
-        sizeof(scene_files->manifest), "\"capabilities\": [\"voyage.define\"]",
-        "\"capabilities\": [\"voyage.define\", \"scene.define\"]"));
-    CHECK(replace_once(scene_files->source, &scene_files->source_size, sizeof(scene_files->source),
-        "return {", "return { scene = { version = 1 },"));
+        && boat_plugin_read("plugins/harbor-life", NULL, scene_files, &d) == BOAT_PLUGIN_OK);
     BoatPluginBundle scene_bundle = boat_plugin_bundle(scene_files);
     BoatPluginHost scene_host;
     CHECK(boat_plugin_host_start(&scene_host, resources.definition, &resources.map, &scene_bundle));
@@ -176,12 +171,13 @@ int main(int argc, char **argv)
     CHECK(scene_digest
         && scene_digest == boat_scene_digest(&boat_plugin_host_active(&scene_host)->voyage.scene));
     CHECK(replace_once(scene_files->manifest, &scene_files->manifest_size,
-        sizeof(scene_files->manifest), "Langedrag voyage", "Langedrag scene"));
+        sizeof(scene_files->manifest), "Harbor life", "Harbor scenes"));
     job = boat_plugin_stage_start(argv[0], &scene_host, scene_files, 0);
     CHECK(job && completed(job, &scene_host) == 1);
     CHECK(scene_host.change == BOAT_PLUGIN_RENAMED && boat_plugin_host_held(&scene_host));
     const BoatPluginVoyage *held_scene = &boat_plugin_host_held(&scene_host)->voyage;
     CHECK(held_scene->has_scene && held_scene->scene.version == 1);
+    CHECK(held_scene->scene.berth_count == 2 && held_scene->scene.module_count == 2);
     CHECK(held_scene->scene_digest == scene_digest
         && boat_scene_digest(&held_scene->scene) == scene_digest);
     boat_plugin_stage_close(job);

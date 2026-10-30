@@ -172,7 +172,7 @@ int main(void)
         waterfront_harbor_evaluate(boat_water_gentle(), time, &waves);
         waterfront_harbor_evaluate(boat_water_gentle(), time, &again);
         CHECK(!memcmp(&waves, &again, sizeof(waves)));
-        CHECK(waves.line_count == WATERFRONT_HARBOR_LINES);
+        CHECK(waves.line_count == WATERFRONT_HARBOR_BOATS * 4 + 6 + WATERFRONT_FERRY_LINES * 2);
         CHECK(fabsf(waves.ferry.position.y) < .22f);
         for (int i = 0; i < WATERFRONT_FERRY_LINES; ++i) {
             // Ferry lines run from the quay-side deck edge down to bollards ashore.
@@ -314,6 +314,54 @@ int main(void)
         CHECK(close_vector(full.boats[i].position, flat.boats[i].position));
         CHECK(full.recipes[i] == berths[i].recipe);
     }
+
+    // L2.3: the two-berth site with a small authored pontoon and gangway. The gangway's shore
+    // end stays fixed while its pontoon landing bobs, and authored berth ropes follow that
+    // pontoon's cleats instead of the compiled dock.
+    BoatSceneDefinition marina = two;
+    marina.modules_present = true;
+    marina.module_count = 2;
+    marina.modules[0] = (BoatSceneModule) {
+        .id = "pier", .kind = BOAT_SCENE_MODULE_PONTOON_SMALL, .x = 20, .z = 170, .heading = 0
+    };
+    marina.modules[1] = (BoatSceneModule) { .id = "ramp",
+        .kind = BOAT_SCENE_MODULE_GANGWAY,
+        .x = 34.1f,
+        .z = 170,
+        .anchor_x = 34.1f,
+        .anchor_z = 170,
+        .attaches = "pier" };
+    WaterfrontHarborFrame modular;
+    waterfront_harbor_evaluate_scene(&marina, boat_water_gentle(), 0, NULL, &modular);
+    CHECK(modular.module_count == 2 && modular.modules[0].kind == BOAT_SCENE_MODULE_PONTOON_SMALL
+        && modular.modules[1].kind == BOAT_SCENE_MODULE_GANGWAY);
+    CHECK(modular.line_count == 2 * 4 + 6 + WATERFRONT_FERRY_LINES * 2);
+    Transform3D pier = modular.modules[0].pose;
+    Vector3 anchor = waterfront_harbor_attachment(modular.lines[7], (Vector3) { 0, 0, .5f });
+    Vector3 local = Vector3Transform(
+        Vector3Subtract(anchor, pier.position), MatrixInvert(MatrixRotateXYZ(pier.rotation)));
+    CHECK(fabsf(local.x - 1.05f) < .25f && fabsf(local.z) < 7);
+    Vector3 shore = waterfront_harbor_attachment(modular.lines[1], (Vector3) { 0, 0, .5f });
+    Vector3 landing = waterfront_harbor_attachment(modular.lines[2], (Vector3) { 0, 0, .5f });
+    WaterfrontHarborFrame modular_later;
+    waterfront_harbor_evaluate_scene(&marina, boat_water_gentle(), 7, NULL, &modular_later);
+    Vector3 shore_later
+        = waterfront_harbor_attachment(modular_later.lines[1], (Vector3) { 0, 0, .5f });
+    Vector3 landing_later
+        = waterfront_harbor_attachment(modular_later.lines[2], (Vector3) { 0, 0, .5f });
+    CHECK(close_vector(shore, shore_later) && Vector3Distance(landing, landing_later) > .01f);
+    Vector3 anchor_later
+        = waterfront_harbor_attachment(modular_later.lines[7], (Vector3) { 0, 0, .5f });
+    Transform3D pier_later = modular_later.modules[0].pose;
+    Vector3 local_later = Vector3Transform(Vector3Subtract(anchor_later, pier_later.position),
+        MatrixInvert(MatrixRotateXYZ(pier_later.rotation)));
+    CHECK(fabsf(local_later.x - 1.05f) < .25f && fabsf(local_later.z) < 7);
+    CHECK(waterfront_harbor_contact_height_scene(
+        &marina, (Vector2) { 20, 170 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+    CHECK(!waterfront_harbor_contact_height_scene(
+        &marina, (Vector2) { 20, 182 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+    CHECK(waterfront_harbor_contact((Vector2) { 20, 182 }, .35f, NULL));
+    CHECK(!waterfront_harbor_camera_clear_scene(&marina, (Vector3) { -27.6f, 2, 170 }, 0));
 
     // L2.2 deterministic marina approach/exit: the authored lane is usable and both hulls stop
     // the same physics that reads BoatWorld.scene.

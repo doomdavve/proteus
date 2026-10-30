@@ -309,7 +309,7 @@ static int scene_berths(void)
         const char *from, *to, *field;
         bool location;
     } cases[] = {
-        { "marina = {", "marina = { modules = {},", "scene.marina.modules", false },
+        { "marina = {", "marina = { pontoons = {},", "scene.marina.pontoons", false },
         { "      entrance = { x = 6, z = 168, width = 8 },\n", "", "scene.marina.entrance", false },
         { "id = \"runabout\"", "id = \"skiff\"", "scene.marina.berths[2].id", false },
         { "recipe = \"runabout\"", "recipe = \"yacht\"", "scene.marina.berths[2].recipe", false },
@@ -368,6 +368,57 @@ static int scene_berths(void)
               NULL, &too_many, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.marina.berths"));
+
+    // L2.3 modules: the small pontoon and gangway decode; malformed, detached, overlapping and
+    // over-budget modules reject with their field paths.
+    struct {
+        const char *from, *to, *field;
+    } module_cases[] = {
+        { "kind = \"pontoon_small\"", "kind = \"barge\"", "scene.marina.modules[1].kind" },
+        { "attaches = \"pier\"", "attaches = \"missing\"", "scene.marina.modules[2].attaches" },
+        { "anchor = { x = 34.1, z = 170 }", "anchor = { x = 20, z = 170 }",
+            "scene.marina.modules[2]" },
+        { "anchor = { x = 34.1, z = 170 }", "anchor = { x = 45, z = 170 }",
+            "scene.marina.modules[2]" },
+        { "x = 20, z = 170", "x = 34, z = 170", "scene.marina.modules[1]" },
+        { "modules = {",
+            "modules = { { id='a', kind='pontoon_small', x=20, z=170, heading=0 },"
+            " { id='b', kind='pontoon_small', x=20, z=170, heading=0 },",
+            "scene.marina.modules[2]" },
+        { "modules = {",
+            "modules = { { id='a', kind='pontoon_small', x=20, z=170, heading=0 },"
+            " { id='b', kind='pontoon_small', x=20, z=180, heading=0 },"
+            " { id='c', kind='pontoon_small', x=20, z=190, heading=0 },"
+            " { id='d', kind='pontoon_small', x=20, z=200, heading=0 },"
+            " { id='e', kind='pontoon_small', x=20, z=210, heading=0 },",
+            "scene.marina.modules" },
+    };
+    for (size_t i = 0; i < sizeof(module_cases) / sizeof(module_cases[0]); ++i) {
+        memcpy(source, files.source, files.source_size);
+        source[files.source_size] = 0;
+        char *at = strstr(source, module_cases[i].from);
+        CHECK(at);
+        size_t from_size = strlen(module_cases[i].from), to_size = strlen(module_cases[i].to);
+        CHECK(files.source_size - from_size + to_size <= BOAT_PLUGIN_SOURCE_MAX);
+        memmove(
+            at + to_size, at + from_size, files.source_size - (size_t)(at - source) - from_size);
+        memcpy(at, module_cases[i].to, to_size);
+        size_t size = files.source_size - from_size + to_size;
+        source[size] = 0;
+        BoatPluginVoyage candidate;
+        BoatPluginStatus status = load(files.manifest, source, size, NULL, &candidate, &d);
+        show(module_cases[i].field, &d);
+        if (!strcmp(module_cases[i].field, "scene.marina.modules[1].kind")
+            || !strcmp(module_cases[i].field, "scene.marina.modules[2].attaches")
+            || !strcmp(module_cases[i].field, "scene.marina.modules"))
+            CHECK(status == BOAT_PLUGIN_SCHEMA && !strcmp(d.field, module_cases[i].field));
+        else {
+            CHECK(status == BOAT_PLUGIN_OK);
+            CHECK(boat_plugin_check_location(&candidate, resources.definition, &resources.map, &d)
+                == BOAT_PLUGIN_SCHEMA);
+            CHECK(!strcmp(d.field, module_cases[i].field));
+        }
+    }
     boat_world_resources_destroy(&resources);
     return 0;
 }
