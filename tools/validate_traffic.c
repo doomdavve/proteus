@@ -2,6 +2,7 @@
 #include "boat_test_session.h"
 #include "boat_view.h"
 #include "waterfront_harbor.h"
+#include "waterfront_route.h"
 #include "waterfront_traffic.h"
 #include "waterfront_upstream.h"
 
@@ -274,9 +275,116 @@ static int check_upstream(void)
     return 0;
 }
 
+// L3.1: the caller-owned definition must reproduce the compiled queries, and its own route
+// evaluation must be periodic, finite and structurally bounded.
+static int check_route_definition(void)
+{
+    const WaterfrontRouteDefinition *defaults = waterfront_route_defaults();
+    WaterfrontRouteDiagnostic diagnostic;
+    CHECK(defaults && defaults->actor_count == WATERFRONT_ROUTE_ACTORS);
+    CHECK(waterfront_route_validate(defaults, &diagnostic));
+    CHECK(waterfront_route_has_content(defaults) && waterfront_route_has_bridge(defaults));
+
+    const double times[] = { -320.75, -1, 0, .001, 40.3, 300, 1200, 86400.3 };
+    for (int i = 0; i < WATERFRONT_ROUTE_ACTORS; ++i) {
+        double period = waterfront_traffic_period(i);
+        CHECK(waterfront_route_period(defaults, i) == period);
+        CHECK(!strcmp(waterfront_route_recipe_name(defaults->actors[i].recipe),
+            waterfront_route_recipe_name(defaults->actors[i].recipe)));
+        for (unsigned t = 0; t < sizeof(times) / sizeof(times[0]); ++t) {
+            WaterfrontVesselMotion a = waterfront_traffic_motion(i, times[t]);
+            WaterfrontVesselMotion b = waterfront_traffic_motion_routes(defaults, i, times[t]);
+            CHECK(!memcmp(&a, &b, sizeof(a)));
+            CHECK(isfinite(b.position.x) && isfinite(b.position.z) && isfinite(b.velocity.x));
+            if (period > 0) {
+                WaterfrontVesselMotion wrapped
+                    = waterfront_traffic_motion(i, times[t] + period);
+                CHECK(near(wrapped.position, a.position, .002f));
+                CHECK(near(wrapped.velocity, a.velocity, .002f));
+            }
+        }
+        // Direct seek and a stepped evaluation use the same pure time input.
+        WaterfrontVesselMotion direct = waterfront_traffic_motion(i, 137.25);
+        WaterfrontVesselMotion stepped = direct;
+        for (int tick = 0; tick <= 13725; ++tick)
+            stepped = waterfront_traffic_motion(i, tick / 100.0);
+        CHECK(near(direct.position, stepped.position, .002f)
+            && near(direct.velocity, stepped.velocity, .002f));
+    }
+    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
+        Vector2 default_stops[8], route_stops[8];
+        int a = waterfront_upstream_stops(i, default_stops, 8);
+        int b = waterfront_route_stops(defaults, WATERFRONT_TRAFFIC_VESSELS + i, route_stops, 8);
+        CHECK(a == b);
+        for (int k = 0; k < a; ++k)
+            CHECK(Vector2Distance(default_stops[k], route_stops[k]) < 1e-5f);
+    }
+    for (int step = 0; step <= 1200; ++step)
+        CHECK(fabsf(waterfront_route_lift(defaults, step) - waterfront_upstream_lift(step)) < 1e-5f);
+
+    WaterfrontTrafficFrame compiled, selected;
+    waterfront_traffic_evaluate((BoatWater) { .upstream = true }, 300, &compiled);
+    waterfront_traffic_evaluate_routes(defaults, (BoatWater) { .upstream = true }, 300, &selected);
+    CHECK(compiled.vessel_count == selected.vessel_count);
+    CHECK(compiled.lift == selected.lift && compiled.wake_count == selected.wake_count);
+    CHECK(!memcmp(compiled.vessels, selected.vessels, sizeof(compiled.vessels)));
+    CHECK(!memcmp(compiled.wakes, selected.wakes, sizeof(selected.wakes)));
+    CHECK(compiled.routes == NULL && selected.routes == defaults);
+
+    // A bounded authored loop: four corners, no stops, period provided without an explicit
+    // cruise speed. It must close, and each structural failure must be rejected.
+    WaterfrontRouteDefinition custom = { .actor_count = 1 };
+    WaterfrontRouteActor *a = &custom.actors[0];
+    strcpy(a->id, "passing");
+    a->shape = WATERFRONT_ROUTE_POINTS;
+    a->recipe = WATERFRONT_CRAFT_RUNABOUT;
+    a->period = 40;
+    a->point_count = 4;
+    a->points[0] = (WaterfrontRoutePoint) { 0, 0, 2 };
+    a->points[1] = (WaterfrontRoutePoint) { 40, 0, 2 };
+    a->points[2] = (WaterfrontRoutePoint) { 40, 40, 2 };
+    a->points[3] = (WaterfrontRoutePoint) { 0, 40, 2 };
+    CHECK(waterfront_route_validate(&custom, &diagnostic));
+    WaterfrontVesselMotion start = waterfront_route_motion(&custom, 0, 0);
+    WaterfrontVesselMotion lap = waterfront_route_motion(&custom, 0, 40);
+    CHECK(near(start.position, lap.position, .01f) && near(start.velocity, lap.velocity, .01f));
+    CHECK(waterfront_route_period(&custom, 0) == 40);
+    CHECK(waterfront_route_mesh(&custom, 0) && waterfront_route_mesh(&custom, 0)->triangle_count);
+
+    custom.actors[1] = custom.actors[0];
+    custom.actor_count = 2;
+    CHECK(!waterfront_route_validate(&custom, &diagnostic));
+    CHECK(!strcmp(diagnostic.field, "scene.traffic.vessels[2].id"));
+    custom.actor_count = WATERFRONT_ROUTE_ACTORS + 1;
+    CHECK(!waterfront_route_validate(&custom, &diagnostic));
+    custom.actor_count = 1;
+    a->points[1].radius = 100;
+    CHECK(!waterfront_route_validate(&custom, &diagnostic));
+    a->points[1].radius = 2;
+    a->speed = 4;
+    a->period = 30;
+    CHECK(!waterfront_route_validate(&custom, &diagnostic));
+    a->speed = 0;
+    a->period = 40;
+    a->stop_count = 1;
+    a->stops[0] = (WaterfrontRouteStop) { 9, 2 };
+    CHECK(!waterfront_route_validate(&custom, &diagnostic));
+    a->stop_count = 0;
+    a->bridge = true;
+    CHECK(!waterfront_route_validate(&custom, &diagnostic));
+    a->bridge = false;
+    CHECK(waterfront_route_validate(&custom, &diagnostic));
+    printf("route_definition actors=%u storage=%zu points=%zu stops=%zu\n",
+        (unsigned)WATERFRONT_ROUTE_ACTORS, sizeof(WaterfrontRouteDefinition),
+        sizeof(WaterfrontRoutePoint) * WATERFRONT_ROUTE_POINT_CAPACITY,
+        sizeof(WaterfrontRouteStop) * WATERFRONT_ROUTE_STOPS);
+    return 0;
+}
+
 int main(void)
 {
     CHECK(check_vertical_contacts() == 0);
+    CHECK(check_route_definition() == 0);
     CHECK(check_upstream() == 0);
     if (check_gulls() || check_long_session())
         return 1;

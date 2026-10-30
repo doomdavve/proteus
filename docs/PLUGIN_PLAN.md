@@ -1780,9 +1780,9 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L2.3 are complete; next in this track: L3.1 native
-route definitions**; the first playable gate is L4.3. `scene.define` installs and stages the
-two-berth harbor-life layout, including its small pontoon and gangway.
+failure cases and acceptance evidence. **L1.1–L3.1 are complete; next in this track: L3.2 one
+authored small-craft route**; the first playable gate is L4.3. `scene.define` installs and stages
+the two-berth harbor-life layout, including its small pontoon and gangway.
 
 ### Coverage and delivery slices
 
@@ -2203,9 +2203,44 @@ verified marina entrance/approach bookmark; a pinned review camera that renders 
 without moving the boat is the other useful option. Record human acceptance of the edit loop as
 pending rather than treating this convenience gap as a failed scene.
 
-**Next in this track: L3.1.** Extract traffic/upstream route and timetable inputs into
-caller-owned native data with compiled parity. This completes the requested L1.1–L2.3 sequence;
-L3+ and the L4.3 playable gate are not started.
+#### L3.1 result, 2026-10-30
+
+**Implemented:** caller-owned travelling-craft routes and timetables, with compiled parity and no
+Lua field yet. New core files [`waterfront_route.[ch]`](../src/waterfront_route.h) own eight
+bounded actors (four river circuits and four outer upstream vessels), straight/arc motion, stops,
+dwell arithmetic, bridge crossings and lift evaluation. `waterfront_traffic.[ch]` and
+`waterfront_upstream.[ch]` retain their wrappers and now delegate to the definition; `NULL`
+selects the compiled defaults.
+
+- **Limits:** 8 actors, 32 corner points and 8 stops per actor. Structural validation rejects
+  unknown shape/recipe, duplicate/ill-spelled IDs, non-finite coordinates, zero-length segments,
+  corner radii larger than their adjacent segments, unordered/out-of-range stops, inconsistent
+  period/travel/dwell arithmetic, malformed ellipses/circuits and bridge actors that stop.
+  `sizeof(WaterfrontRouteDefinition)` is 4,232 bytes (384 bytes of points and 64 bytes of stops).
+- **Parity:** default poses, velocities, periods, contact hulls, visual trails and bridge lift
+  match the previous compiled evaluator, including negative time, lap wrap and the 1,200 s
+  timetable. Default upstream stops remain `{1,4,8}` / `{0,3}`. The definition is pure-time;
+  route motion is cached only by the definition digest, never by accumulated simulation state.
+- **Bridge:** the compiled schooner remains the sole default bridge actor. Lift crossings are
+  derived from the route rather than a second timetable, so later authored tall vessels can join
+  the same dependency group. L3.4 adds the full authored-window and overlap rules.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build. Full `ctest --preset full` passed **315/315 enabled tests** (23.22 s)
+  with local socket access; 13 retired wake-field tests remain disabled.
+- `validate_traffic` now checks default route validation, all eight actors' periods/motion
+  against the wrappers at negative time, boundaries and 30 days, direct versus stepped seeks,
+  upstream stops, lift parity across the full timetable, frame/wake parity, one custom closed
+  loop and structural failures (duplicate IDs, capacity + 1, overlong corner radius,
+  discontinuous period, bad stop, bridge actor without a crossing).
+- `boat_core_boundary` and `boat_net_boundary` pass with the new core files; no renderer, Lua,
+  host or asset path consumes the definition yet. No visual or human acceptance is claimed.
+
+**Next in this track: L3.2.** Decode one authored small-craft route, define full-collection
+replacement with explicit retained defaults, and validate swept corridors against shore, the
+marina/access lane and other scheduled craft. This completes the requested L1.1–L3.1 sequence;
+L3.2+ and the L4.3 playable gate are not started.
 
 #### L2 — a small marina before a marina editor
 
@@ -2328,10 +2363,12 @@ Completed L2.2, 2026-10-30: exposed two editable berths in `plugins/harbor-life`
 accepted scene into physics and both renderers, and added map/restart validation.
 Completed L2.3, 2026-10-30: added registered pontoon/gangway/quay modules, the small authored
 pontoon and gangway, and shared pose/contact/camera/rope handling.
-Next task for this track: **L3.1**, native route definitions with compiled parity. The requested
-L1.1–L2.3 sequence stops here. Known limits: no freeform module mesh editor, depth is unverified,
-and no tram/seal recipes, gameplay dusk, building activity or human scene acceptance are
-implemented.
+Completed L3.1, 2026-10-30: extracted eight native route/timetable actors, compiled-parity motion,
+stops, bridge crossings and bounded structural validation into `waterfront_route`.
+Next task for this track: **L3.2**, one authored small-craft route with full-collection replacement.
+Known limits: routes are native-only and no Lua field exposes them yet; no freeform module mesh
+editor, depth is unverified, and no tram/seal recipes, gameplay dusk, building activity or human
+scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

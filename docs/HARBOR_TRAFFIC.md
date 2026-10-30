@@ -10,7 +10,9 @@ The compact ferry replaces the original large Stena vessel proposal for this pas
 ## Routes and shared state
 
 `src/waterfront_traffic.[ch]` owns four stable actor IDs, generated meshes, continuous routes,
-velocities, lights, and wake histories. `waterfront_scene_evaluate_actors` gathers cars, lamps,
+velocities, lights, and wake histories. Since L3.1 (2026-10-30), the route/timetable inputs live
+in `src/waterfront_route.[ch]` as a bounded caller-owned definition; `NULL` selects these compiled
+defaults. No Lua field exposes them yet. `waterfront_scene_evaluate_actors` gathers cars, lamps,
 moored boats, and travelling vessels at explicit scene time. CPU/GPU drawing, reflections,
 and shadows consume the evaluated transforms. Direct/backward seeks require no warm-up.
 The old one-way box launch has been removed. Main-demo camera and music timing are unchanged.

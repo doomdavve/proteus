@@ -1,124 +1,76 @@
 #include "waterfront_traffic.h"
 
 #include "raymath.h"
+#include "waterfront_route.h"
 #include "waterfront_upstream.h"
 
 #include <math.h>
 
-static const BoatModelKind kinds[WATERFRONT_TRAFFIC_VESSELS]
-    = { BOAT_MODEL_RUNABOUT, BOAT_MODEL_CRUISER, BOAT_MODEL_SAILBOAT, BOAT_MODEL_FERRY };
-static const float dock_speed = 2.2f;
-static const Vector2 river_along = { .8f, .6f }, river_across = { -.6f, .8f };
-static BoatModel models[WATERFRONT_TRAFFIC_VESSELS];
-static bool initialized;
+BoatModelSpec waterfront_traffic_spec_routes(
+    const WaterfrontRouteDefinition *routes, int index)
+{
+    return waterfront_route_spec(routes, index);
+}
 
 BoatModelSpec waterfront_traffic_spec(int index)
 {
-    if (index >= WATERFRONT_TRAFFIC_VESSELS)
-        return waterfront_upstream_spec(index - WATERFRONT_TRAFFIC_VESSELS);
-    if (index < 0)
-        return (BoatModelSpec) { 0 };
-    BoatModelSpec spec = boat_model_preset(kinds[index]);
-    if (index == 0) {
-        spec.hull = (Color) { 227, 154, 60, 255 };
-        spec.trim = (Color) { 242, 227, 196, 255 };
-    }
-    return spec;
+    return waterfront_traffic_spec_routes(NULL, index);
+}
+
+const Mesh3D *waterfront_traffic_mesh_routes(const WaterfrontRouteDefinition *routes, int index)
+{
+    return waterfront_route_mesh(routes, index);
 }
 
 const Mesh3D *waterfront_traffic_mesh(int index)
 {
-    if (index >= WATERFRONT_TRAFFIC_VESSELS)
-        return waterfront_upstream_mesh(index - WATERFRONT_TRAFFIC_VESSELS);
-    if (index < 0)
-        return NULL;
-    if (!initialized) {
-        for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i)
-            boat_model_generate(&models[i], waterfront_traffic_spec(i));
-        initialized = true;
-    }
-    return &models[index].mesh;
+    return waterfront_traffic_mesh_routes(NULL, index);
+}
+
+double waterfront_traffic_period_routes(const WaterfrontRouteDefinition *routes, int index)
+{
+    return waterfront_route_period(routes, index);
 }
 
 double waterfront_traffic_period(int index)
 {
-    if (index >= WATERFRONT_TRAFFIC_VESSELS && index < WATERFRONT_TRAFFIC_ALL)
-        return WATERFRONT_UPSTREAM_PERIOD;
-    if (index < 0 || index >= WATERFRONT_TRAFFIC_VESSELS)
-        return 0;
-    return index == 0 ? (260 + 28 * (double)PI) / dock_speed : index == 3 ? 320 : 260;
+    return waterfront_traffic_period_routes(NULL, index);
 }
 
-static double wrapped(double value, double period)
+WaterfrontVesselMotion waterfront_traffic_motion_routes(
+    const WaterfrontRouteDefinition *routes, int index, double time)
 {
-    value = fmod(value, period);
-    return value < 0 ? value + period : value;
+    return waterfront_route_motion(routes, index, time);
 }
 
 WaterfrontVesselMotion waterfront_traffic_motion(int index, double time)
 {
-    if (index >= WATERFRONT_TRAFFIC_VESSELS)
-        return waterfront_upstream_motion(index - WATERFRONT_TRAFFIC_VESSELS, time);
-    WaterfrontVesselMotion out = { 0 };
-    if (index < 0 || !isfinite(time))
-        return out;
-    Vector2 p, v, a = { 0 };
-    if (index == 0) {
-        // Two straight lanes with 14 m semicircular turns, entirely south of Dockbron.
-        double distance = wrapped((double)time * dock_speed + 70, 260 + 28 * (double)PI);
-        float arc = 14 * PI;
-        if (distance < 130) {
-            p = (Vector2) { 2, -45 + (float)distance };
-            v = (Vector2) { 0, dock_speed };
-        } else if (distance < 130 + arc) {
-            float u = ((float)distance - 130) / 14;
-            p = (Vector2) { 16 - 14 * cosf(u), 85 + 14 * sinf(u) };
-            v = (Vector2) { dock_speed * sinf(u), dock_speed * cosf(u) };
-            a = (Vector2) { dock_speed * dock_speed / 14 * cosf(u),
-                -dock_speed * dock_speed / 14 * sinf(u) };
-        } else if (distance < 260 + arc) {
-            p = (Vector2) { 30, 85 - ((float)distance - 130 - arc) };
-            v = (Vector2) { 0, -dock_speed };
-        } else {
-            float u = ((float)distance - 260 - arc) / 14;
-            p = (Vector2) { 16 + 14 * cosf(u), -45 - 14 * sinf(u) };
-            v = (Vector2) { -dock_speed * sinf(u), -dock_speed * cosf(u) };
-            a = (Vector2) { -dock_speed * dock_speed / 14 * cosf(u),
-                dock_speed * dock_speed / 14 * sinf(u) };
-        }
-    } else {
-        // Nested river circuits keep the ferry and smaller vessels in separate corridors.
-        float long_radius = index == 3 ? 300 : 210, short_radius = index == 3 ? 65 : 28;
-        double rate = 2 * (double)PI / waterfront_traffic_period(index);
-        float u
-            = (float)wrapped((double)time * rate + (index == 2 ? PI / 2 : -PI / 2), 2 * (double)PI);
-        Vector2 local = { long_radius * cosf(u), short_radius * sinf(u) };
-        Vector2 first
-            = { -long_radius * sinf(u) * (float)rate, short_radius * cosf(u) * (float)rate };
-        Vector2 second = { -local.x * (float)(rate * rate), -local.y * (float)(rate * rate) };
-        p = Vector2Add((Vector2) { 50, -290 },
-            Vector2Add(Vector2Scale(river_along, local.x), Vector2Scale(river_across, local.y)));
-        v = Vector2Add(Vector2Scale(river_along, first.x), Vector2Scale(river_across, first.y));
-        a = Vector2Add(Vector2Scale(river_along, second.x), Vector2Scale(river_across, second.y));
-    }
-    out.position = (Vector3) { p.x, 0, p.y };
-    out.velocity = (Vector3) { v.x, 0, v.y };
-    out.heading = atan2f(-v.x, -v.y);
-    out.yaw_rate = (v.y * a.x - v.x * a.y) / Vector2LengthSqr(v);
-    return out;
+    return waterfront_traffic_motion_routes(NULL, index, time);
+}
+
+int waterfront_traffic_actor_count(const WaterfrontRouteDefinition *routes)
+{
+    return routes ? (int)routes->actor_count : WATERFRONT_TRAFFIC_ALL;
+}
+
+static Vector3 wake_point_routes(const WaterfrontRouteDefinition *routes, int index, double time,
+    float age, int side, bool physical)
+{
+    BoatModelSpec spec = waterfront_traffic_spec_routes(routes, index);
+    WaterfrontVesselMotion motion = waterfront_traffic_motion_routes(routes, index, time - age);
+    bool stopping = routes ? (unsigned)routes->actors[index].recipe >= WATERFRONT_CRAFT_ALVSNABBEN
+                           : index >= WATERFRONT_TRAFFIC_VESSELS;
+    // Stopping services follow the heading while stationary.
+    Vector3 forward = stopping ? (Vector3) { -sinf(motion.heading), 0, -cosf(motion.heading) }
+                               : Vector3Normalize(motion.velocity);
+    Vector3 right = { -forward.z, 0, forward.x };
+    return Vector3Add(Vector3Subtract(motion.position, Vector3Scale(forward, spec.length * .54f)),
+        Vector3Scale(right, side * (physical ? .9f + age * 2.4f : spec.beam * .42f + age * .38f)));
 }
 
 static Vector3 wake_point(int index, double time, float age, int side, bool physical)
 {
-    BoatModelSpec spec = waterfront_traffic_spec(index);
-    WaterfrontVesselMotion motion = waterfront_traffic_motion(index, time - age);
-    // Upstream ferries stop at their piers, so their trails follow the heading.
-    Vector3 forward = index < WATERFRONT_TRAFFIC_VESSELS
-        ? Vector3Normalize(motion.velocity)
-        : (Vector3) { -sinf(motion.heading), 0, -cosf(motion.heading) };
-    Vector3 right = { -forward.z, 0, forward.x };
-    return Vector3Add(Vector3Subtract(motion.position, Vector3Scale(forward, spec.length * .54f)),
-        Vector3Scale(right, side * (physical ? .9f + age * 2.4f : spec.beam * .42f + age * .38f)));
+    return wake_point_routes(NULL, index, time, age, side, physical);
 }
 
 static bool track_wakes(BoatWakeObjects *wakes, double time)
@@ -158,36 +110,48 @@ bool waterfront_traffic_wakes_step(BoatWakeObjects *wakes, double time)
     return track_wakes(wakes, time);
 }
 
-void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame)
+void waterfront_traffic_evaluate_routes(const WaterfrontRouteDefinition *routes,
+    BoatWater water, double time, WaterfrontTrafficFrame *frame)
 {
     *frame = (WaterfrontTrafficFrame) { 0 };
-    frame->vessel_count = water.upstream ? WATERFRONT_TRAFFIC_ALL : WATERFRONT_TRAFFIC_VESSELS;
+    frame->routes = routes;
+    frame->vessel_count = routes ? (int)routes->actor_count
+                                 : water.upstream ? WATERFRONT_TRAFFIC_ALL
+                                                  : WATERFRONT_TRAFFIC_VESSELS;
     for (int i = 0; i < frame->vessel_count; ++i) {
-        BoatModelSpec spec = waterfront_traffic_spec(i);
+        BoatModelSpec spec = waterfront_traffic_spec_routes(routes, i);
         WaterfrontVesselState *vessel = &frame->vessels[i];
         vessel->id = 3000 + i;
-        vessel->motion = waterfront_traffic_motion(i, time);
+        vessel->motion = waterfront_traffic_motion_routes(routes, i, time);
         vessel->pose = boat_water_pose(
             water, time, vessel->motion.position, vessel->motion.heading, spec.length, spec.beam);
         for (int light = 0; light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
             vessel->lights[light] = boat_model_point(vessel->pose,
                 (Vector3) { light == 2 ? 0 : (light ? 1 : -1) * spec.beam * .42f,
                     spec.freeboard + .32f, light == 2 ? spec.length * .42f : -spec.length * .12f });
-        // Upstream vessels keep the visual trails, longer and fading out as they stop.
-        bool upstream = i >= WATERFRONT_TRAFFIC_VESSELS;
-        bool physical = water.traffic_objects && !upstream;
+        // Stopping services keep the longer visual trails and fade out as they slow.
+        bool upstream = routes ? (unsigned)routes->actors[i].recipe >= WATERFRONT_CRAFT_ALVSNABBEN
+                               : i >= WATERFRONT_TRAFFIC_VESSELS;
+        // Ordinary authored traffic keeps visual trails. Physical wakes need an explicitly
+        // budgeted recipe, so a scene never turns them on by accident.
+        bool physical = !routes && water.traffic_objects && !upstream;
         int segments = physical ? 16 : WATERFRONT_TRAFFIC_WAKE_SEGMENTS;
         float step = upstream ? 1.2f : .7f;
         for (int side = -1; side <= 1; side += 2)
             for (int j = 0; j < segments; ++j) {
                 float age = j * step, strength = 1;
                 if (upstream) {
-                    strength = Vector3Length(waterfront_traffic_motion(i, time - age).velocity) / 3;
+                    strength = Vector3Length(
+                                   waterfront_traffic_motion_routes(routes, i, time - age).velocity)
+                        / 3;
                     if (strength < .1f)
                         continue;
                 }
-                Vector3 a = wake_point(i, time, age, side, physical);
-                Vector3 b = wake_point(i, time, age + step, side, physical);
+                Vector3 a = routes ? wake_point_routes(routes, i, time, age, side, physical)
+                                   : wake_point(i, time, age, side, physical);
+                Vector3 b = routes
+                    ? wake_point_routes(routes, i, time, age + step, side, physical)
+                    : wake_point(i, time, age + step, side, physical);
                 Vector3 center = Vector3Scale(Vector3Add(a, b), .5f);
                 float length = Vector3Distance(a, b);
                 Vector3 direction = Vector3Subtract(b, a);
@@ -211,7 +175,8 @@ void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTraffic
                         (unsigned char)Lerp(104, 202, fade), 255 } };
             }
     }
-    if (water.upstream) {
+    bool bridge = routes ? waterfront_route_has_bridge(routes) : water.upstream;
+    if (bridge) {
         frame->lift = true;
         frame->lift_pose = waterfront_upstream_span_pose(time);
     }
@@ -249,6 +214,11 @@ void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTraffic
                         (unsigned char)Lerp(104, 218, fade), 255 } };
             }
     }
+}
+
+void waterfront_traffic_evaluate(BoatWater water, double time, WaterfrontTrafficFrame *frame)
+{
+    waterfront_traffic_evaluate_routes(NULL, water, time, frame);
 }
 
 // SAT uses both hull frames, avoiding centre-point or corner-sample tunnelling at crossings.
