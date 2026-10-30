@@ -15,7 +15,9 @@ that workflow to optional voyage objectives/timers. Browser race imports remain 
 read/write, P4.5 pinned CPU frame capture with curated anchors/camera bookmarks, P4.6 a live tool
 bridge to a running native game and P4.7 those tools in the macOS/Windows release packages.
 P4.8 qualifies browser authoring on Chromium, Firefox and WebKit in CI, with tab freeze,
-navigation and repeated-session cleanup, and records native costs on Linux and Windows.
+navigation and repeated-session cleanup, and records native costs on Linux and Windows. Full
+browser qualification is now [manual-only](WEB_BUILD.md#browser-authoring-ci-lanes-2026-10-30);
+relevant PRs retain Node contracts and Wasm compilation/packaging.
 P4.9 adds a bounded objective wire protocol, reusable isolated Wasm evaluator and asynchronous
 init/update/migration/Undo with host-owned in-session state. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
@@ -1684,14 +1686,32 @@ Startup deadline review also found a real clock-origin mismatch: INIT dispatch p
 `emscripten_get_now` clock instead. A regression offsets the page clock and delays host
 consumption of an already cached successful INIT reply: the host must expire it without
 publishing state, even though the JS completion watchdog has already retired. Native callers
-retain their existing clock. Browser CI is being rerun; prior P4.8 results remain historical
-evidence. GCC still reports pre-existing warnings outside the new
+retain their existing clock. Final source `d78c86e` passed every workflow on
+[PR #67](https://github.com/doomdavve/proteus/pull/67): Linux, macOS, Windows and the complete
+three-engine browser qualification, including the cached INIT deadline regression. Prior P4.8
+results remain historical evidence. GCC still reports pre-existing warnings outside the new
 plugin sources.
 
 **Next:** P5's authority/prediction/recording contract review as described in the current status.
 Browser races, interactive preview controls, durable full-session saves, native asynchronous
 objective execution and an in-game agent are not implemented. Physical Safari/mobile devices,
 real background-tab policies and P3 human migration/Undo/recovery acceptance remain open.
+
+#### Browser CI cadence, 2026-10-30
+
+At the user's request, the full browser matrix no longer runs on every relevant PR. PRs keep
+Node contracts and the packaged Wasm build; manual dispatch retains full three-engine runtime
+qualification and evidence. Superseded PR runs are canceled, and no `main` push trigger is
+added. The [browser guide](WEB_BUILD.md#browser-authoring-ci-lanes-2026-10-30) owns the command
+and coverage tradeoff. P5 remains the next implementation task.
+
+Verification, 2026-10-30, Apple Silicon/macOS: Debug configure/build passed using the pinned
+existing dependency sources (project sources warning-clean; bundled `stb_vorbis` warning).
+Full `ctest --preset full` passed 310/310 enabled tests with local socket access, GPU CTests
+off; Node authoring contracts and actionlint 1.7.7 passed. All 322 local links in the four
+affected Markdown guides resolve. The full browser commands are unchanged from P4.9's green
+qualification and were not rerun for this CI-only change. The PR run checks the automatic
+lane and skipped browser steps. No gameplay or audiovisual change.
 
 ### P5 — authority, prediction and recorded revisions
 

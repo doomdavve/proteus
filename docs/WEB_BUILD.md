@@ -404,6 +404,25 @@ for engine in chromium firefox webkit; do
 done
 ```
 
+### Browser authoring CI lanes, 2026-10-30
+
+Relevant pull requests run `web_plugin_author`'s Node contracts and an Emscripten packaged
+build. They skip Playwright installation, the three-engine runtime matrix and its evidence
+upload. Superseded runs are canceled. Ordinary merges/pushes to `main` do not trigger this
+workflow; native CI still runs its normal suite, including the quick Node contract test.
+
+The full **Browser plugin authoring** workflow is on demand. Run it for changes to browser
+plugin execution/lifecycle, the browser SDK or rendering integration, and before a release:
+
+```sh
+gh workflow run web-plugin.yml --ref BRANCH
+```
+
+A manual run retains the full Chromium/Firefox/WebKit transactions, freeze/deadline and cleanup
+checks and uploads their evidence. It keeps the 30-minute failure deadline; routine PR builds
+have a 10-minute deadline. Release/Pages publishing triggers are unchanged. Routine PR checks
+verify contracts and compilation, not real-browser runtime behavior.
+
 Verification, 2026-10-29: Emscripten 6.0.12 MinSizeRel game/worker packaging passes on Apple
 Silicon/macOS. The Node contract and local Chrome/SwiftShader check pass export/import,
 objective/race rejection, real worker launch, live rename, syntax rejection, held water
@@ -419,7 +438,7 @@ WebGL on a GPU-less runner. See
 the [P4.8 result](PLUGIN_PLAN.md#p48-result-2026-10-30) for timings and limits. Safari, mobile
 browsers, physical devices, real background-tab policies and worker/browser-process memory
 remain unqualified; see the [P4.9 result](PLUGIN_PLAN.md#p49-result-2026-10-30) for objective
-execution and Wasm linear-memory evidence. No human play acceptance or deployment is claimed. PR browser CI builds these artifacts
+execution and Wasm linear-memory evidence. No human play acceptance or deployment is claimed. Browser CI builds these artifacts
 without publishing them; the release/Pages deployment workflow retains its existing policy.
 Verification, 2026-10-30 (P4.9): the extended authoring check also passes objective init/update/
 timers, gated ticks, deferred recovery, migration cancellation/Apply/Undo/restart, failure,

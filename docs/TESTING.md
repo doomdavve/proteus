@@ -772,4 +772,7 @@ capability rejection, repeated worker validations, launch, live rename and synta
 water Apply/Undo, stale output, cancellation, navigation mid-validation, repeated source
 restore/revalidation and storage denial. On Chromium it also freezes the tab mid-validation. It
 awaits application/worker conditions; the only fixed waits are the freeze durations themselves.
-The PR browser workflow runs it on all three engines (P4.8). The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.
+The browser PR workflow runs the Node contracts and packages the Wasm build. Full three-engine
+qualification is manual-only; dispatch it for browser/plugin lifecycle changes and before a
+release, using `gh workflow run web-plugin.yml --ref BRANCH`. It is not run on ordinary pushes
+to `main`. Superseded PR builds are canceled. The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.
