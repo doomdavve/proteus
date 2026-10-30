@@ -635,8 +635,8 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
     if (world->combat && world->combat->enabled)
         cannon_visit(boat, basin_box, frame);
     if (world->definition->mapped)
-        waterfront_boating_gulls(
-            time, p->hull.position, (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, frame);
+        waterfront_boating_gulls_scene(view->scene, time, p->hull.position,
+            (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, frame);
     p->particle_count
         = pose_particles(presentation, world, time, p->particles, WATERFRONT_PLAYER_PARTICLES);
 }
@@ -763,7 +763,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
             waterfront_kit_ground(world->definition->map), &harbor);
         waterfront_draw_harbor(renderer, &harbor);
         WaterfrontSceneFrame birds = { 0 };
-        waterfront_boating_gulls(time,
+        waterfront_boating_gulls_scene(view->scene, time,
             (Vector3) { -boat->position.x, boat->height, boat->position.y },
             (Vector3) { -boat->velocity.x, 0, boat->velocity.y }, &birds);
         for (int i = 0; i < birds.gull_count; ++i)

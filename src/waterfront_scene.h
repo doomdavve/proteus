@@ -6,6 +6,7 @@
 #include "boat_water.h"
 #include "renderer3d.h"
 #include "waterfront_city.h"
+#include "waterfront_flock.h"
 #include "waterfront_harbor.h"
 #include "waterfront_traffic.h"
 
@@ -115,6 +116,9 @@ void waterfront_scene_evaluate_actors(double time, BoatWater water, WaterfrontSc
 // Player position/velocity use renderer coordinates; no accumulated simulation state.
 void waterfront_boating_gulls(
     double time, Vector3 player, Vector3 velocity, WaterfrontSceneFrame *frame);
+// L4.1: use the accepted traffic definition for avoidance while the compiled flocks remain.
+void waterfront_boating_gulls_scene(const BoatSceneDefinition *scene, double time, Vector3 player,
+    Vector3 velocity, WaterfrontSceneFrame *frame);
 const Mesh3D *waterfront_gull_mesh(int part);
 const Mesh3D *waterfront_player_hull_mesh(void);
 const Mesh3D *waterfront_player_cabin_mesh(void);

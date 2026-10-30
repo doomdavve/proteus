@@ -1780,10 +1780,10 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L3.4 are complete; next in this track: L4.1 native
-flock definitions**; the first playable gate is L4.3. `scene.define` installs and stages the
-two-berth harbor-life layout, its small pontoon and gangway, one authored passing craft, a retained
-ferry with an edited dwell, and the retained schooner/lift dependency.
+failure cases and acceptance evidence. **L1.1–L4.1 are complete; next in this track: L4.2 flock
+descriptor and timed cues**; the first playable gate is L4.3. `scene.define` installs and stages
+the two-berth harbor-life layout, its small pontoon and gangway, one authored passing craft, a
+retained ferry with an edited dwell, the retained schooner/lift dependency and compiled flocks.
 
 ### Coverage and delivery slices
 
@@ -2347,8 +2347,41 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
   by direct-time validation, not by raising the 60 s `wake_velocity --time` capture limit. CPU
   review has no GPU reflections/shadows; those remain part of L4.3's GPU inspection.
 
-**Next in this track: L4.1.** Extract the four gull groups into caller-owned bounded definitions
-with compiled parity and traffic/player avoidance.
+#### L4.1 result, 2026-10-30
+
+**Implemented:** the four compiled gull groups now live in a caller-owned
+[`WaterfrontFlockDefinition`](../src/waterfront_flock.h) with pure-time evaluation. `NULL` selects
+the compiled groups, preserving the previous paths, cues and wing motion.
+
+- **Limits:** four flocks, eight birds each, 32 birds total and 16 cue intervals per flock. A
+  flock owns its simulation centre, bird count/seed, radius, height, signed turn rate, follow
+  actor and optional explicit cues. Validation rejects duplicate/ill-spelled IDs, bad counts,
+  non-finite centres, invalid radius/height/rate, unknown follow actors, too many cues and
+  malformed intervals.
+- **Avoidance:** player avoidance is unchanged. Traffic avoidance now reads the accepted route
+  definition and all its actors, so an authored craft can disturb a nearby flock; the compiled
+  path keeps the first four river craft. The follow flock uses the accepted actor's motion.
+- **Cues:** compiled flocks keep their trigonometric feeding/alarm story. Explicit `[start,
+  end)` 120 Hz cue intervals with fade and amplitude already evaluate natively; alarm outranks
+  feeding, which outranks circling. L4.2 exposes this through the scene schema.
+- **Integration:** `boat_scene_frame` and the CPU preview pass the accepted scene's traffic into
+  the flock evaluator. The shared `WaterfrontSceneFrame` still carries the same 32 × 3 transforms
+  for every render pass, so there is no new mesh/light/wake pool.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build. Full `ctest --preset full` passed **322/322 enabled tests** (23.99 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_traffic` compares the new evaluator against an independent copy of the previous gull
+  equations at 13 instants (position within 1e-5, rotation 1e-3, scale 1e-5), and checks zero/max
+  counts, independent simultaneous definitions, explicit feeding/alarm cues, player and authored
+  traffic reactions, forward/backward/direct seeks, continuity and finite bird heights.
+  Existing snapshot/seek/player-stimulus checks still pass.
+- No Lua field, worker payload or renderer change yet; L4.2 adds the descriptor. No visual or
+  human acceptance is claimed, and building/terrain clipping remains a visual review item.
+
+**Next in this track: L4.2.** Expose bounded flock IDs, centres, counts, recipes, seeds/phases and
+cue intervals through `scene.gulls`, with restart classification and discovery.
 
 #### L2 — a small marina before a marina editor
 
@@ -2480,11 +2513,13 @@ Completed L3.3, 2026-10-30: added named ordered stops, shared/explicit dwell, pe
 the harbor-life ferry's edited Stenpiren departure.
 Completed L3.4, 2026-10-30: bound tall-vessel passages and the Hisingsbron lift into one validated
 group, retained the schooner in the example, and added a bridge review camera.
-Next task for this track: **L4.1**, native flock definitions.
+Completed L4.1, 2026-10-30: extracted four bounded gull flocks, pure-time cues and accepted-traffic
+avoidance with compiled parity.
+Next task for this track: **L4.2**, flock descriptor and timed cues.
 Known limits: authored route geometry is selected from registered presets; no freeform route
 editor, freeform module mesh editor or physical traffic wake recipe; no boarding/passenger
-simulation; no tram closure interlock; depth is unverified; and no tram/seal recipes, gameplay
-dusk, building activity or human scene acceptance are implemented.
+simulation; no tram closure interlock; depth is unverified; no flock Lua field yet; and no
+tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project
