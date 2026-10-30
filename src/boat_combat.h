@@ -60,9 +60,19 @@ typedef struct BoatCombat {
 } BoatCombat;
 
 #define BOAT_COMBAT_BYTES 3716
+#define BOAT_COMBAT_WORLD_LIMIT 8192.0f // Same horizontal envelope as the protocol.
+#define BOAT_COMBAT_ECHO_TICKS 45 // Longest visual projectile echo after deactivation.
 // Canonical big-endian checkpoint representation, including rules; no padding on wire.
 void boat_combat_encode(const BoatCombat *combat, uint8_t bytes[BOAT_COMBAT_BYTES]);
 bool boat_combat_decode(BoatCombat *combat, const uint8_t bytes[BOAT_COMBAT_BYTES], uint64_t tick);
+// Compact per-tick representation: rules are taken from the installed checkpoint, inactive
+// objects are omitted, and short-lived tick ages and directions are packed. At the full pool
+// occupancy it fits in three 1024-byte pages; typical play fits in one or two.
+#define BOAT_COMBAT_COMPACT_BYTES 3072
+size_t boat_combat_compact_encode(
+    const BoatCombat *combat, uint8_t *bytes, size_t capacity, uint64_t tick);
+bool boat_combat_compact_decode(BoatCombat *combat, const uint8_t *bytes, size_t size,
+    uint64_t tick, const BoatCombatRules *rules);
 
 struct BoatFleet;
 BoatCombatRules boat_combat_default_rules(void);

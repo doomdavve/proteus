@@ -22,9 +22,11 @@ void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
         .first_sequence = config->first_sequence,
         .resources = config->resources,
         .predict = config->predict,
+        .defer_ready = config->defer_ready,
         .started_at = now,
         .serviced_at = now,
         .pong_after = now,
+        .heard_at = now,
         .mismatch_since = -1,
         .resync_at = -1e9,
         .ping_at = -1e9,
@@ -184,10 +186,32 @@ static void install(BoatNetClient *c, double now)
         boat_remote_history_reset(&c->remotes);
     boat_remote_history_push(&c->remotes, state.tick, state.slots);
     c->predict_dirty = true;
-    BoatNetMessage m
-        = { .header = { .type = BOAT_NET_READY, .tick = state.tick }, .checkpoint = b->checkpoint };
-    send_message(c, &m);
+    if (c->defer_ready && !c->ready_sent) {
+        // The caller is still opening its window or audio device. Keep the authority's
+        // spawn and roster traffic off the reliable channels until it can service frames.
+        c->ready_pending = true;
+        c->ready_checkpoint = b->checkpoint;
+    } else {
+        BoatNetMessage m = { .header = { .type = BOAT_NET_READY, .tick = state.tick },
+            .checkpoint = b->checkpoint };
+        send_message(c, &m);
+        c->ready_sent = true;
+    }
     c->phase = BOAT_NET_CLIENT_PLAYING;
+}
+
+bool boat_net_client_ready(BoatNetClient *c)
+{
+    if (c->phase != BOAT_NET_CLIENT_PLAYING)
+        return false;
+    if (!c->ready_pending)
+        return true;
+    BoatNetMessage m = { .header = { .type = BOAT_NET_READY, .tick = mirror_tick(c) },
+        .checkpoint = c->ready_checkpoint };
+    send_message(c, &m);
+    c->ready_pending = false;
+    c->ready_sent = true;
+    return true;
 }
 
 static void snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
@@ -247,7 +271,7 @@ static void snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
     }
 }
 
-// Snapshot and combat pages may arrive in any order on independent channels. Never
+// Snapshot and compact combat pages may arrive in any order on independent channels. Never
 // reconcile a hull against a partial combat state, and never retain superseded pages.
 static void combat_snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
 {
@@ -265,12 +289,23 @@ static void combat_snapshot(BoatNetClient *c, const BoatNetMessage *m, double no
         set->snapshot_received = true;
     } else {
         const BoatNetWorldPage *p = &m->world_page;
-        memcpy(set->bytes + p->index * BOAT_NET_PAGE_BYTES, p->data, p->size);
-        set->pages |= 1u << p->index;
+        if (set->count && set->count != p->count) {
+            ++c->stats.decode_errors;
+            return;
+        }
+        if (!(set->received & (1u << p->index))) {
+            set->count = p->count;
+            set->received |= (uint8_t)(1u << p->index);
+            set->size = (uint16_t)(set->size + p->size);
+            memcpy(set->bytes + p->index * BOAT_NET_PAGE_BYTES, p->data, p->size);
+        }
     }
-    if (set->pages == 15 && set->snapshot_received) {
+    if (set->count && set->received == (uint8_t)((1u << set->count) - 1)
+        && set->snapshot_received) {
         BoatCombat combat;
-        if (!boat_combat_decode(&combat, set->bytes, tick) || !combat.enabled) {
+        if (!boat_combat_compact_decode(
+                &combat, set->bytes, set->size, tick, &c->fleet.state.combat.rules)
+            || !combat.enabled) {
             ++c->stats.decode_errors;
             return;
         }
@@ -350,6 +385,10 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         ++c->stats.decode_errors;
         return;
     }
+    // Any valid message from this session proves the path is alive, even if it is a stale
+    // snapshot or a birth the client cannot apply yet. Snapshot liveness is separate.
+    if (c->phase >= BOAT_NET_CLIENT_BOOTSTRAP && m.header.epoch == c->epoch)
+        c->heard_at = now;
     if (c->phase == BOAT_NET_CLIENT_HANDSHAKE && channel == BOAT_NET_BOOTSTRAP) {
         if (c->early_bootstrap_count < BOAT_NET_EARLY_BOOTSTRAP) {
             c->early_bootstrap[c->early_bootstrap_count++] = *event;
@@ -369,6 +408,7 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     }
     if (m.header.type == BOAT_NET_REJECT && c->phase == BOAT_NET_CLIENT_HANDSHAKE) {
         c->reject = m.reject;
+        c->heard_at = now;
         c->phase = BOAT_NET_CLIENT_REJECTED;
         c->early_bootstrap_count = 0;
         return;
@@ -376,6 +416,7 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     if (m.header.type == BOAT_NET_ACCEPT && c->phase == BOAT_NET_CLIENT_HANDSHAKE) {
         c->accept = m.accept;
         c->epoch = m.header.epoch;
+        c->heard_at = now;
         c->slot = m.accept.slot;
         c->phase = BOAT_NET_CLIENT_BOOTSTRAP;
         unsigned count = c->early_bootstrap_count;
@@ -576,9 +617,10 @@ static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive
     if (c->phase >= BOAT_NET_CLIENT_REJECTED)
         return false;
     bool joining = c->phase < BOAT_NET_CLIENT_PLAYING;
-    if (joining ? now - c->started_at > BOAT_NET_HANDSHAKE_TIMEOUT
-                : now - c->snapshot_at > BOAT_NET_TIMEOUT) {
-        c->timed_out = joining ? 1 : 2;
+    bool unresponsive = !joining && now - c->heard_at > BOAT_NET_TIMEOUT;
+    bool silent = !joining && now - c->snapshot_at > BOAT_NET_SNAPSHOT_SILENCE;
+    if (joining ? now - c->started_at > BOAT_NET_HANDSHAKE_TIMEOUT : (unresponsive || silent)) {
+        c->timed_out = joining ? 1 : unresponsive ? 2 : 3;
         c->phase = BOAT_NET_CLIENT_CLOSED;
         c->transport.disconnect(c->transport.context, 0);
         return false;
@@ -592,12 +634,19 @@ static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive
     }
     if (c->phase != BOAT_NET_CLIENT_PLAYING)
         return true;
-    if (!c->wake_consistent && c->mismatch_since >= 0
-        && now - c->mismatch_since > BOAT_NET_RESYNC_AFTER && now - c->resync_at > 1) {
+    bool wake_stalled = !c->wake_consistent && c->mismatch_since >= 0
+        && now - c->mismatch_since > BOAT_NET_RESYNC_AFTER;
+    // The authority is still talking (pongs, births, roster) but no authoritative fleet state
+    // has applied. Ask for a reliable checkpoint before the hard snapshot-silence ceiling.
+    bool snapshot_stalled = now - c->snapshot_at > BOAT_NET_RESYNC_AFTER
+        && now - c->heard_at <= BOAT_NET_RESYNC_AFTER;
+    if ((wake_stalled || snapshot_stalled) && now - c->resync_at > BOAT_NET_RESYNC_AFTER) {
         c->resync_at = now;
         ++c->stats.resyncs;
+        if (snapshot_stalled && !wake_stalled)
+            ++c->stats.snapshot_resyncs;
         BoatNetMessage m = { .header = { .type = BOAT_NET_RESYNC_REQUEST, .tick = mirror_tick(c) },
-            .resync = { .reason = 1, .snapshot_tick = mirror_tick(c) } };
+            .resync = { .reason = wake_stalled ? 1 : 2, .snapshot_tick = mirror_tick(c) } };
         send_message(c, &m);
     }
     if (c->predict && c->predict_dirty) {
@@ -688,7 +737,9 @@ const char *boat_net_client_failure(const BoatNetClient *c)
     if (c->timed_out == 1)
         return "no answer within 10 s (is the room running and its network endpoint reachable?)";
     if (c->timed_out == 2)
-        return "no snapshot for 5 s";
+        return "no message from the server for 5 s";
+    if (c->timed_out == 3)
+        return "the server is reachable but sent no authoritative state for 10 s";
     switch (c->leave) {
     case BOAT_NET_LEAVE_TIMEOUT:
         return "the server timed this client out";
