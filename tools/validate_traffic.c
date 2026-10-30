@@ -147,10 +147,116 @@ static int check_long_session(void)
     return 0;
 }
 
+// L4.1 independent reference: the compiled four-group equations before extraction. It uses
+// only explicit time and the default traffic evaluator, so it catches phase, cue, conversion
+// and avoidance drift rather than repeating the new evaluator.
+static Vector3 legacy_gull_path(int index, double time, float *alarm)
+{
+    int group = index / 8, bird = index % 8;
+    static const Vector3 roosts[]
+        = { { 15, 0, 38 }, { 16, 0, -20 }, { -70, 0, -245 }, { 135, 0, -235 } };
+    double social_time = time - bird * .21f;
+    float cue = .5f + .5f * sinf(boat_phase(.31f, social_time) + group * 1.9f);
+    float feeding = powf(cue, 6);
+    float startle = fmaxf(0, sinf(boat_phase(.47f, social_time) + group * 2.3f));
+    *alarm = powf(startle, 8);
+    float circling = (.29f + group * .025f) * (group % 2 ? -1 : 1);
+    float angle = boat_phase(circling, time) + bird * (2 * PI / 8)
+        + .14f * sinf(boat_phase(.61f, social_time) + group)
+        + .18f * sinf(boat_phase(.23f, time) + bird * 1.3f);
+    float radius = 13 + (bird % 3) * 3.2f + 5 * feeding + 7 * *alarm
+        + 1.2f * sinf(boat_phase(.37f, time) + bird * 2.1f);
+    Vector3 center = roosts[group];
+    if (group == 2) {
+        WaterfrontVesselMotion boat = waterfront_traffic_motion(1, time);
+        center = Vector3Subtract(boat.position, Vector3Scale(Vector3Normalize(boat.velocity), 18));
+    }
+    return (Vector3) { center.x + radius * cosf(angle),
+        5 + group * 2 + (bird % 3) * 1.1f + 1.1f * sinf(boat_phase(.83f, time) + bird * 1.7f)
+            - 2.5f * feeding + 6 * *alarm,
+        center.z + radius * .75f * sinf(angle) };
+}
+
+static Vector3 legacy_avoid(Vector3 p, Vector3 source, float radius, float strength, float *alarm)
+{
+    Vector3 away = { p.x - source.x, 0, p.z - source.z };
+    float response = expf(-Vector3LengthSqr(away) / (radius * radius));
+    *alarm = fmaxf(*alarm, response * strength);
+    p = Vector3Add(p, Vector3Scale(away, response * strength * .4f));
+    p.y += response * strength * 7;
+    return p;
+}
+
+static Vector3 legacy_gull_position(
+    int index, double time, Vector3 player, Vector3 velocity, float *alarm)
+{
+    Vector3 p = legacy_gull_path(index, time, alarm);
+    Vector3 separation = { 0 };
+    for (int neighbor = index / 8 * 8; neighbor < index / 8 * 8 + 8; ++neighbor) {
+        if (neighbor == index)
+            continue;
+        float ignored;
+        Vector3 delta = Vector3Subtract(p, legacy_gull_path(neighbor, time, &ignored));
+        separation = Vector3Add(separation, Vector3Scale(delta, 2 * expf(-Vector3LengthSqr(delta) / 16)));
+    }
+    p = Vector3Add(p, separation);
+    float speed = Vector3Length(velocity);
+    p = legacy_avoid(p, Vector3Add(player, Vector3Scale(velocity, .8f)), 10 + fminf(speed, 12),
+        .45f + fminf(speed * .08f, .9f), alarm);
+    for (int vessel = 0; vessel < WATERFRONT_TRAFFIC_VESSELS; ++vessel) {
+        WaterfrontVesselMotion boat = waterfront_traffic_motion(vessel, time);
+        p = legacy_avoid(p, boat.position, vessel == 3 ? 23 : 9, .65f, alarm);
+    }
+    return p;
+}
+
+static void legacy_gulls(
+    double time, Vector3 player, Vector3 velocity, Transform3D out[WATERFRONT_HARBOR_GULLS][3])
+{
+    for (int i = 0; i < WATERFRONT_HARBOR_GULLS; ++i) {
+        float alarm, ignored;
+        Vector3 p = legacy_gull_position(i, time, player, velocity, &alarm);
+        const float dt = .06f;
+        Vector3 before = legacy_gull_position(
+            i, time - dt, Vector3Subtract(player, Vector3Scale(velocity, dt)), velocity, &ignored);
+        Vector3 after = legacy_gull_position(
+            i, time + dt, Vector3Add(player, Vector3Scale(velocity, dt)), velocity, &ignored);
+        Vector3 forward = Vector3Normalize(Vector3Subtract(after, before));
+        Vector3 incoming = Vector3Normalize(Vector3Subtract(p, before));
+        Vector3 outgoing = Vector3Normalize(Vector3Subtract(after, p));
+        float yaw = atan2f(-forward.z, forward.x);
+        float pitch = asinf(Clamp(forward.y, -.8f, .8f));
+        float bank = Clamp(-Vector3CrossProduct(incoming, outgoing).y * 22, -.65f, .65f);
+        float beat = boat_phase(BOAT_TWO_PI * (1.7f + (i % 5) * .09f), time);
+        float phase = beat + i * 1.37f * 2 * PI;
+        float effort = .5f + .5f * sinf(boat_phase(.72f, time) + i * 2.1f);
+        effort = Clamp((effort - .58f) * 2.4f + alarm * .9f + fmaxf(0, forward.y), 0, 1);
+        float flap = .65f * effort * sinf(phase);
+        float size = .78f + (i % 5) * .045f;
+        for (int part = 0; part < 3; ++part) {
+            float trim = .035f * sinf(boat_phase(1.9f, time) + i);
+            float wing = part == 1 ? -.12f - flap + trim : part == 2 ? .12f + flap + trim : 0;
+            out[i][part] = (Transform3D) { .position = p,
+                .rotation = { bank + wing, yaw, pitch }, .scale = { size, size, size } };
+        }
+    }
+}
+
 static int check_gulls(void)
 {
     WaterfrontSceneFrame previous = { 0 }, frame = { 0 }, sought = { 0 };
     Vector3 far = { 10000, 0, 10000 };
+    for (int t = 0; t <= 12; ++t) {
+        Transform3D legacy[WATERFRONT_HARBOR_GULLS][3];
+        legacy_gulls(t * 7.25, far, (Vector3) { 0 }, legacy);
+        waterfront_boating_gulls(t * 7.25, far, (Vector3) { 0 }, &frame);
+        for (int i = 0; i < WATERFRONT_HARBOR_GULLS; ++i)
+            for (int part = 0; part < 3; ++part) {
+                CHECK(near(legacy[i][part].position, frame.gulls[i][part].position, 1e-5f));
+                CHECK(near(legacy[i][part].rotation, frame.gulls[i][part].rotation, 1e-3f));
+                CHECK(near(legacy[i][part].scale, frame.gulls[i][part].scale, 1e-5f));
+            }
+    }
     waterfront_boating_gulls(0, far, (Vector3) { 0 }, &previous);
     for (int tick = 0; tick <= 2400; ++tick) {
         float time = tick / 20.0f;
@@ -206,6 +312,85 @@ static int check_gulls(void)
         SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT, &frame);
     CHECK(frame.gull_count == 0);
     puts("harbor_gulls=ok birds=32 continuity=120s seeks=ok player_stimuli=ok snapshot=ok");
+    return 0;
+}
+
+// L4.1: counts, simultaneous definitions, direct seeks, explicit cues and authored traffic
+// avoidance are all explicit-time functions of the caller's inputs.
+static int check_flock_definition(void)
+{
+    const WaterfrontFlockDefinition *defaults = waterfront_flock_defaults();
+    WaterfrontFlockDiagnostic diagnostic;
+    CHECK(defaults->flock_count == WATERFRONT_FLOCKS);
+    CHECK(waterfront_flock_validate(defaults, &diagnostic));
+    CHECK(waterfront_flock_has_content(defaults));
+    WaterfrontFlockFrame frame, other, direct;
+    Vector3 far = { 10000, 0, 10000 }, zero = { 0 };
+    waterfront_flock_evaluate(defaults, NULL, 17.25, far, zero, &frame);
+    CHECK(frame.count == WATERFRONT_FLOCK_MAX_BIRDS);
+    for (int i = 0; i < frame.count; ++i)
+        CHECK(frame.birds[i][0].position.y > 1);
+    WaterfrontFlockDefinition empty = { 0 };
+    CHECK(waterfront_flock_validate(&empty, &diagnostic));
+    waterfront_flock_evaluate(&empty, NULL, 17.25, far, zero, &other);
+    CHECK(other.count == 0);
+
+    // A separate scene remains independent while the compiled definition is evaluated too.
+    WaterfrontFlockDefinition custom = { .flock_count = 1 };
+    WaterfrontFlock *f = &custom.flocks[0];
+    strcpy(f->id, "near_player");
+    f->x = -4;
+    f->z = 6;
+    f->count = 3;
+    f->radius = 4;
+    f->height = 3;
+    f->rate = .5f;
+    f->follow_actor = -1;
+    f->implicit_cues = false;
+    f->cue_count = 2;
+    f->cues[0] = (WaterfrontFlockCue) { 0, 240, 30, WATERFRONT_FLOCK_CUE_FEEDING, .8f };
+    f->cues[1] = (WaterfrontFlockCue) { 120, 240, 30, WATERFRONT_FLOCK_CUE_ALARM, 1 };
+    CHECK(waterfront_flock_validate(&custom, &diagnostic));
+    waterfront_flock_evaluate(&custom, NULL, 1.0, far, zero, &other);
+    CHECK(other.count == 3);
+    waterfront_flock_evaluate(defaults, NULL, 1.0, far, zero, &direct);
+    CHECK(direct.count == WATERFRONT_FLOCK_MAX_BIRDS);
+    for (int i = 0; i < 3; ++i)
+        CHECK(!near(other.birds[i][0].position, direct.birds[i][0].position, .1f));
+    // Feeding lowers the flock; the later alarm climbs above the undisturbed path.
+    waterfront_flock_evaluate(&custom, NULL, .1, far, zero, &other);
+    float feeding_y = other.birds[0][0].position.y;
+    waterfront_flock_evaluate(&custom, NULL, 1.2, far, zero, &other);
+    CHECK(other.birds[0][0].position.y > feeding_y + 1);
+    // Player proximity raises nearby birds; authored traffic does the same.
+    waterfront_flock_evaluate(&custom, NULL, 3, far, zero, &other);
+    float idle = other.birds[0][0].position.y;
+    Vector3 player = other.birds[0][0].position;
+    player.y = 0;
+    waterfront_flock_evaluate(&custom, NULL, 3, player, zero, &other);
+    CHECK(other.birds[0][0].position.y > idle + 1);
+    WaterfrontRouteDefinition traffic = { .actor_count = 1 };
+    CHECK(waterfront_route_preset("marina_pass", &traffic.actors[0]));
+    custom.flocks[0].x = -waterfront_traffic_motion_routes(&traffic, 0, 3).position.x;
+    custom.flocks[0].z = waterfront_traffic_motion_routes(&traffic, 0, 3).position.z;
+    waterfront_flock_evaluate(&custom, NULL, 3, far, zero, &other);
+    float without = other.birds[0][0].position.y;
+    waterfront_flock_evaluate(&custom, &traffic, 3, far, zero, &other);
+    CHECK(other.birds[0][0].position.y > without + .2f);
+    // Forward, backward and direct seeks agree at every sampled time.
+    for (int tick = 0; tick <= 2400; ++tick) {
+        double time = tick / 40.0;
+        waterfront_flock_evaluate(defaults, NULL, time, far, zero, &frame);
+        waterfront_flock_evaluate(defaults, NULL, 60 - time, far, zero, &other);
+        waterfront_flock_evaluate(defaults, NULL, time, far, zero, &other);
+        CHECK(!memcmp(&frame, &other, sizeof(frame)));
+        if (tick)
+            for (int i = 0; i < frame.count; ++i)
+                CHECK(Vector3Distance(frame.birds[i][0].position,
+                          direct.birds[i][0].position)
+                    < 4);
+        direct = frame;
+    }
     return 0;
 }
 
@@ -558,6 +743,7 @@ int main(void)
     CHECK(check_scene_traffic() == 0);
     CHECK(check_ferry_schedule() == 0);
     CHECK(check_bridge_safety() == 0);
+    CHECK(check_flock_definition() == 0);
     CHECK(check_upstream() == 0);
     if (check_gulls() || check_long_session())
         return 1;
