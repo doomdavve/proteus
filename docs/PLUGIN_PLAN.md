@@ -36,10 +36,11 @@ init/migration still evaluate trusted Lua synchronously. Browser voyages evaluat
 Lua in workers; simulation waits at a callback boundary while rendering/UI remain responsive.
 Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
-The proposed [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
-traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; none of
-those scene capabilities is exposed by the current Lua API.
-The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
+The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
+traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; its L1.1
+scene contract and verified site fixture are complete, and none of those scene capabilities is
+exposed by the current Lua API. The milestones below are this plan's P0–P6, independent of
+similarly named foundation tasks.
 
 ## Intended experience and scope
 
@@ -1778,8 +1779,9 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **Next in this track: L1.1 contract and site fixture**;
-the first playable gate is L4.3. No L task is implemented by this documentation change.
+failure cases and acceptance evidence. **L1.1 is complete; next in this track: L1.2 typed
+definition and strict decoding**; the first playable gate is L4.3. No scene grant is supported
+by this contract change.
 
 ### Coverage and delivery slices
 
@@ -1889,6 +1891,53 @@ actual owners and document any necessary deviation before implementation:
 | L1.3 — revision lifecycle and application binding | Extend host candidate/active/Undo ownership, content identity, inspection and `tools/wake_velocity_plugin.[ch]` binding using L1.1's diagram. Install between ticks, invalidate dependent view caches, and restore compiled defaults on disable/session exit. Keep unsupported subsystem edits rejected. Reuse existing pins, restart policy and retirement rules. | Headless session tests cover valid Apply, stale Apply, invalid candidate, allocation/staging failure, Undo, disable, repeated enter/leave and independent sessions. No dangling borrower after retiring a revision; defaults render identically with an omitted scene. An envelope-only `scene.define` may now be reported with its exact supported subset. |
 | L1.4 — close tooling and unsupported paths | Thread scene identity through isolated worker/stage serialization, preview, inspection and CPU capture; extend `tools/plugin_author.py`, `tools/plugin_schema.py` and relevant Python/C validators. Validate worker wire versions/lengths before using new payloads. Explicitly reject scene grants in browser imports, room startup and unsupported replay/recording paths, including objective-bearing packages. | Tool output reports supported subsystems, limits and rejected targets truthfully. Test worker round trip, malformed/truncated payload, pinned capture and browser rejection. Existing browser voyage/objective cases still pass. Update packaged tool metadata/guides where discovery changes; no new browser scene evaluator. |
 
+#### L1.1 result, 2026-10-30
+
+**Implemented:** the frozen contract and first marina site fixture. The
+[API](PLUGIN_API.md#location-life-scene-contract-planned-l11) owns the proposed package
+composition, `scene` schema, replacement/restart semantics, registry, capacities, consumer and
+lifetime inventory. No grant or runtime scene field exists yet; L1.1 is planning evidence only.
+
+- **Checked owners:** `boat_plugin.[ch]` (manifest/decoder/classification), `boat_plugin_host.[ch]`
+  (fixed revision slots and pins), `boat_session.h` (borrowed route seam), `waterfront_scene.[ch]`
+  (shared frame), `waterfront_harbor.[ch]` (seven compiled hulls, pontoon/gangway/quay, contacts,
+  camera), `waterfront_traffic.[ch]`, and CMake membership. `waterfront_harbor` and
+  `waterfront_traffic` are in `proteus_boat_core`; `waterfront_scene` is in `proteus_render`.
+  A plain `BoatSceneDefinition` therefore belongs in core and may be borrowed by physics, while
+  no Lua or host type may enter core.
+- **Capacity decision:** 7 berths reuse `WATERFRONT_HARBOR_BOATS`, the compiled hull records and
+  the existing 42-line rope array. Four dock modules cover the three compiled parts plus one
+  spare. The two-berth example needs only berth pose/draw, hull/pontoon contact and camera exclusion;
+  no new mesh, light, wake or actor pool is introduced by L1–L2.
+- **Site fixture:** [`tools/validate_scene_site.c`](../tools/validate_scene_site.c) checks the
+  planned site with the compiled `outer` water and native skiff/runabout recipes. It passes with
+  two berths at simulation `(13, 167)` and `(13, 173)` heading `−π/2`, a 14 × 2.35 m pontoon at
+  `(20, 170)`, a gangway from land at `(34.1, 170)` to the pontoon landing `(21, 170)`, a 8 m
+  entrance at `(6, 168)` and a north-facing start/camera bookmark at `(6, 158)`. The fixture also
+  samples the `x = 6`, `z = 150..176` approach lane with a 2.4 m hull and checks both moored hull
+  envelopes. `tools/plugin_anchors.json` gains the matching `outer.marina` bookmark. Depth remains
+  unverified because the compiled map has no bathymetry.
+- **Decisions made at this gate:** the scene is additive to the existing voyage package, not a
+  new kind or dependency system; absent subsystems use compiled defaults and present ones replace
+  their whole collection; one package owns the scene; physical layout edits require the existing
+  explicit session restart; the docked ferry and bridge stay compiled; rooms, browser imports and
+  recordings reject `scene.define` until their own gates; moored hulls add no wakes and gulls do
+  not yet avoid berths.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- `cmake --build build -j` built the new `validate_scene_site` without project warnings.
+- `./build/validate_scene_site` printed
+  `scene_site berths=2 pontoon=14.0x2.3 gangway=13.1m bookmark=6,158 failures=0`.
+- Full `ctest --preset full` passed **311/311 enabled tests** (22.46 s) with local socket access
+  and `PROTEUS_GPU_TESTS=OFF`; 13 retired wake-field tests remained disabled. `scene_site` is in
+  the quick lane. Changed local links/anchors and `git diff --check` passed. This result does not
+  claim a scene grant, a visual change or human acceptance.
+
+**Next in this track: L1.2.** Add the plain C scene definition and strict versioned envelope
+decoding without installing a live scene. The later results below remain authoritative for
+their own steps.
+
 #### L2 — a small marina before a marina editor
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
@@ -1996,10 +2045,12 @@ and this plan. No scene-API implementation or visual acceptance is claimed by th
 Completed planning task, 2026-10-30: expanded L1–L8 into per-PR tasks for a smaller model,
 including the first playable harbor package, proposed composition/capacity/time/reload
 defaults, native extraction before Lua exposure, tooling and unsupported-target checks.
-Next task for this track: **L1.1**, validate and freeze the scene contract, consumer/lifetime
-inventory and verified marina site. Known limits: the proposed grant/schema and budgets
-still need L1.1's owner review and implementation evidence; no scene bindings, tram/seal
-recipes, gameplay dusk or building activity are implemented or visually accepted.
+Completed L1.1, 2026-10-30: froze the scene contract, consumer/lifetime inventory, capacities
+and verified two-berth marina site; the API owns the proposed schema and the fixture passes.
+Next task for this track: **L1.2**, add the plain C scene definition and strict versioned
+envelope decoding without installing a live scene. Known limits: the proposed grant/schema and
+budgets still need later implementation evidence; no scene bindings, tram/seal recipes,
+gameplay dusk or building activity are implemented or visually accepted.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

@@ -124,6 +124,175 @@ shelter must be the location's spawn, every shelter must be open water with 8 m 
 arrival centre with 20 m clear (`boat_map_water` on the compiled water). These errors carry
 the field path, such as `voyage.shelters[2]`, and no line.
 
+## Location-life scene contract (planned L1.1)
+
+Status, 2026-10-30: **contract and site fixture only; no scene grant is supported yet.** The
+[location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements this in
+separate worktree/PR steps. L1.1 freezes the ownership, identity, limits and first marina site;
+L1.2 adds a versioned envelope with no authorable subsystem; L1.3 installs that envelope through
+the existing revision host; L2.2 exposes two berths; L2.3 adds registered dock modules. Until
+those steps land, `scene.define` is rejected by the manifest parser and `scene` is an unknown
+field.
+
+### Package composition
+
+The existing single `kind = "voyage"`, `location = "outer"` package gains an optional top-level
+`scene` table and a `scene.define` capability. It is the same package, not a second kind or a
+dependency graph. The canonical capability order is:
+
+```text
+["voyage.define"]                                      old package, unchanged
+["voyage.define", "scene.define"]                      scene envelope
+["voyage.define", "scene.define", "objective.hud"]     scene plus objective
+["voyage.define", "scene.define", "objective.hud", "objective.timers"]
+```
+
+`objective.*` without `scene.define` keeps its current spelling. A scene package still supplies
+the ordinary `voyage` descriptor: the scene does not replace the destination or water. One active
+package owns the scene override. There is no composition of two packages, no dependencies and no
+scene callback API. Rooms, browser imports, race trials, replays and recordings reject
+`scene.define` until their own compatibility work (P5 and a browser scene evaluator) exists.
+
+### Proposed schema
+
+Coordinates follow the voyage API: simulation metres, **x = −east, z = north**, headings in
+radians with forward `(sin(heading), −cos(heading))`. Native scene storage converts to renderer
+X/Z once at the decode boundary (`renderer x = −source x`). Field paths in diagnostics use the
+source spelling.
+
+```lua
+return {
+  voyage = { --[[ the current, complete voyage descriptor ]] },
+  scene = {
+    version = 1,
+    marina = {                                      -- added by L2.2
+      entrance = { x = 6, z = 168, width = 8 },
+      berths = {                                    -- 0..7; a present list replaces all moored hulls
+        { id = "skiff", recipe = "skiff", x = 13, z = 167, heading = -1.5707964,
+          mooring = "pontoon" },
+        { id = "runabout", recipe = "runabout", x = 13, z = 173, heading = -1.5707964,
+          mooring = "pontoon" }
+      },
+      modules = {                                   -- added by L2.3; 0..4
+        { id = "pier", kind = "pontoon_small", x = 20, z = 170, heading = 0 },
+        { id = "ramp", kind = "gangway", anchor = { x = 34.1, z = 170 },
+          attaches = "pier" }
+      }
+    }
+  }
+}
+```
+
+| Field | Planned bound | Meaning |
+| --- | --- | --- |
+| `scene.version` | integer `1` | Scene schema. A different version is incompatible, not migrated. |
+| `marina` | table; absent means compiled marina | Present replaces every authorable marina subsystem it contains. |
+| `marina.entrance` | `{ x, z, width }`, finite, \|x/z\| ≤ 20 000 m, width 4–40 m | Declared approach/clearance point. Validation requires open water and no hull overlap. |
+| `marina.berths` | dense list of 0–7 records | A present list replaces the entire compiled moored collection. Empty means no authored moored hulls. |
+| `berths[i].id` | 1–23 of `a-z 0-9 _`, starting with a letter; unique in the scene | Stable authored identity; diagnostics and later occupancy. Reordering does not change identity. |
+| `berths[i].recipe` | `skiff`, `runabout`, `sailboat`, `cruiser`, `speedboat`, `sailboat_7m`, `workboat` | Registered native hull recipe. Lua cannot supply dimensions, vertices or renderer transforms. |
+| `berths[i].x`, `.z` | finite, \|v\| ≤ 20 000 m | Berth centre in simulation metres. |
+| `berths[i].heading` | finite, \|h\| ≤ 2π | Renderer heading; the boat's forward is `(sin, −cos)`. |
+| `berths[i].mooring` | `pontoon` or `none` | Native attachment rule. `pontoon` attaches two lines to the nearest authored/default pontoon cleat region; `none` leaves the hull unmoored. |
+| `marina.modules` | dense list of 0–4 records | A present list replaces the entire compiled dock furniture. Empty disables it. |
+| `modules[i].id` | 1–23, same spelling; unique across the scene including berths | Stable attachment identity. |
+| `modules[i].kind` | `pontoon`, `pontoon_small`, `gangway`, `quay` | Registered native module recipe. |
+| `modules[i].x`, `.z`, `.heading` | as berth | Pontoon/quay centre and heading. A gangway uses `anchor` instead. |
+| `gangway.anchor` | `{ x, z }`, finite | Shore end. It must be land; the pontoon landing must be water. |
+| `gangway.attaches` | existing pontoon module ID | The far end is the named pontoon's west-side landing, transformed by that pontoon's pose. |
+
+Unknown fields, duplicate IDs, unknown recipes, a gangway with a missing or non-pontoon target,
+wrong location, non-finite values and capacity + 1 are rejected with their field paths. Every
+table is strict; lists are dense. There is no silent clamp, index merge or partial installation.
+Depth is unavailable in the current map, so discovery and diagnostics report **depth unverified**
+instead of inventing a bathymetry check. The other checks use the compiled water and native hull
+recipes.
+
+### Replacement, restart and owner lifetime
+
+- Absent `scene` or a present subsystem means **compiled defaults**. A present subsystem replaces
+  its whole supported collection; an array index never patches a compiled entry. No simultaneous
+  compiled/authored copy is drawn, contacted or queried.
+- The large docked ferry and the bridge remain independent compiled actors in L1–L2. The quay
+  recipe may be authored as a module, but it does not own the ferry or bridge dependency group.
+- A display-only manifest `name` edit keeps the boat, clock, water and wake state. Any scene
+  layout change (berth/module position, heading, recipe, membership, entrance, ID that another
+  module references) is physical: it is held for explicit Apply and restarts the session at the
+  validated compiled spawn. A preserve-only Apply refuses it. Undo follows the same rule.
+- Scene changes commit only between ticks. The session and both renderers consume one accepted
+  `BoatSceneDefinition`; the plugin revision owns it and outlives the session. Retired revisions
+  wait until the session has rebound away from them, following the existing host slots.
+- The compiled scene is restored whenever the active package has no scene or the plugin is
+  disabled/closed. A failed candidate, stale pin, allocation failure, unsafe spawn or failed
+  validation leaves the active revision and its scene untouched.
+
+Planned lifetime trace for every consumer:
+
+```text
+plugin bytes -> candidate BoatSceneDefinition (copied, no Lua pointers)
+             -> host revision slot (active / held / Undo; fixed capacity)
+             -> boat_plugin_host_commit at a tick boundary
+             -> BoatWorld.scene + BoatViewState.scene (borrowed)
+             -> harbor pose/ropes, hull contact, camera query, CPU/GPU draw
+             -> session rebound or scene restored -> old slot reusable
+```
+
+### Consumer inventory
+
+| Consumer | Needs the accepted definition | L1–L2 change |
+| --- | --- | --- |
+| `waterfront_harbor_evaluate_ground` | Berth recipes/poses, pontoon/gangway/quay module poses, rope anchors | Iterate a caller-owned layout; keep compiled wrappers for default parity |
+| `boat.c` `hull_contact` | Static hull and pontoon contact envelopes | Pass `BoatWorld.scene`; no pointers or Lua in core |
+| `boat_combat.c` `blocked` | The same contact envelopes for projectiles | Pass the same scene; combat remains unavailable with plugins where already rejected |
+| `waterfront_harbor_camera_clear` | Berth/module height and footprint exclusion | Query the same accepted layout |
+| `waterfront_draw_harbor` (CPU) | Per-recipe meshes and module transforms | Draw only accepted berths/modules; no invisible compiled hull |
+| `renderer_gpu.c` harbor pass | Prebuilt recipe meshes and module transforms | Same frame data as CPU; no GPU changes to Lua |
+| `waterfront_scene.c` shared frame | Evaluated harbor snapshot for stills/actors | Fill from the accepted scene, preserving explicit time |
+| `boat_view.c` direct harbor pass | Live view's scene | Add a frame-borrowed scene pointer; NULL is compiled |
+| `boat_net_protocol.c` content digest | Compiled harbor content | Unchanged; rooms reject scene packages instead of advertising mismatched content |
+| Gull avoidance | Authored berthed hulls, if a later task chooses to avoid them | **No current consumer.** Gulls avoid the player and travelling traffic; L1–L2 does not add berth avoidance |
+| Wakes | Moored hulls are static; no wake source | **No current consumer.** Authored berths add no physical wake emitter |
+| Minimap | Only the docked ferry is charted today | No berth drawing in L1–L2; the ferry remains compiled |
+
+### Capacity rationale
+
+| Resource | Capacity | Existing owner |
+| --- | --- | --- |
+| Authored berths | 7 | `WATERFRONT_HARBOR_BOATS`, the seven compiled hull records, three GPU/CPU mesh slots per recipe family and the existing contact loop |
+| Dock modules | 4 | Three compiled parts (quay, pontoon, gangway) plus one spare; the GPU scene can prebuild the four registered recipes |
+| Rope/line transforms | 42 | Existing `WATERFRONT_HARBOR_LINES`: seven berths × four lines + six gangway lines + four ferry lines × two |
+| Berth/module IDs | 23 bytes | Same text capacity and spelling as shelter IDs; no new string pool |
+| Scene payload | inside the existing 64 KiB source | One `scene` table; no assets, modules or bytecode |
+
+Reject capacity + 1 rather than truncating. Staging, active and Undo storage remain charged to the
+existing host slots; the scene definition is copied into each revision and adds no heap owner.
+
+### First marina site (verified fixture)
+
+`tools/validate_scene_site.c` checks the planned site against the compiled `outer` water and the
+native skiff/runabout recipes. It is a planning fixture: no scene description is installed yet.
+
+| Item | Simulation `x, z` | Evidence |
+| --- | --- | --- |
+| Skiff berth | `13, 167`, heading `−π/2` | Hull envelope plus 0.45 m lateral/0.9 m longitudinal excursion is water; 4 m centre clearance |
+| Runabout berth | `13, 173`, heading `−π/2` | Same; separate from the skiff envelope |
+| Small pontoon | `20, 170`, length 14 m, beam 2.35 m | Footprint and excursion are water |
+| Gangway shore anchor | `34.1, 170` | Land; landing at `21, 170` is water; span 13.1 m |
+| Declared entrance | `6, 168`, width 8 m | 4 m clear water, clear of both hull envelopes |
+| Approach lane | `x = 6`, `z = 150..176` | 3 m clear water; a 2.4 m hull passes both moored hulls |
+| Camera/start bookmark | `6, 158`, heading `0` | 3 m clear water, facing north into the marina |
+
+Run it with:
+
+```sh
+./build/validate_scene_site
+```
+
+The same pose is the planned anchor `outer.marina` in
+[`tools/plugin_anchors.json`](../tools/plugin_anchors.json), for pinned previews and captures.
+This fixture proves water/shore geometry and hull separation; it does not prove player clearance
+under every driving line, depth, or human acceptance.
+
 ## River race authoring (P2)
 
 The second reference package is [`plugins/river-sprint`](../plugins/river-sprint/). Its

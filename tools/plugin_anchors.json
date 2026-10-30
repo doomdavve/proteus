@@ -12,6 +12,8 @@
      "heading_degrees": 55, "label": "Outside the reference squall, facing its centre"},
     {"id": "outer.langedrag", "location": "outer", "x": 3595, "z": -3370,
      "heading_degrees": 90, "label": "Langedrag arrival area, facing out of the basin"},
+    {"id": "outer.marina", "location": "outer", "x": 6, "z": 158, "heading_degrees": 0,
+     "label": "Planned two-berth marina approach, facing north into the entrance"},
     {"id": "river.sprint-start", "location": "river", "x": -180, "z": -250,
      "heading_degrees": 52, "label": "River sprint start line, facing the first gate"},
     {"id": "river.sprint-finish", "location": "river", "x": 588.5, "z": -767.2,
