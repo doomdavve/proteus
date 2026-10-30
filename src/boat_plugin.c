@@ -596,7 +596,7 @@ static BoatPluginStatus check_scene_traffic(
     const BoatSceneDefinition *scene = &voyage->scene;
     if (!scene->traffic_present || !scene->traffic.actor_count)
         return BOAT_PLUGIN_OK;
-    const double step = .25, horizon = 4160; // The four river periods repeat together here.
+    const double step = .5, horizon = 4160; // The four river periods repeat together here.
     int samples = (int)(horizon / step);
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         const WaterfrontRouteActor *a = &scene->traffic.actors[i];
