@@ -12,16 +12,17 @@ staging. P4.1 adds discovery and isolated native validation; P4.2 adds machine-r
 bounded isolated voyage/race previews and disposable-process live descriptor staging for trusted
 native edits. P4.3 adds browser source bundles and isolated descriptor-only import/reload/export; browser
 objectives and race imports remain explicitly unsupported. P4.4 adds pinned draft workspace
-read/write and P4.5 pinned CPU frame capture with curated anchors/camera bookmarks. There is no in-game agent. The agreed direction
+read/write, P4.5 pinned CPU frame capture with curated anchors/camera bookmarks and P4.6 a live tool
+bridge to a running native game. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.5 pinned frame capture and curated anchors**, following
-[P4.4 draft workspace read/write](#p44-result-2026-10-30); see the
-[P4.5 result](#p45-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: live tool bridge** (owner inspection and stage/apply/undo against a running native
-game), alongside broader target/browser qualification. Native startup, objective updates and Apply-time init/migration
+Completed task: **P4.6 live tool bridge**, following
+[P4.5 pinned frame capture and curated anchors](#p45-result-2026-10-30); see the
+[P4.6 result](#p46-result-2026-10-30). Prior results retain their dated verification evidence.
+**Next task: interactive preview controls**, then release-tool packaging, alongside broader
+target/browser qualification. Native startup, objective updates and Apply-time init/migration
 still evaluate trusted Lua synchronously; browser imports support only `voyage.define` and
 never evaluate source on the game thread. Browser objective isolation and race integration
 remain prerequisites for broadening that subset.
@@ -1372,7 +1373,7 @@ No gameplay, rendering, input, audio or runtime asset-loading changes are includ
 manual playback or human authoring acceptance is claimed.
 
 **Remaining P4 work (recorded at P4.4; capture and anchors implemented below):** frame capture with pinned evidence; curated anchors and camera bookmarks;
-live owner inspection/stage/apply/undo tool access and optional bridge transport; interactive
+live owner inspection/stage/apply/undo tool access and optional bridge transport (P4.6 below); interactive
 preview controls; release-tool packaging; broader Windows/Linux/browser and physical-device
 memory/compiler/callback qualification, tab suspension and repeated-session cleanup. Browser
 objectives require isolated init/update/migration/Undo and state persistence; browser races
@@ -1416,11 +1417,62 @@ shelter-tour bridge captures were inspected: boat, wake, shoreline and squall re
 poses. PR CI on 2026-10-30 passed on Linux and macOS (308/308, `boat_plugin_capture` ran) and
 Windows; the Windows lane runs its CPU/multiplayer subset, so Windows capture is unverified. No human authoring acceptance is claimed.
 
-**Next:** live tool bridge — authenticated local access to owner inspection and stage/apply/undo
-in a running native game — then interactive preview controls, release-tool packaging and
-broader target/browser qualification. Browser objectives still require isolated
-init/update/migration/Undo and state persistence; race capture needs a race-trial screenshot
-path. P3 human migration/Undo/recovery acceptance remains open.
+**Next recorded at P4.5 (live tool bridge implemented below):** live tool bridge — authenticated
+local access to owner inspection and stage/apply/undo in a running native game — then interactive
+preview controls, release-tool packaging and broader target/browser qualification. Browser
+objectives still require isolated init/update/migration/Undo and state persistence; race capture
+needs a race-trial screenshot path. P3 human migration/Undo/recovery acceptance remains open.
+
+#### P4.6 result, 2026-10-30
+
+Implemented the live tool bridge; see the [bridge contract](PLUGIN_API.md#live-tool-bridge-p46).
+
+- `wake_velocity --plugin DIR --plugin-bridge MAILBOX` (native, opt-in) opens a private local
+  directory mailbox: POSIX mode 0700 owned by the user (anything else is refused), and a
+  `session` file (0600) with a random per-launch token and session id. Requests without the
+  current token are `unauthorized` before any owner state is revealed; closing withdraws the
+  session and answers a pending request `cancelled`. No sockets or new dependencies; the game
+  reads one request per 0.25 s poll between ticks, focused or not.
+- `tools/plugin_author.py live-inspect|live-stage|live-apply|live-undo|live-discard` use the
+  same job lifecycle as validation/capture. Inspection returns the active revision, commit
+  epoch, digest, held candidate and change kind, outcome, panel text, diagnostics, the boat and
+  voyage progress, plus the existing developer inspection lines. Every mutation pins the commit
+  epoch it saw and the active (stage/undo) or held (apply) revision; stage also pins the draft
+  `--expect-bundle` and sends those exact bytes. Stale pins change nothing.
+- Requests run through the existing between-tick transactions: stage uses the same isolated
+  staging as a save/F5 and answers when it finishes (or `superseded` by a save/F5); apply/undo/
+  discard are F7/F6. A water Apply restarts the session as F7 does. `WakePlugin` now records a
+  machine outcome per status and counts staging requests.
+- Live smoke testing found that a bridge stage of bytes the package already held, but that no poll
+  had seen yet, was staged again by save polling and silently dropped a held Undo candidate as
+  UNCHANGED. The bridge now marks its bytes as the package's save only when the package on disk
+  matches; a regression case covers it.
+
+Verification, 2026-10-30, Apple Silicon/macOS Debug, GPU CTests off: configure (existing pinned
+dependency sources) and build succeeded, warning-clean for project sources. Full
+`ctest --preset full` passed **309/309 enabled tests** (13 retired field cases disabled),
+including the new `wake_velocity_bridge` validator (token refusal, poll cadence, missing/stale
+pins, malformed payloads, deferred isolated staging while the session steps, busy, held Apply,
+Undo/Discard/conflicts, rejection diagnostics, water restart, Discard cancelling a pending stage,
+save-poll agreement and session withdrawal on close) and `boat_plugin_author`'s new client
+checks: request framing, hard-link no-clobber, virtual deadlines, foreign responses, pin
+requirements, and an end-to-end CLI run against `validate_wake_bridge --serve` (inspect, rename
+applied, stale repeat, held route Apply, Undo, Discard, rejected candidate). Agent-run windowed
+smoke test: `wake_velocity --demo` with `--plugin-bridge` on a copied Långedrag package; the CLI
+inspected it, staged a rename (applied), staged a water change (held), applied it (session
+restarted), undid it (held) and applied the Undo. Save polling applied an editor-style save during
+the same session. On exit the mailbox held no files. No human play acceptance is claimed.
+
+Limits: voyage plugins in `wake_velocity` only (no race trial, browser or room bridge); one
+client at a time; cancelling a client does not retract a request the game has read. Windows
+uses the directory's inherited ACL instead of a mode check, and Windows/Linux bridge behavior
+awaits CI. The bridge drives trusted native Lua exactly as F5–F7 do; it is same-user access
+control, not a sandbox. No rendering, audio or asset-loading change; no new audiovisual review.
+
+**Next:** interactive preview controls, then release-tool packaging and broader target/browser
+qualification. Browser objectives still require isolated init/update/migration/Undo and state
+persistence; race capture and a race bridge need race-trial support. P3 human
+migration/Undo/recovery acceptance remains open.
 
 ### P5 — authority, prediction and recorded revisions
 

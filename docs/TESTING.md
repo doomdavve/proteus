@@ -740,6 +740,13 @@ runs real CPU captures of every outer anchor, repeatable pinned evidence, a reje
 the CLI's atomic `--output`. Its child waits are failure deadlines; the capture lifecycle uses
 the fake process in `boat_plugin_author`. See [frame capture](PLUGIN_API.md#frame-capture-and-anchors-p45).
 
+P4.6 adds `wake_velocity_bridge` (native, CPU lane): `validate_wake_bridge` drives the game's
+bridge over request files on a virtual clock (authentication, pins, deferred isolated staging,
+Apply/Undo/Discard, rejection, restart, cancellation, save-poll agreement). `boat_plugin_author`
+gains client checks against a fake game and an end-to-end CLI run against
+`validate_wake_bridge --serve` (`--bridge-server`). Its loops await external process/file events;
+CTest supplies the deadline. See [live tool bridge](PLUGIN_API.md#live-tool-bridge-p46).
+
 P4.3 adds `web_plugin_author` (Node, CPU quick lane): portable bundle/UTF-8 byte caps, immutable
 framing, bounded worker lanes, one-use receipts, stale epochs, virtual deadlines, cancellation,
 late output and worker/exit/framing faults. The opt-in

@@ -1,8 +1,9 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-29: **P0–P3 native descriptors/objectives and P4.1–P4.3 authoring tools implemented**.
-Native tooling includes schema discovery, isolated validation/preview and live descriptor staging;
-the browser supports source bundles for solo voyage descriptors.
+Status, 2026-10-30: **P0–P3 native descriptors/objectives and P4.1–P4.6 authoring tools implemented**.
+Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
+draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
+running game; the browser supports source bundles for solo voyage descriptors.
 A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
 when the file is saved or on F5, undo, and apply route or water changes with an explicit
 restart. Rooms, the course and replays keep compiled content. The browser offers an opt-in
@@ -208,7 +209,8 @@ unchanged until it is edited. Packaged builds ship it at `assets/plugins/langedr
 and pass that directory.
 
 A small panel at the bottom left shows the active revision and the latest outcome; each
-outcome is also printed to stderr as `Plugin DIR: ...`.
+outcome is also printed to stderr as `Plugin DIR: ...`. Add `--plugin-bridge DIR` to let
+external tools inspect and drive the same transactions ([live tool bridge](#live-tool-bridge-p46)).
 
 | Input | Effect |
 | --- | --- |
@@ -332,6 +334,7 @@ Validation stops at the first failure, and the order is deterministic.
 ./build/validate_boat_plugin                       # every case, from the repository root
 ./build/validate_boat_plugin --case reference_matches_compiled
 ./build/validate_boat_plugin_session                # P1 staging, policies, Undo, polling, parity
+./build/validate_wake_bridge                        # P4.6 live tool bridge
 ctest --test-dir build -R boat_plugin --output-on-failure
 ./build/wake_velocity --renderer cpu --plugin plugins/langedrag --time 3 --screenshot build/p.png
 ```
@@ -797,6 +800,79 @@ does, bounded only by the process deadline. Frames are deterministic for one bui
 they are not portable golden images. No live game is contacted, and a capture is evidence, never
 permission to install a revision.
 
+## Live tool bridge (P4.6)
+
+Native only. Start the game with a bridge directory, then use the `live-*` operations from the
+source root:
+
+```sh
+./build/wake_velocity --plugin ~/drafts/langedrag --plugin-bridge ~/.wake-velocity-bridge
+python3 tools/plugin_author.py live-inspect --bridge ~/.wake-velocity-bridge
+python3 tools/plugin_author.py live-stage ~/drafts/langedrag --bridge ~/.wake-velocity-bridge \
+  --base-revision 1 --base-epoch 0 --expect-bundle "$BUNDLE_ID"
+python3 tools/plugin_author.py live-apply --bridge ~/.wake-velocity-bridge \
+  --held-revision 2 --base-epoch 0
+python3 tools/plugin_author.py live-undo --bridge ~/.wake-velocity-bridge \
+  --base-revision 2 --base-epoch 1
+python3 tools/plugin_author.py live-discard --bridge ~/.wake-velocity-bridge --base-epoch 1
+```
+
+`--plugin-bridge DIR` requires `--plugin` and a window (no `--screenshot`); ordinary play
+never opens a bridge. The game creates `DIR` (POSIX mode 0700) or reuses it only when it is a
+directory owned by the user with no group/other permissions, then writes `DIR/session` (mode
+0600) holding a random 128-bit token and session id that change on every launch. Requests must
+carry the token, so a tool needs to be able to read the user's private file, and requests left
+from an earlier launch are refused as `unauthorized`. On Windows the directory inherits its
+parent's ACL; keep it under the user's profile. Closing the game removes `DIR/session` and
+answers a pending request `cancelled`. This is local same-user access control, not a network
+service and not a sandbox: anyone who can run as the user can already edit the plugin files.
+
+**Transport.** The client writes a complete request beside `DIR/request` and hard-links it into
+place, so a waiting request is never replaced (a second client gets `bridge busy`). Between
+ticks, every 0.25 s whether or not the window has focus, the game reads and removes
+`DIR/request` and atomically writes `DIR/response-ID`, removing its previous response. The client
+reads and deletes its own response. Both are text: the line `wake-velocity-bridge 1`, then
+`KEY=VALUE` lines. A request has `id` (1–32 lowercase hex digits), `token`, `operation` and
+pins, then a blank line and, for `stage`, `payload=N` bytes of the validation snapshot framing.
+Requests are bounded to 1 KiB of header plus the 4 KiB/64 KiB package; responses to 32 KiB.
+
+**Operations and pins.** Every mutation is checked against what its sender inspected; none
+happens while another stage request runs.
+
+| Operation | Pins | Effect |
+| --- | --- | --- |
+| `live-inspect` | — | The owner fields below plus `inspection`: the developer inspection lines (memory, objective state, HUD, timers, queued events, transition trace) |
+| `live-stage DIRECTORY` | `--base-revision`, `--base-epoch`, `--expect-bundle` | Stage that exact snapshot through the same isolated staging as a save/F5. The response waits for the staging result: a rename is applied, a migration/restart is held, an identical candidate is unchanged |
+| `live-apply` | `--held-revision`, `--base-epoch` | F7: commit the held candidate |
+| `live-undo` | `--base-revision`, `--base-epoch` | F6 with nothing held: hold the previous revision under the usual rules |
+| `live-discard` | `--base-epoch` | F6: cancel the running stage request or discard the held candidate |
+
+The commit epoch increases with every commit, including Undo, so an old pin never matches a
+revision number that reappears. The snapshot bytes count as the selected package's save only
+when the package on disk holds the same bytes; otherwise save polling is unaffected and a later
+directory edit still stages. A save or F5 during a bridge stage supersedes it (`superseded`).
+An Apply that changes the water restarts the session, as F7 does.
+
+**Response.** `status` is `ok`, `rejected` (the game refused the candidate, or its migration
+failed), `stale` (a pin no longer matches), `busy`, `conflict` (for example, nothing is held),
+`bad_request`, `unauthorized`, `superseded`, `cancelled` or client-side `deadline`
+(`--timeout`, default 10 s), `bridge_failed` or `input_error`. The exit status is 0 only for `ok`.
+Owner fields: `plugin`, active `revision`, `epoch`, gameplay `digest`, `undo_depth`, `staging`,
+`held_revision` (0 when nothing is held) with `held_change` (`renamed`, `migrate`,
+`restart_voyage`, `restart_session`, ...), `held_undo` and `held_base`; `outcome` (`staging`,
+`applied`, `held`, `unchanged`, `incompatible`, `rejected`, `migration_failed`, `canceled`,
+`discarded`, `nothing_to_undo`), the panel's `message`/`detail`/`alert`, any staging diagnostic
+(`diagnostic_status`, `_file`, `_line`, `_field`, `_message`), and the session's `tick`, `boat_x`,
+`boat_z`, `heading`, `shelter`, `exposed` and `arrived`. Stage responses add the client's
+`bundle_id`; every response echoes `pins`, `request_id` and `session`.
+
+A typical loop is `workspace-read` → `workspace-write --expect-bundle` → `validate`/`preview`/
+`capture` → `live-inspect` → `live-stage` → `live-apply` or `live-undo`. A workspace write is
+itself a save, so with save polling the running game may already stage it; `live-stage` then
+reports the same result or `busy`. Limits: voyage plugins in `wake_velocity` only (no race
+trial, browser or room); one client at a time; cancelling a client stops waiting but does not
+retract a request the game has read; a request is answered within a poll plus the staging time.
+
 ## Live descriptor staging (P4.2)
 
 Native `wake_velocity --plugin DIRECTORY` starts trusted packages as before, then runs settled
@@ -832,8 +908,8 @@ qualify arbitrary imported code or guarantee uninterrupted objective execution. 
 import/reload/export must isolate those remaining paths or explicitly restrict its capability
 subset, and qualify storage failure, cancellation and repeated sessions on the target. The descriptor-only
 browser implementation below resolves this gate for that subset. Draft workspace CLI access
-and pinned frame capture are implemented; the live tool bridge and human recovery acceptance
-remain open.
+pinned frame capture and the [live tool bridge](#live-tool-bridge-p46) are implemented; human
+recovery acceptance remains open.
 
 
 ## Browser source bundles (P4.3)
