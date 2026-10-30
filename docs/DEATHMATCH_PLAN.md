@@ -3,6 +3,19 @@
 This document owns deathmatch rules, implementation, verification and acceptance. Multiplayer
 transport is owned by [the multiplayer plan](MULTIPLAYER_PLAN.md).
 
+## Latest playtest follow-up — 2026-10-30
+
+Planning only: [the execution plan](DEATHMATCH_PLAYTEST_PLAN.md) records the latest request
+for stronger close-range grenade damage, greater wave vulnerability, lethal armed torpedoes
+and boats passing above/below one another. The user confirmed “tornado” meant torpedo.
+It provides file-level tasks, stacked PR boundaries, proposed tuning, deterministic tests,
+compatibility work and separate human deathmatch/free-boating review gates.
+
+Completed: code-path inspection and the execution plan; no gameplay changes. Next: step 0,
+measure the existing encounters before implementing the balance changes. Earlier arsenal
+acceptance below remains historical evidence; this feedback is the current tuning priority.
+Proposed coefficients and free-boating difficulty have not been play-tested or accepted.
+
 ## Arsenal milestone — 2026-10-27
 
 Current status: implemented in `deathmatch-arsenal`, based on `a6bec2c`. This supersedes the
@@ -85,8 +98,8 @@ User acceptance (2026-10-27): after the actual-hull attachment fix, the user rep
 “Looks much better! Water cannon feels great now.” The current water cannon appearance and
 feel are accepted. The user subsequently accepted the stronger grenade (“Great, I like the
 grenade”). Mirror-toggle use and the latest torpedo nose remain pending user review.
-Next: human review of the mirror toggle and rounded torpedo nose, torpedo evasion/balance,
-then platform/browser qualification;
+Current next task: [playtest follow-up step 0](DEATHMATCH_PLAYTEST_PLAN.md#step-0--reproducible-encounter-baseline).
+Mirror-toggle/rounded-nose review and platform/browser qualification remain open;
 Windows/Linux, browser requalification and public deployment remain pending.
 No user acceptance or public deployment is implied by local verification.
 
