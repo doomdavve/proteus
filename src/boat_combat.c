@@ -63,17 +63,36 @@ void boat_combat_enable(BoatFleet *f)
     boat_combat_bind(f);
 }
 
+// Inactive objects are canonical: either a recent hit echo that presentation still draws, or
+// all zero. This keeps the checkpoint/hash independent of stale pool history and lets the
+// compact wire format omit zero slots.
+static void combat_canonicalize(BoatCombat *c, uint64_t tick)
+{
+    for (unsigned k = 0; k < BOAT_COMBAT_BULLETS + BOAT_COMBAT_GRENADES + BOAT_COMBAT_TORPEDOES;
+        ++k) {
+        BoatCombatObject *o = k < BOAT_COMBAT_BULLETS ? &c->bullets[k]
+            : k < BOAT_COMBAT_BULLETS + BOAT_COMBAT_GRENADES
+            ? &c->grenades[k - BOAT_COMBAT_BULLETS]
+            : &c->torpedoes[k - BOAT_COMBAT_BULLETS - BOAT_COMBAT_GRENADES];
+        if (!o->active && (!o->ended || tick - o->ended >= BOAT_COMBAT_ECHO_TICKS))
+            *o = (BoatCombatObject) { 0 };
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i)
+        if (!c->waves[i].active)
+            c->waves[i] = (BoatRadialWave) { 0 };
+}
+
 void boat_combat_clear(BoatFleet *f)
 {
     BoatCombat *c = &f->state.combat;
     for (unsigned i = 0; i < BOAT_COMBAT_BULLETS; ++i)
-        c->bullets[i].active = false;
+        c->bullets[i] = (BoatCombatObject) { 0 };
     for (unsigned i = 0; i < BOAT_COMBAT_GRENADES; ++i)
-        c->grenades[i].active = false;
+        c->grenades[i] = (BoatCombatObject) { 0 };
     for (unsigned i = 0; i < BOAT_COMBAT_TORPEDOES; ++i)
-        c->torpedoes[i].active = false;
+        c->torpedoes[i] = (BoatCombatObject) { 0 };
     for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i)
-        c->waves[i].active = false;
+        c->waves[i] = (BoatRadialWave) { 0 };
 }
 
 void boat_combat_spawn(BoatFleet *f, unsigned slot)
@@ -98,16 +117,16 @@ void boat_combat_leave(BoatFleet *f, unsigned slot)
     ++c->players[slot].generation;
     for (unsigned i = 0; i < BOAT_COMBAT_TORPEDOES; ++i)
         if (c->torpedoes[i].owner == slot)
-            c->torpedoes[i].active = false;
+            c->torpedoes[i] = (BoatCombatObject) { 0 };
     for (unsigned i = 0; i < BOAT_COMBAT_BULLETS; ++i)
         if (c->bullets[i].owner == slot)
-            c->bullets[i].active = false;
+            c->bullets[i] = (BoatCombatObject) { 0 };
     for (unsigned i = 0; i < BOAT_COMBAT_GRENADES; ++i)
         if (c->grenades[i].owner == slot)
-            c->grenades[i].active = false;
+            c->grenades[i] = (BoatCombatObject) { 0 };
     for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i)
         if (c->waves[i].owner == slot)
-            c->waves[i].active = false;
+            c->waves[i] = (BoatRadialWave) { 0 };
 }
 
 static BoatCombatObject *available(BoatCombatObject *objects, unsigned count)
@@ -125,10 +144,11 @@ void boat_combat_advance(BoatFleet *f, const BoatInput inputs[BOAT_COMBAT_PLAYER
         return;
     uint64_t tick = f->state.tick;
     const BoatCombatRules *r = &c->rules;
+    combat_canonicalize(c, tick);
     for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i)
         if (c->waves[i].active
             && (tick - c->waves[i].born) * BOAT_STEP * r->wave_speed >= r->wave_range)
-            c->waves[i].active = false;
+            c->waves[i] = (BoatRadialWave) { 0 };
     // Reserve a ring for every accepted grenade. Four simultaneous throws always detonate.
     for (unsigned i = 0; i < BOAT_COMBAT_GRENADES; ++i) {
         BoatCombatObject *g = &c->grenades[i];
@@ -143,7 +163,7 @@ void boat_combat_advance(BoatFleet *f, const BoatInput inputs[BOAT_COMBAT_PLAYER
             .speed = r->wave_speed,
             .range = r->wave_range,
             .active = true };
-        g->active = false;
+        *g = (BoatCombatObject) { 0 };
     }
     for (unsigned i = 0; i < BOAT_COMBAT_PLAYERS; ++i) {
         BoatCombatPlayer *p = &c->players[i];
@@ -556,5 +576,330 @@ bool boat_combat_decode(BoatCombat *combat, const uint8_t bytes[BOAT_COMBAT_BYTE
     if (!c.valid)
         return false;
     *combat = copy;
+    return true;
+}
+
+// Compact wire codec for the flagship deathmatch state. It deliberately omits the immutable
+// rules block (the reliable checkpoint installed them), inactive objects and fields that do not
+// affect the next tick's simulation. The canonical checkpoint codec above remains the hash and
+// bootstrap representation.
+typedef struct {
+    uint8_t *out;
+    size_t at, capacity;
+    bool valid;
+} CompactWriter;
+
+typedef struct {
+    const uint8_t *in;
+    size_t at, size;
+    bool valid;
+} CompactReader;
+
+static void cw8(CompactWriter *w, uint8_t value)
+{
+    if (!w->valid || w->at >= w->capacity) {
+        w->valid = false;
+        return;
+    }
+    w->out[w->at++] = value;
+}
+
+static void cw16(CompactWriter *w, uint16_t value)
+{
+    cw8(w, (uint8_t)(value >> 8));
+    cw8(w, (uint8_t)value);
+}
+
+static void cw32(CompactWriter *w, uint32_t value)
+{
+    cw8(w, (uint8_t)(value >> 24));
+    cw8(w, (uint8_t)(value >> 16));
+    cw8(w, (uint8_t)(value >> 8));
+    cw8(w, (uint8_t)value);
+}
+
+static void cwf(CompactWriter *w, float value)
+{
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    cw32(w, bits);
+}
+
+static void cw_delta(CompactWriter *w, uint64_t value, uint64_t tick)
+{
+    int64_t delta = (int64_t)value - (int64_t)tick;
+    if (delta < INT32_MIN || delta > INT32_MAX)
+        w->valid = false;
+    cw32(w, (uint32_t)(int32_t)delta);
+}
+
+static void cw_age(CompactWriter *w, uint64_t born, uint64_t tick)
+{
+    if (born > tick || tick - born > UINT16_MAX) {
+        w->valid = false;
+        return;
+    }
+    cw16(w, (uint16_t)(tick - born));
+}
+
+static uint8_t cr8(CompactReader *r)
+{
+    if (!r->valid || r->at >= r->size) {
+        r->valid = false;
+        return 0;
+    }
+    return r->in[r->at++];
+}
+
+static uint16_t cr16(CompactReader *r)
+{
+    uint16_t high = cr8(r), low = cr8(r);
+    return (uint16_t)((high << 8) | low);
+}
+
+static uint32_t cr32(CompactReader *r)
+{
+    uint32_t a = cr8(r), b = cr8(r), c = cr8(r), d = cr8(r);
+    return (a << 24) | (b << 16) | (c << 8) | d;
+}
+
+static float crf(CompactReader *r)
+{
+    uint32_t bits = cr32(r);
+    float value;
+    memcpy(&value, &bits, sizeof(value));
+    if (!isfinite(value) || fabsf(value) > 1e6f)
+        r->valid = false;
+    return value;
+}
+
+static uint64_t cr_delta(CompactReader *r, uint64_t tick)
+{
+    int32_t delta = (int32_t)cr32(r);
+    int64_t value = (int64_t)tick + delta;
+    if (value < 0) {
+        r->valid = false;
+        return 0;
+    }
+    return (uint64_t)value;
+}
+
+static uint64_t cr_age(CompactReader *r, uint64_t tick)
+{
+    uint16_t age = cr16(r);
+    return age == 0 ? tick : tick - age;
+}
+
+size_t boat_combat_compact_encode(
+    const BoatCombat *combat, uint8_t *bytes, size_t capacity, uint64_t tick)
+{
+    CompactWriter w = { bytes, 0, capacity, true };
+    cw8(&w, 1); // Format 1.
+    cw8(&w, (uint8_t)((combat->enabled ? 1 : 0) | (combat->firing ? 2 : 0)));
+    uint8_t object_bits[7] = { 0 };
+    const unsigned object_count
+        = BOAT_COMBAT_BULLETS + BOAT_COMBAT_GRENADES + BOAT_COMBAT_TORPEDOES;
+    for (unsigned i = 0; i < object_count; ++i) {
+        const BoatCombatObject *o = i < BOAT_COMBAT_BULLETS ? &combat->bullets[i]
+            : i < BOAT_COMBAT_BULLETS + BOAT_COMBAT_GRENADES
+            ? &combat->grenades[i - BOAT_COMBAT_BULLETS]
+            : &combat->torpedoes[i - BOAT_COMBAT_BULLETS - BOAT_COMBAT_GRENADES];
+        if (o->active || (o->ended && tick - o->ended < BOAT_COMBAT_ECHO_TICKS))
+            object_bits[i / 8] |= (uint8_t)(1u << (i % 8));
+    }
+    for (unsigned i = 0; i < 7; ++i)
+        cw8(&w, object_bits[i]);
+    uint8_t wave_bits = 0;
+    for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i)
+        if (combat->waves[i].active)
+            wave_bits |= (uint8_t)(1u << i);
+    cw8(&w, wave_bits);
+    for (unsigned i = 0; i < BOAT_COMBAT_PLAYERS; ++i) {
+        const BoatCombatPlayer *p = &combat->players[i];
+        cwf(&w, p->health);
+        cwf(&w, p->heat);
+        cwf(&w, p->pressure);
+        cw_delta(&w, p->life_start, tick);
+        cw_delta(&w, p->next_fire, tick);
+        cw_delta(&w, p->next_grenade, tick);
+        cw_delta(&w, p->defeated, tick);
+        cw_delta(&w, p->hit_tick, tick);
+        cw_delta(&w, p->next_torpedo, tick);
+        cw_delta(&w, p->pressure_tick, tick);
+        cw32(&w, p->generation);
+        cw32(&w, p->request);
+        cw32(&w, p->hit_serial);
+        cw32(&w, p->killer);
+        cw32(&w, p->torpedo_request);
+        cw32(&w, p->ammo);
+        cw32(&w, p->pressure_owner);
+        cw32(&w, p->pressure_generation);
+        cw8(&w, p->overheated ? 1 : 0);
+        for (unsigned j = 0; j < BOAT_COMBAT_PLAYERS; ++j) {
+            cwf(&w, p->damage[j]);
+            cw_delta(&w, p->damage_tick[j], tick);
+            cw32(&w, p->damage_life[j]);
+            cw32(&w, p->damage_generation[j]);
+        }
+    }
+    for (unsigned i = 0; i < object_count; ++i) {
+        const BoatCombatObject *o = i < BOAT_COMBAT_BULLETS ? &combat->bullets[i]
+            : i < BOAT_COMBAT_BULLETS + BOAT_COMBAT_GRENADES
+            ? &combat->grenades[i - BOAT_COMBAT_BULLETS]
+            : &combat->torpedoes[i - BOAT_COMBAT_BULLETS - BOAT_COMBAT_GRENADES];
+        if (!o->active && (!o->ended || tick - o->ended >= BOAT_COMBAT_ECHO_TICKS))
+            continue;
+        cwf(&w, o->position.x);
+        cwf(&w, o->position.y);
+        cwf(&w, o->direction.x);
+        cwf(&w, o->direction.y);
+        cwf(&w, o->height);
+        cw_age(&w, o->born, tick);
+        if (o->ended) {
+            if (o->ended > tick || tick - o->ended >= UINT16_MAX)
+                w.valid = false;
+            else
+                cw16(&w, (uint16_t)(tick - o->ended + 1)); // Zero means "not ended".
+        } else
+            cw16(&w, 0);
+        cw32(&w, o->generation);
+        cw32(&w, o->life);
+        cw8(&w, (uint8_t)o->owner);
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i) {
+        const BoatRadialWave *wave = &combat->waves[i];
+        if (!wave->active)
+            continue;
+        cwf(&w, wave->centre.x);
+        cwf(&w, wave->centre.y);
+        cw_age(&w, wave->born, tick);
+        cw32(&w, wave->generation);
+        cw32(&w, wave->life);
+        cw8(&w, (uint8_t)wave->owner);
+        cwf(&w, wave->height);
+        cwf(&w, wave->speed);
+        cwf(&w, wave->range);
+    }
+    return w.valid ? w.at : 0;
+}
+
+static bool compact_player_valid(const BoatCombatPlayer *p, const BoatCombatRules *r, uint64_t tick)
+{
+    if (p->health < 0 || p->health > r->health || p->heat < 0 || p->heat > 1
+        || p->request > UINT16_MAX || p->life_start > tick || p->hit_tick > tick
+        || p->defeated > tick || (p->killer >= BOAT_COMBAT_PLAYERS && p->killer != UINT32_MAX)
+        || p->pressure < 0 || p->pressure > 1 || p->pressure_tick > tick
+        || p->ammo > r->torpedo_ammo || p->torpedo_request > UINT8_MAX
+        || (p->pressure_owner >= BOAT_COMBAT_PLAYERS && p->pressure_owner != UINT32_MAX))
+        return false;
+    for (unsigned j = 0; j < BOAT_COMBAT_PLAYERS; ++j)
+        if (p->damage[j] < 0 || p->damage[j] > r->health || p->damage_tick[j] > tick)
+            return false;
+    return true;
+}
+
+bool boat_combat_compact_decode(BoatCombat *combat, const uint8_t *bytes, size_t size,
+    uint64_t tick, const BoatCombatRules *rules)
+{
+    if (!rules || !bytes || size == 0)
+        return false;
+    BoatCombatRules installed = *rules;
+    CompactReader r = { bytes, 0, size, true };
+    if (cr8(&r) != 1)
+        return false;
+    uint8_t flags = cr8(&r);
+    if (flags & ~3u)
+        return false;
+    uint8_t object_bits[7];
+    for (unsigned i = 0; i < 7; ++i)
+        object_bits[i] = cr8(&r);
+    uint8_t wave_bits = cr8(&r);
+    BoatCombat decoded
+        = { .enabled = (flags & 1) != 0, .firing = (flags & 2) != 0, .rules = installed };
+    for (unsigned i = 0; i < BOAT_COMBAT_PLAYERS; ++i) {
+        BoatCombatPlayer *p = &decoded.players[i];
+        p->health = crf(&r);
+        p->heat = crf(&r);
+        p->pressure = crf(&r);
+        p->life_start = cr_delta(&r, tick);
+        p->next_fire = cr_delta(&r, tick);
+        p->next_grenade = cr_delta(&r, tick);
+        p->defeated = cr_delta(&r, tick);
+        p->hit_tick = cr_delta(&r, tick);
+        p->next_torpedo = cr_delta(&r, tick);
+        p->pressure_tick = cr_delta(&r, tick);
+        p->generation = cr32(&r);
+        p->request = cr32(&r);
+        p->hit_serial = cr32(&r);
+        p->killer = cr32(&r);
+        p->torpedo_request = cr32(&r);
+        p->ammo = cr32(&r);
+        p->pressure_owner = cr32(&r);
+        p->pressure_generation = cr32(&r);
+        uint8_t overheated = cr8(&r);
+        if (overheated > 1)
+            r.valid = false;
+        p->overheated = overheated != 0;
+        for (unsigned j = 0; j < BOAT_COMBAT_PLAYERS; ++j) {
+            p->damage[j] = crf(&r);
+            p->damage_tick[j] = cr_delta(&r, tick);
+            p->damage_life[j] = cr32(&r);
+            p->damage_generation[j] = cr32(&r);
+        }
+        if (r.valid && !compact_player_valid(p, &installed, tick))
+            r.valid = false;
+    }
+    const unsigned object_count
+        = BOAT_COMBAT_BULLETS + BOAT_COMBAT_GRENADES + BOAT_COMBAT_TORPEDOES;
+    for (unsigned i = 0; i < object_count; ++i) {
+        if (!(object_bits[i / 8] & (1u << (i % 8))))
+            continue;
+        BoatCombatObject *o = i < BOAT_COMBAT_BULLETS ? &decoded.bullets[i]
+            : i < BOAT_COMBAT_BULLETS + BOAT_COMBAT_GRENADES
+            ? &decoded.grenades[i - BOAT_COMBAT_BULLETS]
+            : &decoded.torpedoes[i - BOAT_COMBAT_BULLETS - BOAT_COMBAT_GRENADES];
+        o->position.x = crf(&r);
+        o->position.y = crf(&r);
+        o->direction.x = crf(&r);
+        o->direction.y = crf(&r);
+        o->height = crf(&r);
+        o->born = cr_age(&r, tick);
+        uint16_t ended_age = cr16(&r);
+        o->ended = ended_age ? tick - (ended_age - 1) : 0;
+        o->generation = cr32(&r);
+        o->life = cr32(&r);
+        o->owner = cr8(&r);
+        o->active = o->ended == 0;
+        if (r.valid
+            && (o->owner >= BOAT_COMBAT_PLAYERS || o->born > tick || o->ended > tick
+                || (o->active && fabsf(Vector2LengthSqr(o->direction) - 1) > .01f)
+                || fabsf(o->position.x) > BOAT_COMBAT_WORLD_LIMIT
+                || fabsf(o->position.y) > BOAT_COMBAT_WORLD_LIMIT || fabsf(o->height) > 1000))
+            r.valid = false;
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i) {
+        if (!(wave_bits & (1u << i)))
+            continue;
+        BoatRadialWave *wave = &decoded.waves[i];
+        wave->centre.x = crf(&r);
+        wave->centre.y = crf(&r);
+        wave->born = cr_age(&r, tick);
+        wave->generation = cr32(&r);
+        wave->life = cr32(&r);
+        wave->owner = cr8(&r);
+        wave->height = crf(&r);
+        wave->speed = crf(&r);
+        wave->range = crf(&r);
+        wave->active = true;
+        if (r.valid
+            && (wave->owner >= BOAT_COMBAT_PLAYERS || wave->born > tick
+                || fabsf(wave->centre.x) > BOAT_COMBAT_WORLD_LIMIT
+                || fabsf(wave->centre.y) > BOAT_COMBAT_WORLD_LIMIT || wave->height <= 0
+                || wave->speed <= 0 || wave->range <= 0))
+            r.valid = false;
+    }
+    if (!r.valid || r.at != size)
+        return false;
+    *combat = decoded;
     return true;
 }

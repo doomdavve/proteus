@@ -720,18 +720,17 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, p->index < p->count);
         expect(r, p->count <= BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES);
         if (m->header.type == BOAT_NET_COMBAT_PAGE)
-            expect(r, p->count == 4 && p->index < 4 && p->checkpoint == (uint32_t)m->header.tick);
+            expect(r,
+                p->count >= 1 && p->count <= 3 && p->index < p->count
+                    && p->checkpoint == (uint32_t)m->header.tick);
 
         size_t size = r->size - r->at;
         expect(r, size > 0 && size <= BOAT_NET_PAGE_BYTES);
         if (r->error)
             break;
         p->size = (uint16_t)size;
-        if (m->header.type == BOAT_NET_COMBAT_PAGE)
-            expect(r,
-                size
-                    == (p->index == 3 ? BOAT_COMBAT_BYTES - 3 * BOAT_NET_PAGE_BYTES
-                                      : BOAT_NET_PAGE_BYTES));
+        if (m->header.type == BOAT_NET_COMBAT_PAGE && p->index + 1 < p->count)
+            expect(r, size == BOAT_NET_PAGE_BYTES);
 
         for (size_t i = 0; i < size; ++i)
             p->data[i] = get8(r);

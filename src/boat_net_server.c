@@ -559,21 +559,28 @@ static void send_snapshots(BoatNetServer *s)
         if (s->peers[peer].phase >= BOAT_NET_PEER_BOOTSTRAP)
             send_message(s, peer, &m);
     if (s->fleet.state.combat.enabled) {
-        uint8_t bytes[BOAT_COMBAT_BYTES];
-        boat_combat_encode(&s->fleet.state.combat, bytes);
-        for (unsigned i = 0; i < 4; ++i) {
-            BoatNetMessage page
-                = { .header = { .type = BOAT_NET_COMBAT_PAGE, .tick = s->fleet.state.tick } };
-            BoatNetWorldPage *p = &page.world_page;
-            p->checkpoint = (uint32_t)s->fleet.state.tick;
-            p->index = (uint16_t)i;
-            p->count = 4;
-            p->size = (uint16_t)(i == 3 ? BOAT_COMBAT_BYTES - 3 * BOAT_NET_PAGE_BYTES
-                                        : BOAT_NET_PAGE_BYTES);
-            memcpy(p->data, bytes + i * BOAT_NET_PAGE_BYTES, p->size);
-            for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
-                if (s->peers[peer].phase >= BOAT_NET_PEER_BOOTSTRAP)
-                    send_message(s, peer, &page);
+        uint8_t bytes[BOAT_COMBAT_COMPACT_BYTES];
+        size_t size = boat_combat_compact_encode(
+            &s->fleet.state.combat, bytes, sizeof(bytes), s->fleet.state.tick);
+        if (!size) {
+            ++s->stats.output_faults;
+        } else {
+            uint16_t pages = (uint16_t)((size + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+            for (uint16_t i = 0; i < pages; ++i) {
+                BoatNetMessage page
+                    = { .header = { .type = BOAT_NET_COMBAT_PAGE, .tick = s->fleet.state.tick } };
+                BoatNetWorldPage *p = &page.world_page;
+                size_t offset = (size_t)i * BOAT_NET_PAGE_BYTES;
+                p->checkpoint = (uint32_t)s->fleet.state.tick;
+                p->index = i;
+                p->count = pages;
+                p->size = (uint16_t)(size - offset < BOAT_NET_PAGE_BYTES ? size - offset
+                                                                         : BOAT_NET_PAGE_BYTES);
+                memcpy(p->data, bytes + offset, p->size);
+                for (unsigned peer = 0; peer < BOAT_NET_MAX_PEERS; ++peer)
+                    if (s->peers[peer].phase >= BOAT_NET_PEER_BOOTSTRAP)
+                        send_message(s, peer, &page);
+            }
         }
     }
     ++s->stats.snapshots;
