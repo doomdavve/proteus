@@ -22,6 +22,7 @@ void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
         .first_sequence = config->first_sequence,
         .resources = config->resources,
         .predict = config->predict,
+        .defer_ready = config->defer_ready,
         .started_at = now,
         .serviced_at = now,
         .pong_after = now,
@@ -184,10 +185,32 @@ static void install(BoatNetClient *c, double now)
         boat_remote_history_reset(&c->remotes);
     boat_remote_history_push(&c->remotes, state.tick, state.slots);
     c->predict_dirty = true;
-    BoatNetMessage m
-        = { .header = { .type = BOAT_NET_READY, .tick = state.tick }, .checkpoint = b->checkpoint };
-    send_message(c, &m);
+    if (c->defer_ready && !c->ready_sent) {
+        // The caller is still opening its window or audio device. Keep the authority's
+        // spawn and roster traffic off the reliable channels until it can service frames.
+        c->ready_pending = true;
+        c->ready_checkpoint = b->checkpoint;
+    } else {
+        BoatNetMessage m = { .header = { .type = BOAT_NET_READY, .tick = state.tick },
+            .checkpoint = b->checkpoint };
+        send_message(c, &m);
+        c->ready_sent = true;
+    }
     c->phase = BOAT_NET_CLIENT_PLAYING;
+}
+
+bool boat_net_client_ready(BoatNetClient *c)
+{
+    if (c->phase != BOAT_NET_CLIENT_PLAYING)
+        return false;
+    if (!c->ready_pending)
+        return true;
+    BoatNetMessage m = { .header = { .type = BOAT_NET_READY, .tick = mirror_tick(c) },
+        .checkpoint = c->ready_checkpoint };
+    send_message(c, &m);
+    c->ready_pending = false;
+    c->ready_sent = true;
+    return true;
 }
 
 static void snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)

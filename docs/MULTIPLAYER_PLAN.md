@@ -1876,6 +1876,25 @@ machine joining a hosted room through LAN, and CI on Windows and macOS. Show the
 the room through LAN search), and consider a port fallback when 24680 is taken. M5 and the
 deathmatch/race plans continue.
 
+## Client READY after presentation warm-up — 2026-10-30
+
+A native `--connect` join used to install the world and send `READY` before the game opened its
+window, GPU resources and audio device. The authority could then queue reliable roster, spawn
+and match-state traffic while the client was still initialising, delaying those acknowledgements
+and feeding ENet's RTT-driven outgoing packet throttle. This change adds
+`BoatNetClientConfig.defer_ready` and `boat_net_client_ready()`: the windowed client installs
+the world and enters PLAYING, but holds `READY` until its first frame has finished; the room
+keeps sending unreliable snapshots in the meantime. `boat_bot` and other callers keep the
+immediate-READY default.
+
+Verified on 2026-10-30 with the Debug build and the full CTest preset: **312/312 enabled tests
+passed** (13 retired wake-field cases disabled), including the new `boat_net.deferred_ready`
+case, which confirms snapshots flow before `READY` and the room spawns only afterwards. A live
+hosted room still showed 4/10 five-second snapshot blackouts, so this reduces the startup
+reliable burst but does not by itself fix the ENet throttle interaction. The next changes are
+snapshot liveness/resync and compact combat delivery; human gameplay and deployment are not
+claimed.
+
 ## Exact first implementation task
 
 Begin with **foundations P2a: a display-free benchmark for the existing one-boat arcade loop**.
