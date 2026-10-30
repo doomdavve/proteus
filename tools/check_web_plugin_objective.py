@@ -144,9 +144,20 @@ def check_objectives(browser, args, root, errors, logs):
         hold_next(); resume()
         page.wait_for_function('window.heldObjective !== null && Module.boatPluginCheckpoint.waiting')
         frozen = snapshot()
-        page.keyboard.down('Backspace')
-        page.wait_for_function('Module.boatPluginResetPending', timeout=3500)
-        page.keyboard.up('Backspace')
+        # Use the existing menu's immediate recovery action. The one-second Backspace hold
+        # accumulates capped frame deltas and can outlive the callback deadline on slow renderers.
+        page.keyboard.down('p')
+        page.wait_for_function('Module.boatPluginMenuOpen', timeout=2000)
+        page.keyboard.up('p')
+        box = page.locator('canvas').bounding_box()
+        height = page.evaluate('Module.boatViewportSize().height')
+        # CLI-launched plugin sessions own their window: four menu rows, recovery at y=123
+        # in the centered 320x200 menu coordinates.
+        page.mouse.move(box['x'] + box['width'] / 2,
+                        box['y'] + box['height'] * (0.5 + 23 / height))
+        page.mouse.down()
+        page.wait_for_function('Module.boatPluginResetPending', timeout=2000)
+        page.mouse.up()
         assert snapshot() == frozen, (frozen, snapshot())
         release()
         page.wait_for_function('Module.boatPluginCheckpoint.events > 0 || Module.boatPluginCheckpoint.tick[0] > 240')

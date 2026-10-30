@@ -46,8 +46,10 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
-EM_JS(void, browser_plugin_reset_pending, (bool pending),
-    { Module.boatPluginResetPending = !!pending; })
+EM_JS(void, browser_plugin_controls, (bool pending, bool menu_open), {
+    Module.boatPluginResetPending = !!pending;
+    Module.boatPluginMenuOpen = !!menu_open;
+})
 
 EM_JS(int, boat_web_viewport_size, (int axis), {
     const size = Module['boatViewportSize']();
@@ -1320,7 +1322,7 @@ static int study(int argc, char **argv)
         }
 #ifdef __EMSCRIPTEN__
         if (plugin_path)
-            browser_plugin_reset_pending(plugin_reset_pending);
+            browser_plugin_controls(plugin_reset_pending, menu.open);
 #endif
         if (reset_requested) {
             thrust_target = 0;

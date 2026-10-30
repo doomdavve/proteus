@@ -1669,8 +1669,14 @@ The measurements are evidence, not budgets. Browser startup/VM timing and memory
 physical Safari and real background-tab policies remain unqualified. The browser's synchronous
 staging fallback is compiled out; imported source has no fallback to main-thread evaluation.
 All 380 local links across the eight affected Markdown guides resolve. No release/site was
-published and no human authoring/play acceptance is claimed. Linux/Windows and the extended
-browser checks await this PR's CI; prior P4.8 results remain historical evidence.
+published and no human authoring/play acceptance is claimed. Linux CI on source commit `8869e0f` passed 310/310 enabled tests; macOS and Windows workflows
+also passed. The first browser CI run passed WebKit but exposed a frame-rate dependency in the
+Chromium/Firefox recovery-input fixture: capped frame deltas made the held Backspace gesture
+outlive the callback deadline on the software renderer. The check now drives the existing
+menu's immediate recovery action and waits for observed menu/reset state. The runtime's
+five-second callback deadline is unchanged. Extended browser CI is being rerun; prior P4.8
+results remain historical evidence. GCC still reports pre-existing warnings outside the new
+plugin sources.
 
 **Next:** P5's authority/prediction/recording contract review as described in the current status.
 Browser races, interactive preview controls, durable full-session saves, native asynchronous
