@@ -43,6 +43,19 @@ static int worker(void)
     return boat_plugin_stage_worker();
 }
 
+static bool replace_once(
+    char *text, size_t *size, size_t capacity, const char *from, const char *to)
+{
+    char *at = strstr(text, from);
+    size_t from_size = strlen(from), to_size = strlen(to);
+    if (!at || strstr(at + 1, from) || *size - from_size + to_size > capacity)
+        return false;
+    memmove(at + to_size, at + from_size, *size - (size_t)(at - text) - from_size);
+    memcpy(at, to, to_size);
+    *size = *size - from_size + to_size;
+    return true;
+}
+
 static void rename_manifest(BoatPluginFiles *files)
 {
     // Same-length harmless display edit, preserving immutable source and gameplay.
@@ -144,6 +157,36 @@ int main(int argc, char **argv)
     boat_plugin_stage_close(job);
     CHECK(!boat_plugin_stage_start("/missing/worker", host, files, 0));
     CHECK(!boat_plugin_stage_start(argv[0], host, files, NAN));
+
+    // The PST3 worker carries a scene envelope back with the voyage data. This uses a separate
+    // host so the shelter-tour objective package remains an independent control.
+    BoatPluginFiles *scene_files = calloc(1, sizeof(*scene_files));
+    CHECK(scene_files
+        && boat_plugin_read("plugins/langedrag", NULL, scene_files, &d) == BOAT_PLUGIN_OK);
+    CHECK(replace_once(scene_files->manifest, &scene_files->manifest_size,
+        sizeof(scene_files->manifest), "\"capabilities\": [\"voyage.define\"]",
+        "\"capabilities\": [\"voyage.define\", \"scene.define\"]"));
+    CHECK(replace_once(scene_files->source, &scene_files->source_size, sizeof(scene_files->source),
+        "return {", "return { scene = { version = 1 },"));
+    BoatPluginBundle scene_bundle = boat_plugin_bundle(scene_files);
+    BoatPluginHost scene_host;
+    CHECK(boat_plugin_host_start(&scene_host, resources.definition, &resources.map, &scene_bundle));
+    CHECK(boat_plugin_host_active(&scene_host)->voyage.has_scene);
+    uint64_t scene_digest = boat_plugin_host_active(&scene_host)->voyage.scene_digest;
+    CHECK(scene_digest
+        && scene_digest == boat_scene_digest(&boat_plugin_host_active(&scene_host)->voyage.scene));
+    CHECK(replace_once(scene_files->manifest, &scene_files->manifest_size,
+        sizeof(scene_files->manifest), "Langedrag voyage", "Langedrag scene"));
+    job = boat_plugin_stage_start(argv[0], &scene_host, scene_files, 0);
+    CHECK(job && completed(job, &scene_host) == 1);
+    CHECK(scene_host.change == BOAT_PLUGIN_RENAMED && boat_plugin_host_held(&scene_host));
+    const BoatPluginVoyage *held_scene = &boat_plugin_host_held(&scene_host)->voyage;
+    CHECK(held_scene->has_scene && held_scene->scene.version == 1);
+    CHECK(held_scene->scene_digest == scene_digest
+        && boat_scene_digest(&held_scene->scene) == scene_digest);
+    boat_plugin_stage_close(job);
+    free(scene_files);
+
     // Drive the actual live F5/async completion path through a relocated executable/package.
     CHECK(boat_plugin_read("plugins/shelter-tour", NULL, files, &d) == BOAT_PLUGIN_OK);
     FILE *output = fopen(BOAT_PLUGIN_STAGE_DIR "/plugin.json", "wb");

@@ -510,6 +510,27 @@ class Worker(unittest.TestCase):
             finally:
                 job.close()
 
+    def test_scene_evidence(self):
+        manifest = (ROOT / "plugins/langedrag/plugin.json").read_bytes()
+        source = (ROOT / "plugins/langedrag/main.lua").read_bytes()
+        manifest = manifest.replace(b'["voyage.define"]', b'["voyage.define", "scene.define"]')
+        source = source.replace(b"return {", b"return { scene = { version = 1 },", 1)
+        payload = struct.pack(">II", len(manifest), len(source)) + manifest + source
+        code, result = self.run_worker(payload)
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["scene"], {"present": True, "version": 1,
+            "digest": result["scene"]["digest"], "content": False, "subsystems": []})
+        self.assertNotEqual(result["scene"]["digest"], "0000000000000000")
+        job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=12)
+        try:
+            job.process.wait(timeout=10)
+            self.assertEqual(job.poll(1)["status"], "ok", job.result)
+            self.assertEqual(job.result["evidence"]["scene"]["present"], True)
+        finally:
+            job.close()
+        default = self.run_worker(author.snapshot(ROOT / "plugins/langedrag"))[1]
+        self.assertFalse(default["scene"]["present"])
+
     def test_framing(self):
         for payload in (b"", struct.pack(">II", 4097, 0), struct.pack(">II", 0, 65537),
                         struct.pack(">II", 1, 1) + b"x", struct.pack(">II", 0, 0) + b"x"):

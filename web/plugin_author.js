@@ -4,10 +4,18 @@
   const encoder = new TextEncoder();
   const FORMAT = 'wake-velocity-plugin';
   const STORAGE = 'wake-velocity-plugin-v1';
+  function scenes(manifest) {
+    try {
+      const data = JSON.parse(manifest);
+      return Array.isArray(data.capabilities) && data.capabilities.includes('scene.define');
+    } catch (_) { return false; }
+  }
   function bundle(manifest, source) {
     if (typeof manifest !== 'string' || typeof source !== 'string') throw Error('Expected source text');
     if (encoder.encode(manifest).length > 4096 || encoder.encode(source).length > 65536)
       throw Error('Package exceeds the 4 KiB manifest or 64 KiB source limit');
+    // Native scene authoring is not part of the browser subset; reject before the worker starts.
+    if (scenes(manifest)) throw Error('Scene authoring is native-only; browser scene imports are unsupported');
     return {format: FORMAT, version: 1, manifest, source};
   }
   function decode(text) {
@@ -65,7 +73,7 @@
       if (job.deadline !== undefined) this.clear(job.deadline);
       if (result && (result.exit === 0 || result.exit === 1)
           && result.bytes instanceof Uint8Array && result.bytes.length >= 8 && result.bytes.length <= 4096
-          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === 0x50535432
+          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === 0x50535433
           && (new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(4) === 0) === (result.exit === 0)) {
         job.response = result.bytes.slice(); job.state = result.exit === 0 ? 1 : 2;
       } else job.state = -1;
@@ -85,7 +93,7 @@
   function message(bytes) {
     try {
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      if (view.getUint32(0) !== 0x50535432) return 'Invalid worker reply';
+      if (view.getUint32(0) !== 0x50535433) return 'Invalid worker reply';
       let at = 8;
       const string = () => {
         const length = view.getUint32(at); at += 4;
@@ -230,5 +238,5 @@
     return transport;
   }
   root.installBoatPluginAuthor = install;
-  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install};
+  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install, scenes};
 })(globalThis);
