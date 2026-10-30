@@ -609,7 +609,8 @@ static BoatPluginStatus check_scene_traffic(
                 = waterfront_traffic_motion_routes(&scene->traffic, (int)i, time);
             float speed = Vector3Length(m.velocity);
             float margin = .5f + speed * (float)step * .5f;
-            Vector2 centre = { m.position.x, m.position.z };
+            // Route positions are renderer X/Z; the map and marina are simulation X/Z.
+            Vector2 centre = { -m.position.x, m.position.z };
             Vector2 length = { sinf(m.heading), -cosf(m.heading) };
             Vector2 beam = { cosf(m.heading), sinf(m.heading) };
             float half_length = spec.length * .5f + margin;
@@ -651,7 +652,7 @@ static BoatPluginStatus check_scene_traffic(
                 BoatModelSpec os = waterfront_traffic_spec_routes(&scene->traffic, (int)j);
                 WaterfrontVesselMotion om
                     = waterfront_traffic_motion_routes(&scene->traffic, (int)j, time);
-                Vector2 oc = { om.position.x, om.position.z };
+                Vector2 oc = { -om.position.x, om.position.z };
                 Vector2 ol = { sinf(om.heading), -cosf(om.heading) };
                 Vector2 ob = { cosf(om.heading), sinf(om.heading) };
                 if (box_overlap(centre, length, beam, half_length, half_beam, oc, ol, ob,
@@ -661,12 +662,10 @@ static BoatPluginStatus check_scene_traffic(
             }
             // Compare against the compiled service as well: a present list replaces it only
             // after proving that the retained timetable does not intersect the authored craft.
-            for (int j = 0; j < WATERFRONT_TRAFFIC_ALL; ++j) {
-                if (a->retain == (unsigned)j)
-                    continue; // A retained default is the same scheduled actor, not a conflict.
+            for (int j = 0; a->retain == 0xff && j < WATERFRONT_TRAFFIC_ALL; ++j) {
                 BoatModelSpec os = waterfront_traffic_spec(j);
                 WaterfrontVesselMotion om = waterfront_traffic_motion(j, time);
-                Vector2 oc = { om.position.x, om.position.z };
+                Vector2 oc = { -om.position.x, om.position.z };
                 Vector2 ol = { sinf(om.heading), -cosf(om.heading) };
                 Vector2 ob = { cosf(om.heading), sinf(om.heading) };
                 if (box_overlap(centre, length, beam, half_length, half_beam, oc, ol, ob,

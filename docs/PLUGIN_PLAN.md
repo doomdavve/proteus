@@ -1780,9 +1780,10 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L3.2 are complete; next in this track: L3.3 ferry
-stops and service schedule**; the first playable gate is L4.3. `scene.define` installs and stages
-the two-berth harbor-life layout, its small pontoon and gangway, and one authored passing craft.
+failure cases and acceptance evidence. **L1.1–L3.3 are complete; next in this track: L3.4
+coordinated lift and integrated route safety**; the first playable gate is L4.3. `scene.define`
+installs and stages the two-berth harbor-life layout, its small pontoon and gangway, one authored
+passing craft and a retained ferry with an edited dwell.
 
 ### Coverage and delivery slices
 
@@ -2281,8 +2282,41 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
   passing runabout plus retained river craft on the loop. This is a still-frame inspection, not a
   windowed motion or human acceptance check. No GPU capture was run at this step.
 
-**Next in this track: L3.3.** Add ordered stops, dwell/departure offsets and positive repeat
-periods to one existing upstream ferry, then update the package and boundary tests.
+#### L3.3 result, 2026-10-30
+
+**Implemented:** named, ordered ferry stops on registered routes; explicit or shared dwell;
+positive repeat-period arithmetic; and the harbor-life ferry's edited Stenpiren departure.
+
+- **Schema:** a retained or authored vessel may carry up to eight `{ id, dwell }` stop overrides.
+  IDs must match the registered route's named piers in order (`stenpiren`, `lindholmspiren`,
+  `eriksberg` for `alvsnabben`; `stenpiren`, `frihamnen` for `frihamnen`). A positive dwell is the
+  stop's departure offset; an omitted dwell shares the remaining period. Mixed explicit/shared
+  dwell is supported. Travel uses the existing native smoothstep acceleration/braking profile.
+- **Validation:** a period shorter than travel plus explicit dwell rejects with the vessel's
+  field path. Stop IDs must be valid and unique. Retain entries may now override stop dwells while
+  keeping the compiled route and motion; their map/schedule equivalence is not rechecked against
+  the compiled service.
+- **Example:** `plugins/harbor-life` retains `alvsnabben`, extends Stenpiren to 35 s and leaves the
+  other two stops on the shared remainder of the 1,200 s timetable. Discovery lists the registered
+  stop anchors. The passing craft and retained river runabout remain in the package.
+- **Boundaries:** departure is still a dwell end, not passenger boarding; there is no transit
+  feed, passenger count or per-stop callback. Route motion remains a pure function of time.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build. Full `ctest --preset full` passed **322/322 enabled tests** with local
+  socket access; 13 retired wake-field tests remain disabled.
+- `validate_traffic` checks every stop interval one tick either side of arrival, dwell end and
+  departure, stationary hull contact, acceleration after departure, 1,200 s wrap, identical
+  reload at an explicit time, fewer stationary trail segments, a mixed-dwell timetable and a
+  too-short period. `validate_boat_plugin --case scene_traffic` checks the package's stop IDs and
+  dwell plus wrong-ID and negative-dwell rejection. Session Apply/Undo covers a dwell edit and
+  preserves the other stops. The PST4 worker carries stop IDs/dwell.
+- `WaterfrontRouteDefinition` storage is now 5,768 bytes (stops 256 bytes). No GPU or windowed
+  motion run was needed for this schedule-only change.
+
+**Next in this track: L3.4.** Bind tall-vessel passages and the Hisingsbron lift as one validated
+dependency group, preserving the compiled schooner when untouched.
 
 #### L2 — a small marina before a marina editor
 
@@ -2410,10 +2444,13 @@ stops, bridge crossings and bounded structural validation into `waterfront_route
 Completed L3.2, 2026-10-30: exposed full-collection traffic replacement with retained defaults,
 added the `marina_pass` craft to `plugins/harbor-life`, and wired the accepted routes through
 draw, contact, camera, combat and the PST4 worker wire.
-Next task for this track: **L3.3**, ferry stops and service schedule.
+Completed L3.3, 2026-10-30: added named ordered stops, shared/explicit dwell, period arithmetic and
+the harbor-life ferry's edited Stenpiren departure.
+Next task for this track: **L3.4**, coordinated lift and integrated route safety.
 Known limits: authored route geometry is selected from registered presets; no freeform route
-editor, freeform module mesh editor or physical traffic wake recipe; depth is unverified; and no
-tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
+editor, freeform module mesh editor or physical traffic wake recipe; no boarding/passenger
+simulation; depth is unverified; and no tram/seal recipes, gameplay dusk, building activity or
+human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

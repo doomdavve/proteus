@@ -38,10 +38,7 @@ typedef struct {
     double period;
     unsigned point_count, stop_count;
     WaterfrontRoutePoint points[WATERFRONT_ROUTE_POINT_CAPACITY];
-    struct {
-        unsigned char segment;
-        float dwell;
-    } stops[WATERFRONT_ROUTE_STOPS];
+    WaterfrontRouteStop stops[WATERFRONT_ROUTE_STOPS];
     float origin_x, origin_z, long_radius, short_radius;
     float start_distance, turn_radius;
 } CompiledActor;
@@ -69,7 +66,8 @@ static const CompiledActor compiled[WATERFRONT_ROUTE_ACTORS] = {
             { 2700, 1060, 70 }, { 2041.8f, 831.8f, 60 }, { 1898.8f, 766.8f, 60 },
             { 1600, 560, 150 }, { 1000, 485, 150 }, { 473, 418.2f, 60 }, { 357, 334.2f, 60 },
             { 275, 215, 60 }, { 340, 105, 70 }, { 900, 330, 150 }, { 2000, 640, 200 } },
-        .stops = { { 1, -1 }, { 4, -1 }, { 8, -1 } } },
+        .stops = { { "stenpiren", 1, -1 }, { "lindholmspiren", 4, -1 },
+            { "eriksberg", 8, -1 } } },
     { .shape = WATERFRONT_ROUTE_POINTS, .recipe = WATERFRONT_CRAFT_ALVSNABBEN, .speed = 6,
         .accel = 20, .phase = WATERFRONT_UPSTREAM_PERIOD / 2, .period = WATERFRONT_UPSTREAM_PERIOD,
         .point_count = 14, .stop_count = 3, .points
@@ -77,14 +75,15 @@ static const CompiledActor compiled[WATERFRONT_ROUTE_ACTORS] = {
             { 2700, 1060, 70 }, { 2041.8f, 831.8f, 60 }, { 1898.8f, 766.8f, 60 },
             { 1600, 560, 150 }, { 1000, 485, 150 }, { 473, 418.2f, 60 }, { 357, 334.2f, 60 },
             { 275, 215, 60 }, { 340, 105, 70 }, { 900, 330, 150 }, { 2000, 640, 200 } },
-        .stops = { { 1, -1 }, { 4, -1 }, { 8, -1 } } },
+        .stops = { { "stenpiren", 1, -1 }, { "lindholmspiren", 4, -1 },
+            { "eriksberg", 8, -1 } } },
     { .shape = WATERFRONT_ROUTE_POINTS, .recipe = WATERFRONT_CRAFT_FRIHAMNEN, .speed = 4.5f,
         .accel = 18, .phase = 300, .period = WATERFRONT_UPSTREAM_PERIOD, .point_count = 9,
         .stop_count = 2, .points
         = { { 2786.5f, 842.3f, 40 }, { 2844.5f, 906.3f, 24 }, { 2690, 1200, 60 },
             { 2714, 1346, 40 }, { 2541.9f, 1420.6f, 35 }, { 2565, 1530, 35 }, { 2760, 1420, 60 },
             { 2700, 1100, 80 }, { 2675, 775, 40 } },
-        .stops = { { 0, -1 }, { 3, -1 } } },
+        .stops = { { "stenpiren", 0, -1 }, { "frihamnen", 3, -1 } } },
     { .shape = WATERFRONT_ROUTE_POINTS, .recipe = WATERFRONT_CRAFT_SCHOONER, .bridge = true,
         .speed = 0, .accel = 0, .phase = 0, .period = WATERFRONT_UPSTREAM_PERIOD,
         .point_count = 12, .points
@@ -147,8 +146,7 @@ static void copy_actor(WaterfrontRouteActor *out, const CompiledActor *in)
     for (unsigned i = 0; i < in->point_count; ++i)
         out->points[i] = in->points[i];
     for (unsigned i = 0; i < in->stop_count; ++i)
-        out->stops[i] = (WaterfrontRouteStop) {
-            .segment = in->stops[i].segment, .dwell = in->stops[i].dwell };
+        out->stops[i] = in->stops[i];
 }
 
 const WaterfrontRouteDefinition *waterfront_route_defaults(void)
@@ -315,27 +313,31 @@ static bool build(Route *route, const WaterfrontRouteActor *actor,
         fail(diagnostic, "route.speed", "must be positive when the route stops");
         return false;
     }
-    bool automatic = actor->stops[0].dwell < 0;
+    // Explicit stops keep their authored dwell. The remaining time is shared by stops whose
+    // dwell is negative, so changing one departure does not force the caller to repeat every
+    // other dwell value. A period too short for travel plus the explicit dwell is rejected.
+    double explicit_dwell = 0;
+    unsigned automatic = 0;
     for (int k = 0; k < route->stop_count; ++k) {
-        if ((actor->stops[k].dwell < 0) != automatic) {
-            fail(diagnostic, "route.stops", "must all set dwell or all leave it automatic");
+        if (actor->stops[k].dwell < 0)
+            ++automatic;
+        else if (!isfinite(actor->stops[k].dwell)) {
+            fail(diagnostic, "route.stops", "has a non-finite dwell");
             return false;
-        }
-        route->dwell[k] = automatic ? (float)((actor->period - moving) / route->stop_count)
-                                    : actor->stops[k].dwell;
-        if (route->dwell[k] < 0 || !isfinite(route->dwell[k])) {
-            fail(diagnostic, "route.period", "is too short for the route's travel time");
-            return false;
-        }
+        } else
+            explicit_dwell += actor->stops[k].dwell;
     }
-    if (!automatic) {
-        double total = moving;
-        for (int k = 0; k < route->stop_count; ++k)
-            total += route->dwell[k];
-        if (fabs(total - actor->period) > .02) {
-            fail(diagnostic, "route.period", "must equal travel time plus dwell times");
-            return false;
-        }
+    double remaining = actor->period - moving - explicit_dwell;
+    if (remaining < -.02) {
+        fail(diagnostic, "route.period", "is too short for travel and dwell times");
+        return false;
+    }
+    double shared = automatic ? fmax(remaining, 0) / automatic : 0;
+    for (int k = 0; k < route->stop_count; ++k)
+        route->dwell[k] = actor->stops[k].dwell < 0 ? (float)shared : actor->stops[k].dwell;
+    if (!automatic && fabs(moving + explicit_dwell - actor->period) > .02) {
+        fail(diagnostic, "route.period", "must equal travel time plus dwell times");
+        return false;
     }
     return true;
 }
@@ -485,6 +487,7 @@ uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes)
             hash = fold_float(hash, a->points[p].radius);
         }
         for (unsigned s = 0; s < a->stop_count; ++s) {
+            hash = fold(hash, a->stops[s].id, strlen(a->stops[s].id) + 1);
             hash = fold(hash, &a->stops[s].segment, 1);
             hash = fold_float(hash, a->stops[s].dwell);
         }
@@ -830,6 +833,28 @@ int waterfront_route_stops(const WaterfrontRouteDefinition *routes, int index, V
     return (int)actor->stop_count;
 }
 
+bool waterfront_route_stop_times(const WaterfrontRouteDefinition *routes, int index, int stop,
+    double *arrive, double *depart)
+{
+    bool compiled_actor = false;
+    const WaterfrontRouteActor *actor = actor_at(routes, index, &compiled_actor);
+    if (!actor || actor->shape != WATERFRONT_ROUTE_POINTS || stop < 0
+        || (unsigned)stop >= actor->stop_count)
+        return false;
+    prepare(routes);
+    const Route *route = &built_routes[index];
+    double time = 0;
+    for (int k = 0; k <= stop; ++k) {
+        if (k == stop) {
+            *arrive = time;
+            *depart = time + route->dwell[k];
+            return true;
+        }
+        time += route->dwell[k] + route->legs[k] / route->speed + actor->accel;
+    }
+    return false;
+}
+
 float waterfront_route_lift(const WaterfrontRouteDefinition *routes, double time)
 {
     if (!isfinite(time))
@@ -935,6 +960,15 @@ bool waterfront_route_validate(
                 }
             }
             for (unsigned s = 0; s < a->stop_count; ++s) {
+                if (!a->stops[s].id[0] || !identifier(a->stops[s].id)) {
+                    fail(diagnostic, "scene.traffic.vessels", "has an invalid stop ID");
+                    return false;
+                }
+                for (unsigned previous = 0; previous < s; ++previous)
+                    if (!strcmp(a->stops[s].id, a->stops[previous].id)) {
+                        fail(diagnostic, "scene.traffic.vessels", "repeats a stop ID");
+                        return false;
+                    }
                 if (a->stops[s].segment >= a->point_count
                     || (s && a->stops[s].segment <= a->stops[s - 1].segment)
                     || (a->stops[s].dwell < -1

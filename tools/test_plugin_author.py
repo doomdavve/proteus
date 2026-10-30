@@ -517,7 +517,7 @@ class Worker(unittest.TestCase):
         self.assertEqual(result["scene"], {"present": True, "version": 1,
             "digest": result["scene"]["digest"], "content": True,
             "subsystems": ["marina.berths", "marina.modules", "traffic.vessels"], "berths": 2,
-            "modules": 2, "vessels": 2})
+            "modules": 2, "vessels": 3})
         self.assertNotEqual(result["scene"]["digest"], "0000000000000000")
         job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=12)
         try:
@@ -525,7 +525,7 @@ class Worker(unittest.TestCase):
             self.assertEqual(job.poll(1)["status"], "ok", job.result)
             self.assertEqual(job.result["evidence"]["scene"]["berths"], 2)
             self.assertEqual(job.result["evidence"]["scene"]["modules"], 2)
-            self.assertEqual(job.result["evidence"]["scene"]["vessels"], 2)
+            self.assertEqual(job.result["evidence"]["scene"]["vessels"], 3)
         finally:
             job.close()
         default = self.run_worker(author.snapshot(ROOT / "plugins/langedrag"))[1]

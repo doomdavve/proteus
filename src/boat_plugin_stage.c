@@ -134,6 +134,7 @@ static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
             a->points[p].radius = (float)number(w, a->points[p].radius);
         }
         for (unsigned k = 0; k < a->stop_count; ++k) {
+            string(w, a->stops[k].id, sizeof(a->stops[k].id));
             a->stops[k].segment = (unsigned char)integer(w, a->stops[k].segment, 1);
             a->stops[k].dwell = (float)number(w, a->stops[k].dwell);
         }

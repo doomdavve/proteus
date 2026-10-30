@@ -367,7 +367,7 @@ static int check_route_definition(void)
     a->speed = 0;
     a->period = 40;
     a->stop_count = 1;
-    a->stops[0] = (WaterfrontRouteStop) { 9, 2 };
+    a->stops[0] = (WaterfrontRouteStop) { .id = "pier", .segment = 9, .dwell = 2 };
     CHECK(!waterfront_route_validate(&custom, &diagnostic));
     a->stop_count = 0;
     a->bridge = true;
@@ -431,11 +431,72 @@ static int check_scene_traffic(void)
     return 0;
 }
 
+// L3.3: named stops sit stationary through a dwell, depart on the native acceleration profile,
+// wrap at the period and update one departure without rebuilding the whole timetable.
+static int check_ferry_schedule(void)
+{
+    BoatSceneDefinition scene = { .version = BOAT_SCENE_VERSION, .traffic_present = true };
+    CHECK(waterfront_route_preset("alvsnabben", &scene.traffic.actors[0]));
+    scene.traffic.actor_count = 1;
+    WaterfrontRouteActor *ferry = &scene.traffic.actors[0];
+    WaterfrontRouteDiagnostic diagnostic;
+    CHECK(waterfront_route_validate(&scene.traffic, &diagnostic));
+    // One explicit dwell; the remaining two stops share the rest of the 1,200 s period.
+    ferry->stops[0].dwell = 35;
+    CHECK(waterfront_route_validate(&scene.traffic, &diagnostic));
+    double arrive[3], depart[3];
+    for (int k = 0; k < 3; ++k)
+        CHECK(waterfront_route_stop_times(&scene.traffic, 0, k, &arrive[k], &depart[k]));
+    CHECK(depart[0] - arrive[0] == 35);
+    CHECK(arrive[1] > depart[0] && depart[1] >= arrive[1]);
+    CHECK(arrive[2] > depart[1]);
+    WaterfrontVesselMotion before = waterfront_traffic_motion_routes(
+        &scene.traffic, 0, arrive[0] - 2);
+    WaterfrontVesselMotion stopped
+        = waterfront_traffic_motion_routes(&scene.traffic, 0, arrive[0]);
+    WaterfrontVesselMotion dwell_end
+        = waterfront_traffic_motion_routes(&scene.traffic, 0, depart[0] - .001);
+    WaterfrontVesselMotion leaving
+        = waterfront_traffic_motion_routes(&scene.traffic, 0, depart[0] + 2);
+    CHECK(Vector3Length(before.velocity) > .05f);
+    CHECK(Vector3Length(stopped.velocity) < .01f && Vector3Length(dwell_end.velocity) < .01f);
+    CHECK(Vector3Length(leaving.velocity) > 0 && Vector3Length(leaving.velocity) < 3);
+    CHECK(Vector3Distance(stopped.position, dwell_end.position) < .01f);
+    Vector2 stop_position;
+    CHECK(waterfront_route_stops(&scene.traffic, 0, &stop_position, 1) == 3);
+    CHECK(hypotf(stopped.position.x - stop_position.x, stopped.position.z - stop_position.y)
+        < .01f);
+    WaterfrontVesselMotion lap
+        = waterfront_traffic_motion_routes(&scene.traffic, 0, 1200);
+    CHECK(Vector3Distance(lap.position, waterfront_traffic_motion_routes(&scene.traffic, 0, 0)
+                                            .position) < .01f);
+    BoatWater water = { .upstream = true };
+    WaterfrontTrafficContact contact;
+    CHECK(waterfront_traffic_contact_height_scene(&scene,
+        (Vector2) { -stopped.position.x, stopped.position.z }, stopped.heading, 2, 1.6f, .75f, -.4f,
+        2, water, arrive[0], &contact));
+    CHECK(contact.vessel == 0);
+    // Stationary trail segments fade out; the same explicit time reloads one identical frame.
+    WaterfrontTrafficFrame at_stop, at_leg, repeated;
+    waterfront_traffic_evaluate_routes(&scene.traffic, water, arrive[0], &at_stop);
+    waterfront_traffic_evaluate_routes(&scene.traffic, water, depart[0] + 30, &at_leg);
+    waterfront_traffic_evaluate_routes(&scene.traffic, water, arrive[0], &repeated);
+    CHECK(at_stop.vessel_count == 1 && !memcmp(&at_stop, &repeated, sizeof(at_stop)));
+    CHECK(at_stop.wake_count < at_leg.wake_count || at_leg.wake_count == 0);
+    // A too-short period is rejected rather than truncating a leg or a dwell.
+    ferry->period = 60;
+    CHECK(!waterfront_route_validate(&scene.traffic, &diagnostic));
+    ferry->period = 1200;
+    CHECK(waterfront_route_validate(&scene.traffic, &diagnostic));
+    return 0;
+}
+
 int main(void)
 {
     CHECK(check_vertical_contacts() == 0);
     CHECK(check_route_definition() == 0);
     CHECK(check_scene_traffic() == 0);
+    CHECK(check_ferry_schedule() == 0);
     CHECK(check_upstream() == 0);
     if (check_gulls() || check_long_session())
         return 1;

@@ -126,9 +126,9 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **L1.1–L1.4 and L2–L3.2 complete; scene decoding, binding, staging wire,
-marina berths/modules and travelling-craft routes are implemented.** Authored route geometry
-still selects registered native presets; there is no freeform route editor. The
+Status, 2026-10-30: **L1.1–L1.4 and L2–L3.3 complete; scene decoding, binding, staging wire,
+marina berths/modules, travelling-craft routes and named ferry stops are implemented.** Authored
+route geometry still selects registered native presets; there is no freeform route editor. The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and the versioned envelope; L1.3 installs it between ticks on
@@ -224,7 +224,8 @@ return {
 | `vessels[i].retain` | compiled route actor ID | Copies a compiled route/timetable and keeps its existing map clearance. It cannot be combined with authored route fields. |
 | `vessels[i].route` | `river_runabout`, `river_cruiser`, `river_sailboat`, `river_ferry`, `alvsnabben`, `frihamnen`, `schooner`, `marina_pass` | Registered native route preset. Geometry and stop positions are native; Lua supplies timetable values. |
 | `vessels[i].recipe` | `runabout`, `cruiser`, `sailboat`, `ferry`, `alvsnabben`, `frihamnen`, `schooner`, `workboat` | Registered native craft geometry. |
-| `vessels[i].speed`, `.phase`, `.period` | speed > 0 and ≤ 40 m/s; finite phase; period 5–86400 s | Authored timetable. A no-stop loop requires `period = length / speed` within 0.02 s. Stops add explicit dwell (L3.3). |
+| `vessels[i].speed`, `.phase`, `.period` | speed > 0 and ≤ 40 m/s; finite phase; period 5–86400 s | Authored timetable. A no-stop loop requires `period = length / speed` within 0.02 s. |
+| `vessels[i].stops` | dense list of 0–8 `{ id, dwell }` records | Optional override for a registered stopped route. IDs must match the preset's named piers in order. A positive `dwell` is the departure offset in seconds; an omitted dwell shares the period's remaining time. A period shorter than travel plus explicit dwell rejects. |
 
 The decoder copies berth/module IDs, recipes, mooring/attachment rules, source x/z, headings,
 gangway anchors and the complete route/timetable before the Lua state closes. `boat_scene_validate` checks identities, recipes,

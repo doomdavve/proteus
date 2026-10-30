@@ -236,7 +236,8 @@ static const char *const SCENE[] = { "version", "marina", "traffic", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
 static const char *const VESSEL[]
-    = { "id", "retain", "recipe", "route", "speed", "phase", "period", NULL };
+    = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", NULL };
+static const char *const STOP[] = { "id", "dwell", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
 static const char *const BERTH[] = { "id", "recipe", "x", "z", "heading", "mooring", NULL };
 static const char *const MODULE[] = { "id", "kind", "x", "z", "heading", NULL };
@@ -478,6 +479,63 @@ static bool scene_modules(lua_State *L, Vm *vm, int marina, BoatSceneDefinition 
     return true;
 }
 
+// L3.3: ordered stop overrides for a registered stopped route. IDs must match the preset's
+// named pier anchors in order; an omitted dwell leaves that stop on the shared remainder.
+static bool scene_stops(lua_State *L, Vm *vm, int entry, const char *path, WaterfrontRouteActor *v,
+    char *out)
+{
+    int type = field(L, entry, "stops", path, out);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, out, "must be a table, not a %s", lua_typename(L, type));
+    int list = lua_absindex(L, -1);
+    lua_Unsigned length = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > length)
+            return reject(vm, out, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != length)
+        return reject(vm, out, "must be a list numbered from 1 without gaps");
+    if ((int)length != (int)v->stop_count)
+        return reject(vm, out, "must list all %u stops of route %s", v->stop_count, v->id);
+    for (unsigned i = 0; i < length; ++i) {
+        char stop_path[64], id[WATERFRONT_ROUTE_TEXT];
+        element(stop_path, sizeof(stop_path), out, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, stop_path, "must be a table, not a %s", luaL_typename(L, -1));
+        int stop = lua_absindex(L, -1);
+        if (!only(L, vm, stop, stop_path, STOP)
+            || !string(L, vm, stop, stop_path, "id", id, sizeof(id)))
+            return false;
+        if (strcmp(id, v->stops[i].id))
+            return reject(vm, stop_path, "must name the route's stop %s", v->stops[i].id);
+        char dwell_path[64];
+        int dwell_type = field(L, stop, "dwell", stop_path, dwell_path);
+        if (dwell_type == LUA_TNIL) {
+            lua_pop(L, 1);
+            v->stops[i].dwell = -1;
+        } else {
+            lua_pop(L, 1);
+            double dwell;
+            if (!number(L, vm, stop, stop_path, "dwell", &dwell)
+                || !(dwell >= 0))
+                return reject(vm, dwell_path, "must be zero or positive seconds");
+            v->stops[i].dwell = (float)dwell;
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    return true;
+}
+
 // L3.2: a present vessel list replaces all travelling craft. Entries either retain a
 // registered native actor or select a registered route and override its timetable.
 static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
@@ -539,9 +597,17 @@ static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *
             for (unsigned d = 0; d < defaults->actor_count; ++d)
                 if (!strcmp(defaults->actors[d].id, retained))
                     v->retain = (unsigned char)d;
+            if (!strcmp(retained, "alvsnabben"))
+                v->retain = WATERFRONT_TRAFFIC_VESSELS; // The first compiled upstream ferry.
             memcpy(v->id, id, sizeof(id));
-            // A retain entry carries no other timetable fields.
-            if (!only(L, vm, entry, path, (const char *const[]) { "id", "retain", NULL }))
+            // A retain entry may override its named stop dwells; the route and motion stay
+            // the compiled actor's own.
+            if (!only(L, vm, entry, path,
+                    (const char *const[]) { "id", "retain", "stops", NULL }))
+                return false;
+            char stops_path[64];
+            join(stops_path, sizeof(stops_path), path, "stops");
+            if (!scene_stops(L, vm, entry, path, v, stops_path))
                 return false;
         } else {
             double speed, phase, period;
@@ -571,6 +637,10 @@ static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *
             v->phase = (float)phase;
             v->period = period;
             memcpy(v->id, id, sizeof(id));
+            char stops_path[64];
+            join(stops_path, sizeof(stops_path), path, "stops");
+            if (!scene_stops(L, vm, entry, path, v, stops_path))
+                return false;
         }
         lua_pop(L, 1);
     }

@@ -42,8 +42,9 @@ typedef struct {
 } WaterfrontRoutePoint;
 
 typedef struct {
+    char id[WATERFRONT_ROUTE_TEXT]; // Named pier/anchor within the registered route.
     unsigned char segment; // Index of the straight piece after corner SEGMENT.
-    float dwell; // Seconds stopped; negative distributes the period's remainder.
+    float dwell; // Seconds stopped; negative shares the period's remaining dwell time.
 } WaterfrontRouteStop;
 
 typedef struct {
@@ -103,6 +104,10 @@ WaterfrontVesselMotion waterfront_route_motion(
     const WaterfrontRouteDefinition *routes, int index, double time);
 int waterfront_route_stops(const WaterfrontRouteDefinition *routes, int index, Vector2 *stops,
     int capacity);
+// Timetable interval [ARRIVE, DEPART) of STOP within one period, in seconds from actor phase
+// zero. False when the actor has no such stop. These are direct-time boundaries, not counters.
+bool waterfront_route_stop_times(const WaterfrontRouteDefinition *routes, int index, int stop,
+    double *arrive, double *depart);
 // Highest lift the bridge needs for this definition at TIME, 0 when it stays down.
 float waterfront_route_lift(const WaterfrontRouteDefinition *routes, double time);
 // Schedule diagnostics used by L3.4. A bridge actor's hull must cross the span fully inside

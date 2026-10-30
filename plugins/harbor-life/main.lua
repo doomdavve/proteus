@@ -43,6 +43,14 @@ return {
       vessels = {
         { id = "passing", recipe = "runabout", route = "marina_pass",
           speed = 4, phase = 0, period = 24.8540 },
+        -- The compiled Älvsnabben loop, with its Stenpiren dwell extended. The two later
+        -- stops keep the shared remainder of the 1,200 s timetable.
+        { id = "ferry", retain = "alvsnabben",
+          stops = {
+            { id = "stenpiren", dwell = 35 },
+            { id = "lindholmspiren" },
+            { id = "eriksberg" }
+          } },
         { id = "river_runabout", retain = "river_runabout" }
       }
     }
