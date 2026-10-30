@@ -179,8 +179,8 @@ target_link_libraries(validate_frame_pacer PRIVATE proteus_frame_pacer)
 target_compile_options(validate_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME frame_pacer COMMAND validate_frame_pacer)
 
-add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/boat_title.c src/profiler.c
-  src/boat_audio.c src/xm_audio.c)
+add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/boat_title.c
+  tools/cli_usage.c src/profiler.c src/boat_audio.c src/xm_audio.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
 # Share the web packager's version convention. Source archives can supply an explicit value.
@@ -744,8 +744,8 @@ add_executable(validate_boat_race tools/validate_boat_race.c)
 target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
-add_executable(boat_server tools/boat_server_main.c tools/boat_server.c)
-add_executable(boat_bot tools/boat_bot.c)
+add_executable(boat_server tools/boat_server_main.c tools/boat_server.c tools/cli_usage.c)
+add_executable(boat_bot tools/boat_bot.c tools/cli_usage.c)
 foreach(target boat_server boat_bot)
   target_link_libraries(${target} PRIVATE proteus_boat_net_enet)
 endforeach()

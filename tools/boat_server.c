@@ -16,6 +16,7 @@
 #include "boat_net_rtc.h"
 #endif
 #include "boat_net_server.h"
+#include "cli_usage.h"
 
 #include <inttypes.h>
 #include <signal.h>
@@ -34,11 +35,6 @@
 #include <unistd.h>
 #endif
 
-static void usage_line(FILE *out, const char *option, const char *description)
-{
-    fprintf(out, "  %-29s %s\n", option, description);
-}
-
 static void usage(FILE *out)
 {
     fprintf(out,
@@ -51,36 +47,40 @@ static void usage(FILE *out)
         "--ticks/--seconds or Ctrl+C. A diagnostic: no internet reachability, encryption\n"
         "or authentication; clients must present the same --token.\n");
 
-    fprintf(out, "\nMODES\n");
-    usage_line(out, "--scripted", "Run bots headless, then print the fleet hash and per-tick cost");
-    usage_line(out, "--mode free", "Shared free boating (default)");
-    usage_line(out, "--mode deathmatch", "Timed rounds: +1 defeat, -1 self-capsize, 3 s respawn");
-    usage_line(out, "--mode race", "River sprint: gridded start, 3 s countdown, places");
+    cli_usage_section(out, "MODES");
+    cli_usage_line(
+        out, "--scripted", "Run bots headless, then print the fleet hash and per-tick cost");
+    cli_usage_line(out, "--mode free", "Shared free boating (default)");
+    cli_usage_line(
+        out, "--mode deathmatch", "Timed rounds: +1 defeat, -1 self-capsize, 3 s respawn");
+    cli_usage_line(out, "--mode race", "River sprint: gridded start, 3 s countdown, places");
 
-    fprintf(out, "\nROOM\n");
-    usage_line(out, "--bind IPV4", "Listen address (default 127.0.0.1; use a LAN address)");
-    usage_line(out, "--port N", "UDP port (default 24680)");
-    usage_line(out, "--token TEXT", "Shared join token (default empty)");
-    usage_line(out, "--players 1-4", "Seats in the room (default 4)");
-    usage_line(out, "--location NAME", "basin|river|outer (default basin; race uses river)");
-    usage_line(out, "--waves", "Gentle crossing waves");
-    usage_line(out, "--lan-port N", "LAN search port (default 24681); loopback --bind answers");
-    usage_line(out, "", "only this machine, otherwise the local network");
-    usage_line(out, "--no-lan", "Do not answer LAN searches");
-    usage_line(out, "--exit-with-stdin", "Close when standard input ends (wake_velocity --host)");
-    usage_line(out, "--until-empty", "Close once every accepted player has left or timed out");
-    usage_line(out, "--peer-timeout S", "Drop a silent client after 1-60 s (default 5); for tests");
+    cli_usage_section(out, "ROOM");
+    cli_usage_line(out, "--bind IPV4", "Listen address (default 127.0.0.1; use a LAN address)");
+    cli_usage_line(out, "--port N", "UDP port (default 24680)");
+    cli_usage_line(out, "--token TEXT", "Shared join token (default empty)");
+    cli_usage_line(out, "--players 1-4", "Seats in the room (default 4)");
+    cli_usage_line(out, "--location NAME", "basin|river|outer (default basin; race uses river)");
+    cli_usage_line(out, "--waves", "Gentle crossing waves");
+    cli_usage_line(out, "--lan-port N", "LAN search port (default 24681); loopback --bind answers");
+    cli_usage_line(out, "", "only this machine, otherwise the local network");
+    cli_usage_line(out, "--no-lan", "Do not answer LAN searches");
+    cli_usage_line(
+        out, "--exit-with-stdin", "Close when standard input ends (wake_velocity --host)");
+    cli_usage_line(out, "--until-empty", "Close once every accepted player has left or timed out");
+    cli_usage_line(
+        out, "--peer-timeout S", "Drop a silent client after 1-60 s (default 5); for tests");
 
-    fprintf(out, "\nSIMULATION\n");
-    usage_line(out, "--ticks N", "Stop after N ticks (max 24 h at 120 Hz)");
-    usage_line(out, "--seconds S", "Stop after S seconds (max 24 h); not with --scripted");
-    usage_line(out, "--boats 1-4", "Scripted bots (default 4)");
-    usage_line(out, "--report-every N", "Print progress every N ticks");
-    usage_line(out, "--round-seconds S", "Deathmatch round length, 2-3600 (default 300)");
+    cli_usage_section(out, "SIMULATION");
+    cli_usage_line(out, "--ticks N", "Stop after N ticks (max 24 h at 120 Hz)");
+    cli_usage_line(out, "--seconds S", "Stop after S seconds (max 24 h); not with --scripted");
+    cli_usage_line(out, "--boats 1-4", "Scripted bots (default 4)");
+    cli_usage_line(out, "--report-every N", "Print progress every N ticks");
+    cli_usage_line(out, "--round-seconds S", "Deathmatch round length, 2-3600 (default 300)");
 
-    fprintf(out, "\nWEBRTC (optional build)\n");
-    usage_line(out, "--rtc-port N", "WebRTC signalling port");
-    usage_line(out, "--ice-server URL", "ICE server; requires --rtc-port");
+    cli_usage_section(out, "WEBRTC (optional build)");
+    cli_usage_line(out, "--rtc-port N", "WebRTC signalling port");
+    cli_usage_line(out, "--ice-server URL", "ICE server; requires --rtc-port");
 
     fprintf(out,
         "\nRoom options and --seconds do not apply to --scripted.\n"

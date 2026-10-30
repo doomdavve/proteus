@@ -9,16 +9,12 @@
 #include "boat_fleet_bots.h"
 #include "boat_net_client.h"
 #include "boat_net_enet.h"
+#include "cli_usage.h"
 
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-static void usage_line(FILE *out, const char *option, const char *description)
-{
-    fprintf(out, "  %-29s %s\n", option, description);
-}
 
 static void usage(FILE *out)
 {
@@ -30,23 +26,23 @@ static void usage(FILE *out)
         "summary. In deathmatch rooms it rams and crosses wakes; in race rooms it races the\n"
         "course. Headless; for process smoke tests.\n");
 
-    fprintf(out, "\nJOIN\n");
-    usage_line(out, "--connect HOST:PORT", "Room endpoint (required)");
-    usage_line(out, "--name TEXT", "Player name (default bot; at most 16 bytes)");
-    usage_line(out, "--token TEXT", "Room token (default empty; at most 32 bytes)");
-    usage_line(out, "--seconds S", "Drive for S seconds (default 5)");
-    usage_line(out, "--snapshots N", "Leave after N snapshots instead of a duration");
-    usage_line(out, "--hunt", "Drive at the nearest other boat to ram or cross its wake");
-    usage_line(out, "--predict", "Exercise client prediction");
-    usage_line(out, "--reset-every S", "Request a reset every S seconds (2-86400)");
-    usage_line(out, "--inactive-every S", "Send inactive controls for 1 s every S seconds");
-    usage_line(out, "--expect-reject", "Succeed only when the room refuses the connection");
+    cli_usage_section(out, "JOIN");
+    cli_usage_line(out, "--connect HOST:PORT", "Room endpoint (required)");
+    cli_usage_line(out, "--name TEXT", "Player name (default bot; at most 16 bytes)");
+    cli_usage_line(out, "--token TEXT", "Room token (default empty; at most 32 bytes)");
+    cli_usage_line(out, "--seconds S", "Drive for S seconds (default 5)");
+    cli_usage_line(out, "--snapshots N", "Leave after N snapshots instead of a duration");
+    cli_usage_line(out, "--hunt", "Drive at the nearest other boat to ram or cross its wake");
+    cli_usage_line(out, "--predict", "Exercise client prediction");
+    cli_usage_line(out, "--reset-every S", "Request a reset every S seconds (2-86400)");
+    cli_usage_line(out, "--inactive-every S", "Send inactive controls for 1 s every S seconds");
+    cli_usage_line(out, "--expect-reject", "Succeed only when the room refuses the connection");
 
-    fprintf(out, "\nDISCOVER\n");
-    usage_line(out, "--discover", "Search for LAN rooms instead of joining one");
-    usage_line(out, "--lan-port N", "Discovery port (default 24681)");
-    usage_line(out, "--seconds S", "Search for S seconds (default 2)");
-    usage_line(out, "--first", "Stop at the first answer");
+    cli_usage_section(out, "DISCOVER");
+    cli_usage_line(out, "--discover", "Search for LAN rooms instead of joining one");
+    cli_usage_line(out, "--lan-port N", "Discovery port (default 24681)");
+    cli_usage_line(out, "--seconds S", "Search for S seconds (default 2)");
+    cli_usage_line(out, "--first", "Stop at the first answer");
 
     fprintf(out,
         "\n--snapshots replaces --seconds; --first requires --discover.\n"
