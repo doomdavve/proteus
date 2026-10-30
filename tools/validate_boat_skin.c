@@ -1,6 +1,7 @@
 #include "boat_flag.h"
 #include "boat_pose.h"
 #include "boat_skin.h"
+#include "boat_view.h"
 #include "raymath.h"
 
 // Keep the checks in Release builds, where CI runs this validator.
@@ -93,8 +94,34 @@ static void twin_outboards(void)
     }
 }
 
+static void cabin_waterline(void)
+{
+    BoatViewState view = { 0 };
+    view.boat.heading = .7f;
+    view.boat.roll = .2f;
+    view.boat.pitch = -.12f;
+    BoatFlag flag = { 0 };
+    boat_flag_reset(&flag, boat_pose_hull(&view.boat), (Vector3) { 0 }, 0);
+    BoatFlagSurface original = flag.surface;
+    WaterfrontPlayerState normal = { 0 }, cabin = { 0 };
+    view.skin = BOAT_SKIN_SWEDEN;
+    boat_player_pose(&view, &flag, &normal);
+    view.skin = BOAT_SKIN_CABIN;
+    boat_player_pose(&view, &flag, &cabin);
+    Vector3 offset = Vector3Transform((Vector3) { 0, -.24f, 0 }, boat_pose_rotation(&view.boat));
+    assert(
+        Vector3Distance(cabin.hull.position, Vector3Add(normal.hull.position, offset)) < .00001f);
+    assert(
+        Vector3Distance(cabin.cabin.position, Vector3Add(normal.cabin.position, offset)) < .00001f);
+    for (int i = 0; i < BOAT_FLAG_POINTS; ++i)
+        assert(Vector3Distance(cabin.flag.points[i], Vector3Add(normal.flag.points[i], offset))
+            < .00001f);
+    assert(memcmp(&flag.surface, &original, sizeof(original)) == 0);
+}
+
 int main(void)
 {
+    cabin_waterline();
     twin_outboards();
     flags();
     // The countries share the white hull; the explorer's differs. Accent stripes retain a
