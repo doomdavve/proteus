@@ -926,6 +926,13 @@ compiled or played in this Fedora session (no Emscripten SDK installed).
 
 ## Play-testing time controls — 2026-10-28
 
+Windows play-test follow-up (2026-10-30, v0.0.22): raylib's bracket keys are physical US positions,
+so Swedish players could not reach `[` / `]` (they sit on AltGr+8/9). Time keys now also match the
+typed characters `[ ] \`, with `,` `.` `0` as layout-independent alternatives, and F11 plus an Escape
+menu FULLSCREEN row toggle borderless fullscreen. Automated: full CTest preset passes (macOS).
+Not verified: Windows keyboard behaviour. The reported 50–70 FPS on a >144 Hz display is
+uninvestigated; it needs the F3 overlay (observed vs raylib FPS, monitor Hz) from that machine.
+
 Implemented in `playtest-time-controls`: `[` / `]` extend the existing replay speed mapping
 to live solo play (¼×, ½×, 1×, 2×, 4×, 8×); backslash restores 1× in either context. Live and replay
 rates are independent, start at 1×, and live rate survives boat resets. Camera zoom retains

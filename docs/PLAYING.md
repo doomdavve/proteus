@@ -90,7 +90,9 @@ unfinished attempt but preserves your last completed run and personal best.
 | Left/Right during replay | Seek one second; Shift seeks five seconds |
 | Home/End during replay | Jump to start/finish |
 | Click/drag replay timeline | Seek and pause |
-| [ / ] | Slower/faster solo simulation or replay, from ¼× to 8× |
+| [ / ] or , / . | Slower/faster solo simulation or replay, from ¼× to 8× (`,` `.` and the typed brackets work on any layout, e.g. Swedish AltGr+8/9) |
+| \ or 0 | Restore 1× |
+| F11 | Toggle borderless fullscreen (also in the Escape menu); not in the browser |
 | Backslash | Restore normal speed |
 
 Use the menu's RESTART RUN to leave replay; Backspace reset is inactive during playback.

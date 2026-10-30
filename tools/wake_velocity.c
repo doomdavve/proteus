@@ -259,7 +259,10 @@ static void draw_help(
         minimap ? "N: map in corner / large chart / off" : "",
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler",
-        networked ? "" : "[ / ]: time 0.25x..8x | backslash: 1x",
+        networked ? "" : "[ / ] or , / .: time 0.25x..8x | \\ or 0: 1x",
+#if !defined(__EMSCRIPTEN__)
+        "F11: fullscreen",
+#endif
         course ? "Altered live time: practice, no best/export" : "",
 #if defined(__EMSCRIPTEN__)
         "P: menu in fullscreen | Back to title: setup",
@@ -267,7 +270,7 @@ static void draw_help(
         course ? "G: ghost | L/B: replay last/best" : "",
         course ? "Replay: Space pause | Enter restart" : "",
         course ? "Left/Right: seek | Shift: 5 seconds" : "",
-        course ? "Home/End: start/end | [ / ]: speed" : "",
+        course ? "Home/End: start/end | [ / ] or , / .: speed" : "",
         course ? "Click/drag timeline: seek and pause" : "",
         "?, P or Esc: dismiss help",
     };
@@ -1086,14 +1089,29 @@ static int study(int argc, char **argv)
         BoatFrameMetrics metrics = { 0 }; // Reset once before any tick in this frame.
         int character;
         bool help_pressed = false;
-        while ((character = GetCharPressed()) != 0)
+        // Bracket and backslash sit behind AltGr on many layouts, so time keys also match the
+        // typed character, and , . 0 serve as layout-independent alternatives.
+        int time_direction = 0;
+        bool time_normal = false;
+        while ((character = GetCharPressed()) != 0) {
             help_pressed |= character == '?';
+            time_direction += (character == ']' || character == '.')
+                - (character == '[' || character == ',');
+            time_normal |= character == '\\' || character == '0';
+        }
+        time_direction += IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
+        time_normal |= IsKeyPressed(KEY_BACKSLASH);
+        time_direction = time_direction > 0 ? 1 : time_direction < 0 ? -1 : 0;
         if (help_pressed)
             help_visible = !help_visible;
         // Menu shortcuts release capture without changing steering mode. P preserves fullscreen.
         bool reset_requested = false;
         bool menu_was_open = menu.open;
         bool menu_pressed = IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P);
+#if !defined(__EMSCRIPTEN__)
+        if (IsKeyPressed(KEY_F11))
+            ToggleBorderlessWindowed();
+#endif
 #if defined(__EMSCRIPTEN__)
         menu_pressed |= boat_web_mobile_menu() != 0;
 #endif
@@ -1126,6 +1144,8 @@ static int study(int argc, char **argv)
                 menu.open = false;
             } else if (choice == BOAT_MENU_LEAVE)
                 break;
+            else if (choice == BOAT_MENU_FULLSCREEN)
+                ToggleBorderlessWindowed();
             else if (choice == BOAT_MENU_STEERING) {
 #if defined(__EMSCRIPTEN__)
                 mouse_unavailable = false;
@@ -1268,10 +1288,8 @@ static int study(int argc, char **argv)
                     session.runs.paused = false;
                     replay_adjusted = true;
                 }
-                if (IsKeyPressed(KEY_LEFT_BRACKET))
-                    boat_replay_speed_step(&session.runs, -1);
-                if (IsKeyPressed(KEY_RIGHT_BRACKET))
-                    boat_replay_speed_step(&session.runs, 1);
+                if (time_direction)
+                    boat_replay_speed_step(&session.runs, time_direction);
                 int seek = (IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT))
                     - (IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT));
                 bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
@@ -1300,12 +1318,11 @@ static int study(int argc, char **argv)
         }
         if (active && !networked) {
             if (session.runs.playing) {
-                if (IsKeyPressed(KEY_BACKSLASH))
+                if (time_normal)
                     session.runs.replay_speed_index = BOAT_TIME_NORMAL;
             } else {
-                int direction = IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
-                time_speed_index = boat_time_speed_step(time_speed_index, direction);
-                if (IsKeyPressed(KEY_BACKSLASH))
+                time_speed_index = boat_time_speed_step(time_speed_index, time_direction);
+                if (time_normal)
                     time_speed_index = BOAT_TIME_NORMAL;
             }
         }

@@ -12,6 +12,7 @@ typedef enum {
     BOAT_MENU_RESUME,
     BOAT_MENU_STEERING, // Toggle mouse / keyboard steering.
     BOAT_MENU_CONTROLS, // Open the keyboard guide over the menu.
+    BOAT_MENU_FULLSCREEN, // Toggle borderless fullscreen (not offered on the web).
     BOAT_MENU_RESET, // Explicit reset/restart/request, using the session's existing action.
     BOAT_MENU_LEAVE,
 } BoatMenuChoice;
