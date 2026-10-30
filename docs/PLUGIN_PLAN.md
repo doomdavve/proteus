@@ -1780,11 +1780,11 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L4.2 are complete; next in this track: L4.3 first
-playable harbor qualification**; it is the first playable gate. `scene.define` installs and stages
-the two-berth harbor-life layout, its small pontoon and gangway, one authored passing craft, a
-retained ferry with an edited dwell, the retained schooner/lift dependency and one authored flock
-with timed feeding/alarm cues.
+failure cases and acceptance evidence. **L1.1–L4.3 are complete; the first playable harbor gate is
+implemented and awaits human review.** `scene.define` installs and stages the two-berth harbor-life
+layout, its small pontoon and gangway, one authored passing craft, a retained ferry with an edited
+dwell, the retained schooner/lift dependency and one authored flock with timed feeding/alarm cues.
+Next in this track is L5.1 shared fixed daylight/dusk; L5–L8 remain later work.
 
 ### Coverage and delivery slices
 
@@ -2415,8 +2415,51 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
   still frame does not prove motion clarity. Human acceptance and bird/building clipping review
   remain pending for L4.3.
 
-**Next in this track: L4.3.** Combine the example into the first playable harbor qualification,
-run the worker/live bridge path, and record captures, motion and performance evidence.
+#### L4.3 result, 2026-10-30
+
+**Implemented:** the first playable harbor-life package now combines both berths, the small
+pontoon/gangway, the passing craft, the retained ferry with an edited dwell, the retained
+schooner/lift and the authored gull flock/cues. Its README carries editable recipes, pinned
+camera/time recipes, worker/live-bridge commands and a human-review checklist.
+
+- **Deterministic fixture:** new [`validate_harbor_life`](../tools/validate_harbor_life.c) loads the
+  real package, drives the `x = 6` entrance approach at throttle, idles/turns, exits south, checks
+  player clearance on every tick, inspects the combined frame, checks feeding versus alarm height,
+  walks one ferry dwell/departure and seeks the 1,200 s service. It also renders the compiled and
+  populated scenes at the same camera/time sweep and reports p50/p95, meshes, lights, wakes and
+  host memory.
+- **Measured on this host (Apple Silicon/macOS, Debug, 320×200 CPU, 180 frames, same camera):**
+  compiled p50/p95 **9.095/9.270 ms**, populated **8.972/9.125 ms**, supported-maximum scene
+  **10.762/10.935 ms** (repeat runs varied by a few tenths of a millisecond). The populated frame had 2 berths, 2 modules, 4 travelling craft
+  (48 traffic wake patches), 1 flock/8 birds, 32 meshes, 37 attached lights and 20 cars; the host
+  retained one revision and 746,952 reserved bytes. The maximum scene (7 berths, 4 modules,
+  8 craft, 4×8 birds) occupies 7,944 bytes. These are CPU render timings, not GPU or frame-pacing
+  acceptance.
+- **Worker/live bridge:** `validate_wake_bridge --serve-harbor DIR` hosts the combined package in
+  the real mailbox. `live-inspect` reported R1 with `vessels=4 flocks=1`; `live-stage` of a
+  cue-only draft reported `R2 ACTIVE, renamed / PROGRESS KEPT`; `live-undo` restored R1. Wall
+  times were about **0.07 s inspect** and **1.79 s stage/apply** including isolated worker
+  startup. The package also round-trips through `validate_boat_plugin_stage`.
+- **Captures:** CPU `outer.marina` (3 s), `outer.marina-pass` (9 s), and bridge review at
+  300/342/382/432/502/542 s were produced and inspected. They show the marina layout, passing
+  craft/retained traffic and the lift/schooner phases. Gulls read as distant silhouettes at
+  320×200; a still capture cannot establish motion clarity.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build. Full `ctest --preset full` passed **323/323 enabled tests** with local
+  socket access; 13 retired wake-field tests remain disabled.
+- The GUI/window platform is unavailable in this execution environment (`GLFW: Failed to
+  initialize platform`). Therefore the requested GPU captures and windowed motion demo could not
+  be run here; CPU captures and the headless worker/live-bridge path were exercised instead.
+  This is a verification-environment limitation, not a code failure.
+
+**Human acceptance is pending.** Review should answer whether activity is noticeable from the
+boat, the entrance stays clear, and the result feels alive rather than populated; also inspect
+bird/building/berth clipping in motion. No human acceptance is inferred from tests.
+
+**Next in this track: L5.1**, the native fixed day/dusk lighting frame required before scripted
+lighting. The requested L1.1–L4.3 sequence stops here; do not begin L5 without a new direction.
 
 #### L2 — a small marina before a marina editor
 
@@ -2552,12 +2595,16 @@ Completed L4.1, 2026-10-30: extracted four bounded gull flocks, pure-time cues a
 avoidance with compiled parity.
 Completed L4.2, 2026-10-30: exposed bounded `scene.gulls.flocks`, authored cue intervals and the
 marina flock; cue-only edits keep time while flock layout follows restart.
-Next task for this track: **L4.3**, first playable harbor qualification.
+Completed L4.3, 2026-10-30: combined the package into the first playable harbor qualification,
+added the deterministic approach/idle/departure fixture and measurements, exercised the package
+through the isolated worker and headless live-bridge mailbox, and inspected CPU captures.
+Next task for this track: **L5.1**, shared fixed daylight/dusk. The requested L1.1–L4.3 sequence
+stops here.
 Known limits: authored route geometry is selected from registered presets; no freeform route
 editor, freeform module mesh editor or physical traffic wake recipe; no boarding/passenger
-simulation; no tram closure interlock; depth is unverified; bird/building clipping is a visual
-review item; and no tram/seal recipes, gameplay dusk, building activity or human scene acceptance
-are implemented.
+simulation; no tram closure interlock; depth is unverified; GPU/windowed motion and bird/building
+clipping review could not run in this environment; and no tram/seal recipes, gameplay dusk,
+building activity or human scene acceptance are implemented or claimed.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

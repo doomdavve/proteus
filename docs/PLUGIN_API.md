@@ -126,10 +126,10 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **L1.1–L1.4 and L2–L4.2 complete; scene decoding, binding, staging wire,
-marina berths/modules, travelling-craft routes, named ferry stops and gull flocks/cues are
-implemented.** Authored route geometry still selects registered native presets; there is no
-freeform route editor. The
+Status, 2026-10-30: **L1.1–L1.4 and L2–L4.3 complete; the first playable harbor-life scene is
+implemented, with scene decoding, binding, staging wire, marina berths/modules, travelling-craft
+routes, named ferry stops and gull flocks/cues.** Authored route geometry still selects registered
+native presets; there is no freeform route editor. Human play acceptance is pending. The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and the versioned envelope; L1.3 installs it between ticks on

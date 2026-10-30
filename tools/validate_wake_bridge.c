@@ -165,17 +165,21 @@ int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
         return boat_plugin_stage_worker();
+    // The headless bridge server can host the combined harbor-life package for L4.3.
+    const char *package = argc == 3 && !strcmp(argv[1], "--serve-harbor")
+        ? "plugins/harbor-life"
+        : "plugins/langedrag";
     BoatPluginDiagnostic d;
-    CHECK(boat_plugin_read("plugins/langedrag", NULL, &reference, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_read(package, NULL, &reference, &d) == BOAT_PLUGIN_OK);
     BoatWorldResources resources;
     CHECK(boat_world_resources_init(&resources, boat_location_find("outer")));
     static BoatSession session;
     boat_session_init(&session, &resources, (BoatWater) { 0 });
     session.presentation_enabled = false;
     static WakePlugin plugin;
-    CHECK(wake_plugin_open(&plugin, "plugins/langedrag", &session, 0));
+    CHECK(wake_plugin_open(&plugin, package, &session, 0));
     plugin.watching = false; // Only bridge requests stage here.
-    if (argc == 3 && !strcmp(argv[1], "--serve")) {
+    if (argc == 3 && (!strcmp(argv[1], "--serve") || !strcmp(argv[1], "--serve-harbor"))) {
         directory = argv[2];
         return serve(&plugin, &session, argv[0]);
     }
