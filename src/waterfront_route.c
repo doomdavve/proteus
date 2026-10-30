@@ -100,6 +100,7 @@ static struct {
     float time;
     double period;
     unsigned actor;
+    float along; // Signed station along the bridge axis at the crossing.
 } crossings[WATERFRONT_ROUTE_ACTORS * 2];
 static int crossing_count;
 static uint64_t cache_digest;
@@ -590,10 +591,15 @@ static void prepare(const WaterfrontRouteDefinition *routes)
                 else
                     high = mid;
             }
-            crossings[crossing_count].time = (float)wrapped(
-                (low + high) * .5 / r->speed - actor->phase, actor->period);
+            double station = (low + high) * .5 / r->speed - actor->phase;
+            crossings[crossing_count].time
+                = (float)wrapped(station, actor->period);
             crossings[crossing_count].period = actor->period;
             crossings[crossing_count].actor = i;
+            Vector2 p = sample(r, (float)((low + high) * .5), &tangent, &curvature);
+            Vector2 d = { p.x - WATERFRONT_HISINGSBRON_NORTH.x,
+                p.y - WATERFRONT_HISINGSBRON_NORTH.y };
+            crossings[crossing_count].along = axis.x * d.x + axis.y * d.y;
             ++crossing_count;
             ++found;
         }
@@ -873,6 +879,121 @@ float waterfront_route_lift(const WaterfrontRouteDefinition *routes, double time
     return raised * WATERFRONT_LIFT_HEIGHT;
 }
 
+// Hull occupancy around crossing I, using the vessel's actual cruise speed and length.
+static bool bridge_window_at(const WaterfrontRouteDefinition *routes, int i,
+    WaterfrontBridgeWindow *window)
+{
+    const WaterfrontRouteDefinition *def = definition(routes);
+    if (i < 0 || i >= crossing_count)
+        return false;
+    unsigned actor = crossings[i].actor;
+    if (actor >= def->actor_count || !def->actors[actor].bridge)
+        return false;
+    BoatModelSpec spec = waterfront_route_spec(def, (int)actor);
+    float cruise = def->actors[actor].speed > 0 ? def->actors[actor].speed
+                                                : built_routes[actor].speed;
+    double half = (spec.length * .5 + 1) / fmax(cruise, .1);
+    *window = (WaterfrontBridgeWindow) { .actor = actor, .crossing = crossings[i].time,
+        .entry = crossings[i].time - half, .leave = crossings[i].time + half };
+    return true;
+}
+
+int waterfront_route_bridge_windows(
+    const WaterfrontRouteDefinition *routes, WaterfrontBridgeWindow *windows, int capacity)
+{
+    if (!windows || capacity <= 0)
+        return 0;
+    prepare(routes);
+    int count = 0;
+    for (int i = 0; i < crossing_count && count < capacity; ++i)
+        if (bridge_window_at(routes, i, &windows[count]))
+            ++count;
+    return count;
+}
+
+static bool windows_overlap(WaterfrontBridgeWindow a, WaterfrontBridgeWindow b, double period)
+{
+    for (int shift = -1; shift <= 1; ++shift) {
+        double offset = shift * period;
+        if (a.entry < b.leave + offset && b.entry + offset < a.leave)
+            return true;
+    }
+    return false;
+}
+
+bool waterfront_route_validate_bridge(const WaterfrontRouteDefinition *routes, float underside,
+    float lift_height, WaterfrontRouteDiagnostic *diagnostic)
+{
+    const WaterfrontRouteDefinition *def = definition(routes);
+    prepare(routes);
+    double middle = (WATERFRONT_LIFT_SPAN_START + WATERFRONT_LIFT_SPAN_END) * .5;
+    double span_half = (WATERFRONT_LIFT_SPAN_END - WATERFRONT_LIFT_SPAN_START) * .5;
+    double cycle = 2 * (LIFT_BEFORE + LIFT_RAMP + LIFT_AFTER + LIFT_RAMP);
+    WaterfrontBridgeWindow windows[WATERFRONT_ROUTE_ACTORS * 2];
+    int count = waterfront_route_bridge_windows(routes, windows, WATERFRONT_ROUTE_ACTORS * 2);
+    for (unsigned i = 0; i < def->actor_count; ++i) {
+        if (!def->actors[i].bridge)
+            continue;
+        bool crossed = false;
+        for (int w = 0; w < count; ++w)
+            crossed |= windows[w].actor == i;
+        if (!crossed) {
+            char path[64];
+            indexed_path(path, sizeof(path), "scene.traffic.vessels", i + 1, "");
+            fail(diagnostic, path, "does not cross the Hisingsbron lift span");
+            return false;
+        }
+    }
+    for (int i = 0; i < count; ++i) {
+        const WaterfrontBridgeWindow *w = &windows[i];
+        const WaterfrontRouteActor *actor = &def->actors[w->actor];
+        BoatModelSpec spec = waterfront_route_spec(def, (int)w->actor);
+        char path[64];
+        indexed_path(path, sizeof(path), "scene.traffic.vessels", w->actor + 1, "");
+        if (spec.mast_height + 1 > underside + lift_height) {
+            fail(diagnostic, path, "has insufficient raised bridge clearance for its mast");
+            return false;
+        }
+        if (actor->period < cycle) {
+            fail(diagnostic, path, "period is too short for a complete bridge lift cycle");
+            return false;
+        }
+        // The hull must not enter before the span is fully raised or remain after it starts
+        // lowering; both are expressed against the compiled smoothstep envelope.
+        if (w->entry < w->crossing - LIFT_BEFORE) {
+            fail(diagnostic, path, "starts its bridge passage before the lift is fully raised");
+            return false;
+        }
+        if (w->leave > w->crossing + LIFT_AFTER) {
+            fail(diagnostic, path, "ends its bridge passage after the lift starts lowering");
+            return false;
+        }
+        bool found = false;
+        for (int c = 0; c < crossing_count; ++c)
+            if (crossings[c].actor == w->actor) {
+                float station = crossings[c].along;
+                if (fabsf(station - (float)middle) + spec.length * .5f
+                    > (float)span_half) {
+                    fail(diagnostic, path, "does not cross inside the Hisingsbron lift span");
+                    return false;
+                }
+                found = true;
+            }
+        if (!found) {
+            fail(diagnostic, path, "does not cross the Hisingsbron lift span");
+            return false;
+        }
+        for (int previous = 0; previous < i; ++previous) {
+            double period = fmax(actor->period, def->actors[windows[previous].actor].period);
+            if (windows_overlap(*w, windows[previous], period)) {
+                fail(diagnostic, path, "has an overlapping bridge passage window");
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 bool waterfront_route_bridge_window(const WaterfrontRouteDefinition *routes, int index,
     double *entry, double *leave, WaterfrontRouteDiagnostic *diagnostic)
 {
@@ -883,13 +1004,13 @@ bool waterfront_route_bridge_window(const WaterfrontRouteDefinition *routes, int
         return false;
     }
     prepare(routes);
-    BoatModelSpec spec = waterfront_route_spec(routes, index);
-    float cruise = actor->speed > 0 ? actor->speed : built_routes[index].speed;
-    double half = spec.length * .5 / fmax(cruise, .1);
     for (int i = 0; i < crossing_count; ++i)
         if (crossings[i].actor == (unsigned)index) {
-            *entry = crossings[i].time - half;
-            *leave = crossings[i].time + half;
+            WaterfrontBridgeWindow window;
+            if (!bridge_window_at(routes, i, &window))
+                break;
+            *entry = window.entry;
+            *leave = window.leave;
             return true;
         }
     fail(diagnostic, "route.points", "does not cross the Hisingsbron lift span");
@@ -1004,33 +1125,8 @@ bool waterfront_route_validate(
             }
         }
     }
-    // Bridge dependencies are one group: a tall actor must cross the span, leave the lift
-    // enough time to complete every cycle, and not share an occupancy window with another.
-    for (unsigned i = 0; i < routes->actor_count; ++i) {
-        const WaterfrontRouteActor *a = &routes->actors[i];
-        if (!a->bridge)
-            continue;
-        double entry, leave;
-        if (!waterfront_route_bridge_window(routes, (int)i, &entry, &leave, diagnostic))
-            return false;
-        double minimum = 2 * (LIFT_BEFORE + LIFT_RAMP + LIFT_AFTER + LIFT_RAMP);
-        if (a->period < minimum) {
-            fail(diagnostic, "scene.traffic.vessels.period",
-                "is too short for the bridge lift cycle");
-            return false;
-        }
-        for (unsigned j = i + 1; j < routes->actor_count; ++j)
-            if (routes->actors[j].bridge) {
-                double other_entry, other_leave;
-                if (!waterfront_route_bridge_window(
-                        routes, (int)j, &other_entry, &other_leave, diagnostic))
-                    return false;
-                if (fabs(other_entry - entry) < LIFT_RAMP + LIFT_BEFORE) {
-                    fail(diagnostic, "scene.traffic.vessels",
-                        "has overlapping bridge passage windows");
-                    return false;
-                }
-            }
-    }
-    return true;
+    // Bridge dependencies are one group: hull height, lift transition, span station, period
+    // and pairwise occupancy are validated together before any revision can install.
+    return waterfront_route_validate_bridge(
+        routes, WATERFRONT_LIFT_UNDERSIDE, WATERFRONT_LIFT_HEIGHT, diagnostic);
 }

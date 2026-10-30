@@ -15,7 +15,7 @@
 
 static void usage(void)
 {
-    puts("Usage: harbor_review [--view marina|workboat|overview|launch|traffic|ferry] [--renderer "
+    puts("Usage: harbor_review [--view marina|workboat|overview|launch|traffic|ferry|bridge] [--renderer "
          "cpu|gpu]\n"
          "       [--waves] [--time SECONDS] [--screenshot FILE] [--frames COUNT]\n"
          "       [--resolution 320x180|320x200|320x240]\n"
@@ -81,7 +81,8 @@ int main(int argc, char **argv)
         } else if (!strcmp(argv[i], "--view") && i + 1 < argc) {
             view = argv[++i];
             if (strcmp(view, "marina") && strcmp(view, "workboat") && strcmp(view, "overview")
-                && strcmp(view, "ferry") && strcmp(view, "launch") && strcmp(view, "traffic"))
+                && strcmp(view, "ferry") && strcmp(view, "launch") && strcmp(view, "traffic")
+                && strcmp(view, "bridge"))
                 goto invalid;
         } else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
             const char *name = argv[++i];
@@ -132,6 +133,10 @@ int main(int argc, char **argv)
     if (!strcmp(view, "traffic")) {
         camera.position = (Vector3) { 220, 65, -80 };
         camera.target = (Vector3) { 50, 0, -290 };
+    } else if (!strcmp(view, "bridge")) {
+        // Hisingsbron's lift span, from the south-east approach.
+        camera.position = (Vector3) { 3524, 24, 2032 };
+        camera.target = (Vector3) { 3504, 16, 1962 };
     }
     camera = follow_vessel(camera, view, time);
     Vector3 patch_center = camera.target;
@@ -155,6 +160,8 @@ int main(int argc, char **argv)
     Texture2D texture = { 0 };
     Mesh near = { 0 };
     BoatWater water = waves ? boat_water_gentle() : (BoatWater) { 0 };
+    if (!strcmp(view, "bridge"))
+        water.upstream = true; // Draw the Hisingsbron lift span and upstream service.
     if (!waterfront_scenery_init(&scenery, &waterfront_city_river_map)) {
         result = 1;
         goto cleanup;

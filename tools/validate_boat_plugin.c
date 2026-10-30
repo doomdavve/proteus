@@ -309,7 +309,7 @@ static int scene_traffic(void)
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
-    CHECK(voyage.scene.traffic_present && voyage.scene.traffic.actor_count == 3);
+    CHECK(voyage.scene.traffic_present && voyage.scene.traffic.actor_count == 4);
     const WaterfrontRouteActor *passing = &voyage.scene.traffic.actors[0];
     CHECK(!strcmp(passing->id, "passing") && passing->recipe == WATERFRONT_CRAFT_RUNABOUT);
     CHECK(passing->shape == WATERFRONT_ROUTE_POINTS && passing->point_count == 4);
@@ -324,6 +324,9 @@ static int scene_traffic(void)
     CHECK(ferry->stops[1].dwell < 0 && ferry->stops[2].dwell < 0);
     CHECK(!strcmp(voyage.scene.traffic.actors[2].id, "river_runabout")
         && voyage.scene.traffic.actors[2].retain == 0);
+    CHECK(!strcmp(voyage.scene.traffic.actors[3].id, "schooner")
+        && voyage.scene.traffic.actors[3].retain == WATERFRONT_TRAFFIC_VESSELS + 3);
+    CHECK(waterfront_route_has_bridge(&voyage.scene.traffic));
     CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
     WaterfrontVesselMotion start = waterfront_traffic_motion_routes(
         &voyage.scene.traffic, 0, passing->phase);

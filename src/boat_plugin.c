@@ -651,6 +651,9 @@ static BoatPluginStatus check_scene_traffic(
                         "crosses scene.marina.modules[%u]", m + 1);
             }
             for (unsigned j = i + 1; j < scene->traffic.actor_count; ++j) {
+                // Two retained compiled actors keep their existing relative schedules.
+                if (scene->traffic.actors[j].retain != 0xff)
+                    continue;
                 BoatModelSpec os = waterfront_traffic_spec_routes(&scene->traffic, (int)j);
                 WaterfrontVesselMotion om
                     = waterfront_traffic_motion_routes(&scene->traffic, (int)j, time);

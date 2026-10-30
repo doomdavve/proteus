@@ -93,6 +93,7 @@ def capabilities():
                       "route_stops": {"alvsnabben": ["stenpiren", "lindholmspiren",
                                                      "eriksberg"],
                                       "frihamnen": ["stenpiren", "frihamnen"]},
+                      "bridge_routes": ["schooner"],
                       "traffic_wakes": "visual only"},
             "limits": {"manifest_bytes": MANIFEST_MAX, "source_bytes": SOURCE_MAX,
                        "lua_bytes": 2097152, "entry_instructions": 1000000,
