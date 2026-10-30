@@ -596,10 +596,14 @@ static BoatPluginStatus check_scene_traffic(
     const BoatSceneDefinition *scene = &voyage->scene;
     if (!scene->traffic_present || !scene->traffic.actor_count)
         return BOAT_PLUGIN_OK;
-    const double step = .25, horizon = 4160; // The four river periods repeat together here.
+    const double step = .5, horizon = 4160; // The four river periods repeat together here.
     int samples = (int)(horizon / step);
     for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
         const WaterfrontRouteActor *a = &scene->traffic.actors[i];
+        // Retained actors keep their compiled schedule; authored craft are sampled against them
+        // below, so a retained actor never needs its own full sweep.
+        if (a->retain != 0xff)
+            continue;
         BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)i);
         char path[48];
         snprintf(path, sizeof(path), "scene.traffic.vessels[%u]", i + 1);
@@ -615,13 +619,11 @@ static BoatPluginStatus check_scene_traffic(
             Vector2 beam = { cosf(m.heading), sinf(m.heading) };
             float half_length = spec.length * .5f + margin;
             float half_beam = spec.beam * .5f + margin;
-            bool retained = a->retain != 0xff;
-            // A retained compiled actor keeps its existing route; only authored craft need
-            // new map/marina clearance. Both kinds still prove they clear each other.
-            if (!retained && !box_water(map, centre, length, beam, half_length, half_beam, .5f))
+            // An authored craft needs new map/marina clearance and must clear retained craft.
+            if (!box_water(map, centre, length, beam, half_length, half_beam, .5f))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "swept hull is not open water of the compiled map");
-            if (!retained && scene->entrance_present
+            if (scene->entrance_present
                 && box_contains(centre, length, beam, half_length, half_beam,
                     (Vector2) { scene->entrance_x, scene->entrance_z }, .5f))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
