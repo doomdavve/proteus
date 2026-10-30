@@ -1454,8 +1454,9 @@ static void draw_harbor(
     draw_colored_mesh(scene->harbor_pontoon, material, harbor->pontoon, WHITE, false);
     draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
     draw_colored_mesh(scene->cube, material, harbor->gangway, (Color) { 154, 123, 84, 255 }, false);
-    for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i)
-        draw_colored_mesh(scene->harbor_boats[i], material, harbor->boats[i], WHITE, false);
+    for (int i = 0; i < harbor->berth_count; ++i)
+        draw_colored_mesh(
+            scene->harbor_boats[harbor->recipes[i]], material, harbor->boats[i], WHITE, false);
     for (int i = 0; i < harbor->line_count; ++i)
         draw_colored_mesh(
             scene->cube, material, harbor->lines[i], (Color) { 169, 153, 113, 255 }, false);

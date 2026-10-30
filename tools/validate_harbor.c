@@ -204,6 +204,103 @@ int main(void)
             }
         }
     }
+
+    // L2.1: one caller-owned berth list drives poses, meshes, ropes, contacts and camera queries.
+    // The compiled list remains the NULL-scene parity oracle.
+    WaterfrontHarborFrame compiled_again;
+    waterfront_harbor_evaluate_scene(NULL, (BoatWater) { 0 }, 0, NULL, &compiled_again);
+    CHECK(!memcmp(&flat, &compiled_again, sizeof(flat)));
+    BoatSceneDefinition zero = { .version = 1, .berths_present = true };
+    WaterfrontHarborFrame empty;
+    waterfront_harbor_evaluate_scene(&zero, (BoatWater) { 0 }, 0, NULL, &empty);
+    CHECK(empty.berth_count == 0 && empty.line_count == 6 + WATERFRONT_FERRY_LINES * 2);
+
+    BoatSceneDefinition two = { .version = 1, .berths_present = true, .berth_count = 2 };
+    two.berths[0] = (BoatSceneBerth) { .id = "skiff",
+        .recipe = BOAT_SCENE_BERTH_SKIFF,
+        .mooring = BOAT_SCENE_MOORING_PONTOON,
+        .x = 13,
+        .z = 167,
+        .heading = -PI / 2 };
+    two.berths[1] = (BoatSceneBerth) { .id = "runabout",
+        .recipe = BOAT_SCENE_BERTH_RUNABOUT,
+        .mooring = BOAT_SCENE_MOORING_PONTOON,
+        .x = 13,
+        .z = 173,
+        .heading = -PI / 2 };
+    WaterfrontHarborFrame authored, independent;
+    waterfront_harbor_evaluate_scene(&two, (BoatWater) { 0 }, 0, NULL, &authored);
+    waterfront_harbor_evaluate_scene(&two, (BoatWater) { 0 }, 0, NULL, &independent);
+    CHECK(!memcmp(&authored, &independent, sizeof(authored)));
+    CHECK(authored.berth_count == 2 && authored.recipes[0] == BOAT_SCENE_BERTH_SKIFF
+        && authored.recipes[1] == BOAT_SCENE_BERTH_RUNABOUT);
+    CHECK(authored.line_count == 2 * 4 + 6 + WATERFRONT_FERRY_LINES * 2);
+    WaterfrontBerth first = waterfront_harbor_berth_at(&two, 0);
+    CHECK(!strcmp(first.id, "skiff") && first.position.x == -13 && first.position.z == 167);
+    CHECK(waterfront_harbor_berth_count(&two) == 2);
+    CHECK(waterfront_harbor_berth_count(NULL) == WATERFRONT_HARBOR_BOATS);
+    CHECK(waterfront_harbor_recipe_mesh(BOAT_SCENE_BERTH_RECIPES) == NULL);
+    CHECK(waterfront_harbor_contact_height_scene(
+        &two, (Vector2) { 13, 167 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+    CHECK(!waterfront_harbor_contact_height_scene(
+        &two, (Vector2) { 13, 179 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+    CHECK(!waterfront_harbor_camera_clear_scene(&two, (Vector3) { -13, .5f, 167 }, 0));
+    CHECK(waterfront_harbor_camera_clear_scene(&two, (Vector3) { -13, .5f, 179 }, 0));
+
+    // Reordering IDs changes no pose, rope, contact or camera result.
+    BoatSceneDefinition reordered = two;
+    strcpy(reordered.berths[0].id, "second");
+    strcpy(reordered.berths[1].id, "first");
+    WaterfrontHarborFrame same;
+    waterfront_harbor_evaluate_scene(&reordered, (BoatWater) { 0 }, 0, NULL, &same);
+    CHECK(!memcmp(&authored, &same, sizeof(authored)));
+
+    // Moving or removing a berth moves/removes its hull, ropes, contact and camera exclusion;
+    // the compiled hull at the old place is not drawn or contacted invisibly.
+    BoatSceneDefinition moved = two;
+    moved.berths[1].z = 179;
+    WaterfrontHarborFrame after;
+    waterfront_harbor_evaluate_scene(&moved, (BoatWater) { 0 }, 0, NULL, &after);
+    CHECK(after.berth_count == 2 && after.boats[1].position.z == 179);
+    CHECK(!waterfront_harbor_contact_height_scene(
+        &moved, (Vector2) { 13, 173 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+    CHECK(waterfront_harbor_contact_height_scene(
+        &moved, (Vector2) { 13, 179 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+    CHECK(waterfront_harbor_camera_clear_scene(&moved, (Vector3) { -13, .5f, 173 }, 0));
+    CHECK(!waterfront_harbor_camera_clear_scene(&moved, (Vector3) { -13, .5f, 179 }, 0));
+    BoatSceneDefinition removed = two;
+    removed.berth_count = 1;
+    WaterfrontHarborFrame one;
+    waterfront_harbor_evaluate_scene(&removed, (BoatWater) { 0 }, 0, NULL, &one);
+    CHECK(one.berth_count == 1 && one.line_count == 4 + 6 + WATERFRONT_FERRY_LINES * 2);
+    CHECK(!waterfront_harbor_contact_height_scene(
+        &removed, (Vector2) { 13, 173 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+    CHECK(waterfront_harbor_camera_clear_scene(&removed, (Vector3) { -13, .5f, 173 }, 0));
+    CHECK(waterfront_harbor_contact((Vector2) { 13, 179 }, .35f, NULL));
+    CHECK(!waterfront_harbor_contact_height_scene(
+        &two, (Vector2) { 13, 179 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
+
+    BoatSceneDefinition seven
+        = { .version = 1, .berths_present = true, .berth_count = WATERFRONT_HARBOR_BOATS };
+    for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
+        const WaterfrontBerth *source = &berths[i];
+        seven.berths[i] = (BoatSceneBerth) { .recipe = source->recipe,
+            .mooring = source->mooring,
+            .x = -source->position.x,
+            .z = source->position.z,
+            .heading = source->heading };
+        memcpy(seven.berths[i].id, source->id, sizeof(seven.berths[i].id));
+    }
+    WaterfrontHarborFrame full;
+    waterfront_harbor_evaluate_scene(&seven, (BoatWater) { 0 }, 0, NULL, &full);
+    // Six authored pontoon-moored hulls plus the quay-moored workboat, which has no authored
+    // quay attachment yet (L2.1 deliberately adds no new attachments).
+    CHECK(full.berth_count == WATERFRONT_HARBOR_BOATS && full.line_count == 6 * 4 + 6 + 8);
+    for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
+        CHECK(close_vector(full.boats[i].position, flat.boats[i].position));
+        CHECK(full.recipes[i] == berths[i].recipe);
+    }
+
     // Real simulation contacts: approach the workboat and pontoon, then back away.
     // The third run heads at the ferry's river side from 30 m out.
     Vector2 off = { -(ferry->position.x + across.x * 30), ferry->position.z + across.y * 30 };

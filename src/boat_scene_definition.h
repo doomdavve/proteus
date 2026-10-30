@@ -42,6 +42,7 @@ typedef enum {
 typedef enum {
     BOAT_SCENE_MOORING_NONE,
     BOAT_SCENE_MOORING_PONTOON,
+    BOAT_SCENE_MOORING_QUAY, // Compiled workboat only; not accepted from Lua.
 } BoatSceneMooring;
 
 typedef struct {
@@ -95,6 +96,7 @@ const char *boat_scene_mooring_name(BoatSceneMooring mooring);
 bool boat_scene_mooring_from_name(const char *name, BoatSceneMooring *mooring);
 // Registered native hull recipe. No authored dimensions or vertices.
 BoatModelSpec boat_scene_berth_spec(BoatSceneBerthRecipe recipe);
+BoatModelKind boat_scene_berth_kind(BoatSceneBerthRecipe recipe);
 
 const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, const char *id);
 const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, const char *id);

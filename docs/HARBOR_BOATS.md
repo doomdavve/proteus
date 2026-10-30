@@ -77,6 +77,15 @@ drift, or additional wave source. Travelling vessels are evaluated separately. F
 water retains the existing displacement-to-flat transition; close berth views use the
 fully displaced patch. Reflections remain planar.
 
+L2.1 (2026-10-30) added caller-owned berth inputs without changing the compiled default.
+`WaterfrontBerth` now carries a stable ID, a registered recipe, and a mooring rule;
+`waterfront_harbor_evaluate_scene`, `..._contact_height_scene` and `..._camera_clear_scene`
+select either the compiled seven or an authored list. Mesh generation is per recipe, so a
+moved/removed authored berth cannot leave its compiled hull visible, contacted or
+camera-blocking. The existing NULL-scene wrappers and frame fields are unchanged for current
+callers. Authored rope anchors still use the compiled pontoon's cleat region until L2.3 adds
+registered dock modules; authored quay mooring is not exposed.
+
 Player contacts reuse the shoreline's forgiving contact response with stationary, padded
 oriented envelopes for moored hulls, main pontoon, fingers, and gangway. Envelopes include
 fenders/outboards and allowance for gentle wave attitude; they do not simulate two moving
