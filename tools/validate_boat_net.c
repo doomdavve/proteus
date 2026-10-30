@@ -975,7 +975,7 @@ static int combat_compact(void)
     BoatCombat empty = { .enabled = true, .firing = true, .rules = combat.rules };
     size = boat_combat_compact_encode(&empty, bytes, sizeof(bytes), tick);
     CHECK(size > 0 && size <= BOAT_NET_PAGE_BYTES); // No projectiles: one page.
-    printf("combat_compact: full pool %zu bytes (<=%d), empty %zu bytes\n", full_size,
+    printf("combat_compact: busy pool %zu bytes (<=%d), empty %zu bytes\n", full_size,
         BOAT_COMBAT_COMPACT_BYTES, size);
     return 0;
 }

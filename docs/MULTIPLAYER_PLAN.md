@@ -3,8 +3,8 @@
 Current deathmatch extension (2026-10-30): [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
 uses protocol v8. Enabled fleet checkpoints remain bounded at 16 KiB (9068 encoded bytes);
 the per-tick combat state is a compact 1–3 page payload that omits rules, zero inactive slots
-and wide fields (full pool 2365 bytes, empty 558). The deterministic four-client room measured
-44.4 KiB/s/client downstream, down from about 140 KiB/s for the fixed four-page design;
+and wide fields (measured busy pool 2365 bytes, 2398 maximum; empty 558). The deterministic
+four-client room measured 44.4 KiB/s/client downstream, down from about 140 KiB/s for the fixed four-page design;
 broader bandwidth and qualification work remains open. Disabled free/race rooms do not send
 combat pages. The dated M3/M4/M5 budgets and evidence below describe their original revisions.
 
@@ -1932,7 +1932,7 @@ are zero. The client assembles the pages, decodes into the same `BoatCombat`, ap
 snapshot and combat state atomically, and retains the eight bounded in-flight sets. Free and
 race rooms send no combat pages.
 
-Measured sizes are 2365 bytes for the full pool (three pages), 558 bytes for an empty state (one
+Measured sizes are 2365 bytes for a busy pool (2398 maximum, three pages), 558 bytes for an empty state (one
 page), and one or two pages in typical play. The deterministic four-client `combat_room` test now
 reports **44.4 KiB/s/client** downstream at 12% loss, down from about 140 KiB/s. The 2000-tick
 `combat_compact` round-trip drives the real fleet/combat path and requires byte-for-byte equality

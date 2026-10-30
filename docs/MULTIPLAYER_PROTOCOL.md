@@ -326,8 +326,9 @@ exhaustion does not consume the weapon's cooldown.
 The authority canonicalises inactive projectiles: a recent hit echo (less than 45 ticks old) is
 kept for presentation, older inactive slots are zero and omitted. Active projectiles always have
 an end code of zero. The compact payload takes the immutable rules from the installed reliable
-checkpoint; rules are never repeated per tick. The full pool occupies 2365 bytes (three pages),
-an empty state 558 bytes (one page), and typical play one or two pages.
+checkpoint; rules are never repeated per tick. A measured busy pool is 2365 bytes (2398 maximum)
+and takes three pages;
+an empty state is 558 bytes (one page). Typical play takes one or two pages.
 
 Deathmatch clients retain eight bounded in-flight sets indexed by snapshot sequence. A fleet
 snapshot and all matching pages must arrive before correction. Older complete sets may apply

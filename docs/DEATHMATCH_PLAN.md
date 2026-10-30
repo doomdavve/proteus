@@ -574,7 +574,7 @@ younger than 45 ticks remains for presentation, older slots are zero. The client
 the fleet snapshot and combat state atomically and keeps eight bounded in-flight sets; snapshot
 liveness/resync recovers a stalled world.
 
-The compact codec reports 2365 bytes for the full pool (three pages), 558 bytes for an empty
+The compact codec reports 2365 bytes for a busy pool (2398 maximum, three pages), 558 bytes for an empty
 state (one page), and one or two pages in typical play. The deterministic four-client
 `combat_room` measured **44.4 KiB/s/client** downstream at 12% loss, down from about 140 KiB/s.
 The `combat_compact` test drives 2000 real fleet/combat ticks and requires the compact decode to
