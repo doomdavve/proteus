@@ -16,6 +16,10 @@ typedef struct {
     const char *name, *token, *build;
     uint32_t first_sequence; // First outgoing sequence on every channel (wrap tests).
     bool predict; // Run a speculative fleet ahead of the mirror with the own commands.
+    // Install the world and enter PLAYING, but hold READY until boat_net_client_ready().
+    // A windowed client uses this so the authority does not queue reliable spawn/roster
+    // traffic while the client is still opening its window and audio device.
+    bool defer_ready;
     // BOAT_LOCATION_COUNT owners indexed by location ID, borrowed for the client's lifetime.
     // The room picks the location; an unready entry fails its bootstrap.
     const BoatWorldResources *resources;
@@ -87,6 +91,10 @@ typedef struct {
     uint32_t first_sequence;
     const BoatWorldResources *resources; // Borrowed per-location owners (see the config).
     bool predict, predict_dirty;
+    bool defer_ready; // Config: hold the first READY until the caller is ready to service frames.
+    bool ready_pending; // The installed world waits for boat_net_client_ready().
+    bool ready_sent; // READY has been sent for this session.
+    uint32_t ready_checkpoint; // Checkpoint named by the pending READY.
     BoatNetClientPhase phase;
     double started_at;
     double serviced_at, pong_after; // Exclude RTT samples spanning a local loading stall.
@@ -155,6 +163,9 @@ typedef struct {
 
 void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
     const BoatNetClientConfig *config, double now);
+// Send the READY held by config.defer_ready. True when the session is ready; false before a
+// world is installed (or if it is still joining). Safe to call more than once.
+bool boat_net_client_ready(BoatNetClient *client);
 // Handle waiting messages and, while playing, generate one command per local 120 Hz tick from
 // INPUT (INACTIVE asks the authority to neutralize the controls). False once rejected or closed.
 bool boat_net_client_service(BoatNetClient *client, double now, BoatInput input, bool inactive);

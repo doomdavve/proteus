@@ -71,6 +71,7 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
         .token = token,
         .build = "wake_velocity M4",
         .predict = true,
+        .defer_ready = true, // The window, GPU and audio device open after this returns.
         .resources = worlds };
     boat_net_client_init(&net->client, transport, &config, boat_net_clock());
     fprintf(stdout, "Connecting to %s...\n", endpoint);
@@ -119,6 +120,15 @@ bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, co
     boat_presentation_reset(&session->presentation);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         boat_presentation_reset(&net->presentations[i]);
+    return true;
+}
+
+bool net_study_ready(NetStudy *net)
+{
+    if (!boat_net_client_ready(&net->client)) {
+        fail(net, "Cannot finish joining after initialization.");
+        return false;
+    }
     return true;
 }
 

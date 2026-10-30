@@ -645,7 +645,8 @@ static void room_close(Room *room)
 #endif
 }
 
-static unsigned room_join(Room *room, const char *name, const char *token, uint32_t sequence)
+static unsigned room_join_ex(
+    Room *room, const char *name, const char *token, uint32_t sequence, bool defer_ready)
 {
     if (room->count == ROOM_CLIENTS) {
         fprintf(stderr, "room_join: more than %d clients\n", ROOM_CLIENTS);
@@ -653,11 +654,21 @@ static unsigned room_join(Room *room, const char *name, const char *token, uint3
     }
     unsigned i = room->count++;
     BoatNetTransport transport = room_transport(room, &room->link[i]);
-    BoatNetClientConfig config
-        = { name, token ? token : "room", "validate", sequence, room->predict, test_worlds };
+    BoatNetClientConfig config = { .name = name,
+        .token = token ? token : "room",
+        .build = "validate",
+        .first_sequence = sequence,
+        .predict = room->predict,
+        .defer_ready = defer_ready,
+        .resources = test_worlds };
     boat_net_client_init(&room->clients[i], transport, &config, room->now);
     room->live[i] = true;
     return i;
+}
+
+static unsigned room_join(Room *room, const char *name, const char *token, uint32_t sequence)
+{
+    return room_join_ex(room, name, token, sequence, false);
 }
 
 // What a predicting client would draw for the first other boat: the interpolated pose,
@@ -799,6 +810,34 @@ static unsigned active_boats(const BoatNetServer *server)
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         n += server->fleet.state.slots[i].active;
     return n;
+}
+
+static int deferred_ready(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 1, (BoatNetServerConfig) { 0 }));
+    unsigned a = room_join_ex(&room, "late", NULL, 0, true);
+    room_run(&room, .5);
+    BoatNetClient *c = &room.clients[a];
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING);
+    CHECK(c->ready_pending && !c->ready_sent);
+    CHECK(room.server.slot_peer[c->slot] >= 0);
+    CHECK(room.server.peers[room.server.slot_peer[c->slot]].phase == BOAT_NET_PEER_BOOTSTRAP);
+    CHECK(!room.server.fleet.state.slots[c->slot].active);
+    CHECK(!boat_net_client_own(c));
+    uint64_t tick = c->fleet.state.tick;
+    room_run(&room, .5);
+    CHECK(c->fleet.state.tick > tick); // Snapshots still flow before READY.
+    CHECK(boat_net_client_ready(c));
+    CHECK(!c->ready_pending && c->ready_sent);
+    CHECK(boat_net_client_ready(c)); // Idempotent.
+    room_run(&room, 1);
+    CHECK(room.server.peers[room.server.slot_peer[c->slot]].phase == BOAT_NET_PEER_READY);
+    CHECK(room.server.fleet.state.slots[c->slot].active);
+    CHECK(boat_net_client_own(c) != NULL);
+    printf("deferred_ready: snapshots flowed before READY, then the room spawned the boat\n");
+    room_close(&room);
+    return 0;
 }
 
 static int lossless(void)
@@ -2417,6 +2456,7 @@ static int enet_lifecycle(void)
 static const TestCase cases[] = {
     TEST_CASE(enet_loopback),
     TEST_CASE(enet_lan),
+    TEST_CASE(deferred_ready),
     SLOW_CASE(enet_lifecycle),
     TEST_CASE(rejections),
     SLOW_CASE(deathmatch),
@@ -2430,6 +2470,7 @@ static const TestCase cases[] = {
     TEST_CASE(golden),
     TEST_CASE(codec),
     SLOW_CASE(checkpoints),
+    TEST_CASE(deferred_ready),
     TEST_CASE(lossless),
     TEST_CASE(deathmatch),
     SLOW_CASE(combat_room),
