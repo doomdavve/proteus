@@ -1,11 +1,12 @@
 # Multiplayer: shared boating implementation plan
 
-Current deathmatch extension (2026-10-27): [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
-uses protocol v7. Enabled fleet checkpoints remain bounded at 16 KiB (9068 encoded bytes);
-combat adds eight bounded page assemblies to the client. Complete combat pages at 30 Hz add
-about 114 KiB/s/client, exceeding the original 48 KiB/s target; bandwidth optimization and
-qualification remain open. Disabled free/race rooms do not send combat pages. The dated
-M3/M4/M5 budgets and evidence below describe their original revisions.
+Current deathmatch extension (2026-10-30): [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
+uses protocol v8. Enabled fleet checkpoints remain bounded at 16 KiB (9068 encoded bytes);
+the per-tick combat state is a compact 1–3 page payload that omits rules, zero inactive slots
+and wide fields (full pool 2365 bytes, empty 558). The deterministic four-client room measured
+44.4 KiB/s/client downstream, down from about 140 KiB/s for the fixed four-page design;
+broader bandwidth and qualification work remains open. Disabled free/race rooms do not send
+combat pages. The dated M3/M4/M5 budgets and evidence below describe their original revisions.
 
 
 Prepared 2026-10-23 against `2994e0d`. **M3, the protocol, ENet transport and separate
@@ -1919,6 +1920,31 @@ runs all stayed connected; they received 262–294 snapshots over ten seconds, w
 stall-driven resync in one run. The remaining held prediction ticks show that unreliable combat
 page loss can still stall authoritative state; compact combat delivery is the next change.
 Human gameplay and deployment are not claimed.
+
+## Compact combat delivery — 2026-10-30
+
+Protocol v8 replaces the fixed four-page combat snapshot with a compact payload carried in
+one to three pages. The reliable checkpoint still carries the complete 3716-byte combat state
+and rules; the per-tick payload takes those rules from the checkpoint, omits zero inactive
+slots and packs the active/recent-echo projectiles and waves. The authority canonicalises
+inactive projectiles: a recent hit echo (under 45 ticks) stays for presentation, older slots
+are zero. The client assembles the pages, decodes into the same `BoatCombat`, applies the fleet
+snapshot and combat state atomically, and retains the eight bounded in-flight sets. Free and
+race rooms send no combat pages.
+
+Measured sizes are 2365 bytes for the full pool (three pages), 558 bytes for an empty state (one
+page), and one or two pages in typical play. The deterministic four-client `combat_room` test now
+reports **44.4 KiB/s/client** downstream at 12% loss, down from about 140 KiB/s. The 2000-tick
+`combat_compact` round-trip drives the real fleet/combat path and requires byte-for-byte equality
+with the canonical checkpoint encoding, including inactive hit echoes and wave expiry.
+
+Verified on 2026-10-30 with the Debug build and the full CTest preset: **316/316 enabled tests
+passed** (13 retired wake-field cases disabled). A local protocol-v8 river deathmatch with one
+game client and one predicting bot produced 313 snapshots with zero decode errors, zero stale
+and zero resyncs, and a 44 KiB/s client. The macOS/latest hosted room remains v0.0.21 / protocol
+v7; no deployment or human gameplay is claimed. The browser build and a packed native release
+have not been rerun for v8. Worst-case combat still occupies three pages plus the fleet snapshot,
+so snapshot liveness/resync remains the recovery path under severe loss.
 
 ## Exact first implementation task
 

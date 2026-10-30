@@ -8,6 +8,10 @@ provides the water cannon (hold Space), stern wave grenade (E), torpedo (Q) and 
 rearview mirror (V). A round starts when two players join. There is no room token and
 no player account requirement.
 
+Source status, 2026-10-30: the repository is protocol v8 with compact combat pages. Winterfell
+still runs the matching v0.0.21 native/browser pair at protocol v7; v8 requires a new release and
+the routine cutover below. Do not join the hosted room with a v8 development client.
+
 ## Join
 
 - Native: use v0.0.21, choose MULTIPLAYER and select WINTERFELL, or enter

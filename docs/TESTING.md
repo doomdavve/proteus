@@ -535,7 +535,7 @@ and `boat_server --mode deathmatch|race --round-seconds S` remain available for 
 `boat_net` also runs four predicted clients in the mapped river: shoreline-safe spawns,
 a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
 a snapshot outside the former basin coordinate envelope, a local loading pause, reset and exact
-mirrors at a birth-batch snapshot. The protocol-v7 codec rejects invalid map IDs and reserved
+mirrors at a birth-batch snapshot. The protocol-v8 codec rejects invalid map IDs and reserved
 bytes and checks the RaceState/RaceEvent rules; a race room on the in-memory transport checks
 predicted holds released at GO, ferry-exact mirrors, a mid-race joiner and results, and a
 prediction replay through GO matches the authority; discovery uses the complete compiled-map bundle digest.
@@ -678,7 +678,7 @@ run also completed before the suite policy changed, so its all-98 result remains
 historical evidence. New manual motion/audio review was unnecessary for these test-only
 changes; the preceding default switch has its own capture/desktop evidence.
 
-## Deathmatch weapons (protocol v7)
+## Deathmatch weapons (protocol v8)
 
 `boat_combat` verifies cannon ascent/apex/descent, water landing, three-dimensional descending
 hits/overhead misses and trajectory replay, the shared muzzle attachment on a pitched/rolled
@@ -687,9 +687,10 @@ actual damage/overkill, rearward grenades with a 4 m peak/70 m range/seven-secon
 and four-player ring reuse at recharge, deterministic cadence, overheating/release cooling, grace,
 numbered throws and replay, pool limits, fuses, relative moving-hull sweeps, water blocking,
 life fences, one lethal defeat, respawn, radial derivatives and physical self-waves. It also
-round-trips combat checkpoints and checks malformed pages and the 1100-byte ceiling.
-`boat_net` adds four predicted deathmatch clients, late joins, loss/duplication/reordering,
-a one-second outage, complete page-set recovery and departure generations. Free/race continue
+round-trips combat checkpoints, checks the compact combat payload over 2000 real fleet ticks,
+malformed pages and the 1100-byte ceiling. `boat_net` adds four predicted deathmatch clients,
+late joins, loss/duplication/reordering, a one-second outage, complete page-set recovery,
+snapshot liveness/resync and departure generations. Free/race continue
 through the existing trace/replay cases. `boat_race_trial --gpu-check` now compares both
 production radial shader recipes against CPU height/gradient/vertical velocity.
 

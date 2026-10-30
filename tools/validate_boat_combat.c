@@ -518,15 +518,22 @@ static void codec(void)
     assert(size);
     assert(boat_net_checkpoint_decode(data, size, &state, decoded, NULL) == BOAT_NET_OK);
     assert(boat_fleet_hash(&state) == boat_fleet_hash(&f.state));
-    uint8_t combat[BOAT_COMBAT_BYTES];
-    boat_combat_encode(&f.state.combat, combat);
-    for (unsigned i = 0; i < 4; ++i) {
+    uint8_t combat[BOAT_COMBAT_COMPACT_BYTES];
+    size_t combat_size
+        = boat_combat_compact_encode(&f.state.combat, combat, sizeof(combat), f.state.tick);
+    assert(combat_size && combat_size <= sizeof(combat));
+    unsigned pages = (unsigned)((combat_size + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+    assert(pages >= 1 && pages <= 3);
+    for (unsigned i = 0; i < pages; ++i) {
+        size_t offset = i * BOAT_NET_PAGE_BYTES;
         BoatNetMessage m = { .header = { .type = BOAT_NET_COMBAT_PAGE, .tick = f.state.tick },
             .world_page = { .checkpoint = (uint32_t)f.state.tick,
                 .index = (uint16_t)i,
-                .count = 4,
-                .size = (uint16_t)(i == 3 ? BOAT_COMBAT_BYTES - 3072 : 1024) } };
-        memcpy(m.world_page.data, combat + 1024 * i, m.world_page.size);
+                .count = (uint16_t)pages,
+                .size
+                = (uint16_t)(combat_size - offset < BOAT_NET_PAGE_BYTES ? combat_size - offset
+                                                                        : BOAT_NET_PAGE_BYTES) } };
+        memcpy(m.world_page.data, combat + offset, m.world_page.size);
         uint8_t wire[BOAT_NET_MAX_MESSAGE];
         size_t bytes = boat_net_encode(&m, wire);
         assert(bytes && bytes <= 1100);
@@ -536,9 +543,11 @@ static void codec(void)
         wire[39] = 5;
         assert(boat_net_decode(wire, bytes, &back) != BOAT_NET_OK);
     }
-    combat[0] = 255;
-    assert(!boat_combat_decode(&state.combat, combat, f.state.tick));
-    puts("combat: full checkpoint, hash, bounded pages and malformed-state rejection");
+    uint8_t full[BOAT_COMBAT_BYTES];
+    boat_combat_encode(&f.state.combat, full);
+    full[0] = 255;
+    assert(!boat_combat_decode(&state.combat, full, f.state.tick));
+    puts("combat: full checkpoint, hash, compact bounded pages and malformed-state rejection");
 }
 static int compare_cost(const void *a, const void *b)
 {

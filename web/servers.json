@@ -6,7 +6,7 @@
       "description": "River capsize deathmatch",
       "websocket": "wss://wake.davve.net/room",
       "native": "wake.davve.net:24680",
-      "protocol": 6,
+      "protocol": 7,
       "physics": 9
     }
   ]
