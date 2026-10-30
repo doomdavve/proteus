@@ -15,27 +15,42 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void usage_line(FILE *out, const char *option, const char *description)
+{
+    fprintf(out, "  %-29s %s\n", option, description);
+}
+
 static void usage(FILE *out)
 {
     fprintf(out,
-        "usage: boat_bot --connect HOST:PORT [--name TEXT] [--token TEXT]\n"
-        "                [--seconds S | --snapshots N] [--hunt] [--predict] [--reset-every S]\n"
-        "                [--inactive-every S] [--expect-reject]\n"
-        "       boat_bot --discover [--lan-port N] [--seconds S] [--first]\n"
-        "Join a boat_server room, drive one boat by script for S seconds (default 5), or until\n"
-        "it has received N snapshots after joining, then leave and print a summary.\n"
-        "--hunt drives at the nearest other boat to ram it or cross\n"
-        "it with its wake (for deathmatch rooms). In race rooms the bot races the course.\n"
-        "--expect-reject succeeds only when the room\n"
-        "refuses it. --predict exercises client prediction. --reset-every requests a reset every "
-        "S\n"
-        "seconds; --inactive-every sends inactive controls for one second every S seconds\n"
-        "(S: integer 2-86400). These options exercise session lifecycle in headless tests.\n"
-        "--discover: search the local network (and this machine) for rooms for S seconds\n"
-        "(default 2) on UDP --lan-port (default %d) and print one line per room; exit 1 if\n"
-        "none answered. --first stops at the first answer (S is then only a deadline).\n"
-        "Exit status: 0 success, 1 connection failure, 2 usage, 3 rejected.\n",
-        BOAT_NET_DISCOVERY_PORT);
+        "Usage: boat_bot --connect HOST:PORT [OPTIONS]\n"
+        "       boat_bot --discover [OPTIONS]\n"
+        "\n"
+        "Joins a boat_server room and drives one boat by script, then leaves and prints a\n"
+        "summary. In deathmatch rooms it rams and crosses wakes; in race rooms it races the\n"
+        "course. Headless; for process smoke tests.\n");
+
+    fprintf(out, "\nJOIN\n");
+    usage_line(out, "--connect HOST:PORT", "Room endpoint (required)");
+    usage_line(out, "--name TEXT", "Player name (default bot; at most 16 bytes)");
+    usage_line(out, "--token TEXT", "Room token (default empty; at most 32 bytes)");
+    usage_line(out, "--seconds S", "Drive for S seconds (default 5)");
+    usage_line(out, "--snapshots N", "Leave after N snapshots instead of a duration");
+    usage_line(out, "--hunt", "Drive at the nearest other boat to ram or cross its wake");
+    usage_line(out, "--predict", "Exercise client prediction");
+    usage_line(out, "--reset-every S", "Request a reset every S seconds (2-86400)");
+    usage_line(out, "--inactive-every S", "Send inactive controls for 1 s every S seconds");
+    usage_line(out, "--expect-reject", "Succeed only when the room refuses the connection");
+
+    fprintf(out, "\nDISCOVER\n");
+    usage_line(out, "--discover", "Search for LAN rooms instead of joining one");
+    usage_line(out, "--lan-port N", "Discovery port (default 24681)");
+    usage_line(out, "--seconds S", "Search for S seconds (default 2)");
+    usage_line(out, "--first", "Stop at the first answer");
+
+    fprintf(out,
+        "\n--snapshots replaces --seconds; --first requires --discover.\n"
+        "Exit status: 0 success, 1 connection failure, 2 usage, 3 rejected.\n");
 }
 
 static int discover(uint16_t lan_port, unsigned long seconds, bool first)
