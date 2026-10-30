@@ -13,8 +13,8 @@ For a source build, run `./build/wake_velocity` from the repository root so asse
 The title offers SINGLE PLAYER, MULTIPLAYER, SETTINGS and CREDITS. SETTINGS remembers your
 name, boat livery, steering mode and soundtrack. Choose A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The
-explorer boat has a stronger engine during solo free boating; timed courses use the
-standard engine and multiplayer assigns Nordic liveries by player slot.
+cabin boat reaches about 25 knots on calm water, and the explorer has a stronger engine during
+solo free boating; timed courses use the standard engine and multiplayer assigns Nordic liveries by player slot.
 
 ## Controls
 

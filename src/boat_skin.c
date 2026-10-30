@@ -1,10 +1,11 @@
 #include "boat_skin.h"
+#include "boat_cabin.h"
 #include "boat_flag.h"
 #include "raymath.h"
 
 #include <string.h>
 
-static const char *names[] = { "sweden", "finland", "denmark", "norway", "explorer" };
+static const char *names[] = { "sweden", "finland", "denmark", "norway", "explorer", "cabin" };
 #define WHITE_HULL { 239, 243, 245, 255 } // A macro: MSVC rejects const objects in initializers.
 static const BoatSkinPalette palettes[] = {
     // Hull, deck, stripe/seat accent, upholstery. One shape for all; the explorer has a
@@ -13,7 +14,8 @@ static const BoatSkinPalette palettes[] = {
     { WHITE_HULL, { 239, 243, 245, 255 }, { 0, 53, 128, 255 }, { 29, 48, 71, 255 } },
     { WHITE_HULL, { 198, 12, 48, 255 }, { 250, 246, 237, 255 }, { 63, 36, 43, 255 } },
     { WHITE_HULL, { 186, 12, 47, 255 }, { 0, 32, 91, 255 }, { 29, 40, 62, 255 } },
-    { { 58, 64, 70, 255 }, { 214, 196, 158, 255 }, { 242, 118, 28, 255 }, { 70, 56, 44, 255 } }
+    { { 58, 64, 70, 255 }, { 214, 196, 158, 255 }, { 242, 118, 28, 255 }, { 70, 56, 44, 255 } },
+    { { 235, 238, 235, 255 }, { 244, 245, 239, 255 }, { 173, 129, 80, 255 }, { 71, 111, 127, 255 } }
 };
 static const Color rubber = { 27, 39, 47, 255 };
 static const Color glass = { 43, 85, 106, 255 };
@@ -228,7 +230,11 @@ const Mesh3D *boat_skin_mesh(unsigned int skin, BoatSkinPart part)
     if (part < BOAT_SKIN_HULL || part > BOAT_SKIN_ENGINE)
         return NULL;
     BoatModel *m = &models[skin][part];
-    if (!m->mesh.triangle_count)
-        boat_skin_generate(m, boat_skin_palette(skin), part);
+    if (!m->mesh.triangle_count) {
+        if (skin == BOAT_SKIN_CABIN && part != BOAT_SKIN_ENGINE)
+            boat_cabin_generate(m, part == BOAT_SKIN_HULL);
+        else
+            boat_skin_generate(m, boat_skin_palette(skin), part);
+    }
     return &m->mesh;
 }

@@ -479,6 +479,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         hint = "TYPE, THEN ENTER / ESC: CANCEL";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_BOAT)
         hint = s->skin == BOAT_SKIN_EXPLORER ? "FASTER ENGINE WHEN FREE RIDING SOLO"
+            : s->skin == BOAT_SKIN_CABIN     ? "25 KNOTS WHEN FREE RIDING SOLO"
                                              : "SINGLE PLAYER; ROOMS COLOUR BOATS BY SLOT";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MOUSE)
         hint = "REMEMBERED; ESC MENU OR M SWITCHES IN GAME";

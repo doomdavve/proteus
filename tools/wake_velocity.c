@@ -100,8 +100,8 @@ static void usage(void)
         "--player-wake: legacy D3 trail | --no-player-wake: visual-only player trail\n"
         "--current / --crossing-wake: opt-in authored tests in all locations; hold Backspace 1 s "
         "to restart passage\n"
-        "--skin sweden|finland|denmark|norway|explorer: speedboat livery (default sweden)\n"
-        "  explorer also fits the 30 m/s explorer engine when free boating\n"
+        "--skin sweden|finland|denmark|norway|explorer|cabin: solo boat (default sweden)\n"
+        "  explorer and cabin use their own engines when free boating\n"
         "--camera-distance UNITS: 8..48 (default 20; river 12)\n"
         "--camera-height UNITS: 4..36 (default 14; river 6)\n"
         "--fixed-fov: keep the 55-degree view instead of widening gently with speed\n"
@@ -700,8 +700,10 @@ static int study(int argc, char **argv)
         study_water(location, waves, current, crossing_wake, player_wake));
     if (course)
         boat_session_start_course(&session);
-    else if (skin == BOAT_SKIN_EXPLORER)
+    else if (!connect_to && skin == BOAT_SKIN_EXPLORER)
         session.handling = &boat_handling_explorer;
+    else if (!connect_to && skin == BOAT_SKIN_CABIN)
+        session.handling = &boat_handling_cabin;
     if (start_set) {
         session.boat.position = (Vector2) { start.x, start.y };
         session.boat.heading = start.z * DEG2RAD;
@@ -1515,8 +1517,8 @@ static int study(int argc, char **argv)
             boat_ui_text("P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
-            boat_ui_text(
-                "MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
+            boat_ui_text("MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10,
+                (Color) { 218, 223, 202, 255 });
 #endif
         if (!networked && !session.runs.playing
             && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {

@@ -298,13 +298,37 @@ int main(void)
     BoatWater flat = boat_world_test_water(outer, false, false, false);
     float stock = top_speed(&world, flat, &boat_handling_speedboat);
     float explorer = top_speed(&world, flat, &boat_handling_explorer);
+    float cabin = top_speed(&world, flat, &boat_handling_cabin);
+    CHECK(cabin > 12.75f && cabin < 12.97f); // 25 knots = 12.861 m/s, calm water.
     CHECK(stock > 21 && stock < 25);
     CHECK(explorer > 29 && explorer < 31);
     Run quick_calm = autopilot(&world, water, coastal, COASTAL, &boat_handling_explorer);
     Run quick_rough = autopilot(&world, water, direct, 3, &boat_handling_explorer);
     CHECK(quick_calm.arrived && quick_calm.capsizes == 0 && quick_calm.seconds < calm.seconds);
     CHECK(quick_rough.arrived && quick_rough.seconds < rough.seconds);
+    BoatSession cabin_session;
+    boat_session_init(&cabin_session, &world, flat);
+    cabin_session.handling = &boat_handling_cabin;
+    boat_session_restart(&cabin_session, flat);
+    CHECK(cabin_session.handling == &boat_handling_cabin);
+    boat_session_start_course(&cabin_session);
+    CHECK(cabin_session.course.enabled);
+    BoatSession course_standard;
+    boat_session_init(&course_standard, &world, flat);
+    boat_session_start_course(&course_standard);
+    cabin_session.presentation_enabled = false;
+    course_standard.presentation_enabled = false;
+    for (int tick = 0; tick < 600; ++tick) {
+        BoatInput input = { .throttle_rate = 1 };
+        boat_session_step(&cabin_session, input);
+        boat_session_step(&course_standard, input);
+    }
+    CHECK(Vector2Distance(cabin_session.boat.velocity, course_standard.boat.velocity) < .00001f);
+    CHECK(Vector2Distance(cabin_session.boat.position, course_standard.boat.position) < .00001f);
+    boat_session_destroy(&course_standard);
+    boat_session_destroy(&cabin_session);
     boat_world_resources_destroy(&world);
+    printf("cabin calm top speed %.2f m/s (%.1f knots)\n", cabin, cabin / .514444f);
     printf("boat_voyage=ok reach direct=%.2f coastal=%.2f; centre swell %.2f m; coastal %.1f s; "
            "direct %.1f s, %.1f s exposed, heave %.2f m, %u capsizes; top speed %.1f m/s, "
            "explorer %.1f m/s: coastal %.1f s, direct %.1f s, heave %.2f m, %u capsizes\n",

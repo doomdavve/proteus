@@ -143,7 +143,7 @@ target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_s
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
   src/boat_ui.c src/boat_ui.h
-  src/boat_hud.c src/boat_hud.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
+  src/boat_hud.c src/boat_hud.h src/boat_cabin.c src/boat_cabin.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
   src/boat_voyage_view.c src/boat_voyage_view.h src/boat_minimap.c src/boat_minimap.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
