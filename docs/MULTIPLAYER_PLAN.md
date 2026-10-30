@@ -1,11 +1,12 @@
 # Multiplayer: shared boating implementation plan
 
-Current deathmatch extension (2026-10-27): [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
-uses protocol v7. Enabled fleet checkpoints remain bounded at 16 KiB (9068 encoded bytes);
-combat adds eight bounded page assemblies to the client. Complete combat pages at 30 Hz add
-about 114 KiB/s/client, exceeding the original 48 KiB/s target; bandwidth optimization and
-qualification remain open. Disabled free/race rooms do not send combat pages. The dated
-M3/M4/M5 budgets and evidence below describe their original revisions.
+Current deathmatch extension (2026-10-30): [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
+uses protocol v8. Enabled fleet checkpoints remain bounded at 16 KiB (9068 encoded bytes);
+the per-tick combat state is a compact 1–3 page payload that omits rules, zero inactive slots
+and wide fields (measured busy pool 2365 bytes, 2398 maximum; empty 558). The deterministic
+four-client room measured 44.4 KiB/s/client downstream, down from about 140 KiB/s for the fixed four-page design;
+broader bandwidth and qualification work remains open. Disabled free/race rooms do not send
+combat pages. The dated M3/M4/M5 budgets and evidence below describe their original revisions.
 
 
 Prepared 2026-10-23 against `2994e0d`. **M3, the protocol, ENet transport and separate
@@ -1875,6 +1876,74 @@ packaging, the web build, Linux/Windows builds and CI.
 machine joining a hosted room through LAN, and CI on Windows and macOS. Show the host's LAN address in game (the title only advertises
 the room through LAN search), and consider a port fallback when 24680 is taken. M5 and the
 deathmatch/race plans continue.
+
+## Client READY after presentation warm-up — 2026-10-30
+
+A native `--connect` join used to install the world and send `READY` before the game opened its
+window, GPU resources and audio device. The authority could then queue reliable roster, spawn
+and match-state traffic while the client was still initialising, delaying those acknowledgements
+and feeding ENet's RTT-driven outgoing packet throttle. This change adds
+`BoatNetClientConfig.defer_ready` and `boat_net_client_ready()`: the windowed client installs
+the world and enters PLAYING, but holds `READY` until its first frame has finished; the room
+keeps sending unreliable snapshots in the meantime. `boat_bot` and other callers keep the
+immediate-READY default.
+
+Verified on 2026-10-30 with the Debug build and the full CTest preset: **312/312 enabled tests
+passed** (13 retired wake-field cases disabled), including the new `boat_net.deferred_ready`
+case, which confirms snapshots flow before `READY` and the room spawns only afterwards. A live
+hosted room still showed 4/10 five-second snapshot blackouts, so this reduces the startup
+reliable burst but does not by itself fix the ENet throttle interaction. The next changes are
+snapshot liveness/resync and compact combat delivery; human gameplay and deployment are not
+claimed.
+
+## Snapshot liveness and resync — 2026-10-30
+
+The client used to treat a missing fleet snapshot as a dead connection even while valid pongs,
+births, roster and match messages were still arriving. It now tracks `heard_at` for any valid
+matching-epoch message and `snapshot_at` for applied authoritative state:
+
+- five seconds without any server message closes the session (`no message from the server`);
+- ten seconds without applied authoritative state closes a session whose messages still arrive;
+- after one second of snapshot silence while the path is alive, the client sends the existing
+  reliable `RESYNC_REQUEST` (reason 2), which makes the authority send a complete checkpoint;
+- the stale HUD indicator remains based on `snapshot_at` (250 ms), not on transport liveness.
+
+`boat_net_client_failure()` distinguishes the no-message and no-state ceilings, and
+`BoatNetClientStats.snapshot_resyncs` records the stall-driven requests. A new
+`boat_net.snapshot_resync` test freezes the authority's tick clock so no snapshots are emitted,
+lets pings and pongs continue, and checks that the client requests a checkpoint and stays
+PLAYING.
+
+Verified on 2026-10-30 with the Debug build and the full CTest preset: **314/314 enabled tests
+passed** (13 retired wake-field cases disabled). Five live hosted `--connect --frames 1200`
+runs all stayed connected; they received 262–294 snapshots over ten seconds, with one
+stall-driven resync in one run. The remaining held prediction ticks show that unreliable combat
+page loss can still stall authoritative state; compact combat delivery is the next change.
+Human gameplay and deployment are not claimed.
+
+## Compact combat delivery — 2026-10-30
+
+Protocol v8 replaces the fixed four-page combat snapshot with a compact payload carried in
+one to three pages. The reliable checkpoint still carries the complete 3716-byte combat state
+and rules; the per-tick payload takes those rules from the checkpoint, omits zero inactive
+slots and packs the active/recent-echo projectiles and waves. The authority canonicalises
+inactive projectiles: a recent hit echo (under 45 ticks) stays for presentation, older slots
+are zero. The client assembles the pages, decodes into the same `BoatCombat`, applies the fleet
+snapshot and combat state atomically, and retains the eight bounded in-flight sets. Free and
+race rooms send no combat pages.
+
+Measured sizes are 2365 bytes for a busy pool (2398 maximum, three pages), 558 bytes for an empty state (one
+page), and one or two pages in typical play. The deterministic four-client `combat_room` test now
+reports **44.4 KiB/s/client** downstream at 12% loss, down from about 140 KiB/s. The 2000-tick
+`combat_compact` round-trip drives the real fleet/combat path and requires byte-for-byte equality
+with the canonical checkpoint encoding, including inactive hit echoes and wave expiry.
+
+Verified on 2026-10-30 with the Debug build and the full CTest preset: **316/316 enabled tests
+passed** (13 retired wake-field cases disabled). A local protocol-v8 river deathmatch with one
+game client and one predicting bot produced 313 snapshots with zero decode errors, zero stale
+and zero resyncs, and a 44 KiB/s client. The hosted room remains v0.0.22 / protocol v7; no deployment or human gameplay is claimed. The browser build and a packed native release
+have not been rerun for v8. Worst-case combat still occupies three pages plus the fleet snapshot,
+so snapshot liveness/resync remains the recovery path under severe loss.
 
 ## Exact first implementation task
 

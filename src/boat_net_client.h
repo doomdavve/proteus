@@ -7,7 +7,8 @@
 
 #define BOAT_NET_PENDING_BIRTHS 64 // Births held until their tick's snapshot or the baseline.
 #define BOAT_NET_STALE 0.25 // Seconds without a snapshot before the view is marked stale.
-#define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of wake digest mismatch before a resync request.
+#define BOAT_NET_RESYNC_AFTER 1.0 // Seconds of stall or digest mismatch before a resync request.
+#define BOAT_NET_SNAPSHOT_SILENCE 10.0 // Hard ceiling without an applied authoritative state.
 #define BOAT_NET_HOLD_INCOMPLETE 0.1 // Seconds a prediction correction waits for missing births.
 #define BOAT_NET_MATCH_FEED 6 // Recent deathmatch or race events kept for the feed.
 #define BOAT_NET_EARLY_BOOTSTRAP (BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES + 2)
@@ -16,6 +17,10 @@ typedef struct {
     const char *name, *token, *build;
     uint32_t first_sequence; // First outgoing sequence on every channel (wrap tests).
     bool predict; // Run a speculative fleet ahead of the mirror with the own commands.
+    // Install the world and enter PLAYING, but hold READY until boat_net_client_ready().
+    // A windowed client uses this so the authority does not queue reliable spawn/roster
+    // traffic while the client is still opening its window and audio device.
+    bool defer_ready;
     // BOAT_LOCATION_COUNT owners indexed by location ID, borrowed for the client's lifetime.
     // The room picks the location; an unready entry fails its bootstrap.
     const BoatWorldResources *resources;
@@ -44,6 +49,7 @@ typedef struct {
     uint64_t consistent, inconsistent; // Snapshots whose wake digest matched on arrival.
     uint64_t repaired; // Mismatches later cleared by births.
     double max_mismatch; // Longest repaired mismatch, seconds.
+    uint64_t snapshot_resyncs; // Resync requests sent because authoritative state stalled.
     uint64_t resets; // Own resets completed (a new life after a request).
     uint64_t
         resets_dropped; // Requests the authority never queued (rate limit), given up after 1 s.
@@ -73,8 +79,9 @@ typedef struct {
     uint64_t tick;
     BoatNetSnapshot snapshot;
     bool snapshot_received;
-    unsigned pages;
-    uint8_t bytes[BOAT_COMBAT_BYTES];
+    uint8_t count, received; // Compact pages, 1-3, and the bitmask received for this tick.
+    uint16_t size; // Sum of the received compact page bytes.
+    uint8_t bytes[BOAT_COMBAT_COMPACT_BYTES];
 } BoatNetCombatSet;
 
 // The mirror fleet holds the newest authoritative snapshot, rebuilt from a complete checkpoint
@@ -87,12 +94,18 @@ typedef struct {
     uint32_t first_sequence;
     const BoatWorldResources *resources; // Borrowed per-location owners (see the config).
     bool predict, predict_dirty;
+    bool defer_ready; // Config: hold the first READY until the caller is ready to service frames.
+    bool ready_pending; // The installed world waits for boat_net_client_ready().
+    bool ready_sent; // READY has been sent for this session.
+    uint32_t ready_checkpoint; // Checkpoint named by the pending READY.
     BoatNetClientPhase phase;
     double started_at;
     double serviced_at, pong_after; // Exclude RTT samples spanning a local loading stall.
     BoatNetReject reject; // Valid when REJECTED.
     uint8_t leave; // Server's leave reason when CLOSED, zero for a transport close.
-    uint8_t timed_out; // 1: no handshake/world within 10 s, 2: no snapshot for 5 s.
+    // 1: no handshake/world within 10 s, 2: no server message for 5 s,
+    // 3: messages arrive but no authoritative state has applied for 10 s.
+    uint8_t timed_out;
     BoatNetAccept accept;
     uint32_t epoch;
     unsigned slot;
@@ -117,7 +130,7 @@ typedef struct {
     uint64_t previous_tick;
     uint64_t wake_digest; // Of the newest snapshot.
     bool wake_consistent;
-    double snapshot_at, mismatch_since, resync_at;
+    double heard_at, snapshot_at, mismatch_since, resync_at;
     BoatNetCombatSet combat_sets[BOAT_NET_COMBAT_SETS];
     // Bootstrap assembly.
     BoatNetWorldBegin begin;
@@ -155,6 +168,9 @@ typedef struct {
 
 void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
     const BoatNetClientConfig *config, double now);
+// Send the READY held by config.defer_ready. True when the session is ready; false before a
+// world is installed (or if it is still joining). Safe to call more than once.
+bool boat_net_client_ready(BoatNetClient *client);
 // Handle waiting messages and, while playing, generate one command per local 120 Hz tick from
 // INPUT (INACTIVE asks the authority to neutralize the controls). False once rejected or closed.
 bool boat_net_client_service(BoatNetClient *client, double now, BoatInput input, bool inactive);
