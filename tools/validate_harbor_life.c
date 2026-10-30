@@ -28,7 +28,7 @@
 static double now_ms(void)
 {
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    timespec_get(&ts, TIME_UTC); // C11 portable; no POSIX clock feature macro needed.
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 
