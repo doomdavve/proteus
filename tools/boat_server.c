@@ -16,6 +16,7 @@
 #include "boat_net_rtc.h"
 #endif
 #include "boat_net_server.h"
+#include "cli_usage.h"
 
 #include <inttypes.h>
 #include <signal.h>
@@ -37,38 +38,53 @@
 static void usage(FILE *out)
 {
     fprintf(out,
-        "usage: boat_server [--bind IPV4] [--port N] [--token TEXT] [--players 1-4] [--waves]\n"
-        "                   [--location basin|river|outer] [--ticks N | --seconds S] "
-        "[--report-every N]\n"
-        "                   [--mode free|deathmatch|race] [--round-seconds S]\n"
-        "                   [--lan-port N | --no-lan] [--exit-with-stdin] [--until-empty]\n"
-        "                   [--peer-timeout S]\n"
-        "                   [--rtc-port N] [--ice-server URL] (optional WebRTC build)\n"
-        "       boat_server --scripted [--ticks N] [--boats 1-4] [--location "
-        "basin|river|outer]\n"
-        "                   [--report-every N] [--mode free|deathmatch] [--round-seconds S]\n"
-        "Room (default): listen on --bind (default 127.0.0.1; use a LAN address to accept other\n"
-        "machines) and UDP --port (default %d) for up to four wake_velocity --connect or boat_bot\n"
-        "clients. Runs the 120 Hz authority until --ticks/--seconds or Ctrl+C. Clients\n"
-        "must present the same --token (default empty). A diagnostic: no internet reachability,\n"
-        "encryption or authentication.\n"
-        "The room answers LAN searches (the title's MULTIPLAYER panel, boat_bot --discover) on\n"
-        "UDP --lan-port (default %d): from this machine only with a loopback --bind, otherwise\n"
-        "from the local network. --no-lan stays silent.\n"
-        "--exit-with-stdin: close the room when standard input ends, so a game that hosts the\n"
-        "room through a pipe (wake_velocity --host) cannot leave it running after it exits.\n"
-        "--until-empty: close the room once every accepted player has left or timed out, so a\n"
-        "test ends on events instead of after a fixed time.\n"
-        "--peer-timeout: drop a client after S silent seconds (1-60, default 5); for tests.\n"
-        "--scripted: bots drive N ticks (default 7200, one minute at 120 Hz) as fast as\n"
-        "possible, then print the fleet hash and per-tick cost; no socket.\n"
-        "--mode deathmatch: timed rounds (--round-seconds 2-3600, default 300) scoring +1 for\n"
-        "defeating another boat by torpedo or capsize, -1 for self-capsize; defeats respawn after\n"
-        "3 s.\n"
-        "--mode race: river sprint rounds on the river location (the default for this mode):\n"
-        "two or more players are gridded, held through a 3 s countdown and released together;\n"
-        "places are awarded at the finish. The default free mode is shared free boating.\n",
-        BOAT_NET_PORT, BOAT_NET_DISCOVERY_PORT);
+        "Usage: boat_server [ROOM OPTIONS]\n"
+        "       boat_server --scripted [--ticks N] [--boats 1-4] [--location NAME]\n"
+        "                   [--mode free|deathmatch] [--report-every N]\n"
+        "\n"
+        "Room mode (default) listens on --bind and UDP --port for up to four\n"
+        "wake_velocity --connect or boat_bot clients. It runs the 120 Hz authority until\n"
+        "--ticks/--seconds or Ctrl+C. A diagnostic: no internet reachability, encryption\n"
+        "or authentication; clients must present the same --token.\n");
+
+    cli_usage_section(out, "MODES");
+    cli_usage_line(
+        out, "--scripted", "Run bots headless, then print the fleet hash and per-tick cost");
+    cli_usage_line(out, "--mode free", "Shared free boating (default)");
+    cli_usage_line(
+        out, "--mode deathmatch", "Timed rounds: +1 defeat, -1 self-capsize, 3 s respawn");
+    cli_usage_line(out, "--mode race", "River sprint: gridded start, 3 s countdown, places");
+
+    cli_usage_section(out, "ROOM");
+    cli_usage_line(out, "--bind IPV4", "Listen address (default 127.0.0.1; use a LAN address)");
+    cli_usage_line(out, "--port N", "UDP port (default 24680)");
+    cli_usage_line(out, "--token TEXT", "Shared join token (default empty)");
+    cli_usage_line(out, "--players 1-4", "Seats in the room (default 4)");
+    cli_usage_line(out, "--location NAME", "basin|river|outer (default basin; race uses river)");
+    cli_usage_line(out, "--waves", "Gentle crossing waves");
+    cli_usage_line(out, "--lan-port N", "LAN search port (default 24681); loopback --bind answers");
+    cli_usage_line(out, "", "only this machine, otherwise the local network");
+    cli_usage_line(out, "--no-lan", "Do not answer LAN searches");
+    cli_usage_line(
+        out, "--exit-with-stdin", "Close when standard input ends (wake_velocity --host)");
+    cli_usage_line(out, "--until-empty", "Close once every accepted player has left or timed out");
+    cli_usage_line(
+        out, "--peer-timeout S", "Drop a silent client after 1-60 s (default 5); for tests");
+
+    cli_usage_section(out, "SIMULATION");
+    cli_usage_line(out, "--ticks N", "Stop after N ticks (max 24 h at 120 Hz)");
+    cli_usage_line(out, "--seconds S", "Stop after S seconds (max 24 h); not with --scripted");
+    cli_usage_line(out, "--boats 1-4", "Scripted bots (default 4)");
+    cli_usage_line(out, "--report-every N", "Print progress every N ticks");
+    cli_usage_line(out, "--round-seconds S", "Deathmatch round length, 2-3600 (default 300)");
+
+    cli_usage_section(out, "WEBRTC (optional build)");
+    cli_usage_line(out, "--rtc-port N", "WebRTC signalling port");
+    cli_usage_line(out, "--ice-server URL", "ICE server; requires --rtc-port");
+
+    fprintf(out,
+        "\nRoom options and --seconds do not apply to --scripted.\n"
+        "Exit status: 0 success, 1 runtime failure, 2 usage.\n");
 }
 
 static bool parse_count(const char *text, unsigned long low, unsigned long high, unsigned long *out)

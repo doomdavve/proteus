@@ -16,6 +16,7 @@
 #include "boat_time_control.h"
 #include "boat_ui.h"
 #include "boat_voyage_view.h"
+#include "cli_usage.h"
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
 #ifdef PROTEUS_BOAT_PLUGINS
@@ -78,11 +79,6 @@ EM_JS(float, boat_web_scenery_progress, (const char *name),
     { return Module['boatScenery'].progress(UTF8ToString(name)); })
 #endif
 
-static void usage_line(const char *option, const char *description)
-{
-    printf("  %-29s %s\n", option, description);
-}
-
 static void usage(void)
 {
     puts("Usage: wake_velocity [MODE] [OPTIONS]\n"
@@ -90,90 +86,98 @@ static void usage(void)
          "\n"
          "Starts the title with no arguments. Explicit options start a session at once.");
 
-    puts("\nMODES");
-    usage_line("(no arguments)", "Open the title screen: single player, multiplayer,");
-    usage_line("", "settings and credits");
-    usage_line("--title", "Open the title screen explicitly");
-    usage_line("--course", "Timed S course in the basin");
-    usage_line("--replay FILE", "Watch a saved course run");
-    usage_line("--ghost FILE", "Race a compatible saved run");
-    usage_line("--host free|deathmatch|race", "Start a LAN room and join it");
-    usage_line("--connect HOST:PORT", "Join a boat_server room");
-    usage_line("--serve", "Run only a room; see --serve --help");
+    cli_usage_section(stdout, "MODES");
+    cli_usage_line(stdout, "(no arguments)", "Open the title screen: single player, multiplayer,");
+    cli_usage_line(stdout, "", "settings and credits");
+    cli_usage_line(stdout, "--title", "Open the title screen explicitly");
+    cli_usage_line(stdout, "--course", "Timed S course in the basin");
+    cli_usage_line(stdout, "--replay FILE", "Watch a saved course run");
+    cli_usage_line(stdout, "--ghost FILE", "Race a compatible saved run");
+    cli_usage_line(stdout, "--host free|deathmatch|race", "Start a LAN room and join it");
+    cli_usage_line(stdout, "--connect HOST:PORT", "Join a boat_server room");
+    cli_usage_line(stdout, "--serve", "Run only a room; see --serve --help");
 
-    puts("\nWORLD");
-    usage_line("--location basin|river|outer", "Water map (default basin; title uses river)");
-    usage_line("--start X,Z[,DEGREES]", "Place the boat on mapped water (heading 0 faces -Z)");
-    usage_line("--skin NAME", "sweden|finland|denmark|norway|explorer|cabin");
-    usage_line("", "default sweden; explorer and cabin have their own engines");
-    usage_line("--soundtrack NAME", "a-little-boat|acid-wake|off (default a-little-boat)");
-    usage_line("--mouse-steering", "Start with captured mouse steering");
-    usage_line("--plugin DIR", "Solo voyage from a Lua plugin");
-    usage_line("", "Saves reload; F5 reload, F6 undo, F7 apply migration/restart");
-    usage_line("--waves", "Gentle crossing waves and a floating hull");
+    cli_usage_section(stdout, "WORLD");
+    cli_usage_line(
+        stdout, "--location basin|river|outer", "Water map (default basin; title uses river)");
+    cli_usage_line(
+        stdout, "--start X,Z[,DEGREES]", "Place the boat on mapped water (heading 0 faces -Z)");
+    cli_usage_line(stdout, "--skin NAME", "sweden|finland|denmark|norway|explorer|cabin");
+    cli_usage_line(stdout, "", "default sweden; explorer and cabin have their own engines");
+    cli_usage_line(
+        stdout, "--soundtrack NAME", "a-little-boat|acid-wake|off (default a-little-boat)");
+    cli_usage_line(stdout, "--mouse-steering", "Start with captured mouse steering");
+    cli_usage_line(stdout, "--plugin DIR", "Solo voyage from a Lua plugin");
+    cli_usage_line(stdout, "", "Saves reload; F5 reload, F6 undo, F7 apply migration/restart");
+    cli_usage_line(stdout, "--waves", "Gentle crossing waves and a floating hull");
 
-    puts("\nWATER AND WAKES");
-    usage_line("--wake-objects", "Rideable arcade wakes (default in free boating)");
-    usage_line("--wake-height M", "Crest scale 0.1..3 (default 1.2)");
-    usage_line("--wake-life-ticks N", "Lifetime at 120 Hz, 240..1920 (default 1920)");
-    usage_line("--wake-objects-crossing", "Basin rival sharing wakes and hull contacts");
-    usage_line("--no-player-wake", "Visual-only player trail");
-    usage_line("--current", "Authored current, not measured local conditions");
-    usage_line("--crossing-wake", "Scripted passing boat and physical wake");
-    usage_line("--player-wake", "Legacy D3 trail (research)");
-    usage_line("--wake-field", "Coherent CPU field, native basin only (research)");
+    cli_usage_section(stdout, "WATER AND WAKES");
+    cli_usage_line(stdout, "--wake-objects", "Rideable arcade wakes (default in free boating)");
+    cli_usage_line(stdout, "--wake-height M", "Crest scale 0.1..3 (default 1.2)");
+    cli_usage_line(stdout, "--wake-life-ticks N", "Lifetime at 120 Hz, 240..1920 (default 1920)");
+    cli_usage_line(
+        stdout, "--wake-objects-crossing", "Basin rival sharing wakes and hull contacts");
+    cli_usage_line(stdout, "--no-player-wake", "Visual-only player trail");
+    cli_usage_line(stdout, "--current", "Authored current, not measured local conditions");
+    cli_usage_line(stdout, "--crossing-wake", "Scripted passing boat and physical wake");
+    cli_usage_line(stdout, "--player-wake", "Legacy D3 trail (research)");
+    cli_usage_line(stdout, "--wake-field", "Coherent CPU field, native basin only (research)");
 
-    puts("\nCAMERA AND DISPLAY");
-    usage_line("--camera-distance N", "8..48 (default 20; river 12)");
-    usage_line("--camera-height N", "4..36 (default 14; river 6)");
-    usage_line("--fixed-fov", "Hold the 55-degree view instead of widening with speed");
-    usage_line("--renderer gpu|cpu", "Renderer (default gpu)");
-    usage_line("--gpu", "Alias for --renderer gpu");
-    usage_line("--gpu-aa", "4x supersampling");
-    usage_line("--no-vsync", "Pace at exactly 60 Hz");
-    usage_line("--profiler", "Show the debug profiler at startup");
-    usage_line("--verbose", "Log graphics/window and resource startup");
+    cli_usage_section(stdout, "CAMERA AND DISPLAY");
+    cli_usage_line(stdout, "--camera-distance N", "8..48 (default 20; river 12)");
+    cli_usage_line(stdout, "--camera-height N", "4..36 (default 14; river 6)");
+    cli_usage_line(stdout, "--fixed-fov", "Hold the 55-degree view instead of widening with speed");
+    cli_usage_line(stdout, "--renderer gpu|cpu", "Renderer (default gpu)");
+    cli_usage_line(stdout, "--gpu", "Alias for --renderer gpu");
+    cli_usage_line(stdout, "--gpu-aa", "4x supersampling");
+    cli_usage_line(stdout, "--no-vsync", "Pace at exactly 60 Hz");
+    cli_usage_line(stdout, "--profiler", "Show the debug profiler at startup");
+    cli_usage_line(stdout, "--verbose", "Log graphics/window and resource startup");
 
-    puts("\nCAPTURES AND AUTOMATION");
-    usage_line("--screenshot FILE", "Save a deterministic scripted frame");
-    usage_line("", "CPU screenshots need no window; GPU ones need a context");
-    usage_line("--title --screenshot FILE", "Capture the title screen");
-    usage_line("--time SECONDS", "Screenshot only: 0..60, or 0..600 with --replay");
-    usage_line("--frames COUNT", "Stop a smoke run after COUNT frames");
-    usage_line("--demo", "Run the scripted screenshot drive in a window");
+    cli_usage_section(stdout, "CAPTURES AND AUTOMATION");
+    cli_usage_line(stdout, "--screenshot FILE", "Save a deterministic scripted frame");
+    cli_usage_line(stdout, "", "CPU screenshots need no window; GPU ones need a context");
+    cli_usage_line(stdout, "--title --screenshot FILE", "Capture the title screen");
+    cli_usage_line(stdout, "--time SECONDS", "Screenshot only: 0..60, or 0..600 with --replay");
+    cli_usage_line(stdout, "--frames COUNT", "Stop a smoke run after COUNT frames");
+    cli_usage_line(stdout, "--demo", "Run the scripted screenshot drive in a window");
 
-    puts("\nRECORDINGS");
-    usage_line("--save-run FILE", "Export each finish");
-    usage_line("--data-dir DIR", "Override personal-best storage");
+    cli_usage_section(stdout, "RECORDINGS");
+    cli_usage_line(stdout, "--save-run FILE", "Export each finish");
+    cli_usage_line(stdout, "--data-dir DIR", "Override personal-best storage");
 
-    puts("\nPLUGIN AUTHORING");
-    usage_line("--plugin-bridge DIR", "With --plugin, let tools/plugin_author.py live-inspect,");
-    usage_line("", "stage, apply and undo revisions through the private directory");
+    cli_usage_section(stdout, "PLUGIN AUTHORING");
+    cli_usage_line(
+        stdout, "--plugin-bridge DIR", "With --plugin, let tools/plugin_author.py live-inspect,");
+    cli_usage_line(stdout, "", "stage, apply and undo revisions through the private directory");
 
-    puts("\nMULTIPLAYER");
-    usage_line("--name TEXT", "Player name");
-    usage_line("--token TEXT", "Room token");
-    usage_line("--port N", "Host UDP port (default 24680)");
-    usage_line("", "--location and --waves configure the hosted room");
-    usage_line("", "Leaving closes a room started with --host");
+    cli_usage_section(stdout, "MULTIPLAYER");
+    cli_usage_line(stdout, "--name TEXT", "Player name");
+    cli_usage_line(stdout, "--token TEXT", "Room token");
+    cli_usage_line(stdout, "--port N", "Host UDP port (default 24680)");
+    cli_usage_line(stdout, "", "--location and --waves configure the hosted room");
+    cli_usage_line(stdout, "", "Leaving closes a room started with --host");
 
-    puts("\nCONTROLS");
-    usage_line("Left/Right, A/D", "Adjust wheel");
-    usage_line("W/Up, S/Down", "Forward, reverse (release: neutral); Shift: precision");
-    usage_line("M", "Capture/release mouse steering (move to turn; stop to hold)");
-    usage_line("Wheel", "Keyboard springs to centre; mouse holds");
-    usage_line("Arcade jumps", "Automatic aerial stabilization; steering retains yaw");
-    usage_line("P, Esc", "Menu: steering, controls, leave (solo pauses, rooms run)");
-    usage_line("Backspace (hold 1 s)", "Reset, restart run/passage, or a new multiplayer life");
-    usage_line("+/-, PageUp/PageDown", "Camera closer/farther, higher/lower");
-    usage_line("C", "Reset view");
-    usage_line("F3", "Toggle the debug profiler");
-    usage_line("F5 / F6 / F7", "Plugin: reload / undo / apply migration or restart");
+    cli_usage_section(stdout, "CONTROLS");
+    cli_usage_line(stdout, "Left/Right, A/D", "Adjust wheel");
+    cli_usage_line(stdout, "W/Up, S/Down", "Forward, reverse (release: neutral); Shift: precision");
+    cli_usage_line(stdout, "M", "Capture/release mouse steering (move to turn; stop to hold)");
+    cli_usage_line(stdout, "Wheel", "Keyboard springs to centre; mouse holds");
+    cli_usage_line(stdout, "Arcade jumps", "Automatic aerial stabilization; steering retains yaw");
+    cli_usage_line(stdout, "P, Esc", "Menu: steering, controls, leave (solo pauses, rooms run)");
+    cli_usage_line(
+        stdout, "Backspace (hold 1 s)", "Reset, restart run/passage, or a new multiplayer life");
+    cli_usage_line(stdout, "+/-, PageUp/PageDown", "Camera closer/farther, higher/lower");
+    cli_usage_line(stdout, "C", "Reset view");
+    cli_usage_line(stdout, "F3", "Toggle the debug profiler");
+    cli_usage_line(stdout, "F5 / F6 / F7", "Plugin: reload / undo / apply migration or restart");
     puts("");
-    usage_line("Course", "G ghost on/off | L/B last/best replay | Space pause | Enter restart");
-    usage_line("Solo", "[ / ] speed 0.25x..8x | backslash normal time (altered is practice)");
-    usage_line("Replay", "Left/Right seek 1 s (Shift 5 s) | Home/End | [ / ] speed");
-    usage_line("", "Click/drag the replay timeline to seek and pause; Space resumes");
+    cli_usage_line(
+        stdout, "Course", "G ghost on/off | L/B last/best replay | Space pause | Enter restart");
+    cli_usage_line(
+        stdout, "Solo", "[ / ] speed 0.25x..8x | backslash normal time (altered is practice)");
+    cli_usage_line(stdout, "Replay", "Left/Right seek 1 s (Shift 5 s) | Home/End | [ / ] speed");
+    cli_usage_line(stdout, "", "Click/drag the replay timeline to seek and pause; Space resumes");
 
     puts("\nSee docs/COMMAND_LINE.md for examples, restrictions and defaults.");
 }
