@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and L1.2 scene envelope decoding implemented**.
+Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and L1.2/L1.3 scene envelope decoding/binding implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages with optional objectives/timers.
@@ -126,14 +126,17 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **L1.1 contract/site complete; L1.2 versioned envelope decoding implemented
-but not installed live.** The [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
-implements the remaining steps separately. L1.1 froze the ownership, identity, limits and first
-marina site; L1.2 accepts the manifest grant and `scene = { version = 1 }` only. The decoded
-envelope is copied and classified with the voyage revision, but the running session and both
-renderers keep the compiled marina until L1.3's application binding. Any marina field is still
-an unknown field: L2.2 exposes two berths and L2.3 registered dock modules. `scene.define` does
-not enable a second package, a callback or a browser/room path.
+Status, 2026-10-30: **L1.1 contract/site complete; L1.2 envelope decoding and L1.3 application
+binding implemented, with no authorable subsystem yet.** The
+[location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
+remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
+L1.2 accepts the manifest grant and `scene = { version = 1 }` only. L1.3 installs that accepted
+envelope between ticks on the session's `BoatWorld.scene` and `BoatViewState.scene`, survives
+Undo and session restarts, and restores the compiled route/scene when the plugin closes. The
+renderers and contact queries still choose compiled marina content until L2.1/L2.2 supply the
+accepted berth layout. Any marina field is still an unknown field: L2.2 exposes two berths and
+L2.3 registered dock modules. `scene.define` does not enable a second package, a callback or a
+browser/room path.
 
 ### Package composition
 

@@ -628,6 +628,99 @@ static bool save(const char *from, const char *to)
         && write_text("main.lua", b.source, b.source_size);
 }
 
+// The reference package plus the L1.2 scene envelope. The manifest and entry are edited in
+// separate buffers so a test can write any revision an editor would save.
+static bool replace_once(
+    char *text, size_t *size, size_t capacity, const char *from, const char *to)
+{
+    char *at = strstr(text, from);
+    size_t from_size = strlen(from), to_size = strlen(to);
+    if (!at || strstr(at + 1, from) || *size - from_size + to_size > capacity)
+        return false;
+    memmove(at + to_size, at + from_size, *size - (size_t)(at - text) - from_size);
+    memcpy(at, to, to_size);
+    *size = *size - from_size + to_size;
+    return true;
+}
+
+static bool save_scene(const char *name, unsigned version)
+{
+    BoatPluginFiles files = *reference();
+    char manifest_from[] = "\"capabilities\": [\"voyage.define\"]";
+    char manifest_to[] = "\"capabilities\": [\"voyage.define\", \"scene.define\"]";
+    char source_to[64];
+    snprintf(source_to, sizeof(source_to), "return { scene = { version = %u },", version);
+    if (!replace_once(files.manifest, &files.manifest_size, sizeof(files.manifest), manifest_from,
+            manifest_to)
+        || !replace_once(
+            files.source, &files.source_size, sizeof(files.source), "return {", source_to))
+        return false;
+    if (name
+        && !replace_once(
+            files.manifest, &files.manifest_size, sizeof(files.manifest), "Langedrag voyage", name))
+        return false;
+    return write_text("plugin.json", files.manifest, files.manifest_size)
+        && write_text("main.lua", files.source, files.source_size);
+}
+
+// L1.3: an accepted envelope is installed on the session/world/view at open and at every
+// commit, survives Undo, and is removed when the plugin leaves. Compiled defaults remain the
+// fallback for another independent session.
+static int scene_binding(void)
+{
+    static WakePlugin p, other;
+    BoatSession s, independent;
+    boat_session_init(&s, outer(), calm());
+    boat_session_init(&independent, outer(), calm());
+    s.presentation_enabled = independent.presentation_enabled = false;
+    CHECK(save_scene(NULL, 1));
+    CHECK(wake_plugin_open(&p, BOAT_PLUGIN_SESSION_DIR, &s, 0));
+    const BoatPluginRevision *active = boat_plugin_host_active(&p.host);
+    CHECK(active->voyage.has_scene && !boat_scene_has_content(&active->voyage.scene));
+    CHECK(s.world.scene == &active->voyage.scene);
+    CHECK(boat_session_view(&s).scene == s.world.scene);
+    CHECK(strstr(p.status, "R1 ACTIVE"));
+
+    // A manifest-only rename applies immediately and rebinds the scene to the new slot.
+    CHECK(save_scene("Langedrag scenes", 1));
+    CHECK(!wake_plugin_frame(&p, &s, true, false, false, 1));
+    active = boat_plugin_host_active(&p.host);
+    CHECK(active->number == 2 && active->voyage.has_scene);
+    CHECK(s.world.scene == &active->voyage.scene && boat_session_view(&s).scene == s.world.scene);
+
+    // A broken envelope leaves the running scene and revision intact.
+    CHECK(save_scene("Langedrag scenes", 2));
+    CHECK(!wake_plugin_frame(&p, &s, true, false, false, 2));
+    CHECK(p.alert && strstr(p.status, "scene.version") && strstr(p.status, "KEEPING R2"));
+    CHECK(boat_plugin_host_active(&p.host)->number == 2
+        && s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
+
+    // Undo reinstalls R1 through the same classification and rebinding path.
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 3));
+    CHECK(boat_plugin_host_active(&p.host)->number == 1);
+    CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
+
+    // Independent sessions own their own scene storage; leaving one leaves the other intact.
+    CHECK(save_scene(NULL, 1));
+    CHECK(wake_plugin_open(&other, BOAT_PLUGIN_SESSION_DIR, &independent, 4));
+    CHECK(independent.world.scene == &boat_plugin_host_active(&other.host)->voyage.scene);
+    CHECK(independent.world.scene != s.world.scene);
+    wake_plugin_close(&p, &s);
+    CHECK(!s.world.scene && !boat_session_view(&s).scene);
+    CHECK(independent.world.scene == &boat_plugin_host_active(&other.host)->voyage.scene);
+    wake_plugin_close(&other, &independent);
+    CHECK(!independent.world.scene && !boat_session_view(&independent).scene);
+
+    // Re-enter cleanly after a close; the new revision owns a fresh scene binding.
+    CHECK(wake_plugin_open(&p, BOAT_PLUGIN_SESSION_DIR, &s, 5));
+    CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
+    wake_plugin_close(&p, &s);
+    CHECK(!s.world.scene);
+    boat_session_destroy(&independent);
+    boat_session_destroy(&s);
+    return 0;
+}
+
 // wake_velocity's --plugin glue on real files: F5 (RELOAD), F6 (UNDO) and F7 (APPLY) as the
 // frame loop passes them, its save polling on a virtual clock, and its panel text.
 static int game_controls(void)
@@ -1376,6 +1469,7 @@ static const TestCase cases[] = {
     TEST_CASE(save_polling),
     TEST_CASE(repeated_reloads),
     TEST_CASE(game_controls),
+    TEST_CASE(scene_binding),
     SLOW_CASE(compiled_parity),
 };
 

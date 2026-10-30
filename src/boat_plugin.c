@@ -143,7 +143,7 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
     // Voyage grants are a canonical prefix: scene.define, objective.hud, objective.timers.
     // A package cannot reorder or repeat them, and timers require HUD.
     int order = 0;
-    for (unsigned i = 1; i < capabilities->size; ++i) {
+    for (int i = 1; i < capabilities->size; ++i) {
         char path[32];
         snprintf(path, sizeof(path), "capabilities[%u]", i + 1);
         if (!boat_json_text(json, &tokens[at[6] + i + 1], capability, sizeof(capability)))
@@ -402,8 +402,8 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
         candidate.scene.version = BOAT_SCENE_VERSION;
         BoatSceneDiagnostic scene;
         if (!boat_scene_validate(&candidate.scene, &scene))
-            return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, scene.field, "%s",
-                scene.message);
+            return diagnose(
+                d, BOAT_PLUGIN_SCHEMA, manifest->entry, scene.field, "%s", scene.message);
         candidate.scene_digest = boat_scene_digest(&candidate.scene);
     }
     BoatVoyageRoute *route = &candidate.route;

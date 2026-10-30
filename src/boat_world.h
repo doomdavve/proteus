@@ -2,6 +2,7 @@
 #define PROTEUS_BOAT_WORLD_H
 
 #include "boat_location.h"
+#include "boat_scene_definition.h"
 #include "boat_water.h"
 
 // Caller-owned physical resources of one location: its definition and, when mapped, the
@@ -29,6 +30,9 @@ typedef struct {
     const struct BoatCombat *combat; // Optional presentation view; simulation uses fleet state.
     BoatWater water; // Settings plus the legacy D3 trail history that boats publish into.
     const BoatWake *wake_field; // Optional legacy CPU field endpoint (basin review only).
+    // L1.3: the accepted authored scene, borrowed until the session rebinds or exits. NULL keeps
+    // every compiled marina default. Physics and presentation read this same pointer.
+    const BoatSceneDefinition *scene;
 } BoatWorld;
 
 // RESOURCES must be ready.
