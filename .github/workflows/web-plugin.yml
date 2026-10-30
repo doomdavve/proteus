@@ -48,8 +48,12 @@ jobs:
           python3 -m venv .playwright
           .playwright/bin/pip install playwright==1.64.1
           .playwright/bin/playwright install --with-deps chromium firefox webkit
+          # Headless Firefox renders WebGL through Mesa's software (llvmpipe) driver.
+          sudo apt-get install -y libgl1-mesa-dri
       - name: Qualify browser authoring on Chromium, Firefox and WebKit
         shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           python3 -m http.server 8000 --bind 127.0.0.1 --directory build-web/site &
           for _ in $(seq 50); do curl -fs -o /dev/null http://127.0.0.1:8000/ && break; sleep 0.2; done
