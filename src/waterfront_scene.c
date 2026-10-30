@@ -285,7 +285,8 @@ static void evaluate_actors(const BoatSceneDefinition *scene, double time, BoatW
     frame->time = time;
     evaluate_life(time, ground, frame);
     waterfront_harbor_evaluate_scene(scene, water, time, ground, &frame->harbor);
-    waterfront_traffic_evaluate(water, time, &frame->traffic);
+    waterfront_traffic_evaluate_routes(
+        scene && scene->traffic_present ? &scene->traffic : NULL, water, time, &frame->traffic);
 }
 
 void waterfront_scene_evaluate_actors(double time, BoatWater water, WaterfrontSceneFrame *frame)

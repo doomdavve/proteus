@@ -50,6 +50,7 @@ typedef struct {
     char id[WATERFRONT_ROUTE_TEXT];
     unsigned char shape; // WaterfrontRouteShape
     unsigned char recipe; // WaterfrontCraftRecipe
+    unsigned char retain; // Compiled actor index, or 0xff for an authored/independent craft.
     bool bridge; // Tall vessel whose crossings schedule the Hisingsbron lift.
     float speed, accel, phase; // m/s, seconds to cruise, timetable phase seconds.
     double period; // Positive repeat period in seconds.
@@ -86,8 +87,16 @@ uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes);
 const char *waterfront_route_shape_name(WaterfrontRouteShape shape);
 const char *waterfront_route_recipe_name(WaterfrontCraftRecipe recipe);
 bool waterfront_route_recipe_from_name(const char *name, WaterfrontCraftRecipe *recipe);
+// L3.2: registered route presets. The returned actor owns a ready timetable; callers replace
+// its ID and may override recipe/speed/phase/period. "marina_pass" is a small craft loop south
+// of the authored marina; the remaining IDs name the compiled actors.
+bool waterfront_route_preset(const char *id, WaterfrontRouteActor *actor);
+const char *waterfront_route_preset_name(unsigned index);
+unsigned waterfront_route_preset_count(void);
 BoatModelSpec waterfront_route_spec(const WaterfrontRouteDefinition *routes, int index);
 const Mesh3D *waterfront_route_mesh(const WaterfrontRouteDefinition *routes, int index);
+// Stable generated mesh for a registered craft recipe, shared by authored traffic slots.
+const Mesh3D *waterfront_route_recipe_mesh(WaterfrontCraftRecipe recipe);
 double waterfront_route_period(const WaterfrontRouteDefinition *routes, int index);
 // Closed authored routes; negative time supports trails across the start and lap boundary.
 WaterfrontVesselMotion waterfront_route_motion(

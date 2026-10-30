@@ -277,8 +277,8 @@ static bool blocked(const BoatFleet *f, Vector2 at, float height, double time)
     return !boat_map_water_contact(&w->resources->map, at, .05f, &normal)
         || waterfront_harbor_contact_height_scene(
             w->scene, at, .05f, height, height, w->water, time, &normal)
-        || waterfront_traffic_contact_height(
-            at, 0, .05f, .05f, .05f, height, height, w->water, time, &contact);
+        || waterfront_traffic_contact_height_scene(
+            w->scene, at, 0, .05f, .05f, .05f, height, height, w->water, time, &contact);
 }
 
 void boat_combat_hits(BoatFleet *f, const Boat before[BOAT_COMBAT_PLAYERS])

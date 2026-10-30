@@ -1780,9 +1780,9 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L3.1 are complete; next in this track: L3.2 one
-authored small-craft route**; the first playable gate is L4.3. `scene.define` installs and stages
-the two-berth harbor-life layout, including its small pontoon and gangway.
+failure cases and acceptance evidence. **L1.1–L3.2 are complete; next in this track: L3.3 ferry
+stops and service schedule**; the first playable gate is L4.3. `scene.define` installs and stages
+the two-berth harbor-life layout, its small pontoon and gangway, and one authored passing craft.
 
 ### Coverage and delivery slices
 
@@ -2237,10 +2237,52 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 - `boat_core_boundary` and `boat_net_boundary` pass with the new core files; no renderer, Lua,
   host or asset path consumes the definition yet. No visual or human acceptance is claimed.
 
-**Next in this track: L3.2.** Decode one authored small-craft route, define full-collection
-replacement with explicit retained defaults, and validate swept corridors against shore, the
-marina/access lane and other scheduled craft. This completes the requested L1.1–L3.1 sequence;
-L3.2+ and the L4.3 playable gate are not started.
+#### L3.2 result, 2026-10-30
+
+**Implemented:** one authored small-craft route in `plugins/harbor-life`, full-collection
+traffic replacement, explicit retained compiled actors, and map/schedule corridor validation.
+No physical traffic wake was added.
+
+- **Schema:** `scene.traffic.vessels` is a dense 0–8 list. A present list replaces all travelling
+  craft; an empty list disables them. An entry either retains a compiled actor
+  (`retain = "river_runabout"`) or selects a registered `route`/`recipe` with positive `speed`,
+  `phase` and `period`. Eight route presets cover the compiled actors plus `marina_pass`, a
+  4 m/s loop north of the marina. IDs are unique, non-finite and over-budget values reject with
+  `scene.traffic.vessels[n]` paths, and an authored craft may not reuse the compiled actor's
+  schedule without declaring it as a retain.
+- **Safety:** every authored hull is sampled over the 4,160 s combined river timetable at 0.25 s
+  with half a step of travel inflating the envelope. It must clear compiled water, the declared
+  entrance, authored berths and solid dock modules, other authored craft and every compiled
+  vessel. Retained actors keep their compiled route and are only checked against authored traffic.
+  This is a conservative bounded sample, not a general path planner or proof for arbitrary speed.
+- **Presentation/physics:** the accepted definition reaches the shared scene frame, both
+  renderers, player contacts, combat obstacle queries and camera exclusion through one route
+  pointer. Frame mesh slots select the registered craft recipe without duplicating geometry.
+  Ordinary traffic wakes remain visual; authored routes never enable the race's physical pool.
+- **Package:** the passing runabout loops at ~24.85 s (native preset `marina_pass`) and the
+  compiled river runabout is retained explicitly. The new `outer.marina-pass` anchor at
+  `(0, 205)` faces the loop; the pinned `outer.marina` bookmark still frames the slips.
+- **Worker:** the scene wire is now `PST4`, carrying route/timetable and retain identity; the
+  response bound rose to 32 KiB. Browser imports continue to reject `scene.define`.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build. Full `ctest --preset full` passed **322/322 enabled tests** (23.73 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_boat_plugin --case scene_traffic` loads the package, checks the route/timetable and
+  retain identity, rejects unknown recipe/route, zero speed, a one-second discontinuous loop and a
+  non-retained schedule conflict, and checks native capacity/geometry rejection.
+  `validate_boat_plugin_session --case harbor_life_scene` stages a traffic edit, restarts on
+  Apply, restores it through Undo and keeps a rejected edit from replacing R1.
+  `validate_traffic` checks the shared frame pose/motion, contact and camera identity across
+  reorder, removal and empty replacement. `validate_boat_plugin_stage` round-trips the two-craft
+  scene through the real `PST4` worker; worker/author tests expect the new traffic evidence.
+- CPU captures at `outer.marina` and `outer.marina-pass` show the marina unchanged and the
+  passing runabout plus retained river craft on the loop. This is a still-frame inspection, not a
+  windowed motion or human acceptance check. No GPU capture was run at this step.
+
+**Next in this track: L3.3.** Add ordered stops, dwell/departure offsets and positive repeat
+periods to one existing upstream ferry, then update the package and boundary tests.
 
 #### L2 — a small marina before a marina editor
 
@@ -2365,10 +2407,13 @@ Completed L2.3, 2026-10-30: added registered pontoon/gangway/quay modules, the s
 pontoon and gangway, and shared pose/contact/camera/rope handling.
 Completed L3.1, 2026-10-30: extracted eight native route/timetable actors, compiled-parity motion,
 stops, bridge crossings and bounded structural validation into `waterfront_route`.
-Next task for this track: **L3.2**, one authored small-craft route with full-collection replacement.
-Known limits: routes are native-only and no Lua field exposes them yet; no freeform module mesh
-editor, depth is unverified, and no tram/seal recipes, gameplay dusk, building activity or human
-scene acceptance are implemented.
+Completed L3.2, 2026-10-30: exposed full-collection traffic replacement with retained defaults,
+added the `marina_pass` craft to `plugins/harbor-life`, and wired the accepted routes through
+draw, contact, camera, combat and the PST4 worker wire.
+Next task for this track: **L3.3**, ferry stops and service schedule.
+Known limits: authored route geometry is selected from registered presets; no freeform route
+editor, freeform module mesh editor or physical traffic wake recipe; depth is unverified; and no
+tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

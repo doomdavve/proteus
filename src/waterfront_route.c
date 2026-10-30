@@ -108,6 +108,8 @@ static bool cache_ready;
 static BoatModel models[WATERFRONT_ROUTE_ACTORS];
 static uint64_t model_digest;
 static bool models_ready;
+static BoatModel recipe_models[WATERFRONT_CRAFT_RECIPES];
+static bool recipe_models_ready;
 
 static const char *const shape_names[WATERFRONT_ROUTE_SHAPES]
     = { "dock_circuit", "ellipse", "points" };
@@ -136,7 +138,7 @@ bool waterfront_route_recipe_from_name(const char *name, WaterfrontCraftRecipe *
 
 static void copy_actor(WaterfrontRouteActor *out, const CompiledActor *in)
 {
-    *out = (WaterfrontRouteActor) { .shape = in->shape, .recipe = in->recipe,
+    *out = (WaterfrontRouteActor) { .shape = in->shape, .recipe = in->recipe, .retain = 0xff,
         .bridge = in->bridge, .speed = in->speed, .accel = in->accel, .phase = in->phase,
         .period = in->period, .point_count = in->point_count, .stop_count = in->stop_count,
         .origin_x = in->origin_x, .origin_z = in->origin_z, .long_radius = in->long_radius,
@@ -338,6 +340,54 @@ static bool build(Route *route, const WaterfrontRouteActor *actor,
     return true;
 }
 
+static const char *const preset_names[] = { "river_runabout", "river_cruiser",
+    "river_sailboat", "river_ferry", "alvsnabben", "frihamnen", "schooner", "marina_pass" };
+
+unsigned waterfront_route_preset_count(void)
+{
+    return (unsigned)(sizeof(preset_names) / sizeof(preset_names[0]));
+}
+
+const char *waterfront_route_preset_name(unsigned index)
+{
+    return index < waterfront_route_preset_count() ? preset_names[index] : NULL;
+}
+
+bool waterfront_route_preset(const char *id, WaterfrontRouteActor *actor)
+{
+    if (!id || !actor)
+        return false;
+    for (unsigned i = 0; i < waterfront_route_preset_count(); ++i)
+        if (!strcmp(id, preset_names[i]))
+            break;
+    if (!strcmp(id, "marina_pass")) {
+        *actor = (WaterfrontRouteActor) { .shape = WATERFRONT_ROUTE_POINTS,
+            .recipe = WATERFRONT_CRAFT_RUNABOUT, .retain = 0xff, .speed = 0, .period = 1,
+            .point_count = 4, .points = { { -20, 184, 5 }, { 20, 184, 5 }, { 20, 198, 5 },
+                { -20, 198, 5 } } };
+        strcpy(actor->id, "marina_pass");
+        Route route;
+        if (!build(&route, actor, NULL))
+            return false;
+        actor->speed = 4;
+        actor->period = route.total / actor->speed;
+        return true;
+    }
+    const WaterfrontRouteDefinition *def = waterfront_route_defaults();
+    for (unsigned i = 0; i < WATERFRONT_ROUTE_ACTORS; ++i)
+        if (!strcmp(id, def->actors[i].id)) {
+            *actor = def->actors[i];
+            return true;
+        }
+    // Friendly compiled aliases used by discovery and package examples.
+    if (!strcmp(id, "alvsnabben")) {
+        *actor = def->actors[4];
+        strcpy(actor->id, "alvsnabben");
+        return true;
+    }
+    return false;
+}
+
 static Vector2 sample(const Route *route, float s, Vector2 *tangent, float *curvature)
 {
     s = (float)wrapped(s, route->total);
@@ -421,6 +471,7 @@ uint64_t waterfront_route_digest(const WaterfrontRouteDefinition *routes)
         hash = fold(hash, a->id, strlen(a->id) + 1);
         hash = fold(hash, &a->shape, 1);
         hash = fold(hash, &a->recipe, 1);
+        hash = fold(hash, &a->retain, 1);
         hash = fold(hash, &a->bridge, 1);
         hash = fold_float(hash, a->speed);
         hash = fold_float(hash, a->accel);
@@ -546,17 +597,13 @@ static void prepare(const WaterfrontRouteDefinition *routes)
     }
 }
 
-BoatModelSpec waterfront_route_spec(const WaterfrontRouteDefinition *routes, int index)
+static BoatModelSpec recipe_spec(unsigned recipe, bool orange_runabout)
 {
-    bool compiled_actor = false;
-    const WaterfrontRouteActor *actor = actor_at(routes, index, &compiled_actor);
-    if (!actor)
-        return (BoatModelSpec) { 0 };
     BoatModelSpec spec;
-    switch (actor->recipe) {
+    switch (recipe) {
     case WATERFRONT_CRAFT_RUNABOUT:
         spec = boat_model_preset(BOAT_MODEL_RUNABOUT);
-        if (compiled_actor && index == 0) {
+        if (orange_runabout) {
             spec.hull = (Color) { 227, 154, 60, 255 };
             spec.trim = (Color) { 242, 227, 196, 255 };
         }
@@ -607,9 +654,19 @@ BoatModelSpec waterfront_route_spec(const WaterfrontRouteDefinition *routes, int
     }
 }
 
+BoatModelSpec waterfront_route_spec(const WaterfrontRouteDefinition *routes, int index)
+{
+    bool compiled_actor = false;
+    const WaterfrontRouteActor *actor = actor_at(routes, index, &compiled_actor);
+    if (!actor)
+        return (BoatModelSpec) { 0 };
+    return recipe_spec(
+        actor->recipe, compiled_actor && actor->recipe == WATERFRONT_CRAFT_RUNABOUT && index == 0);
+}
+
 static void build_schooner(BoatModel *m)
 {
-    BoatModelSpec spec = waterfront_route_spec(NULL, WATERFRONT_TRAFFIC_VESSELS + 3);
+    BoatModelSpec spec = recipe_spec(WATERFRONT_CRAFT_SCHOONER, false);
     spec.mast_height = 0;
     if (!boat_model_generate(m, spec))
         return;
@@ -666,6 +723,21 @@ const Mesh3D *waterfront_route_mesh(const WaterfrontRouteDefinition *routes, int
         models_ready = true;
     }
     return &models[index].mesh;
+}
+
+const Mesh3D *waterfront_route_recipe_mesh(WaterfrontCraftRecipe recipe)
+{
+    if (recipe >= WATERFRONT_CRAFT_RECIPES)
+        return NULL;
+    if (!recipe_models_ready) {
+        for (unsigned i = 0; i < WATERFRONT_CRAFT_RECIPES; ++i)
+            if (i == WATERFRONT_CRAFT_SCHOONER)
+                build_schooner(&recipe_models[i]);
+            else
+                boat_model_generate(&recipe_models[i], recipe_spec(i, false));
+        recipe_models_ready = true;
+    }
+    return &recipe_models[recipe].mesh;
 }
 
 double waterfront_route_period(const WaterfrontRouteDefinition *routes, int index)

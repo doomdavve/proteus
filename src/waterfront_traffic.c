@@ -1,5 +1,6 @@
 #include "waterfront_traffic.h"
 
+#include "boat_scene_definition.h"
 #include "raymath.h"
 #include "waterfront_route.h"
 #include "waterfront_upstream.h"
@@ -25,6 +26,16 @@ const Mesh3D *waterfront_traffic_mesh_routes(const WaterfrontRouteDefinition *ro
 const Mesh3D *waterfront_traffic_mesh(int index)
 {
     return waterfront_traffic_mesh_routes(NULL, index);
+}
+
+const Mesh3D *waterfront_traffic_mesh_slot(int slot)
+{
+    if (slot < WATERFRONT_TRAFFIC_ALL)
+        return waterfront_traffic_mesh(slot);
+    int recipe = slot - WATERFRONT_TRAFFIC_ALL;
+    if (recipe < 0 || recipe >= WATERFRONT_TRAFFIC_RECIPE_SLOTS)
+        return NULL;
+    return waterfront_route_recipe_mesh((WaterfrontCraftRecipe)recipe);
 }
 
 double waterfront_traffic_period_routes(const WaterfrontRouteDefinition *routes, int index)
@@ -121,6 +132,9 @@ void waterfront_traffic_evaluate_routes(const WaterfrontRouteDefinition *routes,
     for (int i = 0; i < frame->vessel_count; ++i) {
         BoatModelSpec spec = waterfront_traffic_spec_routes(routes, i);
         WaterfrontVesselState *vessel = &frame->vessels[i];
+        frame->mesh[i] = routes ? (unsigned char)(WATERFRONT_TRAFFIC_ALL
+                                         + routes->actors[i].recipe)
+                                : (unsigned char)i;
         vessel->id = 3000 + i;
         vessel->motion = waterfront_traffic_motion_routes(routes, i, time);
         vessel->pose = boat_water_pose(
@@ -253,24 +267,26 @@ bool waterfront_traffic_contact(Vector2 position, float heading, float bow, floa
         INFINITY, (BoatWater) { 0 }, time, contact);
 }
 
-bool waterfront_traffic_contact_height(Vector2 position, float heading, float bow, float stern,
-    float half_beam, float bottom, float top, BoatWater water, double time,
-    WaterfrontTrafficContact *contact)
+static bool contact_height_routes(const WaterfrontRouteDefinition *routes, Vector2 position,
+    float heading, float bow, float stern, float half_beam, float bottom, float top, BoatWater water,
+    double time, WaterfrontTrafficContact *contact)
 {
     Vector2 forward = { sinf(heading), -cosf(heading) }, right = { cosf(heading), sinf(heading) };
     float mid = (bow - stern) * .5f;
     Vector2 center = Vector2Add(position, Vector2Scale(forward, mid));
-    for (int i = 0; i <= WATERFRONT_TRAFFIC_ALL; ++i) {
-        if (i >= WATERFRONT_TRAFFIC_VESSELS && i < WATERFRONT_TRAFFIC_ALL && !water.upstream)
+    int count = routes ? (int)routes->actor_count : WATERFRONT_TRAFFIC_ALL + 1;
+    for (int i = 0; i < count; ++i) {
+        if (!routes && i >= WATERFRONT_TRAFFIC_VESSELS && i < WATERFRONT_TRAFFIC_ALL
+            && !water.upstream)
             continue;
         // The opt-in race trial has its own authored source, separate from scenery traffic.
         // Its conservative box agrees with the shared CPU/GPU trial ferry presentation.
-        bool trial = i == WATERFRONT_TRAFFIC_TRIAL;
+        bool trial = !routes && i == WATERFRONT_TRAFFIC_TRIAL;
         Vector2 source;
         if (trial && !boat_vessel_wake_position(water.vessel, time, &source))
             continue;
-        BoatModelSpec spec = waterfront_traffic_spec(i);
-        WaterfrontVesselMotion motion = waterfront_traffic_motion(i, time);
+        BoatModelSpec spec = waterfront_traffic_spec_routes(routes, i);
+        WaterfrontVesselMotion motion = waterfront_traffic_motion_routes(routes, i, time);
         if (trial) {
             spec = boat_model_preset(BOAT_MODEL_FERRY);
             spec.length = BOAT_VESSEL_LENGTH;
@@ -321,11 +337,31 @@ bool waterfront_traffic_contact_height(Vector2 position, float heading, float bo
     return false;
 }
 
-bool waterfront_traffic_camera_clear(Vector3 p, double time, float clearance)
+bool waterfront_traffic_contact_height(Vector2 position, float heading, float bow, float stern,
+    float half_beam, float bottom, float top, BoatWater water, double time,
+    WaterfrontTrafficContact *contact)
 {
-    for (int i = 0; i < WATERFRONT_TRAFFIC_VESSELS; ++i) {
-        BoatModelSpec spec = waterfront_traffic_spec(i);
-        WaterfrontVesselMotion m = waterfront_traffic_motion(i, time);
+    return contact_height_routes(
+        NULL, position, heading, bow, stern, half_beam, bottom, top, water, time, contact);
+}
+
+bool waterfront_traffic_contact_height_scene(const BoatSceneDefinition *scene, Vector2 position,
+    float heading, float bow, float stern, float half_beam, float bottom, float top, BoatWater water,
+    double time, WaterfrontTrafficContact *contact)
+{
+    const WaterfrontRouteDefinition *routes
+        = scene && scene->traffic_present ? &scene->traffic : NULL;
+    return contact_height_routes(
+        routes, position, heading, bow, stern, half_beam, bottom, top, water, time, contact);
+}
+
+static bool camera_clear_routes(
+    const WaterfrontRouteDefinition *routes, Vector3 p, double time, float clearance)
+{
+    int count = routes ? (int)routes->actor_count : WATERFRONT_TRAFFIC_VESSELS;
+    for (int i = 0; i < count; ++i) {
+        BoatModelSpec spec = waterfront_traffic_spec_routes(routes, i);
+        WaterfrontVesselMotion m = waterfront_traffic_motion_routes(routes, i, time);
         Vector3 q = Vector3Transform(Vector3Subtract(p, m.position), MatrixRotateY(-m.heading));
         float top = fmaxf(spec.mast_height,
             spec.freeboard + spec.cabin_height + (spec.passenger_deck ? 2.6f : .8f));
@@ -335,4 +371,17 @@ bool waterfront_traffic_camera_clear(Vector3 p, double time, float clearance)
             return false;
     }
     return true;
+}
+
+bool waterfront_traffic_camera_clear(Vector3 p, double time, float clearance)
+{
+    return camera_clear_routes(NULL, p, time, clearance);
+}
+
+bool waterfront_traffic_camera_clear_scene(
+    const BoatSceneDefinition *scene, Vector3 p, double time, float clearance)
+{
+    const WaterfrontRouteDefinition *routes
+        = scene && scene->traffic_present ? &scene->traffic : NULL;
+    return camera_clear_routes(routes, p, time, clearance);
 }

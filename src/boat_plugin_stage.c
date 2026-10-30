@@ -95,6 +95,57 @@ static void diagnostic(Wire *w, BoatPluginDiagnostic *d)
     d->cost.leaked_bytes = (size_t)integer(w, d->cost.leaked_bytes, 8);
     d->cost.fields = (unsigned)integer(w, d->cost.fields, 4);
 }
+// L3.2: bounded travelling-craft routes. Counts are checked before any array access and the
+// definition is revalidated after decoding, so a malformed worker cannot install a partial list.
+static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
+{
+    routes->actor_count = (unsigned)integer(w, routes->actor_count, 4);
+    if (routes->actor_count > WATERFRONT_ROUTE_ACTORS) {
+        w->ok = false;
+        return;
+    }
+    for (unsigned i = 0; i < routes->actor_count; ++i) {
+        WaterfrontRouteActor *a = &routes->actors[i];
+        string(w, a->id, sizeof(a->id));
+        a->shape = (unsigned char)integer(w, a->shape, 1);
+        a->recipe = (unsigned char)integer(w, a->recipe, 1);
+        a->retain = (unsigned char)integer(w, a->retain, 1);
+        if (a->retain != 0xff && a->retain > WATERFRONT_ROUTE_ACTORS)
+            w->ok = false;
+        unsigned bridge = (unsigned)integer(w, a->bridge ? 1u : 0u, 1);
+        if (bridge > 1 || a->shape >= WATERFRONT_ROUTE_SHAPES
+            || a->recipe >= WATERFRONT_CRAFT_RECIPES)
+            w->ok = false;
+        a->bridge = bridge != 0;
+        a->speed = (float)number(w, a->speed);
+        a->accel = (float)number(w, a->accel);
+        a->phase = (float)number(w, a->phase);
+        a->period = number(w, a->period);
+        a->point_count = (unsigned)integer(w, a->point_count, 4);
+        a->stop_count = (unsigned)integer(w, a->stop_count, 4);
+        if (a->point_count > WATERFRONT_ROUTE_POINT_CAPACITY
+            || a->stop_count > WATERFRONT_ROUTE_STOPS) {
+            w->ok = false;
+            return;
+        }
+        for (unsigned p = 0; p < a->point_count; ++p) {
+            a->points[p].x = (float)number(w, a->points[p].x);
+            a->points[p].z = (float)number(w, a->points[p].z);
+            a->points[p].radius = (float)number(w, a->points[p].radius);
+        }
+        for (unsigned k = 0; k < a->stop_count; ++k) {
+            a->stops[k].segment = (unsigned char)integer(w, a->stops[k].segment, 1);
+            a->stops[k].dwell = (float)number(w, a->stops[k].dwell);
+        }
+        a->origin_x = (float)number(w, a->origin_x);
+        a->origin_z = (float)number(w, a->origin_z);
+        a->long_radius = (float)number(w, a->long_radius);
+        a->short_radius = (float)number(w, a->short_radius);
+        a->start_distance = (float)number(w, a->start_distance);
+        a->turn_radius = (float)number(w, a->turn_radius);
+    }
+}
+
 // The full pointer-free scene definition, so an isolated worker can return the same identity
 // the in-process decoder produces. Counts are checked before any array access.
 static void scene_wire(Wire *w, BoatSceneDefinition *s)
@@ -102,15 +153,16 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
     s->version = (unsigned)integer(w, s->version, 4);
     unsigned flags = (unsigned)integer(w,
         (s->entrance_present ? 1u : 0u) | (s->berths_present ? 2u : 0u)
-            | (s->modules_present ? 4u : 0u),
+            | (s->modules_present ? 4u : 0u) | (s->traffic_present ? 8u : 0u),
         1);
-    if (flags > 7 || s->version > BOAT_SCENE_VERSION) {
+    if (flags > 15 || s->version > BOAT_SCENE_VERSION) {
         w->ok = false;
         return;
     }
     s->entrance_present = flags & 1u;
     s->berths_present = flags & 2u;
     s->modules_present = flags & 4u;
+    s->traffic_present = flags & 8u;
     if (s->entrance_present) {
         s->entrance_x = (float)number(w, s->entrance_x);
         s->entrance_z = (float)number(w, s->entrance_z);
@@ -146,6 +198,8 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
         m->anchor_z = (float)number(w, m->anchor_z);
         string(w, m->attaches, sizeof(m->attaches));
     }
+    if (s->traffic_present)
+        traffic_wire(w, &s->traffic);
 }
 
 static void data_wire(Wire *w, BoatPluginVoyageData *v)
@@ -267,7 +321,7 @@ int boat_plugin_stage_worker(void)
             d.cost.peak_bytes = cost.peak_bytes;
     }
 done:
-    integer(&out, 0x50535433, 4); // PST3: scenes extend PST2; other versions are refused.
+    integer(&out, 0x50535434, 4); // PST4: traffic routes extend PST3; other versions are refused.
     diagnostic(&out, &d);
     if (d.status == BOAT_PLUGIN_OK)
         data_wire(&out, &data);
@@ -436,7 +490,7 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
         return 0;
     if (status < 0)
         return failure(j, host, "browser worker failed, canceled or stale");
-    unsigned char bytes[4096];
+    unsigned char bytes[32768];
     int size = browser_read(j->browser_job, bytes);
     if (size <= 0 || fwrite(bytes, 1, (size_t)size, j->output) != (size_t)size)
         return failure(j, host, "invalid browser worker response");
@@ -464,11 +518,11 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
     j->running = false;
     j->finished = true;
     // Fixed maximum response even if a broken worker writes more.
-    if (fseek(j->output, 0, SEEK_END) || ftell(j->output) > 4096)
+    if (fseek(j->output, 0, SEEK_END) || ftell(j->output) > 32768)
         return failure(j, host, "worker output exceeds limit");
     rewind(j->output);
     Wire out = { j->output, true, true };
-    if (integer(&out, 0, 4) != 0x50535433)
+    if (integer(&out, 0, 4) != 0x50535434)
         out.ok = false;
     BoatPluginDiagnostic d = { 0 };
     diagnostic(&out, &d);

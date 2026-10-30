@@ -126,17 +126,19 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **L1.1–L1.4 and L2.1 complete; scene envelope decoding, binding, staging wire
-and native berth parameterization implemented, with no authorable package subsystem yet.** The
+Status, 2026-10-30: **L1.1–L1.4 and L2–L3.2 complete; scene decoding, binding, staging wire,
+marina berths/modules and travelling-craft routes are implemented.** Authored route geometry
+still selects registered native presets; there is no freeform route editor. The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and the versioned envelope; L1.3 installs it between ticks on
 the session's `BoatWorld.scene` and `BoatViewState.scene`, survives Undo/session restarts, and
-restores the compiled route/scene when the plugin closes. L2.2 added `scene.marina.berths` and `entrance`; L2.3 adds registered
-`scene.marina.modules` (pontoon, small pontoon, gangway, quay). Both renderers and physics consume
-the accepted berth/module list. A missing subsystem keeps its compiled default; a present empty
-list disables it. `scene.define` does not enable a second package, a callback or a browser/room
-path.
+restores the compiled route/scene when the plugin closes. L2.2 added `scene.marina.berths` and
+`entrance`; L2.3 adds registered `scene.marina.modules` (pontoon, small pontoon, gangway, quay);
+L3.2 adds `scene.traffic.vessels` with registered route/craft presets and explicit retained
+compiled actors. Both renderers, physics contact, combat and camera exclusion consume the same
+accepted lists. A missing subsystem keeps its compiled default; a present empty list disables it.
+`scene.define` does not enable a second package, a callback or a browser/room path.
 
 ### Package composition
 
@@ -188,6 +190,13 @@ return {
         { id = "ramp", kind = "gangway", anchor = { x = 34.1, z = 170 },
           attaches = "pier" }
       }
+    },
+    traffic = {                                     -- added by L3.2; 0..8 vessels
+      vessels = {
+        { id = "passing", recipe = "runabout", route = "marina_pass",
+          speed = 4, phase = 0, period = 24.8540 },
+        { id = "river_runabout", retain = "river_runabout" }
+      }
     }
   }
 }
@@ -210,17 +219,26 @@ return {
 | `modules[i].x`, `.z`, `.heading` | as berth | Pontoon/quay centre and heading. A gangway uses `anchor` instead. |
 | `gangway.anchor` | `{ x, z }`, finite | Shore end. It must be land; the pontoon landing must be water. |
 | `gangway.attaches` | existing pontoon module ID | The far end is the named pontoon's west-side landing, transformed by that pontoon's pose. |
+| `traffic.vessels` | dense list of 0–8 records | A present list replaces every travelling craft; empty disables them. The docked ferry and bridge stay independent. |
+| `vessels[i].id` | 1–23, same spelling; unique among vessels | Stable authored identity. |
+| `vessels[i].retain` | compiled route actor ID | Copies a compiled route/timetable and keeps its existing map clearance. It cannot be combined with authored route fields. |
+| `vessels[i].route` | `river_runabout`, `river_cruiser`, `river_sailboat`, `river_ferry`, `alvsnabben`, `frihamnen`, `schooner`, `marina_pass` | Registered native route preset. Geometry and stop positions are native; Lua supplies timetable values. |
+| `vessels[i].recipe` | `runabout`, `cruiser`, `sailboat`, `ferry`, `alvsnabben`, `frihamnen`, `schooner`, `workboat` | Registered native craft geometry. |
+| `vessels[i].speed`, `.phase`, `.period` | speed > 0 and ≤ 40 m/s; finite phase; period 5–86400 s | Authored timetable. A no-stop loop requires `period = length / speed` within 0.02 s. Stops add explicit dwell (L3.3). |
 
-The decoder copies berth/module IDs, recipes, mooring/attachment rules, source x/z, headings and
-gangway anchors before the Lua state closes. `boat_scene_validate` checks identities, recipes,
+The decoder copies berth/module IDs, recipes, mooring/attachment rules, source x/z, headings,
+gangway anchors and the complete route/timetable before the Lua state closes. `boat_scene_validate` checks identities, recipes,
 numbers and capacities; `boat_plugin_check_location` then checks hull plus wave/mooring envelopes,
 pairwise hull/pontoon/quay clearance, the declared entrance, the location spawn and every voyage
 recovery shelter. A pontoon must lie in open water, a quay on land, and a gangway needs a land
 anchor, a water landing, a 2–20 m span and an existing pontoon target. Invalid fields, duplicate
 IDs, unknown recipes, a berth or pontoon ashore, overlapping solid modules, a blocked entrance,
-non-finite values and capacity + 1 are rejected with their field paths. Every table is strict;
-lists are dense. There is no silent clamp, index merge or partial installation. Depth is
-unavailable, so discovery and diagnostics report **depth unverified** instead of inventing a
+non-finite values and capacity + 1 are rejected with their field paths. Authored craft are sampled
+over the 4,160 s combined river timetable and must clear compiled water, the declared entrance,
+berths, solid modules, other authored craft and compiled traffic; retained actors keep their
+compiled route. Ordinary traffic wakes stay visual. Every table is strict; lists are dense. There
+is no silent clamp, index merge or partial installation. Depth is unavailable, so discovery and
+diagnostics report **depth unverified** instead of inventing a
 bathymetry check.
 
 ### Replacement, restart and owner lifetime
@@ -1116,7 +1134,8 @@ request drops held output and preserves active source/state/world; stale respons
 newer active/held revisions and report the stale-base diagnostic. Shutdown cancels/reaps. Preview checkpoint save/restore refuses an owner with
 an in-flight process.
 
-The private response is `PST3`, fieldwise network-order unsigned integers, IEEE binary64 data
+The private response is `PST4` (traffic routes extend L1.4's `PST3`), fieldwise network-order
+unsigned integers, IEEE binary64 data
 and bounded length-prefixed strings, at most 4096 bytes. It extends `PST2` with the optional
 scene envelope (version, presence, entrance, counted berth/module records and attachments).
 Completion checks the version, exact framing, array bounds, enum values, finite numbers,

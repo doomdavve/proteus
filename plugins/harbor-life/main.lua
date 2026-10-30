@@ -36,6 +36,15 @@ return {
         { id = "ramp", kind = "gangway", anchor = { x = 34.1, z = 170 },
           attaches = "pier" }
       }
+    },
+    -- A small craft loops just north of the marina every ~27 s. A present vessel list replaces
+    -- all compiled traffic, so the compiled river runabout is retained explicitly.
+    traffic = {
+      vessels = {
+        { id = "passing", recipe = "runabout", route = "marina_pass",
+          speed = 4, phase = 0, period = 24.8540 },
+        { id = "river_runabout", retain = "river_runabout" }
+      }
     }
   }
 }

@@ -180,8 +180,8 @@ static void resolve_traffic(Boat *boat, const BoatWorld *world, double time)
     // Multiple passes cover a rare simultaneous contact without advancing traffic time.
     for (int pass = 0; pass < 4; ++pass) {
         WaterfrontTrafficContact traffic;
-        if (!waterfront_traffic_contact_height(boat->position, boat->heading, HULL_BOW, HULL_STERN,
-                HULL_HALF_BEAM, bottom, top, world->water, time, &traffic))
+        if (!waterfront_traffic_contact_height_scene(world->scene, boat->position, boat->heading,
+                HULL_BOW, HULL_STERN, HULL_HALF_BEAM, bottom, top, world->water, time, &traffic))
             break;
         Vector2 previous = boat->position;
         Vector2 shifted

@@ -884,8 +884,8 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
             || !build_source_mesh(
                 &scene->player_engine[skin], boat_skin_mesh(skin, BOAT_SKIN_ENGINE)))
             goto failed;
-    for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
-        if (!build_source_mesh(&scene->traffic_boats[i], waterfront_traffic_mesh(i)))
+    for (int i = 0; i < WATERFRONT_TRAFFIC_MESH_SLOTS; ++i)
+        if (!build_source_mesh(&scene->traffic_boats[i], waterfront_traffic_mesh_slot(i)))
             goto failed;
     if (!build_source_mesh(&scene->lift_span, waterfront_upstream_span_mesh()))
         goto failed;
@@ -1488,7 +1488,8 @@ static void draw_traffic(const WaterfrontGpuScene *scene, Material material,
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
     for (int i = 0; i < traffic->vessel_count; ++i) {
         const WaterfrontVesselState *vessel = &traffic->vessels[i];
-        draw_colored_mesh(scene->traffic_boats[i], material, vessel->pose, WHITE, false);
+        draw_colored_mesh(scene->traffic_boats[traffic->mesh[i]], material, vessel->pose, WHITE,
+            false);
         float size = i >= 3 ? .32f : .18f;
         for (int light = 0; lights && light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
             draw_colored_mesh(scene->cube, material,
@@ -2019,7 +2020,7 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
             UnloadMesh(scene->gull[part]);
     if (scene->cube.vaoId != 0)
         UnloadMesh(scene->cube);
-    for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
+    for (int i = 0; i < WATERFRONT_TRAFFIC_MESH_SLOTS; ++i)
         if (scene->traffic_boats[i].vaoId)
             UnloadMesh(scene->traffic_boats[i]);
     if (scene->lift_span.vaoId)

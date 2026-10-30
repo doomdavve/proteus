@@ -108,7 +108,19 @@ def schema():
     marina = object_schema({"entrance": record({**point, "width": number(4, 40, "metres")}),
                             "berths": sequence(berth, 0, 7),
                             "modules": sequence(module, 0, 4)}, required=())
-    scene = object_schema({"version": {"const": 1}, "marina": marina}, required=("version",))
+    routes = ["river_runabout", "river_cruiser", "river_sailboat", "river_ferry", "alvsnabben",
+              "frihamnen", "schooner", "marina_pass"]
+    craft = ["runabout", "cruiser", "sailboat", "ferry", "alvsnabben", "frihamnen", "schooner",
+             "workboat"]
+    vessel = {"oneOf": [
+        record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "retain": {"enum": routes}}),
+        record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "recipe": {"enum": craft},
+                "route": {"enum": routes}, "speed": number(0, 40, "m/s"),
+                "phase": number(-86400, 86400, "seconds"),
+                "period": number(5, 86400, "seconds")})]}
+    traffic = object_schema({"vessels": sequence(vessel, 0, 8)}, required=("vessels",))
+    scene = object_schema({"version": {"const": 1}, "marina": marina, "traffic": traffic},
+        required=("version",))
     int64 = number(-(1 << 63), (1 << 63) - 1, integer=True)
     command_base = {"generation": number(1, 0xffffffff, integer=True), "id": text()}
     command_variants = []
@@ -139,6 +151,10 @@ def schema():
                     "declared entrance and the spawn/recovery shelters; depth is unverified",
                     "Pontoon/quay footprints must clear each other; gangways need a land anchor,",
                     "water landing, 2..20 m span and an existing pontoon target",
+                    "scene.traffic.vessels is 0..8; a present list replaces all travelling craft",
+                    "Retain entries copy a compiled actor; authored entries select a registered",
+                    "route and recipe. Hulls must clear the map, marina and scheduled craft",
+                    "Ordinary traffic wakes stay visual; no authored route wake recipe exists",
                     "scene.define requires voyage.define and precedes objective grants"],
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",
                     "skip_ticks <= recovery_ticks; native course/rules validation",

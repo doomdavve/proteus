@@ -8,7 +8,7 @@ const path = require('node:path');
 
 function response(status = 0) {
   const bytes = new Uint8Array(8), view = new DataView(bytes.buffer);
-  view.setUint32(0, 0x50535433); view.setUint32(4, status);
+  view.setUint32(0, 0x50535434); view.setUint32(4, status);
   return {exit: status ? 1 : 0, bytes};
 }
 function fixture() {

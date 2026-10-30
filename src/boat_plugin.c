@@ -588,11 +588,104 @@ static BoatPluginStatus check_scene_modules(
     return BOAT_PLUGIN_OK;
 }
 
+// L3.2: sample every authored craft over the combined river timetable. The hull envelope is
+// inflated by half a sample step of travel, so a thin diagonal cannot slip between samples.
+static BoatPluginStatus check_scene_traffic(
+    const BoatPluginVoyage *voyage, const BoatMap *map, BoatPluginDiagnostic *d)
+{
+    const BoatSceneDefinition *scene = &voyage->scene;
+    if (!scene->traffic_present || !scene->traffic.actor_count)
+        return BOAT_PLUGIN_OK;
+    const double step = .25, horizon = 4160; // The four river periods repeat together here.
+    int samples = (int)(horizon / step);
+    for (unsigned i = 0; i < scene->traffic.actor_count; ++i) {
+        const WaterfrontRouteActor *a = &scene->traffic.actors[i];
+        BoatModelSpec spec = waterfront_traffic_spec_routes(&scene->traffic, (int)i);
+        char path[48];
+        snprintf(path, sizeof(path), "scene.traffic.vessels[%u]", i + 1);
+        for (int s = 0; s <= samples; ++s) {
+            double time = s * step;
+            WaterfrontVesselMotion m
+                = waterfront_traffic_motion_routes(&scene->traffic, (int)i, time);
+            float speed = Vector3Length(m.velocity);
+            float margin = .5f + speed * (float)step * .5f;
+            Vector2 centre = { m.position.x, m.position.z };
+            Vector2 length = { sinf(m.heading), -cosf(m.heading) };
+            Vector2 beam = { cosf(m.heading), sinf(m.heading) };
+            float half_length = spec.length * .5f + margin;
+            float half_beam = spec.beam * .5f + margin;
+            bool retained = a->retain != 0xff;
+            // A retained compiled actor keeps its existing route; only authored craft need
+            // new map/marina clearance. Both kinds still prove they clear each other.
+            if (!retained && !box_water(map, centre, length, beam, half_length, half_beam, .5f))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "swept hull is not open water of the compiled map");
+            if (!retained && scene->entrance_present
+                && box_contains(centre, length, beam, half_length, half_beam,
+                    (Vector2) { scene->entrance_x, scene->entrance_z }, .5f))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "crosses the declared marina entrance");
+            for (unsigned b = 0; !retained && b < scene->berth_count; ++b) {
+                const BoatSceneBerth *berth = &scene->berths[b];
+                BoatModelSpec bs = boat_scene_berth_spec((BoatSceneBerthRecipe)berth->recipe);
+                Vector2 bc, bl, bb;
+                float bhl, bhb;
+                berth_box(berth, bs, &bl, &bb, &bc, &bhl, &bhb);
+                if (box_overlap(centre, length, beam, half_length, half_beam, bc, bl, bb, bhl, bhb,
+                        .3f))
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                        "crosses scene.marina.berths[%u]", b + 1);
+            }
+            for (unsigned m = 0; !retained && m < scene->module_count; ++m) {
+                if (scene->modules[m].kind == BOAT_SCENE_MODULE_GANGWAY)
+                    continue;
+                Vector2 mc, ml, mb;
+                float mhl, mhb;
+                module_box(&scene->modules[m], &ml, &mb, &mc, &mhl, &mhb);
+                if (box_overlap(centre, length, beam, half_length, half_beam, mc, ml, mb, mhl, mhb,
+                        .3f))
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                        "crosses scene.marina.modules[%u]", m + 1);
+            }
+            for (unsigned j = i + 1; j < scene->traffic.actor_count; ++j) {
+                BoatModelSpec os = waterfront_traffic_spec_routes(&scene->traffic, (int)j);
+                WaterfrontVesselMotion om
+                    = waterfront_traffic_motion_routes(&scene->traffic, (int)j, time);
+                Vector2 oc = { om.position.x, om.position.z };
+                Vector2 ol = { sinf(om.heading), -cosf(om.heading) };
+                Vector2 ob = { cosf(om.heading), sinf(om.heading) };
+                if (box_overlap(centre, length, beam, half_length, half_beam, oc, ol, ob,
+                        os.length * .5f + .5f, os.beam * .5f + .5f, .3f))
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                        "crosses scene.traffic.vessels[%u]", j + 1);
+            }
+            // Compare against the compiled service as well: a present list replaces it only
+            // after proving that the retained timetable does not intersect the authored craft.
+            for (int j = 0; j < WATERFRONT_TRAFFIC_ALL; ++j) {
+                if (a->retain == (unsigned)j)
+                    continue; // A retained default is the same scheduled actor, not a conflict.
+                BoatModelSpec os = waterfront_traffic_spec(j);
+                WaterfrontVesselMotion om = waterfront_traffic_motion(j, time);
+                Vector2 oc = { om.position.x, om.position.z };
+                Vector2 ol = { sinf(om.heading), -cosf(om.heading) };
+                Vector2 ob = { cosf(om.heading), sinf(om.heading) };
+                if (box_overlap(centre, length, beam, half_length, half_beam, oc, ol, ob,
+                        os.length * .5f + .5f, os.beam * .5f + .5f, .3f))
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                        "crosses compiled traffic vessel %d", j + 1);
+            }
+        }
+        (void)a;
+    }
+    return BOAT_PLUGIN_OK;
+}
+
 static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
 {
     const BoatSceneDefinition *scene = &voyage->scene;
-    if (!voyage->has_scene || (!scene->berths_present && !scene->modules_present))
+    if (!voyage->has_scene
+        || (!scene->berths_present && !scene->modules_present && !scene->traffic_present))
         return BOAT_PLUGIN_OK;
     if (!location->mapped)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
@@ -639,6 +732,8 @@ static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
                     "overlaps scene.marina.berths[%u] with no hull clearance", i + 1);
         }
     if (scene->modules_present && check_scene_modules(voyage, map, d) != BOAT_PLUGIN_OK)
+        return d->status;
+    if (check_scene_traffic(voyage, map, d) != BOAT_PLUGIN_OK)
         return d->status;
     return BOAT_PLUGIN_OK;
 }

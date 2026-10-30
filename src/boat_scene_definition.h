@@ -6,6 +6,7 @@
 // values. It never points at Lua, files or a plugin host. Simulation x/z coordinates and renderer
 // headings follow the voyage API; a renderer converts x once at its boundary.
 #include "boat_model.h"
+#include "waterfront_route.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -64,13 +65,16 @@ typedef struct {
 
 // A present subsystem replaces its whole compiled collection. An absent one keeps the compiled
 // default; an empty present list disables it where the native owner allows that.
-typedef struct {
+typedef struct BoatSceneDefinition {
     unsigned version;
     bool entrance_present, berths_present, modules_present;
     float entrance_x, entrance_z, entrance_width;
     unsigned berth_count, module_count;
     BoatSceneBerth berths[BOAT_SCENE_BERTHS];
     BoatSceneModule modules[BOAT_SCENE_MODULES];
+    // L3.2: a present vessel list replaces all travelling craft. Count zero disables them.
+    bool traffic_present;
+    WaterfrontRouteDefinition traffic;
 } BoatSceneDefinition;
 
 typedef struct {
