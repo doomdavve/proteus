@@ -2,8 +2,9 @@
 
 A native solo `outer` package that keeps the Långedrag voyage and replaces the compiled moored fleet and
 dock furniture with two editable berths, a small pontoon and a gangway. It also adds a small
-passing craft on a ~25 s loop just north of the marina, and retains the compiled river runabout.
-The docked ferry and bridge remain independent compiled actors.
+passing craft on a ~25 s loop just north of the marina, retains one compiled upstream ferry with
+an edited Stenpiren dwell, and retains the compiled river runabout. The docked ferry and bridge
+remain independent compiled actors.
 
 The berths sit at simulation `(13, 167)` and `(13, 173)` facing east toward the small authored
 pontoon at `(20, 170)`. A gangway runs from land at `(34.1, 170)` to that pontoon.
@@ -35,10 +36,19 @@ boat.
 
 `scene.traffic.vessels` is a 0–8 entry replacement for all travelling craft. An entry either
 retains a compiled actor (`{ id = "river_runabout", retain = "river_runabout" }`) or selects a
-registered route and craft recipe with `speed`, `phase` and `period`. Authored hulls are sampled
-over the combined river timetable and must clear the compiled water, the marina entrance, berths,
-dock modules and compiled/retained traffic. Their wakes stay visual; no physical traffic wake
-recipe is exposed.
+registered route and craft recipe with `speed`, `phase` and `period`. A retained actor may also
+override its named stops:
+
+```lua
+{ id = "ferry", retain = "alvsnabben",
+  stops = { { id = "stenpiren", dwell = 35 }, { id = "lindholmspiren" },
+            { id = "eriksberg" } } }
+```
+
+The stop IDs must match the registered route in order. An omitted `dwell` shares the period's
+remaining time. Authored hulls are sampled over the combined river timetable and must clear the
+compiled water, the marina entrance, berths, dock modules and compiled/retained traffic. Their
+wakes stay visual; no physical traffic wake recipe is exposed.
 
 ## Verify
 

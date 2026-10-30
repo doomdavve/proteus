@@ -179,7 +179,7 @@ int main(int argc, char **argv)
     const BoatPluginVoyage *held_scene = &boat_plugin_host_held(&scene_host)->voyage;
     CHECK(held_scene->has_scene && held_scene->scene.version == 1);
     CHECK(held_scene->scene.berth_count == 2 && held_scene->scene.module_count == 2);
-    CHECK(held_scene->scene.traffic_present && held_scene->scene.traffic.actor_count == 2);
+    CHECK(held_scene->scene.traffic_present && held_scene->scene.traffic.actor_count == 3);
     CHECK(!strcmp(held_scene->scene.traffic.actors[0].id, "passing"));
     CHECK(held_scene->scene_digest == scene_digest
         && boat_scene_digest(&held_scene->scene) == scene_digest);

@@ -112,12 +112,16 @@ def schema():
               "frihamnen", "schooner", "marina_pass"]
     craft = ["runabout", "cruiser", "sailboat", "ferry", "alvsnabben", "frihamnen", "schooner",
              "workboat"]
+    stop = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
+                   "dwell": number(0, 86400, "seconds")})
     vessel = {"oneOf": [
-        record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "retain": {"enum": routes}}),
+        record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "retain": {"enum": routes},
+                "stops": sequence(stop, 0, 8)}),
         record({"id": text(23, r"^[a-z][a-z0-9_]*$"), "recipe": {"enum": craft},
                 "route": {"enum": routes}, "speed": number(0, 40, "m/s"),
                 "phase": number(-86400, 86400, "seconds"),
-                "period": number(5, 86400, "seconds")})]}
+                "period": number(5, 86400, "seconds"),
+                "stops": sequence(stop, 0, 8)})]}
     traffic = object_schema({"vessels": sequence(vessel, 0, 8)}, required=("vessels",))
     scene = object_schema({"version": {"const": 1}, "marina": marina, "traffic": traffic},
         required=("version",))
@@ -152,8 +156,10 @@ def schema():
                     "Pontoon/quay footprints must clear each other; gangways need a land anchor,",
                     "water landing, 2..20 m span and an existing pontoon target",
                     "scene.traffic.vessels is 0..8; a present list replaces all travelling craft",
-                    "Retain entries copy a compiled actor; authored entries select a registered",
-                    "route and recipe. Hulls must clear the map, marina and scheduled craft",
+                    "Retain entries copy a compiled actor and may override its named stop dwells;",
+                    "authored entries select a registered route and recipe. Stop IDs must match",
+                    "the preset in order; omitted dwell shares the period remainder",
+                    "Hulls must clear the map, marina and scheduled craft",
                     "Ordinary traffic wakes stay visual; no authored route wake recipe exists",
                     "scene.define requires voyage.define and precedes objective grants"],
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",

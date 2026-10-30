@@ -309,14 +309,21 @@ static int scene_traffic(void)
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
-    CHECK(voyage.scene.traffic_present && voyage.scene.traffic.actor_count == 2);
+    CHECK(voyage.scene.traffic_present && voyage.scene.traffic.actor_count == 3);
     const WaterfrontRouteActor *passing = &voyage.scene.traffic.actors[0];
     CHECK(!strcmp(passing->id, "passing") && passing->recipe == WATERFRONT_CRAFT_RUNABOUT);
     CHECK(passing->shape == WATERFRONT_ROUTE_POINTS && passing->point_count == 4);
     CHECK(passing->speed == 4 && passing->period > 24 && passing->period < 26);
     CHECK(passing->retain == 0xff);
-    CHECK(!strcmp(voyage.scene.traffic.actors[1].id, "river_runabout")
-        && voyage.scene.traffic.actors[1].retain == 0);
+    const WaterfrontRouteActor *ferry = &voyage.scene.traffic.actors[1];
+    CHECK(!strcmp(ferry->id, "ferry") && ferry->recipe == WATERFRONT_CRAFT_ALVSNABBEN);
+    CHECK(ferry->stop_count == 3 && ferry->stops[0].dwell == 35);
+    CHECK(!strcmp(ferry->stops[0].id, "stenpiren")
+        && !strcmp(ferry->stops[1].id, "lindholmspiren")
+        && !strcmp(ferry->stops[2].id, "eriksberg"));
+    CHECK(ferry->stops[1].dwell < 0 && ferry->stops[2].dwell < 0);
+    CHECK(!strcmp(voyage.scene.traffic.actors[2].id, "river_runabout")
+        && voyage.scene.traffic.actors[2].retain == 0);
     CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
     WaterfrontVesselMotion start = waterfront_traffic_motion_routes(
         &voyage.scene.traffic, 0, passing->phase);
@@ -337,6 +344,9 @@ static int scene_traffic(void)
             "scene.traffic.vessels[1].route" },
         { "speed = 4, phase = 0", "speed = 0, phase = 0", "scene.traffic.vessels[1].speed" },
         { "period = 24.8540", "period = 1", "scene.traffic.vessels[1].period" },
+        { "{ id = \"stenpiren\", dwell = 35 }", "{ id = \"wrong_pier\", dwell = 35 }",
+            "scene.traffic.vessels[2].stops[1]" },
+        { "dwell = 35", "dwell = -1", "scene.traffic.vessels[2].stops[1].dwell" },
     };
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         const char *source = harbor_variant(cases[i].from, cases[i].to);
