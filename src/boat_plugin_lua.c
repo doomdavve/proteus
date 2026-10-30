@@ -327,8 +327,8 @@ static int decode(lua_State *L)
         || !number(L, vm, exposure, part, "height", &d->exposure.height)
         || !number(L, vm, exposure, part, "build", &d->exposure.build))
         return 0;
-    number(L, vm, voyage, at, "exposed_fraction", &d->exposed_fraction)
-        && number(L, vm, voyage, at, "weather_range", &d->weather_range);
+    if (number(L, vm, voyage, at, "exposed_fraction", &d->exposed_fraction))
+        number(L, vm, voyage, at, "weather_range", &d->weather_range);
     return 0;
 }
 

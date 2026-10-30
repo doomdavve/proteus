@@ -378,7 +378,9 @@ static int manifests(void)
             return 1;
     // Sizes beyond the host's limits, which a package cannot raise.
     static char big[BOAT_PLUGIN_MANIFEST_MAX + 64];
-    snprintf(big, sizeof(big), "%s%*s", MANIFEST, BOAT_PLUGIN_MANIFEST_MAX, "");
+    size_t prefix = strlen(MANIFEST);
+    memcpy(big, MANIFEST, prefix);
+    memset(big + prefix, ' ', sizeof(big) - 1 - prefix);
     if (expect("large manifest", big, source, BOAT_PLUGIN_LIMIT, "", 0))
         return 1;
     BoatPluginLimits small = boat_plugin_default_limits;
