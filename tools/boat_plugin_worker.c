@@ -201,7 +201,7 @@ done:
     json_text(d.field);
     printf(",\"message\":");
     json_text(d.message);
-    unsigned scene_present = 0, scene_version = 0, scene_content = 0;
+    unsigned scene_present = 0, scene_version = 0, scene_content = 0, berth_count = 0;
     uint64_t scene_digest = 0;
     if (d.status == BOAT_PLUGIN_OK && !host->racing) {
         const BoatPluginRevision *active = boat_plugin_host_active(host);
@@ -209,14 +209,17 @@ done:
         scene_version = active->voyage.scene.version;
         scene_digest = active->voyage.scene_digest;
         scene_content = boat_scene_has_content(&active->voyage.scene);
+        berth_count = active->voyage.scene.berth_count;
     }
     printf(",\"gameplay_digest\":\"%016llx\",\"scene\":{\"present\":%s,"
            "\"version\":%u,\"digest\":\"%016llx\",\"content\":%s,"
-           "\"subsystems\":[]},\"cost\":{\"instructions\":%llu,"
+           "\"subsystems\":[%s],\"berths\":%u,\"modules\":0},"
+           "\"cost\":{\"instructions\":%llu,"
            "\"entry_instructions\":%llu,\"callback_instructions\":%llu,"
            "\"peak_bytes\":%zu,\"leaked_bytes\":%zu,\"fields\":%u}}\n",
         (unsigned long long)digest, scene_present ? "true" : "false", scene_version,
         (unsigned long long)scene_digest, scene_content ? "true" : "false",
+        berth_count ? "\"marina.berths\"" : "", berth_count,
         (unsigned long long)d.cost.instructions, (unsigned long long)d.cost.entry_instructions,
         (unsigned long long)d.cost.callback_instructions, d.cost.peak_bytes, d.cost.leaked_bytes,
         d.cost.fields);

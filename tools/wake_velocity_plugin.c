@@ -120,6 +120,12 @@ static void bind_scene(WakePlugin *plugin, BoatSession *session)
     const BoatPluginRevision *revision = boat_plugin_host_active(&plugin->host);
     session->world.scene = revision->voyage.has_scene ? &revision->voyage.scene : NULL;
 }
+
+static bool scene_differs(const BoatPluginRevision *active, const BoatPluginRevision *candidate)
+{
+    return active->voyage.has_scene != candidate->voyage.has_scene
+        || active->voyage.scene_digest != candidate->voyage.scene_digest;
+}
 #ifdef __EMSCRIPTEN__
 struct WakePluginEvaluation {
     BoatPluginEvalRequest request;
@@ -481,6 +487,8 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
         plugin->staged_objective = migrated;
 #endif
     }
+    bool scene_restart = change == BOAT_PLUGIN_RESTART_SESSION && held
+        && scene_differs(boat_plugin_host_active(&plugin->host), held);
     const BoatPluginRevision *revision = boat_plugin_host_commit(&plugin->host);
     if (!revision)
         return false;
@@ -512,8 +520,10 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
         return false;
     default:
         session->voyage_route = route; // The caller's restart begins it.
-        report(plugin, "applied", false, "SESSION RESTARTED WITH THE NEW WATER", "R%u %s",
-            revision->number, how);
+        report(plugin, "applied", false,
+            scene_restart ? "SESSION RESTARTED WITH THE NEW MARINA LAYOUT"
+                          : "SESSION RESTARTED WITH THE NEW WATER",
+            "R%u %s", revision->number, how);
         return true;
     }
 }
@@ -542,10 +552,13 @@ static bool offer(WakePlugin *plugin, BoatSession *session)
         return false;
     }
     bool water = change == BOAT_PLUGIN_RESTART_SESSION;
+    bool scene = water && scene_differs(boat_plugin_host_active(&plugin->host), held);
     report(plugin, "held", true,
         water ? "F7 RESTART SESSION / F6 DISCARD" : "F7 RESTART VOYAGE / F6 DISCARD", "R%u %s %s",
         held->number, plugin->host.undo ? "(UNDO) CHANGES" : "CHANGES",
-        water ? "THE EXPOSED WATER" : "THE ROUTE");
+        scene       ? "THE MARINA LAYOUT"
+            : water ? "THE EXPOSED WATER"
+                    : "THE ROUTE");
     return false;
 }
 
@@ -874,10 +887,13 @@ void wake_plugin_inspect(const WakePlugin *p, FILE *output)
     fprintf(output, "revision=%u schema=%u generation=%u tick=%lld pending=%u suspended=%u\n",
         active->number, p->objective.state_version, p->generation, (long long)p->objective.tick,
         p->objective_pending, p->objective.quarantined);
-    fprintf(output, "scene present=%u version=%u digest=%016llx content=%u subsystems=none\n",
+    fprintf(output,
+        "scene present=%u version=%u digest=%016llx content=%u berths=%u modules=%u "
+        "entrance=%u\n",
         active->voyage.has_scene, active->voyage.scene.version,
         (unsigned long long)active->voyage.scene_digest,
-        boat_scene_has_content(&active->voyage.scene));
+        boat_scene_has_content(&active->voyage.scene), active->voyage.scene.berth_count,
+        active->voyage.scene.module_count, active->voyage.scene.entrance_present);
     fprintf(output, "rng=%u acknowledged=%lld queued=%u diagnostic=%s\n", p->objective.rng,
         (long long)p->objective.acknowledged, p->event_count, p->objective_diagnostic.message);
     if (p->objective_pending)

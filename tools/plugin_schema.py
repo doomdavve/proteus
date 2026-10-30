@@ -11,6 +11,13 @@ def record(properties):
             "required": list(properties), "properties": properties}
 
 
+def object_schema(properties, required=None):
+    """A strict object with an explicit required subset (all keys by default)."""
+    required = list(properties) if required is None else list(required)
+    return {"type": "object", "additionalProperties": False,
+            "required": required, "properties": properties}
+
+
 def number(low, high, unit=None, integer=False):
     result = {"type": "integer" if integer else "number", "minimum": low, "maximum": high}
     if unit:
@@ -87,9 +94,8 @@ def schema():
          "then": {"properties": {"state_version": {"const": 1}}}},
         {"if": {"properties": {"capabilities": {"const": ["voyage.define", "scene.define"]}}},
          "then": {"properties": {"state_version": {"const": 1}}}}]
-    # L1.2 accepts only the versioned scene envelope. The full marina projection is published
-    # as a separate planned schema so discovery does not claim fields the decoder still rejects.
-    scene = record({"version": {"const": 1}})
+    # L2.2 exposes marina berths; registered dock modules remain a planned projection so
+    # discovery does not claim fields the decoder still rejects.
     berth = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
                     "recipe": {"enum": ["skiff", "runabout", "sailboat", "cruiser", "speedboat",
                                         "sailboat_7m", "workboat"]},
@@ -99,10 +105,13 @@ def schema():
                      "kind": {"enum": ["pontoon", "pontoon_small", "gangway", "quay"]},
                      **point, "heading": number(-math.tau, math.tau, "radians"),
                      "anchor": record(point), "attaches": text(23)})
-    scene_planned = record({"version": {"const": 1},
-                            "marina": record({"entrance": record({**point, "width": number(4, 40, "metres")}),
-                                              "berths": sequence(berth, 0, 7),
-                                              "modules": sequence(module, 0, 4)})})
+    marina = object_schema({"entrance": record({**point, "width": number(4, 40, "metres")}),
+                            "berths": sequence(berth, 0, 7)}, required=())
+    scene = object_schema({"version": {"const": 1}, "marina": marina}, required=("version",))
+    scene_planned = object_schema({"version": {"const": 1},
+                                   "marina": object_schema(
+                                       {"modules": sequence(module, 0, 4)}, required=())},
+        required=("version",))
     int64 = number(-(1 << 63), (1 << 63) - 1, integer=True)
     command_base = {"generation": number(1, 0xffffffff, integer=True), "id": text()}
     command_variants = []
@@ -126,9 +135,11 @@ def schema():
                     "Last shelter radius 0; others >0; last shelter inside arrival",
                     "No shelter in exposed water; first shelter equals selected location spawn",
                     "Shelters have 8m water clearance; arrival 20m"],
-                "scene": ["L1.2 accepts only { version = 1 }; marina is planned and rejected",
-                    "scene.define requires voyage.define and precedes objective grants",
-                    "No live scene installation is advertised by this schema"],
+                "scene": ["marina.berths is 0..7; missing berths keeps the compiled collection",
+                    "Berth IDs are unique scene-wide; recipes are registered native hulls",
+                    "Hull plus mooring excursion must clear compiled water, other berths, the",
+                    "declared entrance and the spawn/recovery shelters; depth is unverified",
+                    "scene.define requires voyage.define and precedes objective grants"],
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",
                     "skip_ticks <= recovery_ticks; native course/rules validation",
                     "Grid, gate corridors and ferry path pass compiled-map clearance checks"]},

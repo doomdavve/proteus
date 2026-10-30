@@ -86,6 +86,12 @@ camera-blocking. The existing NULL-scene wrappers and frame fields are unchanged
 callers. Authored rope anchors still use the compiled pontoon's cleat region until L2.3 adds
 registered dock modules; authored quay mooring is not exposed.
 
+L2.2 (2026-10-30) wires the accepted scene into `BoatWorld` and `BoatViewState`, so the same
+berth list drives hull contacts, the CPU/GPU harbor pass and the shared scene frame. The first
+`plugins/harbor-life` package exposes two berths at the compiled pontoon; `scene.marina.berths`
+is validated against water, pairwise clearance, the entrance and restart shelters. The compiled
+pontoon, gangway, quay, ferry and bridge remain independent.
+
 Player contacts reuse the shoreline's forgiving contact response with stationary, padded
 oriented envelopes for moored hulls, main pontoon, fingers, and gangway. Envelopes include
 fenders/outboards and allowance for gentle wave attitude; they do not simulate two moving

@@ -120,8 +120,8 @@ static bool hull_contact(
             water = boat_map_water_contact(
                 &world->resources->map, point, HULL_SHORE_CLEARANCE, &normal);
             if (water
-                && waterfront_harbor_contact_height(
-                    point, HULL_SHORE_CLEARANCE, bottom, top, world->water, time, &normal))
+                && waterfront_harbor_contact_height_scene(world->scene, point, HULL_SHORE_CLEARANCE,
+                    bottom, top, world->water, time, &normal))
                 water = false;
         } else {
             Vector2 half = world->definition->half_extent;

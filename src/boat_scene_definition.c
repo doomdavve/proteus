@@ -112,6 +112,8 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         return fail(diagnostic, "scene.marina.berths", "is absent but has entries");
     if (!scene->modules_present && scene->module_count)
         return fail(diagnostic, "scene.marina.modules", "is absent but has entries");
+    if (scene->berths_present && scene->berth_count && !scene->entrance_present)
+        return fail(diagnostic, "scene.marina.entrance", "is required when berths are present");
     if (scene->entrance_present
         && (!finite_in(scene->entrance_x, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT)
             || !finite_in(scene->entrance_z, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT)))

@@ -1,0 +1,10 @@
+{
+  "id": "proteus.harbor-life",
+  "name": "Harbor life",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["voyage.define", "scene.define"],
+  "state_version": 1
+}

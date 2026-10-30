@@ -126,6 +126,11 @@ void waterfront_scene_evaluate(double time, BoatWater water, WaterfrontSceneFram
 // under renderer X/Z, instead of the river's flat 3.5 m ground; NULL keeps that.
 void waterfront_scene_evaluate_ground(
     double time, BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame);
+// L2.2: fill the shared frame from the accepted scene. NULL keeps the compiled marina.
+void waterfront_scene_evaluate_scene(
+    const BoatSceneDefinition *scene, double time, BoatWater water, WaterfrontSceneFrame *frame);
+void waterfront_scene_evaluate_ground_scene(const BoatSceneDefinition *scene, double time,
+    BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame);
 WaterfrontStreet waterfront_scene_street(int index);
 Vector3 waterfront_scene_street_position(
     WaterfrontStreet street, float distance, Vector3 *direction);

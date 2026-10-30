@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and the L1.1–L1.4 scene envelope path implemented**.
+Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and the L1.1–L1.4 + L2.2 scene path implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages with optional objectives/timers.
@@ -130,13 +130,14 @@ Status, 2026-10-30: **L1.1–L1.4 and L2.1 complete; scene envelope decoding, bi
 and native berth parameterization implemented, with no authorable package subsystem yet.** The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
-L1.2 accepts the manifest grant and `scene = { version = 1 }` only. L1.3 installs that accepted
-envelope between ticks on the session's `BoatWorld.scene` and `BoatViewState.scene`, survives
-Undo and session restarts, and restores the compiled route/scene when the plugin closes. The
-renderers and contact queries still choose compiled marina content until L2.1/L2.2 supply the
-accepted berth layout. Any marina field is still an unknown field: L2.2 exposes two berths and
-L2.3 registered dock modules. `scene.define` does not enable a second package, a callback or a
-browser/room path.
+L1.2 accepts the manifest grant and the versioned envelope; L1.3 installs it between ticks on
+the session's `BoatWorld.scene` and `BoatViewState.scene`, survives Undo/session restarts, and
+restores the compiled route/scene when the plugin closes. L2.2 adds `scene.marina.berths` and
+`entrance`, validates them against the compiled water and the voyage's restart points, and both
+renderers and physics consume the accepted list. A missing `berths` field keeps the compiled
+seven hulls; a present empty list disables them. Registered dock modules remain planned for
+L2.3 and are still rejected as unknown fields. `scene.define` does not enable a second package,
+a callback or a browser/room path.
 
 ### Package composition
 
@@ -193,31 +194,32 @@ return {
 }
 ```
 
-| Field | Planned bound | Meaning |
+| Field | Bound | Meaning |
 | --- | --- | --- |
 | `scene.version` | integer `1` | Accepted by L1.2. A different version is rejected, not migrated. |
-| `marina` | table; absent means compiled marina | **Planned L2.2/L2.3; currently rejected as an unknown field.** A present table will replace only its supported subsystems. |
-| `marina.entrance` | `{ x, z, width }`, finite, \|x/z\| ≤ 20 000 m, width 4–40 m | Declared approach/clearance point. Validation requires open water and no hull overlap. |
+| `marina` | table; absent means compiled marina | L2.2 exposes `entrance` and `berths`; `modules` remains planned L2.3. A present list replaces only that subsystem. |
+| `marina.entrance` | `{ x, z, width }`, finite, \|x/z\| ≤ 20 000 m, width 4–40 m | Required when `berths` is non-empty. Validation requires open water with half the width clear and no hull overlap. |
 | `marina.berths` | dense list of 0–7 records | A present list replaces the entire compiled moored collection. Empty means no authored moored hulls. |
 | `berths[i].id` | 1–23 of `a-z 0-9 _`, starting with a letter; unique in the scene | Stable authored identity; diagnostics and later occupancy. Reordering does not change identity. |
 | `berths[i].recipe` | `skiff`, `runabout`, `sailboat`, `cruiser`, `speedboat`, `sailboat_7m`, `workboat` | Registered native hull recipe. Lua cannot supply dimensions, vertices or renderer transforms. |
 | `berths[i].x`, `.z` | finite, \|v\| ≤ 20 000 m | Berth centre in simulation metres. |
 | `berths[i].heading` | finite, \|h\| ≤ 2π | Renderer heading; the boat's forward is `(sin, −cos)`. |
 | `berths[i].mooring` | `pontoon` or `none` | Native attachment rule. `pontoon` attaches two lines to the nearest authored/default pontoon cleat region; `none` leaves the hull unmoored. |
-| `marina.modules` | dense list of 0–4 records | A present list replaces the entire compiled dock furniture. Empty disables it. |
+| `marina.modules` | dense list of 0–4 records | **Planned L2.3; currently rejected as an unknown field.** A present list will replace the compiled dock furniture. |
 | `modules[i].id` | 1–23, same spelling; unique across the scene including berths | Stable attachment identity. |
 | `modules[i].kind` | `pontoon`, `pontoon_small`, `gangway`, `quay` | Registered native module recipe. |
 | `modules[i].x`, `.z`, `.heading` | as berth | Pontoon/quay centre and heading. A gangway uses `anchor` instead. |
 | `gangway.anchor` | `{ x, z }`, finite | Shore end. It must be land; the pontoon landing must be water. |
 | `gangway.attaches` | existing pontoon module ID | The far end is the named pontoon's west-side landing, transformed by that pontoon's pose. |
 
-The L1.2 decoder checks the envelope, its grant and ordering before reading any marina field.
-The plain C `BoatSceneDefinition` already validates the planned IDs, recipes, numbers and
-capacities in `boat_scene_validate`, so L2.2 can expose them without changing the ownership or
-schema rules. Invalid fields, duplicate IDs, unknown recipes, a gangway with a missing or
-non-pontoon target, wrong location, non-finite values and capacity + 1 are rejected with their
-field paths. Every table is strict; lists are dense. There is no silent clamp, index merge or
-partial installation.
+The decoder copies berth IDs, recipes, mooring rules, source x/z and headings before the Lua
+state closes. `boat_scene_validate` checks identities, recipes, numbers and capacities;
+`boat_plugin_check_location` then checks the hull plus wave/mooring envelope against the
+compiled water, pairwise hull clearance, the declared entrance, the location spawn and every
+voyage recovery shelter. Invalid fields, duplicate IDs, unknown recipes, a berth ashore or
+overlapping a restart point, a blocked entrance, non-finite values and capacity + 1 are rejected
+with their field paths. Every table is strict; lists are dense. There is no silent clamp, index
+merge or partial installation. Depth is unavailable, so no depth check is claimed.
 Depth is unavailable in the current map, so discovery and diagnostics report **depth unverified**
 instead of inventing a bathymetry check. The other checks use the compiled water and native hull
 recipes.
@@ -283,7 +285,7 @@ existing host slots; the scene definition is copied into each revision and adds 
 
 ### First marina site (verified fixture)
 
-`tools/validate_scene_site.c` checks the planned site against the compiled `outer` water and the
+`tools/validate_scene_site.c` checks the first site against the compiled `outer` water and the
 native skiff/runabout recipes. It is a planning fixture: no scene description is installed yet.
 
 | Item | Simulation `x, z` | Evidence |
@@ -294,7 +296,7 @@ native skiff/runabout recipes. It is a planning fixture: no scene description is
 | Gangway shore anchor | `34.1, 170` | Land; landing at `21, 170` is water; span 13.1 m |
 | Declared entrance | `6, 168`, width 8 m | 4 m clear water, clear of both hull envelopes |
 | Approach lane | `x = 6`, `z = 150..176` | 3 m clear water; a 2.4 m hull passes both moored hulls |
-| Camera/start bookmark | `6, 158`, heading `0` | 3 m clear water, facing north into the marina |
+| Camera/start bookmark | `2, 170`, heading `π/2` | 3 m clear water, clear of both hulls, facing east across the slips |
 
 Run it with:
 
@@ -302,7 +304,21 @@ Run it with:
 ./build/validate_scene_site
 ```
 
-The same pose is the planned anchor `outer.marina` in
+The first authorable package is [`plugins/harbor-life`](../plugins/harbor-life/), which keeps
+the reference voyage and installs the two berths above. Run and edit it from the repository
+root:
+
+```sh
+./build/wake_velocity --plugin plugins/harbor-life --start 2,170,90
+./build/validate_boat_plugin --case scene_berths
+./build/validate_boat_plugin_session --case harbor_life_scene
+```
+
+A berth/entrance edit is held for F7 and restarts the session at the validated spawn; Undo
+restores the whole layout. The compiled pontoon/gangway/quay remain until L2.3, so the example
+uses the existing dock. A display-only manifest rename still preserves progress.
+
+The same pose is the pinned anchor `outer.marina` in
 [`tools/plugin_anchors.json`](../tools/plugin_anchors.json), for pinned previews and captures.
 This fixture proves water/shore geometry and hull separation; it does not prove player clearance
 under every driving line, depth, or human acceptance.

@@ -41,6 +41,7 @@ starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSI
 
 ```sh
 ./build/wake_velocity --plugin plugins/langedrag
+./build/wake_velocity --plugin plugins/harbor-life --start 2,170,90
 ./build/boat_race_trial --plugin plugins/river-sprint --play
 ./build/boat_plugin_review plugins/shelter-tour 120 360
 python3 tools/plugin_author.py schema
@@ -60,7 +61,8 @@ reloads the package; F5 reloads now, F6 undoes/discards and F7 applies a pending
 Invalid edits leave the running descriptor intact. Packaged plugin examples live under
 `assets/plugins/`; copy one somewhere writable to edit it. Packages also ship the
 [authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47) in `authoring/`. The race tool previews local
-course edits; network rooms retain their compiled course. See the
+course edits; network rooms retain their compiled course. The harbor-life example edits two
+marina berths; a layout change is held for F7 and restarts the session. See the
 [plugin API](PLUGIN_API.md#playing-and-live-authoring-p1) and
 [race example](../plugins/river-sprint/README.md) for reload policies and limits.
 

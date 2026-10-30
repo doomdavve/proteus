@@ -42,6 +42,20 @@ static bool valid_mesh(const Mesh3D *mesh)
 
 static bool close_vector(Vector3 a, Vector3 b) { return Vector3Distance(a, b) < .0001f; }
 
+static bool player_clear_scene(const Boat *boat, const BoatSceneDefinition *scene)
+{
+    for (int end = -1; end <= 1; end += 2)
+        for (int side = -1; side <= 1; side += 2) {
+            Vector2 p = Vector2Add(boat->position,
+                (Vector2) { sinf(boat->heading) * end * 1.6f + cosf(boat->heading) * side * .7f,
+                    -cosf(boat->heading) * end * 1.6f + sinf(boat->heading) * side * .7f });
+            if (waterfront_harbor_contact_height_scene(
+                    scene, p, 0, -INFINITY, INFINITY, (BoatWater) { 0 }, 0, NULL))
+                return false;
+        }
+    return true;
+}
+
 static bool player_clear(const Boat *boat)
 {
     // Independent conservative bow/stern/beam rectangle; the actual collision solver
@@ -299,6 +313,43 @@ int main(void)
     for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
         CHECK(close_vector(full.boats[i].position, flat.boats[i].position));
         CHECK(full.recipes[i] == berths[i].recipe);
+    }
+
+    // L2.2 deterministic marina approach/exit: the authored lane is usable and both hulls stop
+    // the same physics that reads BoatWorld.scene.
+    {
+        BoatSession boat;
+        boat_session_init(&boat, test_world(BOAT_LOCATION_OUTER), (BoatWater) { 0 });
+        boat.world.scene = &two;
+        boat.boat.position = (Vector2) { 6, 150 };
+        boat.boat.heading = PI; // Forward is +z (north) into the marina.
+        boat.boat.velocity = (Vector2) { 0, 6 };
+        for (int tick = 0; tick < 360; ++tick) {
+            boat_session_step(&boat, (BoatInput) { .throttle_rate = .5f });
+            CHECK(player_clear_scene(&boat.boat, &two));
+        }
+        CHECK(boat.boat.position.y > 160);
+        // Leave the lane toward open water; no authored hull is contacted.
+        boat.boat.heading = -PI / 2;
+        boat.boat.velocity = (Vector2) { -5, 0 };
+        for (int tick = 0; tick < 180; ++tick) {
+            boat_session_step(&boat, (BoatInput) { 0 });
+            CHECK(player_clear_scene(&boat.boat, &two));
+        }
+        boat_session_destroy(&boat);
+    }
+    for (int berth = 0; berth < 2; ++berth) {
+        BoatSession boat;
+        boat_session_init(&boat, test_world(BOAT_LOCATION_OUTER), (BoatWater) { 0 });
+        boat.world.scene = &two;
+        boat.boat.position = (Vector2) { 4, berth ? 173 : 167 };
+        boat.boat.heading = PI / 2; // Forward is +x (east) into the moored hull.
+        boat.boat.velocity = (Vector2) { 6, 0 };
+        for (int tick = 0; tick < 240; ++tick)
+            boat_session_step(&boat, (BoatInput) { .throttle_rate = .5f });
+        CHECK(boat.boat.position.x < 9.6f); // Stopped before crossing the hull's centre.
+        CHECK(isfinite(boat.boat.position.x));
+        boat_session_destroy(&boat);
     }
 
     // Real simulation contacts: approach the workboat and pontoon, then back away.
