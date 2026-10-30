@@ -39,9 +39,9 @@ static void flags(void)
     Mesh3D sweden = boat_flag_skin_mesh(&surface, BOAT_SKIN_SWEDEN, &sweden_storage);
     BoatFlagMesh retained = sweden_storage;
     const Color fields[] = { { 0, 106, 167, 255 }, { 250, 246, 237, 255 }, { 198, 12, 48, 255 },
-        { 186, 12, 47, 255 }, { 242, 118, 28, 255 } };
+        { 186, 12, 47, 255 }, { 242, 118, 28, 255 }, { 0, 106, 167, 255 } };
     const Color crosses[] = { { 255, 205, 0, 255 }, { 0, 53, 128, 255 }, { 250, 246, 237, 255 },
-        { 0, 32, 91, 255 }, { 58, 64, 70, 255 } };
+        { 0, 32, 91, 255 }, { 58, 64, 70, 255 }, { 255, 205, 0, 255 } };
     for (unsigned int skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
         Mesh3D mesh = boat_flag_skin_mesh(&surface, skin, &other_storage);
         assert(mesh.triangle_count == BOAT_FLAG_MESH_TRIANGLES);
@@ -100,7 +100,7 @@ int main(void)
     // The countries share the white hull; the explorer's differs. Accent stripes retain a
     // distinct livery color.
     const Color white_hull = { 239, 243, 245, 255 };
-    for (unsigned int skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
+    for (unsigned int skin = 0; skin < BOAT_SKIN_CABIN; ++skin) {
         BoatSkinPalette palette = boat_skin_palette(skin);
         assert((memcmp(&palette.hull, &white_hull, sizeof(Color)) == 0)
             == (skin < BOAT_SKIN_COUNTRIES));
@@ -113,7 +113,7 @@ int main(void)
     for (int part = BOAT_SKIN_HULL; part <= BOAT_SKIN_ENGINE; ++part) {
         const Mesh3D *base = boat_skin_mesh(0, part);
         assert(base && base->triangle_count > 0);
-        for (unsigned int skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
+        for (unsigned int skin = 0; skin < BOAT_SKIN_CABIN; ++skin) {
             unsigned int parsed = 99;
             assert(boat_skin_parse(boat_skin_name(skin), &parsed) && parsed == skin);
             const Mesh3D *mesh = boat_skin_mesh(skin, part);
@@ -135,6 +135,25 @@ int main(void)
                     > .000001f);
             }
             assert(skin == 0 || different);
+        }
+    }
+    unsigned int cabin = 99;
+    assert(boat_skin_parse("cabin", &cabin) && cabin == BOAT_SKIN_CABIN);
+    assert(boat_skin_mesh(cabin, BOAT_SKIN_HULL)->triangle_count > 0);
+    assert(boat_skin_mesh(cabin, BOAT_SKIN_COCKPIT)->triangle_count > 0);
+    for (int part = BOAT_SKIN_HULL; part <= BOAT_SKIN_COCKPIT; ++part) {
+        const Mesh3D *mesh = boat_skin_mesh(cabin, part);
+        for (size_t i = 0; i < mesh->triangle_count; ++i) {
+            const Triangle3D *t = &mesh->triangles[i];
+            Vector3 v[3];
+            for (int j = 0; j < 3; ++j) {
+                assert(t->vertices[j] < mesh->triangle_count * 3);
+                v[j] = mesh->vertices[t->vertices[j]];
+                assert(isfinite(v[j].x) && isfinite(v[j].y) && isfinite(v[j].z));
+            }
+            assert(Vector3Length(Vector3CrossProduct(
+                       Vector3Subtract(v[1], v[0]), Vector3Subtract(v[2], v[0])))
+                > .000001f);
         }
     }
     assert(boat_skin_mesh(999, BOAT_SKIN_HULL) == boat_skin_mesh(0, BOAT_SKIN_HULL));

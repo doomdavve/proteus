@@ -94,5 +94,5 @@ repeatability, and exact interpolated hoist attachment. `boat_flag_cpu` and opt-
 ## Speedboat review
 
 The [player speedboat skins](BOAT_SKINS.md) select their matching flag while retaining these attachments. The close
-review tool additionally accepts `--skin sweden|finland|denmark|norway|explorer` and
+review tool additionally accepts `--skin sweden|finland|denmark|norway|explorer|cabin` and
 `--angle front|side|rear`; the default remains Sweden viewed from the rear quarter.

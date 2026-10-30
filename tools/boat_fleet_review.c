@@ -105,7 +105,8 @@ static int cannon_attachment(Formation *f)
     BoatViewState view = { 0 };
     BoatPresentation presentation = { 0 };
     static WaterfrontSceneFrame frame;
-    for (unsigned skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
+    // Combat room slots use the Nordic speedboats, not solo-only appearances.
+    for (unsigned skin = 0; skin < BOAT_SKIN_COUNTRIES; ++skin) {
         view.skin = skin;
         boat_scene_frame(&view, &presentation, &world, BOAT_CAMERA_DEFAULT, &frame);
         // The scene appends the cannon's foot, body, face and opening after its environment.
@@ -125,7 +126,7 @@ static int cannon_attachment(Formation *f)
         CHECK(body.position.y - body.scale.y * .5f < foot.position.y + foot.scale.y * .5f);
         CHECK(body.position.y + body.scale.y * .5f > foot.position.y - foot.scale.y * .5f);
     }
-    puts("cannon attachment: every mounting-foot corner intersects the actual hull on all skins");
+    puts("cannon attachment: every mounting-foot corner intersects each room-slot hull");
     return 0;
 }
 

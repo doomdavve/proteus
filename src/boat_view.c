@@ -597,7 +597,7 @@ static void draw_skinned_boat(Renderer3D *renderer, const WaterfrontPlayerState 
 {
     renderer3d_draw_mesh(renderer, boat_skin_mesh(boat->skin, BOAT_SKIN_HULL), boat->hull);
     renderer3d_draw_mesh(renderer, boat_skin_mesh(boat->skin, BOAT_SKIN_COCKPIT), boat->cabin);
-    for (int side = -1; side <= 1; side += 2)
+    for (int side = -1; boat->skin != BOAT_SKIN_CABIN && side <= 1; side += 2)
         renderer3d_draw_mesh(renderer, boat_skin_mesh(boat->skin, BOAT_SKIN_ENGINE),
             boat_skin_outboard_pose(boat->hull, boat->engine, side));
     BoatFlagMesh flag_storage;

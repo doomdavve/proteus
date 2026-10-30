@@ -238,6 +238,18 @@ review was repeated after the pane fix. This is scripted motion smoke evidence. 
 are under `build/skin-*`; full test output is `/private/tmp/proteus-skins-ctest-gpu.log`.
 
 
+### Cabin boat return — 2026-10-30
+
+The user approved the white cabin boat after reviewing its rounded bow, softened roof,
+Swedish flag, lowered timber stern platform and hull-mounted inboard-drive detail. Select
+`cabin` in solo settings or with `--skin cabin`. It uses standard handling; the drive is a
+visual detail and room slots remain the four Nordic speedboats. The explorer remains available
+with its existing solo free-riding engine. On 2026-10-30 macOS Debug, CPU basin/river captures
+and a GPU close capture were inspected; a 180-frame GPU river demo ran. The full Debug
+CTest preset passed 308 enabled tests (13 retired cases disabled). This is scripted
+playback, not manual driving or audio review. Windows/browser verification and manual gameplay
+acceptance remain pending.
+
 ### Historical cabin proposal — saved 2026-10-20, superseded
 
 The earlier proposal refined the boxy cabin, roof, gunwale and cream/teal palette. It was

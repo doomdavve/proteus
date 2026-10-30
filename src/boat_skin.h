@@ -3,7 +3,7 @@
 
 #include "boat_model.h"
 
-// Cosmetic. All skins share the same hull and attachments; IDs are local presentation choices,
+// Appearance IDs are local presentation choices,
 // not protocol values. The four countries colour room slots. The explorer livery marks the
 // explorer engine, which the game pairs with it in solo free boating (boat_handling_explorer).
 typedef enum {
@@ -13,10 +13,11 @@ typedef enum {
     BOAT_SKIN_NORWAY,
     BOAT_SKIN_COUNTRIES,
     BOAT_SKIN_EXPLORER = BOAT_SKIN_COUNTRIES,
+    BOAT_SKIN_CABIN,
     BOAT_SKIN_COUNT
 } BoatSkinId;
 
-// ENGINE is one outboard mesh; render it at both boat_skin_outboard_pose mounts.
+// ENGINE is one outboard mesh; the cabin boat has its inboard drive on the hull.
 typedef enum { BOAT_SKIN_HULL, BOAT_SKIN_COCKPIT, BOAT_SKIN_ENGINE } BoatSkinPart;
 
 typedef struct {

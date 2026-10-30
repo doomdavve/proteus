@@ -5,7 +5,7 @@ has a fine pointed bow, simple faceted V hull, flared shoulders, a dark rub rail
 foredeck stripe, low swept windscreen, an open cockpit cutout with a lowered two-seat well and twin compact outboards.
 The accepted baseline uses Sweden, Finland, Denmark and Norway. The user accepted the 2026-10-25 speed
 profile in `boat-white-hulls`, refining the bow taper, forefoot, windscreen and stern/cowl
-shapes. The user also accepted the twin outboards; the package is prepared and verified for main integration. The [owning plan](BOATING_PLAN.md#speedboat-skins--2026-10-24)
+shapes. The user also accepted the twin outboards; the package was integrated into main. The [owning plan](BOATING_PLAN.md#speedboat-skins--2026-10-24)
 records the current review, before/after gallery and verification evidence.
 Each livery now has its matching Nordic-cross flag; the accepted staff and cloth simulation
 remain in place.
@@ -13,7 +13,7 @@ CPU and GPU use the same meshes, including reflections, shadows, replay and ghos
 Nearest-neighbour presentation remains unchanged.
 
 The owning status and acceptance record is in [the boating plan](BOATING_PLAN.md#speedboat-skins--2026-10-24).
-The 2026-10-20 cabin refinement proposal is superseded by this speedboat direction.
+The original cabin craft has returned as a separate solo option, following the 2026-10-30 model review.
 
 ## Try the liveries
 
@@ -24,6 +24,7 @@ The 2026-10-20 cabin refinement proposal is superseded by this speedboat directi
 | 3 / 2 | `denmark` | White hull, red deck, white stripe | White cross on red |
 | 4 / 3 | `norway` | White hull, red deck, navy stripe | White-bordered navy cross on red |
 | — / 4 | `explorer` | Graphite hull, sand deck, signal-orange stripe | Graphite cross on orange (an authored expedition pennant) |
+| — / 5 | `cabin` | White cabin and hull, dark stripe, timber stern platform | Yellow cross on blue |
 
 The explorer (2026-10-26, from the [adventure playtest](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#explorer-boat-2026-10-26))
 is the one livery that is not only cosmetic: `wake_velocity` pairs it with
@@ -50,10 +51,10 @@ GPU modes need a desktop graphics context; CPU screenshots do not open a window.
 
 `src/boat_skin.[ch]` belongs to the presentation library. `BoatSkinPalette` exposes hull,
 deck, accent and upholstery colors; `boat_skin_generate` builds caller-owned geometry
-for a palette, while `boat_skin_mesh` caches the four immutable presets for rendering.
+for a palette, while `boat_skin_mesh` caches the immutable presets for rendering.
 The legacy `waterfront_player_*_mesh` accessors return Sweden for existing review callers.
 The existing pose transforms remain intact; the legacy `cabin` transform now carries
-the cockpit and windscreen.
+the cockpit and windscreen for speedboats and the enclosed cabin for the cabin boat.
 
 Set `BoatViewState.skin` after constructing a view. The selected ID flows into
 `WaterfrontPlayerState.skin`; GPU ghost views use `WaterfrontSceneFrame.ghost_skin`.
@@ -68,10 +69,9 @@ skin. Nordic-cross artwork is fitted to the common 0.64 × 0.40 m cloth canvas; 
 fabric proportions are not simulated. Render-only subdivisions preserve Norway's white border
 without changing the 54 simulation particles, forces or staff attachment.
 
-All presets have identical vertices and topology. No skin enters `Boat`, physics,
+The four Nordic speedboats and explorer share vertices and topology; the cabin boat has its own geometry, with a fixed inboard-drive detail and no outboard. No skin enters `Boat`, physics,
 contacts, thrust, wake generation, audio tuning, course rules or network serialization.
-The hull shape suggests speed without changing speed or introducing another gameplay
-class. The two outboards share the original steering rotation at separate hull-relative mounts;
+The cabin uses standard handling; its inboard drive is visual and does not change propulsion physics. The two outboards share the original steering rotation at separate hull-relative mounts;
 they do not add simulated thrust or mass. The flag keeps its world-space
 attachment and simulation. Harbor/traffic boat recipes are unchanged.
 

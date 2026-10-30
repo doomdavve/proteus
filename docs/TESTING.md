@@ -694,7 +694,7 @@ production radial shader recipes against CPU height/gradient/vertical velocity.
 ```
 
 `boat_fleet_render` also probes the actual transformed hull triangles beneath every corner
-of the cannon mounting foot on all skins and checks that the housing overlaps that foot.
+of the cannon mounting foot on all multiplayer room-slot skins and checks that the housing overlaps that foot.
 This guards against the skin mesh's normalization cancelling the hull pose scale. The same
 gate renders the aft camera at three headings, checks that only trailing boats appear, verifies
 starboard placement after mirroring and confirms read-only fleet state.

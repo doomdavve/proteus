@@ -68,7 +68,8 @@ int main(int argc, char **argv)
                 "Usage: boat_flag_review [--scenario idle|cruise|turn|reverse] "
                 "[--renderer cpu|gpu] [--time 0..60] [--screenshot FILE] "
                 "[--frames COUNT] [--low-resolution] "
-                "[--skin sweden|finland|denmark|norway|explorer] [--angle front|side|rear]\n");
+                "[--skin sweden|finland|denmark|norway|explorer|cabin] [--angle "
+                "front|side|rear]\n");
             return 2;
         }
     }
@@ -127,7 +128,7 @@ int main(int argc, char **argv)
                 return 1;
             renderer3d_draw_mesh(&cpu, boat_skin_mesh(skin, BOAT_SKIN_HULL), player.hull);
             renderer3d_draw_mesh(&cpu, boat_skin_mesh(skin, BOAT_SKIN_COCKPIT), player.cabin);
-            for (int side = -1; side <= 1; side += 2)
+            for (int side = -1; skin != BOAT_SKIN_CABIN && side <= 1; side += 2)
                 renderer3d_draw_mesh(&cpu, boat_skin_mesh(skin, BOAT_SKIN_ENGINE),
                     boat_skin_outboard_pose(player.hull, player.engine, side));
             BoatFlagMesh flag_storage;
