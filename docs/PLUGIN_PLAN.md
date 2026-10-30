@@ -1776,6 +1776,11 @@ evaluate motion/reactions, maintain contacts and render one shared scene snapsho
 editable descriptors before introducing callbacks. A useful first example is a small marina
 with a departing ferry and nearby gulls, followed by an evening variant when lighting exists.
 
+Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
+breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
+failure cases and acceptance evidence. **Next in this track: L1.1 contract and site fixture**;
+the first playable gate is L4.3. No L task is implemented by this documentation change.
+
 ### Coverage and delivery slices
 
 | Slice | Native foundation today | Planned script support and missing native work | Reviewable completion |
@@ -1794,6 +1799,164 @@ marina descriptor. L3 and L4 build on L1 and existing actors; L5 can progress in
 in the sunset owner, and L6 follows the shared lighting work. L7/L8 require new native actor
 work and are later slices rather than blockers for marina/traffic authoring. These labels
 organize plugin integration; they do not reorder the living-city plan's people/cyclist queue.
+
+### Execution guide for a smaller implementation model
+
+All tasks below are **planned**, not implemented. Select one numbered task per worktree/PR;
+complete its tests and documentation before advancing. Read this section, the current
+[API](PLUGIN_API.md), and the named native owner first. Follow existing descriptor, staging
+and test patterns rather than introducing a second plugin host. File names below are entry
+points, not permission to refactor every caller. If a prerequisite is absent, finish that
+task first; do not mock a missing primitive in Lua or advertise an unsupported capability.
+
+**First playable target — `plugins/harbor-life` (proposed package):** a native solo `outer`
+voyage with two occupied berths, an open approach lane, one passing small craft, an existing
+ferry with a visible dwell/departure, and one nearby flock. Keep the existing voyage playable.
+Use the same saved camera bookmarks and explicit times for comparisons. Daytime is sufficient
+for this target; dusk, illuminated rooms, trams and seals are later additions. Success means
+the player can approach, watch activity, and leave without an invisible collision or an
+activity disappearing on reload. Numerical validation and human judgment of liveliness are
+separate gates.
+
+Phase the example's ferry departure and gull cue into its first 60 simulated seconds so
+existing pinned capture limits can show them. Full 1,200-second timetable coverage belongs
+in native direct-time validators; do not raise the current 60-second capture or 72,000-tick
+simulation-preview limits merely to inspect one later schedule boundary.
+
+Recommended order: **L1.1–L1.4 → L2.1–L2.3 → L3.1–L3.4 → L4.1–L4.2 → L4.3**.
+L5 follows its native sunset prerequisites; L6 follows L5. L7 and L8 are independent native
+extensions after the first playable target. P5 remains the main plugin queue's next task;
+selecting an L task does not authorize room integration or the remaining L tasks.
+
+#### Starting decisions and implementation boundaries
+
+Use these defaults to avoid reopening architecture in each task. L1.1 must check them against
+actual owners and document any necessary deviation before implementation:
+
+- Extend the existing single `kind = "voyage"`, `location = "outer"` package with an optional
+  top-level `scene` descriptor and proposed `scene.define` grant. Keep `api = 1` only if the
+  extension is additive; old packages retain identical behavior and old hosts reject the new
+  grant. Do not add a new package kind, a second simultaneous package, dependencies, or a
+  scene callback API. Existing objectives/timers may coexist but receive no actor commands.
+  `scene.define` and the fields below are design targets, **not today's API**.
+- One active package owns the override. Absent `scene` means all compiled defaults. Within
+  `scene`, an absent subsystem uses its compiled defaults; a present subsystem replaces its
+  entire supported collection, and an empty collection disables it where safe. Reject an
+  override of an unsupported subsystem. Keep the large docked ferry and bridge dependencies
+  compiled until their adapter can own the complete dependency group. No merging by array
+  index, patching global arrays, or simultaneous compiled/authored copies.
+- Stable authored IDs use the existing shelter-ID spelling/length rule. Require uniqueness
+  within the scene, including nested resources; qualify external identity by package ID.
+  Reordering arrays must not change identity. Discovery exposes compiled actors as read-only
+  references until the corresponding subsystem is authorable. Registered recipe IDs select
+  existing native geometry; Lua cannot supply mesh vertices or renderer transforms.
+- Store positions in simulation metres (`x = -east`, `z = north`) and headings in radians,
+  matching the voyage API. Convert once at the native adapter boundary. Explicitly name
+  elevation relative to still water or terrain; never infer it from a `Vector3.y`. Reject
+  non-finite, unknown, duplicate, out-of-range and wrong-location values with field paths.
+- Begin with current capacities: at most seven authored moored hulls, eight travelling craft
+  including retained default traffic, 32 gulls across at most four flocks, and 32 selected
+  scene lamps. These are proposed ceilings, not new support promises. L1.1 records every
+  array, mesh, rope, route-point and retained-revision budget; L3.1 adds route/stop bounds,
+  L5/L6 add lighting bounds before exposing those fields. Reject overflow rather than
+  truncating. New structures, trams and seals receive explicit native budgets in their tasks.
+- Scene schedules use session tick origin zero and integer 120 Hz ticks; pauses freeze them,
+  simulation speed changes advance them with simulation, restart resets them, and preserving
+  Apply/Undo retains the current tick. Define half-open intervals `[start, end)` and positive
+  periods; normalize negative preview time with positive modulo. Convert to existing native
+  double-time evaluators at one boundary. Presentation phase is a separate value derived
+  from that input, never a replacement water/race clock. Avoid stateful cue delivery where
+  a pure time envelope suffices.
+- Stage copied C definitions and generated resources before commit. A physical layout or
+  route change initially requires explicit restart at a validated safe spawn; preserve-only
+  Apply refuses it. Cosmetic changes may preserve time only when resource/ID compatibility
+  is proven. Undo of physical edits follows the same restart rule. Candidate failure, stale
+  pins, allocation failure or unsafe spawn leaves active revision and gameplay untouched.
+  Keep active, candidate and Undo storage charged to existing host budgets.
+- Headless collision/motion data stays in the native core with no Lua/host dependency;
+  renderer meshes and GPU resources stay with their native presentation owners. Never pass
+  a `WaterfrontSceneFrame` into physics. Both consume one accepted definition and explicit
+  time; gull avoidance must query authored traffic too. Do not change ENet, protocol or
+  recording formats in L1–L4. Reject scene packages in rooms, browser imports and recordings
+  that cannot represent them; retain existing non-scene workflows.
+
+#### L1 — make a scene revision ownable and inspectable
+
+| Task | Concrete change and entry points | Completion evidence / stop boundary |
+| --- | --- | --- |
+| L1.1 — freeze the first contract | Inspect `boat_plugin.[ch]`, `boat_plugin_host.[ch]`, `boat_session.h`, `waterfront_scene.[ch]`, `waterfront_harbor.[ch]`, `waterfront_traffic.[ch]` and their CMake library membership. Add the proposed schema, subsystem replacement semantics, ID/recipe registry, numeric/resource limits and ownership/lifetime diagram to the API as explicitly planned. List every draw, contact, camera, gull-avoidance and wake consumer that needs the accepted definition. Select two existing berth recipes and one outer-map approach using compiled water and scenery queries; record coordinates and a camera bookmark, not guessed safe positions. | A reviewer can trace compiled/default → candidate → accepted → Undo → release for all consumers. Record why the proposed capacities fit existing arrays. This PR is contract/fixture planning only; no new grant is advertised as supported. |
+| L1.2 — typed definition and strict decoding | Add a small plain C scene definition (proposed `src/boat_scene_definition.[ch]`) and extend `boat_plugin.[ch]`/the Lua decoder. Initially permit only a versioned scene envelope with no authorable subsystem; accept omitted scene as before. Add stable ID/recipe helpers and checked counts; no Lua pointers survive evaluation. Update `tools/plugin_schema.py` and validator fixtures with the planned fields, gated from live support until L1.3. | Old voyage/race/objective fixtures remain identical. Test omitted/empty envelope, missing grant, wrong location, unknown subsystem, duplicate IDs, invalid numbers and capacity+1. Test manifest grant ordering alongside optional objective grants. No live scene installation in this task. |
+| L1.3 — revision lifecycle and application binding | Extend host candidate/active/Undo ownership, content identity, inspection and `tools/wake_velocity_plugin.[ch]` binding using L1.1's diagram. Install between ticks, invalidate dependent view caches, and restore compiled defaults on disable/session exit. Keep unsupported subsystem edits rejected. Reuse existing pins, restart policy and retirement rules. | Headless session tests cover valid Apply, stale Apply, invalid candidate, allocation/staging failure, Undo, disable, repeated enter/leave and independent sessions. No dangling borrower after retiring a revision; defaults render identically with an omitted scene. An envelope-only `scene.define` may now be reported with its exact supported subset. |
+| L1.4 — close tooling and unsupported paths | Thread scene identity through isolated worker/stage serialization, preview, inspection and CPU capture; extend `tools/plugin_author.py`, `tools/plugin_schema.py` and relevant Python/C validators. Validate worker wire versions/lengths before using new payloads. Explicitly reject scene grants in browser imports, room startup and unsupported replay/recording paths, including objective-bearing packages. | Tool output reports supported subsystems, limits and rejected targets truthfully. Test worker round trip, malformed/truncated payload, pinned capture and browser rejection. Existing browser voyage/objective cases still pass. Update packaged tool metadata/guides where discovery changes; no new browser scene evaluator. |
+
+#### L2 — a small marina before a marina editor
+
+| Task | Concrete change and entry points | Completion evidence / stop boundary |
+| --- | --- | --- |
+| L2.1 — parameterize existing moored hulls | Add caller-owned berth inputs to `waterfront_harbor.[ch]`; retain compiled wrappers while callers migrate. Start with existing hull recipes, positions/headings and native attachment points. Route generated meshes, bobbing poses, ropes, static hull envelopes and camera queries through the same accepted berth list. Do not add pontoons or arbitrary attachments yet. | `tools/validate_harbor.c` proves default parity, zero/two/seven berths, reordered IDs and independent instances. Move/remove one berth and verify its mesh, ropes, contact and camera exclusion all move/disappear together. No invisible compiled hull remains. |
+| L2.2 — expose berths and first package | Add bounded `scene.marina.berths` decoding/validation and discovery; implement the two-berth `plugins/harbor-life` example at L1.1's verified site, using the existing outer voyage. Validate hull footprints plus mooring excursion against water/shore, other berths and declared entrance clearance. Use actual map queries; where depth is unavailable, report depth as unverified rather than inventing a bathymetry test. Reject unsupported structure fields. | Bad shore/overlap/entrance and unsafe restart candidates preserve the old revision. Add a deterministic boat approach/exit fixture proving the lane is usable and both hulls block at visible positions. Capture the same site before/after a berth edit; live restart Apply/Undo restores the whole layout. |
+| L2.3 — registered dock modules | Extract the existing pontoon/gangway/quay recipes into bounded supported modules with attachment IDs and explicit anchor/end rules. Add matching contact/camera geometry where missing before exposing a module. Keep the large docked ferry independent. Update site validation and schema with module/rope/mesh bounds; no freeform jetty mesh editor. | One small pontoon and gangway attach correctly at the two-berth site; wave movement preserves shore anchoring and ropes. Inspect water/shore joins, player/camera clearance and both renderer passes. Reject detached, overlapping or over-budget modules. Static occupancy is complete here; arriving/departing moored occupants need a separate future ownership transfer task. |
+
+#### L3 — traffic, stops and a bridge that stays safe
+
+| Task | Concrete change and entry points | Completion evidence / stop boundary |
+| --- | --- | --- |
+| L3.1 — native route definitions with compiled parity | Extract route segments and timetable inputs from `waterfront_traffic.[ch]` and `waterfront_upstream.[ch]` into caller-owned native data. Preserve the current straight/arc motion, smooth departures, four river craft, upstream service and 1,200-second timetable. Set ceilings of 32 route segments and eight stops per actor initially; validate count/length arithmetic and measure storage before accepting them. Expose no Lua route fields yet. | Extend `tools/validate_traffic.c`: default poses, velocities, periods, contact hulls, visual trails and bridge lift agree at stops, departures, negative time and wrap. Direct seek and stepped evaluation agree. Keep wrappers only until all consumers can select the accepted data. |
+| L3.2 — one authored small-craft route | Decode registered vessel recipe, route/segment IDs, speed, phase and period for one craft; native code computes motion and trails. Define full-collection replacement with explicit retained defaults within the eight-actor ceiling. Validate swept hull corridors against shore, marina/access lane and other scheduled craft; reject unsupported intersections rather than implementing avoidance. | The first package adds one visibly passing craft. Tests check segment joins, zero/negative lengths or speed, discontinuous loops, invalid arc radii, phase wrap, capacity+1 and route conflicts. Verify shared draw/contact/camera/wake-source identity after reorder, restart Apply and removal. Physical traffic wakes remain off unless an existing independently budgeted recipe is explicitly selected and tested. |
+| L3.3 — ferry stops and service schedule | Add named existing pier anchors, ordered stops, dwell/departure offsets and positive repeat periods. Use the native acceleration/braking profile and reject travel times too short for distance/speed limits. Start with one existing upstream ferry; retain other dependencies explicitly. Update discovery and the example to change one stop's dwell and departure. | Evaluate one tick before/at/after arrival, dwell end, departure and period wrap. Verify continuous position/heading and the intended native velocity profile, stationary dwell hull/contact, visual trail decay at stops and no duplicated ferry after reload. No boarding, passenger counts or real transit feed. |
+| L3.4 — coordinated lift and integrated route safety | Bind tall-vessel routes and bridge clearance/lift windows as one validated dependency group. Preserve the compiled schooner/lift when untouched; refuse partial replacement that breaks it. Account for hull height, lift transition time and scheduled occupancy; include stationary berths and ferry stops in conflicts. | Test too-early passage, insufficient lift, overlapping passage windows and malformed references; each rejects atomically. Inspect all lift phase boundaries, reflections/shadows and collider agreement. Demonstrate the first package's small craft plus departing ferry without breaking the existing schooner passage. No tram closure logic yet. |
+
+Route safety must use conservative swept envelopes over segments and scheduled intervals;
+checking a few screenshots or sampled points is not proof of clearance. L3.1 records the
+supported geometry and clearance tolerances. Where a crossing cannot be proven safe within
+those bounded primitives, reject it with actor/segment IDs and the conflicting interval.
+Do not let an implementation model silently turn this task into a general path planner.
+
+#### L4 — authored gulls and the first lively-harbor gate
+
+| Task | Concrete change and entry points | Completion evidence / stop boundary |
+| --- | --- | --- |
+| L4.1 — native flock definitions | Extract the four group anchors, per-bird phase/seed, circling/feeding/alarm envelopes from `waterfront_scene.c` into caller-owned bounded definitions. Keep 32 birds total, at most four flocks and current mesh recipes. Rebind avoidance to the accepted traffic definition and current player input; no hidden time accumulation or global random state. | `tools/validate_waterfront_actors.c` checks compiled parity, zero/max counts, two simultaneous scenes and forward/backward seek with identical explicit player/traffic inputs. Check nearby player and authored craft reactions, velocity/wing continuity and bird/terrain/building clearance at the chosen site. |
+| L4.2 — flock descriptor and timed cues | Decode flock ID, center/region, count, recipe, deterministic seed/phase and at most 16 feeding/alarm cue intervals per flock. Define overlap priority (alarm before feeding before circling), bounded amplitude and fade durations in schema. Evaluate envelopes natively at requested ticks; no timer-driven spawn/despawn or new objective commands. | Move the example's flock near the marina and schedule one feeding/alarm event. Test invalid habitat/count, cue overlap/priority, boundary ticks, wrap and repeated seek/reload. Apply/Undo preserves time for compatible cosmetic changes; count/layout changes follow the documented restart classification. Inspect readable flight and actual clipping separately from numeric acceptance. |
+| L4.3 — first playable harbor qualification | Combine the two berths, dock module, small craft, scheduled ferry and flock in `plugins/harbor-life`. Add editable README instructions, recipe/anchor discovery, a deterministic approach/idle/departure input fixture, inspection expectations and pinned camera/time recipes. Exercise the actual worker/live bridge path, not just native evaluator calls. | Build/full CTest plus CPU/GPU captures and a windowed motion demo. Watch at least one complete ferry dwell/departure and the gull cue; inspect a full timetable by virtual-time seeks. Record baseline vs populated frame p50/p95, staging/Apply latency, mesh/light/wake counts and retained memory at typical/max counts using the same camera/input. Human review asks whether activity is noticeable from the boat, the entrance stays clear and the result feels alive. Record pending human acceptance explicitly. |
+
+If combined cost exceeds existing frame/storage budgets, reduce supported content or fix the
+measured native bottleneck before raising capacities. Do not introduce activation streaming
+or a scheduler framework without evidence that this bounded first scene needs it.
+
+#### L5–L8 — later additions, each with a native prerequisite
+
+These tasks are also separate PR-sized steps. Do not bundle their art, renderer and Lua work
+into one task. Native visual review comes before publishing the associated recipe.
+
+| Task | Work boundary and owner | Required result |
+| --- | --- | --- |
+| L5.1 — shared fixed daylight/dusk | Follow [SUNSET_PLAN.md](SUNSET_PLAN.md); move the approved title-only look into a shared gameplay lighting frame with explicit CPU/GPU, sky, water, reflection, shadow and cache inputs. Keep water physics unchanged. | Approved fixed day/dusk views at identical scene/time/camera, including navigation readability. Native result goes in the sunset owner; no Lua grant yet. |
+| L5.2 — bounded lighting schedule | Expose registered preset IDs plus at most eight non-overlapping transition intervals, with start/end ticks and explicit interpolation/hold/wrap rules. Add discovery, validation, preview and revision classification. Do not script individual shader values. | First fixed dusk, then an afternoon-to-dusk variant of the harbor package; test boundary/direct/backward seek, pause, speed, Apply/Undo and default restoration. CPU/GPU and water/reflection colors agree throughout the transition. |
+| L6.1 — native lamp/window groups | In `waterfront_scene.[ch]`, the renderer owners and [LIVING_CITY_PLAN.md](LIVING_CITY_PLAN.md), create stable read-only building/window-group anchors and registered street-light groups. Implement bounded window emission and local-light selection, using the existing 32-lamp selection ceiling. Record a separate window/emissive-group budget before adding fields. | One sparse occupied building and one street group work under fixed day/dusk, occlusion and camera movement. Verify emissive appearance separately from illumination of nearby surfaces; no Lua schedules yet. |
+| L6.2 — scheduled building/street activity | Expose registered group IDs, deterministic occupancy seed, bounded intensity and at most 16 intervals per group. Define precedence: explicit group schedule overrides the preset's automatic lamp state; absent override follows L5. No per-window Lua callbacks. | Harbor evening variant lights the quay and changes sparse occupied rooms. Test unknown buildings, duplicate ownership, limits, daylight override, abrupt reload and Undo; CPU/GPU, selected-light costs and cache invalidation agree. |
+| L7.1 — one native tram on a verified deck | In the living-city owner, choose a currently visible bridge/deck with verified geometry and track elevation; implement one readable native tram recipe and pure-time track/stop motion. Begin on a fixed span if lift interlocks are not ready. Record tram/segment/mesh budgets. | Boat-height views prove silhouette, deck alignment, supports/occlusion and stop/loop continuity. Do not promise arbitrary rail networks or new map coverage. |
+| L7.2 — closure interlock before lift crossing | Extend L3.4's native bridge occupancy contract to deck traffic. Stop before the span, reserve crossing intervals and resume after lowering; reject mutually impossible vessel/tram timetables. | Boundary tests prove no tram enters/occupies a raised or moving span. Direct seek gives the same stopped/resumed pose without depending on prior frames. |
+| L7.3 — expose the proven tram | Publish only the reviewed recipe/track anchors, stops and bounded timetable inputs through the scene schema and tools. Add one optional harbor-package tram. | Invalid deck/closure references reject atomically; captures, windowed motion and restart Apply/Undo pass. No script-owned rail physics, road routing or passenger simulation. |
+| L8.1 — native seal encounter | In the living-city/wildlife owner, add one low-resolution seal recipe with bounded water habitat and optional verified haul-out anchor. Define pure-time surfacing/diving and player-proximity inputs; choose cosmetic-only/no hull contact initially. Record animal/mesh/region budgets. | Review from the player's camera: readable surfacing/dive silhouette, no shoreline/terrain clipping, repeatable seeks and bounded avoidance. Native behavior/art approval precedes script exposure. |
+| L8.2 — species-specific descriptor | Expose only the seal's approved habitat/anchor, count, phase/seed and cue vocabulary, using L4 ownership and explicit limits. Add one optional encounter to the harbor package. | Reject unsupported species, invalid habitat and excess counts; verify boundary ticks, scene isolation, Apply/Undo/disable and CPU/GPU motion. Broader animals need their own native recipes/tasks. |
+
+#### Per-task handoff checklist
+
+Each implementation PR records the selected task ID, prerequisites actually present, changed
+owners, accepted schema/limits, completed evidence, next task and remaining risks in this plan
+and the linked native owner. Move a proposed field into the API's implemented contract only
+when discovery, validation, staging, live use and unsupported-target rejection agree.
+
+Use `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug`, `cmake --build build -j` and
+`ctest --preset full` from the task worktree; `ctest --preset quick` is the iteration lane.
+Extend the existing harbor/traffic/actor/plugin validators where they own the behavior; add
+new cases for semantic failure modes rather than tests that merely mirror the struct fields.
+All schedule tests drive virtual ticks, including one tick either side of each boundary.
+For visual/motion changes, record exact package revision, camera, inputs, times, renderer and
+platform; retain comparison captures and run a windowed demo. A still capture cannot verify
+departures, flight, light transitions or player clearance. Browser support stays rejected
+until a separately selected qualification task; native success is not browser acceptance.
 
 ### Ownership, schedules and reload contract
 
@@ -1830,14 +1993,24 @@ inspect representative CPU/GPU stills and a windowed motion/lighting demo where 
 Record automated checks, manual playback and user acceptance separately in the native owner
 and this plan. No scene-API implementation or visual acceptance is claimed by this proposal.
 
-Completed planning task, 2026-10-30: inspected the current harbor, traffic, upstream, gull and
-scene interfaces and the living-city/sunset plans; recorded all seven requested areas with
-native prerequisites and delivery evidence. Next task for this track: L1's small scene
-ownership/composition contract, then L2's two-berth marina example. Known limits: capability
-names, package composition syntax and exact new resource budgets are intentionally undecided
-until L1; new tram/seal art, gameplay dusk and scene bindings are unimplemented.
+Completed planning task, 2026-10-30: expanded L1–L8 into per-PR tasks for a smaller model,
+including the first playable harbor package, proposed composition/capacity/time/reload
+defaults, native extraction before Lua exposure, tooling and unsupported-target checks.
+Next task for this track: **L1.1**, validate and freeze the scene contract, consumer/lifetime
+inventory and verified marina site. Known limits: the proposed grant/schema and budgets
+still need L1.1's owner review and implementation evidence; no scene bindings, tram/seal
+recipes, gameplay dusk or building activity are implemented or visually accepted.
 
-Verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug build and full
+Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
+configure reused the pinned raylib/Lua/ENet source trees; build passed with no project
+warnings (one upstream `stb_vorbis.c` warning). Full `ctest --preset full` passed **310/310
+enabled tests** with local socket access, 13 retired wake-field tests disabled and GPU CTests
+off. The first sandboxed run failed ten socket-dependent tests; the complete socket-enabled
+rerun passed. All 267 local links/anchors in this plan and the documentation index resolve;
+`git diff --check` passed. No audiovisual run was needed for this documentation-only update.
+No new runtime, browser qualification or human acceptance is claimed.
+
+Prior planning verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug build and full
 `ctest --preset full` passed on the unchanged implementation baseline `1b74a25` in the main
 checkout (309 enabled tests, 13 retired field cases disabled, `PROTEUS_GPU_TESTS=OFF`; local
 socket access enabled). Added local links/anchors and `git diff --check` passed. No new runtime
