@@ -1,4 +1,4 @@
-// Browser descriptor authoring. Transport and bundle functions are also exercised under Node.
+// Browser voyage authoring. Transport and bundle functions are also exercised under Node.
 (function (root) {
   'use strict';
   const encoder = new TextEncoder();
@@ -105,7 +105,7 @@
     const storage = get('plugin-storage');
     const status = get('plugin-status'), manifest = get('plugin-manifest'), source = get('plugin-source');
     const stage = get('plugin-stage'), play = get('plugin-play');
-    const transport = new Transport({makeWorker: () => {
+    const makeWorker = () => {
       const worker = new Worker(files['plugin_worker.js'], {type: 'module'});
       // Pin every runtime component to this package's content-addressed map.
       const post = worker.postMessage.bind(worker);
@@ -113,7 +113,10 @@
         runtime: new URL(files['plugin_stage.js'], window.location.href).href,
         wasm: new URL(files['plugin_stage.wasm'], window.location.href).href});
       return worker;
-    }});
+    };
+    const transport = new Transport({makeWorker});
+    const objective = new root.BoatPluginObjectiveTransport({makeWorker});
+    Module.boatPluginObjective = objective;
     Module.boatPluginStage = transport;
     let sequence = 0, pending = 0, accepted = null, ready = false;
     const base = () => (Module.boatPluginOwner || [0, 0, 0]).slice();
@@ -222,6 +225,7 @@
     });
     window.addEventListener('pagehide', () => {
       cancel(); for (const id of transport.jobs.keys()) transport.close(id);
+      objective.reset();
     });
     return transport;
   }

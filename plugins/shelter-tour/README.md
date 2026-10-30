@@ -19,8 +19,12 @@ Manifest-only renames keep state. Callback errors suspend this optional objectiv
 boating continues. An accepted voyage restart clears the state and error.
 
 See the [P3.2 API](../../docs/PLUGIN_API.md#live-optional-voyage-objective-p32) for event,
-transaction, ownership and limit details. This experimental example ships in the source tree;
-standard native packages still include the descriptor-only Långedrag example.
+transaction, ownership and limit details. This experimental example ships in the source tree and native authoring packages.
+For the browser, export and import it through the [voyage panel](../../docs/PLUGIN_API.md#browser-source-bundles-p43):
+
+```sh
+python3 tools/plugin_author.py export plugins/shelter-tour > build/shelter-tour.wake-plugin.json
+```
 
 Inspect a deterministic native checkpoint and seek without a window:
 

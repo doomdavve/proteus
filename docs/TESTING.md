@@ -1,5 +1,15 @@
 # Test workflow and timing
 
+P4.9 `boat_plugin_eval` checks the bounded objective worker protocol against the native
+transaction engine: canonical state, lossless wide integers, exact framing, capacities,
+protected fields and stale/malformed replies. `web_plugin_author` includes virtual-time
+objective transport reuse, cancellation, late watchdog/result and failure checks. The optional
+three-engine `check_web_plugin_author.py` also runs `check_web_plugin_objective.py` for browser
+init/update/timers, simulation gating, recovery events, migration/Undo/cancel/restart, failure,
+timeout/freeze and repeated-session cleanup. Delivery timings and worker Wasm linear memory are
+evidence, not asserted performance budgets; physical devices and process memory remain open.
+See [P4.9](PLUGIN_PLAN.md#p49-result-2026-10-30).
+
 P3.1 `boat_plugin_state.*` covers fresh-instance objective callbacks, canonical integer state,
 atomic state/RNG/event/HUD commit, quarantine/reset, candidate migration, isolated checkpoint
 replay, resource/event limits and budget failures. These are headless harness checks; they do
@@ -762,4 +772,7 @@ capability rejection, repeated worker validations, launch, live rename and synta
 water Apply/Undo, stale output, cancellation, navigation mid-validation, repeated source
 restore/revalidation and storage denial. On Chromium it also freezes the tab mid-validation. It
 awaits application/worker conditions; the only fixed waits are the freeze durations themselves.
-The PR browser workflow runs it on all three engines (P4.8). The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.
+The browser PR workflow runs the Node contracts and packages the Wasm build. Full three-engine
+qualification is manual-only; dispatch it for browser/plugin lifecycle changes and before a
+release, using `gh workflow run web-plugin.yml --ref BRANCH`. It is not run on ordinary pushes
+to `main`. Superseded PR builds are canceled. The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.

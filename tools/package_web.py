@@ -38,7 +38,7 @@ def main():
         name = f"wake_velocity-{digest}.{suffix}"
         (site / name).write_bytes(content)
         files[original] = name
-    # Plugin compiler/validator is lazy and runs only in a disposable Web Worker.
+    # Plugin compiler/evaluator is lazy and runs only in isolated Web Workers.
     for original in ("plugin_stage.js", "plugin_stage.wasm"):
         content = (args.build_dir / original).read_bytes()
         stem, suffix = original.rsplit(".", 1)

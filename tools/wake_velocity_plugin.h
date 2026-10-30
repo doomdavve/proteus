@@ -21,6 +21,9 @@ typedef struct {
 
 typedef struct {
     const char *stage_executable; // Opt-in trusted native asynchronous reload; borrowed path.
+    struct WakePluginEvaluation *evaluation; // Browser callback receipt, never checkpointed.
+    double frame_now;
+    bool evaluation_migrated;
     BoatPluginStageJob *staging; // Never copied into a preview checkpoint.
     const char *directory;
     BoatPluginHost host;
@@ -50,8 +53,10 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory);
 // Read DIRECTORY, check it against SESSION's location and begin its voyage instead of the
 // compiled one. False with the diagnostic printed.
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);
-// Cancel/reap any pending staging job at session shutdown.
+// Cancel/reap pending jobs and retire the browser evaluator at session shutdown.
 void wake_plugin_close(WakePlugin *plugin);
+// Browser callback at T must finish before solo simulation may step T+1.
+bool wake_plugin_waiting(const WakePlugin *plugin);
 // Browser authoring controls pause solo input while the opt-in panel is open.
 bool wake_plugin_editing(void);
 // At a tick boundary: stage the package on RELOAD or a settled save, hold the previous revision

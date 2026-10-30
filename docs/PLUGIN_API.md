@@ -1,13 +1,13 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-30: **P0–P3 native descriptors/objectives and P4.1–P4.6 authoring tools implemented**.
+Status, 2026-10-30: **P0–P3 native descriptors/objectives and P4.1–P4.9 authoring tools and browser objective isolation implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
-running game; the browser supports source bundles for solo voyage descriptors.
+running game; the browser supports source bundles for solo voyages with optional objectives/timers.
 A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
 when the file is saved or on F5, undo, and apply route or water changes with an explicit
 restart. Rooms, the course and replays keep compiled content. The browser offers an opt-in
-[descriptor-only import workflow](#browser-source-bundles-p43). The
+[voyage import workflow](#browser-source-bundles-p43). The
 [plugin plan](PLUGIN_PLAN.md) owns the staged roadmap; this guide owns the current contract.
 [All plans](README.md).
 
@@ -19,7 +19,7 @@ restart. Rooms, the course and replays keep compiled content. The browser offers
 | Why 5.4 | It is the mature release line. 5.5 (2025-12) is newer; moving to it is a deliberate later choice, not a patch update. |
 | Compiled files | VM/compiler sources plus `lauxlib`, `lbaselib`, `lstrlib`, `ltablib`, `lmathlib` only (`proteus_lua`). `loadlib`, `liolib`, `loslib`, `ldblib`, `lcorolib`, `lutf8lib`, `linit` and the `lua`/`luac` programs are **not compiled**. |
 | Configuration | Unmodified sources; the portable default `luaconf.h` (no platform `LUA_USE_*`). `cmake/proteus_lua.h` is force-included to fix the string-hash seed, so table traversal and diagnostics are identical from run to run. The project-wide `-ffp-contract=off` applies. |
-| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser links the shared descriptor transactions and evaluates imported source only in a disposable Web Worker; its [P4.3 subset](#browser-source-bundles-p43) is solo voyage descriptors. |
+| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser links the shared descriptor transactions and evaluates imported source only in Web Workers; its [voyage subset](#browser-source-bundles-p43) includes optional objectives/timers. |
 | License | Lua is MIT-licensed ("Copyright (C) 1994-2026 Lua.org, PUC-Rio"); the notice is at the end of `lua.h`. Configure extracts it to `build/lua-LICENSE.txt` and fails if it is missing. Native packages ship it as `lua-LICENSE.txt` beside the raylib/jsmn/ENet notices (`tools/macos/package.py`, `.github/workflows/windows-boat.yml`). The web package now ships `lua-LICENSE.txt` alongside its lazy Lua/Wasm descriptor worker (`tools/package_web.py`). |
 
 ## Package
@@ -476,8 +476,8 @@ objective state and pending output. Behavior and schema edits use the [migration
 policy](#live-migration-and-review-p33b). Route gameplay changes still restart the voyage;
 water edits restart the session. F6 Undo applies old code to current state under that same
 policy. A new voyage/session clears queued events, pending output, quarantine, timers and rows.
-A rejected candidate leaves active source, state, generation and route intact. Browser objectives are explicitly unsupported; room
-behavior remains unqualified. Trusted native descriptor staging now uses the [P4.2 live
+A rejected candidate leaves active source, state, generation and route intact. Browser objectives
+use the [isolated evaluator](#browser-objective-transactions-p49); room behavior remains unqualified. Trusted native descriptor staging now uses the [P4.2 live
 worker](#live-descriptor-staging-p42); startup, updates and Apply-time init/migration remain
 synchronous under the [P3.4 qualification](#native-runtime-qualification-p34).
 This API is experimental.
@@ -934,9 +934,7 @@ Native file reads reject FIFOs without waiting for a writer.
 **Trust boundary:** native startup, objective update callbacks and Apply-time init/migration
 still evaluate trusted Lua synchronously. Process isolation of descriptor staging does not
 qualify arbitrary imported code or guarantee uninterrupted objective execution. Browser
-import/reload/export must isolate those remaining paths or explicitly restrict its capability
-subset, and qualify storage failure, cancellation and repeated sessions on the target. The descriptor-only
-browser implementation below resolves this gate for that subset. Draft workspace CLI access
+import/reload/export isolates all imported callbacks through the [P4.9 evaluator](#browser-objective-transactions-p49). Draft workspace CLI access
 pinned frame capture and the [live tool bridge](#live-tool-bridge-p46) are implemented; human
 recovery acceptance remains open.
 
@@ -952,11 +950,11 @@ restarts, and **Undo / discard** for the existing native revision policy. Undo w
 is in flight cancels that request first. **Export draft** downloads the editor's current source,
 including invalid drafts; exporting is not validation or permission to apply.
 
-The browser accepts exactly voyage kind, outer location, API/schema 1 and `["voyage.define"]`.
-It rejects objective/timer grants and race imports explicitly. All imported Lua evaluation
-happens in a disposable Web Worker; the game rechecks decoded data and never evaluates that
-source at startup, staging completion, Apply, Undo or a tick. Native trusted objectives keep
-their existing contract; this subset does not enable imported callbacks or browser races.
+The browser accepts voyage kind, outer location and API/schema 1, with `voyage.define` and
+optional `objective.hud` / `objective.timers` grants under the existing manifest rules.
+Race imports remain unavailable. All imported Lua evaluation happens in Web Workers; the game
+rechecks decoded data and never evaluates that source at startup, staging completion, Apply,
+Undo or a tick. Native trusted objectives retain their existing execution contract.
 
 Native authors can create the same source bundle with:
 
@@ -984,4 +982,42 @@ browser scheduling; suspended tabs can delay its delivery. Worker code/module/Wa
 URLs are content-addressed in the same package, loaded on demand, with a shipped Lua notice.
 
 Build/serve instructions and repeatable browser checks are in the [web guide](WEB_BUILD.md#plugin-source-bundles-p43).
-Current Chrome evidence and other-browser/device limits belong to the [P4.3 result](PLUGIN_PLAN.md#p43-result-2026-10-29).
+Current browser evidence and device limits belong to the [P4.9 result](PLUGIN_PLAN.md#p49-result-2026-10-30).
+
+
+## Browser objective transactions (P4.9)
+
+Export `plugins/shelter-tour` with `plugin_author.py export` and import it through the same
+PLUGIN VOYAGE panel. Initialization, updates, migration, restart and Undo use an isolated
+objective evaluator. Descriptor validation still uses disposable workers. One additional
+worker reuses its Wasm instance, while each callback creates a fresh bounded Lua VM; no
+hidden Lua state survives. The worker receives a copy of the host-owned checkpoint each time.
+
+After dispatch at simulation tick T, solo simulation waits before T+1 while rendering and UI
+remain responsive. Success publishes update state, RNG, timers, event acknowledgment and HUD
+together before T+1. Init completes before the first native step; migration commits source,
+route binding, schema/generation and state together at its held boundary. Worker latency does
+not become simulation time or a catch-up burst. A reset requested while waiting is deferred;
+Undo/cancel abandons an in-flight migration while preserving active state; other Apply/Undo/reload
+attempts while a callback is pending report BUSY and must be retried. Source editing
+and UI validation remain available. Candidate failure keeps active state and pending output;
+callback failure/timeout quarantines objectives and lets native boating continue.
+
+The private PEQ1/PER1 wire protocol uses fieldwise encoding, a 128 KiB request cap and a 48 KiB
+reply cap, covering the full 16 KiB state plus bounded events, timers, commands and HUD.
+Integers travel as bytes without JavaScript numeric conversion. Each request has a monotonic
+identity and pins revision/commit epoch, candidate, generation, dispatch tick and its complete
+source/checkpoint/event input. Replies are accepted once only, checked without Lua, and cannot
+survive session shutdown/reset or a changed base. There is one outstanding objective request;
+it has a five-second acceptance deadline in both transport and host. Browser host timestamps
+use a monotonic origin that survives window initialization; a cached worker success still
+expires if host acceptance is delayed. Delayed tab scheduling
+can defer watchdog delivery; it cannot make an expired result valid. Worker Wasm memory is
+capped at 64 MiB, its stack at 1 MiB and each Lua VM at the existing 2 MiB limit. Browser/process
+overhead is additional. Page hide terminates the warm worker; callback errors preserve state
+in the C host so recovery can use an explicit restart or valid migration.
+
+Persistence here means host-owned state between callbacks, including evaluator replacement.
+Page reload ends the session and restores source only. Objective state, native world progress
+and Undo history are not saved to localStorage or exported as a durable session checkpoint.
+Browser races, room objectives and interactive seek/rewind remain outside this subset.
