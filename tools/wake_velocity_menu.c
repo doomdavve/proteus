@@ -4,7 +4,17 @@
 
 enum { WIDTH = 320, HEIGHT = 200, ROW_HEIGHT = 16 };
 
-typedef enum { ROW_RESUME, ROW_STEERING, ROW_CONTROLS, ROW_RESET, ROW_LEAVE, ROWS } Row;
+typedef enum {
+    ROW_RESUME,
+    ROW_STEERING,
+    ROW_CONTROLS,
+#if !defined(__EMSCRIPTEN__)
+    ROW_FULLSCREEN, // The browser owns the page's fullscreen.
+#endif
+    ROW_RESET,
+    ROW_LEAVE,
+    ROWS
+} Row;
 
 static int row_count(const BoatMenu *menu) { return menu->can_leave ? ROWS : ROW_LEAVE; }
 
@@ -48,12 +58,22 @@ BoatMenuChoice boat_menu_update(BoatMenu *menu, Camera2D camera, float dt)
                 activate = true;
             }
         }
+#if !defined(__EMSCRIPTEN__)
+    if (menu->selected == ROW_FULLSCREEN
+        && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A)
+            || IsKeyPressed(KEY_D)))
+        activate = true;
+#endif
     if (menu->selected == ROW_STEERING
         && (activate || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A)
             || IsKeyPressed(KEY_D)))
         return BOAT_MENU_STEERING;
     if (!activate)
         return BOAT_MENU_NONE;
+#if !defined(__EMSCRIPTEN__)
+    if (menu->selected == ROW_FULLSCREEN)
+        return BOAT_MENU_FULLSCREEN;
+#endif
     return menu->selected == ROW_RESUME  ? BOAT_MENU_RESUME
         : menu->selected == ROW_CONTROLS ? BOAT_MENU_CONTROLS
         : menu->selected == ROW_RESET    ? BOAT_MENU_RESET
@@ -70,7 +90,11 @@ void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, 
     DrawRectangleLines(52, top, 216, height, palette.edge);
     const char *heading = networked ? "ROOM MENU" : "PAUSED";
     boat_ui_text(heading, (WIDTH - boat_ui_width(heading, 10)) / 2, top + 5, 10, palette.text);
-    static const char *labels[ROWS] = { "RESUME", "STEERING", "CONTROLS", "", "" };
+    static const char *labels[ROWS] = { "RESUME", "STEERING", "CONTROLS",
+#if !defined(__EMSCRIPTEN__)
+        "FULLSCREEN",
+#endif
+        "", "" };
     for (int i = 0; i < row_count(menu); ++i) {
         Rectangle row = row_bounds(menu, i);
         bool active = i == menu->selected;
@@ -85,6 +109,11 @@ void boat_menu_draw(const BoatMenu *menu, Camera2D camera, bool mouse_steering, 
                 : i == ROW_RESET    ? menu->reset_label
                                     : labels[i],
             87, (int)row.y + 2, 10, ink);
+#if !defined(__EMSCRIPTEN__)
+        if (i == ROW_FULLSCREEN)
+            boat_ui_text(IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE) ? "< ON >" : "< OFF >", 162,
+                (int)row.y + 2, 10, ink);
+#endif
         if (i == ROW_STEERING)
             boat_ui_text(
                 mouse_steering ? "< MOUSE >" : "< KEYBOARD >", 162, (int)row.y + 2, 10, ink);
