@@ -425,7 +425,9 @@ class Packaged(unittest.TestCase):
         import package_plugin_tools
 
         self.assertEqual(author.capabilities()["layout"], {"kind": "source"})
-        with tempfile.TemporaryDirectory(prefix="plugin tools ") as scratch:
+        # Layout paths are relative, so a real GAME needs the layout on its drive (Windows).
+        near = Path(GAME).resolve().parent if GAME else None
+        with tempfile.TemporaryDirectory(prefix="plugin tools ", dir=near) as scratch:
             package = Path(scratch) / "package"
             authoring = package / "authoring"
             # GAME stays in the build tree so capture finds its assets; it is optional here.

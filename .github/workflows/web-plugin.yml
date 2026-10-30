@@ -53,10 +53,13 @@ jobs:
         run: |
           python3 -m http.server 8000 --bind 127.0.0.1 --directory build-web/site &
           for _ in $(seq 50); do curl -fs -o /dev/null http://127.0.0.1:8000/ && break; sleep 0.2; done
+          failed=0
           for engine in chromium firefox webkit; do
             .playwright/bin/python tools/check_web_plugin_author.py --browser "$engine" \
-              --url http://127.0.0.1:8000/ --output "build-web/plugin-browser-check/$engine"
+              --url http://127.0.0.1:8000/ --output "build-web/plugin-browser-check/$engine" ||
+              { echo "::error::browser authoring check failed on $engine"; failed=1; }
           done
+          exit $failed
       - name: Upload browser authoring evidence
         if: always()
         uses: actions/upload-artifact@v4
