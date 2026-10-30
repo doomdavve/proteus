@@ -25,7 +25,10 @@ LOG_MAX = 16384
 
 
 OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "capture", "export",
-              "workspace-read", "workspace-write"]
+              "workspace-read", "workspace-write", "live-inspect", "live-stage", "live-apply",
+              "live-undo", "live-discard"]
+LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard")
+RESPONSE_MAX = 32768
 
 
 def capabilities():
@@ -43,8 +46,14 @@ def capabilities():
                         "bundle_format": "wake-velocity-plugin", "bundle_version": 1},
             "capture": {"kinds": ["voyage"], "renderer": "cpu", "max_seconds": 60,
                         "width": 320, "height": 200, "format": "png"},
-            "unsupported": ["race_capture", "gpu_capture", "inspect", "apply", "undo",
-                            "tool_bridge"]}
+            "live": {"game_option": "--plugin-bridge DIR", "kinds": ["voyage"],
+                     "transport": "private local directory mailbox; per-launch token",
+                     "actions": list(LIVE_ACTIONS), "pins": {
+                         "stage": ["base_revision", "base_epoch", "expect_bundle"],
+                         "apply": ["held_revision", "base_epoch"],
+                         "undo": ["base_revision", "base_epoch"], "discard": ["base_epoch"]}},
+            "unsupported": ["race_capture", "gpu_capture", "race_live", "browser_live",
+                            "network_bridge"]}
 
 
 def read_regular(path, limit):
@@ -371,6 +380,126 @@ class CaptureJob:
         self.cancel()
 
 
+LIVE_INTEGERS = {"revision", "epoch", "undo_depth", "staging", "held_revision", "held_undo",
+                 "held_base", "alert", "diagnostic_line", "tick", "shelter", "exposed", "arrived"}
+LIVE_REAL = {"boat_x", "boat_z", "heading"}
+
+
+def parse_bridge(data):
+    """KEY=VALUE lines after the protocol line; repeated inspect lines form a list."""
+    lines = data.decode("utf-8", "replace").split("\n")
+    if lines[0] != "wake-velocity-bridge 1":
+        raise ValueError("not a protocol 1 bridge file")
+    fields = {}
+    for line in lines[1:]:
+        if not line:
+            continue
+        key, separator, value = line.partition("=")
+        if not separator:
+            raise ValueError("malformed bridge line")
+        if key == "inspect":
+            fields.setdefault("inspection", []).append(value)
+        elif key in LIVE_INTEGERS:
+            fields[key] = int(value)
+        elif key in LIVE_REAL:
+            fields[key] = float(value)
+        else:
+            fields[key] = value
+    return fields
+
+
+class BridgeJob:
+    """One request to a running game's --plugin-bridge mailbox, with ValidationJob's lifecycle.
+
+    The game answers between ticks on its own poll; a stage answer waits for isolated staging.
+    Cancelling stops waiting only: a request the game has read still takes effect.
+    """
+
+    def __init__(self, bridge, action, now, timeout=10.0, pins=None, payload=b"",
+                 expected_bundle=None):
+        if action not in LIVE_ACTIONS:
+            raise ValueError(f"unknown live action {action}")
+        if not math.isfinite(timeout) or timeout <= 0 or timeout > 60:
+            raise ValueError("timeout must be finite and in (0, 60]")
+        pins = pins or {}
+        for key, value in pins.items():
+            if type(value) is not int or not 0 <= value <= 0xffffffffffffffff:
+                raise ValueError(f"{key} must be an unsigned integer")
+        self.action = action
+        self.bundle = None
+        if action == "stage":
+            if len(payload) > 8 + MANIFEST_MAX + SOURCE_MAX:
+                raise ValueError("snapshot exceeds input limit")
+            self.bundle = hashlib.sha256(payload).hexdigest()
+            if not expected_bundle:
+                raise ValueError("live-stage requires --expect-bundle")
+            if expected_bundle != self.bundle:
+                raise ValueError("bundle changed since the expected snapshot")
+        self.bridge = Path(bridge)
+        session = parse_bridge(read_regular(self.bridge / "session", 4096))
+        self.session = session.get("session")
+        self.id = os.urandom(16).hex()
+        self.pins = pins
+        self.deadline = now + timeout
+        self.result = None
+        self.response = self.bridge / f"response-{self.id}"
+        header = ["wake-velocity-bridge 1", f"id={self.id}", f"token={session.get('token')}",
+                  f"operation={action}"] + [f"{key}={value}" for key, value in pins.items()]
+        if payload:
+            header.append(f"payload={len(payload)}")
+        temporary = self.bridge / f".request-{self.id}"
+        with open(temporary, "xb") as stream:
+            stream.write(("\n".join(header) + "\n\n").encode() + payload)
+        try:
+            # A hard link publishes the complete request without replacing a waiting one.
+            os.link(temporary, self.bridge / "request")
+        except FileExistsError:
+            raise ValueError("bridge busy: an earlier request has not been read") from None
+        finally:
+            temporary.unlink()
+
+    def finish(self, status, fields=None):
+        self.result = {"protocol": 1, "operation": "live-" + self.action, "status": status,
+                       "request_id": self.id, "session": self.session}
+        if self.bundle:
+            self.result["bundle_id"] = self.bundle
+        if self.pins:
+            self.result["pins"] = self.pins
+        if fields:
+            for key in ("protocol", "operation", "status", "id"):
+                fields.pop(key, None)
+            self.result.update(fields)
+        return self.result
+
+    def cancel(self, status="cancelled"):
+        if self.result is None:
+            self.finish(status)
+        return self.result
+
+    def poll(self, now):
+        if self.result is not None:
+            return self.result
+        try:
+            data = read_regular(self.response, RESPONSE_MAX)
+        except FileNotFoundError:
+            if now >= self.deadline:
+                return self.cancel("deadline")
+            return None
+        fields = parse_bridge(data)
+        self.response.unlink(missing_ok=True)
+        if fields.get("id") != self.id or fields.get("session") != self.session:
+            return self.finish("bridge_failed", {"message": "response for another request"})
+        status = fields.get("status")
+        # Like validate, a candidate the game refused is rejected, not an accepted request.
+        if status == "ok" and fields.get("outcome") in (
+                "rejected", "incompatible", "migration_failed"):
+            status = "rejected"
+        return self.finish(status, fields)
+
+    def close(self):
+        self.cancel()
+
+
 def write_frame(path, frame):
     """Atomically place a verified frame; a failure leaves any previous file."""
     path = Path(path)
@@ -385,13 +514,38 @@ def write_frame(path, frame):
         raise
 
 
+def live_job(args):
+    action = args.operation[len("live-"):]
+    if not args.bridge:
+        raise ValueError(f"{args.operation} requires --bridge DIR")
+    needed = {"stage": ("base_revision", "base_epoch"), "apply": ("held_revision", "base_epoch"),
+              "undo": ("base_revision", "base_epoch"), "discard": ("base_epoch",),
+              "inspect": ()}[action]
+    pins = {}
+    for key in needed:
+        value = getattr(args, key)
+        if value is None:
+            raise ValueError(f"{args.operation} requires --{key.replace('_', '-')}")
+        pins[key] = value
+    payload = b""
+    if action == "stage":
+        if not args.directory:
+            raise ValueError("live-stage requires a plugin directory")
+        payload = snapshot(args.directory)
+    return BridgeJob(args.bridge, action, time.monotonic(), args.timeout or 10, pins, payload,
+                     args.expect_bundle)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=OPERATIONS)
     parser.add_argument("directory", nargs="?")
     parser.add_argument("--worker", type=Path, default=Path(__file__).resolve().parent.parent
                         / "build" / ("boat_plugin_worker.exe" if os.name == "nt" else "boat_plugin_worker"))
-    parser.add_argument("--base-revision", type=int, default=0)
+    parser.add_argument("--base-revision", type=int)
+    parser.add_argument("--base-epoch", type=int)
+    parser.add_argument("--held-revision", type=int)
+    parser.add_argument("--bridge", type=Path, help="the game's --plugin-bridge directory")
     parser.add_argument("--expect-bundle")
     parser.add_argument("--file", choices=["plugin.json", "main.lua"])
     parser.add_argument("--ticks", type=int, default=360)
@@ -413,6 +567,7 @@ def main():
     if args.operation == "anchors":
         print(json.dumps(anchors(), sort_keys=True))
         return 0
+    offline_base = args.base_revision or 0  # Correlation only; live pins must be explicit.
     job = None
     try:
         if args.operation in ("workspace-read", "workspace-write"):
@@ -437,18 +592,20 @@ def main():
                 raise ValueError("bundle exceeds the 200000-byte import limit")
             sys.stdout.buffer.write(encoded)
             return 0
-        if not args.directory:
+        if args.operation.startswith("live-"):
+            job = live_job(args)
+        elif not args.directory:
             raise ValueError(f"{args.operation} requires a plugin directory")
-        if args.operation == "capture":
+        elif args.operation == "capture":
             if not args.output:
                 raise ValueError("capture requires --output FILE.png")
             camera = {key: value for key, value in (("distance", args.camera_distance),
                       ("height", args.camera_height)) if value is not None}
-            job = CaptureJob(args.game, snapshot(args.directory), args.base_revision,
+            job = CaptureJob(args.game, snapshot(args.directory), offline_base,
                              time.monotonic(), find_anchor(args.anchor) if args.anchor else None,
                              args.time, camera, args.timeout or 20, args.expect_bundle)
         else:
-            job = ValidationJob(args.worker, snapshot(args.directory), args.base_revision,
+            job = ValidationJob(args.worker, snapshot(args.directory), offline_base,
                                 time.monotonic(), args.timeout or 5, args.expect_bundle,
                                 args.operation, args.ticks)
         while (result := job.poll(time.monotonic())) is None:

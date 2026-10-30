@@ -16,6 +16,7 @@ import plugin_author as author
 ROOT = Path(__file__).resolve().parent.parent
 WORKER = None
 GAME = None
+BRIDGE_SERVER = None
 
 
 class FakeProcess:
@@ -193,6 +194,144 @@ class Capture(unittest.TestCase):
             self.assertEqual(author.png_size(frame), (320, 200))
             self.assertEqual(result["evidence"]["frame"]["bytes"], len(frame))
             self.assertEqual([p.name for p in Path(scratch).iterdir()], ["frame.png"])
+
+
+def bridge_reply(directory, request_id, session, **fields):
+    lines = ["wake-velocity-bridge 1", f"id={request_id}", f"session={session}"]
+    lines += [f"{key}={value}" for key, value in fields.items()]
+    # Bytes, not text: Windows text mode would write CRLF, which the protocol does not use.
+    (Path(directory) / f"response-{request_id}").write_bytes(("\n".join(lines) + "\n").encode())
+
+
+class BridgeLifecycle(unittest.TestCase):
+    """The client against a fake game writing responses; virtual deadlines."""
+
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory()
+        self.directory = Path(self.scratch.name)
+        (self.directory / "session").write_bytes(
+            b"wake-velocity-bridge 1\nsession=00aa\ntoken=" + b"7" * 32 + b"\npid=1\n")
+
+    def tearDown(self):
+        self.scratch.cleanup()
+
+    def test_request_and_response(self):
+        payload = author.snapshot(ROOT / "plugins/langedrag")
+        bundle = author.hashlib.sha256(payload).hexdigest()
+        job = author.BridgeJob(self.directory, "stage", 100, 2,
+                               {"base_revision": 3, "base_epoch": 2}, payload, bundle)
+        request = (self.directory / "request").read_bytes()
+        header, _, body = request.partition(b"\n\n")
+        self.assertEqual(body, payload)
+        self.assertEqual(header.decode().split("\n"), [
+            "wake-velocity-bridge 1", f"id={job.id}", "token=" + "7" * 32, "operation=stage",
+            "base_revision=3", "base_epoch=2", f"payload={len(payload)}"])
+        self.assertEqual(sorted(p.name for p in self.directory.iterdir()), ["request", "session"])
+        with self.assertRaisesRegex(ValueError, "busy"):
+            author.BridgeJob(self.directory, "inspect", 100)
+        self.assertIsNone(job.poll(101))
+        bridge_reply(self.directory, job.id, "00aa", status="ok", outcome="held", revision=3,
+                     held_revision=4, held_change="restart_voyage", boat_x="1.5",
+                     inspect="revision=3 schema=1")
+        result = job.poll(101.5)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual((result["revision"], result["held_revision"]), (3, 4))
+        self.assertEqual(result["boat_x"], 1.5)
+        self.assertEqual(result["inspection"], ["revision=3 schema=1"])
+        self.assertEqual(result["bundle_id"], bundle)
+        self.assertEqual(result["pins"], {"base_revision": 3, "base_epoch": 2})
+        self.assertFalse((self.directory / f"response-{job.id}").exists())
+
+    def test_deadline_rejection_and_foreign_response(self):
+        job = author.BridgeJob(self.directory, "inspect", 100, 2)
+        self.assertEqual(job.poll(102)["status"], "deadline")
+        (self.directory / "request").unlink()
+        job = author.BridgeJob(self.directory, "undo", 0, 2, {"base_revision": 1, "base_epoch": 0})
+        bridge_reply(self.directory, job.id, "00aa", status="ok", outcome="rejected")
+        self.assertEqual(job.poll(1)["status"], "rejected")
+        (self.directory / "request").unlink()
+        job = author.BridgeJob(self.directory, "inspect", 0, 2)
+        bridge_reply(self.directory, job.id, "other", status="ok")
+        self.assertEqual(job.poll(1)["status"], "bridge_failed")
+
+    def test_pins(self):
+        payload = author.snapshot(ROOT / "plugins/langedrag")
+        with self.assertRaisesRegex(ValueError, "expect-bundle"):
+            author.BridgeJob(self.directory, "stage", 0, 2, {}, payload)
+        with self.assertRaisesRegex(ValueError, "changed"):
+            author.BridgeJob(self.directory, "stage", 0, 2, {}, payload, "0" * 64)
+        with self.assertRaises(ValueError):
+            author.BridgeJob(self.directory, "apply", 0, 2, {"held_revision": -1})
+        self.assertFalse((self.directory / "request").exists())
+        run = subprocess.run([sys.executable, str(ROOT / "tools/plugin_author.py"), "live-undo",
+                              "--bridge", str(self.directory), "--base-epoch", "0"],
+                             capture_output=True, timeout=30)
+        self.assertEqual(json.loads(run.stdout)["status"], "input_error")
+        self.assertIn("--base-revision", json.loads(run.stdout)["message"])
+
+
+class Bridge(unittest.TestCase):
+    """The CLI against the game's bridge over a still session (validate_wake_bridge --serve)."""
+
+    def setUp(self):
+        if not BRIDGE_SERVER:
+            self.skipTest("needs --bridge-server")
+        self.scratch = tempfile.TemporaryDirectory()
+        self.mailbox = Path(tempfile.mkdtemp(dir=self.scratch.name))  # Private, mode 0700.
+        self.package = Path(self.scratch.name) / "package"
+        self.package.mkdir()
+        for name in ("plugin.json", "main.lua"):
+            (self.package / name).write_bytes((ROOT / "plugins/langedrag" / name).read_bytes())
+        self.server = subprocess.Popen([BRIDGE_SERVER, "--serve", str(self.mailbox)], cwd=ROOT,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        while not (self.mailbox / "session").exists():  # Startup is external; CTest bounds it.
+            self.assertIsNone(self.server.poll())
+
+    def tearDown(self):
+        (self.mailbox / "stop").write_text("")
+        self.server.wait(timeout=30)
+        self.scratch.cleanup()
+
+    def live(self, action, *options, directory=None):
+        command = [sys.executable, str(ROOT / "tools/plugin_author.py"), "live-" + action]
+        command += [str(directory)] if directory else []
+        command += ["--bridge", str(self.mailbox), *options]
+        run = subprocess.run(command, capture_output=True, timeout=30)
+        return json.loads(run.stdout), run.returncode
+
+    def edit(self, old, new):
+        pin = author.workspace_read(self.package)["bundle_id"]
+        source = (self.package / "main.lua").read_bytes().replace(old, new)
+        return author.workspace_write(self.package, "main.lua", source, pin)["bundle_id"]
+
+    def test_inspect_stage_apply_undo(self):
+        result, code = self.live("inspect")
+        self.assertEqual((code, result["status"], result["revision"]), (0, "ok", 1))
+        self.assertEqual(result["plugin"], "proteus.langedrag")
+        self.assertIn("state=", result["inspection"])
+        pin = self.edit(b'name = "BRIDGE"', b'name = "ALVSBORG"')
+        stage = ("--base-revision", "1", "--base-epoch", "0", "--expect-bundle", pin)
+        result, code = self.live("stage", *stage, directory=self.package)
+        self.assertEqual((code, result["outcome"], result["revision"]), (0, "applied", 2))
+        self.assertEqual(result["bundle_id"], pin)
+        result, code = self.live("stage", *stage, directory=self.package)
+        self.assertEqual((code, result["status"], result["revision"]), (1, "stale", 2))
+        pin = self.edit(b"radius = 150", b"radius = 120")
+        result, _ = self.live("stage", "--base-revision", "2", "--base-epoch", "1",
+                              "--expect-bundle", pin, directory=self.package)
+        self.assertEqual((result["outcome"], result["held_change"]), ("held", "restart_voyage"))
+        result, _ = self.live("apply", "--held-revision", "3", "--base-epoch", "1")
+        self.assertEqual((result["outcome"], result["revision"]), ("applied", 3))
+        result, _ = self.live("undo", "--base-revision", "3", "--base-epoch", "2")
+        self.assertEqual((result["outcome"], result["held_revision"], result["held_undo"]),
+                         ("held", 2, 1))
+        result, _ = self.live("discard", "--base-epoch", "2")
+        self.assertEqual((result["outcome"], result["held_revision"]), ("discarded", 0))
+        pin = self.edit(b"max_speed = 6", b"max_speed = 'six'")
+        result, code = self.live("stage", "--base-revision", "3", "--base-epoch", "2",
+                                 "--expect-bundle", pin, directory=self.package)
+        self.assertEqual((code, result["status"], result["revision"]), (1, "rejected", 3))
+        self.assertEqual(result["diagnostic_field"], "voyage.arrival.max_speed")
 
 
 class Workspace(unittest.TestCase):
@@ -430,7 +569,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--worker", required=True)
     parser.add_argument("--game")
+    parser.add_argument("--bridge-server")
     args, remaining = parser.parse_known_args()
+    BRIDGE_SERVER = str(Path(args.bridge_server).resolve()) if args.bridge_server else None
     WORKER = str(Path(args.worker).resolve())
     GAME = str(Path(args.game).resolve()) if args.game else None
     unittest.main(argv=[__file__] + remaining)

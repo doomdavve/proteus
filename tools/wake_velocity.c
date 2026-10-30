@@ -20,6 +20,9 @@
 #include "wake_velocity_menu.h"
 #ifdef PROTEUS_BOAT_PLUGINS
 #include "wake_velocity_plugin.h"
+#if !defined(__EMSCRIPTEN__)
+#include "wake_velocity_bridge.h"
+#endif
 #endif
 #ifdef PROTEUS_BOAT_NET
 #include "boat_server.h"
@@ -111,6 +114,9 @@ static void usage(void)
         "--start X,Z[,DEGREES]: place the boat in a mapped location (simulation X/Z, heading)\n"
         "--plugin DIR: solo voyage from a Lua plugin, e.g. plugins/langedrag\n"
         "  Saves reload | F5: reload | F6: undo | F7: apply a held migration/restart\n"
+        "--plugin-bridge DIR: with --plugin, let tools/plugin_author.py live-* inspect, stage,\n"
+        "  apply and undo revisions through the private directory DIR");
+    puts( // Two literals keep each within ISO C's minimum supported length.
         "--waves: gentle crossing waves and a floating hull\n"
         "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
         "1 s: retry\n"
@@ -334,6 +340,7 @@ static int study(int argc, char **argv)
     Vector3 start = { 0 }; // --start: simulation X, Z and heading in degrees.
     long host_port = 0; // --port: the hosted room's UDP port.
     const char *plugin_path = NULL; // --plugin: the solo voyage's Lua package.
+    const char *bridge_path = NULL; // --plugin-bridge: the live tool bridge's mailbox.
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
 #endif
@@ -428,6 +435,8 @@ static int study(int argc, char **argv)
             start_set = true;
         } else if (strcmp(argv[i], "--plugin") == 0 && i + 1 < argc) {
             plugin_path = argv[++i];
+        } else if (strcmp(argv[i], "--plugin-bridge") == 0 && i + 1 < argc) {
+            bridge_path = argv[++i];
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -558,6 +567,16 @@ static int study(int argc, char **argv)
     }
     if ((!course && (data_dir || export_path)) || (replay_path && ghost_path))
         goto invalid;
+#if defined(__EMSCRIPTEN__)
+    if (bridge_path) {
+        fprintf(stderr, "--plugin-bridge is only available in native builds.\n");
+        goto invalid;
+    }
+#endif
+    if (bridge_path && (!plugin_path || screenshot)) {
+        fprintf(stderr, "--plugin-bridge needs --plugin and a window (no --screenshot).\n");
+        goto invalid;
+    }
     if (plugin_path) {
 #ifdef PROTEUS_BOAT_PLUGINS
         // Rooms and course recordings keep compiled definitions until they can carry revisions.
@@ -726,6 +745,9 @@ static int study(int argc, char **argv)
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
         GetFileName(argv[0]));
     plugin.stage_executable = stage_executable;
+    static WakeBridge bridge;
+    if (bridge_path && !wake_bridge_open(&bridge, bridge_path, GetTime()))
+        goto cleanup;
 #endif
 #endif
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };
@@ -1242,8 +1264,13 @@ static int study(int argc, char **argv)
         // A plugin revision changes between this frame's ticks; a new exposure restarts below.
         bool plugin_restart = false;
 #ifdef PROTEUS_BOAT_PLUGINS
+#if !defined(__EMSCRIPTEN__)
+        // Tool requests arrive whether or not the window has focus.
+        if (bridge_path)
+            plugin_restart = wake_bridge_frame(&bridge, &plugin, &session, GetTime());
+#endif
         if (plugin_path)
-            plugin_restart = wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
+            plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
                 active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), GetTime());
 #endif
         if (reset_requested) {
@@ -1645,6 +1672,10 @@ cleanup:
 #endif
 #endif
 #ifdef PROTEUS_BOAT_PLUGINS
+#if !defined(__EMSCRIPTEN__)
+    if (bridge_path)
+        wake_bridge_close(&bridge);
+#endif
     if (plugin_path)
         wake_plugin_close(&plugin);
 #endif
