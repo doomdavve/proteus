@@ -46,6 +46,9 @@ typedef struct {
 // SESSION and the client borrow until net_study_close().
 bool net_study_connect(NetStudy *net, const char *endpoint, const char *name, const char *token,
     const BoatWorldResources *worlds, BoatSession *session);
+// Finish joining once the window, renderer and audio are ready. A windowed client holds its
+// READY until here so the authority does not queue reliable spawn traffic during startup.
+bool net_study_ready(NetStudy *net);
 // One displayed frame: service the network with this frame's controls and update the view.
 // False when the connection ended (the reason was printed).
 bool net_study_frame(NetStudy *net, BoatSession *session, BoatInput input, float thrust_target,

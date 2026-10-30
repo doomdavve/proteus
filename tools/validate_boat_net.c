@@ -92,7 +92,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e5400070d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e5400080d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -102,7 +102,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 60);
     CHECK(same_bytes(bytes, size,
-        "50424e54000709000000000900000000000000000000"
+        "50424e54000809000000000900000000000000000000"
         "00c8001c000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f81000000ff" // Steering +1, throttle -1.
@@ -206,7 +206,7 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0x818226576068a7dd));
+    CHECK(digest == UINT64_C(0x413083c341105850));
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
         BoatInput back = boat_net_command_input(
@@ -302,7 +302,7 @@ static unsigned samples(Sample *out)
     m[19] = (BoatNetMessage) { .header = { .type = BOAT_NET_RACE_EVENT, .epoch = 3, .tick = 950 },
         .race_event = { BOAT_RACE_GATE, 2, 1, 3, 0 } };
     m[20] = (BoatNetMessage) { .header = { .type = BOAT_NET_COMBAT_PAGE, .epoch = 3, .tick = 100 },
-        .world_page = { .checkpoint = 100, .index = 0, .count = 4, .size = BOAT_NET_PAGE_BYTES } };
+        .world_page = { .checkpoint = 100, .index = 0, .count = 1, .size = BOAT_NET_PAGE_BYTES } };
     for (unsigned i = 0; i < BOAT_NET_TYPE_LIMIT - 1; ++i) {
         out[n].size = boat_net_encode(&m[i], out[n].bytes);
         if (!out[n].size) {
@@ -645,7 +645,8 @@ static void room_close(Room *room)
 #endif
 }
 
-static unsigned room_join(Room *room, const char *name, const char *token, uint32_t sequence)
+static unsigned room_join_ex(
+    Room *room, const char *name, const char *token, uint32_t sequence, bool defer_ready)
 {
     if (room->count == ROOM_CLIENTS) {
         fprintf(stderr, "room_join: more than %d clients\n", ROOM_CLIENTS);
@@ -653,11 +654,21 @@ static unsigned room_join(Room *room, const char *name, const char *token, uint3
     }
     unsigned i = room->count++;
     BoatNetTransport transport = room_transport(room, &room->link[i]);
-    BoatNetClientConfig config
-        = { name, token ? token : "room", "validate", sequence, room->predict, test_worlds };
+    BoatNetClientConfig config = { .name = name,
+        .token = token ? token : "room",
+        .build = "validate",
+        .first_sequence = sequence,
+        .predict = room->predict,
+        .defer_ready = defer_ready,
+        .resources = test_worlds };
     boat_net_client_init(&room->clients[i], transport, &config, room->now);
     room->live[i] = true;
     return i;
+}
+
+static unsigned room_join(Room *room, const char *name, const char *token, uint32_t sequence)
+{
+    return room_join_ex(room, name, token, sequence, false);
 }
 
 // What a predicting client would draw for the first other boat: the interpolated pose,
@@ -801,6 +812,195 @@ static unsigned active_boats(const BoatNetServer *server)
     return n;
 }
 
+static int deferred_ready(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 1, (BoatNetServerConfig) { 0 }));
+    unsigned a = room_join_ex(&room, "late", NULL, 0, true);
+    room_run(&room, .5);
+    BoatNetClient *c = &room.clients[a];
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING);
+    CHECK(c->ready_pending && !c->ready_sent);
+    CHECK(room.server.slot_peer[c->slot] >= 0);
+    CHECK(room.server.peers[room.server.slot_peer[c->slot]].phase == BOAT_NET_PEER_BOOTSTRAP);
+    CHECK(!room.server.fleet.state.slots[c->slot].active);
+    CHECK(!boat_net_client_own(c));
+    uint64_t tick = c->fleet.state.tick;
+    room_run(&room, .5);
+    CHECK(c->fleet.state.tick > tick); // Snapshots still flow before READY.
+    CHECK(boat_net_client_ready(c));
+    CHECK(!c->ready_pending && c->ready_sent);
+    CHECK(boat_net_client_ready(c)); // Idempotent.
+    room_run(&room, 1);
+    CHECK(room.server.peers[room.server.slot_peer[c->slot]].phase == BOAT_NET_PEER_READY);
+    CHECK(room.server.fleet.state.slots[c->slot].active);
+    CHECK(boat_net_client_own(c) != NULL);
+    printf("deferred_ready: snapshots flowed before READY, then the room spawned the boat\n");
+    room_close(&room);
+    return 0;
+}
+
+static int combat_compact(void)
+{
+    const uint64_t tick = 100000;
+    BoatCombat combat = { .enabled = true, .firing = true, .rules = boat_combat_default_rules() };
+    for (unsigned i = 0; i < BOAT_COMBAT_PLAYERS; ++i) {
+        BoatCombatPlayer *p = &combat.players[i];
+        p->health = combat.rules.health - (float)i;
+        p->heat = .25f + .1f * (float)i;
+        p->pressure = .05f * (float)i;
+        p->life_start = tick - 100 - i;
+        p->next_fire = tick + 15;
+        p->next_grenade = tick + 960;
+        p->next_torpedo = tick + 180;
+        p->pressure_tick = tick - 5;
+        p->generation = i + 1;
+        p->request = i * 17;
+        p->hit_serial = i * 3;
+        p->killer = UINT32_MAX;
+        p->torpedo_request = i + 1;
+        p->ammo = 3;
+        p->pressure_owner = UINT32_MAX;
+        p->pressure_generation = i;
+        for (unsigned j = 0; j < BOAT_COMBAT_PLAYERS; ++j) {
+            p->damage[j] = 1.5f * (float)(i + j);
+            p->damage_tick[j] = tick - 2;
+            p->damage_life[j] = i + 10;
+            p->damage_generation[j] = j;
+        }
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_BULLETS; ++i) {
+        BoatCombatObject *o = &combat.bullets[i];
+        o->position = (Vector2) { 3.25f * (float)i, -2.5f * (float)i };
+        o->direction = (Vector2) { cosf((float)i), sinf((float)i) };
+        o->height = .1f * (float)i;
+        o->born = tick - 10;
+        o->generation = i + 1;
+        o->life = i + 2;
+        o->owner = i % BOAT_COMBAT_PLAYERS;
+        o->active = true;
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_GRENADES; ++i) {
+        BoatCombatObject *o = &combat.grenades[i];
+        o->position = (Vector2) { (float)i, (float)i };
+        o->direction = (Vector2) { 0, 1 };
+        o->height = 1.0f;
+        o->born = tick - 4;
+        o->generation = 20 + i;
+        o->life = 30 + i;
+        o->owner = i;
+        o->active = true;
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_TORPEDOES; ++i) {
+        BoatCombatObject *o = &combat.torpedoes[i];
+        o->position = (Vector2) { -(float)i, 2.0f * (float)i };
+        o->direction = (Vector2) { 1, 0 };
+        o->height = .2f;
+        o->born = tick - 30;
+        o->generation = 40 + i;
+        o->life = 50 + i;
+        o->owner = i % BOAT_COMBAT_PLAYERS;
+        o->active = true;
+    }
+    for (unsigned i = 0; i < BOAT_COMBAT_WAVES; ++i) {
+        BoatRadialWave *w = &combat.waves[i];
+        w->centre = (Vector2) { (float)i, -(float)i };
+        w->born = tick - 5;
+        w->generation = 60 + i;
+        w->life = 70 + i;
+        w->owner = i;
+        w->height = 2.0f;
+        w->speed = 10.0f;
+        w->range = 20.0f;
+        w->active = true;
+    }
+    // A recent inactive hit echo stays in the compact state; stale inactive slots disappear.
+    combat.bullets[0].active = false;
+    combat.bullets[0].ended = tick - 3;
+    combat.bullets[1] = (BoatCombatObject) { 0 };
+    uint8_t bytes[BOAT_COMBAT_COMPACT_BYTES];
+    size_t size = boat_combat_compact_encode(&combat, bytes, sizeof(bytes), tick);
+    CHECK(size > 0 && size <= BOAT_COMBAT_COMPACT_BYTES);
+    CHECK(size <= 3 * BOAT_NET_PAGE_BYTES);
+    size_t full_size = size;
+    BoatCombat decoded;
+    CHECK(boat_combat_compact_decode(&decoded, bytes, size, tick, &combat.rules));
+    uint8_t expected[BOAT_COMBAT_BYTES], actual[BOAT_COMBAT_BYTES];
+    boat_combat_encode(&combat, expected);
+    boat_combat_encode(&decoded, actual);
+    CHECK(memcmp(expected, actual, sizeof(expected)) == 0);
+    // Drive the real fleet/combat path and check that every authoritative tick survives the
+    // compact round trip byte for byte.
+    static BoatFleet fleet;
+    CHECK(boat_fleet_init(&fleet, basin(),
+        boat_world_test_water(basin()->definition, false, false, false), BOAT_OBJECT_LIFE_TICKS,
+        1.2f));
+    boat_combat_enable(&fleet);
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        boat_fleet_request_spawn(&fleet, i);
+    BoatFleetBots bots = { 0 };
+    for (unsigned t = 0; t < 2000; ++t) {
+        BoatInput inputs[BOAT_FLEET_SLOTS];
+        boat_fleet_bots_drive(&bots, &fleet, inputs);
+        for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+            inputs[i].gun = true;
+        boat_fleet_step(&fleet, inputs);
+        size_t encoded = boat_combat_compact_encode(
+            &fleet.state.combat, bytes, sizeof(bytes), fleet.state.tick);
+        CHECK(encoded > 0);
+        BoatCombat live;
+        CHECK(boat_combat_compact_decode(
+            &live, bytes, encoded, fleet.state.tick, &fleet.state.combat.rules));
+        uint8_t live_bytes[BOAT_COMBAT_BYTES], decoded_bytes[BOAT_COMBAT_BYTES];
+        boat_combat_encode(&fleet.state.combat, live_bytes);
+        boat_combat_encode(&live, decoded_bytes);
+        if (memcmp(live_bytes, decoded_bytes, sizeof(live_bytes)) != 0) {
+            for (size_t k = 0; k < sizeof(live_bytes); ++k)
+                if (live_bytes[k] != decoded_bytes[k]) {
+                    fprintf(stderr, "compact mismatch at tick %u byte %zu: %02x != %02x\n", t, k,
+                        live_bytes[k], decoded_bytes[k]);
+                    const BoatCombatObject *a = &fleet.state.combat.bullets[0];
+                    const BoatCombatObject *b = &live.bullets[0];
+                    fprintf(stderr,
+                        "bullet0 live active=%d born=%llu ended=%llu gen=%u life=%u owner=%u; "
+                        "decoded active=%d born=%llu ended=%llu gen=%u life=%u owner=%u\n",
+                        a->active, (unsigned long long)a->born, (unsigned long long)a->ended,
+                        a->generation, a->life, a->owner, b->active, (unsigned long long)b->born,
+                        (unsigned long long)b->ended, b->generation, b->life, b->owner);
+                    break;
+                }
+            return 1;
+        }
+    }
+    BoatCombat empty = { .enabled = true, .firing = true, .rules = combat.rules };
+    size = boat_combat_compact_encode(&empty, bytes, sizeof(bytes), tick);
+    CHECK(size > 0 && size <= BOAT_NET_PAGE_BYTES); // No projectiles: one page.
+    printf("combat_compact: busy pool %zu bytes (<=%d), empty %zu bytes\n", full_size,
+        BOAT_COMBAT_COMPACT_BYTES, size);
+    return 0;
+}
+
+static int snapshot_resync(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 1, (BoatNetServerConfig) { 0 }));
+    unsigned a = room_join(&room, "stall", NULL, 0);
+    room_run(&room, 1);
+    BoatNetClient *c = &room.clients[a];
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING);
+    // Silence authoritative fleet state while control traffic keeps flowing: pings still get
+    // pongs, so only the snapshot-stall resync can recover the world.
+    room.server.tick_limit = room.server.fleet.state.tick;
+    room_run(&room, 2.5);
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->timed_out == 0);
+    CHECK(c->stats.snapshot_resyncs > 0 && c->stats.resyncs > 0);
+    CHECK(room.server.stats.resyncs > 0);
+    printf("snapshot_resync: %llu snapshot stalls requested reliable checkpoints\n",
+        (unsigned long long)c->stats.snapshot_resyncs);
+    room_close(&room);
+    return 0;
+}
+
 static int lossless(void)
 {
     static Room room;
@@ -894,7 +1094,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c5100010007"));
+    CHECK(same_bytes(query, 8, "50424c5100010008"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -2417,6 +2617,9 @@ static int enet_lifecycle(void)
 static const TestCase cases[] = {
     TEST_CASE(enet_loopback),
     TEST_CASE(enet_lan),
+    TEST_CASE(deferred_ready),
+    TEST_CASE(snapshot_resync),
+    TEST_CASE(combat_compact),
     SLOW_CASE(enet_lifecycle),
     TEST_CASE(rejections),
     SLOW_CASE(deathmatch),
@@ -2430,6 +2633,9 @@ static const TestCase cases[] = {
     TEST_CASE(golden),
     TEST_CASE(codec),
     SLOW_CASE(checkpoints),
+    TEST_CASE(deferred_ready),
+    TEST_CASE(snapshot_resync),
+    TEST_CASE(combat_compact),
     TEST_CASE(lossless),
     TEST_CASE(deathmatch),
     SLOW_CASE(combat_room),
