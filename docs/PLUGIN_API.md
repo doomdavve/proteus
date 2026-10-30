@@ -680,6 +680,34 @@ and objective commands plus callback/context/state descriptions and native-only 
 It describes data values; Lua functions are not JSON values. Geometry, duplicate JSON keys,
 resource ownership and cross-field rules still require native validation.
 
+`workspace-read DIRECTORY` returns the two UTF-8 draft files and their `bundle_id` using
+that same framed snapshot hash. `workspace-write DIRECTORY --file main.lua --expect-bundle HEX`
+reads replacement UTF-8 bytes from stdin (bounded to 64 KiB; `plugin.json` is bounded to 4 KiB).
+Only those two file names are accepted. For example, with a selected local draft directory:
+
+```sh
+python3 tools/plugin_author.py workspace-read plugins/langedrag
+# Use the returned bundle_id and a prepared replacement file:
+python3 tools/plugin_author.py workspace-write plugins/langedrag --file main.lua \
+  --expect-bundle "$BUNDLE_ID" < build/main.lua
+python3 tools/plugin_author.py validate plugins/langedrag
+```
+
+Writes require an existing regular-file workspace and an exact current bundle pin, check it
+again after preparing the replacement, and atomically replace one file in its directory.
+A stale pin or preparation/replace failure retains the draft; temporary files are cleaned up.
+The response includes the previous and resulting bundle IDs and draft text. These are **source
+draft operations**: even invalid Lua can be saved, and neither operation evaluates Lua,
+validates a manifest, stages a revision nor changes a running game. Validate/preview the
+result separately; existing native reload watching still observes saved files normally.
+No state, historical Undo or active revision is represented by a draft bundle ID.
+
+The selected directory is a trusted local filesystem workspace, not a security sandbox.
+Pins detect stale edits but do not lock unrelated editors: concurrent writes after the final
+check can race, and the two files are not a single atomic transaction. Serialize writers and
+reread after external edits. This CLI is the workspace operation surface; an authenticated
+local transport and live inspect/stage/apply/undo bridge remain future work.
+
 Validation snapshots `plugin.json` (4 KiB) and `main.lua` (64 KiB) from regular local files.
 Links and special files are rejected; the native manifest parser remains authoritative.
 A snapshot captures the bytes actually read, not an atomic filesystem transaction spanning
@@ -756,8 +784,8 @@ still evaluate trusted Lua synchronously. Process isolation of descriptor stagin
 qualify arbitrary imported code or guarantee uninterrupted objective execution. Browser
 import/reload/export must isolate those remaining paths or explicitly restrict its capability
 subset, and qualify storage failure, cancellation and repeated sessions on the target. The descriptor-only
-browser implementation below resolves this gate for that subset; frame capture, workspace
-bridge and human recovery acceptance remain open.
+browser implementation below resolves this gate for that subset. Draft workspace CLI access
+is implemented; frame capture, live tool bridge and human recovery acceptance remain open.
 
 
 ## Browser source bundles (P4.3)

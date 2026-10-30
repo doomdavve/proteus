@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4 native authoring discovery and cancellable isolated validation (protocol 1)."""
+"""P4 native draft authoring and cancellable isolated validation (protocol 1)."""
 
 import argparse
 import hashlib
@@ -21,7 +21,8 @@ SOURCE_MAX = 65536
 
 
 def capabilities():
-    return {"protocol": 1, "operations": ["capabilities", "schema", "validate", "preview", "export"],
+    return {"protocol": 1, "operations": ["capabilities", "schema", "validate", "preview", "export",
+                         "workspace-read", "workspace-write"],
             "kinds": {"voyage": "outer", "race": "river"},
             "capabilities": ["voyage.define", "race.define", "objective.hud", "objective.timers"],
             "limits": {"manifest_bytes": MANIFEST_MAX, "source_bytes": SOURCE_MAX,
@@ -63,6 +64,61 @@ def export_bundle(directory):
     return {"format": "wake-velocity-plugin", "version": 1,
             "manifest": read_regular(directory / "plugin.json", MANIFEST_MAX).decode("utf-8"),
             "source": read_regular(directory / "main.lua", SOURCE_MAX).decode("utf-8")}
+
+
+def workspace_read(directory):
+    """Read the two selected draft files using the validation snapshot encoding."""
+    return workspace_result(snapshot(directory))
+
+
+def workspace_result(payload):
+    manifest_size, _ = struct.unpack(">II", payload[:8])
+    return {"protocol": 1, "operation": "workspace-read", "status": "ok",
+            "bundle_id": hashlib.sha256(payload).hexdigest(), "draft": True,
+            "files": {"plugin.json": payload[8:8 + manifest_size].decode("utf-8"),
+                      "main.lua": payload[8 + manifest_size:].decode("utf-8")}}
+
+
+def workspace_write(directory, filename, content, expected_bundle):
+    """Replace one draft file, with an optimistic pin; never evaluate or install Lua."""
+    if filename not in ("plugin.json", "main.lua"):
+        raise ValueError("workspace file must be plugin.json or main.lua")
+    if not expected_bundle:
+        raise ValueError("workspace-write requires --expect-bundle")
+    limit = MANIFEST_MAX if filename == "plugin.json" else SOURCE_MAX
+    if len(content) > limit:
+        raise ValueError(f"{filename}: exceeds {limit} bytes")
+    content.decode("utf-8")
+    directory = Path(directory).resolve(strict=True)
+    before = snapshot(directory)
+    manifest_size, _ = struct.unpack(">II", before[:8])
+    before[8:8 + manifest_size].decode("utf-8")
+    before[8 + manifest_size:].decode("utf-8")
+    if hashlib.sha256(before).hexdigest() != expected_bundle:
+        raise ValueError("bundle changed since the expected snapshot")
+    target = directory / filename
+    mode = stat.S_IMODE(target.stat().st_mode)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=directory, prefix=".plugin-draft-",
+                                         delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.chmod(temporary, mode)
+        # Detect edits during preparation as well as stale requests at entry.
+        if snapshot(directory) != before:
+            raise ValueError("bundle changed during draft preparation")
+        os.replace(temporary, target)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    manifest = content if filename == "plugin.json" else before[8:8 + manifest_size]
+    source = content if filename == "main.lua" else before[8 + manifest_size:]
+    result = workspace_result(struct.pack(">II", len(manifest), len(source)) + manifest + source)
+    result.update(operation="workspace-write", previous_bundle_id=expected_bundle,
+                  changed_file=filename)
+    return result
 
 
 class ValidationJob:
@@ -163,12 +219,14 @@ class ValidationJob:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["capabilities", "schema", "validate", "preview", "export"])
+    parser.add_argument("operation", choices=["capabilities", "schema", "validate", "preview", "export",
+                         "workspace-read", "workspace-write"])
     parser.add_argument("directory", nargs="?")
     parser.add_argument("--worker", type=Path, default=Path(__file__).resolve().parent.parent
                         / "build" / ("boat_plugin_worker.exe" if os.name == "nt" else "boat_plugin_worker"))
     parser.add_argument("--base-revision", type=int, default=0)
     parser.add_argument("--expect-bundle")
+    parser.add_argument("--file", choices=["plugin.json", "main.lua"])
     parser.add_argument("--ticks", type=int, default=360)
     parser.add_argument("--timeout", type=float, default=5)
     args = parser.parse_args()
@@ -180,6 +238,19 @@ def main():
         return 0
     job = None
     try:
+        if args.operation in ("workspace-read", "workspace-write"):
+            if not args.directory:
+                raise ValueError(f"{args.operation} requires a plugin directory")
+            if args.operation == "workspace-read":
+                result = workspace_read(args.directory)
+            else:
+                if not args.file or not args.expect_bundle:
+                    raise ValueError("workspace-write requires --file and --expect-bundle")
+                limit = MANIFEST_MAX if args.file == "plugin.json" else SOURCE_MAX
+                result = workspace_write(args.directory, args.file,
+                                         sys.stdin.buffer.read(limit + 1), args.expect_bundle)
+            print(json.dumps(result, sort_keys=True))
+            return 0
         if args.operation == "export":
             if not args.directory:
                 raise ValueError("export requires a plugin directory")
