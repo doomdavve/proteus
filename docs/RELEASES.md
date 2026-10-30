@@ -4,7 +4,8 @@ The [multiplayer plan](MULTIPLAYER_PLAN.md) proposes native multiplayer before b
 release packages link ENet for `wake_velocity --connect` and the title's MULTIPLAYER entry
 (2026-10-23/24) and include `enet-LICENSE.txt`. From 2026-10-24 both also carried `boat_server`
 for LAN rooms; since 2026-10-25 the game serves rooms itself (`wake_velocity --serve`, the
-title's HOST A ROOM, Windows `host.bat`), so packages carry one executable. M6 will add protocol/content
+title's HOST A ROOM, Windows `host.bat`), so packages carry one game executable. Since P4.7
+they also carry the plugin authoring tools' `boat_plugin_worker` helper. M6 will add protocol/content
 identity, native cross-platform checks and a separate Linux headless-server distribution to
 release documentation. A future native multiplayer release need not imply browser multiplayer parity.
 
@@ -171,8 +172,8 @@ standalone playbook. Keep the server and hosted browser client on the same relea
 
 | Asset | Contents |
 | --- | --- |
-| `wake_velocity-<version>-macos-arm64.zip` | Ad-hoc signed `Wake Velocity.app`; Apple Silicon, macOS 13+ |
-| `wake_velocity-<version>-windows-x64.zip` | Portable folder containing `launch.bat`, `wake_velocity.exe`, and assets |
+| `wake_velocity-<version>-macos-arm64.zip` | Ad-hoc signed `Wake Velocity.app`; Apple Silicon, macOS 13+. `Contents/MacOS` also holds `boat_plugin_worker`; `Contents/Resources/authoring` holds the [plugin authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47) |
+| `wake_velocity-<version>-windows-x64.zip` | Portable folder containing `launch.bat`, `wake_velocity.exe`, `boat_plugin_worker.exe`, assets and the `authoring` tools |
 | Matching `.zip.sha256` files | SHA-256 checksums for both archives |
 
 Here `<version>` is the full release tag, including its `v` prefix (for example,

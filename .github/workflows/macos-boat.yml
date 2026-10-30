@@ -64,6 +64,15 @@ jobs:
           test -s "$app/Contents/Resources/assets/fonts/m3x6.fnt"
           test -s "$app/Contents/Resources/assets/fonts/m5x7.png"
           test -s "$app/Contents/Resources/assets/fonts/m3x6.png"
+          # Packaged authoring tools find their worker and game through plugin_tools.json.
+          author="$app/Contents/Resources/authoring/plugin_author.py"
+          cp -R "$app/Contents/Resources/assets/plugins/shelter-tour" mine
+          python3 "$author" validate mine
+          python3 "$author" preview mine
+          python3 "$author" capture mine --anchor outer.dock --time 0 --output plugin-frame.png
+          test -s plugin-frame.png
+          # Running the tools must leave the signed bundle untouched.
+          codesign --verify --deep --strict --verbose=2 "$app"
 
       - name: Upload downloadable app
         uses: actions/upload-artifact@v4

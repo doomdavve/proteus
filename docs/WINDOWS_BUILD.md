@@ -1,5 +1,11 @@
 # Windows Wake Velocity builds
 
+Plugin authoring tools (P4.7, 2026-10-30): the ZIP also carries `boat_plugin_worker.exe`, the
+`authoring` tools and the three example plugins in `assets/plugins`, installed by
+`tools/package_plugin_tools.py`; the relocated check runs the packaged tools' validate, preview
+and capture through the runner's Python. See
+[packaged authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47).
+
 Multiplayer M3 (2026-10-23): `wake_velocity` now links the pinned ENet library (winsock,
 `ws2_32`/`winmm`) for the diagnostic `--connect` mode, and the package step copies
 `enet-LICENSE.txt`. MSVC first compiled ENet and `src/boat_net_enet.c` on 2026-10-24 (below).
