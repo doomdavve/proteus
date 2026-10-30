@@ -6,7 +6,9 @@ transport is owned by [the multiplayer plan](MULTIPLAYER_PLAN.md).
 ## Arsenal milestone — 2026-10-27
 
 Current status: implemented in `deathmatch-arsenal`, based on `a6bec2c`. This supersedes the
-machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below.
+machine-gun and forward-grenade rules in the dated 2026-10-26 milestone below. The current wire
+revision is protocol **v8** (2026-10-30), which carries the same combat rules in a compact 1–3
+page per-tick payload.
 
 | Control | Current behavior |
 | --- | --- |
@@ -71,8 +73,8 @@ Hunting bots use the cannon out to 52 m, torpedoes ahead, and grenades against t
 
 Protocol **v7** repurposes the command's reserved byte for a torpedo request serial. Combat
 checkpoints include pressure, ammo, recent damage bursts and eight torpedoes; 40 short-lived
-water packets replace 64 bullets. Combat remains four pages per snapshot, now 3716 bytes;
-free/race omit combat. Rebuild native/browser peers together. See the
+water packets replace 64 bullets. Combat checkpoints are 3716 bytes; v7's per-tick stream was
+four pages (v8 uses 1–3 compact pages, below). Free/race omit combat. Rebuild native/browser peers together. See the
 [wire layout](MULTIPLAYER_PROTOCOL.md#combatpage-and-combat-checkpoint).
 
 Completed: arsenal, authoritative state/prediction, input, bots, damage feedback, instruments
@@ -560,3 +562,28 @@ Not verified: no human play; Tab-held scoreboard, capsize notice after a credite
 own boat and the bailout feed line were not seen on screen; no Windows/Linux build. Free mode
 physics is untouched by D2 (match code runs only in deathmatch rooms), but no before/after
 capture diff was made for this slice.
+
+
+## Compact combat pages — 2026-10-30
+
+Protocol v8 replaces the fixed four-page CombatPage stream with a compact payload in one to
+three pages. The reliable checkpoint still carries the complete 3716-byte combat state and
+rules; each per-tick payload takes the installed rules, omits zero inactive slots, and packs
+active or recent hit-echo projectiles and waves. Inactive projectiles are canonical: a hit echo
+younger than 45 ticks remains for presentation, older slots are zero. The client still applies
+the fleet snapshot and combat state atomically and keeps eight bounded in-flight sets; snapshot
+liveness/resync recovers a stalled world.
+
+The compact codec reports 2365 bytes for a busy pool (2398 maximum, three pages), 558 bytes for an empty
+state (one page), and one or two pages in typical play. The deterministic four-client
+`combat_room` measured **44.4 KiB/s/client** downstream at 12% loss, down from about 140 KiB/s.
+The `combat_compact` test drives 2000 real fleet/combat ticks and requires the compact decode to
+match the canonical checkpoint encoding byte for byte; `boat_combat` also checks one-to-three-page
+packets and malformed-state rejection.
+
+Verified 2026-10-30 on Apple Silicon/macOS with the Debug build and full CTest preset:
+**316/316 enabled tests passed** (13 retired wake-field cases disabled). A local protocol-v8 river
+deathmatch with one game client and one predicting bot produced 313 snapshots, zero decode
+errors, zero stale snapshots and zero resyncs. Not run: hosted deployment, browser build, packaged
+release, human combat play or platform qualification. The hosted Winterfell room remains
+v0.0.22 / protocol v7 until the next matching release cutover.
