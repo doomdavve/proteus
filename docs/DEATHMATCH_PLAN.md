@@ -584,6 +584,6 @@ packets and malformed-state rejection.
 Verified 2026-10-30 on Apple Silicon/macOS with the Debug build and full CTest preset:
 **316/316 enabled tests passed** (13 retired wake-field cases disabled). A local protocol-v8 river
 deathmatch with one game client and one predicting bot produced 313 snapshots, zero decode
-errors, zero stale snapshots and zero resyncs. Not run: hosted deployment, browser build, packaged
-release, human combat play or platform qualification. The hosted Winterfell room remains
-v0.0.22 / protocol v7 until the next matching release cutover.
+errors, zero stale snapshots and zero resyncs. At this implementation check, hosted deployment, browser build, packaged release, human
+combat play and platform qualification were not run; Winterfell was v0.0.22 / protocol v7.
+Subsequent release/cutover evidence belongs to the [release status](RELEASES.md#status-and-verification).

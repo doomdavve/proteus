@@ -38,7 +38,7 @@ controller vault file in place and pass its path rather than copying it.
 For the next version (replace the tag and paths as appropriate), check prerequisites first:
 
 ```sh
-python3 tools/cut_release.py v0.0.22 \
+python3 tools/cut_release.py v0.0.24 \
   --hosting-repo /path/to/clean-davve-srv-worktree \
   --vault-password-file /path/to/davve-srv/ansible/.vault_pass.txt \
   --browser-python /path/to/playwright-venv/bin/python \
@@ -102,10 +102,10 @@ hardening has not published another release or redeployed Winterfell.
 The merged `bb8e7c8` command passed live `v0.0.22 --check` using the existing controller,
 Playwright environment, vault file and noninteractive SSH/sudo setup. No v0.0.22 tag or
 release output directory was created, and the hosting worktree remained clean.
-The next release will
-qualify the revised complete command against live publication/deployment; physical-device,
-human package/input/audio and wider network review remain open. v0.0.21 remains the deployed
-release; its live evidence below belongs to the earlier command.
+At that preflight check, v0.0.21 was deployed and live qualification of the revised
+command remained next. Subsequent publication/deployment evidence is recorded in
+[current status](#status-and-verification); physical-device, human package/input/audio
+and wider network review remain separate.
 
 Preparation evidence, 2026-10-28: v0.0.21 collects the merged mobile browser controls and adaptive
 viewport work since v0.0.20. Release orchestration and offline archive/pin guards implemented;
@@ -199,7 +199,43 @@ provided token. No personal access token or additional secret is needed.
 
 ## Status and verification
 
-Current status, 2026-10-28: **[v0.0.21](https://github.com/doomdavve/proteus/releases/tag/v0.0.21)**
+Current release, 2026-10-30: **[v0.0.23](https://github.com/doomdavve/proteus/releases/tag/v0.0.23)**
+is published at `11b5e1a75bbf7d43afd331db3e7e520f3ddf855a`. The
+[native release](https://github.com/doomdavve/proteus/actions/runs/41103761378) and
+[Pages](https://github.com/doomdavve/proteus/actions/runs/41103761440) workflows passed.
+This release collects Lua plugin hosting/authoring/objectives and location scenery/harbor
+modules, the cabin boat, CLI help, Windows control fixes, snapshot liveness fixes and
+protocol-v8 compact combat pages since v0.0.22. Native clients and the room must upgrade together.
+
+The reviewed source passed Debug configure/build and all **321 enabled CPU CTests** on Apple
+Silicon/macOS (`ctest --preset full`, GPU tests off, 13 retired wake-field cases disabled).
+The build reported raylib's existing bundled stb_vorbis pointer-comparison warning. CPU basin,
+river and outer captures were inspected; a 120-frame windowed river GPU demo completed.
+Both downloaded native ZIPs passed SHA-256, ZIP integrity and embedded version/commit checks.
+The Mac package reports `Uncommitted changes: False`, passes strict signature verification,
+and completed a 120-frame river GPU demo from outside the repository. Windows package
+execution, human input/audio and physical-device acceptance were not performed.
+
+The required Winterfell native/browser cutover passed through `davve-srv` pin `90c0823`;
+room and relay are active on the exact tagged commit. A full deployment repeat reported
+`changed=0 unreachable=0 failed=0`. Both live browser sites passed named
+joining/driving with no page errors, and their captures were inspected. Public metadata is
+protocol 8 / physics 9. The native bot received 66 snapshots, repaired seven mismatches and
+finished consistent with zero decode errors and zero resyncs.
+[Hosting evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-30) owns deployment limits.
+
+The [three-engine plugin qualification](https://github.com/doomdavve/proteus/actions/runs/41103604448)
+passed Chromium, Firefox and WebKit on attempt 2. The first
+attempt passed Chromium and WebKit; Firefox crossed an objective-worker deadline while the test held
+a reply for recovery, changing quarantine/waiting flags without changing the checkpoint state.
+The same source passed the full workflow on retry; no product or test changes were made.
+Firefox deadline sensitivity remains a qualification limitation.
+Evidence: `/private/tmp/proteus-release-v0.0.23/build/releases/v0.0.23/`, including
+`verification.json`, build/test/deployment logs, package checks and browser captures;
+orchestration log `/private/tmp/proteus-release-v0.0.23.log`.
+Next: human package/input/audio and wider network review; investigate Firefox deadline sensitivity.
+
+Earlier publication evidence, 2026-10-28: **[v0.0.21](https://github.com/doomdavve/proteus/releases/tag/v0.0.21)**
 is published at `0cb1921224149ddeb4707e818dd2069096bc9e3d`, after
 [PR #38](https://github.com/doomdavve/proteus/pull/38) passed macOS, Windows and Linux CI.
 The [native release](https://github.com/doomdavve/proteus/actions/runs/40685734545) and
