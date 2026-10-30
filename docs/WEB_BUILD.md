@@ -393,9 +393,12 @@ and lazy; the packaged site now includes `lua-LICENSE.txt`. Deploy the complete 
 ```sh
 python3 tools/plugin_author.py export plugins/langedrag > build/langedrag.wake-plugin.json
 node tools/test_web_plugin_author.cjs
-# With a built site served on port 8000 and Playwright installed:
-python3 tools/check_web_plugin_author.py --url http://127.0.0.1:8000/ \
-  --output build-web/plugin-browser-check
+# With a built site served on port 8000, Playwright installed and its engines downloaded
+# (`playwright install chromium firefox webkit`); --executable selects system Chrome instead:
+for engine in chromium firefox webkit; do
+  python3 tools/check_web_plugin_author.py --browser $engine --url http://127.0.0.1:8000/ \
+    --output build-web/plugin-browser-check/$engine
+done
 ```
 
 Verification, 2026-10-29: Emscripten 6.0.12 MinSizeRel game/worker packaging passes on Apple
@@ -404,8 +407,13 @@ objective/race rejection, real worker launch, live rename, syntax rejection, hel
 Apply/Undo, stale results across Undo, cancellation/late completion, restored source/new
 sessions and denied source storage. Gameplay and authoring captures were inspected. The
 [plugin plan](PLUGIN_PLAN.md#p43-result-2026-10-29) owns detailed evidence and next work.
-Firefox/Safari, physical devices, tab suspension and peak memory/runtime remain unqualified;
-there is no human play acceptance or deployment claim. PR browser CI builds these artifacts
+Verification, 2026-10-30 (P4.8): the same check, extended with 20 repeated worker validations,
+Chromium tab freeze/resume (including a deadline across a freeze), navigation mid-validation
+and three restored sessions, passes on Playwright Chromium, Firefox and WebKit and on system
+Chrome, locally on Apple Silicon. The PR browser workflow now runs it on all three engines. See
+the [P4.8 result](PLUGIN_PLAN.md#p48-result-2026-10-30) for timings and limits. Safari, mobile
+browsers, physical devices, real background-tab policies and worker/browser-process memory
+remain unqualified; there is no human play acceptance or deployment claim. PR browser CI builds these artifacts
 without publishing them; the release/Pages deployment workflow retains its existing policy.
 
 ## WebRTC rooms

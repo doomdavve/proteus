@@ -14,15 +14,20 @@ native edits. P4.3 adds browser source bundles and isolated descriptor-only impo
 objectives and race imports remain explicitly unsupported. P4.4 adds pinned draft workspace
 read/write, P4.5 pinned CPU frame capture with curated anchors/camera bookmarks, P4.6 a live tool
 bridge to a running native game and P4.7 those tools in the macOS/Windows release packages.
+P4.8 qualifies browser authoring on Chromium, Firefox and WebKit in CI, with tab freeze,
+navigation and repeated-session cleanup, and records native costs on Linux and Windows.
 There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.7 release-tool packaging**, following
-[P4.6 live tool bridge](#p46-result-2026-10-30); see the
-[P4.7 result](#p47-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: broader target/browser qualification.** Interactive preview controls were deferred
+Completed task: **P4.8 automated target/browser qualification**, following
+[P4.7 release-tool packaging](#p47-result-2026-10-30); see the
+[P4.8 result](#p48-result-2026-10-30). Prior results retain their dated verification evidence.
+**Next task: browser objective isolation** — run imported objective init/update/migration/Undo
+in an isolated evaluator with host-owned state persistence before browser imports accept
+callbacks. Physical-device and human qualification need the user and are tracked separately.
+Interactive preview controls were deferred
 on 2026-10-30 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time init/migration
 still evaluate trusted Lua synchronously; browser imports support only `voyage.define` and
 never evaluate source on the game thread. Browser objective isolation and race integration
@@ -1517,11 +1522,65 @@ is ad-hoc signed; on a downloaded, quarantined app, Gatekeeper may need **Open A
 it runs the worker, which is unverified. The packaged `PLUGIN_API.md` links into the source tree.
 No gameplay, rendering, audio or runtime asset-loading change; no new audiovisual review.
 
-**Next:** broader target/browser qualification: Windows/Linux and physical-device memory,
+**Next recorded at P4.7 (automated part implemented below):** broader target/browser qualification: Windows/Linux and physical-device memory,
 compiler and callback costs, tab suspension and repeated-session cleanup. Browser objectives
 still require isolated init/update/migration/Undo and state persistence. Interactive preview
 controls (proposed: in-game checkpoint/rewind over `wake_plugin_preview_*`) are deferred and
 unspecified. P3 human migration/Undo/recovery acceptance remains open.
+
+#### P4.8 result, 2026-10-30
+
+Qualified what an agent and CI can check without physical devices or a human player:
+
+- `tools/check_web_plugin_author.py` takes `--browser chromium|firefox|webkit` and uses
+  Playwright's engines; `--executable` still selects a Chromium-family binary such as system
+  Chrome. Besides the P4.3 transactions, it now checks:
+  - **Repeated validations:** 20 in a row (`--cycles`). Each runs in a fresh worker, and every
+    worker must have closed afterwards.
+  - **Tab freeze (Chromium only):** freezing the page mid-validation through the lifecycle API
+    for 1.5 s must leave a consistent owner and a running game. Freezing for 6 s while a real
+    result is held must, on resume, reject at the five-second deadline, keep the voyage and
+    ignore the late result.
+  - **Navigation mid-validation:** leaving the page during validation, then three restored
+    sessions (`--sessions`). Each must revalidate, launch and leave no worker alive.
+  - **Evidence:** per-validation durations, the Chromium main-thread heap after garbage
+    collection, and the engine and its version go to `results.json`. Durations and heap are
+    recorded, not asserted.
+- The PR-only **Browser plugin authoring** workflow now serves its built site and runs the check
+  on Chromium, Firefox and WebKit (Playwright 1.64.1 on Ubuntu). It uploads the screenshots and
+  `results.json`.
+- Native targets: Linux CI already ran every plugin test (309/309 on `1f0b4a2`). Windows CI ran
+  them all except `boat_plugin_capture`, which it now runs too. Both jobs now run
+  `boat_plugin_bench plugins/shelter-tour` and write its staging/compiler/callback costs to the job
+  summary. Fixed the two GCC warnings that Linux CI reported in plugin sources
+  (`boat_plugin_lua.c` unused value, `validate_boat_plugin.c` format truncation); the
+  descriptor behavior is unchanged.
+
+Verification, 2026-10-30, Apple Silicon/macOS: native Debug build warning-clean for project
+sources; full `ctest --preset full` passed **309/309 enabled tests**. Emscripten 6.0.12
+MinSizeRel `web` build packaged. The extended check passed on Playwright Chromium 156.0.8078.4,
+Firefox 157.0 and WebKit 27.2, and on system Chrome 156.0.8078.74:
+
+| Engine | Cold validation | Median of 20 | Max of 20 | Freeze cases |
+|---|---|---|---|---|
+| Chromium 156 | 90 ms | 60 ms | 61 ms | passed (rename applied after resume; deadline across freeze) |
+| Firefox 157 | 67 ms | 53 ms | 55 ms | not exercised |
+| WebKit 27.2 | 41 ms | 37 ms | 39 ms | not exercised |
+
+The Chromium main-thread heap after collection went from 2.74 to 2.82 MB across the 20
+validations. I inspected the voyage captures from all three engines; each rendered the Långedrag
+voyage with the plugin HUD row. The Linux/Windows bench steps and three-engine CI run first on
+this PR. No human acceptance is claimed.
+
+Limits: these are headless desktop engines on one Mac, not Safari, mobile browsers or physical
+devices. Browser freeze is Chromium's lifecycle emulation, not a real background-tab policy.
+Firefox/WebKit freeze, worker Wasm memory and browser-process memory are not measured. Native
+costs on Linux/Windows come from shared CI runners, so they are evidence, not budgets. No
+gameplay, rendering, audio or asset-loading change; no new audiovisual review.
+
+**Next:** browser objective isolation, as recorded in the status above. Physical-device memory
+and timing, real background-tab behavior on phones, Safari, and P3 human
+migration/Undo/recovery acceptance need the user.
 
 ### P5 — authority, prediction and recorded revisions
 

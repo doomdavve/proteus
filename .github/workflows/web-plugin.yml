@@ -18,7 +18,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
@@ -43,3 +43,24 @@ jobs:
           cmake --build build-web --target web --parallel 2
           test -s build-web/site/index.html
           test -s build-web/site/lua-LICENSE.txt
+      - name: Install Playwright browser engines
+        run: |
+          python3 -m venv .playwright
+          .playwright/bin/pip install playwright==1.64.1
+          .playwright/bin/playwright install --with-deps chromium firefox webkit
+      - name: Qualify browser authoring on Chromium, Firefox and WebKit
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 --directory build-web/site &
+          for _ in $(seq 50); do curl -fs -o /dev/null http://127.0.0.1:8000/ && break; sleep 0.2; done
+          for engine in chromium firefox webkit; do
+            .playwright/bin/python tools/check_web_plugin_author.py --browser "$engine" \
+              --url http://127.0.0.1:8000/ --output "build-web/plugin-browser-check/$engine"
+          done
+      - name: Upload browser authoring evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-plugin-browser-check
+          path: build-web/plugin-browser-check
+          if-no-files-found: ignore

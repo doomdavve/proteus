@@ -30,6 +30,10 @@ jobs:
           cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=OFF -DGLFW_BUILD_WAYLAND=ON -DGLFW_BUILD_X11=ON
           cmake --build build-linux --parallel 2
           ctest --test-dir build-linux -j 4 --output-on-failure
+      - name: Record native plugin staging and callback costs
+        run: |
+          { echo '### Linux plugin costs (boat_plugin_bench, shelter-tour)'; echo '```'
+            ./build-linux/boat_plugin_bench plugins/shelter-tour; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Check native Wayland startup and clean exit
         run: bash tools/check_wayland.sh build-linux
       - name: Check mouse capture startup and clean exit under X11

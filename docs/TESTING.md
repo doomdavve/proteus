@@ -756,8 +756,10 @@ capture. See [packaged authoring tools](PLUGIN_API.md#packaged-authoring-tools-p
 P4.3 adds `web_plugin_author` (Node, CPU quick lane): portable bundle/UTF-8 byte caps, immutable
 framing, bounded worker lanes, one-use receipts, stale epochs, virtual deadlines, cancellation,
 late output and worker/exit/framing faults. The opt-in
-`python3 tools/check_web_plugin_author.py --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
-drives an actual served Wasm build through bundle export/import, capability rejection, launch,
-live rename and syntax failure, held water Apply/Undo, stale output, cancellation, repeated
-source restore/revalidation and storage denial. It awaits application/worker conditions rather
-than fixed sleeps. The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.
+`python3 tools/check_web_plugin_author.py --browser chromium --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
+(also `firefox` or `webkit`) drives an actual served Wasm build through bundle export/import,
+capability rejection, repeated worker validations, launch, live rename and syntax failure, held
+water Apply/Undo, stale output, cancellation, navigation mid-validation, repeated source
+restore/revalidation and storage denial. On Chromium it also freezes the tab mid-validation. It
+awaits application/worker conditions; the only fixed waits are the freeze durations themselves.
+The PR browser workflow runs it on all three engines (P4.8). The [browser guide](WEB_BUILD.md#plugin-source-bundles-p43) owns setup/limits.
