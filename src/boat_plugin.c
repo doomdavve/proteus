@@ -798,11 +798,18 @@ BoatPluginChange boat_plugin_classify(
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
         return BOAT_PLUGIN_RESTART_SESSION;
     // L1.2 has only an empty envelope, so it changes no runtime content. Once L2 authors
-    // berths/modules, any differing authored layout is a physical session restart.
+    // berths/modules, any differing authored layout is a physical session restart. L4.2 gull
+    // cue edits are cosmetic and may keep time; flock count/centre/layout edits restart.
+    bool cosmetic_scene = false;
     if (boat_scene_has_content(&active->scene) || boat_scene_has_content(&candidate->scene)) {
-        if (active->has_scene != candidate->has_scene
-            || active->scene_digest != candidate->scene_digest)
+        if (active->has_scene != candidate->has_scene)
             return BOAT_PLUGIN_RESTART_SESSION;
+        if (active->scene_digest != candidate->scene_digest) {
+            if (boat_scene_same_except_gull_cues(&active->scene, &candidate->scene))
+                cosmetic_scene = true;
+            else
+                return BOAT_PLUGIN_RESTART_SESSION;
+        }
     }
     bool same = a->shelter_count == b->shelter_count
         && same_point(a->arrival_centre, b->arrival_centre)
@@ -819,5 +826,5 @@ BoatPluginChange boat_plugin_classify(
     bool renamed = strcmp(m->name, n->name) != 0;
     for (unsigned i = 0; i < a->shelter_count; ++i)
         renamed |= strcmp(active->shelter_names[i], candidate->shelter_names[i]) != 0;
-    return renamed ? BOAT_PLUGIN_RENAMED : BOAT_PLUGIN_UNCHANGED;
+    return renamed || cosmetic_scene ? BOAT_PLUGIN_RENAMED : BOAT_PLUGIN_UNCHANGED;
 }

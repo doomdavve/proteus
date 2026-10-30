@@ -13,8 +13,9 @@ glide intervals, and asymmetric wing trim break up synchronized movement.
 
 Since L4.1 (2026-10-30), the four groups, counts, centres, radii, heights, turn rates and cue
 intervals live in `src/waterfront_flock.[ch]` as a caller-owned bounded definition. The compiled
-definition remains the default; traffic avoidance reads the accepted traffic routes. Lua exposure
-is L4.2.
+definition remains the default; traffic avoidance reads the accepted traffic routes. L4.2 exposes
+`scene.gulls.flocks` with up to four flocks and 16 half-open 120 Hz cue intervals each. Cue-only
+edits are cosmetic and keep the session clock; flock layout edits follow the restart policy.
 
 Passing traffic and the player's current position and velocity cause smooth outward displacement
 and climbing. A faster player approach increases the response radius and effort. Flight headings,

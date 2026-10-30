@@ -126,9 +126,10 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **L1.1–L1.4 and L2–L3.3 complete; scene decoding, binding, staging wire,
-marina berths/modules, travelling-craft routes and named ferry stops are implemented.** Authored
-route geometry still selects registered native presets; there is no freeform route editor. The
+Status, 2026-10-30: **L1.1–L1.4 and L2–L4.2 complete; scene decoding, binding, staging wire,
+marina berths/modules, travelling-craft routes, named ferry stops and gull flocks/cues are
+implemented.** Authored route geometry still selects registered native presets; there is no
+freeform route editor. The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and the versioned envelope; L1.3 installs it between ticks on
@@ -197,6 +198,16 @@ return {
           speed = 4, phase = 0, period = 24.8540 },
         { id = "river_runabout", retain = "river_runabout" }
       }
+    },
+    gulls = {                                       -- added by L4.2; 0..4 flocks
+      flocks = {
+        { id = "harbor", recipe = "gull", x = -4, z = 182, count = 8,
+          seed = 3, phase = 0, radius = 10, height = 6, rate = 0.3,
+          cues = {
+            { kind = "feeding", start = 240, stop = 600, fade = 60, amplitude = 0.8 },
+            { kind = "alarm", start = 900, stop = 1200, fade = 80, amplitude = 1.0 }
+          } }
+      }
     }
   }
 }
@@ -226,6 +237,14 @@ return {
 | `vessels[i].recipe` | `runabout`, `cruiser`, `sailboat`, `ferry`, `alvsnabben`, `frihamnen`, `schooner`, `workboat` | Registered native craft geometry. |
 | `vessels[i].speed`, `.phase`, `.period` | speed > 0 and ≤ 40 m/s; finite phase; period 5–86400 s | Authored timetable. A no-stop loop requires `period = length / speed` within 0.02 s. |
 | `vessels[i].stops` | dense list of 0–8 `{ id, dwell }` records | Optional override for a registered stopped route. IDs must match the preset's named piers in order. A positive `dwell` is the departure offset in seconds; an omitted dwell shares the period's remaining time. A period shorter than travel plus explicit dwell rejects. |
+| `gulls.flocks` | dense list of 0–4 records | A present list replaces every compiled gull group; empty disables gulls. No physical bird contact is implied. |
+| `flocks[i].id` | 1–23, same spelling; unique among flocks | Stable flock identity. |
+| `flocks[i].recipe` | `gull` | Registered bird recipe. Other species need native work. |
+| `flocks[i].x`, `.z` | finite, \|v\| ≤ 20 000 m | Simulation-metre region centre. |
+| `flocks[i].count` | 1–8 birds; at most 32 across flocks | Bounded group size. |
+| `flocks[i].seed`, `.phase` | seed 0–2³²−1; phase finite seconds | Deterministic per-bird phase and circling phase offset. Cues stay on session time. |
+| `flocks[i].radius`, `.height`, `.rate` | radius/height 0.5–200 m; rate ±5 turns/s and non-zero | Circling region and direction. |
+| `flocks[i].cues` | dense list of 0–16 records | Half-open `[start, stop)` 120 Hz tick intervals. `kind` is `feeding` or `alarm`; `amplitude` is 0–1; optional `fade` is bounded by the interval. Alarm outranks feeding, which outranks circling. No spawn/despawn or timer callback is created. |
 
 The decoder copies berth/module IDs, recipes, mooring/attachment rules, source x/z, headings,
 gangway anchors and the complete route/timetable before the Lua state closes. The lift is derived
@@ -257,6 +276,9 @@ bathymetry check.
   layout change (berth/module position, heading, recipe, membership, entrance, ID that another
   module references) is physical: it is held for explicit Apply and restarts the session at the
   validated compiled spawn. A preserve-only Apply refuses it. Undo follows the same rule.
+- A gull-cue-only edit (timing, fade or amplitude) is compatible and keeps the session clock;
+  changing a flock count, centre, radius, height or rate is a layout edit and restarts. Cues are
+  pure-time envelopes, not timers or spawned actors.
 - Scene changes commit only between ticks. The session and both renderers consume one accepted
   `BoatSceneDefinition`; the plugin revision owns it and outlives the session. Retired revisions
   wait until the session has rebound away from them, following the existing host slots.
@@ -1139,10 +1161,11 @@ request drops held output and preserves active source/state/world; stale respons
 newer active/held revisions and report the stale-base diagnostic. Shutdown cancels/reaps. Preview checkpoint save/restore refuses an owner with
 an in-flight process.
 
-The private response is `PST4` (traffic routes extend L1.4's `PST3`), fieldwise network-order
+The private response is `PST5` (gull cues extend traffic routes and L1.4's `PST3`), fieldwise network-order
 unsigned integers, IEEE binary64 data
-and bounded length-prefixed strings, at most 4096 bytes. It extends `PST2` with the optional
-scene envelope (version, presence, entrance, counted berth/module records and attachments).
+and bounded length-prefixed strings, at most 32768 bytes. It extends `PST2` with the optional
+scene envelope (version, presence, entrance, berth/module records, traffic routes and gull
+flocks/cues).
 Completion checks the version, exact framing, array bounds, enum values, finite numbers,
 exit/status agreement and native schema/map constraints, then installs checked data without
 running the candidate Lua again **during staging**. A reader rejects any other wire version

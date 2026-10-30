@@ -73,7 +73,7 @@
       if (job.deadline !== undefined) this.clear(job.deadline);
       if (result && (result.exit === 0 || result.exit === 1)
           && result.bytes instanceof Uint8Array && result.bytes.length >= 8 && result.bytes.length <= 4096
-          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === 0x50535434
+          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === 0x50535435
           && (new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(4) === 0) === (result.exit === 0)) {
         job.response = result.bytes.slice(); job.state = result.exit === 0 ? 1 : 2;
       } else job.state = -1;
@@ -93,7 +93,7 @@
   function message(bytes) {
     try {
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      if (view.getUint32(0) !== 0x50535434) return 'Invalid worker reply';
+      if (view.getUint32(0) !== 0x50535435) return 'Invalid worker reply';
       let at = 8;
       const string = () => {
         const length = view.getUint32(at); at += 4;

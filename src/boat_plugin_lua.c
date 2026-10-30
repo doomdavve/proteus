@@ -232,9 +232,14 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 }
 
 static const char *const ROOT[] = { "voyage", "scene", "init", "update", "migrate", NULL };
-static const char *const SCENE[] = { "version", "marina", "traffic", NULL };
+static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
+static const char *const GULLS[] = { "flocks", NULL };
+static const char *const FLOCK[]
+    = { "id", "recipe", "x", "z", "count", "seed", "phase", "radius", "height", "rate", "cues",
+          NULL };
+static const char *const CUE[] = { "kind", "start", "stop", "fade", "amplitude", NULL };
 static const char *const VESSEL[]
     = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", NULL };
 static const char *const STOP[] = { "id", "dwell", NULL };
@@ -479,6 +484,152 @@ static bool scene_modules(lua_State *L, Vm *vm, int marina, BoatSceneDefinition 
     return true;
 }
 
+// Decode a nonnegative integer count/tick without narrowing silently.
+static bool unsigned_value(lua_State *L, Vm *vm, int table, const char *path, const char *key,
+    double high, unsigned *out)
+{
+    double value;
+    if (!number(L, vm, table, path, key, &value))
+        return false;
+    if (!(value >= 0) || value > high || value != (double)(unsigned)value) {
+        char at[64];
+        join(at, sizeof(at), path, key);
+        return reject(vm, at, "must be an integer in 0..%u", (unsigned)high);
+    }
+    *out = (unsigned)value;
+    return true;
+}
+
+// L4.2: bounded gull flocks and cue intervals. Cue envelopes are evaluated natively from the
+// session tick; no spawn/despawn callback or timer state is created here.
+static bool scene_gulls(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
+{
+    char at[64];
+    int type = field(L, scene, "gulls", "scene", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int gulls = lua_absindex(L, -1);
+    if (!only(L, vm, gulls, at, GULLS))
+        return false;
+    char list_path[64];
+    type = field(L, gulls, "flocks", at, list_path);
+    if (type != LUA_TTABLE)
+        return reject(vm, list_path, "must be a table, not a %s", lua_typename(L, type));
+    int list = lua_absindex(L, -1);
+    lua_Unsigned length = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > length)
+            return reject(vm, list_path, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != length)
+        return reject(vm, list_path, "must be a list numbered from 1 without gaps");
+    if (length > WATERFRONT_FLOCKS)
+        return reject(vm, list_path, "must list 0 to %d flocks, not %llu", WATERFRONT_FLOCKS,
+            (unsigned long long)length);
+    s->gulls_present = true;
+    s->gulls.flock_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        WaterfrontFlock *f = &s->gulls.flocks[i];
+        char path[64], recipe[WATERFRONT_FLOCK_TEXT];
+        element(path, sizeof(path), list_path, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int entry = lua_absindex(L, -1);
+        double x, z, phase, radius, height, rate;
+        char recipe_path[64];
+        join(recipe_path, sizeof(recipe_path), path, "recipe");
+        if (!only(L, vm, entry, path, FLOCK)
+            || !string(L, vm, entry, path, "id", f->id, sizeof(f->id))
+            || !string(L, vm, entry, path, "recipe", recipe, sizeof(recipe))
+            || !number(L, vm, entry, path, "x", &x) || !number(L, vm, entry, path, "z", &z)
+            || !number(L, vm, entry, path, "phase", &phase)
+            || !number(L, vm, entry, path, "radius", &radius)
+            || !number(L, vm, entry, path, "height", &height)
+            || !number(L, vm, entry, path, "rate", &rate))
+            return false;
+        WaterfrontFlockRecipe r;
+        if (!waterfront_flock_recipe_from_name(recipe, &r))
+            return reject(vm, recipe_path, "is not a registered flock recipe");
+        f->recipe = (unsigned char)r;
+        f->x = (float)x;
+        f->z = (float)z;
+        f->phase = (float)phase;
+        f->radius = (float)radius;
+        f->height = (float)height;
+        f->rate = (float)rate;
+        f->follow_actor = -1;
+        f->implicit_cues = false;
+        if (!unsigned_value(L, vm, entry, path, "count", WATERFRONT_FLOCK_BIRDS, &f->count)
+            || !unsigned_value(L, vm, entry, path, "seed", 4294967295.0, &f->seed))
+            return false;
+        char cues_path[64];
+        join(cues_path, sizeof(cues_path), path, "cues");
+        int cues_type = field(L, entry, "cues", path, cues_path);
+        if (cues_type == LUA_TNIL) {
+            lua_pop(L, 1);
+            f->cue_count = 0;
+            lua_pop(L, 1);
+            continue;
+        }
+        if (cues_type != LUA_TTABLE)
+            return reject(vm, cues_path, "must be a table, not a %s", lua_typename(L, cues_type));
+        int cues = lua_absindex(L, -1);
+        lua_Unsigned cue_count = lua_rawlen(L, cues);
+        if (cue_count > WATERFRONT_FLOCK_CUES)
+            return reject(vm, cues_path, "must list 0 to %d cues, not %llu",
+                WATERFRONT_FLOCK_CUES, (unsigned long long)cue_count);
+        f->cue_count = (unsigned)cue_count;
+        for (unsigned c = 0; c < cue_count; ++c) {
+            WaterfrontFlockCue *cue = &f->cues[c];
+            char cue_path[64], kind_path[64], kind[16];
+            element(cue_path, sizeof(cue_path), cues_path, c + 1);
+            lua_rawgeti(L, cues, c + 1);
+            if (lua_type(L, -1) != LUA_TTABLE)
+                return reject(vm, cue_path, "must be a table, not a %s", luaL_typename(L, -1));
+            int item = lua_absindex(L, -1);
+            join(kind_path, sizeof(kind_path), cue_path, "kind");
+            if (!only(L, vm, item, cue_path, CUE)
+                || !string(L, vm, item, cue_path, "kind", kind, sizeof(kind))
+                || !unsigned_value(L, vm, item, cue_path, "start", 4294967295.0, &cue->start_tick)
+                || !unsigned_value(L, vm, item, cue_path, "stop", 4294967295.0, &cue->end_tick)
+                || !number(L, vm, item, cue_path, "amplitude", &x))
+                return false;
+            if (!strcmp(kind, "feeding"))
+                cue->kind = WATERFRONT_FLOCK_CUE_FEEDING;
+            else if (!strcmp(kind, "alarm"))
+                cue->kind = WATERFRONT_FLOCK_CUE_ALARM;
+            else
+                return reject(vm, kind_path, "must be feeding or alarm");
+            cue->amplitude = (float)x;
+            char fade_path[64];
+            join(fade_path, sizeof(fade_path), cue_path, "fade");
+            int fade_type = field(L, item, "fade", cue_path, fade_path);
+            if (fade_type == LUA_TNIL) {
+                lua_pop(L, 1);
+                cue->fade_ticks = 0;
+            } else {
+                lua_pop(L, 1);
+                if (!unsigned_value(
+                        L, vm, item, cue_path, "fade", 4294967295.0, &cue->fade_ticks))
+                    return false;
+            }
+            lua_pop(L, 1);
+        }
+        lua_pop(L, 2); // cues list and flock entry
+    }
+    lua_pop(L, 2); // flocks list and gulls table
+    return true;
+}
+
 // L3.3: ordered stop overrides for a registered stopped route. IDs must match the preset's
 // named pier anchors in order; an omitted dwell leaves that stop on the shared remainder.
 static bool scene_stops(lua_State *L, Vm *vm, int entry, const char *path, WaterfrontRouteActor *v,
@@ -703,7 +854,8 @@ static int decode(lua_State *L)
         if (!only(L, vm, scene, "scene", SCENE)
             || !number(L, vm, scene, "scene", "version", &version)
             || !scene_marina(L, vm, scene, &d->scene)
-            || !scene_traffic(L, vm, scene, &d->scene))
+            || !scene_traffic(L, vm, scene, &d->scene)
+            || !scene_gulls(L, vm, scene, &d->scene))
             return 0;
         d->has_scene = true;
         d->scene.version = version == (double)BOAT_SCENE_VERSION ? BOAT_SCENE_VERSION : 0;

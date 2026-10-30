@@ -57,7 +57,11 @@ static BoatPluginChange classify(
 {
     BoatPluginChange change = host->racing ? boat_plugin_race_classify(&a->race, &b->race)
                                            : boat_plugin_classify(&a->voyage, &b->voyage);
-    if (!host->racing && change < BOAT_PLUGIN_RESTART_VOYAGE
+    // A gull-cue-only scene edit keeps the session clock even though the source bytes changed.
+    bool cosmetic_gulls = !host->racing && change == BOAT_PLUGIN_RENAMED
+        && a->voyage.has_scene && b->voyage.has_scene
+        && boat_scene_same_except_gull_cues(&a->voyage.scene, &b->voyage.scene);
+    if (!host->racing && change < BOAT_PLUGIN_RESTART_VOYAGE && !cosmetic_gulls
         && (a->voyage.manifest.objective != b->voyage.manifest.objective
             || a->voyage.manifest.timers != b->voyage.manifest.timers
             || a->voyage.manifest.state_version != b->voyage.manifest.state_version
