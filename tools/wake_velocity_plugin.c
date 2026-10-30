@@ -1,4 +1,5 @@
 #include "wake_velocity_plugin.h"
+#include "boat_plugin_eval.h"
 #include "boat_ui.h"
 #include "waterfront_traffic.h"
 
@@ -21,6 +22,7 @@ EM_JS(unsigned, browser_actions, (void), {
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void report(WakePlugin *plugin, const char *outcome, bool alert, const char *detail,
@@ -103,8 +105,170 @@ static void trace(WakePlugin *p, BoatPluginTransition action, uint64_t before,
     }
 }
 
+// A callback receipt is private to its request and complete committed input. No imported
+// Lua is evaluated by this adapter in a browser, including initialization and Undo.
+static bool commit(WakePlugin *plugin, BoatSession *session);
+static void close_stage(WakePlugin *plugin)
+{
+    boat_plugin_stage_close(plugin->staging);
+    plugin->staging = NULL;
+}
+#ifdef __EMSCRIPTEN__
+struct WakePluginEvaluation {
+    BoatPluginEvalRequest request;
+    unsigned job;
+    double deadline;
+};
+EM_JS(unsigned, objective_start, (const unsigned char *bytes, unsigned size), {
+    return Module.boatPluginObjective
+        ? Module.boatPluginObjective.start(HEAPU8.slice(bytes, bytes + size))
+        : 0;
+})
+EM_JS(int, objective_status, (unsigned job),
+    { return Module.boatPluginObjective ? Module.boatPluginObjective.status(job) : -1; })
+EM_JS(int, objective_read, (unsigned job, unsigned char *bytes), {
+    const data = Module.boatPluginObjective ?.read(job);
+    if (!data || data.length > 49152)
+        return -1;
+    HEAPU8.set(data, bytes);
+    return data.length;
+})
+EM_JS(void, objective_close, (unsigned job), { Module.boatPluginObjective ?.close(job); })
+EM_JS(void, objective_shutdown, (void), { Module.boatPluginObjective ?.reset(); })
+EM_JS(void, objective_snapshot,
+    (unsigned low, unsigned high, unsigned native_low, unsigned native_high, unsigned generation,
+        bool initialized, bool quarantined, unsigned events, bool waiting,
+        const unsigned char *bytes, unsigned size),
+    {
+        Module.boatPluginCheckpoint = {
+            tick : [ low, high ],
+            nativeTick : [ native_low, native_high ],
+            generation,
+            initialized : !!initialized,
+            quarantined : !!quarantined,
+            events,
+            waiting : !!waiting,
+            state : HEAPU8.slice(bytes, bytes + size)
+        };
+    })
+static void close_evaluation(WakePlugin *plugin)
+{
+    if (plugin->evaluation) {
+        objective_close(plugin->evaluation->job);
+        free(plugin->evaluation);
+        plugin->evaluation = NULL;
+    }
+}
+static bool begin_evaluation(
+    WakePlugin *p, BoatPluginTransition action, int64_t tick, const BoatPluginRevision *revision)
+{
+    static uint64_t serial;
+    if (p->evaluation || serial == UINT64_MAX)
+        return false;
+    struct WakePluginEvaluation *e = calloc(1, sizeof(*e));
+    unsigned char *bytes = malloc(BOAT_PLUGIN_EVAL_REQUEST_MAX);
+    if (!e || !bytes) {
+        free(e);
+        free(bytes);
+        return false;
+    }
+    BoatPluginEvalRequest *r = &e->request;
+    r->serial = ++serial;
+    r->epoch = p->host.epoch;
+    r->revision = boat_plugin_host_active(&p->host)->number;
+    r->candidate = revision->number;
+    r->transition = action;
+    r->tick = tick;
+    r->objective = p->objective;
+    r->source_size = revision->source_size;
+    memcpy(r->source, revision->source, r->source_size);
+    r->version = revision->voyage.manifest.state_version;
+    r->generation = action == BOAT_PLUGIN_OBJECTIVE_MIGRATE ? p->generation + 1 : p->generation;
+    r->timers = revision->voyage.manifest.timers;
+    if (action == BOAT_PLUGIN_OBJECTIVE_UPDATE) {
+        r->event_count = p->event_count;
+        memcpy(r->events, p->events, r->event_count * sizeof(r->events[0]));
+    }
+    size_t size = boat_plugin_eval_encode_request(r, bytes, BOAT_PLUGIN_EVAL_REQUEST_MAX);
+    if (size)
+        e->job = objective_start(bytes, (unsigned)size);
+    free(bytes);
+    if (!e->job) {
+        free(e);
+        return false;
+    }
+    e->deadline = p->frame_now + 5;
+    p->evaluation = e;
+    return true;
+}
+static bool poll_evaluation(WakePlugin *p, BoatSession *session, double now)
+{
+    struct WakePluginEvaluation *e = p->evaluation;
+    if (!e)
+        return false;
+    int status = objective_status(e->job);
+    bool stale = p->host.epoch != e->request.epoch
+        || boat_plugin_host_active(&p->host)->number != e->request.revision
+        || session->tick != (uint64_t)e->request.tick
+        || p->objective.quarantined != e->request.objective.quarantined
+        || boat_plugin_objective_digest(&p->objective)
+            != boat_plugin_objective_digest(&e->request.objective);
+    bool migration = e->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE;
+    if (migration) {
+        const BoatPluginRevision *held = boat_plugin_host_held(&p->host);
+        stale |= !held || held->number != e->request.candidate;
+    }
+    bool expired = !isfinite(now) || now >= e->deadline;
+    if (!status && !stale && !expired)
+        return false;
+    unsigned char *bytes = malloc(BOAT_PLUGIN_EVAL_REPLY_MAX);
+    int size = status == 1 && bytes ? objective_read(e->job, bytes) : -1;
+    BoatPluginObjective result;
+    BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
+    bool accepted = !stale && !expired && size > 0
+        && boat_plugin_eval_result(&e->request, bytes, (size_t)size, &result, &d);
+    free(bytes);
+    if (!accepted) {
+        d.status = BOAT_PLUGIN_IO;
+        snprintf(d.message, sizeof(d.message), "%s",
+            stale         ? "stale objective receipt"
+                : expired ? "isolated objective deadline"
+                          : "invalid or failed objective worker reply");
+    }
+    BoatPluginTransition action = e->request.transition;
+    uint64_t before = boat_plugin_objective_digest(&p->objective);
+    unsigned events = e->request.event_count;
+    close_evaluation(p);
+    p->objective_diagnostic = d;
+    if (accepted && d.status == BOAT_PLUGIN_OK) {
+        p->staged_objective = result;
+        if (migration) {
+            p->evaluation_migrated = true;
+            return commit(p, session);
+        }
+        if (action == BOAT_PLUGIN_OBJECTIVE_INIT || action == BOAT_PLUGIN_OBJECTIVE_RESET)
+            p->objective = result; // Initialization completes before any native step is permitted.
+        else
+            p->objective_pending = true;
+        trace(p, action, before, &p->staged_objective, events);
+    } else {
+        if (!migration)
+            p->objective.quarantined = true;
+        trace(p, action, before, &p->objective, events);
+        report(p, migration ? "migration_failed" : "objective_suspended", true, d.message,
+            migration ? "MIGRATION FAILED; ACTIVE REVISION KEPT" : "OBJECTIVE SUSPENDED");
+    }
+    return false;
+}
+#endif
+
+bool wake_plugin_waiting(const WakePlugin *plugin) { return plugin->evaluation != NULL; }
+
 void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
 {
+#ifdef __EMSCRIPTEN__
+    close_evaluation(plugin);
+#endif
     plugin->objective = (BoatPluginObjective) { .generation = ++plugin->generation, .rng = 12345 };
     plugin->event_count = 0;
     plugin->sequence = 0;
@@ -121,10 +285,20 @@ void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
                 "objective clock or generation exhausted");
             return;
         }
+#ifdef __EMSCRIPTEN__
+        if (!begin_evaluation(plugin, BOAT_PLUGIN_OBJECTIVE_INIT, (int64_t)session->tick, r)) {
+            plugin->objective.quarantined = true;
+            plugin->objective_diagnostic.status = BOAT_PLUGIN_IO;
+            snprintf(plugin->objective_diagnostic.message,
+                sizeof(plugin->objective_diagnostic.message),
+                "cannot start isolated objective initialization");
+        }
+#else
         boat_plugin_objective_step(&plugin->objective, r->source, r->source_size,
             BOAT_PLUGIN_OBJECTIVE_INIT, (int64_t)session->tick, NULL, 0, NULL,
             &plugin->objective_diagnostic);
         trace(plugin, BOAT_PLUGIN_OBJECTIVE_INIT, 0, &plugin->objective, 0);
+#endif
     }
 }
 
@@ -176,6 +350,14 @@ void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
     if (session->tick % 12 || (int64_t)session->tick <= plugin->objective.tick
         || plugin->objective_pending)
         return;
+#ifdef __EMSCRIPTEN__
+    if (!begin_evaluation(plugin, BOAT_PLUGIN_OBJECTIVE_UPDATE, (int64_t)session->tick, r)) {
+        plugin->objective.quarantined = true;
+        plugin->objective_diagnostic.status = BOAT_PLUGIN_IO;
+        snprintf(plugin->objective_diagnostic.message, sizeof(plugin->objective_diagnostic.message),
+            "cannot start isolated objective update");
+    }
+#else
     plugin->staged_objective = plugin->objective;
     if (boat_plugin_objective_step(&plugin->staged_objective, r->source, r->source_size,
             BOAT_PLUGIN_OBJECTIVE_UPDATE, (int64_t)session->tick, plugin->events,
@@ -188,6 +370,7 @@ void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
         plugin->objective_pending ? &plugin->staged_objective : &plugin->objective,
         plugin->event_count);
     plugin->trace[plugin->trace_count - 1].tick = (int64_t)session->tick;
+#endif
 }
 
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now)
@@ -199,13 +382,14 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     // Keep the large revision history out of temporary stack storage on Windows.
     memset(plugin, 0, sizeof(*plugin));
     plugin->directory = directory;
+    plugin->frame_now = now;
     uint64_t key;
     bool read = read_package(plugin, &key) == BOAT_PLUGIN_OK;
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);
 #ifdef __EMSCRIPTEN__
     (void)bundle;
     // Only a completed, byte-matched browser-worker receipt may launch an imported voyage.
-    // Browser capabilities are descriptor-only: no callback ever executes on this thread.
+    // Callback execution also uses worker receipts; no imported Lua runs on this thread.
     plugin->host.location = session->world.definition;
     plugin->host.map = &session->world.resources->map;
     BoatPluginStageJob *launch
@@ -250,6 +434,17 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     bool undo = plugin->host.undo;
     const BoatPluginRevision *held = boat_plugin_host_held(&plugin->host);
     if (change == BOAT_PLUGIN_MIGRATE && held) {
+#ifdef __EMSCRIPTEN__
+        if (!plugin->evaluation_migrated) {
+            if (session->tick > INT64_MAX || plugin->generation == UINT_MAX
+                || !begin_evaluation(
+                    plugin, BOAT_PLUGIN_OBJECTIVE_MIGRATE, (int64_t)session->tick, held))
+                report(plugin, "migration_failed", true, "cannot start isolated migration",
+                    "MIGRATION FAILED; ACTIVE REVISION KEPT");
+            return false;
+        }
+        plugin->evaluation_migrated = false;
+#else
         // Start from committed T state. Pending old-code output is retired only on success;
         // its unacknowledged input stays queued for the candidate's next update.
         BoatPluginObjective migrated = plugin->objective;
@@ -276,6 +471,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
         if (plugin->host.base != boat_plugin_host_active(&plugin->host)->number)
             return false;
         plugin->staged_objective = migrated;
+#endif
     }
     const BoatPluginRevision *revision = boat_plugin_host_commit(&plugin->host);
     if (!revision)
@@ -347,7 +543,7 @@ static bool offer(WakePlugin *plugin, BoatSession *session)
 static bool stage(WakePlugin *plugin, BoatSession *session, bool read_ok, double now)
 {
     ++plugin->requests;
-    wake_plugin_close(plugin); // Superseding a request also reaps its worker.
+    close_stage(plugin); // Superseding a request also reaps its worker.
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);
     if (read_ok && plugin->stage_executable) {
         plugin->staging
@@ -369,11 +565,21 @@ static bool stage(WakePlugin *plugin, BoatSession *session, bool read_ok, double
         report_failure(plugin);
         return false;
     }
+#ifdef __EMSCRIPTEN__
+    (void)bundle;
+    plugin->host.diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
+    snprintf(plugin->host.diagnostic.message, sizeof(plugin->host.diagnostic.message),
+        "browser reload requires isolated staging");
+    boat_plugin_host_discard(&plugin->host);
+    report_failure(plugin);
+    return false;
+#else
     if (!boat_plugin_host_stage(&plugin->host, &bundle)) {
         report_failure(plugin);
         return false;
     }
     return offer(plugin, session);
+#endif
 }
 
 bool wake_plugin_stage_files(
@@ -394,8 +600,11 @@ bool wake_plugin_stage_files(
 
 void wake_plugin_close(WakePlugin *plugin)
 {
-    boat_plugin_stage_close(plugin->staging);
-    plugin->staging = NULL;
+    close_stage(plugin);
+#ifdef __EMSCRIPTEN__
+    close_evaluation(plugin);
+    objective_shutdown();
+#endif
 }
 
 bool wake_plugin_editing(void)
@@ -410,12 +619,36 @@ bool wake_plugin_editing(void)
 bool wake_plugin_frame(
     WakePlugin *plugin, BoatSession *session, bool reload, bool undo, bool apply, double now)
 {
+    plugin->frame_now = now;
 #ifdef __EMSCRIPTEN__
     unsigned actions = browser_actions();
+    if (plugin->evaluation
+        && plugin->evaluation->request.transition == BOAT_PLUGIN_OBJECTIVE_MIGRATE
+        && ((actions & (2 | 8)) || undo)) {
+        close_evaluation(plugin);
+        boat_plugin_host_discard(&plugin->host);
+        report(plugin, "canceled", false, "ACTIVE REVISION AND STATE KEPT", "MIGRATION CANCELED");
+        return false;
+    }
     if ((actions & 8) && plugin->staging) {
-        wake_plugin_close(plugin);
+        close_stage(plugin);
         boat_plugin_host_discard(&plugin->host);
         report(plugin, "canceled", false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
+        actions &= ~8u;
+    }
+    bool restart = poll_evaluation(plugin, session, now);
+    objective_snapshot((unsigned)plugin->objective.tick,
+        (unsigned)((uint64_t)plugin->objective.tick >> 32), (unsigned)session->tick,
+        (unsigned)(session->tick >> 32), plugin->generation, plugin->objective.initialized,
+        plugin->objective.quarantined, plugin->event_count, wake_plugin_waiting(plugin),
+        plugin->objective.state.bytes, plugin->objective.state.size);
+    if (restart)
+        return true;
+    if (wake_plugin_waiting(plugin)) {
+        // Control actions are refused visibly rather than applied to an in-flight checkpoint.
+        if (actions || reload || undo || apply)
+            report(plugin, "busy", false, "RETRY WHEN THE CALLBACK FINISHES",
+                "OBJECTIVE EVALUATION BUSY");
         return false;
     }
     reload |= (actions & 1) != 0;
@@ -423,12 +656,12 @@ bool wake_plugin_frame(
     apply |= (actions & 4) != 0;
 #endif
     if (apply && !plugin->staging && boat_plugin_host_held(&plugin->host)) {
-        wake_plugin_close(plugin);
+        close_stage(plugin);
         return commit(plugin, session);
     }
     if (undo) {
         if (plugin->staging) {
-            wake_plugin_close(plugin);
+            close_stage(plugin);
             boat_plugin_host_discard(&plugin->host);
             report(plugin, "canceled", false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
             return false;
@@ -460,7 +693,7 @@ bool wake_plugin_frame(
     if (plugin->staging) {
         int ready = boat_plugin_stage_poll(plugin->staging, &plugin->host, now);
         if (ready) {
-            wake_plugin_close(plugin);
+            close_stage(plugin);
             if (ready < 0) {
                 report_failure(plugin);
                 return false;
@@ -533,7 +766,7 @@ static bool preview_session(const BoatSession *s)
 
 bool wake_plugin_preview_save(WakePluginPreview *c, const WakePlugin *p, const BoatSession *s)
 {
-    if (p->staging || !preview_session(s) || !p->host.depth
+    if (p->staging || p->evaluation || !preview_session(s) || !p->host.depth
         || s->voyage_route != &boat_plugin_host_active(&p->host)->voyage.route
         || s->voyage.route != s->voyage_route)
         return false;
@@ -558,7 +791,7 @@ bool wake_plugin_preview_save(WakePluginPreview *c, const WakePlugin *p, const B
 bool wake_plugin_preview_restore(const WakePluginPreview *c, WakePlugin *p, BoatSession *s,
     BoatWakeObjects *objects, BoatWakeObjects *traffic)
 {
-    if (p->staging || !c->valid || !preview_session(s)
+    if (p->staging || p->evaluation || !c->valid || c->plugin.evaluation || !preview_session(s)
         || s->world.resources != c->session.world.resources || (c->has_objects && !objects)
         || (c->has_traffic && !traffic) || (c->has_objects && c->has_traffic && objects == traffic))
         return false;

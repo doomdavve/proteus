@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Optional Playwright check of browser plugin bundles, isolated staging and live transactions."""
+"""Optional browser qualification of plugin bundles, isolated objectives and live transactions."""
 import argparse
 import json
 import statistics
@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+from check_web_plugin_objective import check_objectives
 
 # Each engine needs WebGL in headless mode; Chromium uses SwiftShader, the others their defaults.
 ENGINES = {'chromium': ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
@@ -116,7 +117,7 @@ def main():
             assert page.input_value('#plugin-source') == original['source']
             assert 'Voyage staged' in stage()
             checks.append('bundle export/import')
-            for example in ('shelter-tour', 'river-sprint'):
+            for example in ('river-sprint',):
                 manifest = (root / 'plugins' / example / 'plugin.json').read_text()
                 source = (root / 'plugins' / example / 'main.lua').read_text()
                 page.fill('#plugin-manifest', manifest); page.fill('#plugin-source', source)
@@ -276,6 +277,9 @@ def main():
                 drained(f'session {session + 2}')
             checks.append(f'navigation during validation; {args.sessions} restored sessions revalidated')
             page.close(); context.close()
+
+            evidence['objectives'] = check_objectives(browser, args, root, errors, logs)
+            checks.append('isolated objective init/update/timers, gated ticks, migration/Undo/restart, quarantine, timeout and session cleanup')
 
             # Storage denial preserves import/validation/play and visibly recommends export.
             denied = browser.new_context(viewport={'width': 1100, 'height': 900})

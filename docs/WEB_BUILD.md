@@ -377,11 +377,14 @@ version-1 JSON source bundles, loads the Långedrag example, validates in a disp
 and launches a solo `outer` voyage. Live edits use Stage/reload, explicit Apply and Undo;
 opening the panel pauses solo input. Normal PLAY still opens the shared title.
 
-Only `voyage.define` descriptors are supported. Objectives/timers and race imports are
-explicitly unavailable; no imported Lua executes on the game thread. A completed receipt is
+Voyages support `voyage.define` plus optional objective HUD/timer grants; race imports remain
+unavailable. No imported Lua executes on the game thread. A completed descriptor receipt is
 bound to exact bytes and the current revision/commit epoch before native schema/map checks.
 Cancellation/deadline/late results cannot install a revision. Each UI and game reload lane
-owns at most one job; the browser transport caps total entries at two. See the
+owns at most one job; the descriptor transport caps total entries at two. Objectives use a
+separate reusable Wasm worker with a fresh Lua VM per call; solo simulation waits at T before
+T+1, while rendering/UI remain responsive. Callbacks, migration and Undo use host-owned atomic
+state transactions. See [browser objectives](PLUGIN_API.md#browser-objective-transactions-p49). See the
 [API contract](PLUGIN_API.md#browser-source-bundles-p43) for bundle bytes, transactions and limits.
 
 Source persistence uses localStorage, separately from existing IndexedDB game settings/bests.
@@ -415,8 +418,15 @@ on Ubuntu. There Firefox runs with `--headed` under `xvfb-run`, because headless
 WebGL on a GPU-less runner. See
 the [P4.8 result](PLUGIN_PLAN.md#p48-result-2026-10-30) for timings and limits. Safari, mobile
 browsers, physical devices, real background-tab policies and worker/browser-process memory
-remain unqualified; there is no human play acceptance or deployment claim. PR browser CI builds these artifacts
+remain unqualified; see the [P4.9 result](PLUGIN_PLAN.md#p49-result-2026-10-30) for objective
+execution and Wasm linear-memory evidence. No human play acceptance or deployment is claimed. PR browser CI builds these artifacts
 without publishing them; the release/Pages deployment workflow retains its existing policy.
+Verification, 2026-10-30 (P4.9): the extended authoring check also passes objective init/update/
+timers, gated ticks, deferred recovery, migration cancellation/Apply/Undo/restart, failure,
+timeout and repeated-session cleanup on the same three local engines; Chromium also exercises
+an objective deadline across a lifecycle freeze. All three objective HUD captures were
+inspected. The [P4.9 result](PLUGIN_PLAN.md#p49-result-2026-10-30) owns worker/delivery timings,
+16 MiB evaluator linear-memory evidence and remaining device/process-memory limits.
 
 ## WebRTC rooms
 

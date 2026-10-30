@@ -170,16 +170,6 @@ int boat_plugin_stage_worker(void)
         snprintf(d.message, sizeof(d.message), "this host supports voyage descriptors only");
         goto done;
     }
-#ifdef __EMSCRIPTEN__
-    if (m.objective || m.timers) {
-        d.status = BOAT_PLUGIN_MANIFEST;
-        snprintf(d.file, sizeof(d.file), "plugin.json");
-        snprintf(d.field, sizeof(d.field), "capabilities");
-        snprintf(d.message, sizeof(d.message),
-            "browser imports support voyage.define only; objective callbacks are unavailable");
-        goto done;
-    }
-#endif
     if (boat_plugin_lua_voyage(
             bundle.source, bundle.source_size, m.entry, &boat_plugin_default_limits, &data, &d)
             != BOAT_PLUGIN_OK
@@ -430,9 +420,6 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
     bool ok = boat_plugin_parse_manifest(j->files.manifest, j->files.manifest_size, NULL, &m, &d)
             == BOAT_PLUGIN_OK
         && !strcmp(m.kind, "voyage")
-#ifdef __EMSCRIPTEN__
-        && !m.objective && !m.timers
-#endif
         && boat_plugin_decode_voyage(&m, &data, &r->voyage, &d) == BOAT_PLUGIN_OK
         && boat_plugin_check_location(&r->voyage, host->location, host->map, &d) == BOAT_PLUGIN_OK;
     if (ok && m.objective) {

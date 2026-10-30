@@ -46,6 +46,8 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
+EM_JS(void, browser_plugin_reset_pending, (bool pending),
+    { Module.boatPluginResetPending = !!pending; })
 
 EM_JS(int, boat_web_viewport_size, (int axis), {
     const size = Module['boatViewportSize']();
@@ -1011,6 +1013,7 @@ static int study(int argc, char **argv)
     double accumulator = 0;
     int time_speed_index = BOAT_TIME_NORMAL;
     int frames = 0, demo_tick = 0;
+    bool plugin_reset_pending = false;
     bool replay_dragging = false;
     bool help_visible = false;
     BoatMenu menu = { .can_leave = true,
@@ -1309,6 +1312,16 @@ static int study(int argc, char **argv)
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
                 active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), GetTime());
 #endif
+        if (plugin_path && wake_plugin_waiting(&plugin))
+            plugin_reset_pending |= reset_requested;
+        else if (plugin_reset_pending) {
+            reset_requested = true;
+            plugin_reset_pending = false;
+        }
+#ifdef __EMSCRIPTEN__
+        if (plugin_path)
+            browser_plugin_reset_pending(plugin_reset_pending);
+#endif
         if (reset_requested) {
             thrust_target = 0;
             mouse_wheel = 0;
@@ -1341,6 +1354,9 @@ static int study(int argc, char **argv)
                 mouse_wheel = 0;
             }
 #endif
+        } else if (plugin_path && wake_plugin_waiting(&plugin) && !plugin_restart) {
+            // Keep drawing and polling the worker, but never advance past callback boundary T.
+            accumulator = 0;
         } else if (reset_requested && session.voyage.route && !plugin_restart) {
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
@@ -1394,6 +1410,10 @@ static int study(int argc, char **argv)
                 if (plugin_path)
                     wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;
+                if (plugin_path && wake_plugin_waiting(&plugin)) {
+                    accumulator = 0;
+                    break;
+                }
             }
         } else {
             accumulator = 0;
