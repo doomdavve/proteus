@@ -15,6 +15,12 @@ them are history.
 Perched birds remain pending. The [river expansion](river/README.md) is a separate scenery
 track, not completion of actor/ferry steps. [All plans](README.md).
 
+The proposed [plugin location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
+now specifies how marina layouts/population, traffic and ferry schedules, trams, wildlife and
+building/street lighting can become scriptable. This plan owns native actor/artistic work;
+the plugin plan owns bindings, composition and live-edit policy. Those bindings, trams and
+seals are not implemented; this does not change step 06 as the next numbered city task.
+
 ## Direction
 
 The original artistic brief is an inhabited waterfront at blue hour: apartments above active

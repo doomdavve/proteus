@@ -36,6 +36,9 @@ init/migration still evaluate trusted Lua synchronously. Browser voyages evaluat
 Lua in workers; simulation waits at a callback boundary while rendering/UI remain responsive.
 Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
+The proposed [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
+traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; none of
+those scene capabilities is exposed by the current Lua API.
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -88,7 +91,7 @@ superseded proposals; the source interfaces below are the integration reference.
 | [Voyage/adventure plan](FREE_RIDING_ADVENTURE_PLAN.md), [A3.4 result and playtest](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a34-result-2026-10-26), [`boat_voyage.h`](../src/boat_voyage.h) and [implementation](../src/boat_voyage.c) | `outer` has the Långedrag destination, four shelters, controlled-speed arrival, recovery and a fixed exposed rough-water patch. The route is a compiled `BoatVoyageRoute`; `BoatSession` owns progress. Later terrain, dressing and the docked ferry are implemented, with qualification limits in the adventure ledger. | Best first slice: move route data to Lua while retaining C behavior. Optional errands, multiple destinations and weather progression can follow. Vinga coverage, regional exposure/weather transitions, further landmarks and bounded detailed-asset loading are separate unfinished adventure work. |
 | [River race](RACE_PLAN.md), [`boat_race.h`](../src/boat_race.h), [`boat_race.c`](../src/boat_race.c) | Shortened river sprint, authored gates/grid, crossing ferry, moving storm, authoritative phases, recoveries, DNF, results and network race support. `BoatRaceCourse` and `BoatRaceRules` are already separate data types. | Second descriptor slice: edit gates, durations and supported ferry/storm parameters. Keep swept crossings, tie rules and recovery in C. The full downtown start, further race improvements and some pacing/platform review remain open. Do not confuse this course with the basin's distinct four-gate [`BoatCourse`](../src/boat_course.h). |
 | [Living city](LIVING_CITY_PLAN.md), [`waterfront_scene.h`](../src/waterfront_scene.h) | Shared explicit-time scene snapshots, city dressing, cars/lamps, travelling vessels and reactive gulls; CPU/GPU consume shared evaluated actors. | Later schedule and orchestrate exposed actors. Pedestrians/cyclists, richer road interactions, building activity, perched gulls and final polish remain planned. There is no generic spawnable NPC registry, navigation system or conversation engine to bind today. |
-| [Harbor boats](HARBOR_BOATS.md), [traffic](HARBOR_TRAFFIC.md), [`waterfront_harbor.h`](../src/waterfront_harbor.h), [`waterfront_traffic.h`](../src/waterfront_traffic.h) | Generated boat recipes, fixed berths, shared wave poses, mooring/contact envelopes, four travelling vessels on authored routes, and the docked large ferry. Ordinary traffic is kinematic; optional trial traffic wakes use a separate bounded pool. | A route/actor capability must add caller-owned descriptors and keep physical contacts, visible poses and wakes in agreement. Existing fixed functions are not a runtime actor editor. Do not allocate NPCs out of the four player slots or promise unlimited physical wake sources. |
+| [Harbor boats](HARBOR_BOATS.md), [traffic](HARBOR_TRAFFIC.md), [`waterfront_harbor.h`](../src/waterfront_harbor.h), [`waterfront_traffic.h`](../src/waterfront_traffic.h) | Generated boat recipes, fixed berths, shared wave poses, mooring/contact envelopes, four river craft, upstream ferries/schooner with pier stops and coordinated bridge lift in [`waterfront_upstream.h`](../src/waterfront_upstream.h), and the docked large ferry. Ordinary traffic is kinematic; optional trial traffic wakes use a separate bounded pool. | The [location-life track](#location-life-track-proposed-2026-10-30) plans marina and route/timetable descriptors, keeping contacts, visible poses and wakes in agreement. Existing fixed functions are not a runtime actor editor. Do not allocate NPCs out of the four player slots or promise unlimited physical wake sources. |
 | [Gameplay sunset](SUNSET_PLAN.md), [`waterfront_scene.c`](../src/waterfront_scene.c), [`renderer_gpu.c`](../src/renderer_gpu.c) | Daytime gameplay and a title-only dusk preview. The shared lighting frame and gameplay sunset remain proposed. | Expose fixed lighting presets/phase only after the sunset plan supplies and verifies the native shared frame/cache behavior. A Lua `sunset` name must not imply an implemented sun, window-light or day/night system. |
 | [Deathmatch](DEATHMATCH_PLAN.md), [`boat_match.h`](../src/boat_match.h), [`boat_combat.h`](../src/boat_combat.h) | C match attribution, scores/rounds, water cannon, stern wave grenade, torpedoes, damage feedback and rearview presentation. Current protocol is v7. | Later author supported match parameters, objective/scoring variants and announcements. Projectile integration, hit/credit rules, pressure, capsizes and prediction remain C. New weapons need native work; balance and broader browser/platform qualification are unfinished. |
 | [Multiplayer](MULTIPLAYER_PLAN.md), [protocol](MULTIPLAYER_PROTOCOL.md), [`boat_net_server.c`](../src/boat_net_server.c), [`boat_prediction.h`](../src/boat_prediction.h) | Four-player authority, ENet/native and optional browser transport, content checks, snapshots, input replay, wake reconciliation and remote views. The server currently initializes the compiled river course. | Authority can eventually own gameplay scripts, but script/config/state hashes and timed commands are not in today's wire contract. M5 impairment/resource/soak work and broader platform qualification remain. Scripted worlds must be explicitly rejected by existing clients until P5. |
@@ -478,7 +481,9 @@ P0 → P1 → P2 establishes the two descriptor slices; P3 adds behavior and P4 
 authoring tools practical. **P5 and P6 can branch independently from P4:** a solo in-game
 agent does not need to wait for multiplayer, prediction or session-recording qualification.
 P6 uses the already tested local staging/preview/undo path. Only shared-room agent editing
-depends on P5's authority and content contract.
+depends on P5's authority and content contract. The [location-life track](#location-life-track-proposed-2026-10-30)
+can also proceed from P4 for native solo use: an in-game agent is not a prerequisite.
+Scene changes that affect contacts, water or prediction require P5 before room use.
 
 ### P0 — bounded descriptor loader and contract (implemented 2026-10-28)
 
@@ -1753,6 +1758,97 @@ and an easy “return to last working revision.” If the requested feature need
 native primitive, explain the gap and produce a concrete C work item or external worktree/PR
 proposal instead of pretending the Lua API can do it.
 
+## Location-life track (proposed 2026-10-30)
+
+**Status:** planned, with native foundations present; no scene-authoring Lua bindings or
+location-life plugin example implemented. The current grants remain `voyage.define`,
+`race.define`, `objective.hud` and `objective.timers`. Timers can schedule objective work;
+they do not grant control over boats, birds, lights or other scene actors. P4's authoring
+pipeline is available, but completion of P4 does not mean arbitrary scene content is scriptable.
+P4.9 browser objective isolation is implemented; the main queue now proceeds to P5
+authority/prediction/recording contract review. This is a separate capability track, not a
+renumbering of P0–P6 or authorization to implement all slices.
+
+**Intended result:** a location plugin can dress and populate a marina, run harbor traffic
+and ferries, put a tram on a visible bridge, arrange wildlife, and set an evening lighting
+schedule. Lua supplies bounded definitions and schedules; native owners generate meshes,
+evaluate motion/reactions, maintain contacts and render one shared scene snapshot. Prefer
+editable descriptors before introducing callbacks. A useful first example is a small marina
+with a departing ferry and nearby gulls, followed by an evening variant when lighting exists.
+
+### Coverage and delivery slices
+
+| Slice | Native foundation today | Planned script support and missing native work | Reviewable completion |
+| --- | --- | --- | --- |
+| L1 — scene definition and ownership | Shared explicit-time `WaterfrontSceneFrame`; P4 schema, validation, preview and revision tools | Add a caller-owned, location-scoped scene definition with stable IDs, bounded counts and registered recipes. Decide package composition with voyage/race content and duplicate-ID/conflict policy before choosing manifest syntax. Expose inspected actor IDs, supported recipes and budgets through discovery. No general scene grant exists today. | A small scene descriptor validates, installs atomically and restores the compiled scene when disabled; invalid or over-budget edits preserve the active scene. |
+| L2 — marina layout and population | Generated boat recipes, seven fixed berths, pontoons/quay/gangway fittings, shared wave poses and moored-hull contacts in `waterfront_harbor` | Author berth positions/headings and boat recipes, then bounded pontoon/jetty/attachment layouts. Validate water depth/shore placement as supported, spacing, access lanes and contact/camera clearance. New structures need matching native geometry/contact support. Terrain excavation, shoreline editing and arbitrary mesh import are separate work. | An authored two-berth marina with a clear entrance; moving/removing a berth updates visible boats, ropes, camera clearance and contacts together. Separate static layout from later occupancy/arrival scheduling. |
+| L3 — harbor traffic and ferry schedules | Four river craft in `waterfront_traffic`; upstream ferries and schooner in `waterfront_upstream` use a 1,200-second repeating timetable, pier dwell/departure and a coordinated Hisingsbron lift | Replace fixed actor/route/timetable inputs with validated native-owned definitions. Author supported craft, routes, stops, dwell times, departure offsets and service periods; retain native motion evaluation. Bind ferry/bridge clearance coordination explicitly. Ordinary traffic trails are visual; physical wakes require a separately supported bounded recipe. No traffic avoidance AI, passenger/boarding or real transit feed is implied. | Change one ferry's stop/dwell/departure schedule and add a small craft route; inspect both at identical times, including stop, loop and bridge-lift boundaries. Verify shore, berth and pairwise route clearance and shared visible/contact poses. |
+| L4 — gulls and wildlife orchestration | 32 reactive gulls in four compiled groups; deterministic circling, feeding/alarm cues and boat avoidance | Author flock region, count, supported flight recipe and cue schedule within native limits. Add bounded native commands only if a playable event needs them. Perching, habitat/terrain clearance and persistent animal behavior need native additions. Seals are L8, not a gull recipe with a new name. | Move a flock and schedule a feeding/alarm cue; direct/backward seeks and nearby boat reactions remain repeatable, with no bird clipping accepted merely because validation passed. |
+| L5 — daylight and dusk | Daytime scene and title-only dusk preview; [sunset plan](SUNSET_PLAN.md) proposes shared gameplay lighting | Implement that plan's lighting frame, CPU/GPU/cache agreement and reviewed fixed presets first. Then expose approved preset/phase and bounded transitions at explicit presentation times. Keep presentation phase separate from physics, weather and race clocks. A full astronomical day/night simulation is outside the first slice. | A plugin selects fixed dusk and a repeatable afternoon-to-dusk transition; sky, scenery, water/reflections and navigation readability agree in both renderers. |
+| L6 — building and street lighting | Shared lamp/car placement and renderer lighting machinery; city room activity remains pending | Add stable building/window-group and street-lamp identities, bounded occupancy/on/off/intensity recipes and schedules. Implement native window emission/local-light selection and budgets where absent; distinguish glowing windows/lenses from lights illuminating nearby surfaces. Coordinate defaults with L5 without requiring per-window Lua updates. | A street group switches on and sparse occupied rooms change at authored times, remaining attached to buildings under camera motion and consistent across render passes. Daytime overrides and abrupt reloads have explicit behavior. |
+| L7 — trams visible from the water | Shared actor snapshots and road cars are reusable foundations; no tram actor, track route or script API exists | Add a native tram silhouette/articulated recipe as needed, authored tracks with deck elevation, stops, speeds and bounded scheduling. Use bridge geometry/clearance and lift closures; a timetable alone must not send a tram across a raised span. This is authored transit motion, not a road/rail navigation simulation. | One readable tram crosses a selected visible bridge; inspect water-level views, supports/occlusion, stop/loop continuity and bridge closure behavior before exposing the recipe to plugins. |
+| L8 — seals and other new animals | No seal model, motion or behavior adapter exists | Build one native animal recipe, bounded habitat/haul-out and surfacing/diving behavior, water/shore placement and agreed contact policy. Then expose species-specific definitions/cues using L4's ownership pattern. Do not promise an arbitrary animal API. | One seal encounter reads clearly from the boat at native resolution; native behavior/placement review precedes script control. |
+
+L1 is the first implementation task **when this track is selected**, followed by L2's small
+marina descriptor. L3 and L4 build on L1 and existing actors; L5 can progress independently
+in the sunset owner, and L6 follows the shared lighting work. L7/L8 require new native actor
+work and are later slices rather than blockers for marina/traffic authoring. These labels
+organize plugin integration; they do not reorder the living-city plan's people/cyclist queue.
+
+### Ownership, schedules and reload contract
+
+- The plugin plan owns the scene descriptor/schedule contract and host integration. The
+  [living-city plan](LIVING_CITY_PLAN.md), [harbor boats](HARBOR_BOATS.md),
+  [harbor traffic](HARBOR_TRAFFIC.md), [gulls](HARBOR_GULLS.md) and
+  [sunset plan](SUNSET_PLAN.md) own their native rendering, motion and visual acceptance.
+  Reconcile dated harbor guides with upstream source before implementing schedule adapters:
+  old river ellipse descriptions do not describe all current outer-map ferry behavior.
+- Schedule against explicit host inputs with documented units, phase/origin and pause/restart
+  policy. Periodic routes, timetables and lighting should be directly evaluable at a requested
+  time; stateful callbacks need checkpointed state and ordered cues. No wall-clock polling or
+  per-actor per-frame Lua loop. Preserve seeks and avoid duplicate departures/cues on reload.
+- Use one owned definition and evaluated pose for drawing, reflections, shadows, contact
+  envelopes and supported wake sources. Keep actor pools separate from the four player slots;
+  bound meshes, lights, birds, route points, wakes and active regions. Measure frame and
+  staging costs at the intended populated location, including browser targets when enabled.
+- Define commit/restart policy per slice. Display-only changes can preserve progress when
+  compatible. Moving a berth, pier or colliding vessel must validate player clearance and
+  either stage a safe boundary/reset or refuse the edit. Retire old resources only after
+  consumers release them; Apply and Undo restore the whole accepted definition/state.
+  Composition cannot silently let two packages own the same berth, schedule or lighting phase.
+- Start native solo. Browser capabilities remain explicitly rejected until their descriptor
+  and any callback paths are isolated and qualified. Shared-room collision/water changes need
+  P5's authority, content and prediction contract; shared visual schedules also need an agreed
+  host phase/content identity. Existing pose recordings do not capture these scene revisions.
+
+### Acceptance and next task
+
+For each slice, extend discovery/schema, add a small editable example and diagnostics, and
+exercise validation, deterministic preview/seek, pinned capture, live Apply/Undo and cleanup.
+Check failed edits, ownership/resource retirement and capacity limits. Run build/full CTest;
+inspect representative CPU/GPU stills and a windowed motion/lighting demo where behavior changes.
+Record automated checks, manual playback and user acceptance separately in the native owner
+and this plan. No scene-API implementation or visual acceptance is claimed by this proposal.
+
+Completed planning task, 2026-10-30: inspected the current harbor, traffic, upstream, gull and
+scene interfaces and the living-city/sunset plans; recorded all seven requested areas with
+native prerequisites and delivery evidence. Next task for this track: L1's small scene
+ownership/composition contract, then L2's two-berth marina example. Known limits: capability
+names, package composition syntax and exact new resource budgets are intentionally undecided
+until L1; new tram/seal art, gameplay dusk and scene bindings are unimplemented.
+
+Verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug build and full
+`ctest --preset full` passed on the unchanged implementation baseline `1b74a25` in the main
+checkout (309 enabled tests, 13 retired field cases disabled, `PROTEUS_GPU_TESTS=OFF`; local
+socket access enabled). Added local links/anchors and `git diff --check` passed. No new runtime
+implementation, audiovisual run or user acceptance is claimed.
+
+Merge reconciliation, 2026-10-30: incorporated main `9ab9f3a`, preserving implemented P4.9
+browser objectives and P5 as the next main-queue task alongside this proposed track. In the
+merged worktree, Debug build and full CTest passed (310 enabled tests, 13 disabled, GPU tests
+off, local socket access enabled); all 29 added local links/anchors and `git diff --check`
+passed. No new audiovisual verification was needed for this documentation-only resolution.
+
 ## Longer-term creative roadmap
 
 Grow capabilities when a playable example needs them, preserving the existing owning plans:
@@ -1760,9 +1856,10 @@ Grow capabilities when a playable example needs them, preserving the existing ow
 - **Voyage episodes:** optional deliveries, rescue encounters, visiting landmarks and choosing
   sheltered routes, built over the adventure's real map expansion and weather work. Cargo,
   rescue actors and more destinations need native resource/rule support before Lua orchestration.
-- **Living waterfront:** ferry timetables, small craft routes, local events and gull reactions;
-  later pedestrians/cyclists and building activity once the city plan implements those actors.
-  Share scene snapshots and bounded activation by gameplay region, not a script-owned crowd.
+- **Living waterfront:** the [location-life track](#location-life-track-proposed-2026-10-30)
+  now specifies marina layout/population, harbor traffic and ferry timetables, gulls, trams,
+  seals and building/street lighting. Pedestrians/cyclists remain native city work before
+  script orchestration. Share scene snapshots and bounded activation by gameplay region.
 - **Evening journeys:** scripted fixed lighting or gradual dusk, weather events and restrained
   audio cues after the sunset/weather owners provide consistent physical/presentation recipes.
   Presentation phase stays distinct from water and race clocks.

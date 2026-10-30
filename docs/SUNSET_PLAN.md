@@ -5,6 +5,12 @@ for sunset in the game. This document owns that work. The title redesign supplie
 static dusk preview; gameplay still uses its existing daytime lighting. No sunset
 renderer, time control or day/night cycle is implemented or verified here.
 
+The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
+will expose approved daylight/dusk presets, phase transitions and building/street lighting
+schedules after the native prerequisites here are implemented and reviewed. No lighting
+capability exists in the current Lua API. This plan continues to own the shared lighting
+frame, renderer/cache agreement and visual acceptance.
+
 ## Intended result
 
 Make the river and outer voyage playable from warm late afternoon through sunset into
