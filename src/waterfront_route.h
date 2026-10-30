@@ -110,8 +110,19 @@ bool waterfront_route_stop_times(const WaterfrontRouteDefinition *routes, int in
     double *arrive, double *depart);
 // Highest lift the bridge needs for this definition at TIME, 0 when it stays down.
 float waterfront_route_lift(const WaterfrontRouteDefinition *routes, double time);
-// Schedule diagnostics used by L3.4. A bridge actor's hull must cross the span fully inside
-// one raised window, and the definition must leave enough time for the lift to cycle.
+// L3.4 bridge dependency windows. ENTRY/LEAVE bound the hull's occupancy of the lift span;
+// CROSSING is the centre passage used by the compiled lift envelope.
+typedef struct {
+    unsigned actor;
+    double entry, leave, crossing;
+} WaterfrontBridgeWindow;
+int waterfront_route_bridge_windows(
+    const WaterfrontRouteDefinition *routes, WaterfrontBridgeWindow *windows, int capacity);
+// Validate the whole bridge group: finite crossings inside the span, full lift before entry,
+// enough raised clearance for the tallest mast, a complete lift cycle per period, and no
+// overlapping occupancy windows. UNDER/LIFT are the compiled span dimensions.
+bool waterfront_route_validate_bridge(const WaterfrontRouteDefinition *routes, float underside,
+    float lift_height, WaterfrontRouteDiagnostic *diagnostic);
 bool waterfront_route_bridge_window(const WaterfrontRouteDefinition *routes, int index,
     double *entry, double *leave, WaterfrontRouteDiagnostic *diagnostic);
 

@@ -100,11 +100,13 @@ static int harbor_life_scene(void)
     CHECK(r1->voyage.has_scene && r1->voyage.scene.berth_count == 2);
     CHECK(s.world.scene == &r1->voyage.scene && boat_session_view(&s).scene == s.world.scene);
     CHECK(s.world.scene->berths[1].z == 173);
-    CHECK(s.world.scene->traffic_present && s.world.scene->traffic.actor_count == 3);
+    CHECK(s.world.scene->traffic_present && s.world.scene->traffic.actor_count == 4);
     CHECK(!strcmp(s.world.scene->traffic.actors[0].id, "passing")
         && s.world.scene->traffic.actors[0].speed == 4);
     CHECK(!strcmp(s.world.scene->traffic.actors[1].id, "ferry")
         && s.world.scene->traffic.actors[1].stops[0].dwell == 35);
+    CHECK(!strcmp(s.world.scene->traffic.actors[3].id, "schooner")
+        && waterfront_route_has_bridge(&s.world.scene->traffic));
 
     // A berth edit is a physical scene change: held until F7, then the caller restarts.
     BoatPluginBundle moved = harbor_edit("x = 13, z = 173", "x = 13, z = 179");

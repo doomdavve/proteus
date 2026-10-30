@@ -1780,10 +1780,10 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L3.3 are complete; next in this track: L3.4
-coordinated lift and integrated route safety**; the first playable gate is L4.3. `scene.define`
-installs and stages the two-berth harbor-life layout, its small pontoon and gangway, one authored
-passing craft and a retained ferry with an edited dwell.
+failure cases and acceptance evidence. **L1.1–L3.4 are complete; next in this track: L4.1 native
+flock definitions**; the first playable gate is L4.3. `scene.define` installs and stages the
+two-berth harbor-life layout, its small pontoon and gangway, one authored passing craft, a retained
+ferry with an edited dwell, and the retained schooner/lift dependency.
 
 ### Coverage and delivery slices
 
@@ -2315,8 +2315,40 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 - `WaterfrontRouteDefinition` storage is now 5,768 bytes (stops 256 bytes). No GPU or windowed
   motion run was needed for this schedule-only change.
 
-**Next in this track: L3.4.** Bind tall-vessel passages and the Hisingsbron lift as one validated
-dependency group, preserving the compiled schooner when untouched.
+#### L3.4 result, 2026-10-30
+
+**Implemented:** the Hisingsbron lift and tall-vessel passages are one validated dependency group.
+The harbor-life package retains the compiled schooner, so its passage and the lift remain visible.
+
+- **Group validation:** each bridge actor must cross inside the lift span, carry enough raised
+  clearance for its tallest mast, have a period longer than the complete lift cycle, enter only
+  after the span is fully raised and leave before it lowers, and avoid overlapping another
+  bridge actor's hull-occupancy window. A declared bridge actor whose route never crosses the
+  span rejects. A missing bridge actor leaves the lift down; an absent traffic subsystem keeps
+  the compiled service and lift.
+- **Conflicts:** authored craft are sampled against stationary berths and solid dock modules as
+  well as other authored craft. Two retained compiled actors keep their existing relative
+  schedules (the compiled upstream service already shares berths). A retained bridge actor's
+  changed stop dwell still participates in authored-traffic conflicts.
+- **Review tooling:** `harbor_review --view bridge` frames the lift span and upstream service with
+  `water.upstream` enabled. It is a presentation-only camera; the compiled traffic data is
+  unchanged.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build. Full `ctest --preset full` passed **322/322 enabled tests** (24.50 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_traffic` checks both default windows, fully raised entry/leave, ramp/hold boundaries,
+  span-pose height, hull contact at the crossing, a too-slow passage rejection, low-lift
+  clearance rejection, overlapping tall-vessel windows and a bridge actor with no crossing.
+  The harbor-life package's retained schooner is checked by package/session/stage tests.
+- CPU `harbor_review --view bridge` captures at 300 s (down), 342 s (raised), 382/432 s (raised
+  with schooner passing) and 502/542 s (down) were inspected. The long lift timetable is covered
+  by direct-time validation, not by raising the 60 s `wake_velocity --time` capture limit. CPU
+  review has no GPU reflections/shadows; those remain part of L4.3's GPU inspection.
+
+**Next in this track: L4.1.** Extract the four gull groups into caller-owned bounded definitions
+with compiled parity and traffic/player avoidance.
 
 #### L2 — a small marina before a marina editor
 
@@ -2446,11 +2478,13 @@ added the `marina_pass` craft to `plugins/harbor-life`, and wired the accepted r
 draw, contact, camera, combat and the PST4 worker wire.
 Completed L3.3, 2026-10-30: added named ordered stops, shared/explicit dwell, period arithmetic and
 the harbor-life ferry's edited Stenpiren departure.
-Next task for this track: **L3.4**, coordinated lift and integrated route safety.
+Completed L3.4, 2026-10-30: bound tall-vessel passages and the Hisingsbron lift into one validated
+group, retained the schooner in the example, and added a bridge review camera.
+Next task for this track: **L4.1**, native flock definitions.
 Known limits: authored route geometry is selected from registered presets; no freeform route
 editor, freeform module mesh editor or physical traffic wake recipe; no boarding/passenger
-simulation; depth is unverified; and no tram/seal recipes, gameplay dusk, building activity or
-human scene acceptance are implemented.
+simulation; no tram closure interlock; depth is unverified; and no tram/seal recipes, gameplay
+dusk, building activity or human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

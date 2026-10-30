@@ -228,7 +228,11 @@ return {
 | `vessels[i].stops` | dense list of 0–8 `{ id, dwell }` records | Optional override for a registered stopped route. IDs must match the preset's named piers in order. A positive `dwell` is the departure offset in seconds; an omitted dwell shares the period's remaining time. A period shorter than travel plus explicit dwell rejects. |
 
 The decoder copies berth/module IDs, recipes, mooring/attachment rules, source x/z, headings,
-gangway anchors and the complete route/timetable before the Lua state closes. `boat_scene_validate` checks identities, recipes,
+gangway anchors and the complete route/timetable before the Lua state closes. The lift is derived
+from the remaining bridge actors: `schooner` is the compiled tall-vessel preset. Validation checks
+span station, raised mast clearance, lift transition time, a complete cycle per period and
+non-overlapping hull-occupancy windows. A retained schooner keeps the compiled passage; omitting
+every bridge actor leaves the lift down. `boat_scene_validate` checks identities, recipes,
 numbers and capacities; `boat_plugin_check_location` then checks hull plus wave/mooring envelopes,
 pairwise hull/pontoon/quay clearance, the declared entrance, the location spawn and every voyage
 recovery shelter. A pontoon must lie in open water, a quay on land, and a gangway needs a land

@@ -491,12 +491,73 @@ static int check_ferry_schedule(void)
     return 0;
 }
 
+// L3.4: hull height, span station, lift transition and occupancy are one dependency group.
+static int check_bridge_safety(void)
+{
+    const WaterfrontRouteDefinition *defaults = waterfront_route_defaults();
+    WaterfrontRouteDiagnostic diagnostic;
+    CHECK(waterfront_route_validate_bridge(defaults, WATERFRONT_LIFT_UNDERSIDE,
+        WATERFRONT_LIFT_HEIGHT, &diagnostic));
+    CHECK(!waterfront_route_validate_bridge(defaults, WATERFRONT_LIFT_UNDERSIDE, 4, &diagnostic));
+    CHECK(strstr(diagnostic.message, "insufficient"));
+
+    WaterfrontBridgeWindow windows[WATERFRONT_ROUTE_ACTORS * 2];
+    int count = waterfront_route_bridge_windows(defaults, windows, WATERFRONT_ROUTE_ACTORS * 2);
+    CHECK(count == 2);
+    for (int i = 0; i < count; ++i) {
+        WaterfrontBridgeWindow w = windows[i];
+        CHECK(w.leave > w.entry && w.crossing > w.entry && w.crossing < w.leave);
+        // Fully raised at entry and leave, ramping before/after the hold.
+        CHECK(fabsf(waterfront_route_lift(defaults, w.entry) - WATERFRONT_LIFT_HEIGHT) < .1f);
+        CHECK(fabsf(waterfront_route_lift(defaults, w.leave) - WATERFRONT_LIFT_HEIGHT) < .1f);
+        CHECK(waterfront_route_lift(defaults, w.crossing - 50 - 40 - .1) == 0);
+        CHECK(waterfront_route_lift(defaults, w.crossing + 30 + 40 + .1) == 0);
+        float partial = waterfront_route_lift(defaults, w.crossing - 50 - 20);
+        CHECK(partial > 0 && partial < WATERFRONT_LIFT_HEIGHT);
+        // The rendered span pose and the hull contact use the same crossing time.
+        Transform3D pose = waterfront_upstream_span_pose(w.crossing);
+        CHECK(fabsf(pose.position.y - WATERFRONT_LIFT_HEIGHT) < .1f);
+        WaterfrontVesselMotion m = waterfront_traffic_motion(
+            WATERFRONT_TRAFFIC_VESSELS + WATERFRONT_UPSTREAM_SCHOONER, w.crossing);
+        WaterfrontTrafficContact contact;
+        CHECK(waterfront_traffic_contact_height((Vector2) { -m.position.x, m.position.z },
+            m.heading, 2, 1.6f, .75f, -.4f, 2, (BoatWater) { .upstream = true }, w.crossing,
+            &contact));
+    }
+
+    // A slow bridge actor would enter before the span has finished rising.
+    WaterfrontRouteDefinition single = { .actor_count = 1 };
+    CHECK(waterfront_route_preset("schooner", &single.actors[0]));
+    strcpy(single.actors[0].id, "slow_schooner");
+    single.actors[0].speed = 0;
+    single.actors[0].period = 12000;
+    CHECK(!waterfront_route_validate(&single, &diagnostic));
+    CHECK(strstr(diagnostic.message, "before the lift is fully raised"));
+    // Two tall vessels sharing one passage window are rejected atomically.
+    WaterfrontRouteDefinition two = { .actor_count = 2 };
+    CHECK(waterfront_route_preset("schooner", &two.actors[0]));
+    CHECK(waterfront_route_preset("schooner", &two.actors[1]));
+    strcpy(two.actors[0].id, "schooner_one");
+    strcpy(two.actors[1].id, "schooner_two");
+    CHECK(!waterfront_route_validate(&two, &diagnostic));
+    CHECK(strstr(diagnostic.message, "overlapping"));
+    // A route that never reaches the bridge cannot claim a lift dependency.
+    WaterfrontRouteDefinition malformed = { .actor_count = 1 };
+    CHECK(waterfront_route_preset("marina_pass", &malformed.actors[0]));
+    strcpy(malformed.actors[0].id, "not_bridge");
+    malformed.actors[0].bridge = true;
+    CHECK(!waterfront_route_validate(&malformed, &diagnostic));
+    CHECK(strstr(diagnostic.message, "does not cross"));
+    return 0;
+}
+
 int main(void)
 {
     CHECK(check_vertical_contacts() == 0);
     CHECK(check_route_definition() == 0);
     CHECK(check_scene_traffic() == 0);
     CHECK(check_ferry_schedule() == 0);
+    CHECK(check_bridge_safety() == 0);
     CHECK(check_upstream() == 0);
     if (check_gulls() || check_long_session())
         return 1;

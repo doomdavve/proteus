@@ -51,7 +51,9 @@ return {
             { id = "lindholmspiren" },
             { id = "eriksberg" }
           } },
-        { id = "river_runabout", retain = "river_runabout" }
+        { id = "river_runabout", retain = "river_runabout" },
+        -- The compiled schooner keeps its Hisingsbron passage and lift dependency.
+        { id = "schooner", retain = "schooner" }
       }
     }
   }
