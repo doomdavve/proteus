@@ -232,7 +232,10 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 }
 
 static const char *const ROOT[] = { "voyage", "scene", "init", "update", "migrate", NULL };
-static const char *const SCENE[] = { "version", NULL };
+static const char *const SCENE[] = { "version", "marina", NULL };
+static const char *const MARINA[] = { "entrance", "berths", NULL };
+static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
+static const char *const BERTH[] = { "id", "recipe", "x", "z", "heading", "mooring", NULL };
 static const char *const VOYAGE[]
     = { "shelters", "arrival", "exposure", "exposed_fraction", "weather_range", NULL };
 static const char *const SHELTER[] = { "id", "name", "x", "z", "heading", "radius", NULL };
@@ -285,6 +288,115 @@ static bool shelters(lua_State *L, Vm *vm, int voyage)
     return true;
 }
 
+// L2.2 marina berths. The list is dense 0..7; every field is copied, and names are resolved
+// against the native registry before the Lua state closes.
+static bool scene_berths(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *s)
+{
+    char at[64];
+    int type = field(L, marina, "berths", "scene.marina", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int list = lua_absindex(L, -1);
+    lua_Unsigned length = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > length)
+            return reject(vm, at, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != length)
+        return reject(vm, at, "must be a list numbered from 1 without gaps");
+    if (length > BOAT_SCENE_BERTHS)
+        return reject(vm, at, "must list 0 to %d berths, not %llu", BOAT_SCENE_BERTHS,
+            (unsigned long long)length);
+    s->berths_present = true;
+    s->berth_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        BoatSceneBerth *b = &s->berths[i];
+        char path[64], recipe[24], mooring[24];
+        element(path, sizeof(path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int entry = lua_absindex(L, -1);
+        double x, z, heading;
+        if (!only(L, vm, entry, path, BERTH)
+            || !string(L, vm, entry, path, "id", b->id, sizeof(b->id))
+            || !string(L, vm, entry, path, "recipe", recipe, sizeof(recipe))
+            || !string(L, vm, entry, path, "mooring", mooring, sizeof(mooring))
+            || !number(L, vm, entry, path, "x", &x) || !number(L, vm, entry, path, "z", &z)
+            || !number(L, vm, entry, path, "heading", &heading))
+            return false;
+        b->x = (float)x;
+        b->z = (float)z;
+        b->heading = (float)heading;
+        BoatSceneBerthRecipe r;
+        BoatSceneMooring m;
+        if (!boat_scene_berth_recipe_from_name(recipe, &r)) {
+            char field[64];
+            join(field, sizeof(field), path, "recipe");
+            return reject(vm, field, "is not a registered berth recipe");
+        }
+        if (!boat_scene_mooring_from_name(mooring, &m)) {
+            char field[64];
+            join(field, sizeof(field), path, "mooring");
+            return reject(vm, field, "must be pontoon or none");
+        }
+        b->recipe = (unsigned char)r;
+        b->mooring = (unsigned char)m;
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    return true;
+}
+
+static bool scene_entrance(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *s)
+{
+    char at[64];
+    int type = field(L, marina, "entrance", "scene.marina", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int entrance = lua_absindex(L, -1);
+    double x, z, width;
+    if (!only(L, vm, entrance, at, ENTRANCE) || !number(L, vm, entrance, at, "x", &x)
+        || !number(L, vm, entrance, at, "z", &z) || !number(L, vm, entrance, at, "width", &width))
+        return false;
+    s->entrance_x = (float)x;
+    s->entrance_z = (float)z;
+    s->entrance_width = (float)width;
+    s->entrance_present = true;
+    lua_pop(L, 1);
+    return true;
+}
+
+static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
+{
+    char at[64];
+    int type = field(L, scene, "marina", "scene", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int marina = lua_absindex(L, -1);
+    if (!only(L, vm, marina, at, MARINA) || !scene_entrance(L, vm, marina, s)
+        || !scene_berths(L, vm, marina, s))
+        return false;
+    lua_pop(L, 1);
+    return true;
+}
+
 // Copy the definition at index 2 into the data, using raw access only: no metamethod runs.
 static int decode(lua_State *L)
 {
@@ -320,7 +432,8 @@ static int decode(lua_State *L)
         int scene = lua_absindex(L, -1);
         double version;
         if (!only(L, vm, scene, "scene", SCENE)
-            || !number(L, vm, scene, "scene", "version", &version))
+            || !number(L, vm, scene, "scene", "version", &version)
+            || !scene_marina(L, vm, scene, &d->scene))
             return 0;
         d->has_scene = true;
         d->scene.version = version == (double)BOAT_SCENE_VERSION ? BOAT_SCENE_VERSION : 0;

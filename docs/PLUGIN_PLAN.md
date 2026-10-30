@@ -38,9 +38,9 @@ Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
-scene contract/site fixture, L1.1–L1.4's decoded/bound/staged scene envelope and L2.1's native
-berth parameterization are complete, and none of those scene capabilities yet supplies an
-authorable marina package. The milestones below are this plan's
+scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1/L2.2's native berth
+parameterization plus two-berth `plugins/harbor-life` package are complete; dock modules remain
+planned for L2.3. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1780,10 +1780,9 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L1.4 and L2.1 are complete; next in this track:
-L2.2 berth decoding and the first harbor-life package**; the first playable gate is L4.3.
-`scene.define` installs and stages an empty envelope, and the native harbor accepts a
-caller-owned berth list, but no marina subsystem is authorable yet.
+failure cases and acceptance evidence. **L1.1–L1.4, L2.1 and L2.2 are complete; next in this
+track: L2.3 registered dock modules**; the first playable gate is L4.3. `scene.define` installs
+and stages the two-berth harbor-life layout; pontoon/gangway/quay modules remain compiled.
 
 ### Coverage and delivery slices
 
@@ -1914,11 +1913,13 @@ lifetime inventory. No grant or runtime scene field exists yet; L1.1 is planning
 - **Site fixture:** [`tools/validate_scene_site.c`](../tools/validate_scene_site.c) checks the
   planned site with the compiled `outer` water and native skiff/runabout recipes. It passes with
   two berths at simulation `(13, 167)` and `(13, 173)` heading `−π/2`, a 14 × 2.35 m pontoon at
-  `(20, 170)`, a gangway from land at `(34.1, 170)` to the pontoon landing `(21, 170)`, a 8 m
-  entrance at `(6, 168)` and a north-facing start/camera bookmark at `(6, 158)`. The fixture also
+  `(20, 170)`, a gangway from land at `(34.1, 170)` to the pontoon landing `(21, 170)`, an 8 m
+  entrance at `(6, 168)` and an east-facing start/camera bookmark at `(2, 170)`, heading `π/2`. The fixture also
   samples the `x = 6`, `z = 150..176` approach lane with a 2.4 m hull and checks both moored hull
-  envelopes. `tools/plugin_anchors.json` gains the matching `outer.marina` bookmark. Depth remains
-  unverified because the compiled map has no bathymetry.
+  envelopes. `tools/plugin_anchors.json` gains the matching `outer.marina` bookmark; L2.2 later
+  corrected it from `(6, 158)` to `(2, 170)`, heading `π/2`, because the original view faced
+  south and did not frame both hulls. Depth remains unverified because the compiled map has no
+  bathymetry.
 - **Decisions made at this gate:** the scene is additive to the existing voyage package, not a
   new kind or dependency system; absent subsystems use compiled defaults and present ones replace
   their whole collection; one package owns the scene; physical layout edits require the existing
@@ -1930,7 +1931,7 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 
 - `cmake --build build -j` built the new `validate_scene_site` without project warnings.
 - `./build/validate_scene_site` printed
-  `scene_site berths=2 pontoon=14.0x2.3 gangway=13.1m bookmark=6,158 failures=0`.
+  `scene_site berths=2 pontoon=14.0x2.3 gangway=13.1m bookmark=2,170 failures=0` (the bookmark was corrected in L2.2).
 - Full `ctest --preset full` passed **311/311 enabled tests** (22.46 s) with local socket access
   and `PROTEUS_GPU_TESTS=OFF`; 13 retired wake-field tests remained disabled. `scene_site` is in
   the quick lane. Changed local links/anchors and `git diff --check` passed. This result does not
@@ -1999,9 +2000,9 @@ authorable marina content. No renderer or contact rule was changed.
   can be reused; re-entry no longer leaves a dangling borrower.
 - Inspection reports `scene present/version/digest/content/subsystems=none`. The isolated
   stage-worker wire still omits the envelope (L1.4); in-process launch and host staging carry it.
-- No renderer, contact or camera code consumes the pointer yet. L2.1 replaces the compiled harbor
-  layout input; L2.2 wires contact and the first authored package. An empty envelope consequently
-  renders and collides exactly as before.
+- No renderer, contact or camera code consumed the pointer at this step. L2.1 replaced the
+  compiled harbor layout input and L2.2 wired contact and the first authored package; both are
+  recorded below. An empty envelope consequently rendered and collided exactly as before.
 
 Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 
@@ -2094,6 +2095,53 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 
 **Next in this track: L2.2.** Decode `scene.marina.berths`, wire the accepted scene into
 `BoatWorld`/both renderers, and add the two-berth `plugins/harbor-life` package at the L1.1 site.
+
+#### L2.2 result, 2026-10-30
+
+**Implemented:** bounded berth/entrance decoding, map validation, the first `plugins/harbor-life`
+package, and live scene consumption by physics and both renderers. The compiled pontoon,
+gangway, quay, ferry and bridge remain independent.
+
+- `scene.marina` accepts strict `entrance` and `berths` records; `modules` is still rejected as an
+  unknown field. A present berth list replaces only the compiled hull collection; an empty list
+  disables it. The decoder copies recipes, mooring rules, source x/z and headings before Lua
+  closes.
+- `boat_plugin_check_location` checks each hull plus the native 0.45 m lateral/0.9 m longitudinal
+  excursion against the compiled map with 0.5 m water margin, pairwise hull clearance, the
+  declared entrance, the location spawn and every voyage recovery shelter. Depth is reported
+  unverified; no bathymetry is invented.
+- `BoatWorld.scene` now reaches hull contact and combat. `BoatViewState.scene` reaches
+  `boat_scene_frame`, the direct CPU harbor pass and therefore the GPU frame. The selected
+  berths supply pose, mesh recipe, ropes, contact and camera data from the same list.
+- `plugins/harbor-life` keeps the Långedrag voyage and adds the two berths at `(13, 167)` and
+  `(13, 173)`, entrance `(6, 168)` width 8 m. The pinned `outer.marina` bookmark was corrected
+  to `(2, 170)`, heading `π/2`: heading 0 faces south, and the original `(6, 158)` view did not
+  frame both hulls. The approach-lane fixture still samples `x = 6`, `z = 150..176`.
+- A berth/entrance edit classifies as an explicit session restart; the panel now says
+  `THE MARINA LAYOUT` rather than claiming the exposed water changed. Undo reapplies the whole
+  previous layout. An unsafe candidate preserves active revision and scene.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build and full `ctest --preset full`: **315/315 enabled tests** (16.69 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_boat_plugin --case scene_berths` checks the package fields/digest and rejects unknown
+  modules, missing entrance, duplicate IDs, unknown recipes/mooring, a berth ashore, overlapping
+  berths, a blocked entrance, a blocked spawn and capacity + 1. `--case harbor_life_scene` checks
+  live install, F7 restart, Undo and unsafe-candidate preservation.
+- `validate_harbor` adds a deterministic approach along the lane and two eastward impacts that
+  stop before each moored hull's centre, using the real `BoatWorld.scene` contact path.
+- CPU captures at `outer.marina` before/after moving the runabout 6 m are visually inspected:
+  both hulls and their ropes are visible, and only the runabout moves. SHA-256 changed from
+  `5a5996e5…75f9974` to `e03963dd…0f0c789a`. `validate_scene_site` prints
+  `bookmark=2,170 failures=0`.
+- Node contracts and the Python worker/authoring tests pass, including `harbor-life` discovery,
+  worker evidence (`berths: 2`) and preview. No GPU capture, human driving or human acceptance is
+  claimed.
+
+**Next in this track: L2.3.** Extract the compiled pontoon/gangway/quay into bounded registered
+modules with attachment/anchor rules, replace the example's compiled pontoon with one small
+authored pontoon and gangway, and add matching contact/camera geometry.
 
 #### L2 — a small marina before a marina editor
 
@@ -2212,9 +2260,11 @@ Completed L1.4, 2026-10-30: added the PST3 scene staging wire, worker/preview/ca
 truthful discovery, and browser/room/replay rejection.
 Completed L2.1, 2026-10-30: parameterized native moored hulls by recipe and caller-owned berth
 list, with default parity, move/remove coverage and no invisible compiled hull.
-Next task for this track: **L2.2**, expose two berths in the first harbor-life package and wire
-the accepted scene into physics/renderers. Known limits: no marina fields, authored quay mooring
-or dock modules, tram/seal recipes, gameplay dusk, building activity or human scene acceptance.
+Completed L2.2, 2026-10-30: exposed two editable berths in `plugins/harbor-life`, wired the
+accepted scene into physics and both renderers, and added map/restart validation.
+Next task for this track: **L2.3**, extract registered dock modules and attach a small pontoon
+and gangway at the two-berth site. Known limits: modules are compiled, depth is unverified, and
+no tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

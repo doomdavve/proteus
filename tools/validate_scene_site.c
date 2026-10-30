@@ -26,7 +26,7 @@ static const float gangway_anchor_x = 34.1f, gangway_anchor_z = 170;
 static const float gangway_landing_x = 21, gangway_landing_z = 170;
 static const float entrance_x = 6, entrance_z = 168;
 // A navigable boat pose facing north into the marina, used by --start and plugin anchors.
-static const float bookmark_x = 6, bookmark_z = 158;
+static const float bookmark_x = 2, bookmark_z = 170, bookmark_heading = 1.5707964f;
 
 static int failures;
 
@@ -116,14 +116,12 @@ int main(void)
     check(box_water(map, pontoon_x, pontoon_z, 0, pontoon_length * .5f + .9f,
               pontoon_beam * .5f + .45f, .5f),
         "the small pontoon is open water");
-    check(!water(map, gangway_anchor_x, gangway_anchor_z, 0),
-        "the gangway shore anchor is land");
+    check(!water(map, gangway_anchor_x, gangway_anchor_z, 0), "the gangway shore anchor is land");
     check(water(map, gangway_landing_x, gangway_landing_z, 0),
         "the gangway pontoon landing is water");
-    check(hypotf(gangway_anchor_x - gangway_landing_x, gangway_anchor_z - gangway_landing_z)
-            >= 2 && hypotf(gangway_anchor_x - gangway_landing_x,
-                            gangway_anchor_z - gangway_landing_z)
-            <= 20,
+    check(hypotf(gangway_anchor_x - gangway_landing_x, gangway_anchor_z - gangway_landing_z) >= 2
+            && hypotf(gangway_anchor_x - gangway_landing_x, gangway_anchor_z - gangway_landing_z)
+                <= 20,
         "the gangway span is 2..20 m");
     for (float z = 150; z <= 176; z += 2) {
         char what[96];
@@ -131,21 +129,30 @@ int main(void)
         check(water(map, entrance_x, z, 3), what);
         for (unsigned i = 0; i < BERTH_COUNT; ++i) {
             // A 2.4 m beam hull passing at the lane centre must clear the moored hulls.
-            snprintf(what, sizeof(what), "approach lane clears berth %s at z %.0f", berths[i].id, z);
-            check(!overlap(entrance_x, z, 0, 2.4f, 1.2f, berths[i].x, berths[i].z,
-                      berths[i].heading, specs[i].length * .5f + .9f,
-                      specs[i].beam * .5f + .45f, 0),
+            snprintf(
+                what, sizeof(what), "approach lane clears berth %s at z %.0f", berths[i].id, z);
+            check(
+                !overlap(entrance_x, z, 0, 2.4f, 1.2f, berths[i].x, berths[i].z, berths[i].heading,
+                    specs[i].length * .5f + .9f, specs[i].beam * .5f + .45f, 0),
                 what);
         }
     }
     check(water(map, bookmark_x, bookmark_z, 3), "the camera bookmark is open water");
+    check(sinf(bookmark_heading) > .9f, "the camera bookmark faces east across the marina");
+    for (unsigned i = 0; i < BERTH_COUNT; ++i) {
+        char what[96];
+        snprintf(what, sizeof(what), "the camera bookmark clears berth %s", berths[i].id);
+        check(
+            !overlap(bookmark_x, bookmark_z, bookmark_heading, 2.4f, 1.2f, berths[i].x, berths[i].z,
+                berths[i].heading, specs[i].length * .5f + .9f, specs[i].beam * .5f + .45f, .5f),
+            what);
+    }
     check(water(map, entrance_x, entrance_z, 4), "the declared entrance has 4 m clear water");
     boat_world_resources_destroy(&resources);
     printf("scene_site berths=%u pontoon=%.1fx%.1f gangway=%.1fm bookmark=%.0f,%.0f "
            "failures=%d\n",
         (unsigned)BERTH_COUNT, pontoon_length, pontoon_beam,
-        (double)hypotf(gangway_anchor_x - gangway_landing_x,
-            gangway_anchor_z - gangway_landing_z),
+        (double)hypotf(gangway_anchor_x - gangway_landing_x, gangway_anchor_z - gangway_landing_z),
         bookmark_x, bookmark_z, failures);
     return failures ? 1 : 0;
 }

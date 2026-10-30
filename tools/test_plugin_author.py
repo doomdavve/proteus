@@ -495,7 +495,7 @@ class Worker(unittest.TestCase):
         self.assertEqual(self.run_worker(payload)[1]["status"], "runtime")
 
     def test_examples_and_job(self):
-        for name in ("langedrag", "river-sprint", "shelter-tour"):
+        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour"):
             payload = author.snapshot(ROOT / "plugins" / name)
             code, result = self.run_worker(payload)
             self.assertEqual(code, 0, result)
@@ -511,25 +511,23 @@ class Worker(unittest.TestCase):
                 job.close()
 
     def test_scene_evidence(self):
-        manifest = (ROOT / "plugins/langedrag/plugin.json").read_bytes()
-        source = (ROOT / "plugins/langedrag/main.lua").read_bytes()
-        manifest = manifest.replace(b'["voyage.define"]', b'["voyage.define", "scene.define"]')
-        source = source.replace(b"return {", b"return { scene = { version = 1 },", 1)
-        payload = struct.pack(">II", len(manifest), len(source)) + manifest + source
+        payload = author.snapshot(ROOT / "plugins/harbor-life")
         code, result = self.run_worker(payload)
         self.assertEqual(code, 0, result)
         self.assertEqual(result["scene"], {"present": True, "version": 1,
-            "digest": result["scene"]["digest"], "content": False, "subsystems": []})
+            "digest": result["scene"]["digest"], "content": True,
+            "subsystems": ["marina.berths"], "berths": 2, "modules": 0})
         self.assertNotEqual(result["scene"]["digest"], "0000000000000000")
         job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=12)
         try:
             job.process.wait(timeout=10)
             self.assertEqual(job.poll(1)["status"], "ok", job.result)
-            self.assertEqual(job.result["evidence"]["scene"]["present"], True)
+            self.assertEqual(job.result["evidence"]["scene"]["berths"], 2)
         finally:
             job.close()
         default = self.run_worker(author.snapshot(ROOT / "plugins/langedrag"))[1]
         self.assertFalse(default["scene"]["present"])
+        self.assertEqual(default["scene"]["berths"], 0)
 
     def test_framing(self):
         for payload in (b"", struct.pack(">II", 4097, 0), struct.pack(">II", 0, 65537),
@@ -548,7 +546,7 @@ class Worker(unittest.TestCase):
     def test_schema(self):
         data = author.schema()
         self.assertEqual(data["api"], 1)
-        for name in ("langedrag", "river-sprint", "shelter-tour"):
+        for name in ("langedrag", "harbor-life", "river-sprint", "shelter-tour"):
             manifest = json.loads((ROOT / "plugins" / name / "plugin.json").read_text(encoding="utf-8"))
             self.assertEqual(set(manifest), set(data["schemas"]["manifest"]["required"]))
         self.assertEqual(data["schemas"]["race"]["properties"]["gates"]["maxItems"], 8)
@@ -580,7 +578,7 @@ class Worker(unittest.TestCase):
                     self.assertEqual(result["field"], path, (bound, result))
 
     def test_preview(self):
-        for name in ("langedrag", "shelter-tour", "river-sprint"):
+        for name in ("langedrag", "harbor-life", "shelter-tour", "river-sprint"):
             payload = author.snapshot(ROOT / "plugins" / name)
             evidence = []
             for _ in range(2):

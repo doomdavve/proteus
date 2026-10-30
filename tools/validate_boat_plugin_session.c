@@ -28,6 +28,9 @@
 
 #define REFERENCE "plugins/langedrag"
 
+static BoatWater calm(void);
+static const BoatWorldResources *outer(void);
+
 static BoatPluginFiles reference_files;
 static bool reference_read;
 static BoatWorldResources outer_world;
@@ -56,6 +59,79 @@ static const BoatWorldResources *outer(void)
         outer_ready = true;
     }
     return &outer_world;
+}
+
+// L2.2: the two-berth package installs its layout, holds a physical edit for an explicit session
+// restart, restores it through Undo, and rejects an unsafe berth without touching the active
+// scene. The berth list is the one the physics/renderers borrow.
+static BoatPluginFiles harbor_files;
+static bool harbor_read;
+static BoatPluginBundle harbor_edit(const char *from, const char *to)
+{
+    if (!harbor_read) {
+        BoatPluginDiagnostic d;
+        if (boat_plugin_read("plugins/harbor-life", NULL, &harbor_files, &d) != BOAT_PLUGIN_OK)
+            exit(1);
+        harbor_read = true;
+    }
+    static BoatPluginFiles edited;
+    edited = harbor_files;
+    char *at = strstr(edited.source, from);
+    if (!at) {
+        fprintf(stderr, "fragment not in harbor-life: %s\n", from);
+        exit(1);
+    }
+    size_t from_size = strlen(from), to_size = strlen(to);
+    memmove(at + to_size, at + from_size,
+        edited.source_size - (size_t)(at - edited.source) - from_size);
+    memcpy(at, to, to_size);
+    edited.source_size = edited.source_size - from_size + to_size;
+    return boat_plugin_bundle(&edited);
+}
+
+static int harbor_life_scene(void)
+{
+    static WakePlugin p;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    s.presentation_enabled = false;
+    CHECK(wake_plugin_open(&p, "plugins/harbor-life", &s, 0));
+    const BoatPluginRevision *r1 = boat_plugin_host_active(&p.host);
+    CHECK(r1->voyage.has_scene && r1->voyage.scene.berth_count == 2);
+    CHECK(s.world.scene == &r1->voyage.scene && boat_session_view(&s).scene == s.world.scene);
+    CHECK(s.world.scene->berths[1].z == 173);
+
+    // A berth edit is a physical scene change: held until F7, then the caller restarts.
+    BoatPluginBundle moved = harbor_edit("x = 13, z = 173", "x = 13, z = 179");
+    CHECK(boat_plugin_host_stage(&p.host, &moved));
+    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
+    CHECK(s.world.scene == &r1->voyage.scene && r1->voyage.scene.berths[1].z == 173);
+    CHECK(wake_plugin_frame(&p, &s, false, false, true, 1));
+    CHECK(boat_plugin_host_active(&p.host)->number == 2);
+    CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
+    CHECK(s.world.scene->berths[1].z == 179);
+    boat_session_restart(&s, calm());
+    CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
+    CHECK(s.world.scene->berths[1].z == 179);
+
+    // Undo restores the whole previous layout through the same restart policy.
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 2));
+    CHECK(strstr(p.detail, "F7 RESTART SESSION"));
+    CHECK(wake_plugin_frame(&p, &s, false, false, true, 3));
+    boat_session_restart(&s, calm());
+    CHECK(boat_plugin_host_active(&p.host)->number == 1);
+    CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
+    CHECK(s.world.scene->berths[1].z == 173);
+
+    // An unsafe berth (ashore) is rejected and leaves R1 and its scene intact.
+    BoatPluginBundle bad = harbor_edit("x = 13, z = 173", "x = 32, z = 173");
+    CHECK(!boat_plugin_host_stage(&p.host, &bad));
+    CHECK(p.host.diagnostic.status == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(p.host.diagnostic.field, "scene.marina.berths[2]"));
+    CHECK(boat_plugin_host_active(&p.host)->number == 1
+        && s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
+    boat_session_destroy(&s);
+    return 0;
 }
 
 // The reference package with FROM replaced by TO in its entry (or its manifest when MANIFEST).
@@ -1470,6 +1546,7 @@ static const TestCase cases[] = {
     TEST_CASE(repeated_reloads),
     TEST_CASE(game_controls),
     TEST_CASE(scene_binding),
+    TEST_CASE(harbor_life_scene),
     SLOW_CASE(compiled_parity),
 };
 

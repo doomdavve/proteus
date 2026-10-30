@@ -438,6 +438,113 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
 
 static bool same_point(Vector2 a, Vector2 b) { return a.x == b.x && a.y == b.y; }
 
+// Authored berth geometry is checked on the compiled map. The margins match the native contact
+// envelope (0.45 m lateral/0.9 m longitudinal) and add a small map-water margin.
+static void berth_box(const BoatSceneBerth *b, BoatModelSpec spec, Vector2 *length, Vector2 *beam,
+    Vector2 *centre, float *half_length, float *half_beam)
+{
+    *length = (Vector2) { sinf(b->heading), -cosf(b->heading) };
+    *beam = (Vector2) { cosf(b->heading), sinf(b->heading) };
+    *centre = (Vector2) { b->x, b->z };
+    *half_length = spec.length * .5f + .9f;
+    *half_beam = spec.beam * .5f + .45f;
+}
+
+static bool box_water(const BoatMap *map, Vector2 centre, Vector2 length, Vector2 beam,
+    float half_length, float half_beam, float clearance)
+{
+    for (int end = -1; end <= 1; ++end)
+        for (int side = -1; side <= 1; ++side) {
+            Vector2 p = { centre.x + length.x * end * half_length + beam.x * side * half_beam,
+                centre.y + length.y * end * half_length + beam.y * side * half_beam };
+            if (!boat_map_water(map, p, clearance))
+                return false;
+        }
+    return true;
+}
+
+static float box_extent(
+    Vector2 axis, Vector2 length, Vector2 beam, float half_length, float half_beam)
+{
+    return half_length * fabsf(axis.x * length.x + axis.y * length.y)
+        + half_beam * fabsf(axis.x * beam.x + axis.y * beam.y);
+}
+
+static bool box_overlap(Vector2 a, Vector2 al, Vector2 ab, float ahl, float ahb, Vector2 b,
+    Vector2 bl, Vector2 bb, float bhl, float bhb, float margin)
+{
+    const Vector2 axes[] = { al, ab, bl, bb };
+    Vector2 delta = { b.x - a.x, b.y - a.y };
+    for (int i = 0; i < 4; ++i) {
+        float reach = box_extent(axes[i], al, ab, ahl, ahb) + box_extent(axes[i], bl, bb, bhl, bhb)
+            + margin;
+        if (fabsf(delta.x * axes[i].x + delta.y * axes[i].y) > reach)
+            return false;
+    }
+    return true;
+}
+
+static bool box_contains(Vector2 centre, Vector2 length, Vector2 beam, float half_length,
+    float half_beam, Vector2 point, float margin)
+{
+    Vector2 delta = { point.x - centre.x, point.y - centre.y };
+    return fabsf(delta.x * length.x + delta.y * length.y) < half_length + margin
+        && fabsf(delta.x * beam.x + delta.y * beam.y) < half_beam + margin;
+}
+
+static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
+{
+    const BoatSceneDefinition *scene = &voyage->scene;
+    if (!voyage->has_scene || !scene->berths_present)
+        return BOAT_PLUGIN_OK;
+    if (!location->mapped)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "scene marina requires a mapped location");
+    if (scene->entrance_present
+        && !boat_map_water(
+            map, (Vector2) { scene->entrance_x, scene->entrance_z }, scene->entrance_width * .5f))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, "scene.marina.entrance",
+            "is not open water with half its declared width clear");
+    Vector2 centre[BOAT_SCENE_BERTHS], length[BOAT_SCENE_BERTHS], beam[BOAT_SCENE_BERTHS];
+    float half_length[BOAT_SCENE_BERTHS], half_beam[BOAT_SCENE_BERTHS];
+    for (unsigned i = 0; i < scene->berth_count; ++i) {
+        const BoatSceneBerth *b = &scene->berths[i];
+        BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+        berth_box(b, spec, &length[i], &beam[i], &centre[i], &half_length[i], &half_beam[i]);
+        char path[32];
+        snprintf(path, sizeof(path), "scene.marina.berths[%u]", i + 1);
+        if (!box_water(map, centre[i], length[i], beam[i], half_length[i], half_beam[i], .5f))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                "hull and mooring excursion are not open water of the %s map", location->name);
+        if (scene->entrance_present
+            && box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
+                (Vector2) { scene->entrance_x, scene->entrance_z }, .5f))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                "overlaps the declared marina entrance");
+        // The compiled spawn and every recovery shelter must offer a usable restart.
+        if (box_contains(
+                centre[i], length[i], beam[i], half_length[i], half_beam[i], location->spawn, 4))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                "blocks the location's spawn and restart");
+        for (unsigned s = 0; s < voyage->route.shelter_count; ++s)
+            if (box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
+                    voyage->route.shelters[s].position, 4))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "blocks voyage.shelters[%u] and its recovery", s + 1);
+    }
+    for (unsigned i = 0; i < scene->berth_count; ++i)
+        for (unsigned j = i + 1; j < scene->berth_count; ++j) {
+            char path[32];
+            snprintf(path, sizeof(path), "scene.marina.berths[%u]", j + 1);
+            if (box_overlap(centre[i], length[i], beam[i], half_length[i], half_beam[i], centre[j],
+                    length[j], beam[j], half_length[j], half_beam[j], .45f))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "overlaps scene.marina.berths[%u] with no hull clearance", i + 1);
+        }
+    return BOAT_PLUGIN_OK;
+}
+
 BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic)
 {
@@ -462,6 +569,8 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
     if (!boat_map_water(map, route->arrival_centre, 20))
         return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "voyage.arrival",
             "is not open water of the %s map with 20 m clear", location->name);
+    if (check_scene_location(voyage, location, map, d) != BOAT_PLUGIN_OK)
+        return d->status;
     BoatPluginCost cost = d->cost;
     *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
     return BOAT_PLUGIN_OK;

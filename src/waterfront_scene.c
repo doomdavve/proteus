@@ -279,18 +279,18 @@ static void evaluate_life(
     }
 }
 
-static void evaluate_actors(
-    double time, BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame)
+static void evaluate_actors(const BoatSceneDefinition *scene, double time, BoatWater water,
+    float (*ground)(float x, float z), WaterfrontSceneFrame *frame)
 {
     frame->time = time;
     evaluate_life(time, ground, frame);
-    waterfront_harbor_evaluate_ground(water, time, ground, &frame->harbor);
+    waterfront_harbor_evaluate_scene(scene, water, time, ground, &frame->harbor);
     waterfront_traffic_evaluate(water, time, &frame->traffic);
 }
 
 void waterfront_scene_evaluate_actors(double time, BoatWater water, WaterfrontSceneFrame *frame)
 {
-    evaluate_actors(time, water, NULL, frame);
+    evaluate_actors(NULL, time, water, NULL, frame);
 }
 
 void waterfront_scene_evaluate(double time, BoatWater water, WaterfrontSceneFrame *frame)
@@ -301,12 +301,24 @@ void waterfront_scene_evaluate(double time, BoatWater water, WaterfrontSceneFram
 void waterfront_scene_evaluate_ground(
     double time, BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame)
 {
+    waterfront_scene_evaluate_ground_scene(NULL, time, water, ground, frame);
+}
+
+void waterfront_scene_evaluate_scene(
+    const BoatSceneDefinition *scene, double time, BoatWater water, WaterfrontSceneFrame *frame)
+{
+    waterfront_scene_evaluate_ground_scene(scene, time, water, NULL, frame);
+}
+
+void waterfront_scene_evaluate_ground_scene(const BoatSceneDefinition *scene, double time,
+    BoatWater water, float (*ground)(float x, float z), WaterfrontSceneFrame *frame)
+{
     *frame = (WaterfrontSceneFrame) { 0 };
     frame->bridge = (Transform3D) {
         .position = { 11, 7, 126 }, .rotation = { 0, -.08f, 0 }, .scale = { 68, 1, 3 }
     };
     frame->bridge_color = (Color) { 119, 128, 145, 255 };
-    evaluate_actors(time, water, ground, frame);
+    evaluate_actors(scene, time, water, ground, frame);
 }
 
 WaterfrontStreet waterfront_scene_street(int index)
