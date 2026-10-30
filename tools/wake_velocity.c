@@ -91,7 +91,8 @@ static void usage(void)
          "Starts the title with no arguments. Explicit options start a session at once.");
 
     puts("\nMODES");
-    usage_line("(none), --title", "Title: multiplayer and settings");
+    usage_line("(no arguments)", "Open the title: multiplayer and settings");
+    usage_line("--title", "Open the title explicitly (same as no arguments)");
     usage_line("--course", "Timed S course in the basin");
     usage_line("--replay FILE", "Watch a saved course run");
     usage_line("--ghost FILE", "Race a compatible saved run");
