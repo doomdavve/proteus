@@ -124,7 +124,8 @@ class Workspace(unittest.TestCase):
             with self.assertRaises(ValueError):
                 author.workspace_write(self.directory, "main.lua", b"replacement",
                                        before["bundle_id"])
-        self.assertEqual((self.directory / "main.lua").read_text(), before["files"]["main.lua"])
+        self.assertEqual((self.directory / "main.lua").read_bytes(),
+                         before["files"]["main.lua"].encode("utf-8"))
         self.assertEqual((self.directory / "plugin.json").read_bytes(), b"external edit")
         self.assertEqual(list(self.directory.glob(".plugin-draft-*")), [])
 
@@ -216,7 +217,7 @@ class Worker(unittest.TestCase):
         data = author.schema()
         self.assertEqual(data["api"], 1)
         for name in ("langedrag", "river-sprint", "shelter-tour"):
-            manifest = json.loads((ROOT / "plugins" / name / "plugin.json").read_text())
+            manifest = json.loads((ROOT / "plugins" / name / "plugin.json").read_text(encoding="utf-8"))
             self.assertEqual(set(manifest), set(data["schemas"]["manifest"]["required"]))
         self.assertEqual(data["schemas"]["race"]["properties"]["gates"]["maxItems"], 8)
         self.assertIn("schema", author.capabilities()["operations"])
@@ -234,7 +235,7 @@ class Worker(unittest.TestCase):
 
         for kind, package in (("voyage", "langedrag"), ("race", "river-sprint")):
             manifest = (ROOT / "plugins" / package / "plugin.json").read_bytes()
-            original = (ROOT / "plugins" / package / "main.lua").read_text()
+            original = (ROOT / "plugins" / package / "main.lua").read_text(encoding="utf-8")
             for path, node in leaves(author.schema()["schemas"][kind], kind):
                 for bound, direction in (("minimum", -1), ("maximum", 1)):
                     value = node[bound] + direction * max(1, abs(node[bound]) * .1)

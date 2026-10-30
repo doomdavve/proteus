@@ -1362,7 +1362,11 @@ response-construction refinement, all **19 authoring checks** passed, including 
 checks for UTF-8 round trips, stale pins, edits during preparation, bounded input, path/link/FIFO
 rejection, failed-replace cleanup and actual CLI draft saves without Lua evaluation.
 All 266 local links/anchors in the three changed guides resolve; `git diff --check` passes.
-Windows/Linux execution awaits CI. No new target performance claim is made.
+After the Windows CI encoding failure, the preparation test compares preserved bytes and the
+other authoring fixture reads specify UTF-8. On 2026-10-30, macOS Debug configure/build and
+full CTest passed again (307 enabled; 13 disabled), and all 19 authoring checks passed with
+UTF-8 mode disabled and the C locale. Windows verification of the fix awaits CI.
+No new target performance claim is made.
 No gameplay, rendering, input, audio or runtime asset-loading changes are included; no new
 manual playback or human authoring acceptance is claimed.
 
