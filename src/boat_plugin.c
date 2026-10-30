@@ -628,7 +628,7 @@ static BoatPluginStatus check_scene_traffic(
                     (Vector2) { scene->entrance_x, scene->entrance_z }, .5f))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "crosses the declared marina entrance");
-            for (unsigned b = 0; !retained && b < scene->berth_count; ++b) {
+            for (unsigned b = 0; b < scene->berth_count; ++b) {
                 const BoatSceneBerth *berth = &scene->berths[b];
                 BoatModelSpec bs = boat_scene_berth_spec((BoatSceneBerthRecipe)berth->recipe);
                 Vector2 bc, bl, bb;
@@ -639,7 +639,7 @@ static BoatPluginStatus check_scene_traffic(
                     return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                         "crosses scene.marina.berths[%u]", b + 1);
             }
-            for (unsigned m = 0; !retained && m < scene->module_count; ++m) {
+            for (unsigned m = 0; m < scene->module_count; ++m) {
                 if (scene->modules[m].kind == BOAT_SCENE_MODULE_GANGWAY)
                     continue;
                 Vector2 mc, ml, mb;
