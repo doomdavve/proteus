@@ -2183,6 +2183,17 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
   a shore-side CPU view was inspected for the gangway/pontoon join. The default compiled CPU
   capture remains byte-identical (`ad4a277f…6cebb5`). Human motion/acceptance is not claimed.
 
+**PR stack (unmerged, review in order):**
+[#75 L1.1](https://github.com/doomdavve/proteus/pull/75) →
+[#76 L1.2](https://github.com/doomdavve/proteus/pull/76) →
+[#77 L1.3](https://github.com/doomdavve/proteus/pull/77) →
+[#78 L1.4](https://github.com/doomdavve/proteus/pull/78) →
+[#79 L2.1](https://github.com/doomdavve/proteus/pull/79) →
+[#80 L2.2](https://github.com/doomdavve/proteus/pull/80) →
+[#81 L2.3](https://github.com/doomdavve/proteus/pull/81). Each later PR targets its predecessor;
+they must land in order. Local verification above uses the complete stacked L2.3 worktree.
+No PR is merged and no release/deployment was performed.
+
 **Next in this track: L3.1.** Extract traffic/upstream route and timetable inputs into
 caller-owned native data with compiled parity. This completes the requested L1.1–L2.3 sequence;
 L3+ and the L4.3 playable gate are not started.
