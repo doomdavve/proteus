@@ -76,9 +76,9 @@ def capabilities():
             "capabilities": ["voyage.define", "scene.define", "race.define", "objective.hud",
                              "objective.timers"],
             "scene": {"grant": "scene.define", "envelope_version": 1,
-                      "supported_subsystems": [], "installed": False,
+                      "supported_subsystems": [], "installed": True,
                       "planned_subsystems": ["marina.berths", "marina.modules"],
-                      "depth": "unverified"},
+                      "limits": {"berths": 7, "modules": 4}, "depth": "unverified"},
             "limits": {"manifest_bytes": MANIFEST_MAX, "source_bytes": SOURCE_MAX,
                        "lua_bytes": 2097152, "entry_instructions": 1000000,
                        "callback_instructions": 100000, "migration_instructions": 500000},
@@ -97,7 +97,7 @@ def capabilities():
                          "apply": ["held_revision", "base_epoch"],
                          "undo": ["base_revision", "base_epoch"], "discard": ["base_epoch"]}},
             "unsupported": ["race_capture", "gpu_capture", "race_live", "browser_live",
-                            "network_bridge", "scene_installation", "browser_scene"]}
+                            "network_bridge", "scene_content", "browser_scene"]}
 
 
 def read_regular(path, limit):
@@ -335,7 +335,8 @@ class CaptureJob:
         self.frame = None
         self.scenario = {"location": manifest.get("location"), "seconds": seconds,
                          "ticks": round(seconds * 120), "renderer": "cpu",
-                         "anchor": anchor["id"] if anchor else None, "camera": camera}
+                         "anchor": anchor["id"] if anchor else None, "camera": camera,
+                         "scene_grant": "scene.define" in manifest.get("capabilities", [])}
         self.directory = tempfile.TemporaryDirectory(prefix="plugin-capture-")
         self.log = tempfile.TemporaryFile()
         try:

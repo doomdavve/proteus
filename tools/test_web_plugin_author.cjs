@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 'use strict';
 const assert = require('node:assert/strict');
-const {bundle, decode, encode, frame, Transport, message} = require('../web/plugin_author.js');
+const {bundle, decode, encode, frame, Transport, message, scenes} = require('../web/plugin_author.js');
 const {ObjectiveTransport} = require('../web/plugin_objective.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
 function response(status = 0) {
   const bytes = new Uint8Array(8), view = new DataView(bytes.buffer);
-  view.setUint32(0, 0x50535432); view.setUint32(4, status);
+  view.setUint32(0, 0x50535433); view.setUint32(4, status);
   return {exit: status ? 1 : 0, bytes};
 }
 function fixture() {
@@ -29,6 +29,12 @@ async function main() {
   const original = bundle(fs.readFileSync(path.join(root, 'plugins/langedrag/plugin.json'), 'utf8'),
     fs.readFileSync(path.join(root, 'plugins/langedrag/main.lua'), 'utf8'));
   assert.deepEqual(decode(encode(original)), original);
+  // Scene authoring is rejected before a browser worker starts.
+  const sceneManifest = original.manifest.replace('["voyage.define"]',
+    '["voyage.define", "scene.define"]');
+  assert.equal(scenes(sceneManifest), true);
+  assert.throws(() => bundle(sceneManifest, original.source));
+  assert.throws(() => decode(encode({...original, manifest: sceneManifest})));
   assert.throws(() => encode(bundle('', '\u0001'.repeat(65536))));
   const framed = frame(original), view = new DataView(framed.buffer);
   assert.equal(view.getUint32(0), Buffer.byteLength(original.manifest));

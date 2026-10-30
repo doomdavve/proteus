@@ -12,7 +12,7 @@ typedef struct {
 
 typedef struct {
     bool callbacks, migrates, has_scene;
-    double scene_version;
+    BoatSceneDefinition scene; // Copied native/worker data; no Lua pointers.
     unsigned shelter_count;
     BoatPluginShelterData shelters[BOAT_VOYAGE_SHELTERS];
     struct {

@@ -318,10 +318,12 @@ static int decode(lua_State *L)
     int scene_type = lua_rawget(L, 2);
     if (scene_type == LUA_TTABLE) {
         int scene = lua_absindex(L, -1);
+        double version;
         if (!only(L, vm, scene, "scene", SCENE)
-            || !number(L, vm, scene, "scene", "version", &d->scene_version))
+            || !number(L, vm, scene, "scene", "version", &version))
             return 0;
         d->has_scene = true;
+        d->scene.version = version == (double)BOAT_SCENE_VERSION ? BOAT_SCENE_VERSION : 0;
     } else if (scene_type != LUA_TNIL) {
         reject(vm, "scene", "must be a table, not a %s", lua_typename(L, scene_type));
         return 0;

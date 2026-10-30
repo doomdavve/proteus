@@ -389,7 +389,7 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     if (data->has_scene && !manifest->scene)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene",
             "requires the scene.define capability");
-    if (data->has_scene && data->scene_version != BOAT_SCENE_VERSION)
+    if (data->has_scene && data->scene.version != BOAT_SCENE_VERSION)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.version",
             "must be %d, the supported scene schema", BOAT_SCENE_VERSION);
     Check check = { d, manifest->entry };
@@ -399,7 +399,7 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     BoatPluginVoyage candidate = { .manifest = *manifest, .migrates = data->migrates };
     if (data->has_scene) {
         candidate.has_scene = true;
-        candidate.scene.version = BOAT_SCENE_VERSION;
+        candidate.scene = data->scene;
         BoatSceneDiagnostic scene;
         if (!boat_scene_validate(&candidate.scene, &scene))
             return diagnose(

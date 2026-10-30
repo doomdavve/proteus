@@ -38,8 +38,8 @@ Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
-scene contract/site fixture and L1.2/L1.3's decoded/bound scene envelope are complete, and none
-of those scene capabilities yet supplies authored marina content. The milestones below are this plan's
+scene contract/site fixture and L1.1–L1.4's decoded/bound/staged scene envelope are complete, and
+none of those scene capabilities yet supplies authored marina content. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1779,8 +1779,8 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L1.3 are complete; next in this track: L1.4
-tooling and unsupported-path closure**; the first playable gate is L4.3. `scene.define` installs
+failure cases and acceptance evidence. **L1.1–L1.4 are complete; next in this track: L2.1
+parameterized moored hulls**; the first playable gate is L4.3. `scene.define` installs and stages
 an empty envelope, but no marina subsystem is authorable.
 
 ### Coverage and delivery slices
@@ -2017,6 +2017,47 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 worker/stage wire, preview, inspection and capture; reject scene grants in browser imports,
 rooms and unsupported replay paths. Do this before L2.2 exposes berths.
 
+#### L1.4 result, 2026-10-30
+
+**Implemented:** the scene envelope is carried by every native authoring path, and browsers,
+rooms and incompatible modes reject it explicitly.
+
+- **Worker wire:** `PST3` extends `PST2` with the complete pointer-free scene definition. The
+  worker writes and the parent reads version, presence flags, counted berth/module records,
+  recipes, positions, headings and gangway attachments. Readers refuse another wire version,
+  out-of-range counts, unknown enums and non-finite numbers before decoding. `web/plugin_author.js`
+  uses the same magic and refuses older replies.
+- **Evidence:** `plugin_author.py validate/preview` output gains a top-level `scene` object
+  (`present`, `version`, `digest`, `content`, `subsystems: []`). Preview binds an accepted scene
+  to its fixture session. Capture scenarios record `scene_grant` and accept a scene package. The
+  native inspection line from L1.3 remains the live-session view.
+- **Discovery:** `capabilities` now reports `scene.installed: true`, no supported subsystem,
+  planned `marina.berths/modules`, 7/4 capacities and depth unverified. `scene_content` and
+  `browser_scene` are listed as unsupported; no scene install is claimed in the browser.
+- **Unsupported targets:** the browser bundle constructor rejects `scene.define` before a worker
+  starts, and the Emscripten stage worker repeats the rejection authoritatively. `--plugin` is
+  already refused with rooms, `--course`, `--replay` and `--ghost`, so those paths cannot load a
+  scene package. Objective-bearing scene packages follow the same rejection.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build and full `ctest --preset full`: **313/313 enabled tests** (20.67 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_boat_plugin_stage` round-trips a scene package through the real child worker and
+  checks the digest/version, alongside its existing malformed, oversized, stale, deadline and
+  cancellation cases. `test_plugin_author.py` checks worker/preview scene evidence and the
+  default absent envelope; the Node contract test rejects a scene bundle and uses `PST3`.
+- `plugin_author.py capture build/l14-scene --anchor outer.marina --time 1` returned
+  `scene_grant: true`, gameplay digest `e8509272172cb7c4`, a 320×200 PNG and no worker error.
+  The inspected frame shows the compiled marina from the pinned approach; no authored berth is
+  visible because L2.2 has not exposed one.
+- `wake_velocity --plugin build/l14-scene --replay missing.run` exits 1 with the existing
+  solo-only refusal before loading a replay. No human acceptance is claimed.
+
+**Next in this track: L2.1.** Parameterize the existing moored hulls so meshes, ropes, bobbing
+poses, contacts and camera queries share one caller-owned berth list, preserving compiled
+parity. L2.2 then exposes the first two-berth package.
+
 #### L2 — a small marina before a marina editor
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
@@ -2130,9 +2171,11 @@ Completed L1.2, 2026-10-30: added pointer-free scene storage, the canonical `sce
 envelope decoding and planned-field validation without a live install.
 Completed L1.3, 2026-10-30: bound the accepted envelope through the host, session, world and view,
 with preview rebinding and compiled restoration on close.
-Next task for this track: **L1.4**, close the tooling/unsupported-target paths before L2.2. Known
-limits: the isolated stage-worker wire does not carry the envelope yet; no marina fields,
-tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
+Completed L1.4, 2026-10-30: added the PST3 scene staging wire, worker/preview/capture evidence,
+truthful discovery, and browser/room/replay rejection.
+Next task for this track: **L2.1**, parameterize existing moored hulls before exposing package
+berths. Known limits: no marina fields, tram/seal recipes, gameplay dusk, building activity or
+human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

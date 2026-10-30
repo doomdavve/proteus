@@ -3,6 +3,7 @@
 #endif
 #include "boat_plugin_stage.h"
 #include "boat_plugin_lua.h"
+#include "boat_scene_definition.h"
 #include "boat_world.h"
 
 #include <errno.h>
@@ -94,6 +95,59 @@ static void diagnostic(Wire *w, BoatPluginDiagnostic *d)
     d->cost.leaked_bytes = (size_t)integer(w, d->cost.leaked_bytes, 8);
     d->cost.fields = (unsigned)integer(w, d->cost.fields, 4);
 }
+// The full pointer-free scene definition, so an isolated worker can return the same identity
+// the in-process decoder produces. Counts are checked before any array access.
+static void scene_wire(Wire *w, BoatSceneDefinition *s)
+{
+    s->version = (unsigned)integer(w, s->version, 4);
+    unsigned flags = (unsigned)integer(w,
+        (s->entrance_present ? 1u : 0u) | (s->berths_present ? 2u : 0u)
+            | (s->modules_present ? 4u : 0u),
+        1);
+    if (flags > 7 || s->version > BOAT_SCENE_VERSION) {
+        w->ok = false;
+        return;
+    }
+    s->entrance_present = flags & 1u;
+    s->berths_present = flags & 2u;
+    s->modules_present = flags & 4u;
+    if (s->entrance_present) {
+        s->entrance_x = (float)number(w, s->entrance_x);
+        s->entrance_z = (float)number(w, s->entrance_z);
+        s->entrance_width = (float)number(w, s->entrance_width);
+    }
+    s->berth_count = (unsigned)integer(w, s->berth_count, 4);
+    s->module_count = (unsigned)integer(w, s->module_count, 4);
+    if (s->berth_count > BOAT_SCENE_BERTHS || s->module_count > BOAT_SCENE_MODULES) {
+        w->ok = false;
+        return;
+    }
+    for (unsigned i = 0; i < s->berth_count; ++i) {
+        BoatSceneBerth *b = &s->berths[i];
+        string(w, b->id, sizeof(b->id));
+        b->recipe = (unsigned char)integer(w, b->recipe, 1);
+        b->mooring = (unsigned char)integer(w, b->mooring, 1);
+        if (b->recipe >= BOAT_SCENE_BERTH_RECIPES || b->mooring > BOAT_SCENE_MOORING_PONTOON)
+            w->ok = false;
+        b->x = (float)number(w, b->x);
+        b->z = (float)number(w, b->z);
+        b->heading = (float)number(w, b->heading);
+    }
+    for (unsigned i = 0; i < s->module_count; ++i) {
+        BoatSceneModule *m = &s->modules[i];
+        string(w, m->id, sizeof(m->id));
+        m->kind = (unsigned char)integer(w, m->kind, 1);
+        if (m->kind >= BOAT_SCENE_MODULE_KINDS)
+            w->ok = false;
+        m->x = (float)number(w, m->x);
+        m->z = (float)number(w, m->z);
+        m->heading = (float)number(w, m->heading);
+        m->anchor_x = (float)number(w, m->anchor_x);
+        m->anchor_z = (float)number(w, m->anchor_z);
+        string(w, m->attaches, sizeof(m->attaches));
+    }
+}
+
 static void data_wire(Wire *w, BoatPluginVoyageData *v)
 {
     unsigned callbacks = (unsigned)integer(w, v->callbacks, 1);
@@ -102,6 +156,12 @@ static void data_wire(Wire *w, BoatPluginVoyageData *v)
         w->ok = false;
     v->callbacks = callbacks != 0;
     v->migrates = migrates != 0;
+    unsigned has_scene = (unsigned)integer(w, v->has_scene, 1);
+    if (has_scene > 1)
+        w->ok = false;
+    v->has_scene = has_scene != 0;
+    if (v->has_scene)
+        scene_wire(w, &v->scene);
     v->shelter_count = (unsigned)integer(w, v->shelter_count, 4);
     if (v->shelter_count < 2 || v->shelter_count > BOAT_VOYAGE_SHELTERS) {
         w->ok = false;
@@ -170,6 +230,16 @@ int boat_plugin_stage_worker(void)
         snprintf(d.message, sizeof(d.message), "this host supports voyage descriptors only");
         goto done;
     }
+#ifdef __EMSCRIPTEN__
+    if (m.scene) {
+        d.status = BOAT_PLUGIN_MANIFEST;
+        snprintf(d.file, sizeof(d.file), "plugin.json");
+        snprintf(d.field, sizeof(d.field), "capabilities[2]");
+        snprintf(d.message, sizeof(d.message),
+            "scene.define is native-only; browser scene imports are unsupported");
+        goto done;
+    }
+#endif
     if (boat_plugin_lua_voyage(
             bundle.source, bundle.source_size, m.entry, &boat_plugin_default_limits, &data, &d)
             != BOAT_PLUGIN_OK
@@ -197,7 +267,7 @@ int boat_plugin_stage_worker(void)
             d.cost.peak_bytes = cost.peak_bytes;
     }
 done:
-    integer(&out, 0x50535432, 4); // PST2: never accept another private wire version.
+    integer(&out, 0x50535433, 4); // PST3: scenes extend PST2; other versions are refused.
     diagnostic(&out, &d);
     if (d.status == BOAT_PLUGIN_OK)
         data_wire(&out, &data);
@@ -398,7 +468,7 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
         return failure(j, host, "worker output exceeds limit");
     rewind(j->output);
     Wire out = { j->output, true, true };
-    if (integer(&out, 0, 4) != 0x50535432)
+    if (integer(&out, 0, 4) != 0x50535433)
         out.ok = false;
     BoatPluginDiagnostic d = { 0 };
     diagnostic(&out, &d);

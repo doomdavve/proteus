@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and L1.2/L1.3 scene envelope decoding/binding implemented**.
+Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and the L1.1–L1.4 scene envelope path implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages with optional objectives/timers.
@@ -126,8 +126,8 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **L1.1 contract/site complete; L1.2 envelope decoding and L1.3 application
-binding implemented, with no authorable subsystem yet.** The
+Status, 2026-10-30: **L1.1–L1.4 complete; scene envelope decoding, binding, staging wire and
+unsupported-target rejection implemented, with no authorable subsystem yet.** The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and `scene = { version = 1 }` only. L1.3 installs that accepted
@@ -156,6 +156,12 @@ the ordinary `voyage` descriptor: the scene does not replace the destination or 
 package owns the scene override. There is no composition of two packages, no dependencies and no
 scene callback API. Rooms, browser imports, race trials, replays and recordings reject
 `scene.define` until their own compatibility work (P5 and a browser scene evaluator) exists.
+The browser bundle constructor rejects a scene manifest before a worker starts, and the
+Emscripten stage worker repeats the rejection authoritatively. `--plugin` is already refused
+with rooms, `--course`, `--replay` and `--ghost`, so no scene package can enter those paths.
+The browser bundle constructor rejects a scene manifest before a worker starts, and the
+Emscripten stage worker repeats the rejection authoritatively. `--plugin` is already refused
+with rooms, `--course`, `--replay` and `--ghost`, so no scene package can enter those paths.
 
 ### Proposed schema
 
@@ -1094,10 +1100,13 @@ request drops held output and preserves active source/state/world; stale respons
 newer active/held revisions and report the stale-base diagnostic. Shutdown cancels/reaps. Preview checkpoint save/restore refuses an owner with
 an in-flight process.
 
-The private response is `PST2`, fieldwise network-order unsigned integers, IEEE binary64 data
-and bounded length-prefixed strings, at most 4096 bytes. Completion checks the version, exact
-framing, exit/status agreement and native schema/map constraints, then installs checked data
-without running the candidate Lua again **during staging**. The immutable request retains any
+The private response is `PST3`, fieldwise network-order unsigned integers, IEEE binary64 data
+and bounded length-prefixed strings, at most 4096 bytes. It extends `PST2` with the optional
+scene envelope (version, presence, entrance, counted berth/module records and attachments).
+Completion checks the version, exact framing, array bounds, enum values, finite numbers,
+exit/status agreement and native schema/map constraints, then installs checked data without
+running the candidate Lua again **during staging**. A reader rejects any other wire version
+before using a payload. The immutable request retains any
 objective source for the existing trusted callbacks. This channel is local to a matching worker
 and live host; a CLI artifact/digest is not an installation receipt. The standalone race trial
 keeps its synchronous staging path.
@@ -1120,7 +1129,9 @@ recovery acceptance remains open.
 
 In a built/served browser client, expand **PLUGIN VOYAGE** below the launcher. Load the example
 or import a `*.wake-plugin.json` source bundle, edit `plugin.json`/`main.lua`, then select
-**Stage / reload**. **Play staged voyage** enters solo `outer` directly. Normal PLAY still
+**Stage / reload**. **Play staged voyage** enters solo `outer` directly. Scene authoring is
+native-only in this build: a manifest with `scene.define` is rejected during bundle creation and
+again by the Emscripten stage worker; no browser scene evaluator is linked. Normal PLAY still
 opens the shared title. During a plugin session the same panel appears above the canvas;
 opening it pauses solo input. Stage source edits, use **Apply held revision** for route/water
 restarts, and **Undo / discard** for the existing native revision policy. Undo while UI staging
