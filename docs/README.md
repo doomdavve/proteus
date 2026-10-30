@@ -32,15 +32,13 @@ PR; the native CI workflows skip Markdown-only changes.
 
 ## Current work
 
-Released internet hosting: [v0.0.21](RELEASES.md#status-and-verification) is published and
-Winterfell's matching native/browser room is deployed (2026-10-28), with protocol 7 / physics 9.
-The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) owns deployment,
+Released internet hosting: [v0.0.23](RELEASES.md#status-and-verification) is published and
+Winterfell's matching native/browser room is deployed (2026-10-30), with protocol 8 / physics 9.
+The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-30) owns deployment,
 client-check evidence and limits. Every release includes this hosted cutover through
 `../davve-srv/ansible`; package publication and Pages alone do not complete it. The public
-`wake.davve.net` endpoint and shared known-server directory remain in use. The source tree is
-protocol v8 with compact combat pages; the hosted v0.0.22 room remains protocol v7 until the
-next matching native/browser deployment. Human gameplay/audio and broader network/platform
-qualification remain open.
+`wake.davve.net` endpoint and shared known-server directory remain in use. Human gameplay/audio
+and broader network/platform qualification remain open.
 
 | Area and owning document | Implemented | Remaining / next task |
 | --- | --- | --- |
@@ -62,7 +60,7 @@ qualification remain open.
 | [macOS app builds](MACOS_BUILD.md) | Apple Silicon action, relocatable app bundle, preferred river launch, ad-hoc signing, ZIP/checksum; title backdrop packaging fix added | Verify macOS packaging CI and launch the downloaded app from Finder; macOS 13 execution pending |
 | [Windows builds](WINDOWS_BUILD.md) | Portable x64 action; reversal and basin impact-bound corrections, bundled music, relocated CPU check; ENet/`boat_server` MSVC build and packaged server passed CI (run 40083439355, 2026-10-24); title backdrop packaging fix added, pending CI | Verify the current Windows workflow and launch the downloaded app; then physical mouse/scroll, GPU/audio and connected controls |
 | [Linux builds](LINUX_BUILD.md) | Native Wayland enabled with X11 compatibility; Weston/Xvfb CI checks configured; bundled GLFW no-seat startup crash backport implemented | Rerun Linux CI to verify the Weston crash fix and X11 startup, review CPU screenshots; GNOME/KDE physical input, display scaling, audio and connected play pending |
-| [Automated releases](RELEASES.md) | Release command builds/tests, publishes, verifies downloads and updates/deploys the hosting baseline; preflight and verification-only modes, retry evidence and offline failure guards | v0.0.21 remains deployed; reusable-command hardening passed local full suite and offline guards (2026-10-28); next release qualifies the revised [operator command](RELEASES.md#release-command) end to end; physical phone/package/audio review open ([status](RELEASES.md#status-and-verification)) |
+| [Automated releases](RELEASES.md) | Release command builds/tests, publishes, verifies downloads and updates/deploys the hosting baseline; preflight and verification-only modes, retry evidence and offline failure guards | v0.0.23 published and deployed through the [operator command](RELEASES.md#release-command) end to end (2026-10-30); 321 CPU tests, download checks, Mac package demo, native/browser joins and three-engine plugin qualification (retry) passed; next: human input/audio and wider network review ([status](RELEASES.md#status-and-verification)) |
 | [Browser boating](WEB_BUILD.md) | Shared title, saved setup/settings (including multiplayer smoothing), P/Escape menu and return-to-title; optional WebRTC client and native endpoint alongside ENet; [mobile overlay touch/tilt controls, adaptive portrait viewport and Home Screen presentation](WEB_BUILD.md#mobile-controls-and-iphone-presentation-2026-10-28) | Chrome/SwiftShader fullscreen P-menu/capture check passes (2026-10-28; [evidence](TITLE_SCREEN_PLAN.md#fullscreen-menu-shortcut-2026-10-28)); title/persistence/repeated-session and mixed native/browser free/deathmatch/race automation pass (2026-10-25); iPhone landscape overlay accepted; Android-emulated controls/fullscreen checked; next: physical portrait/tilt/Android/Home Screen review, real impairment, other physical devices, Firefox/Safari, tab suspension and public WSS/ICE/TURN qualification; [status and limits](WEB_BUILD.md#webrtc-rooms) |
 
 These are separate work tracks, not a single execution queue. A next task in one plan
