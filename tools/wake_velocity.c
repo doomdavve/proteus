@@ -349,6 +349,17 @@ static bool study_mouse_steering;
 
 // One session with explicit options. Uses the title's window when one is open and then leaves it
 // open; the Escape menu's last row ends the session.
+// Browser initialization begins before InitWindow resets GLFW's clock. Keep all plugin
+// request/acceptance timestamps on the same monotonic origin throughout that startup.
+static double plugin_time(void)
+{
+#ifdef __EMSCRIPTEN__
+    return emscripten_get_now() / 1000.0;
+#else
+    return GetTime();
+#endif
+}
+
 static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
@@ -778,7 +789,7 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_PLUGINS
     // Owns the revisions the session borrows, so it outlives the session (static, like WORLDS).
     static WakePlugin plugin;
-    if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, GetTime()))
+    if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, plugin_time()))
         goto cleanup;
 #if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
@@ -1312,7 +1323,7 @@ static int study(int argc, char **argv)
 #endif
         if (plugin_path)
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
-                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), GetTime());
+                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), plugin_time());
 #endif
         if (plugin_path && wake_plugin_waiting(&plugin))
             plugin_reset_pending |= reset_requested;

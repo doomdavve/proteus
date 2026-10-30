@@ -1009,7 +1009,9 @@ Integers travel as bytes without JavaScript numeric conversion. Each request has
 identity and pins revision/commit epoch, candidate, generation, dispatch tick and its complete
 source/checkpoint/event input. Replies are accepted once only, checked without Lua, and cannot
 survive session shutdown/reset or a changed base. There is one outstanding objective request;
-it has a five-second acceptance deadline in both transport and host. Delayed tab scheduling
+it has a five-second acceptance deadline in both transport and host. Browser host timestamps
+use a monotonic origin that survives window initialization; a cached worker success still
+expires if host acceptance is delayed. Delayed tab scheduling
 can defer watchdog delivery; it cannot make an expired result valid. Worker Wasm memory is
 capped at 64 MiB, its stack at 1 MiB and each Lua VM at the existing 2 MiB limit. Browser/process
 overhead is additional. Page hide terminates the warm worker; callback errors preserve state

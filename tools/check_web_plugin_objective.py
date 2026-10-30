@@ -258,6 +258,34 @@ def check_objectives(browser, args, root, errors, logs):
             page.reload(); ready()
             assert not workers
         evidence['sessions_cleaned'] = args.sessions + 1
+
+        # GLFW rebases its clock during InitWindow, after INIT has been dispatched. Give
+        # the page clock a constant offset to expose any mixing of those two origins without
+        # waiting for wall time before launch. Durations and native simulation remain unchanged.
+        page.add_init_script('''(() => {
+          const now=performance.now.bind(performance);
+          Object.defineProperty(performance, 'now', {value:()=>now()+60000});
+        })()''')
+        page.reload(); ready(); stage(manifest, source)
+        page.evaluate('''() => {
+          const t=Module.boatPluginObjective, status=t.status.bind(t);
+          window.cachedObjectiveResult=false;
+          t.status=id => {
+            const s=status(id);
+            if (s===1) {
+              window.cachedObjectiveResult=true;
+              if (t.now()-t.job.started < 6000) return 0;
+            }
+            return s;
+          };
+        }''')
+        page.click('#plugin-play')
+        page.wait_for_function('Module.boatPluginCheckpoint?.initialized || Module.boatPluginCheckpoint?.quarantined', timeout=10000)
+        assert page.evaluate('window.cachedObjectiveResult')
+        assert snapshot()['quarantined'] and not snapshot()['initialized'], snapshot()
+        assert not snapshot()['state']
+        assert page.evaluate('Module.boatPluginObjective.completed') == 1
+        evidence['cached_init_deadline'] = True
     except BaseException:
         logs.append('Objective transport: ' + str(page.evaluate('Module.boatPluginObjective?.lastError')))
         logs.append('Objective checkpoint: ' + str(snapshot()))

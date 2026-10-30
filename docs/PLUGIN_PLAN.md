@@ -1679,7 +1679,13 @@ WebKit exposed a separate restored-session readiness assumption: revision 1 was 
 before lazy scenery loading finished, so the next reload interrupted startup with zero native
 ticks. The repeated-session check now waits for an observed native tick before reloading,
 proving each restored session actually played; production navigation behavior is unchanged.
-Browser CI is being rerun; prior P4.8 results remain historical evidence. GCC still reports pre-existing warnings outside the new
+Startup deadline review also found a real clock-origin mismatch: INIT dispatch precedes
+`InitWindow`, which resets GLFW time. Browser plugin open/frame calls now use the stable
+`emscripten_get_now` clock instead. A regression offsets the page clock and delays host
+consumption of an already cached successful INIT reply: the host must expire it without
+publishing state, even though the JS completion watchdog has already retired. Native callers
+retain their existing clock. Browser CI is being rerun; prior P4.8 results remain historical
+evidence. GCC still reports pre-existing warnings outside the new
 plugin sources.
 
 **Next:** P5's authority/prediction/recording contract review as described in the current status.
