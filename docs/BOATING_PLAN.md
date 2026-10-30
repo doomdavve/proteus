@@ -242,7 +242,9 @@ are under `build/skin-*`; full test output is `/private/tmp/proteus-skins-ctest-
 
 The user approved the white cabin boat after reviewing its rounded bow, softened roof,
 Swedish flag, lowered timber stern platform and hull-mounted inboard-drive detail. Select
-`cabin` in solo settings or with `--skin cabin`. It uses standard handling; the drive is a
+`cabin` in solo settings or with `--skin cabin`. In solo free boating its engine is tuned to
+about 25 knots on calm water (12.86 m/s measured after 60 simulated seconds); timed courses
+use standard handling. Waves and currents can change actual speed; this is not a hard cap. The drive is a
 visual detail and room slots remain the four Nordic speedboats. The cabin hull, cabin and flag
 are drawn 0.40 m lower along the boat’s vertical axis to improve the apparent waterline;
 physics and wake placement are unchanged. The explorer remains available

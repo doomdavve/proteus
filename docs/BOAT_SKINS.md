@@ -27,7 +27,7 @@ The original cabin craft has returned as a separate solo option, following the 2
 | — / 5 | `cabin` | White cabin and hull, dark stripe, timber stern platform | Yellow cross on blue |
 
 The explorer (2026-10-26, from the [adventure playtest](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#explorer-boat-2026-10-26))
-is the one livery that is not only cosmetic: `wake_velocity` pairs it with
+uses a stronger engine: `wake_velocity` pairs it with
 `boat_handling_explorer` (`src/boat.h`) in solo free boating, an engine of 18 instead of 11
 thrust units, about 30 m/s flat out. Courses use the standard engine, and room slots use only
 the four countries.
@@ -71,7 +71,7 @@ without changing the 54 simulation particles, forces or staff attachment.
 
 The four Nordic speedboats and explorer share vertices and topology; the cabin boat has its own geometry, with a fixed inboard-drive detail and no outboard. No skin enters `Boat`, physics,
 contacts, thrust, wake generation, audio tuning, course rules or network serialization.
-The cabin is drawn 0.40 m lower, including its flag, and uses standard handling; its inboard drive is visual and does not change propulsion physics. The two outboards share the original steering rotation at separate hull-relative mounts;
+The cabin is drawn 0.40 m lower, including its flag. In solo free boating it uses a lower-thrust engine tuned to about 25 knots on calm water; courses retain the standard engine. Its inboard drive is a visual detail. The two outboards share the original steering rotation at separate hull-relative mounts;
 they do not add simulated thrust or mass. The flag keeps its world-space
 attachment and simulation. Harbor/traffic boat recipes are unchanged.
 

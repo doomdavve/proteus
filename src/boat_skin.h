@@ -4,8 +4,8 @@
 #include "boat_model.h"
 
 // Appearance IDs are local presentation choices,
-// not protocol values. The four countries colour room slots. The explorer livery marks the
-// explorer engine, which the game pairs with it in solo free boating (boat_handling_explorer).
+// not protocol values. The four countries colour room slots. The explorer and cabin choices
+// select their own handling profiles in solo free boating.
 typedef enum {
     BOAT_SKIN_SWEDEN,
     BOAT_SKIN_FINLAND,

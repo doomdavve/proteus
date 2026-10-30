@@ -486,6 +486,7 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
 
 const BoatHandling boat_handling_speedboat = { .thrust = 11.0f };
 const BoatHandling boat_handling_explorer = { .thrust = 18.0f };
+const BoatHandling boat_handling_cabin = { .thrust = 4.45f };
 
 void boat_step(Boat *boat, BoatWorld *world, double now, BoatInput input)
 {

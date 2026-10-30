@@ -52,6 +52,7 @@ typedef struct {
 } BoatHandling;
 extern const BoatHandling boat_handling_speedboat;
 extern const BoatHandling boat_handling_explorer;
+extern const BoatHandling boat_handling_cabin;
 
 // Basin spawn at time zero; boat_reset_location() uses a definition's spawn instead.
 void boat_reset(Boat *boat);
