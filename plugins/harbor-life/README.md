@@ -1,8 +1,9 @@
 # Harbor life
 
 A native solo `outer` package that keeps the Långedrag voyage and replaces the compiled moored fleet and
-dock furniture with two editable berths, a small pontoon and a gangway. The docked ferry and
-bridge remain independent compiled actors.
+dock furniture with two editable berths, a small pontoon and a gangway. It also adds a small
+passing craft on a ~25 s loop just north of the marina, and retains the compiled river runabout.
+The docked ferry and bridge remain independent compiled actors.
 
 The berths sit at simulation `(13, 167)` and `(13, 173)` facing east toward the small authored
 pontoon at `(20, 170)`. A gangway runs from land at `(34.1, 170)` to that pontoon.
@@ -19,9 +20,10 @@ From the repository root:
 ```
 
 F5 reloads, F6 undoes, and F7 applies a held layout change with a session restart at the
-compiled outer start dock. A layout edit therefore returns the boat to the start of the voyage;
-travel back to the marina to inspect it. A saved edit stages once it has settled; an invalid edit
-keeps the running revision.
+compiled outer start dock. A layout or traffic edit therefore returns the boat to the start of
+the voyage; travel back to the marina to inspect it. A saved edit stages once it has settled; an
+invalid edit keeps the running revision. To watch the passing craft without moving the marina
+camera, use the `outer.marina-pass` anchor at `(0, 205)` facing the loop.
 
 ## Edit
 
@@ -30,6 +32,13 @@ game checks the hull and wave/mooring envelope against the compiled water, other
 entrance and the spawn/recovery shelters. Depth is not available in the compiled map, so no
 depth claim is made. A layout change restarts the session rather than moving a hull under the
 boat.
+
+`scene.traffic.vessels` is a 0–8 entry replacement for all travelling craft. An entry either
+retains a compiled actor (`{ id = "river_runabout", retain = "river_runabout" }`) or selects a
+registered route and craft recipe with `speed`, `phase` and `period`. Authored hulls are sampled
+over the combined river timetable and must clear the compiled water, the marina entrance, berths,
+dock modules and compiled/retained traffic. Their wakes stay visual; no physical traffic wake
+recipe is exposed.
 
 ## Verify
 

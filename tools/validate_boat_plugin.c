@@ -11,6 +11,7 @@
 #include "boat_plugin_io.h"
 #include "boat_test_cases.h"
 #include "boat_world.h"
+#include "raymath.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -278,6 +279,105 @@ static int scene_contract(void)
 
 // L2.2: the first two-berth package decodes, validates and carries stable IDs. Invalid geometry
 // is rejected with a field path; an invalid candidate never writes the caller's definition.
+// L3.2: the harbor-life package's authored passing craft and retained default, with semantic
+// failures for route selection, craft recipe, speed/period, capacity and conflicts.
+static const char *harbor_variant(const char *from, const char *to)
+{
+    static char text[BOAT_PLUGIN_SOURCE_MAX + 1];
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    if (boat_plugin_read("plugins/harbor-life", NULL, &files, &d) != BOAT_PLUGIN_OK)
+        return NULL;
+    memcpy(text, files.source, files.source_size);
+    text[files.source_size] = 0;
+    char *at = strstr(text, from);
+    if (!at)
+        return NULL;
+    size_t old = strlen(from), replacement = strlen(to);
+    if (strlen(text) - old + replacement >= sizeof(text))
+        return NULL;
+    memmove(at + replacement, at + old, strlen(at + old) + 1);
+    memcpy(at, to, replacement);
+    return text;
+}
+
+static int scene_traffic(void)
+{
+    static BoatPluginFiles files;
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    BoatPluginVoyage voyage;
+    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    CHECK(voyage.scene.traffic_present && voyage.scene.traffic.actor_count == 2);
+    const WaterfrontRouteActor *passing = &voyage.scene.traffic.actors[0];
+    CHECK(!strcmp(passing->id, "passing") && passing->recipe == WATERFRONT_CRAFT_RUNABOUT);
+    CHECK(passing->shape == WATERFRONT_ROUTE_POINTS && passing->point_count == 4);
+    CHECK(passing->speed == 4 && passing->period > 24 && passing->period < 26);
+    CHECK(passing->retain == 0xff);
+    CHECK(!strcmp(voyage.scene.traffic.actors[1].id, "river_runabout")
+        && voyage.scene.traffic.actors[1].retain == 0);
+    CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
+    WaterfrontVesselMotion start = waterfront_traffic_motion_routes(
+        &voyage.scene.traffic, 0, passing->phase);
+    WaterfrontVesselMotion lap = waterfront_traffic_motion_routes(
+        &voyage.scene.traffic, 0, passing->phase + passing->period);
+    CHECK(Vector3Distance(start.position, lap.position) < .01f);
+    BoatWorldResources resources;
+    CHECK(boat_world_resources_init(&resources, boat_location_find("outer")));
+    CHECK(boat_plugin_check_location(&voyage, resources.definition, &resources.map, &d)
+        == BOAT_PLUGIN_OK);
+
+    struct {
+        const char *from, *to, *field;
+    } cases[] = {
+        { "id = \"passing\", recipe = \"runabout\"", "id = \"passing\", recipe = \"yacht\"",
+            "scene.traffic.vessels[1].recipe" },
+        { "route = \"marina_pass\"", "route = \"missing_route\"",
+            "scene.traffic.vessels[1].route" },
+        { "speed = 4, phase = 0", "speed = 0, phase = 0", "scene.traffic.vessels[1].speed" },
+        { "period = 24.8540", "period = 1", "scene.traffic.vessels[1].period" },
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        const char *source = harbor_variant(cases[i].from, cases[i].to);
+        CHECK(source);
+        BoatPluginStatus status = load(files.manifest, source, strlen(source), NULL, &voyage, &d);
+        CHECK(status == BOAT_PLUGIN_SCHEMA);
+        CHECK(!strcmp(d.field, cases[i].field));
+    }
+    // A non-retained authored copy of the compiled river actor is a real schedule conflict.
+    const char *conflict = harbor_variant(
+        "route = \"marina_pass\",\n          speed = 4, phase = 0, period = 24.8540",
+        "route = \"river_runabout\",\n          speed = 2.2, phase = 70, period = 158.165");
+    CHECK(conflict);
+    CHECK(load(files.manifest, conflict, strlen(conflict), NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_check_location(&voyage, resources.definition, &resources.map, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.traffic.vessels[1]"));
+    boat_world_resources_destroy(&resources);
+
+    // Native definition rejection: capacity, zero speed for an authored craft, bad geometry,
+    // an uncrossable bridge actor and a discontinuous loop.
+    BoatSceneDefinition scene = { .version = BOAT_SCENE_VERSION, .traffic_present = true };
+    WaterfrontRouteDiagnostic route;
+    CHECK(waterfront_route_preset("marina_pass", &scene.traffic.actors[0]));
+    scene.traffic.actor_count = 1;
+    BoatSceneDiagnostic sd;
+    CHECK(boat_scene_validate(&scene, &sd));
+    scene.traffic.actors[0].speed = 0;
+    CHECK(!boat_scene_validate(&scene, &sd));
+    scene.traffic.actors[0].speed = 4;
+    scene.traffic.actors[0].points[0].radius = -1;
+    CHECK(!waterfront_route_validate(&scene.traffic, &route));
+    scene.traffic.actors[0].points[0].radius = 6;
+    scene.traffic.actors[0].period = 1;
+    CHECK(!waterfront_route_validate(&scene.traffic, &route));
+    scene.traffic.actors[0].period = 24.8540;
+    scene.traffic.actor_count = WATERFRONT_ROUTE_ACTORS + 1;
+    CHECK(!waterfront_route_validate(&scene.traffic, &route));
+    return 0;
+}
+
 static int scene_berths(void)
 {
     static BoatPluginFiles files;
@@ -895,6 +995,7 @@ static const TestCase cases[] = {
     TEST_CASE(manifests),
     TEST_CASE(scene_contract),
     TEST_CASE(scene_berths),
+    TEST_CASE(scene_traffic),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),
     TEST_CASE(last_good_survives),

@@ -232,8 +232,11 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 }
 
 static const char *const ROOT[] = { "voyage", "scene", "init", "update", "migrate", NULL };
-static const char *const SCENE[] = { "version", "marina", NULL };
+static const char *const SCENE[] = { "version", "marina", "traffic", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
+static const char *const TRAFFIC[] = { "vessels", NULL };
+static const char *const VESSEL[]
+    = { "id", "retain", "recipe", "route", "speed", "phase", "period", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
 static const char *const BERTH[] = { "id", "recipe", "x", "z", "heading", "mooring", NULL };
 static const char *const MODULE[] = { "id", "kind", "x", "z", "heading", NULL };
@@ -475,6 +478,106 @@ static bool scene_modules(lua_State *L, Vm *vm, int marina, BoatSceneDefinition 
     return true;
 }
 
+// L3.2: a present vessel list replaces all travelling craft. Entries either retain a
+// registered native actor or select a registered route and override its timetable.
+static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
+{
+    char at[64];
+    int type = field(L, scene, "traffic", "scene", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int traffic = lua_absindex(L, -1);
+    if (!only(L, vm, traffic, at, TRAFFIC))
+        return false;
+    char list_path[64];
+    type = field(L, traffic, "vessels", at, list_path);
+    if (type != LUA_TTABLE)
+        return reject(vm, list_path, "must be a table, not a %s", lua_typename(L, type));
+    int list = lua_absindex(L, -1);
+    lua_Unsigned length = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > length)
+            return reject(vm, list_path, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != length)
+        return reject(vm, list_path, "must be a list numbered from 1 without gaps");
+    if (length > WATERFRONT_ROUTE_ACTORS)
+        return reject(vm, list_path, "must list 0 to %d vessels, not %llu",
+            WATERFRONT_ROUTE_ACTORS, (unsigned long long)length);
+    s->traffic_present = true;
+    s->traffic.actor_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        WaterfrontRouteActor *v = &s->traffic.actors[i];
+        char path[64], id[WATERFRONT_ROUTE_TEXT], route[WATERFRONT_ROUTE_TEXT],
+            recipe[WATERFRONT_ROUTE_TEXT], retained[WATERFRONT_ROUTE_TEXT];
+        element(path, sizeof(path), list_path, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int entry = lua_absindex(L, -1);
+        if (!only(L, vm, entry, path, VESSEL)
+            || !string(L, vm, entry, path, "id", id, sizeof(id)))
+            return false;
+        char retain_path[64];
+        int retain_type = field(L, entry, "retain", path, retain_path);
+        if (retain_type != LUA_TNIL) {
+            lua_pop(L, 1);
+            if (!string(L, vm, entry, path, "retain", retained, sizeof(retained)))
+                return false;
+            if (!waterfront_route_preset(retained, v))
+                return reject(vm, retain_path, "is not a registered route actor");
+            v->retain = 0xff;
+            const WaterfrontRouteDefinition *defaults = waterfront_route_defaults();
+            for (unsigned d = 0; d < defaults->actor_count; ++d)
+                if (!strcmp(defaults->actors[d].id, retained))
+                    v->retain = (unsigned char)d;
+            memcpy(v->id, id, sizeof(id));
+            // A retain entry carries no other timetable fields.
+            if (!only(L, vm, entry, path, (const char *const[]) { "id", "retain", NULL }))
+                return false;
+        } else {
+            double speed, phase, period;
+            char route_path[64], recipe_path[64];
+            join(route_path, sizeof(route_path), path, "route");
+            join(recipe_path, sizeof(recipe_path), path, "recipe");
+            if (!string(L, vm, entry, path, "route", route, sizeof(route))
+                || !string(L, vm, entry, path, "recipe", recipe, sizeof(recipe))
+                || !number(L, vm, entry, path, "speed", &speed)
+                || !number(L, vm, entry, path, "phase", &phase)
+                || !number(L, vm, entry, path, "period", &period))
+                return false;
+            if (!(speed > 0) || !(period > 0)) {
+                char speed_path[64], period_path[64];
+                join(speed_path, sizeof(speed_path), path, "speed");
+                join(period_path, sizeof(period_path), path, "period");
+                return reject(vm, !(speed > 0) ? speed_path : period_path,
+                    "must be greater than zero");
+            }
+            if (!waterfront_route_preset(route, v))
+                return reject(vm, route_path, "is not a registered route");
+            WaterfrontCraftRecipe r;
+            if (!waterfront_route_recipe_from_name(recipe, &r))
+                return reject(vm, recipe_path, "is not a registered craft recipe");
+            v->recipe = (unsigned char)r;
+            v->speed = (float)speed;
+            v->phase = (float)phase;
+            v->period = period;
+            memcpy(v->id, id, sizeof(id));
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 2); // vessels list and traffic table
+    return true;
+}
+
 static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
 {
     char at[64];
@@ -529,7 +632,8 @@ static int decode(lua_State *L)
         double version;
         if (!only(L, vm, scene, "scene", SCENE)
             || !number(L, vm, scene, "scene", "version", &version)
-            || !scene_marina(L, vm, scene, &d->scene))
+            || !scene_marina(L, vm, scene, &d->scene)
+            || !scene_traffic(L, vm, scene, &d->scene))
             return 0;
         d->has_scene = true;
         d->scene.version = version == (double)BOAT_SCENE_VERSION ? BOAT_SCENE_VERSION : 0;

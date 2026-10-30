@@ -202,7 +202,8 @@ done:
     printf(",\"message\":");
     json_text(d.message);
     unsigned scene_present = 0, scene_version = 0, scene_content = 0, berth_count = 0,
-             module_count = 0;
+             module_count = 0, vessel_count = 0;
+    bool traffic_present = false;
     uint64_t scene_digest = 0;
     if (d.status == BOAT_PLUGIN_OK && !host->racing) {
         const BoatPluginRevision *active = boat_plugin_host_active(host);
@@ -212,17 +213,21 @@ done:
         scene_content = boat_scene_has_content(&active->voyage.scene);
         berth_count = active->voyage.scene.berth_count;
         module_count = active->voyage.scene.module_count;
+        traffic_present = active->voyage.scene.traffic_present;
+        vessel_count = traffic_present ? active->voyage.scene.traffic.actor_count : 0;
     }
     printf(",\"gameplay_digest\":\"%016llx\",\"scene\":{\"present\":%s,"
            "\"version\":%u,\"digest\":\"%016llx\",\"content\":%s,"
-           "\"subsystems\":[%s%s%s],\"berths\":%u,\"modules\":%u},"
+           "\"subsystems\":[%s%s%s%s%s],\"berths\":%u,\"modules\":%u,\"vessels\":%u},"
            "\"cost\":{\"instructions\":%llu,"
            "\"entry_instructions\":%llu,\"callback_instructions\":%llu,"
            "\"peak_bytes\":%zu,\"leaked_bytes\":%zu,\"fields\":%u}}\n",
         (unsigned long long)digest, scene_present ? "true" : "false", scene_version,
         (unsigned long long)scene_digest, scene_content ? "true" : "false",
-        berth_count ? "\"marina.berths\"" : "", berth_count && module_count ? "," : "",
-        module_count ? "\"marina.modules\"" : "", berth_count, module_count,
+        berth_count ? "\"marina.berths\"" : "",
+        berth_count && (module_count || traffic_present) ? "," : "",
+        module_count ? "\"marina.modules\"" : "", module_count && traffic_present ? "," : "",
+        traffic_present ? "\"traffic.vessels\"" : "", berth_count, module_count, vessel_count,
         (unsigned long long)d.cost.instructions, (unsigned long long)d.cost.entry_instructions,
         (unsigned long long)d.cost.callback_instructions, d.cost.peak_bytes, d.cost.leaked_bytes,
         d.cost.fields);

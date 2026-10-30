@@ -13,6 +13,8 @@
 #define WATERFRONT_TRAFFIC_WAKES (WATERFRONT_TRAFFIC_VESSELS * WATERFRONT_TRAFFIC_WAKE_SEGMENTS * 2)
 #define WATERFRONT_TRAFFIC_WAKE_CAPACITY (WATERFRONT_TRAFFIC_ALL * 16 * 2 + 32)
 #define WATERFRONT_TRAFFIC_LIGHTS 3
+#define WATERFRONT_TRAFFIC_RECIPE_SLOTS 8 // Registered craft recipes; slots follow the defaults.
+#define WATERFRONT_TRAFFIC_MESH_SLOTS (WATERFRONT_TRAFFIC_ALL + WATERFRONT_TRAFFIC_RECIPE_SLOTS)
 
 typedef struct {
     Vector3 position, velocity; // Renderer/world X/Z, rest waterline Y=0.
@@ -32,9 +34,11 @@ typedef struct {
 } WaterfrontTrafficWake;
 
 struct WaterfrontRouteDefinition;
+struct BoatSceneDefinition;
 
 typedef struct {
     int vessel_count; // WATERFRONT_TRAFFIC_VESSELS, or WATERFRONT_TRAFFIC_ALL upstream.
+    unsigned char mesh[WATERFRONT_TRAFFIC_ALL]; // 0..7 compiled slots; 8+ registered recipe.
     WaterfrontVesselState vessels[WATERFRONT_TRAFFIC_ALL];
     bool lift; // Upstream: Hisingsbron's lift span, at LIFT_POSE (waterfront_upstream.h).
     Transform3D lift_pose;
@@ -54,6 +58,7 @@ typedef struct {
 // but only upstream worlds evaluate, draw and collide with them.
 BoatModelSpec waterfront_traffic_spec(int index);
 const Mesh3D *waterfront_traffic_mesh(int index);
+const Mesh3D *waterfront_traffic_mesh_slot(int slot);
 // L3.1: the same queries against a caller-owned definition; NULL selects compiled defaults.
 BoatModelSpec waterfront_traffic_spec_routes(const struct WaterfrontRouteDefinition *routes, int index);
 const Mesh3D *waterfront_traffic_mesh_routes(const struct WaterfrontRouteDefinition *routes, int index);
@@ -80,6 +85,12 @@ bool waterfront_traffic_contact(Vector2 position, float heading, float bow, floa
 bool waterfront_traffic_contact_height(Vector2 position, float heading, float bow, float stern,
     float half_beam, float bottom, float top, BoatWater water, double time,
     WaterfrontTrafficContact *contact);
+// L3.2: the same contacts and camera exclusion against the accepted scene's travelling craft.
+bool waterfront_traffic_contact_height_scene(const struct BoatSceneDefinition *scene,
+    Vector2 position, float heading, float bow, float stern, float half_beam, float bottom,
+    float top, BoatWater water, double time, WaterfrontTrafficContact *contact);
 bool waterfront_traffic_camera_clear(Vector3 position, double time, float clearance);
+bool waterfront_traffic_camera_clear_scene(
+    const struct BoatSceneDefinition *scene, Vector3 position, double time, float clearance);
 
 #endif

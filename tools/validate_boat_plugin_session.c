@@ -100,6 +100,9 @@ static int harbor_life_scene(void)
     CHECK(r1->voyage.has_scene && r1->voyage.scene.berth_count == 2);
     CHECK(s.world.scene == &r1->voyage.scene && boat_session_view(&s).scene == s.world.scene);
     CHECK(s.world.scene->berths[1].z == 173);
+    CHECK(s.world.scene->traffic_present && s.world.scene->traffic.actor_count == 2);
+    CHECK(!strcmp(s.world.scene->traffic.actors[0].id, "passing")
+        && s.world.scene->traffic.actors[0].speed == 4);
 
     // A berth edit is a physical scene change: held until F7, then the caller restarts.
     BoatPluginBundle moved = harbor_edit("x = 13, z = 173", "x = 13, z = 179");
@@ -134,6 +137,23 @@ static int harbor_life_scene(void)
     CHECK(wake_plugin_frame(&p, &s, false, false, true, 6));
     boat_session_restart(&s, calm());
     CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.world.scene->modules[0].z == 170);
+
+    // A traffic timetable edit is physical too: it restarts and Undo restores the old craft.
+    BoatPluginBundle moved_craft = harbor_edit(
+        "speed = 4, phase = 0, period = 24.8540",
+        "speed = 3, phase = 5, period = 33.1387");
+    CHECK(boat_plugin_host_stage(&p.host, &moved_craft));
+    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
+    CHECK(wake_plugin_frame(&p, &s, false, false, true, 7));
+    boat_session_restart(&s, calm());
+    CHECK(s.world.scene->traffic.actors[0].speed == 3
+        && s.world.scene->traffic.actors[0].phase == 5);
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 8));
+    CHECK(wake_plugin_frame(&p, &s, false, false, true, 9));
+    boat_session_restart(&s, calm());
+    CHECK(boat_plugin_host_active(&p.host)->number == 1);
+    CHECK(s.world.scene->traffic.actors[0].speed == 4
+        && s.world.scene->traffic.actors[0].phase == 0);
 
     // An unsafe berth (ashore) is rejected and leaves R1 and its scene intact.
     BoatPluginBundle bad = harbor_edit("x = 13, z = 173", "x = 32, z = 173");

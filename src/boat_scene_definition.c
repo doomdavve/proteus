@@ -147,6 +147,18 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         if (!finite_in(b->heading, -6.28318531f, 6.28318531f))
             return fail(diagnostic, at, "must be finite within one turn");
     }
+    if (!scene->traffic_present && scene->traffic.actor_count)
+        return fail(diagnostic, "scene.traffic.vessels", "is absent but has entries");
+    if (scene->traffic_present) {
+        WaterfrontRouteDiagnostic route;
+        if (!waterfront_route_validate(&scene->traffic, &route))
+            return fail(diagnostic, route.field, route.message);
+        for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
+            if (scene->traffic.actors[i].retain == 0xff
+                && !(scene->traffic.actors[i].speed > 0))
+                return fail(diagnostic, "scene.traffic.vessels",
+                    "an authored craft needs a positive speed");
+    }
     for (unsigned i = 0; i < scene->module_count; ++i) {
         const BoatSceneModule *m = &scene->modules[i];
         indexed(path, sizeof(path), "scene.marina.modules", i + 1, "");
@@ -192,7 +204,8 @@ bool boat_scene_has_content(const BoatSceneDefinition *scene)
 {
     return scene
         && (scene->berths_present || scene->modules_present || scene->entrance_present
-            || scene->berth_count || scene->module_count);
+            || scene->traffic_present || scene->berth_count || scene->module_count
+            || scene->traffic.actor_count);
 }
 
 static void fold(uint64_t *hash, const void *bytes, size_t size)
@@ -261,6 +274,14 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
         value(&hash, "module.anchor.z", m->anchor_z);
         fold(&hash, "module.attaches", 16);
         fold(&hash, m->attaches, strlen(m->attaches) + 1);
+    }
+    // Keep absent-traffic digests identical to L1/L2 revisions; presence itself matters
+    // because a present empty list disables the compiled collection.
+    if (scene->traffic_present) {
+        uint64_t traffic = waterfront_route_digest(&scene->traffic);
+        fold(&hash, "traffic", 8);
+        count(&hash, "traffic.actors", scene->traffic.actor_count);
+        fold(&hash, &traffic, sizeof(traffic));
     }
     return hash;
 }

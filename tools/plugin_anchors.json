@@ -14,6 +14,8 @@
      "heading_degrees": 90, "label": "Langedrag arrival area, facing out of the basin"},
     {"id": "outer.marina", "location": "outer", "x": 2, "z": 170, "heading_degrees": 90,
      "label": "Two-berth harbor-life marina, facing east across the slips"},
+    {"id": "outer.marina-pass", "location": "outer", "x": 0, "z": 205, "heading_degrees": 0,
+     "label": "Harbor-life passing craft, looking south over the marina approach"},
     {"id": "river.sprint-start", "location": "river", "x": -180, "z": -250,
      "heading_degrees": 52, "label": "River sprint start line, facing the first gate"},
     {"id": "river.sprint-finish", "location": "river", "x": 588.5, "z": -767.2,

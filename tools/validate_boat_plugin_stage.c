@@ -158,8 +158,9 @@ int main(int argc, char **argv)
     CHECK(!boat_plugin_stage_start("/missing/worker", host, files, 0));
     CHECK(!boat_plugin_stage_start(argv[0], host, files, NAN));
 
-    // The PST3 worker carries a scene envelope back with the voyage data. This uses a separate
-    // host so the shelter-tour objective package remains an independent control.
+    // The PST4 worker carries the scene envelope, including traffic routes, back with the
+    // voyage data. This uses a separate host so the shelter-tour objective package remains an
+    // independent control.
     BoatPluginFiles *scene_files = calloc(1, sizeof(*scene_files));
     CHECK(scene_files
         && boat_plugin_read("plugins/harbor-life", NULL, scene_files, &d) == BOAT_PLUGIN_OK);
@@ -178,6 +179,8 @@ int main(int argc, char **argv)
     const BoatPluginVoyage *held_scene = &boat_plugin_host_held(&scene_host)->voyage;
     CHECK(held_scene->has_scene && held_scene->scene.version == 1);
     CHECK(held_scene->scene.berth_count == 2 && held_scene->scene.module_count == 2);
+    CHECK(held_scene->scene.traffic_present && held_scene->scene.traffic.actor_count == 2);
+    CHECK(!strcmp(held_scene->scene.traffic.actors[0].id, "passing"));
     CHECK(held_scene->scene_digest == scene_digest
         && boat_scene_digest(&held_scene->scene) == scene_digest);
     boat_plugin_stage_close(job);

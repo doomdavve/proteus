@@ -165,7 +165,7 @@ void waterfront_draw_traffic(Renderer3D *r, const WaterfrontTrafficFrame *frame)
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
     for (int i = 0; i < frame->vessel_count; ++i) {
         const WaterfrontVesselState *vessel = &frame->vessels[i];
-        renderer3d_draw_mesh(r, waterfront_traffic_mesh(i), vessel->pose);
+        renderer3d_draw_mesh(r, waterfront_traffic_mesh_slot(frame->mesh[i]), vessel->pose);
         float size = i >= 3 ? .32f : .18f;
         for (int light = 0; light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
             light_box(r, vessel->lights[light], (Vector3) { size, size, size }, colors[light]);

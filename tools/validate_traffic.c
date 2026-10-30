@@ -381,10 +381,61 @@ static int check_route_definition(void)
     return 0;
 }
 
+// L3.2: one authored craft flows through the shared scene frame, contact and camera queries.
+// Reordering preserves each actor's identity; removing the collection removes every consumer.
+static int check_scene_traffic(void)
+{
+    BoatSceneDefinition scene = { .version = BOAT_SCENE_VERSION, .traffic_present = true };
+    CHECK(waterfront_route_preset("marina_pass", &scene.traffic.actors[0]));
+    CHECK(waterfront_route_preset("river_runabout", &scene.traffic.actors[1]));
+    scene.traffic.actor_count = 2;
+    WaterfrontRouteDiagnostic diagnostic;
+    CHECK(waterfront_route_validate(&scene.traffic, &diagnostic));
+    BoatWater water = { .upstream = true };
+    WaterfrontSceneFrame frame, other;
+    waterfront_scene_evaluate_scene(&scene, 12, water, &frame);
+    CHECK(frame.traffic.routes == &scene.traffic && frame.traffic.vessel_count == 2);
+    for (int i = 0; i < 2; ++i) {
+        WaterfrontVesselMotion m = waterfront_traffic_motion_routes(&scene.traffic, i, 12);
+        CHECK(!memcmp(&frame.traffic.vessels[i].motion, &m, sizeof(m)));
+        CHECK(frame.traffic.vessels[i].pose.position.x == m.position.x);
+        Vector2 p = { -m.position.x, m.position.z };
+        WaterfrontTrafficContact contact;
+        CHECK(waterfront_traffic_contact_height_scene(
+            &scene, p, m.heading, 2, 1.6f, .75f, -.4f, 2, water, 12, &contact));
+        CHECK(contact.vessel == i);
+        CHECK(!waterfront_traffic_camera_clear_scene(
+            &scene, (Vector3) { m.position.x, 1, m.position.z }, 12, 0));
+    }
+    Vector3 passing = frame.traffic.vessels[0].pose.position;
+    CHECK(waterfront_traffic_camera_clear_scene(
+        &scene, (Vector3) { passing.x, 50, passing.z }, 12, 0));
+    CHECK(waterfront_traffic_camera_clear((Vector3) { 0, 50, 0 }, 12, 0));
+    // Reordering arrays must not change identity or the pose drawn for either actor.
+    BoatSceneDefinition reordered = scene;
+    reordered.traffic.actors[0] = scene.traffic.actors[1];
+    reordered.traffic.actors[1] = scene.traffic.actors[0];
+    waterfront_scene_evaluate_scene(&reordered, 12, water, &other);
+    for (int i = 0; i < 2; ++i) {
+        WaterfrontVesselMotion m = waterfront_traffic_motion_routes(&reordered.traffic, i, 12);
+        CHECK(!memcmp(&other.traffic.vessels[i].motion, &m, sizeof(m)));
+    }
+    // A present empty list disables travelling craft without falling back to compiled actors.
+    BoatSceneDefinition removed = scene;
+    removed.traffic.actor_count = 0;
+    waterfront_scene_evaluate_scene(&removed, 12, water, &other);
+    CHECK(other.traffic.vessel_count == 0 && other.traffic.wake_count == 0);
+    WaterfrontVesselMotion m = waterfront_traffic_motion_routes(&reordered.traffic, 0, 12);
+    CHECK(!waterfront_traffic_contact_height_scene(&removed, (Vector2) { -m.position.x, m.position.z },
+        m.heading, 2, 1.6f, .75f, -.4f, 2, water, 12, NULL));
+    return 0;
+}
+
 int main(void)
 {
     CHECK(check_vertical_contacts() == 0);
     CHECK(check_route_definition() == 0);
+    CHECK(check_scene_traffic() == 0);
     CHECK(check_upstream() == 0);
     if (check_gulls() || check_long_session())
         return 1;

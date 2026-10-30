@@ -754,7 +754,9 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     }
     if (world->definition->mapped) {
         WaterfrontTrafficFrame traffic;
-        waterfront_traffic_evaluate(world->water, time, &traffic);
+        waterfront_traffic_evaluate_routes(
+            view->scene && view->scene->traffic_present ? &view->scene->traffic : NULL,
+            world->water, time, &traffic);
         waterfront_draw_traffic(renderer, &traffic);
         WaterfrontHarborFrame harbor;
         waterfront_harbor_evaluate_scene(view->scene, world->water, time,
