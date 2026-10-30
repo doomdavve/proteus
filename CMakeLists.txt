@@ -74,6 +74,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/geometry3d.h
   src/waterfront_city.c src/waterfront_city.h src/waterfront_harbor.c src/waterfront_harbor.h
   src/waterfront_outer.c src/waterfront_outer.h
+  src/waterfront_route.c src/waterfront_route.h
   src/waterfront_traffic.c src/waterfront_traffic.h
   src/waterfront_upstream.c src/waterfront_upstream.h)
 add_library(proteus_boat_core STATIC ${PROTEUS_BOAT_CORE_SOURCES})
