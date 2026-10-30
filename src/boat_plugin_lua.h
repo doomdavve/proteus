@@ -11,7 +11,8 @@ typedef struct {
 } BoatPluginShelterData;
 
 typedef struct {
-    bool callbacks, migrates;
+    bool callbacks, migrates, has_scene;
+    double scene_version;
     unsigned shelter_count;
     BoatPluginShelterData shelters[BOAT_VOYAGE_SHELTERS];
     struct {

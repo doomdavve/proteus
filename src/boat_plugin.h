@@ -7,6 +7,7 @@
 // Every load uses a fresh restricted Lua state that is closed before the call returns.
 #include "boat_location.h"
 #include "boat_race.h"
+#include "boat_scene_definition.h"
 #include "boat_voyage.h"
 
 #include <stddef.h>
@@ -73,6 +74,7 @@ typedef struct {
 typedef struct {
     char id[64], name[64], kind[16], entry[16], location[16];
     unsigned api, state_version;
+    bool scene; // Explicit scene.define capability (voyages only).
     bool objective; // Explicit objective.hud capability (voyages only).
     bool timers; // objective.timers additionally grants bounded tick timers.
 } BoatPluginManifest;
@@ -83,6 +85,11 @@ typedef struct BoatPluginVoyage {
     BoatPluginManifest manifest;
     bool migrates; // Optional explicit migrate callback.
     BoatVoyageRoute route;
+    // L1.2: an optional, pointer-free scene envelope. Content fields arrive in later tasks; an
+    // absent/empty scene means the compiled marina.
+    bool has_scene;
+    BoatSceneDefinition scene;
+    uint64_t scene_digest; // boat_scene_digest(&scene); zero when absent.
     char shelter_ids[BOAT_VOYAGE_SHELTERS][BOAT_PLUGIN_TEXT];
     char shelter_names[BOAT_VOYAGE_SHELTERS][BOAT_PLUGIN_TEXT];
     uint64_t digest; // boat_plugin_route_digest(&route).

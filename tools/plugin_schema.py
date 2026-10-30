@@ -70,8 +70,12 @@ def schema():
                        "api": {"const": 1}, "kind": {"enum": ["voyage", "race"]},
                        "entry": {"const": "main.lua"}, "location": {"enum": ["outer", "river"]},
                        "capabilities": {"enum": [["voyage.define"],
+                           ["voyage.define", "scene.define"],
                            ["voyage.define", "objective.hud"],
-                           ["voyage.define", "objective.hud", "objective.timers"], ["race.define"]]},
+                           ["voyage.define", "scene.define", "objective.hud"],
+                           ["voyage.define", "objective.hud", "objective.timers"],
+                           ["voyage.define", "scene.define", "objective.hud", "objective.timers"],
+                           ["race.define"]]},
                        "state_version": number(1, 65535, integer=True)})
     manifest["allOf"] = [
         {"if": {"properties": {"kind": {"const": "race"}}},
@@ -80,7 +84,25 @@ def schema():
          "else": {"properties": {"location": {"const": "outer"},
              "capabilities": {"not": {"const": ["race.define"]}}}}},
         {"if": {"properties": {"capabilities": {"const": ["voyage.define"]}}},
+         "then": {"properties": {"state_version": {"const": 1}}}},
+        {"if": {"properties": {"capabilities": {"const": ["voyage.define", "scene.define"]}}},
          "then": {"properties": {"state_version": {"const": 1}}}}]
+    # L1.2 accepts only the versioned scene envelope. The full marina projection is published
+    # as a separate planned schema so discovery does not claim fields the decoder still rejects.
+    scene = record({"version": {"const": 1}})
+    berth = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
+                    "recipe": {"enum": ["skiff", "runabout", "sailboat", "cruiser", "speedboat",
+                                        "sailboat_7m", "workboat"]},
+                    **point, "heading": number(-math.tau, math.tau, "radians"),
+                    "mooring": {"enum": ["pontoon", "none"]}})
+    module = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
+                     "kind": {"enum": ["pontoon", "pontoon_small", "gangway", "quay"]},
+                     **point, "heading": number(-math.tau, math.tau, "radians"),
+                     "anchor": record(point), "attaches": text(23)})
+    scene_planned = record({"version": {"const": 1},
+                            "marina": record({"entrance": record({**point, "width": number(4, 40, "metres")}),
+                                              "berths": sequence(berth, 0, 7),
+                                              "modules": sequence(module, 0, 4)})})
     int64 = number(-(1 << 63), (1 << 63) - 1, integer=True)
     command_base = {"generation": number(1, 0xffffffff, integer=True), "id": text()}
     command_variants = []
@@ -92,7 +114,8 @@ def schema():
                      "manifest": {"type": "string", "maxLength": 4096},
                      "source": {"type": "string", "maxLength": 65536}})
     bundle["description"] = "UTF-8 source bundle, at most 200000 bytes; manifest/source byte caps apply after encoding"
-    definitions = {"bundle": bundle, "manifest": manifest, "voyage": voyage, "race": race, "commands": commands}
+    definitions = {"bundle": bundle, "manifest": manifest, "voyage": voyage, "scene": scene,
+                   "scene_planned": scene_planned, "race": race, "commands": commands}
     for value in definitions.values():
         value["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     return {"protocol": 1, "api": 1, "schemas": definitions,
@@ -103,6 +126,9 @@ def schema():
                     "Last shelter radius 0; others >0; last shelter inside arrival",
                     "No shelter in exposed water; first shelter equals selected location spawn",
                     "Shelters have 8m water clearance; arrival 20m"],
+                "scene": ["L1.2 accepts only { version = 1 }; marina is planned and rejected",
+                    "scene.define requires voyage.define and precedes objective grants",
+                    "No live scene installation is advertised by this schema"],
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",
                     "skip_ticks <= recovery_ticks; native course/rules validation",
                     "Grid, gate corridors and ferry path pass compiled-map clearance checks"]},

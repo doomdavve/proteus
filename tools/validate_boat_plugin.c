@@ -135,6 +135,140 @@ static int same_route(const BoatVoyageRoute *a, const BoatVoyageRoute *b)
     return 0;
 }
 
+
+// L1.2: the optional scene envelope decodes and validates without installing runtime content.
+// The typed definition also exercises the planned berth/module limits before L2 exposes them.
+static int scene_contract(void)
+{
+    static const char scene_manifest[] = "{\"id\": \"test.voyage\", \"name\": \"Test\", "
+        "\"api\": 1, \"kind\": \"voyage\", \"entry\": \"main.lua\", \"location\": "
+        "\"outer\", \"capabilities\": [\"voyage.define\", \"scene.define\"], "
+        "\"state_version\": 1}";
+    const char *with_scene = variant("return {", "return { scene = { version = 1 },");
+    BoatPluginVoyage voyage;
+    BoatPluginDiagnostic d;
+    CHECK(load(scene_manifest, with_scene, strlen(with_scene), NULL, &voyage, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(voyage.has_scene && voyage.scene.version == 1);
+    CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
+    CHECK(!boat_scene_has_content(&voyage.scene));
+    CHECK(voyage.digest == boat_plugin_route_digest(&boat_voyage_outer));
+
+    // Omitted and granted-but-absent envelopes keep the compiled scene.
+    CHECK(load_source(variant("return {", "return { scene = { version = 1 },"), &voyage, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene"));
+    CHECK(load_source(variant("return {", "return {"), &voyage, &d) == BOAT_PLUGIN_OK);
+    CHECK(!voyage.has_scene && voyage.scene_digest == 0);
+    CHECK(load(scene_manifest, variant("return {", "return {"), strlen(variant("return {", "return {")),
+              NULL, &voyage, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(!voyage.has_scene);
+
+    // Reject every unsupported or malformed envelope, leaving OUT untouched.
+    CHECK(load(scene_manifest, variant("return {", "return { scene = {},"),
+              strlen(variant("return {", "return { scene = {},")), NULL, &voyage, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.version"));
+    const char *bad_version = variant("return {", "return { scene = { version = 2 },");
+    CHECK(load(scene_manifest, bad_version, strlen(bad_version), NULL, &voyage, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.version"));
+    const char *unknown = variant("return {", "return { scene = { version = 1, marina = {} },");
+    CHECK(load(scene_manifest, unknown, strlen(unknown), NULL, &voyage, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.marina"));
+    const char *not_table = variant("return {", "return { scene = 1,");
+    CHECK(load(scene_manifest, not_table, strlen(not_table), NULL, &voyage, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene"));
+
+    // Manifest grants are a canonical prefix. These are parse-only checks.
+    BoatPluginManifest manifest;
+    static const struct {
+        const char *capabilities, *field;
+    } grants[] = {
+        { "[\"voyage.define\", \"objective.hud\", \"scene.define\"]", "capabilities[3]" },
+        { "[\"voyage.define\", \"scene.define\", \"objective.timers\"]", "capabilities[3]" },
+        { "[\"voyage.define\", \"scene.define\", \"scene.define\"]", "capabilities[3]" },
+        { "[\"voyage.define\", \"scene.define\", \"objective.hud\", \"objective.timers\", "
+          "\"objective.timers\"]", "capabilities" },
+        { "[\"race.define\", \"scene.define\"]", "capabilities[1]" },
+    };
+    for (size_t i = 0; i < sizeof(grants) / sizeof(grants[0]); ++i) {
+        char json[512];
+        snprintf(json, sizeof(json),
+            "{\"id\":\"t\",\"name\":\"T\",\"api\":1,\"kind\":\"voyage\","
+            "\"entry\":\"main.lua\",\"location\":\"outer\",\"capabilities\":%s,"
+            "\"state_version\":1}", grants[i].capabilities);
+        BoatPluginStatus status
+            = boat_plugin_parse_manifest(json, strlen(json), NULL, &manifest, &d);
+        CHECK(status == BOAT_PLUGIN_MANIFEST);
+        CHECK(!strcmp(d.field, grants[i].field));
+    }
+    static const char canonical[] = "{\"id\":\"t\",\"name\":\"T\",\"api\":1,"
+        "\"kind\":\"voyage\",\"entry\":\"main.lua\",\"location\":\"outer\","
+        "\"capabilities\":[\"voyage.define\",\"scene.define\",\"objective.hud\","
+        "\"objective.timers\"],\"state_version\":9}";
+    CHECK(boat_plugin_parse_manifest(canonical, strlen(canonical), NULL, &manifest, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(manifest.scene && manifest.objective && manifest.timers && manifest.state_version == 9);
+
+    // Typed definition validation: planned fields are strict before L2 exposes them in Lua.
+    BoatSceneDefinition scene = { .version = BOAT_SCENE_VERSION };
+    BoatSceneDiagnostic sd;
+    CHECK(boat_scene_validate(&scene, &sd));
+    CHECK(!boat_scene_has_content(&scene));
+    uint64_t empty = boat_scene_digest(&scene);
+    scene.berths_present = true;
+    scene.berth_count = 1;
+    strcpy(scene.berths[0].id, "a");
+    scene.berths[0].recipe = BOAT_SCENE_BERTH_SKIFF;
+    scene.berths[0].mooring = BOAT_SCENE_MOORING_PONTOON;
+    scene.berths[0].x = 13;
+    scene.berths[0].z = 167;
+    scene.berths[0].heading = -1.5707964f;
+    CHECK(boat_scene_validate(&scene, &sd));
+    CHECK(boat_scene_has_content(&scene));
+    CHECK(boat_scene_digest(&scene) != empty);
+    CHECK(!strcmp(boat_scene_berth_recipe_name(BOAT_SCENE_BERTH_SAILBOAT_7M), "sailboat_7m"));
+    BoatSceneBerthRecipe recipe;
+    CHECK(boat_scene_berth_recipe_from_name("workboat", &recipe)
+        && recipe == BOAT_SCENE_BERTH_WORKBOAT);
+    CHECK(!boat_scene_berth_recipe_from_name("yacht", &recipe));
+    CHECK(boat_scene_berth_spec(BOAT_SCENE_BERTH_SAILBOAT_7M).length == 7);
+
+    scene.berth_count = 2;
+    scene.berths[1] = scene.berths[0];
+    CHECK(!boat_scene_validate(&scene, &sd) && !strcmp(sd.field, "scene.marina.berths[2].id"));
+    strcpy(scene.berths[1].id, "b");
+    scene.berths[1].x = 30000;
+    CHECK(!boat_scene_validate(&scene, &sd) && !strcmp(sd.field, "scene.marina.berths[2].x"));
+    scene.berths[1].x = 13;
+    scene.berths[1].recipe = BOAT_SCENE_BERTH_RECIPES;
+    CHECK(!boat_scene_validate(&scene, &sd) && !strcmp(sd.field, "scene.marina.berths[2].recipe"));
+    scene.berths[1].recipe = BOAT_SCENE_BERTH_RUNABOUT;
+    scene.berth_count = BOAT_SCENE_BERTHS + 1;
+    CHECK(!boat_scene_validate(&scene, &sd) && !strcmp(sd.field, "scene.marina.berths"));
+    scene.berth_count = 1;
+
+    scene.modules_present = true;
+    scene.module_count = 1;
+    strcpy(scene.modules[0].id, "ramp");
+    scene.modules[0].kind = BOAT_SCENE_MODULE_GANGWAY;
+    scene.modules[0].x = scene.modules[0].anchor_x = 34.1f;
+    scene.modules[0].z = scene.modules[0].anchor_z = 170;
+    strcpy(scene.modules[0].attaches, "missing");
+    CHECK(!boat_scene_validate(&scene, &sd) && !strcmp(sd.field, "scene.marina.modules[1].attaches"));
+    CHECK(boat_scene_find_berth(&scene, "a") == &scene.berths[0]);
+    strcpy(scene.modules[0].id, "a"); // IDs are unique across berths and modules.
+    CHECK(!boat_scene_validate(&scene, &sd) && !strcmp(sd.field, "scene.marina.modules[1].id"));
+    strcpy(scene.modules[0].id, "ramp");
+    scene.module_count = BOAT_SCENE_MODULES + 1;
+    CHECK(!boat_scene_validate(&scene, &sd) && !strcmp(sd.field, "scene.marina.modules"));
+    return 0;
+}
+
 // The package on disk decodes field for field, bit for bit, to the compiled route, and its names
 // outlive the Lua state and the source bytes.
 static int reference_matches_compiled(void)
@@ -599,6 +733,7 @@ static const TestCase cases[] = {
     TEST_CASE(forbidden_facilities),
     TEST_CASE(invalid_fields),
     TEST_CASE(manifests),
+    TEST_CASE(scene_contract),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),
     TEST_CASE(last_good_survives),

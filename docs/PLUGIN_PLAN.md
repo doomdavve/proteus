@@ -37,10 +37,10 @@ Lua in workers; simulation waits at a callback boundary while rendering/UI remai
 Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
-traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; its L1.1
-scene contract and verified site fixture are complete, and none of those scene capabilities is
-exposed by the current Lua API. The milestones below are this plan's P0–P6, independent of
-similarly named foundation tasks.
+traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
+scene contract/site fixture and L1.2's non-installed scene envelope are complete, and none of
+those scene capabilities is installed in a running session. The milestones below are this plan's
+P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
 
@@ -1779,9 +1779,9 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1 is complete; next in this track: L1.2 typed
-definition and strict decoding**; the first playable gate is L4.3. No scene grant is supported
-by this contract change.
+failure cases and acceptance evidence. **L1.1 and L1.2 are complete; next in this track: L1.3
+revision lifecycle and application binding**; the first playable gate is L4.3. `scene.define`
+decodes an empty envelope but is not installed live.
 
 ### Coverage and delivery slices
 
@@ -1938,6 +1938,50 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 decoding without installing a live scene. The later results below remain authoritative for
 their own steps.
 
+#### L1.2 result, 2026-10-30
+
+**Implemented:** pointer-free scene storage and strict envelope decoding, with no live install.
+[`boat_scene_definition.[ch]`](../src/boat_scene_definition.h) are in `proteus_boat_core`; the
+Lua/manifest work is in `boat_plugin.[ch]` and `boat_plugin_lua.[ch]`.
+
+- **Manifest:** voyages accept `scene.define` as the first optional grant, before `objective.hud`
+  and `objective.timers`. Reordering, repetition, timers without HUD, and a scene grant on a race
+  are rejected at `capabilities[n]`. Existing package grants and fixtures are unchanged.
+- **Lua:** `scene` is optional. Omitted means the compiled scene. A present table must be exactly
+  `{ version = 1 }`; `marina` and every other field are currently unknown. A scene without the
+  grant fails at `scene`; a wrong version fails at `scene.version`. The envelope is copied into
+  `BoatPluginVoyage` with a no-pointer `BoatSceneDefinition` and digest.
+- **Native definition:** `boat_scene_validate` already enforces the planned 7-berth/4-module
+  capacities, unique scene-wide IDs, recipe/mooring/module enums, finite 20 km coordinates,
+  entrance width, gangway attachment and ID spelling. `boat_scene_berth_spec` and the recipe name
+  helpers are the single native recipe registry. This lets L2.2 expose fields without moving
+  ownership or changing the validation rules. `boat_scene_has_content` distinguishes the empty
+  envelope from authored layout for later classification.
+- **No live scene:** the host loads and copies the envelope, but no session, renderer, contact or
+  camera consumer reads it until L1.3. The isolated stage-worker wire still carries only the
+  voyage; L1.4 owns its versioned scene payload. Because L1.2 has no authorable content, dropping
+  the envelope in that path currently changes no running behavior; this would block L2.2 and is
+  recorded in the next-task notes.
+- **Discovery:** `tools/plugin_schema.py` advertises the accepted envelope, a separate
+  `scene_planned` projection and explicit native constraints; `plugin_author.py` reports the
+  grant as accepted but `installed: false`, with no supported subsystem and depth unverified.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Project build is warning-clean. Full `ctest --preset full` passed **312/312 enabled tests**
+  (18.75 s) with local socket access; 13 retired wake-field tests remained disabled.
+- `validate_boat_plugin --case scene_contract` covers omitted and granted-but-absent envelopes,
+  missing grant, malformed tables, unknown `marina`, wrong version, manifest ordering/repetition,
+  direct definition validation (duplicates, invalid numbers/recipe, capacity + 1, gangway target),
+  digest stability/change and recipe lookup. The reference digest remains `e8509272172cb7c4`.
+- Both core/net boundary tests pass with the new core source. No rendering, input, audio or
+  asset-loading behavior changed, so no new visual or motion check applies; human acceptance is
+  not claimed.
+
+**Next in this track: L1.3.** Install the empty envelope through the existing revision host and
+bind `BoatWorld`/`BoatViewState` so later content has a live path, without advertising a marina
+subsystem yet. L1.4 must then add the scene envelope to the isolated worker wire before L2.2.
+
 #### L2 — a small marina before a marina editor
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
@@ -2047,10 +2091,12 @@ including the first playable harbor package, proposed composition/capacity/time/
 defaults, native extraction before Lua exposure, tooling and unsupported-target checks.
 Completed L1.1, 2026-10-30: froze the scene contract, consumer/lifetime inventory, capacities
 and verified two-berth marina site; the API owns the proposed schema and the fixture passes.
-Next task for this track: **L1.2**, add the plain C scene definition and strict versioned
-envelope decoding without installing a live scene. Known limits: the proposed grant/schema and
-budgets still need later implementation evidence; no scene bindings, tram/seal recipes,
-gameplay dusk or building activity are implemented or visually accepted.
+Completed L1.2, 2026-10-30: added pointer-free scene storage, the canonical `scene.define` grant,
+envelope decoding and planned-field validation without a live install.
+Next task for this track: **L1.3**, bind the empty envelope through the host, session, world and
+view without advertising marina content. Known limits: the isolated stage-worker wire does not
+carry the envelope yet (L1.4, before L2.2); no marina fields, tram/seal recipes, gameplay dusk,
+building activity or human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project
