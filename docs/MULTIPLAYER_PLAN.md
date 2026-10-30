@@ -1941,8 +1941,7 @@ with the canonical checkpoint encoding, including inactive hit echoes and wave e
 Verified on 2026-10-30 with the Debug build and the full CTest preset: **316/316 enabled tests
 passed** (13 retired wake-field cases disabled). A local protocol-v8 river deathmatch with one
 game client and one predicting bot produced 313 snapshots with zero decode errors, zero stale
-and zero resyncs, and a 44 KiB/s client. The macOS/latest hosted room remains v0.0.21 / protocol
-v7; no deployment or human gameplay is claimed. The browser build and a packed native release
+and zero resyncs, and a 44 KiB/s client. The hosted room remains v0.0.22 / protocol v7; no deployment or human gameplay is claimed. The browser build and a packed native release
 have not been rerun for v8. Worst-case combat still occupies three pages plus the fleet snapshot,
 so snapshot liveness/resync remains the recovery path under severe loss.
 

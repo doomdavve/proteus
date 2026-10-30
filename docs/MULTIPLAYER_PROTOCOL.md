@@ -311,7 +311,7 @@ The compact payload (format 1) is:
 
 | Section | Count × bytes | Fields in order |
 | --- | --- | --- |
-| Header | 10 | `u8` format 1; `u8` flags (bit 0 enabled, bit 1 firing); `u8` object bitmap\[7] for 40 bullets, four grenades and eight torpedoes; `u8` wave bitmap |
+| Header | 10 | `u8` format 1; `u8` flags (bit 0 enabled, bit 1 firing); `u8` object bitmap[7] for 40 bullets, four grenades and eight torpedoes; `u8` wave bitmap |
 | Players | 4 × 137 | f32 health, heat, pressure; seven `i32` deltas from the header tick: life start, next fire, next grenade, next torpedo, defeated, hit, pressure tick; u32 generation, request, hit serial, killer, torpedo request, ammo, pressure owner/generation; `u8` overheated; four target records, each f32 damage, `i32` tick delta, u32 life/generation |
 | Projectiles | set × 33 | In bitmap order: f32 position x/z, direction x/z, height; `u16` birth age (0 means the header tick); `u16` end code (0 means not ended, otherwise age + 1); u32 generation, life; `u8` owner |
 | Waves | set × 31 | In bitmap order: f32 centre x/z; `u16` birth age; u32 generation, life; `u8` owner; f32 height, speed, range |

@@ -586,4 +586,4 @@ Verified 2026-10-30 on Apple Silicon/macOS with the Debug build and full CTest p
 deathmatch with one game client and one predicting bot produced 313 snapshots, zero decode
 errors, zero stale snapshots and zero resyncs. Not run: hosted deployment, browser build, packaged
 release, human combat play or platform qualification. The hosted Winterfell room remains
-v0.0.21 / protocol v7 until the next matching release cutover.
+v0.0.22 / protocol v7 until the next matching release cutover.

@@ -1,7 +1,9 @@
 # Winterfell internet room
 
-The Winterfell deployment uses released **v0.0.21**, commit
-`0cb1921224149ddeb4707e818dd2069096bc9e3d`, with the optional WebRTC transport enabled.
+The Winterfell deployment currently runs released **v0.0.22**, commit
+`62a6ac16f31ae71472789e3c29d485f3572f630d`, with the optional WebRTC transport enabled. The
+v0.0.21 evidence in the dated status section below is historical; the room has since been
+upgraded to v0.0.22 with the same protocol v7 / physics 9.
 It hosts one shared four-player river deathmatch room for native and browser players.
 The deployed protocol-v7 [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
 provides the water cannon (hold Space), stern wave grenade (E), torpedo (Q) and optional
@@ -9,7 +11,7 @@ rearview mirror (V). A round starts when two players join. There is no room toke
 no player account requirement.
 
 Source status, 2026-10-30: the repository is protocol v8 with compact combat pages. Winterfell
-still runs the matching v0.0.21 native/browser pair at protocol v7; v8 requires a new release and
+still runs the matching v0.0.22 native/browser pair at protocol v7; v8 requires a new release and
 the routine cutover below. Do not join the hosted room with a v8 development client.
 
 ## Join

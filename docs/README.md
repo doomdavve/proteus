@@ -38,7 +38,7 @@ The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-10-28) 
 client-check evidence and limits. Every release includes this hosted cutover through
 `../davve-srv/ansible`; package publication and Pages alone do not complete it. The public
 `wake.davve.net` endpoint and shared known-server directory remain in use. The source tree is
-protocol v8 with compact combat pages; the hosted v0.0.21 room remains protocol v7 until the
+protocol v8 with compact combat pages; the hosted v0.0.22 room remains protocol v7 until the
 next matching native/browser deployment. Human gameplay/audio and broader network/platform
 qualification remain open.
 
