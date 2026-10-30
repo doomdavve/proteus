@@ -126,8 +126,8 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **L1.1–L1.4 complete; scene envelope decoding, binding, staging wire and
-unsupported-target rejection implemented, with no authorable subsystem yet.** The
+Status, 2026-10-30: **L1.1–L1.4 and L2.1 complete; scene envelope decoding, binding, staging wire
+and native berth parameterization implemented, with no authorable package subsystem yet.** The
 [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements the
 remaining steps separately. L1.1 froze the ownership, identity, limits and first marina site;
 L1.2 accepts the manifest grant and `scene = { version = 1 }` only. L1.3 installs that accepted

@@ -22,8 +22,7 @@ bool boat_scene_identifier(const char *text)
     if (!(*text >= 'a' && *text <= 'z'))
         return false;
     for (; *text; ++text)
-        if (!((*text >= 'a' && *text <= 'z') || (*text >= '0' && *text <= '9')
-                || *text == '_'))
+        if (!((*text >= 'a' && *text <= 'z') || (*text >= '0' && *text <= '9') || *text == '_'))
             return false;
     return true;
 }
@@ -53,8 +52,8 @@ static bool fail(BoatSceneDiagnostic *d, const char *field, const char *message)
 }
 
 // Build "PREFIX[INDEX]SUFFIX" without stdio or unbounded formats.
-static void indexed(char *out, size_t capacity, const char *prefix, unsigned index,
-    const char *suffix)
+static void indexed(
+    char *out, size_t capacity, const char *prefix, unsigned index, const char *suffix)
 {
     size_t n = 1;
     out[0] = '\0';
@@ -118,8 +117,8 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
             || !finite_in(scene->entrance_z, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT)))
         return fail(diagnostic, "scene.marina.entrance", "must be finite within 20000 m");
     if (scene->entrance_present
-        && !finite_in(scene->entrance_width, BOAT_SCENE_ENTRANCE_MIN_WIDTH,
-            BOAT_SCENE_ENTRANCE_MAX_WIDTH))
+        && !finite_in(
+            scene->entrance_width, BOAT_SCENE_ENTRANCE_MIN_WIDTH, BOAT_SCENE_ENTRANCE_MAX_WIDTH))
         return fail(diagnostic, "scene.marina.entrance.width", "must be 4..40 m");
     for (unsigned i = 0; i < scene->berth_count; ++i) {
         const BoatSceneBerth *b = &scene->berths[i];
@@ -173,12 +172,13 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
                 || !finite_in(m->anchor_z, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT))
                 return fail(diagnostic, at, "must be finite within 20000 m");
             indexed(at, sizeof(at), "scene.marina.modules", i + 1, ".attaches");
-            if (!bounded_text(m->attaches, sizeof(m->attaches)) || !boat_scene_identifier(m->attaches))
+            if (!bounded_text(m->attaches, sizeof(m->attaches))
+                || !boat_scene_identifier(m->attaches))
                 return fail(diagnostic, at, "must name a pontoon module");
-            const BoatSceneModule *target
-                = boat_scene_find_module(scene, m->attaches);
-            if (!target || (target->kind != BOAT_SCENE_MODULE_PONTOON
-                               && target->kind != BOAT_SCENE_MODULE_PONTOON_SMALL))
+            const BoatSceneModule *target = boat_scene_find_module(scene, m->attaches);
+            if (!target
+                || (target->kind != BOAT_SCENE_MODULE_PONTOON
+                    && target->kind != BOAT_SCENE_MODULE_PONTOON_SMALL))
                 return fail(diagnostic, at, "must name a pontoon or pontoon_small module");
         } else if (m->attaches[0])
             return fail(diagnostic, at, "is only valid for a gangway");
@@ -188,8 +188,9 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
 
 bool boat_scene_has_content(const BoatSceneDefinition *scene)
 {
-    return scene && (scene->berths_present || scene->modules_present
-                        || scene->entrance_present || scene->berth_count || scene->module_count);
+    return scene
+        && (scene->berths_present || scene->modules_present || scene->entrance_present
+            || scene->berth_count || scene->module_count);
 }
 
 static void fold(uint64_t *hash, const void *bytes, size_t size)
@@ -225,9 +226,8 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
     if (!scene)
         return hash;
     count(&hash, "version", scene->version);
-    unsigned char present[3]
-        = { (unsigned char)scene->entrance_present, (unsigned char)scene->berths_present,
-              (unsigned char)scene->modules_present };
+    unsigned char present[3] = { (unsigned char)scene->entrance_present,
+        (unsigned char)scene->berths_present, (unsigned char)scene->modules_present };
     fold(&hash, "present", 8);
     fold(&hash, present, sizeof(present));
     if (scene->entrance_present) {
@@ -299,8 +299,8 @@ bool boat_scene_module_kind_from_name(const char *name, BoatSceneModuleKind *kin
 
 const char *boat_scene_mooring_name(BoatSceneMooring mooring)
 {
-    static const char *const names[] = { "none", "pontoon" };
-    return mooring <= BOAT_SCENE_MOORING_PONTOON ? names[mooring] : "unknown";
+    static const char *const names[] = { "none", "pontoon", "quay" };
+    return mooring <= BOAT_SCENE_MOORING_QUAY ? names[mooring] : "unknown";
 }
 
 bool boat_scene_mooring_from_name(const char *name, BoatSceneMooring *mooring)
@@ -313,14 +313,19 @@ bool boat_scene_mooring_from_name(const char *name, BoatSceneMooring *mooring)
     return false;
 }
 
+BoatModelKind boat_scene_berth_kind(BoatSceneBerthRecipe recipe)
+{
+    static const BoatModelKind kinds[BOAT_SCENE_BERTH_RECIPES]
+        = { BOAT_MODEL_SKIFF, BOAT_MODEL_RUNABOUT, BOAT_MODEL_SAILBOAT, BOAT_MODEL_CRUISER,
+              BOAT_MODEL_SPEEDBOAT, BOAT_MODEL_SAILBOAT, BOAT_MODEL_WORKBOAT };
+    return recipe < BOAT_SCENE_BERTH_RECIPES ? kinds[recipe] : BOAT_MODEL_SKIFF;
+}
+
 BoatModelSpec boat_scene_berth_spec(BoatSceneBerthRecipe recipe)
 {
-    static const BoatModelKind kinds[BOAT_SCENE_BERTH_RECIPES] = { BOAT_MODEL_SKIFF,
-        BOAT_MODEL_RUNABOUT, BOAT_MODEL_SAILBOAT, BOAT_MODEL_CRUISER, BOAT_MODEL_SPEEDBOAT,
-        BOAT_MODEL_SAILBOAT, BOAT_MODEL_WORKBOAT };
     if (recipe >= BOAT_SCENE_BERTH_RECIPES)
         return (BoatModelSpec) { 0 };
-    BoatModelSpec spec = boat_model_preset(kinds[recipe]);
+    BoatModelSpec spec = boat_model_preset(boat_scene_berth_kind(recipe));
     spec.fenders = true;
     if (recipe == BOAT_SCENE_BERTH_SAILBOAT_7M) {
         spec.length = 7;

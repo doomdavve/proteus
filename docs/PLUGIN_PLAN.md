@@ -38,8 +38,9 @@ Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
-scene contract/site fixture and L1.1–L1.4's decoded/bound/staged scene envelope are complete, and
-none of those scene capabilities yet supplies authored marina content. The milestones below are this plan's
+scene contract/site fixture, L1.1–L1.4's decoded/bound/staged scene envelope and L2.1's native
+berth parameterization are complete, and none of those scene capabilities yet supplies an
+authorable marina package. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1779,9 +1780,10 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L1.4 are complete; next in this track: L2.1
-parameterized moored hulls**; the first playable gate is L4.3. `scene.define` installs and stages
-an empty envelope, but no marina subsystem is authorable.
+failure cases and acceptance evidence. **L1.1–L1.4 and L2.1 are complete; next in this track:
+L2.2 berth decoding and the first harbor-life package**; the first playable gate is L4.3.
+`scene.define` installs and stages an empty envelope, and the native harbor accepts a
+caller-owned berth list, but no marina subsystem is authorable yet.
 
 ### Coverage and delivery slices
 
@@ -2058,6 +2060,41 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 poses, contacts and camera queries share one caller-owned berth list, preserving compiled
 parity. L2.2 then exposes the first two-berth package.
 
+#### L2.1 result, 2026-10-30
+
+**Implemented:** the native harbor can evaluate a caller-owned berth list while the compiled
+seven remain the default. No Lua field, renderer binding or package berth is exposed yet.
+
+- `WaterfrontBerth` now owns a stable ID, a registered `recipe`, and a `mooring` rule while
+  retaining the existing kind/pose fields. Mesh generation is per recipe; `waterfront_harbor_
+  recipe_mesh` selects it. `waterfront_harbor_berth_at` converts a scene berth from simulation
+  x/z to renderer X/Z once.
+- `waterfront_harbor_evaluate_scene`, `waterfront_harbor_contact_height_scene` and
+  `waterfront_harbor_camera_clear_scene` select the compiled list for NULL (or no authored
+  berths) and an authored present list otherwise. The old functions are wrappers with unchanged
+  behavior. The frame carries `berth_count` and a recipe per boat; CPU/GPU draw only that count.
+- Body, rope, contact and camera iteration all use the same selected list. The compiled hulls
+  are never appended when an authored list is present, so moving/removing a berth cannot leave
+  an invisible compiled contact. Authored pontoon moorings use the compiled pontoon's cleat
+  region; authored quay mooring and authored dock modules are deferred to L2.3.
+- Renderers and physics do not yet receive `BoatWorld.scene` in this step. L2.2 wires that
+  binding and the Lua decoder; L2.1 proves the native list and its consumers in isolation.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build and full `ctest --preset full`: **313/313 enabled tests** (22.73 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_harbor` adds default parity (`evaluate(NULL)` versus compiled), zero/two/seven
+  berths, independent evaluations, reordered IDs, move/remove of one berth, per-recipe meshes,
+  rope counts, contact and camera exclusion, and the no-invisible-compiled-hull checks. The
+  default frame is still byte-equal to the compiled evaluation.
+- CPU `--time 3` outer captures for compiled and reference-plugin launches remain byte-identical
+  (SHA-256 `ad4a277fc752c2be1cfd4c446429db11827f06c189b0b8cae6bf0c7d156cebb5`). No authored
+  berth is rendered yet; GPU path is unchanged by the recipe index and was not visually rerun.
+
+**Next in this track: L2.2.** Decode `scene.marina.berths`, wire the accepted scene into
+`BoatWorld`/both renderers, and add the two-berth `plugins/harbor-life` package at the L1.1 site.
+
 #### L2 — a small marina before a marina editor
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
@@ -2173,9 +2210,11 @@ Completed L1.3, 2026-10-30: bound the accepted envelope through the host, sessio
 with preview rebinding and compiled restoration on close.
 Completed L1.4, 2026-10-30: added the PST3 scene staging wire, worker/preview/capture evidence,
 truthful discovery, and browser/room/replay rejection.
-Next task for this track: **L2.1**, parameterize existing moored hulls before exposing package
-berths. Known limits: no marina fields, tram/seal recipes, gameplay dusk, building activity or
-human scene acceptance are implemented.
+Completed L2.1, 2026-10-30: parameterized native moored hulls by recipe and caller-owned berth
+list, with default parity, move/remove coverage and no invisible compiled hull.
+Next task for this track: **L2.2**, expose two berths in the first harbor-life package and wire
+the accepted scene into physics/renderers. Known limits: no marina fields, authored quay mooring
+or dock modules, tram/seal recipes, gameplay dusk, building activity or human scene acceptance.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project
