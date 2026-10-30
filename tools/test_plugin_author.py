@@ -74,6 +74,89 @@ class Lifecycle(unittest.TestCase):
                 self.job(**kwargs)
 
 
+class Workspace(unittest.TestCase):
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(self.scratch.cleanup)
+        self.directory = Path(self.scratch.name)
+        for name in ("plugin.json", "main.lua"):
+            (self.directory / name).write_bytes((ROOT / "plugins/langedrag" / name).read_bytes())
+
+    def test_read_write_and_pins(self):
+        before = author.workspace_read(self.directory)
+        self.assertEqual(before["bundle_id"], author.hashlib.sha256(
+            author.snapshot(self.directory)).hexdigest())
+        source = (before["files"]["main.lua"] + "\n-- Göteborg\n").encode()
+        after = author.workspace_write(self.directory, "main.lua", source, before["bundle_id"])
+        self.assertTrue(after["draft"])
+        self.assertEqual(after["previous_bundle_id"], before["bundle_id"])
+        self.assertEqual(after["files"]["plugin.json"], before["files"]["plugin.json"])
+        self.assertEqual((self.directory / "main.lua").read_bytes(), source)
+        with self.assertRaises(ValueError):
+            author.workspace_write(self.directory, "main.lua", b"stale", before["bundle_id"])
+        self.assertEqual(author.workspace_read(self.directory)["bundle_id"], after["bundle_id"])
+        self.assertEqual(list(self.directory.glob(".plugin-draft-*")), [])
+
+    def test_rejection_preserves_files(self):
+        before = author.workspace_read(self.directory)
+        pin = before["bundle_id"]
+        for filename, content, expected in [("../escape", b"x", pin),
+                ("main.lua", b"x", None), ("main.lua", b"\xff", pin),
+                ("main.lua", b"x" * 65537, pin), ("plugin.json", b"x" * 4097, pin)]:
+            with self.assertRaises((ValueError, UnicodeError)):
+                author.workspace_write(self.directory, filename, content, expected)
+            self.assertEqual(author.workspace_read(self.directory), before)
+        with patch.object(author.os, "replace", side_effect=OSError("denied")):
+            with self.assertRaises(OSError):
+                author.workspace_write(self.directory, "main.lua", b"draft", pin)
+        self.assertEqual(author.workspace_read(self.directory), before)
+        self.assertEqual(list(self.directory.glob(".plugin-draft-*")), [])
+
+    def test_edit_during_preparation(self):
+        before = author.workspace_read(self.directory)
+        chmod = os.chmod
+
+        def concurrent_edit(path, mode):
+            chmod(path, mode)
+            (self.directory / "plugin.json").write_bytes(b"external edit")
+
+        with patch.object(author.os, "chmod", side_effect=concurrent_edit):
+            with self.assertRaises(ValueError):
+                author.workspace_write(self.directory, "main.lua", b"replacement",
+                                       before["bundle_id"])
+        self.assertEqual((self.directory / "main.lua").read_text(), before["files"]["main.lua"])
+        self.assertEqual((self.directory / "plugin.json").read_bytes(), b"external edit")
+        self.assertEqual(list(self.directory.glob(".plugin-draft-*")), [])
+
+    def test_links_and_special_files(self):
+        if os.name == "nt":
+            self.skipTest("POSIX links/FIFO fixture")
+        pin = author.workspace_read(self.directory)["bundle_id"]
+        target = self.directory / "main.lua"
+        target.unlink()
+        target.symlink_to(self.directory / "plugin.json")
+        with self.assertRaises(ValueError):
+            author.workspace_write(self.directory, "main.lua", b"draft", pin)
+        target.unlink()
+        os.mkfifo(target)
+        with self.assertRaises(ValueError):
+            author.workspace_read(self.directory)
+
+    def test_cli_draft_does_not_evaluate(self):
+        def run(*args, content=None):
+            return subprocess.run([sys.executable, str(ROOT / "tools/plugin_author.py"),
+                *args], input=content, capture_output=True, timeout=10)
+        before = json.loads(run("workspace-read", str(self.directory)).stdout)
+        args = ("workspace-write", str(self.directory), "--file", "main.lua",
+                "--expect-bundle", before["bundle_id"])
+        result = run(*args, content=b"not valid Lua")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["files"]["main.lua"], "not valid Lua")
+        stale = run(*args, content=b"stale")
+        self.assertEqual(stale.returncode, 1)
+        self.assertEqual(json.loads(stale.stdout)["status"], "input_error")
+
+
 class Worker(unittest.TestCase):
     def run_worker(self, payload):
         run = subprocess.run([WORKER], input=payload, capture_output=True, timeout=10)

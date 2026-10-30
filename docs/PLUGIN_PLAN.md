@@ -1,6 +1,6 @@
 # Lua gameplay plugins and live authoring
 
-Status, 2026-10-29: **P0–P3 implemented for trusted native solo authoring.** Native solo `outer` sessions load and
+Status, 2026-10-30: **P0–P3 implemented for trusted native solo authoring.** Native solo `outer` sessions load and
 live-edit the Långedrag voyage; the local river trial now loads race descriptors through the
 same restricted evaluator and revision host. The compiled race remains the network default.
 P3.1 provides atomic objective transactions and P3.2 connects lossless native voyage events
@@ -16,14 +16,14 @@ is embedded Lua for gameplay authoring, with C retaining physics, collisions, wa
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.3, browser descriptor import/reload/export**, following
-[P4.2 native tools/staging](#p42-result-2026-10-29); see the [P4.3 result](#p43-result-2026-10-29). Prior results retain their implementation,
-automated/manual verification and user-acceptance evidence below.
-**Next task: broader target/browser qualification and the remaining P4 authoring tools**
-(capture/workspace bridge/anchors), then objective import isolation before broadening browser
-capabilities. Native startup, objective updates and Apply-time init/migration still evaluate
-trusted Lua synchronously; browser imports support only `voyage.define` and never evaluate
-source on the game thread.
+Completed task: **P4.4 draft workspace read/write CLI**, following
+[P4.3 browser descriptor import/reload/export](#p43-result-2026-10-29); see the
+[P4.4 result](#p44-result-2026-10-30). Prior results retain their dated verification evidence.
+**Next task: frame capture, curated anchors/bookmarks and live tool bridge**, alongside broader
+target/browser qualification. Native startup, objective updates and Apply-time init/migration
+still evaluate trusted Lua synchronously; browser imports support only `voyage.define` and
+never evaluate source on the game thread. Browser objective isolation and race integration
+remain prerequisites for broadening that subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
@@ -1342,6 +1342,38 @@ objective/callback execution remain unqualified. No website/release was publishe
 adding objectives to browser imports, isolate their init/update/migration/Undo evaluation and
 state persistence transactions. Browser race authoring needs its own native preview integration.
 The P3 human migration/Undo/recovery and target timing gates remain open.
+
+#### P4.4 result, 2026-10-30
+
+Implemented selected draft workspace operations in `tools/plugin_author.py`:
+`workspace-read` returns both bounded UTF-8 files and the validation-compatible SHA-256
+bundle ID; `workspace-write` accepts one allowlisted file from bounded stdin and requires
+`--expect-bundle`. It checks the pin before and after preparing a same-directory replacement,
+then atomically replaces that one file. Failed preparation/replacement cleans temporary files.
+Responses identify source drafts and previous/resulting bundle IDs. No Lua is evaluated and
+no live revision is installed; invalid drafts remain editable. See the
+[CLI contract](PLUGIN_API.md#native-authoring-tools-p41) for commands and concurrency limits.
+
+Verification, 2026-10-30, Apple Silicon/macOS Debug, GPU CTests off: configure/build
+succeeded using the existing pinned dependency source trees. Full `ctest --preset full`
+passed **307/307 enabled tests** (14.29 s) with loopback access; 13 retired field cases
+remain disabled. The sandbox-only run failed the ten socket-dependent cases. After the final
+response-construction refinement, all **19 authoring checks** passed, including five workspace
+checks for UTF-8 round trips, stale pins, edits during preparation, bounded input, path/link/FIFO
+rejection, failed-replace cleanup and actual CLI draft saves without Lua evaluation.
+All 266 local links/anchors in the three changed guides resolve; `git diff --check` passes.
+Windows/Linux execution awaits CI. No new target performance claim is made.
+No gameplay, rendering, input, audio or runtime asset-loading changes are included; no new
+manual playback or human authoring acceptance is claimed.
+
+**Remaining P4 work:** frame capture with pinned evidence; curated anchors and camera bookmarks;
+live owner inspection/stage/apply/undo tool access and optional bridge transport; interactive
+preview controls; release-tool packaging; broader Windows/Linux/browser and physical-device
+memory/compiler/callback qualification, tab suspension and repeated-session cleanup. Browser
+objectives require isolated init/update/migration/Undo and state persistence; browser races
+need native preview integration. P3 human migration/Undo/recovery acceptance remains open.
+The new CLI operates on trusted local source drafts, uses optimistic pins rather than editor
+locks, and does not provide an atomic two-file transaction or a live game connection.
 
 ### P5 — authority, prediction and recorded revisions
 
