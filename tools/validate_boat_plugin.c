@@ -297,6 +297,12 @@ static int scene_berths(void)
         && voyage.scene.berths[1].z == 173);
     CHECK(voyage.scene.entrance_present && voyage.scene.entrance_x == 6
         && voyage.scene.entrance_z == 168 && voyage.scene.entrance_width == 8);
+    CHECK(voyage.scene.modules_present && voyage.scene.module_count == 2);
+    CHECK(!strcmp(voyage.scene.modules[0].id, "pier")
+        && voyage.scene.modules[0].kind == BOAT_SCENE_MODULE_PONTOON_SMALL);
+    CHECK(!strcmp(voyage.scene.modules[1].id, "ramp")
+        && voyage.scene.modules[1].kind == BOAT_SCENE_MODULE_GANGWAY
+        && !strcmp(voyage.scene.modules[1].attaches, "pier"));
     CHECK(voyage.scene_digest != 0 && voyage.scene_digest == boat_scene_digest(&voyage.scene));
     BoatWorldResources resources;
     CHECK(boat_world_resources_init(&resources, boat_location_find("outer")));

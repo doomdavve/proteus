@@ -362,6 +362,13 @@ int main(void)
         &marina, (Vector2) { 20, 182 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
     CHECK(waterfront_harbor_contact((Vector2) { 20, 182 }, .35f, NULL));
     CHECK(!waterfront_harbor_camera_clear_scene(&marina, (Vector3) { -27.6f, 2, 170 }, 0));
+    BoatSceneDefinition no_modules = marina;
+    no_modules.module_count = 0;
+    WaterfrontHarborFrame bare;
+    waterfront_harbor_evaluate_scene(&no_modules, (BoatWater) { 0 }, 0, NULL, &bare);
+    CHECK(bare.modules_authored && bare.module_count == 0);
+    CHECK(!waterfront_harbor_contact_height_scene(
+        &no_modules, (Vector2) { 20, 182 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
 
     // L2.2 deterministic marina approach/exit: the authored lane is usable and both hulls stop
     // the same physics that reads BoatWorld.scene.

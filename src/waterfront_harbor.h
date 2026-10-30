@@ -45,7 +45,9 @@ typedef struct {
     Transform3D pontoon;
     Transform3D gangway;
     Transform3D quay; // Places the quay mesh; identity on the river's 3.5 m ground.
-    // L2.3 authored modules. module_count > 0 means the compiled dock parts are not drawn.
+    // L2.3 authored modules. modules_authored means the compiled dock parts are not drawn,
+    // even when the authored list is empty.
+    bool modules_authored;
     int module_count;
     WaterfrontModuleFrame modules[BOAT_SCENE_MODULES];
     int line_count;

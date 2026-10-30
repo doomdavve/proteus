@@ -296,7 +296,7 @@ WaterfrontModuleSpec waterfront_harbor_module_spec(unsigned kind)
     case BOAT_SCENE_MODULE_GANGWAY:
         return (WaterfrontModuleSpec) { 1.5f, 1.5f, .35f };
     case BOAT_SCENE_MODULE_QUAY:
-        return (WaterfrontModuleSpec) { 6, 4, 1.1f };
+        return (WaterfrontModuleSpec) { 10, 6, 1.1f };
     default:
         return (WaterfrontModuleSpec) { 0 };
     }
@@ -442,6 +442,7 @@ void waterfront_harbor_evaluate_scene(const BoatSceneDefinition *scene, BoatWate
     *frame = (WaterfrontHarborFrame) { 0 };
     bool authored = scene && scene->berths_present;
     bool authored_modules = scene && scene->modules_present;
+    frame->modules_authored = authored_modules;
     unsigned count = waterfront_harbor_berth_count(scene);
     // The quay gear stands around (50, 35); the river kit's ground is 3.5 m.
     float quay_lift = ground ? ground(50, 35) - 3.5f : 0;

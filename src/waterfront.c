@@ -176,7 +176,7 @@ void waterfront_draw_traffic(Renderer3D *r, const WaterfrontTrafficFrame *frame)
 
 void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
 {
-    if (frame->module_count) {
+    if (frame->modules_authored) {
         for (int i = 0; i < frame->module_count; ++i) {
             const WaterfrontModuleFrame *m = &frame->modules[i];
             if (m->kind == BOAT_SCENE_MODULE_GANGWAY)

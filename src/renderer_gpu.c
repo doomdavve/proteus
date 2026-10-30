@@ -1452,7 +1452,7 @@ static void draw_harbor(
     const WaterfrontGpuScene *scene, Material material, const WaterfrontSceneFrame *frame)
 {
     const WaterfrontHarborFrame *harbor = &frame->harbor;
-    if (harbor->module_count) {
+    if (harbor->modules_authored) {
         for (int i = 0; i < harbor->module_count; ++i) {
             const WaterfrontModuleFrame *m = &harbor->modules[i];
             if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
