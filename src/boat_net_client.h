@@ -79,8 +79,9 @@ typedef struct {
     uint64_t tick;
     BoatNetSnapshot snapshot;
     bool snapshot_received;
-    unsigned pages;
-    uint8_t bytes[BOAT_COMBAT_BYTES];
+    uint8_t count, received; // Compact pages, 1-3, and the bitmask received for this tick.
+    uint16_t size; // Sum of the received compact page bytes.
+    uint8_t bytes[BOAT_COMBAT_COMPACT_BYTES];
 } BoatNetCombatSet;
 
 // The mirror fleet holds the newest authoritative snapshot, rebuilt from a complete checkpoint

@@ -271,7 +271,7 @@ static void snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
     }
 }
 
-// Snapshot and combat pages may arrive in any order on independent channels. Never
+// Snapshot and compact combat pages may arrive in any order on independent channels. Never
 // reconcile a hull against a partial combat state, and never retain superseded pages.
 static void combat_snapshot(BoatNetClient *c, const BoatNetMessage *m, double now)
 {
@@ -289,12 +289,23 @@ static void combat_snapshot(BoatNetClient *c, const BoatNetMessage *m, double no
         set->snapshot_received = true;
     } else {
         const BoatNetWorldPage *p = &m->world_page;
-        memcpy(set->bytes + p->index * BOAT_NET_PAGE_BYTES, p->data, p->size);
-        set->pages |= 1u << p->index;
+        if (set->count && set->count != p->count) {
+            ++c->stats.decode_errors;
+            return;
+        }
+        if (!(set->received & (1u << p->index))) {
+            set->count = p->count;
+            set->received |= (uint8_t)(1u << p->index);
+            set->size = (uint16_t)(set->size + p->size);
+            memcpy(set->bytes + p->index * BOAT_NET_PAGE_BYTES, p->data, p->size);
+        }
     }
-    if (set->pages == 15 && set->snapshot_received) {
+    if (set->count && set->received == (uint8_t)((1u << set->count) - 1)
+        && set->snapshot_received) {
         BoatCombat combat;
-        if (!boat_combat_decode(&combat, set->bytes, tick) || !combat.enabled) {
+        if (!boat_combat_compact_decode(
+                &combat, set->bytes, set->size, tick, &c->fleet.state.combat.rules)
+            || !combat.enabled) {
             ++c->stats.decode_errors;
             return;
         }

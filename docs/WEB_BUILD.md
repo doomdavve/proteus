@@ -452,7 +452,7 @@ inspected. The [P4.9 result](PLUGIN_PLAN.md#p49-result-2026-10-30) owns worker/d
 The transport feasibility check first echoed C-codec PING bytes unchanged over all five
 negotiated browser/native DataChannels. Gameplay then reused that adapter. Channel IDs 0 and 4
 (control/bootstrap) are reliable and ordered; 1, 2 and 3 are unordered with no retransmissions.
-Existing application sequence numbers discard stale state/births. Current protocol v7 carries the arsenal in combat pages on the existing unreliable unsequenced channel; rebuild browser and native peers together.
+Existing application sequence numbers discard stale state/births. Current protocol v8 carries the arsenal in a compact 1–3 page payload on the existing unreliable unsequenced channel; rebuild browser and native peers together.
 `boat_net_mux` assigns distinct authority peer IDs to colliding ENet/WebRTC local peer IDs.
 
 Build an optional native endpoint (C++ compiler and OpenSSL development files required;
