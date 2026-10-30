@@ -231,7 +231,8 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
     return only(L, vm, index, at, keys) ? index : 0;
 }
 
-static const char *const ROOT[] = { "voyage", "init", "update", "migrate", NULL };
+static const char *const ROOT[] = { "voyage", "scene", "init", "update", "migrate", NULL };
+static const char *const SCENE[] = { "version", NULL };
 static const char *const VOYAGE[]
     = { "shelters", "arrival", "exposure", "exposed_fraction", "weather_range", NULL };
 static const char *const SHELTER[] = { "id", "name", "x", "z", "heading", "radius", NULL };
@@ -308,6 +309,21 @@ static int decode(lua_State *L)
     d->migrates = !lua_isnil(L, -1);
     if (d->migrates && (!d->callbacks || !lua_isfunction(L, -1))) {
         reject(vm, "migrate", "requires init/update and must be a function");
+        return 0;
+    }
+    lua_pop(L, 1);
+    // L1.2 accepts only the versioned scene envelope. Later tasks add marina fields here and
+    // validate them with the same copied-data rules.
+    lua_pushstring(L, "scene");
+    int scene_type = lua_rawget(L, 2);
+    if (scene_type == LUA_TTABLE) {
+        int scene = lua_absindex(L, -1);
+        if (!only(L, vm, scene, "scene", SCENE)
+            || !number(L, vm, scene, "scene", "version", &d->scene_version))
+            return 0;
+        d->has_scene = true;
+    } else if (scene_type != LUA_TNIL) {
+        reject(vm, "scene", "must be a table, not a %s", lua_typename(L, scene_type));
         return 0;
     }
     lua_pop(L, 1);

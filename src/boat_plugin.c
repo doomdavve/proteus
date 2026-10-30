@@ -130,28 +130,36 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             "must match kind: outer for voyage, river for race");
     const char *grant = !strcmp(m.kind, "race") ? "race.define" : "voyage.define";
     const jsmntok_t *capabilities = &tokens[at[6]];
-    if (capabilities->type != JSMN_ARRAY || (capabilities->size < 1 || capabilities->size > 3))
+    if (capabilities->type != JSMN_ARRAY || capabilities->size < 1
+        || capabilities->size > (!strcmp(m.kind, "race") ? 1 : 4))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
-            "must contain exactly the kind's define capability");
+            !strcmp(m.kind, "race") ? "must contain exactly race.define"
+                                    : "must contain voyage.define and optional grants");
     char capability[32];
     if (!boat_json_text(json, &tokens[at[6] + 1], capability, sizeof(capability))
         || strcmp(capability, grant))
         return diagnose(
             d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]", "is not granted for this kind");
-    if (capabilities->size >= 2) {
-        if (strcmp(m.kind, "voyage")
-            || !boat_json_text(json, &tokens[at[6] + 2], capability, sizeof(capability))
-            || strcmp(capability, "objective.hud"))
-            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities[2]",
-                "only objective.hud is granted for voyages");
-        m.objective = true;
-    }
-    if (capabilities->size == 3) {
-        if (!boat_json_text(json, &tokens[at[6] + 3], capability, sizeof(capability))
-            || strcmp(capability, "objective.timers"))
-            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities[3]",
-                "only objective.timers is granted after objective.hud");
-        m.timers = true;
+    // Voyage grants are a canonical prefix: scene.define, objective.hud, objective.timers.
+    // A package cannot reorder or repeat them, and timers require HUD.
+    int order = 0;
+    for (unsigned i = 1; i < capabilities->size; ++i) {
+        char path[32];
+        snprintf(path, sizeof(path), "capabilities[%u]", i + 1);
+        if (!boat_json_text(json, &tokens[at[6] + i + 1], capability, sizeof(capability)))
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path, "is not a string");
+        if (!strcmp(capability, "scene.define") && order == 0) {
+            m.scene = true;
+            order = 1;
+        } else if (!strcmp(capability, "objective.hud") && order <= 1) {
+            m.objective = true;
+            order = 2;
+        } else if (!strcmp(capability, "objective.timers") && order == 2) {
+            m.timers = true;
+            order = 3;
+        } else
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
+                "is not granted in the order scene.define, objective.hud, objective.timers");
     }
     if (!boat_json_int(json, &tokens[at[7]], &state) || state < 1 || state > 65535
         || (!m.objective && state != BOAT_PLUGIN_STATE_VERSION))
@@ -378,11 +386,26 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     if (data->callbacks != manifest->objective)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
             "callbacks require objective.hud and that capability requires both callbacks");
+    if (data->has_scene && !manifest->scene)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene",
+            "requires the scene.define capability");
+    if (data->has_scene && data->scene_version != BOAT_SCENE_VERSION)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.version",
+            "must be %d, the supported scene schema", BOAT_SCENE_VERSION);
     Check check = { d, manifest->entry };
     if (!validate(&check, data))
         return BOAT_PLUGIN_SCHEMA;
 
     BoatPluginVoyage candidate = { .manifest = *manifest, .migrates = data->migrates };
+    if (data->has_scene) {
+        candidate.has_scene = true;
+        candidate.scene.version = BOAT_SCENE_VERSION;
+        BoatSceneDiagnostic scene;
+        if (!boat_scene_validate(&candidate.scene, &scene))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, scene.field, "%s",
+                scene.message);
+        candidate.scene_digest = boat_scene_digest(&candidate.scene);
+    }
     BoatVoyageRoute *route = &candidate.route;
     route->shelter_count = data->shelter_count;
     for (unsigned i = 0; i < data->shelter_count; ++i) {
@@ -468,6 +491,13 @@ BoatPluginChange boat_plugin_classify(
     const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
         return BOAT_PLUGIN_RESTART_SESSION;
+    // L1.2 has only an empty envelope, so it changes no runtime content. Once L2 authors
+    // berths/modules, any differing authored layout is a physical session restart.
+    if (boat_scene_has_content(&active->scene) || boat_scene_has_content(&candidate->scene)) {
+        if (active->has_scene != candidate->has_scene
+            || active->scene_digest != candidate->scene_digest)
+            return BOAT_PLUGIN_RESTART_SESSION;
+    }
     bool same = a->shelter_count == b->shelter_count
         && same_point(a->arrival_centre, b->arrival_centre)
         && a->arrival_radius == b->arrival_radius && a->arrival_speed == b->arrival_speed

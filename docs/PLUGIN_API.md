@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-30: **P0–P3 native descriptors/objectives and P4.1–P4.9 authoring tools and browser objective isolation implemented**.
+Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and L1.2 scene envelope decoding implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages with optional objectives/timers.
@@ -45,7 +45,7 @@ rejected. Strings are non-empty printable ASCII.
 | `kind` | `"voyage"` or `"race"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
 | `location` | `"outer"` for voyage; `"river"` for race |
-| `capabilities` | `["voyage.define"]`, optionally followed by `"objective.hud"` and then `"objective.timers"`; races use `["race.define"]` |
+| `capabilities` | `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`; races use `["race.define"]` |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -126,13 +126,14 @@ the field path, such as `voyage.shelters[2]`, and no line.
 
 ## Location-life scene contract (planned L1.1)
 
-Status, 2026-10-30: **contract and site fixture only; no scene grant is supported yet.** The
-[location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30) implements this in
-separate worktree/PR steps. L1.1 freezes the ownership, identity, limits and first marina site;
-L1.2 adds a versioned envelope with no authorable subsystem; L1.3 installs that envelope through
-the existing revision host; L2.2 exposes two berths; L2.3 adds registered dock modules. Until
-those steps land, `scene.define` is rejected by the manifest parser and `scene` is an unknown
-field.
+Status, 2026-10-30: **L1.1 contract/site complete; L1.2 versioned envelope decoding implemented
+but not installed live.** The [location-life track](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
+implements the remaining steps separately. L1.1 froze the ownership, identity, limits and first
+marina site; L1.2 accepts the manifest grant and `scene = { version = 1 }` only. The decoded
+envelope is copied and classified with the voyage revision, but the running session and both
+renderers keep the compiled marina until L1.3's application binding. Any marina field is still
+an unknown field: L2.2 exposes two berths and L2.3 registered dock modules. `scene.define` does
+not enable a second package, a callback or a browser/room path.
 
 ### Package composition
 
@@ -185,8 +186,8 @@ return {
 
 | Field | Planned bound | Meaning |
 | --- | --- | --- |
-| `scene.version` | integer `1` | Scene schema. A different version is incompatible, not migrated. |
-| `marina` | table; absent means compiled marina | Present replaces every authorable marina subsystem it contains. |
+| `scene.version` | integer `1` | Accepted by L1.2. A different version is rejected, not migrated. |
+| `marina` | table; absent means compiled marina | **Planned L2.2/L2.3; currently rejected as an unknown field.** A present table will replace only its supported subsystems. |
 | `marina.entrance` | `{ x, z, width }`, finite, \|x/z\| ≤ 20 000 m, width 4–40 m | Declared approach/clearance point. Validation requires open water and no hull overlap. |
 | `marina.berths` | dense list of 0–7 records | A present list replaces the entire compiled moored collection. Empty means no authored moored hulls. |
 | `berths[i].id` | 1–23 of `a-z 0-9 _`, starting with a letter; unique in the scene | Stable authored identity; diagnostics and later occupancy. Reordering does not change identity. |
@@ -201,9 +202,13 @@ return {
 | `gangway.anchor` | `{ x, z }`, finite | Shore end. It must be land; the pontoon landing must be water. |
 | `gangway.attaches` | existing pontoon module ID | The far end is the named pontoon's west-side landing, transformed by that pontoon's pose. |
 
-Unknown fields, duplicate IDs, unknown recipes, a gangway with a missing or non-pontoon target,
-wrong location, non-finite values and capacity + 1 are rejected with their field paths. Every
-table is strict; lists are dense. There is no silent clamp, index merge or partial installation.
+The L1.2 decoder checks the envelope, its grant and ordering before reading any marina field.
+The plain C `BoatSceneDefinition` already validates the planned IDs, recipes, numbers and
+capacities in `boat_scene_validate`, so L2.2 can expose them without changing the ownership or
+schema rules. Invalid fields, duplicate IDs, unknown recipes, a gangway with a missing or
+non-pontoon target, wrong location, non-finite values and capacity + 1 are rejected with their
+field paths. Every table is strict; lists are dense. There is no silent clamp, index merge or
+partial installation.
 Depth is unavailable in the current map, so discovery and diagnostics report **depth unverified**
 instead of inventing a bathymetry check. The other checks use the compiled water and native hull
 recipes.
