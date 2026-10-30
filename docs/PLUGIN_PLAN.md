@@ -2429,8 +2429,8 @@ camera/time recipes, worker/live-bridge commands and a human-review checklist.
   populated scenes at the same camera/time sweep and reports p50/p95, meshes, lights, wakes and
   host memory.
 - **Measured on this host (Apple Silicon/macOS, Debug, 320×200 CPU, 180 frames, same camera):**
-  compiled p50/p95 **9.089/9.195 ms**, populated **8.884/9.004 ms**, supported-maximum scene
-  **10.699/10.872 ms**. The populated frame had 2 berths, 2 modules, 4 travelling craft
+  compiled p50/p95 **9.095/9.270 ms**, populated **8.972/9.125 ms**, supported-maximum scene
+  **10.762/10.935 ms** (repeat runs varied by a few tenths of a millisecond). The populated frame had 2 berths, 2 modules, 4 travelling craft
   (48 traffic wake patches), 1 flock/8 birds, 32 meshes, 37 attached lights and 20 cars; the host
   retained one revision and 746,952 reserved bytes. The maximum scene (7 berths, 4 modules,
   8 craft, 4×8 birds) occupies 7,944 bytes. These are CPU render timings, not GPU or frame-pacing
