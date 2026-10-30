@@ -1013,6 +1013,12 @@ add_test(NAME harbor_geometry COMMAND validate_harbor)
 
 # L1.1 planned marina site: compiled-water and native hull-recipe checks before scene grants.
 add_executable(validate_scene_site tools/validate_scene_site.c)
+add_executable(validate_harbor_life tools/validate_harbor_life.c)
+target_link_libraries(validate_harbor_life PRIVATE proteus_plugins proteus_boat_session)
+target_compile_options(validate_harbor_life PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME harbor_life_qualification COMMAND validate_harbor_life)
+set_tests_properties(harbor_life_qualification PROPERTIES LABELS "cpu;slow"
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(validate_scene_site PRIVATE proteus_boat_core)
 target_compile_options(validate_scene_site PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
