@@ -244,7 +244,7 @@ The user approved the white cabin boat after reviewing its rounded bow, softened
 Swedish flag, lowered timber stern platform and hull-mounted inboard-drive detail. Select
 `cabin` in solo settings or with `--skin cabin`. It uses standard handling; the drive is a
 visual detail and room slots remain the four Nordic speedboats. The cabin hull, cabin and flag
-are drawn 0.24 m lower along the boat’s vertical axis to improve the apparent waterline;
+are drawn 0.40 m lower along the boat’s vertical axis to improve the apparent waterline;
 physics and wake placement are unchanged. The explorer remains available
 with its existing solo free-riding engine. On 2026-10-30 macOS Debug, CPU basin/river captures
 and GPU close and waterline captures were inspected; a 180-frame GPU river demo ran. The full Debug

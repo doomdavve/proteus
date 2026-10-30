@@ -108,7 +108,7 @@ static void cabin_waterline(void)
     boat_player_pose(&view, &flag, &normal);
     view.skin = BOAT_SKIN_CABIN;
     boat_player_pose(&view, &flag, &cabin);
-    Vector3 offset = Vector3Transform((Vector3) { 0, -.24f, 0 }, boat_pose_rotation(&view.boat));
+    Vector3 offset = Vector3Transform((Vector3) { 0, -.40f, 0 }, boat_pose_rotation(&view.boat));
     assert(
         Vector3Distance(cabin.hull.position, Vector3Add(normal.hull.position, offset)) < .00001f);
     assert(

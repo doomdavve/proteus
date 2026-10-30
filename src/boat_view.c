@@ -38,7 +38,7 @@ void boat_player_pose(
     if (player->skin == BOAT_SKIN_CABIN) {
         // The recovered hull has more freeboard than the speedboat. Lower the visual
         // craft, including its cloth, along its own up axis without changing physics.
-        Vector3 offset = Vector3Transform((Vector3) { 0, -.24f, 0 }, boat_pose_rotation(boat));
+        Vector3 offset = Vector3Transform((Vector3) { 0, -.40f, 0 }, boat_pose_rotation(boat));
         player->hull.position = Vector3Add(player->hull.position, offset);
         player->cabin.position = Vector3Add(player->cabin.position, offset);
         for (int i = 0; i < BOAT_FLAG_POINTS; ++i)

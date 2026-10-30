@@ -71,7 +71,7 @@ without changing the 54 simulation particles, forces or staff attachment.
 
 The four Nordic speedboats and explorer share vertices and topology; the cabin boat has its own geometry, with a fixed inboard-drive detail and no outboard. No skin enters `Boat`, physics,
 contacts, thrust, wake generation, audio tuning, course rules or network serialization.
-The cabin is drawn 0.24 m lower, including its flag, and uses standard handling; its inboard drive is visual and does not change propulsion physics. The two outboards share the original steering rotation at separate hull-relative mounts;
+The cabin is drawn 0.40 m lower, including its flag, and uses standard handling; its inboard drive is visual and does not change propulsion physics. The two outboards share the original steering rotation at separate hull-relative mounts;
 they do not add simulated thrust or mass. The flag keeps its world-space
 attachment and simulation. Harbor/traffic boat recipes are unchanged.
 
