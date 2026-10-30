@@ -11,16 +11,17 @@ P3.4 accounts retained/native storage, separates instruction budgets and measure
 staging. P4.1 adds discovery and isolated native validation; P4.2 adds machine-readable schemas,
 bounded isolated voyage/race previews and disposable-process live descriptor staging for trusted
 native edits. P4.3 adds browser source bundles and isolated descriptor-only import/reload/export; browser
-objectives and race imports remain explicitly unsupported. There is no in-game agent. The agreed direction
+objectives and race imports remain explicitly unsupported. P4.4 adds pinned draft workspace
+read/write and P4.5 pinned CPU frame capture with curated anchors/camera bookmarks. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.4 draft workspace read/write CLI**, following
-[P4.3 browser descriptor import/reload/export](#p43-result-2026-10-29); see the
-[P4.4 result](#p44-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: frame capture, curated anchors/bookmarks and live tool bridge**, alongside broader
-target/browser qualification. Native startup, objective updates and Apply-time init/migration
+Completed task: **P4.5 pinned frame capture and curated anchors**, following
+[P4.4 draft workspace read/write](#p44-result-2026-10-30); see the
+[P4.5 result](#p45-result-2026-10-30). Prior results retain their dated verification evidence.
+**Next task: live tool bridge** (owner inspection and stage/apply/undo against a running native
+game), alongside broader target/browser qualification. Native startup, objective updates and Apply-time init/migration
 still evaluate trusted Lua synchronously; browser imports support only `voyage.define` and
 never evaluate source on the game thread. Browser objective isolation and race integration
 remain prerequisites for broadening that subset.
@@ -1370,7 +1371,7 @@ No new target performance claim is made.
 No gameplay, rendering, input, audio or runtime asset-loading changes are included; no new
 manual playback or human authoring acceptance is claimed.
 
-**Remaining P4 work:** frame capture with pinned evidence; curated anchors and camera bookmarks;
+**Remaining P4 work (recorded at P4.4; capture and anchors implemented below):** frame capture with pinned evidence; curated anchors and camera bookmarks;
 live owner inspection/stage/apply/undo tool access and optional bridge transport; interactive
 preview controls; release-tool packaging; broader Windows/Linux/browser and physical-device
 memory/compiler/callback qualification, tab suspension and repeated-session cleanup. Browser
@@ -1378,6 +1379,48 @@ objectives require isolated init/update/migration/Undo and state persistence; br
 need native preview integration. P3 human migration/Undo/recovery acceptance remains open.
 The new CLI operates on trusted local source drafts, uses optimistic pins rather than editor
 locks, and does not provide an atomic two-file transaction or a live game connection.
+
+#### P4.5 result, 2026-10-30
+
+Implemented `capture` and `anchors` in `tools/plugin_author.py`; see the
+[capture contract](PLUGIN_API.md#frame-capture-and-anchors-p45).
+
+- `anchors` publishes seven hand-curated poses from `tools/plugin_anchors.json`: five outer
+  voyage places (dock, bridge, east shore, squall edge, Långedrag arrival) and the river sprint
+  start/finish. Each is a prompt-friendly named coordinate and a camera bookmark. Plugins cannot
+  read them; they add no gameplay data or semantic-map project.
+- `capture` pins one draft snapshot (`--expect-bundle`, `--base-revision`), writes those exact
+  bytes into a private package and runs the existing display-free `wake_velocity --renderer
+  cpu --plugin … --screenshot` path with the anchor's `--start` and optional camera distance/
+  height, under the validation job's poll/kill/reap deadline. Evidence records the game's
+  reported plugin id, revision and gameplay digest, plus PNG size/SHA-256; `artifact_id` hashes
+  the pins, scenario and evidence. Verified frames atomically replace `--output`. Native load
+  diagnostics are `rejected`; other failures are `capture_failed`.
+- No C, rendering, input, audio or runtime asset-loading code changed. The game's screenshot
+  path already composed `--plugin`, `--start` and camera options.
+
+Limits: voyage plugins only (the race trial has no screenshot path); CPU 320×200 world frames
+without HUD/objective rows; the child is the trusted native game, so its Lua runs as in `--plugin`,
+bounded only by the process deadline. Frames are repeatable per build/platform, not portable
+golden images. No live game connection, inspection, Apply or Undo is provided.
+
+Verification, 2026-10-30, Apple Silicon/macOS Debug, GPU CTests off: configure (existing
+pinned dependency sources) and build succeeded warning-clean for project sources. Full
+`ctest --preset full` passed **308/308 enabled tests** (16.47 s; 13 retired field cases
+disabled), including the new slow `render` test `boat_plugin_capture` (8.7 s): every outer anchor
+is navigable, two pinned shelter-tour captures produce identical frames/evidence/artifacts, a
+syntax-error candidate is `rejected`, and the CLI honours `--expect-bundle` and replaces
+`--output` without leftovers. Fake-process checks cover deadline cleanup of the private package,
+rejected/failed/no-revision/non-PNG output and request limits. Bridge, squall-edge, Långedrag and
+shelter-tour bridge captures were inspected: boat, wake, shoreline and squall render at the expected
+poses. PR CI on 2026-10-30 passed on Linux and macOS (308/308, `boat_plugin_capture` ran) and
+Windows; the Windows lane runs its CPU/multiplayer subset, so Windows capture is unverified. No human authoring acceptance is claimed.
+
+**Next:** live tool bridge — authenticated local access to owner inspection and stage/apply/undo
+in a running native game — then interactive preview controls, release-tool packaging and
+broader target/browser qualification. Browser objectives still require isolated
+init/update/migration/Undo and state persistence; race capture needs a race-trial screenshot
+path. P3 human migration/Undo/recovery acceptance remains open.
 
 ### P5 — authority, prediction and recorded revisions
 

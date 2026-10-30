@@ -658,6 +658,11 @@ if(NOT EMSCRIPTEN)
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
     --worker $<TARGET_FILE:boat_plugin_worker>)
   set_tests_properties(boat_plugin_author PROPERTIES LABELS "cpu" TIMEOUT 30)
+  # P4.5 pinned frame captures through the game's CPU screenshot path.
+  add_test(NAME boat_plugin_capture COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
+    --worker $<TARGET_FILE:boat_plugin_worker> --game $<TARGET_FILE:wake_velocity> Capture)
+  set_tests_properties(boat_plugin_capture PROPERTIES LABELS "render" TIMEOUT 120)
 endif()
 
 # P3 runtime qualification: explicit measurements, never timing-sensitive CTest assertions.
@@ -1129,7 +1134,7 @@ set(PROTEUS_SLOW_TESTS
   boat_river_screenshot)
 
 if(TEST boat_plugin_author)
-  list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_stage)
+  list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)
 endif()
 
 # Labels: core (display-free core and net library gates, fleet, server and bot), render (CPU captures), gpu (graphics context)
