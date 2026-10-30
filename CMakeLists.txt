@@ -137,7 +137,8 @@ add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_
   src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
-target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h)
+target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
+  src/boat_plugin_eval.c src/boat_plugin_eval.h)
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
@@ -647,6 +648,11 @@ if(NOT EMSCRIPTEN)
   add_executable(boat_plugin_worker tools/boat_plugin_worker.c tools/wake_velocity_plugin.c)
   target_link_libraries(boat_plugin_worker PRIVATE proteus_plugins proteus_boat_session)
   target_compile_options(boat_plugin_worker PRIVATE ${PROTEUS_WARNINGS})
+  add_executable(validate_boat_plugin_eval tools/validate_boat_plugin_eval.c)
+  target_link_libraries(validate_boat_plugin_eval PRIVATE proteus_plugins)
+  target_compile_options(validate_boat_plugin_eval PRIVATE ${PROTEUS_WARNINGS})
+  add_test(NAME boat_plugin_eval COMMAND validate_boat_plugin_eval)
+  set_tests_properties(boat_plugin_eval PROPERTIES LABELS "cpu;quick" TIMEOUT 10)
   add_executable(validate_boat_plugin_stage tools/validate_boat_plugin_stage.c
     tools/wake_velocity_plugin.c)
   target_link_libraries(validate_boat_plugin_stage PRIVATE proteus_plugins proteus_boat_session)

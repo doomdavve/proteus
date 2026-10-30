@@ -1,6 +1,29 @@
-// One module instance and one bounded request per disposable Web Worker.
+// Disposable descriptor workers; a warm objective worker executes one bounded request at a time.
+let objectiveRuntime = null, busy = false;
 self.onmessage = async ({data}) => {
+  if (busy) { self.postMessage({error: "Worker busy", id: data.id}); return; }
+  busy = true;
   try {
+    if (data.mode === 'objective') {
+      if (!(data.bytes instanceof Uint8Array) || data.bytes.length > 131072)
+        throw Error('Invalid objective frame');
+      if (!objectiveRuntime) {
+        const create = (await import(data.runtime)).default;
+        objectiveRuntime = await create({locateFile: () => data.wasm,
+          print: () => {}, printErr: () => {}});
+      }
+      const runtime = objectiveRuntime;
+      const input = runtime._boat_plugin_eval_input();
+      runtime.boatPluginHeap.set(data.bytes, input);
+      const begun = performance.now();
+      const size = runtime._boat_plugin_eval_run(data.bytes.length);
+      const evalMs = performance.now() - begun;
+      if (!size || size > 49152) throw Error('Invalid objective output');
+      const at = runtime._boat_plugin_eval_output();
+      self.postMessage({id: data.id, evalMs, bytes: runtime.boatPluginHeap.slice(at, at + size),
+        wasmBytes: runtime.boatPluginHeap.buffer.byteLength});
+      return;
+    }
     if (!(data.bytes instanceof Uint8Array) || data.bytes.length > 8 + 4096 + 65536)
       throw Error('Invalid package frame');
     const create = (await import(data.runtime)).default;
@@ -15,5 +38,6 @@ self.onmessage = async ({data}) => {
     });
     const exit = runtime._main();
     self.postMessage({exit, bytes: new Uint8Array(output)});
-  } catch (error) { self.postMessage({error: 'Worker initialization failed: ' + error.message}); }
+  } catch (error) { self.postMessage({id: data.id, error: 'Worker evaluation failed: ' + error.message}); }
+  finally { busy = false; }
 };

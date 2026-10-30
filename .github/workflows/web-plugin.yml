@@ -32,7 +32,7 @@ jobs:
           ref: 3b3963d86a5c97adaf6eaa845cdfe0b811c2f960
           path: .emsdk
           persist-credentials: false
-      - name: Build packaged game and isolated descriptor worker
+      - name: Build packaged game and isolated plugin evaluator
         shell: bash
         run: |
           version=$(cat web/emsdk-version)

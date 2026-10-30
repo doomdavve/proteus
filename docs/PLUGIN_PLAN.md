@@ -10,28 +10,29 @@ resource retirement/composition and a complete compatible solo checkpoint/inspec
 P3.4 accounts retained/native storage, separates instruction budgets and measures synchronous
 staging. P4.1 adds discovery and isolated native validation; P4.2 adds machine-readable schemas,
 bounded isolated voyage/race previews and disposable-process live descriptor staging for trusted
-native edits. P4.3 adds browser source bundles and isolated descriptor-only import/reload/export; browser
-objectives and race imports remain explicitly unsupported. P4.4 adds pinned draft workspace
+native edits. P4.3 adds browser source bundles and isolated descriptor import/reload/export; P4.9 extends
+that workflow to optional voyage objectives/timers. Browser race imports remain unsupported. P4.4 adds pinned draft workspace
 read/write, P4.5 pinned CPU frame capture with curated anchors/camera bookmarks, P4.6 a live tool
 bridge to a running native game and P4.7 those tools in the macOS/Windows release packages.
 P4.8 qualifies browser authoring on Chromium, Firefox and WebKit in CI, with tab freeze,
 navigation and repeated-session cleanup, and records native costs on Linux and Windows.
-There is no in-game agent. The agreed direction
+P4.9 adds a bounded objective wire protocol, reusable isolated Wasm evaluator and asynchronous
+init/update/migration/Undo with host-owned in-session state. There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.8 automated target/browser qualification**, following
-[P4.7 release-tool packaging](#p47-result-2026-10-30); see the
-[P4.8 result](#p48-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: browser objective isolation** — run imported objective init/update/migration/Undo
-in an isolated evaluator with host-owned state persistence before browser imports accept
-callbacks. Physical-device and human qualification need the user and are tracked separately.
-Interactive preview controls were deferred
-on 2026-10-30 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time init/migration
-still evaluate trusted Lua synchronously; browser imports support only `voyage.define` and
-never evaluate source on the game thread. Browser objective isolation and race integration
-remain prerequisites for broadening that subset.
+Completed task: **P4.9 browser objective isolation**, following
+[P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
+[P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
+**Next task: P5 authority/prediction/recording contract review** — choose one proven authored
+scenario, then define matching preinstalled content, compatibility, late join and round-boundary
+reload before implementing room integration. Physical-device and human qualification need the
+user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
+at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time
+init/migration still evaluate trusted Lua synchronously. Browser voyages evaluate all imported
+Lua in workers; simulation waits at a callback boundary while rendering/UI remain responsive.
+Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The milestones below are this plan's P0–P6, independent of similarly named foundation tasks.
 
@@ -1598,9 +1599,99 @@ Firefox/WebKit freeze, worker Wasm memory and browser-process memory are not mea
 costs on Linux/Windows come from shared CI runners, so they are evidence, not budgets. No
 gameplay, rendering, audio or asset-loading change; no new audiovisual review.
 
-**Next:** browser objective isolation, as recorded in the status above. Physical-device memory
+**Next recorded at P4.8 (implemented below):** browser objective isolation. Physical-device memory
 and timing, real background-tab behavior on phones, Safari, and P3 human
 migration/Undo/recovery acceptance need the user.
+
+#### P4.9 result, 2026-10-30
+
+Implemented the reviewed browser objective isolation in two connected slices:
+
+- **P4.9a protocol/evaluator:** `boat_plugin_eval` defines PEQ1/PER1, with fieldwise encoding,
+  lossless signed/unsigned 64-bit fields, 128 KiB request and 48 KiB reply caps. Replies pin a
+  unique request, revision/epoch/candidate, action/tick and complete canonical input (source,
+  checkpoint and event batch). Host decoding validates framing, canonical state, capacities,
+  ownership/generation/schema/grants and acknowledgment without running Lua. The worker reuses
+  the existing atomic transaction engine and creates a fresh bounded Lua VM for every batch.
+- **P4.9b browser lifecycle:** optional voyage HUD/timer grants now use one reusable worker/Wasm
+  evaluator, separate from the two existing disposable descriptor-staging lanes. All init,
+  update, reset and migration/Undo calls are isolated. At dispatch T, solo simulation waits
+  before T+1; rendering/UI and deadline polling continue. Waiting wall time is discarded rather
+  than becoming simulation time. Init completes before native stepping. Candidate success
+  commits code/state/schema/generation together; candidate failure retains active state and old
+  pending output. Update failure/timeout preserves the last commit and suspends callbacks while
+  native boating continues. Undo/cancel can abandon a pending migration; late output is inert.
+  A reset requested while waiting is deferred. Other Apply/Undo/reload attempts during an
+  ordinary callback report BUSY and can be retried.
+- **In-session persistence:** C owns state, RNG, timers, events, HUD and queued output between
+  worker calls. Evaluator replacement cannot turn VM memory into a save. Page reload still ends
+  the native session and restores source only; durable objective/world/Undo checkpoints remain
+  out of scope. The evaluator's Wasm memory is capped at 64 MiB, stack at 1 MiB, and Lua heap at
+  the existing 2 MiB. Worker/browser-process overhead remains additional.
+- **Qualification:** `boat_plugin_eval` adds native parity, wide integer, max-state/source/
+  capacity, malformed/truncated/stale receipt and protected-field tests. The Node transport
+  contract adds one-job ownership, reuse, cancellation, late response/watchdog isolation,
+  deadline, malformed output and worker failure cases under virtual time.
+  `check_web_plugin_objective.py`, called by the existing three-engine browser authoring job,
+  adds real imported init/update/timer execution, pinned simulation ticks, recovery-event
+  ownership, migration cancellation/Apply/Undo/restart, atomic candidate failure, quarantine,
+  timeout/freeze and repeated-session cleanup. It records callback delivery costs and Wasm
+  linear memory separately from the descriptor validation evidence.
+
+Verification, 2026-10-30, Apple Silicon/macOS: Debug configure/build passed with the existing
+pinned dependency sources. Project sources are warning-clean (the first build retained the
+bundled `stb_vorbis` warning). With local socket access, full `ctest --preset full` passed
+**310/310 enabled tests** (13 retired field cases disabled, GPU CTests off). Node transport
+contracts passed. The new codec/validator also passed ASan/UBSan with the existing Lua/core
+libraries uninstrumented; this is not a whole-runtime sanitizer claim. An agent-run windowed
+native `shelter-tour --demo --frames 180` completed without failure; this is not human play.
+
+Emscripten 6.0.12 MinSizeRel `web` packaged successfully. The complete extended browser check
+passed on Playwright Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2. Each ran 20 descriptor
+validations, objective transactions/failures and three restored sessions. Chromium also passed
+an objective result held across a six-second lifecycle freeze, in addition to the existing
+short descriptor freeze. Captures from all three engines were inspected and show the running
+objective HUD. Worker evaluation and main-thread delivery were measured separately on the
+small reference callback fixture:
+
+| Engine (local Mac) | Worker evaluation mean / max | Delivery mean / max | Warm callbacks sampled |
+|---|---|---|---|
+| Chromium 156 (SwiftShader) | 0.26 / 0.40 ms | 70.1 / 123.7 ms | 21 |
+| Firefox 157 | 0.40 / 1 ms | 2.9 / 5 ms | 20 |
+| WebKit 27.2 | 0.40 / 1 ms | 3.6 / 5 ms | 20 |
+
+All three reported **16 MiB Wasm linear memory** for the active objective evaluator. These
+figures exclude deliberate result holds/fault tests, initial game/runtime startup and browser
+process memory. Worker evaluation includes codec/VM work; delivery also includes browser and
+game-loop scheduling. Chromium's much higher delivery delay under software rendering is an
+observed limitation, not a Lua execution cost or a physical-device performance guarantee.
+The measurements are evidence, not budgets. Browser startup/VM timing and memory on phones,
+physical Safari and real background-tab policies remain unqualified. The browser's synchronous
+staging fallback is compiled out; imported source has no fallback to main-thread evaluation.
+All 380 local links across the eight affected Markdown guides resolve. No release/site was
+published and no human authoring/play acceptance is claimed. Linux CI on source commit `8869e0f` passed 310/310 enabled tests; macOS and Windows workflows
+also passed. The first browser CI run passed WebKit but exposed a frame-rate dependency in the
+Chromium/Firefox recovery-input fixture: capped frame deltas made the held Backspace gesture
+outlive the callback deadline on the software renderer. The check now drives the existing
+menu's immediate recovery action and waits for observed menu/reset state. The runtime's
+five-second callback deadline is unchanged. On `77b1212`, all native workflows and the full Chromium/Firefox authoring checks passed.
+WebKit exposed a separate restored-session readiness assumption: revision 1 was visible
+before lazy scenery loading finished, so the next reload interrupted startup with zero native
+ticks. The repeated-session check now waits for an observed native tick before reloading,
+proving each restored session actually played; production navigation behavior is unchanged.
+Startup deadline review also found a real clock-origin mismatch: INIT dispatch precedes
+`InitWindow`, which resets GLFW time. Browser plugin open/frame calls now use the stable
+`emscripten_get_now` clock instead. A regression offsets the page clock and delays host
+consumption of an already cached successful INIT reply: the host must expire it without
+publishing state, even though the JS completion watchdog has already retired. Native callers
+retain their existing clock. Browser CI is being rerun; prior P4.8 results remain historical
+evidence. GCC still reports pre-existing warnings outside the new
+plugin sources.
+
+**Next:** P5's authority/prediction/recording contract review as described in the current status.
+Browser races, interactive preview controls, durable full-session saves, native asynchronous
+objective execution and an in-game agent are not implemented. Physical Safari/mobile devices,
+real background-tab policies and P3 human migration/Undo/recovery acceptance remain open.
 
 ### P5 — authority, prediction and recorded revisions
 

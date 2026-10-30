@@ -1,5 +1,15 @@
 # Test workflow and timing
 
+P4.9 `boat_plugin_eval` checks the bounded objective worker protocol against the native
+transaction engine: canonical state, lossless wide integers, exact framing, capacities,
+protected fields and stale/malformed replies. `web_plugin_author` includes virtual-time
+objective transport reuse, cancellation, late watchdog/result and failure checks. The optional
+three-engine `check_web_plugin_author.py` also runs `check_web_plugin_objective.py` for browser
+init/update/timers, simulation gating, recovery events, migration/Undo/cancel/restart, failure,
+timeout/freeze and repeated-session cleanup. Delivery timings and worker Wasm linear memory are
+evidence, not asserted performance budgets; physical devices and process memory remain open.
+See [P4.9](PLUGIN_PLAN.md#p49-result-2026-10-30).
+
 P3.1 `boat_plugin_state.*` covers fresh-instance objective callbacks, canonical integer state,
 atomic state/RNG/event/HUD commit, quarantine/reset, candidate migration, isolated checkpoint
 replay, resource/event limits and budget failures. These are headless harness checks; they do

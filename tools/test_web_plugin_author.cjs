@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {bundle, decode, encode, frame, Transport, message} = require('../web/plugin_author.js');
+const {ObjectiveTransport} = require('../web/plugin_objective.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -81,6 +82,44 @@ async function main() {
   assert.equal(t.jobs.size, 0); assert.equal(timers.size, 0);
   assert.equal(message(new Uint8Array()), 'Invalid worker reply');
   assert.equal(t.start(new Uint8Array(8 + 4096 + 65537), base), 0);
+  // Objective transitions reuse Wasm, but never share an outstanding callback or its result.
+  const ow = [], otimers = new Map(); let onow = 0, timerId = 0;
+  const o = new ObjectiveTransport({now: () => onow,
+    makeWorker: () => { const w = {terminate() { this.dead = true; },
+      postMessage(data) { this.data = data; }}; ow.push(w); return w; },
+    timer: fn => { otimers.set(++timerId, fn); return timerId; }, clear: id => otimers.delete(id)});
+  const ob = new Uint8Array(8); new DataView(ob.buffer).setUint32(0, 0x50455231);
+  const payload = new Uint8Array(65536);
+  const first = o.start(payload);
+  assert.notEqual(ow[0].data.bytes, payload);
+  assert.equal(o.start(payload), 0);
+  const retiredTimer = [...otimers.values()][0];
+  onow = 20;
+  ow[0].onmessage({data: {id: first, bytes: ob, wasmBytes: 16777216}});
+  assert.equal(o.status(first), 1); assert.equal(o.wasmBytes, 16777216);
+  o.close(first); assert(!ow[0].dead); assert.equal(otimers.size, 0);
+  const second = o.start(payload); assert.equal(ow.length, 1);
+  retiredTimer(); assert.equal(o.status(second), 0);
+  ow[0].onmessage({data: {id: second, bytes: ob}}); o.close(second);
+  assert.equal(o.completed, 2);
+  const timed = o.start(payload), oldMessage = ow[0].onmessage;
+  onow += 5000; // Held response after tab suspension must expire even before timer delivery.
+  oldMessage({data: {id: timed, bytes: ob}});
+  assert.equal(o.status(timed), -1); assert(ow[0].dead); o.close(timed);
+  const next = o.start(payload); oldMessage({data: {id: timed, bytes: ob}});
+  assert.equal(o.status(next), 0); assert.equal(ow.length, 2);
+  o.close(next); assert(ow[1].dead);
+  const wrong = o.start(payload);
+  ow[2].onmessage({data: {id: wrong + 1, bytes: ob}});
+  assert.equal(o.status(wrong), -1); assert(ow[2].dead);
+  const malformed = o.start(payload);
+  ow[3].onmessage({data: {id: malformed, bytes: new Uint8Array(49153)}});
+  assert.equal(o.status(malformed), -1); o.close(malformed);
+  const crash = o.start(payload); ow[4].onerror();
+  assert.equal(o.status(crash), -1); o.close(crash);
+  const cancel = o.start(payload); o.reset();
+  assert.equal(o.status(cancel), -1); assert.equal(otimers.size, 0);
+  assert.equal(o.start(new Uint8Array(131073)), 0);
   console.log('web_plugin_author=ok');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -46,6 +46,10 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
+EM_JS(void, browser_plugin_controls, (bool pending, bool menu_open), {
+    Module.boatPluginResetPending = !!pending;
+    Module.boatPluginMenuOpen = !!menu_open;
+})
 
 EM_JS(int, boat_web_viewport_size, (int axis), {
     const size = Module['boatViewportSize']();
@@ -345,6 +349,17 @@ static bool study_mouse_steering;
 
 // One session with explicit options. Uses the title's window when one is open and then leaves it
 // open; the Escape menu's last row ends the session.
+// Browser initialization begins before InitWindow resets GLFW's clock. Keep all plugin
+// request/acceptance timestamps on the same monotonic origin throughout that startup.
+static double plugin_time(void)
+{
+#ifdef __EMSCRIPTEN__
+    return emscripten_get_now() / 1000.0;
+#else
+    return GetTime();
+#endif
+}
+
 static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
@@ -774,7 +789,7 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_PLUGINS
     // Owns the revisions the session borrows, so it outlives the session (static, like WORLDS).
     static WakePlugin plugin;
-    if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, GetTime()))
+    if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, plugin_time()))
         goto cleanup;
 #if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
@@ -1011,6 +1026,7 @@ static int study(int argc, char **argv)
     double accumulator = 0;
     int time_speed_index = BOAT_TIME_NORMAL;
     int frames = 0, demo_tick = 0;
+    bool plugin_reset_pending = false;
     bool replay_dragging = false;
     bool help_visible = false;
     BoatMenu menu = { .can_leave = true,
@@ -1307,7 +1323,17 @@ static int study(int argc, char **argv)
 #endif
         if (plugin_path)
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
-                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), GetTime());
+                active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), plugin_time());
+#endif
+        if (plugin_path && wake_plugin_waiting(&plugin))
+            plugin_reset_pending |= reset_requested;
+        else if (plugin_reset_pending) {
+            reset_requested = true;
+            plugin_reset_pending = false;
+        }
+#ifdef __EMSCRIPTEN__
+        if (plugin_path)
+            browser_plugin_controls(plugin_reset_pending, menu.open);
 #endif
         if (reset_requested) {
             thrust_target = 0;
@@ -1341,6 +1367,9 @@ static int study(int argc, char **argv)
                 mouse_wheel = 0;
             }
 #endif
+        } else if (plugin_path && wake_plugin_waiting(&plugin) && !plugin_restart) {
+            // Keep drawing and polling the worker, but never advance past callback boundary T.
+            accumulator = 0;
         } else if (reset_requested && session.voyage.route && !plugin_restart) {
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
@@ -1394,6 +1423,10 @@ static int study(int argc, char **argv)
                 if (plugin_path)
                     wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;
+                if (plugin_path && wake_plugin_waiting(&plugin)) {
+                    accumulator = 0;
+                    break;
+                }
             }
         } else {
             accumulator = 0;
