@@ -342,7 +342,7 @@ int main(int argc, char **argv)
     // Closing withdraws the session.
     wake_bridge_close(&bridge);
     CHECK(!read_file("session", session_text, sizeof(session_text)));
-    wake_plugin_close(&plugin);
+    wake_plugin_close(&plugin, &session);
     boat_session_destroy(&session);
     boat_world_resources_destroy(&resources);
     puts("plugin bridge: token, pins, deferred staging, held apply, Undo, Discard, rejection, "

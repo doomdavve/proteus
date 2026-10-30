@@ -113,6 +113,13 @@ static void close_stage(WakePlugin *plugin)
     boat_plugin_stage_close(plugin->staging);
     plugin->staging = NULL;
 }
+// The active revision owns the scene; the session borrows it for physics and presentation.
+// Absent scene content restores the compiled marina without touching the world.
+static void bind_scene(WakePlugin *plugin, BoatSession *session)
+{
+    const BoatPluginRevision *revision = boat_plugin_host_active(&plugin->host);
+    session->world.scene = revision->voyage.has_scene ? &revision->voyage.scene : NULL;
+}
 #ifdef __EMSCRIPTEN__
 struct WakePluginEvaluation {
     BoatPluginEvalRequest request;
@@ -415,6 +422,7 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
 #endif
     // At tick zero nothing has been observed, so this is the voyage's start.
     boat_session_restart_voyage(session, &boat_plugin_host_active(&plugin->host)->voyage.route);
+    bind_scene(plugin, session);
     wake_plugin_reset_objective(plugin, session);
     const BoatPluginVoyage *voyage = &boat_plugin_host_active(&plugin->host)->voyage;
     report(plugin, "active", false,
@@ -476,6 +484,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     const BoatPluginRevision *revision = boat_plugin_host_commit(&plugin->host);
     if (!revision)
         return false;
+    bind_scene(plugin, session);
     const BoatVoyageRoute *route = &revision->voyage.route;
     const char *how = undo ? "UNDONE TO" : "ACTIVE";
     switch (change) {
@@ -598,9 +607,17 @@ bool wake_plugin_stage_files(
     return stage(plugin, session, true, now);
 }
 
-void wake_plugin_close(WakePlugin *plugin)
+void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
 {
     close_stage(plugin);
+    if (session) {
+        // The session borrowed the plugin's route and scene. Restore both compiled defaults
+        // before the host storage may be reused, so re-entry never sees a dangling borrower.
+        session->voyage_route = session->world.definition->voyage;
+        if (session->voyage.route)
+            session->voyage.route = session->voyage_route;
+        session->world.scene = NULL;
+    }
 #ifdef __EMSCRIPTEN__
     close_evaluation(plugin);
     objective_shutdown();
@@ -782,8 +799,10 @@ bool wake_plugin_preview_save(WakePluginPreview *c, const WakePlugin *p, const B
         c->traffic = *s->world.water.traffic_objects;
     c->session.world.water.objects = c->has_objects ? &c->objects : NULL;
     c->session.world.water.traffic_objects = c->has_traffic ? &c->traffic : NULL;
-    c->session.voyage_route = &boat_plugin_host_active(&c->plugin.host)->voyage.route;
+    const BoatPluginRevision *active = boat_plugin_host_active(&c->plugin.host);
+    c->session.voyage_route = &active->voyage.route;
     c->session.voyage.route = c->session.voyage_route;
+    c->session.world.scene = active->voyage.has_scene ? &active->voyage.scene : NULL;
     c->valid = true;
     return true;
 }
@@ -803,8 +822,10 @@ bool wake_plugin_preview_restore(const WakePluginPreview *c, WakePlugin *p, Boat
         *traffic = c->traffic;
     s->world.water.objects = c->has_objects ? objects : NULL;
     s->world.water.traffic_objects = c->has_traffic ? traffic : NULL;
-    s->voyage_route = &boat_plugin_host_active(&p->host)->voyage.route;
+    const BoatPluginRevision *active = boat_plugin_host_active(&p->host);
+    s->voyage_route = &active->voyage.route;
     s->voyage.route = s->voyage_route;
+    s->world.scene = active->voyage.has_scene ? &active->voyage.scene : NULL;
     return true;
 }
 
@@ -849,9 +870,14 @@ void wake_plugin_inspect(const WakePlugin *p, FILE *output)
         boat_plugin_default_limits.memory_bytes,
         sizeof(*p) + boat_plugin_default_limits.memory_bytes, sizeof(WakePluginPreview),
         boat_plugin_stage_bytes(p->staging));
+    const BoatPluginRevision *active = boat_plugin_host_active(&p->host);
     fprintf(output, "revision=%u schema=%u generation=%u tick=%lld pending=%u suspended=%u\n",
-        boat_plugin_host_active(&p->host)->number, p->objective.state_version, p->generation,
-        (long long)p->objective.tick, p->objective_pending, p->objective.quarantined);
+        active->number, p->objective.state_version, p->generation, (long long)p->objective.tick,
+        p->objective_pending, p->objective.quarantined);
+    fprintf(output, "scene present=%u version=%u digest=%016llx content=%u subsystems=none\n",
+        active->voyage.has_scene, active->voyage.scene.version,
+        (unsigned long long)active->voyage.scene_digest,
+        boat_scene_has_content(&active->voyage.scene));
     fprintf(output, "rng=%u acknowledged=%lld queued=%u diagnostic=%s\n", p->objective.rng,
         (long long)p->objective.acknowledged, p->event_count, p->objective_diagnostic.message);
     if (p->objective_pending)

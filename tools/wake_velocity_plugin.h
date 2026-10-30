@@ -53,8 +53,9 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory);
 // Read DIRECTORY, check it against SESSION's location and begin its voyage instead of the
 // compiled one. False with the diagnostic printed.
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);
-// Cancel/reap pending jobs and retire the browser evaluator at session shutdown.
-void wake_plugin_close(WakePlugin *plugin);
+// Cancel/reap pending jobs, restore the session's compiled scene and retire the browser
+// evaluator at session shutdown.
+void wake_plugin_close(WakePlugin *plugin, BoatSession *session);
 // Browser callback at T must finish before solo simulation may step T+1.
 bool wake_plugin_waiting(const WakePlugin *plugin);
 // Browser authoring controls pause solo input while the opt-in panel is open.

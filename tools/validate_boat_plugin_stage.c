@@ -86,7 +86,7 @@ int main(int argc, char **argv)
     CHECK(completed(job, host) == 1);
     CHECK(host->change == BOAT_PLUGIN_RENAMED && host->held);
     CHECK(boat_plugin_host_active(host)->number == 1 && session.tick == 1);
-    wake_plugin_close(plugin);
+    wake_plugin_close(plugin, &session);
     unsigned before = host->numbered;
     job = boat_plugin_stage_start(argv[0], host, files, 0);
     CHECK(job && completed(job, host) == 1);

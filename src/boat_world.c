@@ -39,7 +39,9 @@ void boat_world_init(BoatWorld *world, const BoatWorldResources *resources, Boat
 
 void boat_world_restart(BoatWorld *world, BoatWater water)
 {
+    const BoatSceneDefinition *scene = world->scene;
     boat_world_init(world, world->resources, water);
+    world->scene = scene; // A restart does not silently discard the accepted scene.
 }
 
 bool boat_world_displaced(const BoatWorld *world)

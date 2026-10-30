@@ -58,9 +58,10 @@ double boat_session_time(const BoatSession *session) { return boat_tick_seconds(
 
 BoatViewState boat_session_view(const BoatSession *session)
 {
-    return (BoatViewState) {
-        .boat = session->boat, .time = boat_session_time(session), .course = session->course
-    };
+    return (BoatViewState) { .boat = session->boat,
+        .time = boat_session_time(session),
+        .course = session->course,
+        .scene = session->world.scene };
 }
 
 void boat_session_respawn(BoatSession *session)

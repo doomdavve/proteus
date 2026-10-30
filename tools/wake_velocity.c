@@ -1776,7 +1776,7 @@ cleanup:
         wake_bridge_close(&bridge);
 #endif
     if (plugin_path)
-        wake_plugin_close(&plugin);
+        wake_plugin_close(&plugin, &session);
 #endif
     boat_session_flush(&session);
     boat_session_destroy(&session);

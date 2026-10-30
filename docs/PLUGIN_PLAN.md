@@ -38,8 +38,8 @@ Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
-scene contract/site fixture and L1.2's non-installed scene envelope are complete, and none of
-those scene capabilities is installed in a running session. The milestones below are this plan's
+scene contract/site fixture and L1.2/L1.3's decoded/bound scene envelope are complete, and none
+of those scene capabilities yet supplies authored marina content. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1779,9 +1779,9 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1 and L1.2 are complete; next in this track: L1.3
-revision lifecycle and application binding**; the first playable gate is L4.3. `scene.define`
-decodes an empty envelope but is not installed live.
+failure cases and acceptance evidence. **L1.1–L1.3 are complete; next in this track: L1.4
+tooling and unsupported-path closure**; the first playable gate is L4.3. `scene.define` installs
+an empty envelope, but no marina subsystem is authorable.
 
 ### Coverage and delivery slices
 
@@ -1982,6 +1982,41 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 bind `BoatWorld`/`BoatViewState` so later content has a live path, without advertising a marina
 subsystem yet. L1.4 must then add the scene envelope to the isolated worker wire before L2.2.
 
+#### L1.3 result, 2026-10-30
+
+**Implemented:** the accepted envelope now has a complete owner-to-borrower path, still with no
+authorable marina content. No renderer or contact rule was changed.
+
+- `BoatWorld.scene` and `BoatViewState.scene` are frame-borrowed pointers. `boat_session_view`
+  publishes the world's scene; `boat_world_restart` preserves it, so a voyage or session restart
+  does not silently fall back to compiled defaults.
+- `wake_velocity_plugin` binds the active revision's scene at open, at every host commit
+  (rename, Undo, migration, voyage/session restart), and in preview checkpoint save/restore. A
+  candidate envelope with no content still classifies as unchanged/renamed, so it never forces a
+  restart. `wake_plugin_close` restores the compiled voyage route and scene before host storage
+  can be reused; re-entry no longer leaves a dangling borrower.
+- Inspection reports `scene present/version/digest/content/subsystems=none`. The isolated
+  stage-worker wire still omits the envelope (L1.4); in-process launch and host staging carry it.
+- No renderer, contact or camera code consumes the pointer yet. L2.1 replaces the compiled harbor
+  layout input; L2.2 wires contact and the first authored package. An empty envelope consequently
+  renders and collides exactly as before.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build and full `ctest --preset full`: **313/313 enabled tests** (23.57 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- New `validate_boat_plugin_session --case scene_binding` covers open binding, manifest rename,
+  rejected scene version with R2 kept, Undo rebinding, two independent sessions, close restoring
+  compiled defaults, and clean re-entry.
+- CPU `--time 3` outer captures are byte-identical for compiled, reference-plugin and
+  envelope-plugin launches (SHA-256
+  `ad4a277fc752c2be1cfd4c446429db11827f06c189b0b8cae6bf0c7d156cebb5`). The inspected frame is
+  the unchanged compiled marina. This is a no-regression capture, not human acceptance.
+
+**Next in this track: L1.4.** Carry the scene envelope and its identity through the isolated
+worker/stage wire, preview, inspection and capture; reject scene grants in browser imports,
+rooms and unsupported replay paths. Do this before L2.2 exposes berths.
+
 #### L2 — a small marina before a marina editor
 
 | Task | Concrete change and entry points | Completion evidence / stop boundary |
@@ -2093,10 +2128,11 @@ Completed L1.1, 2026-10-30: froze the scene contract, consumer/lifetime inventor
 and verified two-berth marina site; the API owns the proposed schema and the fixture passes.
 Completed L1.2, 2026-10-30: added pointer-free scene storage, the canonical `scene.define` grant,
 envelope decoding and planned-field validation without a live install.
-Next task for this track: **L1.3**, bind the empty envelope through the host, session, world and
-view without advertising marina content. Known limits: the isolated stage-worker wire does not
-carry the envelope yet (L1.4, before L2.2); no marina fields, tram/seal recipes, gameplay dusk,
-building activity or human scene acceptance are implemented.
+Completed L1.3, 2026-10-30: bound the accepted envelope through the host, session, world and view,
+with preview rebinding and compiled restoration on close.
+Next task for this track: **L1.4**, close the tooling/unsupported-target paths before L2.2. Known
+limits: the isolated stage-worker wire does not carry the envelope yet; no marina fields,
+tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project
