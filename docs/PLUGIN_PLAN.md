@@ -1413,7 +1413,8 @@ syntax-error candidate is `rejected`, and the CLI honours `--expect-bundle` and 
 `--output` without leftovers. Fake-process checks cover deadline cleanup of the private package,
 rejected/failed/no-revision/non-PNG output and request limits. Bridge, squall-edge, Långedrag and
 shelter-tour bridge captures were inspected: boat, wake, shoreline and squall render at the expected
-poses. Windows/Linux capture awaits CI. No human authoring acceptance is claimed.
+poses. PR CI on 2026-10-30 passed on Linux and macOS (308/308, `boat_plugin_capture` ran) and
+Windows; the Windows lane runs its CPU/multiplayer subset, so Windows capture is unverified. No human authoring acceptance is claimed.
 
 **Next:** live tool bridge — authenticated local access to owner inspection and stage/apply/undo
 in a running native game — then interactive preview controls, release-tool packaging and
