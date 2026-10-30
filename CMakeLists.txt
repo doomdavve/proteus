@@ -293,6 +293,9 @@ endif()
 target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h)
 target_link_libraries(wake_velocity PRIVATE proteus_plugins)
 target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_PLUGINS=1)
+if(NOT EMSCRIPTEN)
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
+endif()
 
 if(EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_boat_net)
@@ -654,9 +657,21 @@ if(NOT EMSCRIPTEN)
   add_test(NAME boat_plugin_stage COMMAND validate_boat_plugin_stage)
   set_tests_properties(boat_plugin_stage PROPERTIES LABELS "cpu"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
+  # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
+  add_executable(validate_wake_bridge tools/validate_wake_bridge.c tools/wake_velocity_bridge.c
+    tools/wake_velocity_plugin.c)
+  target_link_libraries(validate_wake_bridge PRIVATE proteus_plugins proteus_boat_session)
+  target_compile_options(validate_wake_bridge PRIVATE ${PROTEUS_WARNINGS})
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/wake-bridge-test")
+  target_compile_definitions(validate_wake_bridge PRIVATE
+    BOAT_BRIDGE_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/wake-bridge-test")
+  add_test(NAME wake_velocity_bridge COMMAND validate_wake_bridge)
+  set_tests_properties(wake_velocity_bridge PROPERTIES LABELS "cpu"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
   add_test(NAME boat_plugin_author COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
-    --worker $<TARGET_FILE:boat_plugin_worker>)
+    --worker $<TARGET_FILE:boat_plugin_worker>
+    --bridge-server $<TARGET_FILE:validate_wake_bridge>)
   set_tests_properties(boat_plugin_author PROPERTIES LABELS "cpu" TIMEOUT 30)
   # P4.5 pinned frame captures through the game's CPU screenshot path.
   add_test(NAME boat_plugin_capture COMMAND ${Python3_EXECUTABLE}

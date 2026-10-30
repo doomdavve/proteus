@@ -29,6 +29,8 @@ typedef struct {
     bool watching; // Save polling; the browser has no files to watch.
     char status[96], detail[192];
     bool alert;
+    const char *outcome; // Machine word for the latest status: "staging", "held", "applied", ...
+    unsigned requests; // Staging requests begun, by saves, F5 or the tool bridge.
     BoatPluginObjective objective, staged_objective;
     BoatPluginEvent events[BOAT_PLUGIN_EVENTS];
     unsigned event_count, generation;
@@ -58,6 +60,10 @@ bool wake_plugin_editing(void);
 // is already the new revision's.
 bool wake_plugin_frame(
     WakePlugin *plugin, BoatSession *session, bool reload, bool undo, bool apply, double now);
+// At a tick boundary: stage FILES (copied) like F5 would stage the package. The tool bridge's
+// byte-pinned request; same return as wake_plugin_frame.
+bool wake_plugin_stage_files(
+    WakePlugin *plugin, BoatSession *session, const BoatPluginFiles *files, double now);
 // Tick adapter: publish T's output before T+1; capture all output immediately after a step
 // or recovery. Reset only alongside a new native voyage/session, never beside a moving world.
 void wake_plugin_before_tick(WakePlugin *plugin);

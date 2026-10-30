@@ -23,7 +23,8 @@ EM_JS(unsigned, browser_actions, (void), {
 #include <stdio.h>
 #include <string.h>
 
-static void report(WakePlugin *plugin, bool alert, const char *detail, const char *format, ...)
+static void report(WakePlugin *plugin, const char *outcome, bool alert, const char *detail,
+    const char *format, ...)
 {
     va_list arguments;
     va_start(arguments, format);
@@ -31,6 +32,7 @@ static void report(WakePlugin *plugin, bool alert, const char *detail, const cha
     va_end(arguments);
     snprintf(plugin->detail, sizeof(plugin->detail), "%s", detail);
     plugin->alert = alert;
+    plugin->outcome = outcome;
 #ifdef __EMSCRIPTEN__
     if (plugin->host.depth) {
         browser_owner(boat_plugin_host_active(&plugin->host)->number, (unsigned)plugin->host.epoch,
@@ -47,8 +49,8 @@ static void report_failure(WakePlugin *plugin)
     char where[96];
     snprintf(where, sizeof(where), "%s%s%.0d%s%s", d->file, d->line ? ":" : "", d->line,
         d->field[0] ? " " : "", d->field);
-    report(plugin, true, d->message, "%s ERROR %s; KEEPING R%u", boat_plugin_status_name(d->status),
-        where, boat_plugin_host_active(&plugin->host)->number);
+    report(plugin, "rejected", true, d->message, "%s ERROR %s; KEEPING R%u",
+        boat_plugin_status_name(d->status), where, boat_plugin_host_active(&plugin->host)->number);
 }
 
 static BoatPluginStatus read_package(WakePlugin *plugin, uint64_t *key)
@@ -231,7 +233,7 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     boat_session_restart_voyage(session, &boat_plugin_host_active(&plugin->host)->voyage.route);
     wake_plugin_reset_objective(plugin, session);
     const BoatPluginVoyage *voyage = &boat_plugin_host_active(&plugin->host)->voyage;
-    report(plugin, false,
+    report(plugin, "active", false,
 #ifdef __EMSCRIPTEN__
         "PLUGIN PANEL: STAGE / APPLY / UNDO",
 #else
@@ -266,7 +268,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
                 != BOAT_PLUGIN_OK) {
             trace(plugin, BOAT_PLUGIN_OBJECTIVE_MIGRATE,
                 boat_plugin_objective_digest(&plugin->objective), &plugin->objective, 0);
-            report(plugin, true, plugin->objective_diagnostic.message,
+            report(plugin, "migration_failed", true, plugin->objective_diagnostic.message,
                 "MIGRATION FAILED; KEEPING R%u", boat_plugin_host_active(&plugin->host)->number);
             return false;
         }
@@ -284,7 +286,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     case BOAT_PLUGIN_UNCHANGED:
     case BOAT_PLUGIN_RENAMED:
         boat_session_rebind_voyage(session, route);
-        report(plugin, false, "PROGRESS KEPT", "R%u %s, %s", revision->number, how,
+        report(plugin, "applied", false, "PROGRESS KEPT", "R%u %s, %s", revision->number, how,
             boat_plugin_change_name(change));
         return false;
     case BOAT_PLUGIN_MIGRATE:
@@ -294,19 +296,19 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
         plugin->generation = plugin->objective.generation;
         plugin->objective_pending = false;
         boat_session_rebind_voyage(session, route);
-        report(
-            plugin, false, "STATE MIGRATED; NATIVE PROGRESS KEPT", "R%u %s", revision->number, how);
+        report(plugin, "applied", false, "STATE MIGRATED; NATIVE PROGRESS KEPT", "R%u %s",
+            revision->number, how);
         return false;
     case BOAT_PLUGIN_RESTART_VOYAGE:
         boat_session_restart_voyage(session, route);
         wake_plugin_reset_objective(plugin, session);
-        report(plugin, false, "VOYAGE RESTARTED AT THE START SHELTER", "R%u %s", revision->number,
-            how);
+        report(plugin, "applied", false, "VOYAGE RESTARTED AT THE START SHELTER", "R%u %s",
+            revision->number, how);
         return false;
     default:
         session->voyage_route = route; // The caller's restart begins it.
-        report(
-            plugin, false, "SESSION RESTARTED WITH THE NEW WATER", "R%u %s", revision->number, how);
+        report(plugin, "applied", false, "SESSION RESTARTED WITH THE NEW WATER", "R%u %s",
+            revision->number, how);
         return true;
     }
 }
@@ -317,40 +319,42 @@ static bool offer(WakePlugin *plugin, BoatSession *session)
     const BoatPluginRevision *held = boat_plugin_host_held(&plugin->host);
     BoatPluginChange change = plugin->host.change;
     if (change == BOAT_PLUGIN_INCOMPATIBLE) {
-        report(plugin, true, "PLUGIN ID, KIND OR LOCATION CHANGED: RELAUNCH TO USE IT",
-            "NOT APPLIED; KEEPING R%u", boat_plugin_host_active(&plugin->host)->number);
+        report(plugin, "incompatible", true,
+            "PLUGIN ID, KIND OR LOCATION CHANGED: RELAUNCH TO USE IT", "NOT APPLIED; KEEPING R%u",
+            boat_plugin_host_active(&plugin->host)->number);
         return false;
     }
     if (!held) {
-        report(plugin, false, "", "R%u UNCHANGED", boat_plugin_host_active(&plugin->host)->number);
+        report(plugin, "unchanged", false, "", "R%u UNCHANGED",
+            boat_plugin_host_active(&plugin->host)->number);
         return false;
     }
     if (change == BOAT_PLUGIN_UNCHANGED || change == BOAT_PLUGIN_RENAMED)
         return commit(plugin, session);
     if (change == BOAT_PLUGIN_MIGRATE) {
-        report(plugin, true, "F7 MIGRATE STATE / F6 DISCARD", "R%u %s OBJECTIVE", held->number,
-            plugin->host.undo ? "(UNDO) CHANGES" : "CHANGES");
+        report(plugin, "held", true, "F7 MIGRATE STATE / F6 DISCARD", "R%u %s OBJECTIVE",
+            held->number, plugin->host.undo ? "(UNDO) CHANGES" : "CHANGES");
         return false;
     }
     bool water = change == BOAT_PLUGIN_RESTART_SESSION;
-    report(plugin, true,
+    report(plugin, "held", true,
         water ? "F7 RESTART SESSION / F6 DISCARD" : "F7 RESTART VOYAGE / F6 DISCARD", "R%u %s %s",
         held->number, plugin->host.undo ? "(UNDO) CHANGES" : "CHANGES",
         water ? "THE EXPOSED WATER" : "THE ROUTE");
     return false;
 }
 
-static bool stage(WakePlugin *plugin, BoatSession *session, uint64_t key, bool read_ok, double now)
+static bool stage(WakePlugin *plugin, BoatSession *session, bool read_ok, double now)
 {
-    if (plugin->watching)
-        boat_plugin_watch_staged(&plugin->watch, key);
+    ++plugin->requests;
     wake_plugin_close(plugin); // Superseding a request also reaps its worker.
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);
     if (read_ok && plugin->stage_executable) {
         plugin->staging
             = boat_plugin_stage_start(plugin->stage_executable, &plugin->host, &plugin->files, now);
         if (plugin->staging) {
-            report(plugin, false, "F6 CANCEL / ACTIVE REVISION KEEPS RUNNING", "STAGING EDIT");
+            report(plugin, "staging", false, "F6 CANCEL / ACTIVE REVISION KEEPS RUNNING",
+                "STAGING EDIT");
             return false;
         }
         plugin->host.diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
@@ -370,6 +374,22 @@ static bool stage(WakePlugin *plugin, BoatSession *session, uint64_t key, bool r
         return false;
     }
     return offer(plugin, session);
+}
+
+bool wake_plugin_stage_files(
+    WakePlugin *plugin, BoatSession *session, const BoatPluginFiles *files, double now)
+{
+    // Bytes the selected package holds now count as its save, whether or not a poll has seen
+    // them yet; other bytes leave polling alone, so a later edit of the directory still stages.
+    static BoatPluginFiles disk;
+    BoatPluginDiagnostic ignored;
+    uint64_t key = boat_plugin_read_key(BOAT_PLUGIN_OK, files, NULL);
+    if (plugin->watching
+        && boat_plugin_read(plugin->directory, NULL, &disk, &ignored) == BOAT_PLUGIN_OK
+        && boat_plugin_read_key(BOAT_PLUGIN_OK, &disk, NULL) == key)
+        boat_plugin_watch_staged(&plugin->watch, key);
+    plugin->files = *files;
+    return stage(plugin, session, true, now);
 }
 
 void wake_plugin_close(WakePlugin *plugin)
@@ -395,7 +415,7 @@ bool wake_plugin_frame(
     if ((actions & 8) && plugin->staging) {
         wake_plugin_close(plugin);
         boat_plugin_host_discard(&plugin->host);
-        report(plugin, false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
+        report(plugin, "canceled", false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
         return false;
     }
     reload |= (actions & 1) != 0;
@@ -410,17 +430,17 @@ bool wake_plugin_frame(
         if (plugin->staging) {
             wake_plugin_close(plugin);
             boat_plugin_host_discard(&plugin->host);
-            report(plugin, false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
+            report(plugin, "canceled", false, "", "STAGING CANCELED; ACTIVE REVISION KEPT");
             return false;
         }
         if (boat_plugin_host_held(&plugin->host)) {
             boat_plugin_host_discard(&plugin->host);
-            report(plugin, false, "", "DISCARDED; KEEPING R%u",
+            report(plugin, "discarded", false, "", "DISCARDED; KEEPING R%u",
                 boat_plugin_host_active(&plugin->host)->number);
             return false;
         }
         if (!boat_plugin_host_undo(&plugin->host)) {
-            report(plugin, false, "", "NOTHING TO UNDO");
+            report(plugin, "nothing_to_undo", false, "", "NOTHING TO UNDO");
             return false;
         }
         return offer(plugin, session);
@@ -428,12 +448,14 @@ bool wake_plugin_frame(
     uint64_t key;
     if (reload) {
         bool ok = read_package(plugin, &key) == BOAT_PLUGIN_OK;
-        return stage(plugin, session, key, ok, now);
+        if (plugin->watching)
+            boat_plugin_watch_staged(&plugin->watch, key);
+        return stage(plugin, session, ok, now);
     }
     if (plugin->watching && boat_plugin_watch_due(&plugin->watch, now)) {
         bool ok = read_package(plugin, &key) == BOAT_PLUGIN_OK;
         if (boat_plugin_watch_settled(&plugin->watch, key, now))
-            return stage(plugin, session, key, ok, now);
+            return stage(plugin, session, ok, now);
     }
     if (plugin->staging) {
         int ready = boat_plugin_stage_poll(plugin->staging, &plugin->host, now);
