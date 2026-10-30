@@ -516,13 +516,14 @@ class Worker(unittest.TestCase):
         self.assertEqual(code, 0, result)
         self.assertEqual(result["scene"], {"present": True, "version": 1,
             "digest": result["scene"]["digest"], "content": True,
-            "subsystems": ["marina.berths"], "berths": 2, "modules": 0})
+            "subsystems": ["marina.berths", "marina.modules"], "berths": 2, "modules": 2})
         self.assertNotEqual(result["scene"]["digest"], "0000000000000000")
         job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=12)
         try:
             job.process.wait(timeout=10)
             self.assertEqual(job.poll(1)["status"], "ok", job.result)
             self.assertEqual(job.result["evidence"]["scene"]["berths"], 2)
+            self.assertEqual(job.result["evidence"]["scene"]["modules"], 2)
         finally:
             job.close()
         default = self.run_worker(author.snapshot(ROOT / "plugins/langedrag"))[1]
@@ -550,6 +551,9 @@ class Worker(unittest.TestCase):
             manifest = json.loads((ROOT / "plugins" / name / "plugin.json").read_text(encoding="utf-8"))
             self.assertEqual(set(manifest), set(data["schemas"]["manifest"]["required"]))
         self.assertEqual(data["schemas"]["race"]["properties"]["gates"]["maxItems"], 8)
+        marina = data["schemas"]["scene"]["properties"]["marina"]["properties"]
+        self.assertEqual(marina["berths"]["maxItems"], 7)
+        self.assertEqual(marina["modules"]["maxItems"], 4)
         self.assertIn("schema", author.capabilities()["operations"])
         self.assertIn("preview", author.capabilities()["operations"])
 

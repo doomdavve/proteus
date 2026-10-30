@@ -19,7 +19,7 @@ return {
     exposed_fraction = 0.8,
     weather_range = 2500
   },
-  -- The first editable marina slice: two moored hulls beside the existing pontoon. The entrance
+  -- The first editable marina slice: two moored hulls beside a small authored pontoon. The entrance
   -- stays clear of both hulls and the approach lane runs north along x = 6.
   scene = {
     version = 1,
@@ -30,6 +30,11 @@ return {
           mooring = "pontoon" },
         { id = "runabout", recipe = "runabout", x = 13, z = 173, heading = -1.5707964,
           mooring = "pontoon" }
+      },
+      modules = {
+        { id = "pier", kind = "pontoon_small", x = 20, z = 170, heading = 0 },
+        { id = "ramp", kind = "gangway", anchor = { x = 34.1, z = 170 },
+          attaches = "pier" }
       }
     }
   }

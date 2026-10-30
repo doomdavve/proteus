@@ -1,13 +1,14 @@
 # Harbor life
 
-A native solo `outer` package that keeps the Långedrag voyage and replaces the compiled moored
-fleet with two editable berths. The docked ferry, pontoon, gangway and quay remain compiled in
-this step; registered dock modules arrive in L2.3.
+A native solo `outer` package that keeps the Långedrag voyage and replaces the compiled moored fleet and
+dock furniture with two editable berths, a small pontoon and a gangway. The docked ferry and
+bridge remain independent compiled actors.
 
-The berths sit at simulation `(13, 167)` and `(13, 173)` facing east toward the compiled pontoon.
+The berths sit at simulation `(13, 167)` and `(13, 173)` facing east toward the small authored
+pontoon at `(20, 170)`. A gangway runs from land at `(34.1, 170)` to that pontoon.
 The declared entrance is `(6, 168)`, width 8 m. The approach lane is `x = 6` from `z = 150` to
-`z = 176`; the pinned camera/start bookmark is `outer.marina` at `(6, 158)`, facing north
-(`heading = 180°`).
+`z = 176`; the pinned camera/start bookmark is `outer.marina` at `(2, 170)`, facing east
+(`heading = 90°`) across both slips.
 
 ## Run
 
@@ -17,8 +18,10 @@ From the repository root:
 ./build/wake_velocity --plugin plugins/harbor-life --start 2,170,90
 ```
 
-F5 reloads, F6 undoes, and F7 applies a held layout change with a session restart at the spawn.
-A saved edit stages once it has settled; an invalid edit keeps the running revision.
+F5 reloads, F6 undoes, and F7 applies a held layout change with a session restart at the
+compiled outer start dock. A layout edit therefore returns the boat to the start of the voyage;
+travel back to the marina to inspect it. A saved edit stages once it has settled; an invalid edit
+keeps the running revision.
 
 ## Edit
 

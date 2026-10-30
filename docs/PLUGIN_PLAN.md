@@ -38,9 +38,9 @@ Browser race integration remains separate from the supported voyage subset.
 Human P3 migration/Undo/recovery acceptance and broader platform timing remain separate work.
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
-scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1/L2.2's native berth
-parameterization plus two-berth `plugins/harbor-life` package are complete; dock modules remain
-planned for L2.3. The milestones below are this plan's
+scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3's native berth/module
+parameterization plus the two-berth `plugins/harbor-life` package are complete. The first
+playable L4.3 harbor gate remains planned. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1780,9 +1780,9 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
-failure cases and acceptance evidence. **L1.1–L1.4, L2.1 and L2.2 are complete; next in this
-track: L2.3 registered dock modules**; the first playable gate is L4.3. `scene.define` installs
-and stages the two-berth harbor-life layout; pontoon/gangway/quay modules remain compiled.
+failure cases and acceptance evidence. **L1.1–L2.3 are complete; next in this track: L3.1 native
+route definitions**; the first playable gate is L4.3. `scene.define` installs and stages the
+two-berth harbor-life layout, including its small pontoon and gangway.
 
 ### Coverage and delivery slices
 
@@ -1906,9 +1906,9 @@ lifetime inventory. No grant or runtime scene field exists yet; L1.1 is planning
   `waterfront_traffic` are in `proteus_boat_core`; `waterfront_scene` is in `proteus_render`.
   A plain `BoatSceneDefinition` therefore belongs in core and may be borrowed by physics, while
   no Lua or host type may enter core.
-- **Capacity decision:** 7 berths reuse `WATERFRONT_HARBOR_BOATS`, the compiled hull records and
-  the existing 42-line rope array. Four dock modules cover the three compiled parts plus one
-  spare. The two-berth example needs only berth pose/draw, hull/pontoon contact and camera exclusion;
+- **Capacity decision:** 7 berths reuse `WATERFRONT_HARBOR_BOATS` and the compiled hull records.
+  Four dock modules cover the three compiled parts plus one spare; L2.3 raises the rope-array
+  capacity from the compiled 42 lines to 60 for four authored gangway/rail groups. The two-berth example needs only berth pose/draw, hull/pontoon contact and camera exclusion;
   no new mesh, light, wake or actor pool is introduced by L1–L2.
 - **Site fixture:** [`tools/validate_scene_site.c`](../tools/validate_scene_site.c) checks the
   planned site with the compiled `outer` water and native skiff/runabout recipes. It passes with
@@ -1965,9 +1965,10 @@ Lua/manifest work is in `boat_plugin.[ch]` and `boat_plugin_lua.[ch]`.
   voyage; L1.4 owns its versioned scene payload. Because L1.2 has no authorable content, dropping
   the envelope in that path currently changes no running behavior; this would block L2.2 and is
   recorded in the next-task notes.
-- **Discovery:** `tools/plugin_schema.py` advertises the accepted envelope, a separate
-  `scene_planned` projection and explicit native constraints; `plugin_author.py` reports the
-  grant as accepted but `installed: false`, with no supported subsystem and depth unverified.
+- **Discovery at this step:** `tools/plugin_schema.py` advertised the accepted envelope, a
+  separate `scene_planned` projection and explicit native constraints; `plugin_author.py`
+  reported the grant as accepted but `installed: false`, with no supported subsystem and depth
+  unverified. L2.2/L2.3 later moved berths and modules into the live `scene` schema.
 
 Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 
@@ -2102,9 +2103,9 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 package, and live scene consumption by physics and both renderers. The compiled pontoon,
 gangway, quay, ferry and bridge remain independent.
 
-- `scene.marina` accepts strict `entrance` and `berths` records; `modules` is still rejected as an
-  unknown field. A present berth list replaces only the compiled hull collection; an empty list
-  disables it. The decoder copies recipes, mooring rules, source x/z and headings before Lua
+- `scene.marina` accepted strict `entrance` and `berths` records at this step; `modules` was
+  still rejected as an unknown field and L2.3 supersedes that. A present berth list replaces only
+  the compiled hull collection; an empty list disables it. The decoder copies recipes, mooring rules, source x/z and headings before Lua
   closes.
 - `boat_plugin_check_location` checks each hull plus the native 0.45 m lateral/0.9 m longitudinal
   excursion against the compiled map with 0.5 m water margin, pairwise hull clearance, the
@@ -2142,6 +2143,69 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 **Next in this track: L2.3.** Extract the compiled pontoon/gangway/quay into bounded registered
 modules with attachment/anchor rules, replace the example's compiled pontoon with one small
 authored pontoon and gangway, and add matching contact/camera geometry.
+
+#### L2.3 result, 2026-10-30
+
+**Implemented:** registered dock modules with deterministic attachment/anchor rules, shared
+draw/contact/camera geometry, and the first small authored pontoon and gangway.
+
+- `scene.marina.modules` accepts 0–4 strict records. Pontoon/small pontoon/quay records carry
+  `id`, `kind`, `x`, `z`, `heading`; a gangway carries `id`, `kind`, `anchor`, `attaches` to an
+  existing pontoon. Unknown fields, duplicate IDs, missing targets, detached/water anchors,
+  spans outside 2–20 m, land pontoons, overlapping solid modules and capacity + 1 reject with
+  field paths. A present empty list disables the compiled dock furniture; the ferry and bridge
+  remain independent compiled actors.
+- `pontoon_small` is a 14 × 2.35 m walkway with three east cleats. The quay recipe is now local
+  to its footing so an authored pose can move it; default rendering/contact are unchanged.
+  CPU/GPU draw module meshes, the gangway box and only the authored module list.
+- The shared frame, contact and camera paths consume authored module poses. Pontoon contact
+  includes the long recipe's fingers; quay contact/camera covers its equipment footprint; the
+  gangway adds a conservative camera centreline volume. Authored berth ropes attach to the
+  nearest authored pontoon's cleat region. The gangway shore end stays on land while its pontoon
+  landing follows the wave pose.
+- `plugins/harbor-life` now owns the small pontoon at `(20, 170)` and a gangway from land
+  `(34.1, 170)` to it. Both berths moor to that pontoon. A module edit follows the same F7
+  session-restart/Undo policy as a berth edit.
+
+Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
+
+- Warning-clean build and full `ctest --preset full`: **315/315 enabled tests** (22.51 s) with
+  local socket access; 13 retired wake-field tests remain disabled.
+- `validate_harbor` checks module count/kinds, authored-pontoon rope anchors at two times, a
+  fixed gangway shore end with a moving landing, module contact/camera exclusion, and the absence
+  of the compiled dock contact when modules are authored. `validate_boat_plugin --case
+  scene_berths` adds unknown kind, missing target, water anchor, overlong span, land pontoon,
+  overlap and capacity + 1. `harbor_life_scene` edits and Undo-restores the pontoon.
+- `validate_boat_plugin_stage` round-trips the harbor-life scene (2 berths, 2 modules) through
+  the real child worker. `test_plugin_author.py` expects both authored subsystems; Node contract
+  remains green.
+- CPU and GPU `outer.marina` captures show the small pontoon, gangway, both hulls and their ropes;
+  a shore-side CPU view was inspected for the gangway/pontoon join. The default compiled CPU
+  capture remains byte-identical (`ad4a277f…6cebb5`). Human motion/acceptance is not claimed.
+
+**PR stack (unmerged, review in order):**
+[#75 L1.1](https://github.com/doomdavve/proteus/pull/75) →
+[#76 L1.2](https://github.com/doomdavve/proteus/pull/76) →
+[#77 L1.3](https://github.com/doomdavve/proteus/pull/77) →
+[#78 L1.4](https://github.com/doomdavve/proteus/pull/78) →
+[#79 L2.1](https://github.com/doomdavve/proteus/pull/79) →
+[#80 L2.2](https://github.com/doomdavve/proteus/pull/80) →
+[#81 L2.3](https://github.com/doomdavve/proteus/pull/81). Each later PR targets its predecessor;
+they must land in order. Local verification above uses the complete stacked L2.3 worktree.
+No PR is merged and no release/deployment was performed.
+
+User feedback, 2026-10-30: the marina layout works, but F7 restarts the session at the compiled
+outer start dock, so the player must travel back to the marina after each physical edit. This is
+the current deliberate policy: a berth/module move is not applied under a moving boat and the
+first implementation has no safe in-place preview. Future authoring UX should either preserve
+the boat when the new layout validates the player's current clearance, or restart at the
+verified marina entrance/approach bookmark; a pinned review camera that renders the candidate
+without moving the boat is the other useful option. Record human acceptance of the edit loop as
+pending rather than treating this convenience gap as a failed scene.
+
+**Next in this track: L3.1.** Extract traffic/upstream route and timetable inputs into
+caller-owned native data with compiled parity. This completes the requested L1.1–L2.3 sequence;
+L3+ and the L4.3 playable gate are not started.
 
 #### L2 — a small marina before a marina editor
 
@@ -2262,9 +2326,12 @@ Completed L2.1, 2026-10-30: parameterized native moored hulls by recipe and call
 list, with default parity, move/remove coverage and no invisible compiled hull.
 Completed L2.2, 2026-10-30: exposed two editable berths in `plugins/harbor-life`, wired the
 accepted scene into physics and both renderers, and added map/restart validation.
-Next task for this track: **L2.3**, extract registered dock modules and attach a small pontoon
-and gangway at the two-berth site. Known limits: modules are compiled, depth is unverified, and
-no tram/seal recipes, gameplay dusk, building activity or human scene acceptance are implemented.
+Completed L2.3, 2026-10-30: added registered pontoon/gangway/quay modules, the small authored
+pontoon and gangway, and shared pose/contact/camera/rope handling.
+Next task for this track: **L3.1**, native route definitions with compiled parity. The requested
+L1.1–L2.3 sequence stops here. Known limits: no freeform module mesh editor, depth is unverified,
+and no tram/seal recipes, gameplay dusk, building activity or human scene acceptance are
+implemented.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

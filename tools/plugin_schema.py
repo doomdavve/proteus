@@ -106,12 +106,9 @@ def schema():
                      **point, "heading": number(-math.tau, math.tau, "radians"),
                      "anchor": record(point), "attaches": text(23)})
     marina = object_schema({"entrance": record({**point, "width": number(4, 40, "metres")}),
-                            "berths": sequence(berth, 0, 7)}, required=())
+                            "berths": sequence(berth, 0, 7),
+                            "modules": sequence(module, 0, 4)}, required=())
     scene = object_schema({"version": {"const": 1}, "marina": marina}, required=("version",))
-    scene_planned = object_schema({"version": {"const": 1},
-                                   "marina": object_schema(
-                                       {"modules": sequence(module, 0, 4)}, required=())},
-        required=("version",))
     int64 = number(-(1 << 63), (1 << 63) - 1, integer=True)
     command_base = {"generation": number(1, 0xffffffff, integer=True), "id": text()}
     command_variants = []
@@ -124,7 +121,7 @@ def schema():
                      "source": {"type": "string", "maxLength": 65536}})
     bundle["description"] = "UTF-8 source bundle, at most 200000 bytes; manifest/source byte caps apply after encoding"
     definitions = {"bundle": bundle, "manifest": manifest, "voyage": voyage, "scene": scene,
-                   "scene_planned": scene_planned, "race": race, "commands": commands}
+                   "race": race, "commands": commands}
     for value in definitions.values():
         value["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     return {"protocol": 1, "api": 1, "schemas": definitions,
@@ -136,9 +133,12 @@ def schema():
                     "No shelter in exposed water; first shelter equals selected location spawn",
                     "Shelters have 8m water clearance; arrival 20m"],
                 "scene": ["marina.berths is 0..7; missing berths keeps the compiled collection",
-                    "Berth IDs are unique scene-wide; recipes are registered native hulls",
+                    "marina.modules is 0..4; missing modules keeps the compiled dock furniture",
+                    "Berth/module IDs are unique scene-wide; recipes are registered native hulls",
                     "Hull plus mooring excursion must clear compiled water, other berths, the",
                     "declared entrance and the spawn/recovery shelters; depth is unverified",
+                    "Pontoon/quay footprints must clear each other; gangways need a land anchor,",
+                    "water landing, 2..20 m span and an existing pontoon target",
                     "scene.define requires voyage.define and precedes objective grants"],
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",
                     "skip_ticks <= recovery_ticks; native course/rules validation",

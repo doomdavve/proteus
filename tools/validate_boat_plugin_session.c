@@ -123,6 +123,18 @@ static int harbor_life_scene(void)
     CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
     CHECK(s.world.scene->berths[1].z == 173);
 
+    // A dock-module edit follows the same explicit restart and Undo policy.
+    BoatPluginBundle moved_module = harbor_edit("x = 20, z = 170", "x = 20, z = 166");
+    CHECK(boat_plugin_host_stage(&p.host, &moved_module));
+    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
+    CHECK(wake_plugin_frame(&p, &s, false, false, true, 4));
+    boat_session_restart(&s, calm());
+    CHECK(s.world.scene->module_count == 2 && s.world.scene->modules[0].z == 166);
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 5));
+    CHECK(wake_plugin_frame(&p, &s, false, false, true, 6));
+    boat_session_restart(&s, calm());
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.world.scene->modules[0].z == 170);
+
     // An unsafe berth (ashore) is rejected and leaves R1 and its scene intact.
     BoatPluginBundle bad = harbor_edit("x = 13, z = 173", "x = 32, z = 173");
     CHECK(!boat_plugin_host_stage(&p.host, &bad));

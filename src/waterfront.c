@@ -176,10 +176,20 @@ void waterfront_draw_traffic(Renderer3D *r, const WaterfrontTrafficFrame *frame)
 
 void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
 {
-    renderer3d_draw_mesh(r, waterfront_harbor_quay_mesh(), frame->quay);
-    renderer3d_draw_mesh(r, waterfront_harbor_pontoon_mesh(), frame->pontoon);
+    if (frame->modules_authored) {
+        for (int i = 0; i < frame->module_count; ++i) {
+            const WaterfrontModuleFrame *m = &frame->modules[i];
+            if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
+                renderer3d_draw_box(r, m->pose, (Color) { 154, 123, 84, 255 });
+            else
+                renderer3d_draw_mesh(r, waterfront_harbor_module_mesh(m->kind), m->pose);
+        }
+    } else {
+        renderer3d_draw_mesh(r, waterfront_harbor_quay_mesh(), frame->quay);
+        renderer3d_draw_mesh(r, waterfront_harbor_pontoon_mesh(), frame->pontoon);
+        renderer3d_draw_box(r, frame->gangway, (Color) { 154, 123, 84, 255 });
+    }
     renderer3d_draw_mesh(r, waterfront_harbor_ferry_mesh(), frame->ferry);
-    renderer3d_draw_box(r, frame->gangway, (Color) { 154, 123, 84, 255 });
     for (int i = 0; i < frame->berth_count; ++i)
         renderer3d_draw_mesh(r, waterfront_harbor_recipe_mesh(frame->recipes[i]), frame->boats[i]);
     for (int i = 0; i < frame->line_count; ++i)

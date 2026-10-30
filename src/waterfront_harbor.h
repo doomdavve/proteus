@@ -7,7 +7,8 @@
 
 #define WATERFRONT_HARBOR_BOATS 7
 #define WATERFRONT_FERRY_LINES 4
-#define WATERFRONT_HARBOR_LINES (WATERFRONT_HARBOR_BOATS * 4 + 6 + WATERFRONT_FERRY_LINES * 2)
+#define WATERFRONT_HARBOR_LINES                                                                    \
+    (WATERFRONT_HARBOR_BOATS * 4 + BOAT_SCENE_MODULES * 6 + WATERFRONT_FERRY_LINES * 2)
 
 typedef struct {
     char id[BOAT_SCENE_TEXT]; // Compiled IDs are for diagnostics and parity; authored IDs are
@@ -27,13 +28,28 @@ typedef struct {
 } WaterfrontFerry;
 
 typedef struct {
+    unsigned char kind; // BoatSceneModuleKind
+    Transform3D pose; // Pontoon/quay mesh or gangway box.
+} WaterfrontModuleFrame;
+
+typedef struct {
+    float length, beam, height;
+} WaterfrontModuleSpec;
+
+typedef struct {
     Transform3D boats[WATERFRONT_HARBOR_BOATS];
     unsigned char recipes[WATERFRONT_HARBOR_BOATS]; // Mesh recipe per drawn boat.
     int berth_count;
     Transform3D ferry;
+    // Compiled dock furniture (NULL/length-zero authored-module scenes use modules instead).
     Transform3D pontoon;
     Transform3D gangway;
     Transform3D quay; // Places the quay mesh; identity on the river's 3.5 m ground.
+    // L2.3 authored modules. modules_authored means the compiled dock parts are not drawn,
+    // even when the authored list is empty.
+    bool modules_authored;
+    int module_count;
+    WaterfrontModuleFrame modules[BOAT_SCENE_MODULES];
     int line_count;
     Transform3D lines[WATERFRONT_HARBOR_LINES];
 } WaterfrontHarborFrame;
@@ -49,6 +65,9 @@ const Mesh3D *waterfront_harbor_recipe_mesh(unsigned recipe);
 const Mesh3D *waterfront_harbor_boat_mesh(int index); // Compiled index wrapper.
 const Mesh3D *waterfront_harbor_pontoon_mesh(void);
 const Mesh3D *waterfront_harbor_quay_mesh(void);
+// L2.3 registered module recipes.
+WaterfrontModuleSpec waterfront_harbor_module_spec(unsigned kind);
+const Mesh3D *waterfront_harbor_module_mesh(unsigned kind);
 const WaterfrontFerry *waterfront_harbor_ferry(void);
 const Mesh3D *waterfront_harbor_ferry_mesh(void);
 // Stateless shared pose/rope evaluation. Flat water stays still; waves use boat_water_query.

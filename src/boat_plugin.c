@@ -3,6 +3,7 @@
 #include "boat_json.h"
 #include "boat_plugin_lua.h"
 #include "raymath.h"
+#include "waterfront_harbor.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -492,11 +493,106 @@ static bool box_contains(Vector2 centre, Vector2 length, Vector2 beam, float hal
         && fabsf(delta.x * beam.x + delta.y * beam.y) < half_beam + margin;
 }
 
+static void module_box(const BoatSceneModule *m, Vector2 *length, Vector2 *beam, Vector2 *centre,
+    float *half_length, float *half_beam)
+{
+    WaterfrontModuleSpec spec = waterfront_harbor_module_spec(m->kind);
+    *length = (Vector2) { sinf(m->heading), -cosf(m->heading) };
+    *beam = (Vector2) { cosf(m->heading), sinf(m->heading) };
+    *centre = (Vector2) { m->x, m->z };
+    *half_length = spec.length * .5f;
+    *half_beam = spec.beam * .5f;
+}
+
+static BoatPluginStatus check_scene_modules(
+    const BoatPluginVoyage *voyage, const BoatMap *map, BoatPluginDiagnostic *d)
+{
+    const BoatSceneDefinition *scene = &voyage->scene;
+    Vector2 centre[BOAT_SCENE_MODULES], length[BOAT_SCENE_MODULES], beam[BOAT_SCENE_MODULES];
+    float half_length[BOAT_SCENE_MODULES], half_beam[BOAT_SCENE_MODULES];
+    bool solid[BOAT_SCENE_MODULES] = { false };
+    for (unsigned i = 0; i < scene->module_count; ++i) {
+        const BoatSceneModule *m = &scene->modules[i];
+        char path[32];
+        snprintf(path, sizeof(path), "scene.marina.modules[%u]", i + 1);
+        if (m->kind == BOAT_SCENE_MODULE_GANGWAY) {
+            const BoatSceneModule *target = boat_scene_find_module(scene, m->attaches);
+            if (!target)
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "attaches to a missing pontoon");
+            Vector2 landing = { target->x + 1.175f * cosf(target->heading),
+                target->z + 1.175f * sinf(target->heading) };
+            float span = hypotf(m->anchor_x - landing.x, m->anchor_z - landing.y);
+            if (span < BOAT_SCENE_GANGWAY_MIN_LENGTH || span > BOAT_SCENE_GANGWAY_MAX_LENGTH)
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "gangway span %.1f m is outside 2..20 m", span);
+            if (boat_map_water(map, (Vector2) { m->anchor_x, m->anchor_z }, 0))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "gangway shore anchor is not land");
+            if (!boat_map_water(map, landing, 0))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "gangway landing is not water");
+            continue;
+        }
+        module_box(m, &length[i], &beam[i], &centre[i], &half_length[i], &half_beam[i]);
+        solid[i] = true;
+        if (m->kind == BOAT_SCENE_MODULE_QUAY) {
+            if (boat_map_water(map, centre[i], 0))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "quay module must stand on land");
+        } else if (!box_water(
+                       map, centre[i], length[i], beam[i], half_length[i], half_beam[i], .5f))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                "pontoon module is not open water of the compiled map");
+        for (unsigned b = 0; b < scene->berth_count; ++b) {
+            const BoatSceneBerth *berth = &scene->berths[b];
+            BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)berth->recipe);
+            Vector2 bc, bl, bb;
+            float bhl, bhb;
+            berth_box(berth, spec, &bl, &bb, &bc, &bhl, &bhb);
+            if (box_overlap(centre[i], length[i], beam[i], half_length[i], half_beam[i], bc, bl, bb,
+                    bhl, bhb, .3f))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "overlaps scene.marina.berths[%u]", b + 1);
+        }
+    }
+    for (unsigned b = 0; b < scene->berth_count; ++b) {
+        const BoatSceneBerth *berth = &scene->berths[b];
+        if (berth->mooring != BOAT_SCENE_MOORING_PONTOON)
+            continue;
+        float best = INFINITY;
+        for (unsigned i = 0; i < scene->module_count; ++i) {
+            const BoatSceneModule *m = &scene->modules[i];
+            if (m->kind != BOAT_SCENE_MODULE_PONTOON && m->kind != BOAT_SCENE_MODULE_PONTOON_SMALL)
+                continue;
+            best = fminf(best, hypotf(berth->x - m->x, berth->z - m->z));
+        }
+        if (best > 20) {
+            char path[32];
+            snprintf(path, sizeof(path), "scene.marina.berths[%u]", b + 1);
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                "mooring is pontoon but no authored pontoon is within rope reach");
+        }
+    }
+    for (unsigned i = 0; i < scene->module_count; ++i)
+        for (unsigned j = i + 1; j < scene->module_count; ++j) {
+            if (!solid[i] || !solid[j])
+                continue;
+            char path[32];
+            snprintf(path, sizeof(path), "scene.marina.modules[%u]", j + 1);
+            if (box_overlap(centre[i], length[i], beam[i], half_length[i], half_beam[i], centre[j],
+                    length[j], beam[j], half_length[j], half_beam[j], .3f))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "overlaps scene.marina.modules[%u]", i + 1);
+        }
+    return BOAT_PLUGIN_OK;
+}
+
 static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
 {
     const BoatSceneDefinition *scene = &voyage->scene;
-    if (!voyage->has_scene || !scene->berths_present)
+    if (!voyage->has_scene || (!scene->berths_present && !scene->modules_present))
         return BOAT_PLUGIN_OK;
     if (!location->mapped)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
@@ -542,6 +638,8 @@ static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "overlaps scene.marina.berths[%u] with no hull clearance", i + 1);
         }
+    if (scene->modules_present && check_scene_modules(voyage, map, d) != BOAT_PLUGIN_OK)
+        return d->status;
     return BOAT_PLUGIN_OK;
 }
 

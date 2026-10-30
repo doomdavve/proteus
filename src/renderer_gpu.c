@@ -893,6 +893,8 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
         if (!build_source_mesh(&scene->harbor_boats[i], waterfront_harbor_boat_mesh(i)))
             goto failed;
     if (!build_source_mesh(&scene->harbor_pontoon, waterfront_harbor_pontoon_mesh())
+        || !build_source_mesh(&scene->harbor_small_pontoon,
+            waterfront_harbor_module_mesh(BOAT_SCENE_MODULE_PONTOON_SMALL))
         || !build_source_mesh(&scene->harbor_quay, waterfront_harbor_quay_mesh())
         || !build_source_mesh(&scene->harbor_ferry, waterfront_harbor_ferry_mesh()))
         goto failed;
@@ -1450,10 +1452,26 @@ static void draw_harbor(
     const WaterfrontGpuScene *scene, Material material, const WaterfrontSceneFrame *frame)
 {
     const WaterfrontHarborFrame *harbor = &frame->harbor;
-    draw_colored_mesh(scene->harbor_quay, material, harbor->quay, WHITE, false);
-    draw_colored_mesh(scene->harbor_pontoon, material, harbor->pontoon, WHITE, false);
+    if (harbor->modules_authored) {
+        for (int i = 0; i < harbor->module_count; ++i) {
+            const WaterfrontModuleFrame *m = &harbor->modules[i];
+            if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
+                draw_colored_mesh(
+                    scene->cube, material, m->pose, (Color) { 154, 123, 84, 255 }, false);
+            else if (m->kind == BOAT_SCENE_MODULE_PONTOON)
+                draw_colored_mesh(scene->harbor_pontoon, material, m->pose, WHITE, false);
+            else if (m->kind == BOAT_SCENE_MODULE_PONTOON_SMALL)
+                draw_colored_mesh(scene->harbor_small_pontoon, material, m->pose, WHITE, false);
+            else
+                draw_colored_mesh(scene->harbor_quay, material, m->pose, WHITE, false);
+        }
+    } else {
+        draw_colored_mesh(scene->harbor_quay, material, harbor->quay, WHITE, false);
+        draw_colored_mesh(scene->harbor_pontoon, material, harbor->pontoon, WHITE, false);
+        draw_colored_mesh(
+            scene->cube, material, harbor->gangway, (Color) { 154, 123, 84, 255 }, false);
+    }
     draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
-    draw_colored_mesh(scene->cube, material, harbor->gangway, (Color) { 154, 123, 84, 255 }, false);
     for (int i = 0; i < harbor->berth_count; ++i)
         draw_colored_mesh(
             scene->harbor_boats[harbor->recipes[i]], material, harbor->boats[i], WHITE, false);
@@ -2011,6 +2029,8 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
             UnloadMesh(scene->harbor_boats[i]);
     if (scene->harbor_pontoon.vaoId)
         UnloadMesh(scene->harbor_pontoon);
+    if (scene->harbor_small_pontoon.vaoId)
+        UnloadMesh(scene->harbor_small_pontoon);
     if (scene->harbor_quay.vaoId)
         UnloadMesh(scene->harbor_quay);
     if (scene->harbor_ferry.vaoId)
