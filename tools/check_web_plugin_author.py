@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 # Each engine needs WebGL in headless mode; Chromium uses SwiftShader, the others their defaults.
 ENGINES = {'chromium': ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
            'firefox': [], 'webkit': []}
-# Headless Firefox on a GPU-less Linux runner otherwise blocklists software WebGL.
+# Firefox otherwise blocklists software WebGL on a GPU-less machine.
 LAUNCH = {'firefox': {'firefox_user_prefs': {'webgl.force-enabled': True}}}
 
 
@@ -22,6 +22,8 @@ def main():
     parser.add_argument('--executable', help='Chromium-family binary instead of Playwright\'s')
     parser.add_argument('--cycles', type=int, default=20, help='repeated worker validations')
     parser.add_argument('--sessions', type=int, default=3, help='repeated page sessions')
+    parser.add_argument('--headed', action='store_true',
+                        help='show the window, e.g. Firefox under xvfb-run where headless lacks GL')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if args.executable and args.browser != 'chromium':
@@ -33,7 +35,7 @@ def main():
     current = {}
     try:
         with sync_playwright() as p:
-            browser = getattr(p, args.browser).launch(executable_path=args.executable, headless=True,
+            browser = getattr(p, args.browser).launch(executable_path=args.executable, headless=not args.headed,
                 args=ENGINES[args.browser], **LAUNCH.get(args.browser, {}))
             evidence['browser'] = {'engine': args.browser, 'version': browser.version}
             context = browser.new_context(viewport={'width': 1100, 'height': 900})
