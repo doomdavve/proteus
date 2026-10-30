@@ -11,6 +11,13 @@ playground for iterating on effects, timing, audio, and presentation.
 
 - Implement all changes, including features and bug fixes, in a separate Git worktree.
 - Push the worktree branch and open a pull request for CI checks.
+- Stack dependent work explicitly: branch each follow-up from its parent branch, open its pull
+  request against that parent rather than `main`, and merge the stack in order. When a parent
+  gains `main` merges or conflict resolutions, merge the updated parent into every open child
+  before asking for review.
+- Keep per-step status in the owning plan. Update the `docs/README.md` overview only when its
+  area-level summary changes; copying each stacked step into the same overview row makes
+  otherwise independent branches conflict.
 - Reserve the main checkout for the user to explore and run different branches; do not use it
   for implementation work.
 
