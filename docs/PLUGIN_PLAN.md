@@ -434,6 +434,11 @@ interpreter/native memory bug.
 
 ## Multiplayer, prediction and recording
 
+The proposed [room-content loading and distribution plan](ROOM_CONTENT_PLAN.md) owns the
+broader path from preinstalled packages to downloaded maps/scenarios. P5 supplies the shared
+authority, prediction and revision contract; its initial matching-preinstalled-package scope
+remains unchanged. Automatic distribution and downloaded-script trust are later gates.
+
 P0–P4 are solo/local authoring. Existing rooms continue using their compiled content. Reject
 plugin gameplay in connected/hosted modes until the protocol integration is implemented;
 having Lua on both machines does not establish compatibility.
