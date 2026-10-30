@@ -204,9 +204,10 @@ different `--location` is refused. It cannot be combined with `--connect`, `--ho
 `--replay` or `--ghost`. Other solo options (`--start`, `--demo`, `--screenshot`, skins,
 renderers) work as before. If the package does not load at launch, the game prints the
 diagnostic and exits. The reference package is equal to the compiled route, so play is
-unchanged until it is edited. Packaged builds ship it at `assets/plugins/langedrag` (macOS:
-`Wake Velocity.app/Contents/Resources/assets/plugins/langedrag`); copy it somewhere writable
-and pass that directory.
+unchanged until it is edited. Packaged builds ship it, `shelter-tour` and `river-sprint` under
+`assets/plugins` (macOS: `Wake Velocity.app/Contents/Resources/assets/plugins`), with the
+[authoring tools](#packaged-authoring-tools-p47); copy one somewhere writable and pass that
+directory.
 
 A small panel at the bottom left shows the active revision and the latest outcome; each
 outcome is also printed to stderr as `Plugin DIR: ...`. Add `--plugin-bridge DIR` to let
@@ -676,8 +677,8 @@ python3 tools/plugin_author.py validate plugins/river-sprint
 ```
 
 `--worker PATH` selects another native build's `boat_plugin_worker` executable (Windows defaults
-to `build/boat_plugin_worker.exe`). These are development tools; release packages do not yet
-include them. `capabilities` returns JSON with limits, supported operations and unsupported
+to `build/boat_plugin_worker.exe`). Release packages ship the same tools
+([packaged authoring tools](#packaged-authoring-tools-p47)). `capabilities` returns JSON with limits, supported operations and unsupported
 features. `schema` returns JSON Schema projections for strict manifests, voyage/race records
 and objective commands plus callback/context/state descriptions and native-only constraints.
 It describes data values; Lua functions are not JSON values. Geometry, duplicate JSON keys,
@@ -872,6 +873,34 @@ itself a save, so with save polling the running game may already stage it; `live
 reports the same result or `busy`. Limits: voyage plugins in `wake_velocity` only (no race
 trial, browser or room); one client at a time; cancelling a client stops waiting but does not
 retract a request the game has read; a request is answered within a poll plus the staging time.
+
+## Packaged authoring tools (P4.7)
+
+The macOS and Windows release packages ship every operation above for their own game. Python
+3.10+ is not included. The tools and this reference are in `authoring/` (macOS:
+`Wake Velocity.app/Contents/Resources/authoring`); `boat_plugin_worker` is beside the game
+executable (macOS: `Contents/MacOS`, so the app's signature covers it). The three examples are
+in `assets/plugins`. From any working directory, for example on macOS:
+
+```sh
+app="/Applications/Wake Velocity.app/Contents"
+cp -R "$app/Resources/assets/plugins/shelter-tour" ~/my-voyage
+python3 "$app/Resources/authoring/plugin_author.py" validate ~/my-voyage
+python3 "$app/Resources/authoring/plugin_author.py" capture ~/my-voyage --anchor outer.dock \
+  --output ~/frame.png
+"$app/MacOS/wake_velocity" --plugin ~/my-voyage --plugin-bridge ~/.wake-velocity-bridge
+```
+
+`authoring/plugin_tools.json` (layout 1) records the package name, version and the worker,
+game, anchors, reference and examples relative to that directory; the tool refuses another
+layout version. Without that file, as in a checkout, it uses the source paths above. Explicit
+`--worker`/`--game` still override. `capabilities` adds `layout` (`{"kind": "source"}` or
+`{"kind": "package", "package": ..., "version": ...}`) and, in a package, reports the anchors,
+reference and examples as absolute paths. The tool never writes bytecode beside itself, so
+using it leaves the signed app unchanged. `river-sprint` validates and previews in a package;
+the race trial that plays it remains a development executable. Linux has no native package.
+`tools/package_plugin_tools.py` installs this layout for `tools/macos/package.py` and the
+Windows workflow.
 
 ## Live descriptor staging (P4.2)
 

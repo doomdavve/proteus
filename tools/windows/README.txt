@@ -41,6 +41,11 @@ CPU rendering is also available:
 Use --location basin for the handling basin. Add --waves for gentle
 waves in either location. Run .\wake_velocity.exe --help for course and replay options.
 
+Lua voyage plugins: copy a folder from assets\plugins somewhere writable and run
+  .\wake_velocity.exe --plugin C:\path\to\copy
+Saving its files reloads the voyage. The authoring folder holds the plugin authoring tools
+(Python 3.10 or newer, not included); see authoring\README.txt.
+
 When reporting issues, include build.txt, Windows version, GPU model, and
 whether the problem also happens without --gpu-aa.
 

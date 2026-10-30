@@ -418,6 +418,55 @@ class Workspace(unittest.TestCase):
         self.assertEqual(json.loads(stale.stdout)["status"], "input_error")
 
 
+class Packaged(unittest.TestCase):
+    """A release layout from package_plugin_tools, driven from outside the checkout."""
+
+    def test_relocated_tools(self):
+        import package_plugin_tools
+
+        self.assertEqual(author.capabilities()["layout"], {"kind": "source"})
+        with tempfile.TemporaryDirectory(prefix="plugin tools ") as scratch:
+            package = Path(scratch) / "package"
+            authoring = package / "authoring"
+            # GAME stays in the build tree so capture finds its assets; it is optional here.
+            game = GAME or package / author.executable("wake_velocity")
+            package_plugin_tools.install(authoring, WORKER,
+                                         package / author.executable("boat_plugin_worker"),
+                                         game, package / "assets/plugins", "test", "dev")
+
+            def tool(*args):
+                run = subprocess.run([sys.executable, str(authoring / "plugin_author.py"), *args],
+                                     cwd=scratch, capture_output=True, timeout=30)
+                return run.returncode, json.loads(run.stdout)
+
+            code, data = tool("capabilities")
+            self.assertEqual(code, 0)
+            self.assertEqual(data["layout"], {"kind": "package", "package": "test",
+                                              "version": "dev"})
+            for path in data["examples"] + [data["anchors"], data["api_document"]]:
+                self.assertTrue(Path(path).exists(), path)
+            self.assertEqual(tool("anchors")[1], author.anchors())
+            for example in data["examples"]:
+                code, result = tool("validate", example)
+                self.assertEqual((code, result["status"]), (0, "ok"), result)
+            code, result = tool("preview", data["examples"][2], "--ticks", "12")
+            self.assertEqual((code, result["status"]), (0, "ok"), result)
+            if GAME:
+                frame = Path(scratch) / "frame.png"
+                code, result = tool("capture", data["examples"][0], "--time", "0",
+                                    "--output", str(frame))
+                self.assertEqual((code, result["status"]), (0, "ok"), result)
+                self.assertEqual(author.png_size(frame.read_bytes()), (320, 200))
+            # Signed app bundles must not gain bytecode caches.
+            self.assertFalse((authoring / "__pycache__").exists())
+            layout = authoring / "plugin_tools.json"
+            layout.write_text(layout.read_text().replace('"layout": 1', '"layout": 2'))
+            run = subprocess.run([sys.executable, str(authoring / "plugin_author.py"),
+                                  "capabilities"], capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn("unsupported plugin tools layout", run.stderr)
+
+
 class Worker(unittest.TestCase):
     def run_worker(self, payload):
         run = subprocess.run([WORKER], input=payload, capture_output=True, timeout=10)

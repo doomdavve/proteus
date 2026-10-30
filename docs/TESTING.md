@@ -747,6 +747,12 @@ gains client checks against a fake game and an end-to-end CLI run against
 `validate_wake_bridge --serve` (`--bridge-server`). Its loops await external process/file events;
 CTest supplies the deadline. See [live tool bridge](PLUGIN_API.md#live-tool-bridge-p46).
 
+P4.7 adds the `Packaged` case to both `boat_plugin_author` and `boat_plugin_capture`: it installs a
+release layout with `tools/package_plugin_tools.py` in a temporary path containing spaces, then runs
+the copied tool from another directory (capabilities, anchors, validate of every example, preview,
+no bytecode cache, refusal of an unknown layout). Only the render lane, with `--game`, adds a
+capture. See [packaged authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47).
+
 P4.3 adds `web_plugin_author` (Node, CPU quick lane): portable bundle/UTF-8 byte caps, immutable
 framing, bounded worker lanes, one-use receipts, stale epochs, virtual deadlines, cancellation,
 late output and worker/exit/framing faults. The opt-in

@@ -1,5 +1,12 @@
 # macOS Wake Velocity builds
 
+Plugin authoring tools (P4.7, 2026-10-30): the bundle also carries `Contents/MacOS/boat_plugin_worker`,
+ad-hoc signed before the app, the tools in `Contents/Resources/authoring` and the three example
+plugins in `Contents/Resources/assets/plugins`; see
+[packaged authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47). CI runs the extracted
+tools' validate, preview and capture, then re-verifies the signature. So the "one executable"
+below is now one game executable plus that helper.
+
 Multiplayer M3 (2026-10-23): native builds fetch the pinned ENet library, and `wake_velocity`
 links it for the diagnostic `--connect` mode, so the app bundle now carries
 `enet-LICENSE.txt`. Since 2026-10-24 the bundle also carries the room authority at

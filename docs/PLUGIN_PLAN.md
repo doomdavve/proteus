@@ -12,17 +12,18 @@ staging. P4.1 adds discovery and isolated native validation; P4.2 adds machine-r
 bounded isolated voyage/race previews and disposable-process live descriptor staging for trusted
 native edits. P4.3 adds browser source bundles and isolated descriptor-only import/reload/export; browser
 objectives and race imports remain explicitly unsupported. P4.4 adds pinned draft workspace
-read/write, P4.5 pinned CPU frame capture with curated anchors/camera bookmarks and P4.6 a live tool
-bridge to a running native game. There is no in-game agent. The agreed direction
+read/write, P4.5 pinned CPU frame capture with curated anchors/camera bookmarks, P4.6 a live tool
+bridge to a running native game and P4.7 those tools in the macOS/Windows release packages.
+There is no in-game agent. The agreed direction
 is embedded Lua for gameplay authoring, with C retaining physics, collisions, wake math, rendering and networking.
 This document owns the boundary, workflow and staged implementation; [the plugin API](PLUGIN_API.md)
 owns the current contract. [All plans](README.md).
 
-Completed task: **P4.6 live tool bridge**, following
-[P4.5 pinned frame capture and curated anchors](#p45-result-2026-10-30); see the
-[P4.6 result](#p46-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: interactive preview controls**, then release-tool packaging, alongside broader
-target/browser qualification. Native startup, objective updates and Apply-time init/migration
+Completed task: **P4.7 release-tool packaging**, following
+[P4.6 live tool bridge](#p46-result-2026-10-30); see the
+[P4.7 result](#p47-result-2026-10-30). Prior results retain their dated verification evidence.
+**Next task: broader target/browser qualification.** Interactive preview controls were deferred
+on 2026-10-30 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time init/migration
 still evaluate trusted Lua synchronously; browser imports support only `voyage.define` and
 never evaluate source on the game thread. Browser objective isolation and race integration
 remain prerequisites for broadening that subset.
@@ -1473,6 +1474,54 @@ control, not a sandbox. No rendering, audio or asset-loading change; no new audi
 qualification. Browser objectives still require isolated init/update/migration/Undo and state
 persistence; race capture and a race bridge need race-trial support. P3 human
 migration/Undo/recovery acceptance remains open.
+
+#### P4.7 result, 2026-10-30
+
+The user chose release-tool packaging ahead of interactive preview controls, which were
+deferred. Implemented the [packaged authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47):
+
+- `tools/package_plugin_tools.py` installs `plugin_author.py`, `plugin_schema.py`, the anchors,
+  `PLUGIN_API.md` and a README into a package's `authoring/` directory. It copies
+  `boat_plugin_worker` beside the game and the three examples into `assets/plugins`. It also
+  writes `plugin_tools.json` (layout 1), which records those paths relative to `authoring/`.
+  `tools/macos/package.py` and the Windows workflow use it. Before, packages shipped only
+  `langedrag`.
+- macOS: the worker is in `Contents/MacOS`, checked for arm64 and system-only libraries like the
+  game, and ad-hoc signed before the app. The tool sets `sys.dont_write_bytecode`, so using it
+  leaves the signed bundle unchanged.
+- `plugin_author.py` takes its default worker, game, anchors and capture working directory from
+  `plugin_tools.json` when present and from the checkout otherwise. It refuses other layout
+  versions. `capabilities` reports `layout`, and in a package it reports absolute anchors,
+  reference and example paths.
+- CI: the macOS relocated-app step copies `shelter-tour` out of the extracted app, runs the
+  packaged validate, preview and capture, then re-verifies the signature. The Windows relocated
+  check runs the same operations on a `langedrag` copy through the runner's Python.
+  `test_plugin_author.py Packaged` builds a layout with the real helper in a temporary path
+  containing spaces and drives the copied tool from another directory. It covers capabilities,
+  anchors, validate of every example, preview, no bytecode cache and refusal of layout 2.
+  `boat_plugin_author` runs it without capture; `boat_plugin_capture` adds a capture.
+
+Verification, 2026-10-30, Apple Silicon/macOS Debug, GPU CTests off: build warning-clean for
+project sources (only the bundled stb_vorbis warning). Full `ctest --preset full` passed **309/309
+enabled tests** (13 retired field cases disabled). Agent-run local package check: I packaged a
+Debug build with `tools/macos/package.py` and extracted the ZIP to a temporary directory.
+`codesign --verify --deep --strict` passed. From another directory, the packaged tool reported
+`layout` kind `package`. It validated `langedrag`, previewed a copied `shelter-tour` and
+`river-sprint`, and captured a 320×200 frame at `outer.dock`, which I inspected. The signature
+still verified afterwards. The macOS and Windows CI package steps have not run yet; the PR's runs
+are their first check. No human acceptance is claimed.
+
+Limits: Python is not bundled. Linux has no native package. Packaged `river-sprint` can be
+validated and previewed but not played, because `boat_race_trial` is not shipped. The macOS app
+is ad-hoc signed; on a downloaded, quarantined app, Gatekeeper may need **Open Anyway** before
+it runs the worker, which is unverified. The packaged `PLUGIN_API.md` links into the source tree.
+No gameplay, rendering, audio or runtime asset-loading change; no new audiovisual review.
+
+**Next:** broader target/browser qualification: Windows/Linux and physical-device memory,
+compiler and callback costs, tab suspension and repeated-session cleanup. Browser objectives
+still require isolated init/update/migration/Undo and state persistence. Interactive preview
+controls (proposed: in-game checkpoint/rewind over `wake_plugin_preview_*`) are deferred and
+unspecified. P3 human migration/Undo/recovery acceptance remains open.
 
 ### P5 — authority, prediction and recorded revisions
 

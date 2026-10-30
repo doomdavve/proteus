@@ -7,6 +7,10 @@ import plistlib
 import re
 import shutil
 import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import package_plugin_tools  # noqa: E402
 
 
 def run(*args):
@@ -32,18 +36,20 @@ def main():
     if app.exists():
         raise SystemExit(f"Refusing to overwrite existing app: {app}")
     executable = build / "wake_velocity"
+    # The plugin authoring tools' isolated validator ships beside the game.
+    worker = build / "boat_plugin_worker"
     architectures = run("lipo", "-archs", str(executable))
-    if architectures != "arm64":
+    if architectures != "arm64" or run("lipo", "-archs", str(worker)) != architectures:
         raise SystemExit(f"Expected Apple Silicon build, got: {architectures}")
     minimum_os = re.search(r"\bminos (\S+)", run("otool", "-l", str(executable)))
     if not minimum_os:
         raise SystemExit("Could not determine executable's minimum macOS version")
     # The game is also its own room authority (wake_velocity --serve), so it ships alone.
-    dependencies = run("otool", "-L", str(executable))
-    for line in dependencies.splitlines()[1:]:
-        library = line.strip().split(" (", 1)[0]
-        if not library.startswith(("/System/Library/", "/usr/lib/")):
-            raise SystemExit(f"Unbundled dependency of {executable.name}: {library}")
+    for binary in (executable, worker):
+        for line in run("otool", "-L", str(binary)).splitlines()[1:]:
+            library = line.strip().split(" (", 1)[0]
+            if not library.startswith(("/System/Library/", "/usr/lib/")):
+                raise SystemExit(f"Unbundled dependency of {binary.name}: {library}")
     commit = run("git", "-C", str(root), "rev-parse", "HEAD")
     dirty = bool(run("git", "-C", str(root), "status", "--porcelain"))
     contents = app / "Contents"
@@ -62,8 +68,12 @@ def main():
         (assets / "geometry" / name).mkdir(parents=True)
         for file in ("manifest.json", "scenery.bin"):
             shutil.copy2(root / "assets/geometry" / name / file, assets / "geometry" / name)
-    # The reference Lua voyage plugin (--plugin); authors copy it somewhere writable to edit.
-    shutil.copytree(root / "plugins/langedrag", assets / "plugins/langedrag")
+    # Reference Lua plugins (--plugin) and their authoring tools; authors copy an example
+    # somewhere writable to edit it. Nested code must live in Contents/MacOS to be signed.
+    package_plugin_tools.install(resources / "authoring", worker,
+                                 contents / "MacOS" / "boat_plugin_worker",
+                                 contents / "MacOS" / "wake_velocity", assets / "plugins",
+                                 "macos-arm64", args.version)
     shutil.copy2(raylib / "LICENSE", resources / "raylib-LICENSE.txt")
     shutil.copy2(raylib / "src/external/glfw/LICENSE.md", resources / "glfw-LICENSE.md")
     shutil.copy2(root / "third_party/jsmn/LICENSE", resources / "jsmn-LICENSE.txt")
@@ -88,6 +98,7 @@ def main():
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": minimum_os.group(1),
         }, stream)
+    run("codesign", "--force", "--sign", "-", str(contents / "MacOS" / "boat_plugin_worker"))
     run("codesign", "--force", "--sign", "-", str(app))
     run("codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app))
     archive = output / f"wake_velocity-{args.version}-macos-arm64.zip"

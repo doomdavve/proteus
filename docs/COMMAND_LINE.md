@@ -55,8 +55,9 @@ CLI voyage packages select their own location and run in native solo free boatin
 The browser offers [descriptor source bundles](PLUGIN_API.md#browser-source-bundles-p43)
 through its PLUGIN VOYAGE panel. Saving
 reloads the package; F5 reloads now, F6 undoes/discards and F7 applies a pending migration or restart.
-Invalid edits leave the running descriptor intact. Packaged voyage examples live under
-`assets/plugins/`; copy one somewhere writable to edit it. The race tool previews local
+Invalid edits leave the running descriptor intact. Packaged plugin examples live under
+`assets/plugins/`; copy one somewhere writable to edit it. Packages also ship the
+[authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47) in `authoring/`. The race tool previews local
 course edits; network rooms retain their compiled course. See the
 [plugin API](PLUGIN_API.md#playing-and-live-authoring-p1) and
 [race example](../plugins/river-sprint/README.md) for reload policies and limits.

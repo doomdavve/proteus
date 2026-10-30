@@ -15,7 +15,9 @@ import sys
 import tempfile
 import time
 
-from plugin_schema import schema
+# Packaged copies live in signed app bundles; importing must not write bytecode beside them.
+sys.dont_write_bytecode = True
+from plugin_schema import schema  # noqa: E402
 
 MANIFEST_MAX = 4096
 SOURCE_MAX = 65536
@@ -31,15 +33,52 @@ LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard")
 RESPONSE_MAX = 32768
 
 
+def executable(name):
+    return name + ".exe" if os.name == "nt" else name
+
+
+def load_layout():
+    """Source-checkout paths, or a release package's plugin_tools.json beside this file."""
+    here = Path(__file__).resolve().parent
+    path = here / "plugin_tools.json"
+    if not path.exists():
+        return {"kind": "source", "base": ROOT,
+                "worker": ROOT / "build" / executable("boat_plugin_worker"),
+                "game": ROOT / "build" / executable("wake_velocity"),
+                "anchors": ROOT / "tools" / "plugin_anchors.json",
+                "anchors_name": "tools/plugin_anchors.json",
+                "api_document": "docs/PLUGIN_API.md",
+                "examples": ["plugins/langedrag", "plugins/river-sprint", "plugins/shelter-tour"]}
+    with open(path, encoding="utf-8") as stream:
+        package = json.load(stream)
+    if package.get("layout") != 1:
+        raise SystemExit(f"{path}: unsupported plugin tools layout")
+    # Packaged paths are relative to this directory; capabilities reports them resolved.
+    resolved = {key: (here / package[key]).resolve()
+                for key in ("worker", "game", "anchors", "api_document")}
+    return {"kind": "package", "base": here, "package": package["package"],
+            "version": package["version"], "worker": resolved["worker"],
+            "game": resolved["game"], "anchors": resolved["anchors"],
+            "anchors_name": str(resolved["anchors"]),
+            "api_document": str(resolved["api_document"]),
+            "examples": [str((here / name).resolve()) for name in package["examples"]]}
+
+
+LAYOUT = load_layout()
+
+
 def capabilities():
-    return {"protocol": 1, "operations": OPERATIONS,
+    layout = {"kind": LAYOUT["kind"]}
+    if LAYOUT["kind"] == "package":
+        layout.update(package=LAYOUT["package"], version=LAYOUT["version"])
+    return {"protocol": 1, "operations": OPERATIONS, "layout": layout,
             "kinds": {"voyage": "outer", "race": "river"},
             "capabilities": ["voyage.define", "race.define", "objective.hud", "objective.timers"],
             "limits": {"manifest_bytes": MANIFEST_MAX, "source_bytes": SOURCE_MAX,
                        "lua_bytes": 2097152, "entry_instructions": 1000000,
                        "callback_instructions": 100000, "migration_instructions": 500000},
-            "api_document": "docs/PLUGIN_API.md", "anchors": "tools/plugin_anchors.json", "examples": ["plugins/langedrag",
-                "plugins/river-sprint", "plugins/shelter-tour"],
+            "api_document": LAYOUT["api_document"], "anchors": LAYOUT["anchors_name"],
+            "examples": LAYOUT["examples"],
             "isolation": "disposable process; restricted Lua; no OS security sandbox",
             "preview": {"max_ticks": 72000, "fixtures": ["voyage-calm-steer-v1", "race-four-grid-v1"]},
             "browser": {"capabilities": ["voyage.define"], "location": "outer",
@@ -237,7 +276,7 @@ class ValidationJob:
 
 
 def anchors():
-    with open(ROOT / "tools" / "plugin_anchors.json", encoding="utf-8") as stream:
+    with open(LAYOUT["anchors"], encoding="utf-8") as stream:
         return json.load(stream)
 
 
@@ -309,8 +348,8 @@ class CaptureJob:
             for key in ("distance", "height"):
                 if key in camera:
                     command += [f"--camera-{key}", repr(float(camera[key]))]
-            # Relative asset paths resolve from the source root, as for any screenshot.
-            self.process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL,
+            # The game finds assets beside itself; the source root also suits a checkout.
+            self.process = subprocess.Popen(command, cwd=LAYOUT["base"], stdin=subprocess.DEVNULL,
                                             stdout=self.log, stderr=subprocess.STDOUT,
                                             close_fds=True)
         except BaseException:
@@ -540,8 +579,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=OPERATIONS)
     parser.add_argument("directory", nargs="?")
-    parser.add_argument("--worker", type=Path, default=Path(__file__).resolve().parent.parent
-                        / "build" / ("boat_plugin_worker.exe" if os.name == "nt" else "boat_plugin_worker"))
+    parser.add_argument("--worker", type=Path, default=LAYOUT["worker"])
     parser.add_argument("--base-revision", type=int)
     parser.add_argument("--base-epoch", type=int)
     parser.add_argument("--held-revision", type=int)
@@ -550,8 +588,7 @@ def main():
     parser.add_argument("--file", choices=["plugin.json", "main.lua"])
     parser.add_argument("--ticks", type=int, default=360)
     parser.add_argument("--timeout", type=float)
-    parser.add_argument("--game", type=Path, default=ROOT / "build" / (
-        "wake_velocity.exe" if os.name == "nt" else "wake_velocity"))
+    parser.add_argument("--game", type=Path, default=LAYOUT["game"])
     parser.add_argument("--anchor")
     parser.add_argument("--time", type=float, default=1.0)
     parser.add_argument("--camera-distance", type=float)

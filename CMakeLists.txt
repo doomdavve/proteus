@@ -673,10 +673,12 @@ if(NOT EMSCRIPTEN)
     --worker $<TARGET_FILE:boat_plugin_worker>
     --bridge-server $<TARGET_FILE:validate_wake_bridge>)
   set_tests_properties(boat_plugin_author PROPERTIES LABELS "cpu" TIMEOUT 30)
-  # P4.5 pinned frame captures through the game's CPU screenshot path.
+  # P4.5 pinned frame captures through the game's CPU screenshot path, also from a P4.7
+  # release layout of the authoring tools.
   add_test(NAME boat_plugin_capture COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
-    --worker $<TARGET_FILE:boat_plugin_worker> --game $<TARGET_FILE:wake_velocity> Capture)
+    --worker $<TARGET_FILE:boat_plugin_worker> --game $<TARGET_FILE:wake_velocity> Capture
+    Packaged)
   set_tests_properties(boat_plugin_capture PROPERTIES LABELS "render" TIMEOUT 120)
 endif()
 

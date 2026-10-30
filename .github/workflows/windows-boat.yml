@@ -74,9 +74,14 @@ jobs:
             Copy-Item "assets/geometry/$map/manifest.json" "$package/assets/geometry/$map"
             Copy-Item "assets/geometry/$map/scenery.bin" "$package/assets/geometry/$map"
           }
-          # The reference Lua voyage plugin (--plugin assets/plugins/langedrag), copied to edit.
-          New-Item -ItemType Directory -Force -Path "$package/assets/plugins" | Out-Null
-          Copy-Item plugins/langedrag "$package/assets/plugins/langedrag" -Recurse
+          # Reference Lua plugins (--plugin assets/plugins/langedrag, copied to edit) and the
+          # authoring tools with their isolated validator beside the game.
+          python tools/package_plugin_tools.py --authoring "$package/authoring" `
+            --worker build-win/Release/boat_plugin_worker.exe `
+            --worker-path "$package/boat_plugin_worker.exe" `
+            --game-path "$package/wake_velocity.exe" --plugins "$package/assets/plugins" `
+            --package windows-x64 --version $env:PACKAGE_VERSION
+          if ($LASTEXITCODE -ne 0) { throw "Plugin tools packaging failed: $LASTEXITCODE" }
           Copy-Item tools/windows/launch.bat $package
           Copy-Item tools/windows/host.bat $package
           Copy-Item tools/windows/README.txt $package
@@ -98,6 +103,15 @@ jobs:
             $plugin = Join-Path (Split-Path $exe) assets/plugins/langedrag
             & $exe --renderer cpu --plugin $plugin --time 3 --screenshot boat-plugin.png
             if ($LASTEXITCODE -ne 0) { throw "Packaged voyage plugin failed: $LASTEXITCODE" }
+            # Packaged authoring tools find their worker and game through plugin_tools.json.
+            $author = Join-Path (Split-Path $exe) authoring/plugin_author.py
+            Copy-Item $plugin mine -Recurse -Force
+            foreach ($operation in @('validate', 'preview')) {
+              python $author $operation mine
+              if ($LASTEXITCODE -ne 0) { throw "Packaged plugin $operation failed: $LASTEXITCODE" }
+            }
+            python $author capture mine --anchor outer.dock --time 0 --output plugin-frame.png
+            if ($LASTEXITCODE -ne 0) { throw "Packaged plugin capture failed: $LASTEXITCODE" }
             & $exe --serve --scripted --ticks 240
             if ($LASTEXITCODE -ne 0) { throw "Relocated boat server failed: $LASTEXITCODE" }
             foreach ($fontAsset in @("m5x7.fnt", "m5x7.png", "m3x6.fnt", "m3x6.png")) {
