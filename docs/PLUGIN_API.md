@@ -748,7 +748,54 @@ and reports phase, round and the canonical fleet digest. Neither fixture promise
 the authored route. A quarantined objective rejects the preview. Cost counters describe staging,
 not aggregate simulation work. Successful preview output adds `artifact_id`, SHA-256 over the
 bundle/base pins and canonical scenario evidence; it is evidence, never permission to install
-anything. No frame capture or application playback effects run in the worker.
+anything. No frame capture or application playback effects run in the worker; see
+[frame capture](#frame-capture-and-anchors-p45).
+
+## Frame capture and anchors (P4.5)
+
+```sh
+python3 tools/plugin_author.py anchors
+python3 tools/plugin_author.py capture plugins/shelter-tour --anchor outer.bridge --time 2 \
+  --base-revision 3 --output build/shelter-bridge.png
+python3 tools/plugin_author.py capture plugins/langedrag --anchor outer.squall-edge \
+  --camera-distance 24 --camera-height 12 --expect-bundle "$BUNDLE_ID" --output build/squall.png
+```
+
+`anchors` returns the hand-curated poses in [`tools/plugin_anchors.json`](../tools/plugin_anchors.json):
+an `id` prefixed by its location, simulation `x`/`z` metres, `heading_degrees` (0 faces −z;
+forward is `(sin, −cos)`, so the Lua radians × 180/π) and a short label. Each is a navigable
+named place for prompts and a camera bookmark for capture. Outer anchors cover the voyage's
+dock, bridge, east shore, squall edge and Långedrag arrival; river anchors name the sprint start
+and finish for race descriptors but are not capturable yet. This is a small curated list, not a
+semantic map; anchors carry no gameplay meaning and plugins cannot read them.
+
+`capture DIRECTORY --output FILE.png` takes one snapshot of the draft (same framing, pins and
+`--expect-bundle` as validation), writes those exact bytes into a private temporary package and
+runs the native game's display-free CPU screenshot path from the source root:
+`wake_velocity --renderer cpu --plugin COPY --screenshot … --time SECONDS`, plus `--start` from
+`--anchor` and optional `--camera-distance` (8–48) / `--camera-height` (4–36). `--time` is
+simulated seconds of the scripted screenshot drive, 0–60 (default 1, 120 ticks per second).
+Without an anchor the boat starts at the voyage's first shelter. `--game PATH` selects another
+native build (Windows default `build/wake_velocity.exe`); the default deadline is 20 seconds,
+configurable in (0, 60], with the same poll/kill/reap and Ctrl-C cancellation as validation.
+Later draft saves cannot change a capture in flight.
+
+A successful response includes `scenario` (location, anchor, camera, seconds, ticks, `cpu`
+renderer), `evidence` (plugin id, active revision and gameplay digest reported by the game, and
+the frame's PNG dimensions, byte count and SHA-256), `frame_path` and `artifact_id`: SHA-256 over
+the bundle/base pins and canonical scenario/evidence. The PNG is verified before it atomically
+replaces `--output`; failures leave any previous file. Repeating a request on the same build
+yields the same frame and artifact. A native load diagnostic returns `rejected` with that
+message; any other failure (unnavigable pose, missing assets, no active revision, bad PNG) is
+`capture_failed`, and expiry is `deadline`. Exit codes match validation.
+
+Limits: voyages only (races play in `boat_race_trial`, which has no screenshot path); CPU only,
+320×200 world rendering without HUD/objective rows or plugin panels (use `preview` evidence for
+HUD values); the scripted drive is the game's screenshot drive, not the preview fixture. The
+child is the trusted native game, so startup and objective callbacks evaluate Lua as `--plugin`
+does, bounded only by the process deadline. Frames are deterministic for one build and platform;
+they are not portable golden images. No live game is contacted, and a capture is evidence, never
+permission to install a revision.
 
 ## Live descriptor staging (P4.2)
 
@@ -785,7 +832,8 @@ qualify arbitrary imported code or guarantee uninterrupted objective execution. 
 import/reload/export must isolate those remaining paths or explicitly restrict its capability
 subset, and qualify storage failure, cancellation and repeated sessions on the target. The descriptor-only
 browser implementation below resolves this gate for that subset. Draft workspace CLI access
-is implemented; frame capture, live tool bridge and human recovery acceptance remain open.
+and pinned frame capture are implemented; the live tool bridge and human recovery acceptance
+remain open.
 
 
 ## Browser source bundles (P4.3)

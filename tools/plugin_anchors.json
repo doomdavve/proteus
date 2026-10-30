@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "note": "Hand-curated, navigable boat poses in simulation metres (x = -east, z = north). heading_degrees: 0 faces -z (north); forward is (sin, -cos). Each pose is also a capture bookmark for its location.",
+  "anchors": [
+    {"id": "outer.dock", "location": "outer", "x": -12, "z": 60, "heading_degrees": 0,
+     "label": "Voyage start dock, facing out to the river mouth"},
+    {"id": "outer.bridge", "location": "outer", "x": 650, "z": -850, "heading_degrees": 76,
+     "label": "Bridge shelter, facing downstream toward the fjord"},
+    {"id": "outer.east-shore", "location": "outer", "x": 3250, "z": -2000,
+     "heading_degrees": 49, "label": "East shore shelter, facing the open water"},
+    {"id": "outer.squall-edge", "location": "outer", "x": 3650, "z": -2200,
+     "heading_degrees": 55, "label": "Outside the reference squall, facing its centre"},
+    {"id": "outer.langedrag", "location": "outer", "x": 3595, "z": -3370,
+     "heading_degrees": 90, "label": "Langedrag arrival area, facing out of the basin"},
+    {"id": "river.sprint-start", "location": "river", "x": -180, "z": -250,
+     "heading_degrees": 52, "label": "River sprint start line, facing the first gate"},
+    {"id": "river.sprint-finish", "location": "river", "x": 588.5, "z": -767.2,
+     "heading_degrees": 50, "label": "River sprint finish gate"}
+  ]
+}

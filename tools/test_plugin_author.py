@@ -15,6 +15,7 @@ import plugin_author as author
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKER = None
+GAME = None
 
 
 class FakeProcess:
@@ -72,6 +73,126 @@ class Lifecycle(unittest.TestCase):
                        {"timeout": 61}, {"expected_bundle": "stale"}]:
             with self.assertRaises(ValueError):
                 self.job(**kwargs)
+
+
+class CaptureLifecycle(unittest.TestCase):
+    def job(self, package="langedrag", **kwargs):
+        payload = author.snapshot(ROOT / "plugins" / package)
+        with patch.object(author.subprocess, "Popen", FakeProcess):
+            return author.CaptureJob("game", payload, 7, 100, **kwargs)
+
+    def test_deadline_and_cleanup(self):
+        job = self.job(timeout=2)
+        directory = Path(job.directory.name)
+        self.assertTrue((directory / "package" / "main.lua").is_file())
+        self.assertIsNone(job.poll(101))
+        self.assertEqual(job.poll(102)["status"], "deadline")
+        self.assertTrue(job.process.killed and job.process.reaped)
+        self.assertFalse(directory.exists())
+        self.assertTrue(job.log.closed)
+        self.assertIs(job.cancel(), job.result)
+
+    def test_bad_game_output(self):
+        for code, log, status in [(0, b"", "capture_failed"),
+                                  (1, b"Plugin x: syntax error in main.lua:1 : bad", "rejected"),
+                                  (1, b"River spawn is not navigable.", "capture_failed"),
+                                  (0, b"Plugin x: p R1 ACTIVE 0123456789abcdef", "capture_failed")]:
+            job = self.job()
+            job.process.code = code
+            job.log.write(log)
+            if code == 0 and log:
+                job.output.write_bytes(b"not a png")
+            result = job.poll(101)
+            self.assertEqual(result["status"], status, log)
+            self.assertNotIn("artifact_id", result)
+            self.assertIsNone(job.frame)
+
+    def test_request_limits(self):
+        bridge = author.find_anchor("outer.bridge")
+        for package, kwargs in [("langedrag", {"timeout": 0}), ("langedrag", {"seconds": 61}),
+                                ("langedrag", {"seconds": float("nan")}),
+                                ("langedrag", {"camera": {"distance": 7}}),
+                                ("langedrag", {"camera": {"height": 37}}),
+                                ("langedrag", {"expected_bundle": "stale"}),
+                                ("langedrag", {"anchor": author.find_anchor("river.sprint-start")}),
+                                ("river-sprint", {"anchor": bridge})]:
+            with self.assertRaises(ValueError, msg=(package, kwargs)):
+                self.job(package, **kwargs)
+        with self.assertRaises(ValueError):
+            author.find_anchor("nowhere")
+
+    def test_anchors(self):
+        data = author.anchors()
+        ids = [anchor["id"] for anchor in data["anchors"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        for anchor in data["anchors"]:
+            self.assertTrue(anchor["id"].startswith(anchor["location"] + "."))
+            self.assertIn(anchor["location"], ("outer", "river"))
+        self.assertIn("capture", author.capabilities()["operations"])
+        self.assertNotIn("capture", author.capabilities()["unsupported"])
+
+
+class Capture(unittest.TestCase):
+    """Real CPU captures; the wait is a failure deadline, not simulated time."""
+
+    def setUp(self):
+        if not GAME:
+            self.skipTest("needs --game")
+
+    def run_jobs(self, jobs):
+        try:
+            for job in jobs:
+                job.process.wait(timeout=60)
+            return [job.poll(0) for job in jobs]
+        finally:
+            for job in jobs:
+                job.close()
+
+    def test_anchors_are_navigable(self):
+        payload = author.snapshot(ROOT / "plugins/langedrag")
+        outer = [a for a in author.anchors()["anchors"] if a["location"] == "outer"]
+        results = self.run_jobs([author.CaptureJob(GAME, payload, 0, 0, anchor, 0, timeout=60)
+                                 for anchor in outer])
+        for anchor, result in zip(outer, results):
+            self.assertEqual(result["status"], "ok", (anchor["id"], result))
+
+    def test_pinned_repeatable_evidence(self):
+        payload = author.snapshot(ROOT / "plugins/shelter-tour")
+        bridge = author.find_anchor("outer.bridge")
+        camera = {"distance": 20, "height": 10}
+        jobs = [author.CaptureJob(GAME, payload, 3, 0, bridge, 1, camera, timeout=60)
+                for _ in range(2)]
+        first, second = self.run_jobs(jobs)
+        self.assertEqual(first, second)
+        self.assertEqual(first["status"], "ok")
+        self.assertEqual(first["evidence"]["plugin_id"], "proteus.shelter-tour")
+        self.assertEqual(first["evidence"]["frame"]["width"], 320)
+        self.assertEqual(first["scenario"]["ticks"], 120)
+        self.assertEqual(jobs[0].frame, jobs[1].frame)
+        self.assertEqual(len(first["artifact_id"]), 64)
+
+    def test_rejected_candidate_and_cli(self):
+        manifest = (ROOT / "plugins/langedrag/plugin.json").read_bytes()
+        source = b"this is invalid lua"
+        payload = struct.pack(">II", len(manifest), len(source)) + manifest + source
+        result = self.run_jobs([author.CaptureJob(GAME, payload, 0, 0, timeout=60)])[0]
+        self.assertEqual(result["status"], "rejected")
+        self.assertIn("syntax", result["message"])
+        with tempfile.TemporaryDirectory() as scratch:
+            output = Path(scratch) / "frame.png"
+            output.write_bytes(b"previous")
+            pin = author.workspace_read(ROOT / "plugins/langedrag")["bundle_id"]
+            run = subprocess.run([sys.executable, str(ROOT / "tools/plugin_author.py"), "capture",
+                                  str(ROOT / "plugins/langedrag"), "--game", GAME, "--time", "0",
+                                  "--anchor", "outer.dock", "--expect-bundle", pin,
+                                  "--output", str(output)], capture_output=True, timeout=60)
+            self.assertEqual(run.returncode, 0, run.stdout)
+            result = json.loads(run.stdout)
+            self.assertEqual(result["bundle_id"], pin)
+            frame = output.read_bytes()
+            self.assertEqual(author.png_size(frame), (320, 200))
+            self.assertEqual(result["evidence"]["frame"]["bytes"], len(frame))
+            self.assertEqual([p.name for p in Path(scratch).iterdir()], ["frame.png"])
 
 
 class Workspace(unittest.TestCase):
@@ -308,6 +429,8 @@ class Worker(unittest.TestCase):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--worker", required=True)
+    parser.add_argument("--game")
     args, remaining = parser.parse_known_args()
     WORKER = str(Path(args.worker).resolve())
+    GAME = str(Path(args.game).resolve()) if args.game else None
     unittest.main(argv=[__file__] + remaining)

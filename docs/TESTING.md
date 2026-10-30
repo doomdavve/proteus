@@ -735,6 +735,11 @@ malformed/oversized output, syntax failure and the live F5/completion adapter. I
 completion loops await an external event; CTest supplies the failure deadline. No simulated
 clock is advanced to wait for a child. See [live descriptor staging](PLUGIN_API.md#live-descriptor-staging-p42).
 
+P4.5 adds `boat_plugin_capture` (native, slow render lane): the same script with `--game`
+runs real CPU captures of every outer anchor, repeatable pinned evidence, a rejected candidate and
+the CLI's atomic `--output`. Its child waits are failure deadlines; the capture lifecycle uses
+the fake process in `boat_plugin_author`. See [frame capture](PLUGIN_API.md#frame-capture-and-anchors-p45).
+
 P4.3 adds `web_plugin_author` (Node, CPU quick lane): portable bundle/UTF-8 byte caps, immutable
 framing, bounded worker lanes, one-use receipts, stale epochs, virtual deadlines, cancellation,
 late output and worker/exit/framing faults. The opt-in

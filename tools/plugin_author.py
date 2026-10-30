@@ -7,6 +7,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import stat
 import struct
 import subprocess
@@ -18,23 +19,32 @@ from plugin_schema import schema
 
 MANIFEST_MAX = 4096
 SOURCE_MAX = 65536
+ROOT = Path(__file__).resolve().parent.parent
+FRAME_MAX = 4 << 20
+LOG_MAX = 16384
+
+
+OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "capture", "export",
+              "workspace-read", "workspace-write"]
 
 
 def capabilities():
-    return {"protocol": 1, "operations": ["capabilities", "schema", "validate", "preview", "export",
-                         "workspace-read", "workspace-write"],
+    return {"protocol": 1, "operations": OPERATIONS,
             "kinds": {"voyage": "outer", "race": "river"},
             "capabilities": ["voyage.define", "race.define", "objective.hud", "objective.timers"],
             "limits": {"manifest_bytes": MANIFEST_MAX, "source_bytes": SOURCE_MAX,
                        "lua_bytes": 2097152, "entry_instructions": 1000000,
                        "callback_instructions": 100000, "migration_instructions": 500000},
-            "api_document": "docs/PLUGIN_API.md", "examples": ["plugins/langedrag",
+            "api_document": "docs/PLUGIN_API.md", "anchors": "tools/plugin_anchors.json", "examples": ["plugins/langedrag",
                 "plugins/river-sprint", "plugins/shelter-tour"],
             "isolation": "disposable process; restricted Lua; no OS security sandbox",
             "preview": {"max_ticks": 72000, "fixtures": ["voyage-calm-steer-v1", "race-four-grid-v1"]},
             "browser": {"capabilities": ["voyage.define"], "location": "outer",
                         "bundle_format": "wake-velocity-plugin", "bundle_version": 1},
-            "unsupported": ["capture", "apply", "undo", "tool_bridge"]}
+            "capture": {"kinds": ["voyage"], "renderer": "cpu", "max_seconds": 60,
+                        "width": 320, "height": 200, "format": "png"},
+            "unsupported": ["race_capture", "gpu_capture", "inspect", "apply", "undo",
+                            "tool_bridge"]}
 
 
 def read_regular(path, limit):
@@ -217,10 +227,167 @@ class ValidationJob:
         self.cancel()
 
 
+def anchors():
+    with open(ROOT / "tools" / "plugin_anchors.json", encoding="utf-8") as stream:
+        return json.load(stream)
+
+
+def find_anchor(name):
+    for anchor in anchors()["anchors"]:
+        if anchor["id"] == name:
+            return anchor
+    raise ValueError(f"unknown anchor {name}; see the anchors operation")
+
+
+def png_size(frame):
+    if (len(frame) < 24 or frame[:8] != b"\x89PNG\r\n\x1a\n" or frame[12:16] != b"IHDR"):
+        raise ValueError("capture is not a PNG")
+    return struct.unpack(">II", frame[16:24])
+
+
+class CaptureJob:
+    """One pinned CPU frame from the game's screenshot path, with ValidationJob's lifecycle.
+
+    The game reads a private copy of the snapshot, so later draft saves cannot change the frame.
+    The child is the trusted native game (synchronous Lua, as in --plugin), only time-bounded.
+    """
+
+    def __init__(self, game, payload, base_revision, now, anchor=None, seconds=1.0,
+                 camera=None, timeout=20.0, expected_bundle=None):
+        if not math.isfinite(timeout) or timeout <= 0 or timeout > 60:
+            raise ValueError("timeout must be finite and in (0, 60]")
+        if not math.isfinite(seconds) or not 0 <= seconds <= 60:
+            raise ValueError("capture time must be in [0, 60] seconds")
+        if type(base_revision) is not int or not 0 <= base_revision <= 0xffffffff:
+            raise ValueError("base revision must be an unsigned 32-bit integer")
+        if len(payload) > 8 + MANIFEST_MAX + SOURCE_MAX:
+            raise ValueError("snapshot exceeds input limit")
+        camera = camera or {}
+        for key, low, high in (("distance", 8, 48), ("height", 4, 36)):
+            if key in camera and not (math.isfinite(camera[key]) and low <= camera[key] <= high):
+                raise ValueError(f"camera {key} must be in [{low}, {high}]")
+        self.bundle = hashlib.sha256(payload).hexdigest()
+        if expected_bundle is not None and expected_bundle != self.bundle:
+            raise ValueError("bundle changed since the expected snapshot")
+        manifest_size, _ = struct.unpack(">II", payload[:8])
+        manifest = json.loads(payload[8:8 + manifest_size])
+        # The native parser stays authoritative; this only routes the request.
+        if not isinstance(manifest, dict) or manifest.get("kind") != "voyage":
+            raise ValueError("capture supports voyage plugins; race capture is unsupported")
+        if anchor is not None and anchor["location"] != manifest.get("location"):
+            raise ValueError(f"anchor {anchor['id']} is not in {manifest.get('location')}")
+        self.base_revision = base_revision
+        self.deadline = now + timeout
+        self.result = None
+        self.frame = None
+        self.scenario = {"location": manifest.get("location"), "seconds": seconds,
+                         "ticks": round(seconds * 120), "renderer": "cpu",
+                         "anchor": anchor["id"] if anchor else None, "camera": camera}
+        self.directory = tempfile.TemporaryDirectory(prefix="plugin-capture-")
+        self.log = tempfile.TemporaryFile()
+        try:
+            package = Path(self.directory.name) / "package"
+            package.mkdir()
+            (package / "plugin.json").write_bytes(payload[8:8 + manifest_size])
+            (package / "main.lua").write_bytes(payload[8 + manifest_size:])
+            self.package = str(package)
+            self.output = Path(self.directory.name) / "frame.png"
+            command = [str(Path(game).resolve()), "--renderer", "cpu", "--plugin", self.package,
+                       "--screenshot", str(self.output), "--time", repr(float(seconds))]
+            if anchor:
+                command += ["--start", f"{anchor['x']!r},{anchor['z']!r},"
+                            f"{anchor['heading_degrees']!r}"]
+            for key in ("distance", "height"):
+                if key in camera:
+                    command += [f"--camera-{key}", repr(float(camera[key]))]
+            # Relative asset paths resolve from the source root, as for any screenshot.
+            self.process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                            stdout=self.log, stderr=subprocess.STDOUT,
+                                            close_fds=True)
+        except BaseException:
+            self.log.close()
+            self.directory.cleanup()
+            raise
+
+    def finish(self, status, message=None, evidence=None):
+        self.result = {"protocol": 1, "operation": "capture", "bundle_id": self.bundle,
+                       "base_revision": self.base_revision, "status": status,
+                       "scenario": self.scenario}
+        if message:
+            self.result["message"] = message
+        if evidence is not None:
+            self.result["evidence"] = evidence
+            canonical = json.dumps({"scenario": self.scenario, "evidence": evidence},
+                                   sort_keys=True, separators=(",", ":"))
+            pins = self.bundle + ":" + str(self.base_revision) + ":"
+            self.result["artifact_id"] = hashlib.sha256((pins + canonical).encode()).hexdigest()
+        self.log.close()
+        self.directory.cleanup()
+        return self.result
+
+    def cancel(self, status="cancelled"):
+        if self.result is None:
+            self.process.kill()
+            self.process.wait()
+            self.finish(status)
+        return self.result
+
+    def poll(self, now):
+        if self.result is not None:
+            return self.result
+        if now >= self.deadline:
+            return self.cancel("deadline")
+        code = self.process.poll()
+        if code is None:
+            return None
+        self.log.seek(0, os.SEEK_END)
+        self.log.seek(max(0, self.log.tell() - LOG_MAX))
+        lines = [line.replace(self.package, "plugin") for line in
+                 self.log.read().decode("utf-8", "replace").splitlines() if line.strip()]
+        plugin = [line for line in lines if line.startswith("Plugin ")]
+        if code != 0:
+            # A diagnostic from the native host means the candidate itself was rejected.
+            rejected = [line for line in plugin if " error in " in line]
+            return self.finish("rejected" if rejected else "capture_failed",
+                               (rejected or lines or [f"game exited with {code}"])[-1])
+        match = re.search(r": (\S+) R(\d+) ACTIVE ([0-9a-f]{16})", plugin[-1] if plugin else "")
+        try:
+            if not match:
+                raise ValueError("game did not report an active plugin revision")
+            with open(self.output, "rb") as stream:
+                frame = stream.read(FRAME_MAX + 1)
+            if len(frame) > FRAME_MAX:
+                raise ValueError("capture exceeds frame limit")
+            width, height = png_size(frame)
+        except (OSError, ValueError) as error:
+            return self.finish("capture_failed", str(error))
+        self.frame = frame
+        return self.finish("ok", evidence={
+            "plugin_id": match[1], "revision": int(match[2]), "gameplay_digest": match[3],
+            "frame": {"format": "png", "width": width, "height": height,
+                      "bytes": len(frame), "sha256": hashlib.sha256(frame).hexdigest()}})
+
+    def close(self):
+        self.cancel()
+
+
+def write_frame(path, frame):
+    """Atomically place a verified frame; a failure leaves any previous file."""
+    path = Path(path)
+    with tempfile.NamedTemporaryFile(dir=path.parent or ".", prefix=".capture-",
+                                     delete=False) as stream:
+        temporary = Path(stream.name)
+        stream.write(frame)
+    try:
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["capabilities", "schema", "validate", "preview", "export",
-                         "workspace-read", "workspace-write"])
+    parser.add_argument("operation", choices=OPERATIONS)
     parser.add_argument("directory", nargs="?")
     parser.add_argument("--worker", type=Path, default=Path(__file__).resolve().parent.parent
                         / "build" / ("boat_plugin_worker.exe" if os.name == "nt" else "boat_plugin_worker"))
@@ -228,13 +395,23 @@ def main():
     parser.add_argument("--expect-bundle")
     parser.add_argument("--file", choices=["plugin.json", "main.lua"])
     parser.add_argument("--ticks", type=int, default=360)
-    parser.add_argument("--timeout", type=float, default=5)
+    parser.add_argument("--timeout", type=float)
+    parser.add_argument("--game", type=Path, default=ROOT / "build" / (
+        "wake_velocity.exe" if os.name == "nt" else "wake_velocity"))
+    parser.add_argument("--anchor")
+    parser.add_argument("--time", type=float, default=1.0)
+    parser.add_argument("--camera-distance", type=float)
+    parser.add_argument("--camera-height", type=float)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.operation == "capabilities":
         print(json.dumps(capabilities(), sort_keys=True))
         return 0
     if args.operation == "schema":
         print(json.dumps(schema(), sort_keys=True))
+        return 0
+    if args.operation == "anchors":
+        print(json.dumps(anchors(), sort_keys=True))
         return 0
     job = None
     try:
@@ -262,11 +439,23 @@ def main():
             return 0
         if not args.directory:
             raise ValueError(f"{args.operation} requires a plugin directory")
-        job = ValidationJob(args.worker, snapshot(args.directory), args.base_revision,
-                            time.monotonic(), args.timeout, args.expect_bundle,
-                            args.operation, args.ticks)
+        if args.operation == "capture":
+            if not args.output:
+                raise ValueError("capture requires --output FILE.png")
+            camera = {key: value for key, value in (("distance", args.camera_distance),
+                      ("height", args.camera_height)) if value is not None}
+            job = CaptureJob(args.game, snapshot(args.directory), args.base_revision,
+                             time.monotonic(), find_anchor(args.anchor) if args.anchor else None,
+                             args.time, camera, args.timeout or 20, args.expect_bundle)
+        else:
+            job = ValidationJob(args.worker, snapshot(args.directory), args.base_revision,
+                                time.monotonic(), args.timeout or 5, args.expect_bundle,
+                                args.operation, args.ticks)
         while (result := job.poll(time.monotonic())) is None:
             time.sleep(.01)
+        if args.operation == "capture" and result["status"] == "ok":
+            write_frame(args.output, job.frame)
+            result["frame_path"] = str(args.output)
     except KeyboardInterrupt:
         result = job.cancel() if job else {"status": "cancelled"}
     except (OSError, ValueError, UnicodeError) as error:
