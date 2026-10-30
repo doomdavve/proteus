@@ -410,7 +410,9 @@ sessions and denied source storage. Gameplay and authoring captures were inspect
 Verification, 2026-10-30 (P4.8): the same check, extended with 20 repeated worker validations,
 Chromium tab freeze/resume (including a deadline across a freeze), navigation mid-validation
 and three restored sessions, passes on Playwright Chromium, Firefox and WebKit and on system
-Chrome, locally on Apple Silicon. The PR browser workflow now runs it on all three engines. See
+Chrome, locally on Apple Silicon. It also passes in the PR browser workflow on all three engines
+on Ubuntu. There Firefox runs with `--headed` under `xvfb-run`, because headless Firefox has no
+WebGL on a GPU-less runner. See
 the [P4.8 result](PLUGIN_PLAN.md#p48-result-2026-10-30) for timings and limits. Safari, mobile
 browsers, physical devices, real background-tab policies and worker/browser-process memory
 remain unqualified; there is no human play acceptance or deployment claim. PR browser CI builds these artifacts

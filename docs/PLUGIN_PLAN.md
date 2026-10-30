@@ -1548,13 +1548,18 @@ Qualified what an agent and CI can check without physical devices or a human pla
     recorded, not asserted.
 - The PR-only **Browser plugin authoring** workflow now serves its built site and runs the check
   on Chromium, Firefox and WebKit (Playwright 1.64.1 on Ubuntu). It uploads the screenshots and
-  `results.json`.
+  `results.json`, and a failed run also saves `failure.png` and the console log. Headless Firefox
+  cannot create a WebGL context on the GPU-less runner ("Exhausted GL driver options"), so CI runs
+  it with `--headed` under `xvfb-run`, where Mesa renders in software.
 - Native targets: Linux CI already ran every plugin test (309/309 on `1f0b4a2`). Windows CI ran
   them all except `boat_plugin_capture`, which it now runs too. Both jobs now run
   `boat_plugin_bench plugins/shelter-tour` and write its staging/compiler/callback costs to the job
   summary. Fixed the two GCC warnings that Linux CI reported in plugin sources
   (`boat_plugin_lua.c` unused value, `validate_boat_plugin.c` format truncation); the
   descriptor behavior is unchanged.
+- CI exposed a Windows-only test bug: the `Packaged` capture case built its temporary layout on
+  `C:` and pointed it at the game on `D:`, which a relative layout path cannot express. The case
+  now builds the layout on the game's drive. Real packages keep the game inside the package.
 
 Verification, 2026-10-30, Apple Silicon/macOS: native Debug build warning-clean for project
 sources; full `ctest --preset full` passed **309/309 enabled tests**. Emscripten 6.0.12
@@ -1569,10 +1574,25 @@ Firefox 157.0 and WebKit 27.2, and on system Chrome 156.0.8078.74:
 
 The Chromium main-thread heap after collection went from 2.74 to 2.82 MB across the 20
 validations. I inspected the voyage captures from all three engines; each rendered the Långedrag
-voyage with the plugin HUD row. The Linux/Windows bench steps and three-engine CI run first on
-this PR. No human acceptance is claimed.
+voyage with the plugin HUD row. No human acceptance is claimed.
 
-Limits: these are headless desktop engines on one Mac, not Safari, mobile browsers or physical
+CI on PR #65's final commit passed every workflow. Linux ran 309/309 and Windows 130/130, now
+including `boat_plugin_capture`. On Ubuntu runners the three engines took:
+
+| Engine (Ubuntu CI) | Cold validation | Median of 20 | Max of 20 |
+|---|---|---|---|
+| Chromium 156, headless | 123 ms | 91 ms | 135 ms |
+| Firefox 157, headed under Xvfb | 136 ms | 89 ms | 108 ms |
+| WebKit 27.2, headless | 79 ms | 70 ms | 80 ms |
+
+`boat_plugin_bench plugins/shelter-tour` reported these p50 costs on the shared runners:
+
+| Runner | Reference stage | Dense 64 KiB stage | Update | Callback budget trip |
+|---|---|---|---|---|
+| Linux | 0.15 ms | 5.6 ms | 0.07 ms | 0.43 ms |
+| Windows | 0.12 ms | 3.6 ms | 0.06 ms | 0.37 ms |
+
+Limits: these are desktop engines on one Mac and on CI runners, not Safari, mobile browsers or physical
 devices. Browser freeze is Chromium's lifecycle emulation, not a real background-tab policy.
 Firefox/WebKit freeze, worker Wasm memory and browser-process memory are not measured. Native
 costs on Linux/Windows come from shared CI runners, so they are evidence, not budgets. No
