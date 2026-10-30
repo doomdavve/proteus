@@ -840,6 +840,27 @@ static int deferred_ready(void)
     return 0;
 }
 
+static int snapshot_resync(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 1, (BoatNetServerConfig) { 0 }));
+    unsigned a = room_join(&room, "stall", NULL, 0);
+    room_run(&room, 1);
+    BoatNetClient *c = &room.clients[a];
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING);
+    // Silence authoritative fleet state while control traffic keeps flowing: pings still get
+    // pongs, so only the snapshot-stall resync can recover the world.
+    room.server.tick_limit = room.server.fleet.state.tick;
+    room_run(&room, 2.5);
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->timed_out == 0);
+    CHECK(c->stats.snapshot_resyncs > 0 && c->stats.resyncs > 0);
+    CHECK(room.server.stats.resyncs > 0);
+    printf("snapshot_resync: %llu snapshot stalls requested reliable checkpoints\n",
+        (unsigned long long)c->stats.snapshot_resyncs);
+    room_close(&room);
+    return 0;
+}
+
 static int lossless(void)
 {
     static Room room;
@@ -2457,6 +2478,7 @@ static const TestCase cases[] = {
     TEST_CASE(enet_loopback),
     TEST_CASE(enet_lan),
     TEST_CASE(deferred_ready),
+    TEST_CASE(snapshot_resync),
     SLOW_CASE(enet_lifecycle),
     TEST_CASE(rejections),
     SLOW_CASE(deathmatch),
@@ -2471,6 +2493,7 @@ static const TestCase cases[] = {
     TEST_CASE(codec),
     SLOW_CASE(checkpoints),
     TEST_CASE(deferred_ready),
+    TEST_CASE(snapshot_resync),
     TEST_CASE(lossless),
     TEST_CASE(deathmatch),
     SLOW_CASE(combat_room),

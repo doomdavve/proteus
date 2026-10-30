@@ -739,6 +739,12 @@ void net_study_close(NetStudy *net)
             p->max_remote_error, (unsigned long long)p->snaps, (unsigned long long)p->held_ticks,
             (unsigned long long)p->wakes_vanished, (unsigned long long)p->visible_vanished,
             (unsigned long long)p->carried, (unsigned long long)p->incomplete_corrections);
+    const BoatNetClientStats *s = &net->client.stats;
+    fprintf(stdout,
+        "network: %llu snapshots, %llu stale, %llu resyncs (%llu stall), %llu decode errors\n",
+        (unsigned long long)s->snapshots, (unsigned long long)s->stale_snapshots,
+        (unsigned long long)s->resyncs, (unsigned long long)s->snapshot_resyncs,
+        (unsigned long long)s->decode_errors);
     if (net->frames)
         fprintf(stdout,
             "other boat: %llu frames, %.1f%% interpolated, %.1f%% extrapolated, %.1f%% held, "

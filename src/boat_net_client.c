@@ -26,6 +26,7 @@ void boat_net_client_init(BoatNetClient *client, BoatNetTransport transport,
         .started_at = now,
         .serviced_at = now,
         .pong_after = now,
+        .heard_at = now,
         .mismatch_since = -1,
         .resync_at = -1e9,
         .ping_at = -1e9,
@@ -373,6 +374,10 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         ++c->stats.decode_errors;
         return;
     }
+    // Any valid message from this session proves the path is alive, even if it is a stale
+    // snapshot or a birth the client cannot apply yet. Snapshot liveness is separate.
+    if (c->phase >= BOAT_NET_CLIENT_BOOTSTRAP && m.header.epoch == c->epoch)
+        c->heard_at = now;
     if (c->phase == BOAT_NET_CLIENT_HANDSHAKE && channel == BOAT_NET_BOOTSTRAP) {
         if (c->early_bootstrap_count < BOAT_NET_EARLY_BOOTSTRAP) {
             c->early_bootstrap[c->early_bootstrap_count++] = *event;
@@ -392,6 +397,7 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     }
     if (m.header.type == BOAT_NET_REJECT && c->phase == BOAT_NET_CLIENT_HANDSHAKE) {
         c->reject = m.reject;
+        c->heard_at = now;
         c->phase = BOAT_NET_CLIENT_REJECTED;
         c->early_bootstrap_count = 0;
         return;
@@ -399,6 +405,7 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     if (m.header.type == BOAT_NET_ACCEPT && c->phase == BOAT_NET_CLIENT_HANDSHAKE) {
         c->accept = m.accept;
         c->epoch = m.header.epoch;
+        c->heard_at = now;
         c->slot = m.accept.slot;
         c->phase = BOAT_NET_CLIENT_BOOTSTRAP;
         unsigned count = c->early_bootstrap_count;
@@ -599,9 +606,10 @@ static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive
     if (c->phase >= BOAT_NET_CLIENT_REJECTED)
         return false;
     bool joining = c->phase < BOAT_NET_CLIENT_PLAYING;
-    if (joining ? now - c->started_at > BOAT_NET_HANDSHAKE_TIMEOUT
-                : now - c->snapshot_at > BOAT_NET_TIMEOUT) {
-        c->timed_out = joining ? 1 : 2;
+    bool unresponsive = !joining && now - c->heard_at > BOAT_NET_TIMEOUT;
+    bool silent = !joining && now - c->snapshot_at > BOAT_NET_SNAPSHOT_SILENCE;
+    if (joining ? now - c->started_at > BOAT_NET_HANDSHAKE_TIMEOUT : (unresponsive || silent)) {
+        c->timed_out = joining ? 1 : unresponsive ? 2 : 3;
         c->phase = BOAT_NET_CLIENT_CLOSED;
         c->transport.disconnect(c->transport.context, 0);
         return false;
@@ -615,12 +623,19 @@ static bool service(BoatNetClient *c, double now, BoatInput input, bool inactive
     }
     if (c->phase != BOAT_NET_CLIENT_PLAYING)
         return true;
-    if (!c->wake_consistent && c->mismatch_since >= 0
-        && now - c->mismatch_since > BOAT_NET_RESYNC_AFTER && now - c->resync_at > 1) {
+    bool wake_stalled = !c->wake_consistent && c->mismatch_since >= 0
+        && now - c->mismatch_since > BOAT_NET_RESYNC_AFTER;
+    // The authority is still talking (pongs, births, roster) but no authoritative fleet state
+    // has applied. Ask for a reliable checkpoint before the hard snapshot-silence ceiling.
+    bool snapshot_stalled = now - c->snapshot_at > BOAT_NET_RESYNC_AFTER
+        && now - c->heard_at <= BOAT_NET_RESYNC_AFTER;
+    if ((wake_stalled || snapshot_stalled) && now - c->resync_at > BOAT_NET_RESYNC_AFTER) {
         c->resync_at = now;
         ++c->stats.resyncs;
+        if (snapshot_stalled && !wake_stalled)
+            ++c->stats.snapshot_resyncs;
         BoatNetMessage m = { .header = { .type = BOAT_NET_RESYNC_REQUEST, .tick = mirror_tick(c) },
-            .resync = { .reason = 1, .snapshot_tick = mirror_tick(c) } };
+            .resync = { .reason = wake_stalled ? 1 : 2, .snapshot_tick = mirror_tick(c) } };
         send_message(c, &m);
     }
     if (c->predict && c->predict_dirty) {
@@ -711,7 +726,9 @@ const char *boat_net_client_failure(const BoatNetClient *c)
     if (c->timed_out == 1)
         return "no answer within 10 s (is the room running and its network endpoint reachable?)";
     if (c->timed_out == 2)
-        return "no snapshot for 5 s";
+        return "no message from the server for 5 s";
+    if (c->timed_out == 3)
+        return "the server is reachable but sent no authoritative state for 10 s";
     switch (c->leave) {
     case BOAT_NET_LEAVE_TIMEOUT:
         return "the server timed this client out";
