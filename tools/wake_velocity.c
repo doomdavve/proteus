@@ -78,72 +78,102 @@ EM_JS(float, boat_web_scenery_progress, (const char *name),
     { return Module['boatScenery'].progress(UTF8ToString(name)); })
 #endif
 
+static void usage_line(const char *option, const char *description)
+{
+    printf("  %-29s %s\n", option, description);
+}
+
 static void usage(void)
 {
-    puts(
-        "Usage: wake_velocity [--demo] [--frames COUNT] [--screenshot FILE [--time SECONDS]]\n"
-        "--verbose: log graphics/window backend and resource initialization\n"
-        "No options (or --title): Wake Velocity title with multiplayer and settings (name, boat,\n"
-        "  mouse steering, soundtrack)\n"
-        "  Esc > BACK TO TITLE returns to it | --title --screenshot FILE: capture the title\n"
-        "--soundtrack a-little-boat|acid-wake|off: local background music (default a-little-boat)\n"
-        "Left/Right or A/D: adjust wheel\n"
-        "Hold W/Up: forward | S/Down: reverse | release: neutral | Shift: precision\n"
-        "M: capture/release mouse steering (move to turn; stop to hold) | --mouse-steering\n"
-        "Arcade jumps: automatic aerial stabilization; steering retains yaw\n"
-        "Keyboard wheel springs to centre; mouse wheel holds. Hold Backspace 1 s: reset | P/Esc: "
-        "menu "
-        "(steering, controls, leave; solo pauses, rooms keep running)\n"
-        "+/-: closer/farther | PageUp/PageDown: raise/lower camera | C: reset view\n"
-        "--wake-field: opt-in coherent CPU field, native basin only\n"
-        "--wake-objects: bounded arcade jump wakes (default in free boating)\n"
-        "--wake-objects-crossing: a scripted second fleet boat sharing wakes and contacts "
-        "(basin only)\n"
-        "--wake-life-ticks 240..1920 (default 1920) | --wake-height 0.1..3 (default 1.2 m)\n"
-        "--player-wake: legacy D3 trail | --no-player-wake: visual-only player trail\n"
-        "--current / --crossing-wake: opt-in authored tests in all locations; hold Backspace 1 s "
-        "to restart passage\n"
-        "--skin sweden|finland|denmark|norway|explorer|cabin: solo boat (default sweden)\n"
-        "  explorer and cabin use their own engines when free boating\n"
-        "--camera-distance UNITS: 8..48 (default 20; river 12)\n"
-        "--camera-height UNITS: 4..36 (default 14; river 6)\n"
-        "--fixed-fov: keep the 55-degree view instead of widening gently with speed\n"
-        "--location basin|river|outer (default basin; river extends to Alvsborgsbron, outer\n"
-        "  adds the baked run to Langedrag: a destination cue, rough exposed water in the outer\n"
-        "  fjord, and hold Backspace 1 s to return to the last shelter reached)\n"
-        "--start X,Z[,DEGREES]: place the boat in a mapped location (simulation X/Z, heading)\n"
-        "--plugin DIR: solo voyage from a Lua plugin, e.g. plugins/langedrag\n"
-        "  Saves reload | F5: reload | F6: undo | F7: apply a held migration/restart\n"
-        "--plugin-bridge DIR: with --plugin, let tools/plugin_author.py live-* inspect, stage,\n"
-        "  apply and undo revisions through the private directory DIR");
-    puts( // Two literals keep each within ISO C's minimum supported length.
-        "--waves: gentle crossing waves and a floating hull\n"
-        "--course: timed S course in the basin; cross highlighted gates in order | hold Backspace "
-        "1 s: retry\n"
-        "G: ghost on/off | L/B: replay last/best | Space: pause replay | Enter: restart replay\n"
-        "Solo: [ / ] slower/faster (0.25x..8x) | backslash: normal time; altered runs are "
-        "practice\n"
-        "Replay: Left/Right seek 1s (Shift: 5s) | Home/End | [ / ]: speed | backslash: 1x\n"
-        "Click/drag the replay timeline to seek and pause; Space resumes.\n"
-        "--replay FILE: watch a saved course run (also supports --screenshot --time)\n"
-        "--ghost FILE: race a compatible saved run | --save-run FILE: export each finish\n"
-        "--data-dir DIR: override personal-best storage directory\n"
-        "--renderer gpu|cpu (default gpu) | --gpu: select GPU | --gpu-aa: 4x supersampling\n"
-        "F3: toggle debug profiler | --profiler: show it on startup\n"
-        "Frames follow the display with vsync (capped just above its refresh rate) |\n"
-        "  --no-vsync: pace to exactly 60 Hz instead\n"
-        "CPU screenshots need no window; GPU screenshots require a graphics context.\n"
-        "--time is screenshot-only (0..60, or 0..600 with --replay); --frames limits a smoke run.\n"
-        "--demo drives the screenshot example in a window; hold Backspace for 1 s to restart it.\n"
-        "--connect HOST:PORT: join a boat_server room (native multiplayer, in progress: the own\n"
-        "  boat is predicted and answers at once; hold Backspace 1 s for a new life; every boat is "
-        "drawn in\n"
-        "  its slot's country: 1 Sweden, 2 Finland, 3 Denmark, 4 Norway) | --name TEXT |\n"
-        "  --token TEXT\n"
-        "--host free|deathmatch|race: start a room open to the local network (a second copy of\n"
-        "  this program in --serve mode) and join it; --location and --waves set its water,\n"
-        "  --port its UDP port (default 24680). The room closes when you leave it.\n"
-        "--serve [boat_server options]: run only a room, as boat_server does (--serve --help)");
+    puts("Usage: wake_velocity [MODE] [OPTIONS]\n"
+         "       wake_velocity --serve [boat_server options]\n"
+         "\n"
+         "Starts the title with no arguments. Explicit options start a session at once.");
+
+    puts("\nMODES");
+    usage_line("(none), --title", "Title: multiplayer and settings");
+    usage_line("--course", "Timed S course in the basin");
+    usage_line("--replay FILE", "Watch a saved course run");
+    usage_line("--ghost FILE", "Race a compatible saved run");
+    usage_line("--host free|deathmatch|race", "Start a LAN room and join it");
+    usage_line("--connect HOST:PORT", "Join a boat_server room");
+    usage_line("--serve", "Run only a room; see --serve --help");
+
+    puts("\nWORLD");
+    usage_line("--location basin|river|outer", "Water map (default basin; title uses river)");
+    usage_line("--start X,Z[,DEGREES]", "Place the boat on mapped water (heading 0 faces -Z)");
+    usage_line("--skin NAME", "sweden|finland|denmark|norway|explorer|cabin");
+    usage_line("", "default sweden; explorer and cabin have their own engines");
+    usage_line("--soundtrack NAME", "a-little-boat|acid-wake|off (default a-little-boat)");
+    usage_line("--mouse-steering", "Start with captured mouse steering");
+    usage_line("--plugin DIR", "Solo voyage from a Lua plugin");
+    usage_line("", "Saves reload; F5 reload, F6 undo, F7 apply migration/restart");
+    usage_line("--waves", "Gentle crossing waves and a floating hull");
+
+    puts("\nWATER AND WAKES");
+    usage_line("--wake-objects", "Rideable arcade wakes (default in free boating)");
+    usage_line("--wake-height M", "Crest scale 0.1..3 (default 1.2)");
+    usage_line("--wake-life-ticks N", "Lifetime at 120 Hz, 240..1920 (default 1920)");
+    usage_line("--wake-objects-crossing", "Basin rival sharing wakes and hull contacts");
+    usage_line("--no-player-wake", "Visual-only player trail");
+    usage_line("--current", "Authored current, not measured local conditions");
+    usage_line("--crossing-wake", "Scripted passing boat and physical wake");
+    usage_line("--player-wake", "Legacy D3 trail (research)");
+    usage_line("--wake-field", "Coherent CPU field, native basin only (research)");
+
+    puts("\nCAMERA AND DISPLAY");
+    usage_line("--camera-distance N", "8..48 (default 20; river 12)");
+    usage_line("--camera-height N", "4..36 (default 14; river 6)");
+    usage_line("--fixed-fov", "Hold the 55-degree view instead of widening with speed");
+    usage_line("--renderer gpu|cpu", "Renderer (default gpu)");
+    usage_line("--gpu", "Alias for --renderer gpu");
+    usage_line("--gpu-aa", "4x supersampling");
+    usage_line("--no-vsync", "Pace at exactly 60 Hz");
+    usage_line("--profiler", "Show the debug profiler at startup");
+    usage_line("--verbose", "Log graphics/window and resource startup");
+
+    puts("\nCAPTURES AND AUTOMATION");
+    usage_line("--screenshot FILE", "Save a deterministic scripted frame");
+    usage_line("", "CPU screenshots need no window; GPU ones need a context");
+    usage_line("--title --screenshot FILE", "Capture the title screen");
+    usage_line("--time SECONDS", "Screenshot only: 0..60, or 0..600 with --replay");
+    usage_line("--frames COUNT", "Stop a smoke run after COUNT frames");
+    usage_line("--demo", "Run the scripted screenshot drive in a window");
+
+    puts("\nRECORDINGS");
+    usage_line("--save-run FILE", "Export each finish");
+    usage_line("--data-dir DIR", "Override personal-best storage");
+
+    puts("\nPLUGIN AUTHORING");
+    usage_line("--plugin-bridge DIR", "With --plugin, let tools/plugin_author.py live-inspect,");
+    usage_line("", "stage, apply and undo revisions through the private directory");
+
+    puts("\nMULTIPLAYER");
+    usage_line("--name TEXT", "Player name");
+    usage_line("--token TEXT", "Room token");
+    usage_line("--port N", "Host UDP port (default 24680)");
+    usage_line("", "--location and --waves configure the hosted room");
+    usage_line("", "Leaving closes a room started with --host");
+
+    puts("\nCONTROLS");
+    usage_line("Left/Right, A/D", "Adjust wheel");
+    usage_line("W/Up, S/Down", "Forward, reverse (release: neutral); Shift: precision");
+    usage_line("M", "Capture/release mouse steering (move to turn; stop to hold)");
+    usage_line("Wheel", "Keyboard springs to centre; mouse holds");
+    usage_line("Arcade jumps", "Automatic aerial stabilization; steering retains yaw");
+    usage_line("P, Esc", "Menu: steering, controls, leave (solo pauses, rooms run)");
+    usage_line("Backspace (hold 1 s)", "Reset, restart run/passage, or a new multiplayer life");
+    usage_line("+/-, PageUp/PageDown", "Camera closer/farther, higher/lower");
+    usage_line("C", "Reset view");
+    usage_line("F3", "Toggle the debug profiler");
+    usage_line("F5 / F6 / F7", "Plugin: reload / undo / apply migration or restart");
+    puts("");
+    usage_line("Course", "G ghost on/off | L/B last/best replay | Space pause | Enter restart");
+    usage_line("Solo", "[ / ] speed 0.25x..8x | backslash normal time (altered is practice)");
+    usage_line("Replay", "Left/Right seek 1 s (Shift 5 s) | Home/End | [ / ] speed");
+    usage_line("", "Click/drag the replay timeline to seek and pause; Space resumes");
+
+    puts("\nSee docs/COMMAND_LINE.md for examples, restrictions and defaults.");
 }
 
 // Native builds load every mapped location's scenery pack at start. The browser loads only the
