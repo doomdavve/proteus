@@ -1674,8 +1674,12 @@ also passed. The first browser CI run passed WebKit but exposed a frame-rate dep
 Chromium/Firefox recovery-input fixture: capped frame deltas made the held Backspace gesture
 outlive the callback deadline on the software renderer. The check now drives the existing
 menu's immediate recovery action and waits for observed menu/reset state. The runtime's
-five-second callback deadline is unchanged. Extended browser CI is being rerun; prior P4.8
-results remain historical evidence. GCC still reports pre-existing warnings outside the new
+five-second callback deadline is unchanged. On `77b1212`, all native workflows and the full Chromium/Firefox authoring checks passed.
+WebKit exposed a separate restored-session readiness assumption: revision 1 was visible
+before lazy scenery loading finished, so the next reload interrupted startup with zero native
+ticks. The repeated-session check now waits for an observed native tick before reloading,
+proving each restored session actually played; production navigation behavior is unchanged.
+Browser CI is being rerun; prior P4.8 results remain historical evidence. GCC still reports pre-existing warnings outside the new
 plugin sources.
 
 **Next:** P5's authority/prediction/recording contract review as described in the current status.

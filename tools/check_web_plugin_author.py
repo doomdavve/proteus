@@ -274,6 +274,10 @@ def main():
                 assert page.locator('#plugin-play').is_disabled()
                 assert 'Voyage staged' in stage()
                 page.click('#plugin-play'); owner(1)
+                # Revision activation precedes lazy scenery loading. A restored session must
+                # actually play before the next reload; WebKit can interrupt an overlapping
+                # startup navigation while that old session still owns fetches.
+                page.wait_for_function('Module.boatPluginCheckpoint?.nativeTick[0] > 0')
                 drained(f'session {session + 2}')
             checks.append(f'navigation during validation; {args.sessions} restored sessions revalidated')
             page.close(); context.close()
