@@ -8,6 +8,8 @@ from pathlib import Path
 import shutil
 import subprocess
 
+from check_web_wasm import assert_no_lua
+
 
 def build_version(root):
     try:
@@ -28,6 +30,9 @@ def main():
     parser.add_argument("--version", help="Override the Git build version (e.g. source archives)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
+    # PD4: the game links the plugin runtime but must not carry Lua's parser or VM. Check the
+    # linked outputs; the worker is the positive control.
+    assert_no_lua(args.build_dir / "wake_velocity.wasm", args.build_dir / "plugin_stage.wasm")
     site = args.build_dir / "site"
     site.mkdir(parents=True, exist_ok=True)
     files = {}
