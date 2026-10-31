@@ -1672,6 +1672,82 @@ static int catalog_runtime(void)
     return 0;
 }
 
+// PD5: the game's default selection opens each bundled entry with no compiled fallback, and the
+// resulting voyage, course, rules and scene equal the shipped fixtures.
+static int default_sessions(void)
+{
+    static BoatWorldResources basin, river;
+    CHECK(boat_world_resources_init(&basin, boat_location(BOAT_LOCATION_BASIN)));
+    CHECK(boat_world_resources_init(&river, boat_location(BOAT_LOCATION_RIVER)));
+    static WakePlugin p;
+    BoatSession s;
+
+    // Free packages select only their location: no voyage, course or scene is installed.
+    for (int id = BOAT_LOCATION_BASIN; id <= BOAT_LOCATION_RIVER; ++id) {
+        const BoatWorldResources *world = id == BOAT_LOCATION_BASIN ? &basin : &river;
+        const BoatPluginCatalogEntry *entry
+            = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, world->definition->name);
+        CHECK(entry);
+        boat_session_init(&s, world, calm());
+        CHECK(wake_plugin_open_catalog(&p, entry, &s));
+        CHECK(p.host.kind == BOAT_PLUGIN_KIND_FREE);
+        CHECK(s.voyage_route == NULL && s.course_definition == NULL && s.world.scene == NULL);
+        wake_plugin_close(&p, &s);
+        boat_session_destroy(&s);
+    }
+
+    // The outer default is the standard Långedrag voyage, not Harbor life.
+    const BoatPluginCatalogEntry *outer_entry
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_VOYAGE, "outer");
+    CHECK(outer_entry && !strcmp(outer_entry->id, BOAT_PLUGIN_DEFAULT_OUTER_VOYAGE));
+    boat_session_init(&s, outer(), calm());
+    CHECK(wake_plugin_open_catalog(&p, outer_entry, &s));
+    CHECK(p.host.kind == BOAT_PLUGIN_KIND_VOYAGE);
+    CHECK(s.voyage_route == &boat_plugin_host_active(&p.host)->voyage.route);
+    CHECK(boat_plugin_route_digest(s.voyage_route)
+        == boat_plugin_route_digest(&boat_fixture_voyage_outer));
+    CHECK(s.world.scene == NULL);
+    wake_plugin_close(&p, &s);
+    CHECK(s.voyage_route == NULL && s.world.scene == NULL);
+    boat_session_destroy(&s);
+
+    // The time trial binds the standard course; an enabled course has no compiled fallback.
+    const BoatPluginCatalogEntry *course_entry
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_COURSE, "basin");
+    CHECK(course_entry);
+    boat_session_init(&s, &basin, calm());
+    CHECK(wake_plugin_open_catalog(&p, course_entry, &s));
+    CHECK(s.course_definition == &boat_plugin_host_active(&p.host)->course.course);
+    CHECK(boat_course_digest(s.course_definition) == BOAT_COURSE_STANDARD_DIGEST);
+    CHECK(!memcmp(s.course_definition, &boat_fixture_course_default,
+        sizeof(BoatCourseDefinition)));
+    boat_session_start_course(&s);
+    CHECK(Vector2Equals(s.boat.position, boat_fixture_course_default.start));
+    wake_plugin_close(&p, &s);
+    CHECK(s.course_definition == NULL);
+    boat_session_destroy(&s);
+
+    // Room defaults equal the fixture rules and courses they replaced.
+    BoatPluginRevision revision;
+    BoatPluginDiagnostic diagnostic = { 0 };
+    const BoatPluginCatalogEntry *match
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_MATCH, "basin");
+    CHECK(match && boat_plugin_catalog_decode(match, &revision, &diagnostic));
+    CHECK(boat_plugin_match_digest(&revision.match.rules, &revision.match.combat)
+        == boat_plugin_match_digest(
+            &boat_fixture_match_default_rules, &boat_fixture_combat_default_rules));
+    const BoatPluginCatalogEntry *race
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_RACE, "river");
+    CHECK(race && boat_plugin_catalog_decode(race, &revision, &diagnostic));
+    CHECK(!memcmp(&revision.race.course, &boat_fixture_river_course, sizeof(BoatRaceCourse)));
+    CHECK(boat_plugin_race_digest(&revision.race.course, &revision.race.rules)
+        == boat_plugin_race_digest(&boat_fixture_river_course, &boat_fixture_race_default_rules));
+
+    boat_world_resources_destroy(&basin);
+    boat_world_resources_destroy(&river);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(memory_accounting),
     TEST_CASE(live_migration),
@@ -1695,6 +1771,7 @@ static const TestCase cases[] = {
     TEST_CASE(game_controls),
     TEST_CASE(scene_binding),
     TEST_CASE(catalog_runtime),
+    TEST_CASE(default_sessions),
     TEST_CASE(harbor_life_scene),
     SLOW_CASE(compiled_parity),
 };

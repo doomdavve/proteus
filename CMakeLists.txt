@@ -717,6 +717,14 @@ add_test(NAME boat_plugin_catalog_invalid COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_catalog_gen.py
   --generator $<TARGET_FILE:boat_plugin_catalog_gen>)
 set_tests_properties(boat_plugin_catalog_invalid PROPERTIES LABELS "cpu" TIMEOUT 120)
+if(NOT EMSCRIPTEN)
+  # PD5: compiled selection is gone from production sources and executables; fixtures are test-only.
+  add_test(NAME compiled_selection_guard COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compiled_selection.py
+    --source-dir ${CMAKE_CURRENT_SOURCE_DIR} --nm ${CMAKE_NM}
+    --binary $<TARGET_FILE:wake_velocity> --binary $<TARGET_FILE:boat_server>)
+  set_tests_properties(compiled_selection_guard PROPERTIES LABELS "cpu;quick" TIMEOUT 60)
+endif()
 # P3.3b display-free objective inspection and native checkpoint/seek review.
 add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)
 target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
