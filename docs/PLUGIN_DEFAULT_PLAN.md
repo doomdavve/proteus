@@ -1,6 +1,6 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **PD1 implemented; PC next.** Native solo sessions now run from packages
+Status, 2026-10-31: **PD1 implemented and merged; the solo package is next.** Native solo sessions now run from packages
 compiled at build time, `--plugin` is the separate authoring path, and a temporary
 `--no-plugins` restores compiled content. This document owns the sequence, per-PR status and
 acceptance for that move. The [plugin plan](PLUGIN_PLAN.md) and [API](PLUGIN_API.md) keep the
@@ -8,19 +8,43 @@ existing plugin contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) ke
 and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: **[PC](#pc--live-console-and-edits-without-reset)**.
+Next task: **the [solo package](#packages)**, [PC](#pc--live-console-and-edits-without-reset) then
+[PD4](#pd4--browser-parity).
 
-| PR | Outcome | Depends on | Status |
+| Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; in review |
 | [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Not started |
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Not started |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Not started |
-| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD3 | Not started |
+| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1 | Not started |
 | [PD5](#pd5--cutover) | The compiled selection and the off switch are gone | PD4 | Not started |
 
-PC does not depend on PD2–PD5 and can run at any point after PD1. The recommended order is PD1,
-PC, then PD2. The remaining PDs must run in order.
+### Packages
+
+PD1 took about 30 minutes (user report, 2026-10-31), so the user asked for bigger units of work. Each
+remaining **package is one branch and one PR**. The step sections below stay the specification.
+
+| Package | Steps, in order | Branch | Why these belong together |
+| --- | --- | --- | --- |
+| **Solo** | PC, PD4 | `feat/plugin-default-solo` | Finishes solo play on every platform, and the console reaches the browser in the same PR. Rooms are untouched: browser rooms keep compiled content until the room package. |
+| **Rooms** | PD2, PD3 | `feat/plugin-default-rooms` | One protocol bump and one hosted cutover instead of two. PD3 only extends the definition PD2 introduces. |
+| **Cutover** | PD5 | `feat/plugin-default-cutover` | Runs last, because it removes the fallback that the other packages still compare against. |
+
+Run the solo and room packages in either order, one at a time, then cutover. PD4 no longer waits for
+PD2 and PD3: browser solo play needs only PD1's catalog and PC's console. Do not combine the solo and
+room packages. They have unrelated risks, and the room PR is the one that needs careful review.
+
+Inside a package:
+
+- Work through its steps in order and do not stop at the boundary between them. Run the full acceptance
+  list of each step, then push the branch as a backup before starting the next.
+- Keep a separate result subsection and status row for each step.
+- A step's "stop and report" or "land the rest" clause limits that step. If the first step lands in a
+  reduced form, continue with the second where it is still correct and report the reduction. Stop only if
+  the second depends on what was dropped.
+- If time or confidence runs out, open the PR with what is complete, and name what remains. A complete
+  first step is a good PR; an unstable second step should not be included in it.
 
 ## Target and decisions
 
@@ -72,23 +96,25 @@ this cost from bundled launches; a console edit pays it in a worker while the ga
 
 ## How to execute this plan
 
-### One step, one PR
+### One package, one PR
 
-Each step below (PD1–PD5 and PC) is **one branch and one PR**, however long it takes. Make as many
-small, focused commits inside it as the work needs. Do not split a step into several PRs and do not
-start the next step unless told to.
+Each [package](#packages) is **one branch and one PR**, however long it takes. Do not split a package
+into several PRs and do not start the next package unless told to.
+
+Make small, focused commits and **do not squash them**, with at least one commit per task. A large PR
+stays reviewable only through its commit history, and PD1 arrived as one commit of about 2,700 lines.
 
 Reduce CI churn. Workflows run on pull requests and pushes to `main`, not on ordinary branch pushes:
 
-1. Work in a separate worktree, on a branch named `feat/plugin-default-pdN` (`-pc` for PC), from
-   current `main`.
-   If the parent PD is still unmerged and you were told to continue, branch from the parent and
-   target it, following the stacking rule in [AGENTS.md](../AGENTS.md).
+1. Work in a separate worktree, on the package's branch, from current `main`. If the previous package
+   is still unmerged and you were told to continue, branch from it and target it, following the stacking
+   rule in [AGENTS.md](../AGENTS.md).
 2. Commit often. Push the branch whenever you like as a backup. **Do not open the PR yet.**
-3. Open the PR only when the step's whole acceptance list passes locally.
+3. Open the PR only when the whole acceptance list of every included step passes locally.
 4. After that, push rarely: collect every fix for a CI failure, then push once. Do not push to
    poll CI, and do not push documentation tweaks separately.
-5. Run the manual browser workflow only where a PD says to, once, on the final revision.
+5. Run the manual browser workflow only where a step says to, and only once per package, on its final
+   revision.
 6. Do not merge the PR, cut a release or deploy. The user does those.
 
 ### Working loop
@@ -106,7 +132,9 @@ continue from your commits and the result section.
 Keep these rules throughout:
 
 - Format with `.clang-format`, stay warning-clean, and write Windows-safe C. Windows is only
-  checked in CI, so avoid POSIX-only calls and very long string literals (MSVC limits them).
+  checked in CI, so avoid POSIX-only calls and very long string literals (MSVC limits them). Any file
+  including `<windows.h>` must define `NOGDI` and `NOUSER` first if raylib's headers can also reach it
+  (`Rectangle`, `CloseWindow` and `ShowCursor` clash, which broke PD1's first Windows run).
 - Core and net stay free of files, sockets, Lua and windows; `check_core_boundary.py` and the
   link guard in `CMakeLists.txt` stay on.
 - Tests use virtual clocks only (`test_time` enforces this). Timing is measured with tools outside
@@ -308,10 +336,11 @@ run took 1.12 s while the system scanned the new binary. Against the baseline (c
 is `harbor-life`'s traffic sweep.
 
 **Known limits.** Emscripten still uses compiled content and was not built for this step; the
-browser worker and constructor reject `free`/`course` explicitly. Windows CI has not run this
-branch yet, so the generator's MSVC build and its byte arrays are unverified here. GPU CTests and
+browser worker and constructor reject `free`/`course` explicitly. GPU CTests and
 the manual three-engine browser workflow were not run. The `free` river scene and package-defined
-rooms remain for later steps.
+rooms remain for later steps. Linux, macOS, Windows and Browser plugin authoring CI passed on the
+merged revision of [#96](https://github.com/doomdavve/proteus/pull/96), after a fix for a `windows.h`
+clash in `validate_boat_plugin_session.c`.
 
 **Needs the user.** Play the default basin, river, outer and time-trial sessions for regressions;
 judge Harbor life from the title's CONTENT row; confirm the title row's Standard/Harbor life
@@ -428,8 +457,8 @@ the console says so if asked for something with no capability instead of pretend
      screenshots. Editing a time trial runs under the existing `practice` latch, so it never records a best.
 8. **Add saving.** `/save DIR` writes a complete package natively, reusing the pinned single-file
    replacement from [P4.4](PLUGIN_PLAN.md#p44-result-2026-10-30). It refuses a non-empty directory that
-   is not this session's package, and never writes into the installed catalog. Add the browser's export
-   path if PD4 has merged; otherwise PD4 adds it.
+   is not this session's package, and never writes into the installed catalog. PD4 adds the browser's
+   export path.
 9. **Document.** Add the console to [PLAYING.md](PLAYING.md), [COMMAND_LINE.md](COMMAND_LINE.md) and the
    [API](PLUGIN_API.md), and update the P6 section of the [plugin plan](PLUGIN_PLAN.md) so its tool
    dispatcher is this command layer.
@@ -592,8 +621,8 @@ any correction is visible. Decide whether revisions should be exposed beyond the
 
 ## PD4 — browser parity
 
-**Outcome.** Browser solo play starts from the same compiled catalog as native, including Harbor life.
-Imported voyages may carry scenes. Normal play starts no worker, and the game's Wasm has no Lua VM.
+**Outcome.** Browser solo play starts from the same compiled catalog as native, including Harbor life,
+and desktop browsers get the console. Imported voyages may carry scenes. Normal play starts no worker, and the game's Wasm has no Lua VM.
 
 Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 [browser source bundles](PLUGIN_API.md#browser-source-bundles-p43), `web/plugin_author.js`,
@@ -620,9 +649,9 @@ Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
    sweep off the game thread. Add worker deadlines suited to a slow device. Imported `free` and
    `course` kinds behave the same way. Imported race packages stay rejected with a message pointing
    to rooms, because the browser has no solo race trial.
-5. **Bring the console to desktop browsers.** If PC has merged, enable it where a physical keyboard
-   exists, with edits and queries going to the worker and `/save` using the export path. Do not add it to
-   mobile. If PC has not merged, it adds this instead.
+5. **Bring the console to desktop browsers.** Enable it where a physical keyboard exists, with edits and
+   queries going to the worker and `/save` using the export path. Add the worker's console queries and
+   live-apply checks to the qualification below. Do not add it to mobile.
 6. **Update qualification.** Extend `check_web_title.py`, `check_web_plugin_author.py` and the Node
    contracts for default sessions, Harbor life, scene imports, tab freeze and repeated sessions. Do
    not enable the full matrix on PRs.
@@ -693,6 +722,10 @@ are gone, and every doc says so.
   way and cannot move the boat. Provider, credentials and cost controls stay P6's work.
 
 ## Planning verification
+
+Packaging revision, 2026-10-31, Apple Silicon/macOS, documentation-only, on merged PD1 (`692104a`):
+Debug build passed and `ctest --preset full` passed all 329 enabled tests with local sockets (13 retired
+tests disabled, GPU CTests off). All 239 local links and anchors in the two changed documents resolve. PD4's dependency on PD3 was a sequencing choice, not a technical one, so it was removed.
 
 Reviewed 2026-10-31 against `e335b84`: the plugin, multiplayer, room content, deathmatch playtest,
 living city, sunset, adventure and architecture documents and the source seams cited above, plus the
