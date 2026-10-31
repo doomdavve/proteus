@@ -25,6 +25,9 @@ uniform vec4 playerWakeParameters[64];
 uniform vec4 waveParameters[3]; // World X/Z wave vector, amplitude, CPU-reduced phase.
 uniform int reflectionsEnabled;
 uniform int shadowsEnabled;
+uniform int farShadowsEnabled;
+uniform sampler2D farShadowMap;
+uniform mat4 farLightViewProjection;
 uniform sampler2D shadowMap;
 uniform mat4 lightViewProjection;
 uniform int waterPatchPass;
@@ -34,13 +37,38 @@ uniform float surfacePixelScale;
 
 out vec4 finalColor;
 
+// Square light-space coverage; blend before the detailed map ends, then fade the far map.
+float shadow_visibility(float bias)
+{
+    vec4 nearLight = lightViewProjection * vec4(fragWorldPosition, 1.0);
+    vec3 p = nearLight.xyz / nearLight.w * 0.5 + 0.5;
+    float edge = max(abs(p.x * 2.0 - 1.0), abs(p.y * 2.0 - 1.0));
+    float nearVisibility = 1.0;
+    if (all(greaterThan(p, vec3(0.0))) && all(lessThan(p, vec3(1.0))))
+        nearVisibility = p.z - bias > texture(shadowMap, p.xy).r ? 0.0 : 1.0;
+    if (farShadowsEnabled == 0)
+        return nearVisibility;
+
+    float nearWeight = 1.0 - smoothstep(0.70, 0.95, edge);
+    if (nearWeight >= 1.0)
+        return nearVisibility;
+    vec4 farLight = farLightViewProjection * vec4(fragWorldPosition, 1.0);
+    vec3 q = farLight.xyz / farLight.w * 0.5 + 0.5;
+    float farVisibility = 1.0;
+    if (all(greaterThan(q, vec3(0.0))) && all(lessThan(q, vec3(1.0)))) {
+        // Match the near map's world-space bias across the longer 2200 m depth span.
+        farVisibility = q.z - bias * (1400.0 / 2200.0) > texture(farShadowMap, q.xy).r
+            ? 0.0 : 1.0;
+        float farEdge = max(abs(q.x * 2.0 - 1.0), abs(q.y * 2.0 - 1.0));
+        farVisibility = mix(farVisibility, 1.0, smoothstep(0.80, 0.98, farEdge));
+    }
+    return mix(farVisibility, nearVisibility, nearWeight);
+}
+
 float waterShadow()
 {
     if (shadowsEnabled == 0) return 1.0;
-    vec4 lightPosition = lightViewProjection * vec4(fragWorldPosition, 1.0);
-    vec3 p = lightPosition.xyz / lightPosition.w * 0.5 + 0.5;
-    if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, vec3(1.0)))) return 1.0;
-    return p.z - 0.00018 > texture(shadowMap, p.xy).r ? 0.55 : 1.0;
+    return mix(0.55, 1.0, shadow_visibility(0.00018));
 }
 
 // Authored shelter around the narrow dock. It opens gradually across the mouth;

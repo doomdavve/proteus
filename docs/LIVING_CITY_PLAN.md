@@ -1,6 +1,6 @@
 # Living river city plan
 
-Status, reconciled 2026-10-18: execution steps 01–04 and follow-ups 04b–04d complete
+Status, reconciled 2026-10-31: execution steps 01–04 and follow-ups 04b–04d complete
 (2026-09-19); boat-view audit 04e, surface pass 04f, and selected waterline pass 04g
 complete (2026-10-17). Generated moored fleet and dressed berths 04h implemented
 (2026-10-18); see [the generator/berth guide](HARBOR_BOATS.md). Shared actor evaluation
@@ -20,6 +20,36 @@ now specifies how marina layouts/population, traffic and ferry schedules, trams,
 building/street lighting can become scriptable. This plan owns native actor/artistic work;
 the plugin plan owns bindings, composition and live-edit policy. Those bindings, trams and
 seals are not implemented; this does not change step 06 as the next numbered city task.
+
+## Distant shadow follow-up — 2026-10-31
+
+Implemented: preserve the detailed gameplay shadow map and add a wider map for buildings
+approaching along the river, with near/far blending and a fade at the outer boundary.
+[Renderer contract](3D.md#gameplay-shadow-coverage) and
+[performance evidence](BOATING_PERFORMANCE.md#distant-shadows--2026-10-31) own the details.
+The production city shader now has controlled-depth probes for far coverage, near-map
+precedence, both transitions and the disabled-far fallback.
+
+Verification, 2026-10-31, Apple Silicon/macOS: native Debug build and all 364 enabled
+CTests passed with GPU tests on (15 retired experiments disabled; 76.40 s). River,
+outer-map and basin GPU frames were inspected; a 360-frame windowed river demo exited
+successfully. The flat-water river comparison measured about +0.58 ms CPU submission
+and +0.10 ms GPU time at the median on M1 Max; the performance guide records full
+figures and limits. User play feedback: better, but the coarse far silhouette visibly
+resolves into the detailed near shadow; no additional tuning was requested. Next for
+this follow-up: assess that transition during ordinary play and decide whether the far
+map needs more resolution. Final acceptance, other platforms, rough water/AA timing and
+release performance qualification remain open. People/cyclists 06 remains the next
+numbered city task.
+
+Integration follow-up, 2026-10-31: merged `main` through `5351cf4`, retaining the
+reflection waterline fix from PR #102. The sole conflict was the fixture's check list;
+it now runs both the shadow-cascade and reflection-waterline regressions. Native Debug
+build and all 364 enabled CTests passed with GPU tests on (15 retired experiments
+disabled; 77.86 s), including both regressions. River (18 s) and outer starting-dock GPU
+captures were inspected, and a 360-frame windowed river demo exited successfully.
+Other platforms and human acceptance of the merged result remain unverified. The timing
+figures above predate this reflection merge; no new performance claim is made.
 
 ## Direction
 

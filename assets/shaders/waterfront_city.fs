@@ -20,6 +20,9 @@ uniform float directionalIntensity;
 uniform mat4 lightViewProjection;
 uniform sampler2D shadowMap;
 uniform int shadowsEnabled;
+uniform int farShadowsEnabled;
+uniform sampler2D farShadowMap;
+uniform mat4 farLightViewProjection;
 uniform vec3 cameraPosition;
 uniform vec3 fogColor;
 uniform float fogStart;
@@ -152,24 +155,42 @@ vec3 apply_atmosphere(vec3 color)
     return mix(color, fogColor, fog);
 }
 
+// Square light-space coverage; blend before the detailed map ends, then fade the far map.
+float shadow_visibility(float bias)
+{
+    vec4 nearLight = lightViewProjection * vec4(fragWorldPosition, 1.0);
+    vec3 p = nearLight.xyz / nearLight.w * 0.5 + 0.5;
+    float edge = max(abs(p.x * 2.0 - 1.0), abs(p.y * 2.0 - 1.0));
+    float nearVisibility = 1.0;
+    if (all(greaterThan(p, vec3(0.0))) && all(lessThan(p, vec3(1.0))))
+        nearVisibility = p.z - bias > texture(shadowMap, p.xy).r ? 0.0 : 1.0;
+    if (farShadowsEnabled == 0)
+        return nearVisibility;
+
+    float nearWeight = 1.0 - smoothstep(0.70, 0.95, edge);
+    if (nearWeight >= 1.0)
+        return nearVisibility;
+    vec4 farLight = farLightViewProjection * vec4(fragWorldPosition, 1.0);
+    vec3 q = farLight.xyz / farLight.w * 0.5 + 0.5;
+    float farVisibility = 1.0;
+    if (all(greaterThan(q, vec3(0.0))) && all(lessThan(q, vec3(1.0)))) {
+        // Match the near map's world-space bias across the longer 2200 m depth span.
+        farVisibility = q.z - bias * (1400.0 / 2200.0) > texture(farShadowMap, q.xy).r
+            ? 0.0 : 1.0;
+        float farEdge = max(abs(q.x * 2.0 - 1.0), abs(q.y * 2.0 - 1.0));
+        farVisibility = mix(farVisibility, 1.0, smoothstep(0.80, 0.98, farEdge));
+    }
+    return mix(farVisibility, nearVisibility, nearWeight);
+}
+
 float directional_shadow(vec3 normal)
 {
     if (shadowsEnabled == 0)
         return 1.0;
-
-    vec4 lightSpace = lightViewProjection * vec4(fragWorldPosition, 1.0);
-    vec3 projected = lightSpace.xyz / max(lightSpace.w, 0.0001);
-    projected = projected * 0.5 + 0.5;
-    if (projected.x <= 0.0 || projected.x >= 1.0 || projected.y <= 0.0 || projected.y >= 1.0
-        || projected.z <= 0.0 || projected.z >= 1.0)
-        return 1.0;
-
     float incidence = max(0.0, dot(normal, normalize(directionalDirection)));
     float bias = max(0.0012 * (1.0 - incidence), 0.00018);
-    // The city uses a coarse six-level ramp. A partial multiplier commonly quantizes to the same
-    // level as lit surfaces, so fully remove direct fill here; ambient and local/emissive light
-    // remain visible below.
-    return projected.z - bias > texture(shadowMap, projected.xy).r ? 0.0 : 1.0;
+    // Remove direct fill in shadow; ambient and local/emissive light remain visible.
+    return shadow_visibility(bias);
 }
 
 void main()

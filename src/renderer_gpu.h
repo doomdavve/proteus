@@ -10,6 +10,7 @@
 
 #define WATERFRONT_GPU_MAX_LOCAL_LIGHTS 32
 #define WATERFRONT_GPU_SHADOW_MAP_SIZE 1024
+#define WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE 512
 #define WATERFRONT_GPU_REFLECTION_WIDTH 160
 #define WATERFRONT_GPU_REFLECTION_HEIGHT 120
 
@@ -119,8 +120,10 @@ typedef struct {
     Shader sky_shader;
     Texture2D sky_texture;
     RenderTexture2D shadow_map;
+    RenderTexture2D far_shadow_map;
     RenderTexture2D reflection;
     Matrix light_view_projection;
+    Matrix far_light_view_projection;
     Matrix reflection_view_projection;
     int shadow_map_size;
     Material city_material;
@@ -134,6 +137,7 @@ typedef struct {
     int local_light_count;
     bool lighting_enabled;
     bool shadows_enabled;
+    bool far_shadows_active; // Gameplay only; title keeps its existing single map.
     bool atmosphere_enabled;
     bool reflections_enabled;
     bool culling_disabled; // Review only: draw every map tile in every pass.

@@ -471,7 +471,9 @@ ctest --test-dir build -L gpu --output-on-failure
 ```
 
 The default display-free suite omits these checks. Report that omission when recording
-verification. Fixture capture commands live in the [renderer guide](3D.md#gpu-review-captures).
+verification. The `gpu_surface_materials` case also probes the production city shader
+with controlled near/far depths: near-map precedence, distant shadow coverage, blended handover, outer fade
+and disabled-far fallback. Fixture capture commands live in the [renderer guide](3D.md#gpu-review-captures).
 
 ## Network checks
 

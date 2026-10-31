@@ -14,6 +14,43 @@ The foundations [P2a task](BOATING_FOUNDATIONS_PLAN.md#p2a-completion--2026-10-2
 owns the finite scripted arcade wake-return benchmark. Full P2 renderer counters and the
 P3 workload matrix remain pending.
 
+## Distant shadows — 2026-10-31
+
+Gameplay retains the 96 m / 1024-pixel near shadow map and adds a 768 m / 512-pixel
+far map, blended at the near boundary and faded at the far boundary. See
+[coverage and diagnostics](3D.md#gameplay-shadow-coverage). Both caster passes contribute
+to the existing `shadow_*` submission, triangle and tile-culling counters. The title keeps
+one pass. The extra depth texture uses about 0.75–1 MiB with 24/32-bit storage.
+
+Apple M1 Max / macOS, AppleClang 21, Debug, 2026-10-31: baseline `d3467ff` and the
+candidate ran `boat_water_review --benchmark PREFIX --aa off`, flat water, hidden and
+unpaced at 320×200. Both completed the identical route and final physical state over
+6,037 frames (120 warmup, 5,917 measured). The final candidate includes the longer far
+map depth range; local reports are `build/shadow-review/before.{json,csv}` and
+`after-depth.{json,csv}`.
+
+| Metric (ms unless noted) | Baseline p50 / p95 | Two maps p50 / p95 |
+| --- | --- | --- |
+| CPU render submission | 3.756 / 3.992 | 4.334 / 4.688 |
+| GPU scene time | 2.457 / 2.807 | 2.552 / 3.007 |
+| Whole frame, including presentation | 4.233 / 4.656 | 4.901 / 7.246 |
+| Scene draw submissions (count) | 1,006 / 1,035 | 1,249 / 1,282 |
+
+This pair adds about 0.58 ms CPU submission and 0.10 ms GPU time at the median.
+Presentation variance contributes to the larger frame-time increase. An earlier candidate
+run before the depth-range correction added 0.65 ms CPU / 0.15 ms GPU at the median.
+These are development measurements, not a repeated release performance qualification;
+AA, rough water, the outer map and other machines were not benchmarked.
+
+Verification, 2026-10-31, Apple Silicon/macOS: native Debug build passed, and
+`ctest --preset full` with `PROTEUS_GPU_TESTS=ON` passed all 364 enabled tests in
+76.40 s (15 retired experiments disabled). This includes controlled-depth production
+shader probes, tile-culling parity, GPU view lifecycle and the river benchmark contract.
+River GPU captures at 3/18 s, the outer voyage's starting dock, a reverse view at `--start -15,-180,180`, the outer map
+at `--start 1980,-1196,75`, and the basin were inspected. A 360-frame windowed river
+`--demo` run exited successfully. These are agent-run captures and a scripted smoke run;
+user play/acceptance and browser/Windows/Linux rendering remain open.
+
 ## Shared driver extraction — 2026-10-23
 
 `tools/wake_velocity_drive.[ch]` now owns the app's existing scripted controls and step wrapper.
