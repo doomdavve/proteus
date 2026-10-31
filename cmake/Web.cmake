@@ -101,7 +101,7 @@ target_compile_options(plugin_stage PRIVATE -Os ${PROTEUS_WARNINGS})
 set_target_properties(plugin_stage PROPERTIES SUFFIX ".js")
 target_link_options(plugin_stage PRIVATE -Os -sMODULARIZE=1 -sEXPORT_ES6=1
   -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sENVIRONMENT=worker -sALLOW_MEMORY_GROWTH=1
-  -sSTACK_SIZE=1048576 -sMAXIMUM_MEMORY=67108864 "-sEXPORTED_FUNCTIONS=['_main','_boat_plugin_eval_input','_boat_plugin_eval_output','_boat_plugin_eval_run']")
+  -sSTACK_SIZE=1048576 -sMAXIMUM_MEMORY=67108864 "-sEXPORTED_FUNCTIONS=['_main','_boat_plugin_eval_input','_boat_plugin_eval_output','_boat_plugin_eval_run','_boat_plugin_query_worker']")
 
 # Only this directory is served/deployed. Content hashes keep JS, Wasm and data in sync.
 add_custom_target(web ALL

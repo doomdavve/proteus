@@ -108,8 +108,11 @@ def capabilities():
             "examples": LAYOUT["examples"],
             "isolation": "disposable process; restricted Lua; no OS security sandbox",
             "preview": {"max_ticks": 72000, "fixtures": ["voyage-calm-steer-v1", "race-four-grid-v1"]},
-            "browser": {"capabilities": ["voyage.define"], "location": "outer",
-                        "bundle_format": "wake-velocity-plugin", "bundle_version": 1},
+            "browser": {"capabilities": ["voyage.define", "free.define", "course.define",
+                                         "scene.define"],
+                        "locations": ["basin", "river", "outer"],
+                        "bundle_format": "wake-velocity-plugin", "bundle_version": 1,
+                        "result_bytes": 16384},
             "capture": {"kinds": ["voyage"], "renderer": "cpu", "max_seconds": 60,
                         "width": 320, "height": 200, "format": "png"},
             "live": {"game_option": "--plugin-bridge DIR", "kinds": ["voyage"],
@@ -119,7 +122,7 @@ def capabilities():
                          "apply": ["held_revision", "base_epoch"],
                          "undo": ["base_revision", "base_epoch"], "discard": ["base_epoch"]}},
             "unsupported": ["race_capture", "gpu_capture", "race_live", "browser_live",
-                            "network_bridge", "browser_scene"]}
+                            "network_bridge", "browser_race"]}
 
 
 def read_regular(path, limit):

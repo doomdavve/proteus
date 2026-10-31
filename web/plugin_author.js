@@ -4,6 +4,10 @@
   const encoder = new TextEncoder();
   const FORMAT = 'wake-velocity-plugin';
   const STORAGE = 'wake-velocity-plugin-v1';
+  // Must equal BOAT_PLUGIN_WIRE_VERSION in src/boat_plugin_wire.h; web_plugin_wire checks it.
+  const WIRE_MAGIC = 0x50535437;
+  // Harbor life's scene revision measures 5,505 bytes; leave room for larger authored scenes.
+  const RESULT_LIMIT = 16384;
   function scenes(manifest) {
     try {
       const data = JSON.parse(manifest);
@@ -18,10 +22,10 @@
     if (encoder.encode(manifest).length > 4096 || encoder.encode(source).length > 65536)
       throw Error('Package exceeds the 4 KiB manifest or 64 KiB source limit');
     // Native scene authoring is not part of the browser subset; reject before the worker starts.
-    if (scenes(manifest)) throw Error('Scene authoring is native-only; browser scene imports are unsupported');
+    // Imported scenes and all solo kinds share the worker's bounded stage wire.
     const type = kind(manifest);
-    if (type && type !== 'voyage')
-      throw Error(`${type} packages are native-only until browser parity; use a voyage`);
+    if (type === 'race' || type === 'match')
+      throw Error(`${type} packages are room content; import them through a room`);
     return {format: FORMAT, version: 1, manifest, source};
   }
   function decode(text) {
@@ -52,13 +56,13 @@
       this.makeWorker = makeWorker; this.timer = timer; this.clear = clear;
       this.jobs = new Map(); this.serial = 0; this.prepared = null;
     }
-    start(bytes, base) {
-      if (bytes.length > 8 + 4096 + 65536 || this.jobs.size >= 2 || this.serial === 0xffffffff) return 0;
+    start(bytes, base, mode = 'stage') {
+      if (bytes.length > 131072 || this.jobs.size >= 2 || this.serial === 0xffffffff) return 0;
       const id = ++this.serial;
-      const job = {bytes: bytes.slice(), base: base.slice(), state: 0, response: null};
+      const job = {bytes: bytes.slice(), base: base.slice(), state: 0, response: null, mode};
       job.promise = new Promise(resolve => { job.resolve = resolve; });
       this.jobs.set(id, job);
-      if (this.prepared && equal(bytes, this.prepared.bytes)) {
+      if (mode === 'stage' && this.prepared && equal(bytes, this.prepared.bytes)) {
         const prepared = this.prepared; this.prepared = null; // One receipt, one request.
         this.finish(id, sameBase(base, prepared.base) ? prepared.result : null);
         return id;
@@ -67,23 +71,32 @@
         job.worker = this.makeWorker();
         job.worker.onmessage = event => this.finish(id, event.data);
         job.worker.onerror = () => this.finish(id, null);
-        job.deadline = this.timer(() => this.finish(id, null), 5000);
-        job.worker.postMessage({bytes: job.bytes});
+        job.deadline = this.timer(() => this.finish(id, null), 15000);
+        job.worker.postMessage({bytes: job.bytes, mode});
       } catch (_) { this.finish(id, null); }
       return id;
     }
+    query(bytes, base) { return this.start(bytes, base, 'query'); }
     finish(id, result) {
       const job = this.jobs.get(id);
       if (!job || job.state) return; // Late results from canceled/expired workers are inert.
       if (job.worker) job.worker.terminate();
       if (job.deadline !== undefined) this.clear(job.deadline);
       if (result && (result.exit === 0 || result.exit === 1)
-          && result.bytes instanceof Uint8Array && result.bytes.length >= 8 && result.bytes.length <= 4096
-          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === 0x50535435
+          && result.bytes instanceof Uint8Array && result.bytes.length >= 8 && result.bytes.length <= RESULT_LIMIT
+          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === WIRE_MAGIC
           && (new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(4) === 0) === (result.exit === 0)) {
         job.response = result.bytes.slice(); job.state = result.exit === 0 ? 1 : 2;
-      } else job.state = -1;
-      job.resolve({state: job.state, bytes: job.response, base: job.base});
+      } else {
+        job.state = -1;
+        // An unrecognised reply is a protocol mismatch, not a missed deadline. Keep the two
+        // apart so the panel does not send the next wire bump looking for a slow worker.
+        job.failure = result && result.bytes instanceof Uint8Array
+          ? 'Worker replied with an unrecognised result'
+          : result && typeof result.error === 'string' ? result.error
+          : 'Worker failed or reached its deadline';
+      }
+      job.resolve({state: job.state, bytes: job.response, base: job.base, failure: job.failure});
     }
     status(id) { return this.jobs.get(id)?.state ?? -1; }
     read(id) { return this.jobs.get(id)?.response; }
@@ -99,7 +112,7 @@
   function message(bytes) {
     try {
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      if (view.getUint32(0) !== 0x50535435) return 'Invalid worker reply';
+      if (view.getUint32(0) !== WIRE_MAGIC) return 'Worker replied with an unrecognised wire version';
       let at = 8;
       const string = () => {
         const length = view.getUint32(at); at += 4;
@@ -111,7 +124,7 @@
       const field = string(), detail = string();
       return [file + (line ? ':' + line : ''), field, detail].filter(Boolean).join(' ')
         || 'Descriptor validated';
-    } catch (_) { return 'Invalid worker reply'; }
+    } catch (_) { return 'Worker replied with an unrecognised wire version'; }
   }
 
   function install(Module, files, getFS, launch, document, window) {
@@ -172,7 +185,7 @@
         if (request !== sequence) return;
         if (!sameBase(pin, base())) throw Error('Voyage changed during validation; stage again');
         if (result.state !== 1) throw Error(result.bytes ? message(result.bytes)
-          : 'Worker failed or reached its five-second deadline');
+          : result.failure || 'Worker failed or reached its five-second deadline');
         transport.prepare(bytes, pin, result.bytes);
         accepted = data;
         const fs = getFS();
@@ -200,11 +213,19 @@
     };
     get('plugin-export').onclick = () => {
       try {
-        const url = URL.createObjectURL(new Blob([encode(current())],
-          {type: 'application/json'}));
-        const link = document.createElement('a'); link.href = url;
-        link.download = 'voyage.wake-plugin.json'; link.click(); URL.revokeObjectURL(url);
+        const data = current();
+        downloadBundle(data.manifest, data.source);
       } catch (error) { show(error.message); }
+    };
+    function downloadBundle(manifestText, sourceText) {
+      const url = URL.createObjectURL(new Blob([encode(bundle(manifestText, sourceText))],
+        {type: 'application/json'}));
+      const link = document.createElement('a'); link.href = url;
+      link.download = 'voyage.wake-plugin.json'; link.click(); URL.revokeObjectURL(url);
+    }
+    // The native console's /save reaches this export path instead of writing a directory.
+    Module.boatPluginExport = (manifestBytes, sourceBytes) => {
+      downloadBundle(new TextDecoder().decode(manifestBytes), new TextDecoder().decode(sourceBytes));
     };
     get('plugin-import').onchange = async event => {
       cancel(); const request = sequence;
@@ -244,5 +265,5 @@
     return transport;
   }
   root.installBoatPluginAuthor = install;
-  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install, scenes};
+  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install, scenes, WIRE_MAGIC};
 })(globalThis);

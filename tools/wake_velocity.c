@@ -20,9 +20,7 @@
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
 #ifdef PROTEUS_BOAT_PLUGINS
-#if !defined(__EMSCRIPTEN__)
 #include "boat_plugin_catalog.h"
-#endif
 #include "wake_command.h"
 #include "wake_console.h"
 #include "wake_velocity_plugin.h"
@@ -78,6 +76,15 @@ EM_JS(float, boat_web_mobile_target, (void), { return Module['boatMobile']['targ
 EM_JS(int, boat_web_mouse_state, (int wanted, int available),
     { return Module['boatMouse']['state'](wanted, available); })
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
+EM_JS(int, boat_web_physical_keyboard, (void), {
+    return (window.matchMedia && window.matchMedia('(pointer: fine)').matches)
+        || (navigator.maxTouchPoints || 0) === 0;
+})
+EM_JS(void, boat_web_console_state, (bool open, bool available, bool focused), {
+    Module.boatConsoleOpen = !!open;
+    Module.boatConsoleAvailable = !!available;
+    Module.boatConsoleFocused = !!focused;
+})
 EM_JS(float, boat_web_mouse_movement, (void), { return Module['boatMouse']['movement'](); })
 EM_JS(float, boat_web_mouse_scroll, (void), { return Module['boatMouse']['scroll'](); })
 EM_JS(void, boat_web_scenery_start, (const char *name, const char *path),
@@ -376,11 +383,43 @@ static double plugin_time(void)
 }
 
 #ifdef PROTEUS_BOAT_PLUGINS
+#if defined(__EMSCRIPTEN__)
+EM_JS(int, browser_plugin_export,
+    (const unsigned char *manifest, unsigned manifest_size, const unsigned char *source,
+        unsigned source_size), {
+        if (!Module.boatPluginExport)
+            return 0;
+        Module.boatPluginExport(HEAPU8.slice(manifest, manifest + manifest_size),
+            HEAPU8.slice(source, source + source_size));
+        return 1;
+    })
+#endif
+
 static bool console_save(
     void *context, const WakePlugin *plugin, const char *directory, char *message, size_t capacity)
 {
     (void)context;
+#if defined(__EMSCRIPTEN__)
+    (void)directory;
+    WakePlugin *mutable_plugin = (WakePlugin *)plugin;
+    if (!plugin->authoring && !wake_plugin_promote(mutable_plugin)) {
+        snprintf(message, capacity, "cannot export this package");
+        return false;
+    }
+    const char *manifest = NULL, *source = NULL;
+    size_t manifest_size = wake_plugin_manifest(plugin, &manifest);
+    size_t source_size = wake_plugin_source(plugin, &source);
+    if (!manifest_size || !source_size
+        || !browser_plugin_export((const unsigned char *)manifest, (unsigned)manifest_size,
+            (const unsigned char *)source, (unsigned)source_size)) {
+        snprintf(message, capacity, "the browser export is unavailable");
+        return false;
+    }
+    snprintf(message, capacity, "EXPORTED voyage.wake-plugin.json");
+    return true;
+#else
     return wake_plugin_save(plugin, directory, message, capacity);
+#endif
 }
 #endif
 
@@ -696,9 +735,10 @@ static int study(int argc, char **argv)
         goto invalid;
 #endif
     }
-#if defined(PROTEUS_BOAT_PLUGINS) && !defined(__EMSCRIPTEN__)
+#if defined(PROTEUS_BOAT_PLUGINS)
     // PD1: every solo session starts from a build-time catalog entry unless --no-plugins
-    // restores the compiled path. Explicit --package IDs must name this location's kind.
+    // restores the compiled path. Explicit --package IDs must name this location's kind. PD4
+    // uses the same catalog in the browser; it is built into the game Wasm.
     const BoatPluginCatalogEntry *catalog = NULL;
     if (!plugin_path && !no_plugins && !connect_to) {
         BoatPluginKind kind = course              ? BOAT_PLUGIN_KIND_COURSE
@@ -727,7 +767,7 @@ static int study(int argc, char **argv)
     }
 #else
     if (package_id) {
-        fprintf(stderr, "--package is only available in native builds.\n");
+        fprintf(stderr, "--package needs the plugin runtime in this build.\n");
         goto invalid;
     }
 #endif
@@ -875,7 +915,6 @@ static int study(int argc, char **argv)
         }
         plugin_active = true;
     }
-#if !defined(__EMSCRIPTEN__)
     else if (catalog) {
         if (!wake_plugin_open_catalog(&plugin, catalog, &session)) {
             snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
@@ -883,7 +922,6 @@ static int study(int argc, char **argv)
         }
         plugin_active = true;
     }
-#endif
 #if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
@@ -897,6 +935,10 @@ static int study(int argc, char **argv)
         wake_bridge_commands(&bridge, &command);
 #endif
 #endif
+    // An imported course package is still a time trial: use the same start, best-run path and
+    // practice latch as the bundled course.
+    if (plugin_active && plugin.host.kind == BOAT_PLUGIN_KIND_COURSE)
+        course = true;
     if (course)
         boat_session_start_course(&session);
     else if (!connect_to && skin == BOAT_SKIN_EXPLORER)
@@ -1210,7 +1252,12 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_PLUGINS
         console_was_open = console.open;
         bool console_available = false;
-#if !defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__)
+        // Desktop browsers with a physical keyboard get the same console; touch-only phones do
+        // not, because the panel would cover the game and has no text-entry affordance.
+        console_available = plugin_active && !networked && !demo && !screenshot
+            && !session.runs.playing && !menu.open && !help_visible && boat_web_physical_keyboard();
+#else
         console_available = plugin_active && !networked && !demo && !screenshot
             && !session.runs.playing && !menu.open && !help_visible;
 #endif
@@ -1222,6 +1269,9 @@ static int study(int argc, char **argv)
             console_just_opened = true;
             plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
         }
+#if defined(__EMSCRIPTEN__)
+        boat_web_console_state(console.open, console_available, IsWindowFocused());
+#endif
 #endif
         while ((character = GetCharPressed()) != 0) {
 #ifdef PROTEUS_BOAT_PLUGINS

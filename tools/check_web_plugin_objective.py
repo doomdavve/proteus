@@ -201,10 +201,12 @@ def check_objectives(browser, args, root, errors, logs):
         page.wait_for_function("document.getElementById('plugin-status').textContent.includes('DISCARDED')")
 
         # Restart initializes asynchronously without running source on the game thread.
-        route_source = source.replace('max_speed = 6', 'max_speed = 5')
+        # Exposed water is a session restart; arrival edits are live now, and an objective
+        # package would be forced through a state migration instead of this restart path.
+        route_source = source.replace('weather_range = 2500', 'weather_range = 2400')
         assert route_source != source
         stage(manifest, route_source)
-        page.wait_for_function("document.getElementById('plugin-status').textContent.includes('CHANGES THE ROUTE')")
+        page.wait_for_function("document.getElementById('plugin-status').textContent.includes('CHANGES THE EXPOSED WATER')")
         previous = page.evaluate('Module.boatPluginOwner[0]')
         generation = snapshot()['generation']
         page.click('#plugin-apply')

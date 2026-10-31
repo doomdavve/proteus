@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 'use strict';
 const assert = require('node:assert/strict');
-const {bundle, decode, encode, frame, Transport, message, scenes} = require('../web/plugin_author.js');
+const {bundle, decode, encode, frame, Transport, message, scenes, WIRE_MAGIC} = require('../web/plugin_author.js');
 const {ObjectiveTransport} = require('../web/plugin_objective.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
 function response(status = 0) {
   const bytes = new Uint8Array(8), view = new DataView(bytes.buffer);
-  view.setUint32(0, 0x50535435); view.setUint32(4, status);
+  view.setUint32(0, WIRE_MAGIC); view.setUint32(4, status);
   return {exit: status ? 1 : 0, bytes};
 }
 function fixture() {
@@ -29,12 +29,16 @@ async function main() {
   const original = bundle(fs.readFileSync(path.join(root, 'plugins/langedrag/plugin.json'), 'utf8'),
     fs.readFileSync(path.join(root, 'plugins/langedrag/main.lua'), 'utf8'));
   assert.deepEqual(decode(encode(original)), original);
-  // Scene authoring is rejected before a browser worker starts.
+  // Imported scenes and solo kinds share the worker wire; room kinds are rejected up front.
   const sceneManifest = original.manifest.replace('["voyage.define"]',
     '["voyage.define", "scene.define"]');
   assert.equal(scenes(sceneManifest), true);
-  assert.throws(() => bundle(sceneManifest, original.source));
-  assert.throws(() => decode(encode({...original, manifest: sceneManifest})));
+  assert.ok(bundle(sceneManifest, original.source));
+  assert.deepEqual(decode(encode({...original, manifest: sceneManifest})).manifest, sceneManifest);
+  assert.throws(() => bundle(original.manifest.replace('"kind": "voyage"', '"kind": "race"'),
+    original.source), /room content/);
+  assert.throws(() => bundle(original.manifest.replace('"kind": "voyage"', '"kind": "match"'),
+    original.source), /room content/);
   assert.throws(() => encode(bundle('', '\u0001'.repeat(65536))));
   const framed = frame(original), view = new DataView(framed.buffer);
   assert.equal(view.getUint32(0), Buffer.byteLength(original.manifest));
@@ -81,13 +85,20 @@ async function main() {
   }
   const rejected = t.start(framed, base);
   workers.at(-1).onmessage({data: response(3)}); assert.equal(t.status(rejected), 2); t.close(rejected);
+  const wrongWire = response(), wrongView = new DataView(wrongWire.bytes.buffer);
+  wrongView.setUint32(0, 0x50535436);
+  const unrecognised = t.start(framed, base);
+  workers.at(-1).onmessage({data: wrongWire});
+  assert.equal(t.status(unrecognised), -1);
+  assert.match((await t.wait(unrecognised)).failure, /unrecognised result/);
+  t.close(unrecognised);
   const cap1 = t.start(framed, base), cap2 = t.start(framed, base);
   assert.equal(t.start(framed, base), 0); t.close(cap1); t.close(cap2);
   const failed = t.start(framed, base);
   workers.at(-1).onerror(); assert.equal(t.status(failed), -1); t.close(failed);
   assert.equal(t.jobs.size, 0); assert.equal(timers.size, 0);
-  assert.equal(message(new Uint8Array()), 'Invalid worker reply');
-  assert.equal(t.start(new Uint8Array(8 + 4096 + 65537), base), 0);
+  assert.equal(message(new Uint8Array()), 'Worker replied with an unrecognised wire version');
+  assert.equal(t.start(new Uint8Array(131073), base), 0);
   // Objective transitions reuse Wasm, but never share an outstanding callback or its result.
   const ow = [], otimers = new Map(); let onow = 0, timerId = 0;
   const o = new ObjectiveTransport({now: () => onow,

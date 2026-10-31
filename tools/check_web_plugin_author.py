@@ -122,8 +122,19 @@ def main():
                 source = (root / 'plugins' / example / 'main.lua').read_text()
                 page.fill('#plugin-manifest', manifest); page.fill('#plugin-source', source)
                 rejected = stage()
-                assert 'Rejected:' in rejected and ('callbacks' in rejected or 'voyage descriptors' in rejected), rejected
+                assert 'Rejected:' in rejected and 'room content' in rejected, rejected
             checks.append('capability rejection')
+
+            # PD4: a scene import uses the same worker wire; Harbor life's 5,513-byte result also
+            # proves the raised response cap.
+            for example in ('harbor-life',):
+                manifest = (root / 'plugins' / example / 'plugin.json').read_text()
+                source = (root / 'plugins' / example / 'main.lua').read_text()
+                page.fill('#plugin-manifest', manifest); page.fill('#plugin-source', source)
+                assert 'Voyage staged' in stage(), example
+            checks.append('scene import accepted above the old response cap')
+            page.fill('#plugin-manifest', original['manifest']); page.fill('#plugin-source', original['source'])
+            assert 'Voyage staged' in stage()
 
             # Repeated validations: each uses and retires its own worker; distinct names avoid the
             # one-use prepared receipt so every cycle evaluates in a fresh worker.
@@ -225,7 +236,7 @@ def main():
 
             if chromium:
                 # Freeze the tab mid-validation, as a background-tab discard policy would. Either the
-                # result or the five-second deadline may win on resume; both must keep a consistent
+                # result or the worker deadline may win on resume; both must keep a consistent
                 # owner, retire the worker and let the game keep running.
                 renamed['name'] = 'Frozen proposed name'
                 page.fill('#plugin-manifest', json.dumps(renamed))
@@ -254,9 +265,9 @@ def main():
                 page.click('#plugin-stage')
                 page.wait_for_function('window.authorResult !== null')
                 cdp.send('Page.setWebLifecycleState', {'state': 'frozen'})
-                time.sleep(6)
+                time.sleep(16)  # Past the 15-second browser worker deadline.
                 cdp.send('Page.setWebLifecycleState', {'state': 'active'})
-                page.wait_for_function("document.getElementById('plugin-status').textContent.includes('five-second deadline')")
+                page.wait_for_function("document.getElementById('plugin-status').textContent.includes('deadline')")
                 page.evaluate('holdAuthorResult = false; authorResult()')
                 assert page.evaluate('Module.boatPluginOwner') == revision
                 drained('after deadline across freeze')
@@ -280,7 +291,25 @@ def main():
                 page.wait_for_function('Module.boatPluginCheckpoint?.nativeTick[0] > 0')
                 drained(f'session {session + 2}')
             checks.append(f'navigation during validation; {args.sessions} restored sessions revalidated')
+
             page.close(); context.close()
+
+            # PD4: free and course packages launch through the same import path. Each needs its own
+            # session because a running host keeps its kind.
+            for example in ('river-free', 'time-trial'):
+                kind_context = browser.new_context(viewport={'width': 1100, 'height': 900})
+                page = kind_context.new_page()
+                watch(page)
+                page.goto(args.url); ready()
+                page.fill('#plugin-manifest', (root / 'plugins' / example / 'plugin.json').read_text())
+                page.fill('#plugin-source', (root / 'plugins' / example / 'main.lua').read_text())
+                assert 'Voyage staged' in stage(), example
+                page.click('#plugin-play'); owner(1)
+                page.wait_for_timeout(2000)
+                shot(f'{example}-import')
+                assert not errors, errors
+                page.close(); kind_context.close()
+            checks.append('free and course imports launch')
 
             evidence['objectives'] = check_objectives(browser, args, root, errors, logs)
             checks.append('isolated objective init/update/timers, gated ticks, migration/Undo/restart, quarantine, timeout and session cleanup')

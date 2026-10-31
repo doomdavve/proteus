@@ -6,6 +6,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+EM_JS(void, browser_console_line, (const char *line), {
+    (Module.boatConsoleLines ||= []).push(UTF8ToString(line));
+    if (Module.boatConsoleLines.length > 64)
+        Module.boatConsoleLines.shift();
+})
+EM_JS(void, browser_console_clear, (void), { Module.boatConsoleLines = []; })
+#endif
+
 #define WAKE_CONSOLE_WORLD_1 161
 
 void wake_console_init(WakeConsole *console)
@@ -36,6 +46,9 @@ void wake_console_print(void *context, const char *line)
     console->scroll[console->scroll_count][length] = 0;
     ++console->scroll_count;
     console->scroll_back = 0;
+#ifdef __EMSCRIPTEN__
+    browser_console_line(console->scroll[console->scroll_count - 1]);
+#endif
 }
 
 void wake_console_clear(void *context)
@@ -45,6 +58,9 @@ void wake_console_clear(void *context)
         console->scroll_count = 0;
         console->scroll_back = 0;
     }
+#ifdef __EMSCRIPTEN__
+    browser_console_clear();
+#endif
 }
 
 static void backspace(WakeConsole *console)

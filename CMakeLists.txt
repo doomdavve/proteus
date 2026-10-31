@@ -147,36 +147,52 @@ target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_s
 
 # PD1: bundled packages are evaluated and fully validated by a build-time generator. The
 # generated table and the lookup/decode helpers form a library that depends on proteus_plugins;
-# the generator itself never links the catalog, so there is no cycle. Emscripten keeps the
-# compiled content path until PD4.
-if(NOT EMSCRIPTEN)
-  add_executable(boat_plugin_catalog_gen tools/boat_plugin_catalog_gen.c)
-  target_link_libraries(boat_plugin_catalog_gen PRIVATE proteus_plugins)
-  target_compile_options(boat_plugin_catalog_gen PRIVATE ${PROTEUS_WARNINGS})
-  set(BOAT_PLUGIN_PACKAGES
-    plugins/basin-free plugins/river-free plugins/outer-free plugins/time-trial
-    plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
-    plugins/harbor-room plugins/harbor-race)
-  set(BOAT_PLUGIN_PACKAGE_FILES)
-  foreach(package IN LISTS BOAT_PLUGIN_PACKAGES)
-    list(APPEND BOAT_PLUGIN_PACKAGE_FILES
-      ${CMAKE_CURRENT_SOURCE_DIR}/${package}/plugin.json
-      ${CMAKE_CURRENT_SOURCE_DIR}/${package}/main.lua)
-  endforeach()
-  set(BOAT_PLUGIN_CATALOG_C "${CMAKE_CURRENT_BINARY_DIR}/generated/boat_plugin_catalog_data.c")
-  add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/generated"
-    COMMAND $<TARGET_FILE:boat_plugin_catalog_gen> --output ${BOAT_PLUGIN_CATALOG_C}
-      ${BOAT_PLUGIN_PACKAGES}
-    DEPENDS boat_plugin_catalog_gen ${BOAT_PLUGIN_PACKAGE_FILES}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Generating the bundled plugin catalog"
-    VERBATIM)
-  add_library(proteus_plugin_catalog STATIC
-    src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
-  target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
-  target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
+# the generator itself never links the catalog, so there is no cycle. PD4 builds the same
+# generator as a Node program for the browser and lets CMake run it through the cross-compiling
+# emulator; only solo entries are linked into the game.
+set(BOAT_PLUGIN_PACKAGES
+  plugins/basin-free plugins/river-free plugins/outer-free plugins/time-trial
+  plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
+  plugins/harbor-room plugins/harbor-race)
+if(EMSCRIPTEN)
+  set(BOAT_PLUGIN_CATALOG_PACKAGES
+    plugins/basin-free plugins/river-free plugins/time-trial plugins/langedrag
+    plugins/harbor-life)
+else()
+  set(BOAT_PLUGIN_CATALOG_PACKAGES ${BOAT_PLUGIN_PACKAGES})
 endif()
+set(BOAT_PLUGIN_PACKAGE_FILES)
+foreach(package IN LISTS BOAT_PLUGIN_CATALOG_PACKAGES)
+  list(APPEND BOAT_PLUGIN_PACKAGE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/${package}/plugin.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/${package}/main.lua)
+endforeach()
+add_executable(boat_plugin_catalog_gen tools/boat_plugin_catalog_gen.c)
+target_link_libraries(boat_plugin_catalog_gen PRIVATE proteus_plugins)
+target_compile_options(boat_plugin_catalog_gen PRIVATE ${PROTEUS_WARNINGS})
+if(EMSCRIPTEN)
+  # Build-time only: the game never links this Node program or its Lua.
+  set_target_properties(boat_plugin_catalog_gen PROPERTIES SUFFIX ".js")
+  target_link_options(boat_plugin_catalog_gen PRIVATE
+    -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB)
+endif()
+set(BOAT_PLUGIN_CATALOG_GEN $<TARGET_FILE:boat_plugin_catalog_gen>)
+if(CMAKE_CROSSCOMPILING_EMULATOR)
+  set(BOAT_PLUGIN_CATALOG_GEN ${CMAKE_CROSSCOMPILING_EMULATOR} ${BOAT_PLUGIN_CATALOG_GEN})
+endif()
+set(BOAT_PLUGIN_CATALOG_C "${CMAKE_CURRENT_BINARY_DIR}/generated/boat_plugin_catalog_data.c")
+add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/generated"
+  COMMAND ${BOAT_PLUGIN_CATALOG_GEN} --output ${BOAT_PLUGIN_CATALOG_C}
+    ${BOAT_PLUGIN_CATALOG_PACKAGES}
+  DEPENDS boat_plugin_catalog_gen ${BOAT_PLUGIN_PACKAGE_FILES}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Generating the bundled plugin catalog"
+  VERBATIM)
+add_library(proteus_plugin_catalog STATIC
+  src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
+target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
+target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
@@ -332,10 +348,7 @@ endif()
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
 target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
   tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h)
-target_link_libraries(wake_velocity PRIVATE proteus_plugins)
-if(NOT EMSCRIPTEN)
-  target_link_libraries(wake_velocity PRIVATE proteus_plugin_catalog)
-endif()
+target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_plugin_catalog)
 target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_PLUGINS=1)
 if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
@@ -577,6 +590,10 @@ add_test(NAME boat_fleet_render COMMAND boat_fleet_review --check)
 set_tests_properties(boat_fleet_render PROPERTIES LABELS "render;cpu"
   PASS_REGULAR_EXPRESSION "boat_fleet_render=ok")
 find_program(PROTEUS_NODE_EXECUTABLE node)
+add_test(NAME web_plugin_wire COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_web_wire.py)
+set_tests_properties(web_plugin_wire PROPERTIES LABELS "cpu;quick"
+  PASS_REGULAR_EXPRESSION "web_plugin_wire=ok")
 if(PROTEUS_NODE_EXECUTABLE)
   add_test(NAME web_plugin_author COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_plugin_author.cjs)

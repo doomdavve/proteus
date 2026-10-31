@@ -1,9 +1,9 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-31: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime and the PC live console implemented**.
+Status, 2026-10-31: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
-running game; the browser supports source bundles for solo voyages with optional objectives/timers.
+running game; the browser supports source bundles for solo voyages, free boating and the basin time trial, with optional objectives/timers and authored scenes.
 Every native solo session starts from a [bundled package](#bundled-catalog-pd1) compiled at build
 time; `--plugin` remains the file-based authoring path, with save reloading, F5/F6/F7 and the
 authoring panel. Native solo play also has a [live console](#live-console-and-command-layer-pc)
@@ -21,7 +21,7 @@ The browser offers an opt-in [voyage import workflow](#browser-source-bundles-p4
 | Why 5.4 | It is the mature release line. 5.5 (2025-12) is newer; moving to it is a deliberate later choice, not a patch update. |
 | Compiled files | VM/compiler sources plus `lauxlib`, `lbaselib`, `lstrlib`, `ltablib`, `lmathlib` only (`proteus_lua`). `loadlib`, `liolib`, `loslib`, `ldblib`, `lcorolib`, `lutf8lib`, `linit` and the `lua`/`luac` programs are **not compiled**. |
 | Configuration | Unmodified sources; the portable default `luaconf.h` (no platform `LUA_USE_*`). `cmake/proteus_lua.h` is force-included to fix the string-hash seed, so table traversal and diagnostics are identical from run to run. The project-wide `-ffp-contract=off` applies. |
-| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser links the shared descriptor transactions and evaluates imported source only in Web Workers; its [voyage subset](#browser-source-bundles-p43) includes optional objectives/timers. |
+| Web | The same sources compile with Emscripten 6.0.12; the validator passes under Node (see the [P0 result](PLUGIN_PLAN.md#p0-result-2026-10-28)). The browser links the shared descriptor transactions and evaluates imported source only in Web Workers; its [browser subset](#browser-source-bundles-p43) includes solo kinds, optional objectives/timers and scenes. |
 | License | Lua is MIT-licensed ("Copyright (C) 1994-2026 Lua.org, PUC-Rio"); the notice is at the end of `lua.h`. Configure extracts it to `build/lua-LICENSE.txt` and fails if it is missing. Native packages ship it as `lua-LICENSE.txt` beside the raylib/jsmn/ENet notices (`tools/macos/package.py`, `.github/workflows/windows-boat.yml`). The web package now ships `lua-LICENSE.txt` alongside its lazy Lua/Wasm descriptor worker (`tools/package_web.py`). |
 
 ## Package
@@ -261,14 +261,10 @@ dependency graph. The canonical capability order is:
 `objective.*` without `scene.define` keeps its current spelling. A scene package still supplies
 the ordinary `voyage` descriptor: the scene does not replace the destination or water. One active
 package owns the scene override. There is no composition of two packages, no dependencies and no
-scene callback API. Rooms, browser imports, race trials, replays and recordings reject
-`scene.define` until their own compatibility work (P5 and a browser scene evaluator) exists.
-The browser bundle constructor rejects a scene manifest before a worker starts, and the
-Emscripten stage worker repeats the rejection authoritatively. `--plugin` is already refused
-with rooms, `--course`, `--replay` and `--ghost`, so no scene package can enter those paths.
-The browser bundle constructor rejects a scene manifest before a worker starts, and the
-Emscripten stage worker repeats the rejection authoritatively. `--plugin` is already refused
-with rooms, `--course`, `--replay` and `--ghost`, so no scene package can enter those paths.
+scene callback API. Since PD4 the browser accepts an imported scene through the same stage wire and
+binds it to the solo session; rooms carry an authored scene as definition data. Race trials,
+replays and recordings still reject `scene.define`. `--plugin` accepts solo voyage, free and course
+packages, so no scene package can enter a room, replay or `--course` recording path.
 
 ### Proposed schema
 
@@ -1361,20 +1357,24 @@ recovery acceptance remains open.
 
 In a built/served browser client, expand **PLUGIN VOYAGE** below the launcher. Load the example
 or import a `*.wake-plugin.json` source bundle, edit `plugin.json`/`main.lua`, then select
-**Stage / reload**. **Play staged voyage** enters solo `outer` directly. Scene authoring is
-native-only in this build: a manifest with `scene.define` is rejected during bundle creation and
-again by the Emscripten stage worker; no browser scene evaluator is linked. Normal PLAY still
-opens the shared title. During a plugin session the same panel appears above the canvas;
-opening it pauses solo input. Stage source edits, use **Apply held revision** for route/water
-restarts, and **Undo / discard** for the existing native revision policy. Undo while UI staging
-is in flight cancels that request first. **Export draft** downloads the editor's current source,
-including invalid drafts; exporting is not validation or permission to apply.
+**Stage / reload**. **Play staged voyage** enters the package's solo session directly. The browser
+accepts the `voyage`, `free` and `course` kinds with their normal grants, optionally followed by
+`scene.define`; an imported scene is validated and returned by the worker, with the traffic sweep
+off the game thread. `race` and `match` imports are rejected with a message pointing to rooms,
+because browser solo has no race trial or authority. Normal PLAY still opens the shared title and
+now starts the same bundled catalog as native. During a plugin session the same panel appears
+above the canvas; opening it pauses solo input. Stage source edits, use **Apply held revision** for
+route/water restarts, and **Undo / discard** for the existing native revision policy. Undo while
+UI staging is in flight cancels that request first. **Export draft** downloads the editor's current
+source, including invalid drafts; exporting is not validation or permission to apply.
 
-The browser accepts voyage kind, outer location and API/schema 1, with `voyage.define` and
-optional `objective.hud` / `objective.timers` grants under the existing manifest rules.
-Race imports remain unavailable. All imported Lua evaluation happens in Web Workers; the game
-rechecks decoded data and never evaluates that source at startup, staging completion, Apply,
-Undo or a tick. Native trusted objectives retain their existing execution contract.
+The editor caps a bundle manifest at 4096 bytes and its source at 65536 bytes. A stage result may
+be up to 16384 bytes, which covers Harbor life's 5,505-byte scene revision and leaves room for
+larger authored scenes. All imported Lua evaluation happens in Web Workers; the game rechecks
+decoded data and never evaluates that source at startup, staging completion, Apply, Undo or a tick.
+Normal bundled sessions create no worker at all. Native trusted objectives retain their existing
+execution contract. Desktop browsers with a physical keyboard also get the live console; its
+edits and `= queries` use the same worker transport and `/save` downloads a source bundle.
 
 Native authors can create the same source bundle with:
 
@@ -1397,8 +1397,10 @@ Undo history are not exported/persisted. Reloading the page ends the plugin sess
 Every request pins its exact bytes and current native revision/commit epoch. A successful UI
 receipt can be consumed once by that owner; a changed base rejects it. UI validation and a
 native-triggered reload each own at most one request (transport cap two), and terminate/release
-workers on completion, cancellation, timeout or page hide. The five-second deadline follows
-browser scheduling; suspended tabs can delay its delivery. Worker code/module/Wasm/example
+workers on completion, cancellation, timeout or page hide. The descriptor/query worker deadline is
+15 seconds so slower devices can finish; objective acceptance keeps its own five-second deadline.
+Both follow browser scheduling, and suspended tabs can delay delivery.
+Worker code/module/Wasm/example
 URLs are content-addressed in the same package, loaded on demand, with a shipped Lua notice.
 
 Build/serve instructions and repeatable browser checks are in the [web guide](WEB_BUILD.md#plugin-source-bundles-p43).

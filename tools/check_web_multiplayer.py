@@ -108,6 +108,8 @@ try:
             page.bring_to_front()
             page.locator('#canvas').focus()
         page.bring_to_front()
+        # Keyboard driving and Backspace reset need the game canvas focused, not just the tab.
+        page.locator('#canvas').click()
         page.evaluate("""() => {
             window.spawnRequests = 0;
             window.combatCounters = { gun: 0, grenades: new Set(), torpedoes: new Set(), pages: 0 };

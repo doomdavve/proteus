@@ -1,26 +1,26 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **PD1 and PC are merged; the Rooms package (PD2, PD3) is implemented on
-`feat/plugin-default-rooms` and awaits review; PD4 follows as its own package.** Native solo sessions now run from packages
-compiled at build time, `--plugin` is the separate authoring path, and a temporary
+Status, 2026-10-31: **PD1, PC and Rooms are merged; the Browser package (PD4) is implemented on
+`feat/plugin-default-browser` and awaits review.** Native and browser solo sessions now run from
+packages compiled at build time, `--plugin` is the separate authoring path, and a temporary
 `--no-plugins` restores compiled content. The live console edits the running session without a
-reset. This document owns the sequence, per-PR status and
+reset, natively and in desktop browsers. This document owns the sequence, per-PR status and
 acceptance for that move. The [plugin plan](PLUGIN_PLAN.md) and [API](PLUGIN_API.md) keep the
 existing plugin contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts,
 and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: the [Browser package](PLUGIN_DEFAULT_PLAN.md#packages) (PD4), on
-`feat/plugin-default-browser`, once the Rooms PR merges.
+Next task: the [Cutover package](#packages), [PD5](#pd5--cutover), on
+`feat/plugin-default-cutover`, once the Browser PR merges.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; merged in [#96](https://github.com/doomdavve/proteus/pull/96) |
 | [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31; merged in [#98](https://github.com/doomdavve/proteus/pull/98) without PD4 |
-| [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Implemented 2026-10-31 on `feat/plugin-default-rooms`; PR pending |
-| [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Implemented 2026-10-31 on the same branch; round-boundary revisions deferred to v10 |
-| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Next package |
-| [PD5](#pd5--cutover) | The compiled selection and the off switch are gone | PD3, PD4 | Not started |
+| [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100) |
+| [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100); round-boundary revisions deferred to v10; [follow-ups](#rooms-follow-ups) open |
+| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Implemented 2026-10-31 on `feat/plugin-default-browser`; PR pending |
+| [PD5](#pd5--cutover) | The compiled selection and the off switch are gone | PD3, PD4 | Next package |
 
 ### Packages
 
@@ -29,9 +29,9 @@ remaining **package is one branch and one PR**. The step sections below stay the
 
 | Order | Package | Steps, in order | Branch | Why these belong together |
 | --- | --- | --- | --- | --- |
-| Next | **Rooms** | PD2, PD3 | `feat/plugin-default-rooms` | One protocol bump and one hosted cutover instead of two. PD3 only extends the definition PD2 introduces. |
-| Then | **Browser** | PD4 | `feat/plugin-default-browser` | The rest of the original Solo package. [#98](https://github.com/doomdavve/proteus/pull/98) delivered PC alone. |
-| Last | **Cutover** | PD5 | `feat/plugin-default-cutover` | Removes the fallback that the other packages still compare against. |
+| Done | **Rooms** | PD2, PD3 | `feat/plugin-default-rooms` | One protocol bump and one hosted cutover instead of two. PD3 only extends the definition PD2 introduces. |
+| Done | **Browser** | PD4 | `feat/plugin-default-browser` | The rest of the original Solo package. [#98](https://github.com/doomdavve/proteus/pull/98) delivered PC alone. |
+| Next | **Cutover** | PD5 | `feat/plugin-default-cutover` | Removes the fallback that the other packages still compare against. |
 
 Rooms goes before Browser because rooms are the largest remaining gap and the riskiest work, while
 browser solo already works on compiled content. They do not depend on each other: a browser room client
@@ -159,6 +159,9 @@ Keep these rules throughout:
   `build-web/_deps` and use `emcmake` with the same disconnected flag. Playwright has no global
   install; make a scratch venv and run `pip install playwright` and
   `playwright install chromium firefox webkit`.
+- **Browser checks must never join the hosted room.** The join panel's default server is Winterfell, so
+  a script's blind key presses can connect to production. Type a local URL, and read any new key sequence
+  against the current menu. A stale script joined it once on 2026-10-31.
 - Keep scratch files out of the repo. Do not use the main checkout for implementation.
 
 ### Stop and report
@@ -863,6 +866,20 @@ and tick-cost comparisons that PD2 and PD3 list.
 whether any correction is visible. Decide whether revisions should be exposed beyond the
 `--package-reload` idea now that they are deferred to v10.
 
+### Rooms follow-ups
+
+None of these blocks the Browser package. [Cutover](#pd5--cutover) closes the ones needed for a v9
+release.
+
+| Item | State |
+| --- | --- |
+| Forced contact with a moving authored craft, and contact through a resync | Unproven. `scene_contact_room` covers moored berths and had no resync. |
+| Contact prediction is 0.126 mm from the authority, not bit for bit | Cause not investigated. A wake reaching the berth's height query is only a guess. |
+| Four-client bandwidth and tick cost with the maximum scene; v8 bootstrap comparison | Not measured |
+| `--four-players` and an edited course in a browser client | Not run |
+| Round-boundary revisions | Deferred to protocol v10; the user decides whether they are worth building |
+| HOST panel package row and read-only room `/status` | Left out. The host uses the default package. |
+
 ## PD4 — browser parity
 
 **Outcome.** Browser solo play starts from the same compiled catalog as native, including Harbor life,
@@ -873,33 +890,69 @@ Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 `web/plugin_worker.js`, `src/boat_plugin_stage.c`, `tools/wake_velocity_plugin.c`, `cmake/Web.cmake`,
 `tools/package_web.py`, `tools/check_web_plugin_author.py`.
 
+### Settled from the source and a trial, 2026-10-31
+
+Each of these was checked on `a949d7a`, the reviewed Rooms branch, in headless Chrome on Apple
+Silicon/macOS. The tasks below assume them.
+
+| Finding | What to do |
+| --- | --- |
+| **Browser import is broken on `main`.** `web/plugin_author.js` hard-codes the wire magic as `0x50535435` (PST5). #96 moved the C side to PST6 and #100 to PST7, so every valid result reports "Worker failed or reached its five-second deadline". v0.0.23 predates this, so no release has it. | Task 1. With the magic alone corrected, staging succeeds and the check reaches its next failure, a stale expected message at `check_web_plugin_author.py:125`. Later cases have not been reached. |
+| **The generator runs under Node.** Built with `-sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB`, it evaluates all ten packages in 1.36 s, against 0.83 s natively, and its 111,266-byte output is **byte-identical** to the native generator's. | Use Node. The host-built fallback is no longer needed. Only the build step was tried, not linking the result into the game. |
+| The kind rejection is in three places: `boat_plugin_stage.c`, `plugin_author.js` and `plugin_worker.js`, which #96 added. | Change all three, and keep race rejected with the message pointing to rooms. |
+| The worker and `plugin_author.js` both cap results at 4,096 bytes, and a revision carrying a scene may exceed that. No scene revision was measured against it. | Measure Harbor life's result, then raise both caps together from one stated limit. |
+| The worker has descriptor and objective modes only. | Console queries need a new mode. |
+| Rooms send their definition as data, so the browser never hosts or loads a room package. | Link only the solo entries into the game: basin and river free, time trial, Långedrag and Harbor life. |
+
+Baseline for the size comparison, from `a949d7a` in MinSizeRel:
+
+| Output | Raw | Brotli | Gzip | Lua message strings |
+| --- | ---: | ---: | ---: | --- |
+| `wake_velocity` Wasm | 1,986,419 | 774,623 | 970,154 | None |
+| `plugin_stage` worker Wasm | 390,072 | 151,856 | 184,113 | Present, as expected |
+
+Check baselines, on the same build with #100's script fixes. Fix what is stale as part of this package,
+and do not count a stale script as a pass:
+
+| Check | Result on `a949d7a` | Same on `main` |
+| --- | --- | --- |
+| `check_web_title.py` | Passes | Not run |
+| `check_web_mobile.py` | Passes | Not run |
+| `check_web_plugin_author.py` | Fails on the wire magic, above | Yes |
+| `check_web_multiplayer.py --mode race` | Passes, including rejoin | `main`'s pass was false: its rejoin reached the hosted room |
+| `check_web_multiplayer.py --mode free` | Joins, then times out on `spawnRequests === 1` | Yes |
+| `check_web_multiplayer.py --mode deathmatch` | Joins, then `Browser network receive queue is full` and no weapon counters | Yes |
+
+The deathmatch error matters most, because the hosted room runs deathmatch. Find out whether it comes from
+the headless script or would also hit a player, and record the answer even if it needs no fix.
+
 ### Tasks
 
-1. **Generate the catalog for Wasm.** `proteus_plugin_catalog` is native-only today (`CMakeLists.txt:151`)
-   and the catalog wire is portable bytes, so both generator options below remain open. Build `boat_plugin_catalog_gen` for Emscripten as a Node target
-   (`-sENVIRONMENT=node -sNODERAWFS=1`), run it through `CMAKE_CROSSCOMPILING_EMULATOR` during the web
-   build, and link the output into the game. If running it under Node proves impractical, fall back to
-   a host-built generator, provided the wire stays fieldwise and portable; record which you chose and
-   why. Do not add Lua to the game as a fallback. Add a check that the game Wasm lacks Lua's VM and parser
+1. **Restore browser import first.** Correct the magic, and add a CTest that fails if the magic in
+   `web/plugin_author.js` differs from `BOAT_PLUGIN_WIRE_VERSION`, so the next wire bump cannot repeat
+   this silently. Report an unrecognised result as what it is, not as a deadline. Update the check's stale
+   expectations, then get it passing before starting the rest.
+2. **Generate the catalog for Wasm.** `proteus_plugin_catalog` is native-only today (`CMakeLists.txt`). Build `boat_plugin_catalog_gen` for Emscripten as a Node target
+   (flags above), run it through `CMAKE_CROSSCOMPILING_EMULATOR` during the web
+   build, and link the output into the game. Do not add Lua to the game as a fallback. Add a check that the game Wasm lacks Lua's VM and parser
    by its message strings and symbols. `wake_velocity` already links `proteus_plugins` on the web, which
    puts `proteus_lua` on the link line and relies on the linker discarding it, so the check must test the
    output and not the link line. Record game
    Wasm size before and after, raw and compressed.
-2. **Default browser solo.** Remove the compiled path from browser solo sessions, using runtime mode
+3. **Default browser solo.** Remove the compiled path from browser solo sessions, using runtime mode
    from PD1. Add the title's content row on web. Keep save settings compatible. Time trial bests in
    IndexedDB must remain valid, using the same digest rule as PD1.
-3. **Render scenes in the browser.** Verify authored scene paths through the web GPU renderer
+4. **Render scenes in the browser.** Verify authored scene paths through the web GPU renderer
    (berths, modules, traffic, gulls) against native at pinned cameras and times. Fix actual
    differences. Check lazy scenery loading and repeated sessions.
-4. **Allow imported scenes.** Remove the rejection at `src/boat_plugin_stage.c:206` and
-   `web/plugin_author.js:20`, and return the existing scene wire from the worker, with the traffic
+5. **Allow imported scenes.** Remove the rejections listed above, and return the existing scene wire from the worker, with the traffic
    sweep off the game thread. Add worker deadlines suited to a slow device. Imported `free` and
    `course` kinds behave the same way. Imported race packages stay rejected with a message pointing
    to rooms, because the browser has no solo race trial.
-5. **Bring the console to desktop browsers.** Enable it where a physical keyboard exists, with edits and
+6. **Bring the console to desktop browsers.** Enable it where a physical keyboard exists, with edits and
    queries going to the worker and `/save` using the export path. Add the worker's console queries and
    live-apply checks to the qualification below. Do not add it to mobile.
-6. **Update qualification.** Extend `check_web_title.py`, `check_web_plugin_author.py` and the Node
+7. **Update qualification.** Extend `check_web_title.py`, `check_web_plugin_author.py` and the Node
    contracts for default sessions, Harbor life, scene imports, tab freeze and repeated sessions. Do
    not enable the full matrix on PRs.
 
@@ -910,10 +963,69 @@ Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 - Local three-engine `check_web_plugin_author.py` and `check_web_title.py` pass, with captures
   inspected and costs recorded: game start, memory, Harbor life frame time. Run the manual browser
   workflow once on the final revision.
-- `check_web_multiplayer.py` and `check_web_mobile.py` still pass.
+- `check_web_multiplayer.py` passes in free, race and deathmatch, and `check_web_mobile.py` still
+  passes. None of them contacts the hosted room.
+- Harbor life's revision result is measured against the raised cap.
+- The deathmatch receive-queue question has a recorded answer.
 
-**Needs the user:** Harbor life and normal play on an iPhone and in physical Safari. Those results
-decide whether Harbor life is offered on mobile.
+
+### PD4 result, 2026-10-31
+
+**Implemented.** Browser import works again: `web/plugin_author.js` uses the current PST7 magic,
+`web_plugin_wire` compares it with `BOAT_PLUGIN_WIRE_VERSION` in CTest, and an unrecognised reply
+is reported as a wire mismatch rather than as a worker deadline. The catalog generator builds for
+Emscripten as a Node program (`-sENVIRONMENT=node -sNODERAWFS=1`) and CMake runs it through the
+cross-compiling emulator; the generated table is linked into the game Wasm with only the five solo
+entries (basin and river free, time trial, Långedrag and Harbor life). `tools/check_web_wasm.py`
+runs from `package_web.py` and proves the game Wasm lacks Lua parser/VM messages, using
+`plugin_stage.wasm` as the positive control.
+
+Browser solo now opens the same build-time catalog as native through `wake_plugin_open_catalog`;
+normal play creates no worker. The title's CONTENT row is available on web, so Outer offers
+Standard or Harbor life. `--package` works in browser solo, and the time-trial course keeps the
+compiled digest in the best-run name. An imported course now sets the session's course mode, so
+`--plugin` free and course packages behave as solo content.
+
+Imported scenes are accepted through the worker: the Emscripten kind/scene rejections are gone,
+`race` and `match` stay rejected with messages pointing to rooms, and the stage response cap rose
+from 4 KiB to 16 KiB to carry Harbor life's 5,505-byte scene revision. The browser worker deadline
+is 15 seconds. Desktop browsers with a physical keyboard get the live console; edits and `= queries`
+use the worker, `/save DIR` downloads a source bundle, and the canvas keydown handler now lets
+printable characters (including space) reach `GetCharPressed` while the console is open.
+
+**Verification actually run, Apple Silicon/macOS, 2026-10-31.** Native Debug build is
+warning-clean; `ctest --preset quick` passed all 241 enabled tests, and `ctest --preset full`
+passed all 339 enabled tests with local sockets (13 retired field tests disabled, GPU CTests off).
+The Emscripten MinSizeRel `wake_velocity` and `plugin_stage` targets build; `package_web.py` passes
+the Wasm Lua check. Local Playwright Chromium against the served site passes
+`check_web_title.py`, `check_web_mobile.py`, and the full `check_web_plugin_author.py`
+(20 validation cycles, freeze/resume, three restored sessions, objective transactions, scene import,
+free/course launch and storage denial). Captures inspected: Harbor life from the title, the console
+open/query/export/live-edit flow, and free/course imports. `check_web_multiplayer.py --mode race`
+passes against a local WebRTC native server.
+
+**Measurements.** Game Wasm raw/Brotli/gzip: 1,986,419 / 774,623 / 970,154 bytes before this
+package, 2,001,499 / 778,037 / 975,309 after (+15,080 raw, +3,414 Brotli, +5,155 gzip). Worker Wasm
+390,072 → 395,778 bytes raw. The Node generator evaluates the five web entries in 1.34 s and writes
+48,616 bytes of C; the build runs it once per catalog change. Headless Chromium/SwiftShader on this
+machine measured 47.7 ms from Play click to session return, a 15.1 MB used JS heap, and 253 ms median
+frame interval (261 ms max) for Harbor life; the software renderer makes the frame figure
+non-representative.
+
+**Deviations and limits.** Only Chromium was run locally; Firefox, WebKit and the manual three-engine
+`web-plugin.yml` workflow were not dispatched, and no iPhone or physical Safari check was made.
+Harbor life's browser capture is at the voyage start rather than a pinned marina camera: the
+authored traffic craft and outer scenery render, and the marina scene is carried by the same 5,505
+byte wire and covered by native captures, but a browser marina capture is still owed.
+`check_web_multiplayer.py` still fails free and deathmatch on this branch exactly as recorded on the
+pre-package baseline: free joins and plays but the headless client sends no spawn request on
+Backspace, and deathmatch reports `Browser network receive queue is full` with no combat counters.
+Race passes. The room client was not changed by this package, and the cause of the two failures was
+not established. `--no-plugins` and the compiled fallback remain until PD5.
+
+**Needs the user.** Harbor life and normal play on an iPhone and in physical Safari, which decides
+whether Harbor life is offered on mobile; a browser marina capture or play check at the dock; and a
+decision on whether the free/deathmatch browser room failures block the Cutover package.
 
 ## PD5 — cutover
 
@@ -922,6 +1034,9 @@ are gone, and every doc says so.
 
 ### Tasks
 
+0. **Close the room follow-ups a release needs.** Prove contact with a moving authored craft and through a
+   resync, explain or accept the 0.126 mm prediction error, and make the measurements and browser runs in
+   [Rooms follow-ups](#rooms-follow-ups). If moving-craft contact needs a physics change, stop and report.
 1. **Remove the switch.** Delete `--no-plugins`, `PROTEUS_BOAT_PLUGINS` and the conditional paths it
    guards. Replace `plugin_default_parity` with pinned-digest and capture checks; pin values from
    the last commit with both paths available.
@@ -969,6 +1084,12 @@ are gone, and every doc says so.
   way and cannot move the boat. Provider, credentials and cost controls stay P6's work.
 
 ## Planning verification
+
+Browser preparation, 2026-10-31, Apple Silicon/macOS, on `a949d7a`, documentation-only: `ctest --preset
+full` passed all 338 enabled tests with local sockets (13 retired tests disabled, GPU CTests off). The
+generator trial and the browser baselines ran in throwaway worktrees and are recorded under PD4. The Wasm
+sizes come from `emcmake` MinSizeRel with the local emsdk. Firefox, WebKit and physical devices were not
+tried. The PD4 design remains unimplemented, and no user acceptance is implied.
 
 Rooms preparation, 2026-10-31, Apple Silicon/macOS, documentation-only, on merged PC (`4e11c2a`): Debug
 build with no warning outside raylib's `stb_vorbis.c`, and `ctest --preset full` passed all 330 enabled

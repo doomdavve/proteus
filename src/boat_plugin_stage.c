@@ -31,6 +31,12 @@ extern char **environ;
 #include <stdio.h>
 
 #define BOAT_PLUGIN_STAGE_RESPONSE_MAX (BOAT_PLUGIN_SOURCE_MAX + 32768u)
+// Browser workers start and evaluate Lua on the visitor's device; allow a slow phone.
+#if defined(__EMSCRIPTEN__)
+#define BOAT_PLUGIN_BROWSER_DEADLINE 15.0
+#else
+#define BOAT_PLUGIN_BROWSER_DEADLINE 5.0
+#endif
 
 // Deliberately fieldwise: network-order unsigned integers and IEEE-754 binary64 values;
 // strings have bounded uint32 lengths, with no NUL on the wire.
@@ -106,7 +112,6 @@ static bool files_wire(Wire *w, BoatPluginFiles *f)
 
 // PC query request: manifest, source and expression, each with a 32-bit length. The reply is a
 // diagnostic followed by the bounded rendered text.
-#if !defined(__EMSCRIPTEN__)
 static void query_write(Wire *w, const BoatPluginFiles *f, const char *expression)
 {
     integer(w, f->manifest_size, 4);
@@ -116,7 +121,6 @@ static void query_write(Wire *w, const BoatPluginFiles *f, const char *expressio
     w->ok &= fwrite(f->source, 1, f->source_size, w->file) == f->source_size;
     w->ok &= fwrite(expression, 1, strlen(expression), w->file) == strlen(expression);
 }
-#endif // !__EMSCRIPTEN__
 
 static bool query_read(Wire *w, BoatPluginFiles *f, char *expression, size_t capacity)
 {
@@ -195,20 +199,13 @@ int boat_plugin_stage_worker(void)
         goto done;
     }
 #ifdef __EMSCRIPTEN__
-    if (kind != BOAT_PLUGIN_KIND_VOYAGE) {
+    // Rooms carry their own definition as data. Browser solo has no race trial or match.
+    if (kind == BOAT_PLUGIN_KIND_RACE || kind == BOAT_PLUGIN_KIND_MATCH) {
         d.status = BOAT_PLUGIN_MANIFEST;
         snprintf(d.file, sizeof(d.file), "plugin.json");
         snprintf(d.field, sizeof(d.field), "kind");
         snprintf(d.message, sizeof(d.message),
-            "%s packages are native-only until browser parity; use a voyage", m.kind);
-        goto done;
-    }
-    if (m.scene) {
-        d.status = BOAT_PLUGIN_MANIFEST;
-        snprintf(d.file, sizeof(d.file), "plugin.json");
-        snprintf(d.field, sizeof(d.field), "capabilities[2]");
-        snprintf(d.message, sizeof(d.message),
-            "scene.define is native-only; browser scene imports are unsupported");
+            "%s packages are room content; join a room instead of importing one", m.kind);
         goto done;
     }
 #endif
@@ -365,6 +362,11 @@ EM_JS(void, browser_close, (unsigned job), {
     if (Module.boatPluginStage)
         Module.boatPluginStage.close(job);
 })
+EM_JS(unsigned, browser_query_start, (const unsigned char *data, unsigned size), {
+    if (!Module.boatPluginStage || !Module.boatPluginStage.query)
+        return 0;
+    return Module.boatPluginStage.query(HEAPU8.slice(data, data + size), [ 0, 0, 0 ]);
+})
 #endif
 
 _Static_assert(sizeof(BoatPluginStageJob) <= (80u << 10), "staging request exceeds 80 KiB");
@@ -388,7 +390,7 @@ BoatPluginStageJob *boat_plugin_stage_start(
 {
 #ifdef __EMSCRIPTEN__
     (void)executable;
-    if (!isfinite(now) || host->kind != BOAT_PLUGIN_KIND_VOYAGE)
+    if (!isfinite(now))
 #else
     if (!executable || !isfinite(now) || !host->depth)
 #endif
@@ -400,7 +402,7 @@ BoatPluginStageJob *boat_plugin_stage_start(
     j->worker_argument = "--plugin-stage-worker";
     j->epoch = host->epoch;
     j->base = host->depth ? boat_plugin_host_active(host)->number : 0;
-    j->deadline = now + 5;
+    j->deadline = now + BOAT_PLUGIN_BROWSER_DEADLINE;
     j->input = tmpfile();
     j->output = tmpfile();
     if (!j->input || !j->output)
@@ -630,12 +632,45 @@ BoatPluginStageJob *boat_plugin_query_start(const char *executable, const char *
 {
 #if defined(__EMSCRIPTEN__)
     (void)executable;
-    (void)manifest;
-    (void)manifest_size;
-    (void)source;
-    (void)source_size;
-    (void)expression;
-    (void)now;
+    if (!manifest || !source || !expression || !isfinite(now)
+        || manifest_size > BOAT_PLUGIN_MANIFEST_MAX || source_size > BOAT_PLUGIN_SOURCE_MAX
+        || strlen(expression) >= BOAT_PLUGIN_QUERY_MAX)
+        return NULL;
+    BoatPluginStageJob *j = calloc(1, sizeof(*j));
+    if (!j)
+        return NULL;
+    j->query = true;
+    j->worker_argument = "--plugin-query-worker";
+    j->files.manifest_size = manifest_size;
+    j->files.source_size = source_size;
+    memcpy(j->files.manifest, manifest, manifest_size);
+    memcpy(j->files.source, source, source_size);
+    snprintf(j->expression, sizeof(j->expression), "%s", expression);
+    j->deadline = now + BOAT_PLUGIN_BROWSER_DEADLINE;
+    j->input = tmpfile();
+    j->output = tmpfile();
+    if (!j->input || !j->output)
+        goto failed;
+    Wire in = { j->input, false, true };
+    query_write(&in, &j->files, j->expression);
+    if (!in.ok || fflush(j->input))
+        goto failed;
+    long end = ftell(j->input);
+    if (end <= 0 || end > 131072)
+        goto failed;
+    rewind(j->input);
+    size_t size = (size_t)end;
+    unsigned char *payload = malloc(size);
+    bool read = payload && fread(payload, 1, size, j->input) == size;
+    if (read)
+        j->browser_job = browser_query_start(payload, (unsigned)size);
+    free(payload);
+    if (!j->browser_job)
+        goto failed;
+    j->running = true;
+    return j;
+failed:
+    boat_plugin_stage_close(j);
     return NULL;
 #else
     if (!executable || !manifest || !source || !expression || !isfinite(now)
@@ -652,7 +687,7 @@ BoatPluginStageJob *boat_plugin_query_start(const char *executable, const char *
     memcpy(j->files.manifest, manifest, manifest_size);
     memcpy(j->files.source, source, source_size);
     snprintf(j->expression, sizeof(j->expression), "%s", expression);
-    j->deadline = now + 5;
+    j->deadline = now + BOAT_PLUGIN_BROWSER_DEADLINE;
     j->input = tmpfile();
     j->output = tmpfile();
     if (!j->input || !j->output)
@@ -669,16 +704,81 @@ failed:
 #endif
 }
 
+// Read one completed query reply from OUTPUT. Both the native child and the browser worker
+// produce the same wire, so this is the one parser.
+static int query_parse(FILE *output, bool success, char *text, size_t capacity,
+    BoatPluginDiagnostic *result)
+{
+    if (fseek(output, 0, SEEK_END)
+        || ftell(output) > (long)BOAT_PLUGIN_QUERY_REPLY_MAX + 8192)
+        return -1;
+    long end = ftell(output);
+    rewind(output);
+    Wire out = { output, true, true };
+    if (integer(&out, 0, 4) != BOAT_PLUGIN_WIRE_VERSION)
+        out.ok = false;
+    BoatPluginDiagnostic d = { 0 };
+    diagnostic(&out, &d);
+    long at = ftell(output);
+    size_t size = at >= 0 && end >= at ? (size_t)(end - at) : 0;
+    unsigned char *bytes = size ? malloc(size) : NULL;
+    if (bytes && fread(bytes, 1, size, output) != size)
+        size = 0;
+    size_t reported = size >= 4
+        ? (size_t)bytes[0] << 24 | (size_t)bytes[1] << 16 | (size_t)bytes[2] << 8 | (size_t)bytes[3]
+        : 0;
+    if (!out.ok || fgetc(output) != EOF || ferror(output)
+        || (d.status == BOAT_PLUGIN_OK) != success || reported + 4 != size || reported >= capacity
+        || reported >= BOAT_PLUGIN_QUERY_REPLY_MAX) {
+        free(bytes);
+        return -1;
+    }
+    if (reported)
+        memcpy(text, bytes + 4, reported);
+    text[reported] = 0;
+    free(bytes);
+    if (result)
+        *result = d;
+    return success ? 1 : -1;
+}
+
 int boat_plugin_query_poll(
     BoatPluginStageJob *j, char *text, size_t capacity, BoatPluginDiagnostic *result, double now)
 {
 #if defined(__EMSCRIPTEN__)
-    (void)j;
-    (void)text;
-    (void)capacity;
-    (void)result;
-    (void)now;
-    return -1;
+    if (!j || !j->query || !text)
+        return -1;
+    if (!isfinite(now) || now >= j->deadline) {
+        j->finished = true;
+        if (result) {
+            result->status = BOAT_PLUGIN_IO;
+            snprintf(result->message, sizeof(result->message), "worker deadline exceeded");
+        }
+        return -1;
+    }
+    int state = browser_status(j->browser_job);
+    if (state == 0)
+        return 0;
+    j->running = false;
+    j->finished = true;
+    if (state < 0)
+        return -1;
+    unsigned char *bytes = malloc(BOAT_PLUGIN_QUERY_REPLY_MAX + 8192);
+    if (!bytes)
+        return -1;
+    int size = browser_read(j->browser_job, bytes);
+    if (size < 0) {
+        free(bytes);
+        return -1;
+    }
+    rewind(j->output);
+    bool written = fwrite(bytes, 1, (size_t)size, j->output) == (size_t)size;
+    free(bytes);
+    if (!written || fflush(j->output))
+        return -1;
+    browser_close(j->browser_job);
+    j->browser_job = 0;
+    return query_parse(j->output, state == 1, text, capacity, result);
 #else
     if (!j || !j->query || !text)
         return -1;
@@ -707,37 +807,7 @@ int boat_plugin_query_poll(
 #endif
     j->running = false;
     j->finished = true;
-    if (fseek(j->output, 0, SEEK_END)
-        || ftell(j->output) > (long)BOAT_PLUGIN_QUERY_REPLY_MAX + 8192)
-        return -1;
-    long end = ftell(j->output);
-    rewind(j->output);
-    Wire out = { j->output, true, true };
-    if (integer(&out, 0, 4) != BOAT_PLUGIN_WIRE_VERSION)
-        out.ok = false;
-    BoatPluginDiagnostic d = { 0 };
-    diagnostic(&out, &d);
-    long at = ftell(j->output);
-    size_t size = at >= 0 && end >= at ? (size_t)(end - at) : 0;
-    unsigned char *bytes = size ? malloc(size) : NULL;
-    if (bytes && fread(bytes, 1, size, j->output) != size)
-        size = 0;
-    size_t reported = size >= 4
-        ? (size_t)bytes[0] << 24 | (size_t)bytes[1] << 16 | (size_t)bytes[2] << 8 | (size_t)bytes[3]
-        : 0;
-    if (!out.ok || fgetc(j->output) != EOF || ferror(j->output)
-        || (d.status == BOAT_PLUGIN_OK) != success || reported + 4 != size || reported >= capacity
-        || reported >= BOAT_PLUGIN_QUERY_REPLY_MAX) {
-        free(bytes);
-        return -1;
-    }
-    if (reported)
-        memcpy(text, bytes + 4, reported);
-    text[reported] = 0;
-    free(bytes);
-    if (result)
-        *result = d;
-    return success ? 1 : -1;
+    return query_parse(j->output, success, text, capacity, result);
 #endif
 }
 

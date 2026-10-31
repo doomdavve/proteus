@@ -151,7 +151,7 @@ typedef struct {
     unsigned shown; // The found room the LAN row offers.
     unsigned public_shown;
     double queried;
-    bool solo_content; // The native outer content row is visible in this panel.
+    bool solo_content; // The outer content row is visible in this panel.
     FramePacer pacer;
 } Title;
 
@@ -247,7 +247,7 @@ static int row_count(const Title *t)
                                      : MAIN_ROWS;
 }
 
-// A visible SOLO row as its enum value: the content row is hidden except on native outer.
+// A visible SOLO row as its enum value: the content row is hidden except on the outer location.
 static int solo_row(const Title *t, int visible)
 {
     if (t->solo_content || visible < ROW_SOLO_CONTENT)
@@ -500,7 +500,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
     if (!hint && t->panel == PANEL_SINGLE && solo_row(t, t->selected) == ROW_SOLO_CONTENT)
-        hint = s->outer_content ? "AUTHORED MARINA, TRAFFIC AND GULLS" : "THE COMPILED OUTER RIVER";
+        hint = s->outer_content ? "AUTHORED MARINA, TRAFFIC AND GULLS" : "THE STANDARD OUTER RIVER";
     char public_hint[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_PUBLIC_SERVER) {
         if (!public_server_count())
@@ -1001,11 +1001,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     back = true;
             } else if (t.selected == ROW_SINGLE) {
                 t.panel = PANEL_SINGLE;
-#if !defined(__EMSCRIPTEN__)
                 t.solo_content = s->location == BOAT_LOCATION_OUTER;
-#else
-                t.solo_content = false;
-#endif
                 t.selected = t.solo_content ? ROW_SOLO_START : ROW_SOLO_START - 1;
             } else if (t.selected == ROW_MULTI) {
                 t.panel = PANEL_JOIN;
