@@ -66,6 +66,11 @@ void boat_session_recover(BoatSession *session);
 // Replace the route the voyage borrows, keeping its progress, for a ROUTE whose gameplay is the
 // current one's (only names differ). Later restarts begin ROUTE.
 void boat_session_rebind_voyage(BoatSession *session, const BoatVoyageRoute *route);
+// A live route edit: keep the boat, clock, water and wakes; progress maps by shelter ID. A
+// removed reached shelter falls back to the start shelter, so recovery stays usable. ROUTE's
+// exposure must equal the current one's, which the host classification guarantees.
+void boat_session_rebind_voyage_live(BoatSession *session, const BoatVoyageRoute *route,
+    const char *old_id, const char *const *new_ids, unsigned new_count);
 // Begin ROUTE's voyage at the start shelter now: progress, timing and recoveries reset while the
 // boat, clock, water and weather continue, so ROUTE's exposure must be the current one's. A
 // boat already inside an area is observed on the next step. Later restarts begin ROUTE.

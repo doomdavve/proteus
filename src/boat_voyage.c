@@ -2,6 +2,7 @@
 #include "raymath.h"
 
 #include <math.h>
+#include <string.h>
 
 // The outer location's first-slice outing (A0.3 route, A3.1 map), in simulation X = -east,
 // Z = north. The dock and the river below Älvsborgsbron are sheltered; the east shore of the
@@ -46,6 +47,25 @@ void boat_voyage_restart(BoatVoyage *voyage, const BoatVoyageRoute *route, doubl
     voyage->observed = previous.observed;
     voyage->weather = previous.weather;
     voyage->weather_started = previous.weather_started;
+}
+
+void boat_voyage_rebind(BoatVoyage *voyage, const BoatVoyageRoute *route, const char *old_id,
+    const char *const *new_ids, unsigned new_count)
+{
+    if (!route)
+        return;
+    unsigned shelter = 0;
+    for (unsigned i = 0; old_id && new_ids && i < new_count && i < route->shelter_count; ++i)
+        if (!strcmp(old_id, new_ids[i])) {
+            shelter = i;
+            break;
+        }
+    // The destination's identity is its last shelter; keep an arrival only when it survives.
+    bool arrived = voyage->arrived && new_count && new_ids
+        && !strcmp(old_id ? old_id : "", new_ids[new_count - 1]);
+    voyage->route = route;
+    voyage->shelter = arrived ? route->shelter_count - 1 : shelter;
+    voyage->arrived = arrived;
 }
 
 void boat_voyage_step_events(

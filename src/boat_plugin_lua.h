@@ -71,6 +71,13 @@ unsigned boat_plugin_lua_states(void);
 BoatPluginStatus boat_plugin_lua_voyage(const char *source, size_t size, const char *chunk,
     const BoatPluginLimits *limits, BoatPluginVoyageData *out, BoatPluginDiagnostic *diagnostic);
 
+// PC console: evaluate SOURCE, then render EXPRESSION against the table it returned, bound as the
+// global DEF for the expression only. The rendering is bounded by depth and size and never runs
+// metamethods; OUT is NUL-terminated. No native state is exposed and no revision is created.
+BoatPluginStatus boat_plugin_lua_query(const char *source, size_t size, const char *chunk,
+    const char *expression, const BoatPluginLimits *limits, char *out, size_t capacity,
+    BoatPluginDiagnostic *diagnostic);
+
 // Decode already evaluated data using the same checks, without opening a Lua VM.
 BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     const BoatPluginVoyageData *data, BoatPluginVoyage *out, BoatPluginDiagnostic *diagnostic);

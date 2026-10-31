@@ -1203,6 +1203,222 @@ BoatPluginStatus boat_plugin_lua_course(const char *source, size_t size, const c
     return status;
 }
 
+typedef struct {
+    char *out;
+    size_t capacity, size;
+    bool truncated;
+} Render;
+
+static void render_put(Render *r, const char *text, size_t size)
+{
+    if (r->truncated)
+        return;
+    if (size >= r->capacity - r->size) {
+        r->truncated = true;
+        return;
+    }
+    memcpy(r->out + r->size, text, size);
+    r->size += size;
+}
+
+static void render_text(Render *r, const char *text) { render_put(r, text, strlen(text)); }
+
+static void render_string(Render *r, const char *text, size_t size)
+{
+    render_text(r, "\"");
+    for (size_t i = 0; i < size && i < 96 && !r->truncated; ++i) {
+        char escape[8], c = text[i];
+        if (c == '"' || c == '\\') {
+            escape[0] = '\\';
+            escape[1] = c;
+            render_put(r, escape, 2);
+        } else if (c == '\n') {
+            render_text(r, "\\n");
+        } else if (c == '\r') {
+            render_text(r, "\\r");
+        } else if (c == '\t') {
+            render_text(r, "\\t");
+        } else if ((unsigned char)c < 32 || (unsigned char)c == 127) {
+            snprintf(escape, sizeof(escape), "\\%03u", (unsigned char)c);
+            render_text(r, escape);
+        } else {
+            render_put(r, &c, 1);
+        }
+    }
+    if (size > 96 || r->truncated) {
+        r->truncated = false;
+        render_text(r, "...");
+    }
+    render_text(r, "\"");
+}
+
+static bool plain_key(const char *key)
+{
+    if (!((*key >= 'a' && *key <= 'z') || (*key >= 'A' && *key <= 'Z') || *key == '_'))
+        return false;
+    for (; *key; ++key)
+        if (!((*key >= 'a' && *key <= 'z') || (*key >= 'A' && *key <= 'Z')
+                || (*key >= '0' && *key <= '9') || *key == '_'))
+            return false;
+    return true;
+}
+
+static void render_value(lua_State *L, int index, int depth, Render *r)
+{
+    index = lua_absindex(L, index);
+    switch (lua_type(L, index)) {
+    case LUA_TNIL:
+        render_text(r, "nil");
+        return;
+    case LUA_TBOOLEAN:
+        render_text(r, lua_toboolean(L, index) ? "true" : "false");
+        return;
+    case LUA_TNUMBER:
+        if (lua_isinteger(L, index)) {
+            char number[32];
+            snprintf(number, sizeof(number), "%lld", (long long)lua_tointeger(L, index));
+            render_text(r, number);
+        } else {
+            char number[48];
+            snprintf(number, sizeof(number), "%.14g", lua_tonumber(L, index));
+            render_text(r, number);
+        }
+        return;
+    case LUA_TSTRING: {
+        size_t size;
+        const char *text = lua_tolstring(L, index, &size);
+        render_string(r, text, size);
+        return;
+    }
+    case LUA_TFUNCTION:
+        render_text(r, "<function>");
+        return;
+    case LUA_TUSERDATA:
+        render_text(r, "<userdata>");
+        return;
+    case LUA_TTHREAD:
+        render_text(r, "<thread>");
+        return;
+    case LUA_TTABLE:
+        break;
+    default:
+        render_text(r, "<value>");
+        return;
+    }
+    if (depth >= 4) {
+        render_text(r, "{ ... }");
+        return;
+    }
+    render_text(r, "{ ");
+    unsigned entries = 0;
+    bool more = false;
+    lua_pushnil(L);
+    while (lua_next(L, index)) {
+        if (entries == 12) {
+            more = true;
+            lua_pop(L, 2);
+            break;
+        }
+        if (entries++)
+            render_text(r, ", ");
+        int key = lua_absindex(L, -2), value = lua_absindex(L, -1);
+        if (lua_type(L, key) == LUA_TSTRING) {
+            const char *name = lua_tostring(L, key);
+            if (plain_key(name)) {
+                render_text(r, name);
+            } else {
+                render_text(r, "[");
+                render_value(L, key, depth + 1, r);
+                render_text(r, "]");
+            }
+        } else {
+            render_text(r, "[");
+            render_value(L, key, depth + 1, r);
+            render_text(r, "]");
+        }
+        render_text(r, " = ");
+        render_value(L, value, depth + 1, r);
+        lua_pop(L, 1);
+    }
+    render_text(r, more ? ", ... }" : " }");
+}
+
+BoatPluginStatus boat_plugin_lua_query(const char *source, size_t size, const char *chunk,
+    const char *expression, const BoatPluginLimits *limits, char *out, size_t capacity,
+    BoatPluginDiagnostic *diagnostic)
+{
+    limits = limits ? limits : &boat_plugin_default_limits;
+    *diagnostic = (BoatPluginDiagnostic) { 0 };
+    out[0] = 0;
+    Vm vm = {
+        .limit = limits->memory_bytes, .budget = limits->instructions, .diagnostic = diagnostic
+    };
+    lua_State *L = lua_newstate(allocate, &vm);
+    if (!L) {
+        failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
+        return BOAT_PLUGIN_MEMORY;
+    }
+    ++lua_states;
+    BoatPluginStatus status = BOAT_PLUGIN_OK;
+    lua_pushcfunction(L, setup);
+    int lua_status = lua_pcall(L, 0, 0, 0);
+    if (lua_status == LUA_OK)
+        lua_status = luaL_loadbufferx(L, source, size, "=main.lua", "t");
+    if (lua_status != LUA_OK)
+        failure(diagnostic, lua_status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY : BOAT_PLUGIN_SYNTAX,
+            "main.lua", lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string error");
+    else {
+        lua_sethook(L, count, LUA_MASKCOUNT, BOAT_PLUGIN_HOOK_STEP);
+        lua_status = lua_pcall(L, 0, 1, 0);
+        lua_sethook(L, NULL, 0, 0);
+        if (lua_status != LUA_OK)
+            failure(diagnostic,
+                vm.exhausted                   ? BOAT_PLUGIN_BUDGET
+                    : lua_status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY
+                                               : BOAT_PLUGIN_RUNTIME,
+                "main.lua",
+                lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string error");
+        else {
+            lua_setglobal(L, "def");
+            char text[BOAT_PLUGIN_QUERY_MAX + 8];
+            snprintf(text, sizeof(text), "return %s", expression);
+            int loaded = luaL_loadbufferx(L, text, strlen(text), "=console", "t");
+            if (loaded != LUA_OK)
+                failure(diagnostic, loaded == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY : BOAT_PLUGIN_SYNTAX,
+                    "console",
+                    lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string error");
+            else {
+                vm.instructions = 0;
+                vm.budget = BOAT_PLUGIN_CALLBACK_INSTRUCTIONS;
+                lua_sethook(L, count, LUA_MASKCOUNT, BOAT_PLUGIN_HOOK_STEP);
+                lua_status = lua_pcall(L, 0, 1, 0);
+                lua_sethook(L, NULL, 0, 0);
+                if (lua_status != LUA_OK)
+                    failure(diagnostic,
+                        vm.exhausted                   ? BOAT_PLUGIN_BUDGET
+                            : lua_status == LUA_ERRMEM ? BOAT_PLUGIN_MEMORY
+                                                       : BOAT_PLUGIN_RUNTIME,
+                        "console",
+                        lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "non-string error");
+                else {
+                    Render render = { .out = out, .capacity = capacity };
+                    render_value(L, -1, 0, &render);
+                    out[render.size] = 0;
+                }
+            }
+        }
+    }
+    if (status == BOAT_PLUGIN_OK)
+        status = diagnostic->status;
+    diagnostic->cost = (BoatPluginCost) { .instructions = vm.instructions,
+        .entry_instructions = vm.instructions,
+        .peak_bytes = vm.peak,
+        .leaked_bytes = vm.live,
+        .fields = vm.fields };
+    lua_close(L);
+    return status;
+}
+
 BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
     const BoatPluginLimits *limits, uint64_t callback_budget, int (*callback)(lua_State *),
     void *context, BoatPluginDiagnostic *diagnostic)

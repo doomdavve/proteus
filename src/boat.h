@@ -86,6 +86,11 @@ void boat_pair_apply(Boat *a, float mass_a, Boat *b, float mass_b, BoatPairConta
 bool boat_collide_pair(Boat *a, float mass_a, Boat *b, float mass_b);
 // True when no hull sample touches the world's shoreline or basin wall at TIME.
 bool boat_hull_clear(const Boat *boat, const BoatWorld *world, double time);
+// True when SCENE's authored berths, modules and travelling craft leave the hull MARGIN metres
+// clear at TIME. The world's own scene is ignored: this asks about a candidate revision before
+// it is installed, so a live edit can wait for clear water instead of displacing the boat.
+bool boat_scene_clear(const Boat *boat, const BoatWorld *world, const BoatSceneDefinition *scene,
+    double time, float margin);
 BoatWakeStern boat_wake_stern(const Boat *boat, const BoatWorld *world, double time);
 
 #endif

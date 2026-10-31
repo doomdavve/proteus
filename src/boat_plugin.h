@@ -22,6 +22,9 @@
 // Host capacities. Limits passed to a load may be lower, never higher.
 #define BOAT_PLUGIN_MANIFEST_MAX 4096
 #define BOAT_PLUGIN_SOURCE_MAX 65536
+// PC console: one query expression and its bounded rendering.
+#define BOAT_PLUGIN_QUERY_MAX 2048
+#define BOAT_PLUGIN_QUERY_REPLY_MAX 4096
 #define BOAT_PLUGIN_TEXT 24 // Shelter id and name capacity, including the terminator.
 
 typedef enum {
@@ -166,6 +169,10 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
 typedef enum {
     BOAT_PLUGIN_UNCHANGED, // Identical: nothing to install.
     BOAT_PLUGIN_RENAMED, // Only display names differ: rebind them and keep all progress.
+    // PC: a scene layout or voyage-progress edit that can be installed between ticks. The boat,
+    // clock, water and wakes carry on; the boat is never displaced. A physical layout change
+    // waits until the hull clears the candidate envelopes.
+    BOAT_PLUGIN_LIVE,
     BOAT_PLUGIN_MIGRATE, // Compatible native route; explicit migration on Apply.
     BOAT_PLUGIN_RESTART_VOYAGE, // Route gameplay differs and the water does not.
     BOAT_PLUGIN_RESTART_SESSION, // The exposure or its weather range differs.
