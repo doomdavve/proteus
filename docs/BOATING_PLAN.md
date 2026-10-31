@@ -976,3 +976,24 @@ audio scenarios were not reported. Next task: integrate the PR after CI checks; 
 platform qualification remains separate. Known limits: fast-forward increases physics CPU
 work; audio plays at its normal rate, and the existing stall clamp still discards real time
 above 0.1 s per frame. Browser/Windows verification remains pending.
+
+## Shoreline reflection correction — 2026-10-31
+
+Implemented: the GPU reflection pass clips scenery below the rest waterline (`y = 0`).
+Its mirrored camera previously included submerged quay walls and hull bottoms, which could
+occlude reflected scenery and produce a false strip along a ledge. The main and shadow passes
+retain submerged geometry. Clipping runs after material derivatives; discarding earlier caused
+1–2 channel-value differences in the existing view-binding and tile-culling parity checks.
+
+Verification on Apple Silicon/macOS, Debug, 2026-10-31: `gpu_fixture --city --check`
+checks that a dry marker appears in the reflection, adding a submerged marker leaves that
+reflection identical, and the submerged marker still changes the main image. Disabling the
+clip in the build-only shader makes this regression fail. Debug configure/build passed, and
+`ctest --preset full` passed all 364 enabled tests (15 retired experiments disabled, GPU tests
+on) in 72.88 s, including view-binding and all 144 tile-culling views. The incremental final
+build emitted no warnings. Basin/river GPU suite captures and before/after captures near the
+south bank opposite Eriksberg
+(`--location outer --start -1400,350,270 --time 1`) were inspected, along with an agent-run
+180-frame windowed demo at that start. These approximate the reported area south of Karlatornet;
+the exact screenshot pose was not recovered. No human acceptance or browser/Windows/Linux
+verification is claimed. Next: review CI and have the user revisit the original ledge.

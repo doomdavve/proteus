@@ -456,6 +456,11 @@ off has less coverage; report that omission.
 
 ## GPU checks
 
+`gpu_fixture --city --check` (CTest `gpu_surface_materials`) also verifies reflection waterline
+clipping: above-water scenery remains visible, submerged scenery cannot change the reflection,
+and clipping is reset before the main pass. This requires `PROTEUS_GPU_TESTS=ON` and a desktop
+graphics context.
+
 GPU checks are opt-in and require a desktop graphics context. Configure and run the
 labelled cases on a machine that can create a raylib/OpenGL window:
 

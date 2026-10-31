@@ -531,6 +531,56 @@ static bool verify_sky_targets(WaterfrontGpuScene *scene)
     return ok;
 }
 
+static bool verify_reflection_waterline(WaterfrontGpuScene *scene)
+{
+    RenderTexture2D target = LoadRenderTexture(160, 100);
+    if (!IsRenderTextureValid(target))
+        return false;
+    Mesh water = scene->water;
+    scene->water = (Mesh) { 0 }; // Expose the submerged marker in the main pass.
+    WaterfrontSceneFrame frame = { .boating_basin = true,
+        .camera = { .position = { 0, 6, 14 },
+            .target = { 0, 0, 0 },
+            .up = { 0, 1, 0 },
+            .vertical_fov = 60 * DEG2RAD,
+            .near_plane = .25f,
+            .far_plane = 100 } };
+    // One dry marker, then a submerged wall. The latter must change the main
+    // image but leave the reflection exactly as it was with the dry marker alone.
+    frame.scenery[0].transform = (Transform3D) { .position = { -3, 2, 0 }, .scale = { 3, 3, 3 } };
+    frame.scenery[0].color = RED;
+    frame.scenery[1].transform = (Transform3D) { .position = { 3, -2, 0 }, .scale = { 3, 3, 3 } };
+    frame.scenery[1].color = GREEN;
+    waterfront_gpu_scene_set_shadows_enabled(scene, false);
+    waterfront_gpu_scene_set_reflections_enabled(scene, true);
+    Image reflected[3] = { 0 }, main[3] = { 0 };
+    bool ok = true;
+    for (int count = 0; count < 3; ++count) {
+        frame.scenery_count = count;
+        BeginTextureMode(target);
+        waterfront_gpu_scene_draw(scene, &frame, 160, 100);
+        EndTextureMode();
+        reflected[count] = LoadImageFromTexture(scene->reflection.texture);
+        main[count] = LoadImageFromTexture(target.texture);
+        ok = ok && reflected[count].data && main[count].data;
+    }
+    if (ok) {
+        size_t reflected_bytes = (size_t)reflected[0].width * reflected[0].height * 4;
+        size_t main_bytes = (size_t)main[0].width * main[0].height * 4;
+        ok = memcmp(reflected[0].data, reflected[1].data, reflected_bytes) != 0
+            && memcmp(reflected[1].data, reflected[2].data, reflected_bytes) == 0
+            && memcmp(main[1].data, main[2].data, main_bytes) != 0;
+    }
+    for (int i = 0; i < 3; ++i) {
+        UnloadImage(reflected[i]);
+        UnloadImage(main[i]);
+    }
+    UnloadRenderTexture(target);
+    scene->water = water;
+    printf("reflection_waterline=%s\n", ok ? "ok" : "failed");
+    return ok;
+}
+
 static bool draw_city(RenderTexture2D target, WaterfrontGpuScene *scene, FixtureOptions options)
 {
     char shader_path[1024];
@@ -550,7 +600,7 @@ static bool draw_city(RenderTexture2D target, WaterfrontGpuScene *scene, Fixture
     }
     if (options.check
         && (!verify_surface_materials(scene, false) || !verify_surface_materials(scene, true)
-            || !verify_sky_targets(scene)))
+            || !verify_sky_targets(scene) || !verify_reflection_waterline(scene)))
         return false;
     waterfront_gpu_scene_set_lighting_enabled(scene, options.lighting);
     waterfront_gpu_scene_set_shadows_enabled(scene, options.shadows);
