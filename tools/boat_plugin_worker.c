@@ -181,7 +181,9 @@ int main(int argc, char **argv)
     if (boat_plugin_parse_manifest(bundle.manifest, bundle.manifest_size, NULL, &manifest, &d)
         != BOAT_PLUGIN_OK)
         goto done;
-    if (!boat_world_resources_init(&resources, boat_location_find(manifest.location))) {
+    // A match package without a scene serves every location; validate it against the basin.
+    const char *map_name = !strcmp(manifest.location, "any") ? "basin" : manifest.location;
+    if (!boat_world_resources_init(&resources, boat_location_find(map_name))) {
         d.status = BOAT_PLUGIN_MEMORY;
         goto done;
     }
@@ -198,6 +200,9 @@ int main(int argc, char **argv)
             break;
         case BOAT_PLUGIN_KIND_FREE:
             digest = revision->free.digest;
+            break;
+        case BOAT_PLUGIN_KIND_MATCH:
+            digest = revision->match.digest;
             break;
         default:
             digest = revision->voyage.digest;

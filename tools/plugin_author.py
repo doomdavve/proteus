@@ -74,10 +74,11 @@ def capabilities():
     if LAYOUT["kind"] == "package":
         layout.update(package=LAYOUT["package"], version=LAYOUT["version"])
     return {"protocol": 1, "operations": OPERATIONS, "layout": layout,
-            "kinds": {"voyage": "outer", "free": "basin or river", "course": "basin",
-                      "race": "river"},
+            "kinds": {"voyage": "outer", "free": "basin, river or outer", "course": "basin",
+                      "race": "river", "match": "any or a compiled location"},
             "capabilities": ["voyage.define", "scene.define", "free.define", "course.define",
-                             "race.define", "objective.hud", "objective.timers"],
+                             "race.define", "match.define", "objective.hud",
+                             "objective.timers"],
             "scene": {"grant": "scene.define", "envelope_version": 1,
                       "supported_subsystems": ["marina.berths", "marina.modules",
                                                "traffic.vessels", "gulls.flocks"],

@@ -25,6 +25,7 @@ extern const unsigned boat_plugin_catalog_count;
 #define BOAT_PLUGIN_DEFAULT_OUTER_VOYAGE "proteus.langedrag"
 #define BOAT_PLUGIN_DEFAULT_RIVER_RACE "proteus.river-sprint"
 #define BOAT_PLUGIN_DEFAULT_BASIN_COURSE "proteus.time-trial"
+#define BOAT_PLUGIN_DEFAULT_MATCH "proteus.deathmatch"
 
 const BoatPluginCatalogEntry *boat_plugin_catalog_at(unsigned index);
 const BoatPluginCatalogEntry *boat_plugin_catalog_find(const char *id);

@@ -33,11 +33,11 @@ const char *boat_plugin_status_name(BoatPluginStatus status)
     return (unsigned)status < sizeof(names) / sizeof(names[0]) ? names[status] : "unknown";
 }
 
-static const char *const KIND_NAMES[] = { "none", "voyage", "free", "course", "race" };
+static const char *const KIND_NAMES[] = { "none", "voyage", "free", "course", "race", "match" };
 
 BoatPluginKind boat_plugin_kind_parse(const char *kind)
 {
-    for (unsigned i = BOAT_PLUGIN_KIND_VOYAGE; i <= BOAT_PLUGIN_KIND_RACE; ++i)
+    for (unsigned i = BOAT_PLUGIN_KIND_VOYAGE; i <= BOAT_PLUGIN_KIND_MATCH; ++i)
         if (!strcmp(KIND_NAMES[i], kind))
             return (BoatPluginKind)i;
     return BOAT_PLUGIN_KIND_NONE;
@@ -138,44 +138,60 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
     if (!boat_json_text(json, &tokens[at[3]], m.kind, sizeof(m.kind))
         || (kind = boat_plugin_kind_parse(m.kind)) == BOAT_PLUGIN_KIND_NONE)
         return diagnose(
-            d, BOAT_PLUGIN_MANIFEST, file, "kind", "must be voyage, free, course or race");
+            d, BOAT_PLUGIN_MANIFEST, file, "kind", "must be voyage, free, course, race or match");
     if (!boat_json_text(json, &tokens[at[4]], m.entry, sizeof(m.entry)) || !plain_file(m.entry)
         || strcmp(m.entry, "main.lua"))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "entry", "must be \"main.lua\"");
-    const char *location = kind == BOAT_PLUGIN_KIND_VOYAGE ? "outer"
-        : kind == BOAT_PLUGIN_KIND_COURSE                  ? "basin"
-        : kind == BOAT_PLUGIN_KIND_RACE                    ? "river"
-                                                           : NULL;
-    if (!boat_json_text(json, &tokens[at[5]], m.location, sizeof(m.location))
-        || (location ? strcmp(m.location, location)
-                     : strcmp(m.location, "basin") && strcmp(m.location, "river")))
+    if (!boat_json_text(json, &tokens[at[5]], m.location, sizeof(m.location)))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location", "must be a string");
+    bool known_location = !strcmp(m.location, "basin") || !strcmp(m.location, "river")
+        || !strcmp(m.location, "outer");
+    bool location_ok = kind == BOAT_PLUGIN_KIND_VOYAGE ? !strcmp(m.location, "outer")
+        : kind == BOAT_PLUGIN_KIND_COURSE              ? !strcmp(m.location, "basin")
+        : kind == BOAT_PLUGIN_KIND_RACE                ? !strcmp(m.location, "river")
+        : kind == BOAT_PLUGIN_KIND_MATCH ? known_location || !strcmp(m.location, "any")
+                                         : known_location;
+    if (!location_ok)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location",
-            kind == BOAT_PLUGIN_KIND_FREE
-                ? "must be basin or river for free"
-                : "must match kind: outer for voyage, basin for course, river for race");
+            "must be any or a compiled location for match, basin or river for free, outer for "
+            "voyage, basin for course, river for race");
     const char *grant = kind == BOAT_PLUGIN_KIND_VOYAGE ? "voyage.define"
         : kind == BOAT_PLUGIN_KIND_FREE                 ? "free.define"
         : kind == BOAT_PLUGIN_KIND_COURSE               ? "course.define"
-                                                        : "race.define";
+        : kind == BOAT_PLUGIN_KIND_RACE                 ? "race.define"
+                                                        : "match.define";
     const jsmntok_t *capabilities = &tokens[at[6]];
+    unsigned maximum = kind == BOAT_PLUGIN_KIND_VOYAGE ? 4 : 2;
     if (capabilities->type != JSMN_ARRAY || capabilities->size < 1
-        || capabilities->size > (kind == BOAT_PLUGIN_KIND_VOYAGE ? 4 : 1))
+        || capabilities->size > (int)maximum)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
-            kind == BOAT_PLUGIN_KIND_VOYAGE ? "must contain voyage.define and optional grants"
-                                            : "must contain exactly one kind grant");
+            kind == BOAT_PLUGIN_KIND_VOYAGE
+                ? "must contain voyage.define and optional grants"
+                : "must contain one kind grant and optionally scene.define");
     char capability[32];
     if (!boat_json_text(json, &tokens[at[6] + 1], capability, sizeof(capability))
         || strcmp(capability, grant))
         return diagnose(
             d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]", "is not granted for this kind");
     // Voyage grants are a canonical prefix: scene.define, objective.hud, objective.timers.
-    // A package cannot reorder or repeat them, and timers require HUD.
+    // A package cannot reorder or repeat them, and timers require HUD. Other kinds may add only
+    // scene.define, immediately after their kind grant.
     int order = 0;
+    bool extra_scene = false;
     for (int i = 1; i < capabilities->size; ++i) {
         char path[32];
         snprintf(path, sizeof(path), "capabilities[%u]", i + 1);
         if (!boat_json_text(json, &tokens[at[6] + i + 1], capability, sizeof(capability)))
             return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path, "is not a string");
+        if (kind != BOAT_PLUGIN_KIND_VOYAGE) {
+            if (!strcmp(capability, "scene.define") && !extra_scene) {
+                m.scene = true;
+                extra_scene = true;
+            } else
+                return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
+                    "must be scene.define and may appear once");
+            continue;
+        }
         if (!strcmp(capability, "scene.define") && order == 0) {
             m.scene = true;
             order = 1;
@@ -863,6 +879,34 @@ BoatPluginChange boat_plugin_classify(
 
 // PD1 free and course kinds -------------------------------------------------------------------
 
+// PD2: the shared scene capability rule for kinds that may author a scene.
+BoatPluginStatus boat_plugin_take_scene(const BoatPluginManifest *manifest, bool has_scene,
+    const BoatSceneDefinition *scene, bool *out_has_scene, BoatSceneDefinition *out_scene,
+    uint64_t *out_digest, BoatPluginDiagnostic *d)
+{
+    *out_has_scene = false;
+    *out_digest = 0;
+    if (!has_scene) {
+        if (manifest->scene)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene",
+                "the scene.define capability requires a scene table");
+        return BOAT_PLUGIN_OK;
+    }
+    if (!manifest->scene)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene",
+            "requires the scene.define capability");
+    if (scene->version != BOAT_SCENE_VERSION)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.version",
+            "must be %d, the supported scene schema", BOAT_SCENE_VERSION);
+    BoatSceneDiagnostic check;
+    if (!boat_scene_validate(scene, &check))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, check.field, "%s", check.message);
+    *out_has_scene = true;
+    *out_scene = *scene;
+    *out_digest = boat_scene_digest(scene);
+    return BOAT_PLUGIN_OK;
+}
+
 BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
     const BoatPluginFreeData *data, BoatPluginFree *out, BoatPluginDiagnostic *d)
 {
@@ -870,6 +914,11 @@ BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "free.version",
             "must be 1, the supported free schema");
     BoatPluginFree candidate = { .manifest = *manifest, .digest = 0 };
+    if (boat_plugin_take_scene(manifest, data->has_scene, &data->scene, &candidate.has_scene,
+            &candidate.scene, &candidate.scene_digest, d)
+        != BOAT_PLUGIN_OK)
+        return BOAT_PLUGIN_SCHEMA;
+    candidate.digest = candidate.scene_digest;
     *out = candidate;
     BoatPluginCost cost = d->cost;
     *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
@@ -1037,6 +1086,8 @@ BoatPluginChange boat_plugin_free_classify(
         || strcmp(active->manifest.location, candidate->manifest.location)
         || active->manifest.api != candidate->manifest.api)
         return BOAT_PLUGIN_INCOMPATIBLE;
+    if (active->digest != candidate->digest)
+        return BOAT_PLUGIN_RESTART_SESSION;
     return strcmp(active->manifest.name, candidate->manifest.name) ? BOAT_PLUGIN_RENAMED
                                                                    : BOAT_PLUGIN_UNCHANGED;
 }
@@ -1050,6 +1101,188 @@ BoatPluginChange boat_plugin_course_classify(
         || active->manifest.api != candidate->manifest.api)
         return BOAT_PLUGIN_INCOMPATIBLE;
     if (active->digest != candidate->digest)
+        return BOAT_PLUGIN_RESTART_SESSION;
+    return strcmp(active->manifest.name, candidate->manifest.name) ? BOAT_PLUGIN_RENAMED
+                                                                   : BOAT_PLUGIN_UNCHANGED;
+}
+
+// PD2 match kind -------------------------------------------------------------------------------
+
+static void match_hash(uint64_t *hash, double value)
+{
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    for (unsigned i = 0; i < 8; ++i) {
+        *hash ^= (bits >> (8 * i)) & 255;
+        *hash *= 1099511628211ull;
+    }
+}
+
+uint64_t boat_plugin_match_digest(const BoatMatchRules *rules, const BoatCombatRules *combat)
+{
+    uint64_t hash = 14695981039346656037ull;
+    const double match[] = { (double)rules->round_ticks, (double)rules->intermission_ticks,
+        (double)rules->credit_ticks, (double)rules->grace_ticks, (double)rules->respawn_ticks,
+        (double)rules->skip_ticks, rules->contact_impulse, rules->wake_height, rules->min_players };
+    const double values[] = { combat->health, combat->damage, combat->bullet_speed,
+        combat->bullet_range, combat->grenade_distance, combat->wave_height, combat->wave_speed,
+        combat->wave_range, combat->cannon_pressure, combat->pressure_recovery,
+        combat->torpedo_damage, combat->torpedo_speed, combat->torpedo_range,
+        (double)combat->torpedo_ticks, (double)combat->arming_ticks, (double)combat->torpedo_ammo,
+        (double)combat->fire_ticks, (double)combat->heat_ticks, (double)combat->cool_ticks,
+        (double)combat->grenade_ticks, (double)combat->splash_ticks, (double)combat->fuse_ticks,
+        (double)combat->grace_ticks };
+    for (size_t i = 0; i < sizeof(match) / sizeof(*match); ++i)
+        match_hash(&hash, match[i]);
+    for (size_t i = 0; i < sizeof(values) / sizeof(*values); ++i)
+        match_hash(&hash, values[i]);
+    return hash;
+}
+
+BoatPluginStatus boat_plugin_decode_match(const BoatPluginManifest *manifest,
+    const BoatPluginMatchData *data, BoatPluginMatch *out, BoatPluginDiagnostic *d)
+{
+    const char *file = manifest->entry;
+    if (data->version != 1)
+        return diagnose(
+            d, BOAT_PLUGIN_SCHEMA, file, "match.version", "must be 1, the supported match schema");
+    static const double low[] = { 1, 0, 1, 0, 0, 0, 0, 0, 1 };
+    static const double high[]
+        = { 432000, 432000, 432000, 432000, 432000, 432000, 1e5, 100, BOAT_FLEET_SLOTS };
+    static const unsigned integer[] = { 1, 1, 1, 1, 1, 1, 0, 0, 1 };
+    static const char *const match_names[] = { BOAT_PLUGIN_MATCH_RULE_FIELDS };
+    for (unsigned i = 0; i < 9; ++i) {
+        if (!isfinite(data->rules[i]) || data->rules[i] < low[i] || data->rules[i] > high[i]
+            || (integer[i] && floor(data->rules[i]) != data->rules[i])) {
+            char path[64];
+            snprintf(path, sizeof(path), "match.rules.%s", match_names[i]);
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path, "is outside the match envelope");
+        }
+    }
+    static const char *const combat_names[] = { BOAT_PLUGIN_COMBAT_FIELDS };
+    static const double combat_low[]
+        = { 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 };
+    static const double combat_high[] = { 1e5, 1e5, 1e4, 1e4, 1e4, 100, 1e4, 1e4, 100, 100, 1e5,
+        1e4, 1e4, 432000, 432000, 432000, 432000, 432000, 432000, 432000, 432000, 432000, 432000 };
+    for (unsigned i = 0; i < 23; ++i) {
+        bool whole = i >= 13;
+        if (!isfinite(data->combat[i]) || data->combat[i] < combat_low[i]
+            || data->combat[i] > combat_high[i]
+            || (whole && floor(data->combat[i]) != data->combat[i])) {
+            char path[64];
+            snprintf(path, sizeof(path), "match.combat.%s", combat_names[i]);
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path, "is outside the combat envelope");
+        }
+    }
+    BoatPluginMatch candidate = { .manifest = *manifest };
+    candidate.rules = (BoatMatchRules) { .round_ticks = (uint64_t)data->rules[0],
+        .intermission_ticks = (uint64_t)data->rules[1],
+        .credit_ticks = (uint64_t)data->rules[2],
+        .grace_ticks = (uint64_t)data->rules[3],
+        .respawn_ticks = (uint64_t)data->rules[4],
+        .skip_ticks = (uint64_t)data->rules[5],
+        .contact_impulse = (float)data->rules[6],
+        .wake_height = (float)data->rules[7],
+        .min_players = (unsigned)data->rules[8] };
+    if (candidate.rules.skip_ticks > candidate.rules.respawn_ticks)
+        return diagnose(
+            d, BOAT_PLUGIN_SCHEMA, file, "match.rules.skip_ticks", "must not exceed respawn_ticks");
+    candidate.combat = (BoatCombatRules) { .health = (float)data->combat[0],
+        .damage = (float)data->combat[1],
+        .bullet_speed = (float)data->combat[2],
+        .bullet_range = (float)data->combat[3],
+        .grenade_distance = (float)data->combat[4],
+        .wave_height = (float)data->combat[5],
+        .wave_speed = (float)data->combat[6],
+        .wave_range = (float)data->combat[7],
+        .cannon_pressure = (float)data->combat[8],
+        .pressure_recovery = (float)data->combat[9],
+        .torpedo_damage = (float)data->combat[10],
+        .torpedo_speed = (float)data->combat[11],
+        .torpedo_range = (float)data->combat[12],
+        .torpedo_ticks = (uint32_t)data->combat[13],
+        .arming_ticks = (uint32_t)data->combat[14],
+        .torpedo_ammo = (uint32_t)data->combat[15],
+        .fire_ticks = (uint32_t)data->combat[16],
+        .heat_ticks = (uint32_t)data->combat[17],
+        .cool_ticks = (uint32_t)data->combat[18],
+        .grenade_ticks = (uint32_t)data->combat[19],
+        .splash_ticks = (uint32_t)data->combat[20],
+        .fuse_ticks = (uint32_t)data->combat[21],
+        .grace_ticks = (uint32_t)data->combat[22] };
+    BoatMatch native;
+    if (!boat_match_init(&native, &candidate.rules))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "match.rules", "invalid native match rules");
+    if (boat_plugin_take_scene(manifest, data->has_scene, &data->scene, &candidate.has_scene,
+            &candidate.scene, &candidate.scene_digest, d)
+        != BOAT_PLUGIN_OK)
+        return BOAT_PLUGIN_SCHEMA;
+    if (candidate.has_scene && !strcmp(manifest->location, "any"))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "scene",
+            "a scene fixes the location; the manifest cannot say any");
+    candidate.digest = boat_plugin_match_digest(&candidate.rules, &candidate.combat);
+    *out = candidate;
+    BoatPluginCost cost = d->cost;
+    *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
+    return BOAT_PLUGIN_OK;
+}
+
+BoatPluginStatus boat_plugin_load_match(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginMatch *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    BoatPluginManifest manifest;
+    BoatPluginStatus status = load_manifest(bundle, limits, d, &manifest, BOAT_PLUGIN_KIND_MATCH);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    BoatPluginMatchData data;
+    status = boat_plugin_lua_match(
+        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    return boat_plugin_decode_match(&manifest, &data, out, d);
+}
+
+BoatPluginStatus boat_plugin_match_check_location(const BoatPluginMatch *match,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    if (!location)
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location", "requires a compiled location");
+    bool any = !strcmp(match->manifest.location, "any");
+    if (!any && strcmp(match->manifest.location, location->name))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "is \"%s\"; this room is at \"%s\"", match->manifest.location, location->name);
+    if (match->has_scene) {
+        if (any || !map)
+            return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+                "a scene requires a fixed location and its prepared map");
+        for (unsigned i = 0; i < match->scene.berth_count; ++i) {
+            const BoatSceneBerth *b = &match->scene.berths[i];
+            char path[64];
+            snprintf(path, sizeof(path), "scene.marina.berths[%u]", i + 1);
+            if (!boat_map_water(map, (Vector2) { b->x, b->z },
+                    (int)ceilf(boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe).length)))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, match->manifest.entry, path,
+                    "is not open water of the %s map", location->name);
+        }
+    }
+    d->status = BOAT_PLUGIN_OK;
+    return BOAT_PLUGIN_OK;
+}
+
+BoatPluginChange boat_plugin_match_classify(
+    const BoatPluginMatch *active, const BoatPluginMatch *candidate)
+{
+    if (strcmp(active->manifest.id, candidate->manifest.id)
+        || strcmp(active->manifest.kind, candidate->manifest.kind)
+        || strcmp(active->manifest.location, candidate->manifest.location)
+        || active->manifest.api != candidate->manifest.api)
+        return BOAT_PLUGIN_INCOMPATIBLE;
+    if (active->digest != candidate->digest || active->scene_digest != candidate->scene_digest)
         return BOAT_PLUGIN_RESTART_SESSION;
     return strcmp(active->manifest.name, candidate->manifest.name) ? BOAT_PLUGIN_RENAMED
                                                                    : BOAT_PLUGIN_UNCHANGED;

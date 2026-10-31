@@ -51,8 +51,13 @@ static bool evaluate(const char *directory, Entry *entry)
         show(directory, &d);
         return false;
     }
+    // A match package without a scene serves every location; validate it against the basin.
+    const char *map_name
+        = entry->kind == BOAT_PLUGIN_KIND_MATCH && !strcmp(entry->manifest.location, "any")
+        ? "basin"
+        : entry->manifest.location;
     BoatWorldResources resources;
-    if (!boat_world_resources_init(&resources, boat_location_find(entry->manifest.location))) {
+    if (!boat_world_resources_init(&resources, boat_location_find(map_name))) {
         fprintf(stderr, "boat_plugin_catalog_gen: %s: cannot prepare the %s world\n", directory,
             entry->manifest.location);
         return false;
@@ -92,6 +97,13 @@ static bool evaluate(const char *directory, Entry *entry)
             status = boat_plugin_decode_course(
                 &entry->manifest, &entry->decoded.course, &entry->revision.course, &d);
         break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        status = boat_plugin_lua_match(files.source, files.source_size, entry->manifest.entry,
+            &boat_plugin_default_limits, &entry->decoded.match, &d);
+        if (status == BOAT_PLUGIN_OK)
+            status = boat_plugin_decode_match(
+                &entry->manifest, &entry->decoded.match, &entry->revision.match, &d);
+        break;
     default:
         status = BOAT_PLUGIN_MANIFEST;
         break;
@@ -113,6 +125,10 @@ static bool evaluate(const char *directory, Entry *entry)
         case BOAT_PLUGIN_KIND_COURSE:
             status = boat_plugin_course_check_location(
                 &entry->revision.course, resources.definition, &resources.map, &d);
+            break;
+        case BOAT_PLUGIN_KIND_MATCH:
+            status = boat_plugin_match_check_location(
+                &entry->revision.match, resources.definition, &resources.map, &d);
             break;
         default:
             break;
@@ -138,6 +154,9 @@ static bool evaluate(const char *directory, Entry *entry)
         break;
     case BOAT_PLUGIN_KIND_FREE:
         entry->digest = entry->revision.free.digest;
+        break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        entry->digest = entry->revision.match.digest;
         break;
     default:
         break;

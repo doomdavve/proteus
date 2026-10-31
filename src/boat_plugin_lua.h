@@ -36,16 +36,44 @@ typedef struct {
     double start[5], gates[BOAT_RACE_GATES][5], grid[BOAT_FLEET_SLOTS][2];
     unsigned gate_count;
     double source[12], storm[8], rules[9];
+    bool has_scene;
+    BoatSceneDefinition scene; // Copied native/worker data; no Lua pointers.
 } BoatPluginRaceData;
 
 typedef struct {
     double version;
+    bool has_scene;
+    BoatSceneDefinition scene;
 } BoatPluginFreeData;
 
 typedef struct {
     double start[3], gates[BOAT_COURSE_GATES][3];
     unsigned gate_count;
 } BoatPluginCourseData;
+
+#define BOAT_PLUGIN_MATCH_RULE_FIELDS                                                              \
+    "round_ticks", "intermission_ticks", "credit_ticks", "grace_ticks", "respawn_ticks",           \
+        "skip_ticks", "contact_impulse", "wake_height", "min_players"
+#define BOAT_PLUGIN_COMBAT_FIELDS                                                                  \
+    "health", "damage", "bullet_speed", "bullet_range", "grenade_distance", "wave_height",         \
+        "wave_speed", "wave_range", "cannon_pressure", "pressure_recovery", "torpedo_damage",      \
+        "torpedo_speed", "torpedo_range", "torpedo_ticks", "arming_ticks", "torpedo_ammo",         \
+        "fire_ticks", "heat_ticks", "cool_ticks", "grenade_ticks", "splash_ticks", "fuse_ticks",   \
+        "grace_ticks"
+
+// PD2: a deathmatch room definition as Lua returned it. Rules are integers; combat values mix
+// finite numbers with integer tick counts, both validated by the native decoder.
+typedef struct {
+    double version;
+    double rules[9], combat[23];
+    bool has_scene;
+    BoatSceneDefinition scene;
+} BoatPluginMatchData;
+
+// PD2: the shared scene capability check for free, race and match packages.
+BoatPluginStatus boat_plugin_take_scene(const BoatPluginManifest *manifest, bool has_scene,
+    const BoatSceneDefinition *scene, bool *out_has_scene, BoatSceneDefinition *out_scene,
+    uint64_t *out_digest, BoatPluginDiagnostic *diagnostic);
 
 BoatPluginStatus boat_plugin_lua_free(const char *source, size_t size, const char *chunk,
     const BoatPluginLimits *limits, BoatPluginFreeData *out, BoatPluginDiagnostic *diagnostic);
@@ -54,6 +82,8 @@ BoatPluginStatus boat_plugin_lua_course(const char *source, size_t size, const c
 
 BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const char *chunk,
     const BoatPluginLimits *limits, BoatPluginRaceData *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_lua_match(const char *source, size_t size, const char *chunk,
+    const BoatPluginLimits *limits, BoatPluginMatchData *out, BoatPluginDiagnostic *diagnostic);
 
 // PD1: decode already evaluated free/course data without opening a Lua VM.
 BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
@@ -62,6 +92,8 @@ BoatPluginStatus boat_plugin_decode_course(const BoatPluginManifest *manifest,
     const BoatPluginCourseData *data, BoatPluginCourse *out, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_decode_race(const BoatPluginManifest *manifest,
     const BoatPluginRaceData *data, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_decode_match(const BoatPluginManifest *manifest,
+    const BoatPluginMatchData *data, BoatPluginMatch *out, BoatPluginDiagnostic *diagnostic);
 
 // How many Lua states this process has created, for the no-Lua runtime gate.
 unsigned boat_plugin_lua_states(void);

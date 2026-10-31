@@ -243,6 +243,16 @@ int boat_plugin_stage_worker(void)
         if (status == BOAT_PLUGIN_OK)
             status = boat_plugin_decode_course(&m, &decoded->course, &revision->course, &d);
         break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        // A match package takes the authority's --location unless its scene fixes one; the
+        // isolated worker has neither, so rooms evaluate it directly on the authority.
+        status = BOAT_PLUGIN_MANIFEST;
+        d.status = status;
+        snprintf(d.file, sizeof(d.file), "%s", "plugin.json");
+        snprintf(d.field, sizeof(d.field), "%s", "kind");
+        snprintf(d.message, sizeof(d.message), "%s",
+            "match packages are evaluated by the room authority, not by the worker");
+        break;
     default:
         status = BOAT_PLUGIN_MANIFEST;
         break;
@@ -587,6 +597,10 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
             break;
         case BOAT_PLUGIN_KIND_COURSE:
             ok = boat_plugin_course_check_location(&r->course, host->location, host->map, &d)
+                == BOAT_PLUGIN_OK;
+            break;
+        case BOAT_PLUGIN_KIND_MATCH:
+            ok = boat_plugin_match_check_location(&r->match, host->location, host->map, &d)
                 == BOAT_PLUGIN_OK;
             break;
         default:

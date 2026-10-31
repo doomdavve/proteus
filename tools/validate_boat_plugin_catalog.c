@@ -44,6 +44,11 @@ static BoatPluginStatus load_source(
         if (status == BOAT_PLUGIN_OK)
             revision->manifest = revision->course.manifest;
         return status;
+    case BOAT_PLUGIN_KIND_MATCH:
+        status = boat_plugin_load_match(&bundle, NULL, &revision->match, d);
+        if (status == BOAT_PLUGIN_OK)
+            revision->manifest = revision->match.manifest;
+        return status;
     default:
         return BOAT_PLUGIN_MANIFEST;
     }
@@ -58,6 +63,10 @@ static uint64_t revision_digest(const BoatPluginRevision *r, BoatPluginKind kind
         return r->race.digest;
     case BOAT_PLUGIN_KIND_COURSE:
         return r->course.digest;
+    case BOAT_PLUGIN_KIND_FREE:
+        return r->free.digest;
+    case BOAT_PLUGIN_KIND_MATCH:
+        return r->match.digest;
     default:
         return 0;
     }
@@ -123,8 +132,23 @@ static int defaults_match_compiled(void)
     CHECK(r.course.digest == boat_course_compiled_digest());
     CHECK(!memcmp(&r.course.course, &boat_course_default, sizeof(BoatCourseDefinition)));
     // Unknown kinds and locations have no default.
+    const BoatPluginCatalogEntry *outer_free
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "outer");
+    CHECK(outer_free);
+    CHECK(boat_plugin_catalog_decode(outer_free, &r, &d) && r.free.digest == 0);
+    // The deathmatch package equals the native defaults at every location.
+    for (int id = 0; id < BOAT_LOCATION_COUNT; ++id) {
+        const char *name = boat_location((BoatLocationId)id)->name;
+        const BoatPluginCatalogEntry *match
+            = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_MATCH, name);
+        CHECK(match && !strcmp(match->id, "proteus.deathmatch"));
+        CHECK(boat_plugin_catalog_decode(match, &r, &d));
+        BoatMatchRules rules = boat_match_default_rules();
+        BoatCombatRules combat = boat_combat_default_rules();
+        CHECK(boat_plugin_match_digest(&r.match.rules, &r.match.combat)
+            == boat_plugin_match_digest(&rules, &combat));
+    }
     CHECK(!boat_plugin_catalog_default(BOAT_PLUGIN_KIND_COURSE, "river"));
-    CHECK(!boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "outer"));
     return 0;
 }
 

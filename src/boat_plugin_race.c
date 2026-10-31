@@ -154,6 +154,10 @@ BoatPluginStatus boat_plugin_decode_race(const BoatPluginManifest *manifest,
     BoatRace native;
     if (!boat_race_init(&native, &r.rules, &r.course))
         return fail(d, BOAT_PLUGIN_SCHEMA, file, "race", "invalid native course or rules");
+    if (boat_plugin_take_scene(
+            manifest, data->has_scene, &data->scene, &r.has_scene, &r.scene, &r.scene_digest, d)
+        != BOAT_PLUGIN_OK)
+        return BOAT_PLUGIN_SCHEMA;
     r.digest = boat_plugin_race_digest(&r.course, &r.rules);
     *out = r;
     BoatPluginCost cost = d->cost;
@@ -207,7 +211,7 @@ BoatPluginChange boat_plugin_race_classify(const BoatPluginRace *a, const BoatPl
         || strcmp(a->manifest.location, b->manifest.location) || a->manifest.api != b->manifest.api
         || a->manifest.state_version != b->manifest.state_version)
         return BOAT_PLUGIN_INCOMPATIBLE;
-    if (a->digest != b->digest)
+    if (a->digest != b->digest || a->scene_digest != b->scene_digest)
         return BOAT_PLUGIN_RESTART_SESSION;
     return strcmp(a->manifest.name, b->manifest.name) ? BOAT_PLUGIN_RENAMED : BOAT_PLUGIN_UNCHANGED;
 }

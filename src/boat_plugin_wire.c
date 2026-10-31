@@ -297,6 +297,31 @@ static void race_payload(Wire *w, BoatPluginRaceData *r)
         r->storm[i] = number(w, r->storm[i]);
     for (unsigned i = 0; i < 9; ++i)
         r->rules[i] = number(w, r->rules[i]);
+    unsigned flags = (unsigned)integer(w, r->has_scene ? 1u : 0u, 1);
+    if (flags > 1) {
+        w->ok = false;
+        return;
+    }
+    r->has_scene = flags != 0;
+    if (r->has_scene)
+        scene_wire(w, &r->scene);
+}
+
+static void match_payload(Wire *w, BoatPluginMatchData *m)
+{
+    m->version = number(w, m->version);
+    for (unsigned i = 0; i < 9; ++i)
+        m->rules[i] = number(w, m->rules[i]);
+    for (unsigned i = 0; i < 23; ++i)
+        m->combat[i] = number(w, m->combat[i]);
+    unsigned flags = (unsigned)integer(w, m->has_scene ? 1u : 0u, 1);
+    if (flags > 1) {
+        w->ok = false;
+        return;
+    }
+    m->has_scene = flags != 0;
+    if (m->has_scene)
+        scene_wire(w, &m->scene);
 }
 
 static void course_payload(Wire *w, BoatPluginCourseData *c)
@@ -322,11 +347,23 @@ static void payload(Wire *w, BoatPluginDecoded *d)
     case BOAT_PLUGIN_KIND_RACE:
         race_payload(w, &d->race);
         break;
-    case BOAT_PLUGIN_KIND_FREE:
+    case BOAT_PLUGIN_KIND_FREE: {
         d->free.version = number(w, d->free.version);
+        unsigned flags = (unsigned)integer(w, d->free.has_scene ? 1u : 0u, 1);
+        if (flags > 1) {
+            w->ok = false;
+            break;
+        }
+        d->free.has_scene = flags != 0;
+        if (d->free.has_scene)
+            scene_wire(w, &d->free.scene);
         break;
+    }
     case BOAT_PLUGIN_KIND_COURSE:
         course_payload(w, &d->course);
+        break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        match_payload(w, &d->match);
         break;
     default:
         w->ok = false;
@@ -393,7 +430,7 @@ bool boat_plugin_wire_decode(const unsigned char *bytes, size_t size, BoatPlugin
     if (integer(&w, 0, 4) != BOAT_PLUGIN_WIRE_VERSION)
         w.ok = false;
     decoded->kind = (BoatPluginKind)integer(&w, 0, 1);
-    if (decoded->kind <= BOAT_PLUGIN_KIND_NONE || decoded->kind > BOAT_PLUGIN_KIND_RACE)
+    if (decoded->kind <= BOAT_PLUGIN_KIND_NONE || decoded->kind > BOAT_PLUGIN_KIND_MATCH)
         w.ok = false;
     decoded->manifest_size = (size_t)integer(&w, 0, 4);
     if (decoded->manifest_size > BOAT_PLUGIN_MANIFEST_MAX)
@@ -462,6 +499,10 @@ bool boat_plugin_decoded_revision(const BoatPluginDecoded *decoded, BoatPluginRe
     case BOAT_PLUGIN_KIND_COURSE:
         status = boat_plugin_decode_course(
             &decoded->parsed, &decoded->course, &revision->course, diagnostic);
+        break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        status = boat_plugin_decode_match(
+            &decoded->parsed, &decoded->match, &revision->match, diagnostic);
         break;
     default:
         status = BOAT_PLUGIN_MANIFEST;

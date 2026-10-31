@@ -75,16 +75,18 @@ def schema():
                                     "min_players": number(1, 4, integer=True)})})
     manifest = record({"id": text(63, r"^[a-z][a-z0-9._-]*$"), "name": text(63),
                        "api": {"const": 1},
-                       "kind": {"enum": ["voyage", "free", "course", "race"]},
+                       "kind": {"enum": ["voyage", "free", "course", "race", "match"]},
                        "entry": {"const": "main.lua"},
-                       "location": {"enum": ["basin", "river", "outer"]},
+                       "location": {"enum": ["basin", "river", "outer", "any"]},
                        "capabilities": {"enum": [["voyage.define"],
                            ["voyage.define", "scene.define"],
                            ["voyage.define", "objective.hud"],
                            ["voyage.define", "scene.define", "objective.hud"],
                            ["voyage.define", "objective.hud", "objective.timers"],
                            ["voyage.define", "scene.define", "objective.hud", "objective.timers"],
-                           ["free.define"], ["course.define"], ["race.define"]]},
+                           ["free.define"], ["free.define", "scene.define"], ["course.define"],
+                            ["race.define"], ["race.define", "scene.define"],
+                            ["match.define"], ["match.define", "scene.define"]]},
                        "state_version": number(1, 65535, integer=True)})
     manifest["allOf"] = [
         {"if": {"properties": {"kind": {"const": "race"}}},
@@ -147,6 +149,34 @@ def schema():
     gulls = object_schema({"flocks": sequence(flock, 0, 4)}, required=("flocks",))
     scene = object_schema({"version": {"const": 1}, "marina": marina, "traffic": traffic,
                            "gulls": gulls}, required=("version",))
+    match_rules = record({"round_ticks": number(1, 432000, "120 Hz ticks", True),
+                          "intermission_ticks": number(0, 432000, "120 Hz ticks", True),
+                          "credit_ticks": number(1, 432000, "120 Hz ticks", True),
+                          "grace_ticks": number(0, 432000, "120 Hz ticks", True),
+                          "respawn_ticks": number(0, 432000, "120 Hz ticks", True),
+                          "skip_ticks": number(0, 432000, "120 Hz ticks", True),
+                          "contact_impulse": number(.0001, 100000, "impulse"),
+                          "wake_height": number(.0001, 100, "metres"),
+                          "min_players": number(1, 4, integer=True)})
+    combat_fields = {"health": number(1, 100000), "damage": number(0, 100000),
+                     "bullet_speed": number(1, 10000, "m/s"), "bullet_range": number(1, 10000, "m"),
+                     "grenade_distance": number(0, 10000, "m"),
+                     "wave_height": number(0, 100), "wave_speed": number(0, 10000, "m/s"),
+                     "wave_range": number(1, 10000, "m"),
+                     "cannon_pressure": number(0, 100), "pressure_recovery": number(0, 100),
+                     "torpedo_damage": number(0, 100000), "torpedo_speed": number(1, 10000, "m/s"),
+                     "torpedo_range": number(1, 10000, "m"),
+                     "torpedo_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "arming_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "torpedo_ammo": number(1, 432000, integer=True),
+                     "fire_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "heat_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "cool_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "grenade_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "splash_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "fuse_ticks": number(0, 432000, "120 Hz ticks", True),
+                     "grace_ticks": number(0, 432000, "120 Hz ticks", True)}
+    combat = record(combat_fields)
     free = record({"version": {"const": 1}})
     course_gate = record({**point, "half_width": number(4, 500, "metres")})
     course = record({"start": record({**point, "heading": number(-math.tau, math.tau, "radians")}),
@@ -162,8 +192,14 @@ def schema():
                      "manifest": {"type": "string", "maxLength": 4096},
                      "source": {"type": "string", "maxLength": 65536}})
     bundle["description"] = "UTF-8 source bundle, at most 200000 bytes; manifest/source byte caps apply after encoding"
+    # A race, free or match definition may carry the same authored scene envelope.
+    race = object_schema({**race["properties"], "scene": scene}, required=race["required"])
+    free = object_schema({**free["properties"], "scene": scene}, required=("version",))
+    match = object_schema({"version": {"const": 1}, "rules": match_rules, "combat": combat,
+                           "scene": scene}, required=("version", "rules", "combat"))
     definitions = {"bundle": bundle, "manifest": manifest, "voyage": voyage, "scene": scene,
-                   "race": race, "free": free, "course": course, "commands": commands}
+                   "race": race, "free": free, "course": course, "match": match,
+                   "commands": commands}
     for value in definitions.values():
         value["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     return {"protocol": 1, "api": 1, "schemas": definitions,

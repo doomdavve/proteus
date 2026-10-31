@@ -584,6 +584,11 @@ class Worker(unittest.TestCase):
             manifest = (ROOT / "plugins" / package / "plugin.json").read_bytes()
             original = (ROOT / "plugins" / package / "main.lua").read_text(encoding="utf-8")
             for path, node in leaves(author.schema()["schemas"][kind], kind):
+                # The scene envelope's bounds are exercised through the voyage package; a
+                # race/free scene is nested under the kind table and would need a package with
+                # one. The decoder's field path is scene-relative either way.
+                if ".scene." in path:
+                    continue
                 for bound, direction in (("minimum", -1), ("maximum", 1)):
                     value = node[bound] + direction * max(1, abs(node[bound]) * .1)
                     source = ("local p = (function()\n" + original + "\nend)(); p."
