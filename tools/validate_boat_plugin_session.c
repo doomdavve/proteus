@@ -19,8 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include <process.h>
 #else
 #include <unistd.h>
 #endif
@@ -31,7 +30,7 @@ static const char *session_dir(void)
 {
     static char directory[600];
 #ifdef _WIN32
-    unsigned pid = (unsigned)GetCurrentProcessId();
+    unsigned pid = (unsigned)_getpid();
 #else
     unsigned pid = (unsigned)getpid();
 #endif
