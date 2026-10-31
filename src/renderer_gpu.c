@@ -904,8 +904,11 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     scene->shadow_map_size = WATERFRONT_GPU_SHADOW_MAP_SIZE;
     if (!create_shadow_map(&scene->shadow_map, scene->shadow_map_size))
         goto failed;
-    scene->reflection
-        = LoadRenderTexture(WATERFRONT_GPU_REFLECTION_WIDTH, WATERFRONT_GPU_REFLECTION_HEIGHT);
+    // SPIKE: reflection size multiplier for the look test.
+    const char *reflection_text = getenv("PROTEUS_SPIKE_REFLECTION");
+    int reflection_scale = reflection_text ? atoi(reflection_text) : 1;
+    scene->reflection = LoadRenderTexture(WATERFRONT_GPU_REFLECTION_WIDTH * reflection_scale,
+        WATERFRONT_GPU_REFLECTION_HEIGHT * reflection_scale);
     if (!IsRenderTextureValid(scene->reflection))
         goto failed;
     SetTextureFilter(scene->reflection.texture, TEXTURE_FILTER_POINT);
@@ -1854,6 +1857,11 @@ static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *fr
     float pixel_scale = fmaxf(1, width / 320.0f);
     SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
+    // SPIKE: world-anchored water squares for the look test.
+    const char *square_text = getenv("PROTEUS_SPIKE_SQUARE");
+    float square = square_text ? (float)atof(square_text) : 0;
+    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "waterSquare"),
+        &square, SHADER_UNIFORM_FLOAT);
     int pass = scene->near_water.vaoId ? 1 : 0;
     int location = GetShaderLocation(scene->water_shader, "waterPatchPass");
     SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);

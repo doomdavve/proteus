@@ -31,13 +31,15 @@ uniform int waterPatchPass;
 uniform vec4 wavePatch;
 uniform int waterfrontWater; // Only playable mapped water; leave basin materials alone.
 uniform float surfacePixelScale;
+uniform float waterSquare; // SPIKE: world square edge in metres, 0 is off.
+vec3 shadePosition; // SPIKE: fragWorldPosition, snapped when squares are on.
 
 out vec4 finalColor;
 
 float waterShadow()
 {
     if (shadowsEnabled == 0) return 1.0;
-    vec4 lightPosition = lightViewProjection * vec4(fragWorldPosition, 1.0);
+    vec4 lightPosition = lightViewProjection * vec4(shadePosition, 1.0);
     vec3 p = lightPosition.xyz / lightPosition.w * 0.5 + 0.5;
     if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, vec3(1.0)))) return 1.0;
     return p.z - 0.00018 > texture(shadowMap, p.xy).r ? 0.55 : 1.0;
@@ -353,20 +355,28 @@ void main()
     float boatDistance = length(fragWorldPosition.xz - wavePatch.xy);
     if (waterPatchPass == 1 && (wakeFieldEnabled != 0 || boatDistance < wavePatch.w)) discard;
     if (waterPatchPass == 2 && wakeFieldEnabled == 0 && boatDistance >= wavePatch.w) discard;
+    shadePosition = fragWorldPosition;
+    if (waterSquare > 0.0) {
+        // SPIKE: squares never drop below four output pixels, doubling with distance.
+        float pixel = footprint / max(surfacePixelScale, 1.0);
+        float square = waterSquare * pow(2.0, max(0.0, ceil(log2(4.0 * pixel / waterSquare))));
+        shadePosition.xz = (floor(fragWorldPosition.xz / square) + 0.5) * square;
+        footprint = max(footprint, square);
+    }
     vec3 base = texture(texture0, fragTexCoord).rgb * objectColor.rgb * fragColor.rgb;
     vec3 normal = normalize(fragWorldNormal);
-    float exposed = exposure(fragWorldPosition.xz);
+    float exposed = exposure(shadePosition.xz);
     vec3 wake = vec3(0.0);
-    vec3 vessel = vesselWake(fragWorldPosition.xz).xyz;
-    vec3 storm = stormWave(fragWorldPosition.xz).xyz;
-    vec3 radial = radialWave(fragWorldPosition.xz).xyz;
+    vec3 vessel = vesselWake(shadePosition.xz).xyz;
+    vec3 storm = stormWave(shadePosition.xz).xyz;
+    vec3 radial = radialWave(shadePosition.xz).xyz;
     if (physicalWaves != 0) {
-        vec3 ambient = ambientWaves(fragWorldPosition.xz, footprint);
+        vec3 ambient = ambientWaves(shadePosition.xz, footprint);
         vec2 slope = ambient.yz;
         float surfaceHeight = ambient.x;
-        wake = crossingWake(fragWorldPosition.xz, crossingWakeTime)
-            + playerWake(fragWorldPosition.xz)
-            + wakeFieldSample(fragWorldPosition.xz) + vessel + storm + radial;
+        wake = crossingWake(shadePosition.xz, crossingWakeTime)
+            + playerWake(shadePosition.xz)
+            + wakeFieldSample(shadePosition.xz) + vessel + storm + radial;
         slope += wake.yz;
         surfaceHeight += wake.x;
         if (waterPatchPass != 0 && wakeFieldEnabled == 0) {
@@ -374,7 +384,7 @@ void main()
             float t = clamp((boatDistance - wavePatch.z) / span, 0.0, 1.0);
             float fade = 1.0 - t*t*(3.0-2.0*t);
             vec2 fadeGradient = -6.0*t*(1.0-t)/span
-                * (fragWorldPosition.xz-wavePatch.xy)/max(boatDistance,0.001);
+                * (shadePosition.xz-wavePatch.xy)/max(boatDistance,0.001);
             slope = slope*fade + surfaceHeight*fadeGradient;
         }
         if (waterfrontWater != 0 && objectWakeEnabled == 0) slope *= mix(0.55, 1.0, exposed);
@@ -385,8 +395,8 @@ void main()
     }
     if (waterfrontWater != 0) {
         vec2 wind = vec2(-0.6, -0.8), crossing = vec2(0.8, -0.6);
-        float longRipple = dot(wind, fragWorldPosition.xz) * 1.65 - detailRipplePhase.x;
-        float shortRipple = dot(crossing, fragWorldPosition.xz) * 3.7 - detailRipplePhase.y;
+        float longRipple = dot(wind, shadePosition.xz) * 1.65 - detailRipplePhase.x;
+        float shortRipple = dot(crossing, shadePosition.xz) * 3.7 - detailRipplePhase.y;
         vec2 detail = wind * cos(longRipple) * resolved(1.65, footprint)
             + crossing * cos(shortRipple) * 0.45 * resolved(3.7, footprint);
         vec2 slope = normal.xz + detail * mix(0.004, 0.035, exposed);
@@ -398,12 +408,12 @@ void main()
         return;
     }
 
-    vec4 reflectedPosition = reflectionViewProjection * vec4(fragWorldPosition, 1.0);
+    vec4 reflectedPosition = reflectionViewProjection * vec4(shadePosition, 1.0);
     vec2 reflectionUv = reflectedPosition.xy / max(reflectedPosition.w, 0.0001) * 0.5 + 0.5;
-    vec2 ripple = vec2(sin(fragWorldPosition.x * 0.09 + reflectionRipplePhase.x)
-            + sin(fragWorldPosition.z * 0.05 - reflectionRipplePhase.y),
-        sin(fragWorldPosition.z * 0.08 + reflectionRipplePhase.z)
-            + sin(fragWorldPosition.x * 0.04 + reflectionRipplePhase.w)) * 0.0025;
+    vec2 ripple = vec2(sin(shadePosition.x * 0.09 + reflectionRipplePhase.x)
+            + sin(shadePosition.z * 0.05 - reflectionRipplePhase.y),
+        sin(shadePosition.z * 0.08 + reflectionRipplePhase.z)
+            + sin(shadePosition.x * 0.04 + reflectionRipplePhase.w)) * 0.0025;
     if (physicalWaves != 0) ripple = normal.xz * 0.08;
     if (waterfrontWater != 0 && physicalWaves == 0)
         ripple = normal.xz * 0.06 + ripple * mix(0.25, 0.75, exposed);
@@ -413,7 +423,7 @@ void main()
     if (reflectedPosition.w <= 0.0) coverage = 0.0;
     reflectionUv = clamp(reflectionUv, vec2(0.004), vec2(0.996));
     vec3 reflection = texture(reflectionTexture, reflectionUv).rgb;
-    vec3 viewDirection = normalize(cameraPosition - fragWorldPosition);
+    vec3 viewDirection = normalize(cameraPosition - shadePosition);
     float viewDot = max(0.0, dot(normal, viewDirection));
     float reflectionAmount = mix(0.10, physicalWaves != 0 ? 0.30 : 0.42,
         (1.0 - viewDot) * (1.0 - viewDot));
@@ -437,7 +447,7 @@ void main()
         foam = max(foam, 0.28 * waveCrestFoam(storm, 0.42));
         foam = max(foam, 0.8 * waveCrestFoam(radial, 0.4));
         // The compact rain footprint darkens only the rough patch.
-        vec2 stormDelta = (fragWorldPosition.xz-stormArea.xy)/max(stormArea.z,1.0);
+        vec2 stormDelta = (shadePosition.xz-stormArea.xy)/max(stormArea.z,1.0);
         float stormShade = pow(max(0.0,1.0-dot(stormDelta,stormDelta)),2.0);
         if (stormArea.w > 0.0) color *= 1.0-0.32*stormShade;
         color = mix(color, vec3(0.65, 0.78, 0.80), foam);

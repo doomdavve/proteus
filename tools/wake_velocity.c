@@ -805,6 +805,7 @@ static int study(int argc, char **argv)
 
     SetTraceLogLevel(verbose ? LOG_INFO : LOG_WARNING);
     int width = 320, height = 200;
+    int spike_scale = 1;
     Color *pixels = malloc(width * height * sizeof(*pixels));
     if (!pixels)
         return 1;
@@ -1052,7 +1053,10 @@ static int study(int argc, char **argv)
 #else
         SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 #endif
-        InitWindow(width * 3, height * 3, "Wake Velocity");
+        // SPIKE: the scene renders at this multiple of 320x200, the HUD stays at 320x200.
+        spike_scale = getenv("PROTEUS_SPIKE_SCALE") ? atoi(getenv("PROTEUS_SPIKE_SCALE")) : 1;
+        InitWindow(width * (spike_scale > 3 ? spike_scale : 3),
+            height * (spike_scale > 3 ? spike_scale : 3), "Wake Velocity");
         if (!IsWindowReady())
             goto cleanup;
         window_owned = true;
@@ -1078,6 +1082,8 @@ static int study(int argc, char **argv)
             fprintf(stderr, "Could not initialize GPU boating resources.\n");
             goto cleanup;
         }
+        if (spike_scale > 1 && !boat_gpu_resize(&gpu, width * spike_scale, height * spike_scale))
+            goto cleanup;
         texture = gpu.target.texture;
         if (screenshot) {
             boat_gpu_draw_with_ghost(&gpu, view, view_presentation, view_world, camera_settings,
@@ -1784,10 +1790,11 @@ static int study(int argc, char **argv)
         }
         double present_started_at = boat_profile_time(true);
         BeginTextureMode(frame_target);
-        ClearBackground((Color) { 14, 23, 32, 255 });
-        DrawTexturePro(texture,
-            (Rectangle) { 0, 0, gpu_enabled ? -width : width, gpu_enabled ? -height : height },
-            (Rectangle) { 0, 0, width, height }, (Vector2) { 0 }, 0, WHITE);
+        ClearBackground(spike_scale > 1 ? BLANK : (Color) { 14, 23, 32, 255 });
+        if (spike_scale <= 1)
+            DrawTexturePro(texture,
+                (Rectangle) { 0, 0, gpu_enabled ? -width : width, gpu_enabled ? -height : height },
+                (Rectangle) { 0, 0, width, height }, (Vector2) { 0 }, 0, WHITE);
         boat_hud_draw(
             (BoatHudTelemetry) { .speed_mps = hypotf(view->boat.velocity.x, view->boat.velocity.y),
                 .thrust = view->boat.throttle,
@@ -1833,6 +1840,9 @@ static int study(int argc, char **argv)
         EndTextureMode();
         BeginDrawing();
         ClearBackground((Color) { 14, 23, 32, 255 });
+        if (spike_scale > 1)
+            DrawTexturePro(texture, (Rectangle) { 0, 0, -texture.width, -texture.height },
+                destination, (Vector2) { 0 }, 0, WHITE);
         DrawTexturePro(frame_target.texture, (Rectangle) { 0, 0, width, -height }, destination,
             (Vector2) { 0 }, 0, WHITE);
         const char *notice = NULL;
