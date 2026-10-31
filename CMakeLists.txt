@@ -85,6 +85,13 @@ target_include_directories(proteus_boat_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/
 target_link_libraries(proteus_boat_core PUBLIC raylib)
 target_compile_options(proteus_boat_core PRIVATE ${PROTEUS_WARNINGS})
 
+# Fixture data for validators and review tools: the shipped voyage, course, race course and rule
+# values that packages replace. Production targets never link this library.
+add_library(proteus_boat_fixtures STATIC tools/boat_fixtures.c tools/boat_fixtures.h)
+target_include_directories(proteus_boat_fixtures PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+target_link_libraries(proteus_boat_fixtures PUBLIC proteus_boat_core)
+target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
+
 # Scenery packs: each mapped location's whole bake (assets/geometry/<location>/scenery.bin), loaded
 # at run time for presentation. The core keeps only the compiled water, so it never reads them.
 add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h)
@@ -923,6 +930,13 @@ target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus
 target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# Validators and review tools compare packages against the shipped fixture values.
+foreach(target validate_boat validate_boat_replay validate_boat_core validate_boat_voyage
+    validate_boat_plugin validate_boat_plugin_session validate_boat_plugin_catalog
+    validate_boat_minimap validate_boat_combat validate_boat_match validate_boat_plugin_race
+    validate_boat_race validate_boat_net validate_boat_room_package boat_race_trial boat_hud_review)
+  target_link_libraries(${target} PRIVATE proteus_boat_fixtures)
+endforeach()
 # No networked client path may read the compiled river course.
 add_test(NAME boat_room_course_source COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_room_course_source.py)
