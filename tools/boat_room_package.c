@@ -72,6 +72,9 @@ static bool scene_clear(
     if (room->mode != BOAT_ROOM_MODE_RACE)
         return true;
     const BoatRaceCourse *c = &room->course;
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        if (!scene_contact(scene, c->grid[i], 6, "a grid slot", error, size))
+            return false;
     for (unsigned i = 0; i <= c->gate_count; ++i) {
         const BoatRaceGate *g = i ? &c->gates[i - 1] : &c->start;
         char field[64];
