@@ -306,16 +306,16 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   the outer map's water. Instruction budgets are counted by a hook, never timed.
 - `boat_plugin_session` runs `validate_boat_plugin_session` (Lua plugins P1/P3; bounded quick cases
   of about 37 ms together in Debug, plus a slow parity case of about 0.2 s). It covers staging
-  against the outer map with field paths, and the classification of renames, route changes,
-  water changes and other plugins. It applies each policy to a live `BoatSession`, including a
-  voyage restart inside a shelter, while exposed, after arrival and when a reached shelter is
-  removed. Broken stages must leave the active revision byte-identical, and Undo is checked
-  over the eight-deep history. The save poller runs on a virtual clock. `game_controls` drives
-  the game's `--plugin` F5/F6/F7 and polling glue on files in a build-tree scratch directory.
-  `compiled_parity` steps a compiled and a plugin session with identical input to Långedrag
-  and compares the boat, the water and every voyage field at each tick. The
-  `wake_velocity_plugin_*` tests render a CPU frame with the plugin and check that `--plugin`
-  is refused with a room, the course, another location or a missing package.
+  against the outer map with field paths, and the classification of renames, live route/layout
+  changes, water changes and other plugins. It applies each policy to a live `BoatSession`: a
+  route change maps progress by shelter ID with the boat kept, while a removed reached shelter
+  falls back to the start; a water change still restarts. Broken stages must leave the active
+  revision byte-identical, and Undo is checked over the eight-deep history. The save poller runs
+  on a virtual clock. `game_controls` drives the game's `--plugin` F5/F6/F7 and polling glue on
+  files in a build-tree scratch directory. `compiled_parity` steps a compiled and a plugin
+  session with identical input to Långedrag and compares the boat, the water and every voyage
+  field at each tick. The `wake_velocity_plugin_*` tests render a CPU frame with the plugin and
+  check that `--plugin` is refused with a room, the course, another location or a missing package.
 - `boat_plugin_catalog` (PD1) decodes every generated entry and proves it equals evaluating its
   embedded source, that the basin-free, river-free, outer-voyage and time-trial defaults equal
   the compiled definitions, and that catalog decoding creates no Lua state (the
@@ -763,10 +763,21 @@ the fake process in `boat_plugin_author`. See [frame capture](PLUGIN_API.md#fram
 
 P4.6 adds `wake_velocity_bridge` (native, CPU lane): `validate_wake_bridge` drives the game's
 bridge over request files on a virtual clock (authentication, pins, deferred isolated staging,
-Apply/Undo/Discard, rejection, restart, cancellation, save-poll agreement). `boat_plugin_author`
+Apply/Undo/Discard, rejection, restart, cancellation, save-poll agreement, and the PC `console`
+operation). `boat_plugin_author`
 gains client checks against a fake game and an end-to-end CLI run against
 `validate_wake_bridge --serve` (`--bridge-server`). Its loops await external process/file events;
 CTest supplies the deadline. See [live tool bridge](PLUGIN_API.md#live-tool-bridge-p46).
+
+PC adds `wake_command` (native, CPU lane): `validate_wake_command` drives the console's input,
+history and bounded scrollback headlessly; composes edits as one entry and checks the `console N`
+attribution; stages a far berth edit through the real isolated worker and proves the boat and
+voyage trace match a control tick for tick and that repeating the same edit at the same tick
+hashes identically; holds a berth moved under the hull, commits it at the first clear boundary
+without displacing the boat, and Undo restores the prior envelope with the boat kept. It also
+covers a failed edit keeping the active revision, `/capability scene.define`, `/save` reading back,
+a bounded query, and that no Lua state is created on the game thread. The child waits are failure
+deadlines, not simulated time.
 
 P4.7 adds the `Packaged` case to both `boat_plugin_author` and `boat_plugin_capture`: it installs a
 release layout with `tools/package_plugin_tools.py` in a temporary path containing spaces, then runs

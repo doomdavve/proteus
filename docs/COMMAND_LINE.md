@@ -81,9 +81,32 @@ Invalid edits leave the running descriptor intact. Packaged plugin examples live
 `assets/plugins/`; copy one somewhere writable to edit it. Packages also ship the
 [authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47) in `authoring/`. The race tool previews local
 course edits; network rooms retain their compiled course. The harbor-life example edits two
-marina berths; a layout change is held for F7 and restarts the session. See the
+marina berths; a layout change is live when the boat is clear of the new hulls. See the
 [plugin API](PLUGIN_API.md#playing-and-live-authoring-p1) and
 [race example](../plugins/river-sprint/README.md) for reload policies and limits.
+
+### Live console
+
+In native solo free boating and voyages, including release builds, press `` ` ``, `F2` or the
+world-1 key (`§` on some macOS ISO keyboards). A plain line edits the package's `def` table; `=`
+starts a read-only query; `/` starts a command. The simulation keeps running with a neutral helm.
+
+```text
+def.scene.marina.berths[1].x = 15
+= def.scene.marina.berths[1]
+/status
+/capability scene.define
+/undo
+/save ~/drafts/my-harbor
+```
+
+The first edit moves a bundled session to authoring; the catalog's embedded source is the base.
+Each edit is composed as one entry and evaluated in the isolated worker, so Lua never runs on the
+game thread and the boat is never moved. Layout edits install live when the hull is clear and are
+otherwise held until it is. `/save DIR` writes a complete package and refuses a non-empty directory
+that is not this session's package. See the
+[console contract](PLUGIN_API.md#live-console-and-command-layer-pc) for the command list and limits.
+`--plugin-bridge DIR` exposes the same lines as `plugin_author.py live-console --line TEXT`.
 
 ## Courses and recordings
 

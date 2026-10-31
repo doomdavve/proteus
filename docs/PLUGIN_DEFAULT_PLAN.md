@@ -1,20 +1,21 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **PD1 implemented and merged; the solo package is next.** Native solo sessions now run from packages
+Status, 2026-10-31: **PD1 implemented and merged; PC is implemented in the solo package and
+awaiting review; PD4 is next.** Native solo sessions now run from packages
 compiled at build time, `--plugin` is the separate authoring path, and a temporary
-`--no-plugins` restores compiled content. This document owns the sequence, per-PR status and
+`--no-plugins` restores compiled content. The live console edits the running session without a
+reset. This document owns the sequence, per-PR status and
 acceptance for that move. The [plugin plan](PLUGIN_PLAN.md) and [API](PLUGIN_API.md) keep the
 existing plugin contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts,
 and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: **the [solo package](#packages)**, [PC](#pc--live-console-and-edits-without-reset) then
-[PD4](#pd4--browser-parity).
+Next task: [PD4](#pd4--browser-parity), the second step of the [solo package](#packages).
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; in review |
-| [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Not started |
+| [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; merged in [#96](https://github.com/doomdavve/proteus/pull/96) |
+| [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31 in the solo package; in review |
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Not started |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Not started |
 | [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1 | Not started |
@@ -483,6 +484,72 @@ If a consumer cannot take a live swap safely, leave that change class held, reco
 
 **Needs the user:** try the console while driving, and check which key opens it on your keyboard. Judge
 whether live edits read as continuous, and whether held edits are understandable.
+
+### PC result, 2026-10-31
+
+**Implemented.** `tools/wake_command.[ch]` is the one command layer for the console and the tool
+bridge. It parses edits, `=` queries and `/` commands, composes every accepted edit onto the
+package's unchanged entry as one immutable file, submits it through the isolated staging worker,
+and appends bounded result lines. The first edit promotes a bundled session to authoring with the
+catalog revision's embedded source. A second edit while one is staging is refused with a clear
+message; syntax and schema failures drop that chunk and keep the active revision. `/undo` steps
+revisions and chunks together; `/capability scene.define` rewrites only the session manifest copy;
+`/save DIR` writes `plugin.json` and `main.lua` atomically and refuses a non-empty directory that is
+not this session's package. Queries run in the same worker, render a depth- and size-bounded value
+and create no revision.
+
+`BOAT_PLUGIN_LIVE` is the new classification for voyage route gameplay and scene layout edits.
+`wake_plugin_live_ready` checks the hull against the candidate berth, module and moving-craft
+envelopes with 0.5 m to spare; a clear change installs at the next tick boundary, and a blocked one
+is held and retried each frame until clear. `boat_session_rebind_voyage_live` maps a reached shelter
+by ID and falls back to the start when it is removed. `boat_scene_clear` is the shared clearance
+query. Exposure/weather changes and course edits still hold for F7 and restart; objective
+migrations and restarts are unchanged.
+
+`tools/wake_console.[ch]` owns input, history and bounded scrollback; drawing is separate. The key
+is `` ` ``, `F2` or 161 (GLFW world-1, `§` on some macOS ISO keyboards). The console is available in
+native solo free boating and voyages, including release builds; it is unavailable in rooms,
+replays, `--demo` and screenshots. While it is open, driving input is suspended but the simulation
+continues with a neutral helm. A time-trial edit sets the existing `practice` latch, so no best is
+recorded. The bridge gains `console` (one line, epoch-pinned, repeated `output` lines) and
+`plugin_author.py` gains `live-console --line TEXT`.
+
+**Deviations and limits.** PD4 (browser parity) is not included in this revision, so the browser
+keeps compiled solo content and the console is native-only. The bridge's existing `stage`, `apply`,
+`undo` and `discard` operations still call the same plugin primitives directly rather than the
+command layer's line parser; they keep their revision/epoch pins and the new `console` operation
+uses the shared state. A `--plugin` save that lands while console chunks exist stages one
+composition against the new disk base; if it cannot apply, the last chunk is reported and dropped
+rather than rebased chunk by chunk. Rooms have no package host yet, so the planned read-only
+`/status` console in rooms is not offered. Shift/AltGr-modified key handling follows
+`GetCharPressed` as before; there is no completion or multiline entry.
+
+**Verification actually run, Apple Silicon/macOS, 2026-10-31.** Debug build from the pinned
+dependencies: warning-clean apart from raylib's `stb_vorbis.c` warning. `ctest --preset full`
+passed all 330 enabled tests (13 retired field tests disabled, GPU CTests off), including the new
+`wake_command` case, `wake_velocity_bridge` with its console operation, `boat_plugin_session`
+(classification, live route policy, Undo, game controls, Harbor life scene),
+`plugin_default_parity`, `boat_plugin_catalog.*`, `boat_plugin_author` and
+`boat_plugin_capture`. `git diff --check` passes. The Emscripten `wake_velocity` target builds
+(the pre-existing `boat_race_trial` web link failure is unchanged and outside this step). A
+windowed `--demo` run and an interactive console session were not possible in this environment
+because the harness opened no window; the console input/history/scrollback and every command were
+driven headlessly instead. Two CPU captures of the Harbor life marina at `--start 6,190,180`, one
+from the package unchanged and one with the runabout's `z` changed from 173 to 179, were inspected:
+the moored hull visibly moves and the rest of the frame is unchanged.
+
+The key proof runs in `wake_command`: one session receives a berth edit far from the boat at tick
+20 and a control receives none; their boat and voyage traces are identical tick for tick
+(`9419d4ffbd71b8a5` in the run recorded here) and a repeat of the same edit at the same tick gives
+the same hash. A berth moved under the hull is held and commits at the first clear boundary with the
+boat at its new position; Undo restores the prior envelope with the boat kept and the chunk count
+back at 1. A malformed edit is rejected and keeps the active revision. No Lua state is created on
+the game thread; the child worker performs every evaluation.
+
+**Needs the user.** Open the console while driving on your keyboard (`` ` ``, `F2` or `§`) and
+judge whether live edits read as continuous and held edits are understandable. Play Harbor life
+with a berth edit near the boat and check that the boat is never nudged. Decide whether the
+native-only console is acceptable until PD4.
 
 ## PD2 — package-defined rooms
 

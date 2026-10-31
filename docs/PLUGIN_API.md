@@ -1,12 +1,14 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-31: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, and PD1 bundled runtime implemented**.
+Status, 2026-10-31: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime and the PC live console implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages with optional objectives/timers.
 Every native solo session starts from a [bundled package](#bundled-catalog-pd1) compiled at build
 time; `--plugin` remains the file-based authoring path, with save reloading, F5/F6/F7 and the
-authoring panel. Rooms, the browser and the temporary `--no-plugins` switch use compiled content.
+authoring panel. Native solo play also has a [live console](#live-console-and-command-layer-pc)
+whose edits install without a reset and never move the boat. Rooms, the browser and the temporary
+`--no-plugins` switch use compiled content.
 The browser offers an opt-in [voyage import workflow](#browser-source-bundles-p43). The
 [plugin plan](PLUGIN_PLAN.md) owns the staged roadmap; this guide owns the current contract.
 [All plans](README.md).
@@ -328,12 +330,14 @@ bathymetry check.
   compiled/authored copy is drawn, contacted or queried.
 - The large docked ferry and the bridge remain independent compiled actors in L1–L2. The quay
   recipe may be authored as a module, but it does not own the ferry or bridge dependency group.
-- A display-only manifest `name` edit keeps the boat, clock, water and wake state. Any scene
+- A display-only manifest `name` edit keeps the boat, clock, water and wake state. A scene
   layout change (berth/module position, heading, recipe, membership, entrance, ID that another
-  module references) is physical: it is held for explicit Apply and restarts the session at the
-  validated compiled spawn. A preserve-only Apply refuses it. Undo follows the same rule.
+  module references, travelling craft or flock layout) is **live**: it installs between ticks
+  when the hull clears every candidate envelope with 0.5 m to spare, and is otherwise held and
+  retried at each tick boundary until it does. The boat is never displaced. A preserve-only Apply
+  still commits a held live change when the player asks. Undo follows the same rule.
 - A gull-cue-only edit (timing, fade or amplitude) is compatible and keeps the session clock;
-  changing a flock count, centre, radius, height or rate is a layout edit and restarts. Cues are
+  changing a flock count, centre, radius, height or rate is a live layout edit. Cues are
   pure-time envelopes, not timers or spawned actors.
 - Scene changes commit only between ticks. The session and both renderers consume one accepted
   `BoatSceneDefinition`; the plugin revision owns it and outlives the session. Retired revisions
@@ -530,7 +534,8 @@ Staging never changes the running voyage. A candidate is compared with the activ
 | Behavior bytes, objective schema or timer grant change, with unchanged native gameplay and `migrate` in the candidate | Held for F7 transactional migration; native progress kept; comments/layout count for behavior packages |
 | Behavior edit without candidate `migrate`, or adding/removing `objective.hud` | Held for F7, restarting native voyage and objective together |
 | Display names only: manifest `name`, or shelter `name` in descriptor-only packages; ordered shelter IDs and every number identical | Applied at once. The boat, clock, water, wakes and all voyage progress are kept; the HUD shows the new names |
-| Shelter IDs, order, count, position, heading or radius; arrival; `exposed_fraction` | Held until F7, then **restart voyage**: progress, timing and recoveries begin again at the start shelter; the boat, clock, water and any weather already met continue. A boat already inside a shelter or the arrival area is observed by the ordinary rules on the next tick |
+| Shelter IDs, order, count, position, heading or radius; arrival; `exposed_fraction` | **Live** (`BOAT_PLUGIN_LIVE`): progress maps to the new route **by shelter ID**, keeping the boat, clock, water and any weather already met. A removed reached shelter falls back to the start shelter for recovery. A boat inside a new shelter or the arrival area is observed by the ordinary rules on the next tick |
+| Scene layout: berth, module, entrance, travelling craft or flock count/centre/radius; a present scene becoming absent or the reverse | **Live** when the hull clears every candidate berth, module and moving-craft envelope with 0.5 m to spare; otherwise held and retried at each tick boundary until it clears. The boat is never displaced. A gull-cue-only edit is still a rename |
 | `exposure` or `weather_range` | Held until F7, then **restart session**: the same full restart as Backspace without a voyage (tick zero, the boat at the spawn, calm water until the weather begins) with the new revision |
 | `course` start, heading or any gate (course packages) | Held until F7, then **restart session**; fairness comes first and a run is never continued across a course edit. The compiled digest keeps existing bests valid; another course changes the saved path |
 | Free package display name | Applied at once; a free package has no other content |
@@ -541,9 +546,67 @@ active revision and drops any held candidate; the panel shows the file, line whe
 one, field path and message. Revisions are numbered R1 (launch), R2, ... in the order they are
 staged; a held candidate staged again unchanged keeps its number. Undo keeps the eight
 previous revisions. It reinstalls a revision through the same rules and does not rewind the
-boat or the clock; a rename is undone at once, a route or water change is held for F7. A new
-revision after an Undo discards the undone ones (no Redo). Progress is never inferred from an
-old shelter index: every restart begins at shelter 0.
+boat or the clock; a rename is undone at once, a route or layout change is live, and a water
+change is held for F7. A new revision after an Undo discards the undone ones (no Redo).
+Progress is never inferred from an old shelter index: a live route edit maps it by shelter ID,
+while a restart begins at shelter 0.
+
+## Live console and command layer (PC)
+
+Native solo free boating and voyages, release builds included. `F2`, `` ` `` or GLFW's world-1 key
+(161, which some macOS ISO keyboards report as `§`) opens a drop-down console at the top of the
+low-resolution frame. The simulation keeps running with a neutral helm; driving input resumes when
+the console closes. Replays, `--demo`, screenshots and rooms do not offer it.
+
+A plain line is a **Lua edit** of `def`, the table the package's entry returns. `=` starts a
+read-only **query**; `/` starts a **command**.
+
+```text
+> def.scene.marina.berths[1].x = 15
+R2 ACTIVE, live / BOAT KEPT
+> def.scene.gulls.flocks[1].count = 4
+R3 ACTIVE, live / BOAT KEPT
+> = def.scene.marina.berths[1]
+{ id = "skiff", recipe = "skiff", x = 15, z = 167, ... }
+> def.voyage.exposure.height = 3
+R4 CHANGES THE EXPOSED WATER / F7 RESTART SESSION / F6 DISCARD
+> /undo
+R3 UNDONE TO, live / BOAT KEPT
+> /save ~/drafts/my-harbor
+SAVED ~/drafts/my-harbor
+```
+
+| Command | Effect |
+| --- | --- |
+| `/help` | The command list |
+| `/status` | Active revision, package, chunks, tick, boat position and pending work |
+| `/capabilities` | The session manifest's grants |
+| `/recipes`, `/anchors` | Registered berth recipes; voyage shelters and coordinates |
+| `/apply`, `/discard`, `/undo` | The F7/F6 transactions, named |
+| `/restart` | Restart the session |
+| `/capability NAME` | Add `scene.define` to this session's manifest copy (voyages only) |
+| `/save DIR` | Write `plugin.json` and `main.lua`; refuses a non-empty directory that is not this session's package |
+| `/clear` | Clear the scrollback |
+
+The first edit moves a runtime session to authoring using the catalog revision's embedded source.
+Every edit is composed as one immutable entry, so staging, revisions, Undo and export need no new
+concept:
+
+```lua
+local def = (function()
+  -- the package's main.lua, unchanged
+end)()
+do def.scene.marina.berths[1].x = 15 end -- console 1
+do def.scene.gulls.flocks[1].count = 4 end -- console 2
+return def
+```
+
+The composed source (at most 64 KiB) is evaluated by the isolated staging worker; Lua never runs
+on the game thread, the boat is never moved, and the game keeps running while a candidate is
+checked. A syntax or schema failure installs nothing and drops that chunk with a `console N`
+diagnostic. A query runs in the same worker against the current candidate, renders a bounded value
+(functions as `<function>`), and never creates a revision. The tool bridge's `console` operation
+submits the same lines through the same state.
 
 ## Native interface
 
@@ -1150,6 +1213,7 @@ happens while another stage request runs.
 | `live-apply` | `--held-revision`, `--base-epoch` | F7: commit the held candidate |
 | `live-undo` | `--base-revision`, `--base-epoch` | F6 with nothing held: hold the previous revision under the usual rules |
 | `live-discard` | `--base-epoch` | F6: cancel the running stage request or discard the held candidate |
+| `live-console --line TEXT` | `--base-epoch` | Submit one console line through the game's command layer. The response's repeated `output` lines are its immediate result; an edit reports `pending` and completes through a later `live-inspect`/`live-console /status` |
 
 The commit epoch increases with every commit, including Undo, so an old pin never matches a
 revision number that reappears. The snapshot bytes count as the selected package's save only
@@ -1162,7 +1226,7 @@ failed), `stale` (a pin no longer matches), `busy`, `conflict` (for example, not
 `bad_request`, `unauthorized`, `superseded`, `cancelled` or client-side `deadline`
 (`--timeout`, default 10 s), `bridge_failed` or `input_error`. The exit status is 0 only for `ok`.
 Owner fields: `plugin`, active `revision`, `epoch`, gameplay `digest`, `undo_depth`, `staging`,
-`held_revision` (0 when nothing is held) with `held_change` (`renamed`, `migrate`,
+`held_revision` (0 when nothing is held) with `held_change` (`renamed`, `live`, `migrate`,
 `restart_voyage`, `restart_session`, ...), `held_undo` and `held_base`; `outcome` (`staging`,
 `applied`, `held`, `unchanged`, `incompatible`, `rejected`, `migration_failed`, `canceled`,
 `discarded`, `nothing_to_undo`), the panel's `message`/`detail`/`alert`, any staging diagnostic
