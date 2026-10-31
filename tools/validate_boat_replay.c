@@ -414,6 +414,50 @@ static int banked_course(const char *directory)
     return 0;
 }
 
+// PD1: a pre-existing compiled-course best keeps its established path, loads as the best and is
+// never overwritten by an equal or slower run through the selected course.
+static int legacy_best(const char *directory, const BoatReplay *fast)
+{
+    char legacy[2048], other[2048];
+    CHECK(boat_replay_best_path(
+        legacy, sizeof(legacy), directory, false, boat_course_compiled_digest()));
+    CHECK(snprintf(other, sizeof(other), "%s/course-calm-physics%d.run", directory,
+              BOAT_PHYSICS_REVISION)
+        == (int)strlen(legacy));
+    CHECK(!strcmp(legacy, other));
+    uint64_t changed = boat_course_compiled_digest() ^ 1u;
+    CHECK(boat_replay_best_path(other, sizeof(other), directory, false, changed));
+    char suffix[64];
+    CHECK(snprintf(suffix, sizeof(suffix), "-%016llx.run", (unsigned long long)changed) > 0);
+    CHECK(strstr(other, suffix) != NULL && strcmp(other, legacy));
+    BoatReplay slow = { 0 };
+    CHECK(route(&slow, NULL, 700, false) == 0);
+    CHECK(boat_replay_save(fast, legacy));
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        BoatReplayRuns runs = { 0 };
+        CHECK(boat_replay_copy(&runs.best, fast));
+        snprintf(runs.best_path, sizeof(runs.best_path), "%s", legacy);
+        if (attempt)
+            CHECK(boat_replay_copy(&runs.recording, fast));
+        else {
+            runs.recording = slow;
+            slow = (BoatReplay) { 0 };
+        }
+        BoatCourse finished = { .enabled = true, .next_gate = BOAT_COURSE_GATES };
+        boat_replay_runs_step(
+            &runs, (BoatReplaySample) { 0 }, (BoatReplaySample) { 0 }, &finished, false);
+        CHECK(runs.finished && !runs.save_best);
+        boat_replay_runs_flush(&runs);
+        BoatReplay remains = { 0 };
+        CHECK(boat_replay_load(&remains, legacy));
+        CHECK(memcmp(remains.splits, fast->splits, sizeof(fast->splits)) == 0);
+        boat_replay_destroy(&remains);
+        boat_replay_runs_destroy(&runs);
+    }
+    boat_replay_destroy(&slow);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     CHECK(clock_contracts() == 0);
@@ -442,6 +486,7 @@ int main(int argc, char **argv)
         CHECK(run.splits[i] > run.splits[i - 1]);
     CHECK(boat_replay_save(&run, fixture));
     CHECK(boat_replay_save(&run, saved_best));
+    CHECK(legacy_best(argv[1], &run) == 0);
     CHECK(boat_replay_load(&loaded, fixture));
     CHECK(loaded.complete && !loaded.waves && loaded.count == run.count);
     CHECK(memcmp(loaded.splits, run.splits, sizeof(run.splits)) == 0);

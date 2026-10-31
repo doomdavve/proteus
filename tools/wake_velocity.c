@@ -20,6 +20,9 @@
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
 #ifdef PROTEUS_BOAT_PLUGINS
+#if !defined(__EMSCRIPTEN__)
+#include "boat_plugin_catalog.h"
+#endif
 #include "wake_velocity_plugin.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_bridge.h"
@@ -113,6 +116,9 @@ static void usage(void)
     cli_usage_line(stdout, "--mouse-steering", "Start with captured mouse steering");
     cli_usage_line(stdout, "--plugin DIR", "Solo voyage from a Lua plugin");
     cli_usage_line(stdout, "", "Saves reload; F5 reload, F6 undo, F7 apply migration/restart");
+    cli_usage_line(
+        stdout, "--package ID", "Bundled solo package (title content row selects outer)");
+    cli_usage_line(stdout, "--no-plugins", "Temporary compiled-content path for parity checks");
     cli_usage_line(stdout, "--waves", "Gentle crossing waves and a floating hull");
 
     cli_usage_section(stdout, "WATER AND WAKES");
@@ -349,6 +355,8 @@ static NetHost net_host; // The room this session started with --host, if any.
 
 // The steering mode a session ended in, so the title remembers changes made in game.
 static bool study_mouse_steering;
+// The latest session launch's diagnostic, for the title's message line.
+static char study_failure[192];
 
 // One session with explicit options. Uses the title's window when one is open and then leaves it
 // open; the Escape menu's last row ends the session.
@@ -394,6 +402,8 @@ static int study(int argc, char **argv)
     Vector3 start = { 0 }; // --start: simulation X, Z and heading in degrees.
     long host_port = 0; // --port: the hosted room's UDP port.
     const char *plugin_path = NULL; // --plugin: the solo voyage's Lua package.
+    const char *package_id = NULL; // --package: a bundled catalog entry in runtime mode.
+    bool no_plugins = false; // Temporary compiled-content path for parity checks.
     const char *bridge_path = NULL; // --plugin-bridge: the live tool bridge's mailbox.
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
@@ -489,6 +499,10 @@ static int study(int argc, char **argv)
             start_set = true;
         } else if (strcmp(argv[i], "--plugin") == 0 && i + 1 < argc) {
             plugin_path = argv[++i];
+        } else if (strcmp(argv[i], "--package") == 0 && i + 1 < argc) {
+            package_id = argv[++i];
+        } else if (strcmp(argv[i], "--no-plugins") == 0) {
+            no_plugins = true;
         } else if (strcmp(argv[i], "--plugin-bridge") == 0 && i + 1 < argc) {
             bridge_path = argv[++i];
         } else if (strcmp(argv[i], "--demo") == 0) {
@@ -631,6 +645,22 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--plugin-bridge needs --plugin and a window (no --screenshot).\n");
         goto invalid;
     }
+    if (plugin_path && (package_id || no_plugins)) {
+        fprintf(stderr,
+            "--plugin is the file-based authoring path; it cannot take --package or "
+            "--no-plugins.\n");
+        goto invalid;
+    }
+    if (package_id && no_plugins) {
+        fprintf(stderr, "--package selects a bundled package; --no-plugins selects no package.\n");
+        goto invalid;
+    }
+    if (package_id && connect_to) {
+        fprintf(stderr, "--package applies to solo sessions; rooms use compiled content.\n");
+        goto invalid;
+    }
+    if (no_plugins && connect_to)
+        no_plugins = false; // Rooms already use compiled content.
     if (plugin_path) {
 #ifdef PROTEUS_BOAT_PLUGINS
         // Rooms and course recordings keep compiled definitions until they can carry revisions.
@@ -653,6 +683,41 @@ static int study(int argc, char **argv)
         goto invalid;
 #endif
     }
+#if defined(PROTEUS_BOAT_PLUGINS) && !defined(__EMSCRIPTEN__)
+    // PD1: every solo session starts from a build-time catalog entry unless --no-plugins
+    // restores the compiled path. Explicit --package IDs must name this location's kind.
+    const BoatPluginCatalogEntry *catalog = NULL;
+    if (!plugin_path && !no_plugins && !connect_to) {
+        BoatPluginKind kind = course              ? BOAT_PLUGIN_KIND_COURSE
+            : location->id == BOAT_LOCATION_OUTER ? BOAT_PLUGIN_KIND_VOYAGE
+                                                  : BOAT_PLUGIN_KIND_FREE;
+        catalog = package_id ? boat_plugin_catalog_find(package_id)
+                             : boat_plugin_catalog_default(kind, location->name);
+        if (!catalog) {
+            fprintf(stderr,
+                package_id ? "--package %s is not a bundled package.\n"
+                           : "No bundled package is available for %s %s.\n",
+                package_id ? package_id : boat_plugin_kind_name(kind), location->name);
+            return 1;
+        }
+        BoatPluginKind found = boat_plugin_kind_parse(catalog->kind);
+        if (strcmp(catalog->location, location->name)) {
+            fprintf(
+                stderr, "--package %s belongs to --location %s.\n", catalog->id, catalog->location);
+            return 1;
+        }
+        if (found != kind) {
+            fprintf(stderr, "--package %s is a %s package; this session needs %s.\n", catalog->id,
+                catalog->kind, boat_plugin_kind_name(kind));
+            return 1;
+        }
+    }
+#else
+    if (package_id) {
+        fprintf(stderr, "--package is only available in native builds.\n");
+        goto invalid;
+    }
+#endif
     if (start_set && (!location->mapped || course || replay_path || ghost_path || connect_to)) {
         fprintf(stderr, "--start places the boat in a mapped location's free boating.\n");
         goto invalid;
@@ -771,12 +836,6 @@ static int study(int argc, char **argv)
     BoatSession session;
     boat_session_init(&session, &worlds[location->id],
         study_water(location, waves, current, crossing_wake, player_wake));
-    if (course)
-        boat_session_start_course(&session);
-    else if (!connect_to && skin == BOAT_SKIN_EXPLORER)
-        session.handling = &boat_handling_explorer;
-    else if (!connect_to && skin == BOAT_SKIN_CABIN)
-        session.handling = &boat_handling_cabin;
     if (start_set) {
         session.boat.position = (Vector2) { start.x, start.y };
         session.boat.heading = start.z * DEG2RAD;
@@ -786,24 +845,54 @@ static int study(int argc, char **argv)
     BoatWakePlayer *wake = NULL;
     ObjectStudy object_world = { 0 };
     ObjectStudy *objects = wake_objects ? &object_world : NULL;
-    if (objects)
-        object_study_reset(objects, &session, object_crossing, object_life, object_height);
     int result = 1;
+    bool plugin_active = false;
+    study_failure[0] = 0;
 #ifdef PROTEUS_BOAT_PLUGINS
     // Owns the revisions the session borrows, so it outlives the session (static, like WORLDS).
     static WakePlugin plugin;
-    if (plugin_path && !wake_plugin_open(&plugin, plugin_path, &session, plugin_time()))
-        goto cleanup;
+    if (plugin_path) {
+        if (!wake_plugin_open(&plugin, plugin_path, &session, plugin_time())) {
+            snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
+            goto cleanup;
+        }
+        plugin_active = true;
+    }
+#if !defined(__EMSCRIPTEN__)
+    else if (catalog) {
+        if (!wake_plugin_open_catalog(&plugin, catalog, &session)) {
+            snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
+            goto cleanup;
+        }
+        plugin_active = true;
+    }
+#endif
 #if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
         GetFileName(argv[0]));
-    plugin.stage_executable = stage_executable;
+    if (plugin_path)
+        plugin.stage_executable = stage_executable;
     static WakeBridge bridge;
     if (bridge_path && !wake_bridge_open(&bridge, bridge_path, GetTime()))
         goto cleanup;
 #endif
 #endif
+    if (course)
+        boat_session_start_course(&session);
+    else if (!connect_to && skin == BOAT_SKIN_EXPLORER)
+        session.handling = &boat_handling_explorer;
+    else if (!connect_to && skin == BOAT_SKIN_CABIN)
+        session.handling = &boat_handling_cabin;
+    if (objects)
+        object_study_reset(objects, &session, object_crossing, object_life, object_height);
+    // A replay or ghost is recorded against one exact course; only the compiled/bundled course
+    // may be replayed while other course packages remain playable.
+    if ((replay_path || ghost_path)
+        && boat_course_digest(session.course_definition) != boat_course_compiled_digest()) {
+        fprintf(stderr, "--replay and --ghost need the default time-trial course.\n");
+        goto cleanup;
+    }
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };
 #ifdef PROTEUS_BOAT_NET
 #if !defined(__EMSCRIPTEN__)
@@ -849,10 +938,9 @@ static int study(int argc, char **argv)
     if (course) {
         char directory[1800];
         if (data_dir || boat_replay_data_directory(directory, sizeof(directory))) {
-            int n = snprintf(session.runs.best_path, sizeof(session.runs.best_path),
-                "%s/course-%s-physics%d.run", data_dir ? data_dir : directory,
-                waves ? "waves" : "calm", BOAT_PHYSICS_REVISION);
-            if (n < 0 || (size_t)n >= sizeof(session.runs.best_path))
+            if (!boat_replay_best_path(session.runs.best_path, sizeof(session.runs.best_path),
+                    data_dir ? data_dir : directory, waves,
+                    boat_course_digest(session.course_definition)))
                 session.runs.best_path[0] = 0;
         }
         if (session.runs.best_path[0] && FileExists(session.runs.best_path)
@@ -895,10 +983,10 @@ static int study(int argc, char **argv)
         view_world = &playback_world;
     } else if (screenshot) {
         for (int tick = 0; tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
-            if (plugin_path)
+            if (plugin_active)
                 wake_plugin_before_tick(&plugin);
             demo_step(&session, tick, NULL, wake, objects);
-            if (plugin_path)
+            if (plugin_active)
                 wake_plugin_after_tick(&plugin, &session);
         }
     }
@@ -1096,8 +1184,8 @@ static int study(int argc, char **argv)
         bool time_normal = false;
         while ((character = GetCharPressed()) != 0) {
             help_pressed |= character == '?';
-            time_direction += (character == ']' || character == '.')
-                - (character == '[' || character == ',');
+            time_direction
+                += (character == ']' || character == '.') - (character == '[' || character == ',');
             time_normal |= character == '\\' || character == '0';
         }
         time_direction += IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
@@ -1343,7 +1431,7 @@ static int study(int argc, char **argv)
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
                 active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), plugin_time());
 #endif
-        if (plugin_path && wake_plugin_waiting(&plugin))
+        if (plugin_active && wake_plugin_waiting(&plugin))
             plugin_reset_pending |= reset_requested;
         else if (plugin_reset_pending) {
             reset_requested = true;
@@ -1385,14 +1473,14 @@ static int study(int argc, char **argv)
                 mouse_wheel = 0;
             }
 #endif
-        } else if (plugin_path && wake_plugin_waiting(&plugin) && !plugin_restart) {
+        } else if (plugin_active && wake_plugin_waiting(&plugin) && !plugin_restart) {
             // Keep drawing and polling the worker, but never advance past callback boundary T.
             accumulator = 0;
         } else if (reset_requested && session.voyage.route && !plugin_restart) {
             // The outing continues: back to the last shelter, clock, water and wakes running.
             thrust_target = 0;
             boat_session_recover(&session);
-            if (plugin_path)
+            if (plugin_active)
                 wake_plugin_after_tick(&plugin, &session);
             accumulator = 0;
         } else if (reset_requested || plugin_restart) {
@@ -1406,7 +1494,7 @@ static int study(int argc, char **argv)
             if (objects)
                 object_study_reset(objects, &session, object_crossing, object_life, object_height);
             accumulator = 0;
-            if (plugin_path)
+            if (plugin_active)
                 wake_plugin_reset_objective(&plugin, &session);
             demo_tick = 0;
             replay_dragging = false;
@@ -1427,7 +1515,7 @@ static int study(int argc, char **argv)
                 session.runs.practice = true;
             accumulator += boat_time_frame_seconds(raw_active_delta, time_speed_index);
             while (accumulator >= BOAT_TICK_SECONDS) {
-                if (plugin_path)
+                if (plugin_active)
                     wake_plugin_before_tick(&plugin);
                 if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
@@ -1438,10 +1526,10 @@ static int study(int argc, char **argv)
                     input.throttle_rate = boat_throttle_rate(session.boat.throttle, thrust_target);
                     timed_boat_step(&session, input, &metrics, wake, objects);
                 }
-                if (plugin_path)
+                if (plugin_active)
                     wake_plugin_after_tick(&plugin, &session);
                 accumulator -= BOAT_TICK_SECONDS;
-                if (plugin_path && wake_plugin_waiting(&plugin)) {
+                if (plugin_active && wake_plugin_waiting(&plugin)) {
                     accumulator = 0;
                     break;
                 }
@@ -1775,7 +1863,7 @@ cleanup:
     if (bridge_path)
         wake_bridge_close(&bridge);
 #endif
-    if (plugin_path)
+    if (plugin_active)
         wake_plugin_close(&plugin, &session);
 #endif
     boat_session_flush(&session);
@@ -1818,13 +1906,17 @@ invalid:
 // Single player from the title: free boating on the river, as the macOS app used to start.
 static int title_single(const BoatTitleSettings *settings)
 {
-    char *arguments[20] = { "wake_velocity", "--current", "--crossing-wake" };
+    char *arguments[24] = { "wake_velocity", "--current", "--crossing-wake" };
     int count = 3;
     if (settings->location == BOAT_LOCATION_COUNT)
         arguments[count++] = "--course";
     else {
         arguments[count++] = "--location";
         arguments[count++] = (char *)boat_location(settings->location)->name;
+    }
+    if (settings->location == BOAT_LOCATION_OUTER && settings->outer_content) {
+        arguments[count++] = "--package";
+        arguments[count++] = (char *)"proteus.harbor-life";
     }
     if (settings->waves)
         arguments[count++] = "--waves";
@@ -1920,7 +2012,8 @@ int main(int argc, char **argv)
     for (BoatTitleChoice choice; (choice = boat_title_run(&settings)) != BOAT_TITLE_EXIT;) {
         boat_title_save(&settings);
         if (choice == BOAT_TITLE_SINGLE && title_single(&settings))
-            snprintf(settings.message, sizeof(settings.message), "Single player stopped.");
+            snprintf(settings.message, sizeof(settings.message), "%s",
+                study_failure[0] ? study_failure : "Single player stopped.");
 #ifdef PROTEUS_BOAT_NET
         if (choice == BOAT_TITLE_JOIN || choice == BOAT_TITLE_HOST)
             title_join(&settings, choice == BOAT_TITLE_HOST);

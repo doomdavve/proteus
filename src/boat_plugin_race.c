@@ -62,16 +62,28 @@ BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
     status = boat_plugin_lua_race(bundle->source, bundle->source_size, file, limits, &data, d);
     if (status != BOAT_PLUGIN_OK)
         return status;
+    return boat_plugin_decode_race(&r.manifest, &data, out, d);
+}
+
+BoatPluginStatus boat_plugin_decode_race(const BoatPluginManifest *manifest,
+    const BoatPluginRaceData *data, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    if (boat_plugin_kind_parse(manifest->kind) != BOAT_PLUGIN_KIND_RACE)
+        return fail(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "kind", "requires a race host");
+    const char *file = manifest->entry;
+    BoatPluginRace r = { .manifest = *manifest };
     static const char *const gate_names[] = { BOAT_PLUGIN_GATE_FIELDS };
     static const double gate_low[] = { -20000, -20000, -1, -1, 4 };
     static const double gate_high[] = { 20000, 20000, 1, 1, 500 };
-    for (unsigned i = 0; i <= data.gate_count; ++i) {
+    for (unsigned i = 0; i <= data->gate_count; ++i) {
         char path[32];
         if (i)
             snprintf(path, sizeof(path), "race.gates[%u]", i);
         else
             snprintf(path, sizeof(path), "race.start");
-        const double *v = i ? data.gates[i - 1] : data.start;
+        const double *v = i ? data->gates[i - 1] : data->start;
         if (!fields(d, file, path, gate_names, v, gate_low, gate_high, 5, false))
             return BOAT_PLUGIN_SCHEMA;
         if (fabs(hypot(v[2], v[3]) - 1) > .01)
@@ -81,15 +93,15 @@ BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
         else
             r.course.start = gate(v);
     }
-    r.course.gate_count = data.gate_count;
+    r.course.gate_count = data->gate_count;
     static const char *const point_names[] = { "x", "z" };
     static const double point_low[] = { -20000, -20000 }, point_high[] = { 20000, 20000 };
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
         char path[32];
         snprintf(path, sizeof(path), "race.grid[%u]", i + 1);
-        if (!fields(d, file, path, point_names, data.grid[i], point_low, point_high, 2, false))
+        if (!fields(d, file, path, point_names, data->grid[i], point_low, point_high, 2, false))
             return BOAT_PLUGIN_SCHEMA;
-        r.course.grid[i] = (Vector2) { (float)data.grid[i][0], (float)data.grid[i][1] };
+        r.course.grid[i] = (Vector2) { (float)data->grid[i][0], (float)data->grid[i][1] };
     }
     static const char *const source_names[] = { BOAT_PLUGIN_SOURCE_FIELDS };
     static const double source_low[] = { -20000, -20000, -1, -1, -600, .1, .001, 1, 1, 2, 1, 2 };
@@ -102,11 +114,11 @@ BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
     static const double rule_high[]
         = { 432000, 432000, 432000, 432000, 432000, 432000, 432000, 432000, BOAT_FLEET_SLOTS };
     if (!fields(
-            d, file, "race.source", source_names, data.source, source_low, source_high, 12, false)
-        || !fields(d, file, "race.storm", storm_names, data.storm, storm_low, storm_high, 8, false)
-        || !fields(d, file, "race.rules", rule_names, data.rules, rule_low, rule_high, 9, true))
+            d, file, "race.source", source_names, data->source, source_low, source_high, 12, false)
+        || !fields(d, file, "race.storm", storm_names, data->storm, storm_low, storm_high, 8, false)
+        || !fields(d, file, "race.rules", rule_names, data->rules, rule_low, rule_high, 9, true))
         return BOAT_PLUGIN_SCHEMA;
-    const double *v = data.source;
+    const double *v = data->source;
     r.course.source = (BoatVesselWake) { .origin = { (float)v[0], (float)v[1] },
         .direction = { (float)v[2], (float)v[3] },
         .started = v[4],
@@ -119,14 +131,14 @@ BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
         .half_width = (float)v[11] };
     if (!boat_vessel_wake_valid(r.course.source))
         return fail(d, BOAT_PLUGIN_SCHEMA, file, "race.source", "invalid ferry wake recipe");
-    v = data.storm;
+    v = data->storm;
     r.course.storm = (BoatStorm) { .centre = { (float)v[0], (float)v[1] },
         .velocity = { (float)v[2], (float)v[3] },
         .radius = (float)v[4],
         .height = (float)v[5],
         .started = v[6],
         .build = (float)v[7] };
-    v = data.rules;
+    v = data->rules;
     r.rules = (BoatRaceRules) { .grid_ticks = (uint64_t)v[0],
         .countdown_ticks = (uint64_t)v[1],
         .results_ticks = (uint64_t)v[2],
@@ -144,6 +156,8 @@ BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
         return fail(d, BOAT_PLUGIN_SCHEMA, file, "race", "invalid native course or rules");
     r.digest = boat_plugin_race_digest(&r.course, &r.rules);
     *out = r;
+    BoatPluginCost cost = d->cost;
+    *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
     return BOAT_PLUGIN_OK;
 }
 

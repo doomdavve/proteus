@@ -1,4 +1,5 @@
 build/
+build-release/
 build-mac/
 build-profile/
 build-web/

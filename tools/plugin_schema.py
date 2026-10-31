@@ -74,21 +74,30 @@ def schema():
                                         for k, v in rule_lows.items()},
                                     "min_players": number(1, 4, integer=True)})})
     manifest = record({"id": text(63, r"^[a-z][a-z0-9._-]*$"), "name": text(63),
-                       "api": {"const": 1}, "kind": {"enum": ["voyage", "race"]},
-                       "entry": {"const": "main.lua"}, "location": {"enum": ["outer", "river"]},
+                       "api": {"const": 1},
+                       "kind": {"enum": ["voyage", "free", "course", "race"]},
+                       "entry": {"const": "main.lua"},
+                       "location": {"enum": ["basin", "river", "outer"]},
                        "capabilities": {"enum": [["voyage.define"],
                            ["voyage.define", "scene.define"],
                            ["voyage.define", "objective.hud"],
                            ["voyage.define", "scene.define", "objective.hud"],
                            ["voyage.define", "objective.hud", "objective.timers"],
                            ["voyage.define", "scene.define", "objective.hud", "objective.timers"],
-                           ["race.define"]]},
+                           ["free.define"], ["course.define"], ["race.define"]]},
                        "state_version": number(1, 65535, integer=True)})
     manifest["allOf"] = [
         {"if": {"properties": {"kind": {"const": "race"}}},
          "then": {"properties": {"location": {"const": "river"},
-             "capabilities": {"const": ["race.define"]}, "state_version": {"const": 1}}},
-         "else": {"properties": {"location": {"const": "outer"},
+             "capabilities": {"const": ["race.define"]}, "state_version": {"const": 1}}}},
+        {"if": {"properties": {"kind": {"const": "course"}}},
+         "then": {"properties": {"location": {"const": "basin"},
+             "capabilities": {"const": ["course.define"]}, "state_version": {"const": 1}}}},
+        {"if": {"properties": {"kind": {"const": "free"}}},
+         "then": {"properties": {"location": {"enum": ["basin", "river"]},
+             "capabilities": {"const": ["free.define"]}, "state_version": {"const": 1}}}},
+        {"if": {"properties": {"kind": {"const": "voyage"}}},
+         "then": {"properties": {"location": {"const": "outer"},
              "capabilities": {"not": {"const": ["race.define"]}}}}},
         {"if": {"properties": {"capabilities": {"const": ["voyage.define"]}}},
          "then": {"properties": {"state_version": {"const": 1}}}},
@@ -138,6 +147,10 @@ def schema():
     gulls = object_schema({"flocks": sequence(flock, 0, 4)}, required=("flocks",))
     scene = object_schema({"version": {"const": 1}, "marina": marina, "traffic": traffic,
                            "gulls": gulls}, required=("version",))
+    free = record({"version": {"const": 1}})
+    course_gate = record({**point, "half_width": number(4, 500, "metres")})
+    course = record({"start": record({**point, "heading": number(-math.tau, math.tau, "radians")}),
+                     "gates": sequence(course_gate, 4, 4)})
     int64 = number(-(1 << 63), (1 << 63) - 1, integer=True)
     command_base = {"generation": number(1, 0xffffffff, integer=True), "id": text()}
     command_variants = []
@@ -150,7 +163,7 @@ def schema():
                      "source": {"type": "string", "maxLength": 65536}})
     bundle["description"] = "UTF-8 source bundle, at most 200000 bytes; manifest/source byte caps apply after encoding"
     definitions = {"bundle": bundle, "manifest": manifest, "voyage": voyage, "scene": scene,
-                   "race": race, "commands": commands}
+                   "race": race, "free": free, "course": course, "commands": commands}
     for value in definitions.values():
         value["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     return {"protocol": 1, "api": 1, "schemas": definitions,
@@ -180,7 +193,11 @@ def schema():
                     "scene.define requires voyage.define and precedes objective grants"],
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",
                     "skip_ticks <= recovery_ticks; native course/rules validation",
-                    "Grid, gate corridors and ferry path pass compiled-map clearance checks"]},
+                    "Grid, gate corridors and ferry path pass compiled-map clearance checks"],
+                "free": ["free.version must be 1; content stays the engine's registered defaults"],
+                "course": ["Exactly four gates south of the start and in strictly decreasing z",
+                    "The gate centre and both edges must be open water; basin gates stay in bounds",
+                    "The compiled course's digest keeps existing course-*.run bests valid"]},
             "objective": {"functions": {"init": "(context) -> state, commands",
                 "update": "(context, state) -> state, commands",
                 "migrate": "optional (context, state) -> state, commands"},

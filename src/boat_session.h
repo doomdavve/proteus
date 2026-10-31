@@ -30,6 +30,9 @@ typedef struct {
     // The boat's engine class for free boating; boat_session_init() sets the speedboat and
     // restarts keep it. Course ticks always use the speedboat, so runs and bests compare.
     const BoatHandling *handling;
+    // PD1: the time trial's start and gates. Borrowed from the selected package revision and
+    // outliving the session; NULL selects the compiled course.
+    const BoatCourseDefinition *course_definition;
 } BoatSession;
 
 // Tick zero, the boat at the definition's spawn, a reset enabled presentation, no course or
@@ -40,6 +43,10 @@ void boat_session_init(BoatSession *session, const BoatWorldResources *resources
 void boat_session_destroy(BoatSession *session);
 // Enable the course and put a reset boat and presentation at its start.
 void boat_session_start_course(BoatSession *session);
+// Select the course before boat_session_start_course(): the definition is borrowed and must
+// outlive every use. NULL restores the compiled S course.
+void boat_session_set_course_definition(
+    BoatSession *session, const BoatCourseDefinition *definition);
 // A new attempt in the same location: flush, reinitialize clock, WATER, boat and presentation
 // (at the course start when the course is enabled) and pin the course opponent. Runs and the
 // borrowed resources survive.

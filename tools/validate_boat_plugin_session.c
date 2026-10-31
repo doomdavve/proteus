@@ -4,6 +4,7 @@
  * change restarts the session; a failed stage never touches the active revision; Undo reinstalls
  * through the same rules; and save polling, on a virtual clock, stages each settled save once. */
 #include "boat_plugin_host.h"
+#include "boat_plugin_lua.h"
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_test_cases.h"
@@ -17,6 +18,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+// Cases run in parallel; each process gets its own package directory so a save from one case
+// cannot be staged by another.
+static const char *session_dir(void)
+{
+    static char directory[600];
+#ifdef _WIN32
+    unsigned pid = (unsigned)GetCurrentProcessId();
+#else
+    unsigned pid = (unsigned)getpid();
+#endif
+    snprintf(directory, sizeof(directory), "%s/%u", BOAT_PLUGIN_SESSION_DIR, pid);
+    MakeDirectory(directory);
+    return directory;
+}
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -147,20 +169,19 @@ static int harbor_life_scene(void)
 
     // A traffic timetable edit is physical too: it restarts and Undo restores the old craft.
     BoatPluginBundle moved_craft = harbor_edit(
-        "speed = 4, phase = 0, period = 24.8540",
-        "speed = 3, phase = 5, period = 33.1387");
+        "speed = 4, phase = 0, period = 24.8540", "speed = 3, phase = 5, period = 33.1387");
     CHECK(boat_plugin_host_stage(&p.host, &moved_craft));
     CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
     CHECK(wake_plugin_frame(&p, &s, false, false, true, 7));
     boat_session_restart(&s, calm());
-    CHECK(s.world.scene->traffic.actors[0].speed == 3
-        && s.world.scene->traffic.actors[0].phase == 5);
+    CHECK(
+        s.world.scene->traffic.actors[0].speed == 3 && s.world.scene->traffic.actors[0].phase == 5);
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 8));
     CHECK(wake_plugin_frame(&p, &s, false, false, true, 9));
     boat_session_restart(&s, calm());
     CHECK(boat_plugin_host_active(&p.host)->number == 1);
-    CHECK(s.world.scene->traffic.actors[0].speed == 4
-        && s.world.scene->traffic.actors[0].phase == 0);
+    CHECK(
+        s.world.scene->traffic.actors[0].speed == 4 && s.world.scene->traffic.actors[0].phase == 0);
 
     // One ferry dwell edit follows the same restart/Undo policy and preserves the other stops.
     BoatPluginBundle moved_dwell = harbor_edit("dwell = 35", "dwell = 40");
@@ -756,7 +777,7 @@ static int repeated_reloads(void)
 static bool write_text(const char *name, const char *text, size_t size)
 {
     char path[512];
-    snprintf(path, sizeof(path), "%s/%s", BOAT_PLUGIN_SESSION_DIR, name);
+    snprintf(path, sizeof(path), "%s/%s", session_dir(), name);
     FILE *file = fopen(path, "wb");
     if (!file)
         return false;
@@ -818,7 +839,7 @@ static int scene_binding(void)
     boat_session_init(&independent, outer(), calm());
     s.presentation_enabled = independent.presentation_enabled = false;
     CHECK(save_scene(NULL, 1));
-    CHECK(wake_plugin_open(&p, BOAT_PLUGIN_SESSION_DIR, &s, 0));
+    CHECK(wake_plugin_open(&p, session_dir(), &s, 0));
     const BoatPluginRevision *active = boat_plugin_host_active(&p.host);
     CHECK(active->voyage.has_scene && !boat_scene_has_content(&active->voyage.scene));
     CHECK(s.world.scene == &active->voyage.scene);
@@ -846,7 +867,7 @@ static int scene_binding(void)
 
     // Independent sessions own their own scene storage; leaving one leaves the other intact.
     CHECK(save_scene(NULL, 1));
-    CHECK(wake_plugin_open(&other, BOAT_PLUGIN_SESSION_DIR, &independent, 4));
+    CHECK(wake_plugin_open(&other, session_dir(), &independent, 4));
     CHECK(independent.world.scene == &boat_plugin_host_active(&other.host)->voyage.scene);
     CHECK(independent.world.scene != s.world.scene);
     wake_plugin_close(&p, &s);
@@ -856,7 +877,7 @@ static int scene_binding(void)
     CHECK(!independent.world.scene && !boat_session_view(&independent).scene);
 
     // Re-enter cleanly after a close; the new revision owns a fresh scene binding.
-    CHECK(wake_plugin_open(&p, BOAT_PLUGIN_SESSION_DIR, &s, 5));
+    CHECK(wake_plugin_open(&p, session_dir(), &s, 5));
     CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
     wake_plugin_close(&p, &s);
     CHECK(!s.world.scene);
@@ -874,7 +895,7 @@ static int game_controls(void)
     boat_session_init(&session, outer(), calm());
     session.presentation_enabled = false;
     CHECK(save(NULL, NULL));
-    CHECK(wake_plugin_open(&plugin, BOAT_PLUGIN_SESSION_DIR, &session, 0));
+    CHECK(wake_plugin_open(&plugin, session_dir(), &session, 0));
     const BoatVoyageRoute *r1 = session.voyage.route;
     CHECK(r1 == &boat_plugin_host_active(&plugin.host)->voyage.route && plugin.watching);
     observe(&session, r1->shelters[1].position, (Vector2) { 0 });
@@ -1592,6 +1613,45 @@ static int memory_accounting(void)
     return 0;
 }
 
+// PD1: a bundled catalog entry installs revision 1 with no Lua state, file watch, staging worker
+// or authoring panel; the runtime frame path does nothing and close restores compiled content.
+static int catalog_runtime(void)
+{
+    static WakePlugin p;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    s.presentation_enabled = false;
+    const BoatPluginCatalogEntry *entry
+        = boat_plugin_catalog_find(BOAT_PLUGIN_DEFAULT_OUTER_VOYAGE);
+    CHECK(entry);
+    unsigned before = boat_plugin_lua_states();
+    CHECK(wake_plugin_open_catalog(&p, entry, &s));
+    CHECK(boat_plugin_lua_states() == before);
+    CHECK(!p.authoring && !p.watching && !p.staging);
+    CHECK(s.voyage.route == &boat_plugin_host_active(&p.host)->voyage.route);
+    CHECK(boat_plugin_route_digest(s.voyage.route) == boat_plugin_route_digest(&boat_voyage_outer));
+    CHECK(!s.world.scene);
+    // Runtime has no reload, undo, apply, save polling or authoring controls.
+    CHECK(!wake_plugin_frame(&p, &s, true, true, true, 1));
+    CHECK(!p.watching && !p.authoring);
+    wake_plugin_close(&p, &s);
+    CHECK(s.voyage_route == s.world.definition->voyage && !s.world.scene);
+
+    // The selectable Harbor life entry binds its authored scene but still starts no Lua VM.
+    const BoatPluginCatalogEntry *harbor = boat_plugin_catalog_find("proteus.harbor-life");
+    CHECK(harbor);
+    before = boat_plugin_lua_states();
+    CHECK(wake_plugin_open_catalog(&p, harbor, &s));
+    CHECK(boat_plugin_lua_states() == before);
+    const BoatPluginRevision *active = boat_plugin_host_active(&p.host);
+    CHECK(active->voyage.has_scene && s.world.scene == &active->voyage.scene);
+    CHECK(s.world.scene->berth_count == 2);
+    wake_plugin_close(&p, &s);
+    CHECK(!s.world.scene);
+    boat_session_destroy(&s);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(memory_accounting),
     TEST_CASE(live_migration),
@@ -1614,6 +1674,7 @@ static const TestCase cases[] = {
     TEST_CASE(repeated_reloads),
     TEST_CASE(game_controls),
     TEST_CASE(scene_binding),
+    TEST_CASE(catalog_runtime),
     TEST_CASE(harbor_life_scene),
     SLOW_CASE(compiled_parity),
 };

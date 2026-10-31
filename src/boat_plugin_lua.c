@@ -18,8 +18,14 @@ typedef struct {
     unsigned fields;
     BoatPluginVoyageData *data;
     BoatPluginRaceData *race;
+    BoatPluginFreeData *free;
+    BoatPluginCourseData *course;
     BoatPluginDiagnostic *diagnostic;
 } Vm;
+
+static unsigned lua_states;
+
+unsigned boat_plugin_lua_states(void) { return lua_states; }
 
 static void *allocate(void *context, void *block, size_t old_size, size_t size)
 {
@@ -236,9 +242,8 @@ static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", NU
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
 static const char *const GULLS[] = { "flocks", NULL };
-static const char *const FLOCK[]
-    = { "id", "recipe", "x", "z", "count", "seed", "phase", "radius", "height", "rate", "cues",
-          NULL };
+static const char *const FLOCK[] = { "id", "recipe", "x", "z", "count", "seed", "phase", "radius",
+    "height", "rate", "cues", NULL };
 static const char *const CUE[] = { "kind", "start", "stop", "fade", "amplitude", NULL };
 static const char *const VESSEL[]
     = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", NULL };
@@ -485,8 +490,8 @@ static bool scene_modules(lua_State *L, Vm *vm, int marina, BoatSceneDefinition 
 }
 
 // Decode a nonnegative integer count/tick without narrowing silently.
-static bool unsigned_value(lua_State *L, Vm *vm, int table, const char *path, const char *key,
-    double high, unsigned *out)
+static bool unsigned_value(
+    lua_State *L, Vm *vm, int table, const char *path, const char *key, double high, unsigned *out)
 {
     double value;
     if (!number(L, vm, table, path, key, &value))
@@ -585,8 +590,8 @@ static bool scene_gulls(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
         int cues = lua_absindex(L, -1);
         lua_Unsigned cue_count = lua_rawlen(L, cues);
         if (cue_count > WATERFRONT_FLOCK_CUES)
-            return reject(vm, cues_path, "must list 0 to %d cues, not %llu",
-                WATERFRONT_FLOCK_CUES, (unsigned long long)cue_count);
+            return reject(vm, cues_path, "must list 0 to %d cues, not %llu", WATERFRONT_FLOCK_CUES,
+                (unsigned long long)cue_count);
         f->cue_count = (unsigned)cue_count;
         for (unsigned c = 0; c < cue_count; ++c) {
             WaterfrontFlockCue *cue = &f->cues[c];
@@ -618,8 +623,7 @@ static bool scene_gulls(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
                 cue->fade_ticks = 0;
             } else {
                 lua_pop(L, 1);
-                if (!unsigned_value(
-                        L, vm, item, cue_path, "fade", 4294967295.0, &cue->fade_ticks))
+                if (!unsigned_value(L, vm, item, cue_path, "fade", 4294967295.0, &cue->fade_ticks))
                     return false;
             }
             lua_pop(L, 1);
@@ -632,8 +636,8 @@ static bool scene_gulls(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
 
 // L3.3: ordered stop overrides for a registered stopped route. IDs must match the preset's
 // named pier anchors in order; an omitted dwell leaves that stop on the shared remainder.
-static bool scene_stops(lua_State *L, Vm *vm, int entry, const char *path, WaterfrontRouteActor *v,
-    char *out)
+static bool scene_stops(
+    lua_State *L, Vm *vm, int entry, const char *path, WaterfrontRouteActor *v, char *out)
 {
     int type = field(L, entry, "stops", path, out);
     if (type == LUA_TNIL) {
@@ -676,8 +680,7 @@ static bool scene_stops(lua_State *L, Vm *vm, int entry, const char *path, Water
         } else {
             lua_pop(L, 1);
             double dwell;
-            if (!number(L, vm, stop, stop_path, "dwell", &dwell)
-                || !(dwell >= 0))
+            if (!number(L, vm, stop, stop_path, "dwell", &dwell) || !(dwell >= 0))
                 return reject(vm, dwell_path, "must be zero or positive seconds");
             v->stops[i].dwell = (float)dwell;
         }
@@ -719,8 +722,8 @@ static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *
     if (entries != length)
         return reject(vm, list_path, "must be a list numbered from 1 without gaps");
     if (length > WATERFRONT_ROUTE_ACTORS)
-        return reject(vm, list_path, "must list 0 to %d vessels, not %llu",
-            WATERFRONT_ROUTE_ACTORS, (unsigned long long)length);
+        return reject(vm, list_path, "must list 0 to %d vessels, not %llu", WATERFRONT_ROUTE_ACTORS,
+            (unsigned long long)length);
     s->traffic_present = true;
     s->traffic.actor_count = (unsigned)length;
     for (unsigned i = 0; i < length; ++i) {
@@ -732,8 +735,7 @@ static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *
         if (lua_type(L, -1) != LUA_TTABLE)
             return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
         int entry = lua_absindex(L, -1);
-        if (!only(L, vm, entry, path, VESSEL)
-            || !string(L, vm, entry, path, "id", id, sizeof(id)))
+        if (!only(L, vm, entry, path, VESSEL) || !string(L, vm, entry, path, "id", id, sizeof(id)))
             return false;
         char retain_path[64];
         int retain_type = field(L, entry, "retain", path, retain_path);
@@ -753,8 +755,7 @@ static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *
             memcpy(v->id, id, sizeof(id));
             // A retain entry may override its named stop dwells; the route and motion stay
             // the compiled actor's own.
-            if (!only(L, vm, entry, path,
-                    (const char *const[]) { "id", "retain", "stops", NULL }))
+            if (!only(L, vm, entry, path, (const char *const[]) { "id", "retain", "stops", NULL }))
                 return false;
             char stops_path[64];
             join(stops_path, sizeof(stops_path), path, "stops");
@@ -775,8 +776,8 @@ static bool scene_traffic(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *
                 char speed_path[64], period_path[64];
                 join(speed_path, sizeof(speed_path), path, "speed");
                 join(period_path, sizeof(period_path), path, "period");
-                return reject(vm, !(speed > 0) ? speed_path : period_path,
-                    "must be greater than zero");
+                return reject(
+                    vm, !(speed > 0) ? speed_path : period_path, "must be greater than zero");
             }
             if (!waterfront_route_preset(route, v))
                 return reject(vm, route_path, "is not a registered route");
@@ -853,8 +854,7 @@ static int decode(lua_State *L)
         double version;
         if (!only(L, vm, scene, "scene", SCENE)
             || !number(L, vm, scene, "scene", "version", &version)
-            || !scene_marina(L, vm, scene, &d->scene)
-            || !scene_traffic(L, vm, scene, &d->scene)
+            || !scene_marina(L, vm, scene, &d->scene) || !scene_traffic(L, vm, scene, &d->scene)
             || !scene_gulls(L, vm, scene, &d->scene))
             return 0;
         d->has_scene = true;
@@ -926,22 +926,23 @@ static bool numbers(
     return true;
 }
 
-static bool numeric_record(
-    lua_State *L, Vm *vm, int parent, const char *key, const char *const *keys, double *out)
+static bool numeric_record(lua_State *L, Vm *vm, int parent, const char *path, const char *key,
+    const char *const *keys, double *out)
 {
     char at[64];
-    int table = record(L, vm, parent, "race", key, keys, at);
+    int table = record(L, vm, parent, path, key, keys, at);
     if (!table || !numbers(L, vm, table, at, keys, out))
         return false;
     lua_pop(L, 1);
     return true;
 }
 
-static bool numeric_list(lua_State *L, Vm *vm, int parent, const char *key, const char *const *keys,
-    double *out, unsigned stride, unsigned min, unsigned max, unsigned *count_out)
+static bool numeric_list(lua_State *L, Vm *vm, int parent, const char *path, const char *key,
+    const char *const *keys, double *out, unsigned stride, unsigned min, unsigned max,
+    unsigned *count_out)
 {
     char at[64];
-    if (field(L, parent, key, "race", at) != LUA_TTABLE)
+    if (field(L, parent, key, path, at) != LUA_TTABLE)
         return reject(vm, at, "must be a dense list");
     int list = lua_absindex(L, -1);
     size_t count = lua_rawlen(L, list), entries = 0;
@@ -985,15 +986,59 @@ static int decode_race(lua_State *L)
     int race = record(L, vm, 2, "", "race", RACE, at);
     BoatPluginRaceData *d = vm->race;
     unsigned grid_count;
-    if (!race || !numeric_record(L, vm, race, "start", GATE, d->start)
-        || !numeric_list(
-            L, vm, race, "gates", GATE, &d->gates[0][0], 5, 1, BOAT_RACE_GATES, &d->gate_count)
-        || !numeric_list(L, vm, race, "grid", POINT, &d->grid[0][0], 2, BOAT_FLEET_SLOTS,
+    if (!race || !numeric_record(L, vm, race, "race", "start", GATE, d->start)
+        || !numeric_list(L, vm, race, "race", "gates", GATE, &d->gates[0][0], 5, 1, BOAT_RACE_GATES,
+            &d->gate_count)
+        || !numeric_list(L, vm, race, "race", "grid", POINT, &d->grid[0][0], 2, BOAT_FLEET_SLOTS,
             BOAT_FLEET_SLOTS, &grid_count)
-        || !numeric_record(L, vm, race, "source", SOURCE, d->source)
-        || !numeric_record(L, vm, race, "storm", STORM, d->storm)
-        || !numeric_record(L, vm, race, "rules", RULES, d->rules))
+        || !numeric_record(L, vm, race, "race", "source", SOURCE, d->source)
+        || !numeric_record(L, vm, race, "race", "storm", STORM, d->storm)
+        || !numeric_record(L, vm, race, "race", "rules", RULES, d->rules))
         return 0;
+    return 0;
+}
+
+static const char *const FREE_ROOT[] = { "free", NULL };
+static const char *const FREE[] = { "version", NULL };
+static const char *const COURSE_ROOT[] = { "course", NULL };
+static const char *const COURSE[] = { "start", "gates", NULL };
+static const char *const COURSE_START[] = { "x", "z", "heading", NULL };
+static const char *const COURSE_GATE[] = { "x", "z", "half_width", NULL };
+
+static int decode_free(lua_State *L)
+{
+    Vm *vm = lua_touserdata(L, 1);
+    if (lua_type(L, 2) != LUA_TTABLE) {
+        reject(vm, "", "the entry must return a table");
+        return 0;
+    }
+    char at[64];
+    if (!only(L, vm, 2, "", FREE_ROOT))
+        return 0;
+    int free = record(L, vm, 2, "", "free", FREE, at);
+    if (!free || !number(L, vm, free, at, "version", &vm->free->version))
+        return 0;
+    return 0;
+}
+
+static int decode_course(lua_State *L)
+{
+    Vm *vm = lua_touserdata(L, 1);
+    if (lua_type(L, 2) != LUA_TTABLE) {
+        reject(vm, "", "the entry must return a table");
+        return 0;
+    }
+    char at[64];
+    if (!only(L, vm, 2, "", COURSE_ROOT))
+        return 0;
+    int course = record(L, vm, 2, "", "course", COURSE, at);
+    BoatPluginCourseData *d = vm->course;
+    unsigned gate_count;
+    if (!course || !numeric_record(L, vm, course, "course", "start", COURSE_START, d->start)
+        || !numeric_list(L, vm, course, "course", "gates", COURSE_GATE, &d->gates[0][0], 3,
+            BOAT_COURSE_GATES, BOAT_COURSE_GATES, &gate_count))
+        return 0;
+    d->gate_count = gate_count;
     return 0;
 }
 
@@ -1027,7 +1072,11 @@ static BoatPluginStatus run(
         return d->status;
     }
     int result = lua_gettop(L);
-    lua_pushcfunction(L, vm->race ? decode_race : decode);
+    lua_pushcfunction(L,
+        vm->race         ? decode_race
+            : vm->free   ? decode_free
+            : vm->course ? decode_course
+                         : decode);
     lua_pushlightuserdata(L, vm);
     lua_pushvalue(L, result);
     status = lua_pcall(L, 2, 0, 0);
@@ -1056,6 +1105,7 @@ BoatPluginStatus boat_plugin_lua_voyage(const char *source, size_t size, const c
         failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
         status = BOAT_PLUGIN_MEMORY;
     } else {
+        ++lua_states;
         status = run(L, &vm, source, size, chunk);
         lua_close(L);
     }
@@ -1083,6 +1133,63 @@ BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const cha
         failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
         status = BOAT_PLUGIN_MEMORY;
     } else {
+        ++lua_states;
+        status = run(L, &vm, source, size, chunk);
+        lua_close(L);
+    }
+    diagnostic->cost = (BoatPluginCost) { .instructions = vm.instructions,
+        .entry_instructions = vm.instructions,
+        .peak_bytes = vm.peak,
+        .leaked_bytes = vm.live,
+        .fields = vm.fields };
+    if (status == BOAT_PLUGIN_OK)
+        *out = data;
+    return status;
+}
+
+BoatPluginStatus boat_plugin_lua_free(const char *source, size_t size, const char *chunk,
+    const BoatPluginLimits *limits, BoatPluginFreeData *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginFreeData data = { 0 };
+    Vm vm = { .limit = limits->memory_bytes,
+        .budget = limits->instructions,
+        .free = &data,
+        .diagnostic = diagnostic };
+    BoatPluginStatus status;
+    lua_State *L = lua_newstate(allocate, &vm);
+    if (!L) {
+        failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
+        status = BOAT_PLUGIN_MEMORY;
+    } else {
+        ++lua_states;
+        status = run(L, &vm, source, size, chunk);
+        lua_close(L);
+    }
+    diagnostic->cost = (BoatPluginCost) { .instructions = vm.instructions,
+        .entry_instructions = vm.instructions,
+        .peak_bytes = vm.peak,
+        .leaked_bytes = vm.live,
+        .fields = vm.fields };
+    if (status == BOAT_PLUGIN_OK)
+        *out = data;
+    return status;
+}
+
+BoatPluginStatus boat_plugin_lua_course(const char *source, size_t size, const char *chunk,
+    const BoatPluginLimits *limits, BoatPluginCourseData *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginCourseData data = { 0 };
+    Vm vm = { .limit = limits->memory_bytes,
+        .budget = limits->instructions,
+        .course = &data,
+        .diagnostic = diagnostic };
+    BoatPluginStatus status;
+    lua_State *L = lua_newstate(allocate, &vm);
+    if (!L) {
+        failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
+        status = BOAT_PLUGIN_MEMORY;
+    } else {
+        ++lua_states;
         status = run(L, &vm, source, size, chunk);
         lua_close(L);
     }
@@ -1108,6 +1215,7 @@ BoatPluginStatus boat_plugin_lua_transition(const char *source, size_t size,
     uint64_t entry_instructions = 0;
     bool callback_started = false;
     if (L) {
+        ++lua_states;
         lua_pushcfunction(L, setup);
         status = lua_pcall(L, 0, 0, 0);
         if (status == LUA_OK)

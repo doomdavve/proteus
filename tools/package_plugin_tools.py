@@ -9,7 +9,8 @@ import shutil
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ("plugin_author.py", "plugin_schema.py", "plugin_anchors.json")
-EXAMPLES = ("langedrag", "river-sprint", "shelter-tour")
+EXAMPLES = ("langedrag", "river-sprint", "shelter-tour", "harbor-life", "basin-free",
+            "river-free", "time-trial")
 
 
 def install(authoring, worker, worker_path, game_path, plugins, package, version):

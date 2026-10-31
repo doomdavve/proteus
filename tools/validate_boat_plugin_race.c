@@ -122,7 +122,8 @@ static int reload_and_undo(void)
 {
     BoatPluginHost host;
     BoatPluginBundle b = original();
-    CHECK(boat_plugin_host_start(&host, river()->definition, &river()->map, &b) && host.racing);
+    CHECK(boat_plugin_host_start(&host, river()->definition, &river()->map, &b)
+        && host.kind == BOAT_PLUGIN_KIND_RACE);
     const BoatPluginRevision *active = boat_plugin_host_active(&host);
     b = edit("River sprint", "Evening sprint", true);
     CHECK(boat_plugin_host_stage(&host, &b) && host.change == BOAT_PLUGIN_RENAMED);

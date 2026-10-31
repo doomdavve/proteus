@@ -1,0 +1,10 @@
+{
+  "id": "proteus.time-trial",
+  "name": "Basin time trial",
+  "api": 1,
+  "kind": "course",
+  "entry": "main.lua",
+  "location": "basin",
+  "capabilities": ["course.define"],
+  "state_version": 1
+}

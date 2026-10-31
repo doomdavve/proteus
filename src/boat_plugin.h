@@ -5,6 +5,7 @@
 // evaluates one plugin's manifest and Lua entry text and decodes its voyage into owned native
 // data. Input is immutable bytes; nothing here touches files (boat_plugin_io.h acquires them).
 // Every load uses a fresh restricted Lua state that is closed before the call returns.
+#include "boat_course.h"
 #include "boat_location.h"
 #include "boat_race.h"
 #include "boat_scene_definition.h"
@@ -22,6 +23,17 @@
 #define BOAT_PLUGIN_MANIFEST_MAX 4096
 #define BOAT_PLUGIN_SOURCE_MAX 65536
 #define BOAT_PLUGIN_TEXT 24 // Shelter id and name capacity, including the terminator.
+
+typedef enum {
+    BOAT_PLUGIN_KIND_NONE,
+    BOAT_PLUGIN_KIND_VOYAGE,
+    BOAT_PLUGIN_KIND_FREE,
+    BOAT_PLUGIN_KIND_COURSE,
+    BOAT_PLUGIN_KIND_RACE,
+} BoatPluginKind;
+// The manifest spelling ("voyage", "free", "course" or "race"), or NONE for an unknown one.
+BoatPluginKind boat_plugin_kind_parse(const char *kind);
+const char *boat_plugin_kind_name(BoatPluginKind kind);
 
 typedef enum {
     BOAT_PLUGIN_OK,
@@ -103,9 +115,32 @@ typedef struct {
     BoatRaceRules rules;
     uint64_t digest;
 } BoatPluginRace;
+
+// PD1: a free-boating session definition. It selects the location and nothing else; the
+// engine's registered default content applies, exactly as an absent subsystem does.
+typedef struct {
+    BoatPluginManifest manifest;
+    uint64_t digest;
+} BoatPluginFree;
+
+// PD1: a time-trial session definition. The course is the same value the session binds.
+typedef struct {
+    BoatPluginManifest manifest;
+    BoatCourseDefinition course;
+    uint64_t digest;
+} BoatPluginCourse;
+
 BoatPluginStatus boat_plugin_load_race(const BoatPluginBundle *bundle,
     const BoatPluginLimits *limits, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_load_free(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginFree *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginCourse *out, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_race_check_location(const BoatPluginRace *race,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
+    const BoatWorldDefinition *location, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_course_check_location(const BoatPluginCourse *course,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
 uint64_t boat_plugin_race_digest(const BoatRaceCourse *course, const BoatRaceRules *rules);
 
@@ -139,6 +174,10 @@ typedef enum {
 
 BoatPluginChange boat_plugin_race_classify(
     const BoatPluginRace *active, const BoatPluginRace *candidate);
+BoatPluginChange boat_plugin_free_classify(
+    const BoatPluginFree *active, const BoatPluginFree *candidate);
+BoatPluginChange boat_plugin_course_classify(
+    const BoatPluginCourse *active, const BoatPluginCourse *candidate);
 const char *boat_plugin_change_name(BoatPluginChange change);
 // Shelter identity is by ordered ID: a renamed ID or a reordering restarts the voyage.
 BoatPluginChange boat_plugin_classify(

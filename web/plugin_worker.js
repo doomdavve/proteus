@@ -26,6 +26,14 @@ self.onmessage = async ({data}) => {
     }
     if (!(data.bytes instanceof Uint8Array) || data.bytes.length > 8 + 4096 + 65536)
       throw Error('Invalid package frame');
+    const view = new DataView(data.bytes.buffer, data.bytes.byteOffset, data.bytes.byteLength);
+    const manifestSize = view.getUint32(0);
+    if (manifestSize > 4096)
+      throw Error('Invalid package manifest size');
+    const manifest = JSON.parse(new TextDecoder().decode(
+      data.bytes.slice(8, 8 + manifestSize)));
+    if (manifest && manifest.kind !== 'voyage')
+      throw Error(`${manifest.kind} packages are native-only until browser parity; use a voyage`);
     const create = (await import(data.runtime)).default;
     let offset = 0;
     const output = [];

@@ -1,17 +1,18 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **planned; no implementation.** The user asked for plugins to become the
-default and always enabled, and for this plan to be executable by a long-running agent. This
-document owns the sequence, per-PR status and acceptance for that move. The
-[plugin plan](PLUGIN_PLAN.md) and [API](PLUGIN_API.md) keep the existing plugin contract, the
-[multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts, and the
-[room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps. [All plans](README.md).
+Status, 2026-10-31: **PD1 implemented; PC next.** Native solo sessions now run from packages
+compiled at build time, `--plugin` is the separate authoring path, and a temporary
+`--no-plugins` restores compiled content. This document owns the sequence, per-PR status and
+acceptance for that move. The [plugin plan](PLUGIN_PLAN.md) and [API](PLUGIN_API.md) keep the
+existing plugin contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts,
+and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
+[All plans](README.md).
 
-Next task: **[PD1](#pd1--bundled-runtime-and-complete-solo-coverage)**.
+Next task: **[PC](#pc--live-console-and-edits-without-reset)**.
 
 | PR | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
-| [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Not started |
+| [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; in review |
 | [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Not started |
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Not started |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Not started |
@@ -252,6 +253,69 @@ Read first: `tools/wake_velocity_plugin.[ch]`, `tools/wake_velocity.c`, `tools/b
 - Windows CI builds and runs the generator and exercises the catalog.
 
 **Needs the user:** play default solo modes for regressions, and judge Harbor life from the title.
+
+### PD1 result, 2026-10-31
+
+**Implemented.** Native solo sessions open a build-time catalog entry through
+`boat_plugin_host_start_decoded`: no Lua state, file poll, staging worker, bridge or panel. The
+F5/F6/F7 controls, save polling, bridge and panel now belong to `--plugin DIR` only. The
+handwritten generator `tools/boat_plugin_catalog_gen.c` evaluates each package with the normal
+loader, runs the staging checks (manifest, schema, map, scene and the full traffic sweep),
+rejects objective callbacks and writes `build/generated/boat_plugin_catalog_data.c` as byte
+arrays. `proteus_plugin_catalog` (lookup by ID and by kind/location default, plus decode) depends
+on `proteus_plugins`; the generator does not link it. `add_custom_command` uses
+`$<TARGET_FILE:...>` and depends on every package file.
+
+The new `free` and `course` kinds, their `free.define`/`course.define` grants, the stage wire
+(PST6), `BoatPluginHost.kind`, revisions, classification and Objective/Undo paths are implemented
+for all four kinds. `plugins/basin-free`, `plugins/river-free` and `plugins/time-trial` join
+`langedrag`, `river-sprint` and `harbor-life` in the catalog. The time trial's start and gates are
+bound into `BoatSession`/`BoatCourse`; the compiled digest keeps
+`course-{calm|waves}-physicsN.run`, while another course appends its digest and refuses
+`--replay`/`--ghost`. `--package ID` selects a bundled entry; `--no-plugins` restores the compiled
+path; unknown IDs and location/kind mismatches fail explicitly. The title's native single-player
+panel gains a saved CONTENT row for `outer` (Standard or Harbor life), and a failed open returns
+to the title with the diagnostic.
+
+**Deviations.** The optional `free` scene on the river was deferred: a free package has no voyage
+route, so the existing scene checks would need a new no-route validation path; the river therefore
+keeps its compiled scene and `harbor-life` remains a selectable `outer` voyage. The generated C
+file stores the bulk definition, manifest text and source as byte arrays but keeps short ID/name/
+kind/location strings as literals. `boat_plugin_bench` accepts packages without objectives and
+skips the callback benches for them. `boat_plugin_classify` now considers source bytes only when
+an objective is present, because non-objective revisions now retain their source for a later
+console.
+
+**Verification actually run, Apple Silicon/macOS, 2026-10-31.** Debug configure/build from the
+pinned dependency sources: warning-clean apart from raylib's `stb_vorbis.c` warning.
+`ctest --preset quick` passed all 231 enabled tests. `ctest --preset full` passed all 329 enabled
+tests (13 retired field tests disabled, GPU CTests off). That includes
+`plugin_default_parity` (4.6 s), the three `boat_plugin_catalog.*` cases,
+`boat_plugin_catalog_invalid`, `boat_plugin_session.catalog_runtime`, `boat_plugin_author`, `boat_plugin_capture`,
+`boat_plugin_stage`, `wake_velocity_bridge` and the extended `boat_replay` legacy-best case.
+`git diff --check` passes; changed local links were checked. CPU captures of basin, river, outer
+and `--course` are byte-identical between the catalog and `--no-plugins`. A windowed
+`--location river --demo --frames 60` run completed. Title captures of the SOLO panel with
+`CONTENT < STANDARD >` and `CONTENT < HARBOR LIFE >` were inspected. The game was run from the
+repository root so relative assets resolved.
+
+**Measurements, Release, Apple Silicon/macOS, display-free CPU capture of a three-second drive.**
+Four runs each after one warm-up: compiled `outer` 0.79 s (range 0.79–0.80), default catalog
+`outer` 0.79 s (0.79–0.80), bundled `harbor-life` 0.79 s (0.79–0.80). The first uncached default
+run took 1.12 s while the system scanned the new binary. Against the baseline (compiled
+`outer` 0.80 s, `harbor-life` 1.56 s) the +0.75 s sweep is gone. The generator takes 0.80 s p50
+(0.81 s max) for all six packages in both Debug and Release builds on this machine; most of that
+is `harbor-life`'s traffic sweep.
+
+**Known limits.** Emscripten still uses compiled content and was not built for this step; the
+browser worker and constructor reject `free`/`course` explicitly. Windows CI has not run this
+branch yet, so the generator's MSVC build and its byte arrays are unverified here. GPU CTests and
+the manual three-engine browser workflow were not run. The `free` river scene and package-defined
+rooms remain for later steps.
+
+**Needs the user.** Play the default basin, river, outer and time-trial sessions for regressions;
+judge Harbor life from the title's CONTENT row; confirm the title row's Standard/Harbor life
+wording.
 
 ## PC — live console and edits without reset
 
@@ -632,10 +696,11 @@ are gone, and every doc says so.
 
 Reviewed 2026-10-31 against `e335b84`: the plugin, multiplayer, room content, deathmatch playtest,
 living city, sunset, adventure and architecture documents and the source seams cited above, plus the
-reload classification, session commit, tool bridge and key bindings for PC. The console design is a
-proposal: none of it has been prototyped, and generating the catalog under Node has not been tried. CI
-triggers were read from the workflow files, and start-up was measured as stated in the baseline.
-Nothing here is implemented, and no user acceptance is recorded or implied.
+reload classification, session commit, tool bridge and key bindings for PC. That review was made
+before PD1: the console design remains a proposal, and generating the catalog under Node has not
+been tried. CI triggers were read from the workflow files, and start-up was measured as stated in
+the baseline. PD1 is now implemented as recorded in its result subsection; later steps remain
+unimplemented, and no user acceptance is recorded or implied.
 
 Handoff verification, 2026-10-31, Apple Silicon/macOS, documentation-only, on this branch before the
 build-time catalog and console revision (source unchanged since): Debug build passed and

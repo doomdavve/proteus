@@ -50,8 +50,7 @@ int main(int argc, char **argv)
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginManifest manifest;
     if (boat_plugin_parse_manifest(bundle.manifest, bundle.manifest_size, NULL, &manifest, &d)
-            != BOAT_PLUGIN_OK
-        || !manifest.objective)
+        != BOAT_PLUGIN_OK)
         return 1;
     const BoatWorldDefinition *location = boat_location_find(manifest.location);
     BoatWorldResources resources;
@@ -95,7 +94,7 @@ int main(int argc, char **argv)
             bool ok = boat_plugin_host_stage(host, &bundle);
             samples[i] = (now() - started) * 1000;
             d = host->diagnostic;
-            if (!ok || !boat_plugin_host_commit(host))
+            if (!ok || (host->held && !boat_plugin_host_commit(host)))
                 goto done;
         }
         report(full == 2 ? "stage_dense_64KiB"
@@ -133,41 +132,43 @@ int main(int argc, char **argv)
         boat_plugin_default_limits.memory_bytes);
     printf("native_owner=%zu owned_ceiling=%zu preview_checkpoint=%zu\n", sizeof(WakePlugin),
         sizeof(WakePlugin) + boat_plugin_default_limits.memory_bytes, sizeof(WakePluginPreview));
-    const char *scripts[] = {
-        files.source,
-        "return {update=function(c,s) while true do end end}",
-        "return {migrate=function(c,s) while true do end end}",
-        "while true do end",
-        "return {update=function(c,s) return {s=string.rep('x',3000000)},{} end}",
-        "local n=0; for i=1,200000 do n=n+1 end; return {update=function(c,s) "
-        "for i=1,20000 do n=n+1 end; return s,{} end}",
-    };
-    const char *names[] = { "update_reference", "callback_budget", "migration_budget",
-        "entry_budget", "heap_rejection", "entry_plus_callback" };
-    BoatPluginObjective initial = { .generation = 1,
-        .rng = 12345,
-        .state_version = manifest.state_version,
-        .timers_enabled = manifest.timers };
-    if (boat_plugin_objective_step(&initial, files.source, files.source_size,
-            BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &d)
-        != BOAT_PLUGIN_OK)
-        goto done;
-    for (unsigned script = 0; script < sizeof(scripts) / sizeof(*scripts); ++script) {
-        for (unsigned i = 0; i < SAMPLES; ++i) {
-            BoatPluginObjective objective = initial;
-            double started = now();
-            BoatPluginStatus status = boat_plugin_objective_step(&objective, scripts[script],
-                script == 0 ? files.source_size : strlen(scripts[script]),
-                script == 2 ? BOAT_PLUGIN_OBJECTIVE_MIGRATE : BOAT_PLUGIN_OBJECTIVE_UPDATE, 12,
-                NULL, 0, NULL, &d);
-            samples[i] = (now() - started) * 1000;
-            BoatPluginStatus expected = (script == 0 || script == 5) ? BOAT_PLUGIN_OK
-                : script == 4                                        ? BOAT_PLUGIN_MEMORY
-                                                                     : BOAT_PLUGIN_BUDGET;
-            if (status != expected || d.cost.leaked_bytes)
-                goto done;
+    if (manifest.objective) {
+        const char *scripts[] = {
+            files.source,
+            "return {update=function(c,s) while true do end end}",
+            "return {migrate=function(c,s) while true do end end}",
+            "while true do end",
+            "return {update=function(c,s) return {s=string.rep('x',3000000)},{} end}",
+            "local n=0; for i=1,200000 do n=n+1 end; return {update=function(c,s) "
+            "for i=1,20000 do n=n+1 end; return s,{} end}",
+        };
+        const char *names[] = { "update_reference", "callback_budget", "migration_budget",
+            "entry_budget", "heap_rejection", "entry_plus_callback" };
+        BoatPluginObjective initial = { .generation = 1,
+            .rng = 12345,
+            .state_version = manifest.state_version,
+            .timers_enabled = manifest.timers };
+        if (boat_plugin_objective_step(&initial, files.source, files.source_size,
+                BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &d)
+            != BOAT_PLUGIN_OK)
+            goto done;
+        for (unsigned script = 0; script < sizeof(scripts) / sizeof(*scripts); ++script) {
+            for (unsigned i = 0; i < SAMPLES; ++i) {
+                BoatPluginObjective objective = initial;
+                double started = now();
+                BoatPluginStatus status = boat_plugin_objective_step(&objective, scripts[script],
+                    script == 0 ? files.source_size : strlen(scripts[script]),
+                    script == 2 ? BOAT_PLUGIN_OBJECTIVE_MIGRATE : BOAT_PLUGIN_OBJECTIVE_UPDATE, 12,
+                    NULL, 0, NULL, &d);
+                samples[i] = (now() - started) * 1000;
+                BoatPluginStatus expected = (script == 0 || script == 5) ? BOAT_PLUGIN_OK
+                    : script == 4                                        ? BOAT_PLUGIN_MEMORY
+                                                                         : BOAT_PLUGIN_BUDGET;
+                if (status != expected || d.cost.leaked_bytes)
+                    goto done;
+            }
+            report(names[script], samples, &d);
         }
-        report(names[script], samples, &d);
     }
     result = 0;
 done:
