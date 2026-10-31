@@ -6,6 +6,8 @@
   const STORAGE = 'wake-velocity-plugin-v1';
   // Must equal BOAT_PLUGIN_WIRE_VERSION in src/boat_plugin_wire.h; web_plugin_wire checks it.
   const WIRE_MAGIC = 0x50535437;
+  // Harbor life's scene revision measures 5,505 bytes; leave room for larger authored scenes.
+  const RESULT_LIMIT = 16384;
   function scenes(manifest) {
     try {
       const data = JSON.parse(manifest);
@@ -20,10 +22,10 @@
     if (encoder.encode(manifest).length > 4096 || encoder.encode(source).length > 65536)
       throw Error('Package exceeds the 4 KiB manifest or 64 KiB source limit');
     // Native scene authoring is not part of the browser subset; reject before the worker starts.
-    if (scenes(manifest)) throw Error('Scene authoring is native-only; browser scene imports are unsupported');
+    // Imported scenes and all solo kinds share the worker's bounded stage wire.
     const type = kind(manifest);
-    if (type && type !== 'voyage')
-      throw Error(`${type} packages are native-only until browser parity; use a voyage`);
+    if (type === 'race' || type === 'match')
+      throw Error(`${type} packages are room content; import them through a room`);
     return {format: FORMAT, version: 1, manifest, source};
   }
   function decode(text) {
@@ -80,7 +82,7 @@
       if (job.worker) job.worker.terminate();
       if (job.deadline !== undefined) this.clear(job.deadline);
       if (result && (result.exit === 0 || result.exit === 1)
-          && result.bytes instanceof Uint8Array && result.bytes.length >= 8 && result.bytes.length <= 4096
+          && result.bytes instanceof Uint8Array && result.bytes.length >= 8 && result.bytes.length <= RESULT_LIMIT
           && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === WIRE_MAGIC
           && (new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(4) === 0) === (result.exit === 0)) {
         job.response = result.bytes.slice(); job.state = result.exit === 0 ? 1 : 2;

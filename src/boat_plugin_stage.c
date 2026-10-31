@@ -195,20 +195,13 @@ int boat_plugin_stage_worker(void)
         goto done;
     }
 #ifdef __EMSCRIPTEN__
-    if (kind != BOAT_PLUGIN_KIND_VOYAGE) {
+    // Rooms carry their own definition as data. Browser solo has no race trial or match.
+    if (kind == BOAT_PLUGIN_KIND_RACE || kind == BOAT_PLUGIN_KIND_MATCH) {
         d.status = BOAT_PLUGIN_MANIFEST;
         snprintf(d.file, sizeof(d.file), "plugin.json");
         snprintf(d.field, sizeof(d.field), "kind");
         snprintf(d.message, sizeof(d.message),
-            "%s packages are native-only until browser parity; use a voyage", m.kind);
-        goto done;
-    }
-    if (m.scene) {
-        d.status = BOAT_PLUGIN_MANIFEST;
-        snprintf(d.file, sizeof(d.file), "plugin.json");
-        snprintf(d.field, sizeof(d.field), "capabilities[2]");
-        snprintf(d.message, sizeof(d.message),
-            "scene.define is native-only; browser scene imports are unsupported");
+            "%s packages are room content; join a room instead of importing one", m.kind);
         goto done;
     }
 #endif
@@ -388,7 +381,7 @@ BoatPluginStageJob *boat_plugin_stage_start(
 {
 #ifdef __EMSCRIPTEN__
     (void)executable;
-    if (!isfinite(now) || host->kind != BOAT_PLUGIN_KIND_VOYAGE)
+    if (!isfinite(now))
 #else
     if (!executable || !isfinite(now) || !host->depth)
 #endif

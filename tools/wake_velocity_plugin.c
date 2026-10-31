@@ -420,13 +420,20 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     BoatPluginBundle bundle = boat_plugin_bundle(&plugin->files);
 #ifdef __EMSCRIPTEN__
     (void)bundle;
-    // Only a completed, byte-matched browser-worker receipt may launch an imported voyage.
+    // Only a completed, byte-matched browser-worker receipt may launch an imported package.
     // Callback execution also uses worker receipts; no imported Lua runs on this thread.
+    BoatPluginManifest manifest;
+    bool parsed = read
+        && boat_plugin_parse_manifest(
+               plugin->files.manifest, plugin->files.manifest_size, NULL, &manifest,
+               &plugin->host.diagnostic)
+            == BOAT_PLUGIN_OK;
     plugin->host.location = session->world.definition;
     plugin->host.map = &session->world.resources->map;
-    plugin->host.kind = BOAT_PLUGIN_KIND_VOYAGE;
-    BoatPluginStageJob *launch
-        = read ? boat_plugin_stage_start(NULL, &plugin->host, &plugin->files, now) : NULL;
+    plugin->host.kind = parsed ? boat_plugin_kind_parse(manifest.kind) : BOAT_PLUGIN_KIND_NONE;
+    BoatPluginStageJob *launch = read && parsed && plugin->host.kind != BOAT_PLUGIN_KIND_NONE
+        ? boat_plugin_stage_start(NULL, &plugin->host, &plugin->files, now)
+        : NULL;
     bool started = launch && boat_plugin_stage_poll(launch, &plugin->host, now) == 1;
     boat_plugin_stage_close(launch);
     plugin->stage_executable = "browser-worker";
@@ -446,18 +453,27 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     plugin->watching = true;
     boat_plugin_watch_start(&plugin->watch, key, now);
 #endif
-    // At tick zero nothing has been observed, so this is the voyage's start.
-    boat_session_restart_voyage(session, &boat_plugin_host_active(&plugin->host)->voyage.route);
+    const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
+    switch (plugin->host.kind) {
+    case BOAT_PLUGIN_KIND_VOYAGE:
+        // At tick zero nothing has been observed, so this is the voyage's start.
+        boat_session_restart_voyage(session, &active->voyage.route);
+        wake_plugin_reset_objective(plugin, session);
+        break;
+    case BOAT_PLUGIN_KIND_COURSE:
+        boat_session_set_course_definition(session, &active->course.course);
+        break;
+    default:
+        break;
+    }
     bind_scene(plugin, session);
-    wake_plugin_reset_objective(plugin, session);
-    const BoatPluginVoyage *voyage = &boat_plugin_host_active(&plugin->host)->voyage;
     report(plugin, "active", false,
 #ifdef __EMSCRIPTEN__
         "PLUGIN PANEL: STAGE / APPLY / UNDO",
 #else
         "F5 RELOAD / F6 UNDO / SAVES RELOAD",
 #endif
-        "%s R1 ACTIVE %016llx", voyage->manifest.id, (unsigned long long)voyage->digest);
+        "%s R1 ACTIVE", active->manifest.name);
     return true;
 }
 

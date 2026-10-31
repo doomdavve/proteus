@@ -29,12 +29,16 @@ async function main() {
   const original = bundle(fs.readFileSync(path.join(root, 'plugins/langedrag/plugin.json'), 'utf8'),
     fs.readFileSync(path.join(root, 'plugins/langedrag/main.lua'), 'utf8'));
   assert.deepEqual(decode(encode(original)), original);
-  // Scene authoring is rejected before a browser worker starts.
+  // Imported scenes and solo kinds share the worker wire; room kinds are rejected up front.
   const sceneManifest = original.manifest.replace('["voyage.define"]',
     '["voyage.define", "scene.define"]');
   assert.equal(scenes(sceneManifest), true);
-  assert.throws(() => bundle(sceneManifest, original.source));
-  assert.throws(() => decode(encode({...original, manifest: sceneManifest})));
+  assert.ok(bundle(sceneManifest, original.source));
+  assert.deepEqual(decode(encode({...original, manifest: sceneManifest})).manifest, sceneManifest);
+  assert.throws(() => bundle(original.manifest.replace('"kind": "voyage"', '"kind": "race"'),
+    original.source), /room content/);
+  assert.throws(() => bundle(original.manifest.replace('"kind": "voyage"', '"kind": "match"'),
+    original.source), /room content/);
   assert.throws(() => encode(bundle('', '\u0001'.repeat(65536))));
   const framed = frame(original), view = new DataView(framed.buffer);
   assert.equal(view.getUint32(0), Buffer.byteLength(original.manifest));
