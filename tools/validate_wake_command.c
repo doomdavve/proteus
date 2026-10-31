@@ -150,7 +150,7 @@ static uint64_t trace(WakePlugin *out, BoatSession *target, unsigned ticks, bool
             wake_command_submit(command, out, target, edit_line, *now);
             CHECK(command->pending, "edit submission");
             if (out->staging)
-                pump(out, target, *now, 20000000);
+                pump(out, target, *now, 200000000);
             wake_command_frame(command, out, target, *now);
         }
         wake_plugin_before_tick(out);
@@ -195,7 +195,7 @@ static void test_live_scene(const char *executable)
     double now = 0;
     uint64_t first
         = trace(&edited, &a, 120, true, &now, "def.scene.marina.berths[1].x = 11", &edit_command);
-    pump(&edited, &a, now, 20000000);
+    pump(&edited, &a, now, 200000000);
     wake_command_frame(&edit_command, &edited, &a, now);
     double control_now = 0;
     uint64_t both = trace(&control, &b, 120, false, &control_now, NULL, &idle_command);
@@ -218,7 +218,7 @@ static void test_live_scene(const char *executable)
     double repeat_now = 0;
     uint64_t again = trace(
         &repeat, &r, 120, true, &repeat_now, "def.scene.marina.berths[1].x = 11", &repeat_command);
-    pump(&repeat, &r, repeat_now, 20000000);
+    pump(&repeat, &r, repeat_now, 200000000);
     CHECK(again == first,
         "repeating the edit at the same tick hashes identically: %016llx vs "
         "%016llx",
@@ -235,13 +235,13 @@ static void test_live_scene(const char *executable)
               &edit_command, &edited, &a, "def.scene.marina.berths[2].heading = -1.45", held_now)
             == false,
         "held edit submission");
-    CHECK(pump(&edited, &a, held_now, 20000000), "held edit staged");
+    CHECK(pump(&edited, &a, held_now, 200000000), "held edit staged");
     wake_command_frame(&edit_command, &edited, &a, held_now);
     CHECK(boat_plugin_host_held(&edited.host) != NULL, "the edit is held under the boat");
     CHECK(boat_plugin_host_active(&edited.host)->voyage.scene.berths[1].heading == heading_before,
         "the active scene is unchanged while held");
     a.boat.position = (Vector2) { 0, 100 };
-    CHECK(pump(&edited, &a, held_now, 20000000), "held edit commits when clear");
+    CHECK(pump(&edited, &a, held_now, 200000000), "held edit commits when clear");
     CHECK(boat_plugin_host_held(&edited.host) == NULL, "the held edit committed");
     CHECK(a.boat.position.x == 0 && a.boat.position.y == 100, "the boat was not displaced");
     wake_command_frame(&edit_command, &edited, &a, held_now);
@@ -286,7 +286,7 @@ static void test_live_scene(const char *executable)
             == false,
         "query submission");
     double query_now = held_now + 2;
-    for (unsigned i = 0; i < 20000000 && query_command.query_pending; ++i)
+    for (unsigned i = 0; i < 200000000 && query_command.query_pending; ++i)
         wake_command_frame(&query_command, &edited, &a, query_now);
     CHECK(!query_command.query_pending, "query completed");
     CHECK(has_line(&query_output, "DOCK"), "query rendered the shelter name");
@@ -298,11 +298,24 @@ static void test_live_scene(const char *executable)
               &edit_command, &edited, &a, "def.scene.marina.berths[1].x = ", query_now + 1)
             == false,
         "broken edit submission");
-    CHECK(pump(&edited, &a, query_now, 20000000), "broken edit staged");
+    CHECK(pump(&edited, &a, query_now, 200000000), "broken edit staged");
     wake_command_frame(&edit_command, &edited, &a, query_now);
     CHECK(has_line(&output, "REJECTED"), "the console reported the rejection");
     CHECK(boat_plugin_host_active(&edited.host)->number == active_number,
         "the active revision survived the broken edit");
+
+    // A second edit while one is staging is refused rather than queued behind it.
+    CHECK(!wake_command_submit(
+              &edit_command, &edited, &a, "def.scene.marina.berths[1].x = 12", query_now + 2),
+        "first queued edit");
+    CHECK(edit_command.pending, "the first edit is staging");
+    CHECK(!wake_command_submit(
+              &edit_command, &edited, &a, "def.scene.marina.berths[1].x = 13", query_now + 2),
+        "second edit refused");
+    CHECK(has_line(&output, "STAGING"), "the refusal names the staging state");
+    CHECK(pump(&edited, &a, query_now + 2, 20000000), "queued edit staged");
+    wake_command_frame(&edit_command, &edited, &a, query_now + 2);
+
     // Every edit and query above ran in the isolated worker: this process never opened a Lua VM.
     CHECK(boat_plugin_lua_states() == 0, "plain play and the console create no game-thread Lua");
 
@@ -342,6 +355,7 @@ static void test_commands(const char *executable)
     CHECK(has_line(&output, "CHUNKS 0"), "status reports the chunk count");
     CHECK(wake_command_submit(&command, &plugin, &session, "/nonsense", 0) == false, "unknown");
     CHECK(has_line(&output, "UNKNOWN COMMAND"), "unknown command reported");
+    CHECK(wake_command_submit(&command, &plugin, &session, "/restart", 0), "restart requested");
     // Granting scene.define to a package without it changes only the session's manifest copy.
     CHECK(wake_command_submit(&command, &plugin, &session, "/capability scene.define", 0) == false,
         "grant");

@@ -105,6 +105,10 @@ static bool submit_edit(
         emit(command, "EDIT LIMIT REACHED (%d); /undo OR /save", WAKE_COMMAND_CHUNKS);
         return false;
     }
+    if (plugin->staging) {
+        emit(command, "AN EDIT IS STAGING; WAIT OR /discard");
+        return false;
+    }
     if (!prepare_base(command, plugin, true))
         return false;
     snprintf(command->chunks[command->chunk_count], WAKE_COMMAND_CHUNK_TEXT, "%s", line);
