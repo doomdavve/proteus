@@ -520,7 +520,9 @@ keeps compiled solo content and the console is native-only. The bridge's existin
 command layer's line parser; they keep their revision/epoch pins and the new `console` operation
 uses the shared state. A `--plugin` save that lands while console chunks exist stages one
 composition against the new disk base; if it cannot apply, the last chunk is reported and dropped
-rather than rebased chunk by chunk. Rooms have no package host yet, so the planned read-only
+rather than rebased chunk by chunk. A second edit while one is staging is refused with a message
+naming the staging state rather than queued, so the console cannot build an unbounded queue.
+Rooms have no package host yet, so the planned read-only
 `/status` console in rooms is not offered. Shift/AltGr-modified key handling follows
 `GetCharPressed` as before; there is no completion or multiline entry.
 
