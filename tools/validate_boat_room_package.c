@@ -439,7 +439,119 @@ static int catalog_rooms(void)
     return 0;
 }
 
+// A resolved hull ends each tick just outside the envelope, so a contact shows as being this close.
+static unsigned touching(const BoatNetServer *server)
+{
+    unsigned count = 0;
+    BoatWorld world = boat_fleet_world(&server->fleet);
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+        const BoatFleetSlot *slot = &server->fleet.state.slots[i];
+        count += slot->active
+            && !boat_scene_clear(
+                &slot->boat, &world, world.scene, boat_fleet_time(&server->fleet), .25f);
+    }
+    return count;
+}
+
+// Authored moored boats on the track a bot really drives, sampled from a room without them. Moving
+// craft use the same contact path and clock but are not forced into contact here.
+static int scene_contact_room(void)
+{
+    static Room room;
+    BoatRoomDefinition d = {
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+    };
+    snprintf(d.id, sizeof(d.id), "scene.contact");
+    snprintf(d.name, sizeof(d.name), "Scene contact");
+    CHECK(room_open(&room, &d, true));
+    unsigned solo = join(&room, "track", true);
+    run(&room, 1);
+    d.has_scene = true;
+    d.scene.version = BOAT_SCENE_VERSION;
+    d.scene.entrance_present = true;
+    d.scene.entrance_width = 8;
+    d.scene.berths_present = true;
+    d.scene.berth_count = BOAT_SCENE_BERTHS;
+    for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i) {
+        run(&room, 2);
+        const BoatFleetSlot *own = boat_net_client_own(&room.clients[solo]);
+        CHECK(own != NULL);
+        BoatSceneBerth *b = &d.scene.berths[i];
+        snprintf(b->id, sizeof(b->id), "berth_%u", i);
+        b->recipe = BOAT_SCENE_BERTH_CRUISER;
+        b->x = own->boat.position.x;
+        b->z = own->boat.position.y;
+    }
+    boat_net_memory_destroy(room.network);
+    BoatRoomDiagnostic rd;
+    CHECK(boat_room_definition_validate(&d, &rd));
+
+    // Alone on a steady link nothing is guessed, so a prediction that lacked the scene would have
+    // to be corrected the moment the hull touched.
+    CHECK(room_open(&room, &d, true));
+    solo = join(&room, "steady", true);
+    BoatNetImpairment steady = { .delay = .03 };
+    boat_net_memory_impair(room.network, room.link[solo], steady, steady);
+    unsigned contact = 0;
+    for (double end = room.now + 25; room.now < end;) {
+        step(&room, (1 + (unsigned)(room.now * 977) % 3) / 240.0);
+        contact += touching(&room.server);
+    }
+    const BoatNetClient *c = &room.clients[solo];
+    CHECK(contact > 0 && room.matches > 0 && room.mismatches == 0);
+    CHECK(room.server.fleet.world.scene == &room.server.config.room->scene);
+    CHECK(c->fleet.world.scene == &c->room.scene);
+    CHECK(c->prediction.fleet.world.scene == &c->room.scene);
+    CHECK(c->prediction.stats.corrections > 0);
+    printf("room_package scene steady: %u contact ticks, own error max %.6f m, %llu/%llu hashes\n",
+        contact, c->prediction.stats.max_error, (unsigned long long)room.matches,
+        (unsigned long long)(room.matches + room.mismatches));
+    // Without the scene this would be metres. It is about 0.1 mm against exactly zero in a room
+    // with no contact, so contact prediction is close but not bit for bit (recorded in the plan).
+    CHECK(c->prediction.stats.max_error < .001f);
+    boat_net_memory_destroy(room.network);
+
+    // Loss, reordering and delay, a late joiner and an outage.
+    CHECK(room_open(&room, &d, true));
+    BoatNetImpairment f = { .04, .01, .01, .002, .01, .02 };
+    unsigned a = join(&room, "one", true), b = join(&room, "two", true);
+    boat_net_memory_impair(room.network, room.link[a], f, f);
+    boat_net_memory_impair(room.network, room.link[b], f, f);
+    contact = 0;
+    for (double end = room.now + 8; room.now < end;) {
+        step(&room, 1 / 120.0);
+        contact += touching(&room.server);
+    }
+    unsigned late = join(&room, "late", true);
+    boat_net_memory_impair(room.network, room.link[late], f, f);
+    for (double end = room.now + 8; room.now < end;) {
+        step(&room, 1 / 120.0);
+        contact += touching(&room.server);
+    }
+    boat_net_memory_blackout(room.network, room.link[b], true);
+    run(&room, 1);
+    boat_net_memory_blackout(room.network, room.link[b], false);
+    for (double end = room.now + 8; room.now < end;) {
+        step(&room, 1 / 120.0);
+        contact += touching(&room.server);
+    }
+    uint64_t checks = room.matches + room.mismatches;
+    CHECK(contact > 0 && checks > 0 && room.matches > checks * 8 / 10);
+    for (unsigned i = 0; i < room.count; ++i) {
+        c = &room.clients[i];
+        CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.decode_errors == 0);
+        CHECK(c->fleet.world.scene == &c->room.scene);
+        CHECK(c->prediction.fleet.world.scene == &c->room.scene);
+    }
+    printf("room_package scene impaired: %u contact ticks, %llu/%llu hashes, resyncs %llu\n",
+        contact, (unsigned long long)room.matches, (unsigned long long)checks,
+        (unsigned long long)room.clients[b].stats.resyncs);
+    boat_net_memory_destroy(room.network);
+    return 0;
+}
+
 static const TestCase cases[] = {
+    TEST_CASE(scene_contact_room),
     TEST_CASE(catalog_rooms),
     TEST_CASE(race_room),
     TEST_CASE(match_room),
