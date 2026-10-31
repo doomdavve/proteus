@@ -1,7 +1,7 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **PD1 implemented and merged; PC is implemented in the solo package and
-awaiting review; PD4 is next.** Native solo sessions now run from packages
+Status, 2026-10-31: **PD1 and PC are merged; the Rooms package (PD2, PD3) is next, and PD4 follows
+as its own package.** Native solo sessions now run from packages
 compiled at build time, `--plugin` is the separate authoring path, and a temporary
 `--no-plugins` restores compiled content. The live console edits the running session without a
 reset. This document owns the sequence, per-PR status and
@@ -10,31 +10,33 @@ existing plugin contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) ke
 and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: [PD4](#pd4--browser-parity), the second step of the [solo package](#packages).
+Next task: the [Rooms package](#packages), [PD2](#pd2--package-defined-rooms) then
+[PD3](#pd3--authored-scenes-and-revisions-in-rooms), on `feat/plugin-default-rooms`.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; merged in [#96](https://github.com/doomdavve/proteus/pull/96) |
-| [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31 in the solo package; in review |
+| [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31; merged in [#98](https://github.com/doomdavve/proteus/pull/98) without PD4 |
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Not started |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Not started |
-| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1 | Not started |
-| [PD5](#pd5--cutover) | The compiled selection and the off switch are gone | PD4 | Not started |
+| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Not started |
+| [PD5](#pd5--cutover) | The compiled selection and the off switch are gone | PD3, PD4 | Not started |
 
 ### Packages
 
 PD1 took about 30 minutes (user report, 2026-10-31), so the user asked for bigger units of work. Each
 remaining **package is one branch and one PR**. The step sections below stay the specification.
 
-| Package | Steps, in order | Branch | Why these belong together |
-| --- | --- | --- | --- |
-| **Solo** | PC, PD4 | `feat/plugin-default-solo` | Finishes solo play on every platform, and the console reaches the browser in the same PR. Rooms are untouched: browser rooms keep compiled content until the room package. |
-| **Rooms** | PD2, PD3 | `feat/plugin-default-rooms` | One protocol bump and one hosted cutover instead of two. PD3 only extends the definition PD2 introduces. |
-| **Cutover** | PD5 | `feat/plugin-default-cutover` | Runs last, because it removes the fallback that the other packages still compare against. |
+| Order | Package | Steps, in order | Branch | Why these belong together |
+| --- | --- | --- | --- | --- |
+| Next | **Rooms** | PD2, PD3 | `feat/plugin-default-rooms` | One protocol bump and one hosted cutover instead of two. PD3 only extends the definition PD2 introduces. |
+| Then | **Browser** | PD4 | `feat/plugin-default-browser` | The rest of the original Solo package. [#98](https://github.com/doomdavve/proteus/pull/98) delivered PC alone. |
+| Last | **Cutover** | PD5 | `feat/plugin-default-cutover` | Removes the fallback that the other packages still compare against. |
 
-Run the solo and room packages in either order, one at a time, then cutover. PD4 no longer waits for
-PD2 and PD3: browser solo play needs only PD1's catalog and PC's console. Do not combine the solo and
-room packages. They have unrelated risks, and the room PR is the one that needs careful review.
+Rooms goes before Browser because rooms are the largest remaining gap and the riskiest work, while
+browser solo already works on compiled content. They do not depend on each other: a browser room client
+consumes the room definition and needs neither the catalog nor PD4. Do not combine them. Their risks are
+unrelated, and the room PR needs careful review.
 
 Inside a package:
 
@@ -79,7 +81,7 @@ Decisions already made. Do not reopen them inside a PR; report a problem instead
 | A live edit never moves the player's boat. An edit needing that is held until the boat is clear or the player asks. | An agent editing during play must not teleport or reset the player. |
 | Full browser qualification stays manual-only. | The user reduced it deliberately. Dispatch it once per PR where this plan says to. |
 
-Out of scope for all six PRs: authority objective callbacks and commands in rooms (the rest of
+Out of scope for every step: authority objective callbacks and commands in rooms (the rest of
 [P5](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions)), session recordings, room
 downloads and dynamic maps (room stages R2 and R4), the in-game agent itself (P6, which PC prepares
 for), lighting and other
@@ -104,6 +106,8 @@ into several PRs and do not start the next package unless told to.
 
 Make small, focused commits and **do not squash them**, with at least one commit per task. A large PR
 stays reviewable only through its commit history, and PD1 arrived as one commit of about 2,700 lines.
+Finish every step of the package unless a stop rule applies. The PC PR stopped before PD4 with no blocker
+recorded, which left Solo half done.
 
 Reduce CI churn. Workflows run on pull requests and pushes to `main`, not on ordinary branch pushes:
 
@@ -121,8 +125,8 @@ Reduce CI churn. Workflows run on pull requests and pushes to `main`, not on ord
 ### Working loop
 
 Before starting, read this plan, [AGENTS.md](../AGENTS.md), the [testing guide](TESTING.md) and
-the documents named in your step. This plan names files and symbols from `e335b84`, so confirm they
-are still accurate. Where the source disagrees with this plan, the source wins: adapt, and record
+the documents named in your step. The Rooms references were rechecked on `4e11c2a`, the merge of PC; other
+steps name files and symbols from `e335b84`. Confirm they are still accurate. Where the source disagrees with this plan, the source wins: adapt, and record
 the difference in your step's result.
 
 Work through the step's tasks in order and commit each one with the tree building and
@@ -569,6 +573,26 @@ Compiled content used by rooms today: `boat_net_server.c:30`, `tools/boat_server
 `src/boat_view.c:165`, `tools/boat_bot.c:240`, and the handshake digest at
 `src/boat_net_protocol.c:1086`.
 
+### Settled from the source, 2026-10-31
+
+Each of these was checked on `4e11c2a`. The tasks below assume them.
+
+| Finding | What to do |
+| --- | --- |
+| The hosted room runs `--mode deathmatch --location river` (`ansible/roles/wake_velocity/defaults/main.yml` in `davve-srv`). Its service line passes both flags. | That command must keep working with no `davve-srv` change. One `plugins/deathmatch` serves every location: a `match` package without a scene takes its location from `--location`, and the definition always carries the resolved location. A package with a scene fixes its location, and a conflicting flag refuses to start. |
+| No free package exists for `outer`, and `--location outer` is hostable. | Add `plugins/outer-free`. Defaults with no `--package`: free uses `basin-free`, `river-free` or `outer-free`; deathmatch uses `deathmatch`; race uses `river-sprint`. Solo is unaffected, because the title's rows and `--package` kind checks already exclude these. |
+| Race rooms are river-only in `boat_net_server_init`, the server's flags and the `race` manifest rule. | Keep that. Only the course's values become data, not the map. |
+| `boat_combat_enable` hardcodes the default rules (`src/boat_combat.c:60`). Clients already install rules from the checkpoint, and compact pages omit them. | Give the enable call the rules. Do not add a second path for them on the client: it compares the checkpoint's rules with the definition at install and closes on a mismatch. |
+| `BOAT_NET_EARLY_BOOTSTRAP` holds one checkpoint's messages until Accept and **drops the rest**, which on a reliable channel leaves the client stuck in bootstrap. | Size it for the largest definition plus the largest checkpoint, and test every bootstrap message arriving before Accept. Bootstrap and control are separate channels, so this ordering is real. |
+| `validate_boat_net` links only `proteus_boat_net`, and `boat_server` links only the ENet library. | Keep `validate_boat_net` free of plugins and have it build definitions in code. A new `validate_boat_room_package` links plugins, catalog and net for the edited-package proof. Add plugins and catalog to `boat_server`. `boat_server.c` also links into `wake_velocity` for `--serve`. |
+| The hosted build runs `cmake --build --target boat_server boat_bot`. | It will now build and run the catalog generator, so check that exact target list from a clean configure, with `PROTEUS_WEBRTC=ON` where available. No new configure flag may be needed. |
+| Protocol types run 1–21 and `MULTIPLAYER_PROTOCOL.md`'s header table still says version 6, while the code says 8. | Add `DEFINITION_BEGIN`, `_PAGE` and `_END` with the world page layout and separate assembly state. Correct the table to 9. |
+| The deathmatch playtest changes are [still only planned](DEATHMATCH_PLAYTEST_PLAN.md). | `plugins/deathmatch` equals today's native defaults, and the catalog equality test keeps it so. |
+
+Overrides such as `--round-seconds` apply before the definition is built, so clients always receive the
+effective values. Discovery rows do not change: compatibility follows version and digest, and the package
+name is shown only after joining.
+
 ### Tasks
 
 1. **Add the room definition.** New `src/boat_room_definition.[ch]` in `proteus_boat_core`: a
@@ -593,15 +617,19 @@ Compiled content used by rooms today: `boat_net_server.c:30`, `tools/boat_server
    wake contract and recipe revisions. Harbor data stays until PD3. Encode the definition fieldwise
    into canonical bytes capped at 16 KiB. After Accept and before the world checkpoint, send it on
    the reliable bootstrap channel using paged messages with the checkpoint's assembly pattern. The
-   digest here detects corruption, not authorship. Decode must reject truncation, extra bytes,
+   digest here detects corruption, not authorship. Send it once per connection; a resync reuses it.
+   Decode must reject truncation, extra bytes,
    non-finite values, out-of-range counts, reordered pages and digest mismatch, and treat the sender
-   as untrusted. Remove `BoatNetRaceCourse`. Update fixtures, goldens, the protocol document and the
+   as untrusted. Remove `BoatNetRaceCourse` and the race state's `course` byte;
+   `boat_net_race_bind` takes the course. Update fixtures, goldens, the protocol document and the
    version rules. v8 clients are rejected explicitly.
 5. **Install on the client.** `BoatNetClient` owns the validated definition for the connection and
    holds READY until it is installed; a failure closes with a clear reason and never enters the
    world. Bind it in `boat_net_race_bind`, prediction, `tools/wake_velocity_net.c`, the course view
    and `boat_bot`. Display the package name in the existing room UI. Resync and late join reuse the
-   installed definition; reconnect receives it again.
+   installed definition; reconnect receives it again. Offer the console's read-only `/status` in
+   rooms, as PC originally specified, showing the package and its digest. It is the last and smallest
+   item here: leave it out if it complicates the console, and say so.
 6. **Check discovery and hosting.** LAN and directory compatibility must keep working with the new
    digest meaning. Record what `../davve-srv` or the release needs for v9 in
    [RELEASES.md](RELEASES.md) and [MULTIPLAYER_HOSTING.md](MULTIPLAYER_HOSTING.md), but make no
@@ -612,19 +640,25 @@ Compiled content used by rooms today: `boat_net_server.c:30`, `tools/boat_server
 - **The key proof:** an in-memory race room with a *non-default* course (different gates, grid and
   ferry timing) and non-default rules, created from an edited package. Clients, including a
   mid-race joiner and a predicting client, finish with authority and client hashes identical and
-  prediction replay through GO bit for bit. No client code path may read the compiled course. Add a
-  test hook or link-level check that proves this.
+  prediction replay through GO bit for bit. No client code path may read the compiled course: add a
+  CTest source check that `boat_race_river_course` is not referenced by `boat_net_client.c`,
+  `boat_net_protocol.c`, `boat_prediction.c`, `boat_view.c`, `wake_velocity_net.c` or `boat_bot.c`,
+  with the solo race trial passing its course to the view explicitly.
 - The same with non-default deathmatch rules, including combat values that affect prediction.
 - Every existing `boat_net_*` loopback, four-player and impairment test passes on v9 with default
   packages. Bots finish the default race in the same time range as now.
 - Malformed, oversized, truncated, stale and mismatched definitions all fail safely under virtual
-  time, with no world installed.
+  time, with no world installed. So does a definition whose combat rules differ from the checkpoint's.
+- A maximum definition and checkpoint delivered entirely before Accept still bootstrap.
+- `boat_server --mode deathmatch --location river`, with no new flag, behaves as it does on v8 and
+  reports `deathmatch` as its package.
 - Bytes on the wire are measured for each bundled package and for the maximum definition.
 - Bootstrap time and bandwidth are compared with v8 for a four-client room.
 - Local `check_web_multiplayer.py` passes free, deathmatch and race against a native server, using a
   browser client with no Lua evaluation. Include one edited course. Run the manual browser workflow
   once on the final revision.
-- `boat_server`'s package and the Windows and Linux server builds link and run in CI.
+- `boat_server`'s package and the Windows and Linux server builds link and run in CI. The hosted
+  target list builds from a clean configure.
 
 **Needs the user:** one two-machine race and one deathmatch on v9, one with a browser client, and
 a hosted cutover at the next release.
@@ -641,7 +675,23 @@ the [scene contract](PLUGIN_API.md#location-life-scene-contract-planned-l11) and
 [multiplayer prediction contract](PLUGIN_PLAN.md#multiplayer-prediction-and-recording).
 
 `BoatWorld.scene` is the seam: physics and presentation read that pointer, and rooms leave it NULL.
-This is the riskiest PR in the plan because prediction copies fleets and replays them.
+This is the riskiest step in the plan because prediction copies fleets and replays them.
+
+Checked on `4e11c2a`, which narrows the risk:
+
+- **Where the pointer must be bound.** Hull and projectile contacts (`src/boat.c:123`, `:183`,
+  `src/boat_combat.c:279`) read `world->scene`. `boat_fleet_world` and `boat_prediction_reset` copy the
+  fleet's world by value, so they carry the pointer. The sites to change are `boat_net_server_init`, and
+  `install` in `src/boat_net_client.c`, which builds a new fleet with `boat_fleet_init` at each bootstrap.
+  Confirm this with a test, not by inspection.
+- **Clock.** Physics poses use `boat_fleet_time`, which is `tick` seconds and so already shared. Check
+  only the presentation path.
+- **Moving craft create no wake state.** Rooms never set `water.traffic_objects`, and authored routes
+  are visual-only by rule (`src/waterfront_traffic.c:151`). Keep both, so checkpoints need no traffic wake
+  pool. Physical traffic wakes in rooms are out of scope.
+- **Size.** In memory on Apple Silicon: scene 7,944 bytes, course 312, race rules 72, match rules 64 and
+  combat rules 92, about 8.5 KiB. The fieldwise encoding should fit the 16 KiB cap in about nine pages.
+  The acceptance still measures it.
 
 ### Tasks
 
@@ -667,7 +717,10 @@ This is the riskiest PR in the plan because prediction copies fleets and replays
    readiness, then all commit together at that tick. A client that cannot get ready by the deadline
    is disconnected with an explicit reason and everyone else continues; a failed stage keeps the
    running revision. Free rooms apply only at room restart or when empty. Add a generation fence so
-   stale prediction and messages cannot cross a commit.
+   stale prediction and messages cannot cross a commit. This is the one new synchronisation mechanism
+   in the package and the only part of it that nothing else depends on. Do it last, in its own commits.
+   If it is not stable, open the PR without it and with no unused message types on the wire; it would
+   then arrive later as protocol v10.
 
 ### Acceptance
 
@@ -700,12 +753,15 @@ Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 
 ### Tasks
 
-1. **Generate the catalog for Wasm.** Build `boat_plugin_catalog_gen` for Emscripten as a Node target
+1. **Generate the catalog for Wasm.** `proteus_plugin_catalog` is native-only today (`CMakeLists.txt:151`)
+   and the catalog wire is portable bytes, so both generator options below remain open. Build `boat_plugin_catalog_gen` for Emscripten as a Node target
    (`-sENVIRONMENT=node -sNODERAWFS=1`), run it through `CMAKE_CROSSCOMPILING_EMULATOR` during the web
    build, and link the output into the game. If running it under Node proves impractical, fall back to
    a host-built generator, provided the wire stays fieldwise and portable; record which you chose and
    why. Do not add Lua to the game as a fallback. Add a check that the game Wasm lacks Lua's VM and parser
-   (for example its message strings or symbols) and that `proteus_lua` is not in its link. Record game
+   by its message strings and symbols. `wake_velocity` already links `proteus_plugins` on the web, which
+   puts `proteus_lua` on the link line and relies on the linker discarding it, so the check must test the
+   output and not the link line. Record game
    Wasm size before and after, raw and compressed.
 2. **Default browser solo.** Remove the compiled path from browser solo sessions, using runtime mode
    from PD1. Add the title's content row on web. Keep save settings compatible. Time trial bests in
@@ -713,8 +769,8 @@ Read first: [Browser builds](WEB_BUILD.md), including its plugin sections,
 3. **Render scenes in the browser.** Verify authored scene paths through the web GPU renderer
    (berths, modules, traffic, gulls) against native at pinned cameras and times. Fix actual
    differences. Check lazy scenery loading and repeated sessions.
-4. **Allow imported scenes.** Remove the rejection at `src/boat_plugin_stage.c:344` and
-   `web/plugin_author.js:17`, and return the existing scene wire from the worker, with the traffic
+4. **Allow imported scenes.** Remove the rejection at `src/boat_plugin_stage.c:206` and
+   `web/plugin_author.js:20`, and return the existing scene wire from the worker, with the traffic
    sweep off the game thread. Add worker deadlines suited to a slow device. Imported `free` and
    `course` kinds behave the same way. Imported race packages stay rejected with a message pointing
    to rooms, because the browser has no solo race trial.
@@ -791,6 +847,13 @@ are gone, and every doc says so.
   way and cannot move the boat. Provider, credentials and cost controls stay P6's work.
 
 ## Planning verification
+
+Rooms preparation, 2026-10-31, Apple Silicon/macOS, documentation-only, on merged PC (`4e11c2a`): Debug
+build with no warning outside raylib's `stb_vorbis.c`, and `ctest --preset full` passed all 330 enabled
+tests with local sockets (13 retired tests disabled, GPU CTests off). The PD2 and PD3 source references
+and the findings recorded under those steps were read from this revision. The struct sizes were compiled
+and printed once on this machine. `davve-srv` was read, not changed. The Rooms and Browser designs remain
+unimplemented proposals, nothing was prototyped, and no user acceptance is implied.
 
 Packaging revision, 2026-10-31, Apple Silicon/macOS, documentation-only, on merged PD1 (`692104a`):
 Debug build passed and `ctest --preset full` passed all 329 enabled tests with local sockets (13 retired
