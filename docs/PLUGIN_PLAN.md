@@ -27,7 +27,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: the [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md)'s [PD1](PLUGIN_DEFAULT_PLAN.md#pd1--bundled-runtime-and-complete-solo-coverage) was implemented on 2026-10-31; [PC](PLUGIN_DEFAULT_PLAN.md#pc--live-console-and-edits-without-reset) is next.**
+**Next task: the [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md)'s [PD1](PLUGIN_DEFAULT_PLAN.md#pd1--bundled-runtime-and-complete-solo-coverage) and [PC](PLUGIN_DEFAULT_PLAN.md#pc--live-console-and-edits-without-reset) are merged; the [Rooms package](PLUGIN_DEFAULT_PLAN.md#packages) is next.**
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 Authority callbacks, commands and session recordings remain P5 work after it. Physical-device and human qualification need the
