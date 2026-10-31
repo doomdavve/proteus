@@ -1,7 +1,7 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **PD1, PC and Rooms are merged; the Browser package (PD4) is implemented on
-`feat/plugin-default-browser` and awaits review.** Native and browser solo sessions now run from
+Status, 2026-10-31: **PD1, PC, Rooms and the Browser package are merged; Cutover (PD5) is prepared and
+next.** Native and browser solo sessions now run from
 packages compiled at build time, `--plugin` is the separate authoring path, and a temporary
 `--no-plugins` restores compiled content. The live console edits the running session without a
 reset, natively and in desktop browsers. This document owns the sequence, per-PR status and
@@ -11,7 +11,7 @@ and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic ma
 [All plans](README.md).
 
 Next task: the [Cutover package](#packages), [PD5](#pd5--cutover), on
-`feat/plugin-default-cutover`, once the Browser PR merges.
+`feat/plugin-default-cutover`, from current `main`.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
@@ -19,8 +19,8 @@ Next task: the [Cutover package](#packages), [PD5](#pd5--cutover), on
 | [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31; merged in [#98](https://github.com/doomdavve/proteus/pull/98) without PD4 |
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100) |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100); round-boundary revisions deferred to v10; [follow-ups](#rooms-follow-ups) open |
-| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Implemented 2026-10-31 on `feat/plugin-default-browser`; PR pending |
-| [PD5](#pd5--cutover) | The compiled selection and the off switch are gone | PD3, PD4 | Next package |
+| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Implemented 2026-10-31; merged in [#106](https://github.com/doomdavve/proteus/pull/106) |
+| [PD5](#pd5--cutover) | The room gaps a release needs are closed; the compiled selection and the off switch are gone | PD3, PD4 | Next package; [prepared](#settled-from-the-source-and-a-trial-2026-10-31-1) on `381e802` |
 
 ### Packages
 
@@ -31,7 +31,7 @@ remaining **package is one branch and one PR**. The step sections below stay the
 | --- | --- | --- | --- | --- |
 | Done | **Rooms** | PD2, PD3 | `feat/plugin-default-rooms` | One protocol bump and one hosted cutover instead of two. PD3 only extends the definition PD2 introduces. |
 | Done | **Browser** | PD4 | `feat/plugin-default-browser` | The rest of the original Solo package. [#98](https://github.com/doomdavve/proteus/pull/98) delivered PC alone. |
-| Next | **Cutover** | PD5 | `feat/plugin-default-cutover` | Removes the fallback that the other packages still compare against. |
+| Next | **Cutover** | PD5 | `feat/plugin-default-cutover` | Proves the last room gaps first, then removes the fallback that those proofs and the other packages still compare against, and leaves one releasable tree. |
 
 Rooms goes before Browser because rooms are the largest remaining gap and the riskiest work, while
 browser solo already works on compiled content. They do not depend on each other: a browser room client
@@ -125,8 +125,8 @@ Reduce CI churn. Workflows run on pull requests and pushes to `main`, not on ord
 ### Working loop
 
 Before starting, read this plan, [AGENTS.md](../AGENTS.md), the [testing guide](TESTING.md) and
-the documents named in your step. The Rooms references were rechecked on `4e11c2a`, the merge of PC; other
-steps name files and symbols from `e335b84`. Confirm they are still accurate. Where the source disagrees with this plan, the source wins: adapt, and record
+the documents named in your step. The Cutover references were rechecked on `381e802`; earlier steps name files
+and symbols from older revisions. Confirm they are still accurate. Where the source disagrees with this plan, the source wins: adapt, and record
 the difference in your step's result.
 
 Work through the step's tasks in order and commit each one with the tree building and
@@ -868,15 +868,14 @@ whether any correction is visible. Decide whether revisions should be exposed be
 
 ### Rooms follow-ups
 
-None of these blocks the Browser package. [Cutover](#pd5--cutover) closes the ones needed for a v9
-release.
+[Cutover](#pd5--cutover) closes the ones needed for a v9 release. State as of its preparation, 2026-10-31:
 
 | Item | State |
 | --- | --- |
-| Forced contact with a moving authored craft, and contact through a resync | Unproven. `scene_contact_room` covers moored berths and had no resync. |
-| Contact prediction is 0.126 mm from the authority, not bit for bit | Cause not investigated. A wake reaching the berth's height query is only a guess. |
-| Four-client bandwidth and tick cost with the maximum scene; v8 bootstrap comparison | Not measured |
-| `--four-players` and an edited course in a browser client | Not run |
+| Forced contact with a moving authored craft, and contact through a resync | Unproven. `scene_contact_room` covers moored berths and had no resync. PD5 task 3 |
+| Contact prediction is 0.126 mm from the authority, not bit for bit | Cause not investigated. A wake reaching the berth's height query is only a guess. PD5 task 3 |
+| Four-client bandwidth and tick cost with the maximum scene; v8 bootstrap comparison | Not measured; PD5 task 3 |
+| `--four-players` and an edited course in a browser client | `--four-players` passes on Metal with corrected keys in a scratch copy; PD5 task 1 lands the fix. Edited course not run; PD5 task 3 |
 | Round-boundary revisions | Deferred to protocol v10; the user decides whether they are worth building |
 | HOST panel package row and read-only room `/status` | Left out. The host uses the default package. |
 
@@ -1027,45 +1026,201 @@ not established. `--no-plugins` and the compiled fallback remain until PD5.
 whether Harbor life is offered on mobile; a browser marina capture or play check at the dock; and a
 decision on whether the free/deathmatch browser room failures block the Cutover package.
 
+Later finding, 2026-10-31: those failures come from SwiftShader's frame rate and one script key press, and they do
+not block Cutover. The [PD5 preparation](#settled-from-the-source-and-a-trial-2026-10-31-1) has the evidence.
+
 ## PD5 — cutover
 
 **Outcome.** There is one path for play. The compiled selection, the switch and the plugin compile-time flag
-are gone, and every doc says so.
+are gone, the room gaps a v9 release needs are closed, and every doc says so. The tree is ready for the user
+to cut the release.
+
+### Settled from the source and a trial, 2026-10-31
+
+Read and run on `381e802`, the merge of the Browser package and distant shadows. Browser trials used the
+`7289250` site and WebRTC server; `git diff` shows no change since then in the room client, server or `web/`
+network code.
+
+**The browser room failures are not room bugs, so they do not block this package.** Both came from running
+on SwiftShader, which here shows 3-second gaps between frames (about 5 fps) in a room. The same flow on a real
+GPU (headless Chrome, `--use-angle=metal`, steady 60 fps):
+
+| Check, on Metal | Result |
+| --- | --- |
+| `--mode free` | Passes, including two resets and the rejoin |
+| `--mode race` | Passes |
+| `--mode deathmatch` | Passes once the script's `press('q')` gets a delay (gun 3,108 inputs, 1 grenade, 1 torpedo, 189 combat pages, 2 resets, rejoin). With no delay the press and release land in one frame, so the game never sees it |
+| `--four-players`, free | Passes after correcting the extra client's join keys, with `wake.davve.net` unresolvable in the browser |
+
+A healthy deathmatch client receives about 72 messages a second. The 256-entry receive queue therefore fills
+only after a stall of about 3.5 s, or during catch-up after a long stall. The results on Metal:
+
+| Main-thread stall in deathmatch | Result |
+| --- | --- |
+| 1.5 s, 3 s | Survives |
+| 5 s | The server times the client out, by design (`BOAT_NET_TIMEOUT`) |
+| 8 s | `Browser network receive queue is full` |
+
+One defect remains: `web/rtc_transport.js` ends the session when a reliable message meets a queue full of
+*disposable* snapshots. A slow device's stall during join can hit this, as SwiftShader does. Task 2 fixes it.
+
+**Do not run `--four-players` as it stands.** The extra client presses `ArrowDown, Enter, ArrowUp, Enter`, which
+no longer matches the menu, and the check for the hosted room reads only the first page's logs. It has the same
+kind of stale key sequence that joined production on 2026-10-31.
+
+**Saved bests depend on the compiled course.** `boat_replay_best_path` (`src/boat_replay.c:363`) keeps the plain
+`course-calm-physicsN.run` name only when the digest equals `boat_course_compiled_digest()`, and
+`tools/wake_velocity.c:953` uses the same value to gate `--replay` and `--ghost`. Deleting the compiled course
+without a pinned value would orphan every player's best, which is a stop rule. The value is
+`0xa27ccadf8bd7a754`. It was computed outside the code from the digest's definition, so the first test that uses
+it must confirm it.
+
+**Byte-pinned captures do not belong in CTest.** The original task replaced `plugin_default_parity` with pinned
+capture checks. That test only ever compared two paths on one machine, and every CPU rendering change alters the
+PNG bytes. #103 did so just now, and the graphics overhaul will keep doing so. Pins would also need separate
+values for Windows and Linux. So the capture comparison is a one-off proof in this PR, and the durable gate is
+definition equality against the fixtures. See task 4.
+
+Other findings:
+
+- **Definitions:** Hello's location digest loop (`src/boat_net_protocol.c:1122`) reads named fields and not
+  `voyage`, so removing that field should leave the content digest unchanged and needs no protocol bump. Prove it.
+- **Equality cases:** they live in `tools/validate_boat_plugin_catalog.c:129-147`, not in the generator as this
+  plan first said. The generator links only `proteus_plugins`, so it stays clean.
+- **Production uses to replace:**
+  - `boat_session.c:21` and `:38`
+  - `boat_course.c:37` and `:55`
+  - `boat_course_view.c:20` and `:77`
+  - `boat_combat.c:74`
+  - `boat_location.c:40`
+  - `boat_replay.c:363`
+  - `tools/wake_velocity.c:953`
+  - `tools/wake_velocity_plugin.c:412`, `:495` and `:747-751`, which compare with or restore `definition->voyage`
+    and a NULL course
+  - `tools/boat_server.c:218` and `:700`, the `--scripted` path
+- **Dev tools to move:** `boat_hud_review`, `boat_race_trial`, `boat_combat_review` and `boat_fleet_review`.
+- **Validators:** scope is small. Across `tools/`, `boat_voyage_outer` has 16 uses, `boat_race_river_course` 14,
+  `boat_race_default_rules` 14, `boat_match_default_rules` 10 and the rest under 5. Include
+  `validate_boat_minimap`'s `location->voyage`.
+- **Keep:** a room with no scene falls back to the compiled harbour contacts. This is the registered default the
+  decisions table allows, not compiled selection. Physics paths also stay: `RIVER_SPAWNS` and the recipes.
+- **Moving contact seams:** moving craft do collide, through `waterfront_traffic_contact_height_scene` at
+  `src/boat.c:183`. `tools/validate_boat_room_package.c:458` has the room harness. `room.server.tick_limit` in
+  `snapshot_resync` (`tools/validate_boat_net.c:1018`) forces a resync.
+- **First hosted build with the Node generator:** v0.0.23 predates it. The role configures with `emsdk_env.sh`
+  sourced, then builds `--target web` with only `EMSDK` and `EM_CONFIG` added. The Node emulator is cached as an
+  absolute path, so this should work, but it has never run that way. Task 9 reproduces it.
+- **`cut_release.py --check`:** it refuses any commit other than `origin/main`, so it cannot pass from the PR
+  branch. It also needs a `davve-srv` checkout at its baseline, and the local one is 7 commits behind.
 
 ### Tasks
 
-0. **Close the room follow-ups a release needs.** Prove contact with a moving authored craft and through a
-   resync, explain or accept the 0.126 mm prediction error, and make the measurements and browser runs in
-   [Rooms follow-ups](#rooms-follow-ups). If moving-craft contact needs a physics change, stop and report.
-1. **Remove the switch.** Delete `--no-plugins`, `PROTEUS_BOAT_PLUGINS` and the conditional paths it
-   guards. Replace `plugin_default_parity` with pinned-digest and capture checks; pin values from
-   the last commit with both paths available.
-2. **Remove compiled selection.** Delete `BoatWorldDefinition.voyage` and the session's fallback to
-   it. Move `boat_voyage_outer`, the `RIVER` course table, `boat_course_gates`,
-   `boat_race_default_rules`, `boat_match_default_rules` and `boat_combat_default_rules` into a
-   test-only fixture library for validators. Keep registered recipes, routes and flock behaviour.
-   `boat_combat.c:60`-style internal defaults take their rules from the caller. Tools (`boat_bot`,
-   `boat_race_trial`, the review tools) use the catalog or the room definition. The generator's equality
-   cases then compare with fixtures. Add a check that no production target links the fixture library.
-3. **Update durable rules.** Rewrite the rules that assumed opt-in: the
-   [plugin plan's milestone rule](PLUGIN_PLAN.md#milestones-and-acceptance), "existing rooms continue
-   using compiled content" in its multiplayer section, the room plan's starting point, and the layout
-   notes in [AGENTS.md](../AGENTS.md) that say the server needs only compiled water. Sweep
-   `README.md`, [PLAYING.md](PLAYING.md), [COMMAND_LINE.md](COMMAND_LINE.md), [TESTING.md](TESTING.md),
-   [WEB_BUILD.md](WEB_BUILD.md), [RELEASES.md](RELEASES.md) and the hosting guide.
-4. **Harbor life as default, only if accepted.** Change the default `outer` package only when the
-   user's acceptance is recorded here. Otherwise it stays a title choice, and this PR says so.
-5. **Prepare the release.** Update release notes and checks for v9 and the new package set. The
-   user runs `tools/cut_release.py` afterward.
+Use at least one commit per task, and more for task 6. Tasks 1–3 stay independently correct even if a later task
+hits a stop rule.
+
+**Browser rooms and the last room proofs**
+
+1. **Repair `check_web_multiplayer.py`.**
+   - Give the torpedo press a delay.
+   - Use one join helper for every client, with the extra client's keys read against the current menu.
+   - Add `--host-resolver-rules=MAP wake.davve.net ~NOTFOUND` to the browser launch, and check every page's logs
+     for the hosted room. Add the same guard to any other script that presses keys through the join panel. Leave
+     out `check_web_server_directory.py`, which the release runs against the hosted site on purpose.
+   - Add `--angle`, defaulting to `metal` on macOS and `swiftshader` elsewhere.
+   - Measure the frame rate and fail with a plain "too slow to qualify a room" message below 20 fps, so software
+     rendering can never look like a room failure again.
+2. **Survive a stall during join.** When the queue is full and a reliable message arrives, drop the oldest
+   disposable event instead of failing, and fail only when every queued event is reliable. Keep reliable order.
+   Update `tools/test_web_rtc_transport.cjs` for both cases. After this, SwiftShader deathmatch must no longer
+   report a full queue, though the frame-rate guard will still refuse to qualify it. The 5-second timeout for a
+   silent client stays. Document in [WEB_BUILD.md](WEB_BUILD.md) that a hidden browser tab leaves the room, and
+   do not change that here.
+3. **Close the [room follow-ups](#rooms-follow-ups) a release needs.**
+   - Add `boat_room_package` cases that force contact with a moving authored craft and force contact through a
+     resync. Compare hashes as `scene_contact_room` does. If moving contact needs a physics change, stop and report.
+   - Find out where the 0.126 mm prediction error comes from: run the steady case with waves and wakes removed,
+     and compare the first differing tick. Fix it if it is a bug in non-physics code. If it is a physics change or
+     harmless float noise, tighten the test's bound to what you measure and record the reason. Do not spend more
+     than this comparison on it.
+   - Measure four-client bandwidth and server tick cost in `boat_server --package proteus.harbor-room`, the maximum shipped
+     scene, against a plain river room. Measure bootstrap bytes against v8 using the existing v0.0.23 worktree at
+     `/private/tmp/v23`, or a fresh worktree of the tag if that one is gone. Measurements are evidence, not asserts.
+   - Run an edited race package in a browser client through `boat_server --package DIR`.
+
+**Removing the compiled path**
+
+4. **Pin before removing, on the last commit with both paths.** Record each of these for basin, river, outer,
+   course and harbor-life, on this machine, in the result:
+   - the SHA-256 of the CPU capture;
+   - the route or course digest;
+   - Hello's content digest;
+   - the game's Wasm size.
+
+   After task 6, recapture with the same commands and require identical bytes. Keep the capture script out of the
+   repo; a CTest pin was ruled out above.
+5. **Remove the switch.** Delete `--no-plugins`, `PROTEUS_BOAT_PLUGINS` (17 sites in `tools/wake_velocity.c`, one
+   in `CMakeLists.txt`) and the paths it guards, including the unconditional-branch leftovers and the stale "rooms
+   use compiled content" message. Delete `plugin_default_parity` and its script, and replace its session coverage
+   as in task 6.
+6. **Remove compiled selection,** in this order, with a building tree and a green quick lane at each commit:
+   1. **Fixtures.** Add `proteus_boat_fixtures` (`tools/boat_fixtures.[ch]`) holding `boat_voyage_outer`, the course
+      table and default, `RIVER`, and the race, match and combat default rules. Validators link it. Nothing else
+      moves yet.
+   2. **Course.** Add `BOAT_COURSE_STANDARD_DIGEST` to core, and use it in `boat_replay_best_path` and the
+      `--replay`/`--ghost` gate. Add a test that the fixture's digest and `proteus.time-trial`'s digest both equal
+      it, and keep the legacy-best case. Then remove `boat_course_gates`, the NULL fallbacks and
+      `boat_course_compiled_digest`. An enabled course requires a definition.
+   3. **Voyage.** Delete `BoatWorldDefinition.voyage` and the session fallback. The session's route starts NULL,
+      `wake_plugin_open*`'s owner check tests for NULL, and close restores NULL.
+   4. **Rules and race course.** `boat_combat_enable` requires rules from its caller. `boat_server --scripted` and
+      the review tools decode the catalog's `proteus.deathmatch`. `boat_race_trial` and `boat_hud_review` use the
+      catalog.
+   5. **Guards.** Add a check that no production target (`wake_velocity`, `boat_server`, `boat_bot`,
+      `boat_plugin_worker`, `boat_plugin_catalog_gen`, `plugin_stage`) links the fixtures, and that the removed
+      symbols are absent from `src/` and those targets' sources. Add `boat_plugin_session.default_sessions`, which
+      opens each default entry through the game's selection path and compares its route, course, rules and scene
+      with the fixtures. The `.lua` comments naming `boat_voyage_outer` may change only if every pinned digest in
+      task 4 stays the same.
+
+**Documents and release**
+
+7. **Update durable rules.** Rewrite the rules that assumed opt-in: the
+   [plugin plan's milestone rule](PLUGIN_PLAN.md#milestones-and-acceptance), "existing rooms continue using their
+   compiled content" (`PLUGIN_PLAN.md:443`, and the live claim at `:1320`), the room plan's starting point, and the
+   layout note in [AGENTS.md](../AGENTS.md) that the server needs only compiled water. Sweep for `--no-plugins` and
+   compiled-content claims in `README.md`, [PLAYING.md](PLAYING.md), [COMMAND_LINE.md](COMMAND_LINE.md),
+   [TESTING.md](TESTING.md), [PLUGIN_API.md](PLUGIN_API.md), [WEB_BUILD.md](WEB_BUILD.md),
+   [RELEASES.md](RELEASES.md), the hosting guide and `plugins/*/README.md`. Dated results stay as history.
+8. **Harbor life stays a title choice** unless the user's acceptance is recorded here before you start. It has not
+   been as of this writing, so do not change the default `outer` package, and say so in the PR.
+9. **Prepare the release.**
+   - Update [RELEASES.md's next-release notes](RELEASES.md#next-release-unreleased) for this package.
+   - Reproduce the hosted browser build locally in a scratch directory: the role's `emcmake` command with
+     `emsdk_env.sh` sourced, then `cmake --build ... --target web` under `env -i` with only `PATH`, `HOME`, `EMSDK`
+     and `EM_CONFIG`. Read `../davve-srv/ansible/roles/wake_velocity/tasks/main.yml` for the exact commands, and do
+     not change that repository.
+   - Run `tools/cut_release.py vX.Y.Z --check` from a clean detached `origin/main` worktree with a `davve-srv` at its
+     baseline, and report what it says. Expect it to validate only prerequisites, since it refuses the PR branch by
+     design.
 
 ### Acceptance
 
-- The full native suite and captures match the pinned values. `git grep` finds no production use of
-  the removed symbols. Run the manual browser workflow once on the final revision.
-- Startup and frame costs for default sessions are unchanged against PD1's measurements.
-- `tools/cut_release.py --check` passes, or its failure is reported.
+- The common list in [What every step must leave behind](#what-every-step-must-leave-behind) passes.
+- On Metal, `check_web_multiplayer.py` passes all of `free`, `race`, `deathmatch` and `--four-players`. Every run
+  stays local, and the hosted-room guard is in place.
+- After removal, the task 4 captures, digests and legacy-best behaviour are identical. A best saved by the current
+  build still loads from the same file name, and the compiled-digest course still replays and ghosts.
+- `git grep` finds no production use of the removed symbols, and `nm` finds none in `wake_velocity` or `boat_server`.
+  The new link guard fails when deliberately broken, once, locally.
+- The game Wasm still has no Lua (`check_web_wasm.py`), and its size is reported against task 4.
+- Dispatch the manual `web-plugin.yml` workflow once on the final revision, on Chromium, Firefox and WebKit.
+- Startup and frame costs for default sessions match [PD1's measurements](#pd1-result-2026-10-31): 0.79 s for a
+  three-second Release CPU drive of `outer`, four runs after one warm-up.
+- The hosted-build reproduction succeeds, and the `--check` outcome is reported.
 
-**Needs the user:** merge, cut the release, verify the hosted room, and make the Harbor life decision.
+**Needs the user:** merge, cut the release, verify the hosted room and make the Harbor life decision. Still open
+from earlier packages: a two-person harbor room with deliberate contact, Harbor life and normal play on an iPhone
+and physical Safari, and a browser marina play check. None of these blocks the PR.
 
 ## Interactions with other tracks
 
@@ -1084,6 +1239,14 @@ are gone, and every doc says so.
   way and cannot move the boat. Provider, credentials and cost controls stay P6's work.
 
 ## Planning verification
+
+Cutover preparation, 2026-10-31, Apple Silicon/macOS, documentation-only, on `381e802`: `ctest --preset full` passed all 339 enabled tests with
+local sockets (13 retired tests disabled, GPU CTests off).
+Browser trials ran with Chrome headless from scratch copies of the check script against a local `boat_server`, and
+no client reached the hosted room. Firefox, WebKit, physical devices and `--use-angle=metal` under a headed window
+were not tried. `tools/cut_release.py v0.0.24 --check` was run against the local `davve-srv`: it stopped at the hosting baseline check because
+that checkout is behind `origin/main`, so the later prerequisites (vault file, SSH) were not reached.
+The PD5 design remains an unimplemented proposal, and no user acceptance is implied.
 
 Browser preparation, 2026-10-31, Apple Silicon/macOS, on `a949d7a`, documentation-only: `ctest --preset
 full` passed all 338 enabled tests with local sockets (13 retired tests disabled, GPU CTests off). The
