@@ -29,8 +29,10 @@ Check each visual stage against these. Change a rule by editing it here, with th
    welcome, and 320×200 stays available as a preset.
 2. **Water comes first.** It gets the largest share of new frame budget and is the first thing
    reviewed in any capture.
-3. **Toy-like shapes stay.** Keep flat facets, chunky cube foam and spray, and procedural finishes
-   rather than photographic textures.
+3. **Toy-like shapes stay.** Keep flat facets and procedural finishes rather than photographic
+   textures. The blocky foam thrown up by a fast boat is a signature the user loves: keep it, with
+   lifetimes that make sense. Those cubes are objects that live and die, unlike the rejected water
+   squares, which were a pattern painted over the surface.
 4. **Colour is authored.** Keep palettes per time of day and restrained bloom. No filmic grey
    tonemapping, no temporal blur.
 5. **Light is for coziness.** Lighting complexity should show up as warm windows and lamp streaks
@@ -148,7 +150,8 @@ height, foam and ripples.
 
 1. **Stamp wakes.** Draw wake pieces as small additive quads into the texture, replacing the
    per-pixel `objectWake` loop. Visually equivalent to today.
-2. **Foam memory.** Foam lingers, drifts and fades instead of following only the current crest.
+2. **Foam memory.** Surface foam lingers, drifts and fades instead of following only the current
+   crest. It adds to the boat's cube foam and never replaces it.
 3. **Ripples.** Run a small wave simulation in a fragment shader, so that ripples bounce off quays
    and hulls, and gulls and rain leave marks.
 
@@ -189,7 +192,7 @@ Done when: glassy docks and choppy open water read clearly apart in captures, on
 4. **Dusk on the water.** Hundreds of windows and lamps as long stepped streaks in the reflection.
    Depends on the [gameplay sunset](SUNSET_PLAN.md) shared lighting frame.
 5. **Finishing.** Baked ambient occlusion in the scenery pack; GPU particles for foam and spray
-   within what the platform allows.
+   within what the platform allows, keeping the cubes' look and lifetimes.
 
 Done when: the user accepts the look at the chosen presets on desktop and in a browser.
 
