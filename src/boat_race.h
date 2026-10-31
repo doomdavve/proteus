@@ -101,11 +101,6 @@ typedef struct {
     BoatRaceEvent events[BOAT_RACE_MAX_EVENTS];
 } BoatRaceOutput;
 
-// 1 s grid, 3 s countdown, 8 s results, 15 s after the winner, 90 s cap, 2 s recovery,
-// finishers parked 2 s after their finish.
-BoatRaceRules boat_race_default_rules(void);
-// The shortened Eriksberg/bridge sprint (R0 route) with its crossing ferry.
-const BoatRaceCourse *boat_race_river_course(void);
 // False for invalid rules or course geometry.
 bool boat_race_init(BoatRace *race, const BoatRaceRules *rules, const BoatRaceCourse *course);
 // Native recovery/parking candidate 0..13; false when outside the gate width or capacity.

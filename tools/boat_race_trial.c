@@ -1,6 +1,7 @@
 // R0 fixture: a shortened river route and one independently owned physical ferry wake.
 #include "boat_gpu.h"
 #include "boat_map.h"
+#include "boat_plugin_catalog.h"
 #include "boat_race.h"
 #include "boat_race_plugin.h"
 #include "boat_reset_hold.h"
@@ -32,10 +33,22 @@ static RacePlugin plugin;
 static const char *plugin_path;
 static bool plugin_enabled;
 
+static const BoatRaceCourse *bundled_course(void)
+{
+    static BoatPluginRevision revision;
+    static bool ready;
+    if (!ready) {
+        const BoatPluginCatalogEntry *entry = boat_plugin_catalog_find("proteus.river-sprint");
+        BoatPluginDiagnostic diagnostic = { 0 };
+        CHECK(entry && boat_plugin_catalog_decode(entry, &revision, &diagnostic));
+        ready = true;
+    }
+    return &revision.race.course;
+}
+
 static const BoatRaceCourse *preview_course(void)
 {
-    return plugin_enabled ? &boat_plugin_host_active(&plugin.host)->race.course
-                          : boat_race_river_course();
+    return plugin_enabled ? &boat_plugin_host_active(&plugin.host)->race.course : bundled_course();
 }
 
 static const Vector2 route[]
@@ -135,7 +148,7 @@ static void contracts(void)
     BoatVesselWake w = ferry();
     CHECK(boat_vessel_wake_valid(w));
     crest_profile(w);
-    crest_profile(boat_race_river_course()->source);
+    crest_profile(bundled_course()->source);
     CHECK(!boat_vessel_wake_valid((BoatVesselWake) { 0 }));
     BoatVesselWake invalid = w;
     invalid.direction.x = NAN;
@@ -724,7 +737,7 @@ int main(int argc, char **argv)
             }
         }
         BoatViewState view = boat_session_view(&session);
-        view.race.course = skill ? preview_course() : boat_race_river_course();
+        view.race.course = preview_course();
         view.race.enabled = true; // The race room's start, checkpoint and finish lines.
         if (skill)
             view.race.next_gate = (uint8_t)(next - 1);

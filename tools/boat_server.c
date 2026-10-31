@@ -201,7 +201,7 @@ static void print_race_event(const BoatNetServer *server, const BoatRaceEvent *e
 }
 
 static int scripted(unsigned long ticks, unsigned long boats, unsigned long report,
-    const BoatMatchRules *rules, const BoatWorldResources *world)
+    const BoatMatchRules *rules, const BoatCombatRules *combat, const BoatWorldResources *world)
 {
     static BoatMatch match;
     if (rules && !boat_match_init(&match, rules)) {
@@ -215,7 +215,7 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
         return 1;
     }
     if (rules)
-        boat_combat_enable(&fleet, NULL);
+        boat_combat_enable(&fleet, combat);
     for (unsigned slot = 0; slot < boats; ++slot)
         boat_fleet_request_spawn(&fleet, slot);
     double *cost = malloc(ticks * sizeof(*cost));
@@ -697,9 +697,6 @@ int boat_server_main(int argc, char **argv)
     }
     if (race)
         room_options.location = BOAT_LOCATION_RIVER;
-    BoatMatchRules rules = boat_match_default_rules();
-    if (round)
-        rules.round_ticks = round * BOAT_TICK_HZ;
     if (scripted_mode) {
         if (race) {
             fprintf(stderr,
@@ -720,8 +717,24 @@ int boat_server_main(int argc, char **argv)
         }
         if (!open_world(&world, room_options.location))
             return 1;
-        int status
-            = scripted(ticks ? ticks : 7200, boats, report, deathmatch ? &rules : NULL, &world);
+        BoatMatchRules rules = { 0 };
+        BoatCombatRules combat = { 0 };
+        if (deathmatch) {
+            BoatRoomDefinition definition;
+            char error[220];
+            if (!boat_room_package_load("proteus.deathmatch", true, false,
+                    room_options.location, &world, &definition, error, sizeof(error))) {
+                fprintf(stderr, "boat_server: %s\n", error);
+                boat_world_resources_destroy(&world);
+                return 1;
+            }
+            rules = definition.match_rules;
+            combat = definition.combat_rules;
+            if (round)
+                rules.round_ticks = round * BOAT_TICK_HZ;
+        }
+        int status = scripted(ticks ? ticks : 7200, boats, report, deathmatch ? &rules : NULL,
+            deathmatch ? &combat : NULL, &world);
         boat_world_resources_destroy(&world);
         return status;
     }

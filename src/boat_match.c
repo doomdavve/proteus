@@ -2,19 +2,6 @@
 
 #include <math.h>
 
-BoatMatchRules boat_match_default_rules(void)
-{
-    return (BoatMatchRules) { .round_ticks = 300 * BOAT_TICK_HZ,
-        .intermission_ticks = 10 * BOAT_TICK_HZ,
-        .credit_ticks = 5 * BOAT_TICK_HZ,
-        .grace_ticks = 2 * BOAT_TICK_HZ,
-        .respawn_ticks = 3 * BOAT_TICK_HZ,
-        .skip_ticks = 1 * BOAT_TICK_HZ,
-        .contact_impulse = 1.5f,
-        .wake_height = .35f,
-        .min_players = 2 };
-}
-
 bool boat_match_init(BoatMatch *match, const BoatMatchRules *rules)
 {
     if (!rules || !rules->round_ticks || !rules->credit_ticks || !(rules->contact_impulse > 0)

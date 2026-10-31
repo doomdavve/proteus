@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "boat_fixtures.h"
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -234,8 +235,8 @@ static int race_room(void)
     CHECK(boat_plugin_load_race(&bundle, NULL, &race, &d) == BOAT_PLUGIN_OK);
     CHECK(boat_plugin_race_check_location(&race, world()->definition, &world()->map, &d)
         == BOAT_PLUGIN_OK);
-    CHECK(race.course.gates[1].centre.x != boat_race_river_course()->gates[1].centre.x);
-    CHECK(race.course.source.speed != boat_race_river_course()->source.speed);
+    CHECK(race.course.gates[1].centre.x != (&boat_fixture_river_course)->gates[1].centre.x);
+    CHECK(race.course.source.speed != (&boat_fixture_river_course)->source.speed);
     BoatRoomDefinition definition = from_race(&race);
     BoatRoomDiagnostic rd;
     CHECK(boat_room_definition_validate(&definition, &rd));
@@ -326,8 +327,8 @@ static int definition_size(void)
     };
     snprintf(d.id, sizeof(d.id), "maximum");
     snprintf(d.name, sizeof(d.name), "Maximum definition");
-    d.course = *boat_race_river_course();
-    d.race_rules = boat_race_default_rules();
+    d.course = *(&boat_fixture_river_course);
+    d.race_rules = boat_fixture_race_default_rules;
     d.has_scene = true;
     d.scene.version = BOAT_SCENE_VERSION;
     d.scene.entrance_present = true;

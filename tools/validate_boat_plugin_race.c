@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "boat_fixtures.h"
 
 #define CHECK(x)                                                                                   \
     do {                                                                                           \
@@ -43,8 +44,8 @@ static BoatPluginBundle edit(const char *from, const char *to, bool manifest)
 
 static int reference_matches_compiled(void)
 {
-    BoatRaceRules rules = boat_race_default_rules();
-    uint64_t compiled = boat_plugin_race_digest(boat_race_river_course(), &rules);
+    BoatRaceRules rules = boat_fixture_race_default_rules;
+    uint64_t compiled = boat_plugin_race_digest((&boat_fixture_river_course), &rules);
     CHECK(reference_race.digest == compiled);
     BoatPluginDiagnostic d = { 0 };
     CHECK(boat_plugin_race_check_location(&reference_race, river()->definition, &river()->map, &d)
@@ -222,8 +223,8 @@ static BoatFleet fleets[2];
 static BoatRace races[2];
 static int physical_parity(void)
 {
-    BoatRaceRules rules = boat_race_default_rules();
-    CHECK(boat_race_init(&races[0], &rules, boat_race_river_course()));
+    BoatRaceRules rules = boat_fixture_race_default_rules;
+    CHECK(boat_race_init(&races[0], &rules, (&boat_fixture_river_course)));
     CHECK(boat_race_init(&races[1], &reference_race.rules, &reference_race.course));
     for (unsigned n = 0; n < 2; ++n) {
         CHECK(boat_fleet_init(&fleets[n], river(), (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS,

@@ -267,7 +267,8 @@ target_include_directories(wake_velocity PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/ge
 add_executable(boat_race_trial tools/boat_race_trial.c tools/boat_vessel_wake_gpu.c
   tools/boat_race_plugin.c tools/boat_race_plugin.h)
 target_include_directories(boat_race_trial PRIVATE ${raylib_SOURCE_DIR}/src)
-target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu proteus_plugins)
+target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu proteus_plugins
+  proteus_plugin_catalog)
 target_compile_options(boat_race_trial PRIVATE ${PROTEUS_WARNINGS})
 
 # Shared multiplayer codec, authority/client sessions, prediction and memory/multiplexed
@@ -348,7 +349,8 @@ endif()
 
 if(NOT EMSCRIPTEN)
   add_executable(boat_combat_review tools/boat_combat_review.c tools/wake_velocity_net.c src/boat_audio.c)
-  target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu proteus_boat_net_enet)
+  target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
+    proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
 endif()
 
@@ -935,7 +937,8 @@ foreach(target validate_boat validate_boat_banking validate_boat_clock validate_
     validate_boat_replay validate_boat_core validate_boat_voyage validate_boat_plugin
     validate_boat_plugin_session validate_boat_plugin_catalog validate_boat_minimap
     validate_boat_combat validate_boat_match validate_boat_plugin_race validate_boat_race
-    validate_boat_net validate_boat_room_package boat_race_trial boat_hud_review)
+    validate_boat_race_plugin validate_boat_net validate_boat_net_enet validate_boat_room_package
+    boat_race_trial boat_hud_review boat_fleet_review)
   target_link_libraries(${target} PRIVATE proteus_boat_fixtures)
 endforeach()
 # No networked client path may read the compiled river course.

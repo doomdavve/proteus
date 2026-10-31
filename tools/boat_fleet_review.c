@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "boat_fixtures.h"
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -100,7 +101,7 @@ static float hull_surface(const Mesh3D *mesh, Transform3D hull, float x, float z
 
 static int cannon_attachment(Formation *f)
 {
-    boat_combat_enable(&f->fleet, NULL);
+    boat_combat_enable(&f->fleet, &boat_fixture_combat_default_rules);
     BoatWorld world = boat_fleet_world(&f->fleet);
     BoatViewState view = { 0 };
     BoatPresentation presentation = { 0 };

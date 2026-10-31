@@ -4,6 +4,7 @@
  * leavers, joiners, deadlines and grid rotation. Physical cases step a real fleet: the grid
  * hold through a full-throttle countdown, and a four-bot race through the ferry encounter
  * with a mid-race checkpoint restore. */
+#include "boat_fixtures.h"
 #include "boat_fleet_bots.h"
 #include "boat_map.h"
 #include "boat_race.h"
@@ -29,10 +30,11 @@
 #ifdef BOAT_RACE_PLUGIN_FIXTURE
 #include "boat_plugin.h"
 #include "boat_plugin_io.h"
+#include "boat_fixtures.h"
 static BoatPluginRace plugin_race;
 static const BoatRaceCourse *fixture_course(void) { return &plugin_race.course; }
 #else
-static const BoatRaceCourse *fixture_course(void) { return boat_race_river_course(); }
+static const BoatRaceCourse *fixture_course(void) { return (&boat_fixture_river_course); }
 #endif
 
 static BoatFleet fleet;
@@ -85,7 +87,7 @@ static bool phase_event(BoatRacePhase phase)
 
 static int geometry(void)
 {
-    CHECK(fresh(boat_race_default_rules()));
+    CHECK(fresh(boat_fixture_race_default_rules));
     const BoatRaceCourse *c = &race.course;
     // Skill openings and the full-width finish stay on water, with safe approach lines.
     for (unsigned i = 0; i < c->gate_count; ++i) {
@@ -208,7 +210,7 @@ static int storm_surface(void)
 
 static int crossing(void)
 {
-    CHECK(fresh(boat_race_default_rules()));
+    CHECK(fresh(boat_fixture_race_default_rules));
     const BoatRaceGate *g = gate(0);
     float f = boat_race_cross(g, along(g, -3, 0), along(g, 1, 0));
     CHECK(fabsf(f - .75f) < 1e-4f);
@@ -224,7 +226,7 @@ static int crossing(void)
 // Two (or more) joined players through the grid to GO, hand-set. Returns the GO tick.
 static int grid_to_go(unsigned players, uint64_t *go)
 {
-    CHECK(fresh(boat_race_default_rules()));
+    CHECK(fresh(boat_fixture_race_default_rules));
     CHECK(boat_race_join(&race, &fleet, 0));
     CHECK(!boat_race_join(&race, &fleet, 0)); // Occupied.
     at(1);
@@ -534,7 +536,7 @@ static int leavers(void)
     boat_race_leave(&race, &fleet, 1);
     at(race.phase_end);
     CHECK(race.phase == BOAT_RACE_WAITING); // One player is too few for a grid.
-    CHECK(fresh(boat_race_default_rules()));
+    CHECK(fresh(boat_fixture_race_default_rules));
     CHECK(boat_race_join(&race, &fleet, 0) && boat_race_join(&race, &fleet, 1));
     at(1);
     CHECK(race.phase == BOAT_RACE_GRID);
@@ -548,7 +550,7 @@ static int leavers(void)
 
 static int rejects(void)
 {
-    BoatRaceRules rules = boat_race_default_rules();
+    BoatRaceRules rules = boat_fixture_race_default_rules;
     BoatRaceCourse course = *fixture_course();
     CHECK(boat_race_init(&race, &rules, &course));
     course.storm.radius = NAN;
@@ -559,10 +561,10 @@ static int rejects(void)
     course = *fixture_course();
     rules.countdown_ticks = 0;
     CHECK(!boat_race_init(&race, &rules, &course));
-    rules = boat_race_default_rules();
+    rules = boat_fixture_race_default_rules;
     rules.skip_ticks = rules.recovery_ticks + 1;
     CHECK(!boat_race_init(&race, &rules, &course));
-    rules = boat_race_default_rules();
+    rules = boat_fixture_race_default_rules;
     course.gate_count = 0;
     CHECK(!boat_race_init(&race, &rules, &course));
     course = *fixture_course();
@@ -607,7 +609,7 @@ static void step(BoatFleet *f, BoatRace *r, Tally *tally)
 
 static int hold(void)
 {
-    BoatRaceRules rules = boat_race_default_rules();
+    BoatRaceRules rules = boat_fixture_race_default_rules;
     BoatWater water = { 0 };
     CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), water, BOAT_OBJECT_LIFE_TICKS,
         BOAT_OBJECT_DEFAULT_HEIGHT));
@@ -648,7 +650,7 @@ static int hold(void)
 
 static int full_race(void)
 {
-    BoatRaceRules rules = boat_race_default_rules();
+    BoatRaceRules rules = boat_fixture_race_default_rules;
     CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 },
         BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     CHECK(boat_race_init(&race, &rules, fixture_course()));
