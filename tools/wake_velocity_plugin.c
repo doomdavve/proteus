@@ -3,6 +3,18 @@
 #include "boat_ui.h"
 #include "waterfront_traffic.h"
 
+#ifdef _WIN32
+#include <direct.h>
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#define NOUSER
+#include <windows.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 EM_JS(void, browser_owner, (unsigned revision, unsigned low, unsigned high, const char *status), {
@@ -18,6 +30,7 @@ EM_JS(unsigned, browser_actions, (void), {
 })
 #endif
 
+#include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdarg.h>
@@ -537,6 +550,11 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     }
     bool scene_restart = change == BOAT_PLUGIN_RESTART_SESSION && held
         && scene_differs(boat_plugin_host_active(&plugin->host), held);
+    const BoatPluginRevision *previous = boat_plugin_host_active(&plugin->host);
+    const char *shelter_id = plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
+            && session->voyage.shelter < previous->voyage.route.shelter_count
+        ? previous->voyage.shelter_ids[session->voyage.shelter]
+        : NULL;
     const BoatPluginRevision *revision = boat_plugin_host_commit(&plugin->host);
     if (!revision)
         return false;
@@ -550,6 +568,19 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
         report(plugin, "applied", false, "PROGRESS KEPT", "R%u %s, %s", revision->number, how,
             boat_plugin_change_name(change));
         return false;
+    case BOAT_PLUGIN_LIVE: {
+        const char *ids[BOAT_VOYAGE_SHELTERS] = { 0 };
+        unsigned count = revision->voyage.route.shelter_count;
+        if (count > BOAT_VOYAGE_SHELTERS)
+            count = BOAT_VOYAGE_SHELTERS;
+        for (unsigned i = 0; i < count; ++i)
+            ids[i] = revision->voyage.shelter_ids[i];
+        if (plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE)
+            boat_session_rebind_voyage_live(session, route, shelter_id, ids, count);
+        report(plugin, "applied", false, "BOAT KEPT", "R%u %s, %s", revision->number, how,
+            boat_plugin_change_name(change));
+        return false;
+    }
     case BOAT_PLUGIN_MIGRATE:
         trace(plugin, BOAT_PLUGIN_OBJECTIVE_MIGRATE,
             boat_plugin_objective_digest(&plugin->objective), &plugin->staged_objective, 0);
@@ -594,6 +625,13 @@ static bool offer(WakePlugin *plugin, BoatSession *session)
     }
     if (change == BOAT_PLUGIN_UNCHANGED || change == BOAT_PLUGIN_RENAMED)
         return commit(plugin, session);
+    if (change == BOAT_PLUGIN_LIVE) {
+        if (wake_plugin_live_ready(plugin, session))
+            return commit(plugin, session);
+        report(plugin, "held", true, "WAITING FOR CLEAR WATER; THE BOAT IS NOT MOVED",
+            "R%u LIVE EDIT HELD", held->number);
+        return false;
+    }
     if (change == BOAT_PLUGIN_MIGRATE) {
         report(plugin, "held", true, "F7 MIGRATE STATE / F6 DISCARD", "R%u %s OBJECTIVE",
             held->number, plugin->host.undo ? "(UNDO) CHANGES" : "CHANGES");
@@ -637,6 +675,7 @@ static bool stage(WakePlugin *plugin, BoatSession *session, bool read_ok, double
     }
 #ifdef __EMSCRIPTEN__
     (void)bundle;
+    (void)session;
     plugin->host.diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_IO };
     snprintf(plugin->host.diagnostic.message, sizeof(plugin->host.diagnostic.message),
         "browser reload requires isolated staging");
@@ -673,6 +712,10 @@ bool wake_plugin_stage_files(
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
 {
     close_stage(plugin);
+    if (plugin->query) {
+        boat_plugin_stage_close(plugin->query);
+        plugin->query = NULL;
+    }
     if (session) {
         // The session borrowed the plugin's route and scene. Restore both compiled defaults
         // before the host storage may be reused, so re-entry never sees a dangling borrower.
@@ -697,6 +740,285 @@ bool wake_plugin_editing(void)
     return browser_editing();
 #else
     return false;
+#endif
+}
+
+// PC live console -----------------------------------------------------------------------------
+
+static void json_text(char *out, size_t capacity, const char *text)
+{
+    size_t at = 0;
+    for (const char *c = text; *c && at + 7 < capacity; ++c) {
+        unsigned char value = (unsigned char)*c;
+        if (*c == '"' || *c == '\\') {
+            out[at++] = '\\';
+            out[at++] = *c;
+        } else if (value < 32) {
+            at += (size_t)snprintf(out + at, capacity - at, "\\u%04x", value);
+        } else {
+            out[at++] = *c;
+        }
+    }
+    out[at] = 0;
+}
+
+// Canonical manifest text for a catalog revision. PD1 stores the parsed manifest, not its source
+// text; reserialising it changes no meaning, and the catalog generator emits the same fields.
+static size_t manifest_json(const BoatPluginManifest *m, char *out, size_t capacity)
+{
+    char id[192], name[192], kind[32], entry[32], location[32];
+    json_text(id, sizeof(id), m->id);
+    json_text(name, sizeof(name), m->name);
+    json_text(kind, sizeof(kind), m->kind);
+    json_text(entry, sizeof(entry), m->entry);
+    json_text(location, sizeof(location), m->location);
+    int n = snprintf(out, capacity,
+        "{\"id\":\"%s\",\"name\":\"%s\",\"api\":%u,\"kind\":\"%s\",\"entry\":\"%s\","
+        "\"location\":\"%s\",\"capabilities\":[\"%s.define\"%s%s%s],\"state_version\":%u}",
+        id, name, m->api, kind, entry, location, m->kind, m->scene ? ",\"scene.define\"" : "",
+        m->objective ? ",\"objective.hud\"" : "", m->timers ? ",\"objective.timers\"" : "",
+        m->state_version);
+    return n > 0 && (size_t)n < capacity ? (size_t)n : 0;
+}
+
+bool wake_plugin_promote(WakePlugin *plugin)
+{
+    if (plugin->authoring)
+        return true;
+    if (!plugin->host.depth)
+        return false;
+    const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
+    size_t manifest_size
+        = manifest_json(&active->manifest, plugin->files.manifest, sizeof(plugin->files.manifest));
+    if (!manifest_size || active->source_size > sizeof(plugin->files.source))
+        return false;
+    plugin->files.manifest_size = manifest_size;
+    plugin->files.source_size = active->source_size;
+    memcpy(plugin->files.source, active->source, active->source_size);
+    plugin->authoring = true;
+    plugin->watching = false;
+    plugin->directory = NULL;
+    return true;
+}
+
+bool wake_plugin_stage_source(
+    WakePlugin *plugin, BoatSession *session, const char *source, size_t size, double now)
+{
+    if (!plugin->authoring || !plugin->stage_executable || !source || !size
+        || size > sizeof(plugin->files.source) || !plugin->files.manifest_size)
+        return false;
+    memcpy(plugin->files.source, source, size);
+    plugin->files.source_size = size;
+    wake_plugin_stage_files(plugin, session, &plugin->files, now);
+    return plugin->staging != NULL;
+}
+
+size_t wake_plugin_manifest(const WakePlugin *plugin, const char **text)
+{
+    *text = plugin->files.manifest;
+    return plugin->authoring ? plugin->files.manifest_size : 0;
+}
+
+size_t wake_plugin_source(const WakePlugin *plugin, const char **text)
+{
+    const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
+    *text = active->source;
+    return plugin->host.depth ? active->source_size : 0;
+}
+
+bool wake_plugin_grant(WakePlugin *plugin, const char *capability, char *message, size_t capacity)
+{
+    if (!plugin->host.depth || plugin->host.kind != BOAT_PLUGIN_KIND_VOYAGE) {
+        snprintf(message, capacity, "only a voyage package can take optional grants");
+        return false;
+    }
+    if (strcmp(capability, "scene.define")) {
+        snprintf(message, capacity, "unknown capability %s", capability);
+        return false;
+    }
+    if (boat_plugin_host_active(&plugin->host)->manifest.scene) {
+        snprintf(message, capacity, "%s is already granted", capability);
+        return false;
+    }
+    if (!wake_plugin_promote(plugin)) {
+        snprintf(message, capacity, "cannot promote the session to authoring");
+        return false;
+    }
+    const char *text = plugin->files.manifest;
+    const char *key = strstr(text, "\"capabilities\"");
+    const char *open = key ? strchr(key, '[') : NULL;
+    const char *close = open ? strchr(open, ']') : NULL;
+    if (!open || !close) {
+        snprintf(message, capacity, "the manifest has no capabilities array");
+        return false;
+    }
+    bool content = false;
+    for (const char *c = open + 1; c < close; ++c)
+        content |= *c != ' ' && *c != '\n' && *c != '\r' && *c != '\t';
+    char out[BOAT_PLUGIN_MANIFEST_MAX];
+    int n = snprintf(out, sizeof(out), "%.*s%s\"%s\"%s", (int)(close - text), text,
+        content ? ", " : "", capability, close);
+    if (n < 0 || (size_t)n >= sizeof(out) || (size_t)n > BOAT_PLUGIN_MANIFEST_MAX) {
+        snprintf(message, capacity, "the manifest would exceed its size limit");
+        return false;
+    }
+    BoatPluginManifest parsed;
+    BoatPluginDiagnostic d;
+    if (boat_plugin_parse_manifest(out, (size_t)n, NULL, &parsed, &d) != BOAT_PLUGIN_OK
+        || !parsed.scene) {
+        snprintf(message, capacity, "%s", d.message[0] ? d.message : "the grant is not valid");
+        return false;
+    }
+    memcpy(plugin->files.manifest, out, (size_t)n);
+    plugin->files.manifest_size = (size_t)n;
+    return true;
+}
+
+bool wake_plugin_query_begin(
+    WakePlugin *plugin, const char *source, size_t size, const char *expression, double now)
+{
+    if (plugin->query || !plugin->stage_executable || !plugin->host.depth)
+        return false;
+    // A query can run before the first edit promotes the session. Build the manifest text here
+    // without changing the runtime/authoring mode.
+    char manifest[BOAT_PLUGIN_MANIFEST_MAX];
+    const char *text = plugin->files.manifest;
+    size_t manifest_size = plugin->authoring ? plugin->files.manifest_size : 0;
+    if (!manifest_size) {
+        manifest_size = manifest_json(
+            &boat_plugin_host_active(&plugin->host)->manifest, manifest, sizeof(manifest));
+        text = manifest;
+    }
+    if (!manifest_size)
+        return false;
+    plugin->query = boat_plugin_query_start(
+        plugin->stage_executable, text, manifest_size, source, size, expression, now);
+    return plugin->query != NULL;
+}
+
+int wake_plugin_query_result(WakePlugin *plugin, char *text, size_t capacity, double now)
+{
+    if (!plugin->query)
+        return -1;
+    BoatPluginDiagnostic d = { 0 };
+    int result = boat_plugin_query_poll(plugin->query, text, capacity, &d, now);
+    if (result) {
+        boat_plugin_stage_close(plugin->query);
+        plugin->query = NULL;
+        if (result < 0)
+            snprintf(text, capacity, "%s", d.message[0] ? d.message : "query failed");
+    }
+    return result;
+}
+
+bool wake_plugin_query_pending(const WakePlugin *plugin) { return plugin->query != NULL; }
+
+bool wake_plugin_live_ready(const WakePlugin *plugin, const BoatSession *session)
+{
+    const BoatPluginRevision *held = boat_plugin_host_held(&plugin->host);
+    if (!held || plugin->host.change != BOAT_PLUGIN_LIVE
+        || plugin->host.kind != BOAT_PLUGIN_KIND_VOYAGE)
+        return false;
+    const BoatSceneDefinition *scene = held->voyage.has_scene ? &held->voyage.scene : NULL;
+    return boat_scene_clear(
+        &session->boat, &session->world, scene, boat_session_time(session), .5f);
+}
+
+#if !defined(__EMSCRIPTEN__)
+static bool directory_nonempty(const char *directory)
+{
+#ifdef _WIN32
+    char pattern[1100];
+    snprintf(pattern, sizeof(pattern), "%s/*", directory);
+    WIN32_FIND_DATAA entry;
+    HANDLE found = FindFirstFileA(pattern, &entry);
+    if (found == INVALID_HANDLE_VALUE)
+        return false;
+    bool nonempty = strcmp(entry.cFileName, ".") && strcmp(entry.cFileName, "..");
+    FindClose(found);
+    return nonempty;
+#else
+    DIR *dir = opendir(directory);
+    if (!dir)
+        return false;
+    bool nonempty = false;
+    for (struct dirent *entry; (entry = readdir(dir)) && !nonempty;)
+        nonempty = strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..");
+    closedir(dir);
+    return nonempty;
+#endif
+}
+
+static bool replace_file(const char *directory, const char *name, const char *bytes, size_t size)
+{
+    char path[1100], temporary[1100];
+    if (snprintf(path, sizeof(path), "%s/%s", directory, name) >= (int)sizeof(path)
+        || snprintf(temporary, sizeof(temporary), "%s/.%s.tmp", directory, name)
+            >= (int)sizeof(temporary))
+        return false;
+    FILE *file = fopen(temporary, "wb");
+    if (!file)
+        return false;
+    bool ok = fwrite(bytes, 1, size, file) == size;
+    ok = !fclose(file) && ok;
+#ifdef _WIN32
+    remove(path); // rename does not replace on Windows.
+#endif
+    if (!ok || rename(temporary, path)) {
+        remove(temporary);
+        return false;
+    }
+    return true;
+}
+#endif
+
+bool wake_plugin_save(
+    const WakePlugin *plugin, const char *directory, char *message, size_t capacity)
+{
+#if defined(__EMSCRIPTEN__)
+    (void)plugin;
+    (void)directory;
+    snprintf(message, capacity, "the browser exports downloads instead");
+    return false;
+#else
+    if (!plugin || !plugin->host.depth || !directory || !*directory) {
+        snprintf(message, capacity, "no package to save");
+        return false;
+    }
+#ifdef _WIN32
+    if (_mkdir(directory) && errno != EEXIST) {
+        snprintf(message, capacity, "cannot create %s", directory);
+        return false;
+    }
+#else
+    if (mkdir(directory, 0700) && errno != EEXIST) {
+        snprintf(message, capacity, "cannot create %s", directory);
+        return false;
+    }
+#endif
+    bool own = plugin->directory && !strcmp(plugin->directory, directory);
+    if (!own && directory_nonempty(directory)) {
+        snprintf(
+            message, capacity, "%s is not empty and does not belong to this session", directory);
+        return false;
+    }
+    const char *manifest = plugin->files.manifest;
+    size_t manifest_size = plugin->files.manifest_size;
+    char generated[BOAT_PLUGIN_MANIFEST_MAX];
+    if (!plugin->authoring || !manifest_size) {
+        manifest_size = manifest_json(
+            &boat_plugin_host_active(&plugin->host)->manifest, generated, sizeof(generated));
+        manifest = generated;
+    }
+    const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
+    if (!manifest_size || !active->source_size
+        || !replace_file(directory, "plugin.json", manifest, manifest_size)
+        || !replace_file(directory, "main.lua", active->source, active->source_size)) {
+        snprintf(message, capacity, "cannot write the package files");
+        return false;
+    }
+    snprintf(message, capacity, "SAVED %s", directory);
+    return true;
 #endif
 }
 
@@ -787,6 +1109,11 @@ bool wake_plugin_frame(
             return offer(plugin, session);
         }
     }
+    // A held live edit commits at the first boundary where the hull clears its candidate
+    // envelopes. It never moves the boat and needs no APPLY.
+    if (!plugin->staging && boat_plugin_host_held(&plugin->host)
+        && plugin->host.change == BOAT_PLUGIN_LIVE && wake_plugin_live_ready(plugin, session))
+        return commit(plugin, session);
     return false;
 }
 

@@ -28,8 +28,8 @@ LOG_MAX = 16384
 
 OPERATIONS = ["capabilities", "schema", "anchors", "validate", "preview", "capture", "export",
               "workspace-read", "workspace-write", "live-inspect", "live-stage", "live-apply",
-              "live-undo", "live-discard"]
-LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard")
+              "live-undo", "live-discard", "live-console"]
+LIVE_ACTIONS = ("inspect", "stage", "apply", "undo", "discard", "console")
 RESPONSE_MAX = 32768
 
 
@@ -465,6 +465,8 @@ def parse_bridge(data):
             raise ValueError("malformed bridge line")
         if key == "inspect":
             fields.setdefault("inspection", []).append(value)
+        elif key == "output":
+            fields.setdefault("output", []).append(value)
         elif key in LIVE_INTEGERS:
             fields[key] = int(value)
         elif key in LIVE_REAL:
@@ -586,7 +588,7 @@ def live_job(args):
         raise ValueError(f"{args.operation} requires --bridge DIR")
     needed = {"stage": ("base_revision", "base_epoch"), "apply": ("held_revision", "base_epoch"),
               "undo": ("base_revision", "base_epoch"), "discard": ("base_epoch",),
-              "inspect": ()}[action]
+              "console": ("base_epoch",), "inspect": ()}[action]
     pins = {}
     for key in needed:
         value = getattr(args, key)
@@ -598,6 +600,10 @@ def live_job(args):
         if not args.directory:
             raise ValueError("live-stage requires a plugin directory")
         payload = snapshot(args.directory)
+    elif action == "console":
+        if args.line is None:
+            raise ValueError("live-console requires --line TEXT")
+        payload = args.line.encode("utf-8")
     return BridgeJob(args.bridge, action, time.monotonic(), args.timeout or 10, pins, payload,
                      args.expect_bundle)
 
@@ -612,6 +618,7 @@ def main():
     parser.add_argument("--held-revision", type=int)
     parser.add_argument("--bridge", type=Path, help="the game's --plugin-bridge directory")
     parser.add_argument("--expect-bundle")
+    parser.add_argument("--line", help="one console line for live-console")
     parser.add_argument("--file", choices=["plugin.json", "main.lua"])
     parser.add_argument("--ticks", type=int, default=360)
     parser.add_argument("--timeout", type=float)

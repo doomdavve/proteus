@@ -1741,7 +1741,9 @@ its own acceptance gate. Seamless mid-round source swaps are not required for th
 ### P6 — in-game asynchronous agent
 
 The [live console step](PLUGIN_DEFAULT_PLAN.md#pc--live-console-and-edits-without-reset) of the
-plugins-by-default plan is planned to supply this milestone's command layer and live-apply policy.
+plugins-by-default plan supplies this milestone's command layer and live-apply policy. PC's
+`tools/wake_command.[ch]` is now the dispatcher: the agent submits the same edit and `/` command
+lines as a player, appears in the console, is undone the same way and cannot move the boat.
 
 **Deliverable:** an optional in-game conversation can use the proven P4 authoring tools to
 make and test a supported change, show its result and apply it under the current authoring

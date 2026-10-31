@@ -78,6 +78,11 @@ void boat_voyage_start(BoatVoyage *voyage, const BoatVoyageRoute *route, double 
 // Begin ROUTE again at the start shelter at TIME, keeping the weather the boat has already met.
 // ROUTE's exposure and weather range must equal the current route's: the water is unchanged.
 void boat_voyage_restart(BoatVoyage *voyage, const BoatVoyageRoute *route, double time);
+// A live route edit: keep progress, the clock and the boat where they are, and identify the most
+// recently reached shelter by OLD_ID among NEW_IDS. A removed shelter falls back to the start
+// shelter, which is always a usable recovery. The exposure fields must still agree.
+void boat_voyage_rebind(BoatVoyage *voyage, const BoatVoyageRoute *route, const char *old_id,
+    const char *const *new_ids, unsigned new_count);
 // Observe the boat after a tick at TIME.
 void boat_voyage_step_events(
     BoatVoyage *voyage, Vector2 position, Vector2 velocity, double time, BoatVoyageEvents *events);

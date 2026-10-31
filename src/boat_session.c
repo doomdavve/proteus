@@ -100,6 +100,15 @@ void boat_session_rebind_voyage(BoatSession *session, const BoatVoyageRoute *rou
         session->voyage.route = route;
 }
 
+void boat_session_rebind_voyage_live(BoatSession *session, const BoatVoyageRoute *route,
+    const char *old_id, const char *const *new_ids, unsigned new_count)
+{
+    session->voyage_route = route;
+    boat_voyage_rebind(&session->voyage, route, old_id, new_ids, new_count);
+    if (route)
+        session->world.water.storm = boat_voyage_weather(&session->voyage);
+}
+
 void boat_session_restart_voyage(BoatSession *session, const BoatVoyageRoute *route)
 {
     session->voyage_route = route;

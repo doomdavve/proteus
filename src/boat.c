@@ -195,6 +195,34 @@ static void resolve_traffic(Boat *boat, const BoatWorld *world, double time)
     }
 }
 
+bool boat_scene_clear(const Boat *boat, const BoatWorld *world, const BoatSceneDefinition *scene,
+    double time, float margin)
+{
+    if (!scene)
+        return true;
+    if (!world->definition->mapped)
+        return !boat_scene_has_content(scene);
+    float bottom, top;
+    hull_vertical_bounds(boat, &bottom, &top);
+    Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
+    Vector2 right = { cosf(boat->heading), sinf(boat->heading) };
+    const float clearance = HULL_SHORE_CLEARANCE + (margin > 0 ? margin : 0);
+    const Vector2 samples[] = { { 0, HULL_BOW }, { -HULL_HALF_BEAM, HULL_BOW },
+        { HULL_HALF_BEAM, HULL_BOW }, { 0, -HULL_STERN }, { -HULL_HALF_BEAM, -HULL_STERN },
+        { HULL_HALF_BEAM, -HULL_STERN } };
+    for (size_t i = 0; i < sizeof(samples) / sizeof(*samples); ++i) {
+        Vector2 point = hull_point(forward, right, boat->position, samples[i]);
+        Vector2 normal = { 0 };
+        if (waterfront_harbor_contact_height_scene(
+                scene, point, clearance, bottom, top, world->water, time, &normal))
+            return false;
+    }
+    WaterfrontTrafficContact contact;
+    return !waterfront_traffic_contact_height_scene(scene, boat->position, boat->heading,
+        HULL_BOW + (margin > 0 ? margin : 0), HULL_STERN + (margin > 0 ? margin : 0),
+        HULL_HALF_BEAM + (margin > 0 ? margin : 0), bottom, top, world->water, time, &contact);
+}
+
 bool boat_pair_contact(const Boat *a, const Boat *b, BoatPairContact *contact)
 {
     float low_a, high_a, low_b, high_b;

@@ -309,6 +309,9 @@ class Bridge(unittest.TestCase):
         self.assertEqual((code, result["status"], result["revision"]), (0, "ok", 1))
         self.assertEqual(result["plugin"], "proteus.langedrag")
         self.assertIn("state=", result["inspection"])
+        result, code = self.live("console", "--base-epoch", "0", "--line", "/capabilities")
+        self.assertEqual((code, result["status"]), (0, "ok"))
+        self.assertIn("voyage.define", result["output"])
         pin = self.edit(b'name = "BRIDGE"', b'name = "ALVSBORG"')
         stage = ("--base-revision", "1", "--base-epoch", "0", "--expect-bundle", pin)
         result, code = self.live("stage", *stage, directory=self.package)
@@ -316,21 +319,28 @@ class Bridge(unittest.TestCase):
         self.assertEqual(result["bundle_id"], pin)
         result, code = self.live("stage", *stage, directory=self.package)
         self.assertEqual((code, result["status"], result["revision"]), (1, "stale", 2))
+        # PC: a route edit installs live and keeps the boat; no Apply is needed.
         pin = self.edit(b"radius = 150", b"radius = 120")
         result, _ = self.live("stage", "--base-revision", "2", "--base-epoch", "1",
                               "--expect-bundle", pin, directory=self.package)
-        self.assertEqual((result["outcome"], result["held_change"]), ("held", "restart_voyage"))
-        result, _ = self.live("apply", "--held-revision", "3", "--base-epoch", "1")
         self.assertEqual((result["outcome"], result["revision"]), ("applied", 3))
-        result, _ = self.live("undo", "--base-revision", "3", "--base-epoch", "2")
+        # A water change is still held, and Apply must name its revision.
+        pin = self.edit(b"height = 1.6", b"height = 1.2")
+        result, _ = self.live("stage", "--base-revision", "3", "--base-epoch", "2",
+                              "--expect-bundle", pin, directory=self.package)
+        self.assertEqual((result["outcome"], result["held_change"]), ("held", "restart_session"))
+        result, _ = self.live("apply", "--held-revision", "4", "--base-epoch", "2")
+        self.assertEqual((result["outcome"], result["revision"]), ("applied", 4))
+        # Undo holds the previous water revision; Discard drops it.
+        result, _ = self.live("undo", "--base-revision", "4", "--base-epoch", "3")
         self.assertEqual((result["outcome"], result["held_revision"], result["held_undo"]),
-                         ("held", 2, 1))
-        result, _ = self.live("discard", "--base-epoch", "2")
+                         ("held", 3, 1))
+        result, _ = self.live("discard", "--base-epoch", "3")
         self.assertEqual((result["outcome"], result["held_revision"]), ("discarded", 0))
         pin = self.edit(b"max_speed = 6", b"max_speed = 'six'")
-        result, code = self.live("stage", "--base-revision", "3", "--base-epoch", "2",
+        result, code = self.live("stage", "--base-revision", "4", "--base-epoch", "3",
                                  "--expect-bundle", pin, directory=self.package)
-        self.assertEqual((code, result["status"], result["revision"]), (1, "rejected", 3))
+        self.assertEqual((code, result["status"], result["revision"]), (1, "rejected", 4))
         self.assertEqual(result["diagnostic_field"], "voyage.arrival.max_speed")
 
 

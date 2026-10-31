@@ -23,6 +23,7 @@ typedef struct {
 typedef struct {
     const char *stage_executable; // Opt-in trusted native asynchronous reload; borrowed path.
     struct WakePluginEvaluation *evaluation; // Browser callback receipt, never checkpointed.
+    struct BoatPluginStageJob *query; // PC console query in the isolated worker.
     double frame_now;
     bool evaluation_migrated;
     BoatPluginStageJob *staging; // Never copied into a preview checkpoint.
@@ -110,4 +111,29 @@ bool wake_plugin_preview_seek(const WakePluginPreview *checkpoint, WakePlugin *p
 void wake_plugin_inspect(const WakePlugin *plugin, FILE *output);
 // The authoring panel, in screen pixels, with its last line ending above BOTTOM.
 void wake_plugin_draw(const WakePlugin *plugin, int x, int bottom);
+
+// PC live console -----------------------------------------------------------------------------
+// Move a running session from runtime to authoring. The catalog revision's embedded source and
+// manifest become the console's base; no save polling starts. False without an active revision.
+bool wake_plugin_promote(WakePlugin *plugin);
+// Stage SOURCE (copied) as the console's candidate revision. True when a worker started.
+bool wake_plugin_stage_source(
+    WakePlugin *plugin, BoatSession *session, const char *source, size_t size, double now);
+// The session's manifest text and the active revision's source, borrowed.
+size_t wake_plugin_manifest(const WakePlugin *plugin, const char **text);
+size_t wake_plugin_source(const WakePlugin *plugin, const char **text);
+// Add a canonical optional voyage grant to this session's manifest copy. False with MESSAGE.
+bool wake_plugin_grant(WakePlugin *plugin, const char *capability, char *message, size_t capacity);
+// Start a read-only expression query in the isolated worker. One at a time.
+bool wake_plugin_query_begin(
+    WakePlugin *plugin, const char *source, size_t size, const char *expression, double now);
+// 0 pending, 1 answered (TEXT), -1 failed (MESSAGE when supplied).
+int wake_plugin_query_result(WakePlugin *plugin, char *text, size_t capacity, double now);
+bool wake_plugin_query_pending(const WakePlugin *plugin);
+// Write the active package as plugin.json and main.lua. Never writes into a directory that holds
+// another package. False with MESSAGE.
+bool wake_plugin_save(
+    const WakePlugin *plugin, const char *directory, char *message, size_t capacity);
+// A held LIVE candidate may be installed when the hull clears its candidate envelopes.
+bool wake_plugin_live_ready(const WakePlugin *plugin, const BoatSession *session);
 #endif

@@ -802,7 +802,7 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
 
 const char *boat_plugin_change_name(BoatPluginChange change)
 {
-    static const char *const names[] = { "unchanged", "renamed", "migrate objective",
+    static const char *const names[] = { "unchanged", "renamed", "live", "migrate objective",
         "restart voyage", "restart session", "incompatible" };
     return (unsigned)change < sizeof(names) / sizeof(names[0]) ? names[change] : "unknown";
 }
@@ -824,18 +824,20 @@ BoatPluginChange boat_plugin_classify(
     const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
         return BOAT_PLUGIN_RESTART_SESSION;
-    // L1.2 has only an empty envelope, so it changes no runtime content. Once L2 authors
-    // berths/modules, any differing authored layout is a physical session restart. L4.2 gull
-    // cue edits are cosmetic and may keep time; flock count/centre/layout edits restart.
-    bool cosmetic_scene = false;
-    if (boat_scene_has_content(&active->scene) || boat_scene_has_content(&candidate->scene)) {
-        if (active->has_scene != candidate->has_scene)
-            return BOAT_PLUGIN_RESTART_SESSION;
-        if (active->scene_digest != candidate->scene_digest) {
+    // PC: scene layout edits install live between ticks. A gull-cue-only edit stays cosmetic.
+    // Flock layout, berth, module, entrance and travelling-craft changes all take the live path;
+    // the application waits for the hull to clear the candidate envelopes before installing.
+    bool cosmetic_scene = false, live = false;
+    bool scene_a = active->has_scene && boat_scene_has_content(&active->scene);
+    bool scene_b = candidate->has_scene && boat_scene_has_content(&candidate->scene);
+    if (scene_a || scene_b) {
+        if (!scene_a || !scene_b) {
+            live = true;
+        } else if (active->scene_digest != candidate->scene_digest) {
             if (boat_scene_same_except_gull_cues(&active->scene, &candidate->scene))
                 cosmetic_scene = true;
             else
-                return BOAT_PLUGIN_RESTART_SESSION;
+                live = true;
         }
     }
     bool same = a->shelter_count == b->shelter_count
@@ -849,11 +851,14 @@ BoatPluginChange boat_plugin_classify(
             && s->radius == t->radius;
     }
     if (!same)
-        return BOAT_PLUGIN_RESTART_VOYAGE;
+        live = true;
     bool renamed = strcmp(m->name, n->name) != 0;
-    for (unsigned i = 0; i < a->shelter_count; ++i)
+    unsigned common = a->shelter_count < b->shelter_count ? a->shelter_count : b->shelter_count;
+    for (unsigned i = 0; i < common; ++i)
         renamed |= strcmp(active->shelter_names[i], candidate->shelter_names[i]) != 0;
-    return renamed || cosmetic_scene ? BOAT_PLUGIN_RENAMED : BOAT_PLUGIN_UNCHANGED;
+    return live                     ? BOAT_PLUGIN_LIVE
+        : renamed || cosmetic_scene ? BOAT_PLUGIN_RENAMED
+                                    : BOAT_PLUGIN_UNCHANGED;
 }
 
 // PD1 free and course kinds -------------------------------------------------------------------

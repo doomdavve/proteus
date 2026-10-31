@@ -190,6 +190,9 @@ static void respond(WakeBridge *bridge, const char *id, const char *status, cons
     add(&r, "id=%s\nsession=%s\nstatus=%s\n", id, bridge->session, status);
     if (message)
         field(&r, "status_message", message);
+    for (unsigned i = 0; i < bridge->console_count; ++i)
+        field(&r, "output", bridge->console_lines[i]);
+    bridge->console_count = 0;
     if (plugin && plugin->host.depth)
         owner(&r, plugin, session);
     if (inspect && plugin) {
@@ -237,8 +240,7 @@ static void respond(WakeBridge *bridge, const char *id, const char *status, cons
 }
 
 bool wake_bridge_open(WakeBridge *bridge, const char *directory, double now)
-{
-    memset(bridge, 0, sizeof(*bridge));
+{    memset(bridge, 0, sizeof(*bridge));
     if (strlen(directory) >= sizeof(bridge->directory) - 64 || !private_directory(directory)) {
         fprintf(stderr, "Plugin bridge: cannot use directory %s\n", directory);
         return false;
@@ -270,9 +272,13 @@ bool wake_bridge_open(WakeBridge *bridge, const char *directory, double now)
     return true;
 }
 
-void wake_bridge_close(WakeBridge *bridge)
+void wake_bridge_commands(WakeBridge *bridge, WakeCommand *commands)
 {
-    if (!bridge->open)
+    bridge->commands = commands;
+}
+
+void wake_bridge_close(WakeBridge *bridge)
+{    if (!bridge->open)
         return;
     if (bridge->pending[0])
         respond(bridge, bridge->pending, "cancelled", "the game closed", NULL, NULL, false);
@@ -387,6 +393,14 @@ static bool unpack(const Request *q, BoatPluginFiles *files)
     return true;
 }
 
+static void console_line(void *context, const char *line)
+{
+    WakeBridge *bridge = context;
+    if (bridge->console_count < 16)
+        snprintf(bridge->console_lines[bridge->console_count++], sizeof(bridge->console_lines[0]),
+            "%s", line);
+}
+
 static bool handle(
     WakeBridge *bridge, WakePlugin *plugin, BoatSession *session, const Request *q, double now)
 {
@@ -396,6 +410,38 @@ static bool handle(
     const char *op = q->operation;
     bool stage = !strcmp(op, "stage"), apply = !strcmp(op, "apply"), undo = !strcmp(op, "undo"),
          discard = !strcmp(op, "discard");
+    if (!strcmp(op, "console")) {
+        if (!q->has_base_epoch) {
+            respond(bridge, q->id, "bad_request", "missing epoch pin", plugin, session, false);
+            return false;
+        }
+        if ((uint64_t)q->base_epoch != host->epoch) {
+            respond(bridge, q->id, "stale", "pinned epoch is no longer current", plugin, session,
+                false);
+            return false;
+        }
+        if (!bridge->commands) {
+            respond(bridge, q->id, "bad_request", "no console in this session", plugin, session,
+                false);
+            return false;
+        }
+        if (!q->payload_size || q->payload_size >= WAKE_COMMAND_LINE
+            || memchr(q->payload, '\n', q->payload_size)
+            || memchr(q->payload, '\r', q->payload_size)) {
+            respond(
+                bridge, q->id, "bad_request", "one console line expected", plugin, session, false);
+            return false;
+        }
+        char line[WAKE_COMMAND_LINE];
+        memcpy(line, q->payload, q->payload_size);
+        line[q->payload_size] = 0;
+        bridge->console_count = 0;
+        wake_command_tee(bridge->commands, console_line, bridge);
+        bool restart = wake_command_submit(bridge->commands, plugin, session, line, now);
+        wake_command_tee(bridge->commands, NULL, NULL);
+        respond(bridge, q->id, restart ? "restart" : "ok", NULL, plugin, session, false);
+        return restart;
+    }
     if (!strcmp(op, "inspect")) {
         respond(bridge, q->id, "ok", NULL, plugin, session, true);
         return false;

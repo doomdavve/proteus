@@ -33,9 +33,16 @@ solo free boating; timed courses use the standard engine and multiplayer assigns
 | PageUp / PageDown | Raise / lower camera |
 | C | Restore default camera |
 | F3 | Toggle profiler |
+| `` ` `` or F2 (native solo) | Live Lua console; `/help` lists commands and `/save DIR` writes a package |
 
 Holding both thrust directions selects neutral. Reverse power is weaker than forward;
 Shift selects 5% power in either direction. Scrolling is unassigned and R does nothing.
+
+The live console is available in native solo free boating and voyages, including release builds.
+It takes typed input while the world keeps running with a neutral helm, so a test edit never
+stops the boat. A plain line edits the package, `=` queries the current candidate and `/` runs a
+command; see [the console contract](PLUGIN_API.md#live-console-and-command-layer-pc). It is
+unavailable in replays, demos, screenshots and rooms.
 
 Mouse steering captures the pointer. Move horizontally to turn the wheel, then stop
 moving to hold its setting; move back to straighten it. The wheel needle shows the actual

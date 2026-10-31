@@ -132,83 +132,68 @@ static int harbor_life_scene(void)
     CHECK(!strcmp(s.world.scene->gulls.flocks[0].id, "harbor")
         && s.world.scene->gulls.flocks[0].cue_count == 2);
 
-    // A berth edit is a physical scene change: held until F7, then the caller restarts.
+    // PC: a berth edit installs live between ticks; the boat, clock and boat position carry on.
+    uint64_t tick_before = s.tick;
     BoatPluginBundle moved = harbor_edit("x = 13, z = 173", "x = 13, z = 179");
     CHECK(boat_plugin_host_stage(&p.host, &moved));
-    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
-    CHECK(s.world.scene == &r1->voyage.scene && r1->voyage.scene.berths[1].z == 173);
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 1));
-    CHECK(boat_plugin_host_active(&p.host)->number == 2);
+    CHECK(p.host.change == BOAT_PLUGIN_LIVE);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, false, 1));
+    CHECK(boat_plugin_host_active(&p.host)->number == 2 && s.tick == tick_before);
     CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
     CHECK(s.world.scene->berths[1].z == 179);
-    boat_session_restart(&s, calm());
-    CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
-    CHECK(s.world.scene->berths[1].z == 179);
+    CHECK(strstr(p.status, "R2 ACTIVE, live") && strstr(p.detail, "BOAT KEPT"));
 
-    // Undo restores the whole previous layout through the same restart policy.
+    // Undo restores the layout live as well, with the boat kept.
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 2));
-    CHECK(strstr(p.detail, "F7 RESTART SESSION"));
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 3));
-    boat_session_restart(&s, calm());
-    CHECK(boat_plugin_host_active(&p.host)->number == 1);
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.tick == tick_before);
     CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
     CHECK(s.world.scene->berths[1].z == 173);
 
-    // A dock-module edit follows the same explicit restart and Undo policy.
+    // A dock-module edit follows the same live and Undo policy.
     BoatPluginBundle moved_module = harbor_edit("x = 20, z = 170", "x = 20, z = 166");
     CHECK(boat_plugin_host_stage(&p.host, &moved_module));
-    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 4));
-    boat_session_restart(&s, calm());
+    CHECK(p.host.change == BOAT_PLUGIN_LIVE);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, false, 3));
     CHECK(s.world.scene->module_count == 2 && s.world.scene->modules[0].z == 166);
-    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 5));
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 6));
-    boat_session_restart(&s, calm());
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 4));
     CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.world.scene->modules[0].z == 170);
 
-    // A traffic timetable edit is physical too: it restarts and Undo restores the old craft.
+    // A traffic timetable edit is live too: actors are evaluated at the current time.
     BoatPluginBundle moved_craft = harbor_edit(
         "speed = 4, phase = 0, period = 24.8540", "speed = 3, phase = 5, period = 33.1387");
     CHECK(boat_plugin_host_stage(&p.host, &moved_craft));
-    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 7));
-    boat_session_restart(&s, calm());
+    CHECK(p.host.change == BOAT_PLUGIN_LIVE);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, false, 5));
     CHECK(
         s.world.scene->traffic.actors[0].speed == 3 && s.world.scene->traffic.actors[0].phase == 5);
-    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 8));
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 9));
-    boat_session_restart(&s, calm());
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 6));
     CHECK(boat_plugin_host_active(&p.host)->number == 1);
     CHECK(
         s.world.scene->traffic.actors[0].speed == 4 && s.world.scene->traffic.actors[0].phase == 0);
 
-    // One ferry dwell edit follows the same restart/Undo policy and preserves the other stops.
+    // One ferry dwell edit follows the same live/Undo policy and preserves the other stops.
     BoatPluginBundle moved_dwell = harbor_edit("dwell = 35", "dwell = 40");
     CHECK(boat_plugin_host_stage(&p.host, &moved_dwell));
-    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 10));
-    boat_session_restart(&s, calm());
+    CHECK(p.host.change == BOAT_PLUGIN_LIVE);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, false, 7));
     CHECK(s.world.scene->traffic.actors[1].stops[0].dwell == 40);
-    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 11));
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 12));
-    boat_session_restart(&s, calm());
+    CHECK(!wake_plugin_frame(&p, &s, false, true, false, 8));
     CHECK(boat_plugin_host_active(&p.host)->number == 1
         && s.world.scene->traffic.actors[1].stops[0].dwell == 35);
 
-    // A cue-only edit is cosmetic: Apply keeps the session clock, unlike a flock move.
+    // A cue-only edit is cosmetic; a flock layout move is live and keeps the clock.
     uint64_t before_tick = s.tick;
     BoatPluginBundle cue_edit = harbor_edit("start = 900", "start = 780");
     CHECK(boat_plugin_host_stage(&p.host, &cue_edit));
     CHECK(p.host.change == BOAT_PLUGIN_RENAMED);
-    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 13));
+    CHECK(!wake_plugin_frame(&p, &s, false, false, true, 9));
     CHECK(s.tick == before_tick);
     CHECK(s.world.scene->gulls.flocks[0].cues[1].start_tick == 780);
     BoatPluginBundle moved_flock = harbor_edit("x = -4, z = 182", "x = -8, z = 182");
     CHECK(boat_plugin_host_stage(&p.host, &moved_flock));
-    CHECK(p.host.change == BOAT_PLUGIN_RESTART_SESSION);
-    CHECK(wake_plugin_frame(&p, &s, false, false, true, 14));
-    boat_session_restart(&s, calm());
-    CHECK(s.world.scene->gulls.flocks[0].x == -8);
+    CHECK(p.host.change == BOAT_PLUGIN_LIVE);
+    CHECK(!wake_plugin_frame(&p, &s, false, false, false, 10));
+    CHECK(s.tick == before_tick && s.world.scene->gulls.flocks[0].x == -8);
 
     // An unsafe berth (ashore) is rejected and leaves the active revision and scene intact.
     unsigned active_before_bad = boat_plugin_host_active(&p.host)->number;
@@ -388,16 +373,15 @@ static int classification(void)
     // Comments and layout change no value.
     failed |= expect_change(
         "-- Facing out of the basin.", "-- Facing west.", false, BOAT_PLUGIN_UNCHANGED);
-    // Route gameplay: positions, radii, order identity, arrival and the exposure threshold.
-    failed
-        |= expect_change("id = \"bridge\"", "id = \"alvsborg\"", false, BOAT_PLUGIN_RESTART_VOYAGE);
-    failed |= expect_change("x = 650", "x = 655", false, BOAT_PLUGIN_RESTART_VOYAGE);
-    failed |= expect_change("heading = 1.33", "heading = 1.3", false, BOAT_PLUGIN_RESTART_VOYAGE);
-    failed |= expect_change("radius = 150", "radius = 120", false, BOAT_PLUGIN_RESTART_VOYAGE);
-    failed |= expect_change("radius = 75", "radius = 90", false, BOAT_PLUGIN_RESTART_VOYAGE);
-    failed |= expect_change("max_speed = 6", "max_speed = 4", false, BOAT_PLUGIN_RESTART_VOYAGE);
+    // PC: route gameplay edits install live and map progress by shelter ID.
+    failed |= expect_change("id = \"bridge\"", "id = \"alvsborg\"", false, BOAT_PLUGIN_LIVE);
+    failed |= expect_change("x = 650", "x = 655", false, BOAT_PLUGIN_LIVE);
+    failed |= expect_change("heading = 1.33", "heading = 1.3", false, BOAT_PLUGIN_LIVE);
+    failed |= expect_change("radius = 150", "radius = 120", false, BOAT_PLUGIN_LIVE);
+    failed |= expect_change("radius = 75", "radius = 90", false, BOAT_PLUGIN_LIVE);
+    failed |= expect_change("max_speed = 6", "max_speed = 4", false, BOAT_PLUGIN_LIVE);
     failed |= expect_change(
-        "exposed_fraction = 0.8", "exposed_fraction = 0.7", false, BOAT_PLUGIN_RESTART_VOYAGE);
+        "exposed_fraction = 0.8", "exposed_fraction = 0.7", false, BOAT_PLUGIN_LIVE);
     // The water: the exposure itself and when its weather begins.
     failed |= expect_change("height = 1.6", "height = 1.2", false, BOAT_PLUGIN_RESTART_SESSION);
     failed |= expect_change("build = 60", "build = 30", false, BOAT_PLUGIN_RESTART_SESSION);
@@ -503,8 +487,10 @@ static int rename_keeps_progress(void)
     return 0;
 }
 
-// Restart the voyage with ROUTE_EDIT applied, from a session in STATE.
-static int restart_from(const char *label, Vector2 place, Vector2 velocity, unsigned shelter,
+// Install a live route edit with ROUTE_EDIT applied, from a session in STATE. The boat, clock,
+// water and wakes continue; progress maps by shelter ID and a removed shelter falls back to the
+// start for recovery.
+static int live_from(const char *label, Vector2 place, Vector2 velocity, unsigned shelter,
     bool arrive, const char *from, const char *to)
 {
     BoatPluginHost host;
@@ -519,32 +505,48 @@ static int restart_from(const char *label, Vector2 place, Vector2 velocity, unsi
     BoatVoyage before = session.voyage;
     Boat boat = session.boat;
     BoatStorm storm = session.world.water.storm;
+    uint64_t tick = session.tick;
+    char old_id[BOAT_PLUGIN_TEXT];
+    snprintf(old_id, sizeof(old_id), "%s",
+        boat_plugin_host_active(&host)->voyage.shelter_ids[before.shelter]);
     BoatPluginBundle bundle = edited(from, to, false);
-    CHECK(boat_plugin_host_stage(&host, &bundle) && host.change == BOAT_PLUGIN_RESTART_VOYAGE);
+    if (!boat_plugin_host_stage(&host, &bundle) || host.change != BOAT_PLUGIN_LIVE) {
+        fprintf(stderr, "stage %s: %s %s %s\n", label,
+            boat_plugin_status_name(host.diagnostic.status), host.diagnostic.field,
+            host.diagnostic.message);
+        return 1;
+    }
     const BoatPluginRevision *revision = boat_plugin_host_commit(&host);
     CHECK(revision);
-    boat_session_restart_voyage(&session, &revision->voyage.route);
+    const char *ids[BOAT_VOYAGE_SHELTERS] = { 0 };
+    unsigned count = revision->voyage.route.shelter_count;
+    unsigned mapped = 0;
+    bool found = false;
+    for (unsigned i = 0; i < count && i < BOAT_VOYAGE_SHELTERS; ++i) {
+        ids[i] = revision->voyage.shelter_ids[i];
+        if (!strcmp(ids[i], old_id)) {
+            mapped = i;
+            found = true;
+        }
+    }
+    boat_session_rebind_voyage_live(&session, &revision->voyage.route, old_id, ids, count);
     const BoatVoyageRoute *route = session.voyage.route;
-    double now = boat_session_time(&session);
-    // Progress starts again now; the boat, clock and grown weather are untouched.
-    CHECK(route == &revision->voyage.route && session.voyage.shelter == 0);
-    CHECK(!session.voyage.arrived && !session.voyage.exposed && session.voyage.recoveries == 0);
-    CHECK(session.voyage.started == now && session.voyage.event == BOAT_VOYAGE_NONE);
-    CHECK(session.voyage.weather && session.voyage.weather_started == before.weather_started);
-    CHECK(same_boat(&boat, &session.boat) && same_storm(storm, session.world.water.storm));
-    // Observation resumes on the next tick with the ordinary rules.
-    session.boat.position = place;
-    session.boat.velocity = velocity;
-    boat_session_step(&session, (BoatInput) { 0 });
-    CHECK(session.voyage.shelter < route->shelter_count);
-    bool inside_arrival = Vector2Distance(place, route->arrival_centre) <= route->arrival_radius
-        && Vector2Length(session.boat.velocity) <= route->arrival_speed;
-    CHECK(session.voyage.arrived == inside_arrival);
-    // Recovery uses the new route's shelters.
+    // The boat, clock and grown weather are untouched; progress is identified by shelter ID.
+    CHECK(same_boat(&boat, &session.boat) && session.tick == tick);
+    CHECK(same_storm(storm, session.world.water.storm));
+    if (!(route == &revision->voyage.route && session.voyage.shelter == (found ? mapped : 0))) {
+        fprintf(stderr, "live %s shelter mismatch: found=%d mapped=%u shelter=%u\n", label, found,
+            mapped, session.voyage.shelter);
+        return 1;
+    }
+    CHECK(session.voyage.exposed == before.exposed);
+    CHECK(
+        session.voyage.arrived == (before.arrived && found && mapped == route->shelter_count - 1));
+    // Recovery uses the new route's shelter, which is a usable restart either way.
     boat_session_recover(&session);
     const BoatVoyageShelter *s = &route->shelters[session.voyage.shelter];
     CHECK(session.boat.position.x == s->position.x && session.boat.position.y == s->position.y);
-    printf("restart %s: was shelter %u%s%s; now shelter %u%s, %u shelters\n", label, before.shelter,
+    printf("live %s: was shelter %u%s%s; now shelter %u%s, %u shelters\n", label, before.shelter,
         before.exposed ? " exposed" : "", before.arrived ? " arrived" : "", session.voyage.shelter,
         session.voyage.arrived ? " arrived" : "", route->shelter_count);
     boat_session_destroy(&session);
@@ -556,17 +558,16 @@ static int restart_voyage_policy(void)
     const BoatVoyageRoute *r = &boat_voyage_outer;
     int failed = 0;
     // Inside the bridge shelter's radius when its radius changes.
-    failed |= restart_from("in shelter", r->shelters[1].position, (Vector2) { 0 }, 1, false,
+    failed |= live_from("in shelter", r->shelters[1].position, (Vector2) { 0 }, 1, false,
         "radius = 150", "radius = 160");
-    // Exposed when the threshold changes.
-    failed |= restart_from("exposed", r->exposure.centre, (Vector2) { 4, 0 }, 1, false,
+    // Exposed when the threshold changes: the water itself stays the same.
+    failed |= live_from("exposed", r->exposure.centre, (Vector2) { 4, 0 }, 1, false,
         "exposed_fraction = 0.8", "exposed_fraction = 0.6");
-    // After arriving, still in the harbour at a crawl, when the arrival speed changes: the new
-    // objective completes on the next tick.
-    failed |= restart_from("arrived", r->arrival_centre, (Vector2) { 1, 0 }, 3, true,
-        "max_speed = 6", "max_speed = 5");
-    // At the last of four shelters when the route loses one: the index cannot survive.
-    failed |= restart_from("fewer shelters", r->shelters[2].position, (Vector2) { 0 }, 2, false,
+    // After arriving, still in the harbour at a crawl: the destination keeps its identity.
+    failed |= live_from("arrived", r->arrival_centre, (Vector2) { 1, 0 }, 3, true, "max_speed = 6",
+        "max_speed = 5");
+    // At the last of four shelters when the route loses one: the ID cannot survive.
+    failed |= live_from("fewer shelters", r->shelters[2].position, (Vector2) { 0 }, 2, false,
         "{ id = \"east_shore\", name = \"EAST SHORE\", x = 3250, z = -2000,\n"
         "        heading = 0.86, radius = 200 },\n",
         "");
@@ -650,25 +651,42 @@ static int undo_history(void)
     const BoatPluginRevision *r = boat_plugin_host_commit(&host);
     boat_session_rebind_voyage(&session, &r->voyage.route);
     BoatPluginBundle moved = edited("radius = 150", "radius = 120", false);
-    CHECK(boat_plugin_host_stage(&host, &moved) && host.change == BOAT_PLUGIN_RESTART_VOYAGE);
+    if (!boat_plugin_host_stage(&host, &moved) || host.change != BOAT_PLUGIN_LIVE) {
+        fprintf(stderr, "undo stage: status=%s change=%s %s %s\n",
+            boat_plugin_status_name(host.diagnostic.status), boat_plugin_change_name(host.change),
+            host.diagnostic.field, host.diagnostic.message);
+        return 1;
+    }
     // Staging the same bytes again keeps the held number.
     moved = edited("radius = 150", "radius = 120", false);
     CHECK(boat_plugin_host_stage(&host, &moved) && boat_plugin_host_held(&host)->number == 3);
+    char old_id[BOAT_PLUGIN_TEXT];
+    snprintf(old_id, sizeof(old_id), "%s",
+        boat_plugin_host_active(&host)->voyage.shelter_ids[session.voyage.shelter]);
     r = boat_plugin_host_commit(&host);
     CHECK(r && r->number == 3 && host.depth == 3);
-    boat_session_restart_voyage(&session, &r->voyage.route);
+    const char *ids[BOAT_VOYAGE_SHELTERS] = { 0 };
+    for (unsigned i = 0; i < r->voyage.route.shelter_count; ++i)
+        ids[i] = r->voyage.shelter_ids[i];
+    boat_session_rebind_voyage_live(
+        &session, &r->voyage.route, old_id, ids, r->voyage.route.shelter_count);
     observe(&session, r->voyage.route.shelters[1].position, (Vector2) { 0 });
 
-    // Undo r3 -> r2 restarts the voyage under the same rule; Discard drops a held undo.
-    CHECK(boat_plugin_host_undo(&host) && host.change == BOAT_PLUGIN_RESTART_VOYAGE);
+    // Undo r3 -> r2 is a live route change again; Discard drops a held undo.
+    CHECK(boat_plugin_host_undo(&host) && host.change == BOAT_PLUGIN_LIVE);
     CHECK(boat_plugin_host_held(&host)->number == 2);
     boat_plugin_host_discard(&host);
     CHECK(!boat_plugin_host_commit(&host) && boat_plugin_host_active(&host)->number == 3);
     CHECK(boat_plugin_host_undo(&host));
     r = boat_plugin_host_commit(&host);
     CHECK(r && r->number == 2 && host.depth == 2);
-    boat_session_restart_voyage(&session, &r->voyage.route);
-    CHECK(session.voyage.route->shelters[1].radius == 150 && session.voyage.shelter == 0);
+    snprintf(old_id, sizeof(old_id), "%s",
+        boat_plugin_host_active(&host)->voyage.shelter_ids[session.voyage.shelter]);
+    for (unsigned i = 0; i < r->voyage.route.shelter_count; ++i)
+        ids[i] = r->voyage.shelter_ids[i];
+    boat_session_rebind_voyage_live(
+        &session, &r->voyage.route, old_id, ids, r->voyage.route.shelter_count);
+    CHECK(session.voyage.route->shelters[1].radius == 150 && session.voyage.shelter == 1);
     // Undo r2 -> r1 is a rename: progress is kept.
     observe(&session, r->voyage.route.shelters[1].position, (Vector2) { 0 });
     CHECK(boat_plugin_host_undo(&host) && host.change == BOAT_PLUGIN_RENAMED);
@@ -906,14 +924,12 @@ static int game_controls(void)
     CHECK(
         session.voyage.shelter == 1 && !strcmp(session.voyage.route->shelters[1].name, "ALVSBORG"));
     CHECK(strstr(plugin.status, "R2 ACTIVE") && !plugin.alert);
-    // A route change waits for F7, then restarts the voyage.
+    // A route change installs live, keeping the boat and progress.
     CHECK(save("radius = 150", "radius = 120"));
     CHECK(!wake_plugin_frame(&plugin, &session, true, false, false, 2));
-    CHECK(session.voyage.shelter == 1 && session.voyage.route->shelters[1].radius == 150);
-    CHECK(strstr(plugin.detail, "F7 RESTART VOYAGE") && plugin.alert);
-    CHECK(!wake_plugin_frame(&plugin, &session, false, false, true, 3));
-    CHECK(session.voyage.shelter == 0 && session.voyage.route->shelters[1].radius == 120);
-    CHECK(strstr(plugin.status, "R3 ACTIVE"));
+    CHECK(session.voyage.shelter == 1 && session.voyage.route->shelters[1].radius == 120);
+    CHECK(strstr(plugin.status, "R3 ACTIVE, live") && strstr(plugin.detail, "BOAT KEPT")
+        && !plugin.alert);
     // An exposure change asks the caller for a session restart.
     CHECK(save("height = 1.6", "height = 1.2"));
     CHECK(!wake_plugin_frame(&plugin, &session, true, false, false, 4));
