@@ -902,7 +902,8 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
         || !build_unit_plane(&scene->plane))
         goto failed;
     scene->shadow_map_size = WATERFRONT_GPU_SHADOW_MAP_SIZE;
-    if (!create_shadow_map(&scene->shadow_map, scene->shadow_map_size))
+    if (!create_shadow_map(&scene->shadow_map, scene->shadow_map_size)
+        || !create_shadow_map(&scene->far_shadow_map, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE))
         goto failed;
     scene->reflection
         = LoadRenderTexture(WATERFRONT_GPU_REFLECTION_WIDTH, WATERFRONT_GPU_REFLECTION_HEIGHT);
@@ -1127,6 +1128,24 @@ static void select_local_lights(WaterfrontGpuScene *scene, const WaterfrontScene
     }
 }
 
+// Slot 15 is free in both city and water materials (WebGL2 guarantees 16 fragment slots).
+static void set_far_shadow_uniforms(const WaterfrontGpuScene *scene, Shader shader)
+{
+    int enabled = scene->shadows_enabled && scene->far_shadows_active;
+    SetShaderValue(
+        shader, GetShaderLocation(shader, "farShadowsEnabled"), &enabled, SHADER_UNIFORM_INT);
+    if (!enabled)
+        return;
+    SetShaderValueMatrix(shader, GetShaderLocation(shader, "farLightViewProjection"),
+        scene->far_light_view_projection);
+    int slot = 15;
+    rlEnableShader(shader.id);
+    rlActiveTextureSlot(slot);
+    rlEnableTexture(scene->far_shadow_map.depth.id);
+    rlSetUniform(GetShaderLocation(shader, "farShadowMap"), &slot, SHADER_UNIFORM_INT, 1);
+    rlActiveTextureSlot(0);
+}
+
 static void set_lighting_uniforms(WaterfrontGpuScene *scene)
 {
     static const float ambient_color[] = { .48f, .57f, .65f };
@@ -1165,6 +1184,7 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
             rlActiveTextureSlot(0);
         }
     }
+    set_far_shadow_uniforms(scene, scene->shader);
     int light_count = scene->lighting_enabled ? scene->local_light_count : 0;
     location = GetShaderLocation(scene->shader, "localLightCount");
     if (location >= 0)
@@ -1386,6 +1406,7 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
             GetShaderLocation(scene->water_shader, "shadowMap"), &slot, SHADER_UNIFORM_INT, 1);
         rlActiveTextureSlot(0);
     }
+    set_far_shadow_uniforms(scene, scene->water_shader);
     float camera[]
         = { frame->camera.position.x, frame->camera.position.y, frame->camera.position.z };
     int reflections_enabled = scene->reflections_enabled;
@@ -1488,8 +1509,8 @@ static void draw_traffic(const WaterfrontGpuScene *scene, Material material,
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
     for (int i = 0; i < traffic->vessel_count; ++i) {
         const WaterfrontVesselState *vessel = &traffic->vessels[i];
-        draw_colored_mesh(scene->traffic_boats[traffic->mesh[i]], material, vessel->pose, WHITE,
-            false);
+        draw_colored_mesh(
+            scene->traffic_boats[traffic->mesh[i]], material, vessel->pose, WHITE, false);
         float size = i >= 3 ? .32f : .18f;
         for (int light = 0; lights && light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
             draw_colored_mesh(scene->cube, material,
@@ -1775,10 +1796,10 @@ static void render_reflection(
     scene->reflection_view_projection = MatrixMultiply(view, projection);
 }
 
-static Camera3D shadow_camera(const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
+static Camera3D shadow_camera(
+    const WaterfrontSceneFrame *frame, float coverage, int map_size, float light_distance)
 {
-    const float coverage = frame->player_active ? 96.0f : 500.0f;
-    const float texel_size = coverage / scene->shadow_map_size;
+    const float texel_size = coverage / map_size;
     Vector3 light_direction = waterfront_sun_direction();
     Vector3 right = Vector3Normalize(Vector3CrossProduct((Vector3) { 0, 1, 0 }, light_direction));
     Vector3 up = Vector3CrossProduct(light_direction, right);
@@ -1789,7 +1810,8 @@ static Camera3D shadow_camera(const WaterfrontGpuScene *scene, const WaterfrontS
         - Vector3DotProduct(target, up);
     target = Vector3Add(
         target, Vector3Add(Vector3Scale(right, right_offset), Vector3Scale(up, up_offset)));
-    return (Camera3D) { .position = Vector3Add(target, Vector3Scale(light_direction, 600)),
+    Vector3 position = Vector3Add(target, Vector3Scale(light_direction, light_distance));
+    return (Camera3D) { .position = position,
         .target = target,
         .up = up,
         .fovy = coverage,
@@ -1821,16 +1843,18 @@ static void draw_shadow_casters(
     draw_map_mesh(scene->crane, material);
 }
 
-static void render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
+static Matrix render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame,
+    RenderTexture2D target, float coverage, int map_size, float light_distance)
 {
-    Camera3D camera = shadow_camera(scene, frame);
+    Camera3D camera = shadow_camera(frame, coverage, map_size, light_distance);
     RenderTargetState previous = render_target_state();
-    BeginTextureMode(scene->shadow_map);
+    BeginTextureMode(target);
     ClearBackground(WHITE);
     BeginMode3D(camera);
     float half_coverage = camera.fovy * .5f;
-    rlSetMatrixProjection(
-        MatrixOrtho(-half_coverage, half_coverage, -half_coverage, half_coverage, .25, 1400));
+    // A wider map reaches farther along the light axis, too; retain room for its casters.
+    rlSetMatrixProjection(MatrixOrtho(-half_coverage, half_coverage, -half_coverage, half_coverage,
+        .25, light_distance * 2 + 200));
     Matrix view = rlGetMatrixModelview();
     Matrix projection = rlGetMatrixProjection();
     draw_shadow_casters(scene, scene->shadow_material, frame);
@@ -1839,7 +1863,7 @@ static void render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontSceneFr
     restore_render_target(previous);
     // raylib composes matrices in this order for its shaders; retain the pinned example's
     // convention so this matrix maps world positions into the depth texture's clip space.
-    scene->light_view_projection = MatrixMultiply(view, projection);
+    return MatrixMultiply(view, projection);
 }
 
 static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width)
@@ -1910,8 +1934,14 @@ static void draw_scene(
     Material material = scene->city_material;
     Material life_material = scene->life_material;
     counting_pass = WATERFRONT_GPU_PASS_SHADOW;
-    if (scene->shadows_enabled)
-        render_shadow_map(scene, frame);
+    scene->far_shadows_active = frame->player_active;
+    if (scene->shadows_enabled) {
+        scene->light_view_projection = render_shadow_map(scene, frame, scene->shadow_map,
+            frame->player_active ? 96.0f : 500.0f, scene->shadow_map_size, 600);
+        if (scene->far_shadows_active)
+            scene->far_light_view_projection = render_shadow_map(scene, frame,
+                scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000);
+    }
     select_local_lights(scene, frame);
     set_lighting_uniforms(scene);
     counting_pass = WATERFRONT_GPU_PASS_REFLECTION;
@@ -2084,6 +2114,8 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         UnloadTexture(scene->roof_texture);
     if (scene->shadow_map.id != 0)
         rlUnloadFramebuffer(scene->shadow_map.id);
+    if (scene->far_shadow_map.id != 0)
+        rlUnloadFramebuffer(scene->far_shadow_map.id);
     if (scene->reflection.id != 0)
         UnloadRenderTexture(scene->reflection);
     if (scene->shader.id != 0 && scene->shader.id != rlGetShaderIdDefault())

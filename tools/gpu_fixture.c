@@ -419,6 +419,98 @@ cleanup:
     return ok;
 }
 
+// Probe the production city shader with controlled occluder depths. This catches a missing
+// far sampler/matrix and checks that nearby detail wins and both boundaries blend to lit.
+static bool verify_shadow_cascades(WaterfrontGpuScene *scene)
+{
+    RenderTexture2D target = LoadRenderTexture(16, 16);
+    Image black = GenImageColor(1, 1, BLACK), white = GenImageColor(1, 1, WHITE);
+    Texture2D depths[] = { LoadTextureFromImage(black), LoadTextureFromImage(white) };
+    UnloadImage(black);
+    UnloadImage(white);
+    Mesh plane = material_probe_plane();
+    bool ok = IsRenderTextureValid(target) && depths[0].id && depths[1].id && plane.vaoId;
+    if (!ok)
+        goto cleanup;
+    Shader shader = scene->shader;
+    int zero = 0, one = 1;
+    const char *off[]
+        = { "emissive", "groundPass", "facadePass", "atmosphereEnabled", "localLightCount" };
+    for (size_t i = 0; i < sizeof(off) / sizeof(off[0]); ++i)
+        SetShaderValue(shader, GetShaderLocation(shader, off[i]), &zero, SHADER_UNIFORM_INT);
+    float ambient[] = { .2f, .2f, .2f }, sun[] = { 0, 1, 0 }, color[] = { 1, 1, 1, 1 };
+    float intensity = .7f;
+    SetShaderValue(shader, GetShaderLocation(shader, "ambientColor"), ambient, SHADER_UNIFORM_VEC3);
+    SetShaderValue(
+        shader, GetShaderLocation(shader, "directionalColor"), color, SHADER_UNIFORM_VEC3);
+    SetShaderValue(
+        shader, GetShaderLocation(shader, "directionalDirection"), sun, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shader, GetShaderLocation(shader, "directionalIntensity"), &intensity,
+        SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, GetShaderLocation(shader, "objectColor"), color, SHADER_UNIFORM_VEC4);
+    SetShaderValue(shader, GetShaderLocation(shader, "shadowsEnabled"), &one, SHADER_UNIFORM_INT);
+    Matrix view = MatrixLookAt((Vector3) { 0, 600, 0 }, (Vector3) { 0 }, (Vector3) { 0, 0, -1 });
+    SetShaderValueMatrix(shader, GetShaderLocation(shader, "lightViewProjection"),
+        MatrixMultiply(view, MatrixOrtho(-48, 48, -48, 48, .25, 1400)));
+    SetShaderValueMatrix(shader, GetShaderLocation(shader, "farLightViewProjection"),
+        MatrixMultiply(
+            MatrixLookAt((Vector3) { 0, 1000, 0 }, (Vector3) { 0 }, (Vector3) { 0, 0, -1 }),
+            MatrixOrtho(-384, 384, -384, 384, .25, 2200)));
+    const float positions[] = { 0, 40, 96, 300, 344, 380, 400, 96 };
+    int values[8] = { 0 };
+    for (int i = 0; i < 8; ++i) {
+        int far_enabled = i != 7;
+        SetShaderValue(shader, GetShaderLocation(shader, "farShadowsEnabled"), &far_enabled,
+            SHADER_UNIFORM_INT);
+        Camera3D camera = { .position = { positions[i], 20, 0 },
+            .target = { positions[i], 0, 0 },
+            .up = { 0, 0, -1 },
+            .fovy = 2,
+            .projection = CAMERA_ORTHOGRAPHIC };
+        BeginTextureMode(target);
+        ClearBackground(MAGENTA);
+        BeginMode3D(camera);
+        rlEnableShader(shader.id);
+        // Near is fully lit, far is occluded: centre stays lit, transition darkens, far fades.
+        int slots[] = { 10, 15 };
+        const char *samplers[] = { "shadowMap", "farShadowMap" };
+        for (int map = 0; map < 2; ++map) {
+            rlActiveTextureSlot(slots[map]);
+            rlEnableTexture(depths[1 - map].id);
+            rlSetUniform(
+                GetShaderLocation(shader, samplers[map]), &slots[map], SHADER_UNIFORM_INT, 1);
+        }
+        rlActiveTextureSlot(0);
+        // Translate the probe plane as well so the distant samples still have geometry.
+        DrawMesh(plane, scene->city_material, MatrixTranslate(positions[i], 0, 0));
+        EndMode3D();
+        EndTextureMode();
+        Image image = LoadImageFromTexture(target.texture);
+        if (!image.data) {
+            ok = false;
+            break;
+        }
+        values[i] = GetImageColor(image, 8, 8).r;
+        UnloadImage(image);
+    }
+    printf("shadow_cascades=%d,%d,%d,%d,%d,%d,%d off=%d\n", values[0], values[1], values[2],
+        values[3], values[4], values[5], values[6], values[7]);
+    ok = ok && values[0] > values[1] && values[1] > values[2] && abs(values[2] - values[3]) <= 2
+        && values[4] > values[3] && values[4] < values[5] && abs(values[5] - values[6]) <= 2
+        && abs(values[0] - values[6]) <= 2 && abs(values[7] - values[0]) <= 2;
+cleanup:
+    if (plane.vaoId)
+        UnloadMesh(plane);
+    if (target.id)
+        UnloadRenderTexture(target);
+    for (int i = 0; i < 2; ++i)
+        if (depths[i].id)
+            UnloadTexture(depths[i]);
+    if (!ok)
+        fprintf(stderr, "GPU shadow cascade coverage/blending check failed\n");
+    return ok;
+}
+
 static bool verify_sky_targets(WaterfrontGpuScene *scene)
 {
     const FixtureSize sizes[] = { { 320, 200 }, { 320, 240 }, { 1280, 800 }, { 1280, 960 } };
@@ -550,7 +642,7 @@ static bool draw_city(RenderTexture2D target, WaterfrontGpuScene *scene, Fixture
     }
     if (options.check
         && (!verify_surface_materials(scene, false) || !verify_surface_materials(scene, true)
-            || !verify_sky_targets(scene)))
+            || !verify_shadow_cascades(scene) || !verify_sky_targets(scene)))
         return false;
     waterfront_gpu_scene_set_lighting_enabled(scene, options.lighting);
     waterfront_gpu_scene_set_shadows_enabled(scene, options.shadows);
