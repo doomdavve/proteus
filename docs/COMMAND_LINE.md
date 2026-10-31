@@ -43,17 +43,16 @@ starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSI
 ./build/wake_velocity --location river
 ./build/wake_velocity --location outer --package proteus.harbor-life
 ./build/wake_velocity --course
-./build/wake_velocity --location basin --no-plugins
 ```
 
 Every native solo session starts from a package compiled into the executable at build time; the
 default for the basin and river is free boating, for `outer` the Långedrag voyage, and for
 `--course` the basin time trial. `--package ID` selects another bundled package, which must
 belong to the session's location and mode (for example `proteus.harbor-life` on `outer`).
-Launching a package starts no Lua VM, polls no files and shows no authoring panel. The temporary
-`--no-plugins` switch restores the compiled-content path for parity checks. Browser solo sessions
-use the same catalog, built into the game Wasm; rooms receive their definition as data. An unknown
-ID, or a package for another location, fails with an explicit message. The title's single-player
+Launching a package starts no Lua VM, polls no files and shows no authoring panel. There is no
+compiled-content switch: every solo session takes this path. Browser solo sessions use the same
+catalog, built into the game Wasm; rooms receive their definition as data. An unknown ID, or a
+package for another location, fails with an explicit message. The title's single-player
 panel selects Standard or Harbor life for `outer` on native and web builds.
 
 ### Live Lua authoring
@@ -80,7 +79,7 @@ reloads the package; F5 reloads now, F6 undoes/discards and F7 applies a pending
 Invalid edits leave the running descriptor intact. Packaged plugin examples live under
 `assets/plugins/`; copy one somewhere writable to edit it. Packages also ship the
 [authoring tools](PLUGIN_API.md#packaged-authoring-tools-p47) in `authoring/`. The race tool previews local
-course edits; network rooms retain their compiled course. The harbor-life example edits two
+course edits; network rooms use their own package definition. The harbor-life example edits two
 marina berths; a layout change is live when the boat is clear of the new hulls. See the
 [plugin API](PLUGIN_API.md#playing-and-live-authoring-p1) and
 [race example](../plugins/river-sprint/README.md) for reload policies and limits.
@@ -124,7 +123,7 @@ package. `--replay FILE` and `--ghost FILE` imply course mode. Replay uses the r
 preset; an imported ghost must match the selected preset. Imported ghosts remain selected across
 retries while your personal best is tracked separately. `--save-run FILE` exports every completed
 normal-time attempt, including slower runs; altered-time practice attempts preserve existing
-exports and bests. A course whose gameplay digest equals the compiled S course keeps the
+exports and bests. A course whose gameplay digest equals the standard S course keeps the
 established `course-*.run` best path; another `--package` course adds its digest to the filename
 and refuses `--replay`/`--ghost`. See [saved runs](PLAYING.md#saved-runs) for storage and
 compatibility.

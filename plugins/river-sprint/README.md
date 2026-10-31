@@ -29,5 +29,6 @@ ticks. All fields are required; unknown fields and sparse lists are rejected.
 
 This is a local course/source preview. It displays and drives the authored gates, ferry and
 storm; it does not run a multiplayer round or display standings/countdowns. The headless race
-fixture tests the authored rules with the native race engine. Production rooms and browser
-clients continue to use the compiled course until the protocol work in P5.
+fixture tests the authored rules with the native race engine. Production rooms use this package's
+validated definition as data, and browser clients receive the room definition without evaluating
+the package.

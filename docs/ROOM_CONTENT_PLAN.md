@@ -15,11 +15,12 @@ descriptor part of R1 and R3 on built-in maps; loaded maps (R2) and distribution
 
 ## Starting point
 
-The server already supplies room settings, live boats, wakes and match state, including a
-checkpoint for late joiners. Clients supply the playable world's static definitions.
-The handshake checks protocol, physics revision and a digest of every compiled location,
-water geometry and shared gameplay recipes. A change to another location can therefore
-reject a client even when the selected room's content is unchanged.
+The server supplies the validated room definition (course, rules and optional scene) as data,
+along with live boats, wakes and match state, including a checkpoint for late joiners. Clients
+supply the engine and built-in maps. The handshake checks protocol, physics revision and a digest
+of every compiled location, water geometry and shared gameplay recipes; the course, rules and
+authored scene travel separately. A change to another location can therefore reject a client
+even when the selected room's content is unchanged.
 
 Visual scenery is already separate: `boat_scenery` loads binary packs at runtime, and those
 packs are excluded from the multiplayer digest. Their water must match the compiled map.
