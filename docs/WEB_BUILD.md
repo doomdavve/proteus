@@ -374,12 +374,28 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
 
 Development browser builds now include the opt-in **PLUGIN VOYAGE** panel. It imports/exports
 version-1 JSON source bundles, loads the Långedrag example, validates in a disposable Web Worker
-and launches a solo `outer` voyage. Live edits use Stage/reload, explicit Apply and Undo;
-opening the panel pauses solo input. Normal PLAY still opens the shared title.
+and launches solo voyages, free boating or the basin time trial. Live edits use Stage/reload,
+explicit Apply and Undo; opening the panel pauses solo input. Normal PLAY still opens the shared
+title, which now starts the same build-time package catalog as native, including Harbor life.
 
-Voyages support `voyage.define` plus optional objective HUD/timer grants; race imports remain
-unavailable. No imported Lua executes on the game thread. A completed descriptor receipt is
-bound to exact bytes and the current revision/commit epoch before native schema/map checks.
+Voyages, free and course packages support their normal grants plus optional objective HUD/timer
+grants and `scene.define`; a scene is returned through the stage wire with the traffic sweep off
+the game thread. `race` and `match` imports are rejected with a message pointing to rooms. No
+imported Lua executes on the game thread. A completed descriptor receipt is bound to exact bytes
+and the current revision/commit epoch before native schema/map checks.
+
+A stage result may be 16384 bytes; Harbor life's scene revision measures 5,505 bytes, above the
+old 4 KiB cap. The browser worker deadline is 15 seconds. The bundled catalog is generated for
+Wasm by the same Node generator the native build runs through CMake's cross-compiling emulator;
+only the solo entries (basin and river free, time trial, Långedrag and Harbor life) are linked.
+The game Wasm links `proteus_plugins` for runtime package data, so `tools/check_web_wasm.py` tests
+the linked output for Lua parser/VM strings and uses `plugin_stage.wasm` as the positive control.
+`web_plugin_wire` (CTest) prevents the browser author's wire magic from drifting from
+`BOAT_PLUGIN_WIRE_VERSION`. Normal sessions create no worker.
+
+Desktop browsers with a physical keyboard get the live console (grave or F2). Edits and `= queries`
+use the same isolated worker; `/save DIR` downloads a version-1 source bundle. Touch-only phones
+do not expose the console.
 Cancellation/deadline/late results cannot install a revision. Each UI and game reload lane
 owns at most one job; the descriptor transport caps total entries at two. Objectives use a
 separate reusable Wasm worker with a fresh Lua VM per call; solo simulation waits at T before
@@ -387,7 +403,9 @@ T+1, while rendering/UI remain responsive. Callbacks, migration and Undo use hos
 state transactions. See [browser objectives](PLUGIN_API.md#browser-objective-transactions-p49). See the
 [API contract](PLUGIN_API.md#browser-source-bundles-p43) for bundle bytes, transactions and limits.
 
-Source persistence uses localStorage, separately from existing IndexedDB game settings/bests.
+Source persistence uses localStorage, separately from existing IndexedDB game settings/bests;
+time-trial bests keep the same digest-derived file name as native, so existing bests remain valid.
+Import and stage results are bounded by the manifest/source limits above and the 16 KiB result cap.
 Denied/corrupt storage leaves import, validation, play and export usable and reports the loss
 of persistence. Saved source always requires revalidation after reload. No world progress,
 callback state or Undo history is persisted. Example/worker JS/Wasm URLs are content-addressed
@@ -453,6 +471,17 @@ timeout and repeated-session cleanup on the same three local engines; Chromium a
 an objective deadline across a lifecycle freeze. All three objective HUD captures were
 inspected. The [P4.9 result](PLUGIN_PLAN.md#p49-result-2026-10-30) owns worker/delivery timings,
 16 MiB evaluator linear-memory evidence and remaining device/process-memory limits.
+
+Verification, 2026-10-31 (PD4): Emscripten MinSizeRel game/worker packaging passes on Apple
+Silicon/macOS; the package step proves the game Wasm has no Lua parser/VM strings or Lua symbols.
+Local Playwright Chromium passes the title, mobile and full authoring checks: bundled Harbor life,
+console query/export/live edit, scene import, free/course launch, repeated validations, freeze and
+restored sessions. The game Wasm measures 2,001,499 bytes raw (778,037 Brotli, 975,309 gzip), up
+15,080 raw from the pre-PD4 build. Race passes `check_web_multiplayer.py` against a local WebRTC
+server; free joins but does not send the headless spawn request, and deathmatch still reports a
+full browser receive queue, both as on the pre-package baseline. Firefox, WebKit, the manual
+three-engine workflow and physical devices were not run. The
+[PD4 result](PLUGIN_DEFAULT_PLAN.md#pd4-result-2026-10-31) owns details and remaining limits.
 
 ## WebRTC rooms
 

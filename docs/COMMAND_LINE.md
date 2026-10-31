@@ -51,10 +51,10 @@ default for the basin and river is free boating, for `outer` the Långedrag voya
 `--course` the basin time trial. `--package ID` selects another bundled package, which must
 belong to the session's location and mode (for example `proteus.harbor-life` on `outer`).
 Launching a package starts no Lua VM, polls no files and shows no authoring panel. The temporary
-`--no-plugins` switch restores the compiled-content path for parity checks. Rooms and the browser
-continue on compiled content until later steps. An unknown ID, or a package for another location,
-fails with an explicit message. The title's single-player panel selects Standard or Harbor life
-for `outer` on native builds.
+`--no-plugins` switch restores the compiled-content path for parity checks. Browser solo sessions
+use the same catalog, built into the game Wasm; rooms receive their definition as data. An unknown
+ID, or a package for another location, fails with an explicit message. The title's single-player
+panel selects Standard or Harbor life for `outer` on native and web builds.
 
 ### Live Lua authoring
 
@@ -73,9 +73,9 @@ fixture with player/traffic wakes, restores a complete compatible checkpoint and
 events and command traces. Ticks default to 120/360, within 0..72000. See the
 [migration/review contract](PLUGIN_API.md#live-migration-and-review-p33b) for inputs and limits.
 
-CLI voyage packages select their own location and run in native solo free boating.
+CLI voyage, free and course packages select their own location and run in native solo play.
 The browser offers [descriptor source bundles](PLUGIN_API.md#browser-source-bundles-p43)
-through its PLUGIN VOYAGE panel. Saving
+through its PLUGIN VOYAGE panel, including free/course kinds and authored scenes. Saving
 reloads the package; F5 reloads now, F6 undoes/discards and F7 applies a pending migration or restart.
 Invalid edits leave the running descriptor intact. Packaged plugin examples live under
 `assets/plugins/`; copy one somewhere writable to edit it. Packages also ship the
@@ -88,7 +88,8 @@ marina berths; a layout change is live when the boat is clear of the new hulls. 
 ### Live console
 
 In native solo free boating and voyages, including release builds, press `` ` ``, `F2` or the
-world-1 key (`§` on some macOS ISO keyboards). A plain line edits the package's `def` table; `=`
+world-1 key (`§` on some macOS ISO keyboards). Desktop browsers with a physical keyboard also
+offer it; touch-only phones do not. A plain line edits the package's `def` table; `=`
 starts a read-only query; `/` starts a command. The simulation keeps running with a neutral helm.
 
 ```text
@@ -104,7 +105,7 @@ The first edit moves a bundled session to authoring; the catalog's embedded sour
 Each edit is composed as one entry and evaluated in the isolated worker, so Lua never runs on the
 game thread and the boat is never moved. Layout edits install live when the hull is clear and are
 otherwise held until it is. `/save DIR` writes a complete package and refuses a non-empty directory
-that is not this session's package. See the
+that is not this session's package; in the browser the same command downloads a source bundle. See the
 [console contract](PLUGIN_API.md#live-console-and-command-layer-pc) for the command list and limits.
 `--plugin-bridge DIR` exposes the same lines as `plugin_author.py live-console --line TEXT`.
 

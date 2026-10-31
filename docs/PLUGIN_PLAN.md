@@ -11,7 +11,7 @@ P3.4 accounts retained/native storage, separates instruction budgets and measure
 staging. P4.1 adds discovery and isolated native validation; P4.2 adds machine-readable schemas,
 bounded isolated voyage/race previews and disposable-process live descriptor staging for trusted
 native edits. P4.3 adds browser source bundles and isolated descriptor import/reload/export; P4.9 extends
-that workflow to optional voyage objectives/timers. Browser race imports remain unsupported. P4.4 adds pinned draft workspace
+that workflow to optional voyage objectives/timers; PD4 extends browser imports to solo free/course kinds and authored scenes while race and match stay room content. P4.4 adds pinned draft workspace
 read/write, P4.5 pinned CPU frame capture with curated anchors/camera bookmarks, P4.6 a live tool
 bridge to a running native game and P4.7 those tools in the macOS/Windows release packages.
 P4.8 qualifies browser authoring on Chromium, Firefox and WebKit in CI, with tab freeze,

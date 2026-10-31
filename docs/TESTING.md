@@ -798,13 +798,19 @@ capture. See [packaged authoring tools](PLUGIN_API.md#packaged-authoring-tools-p
 
 P4.3 adds `web_plugin_author` (Node, CPU quick lane): portable bundle/UTF-8 byte caps, immutable
 framing, bounded worker lanes, one-use receipts, stale epochs, virtual deadlines, cancellation,
-late output and worker/exit/framing faults. The opt-in
+late output and worker/exit/framing faults. PD4 adds `web_plugin_wire` (quick), which fails if
+`web/plugin_author.js`'s wire magic differs from `BOAT_PLUGIN_WIRE_VERSION`, and extends the Node
+contract with scene and free/course imports plus room-kind rejection. `tools/package_web.py`
+runs `tools/check_web_wasm.py` on every packaged site: the game Wasm must lack Lua parser/VM
+strings, with `plugin_stage.wasm` as the positive control. The opt-in
 `python3 tools/check_web_plugin_author.py --browser chromium --url http://127.0.0.1:8000/ --output build-web/plugin-browser-check`
 (also `firefox` or `webkit`) drives an actual served Wasm build through bundle export/import,
-capability rejection, repeated worker validations, launch, live rename and syntax failure, held
-water Apply/Undo, stale output, cancellation, navigation mid-validation, repeated source
-restore/revalidation and storage denial. On Chromium it also freezes the tab mid-validation. It
-awaits application/worker conditions; the only fixed waits are the freeze durations themselves.
+capability rejection, scene/free/course staging and launch, repeated worker validations, launch,
+live rename and syntax failure, held water Apply/Undo, stale output, cancellation, navigation
+mid-validation, repeated source restore/revalidation and storage denial. On Chromium it also
+freezes the tab mid-validation. The title check now covers the bundled Harbor life catalog session,
+the desktop console query/export/live-edit path and the absence of a worker in a normal session.
+It awaits application/worker conditions; the only fixed waits are the freeze durations themselves.
 The browser PR workflow runs the Node contracts and packages the Wasm build. Full three-engine
 qualification is manual-only; dispatch it for browser/plugin lifecycle changes and before a
 release, using `gh workflow run web-plugin.yml --ref BRANCH`. It is not run on ordinary pushes

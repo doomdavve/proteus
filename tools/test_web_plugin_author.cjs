@@ -98,7 +98,7 @@ async function main() {
   workers.at(-1).onerror(); assert.equal(t.status(failed), -1); t.close(failed);
   assert.equal(t.jobs.size, 0); assert.equal(timers.size, 0);
   assert.equal(message(new Uint8Array()), 'Worker replied with an unrecognised wire version');
-  assert.equal(t.start(new Uint8Array(8 + 4096 + 65537), base), 0);
+  assert.equal(t.start(new Uint8Array(131073), base), 0);
   // Objective transitions reuse Wasm, but never share an outstanding callback or its result.
   const ow = [], otimers = new Map(); let onow = 0, timerId = 0;
   const o = new ObjectiveTransport({now: () => onow,
