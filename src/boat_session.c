@@ -20,7 +20,7 @@ static void reset(BoatSession *session)
 void boat_session_init(BoatSession *session, const BoatWorldResources *resources, BoatWater water)
 {
     boat_world_init(&session->world, resources, water);
-    session->voyage_route = session->world.definition->voyage;
+    session->voyage_route = NULL;
     session->course_definition = NULL;
     reset(session);
     session->handling = &boat_handling_speedboat;

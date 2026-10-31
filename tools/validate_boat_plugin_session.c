@@ -3,6 +3,7 @@
  * classified; a rename keeps all progress, a route change restarts the voyage and an exposure
  * change restarts the session; a failed stage never touches the active revision; Undo reinstalls
  * through the same rules; and save polling, on a virtual clock, stages each settled save once. */
+#include "boat_fixtures.h"
 #include "boat_plugin_host.h"
 #include "boat_plugin_lua.h"
 #include "boat_session.h"
@@ -285,10 +286,12 @@ static int compiled_parity(void)
     BoatSession lua, compiled;
     CHECK(start(&host, &lua));
     boat_session_init(&compiled, outer(), calm());
+    boat_session_restart_voyage(&compiled, &boat_fixture_voyage_outer);
     compiled.presentation_enabled = false;
-    CHECK(compiled.voyage.route == &boat_voyage_outer && lua.voyage.route != &boat_voyage_outer);
-    CHECK(
-        boat_plugin_route_digest(lua.voyage.route) == boat_plugin_route_digest(&boat_voyage_outer));
+    CHECK(compiled.voyage.route == &boat_fixture_voyage_outer
+        && lua.voyage.route != &boat_fixture_voyage_outer);
+    CHECK(boat_plugin_route_digest(lua.voyage.route)
+        == boat_plugin_route_digest(&boat_fixture_voyage_outer));
     for (BoatSession *s = &lua; s; s = s == &lua ? &compiled : NULL) {
         s->boat.position = sim(path[0]);
         Vector2 first = Vector2Subtract(sim(path[1]), s->boat.position);
@@ -555,7 +558,7 @@ static int live_from(const char *label, Vector2 place, Vector2 velocity, unsigne
 
 static int restart_voyage_policy(void)
 {
-    const BoatVoyageRoute *r = &boat_voyage_outer;
+    const BoatVoyageRoute *r = &boat_fixture_voyage_outer;
     int failed = 0;
     // Inside the bridge shelter's radius when its radius changes.
     failed |= live_from("in shelter", r->shelters[1].position, (Vector2) { 0 }, 1, false,
@@ -580,7 +583,7 @@ static int restart_session_policy(void)
     BoatPluginHost host;
     BoatSession session;
     CHECK(start(&host, &session));
-    observe(&session, boat_voyage_outer.exposure.centre, (Vector2) { 5, 0 });
+    observe(&session, boat_fixture_voyage_outer.exposure.centre, (Vector2) { 5, 0 });
     CHECK(session.world.water.storm.height == 1.6f);
     BoatPluginBundle bundle = edited("height = 1.6", "height = 0.8", false);
     CHECK(boat_plugin_host_stage(&host, &bundle) && host.change == BOAT_PLUGIN_RESTART_SESSION);
@@ -986,7 +989,7 @@ static void observe_objective(WakePlugin *p, BoatSession *s, unsigned tick, Vect
 
 static int lossless_events(void)
 {
-    BoatVoyageRoute route = boat_voyage_outer;
+    BoatVoyageRoute route = boat_fixture_voyage_outer;
     route.shelters[1].position = route.shelters[2].position = route.arrival_centre;
     route.exposure.centre = route.arrival_centre;
     route.weather_range = 1;
@@ -1153,6 +1156,7 @@ static int objective_tick_parity(void)
     BoatSession a, b, repeated;
     boat_session_init(&a, outer(), calm());
     boat_session_init(&b, outer(), calm());
+    boat_session_restart_voyage(&b, &boat_fixture_voyage_outer);
     boat_session_init(&repeated, outer(), calm());
     clock_t launch_started = clock();
     CHECK(wake_plugin_open(&p, "plugins/shelter-tour", &a, 0));
@@ -1644,13 +1648,14 @@ static int catalog_runtime(void)
     CHECK(boat_plugin_lua_states() == before);
     CHECK(!p.authoring && !p.watching && !p.staging);
     CHECK(s.voyage.route == &boat_plugin_host_active(&p.host)->voyage.route);
-    CHECK(boat_plugin_route_digest(s.voyage.route) == boat_plugin_route_digest(&boat_voyage_outer));
+    CHECK(boat_plugin_route_digest(s.voyage.route)
+        == boat_plugin_route_digest(&boat_fixture_voyage_outer));
     CHECK(!s.world.scene);
     // Runtime has no reload, undo, apply, save polling or authoring controls.
     CHECK(!wake_plugin_frame(&p, &s, true, true, true, 1));
     CHECK(!p.watching && !p.authoring);
     wake_plugin_close(&p, &s);
-    CHECK(s.voyage_route == s.world.definition->voyage && !s.world.scene);
+    CHECK(s.voyage_route == NULL && !s.world.scene);
 
     // The selectable Harbor life entry binds its authored scene but still starts no Lua VM.
     const BoatPluginCatalogEntry *harbor = boat_plugin_catalog_find("proteus.harbor-life");

@@ -409,7 +409,7 @@ void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
 
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now)
 {
-    if (session->voyage_route != session->world.definition->voyage) {
+    if (session->voyage_route != NULL) {
         fprintf(stderr, "Plugin voyage already has an owner; second owner rejected.\n");
         return false;
     }
@@ -492,7 +492,7 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
 bool wake_plugin_open_catalog(
     WakePlugin *plugin, const BoatPluginCatalogEntry *entry, BoatSession *session)
 {
-    if (session->voyage_route != session->world.definition->voyage) {
+    if (session->voyage_route != NULL) {
         fprintf(stderr, "Plugin voyage already has an owner; second owner rejected.\n");
         return false;
     }
@@ -741,12 +741,12 @@ void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
         plugin->query = NULL;
     }
     if (session) {
-        // The session borrowed the plugin's route and scene. Restore both compiled defaults
-        // before the host storage may be reused, so re-entry never sees a dangling borrower.
+        // The session borrowed the plugin's route and scene. Clear both before the host storage
+        // may be reused, so re-entry never sees a dangling borrower.
         if (plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE) {
-            session->voyage_route = session->world.definition->voyage;
+            session->voyage_route = NULL;
             if (session->voyage.route)
-                session->voyage.route = session->voyage_route;
+                session->voyage.route = NULL;
         } else if (plugin->host.kind == BOAT_PLUGIN_KIND_COURSE) {
             boat_session_set_course_definition(session, NULL);
         }

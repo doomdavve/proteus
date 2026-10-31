@@ -1,10 +1,11 @@
 /* Lua plugins P0 (docs/PLUGIN_PLAN.md): the reference package decodes to exactly the compiled
- * boat_voyage_outer; bad manifests, syntax, runtime errors, forbidden facilities, invalid fields,
+ * fixture voyage; bad manifests, syntax, runtime errors, forbidden facilities, invalid fields,
  * memory and instruction exhaustion and unsafe files are rejected with a structured diagnostic;
  * a failure never changes the caller's last good definition and never leaks the Lua state. */
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L // mkdir and symlink for the file cases under strict C17.
 #endif
+#include "boat_fixtures.h"
 #include "boat_location.h"
 #include "boat_map.h"
 #include "boat_plugin.h"
@@ -153,7 +154,7 @@ static int scene_contract(void)
     CHECK(voyage.has_scene && voyage.scene.version == 1);
     CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
     CHECK(!boat_scene_has_content(&voyage.scene));
-    CHECK(voyage.digest == boat_plugin_route_digest(&boat_voyage_outer));
+    CHECK(voyage.digest == boat_plugin_route_digest(&boat_fixture_voyage_outer));
 
     // Omitted and granted-but-absent envelopes keep the compiled scene.
     CHECK(load_source(variant("return {", "return { scene = { version = 1 },"), &voyage, &d)
@@ -577,10 +578,10 @@ static int reference_matches_compiled(void)
         CHECK(!strcmp(voyage.shelter_ids[i], ids[i]));
         CHECK(voyage.route.shelters[i].name == voyage.shelter_names[i]);
     }
-    if (same_route(&voyage.route, &boat_voyage_outer))
+    if (same_route(&voyage.route, &boat_fixture_voyage_outer))
         return 1;
     CHECK(!strcmp(boat_voyage_destination(&voyage.route), "LANGEDRAG"));
-    uint64_t compiled = boat_plugin_route_digest(&boat_voyage_outer);
+    uint64_t compiled = boat_plugin_route_digest(&boat_fixture_voyage_outer);
     CHECK(voyage.digest == compiled);
 
     // A copy owns its names: scribbling over the original leaves it intact.
@@ -588,7 +589,7 @@ static int reference_matches_compiled(void)
     boat_plugin_voyage_copy(&copy, &voyage);
     memset(&voyage, 0xa5, sizeof(voyage));
     CHECK(copy.route.shelters[2].name == copy.shelter_names[2]);
-    if (same_route(&copy.route, &boat_voyage_outer))
+    if (same_route(&copy.route, &boat_fixture_voyage_outer))
         return 1;
     CHECK(boat_plugin_route_digest(&copy.route) == compiled);
     printf("boat_plugin digest=%016llx compiled=%016llx instructions<%llu peak_bytes=%zu "
@@ -623,7 +624,7 @@ static int computed_definition(void)
     BoatPluginStatus status = load_source(computed, &voyage, &d);
     show("computed", &d);
     CHECK(status == BOAT_PLUGIN_OK);
-    CHECK(voyage.digest == boat_plugin_route_digest(&boat_voyage_outer));
+    CHECK(voyage.digest == boat_plugin_route_digest(&boat_fixture_voyage_outer));
     return 0;
 }
 

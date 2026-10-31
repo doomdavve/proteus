@@ -7,8 +7,6 @@
 #define BOAT_BASIN_HALF_X 120.0f
 #define BOAT_BASIN_HALF_Z 80.0f
 
-struct BoatVoyageRoute;
-
 typedef enum {
     BOAT_LOCATION_BASIN,
     BOAT_LOCATION_RIVER,
@@ -33,8 +31,6 @@ typedef struct {
     // A3.5j: river life upstream of the river crop (ferries, a schooner, Hisingsbron's lift),
     // which the player collides with; copied into the world's water (BoatWater.upstream).
     bool upstream;
-    // Single-player adventure destination, shelters and exposed water; NULL for none.
-    const struct BoatVoyageRoute *voyage;
     // Presentation companion values; physics never reads these.
     float camera_distance, camera_height;
     float far_plane;

@@ -4,27 +4,6 @@
 #include <math.h>
 #include <string.h>
 
-// The outer location's first-slice outing (A0.3 route, A3.1 map), in simulation X = -east,
-// Z = north. The dock and the river below Älvsborgsbron are sheltered; the east shore of the
-// outer fjord sits in the lee of the exposed patch; Långedrag's old harbour basin is the
-// destination. The exposure lies over the open fjord west of the direct route's southern leg
-// (east -3850): the direct line crosses its eastern flank, the east shore stays nearly calm and
-// the middle of the fjord is the full patch. It is an authored encounter, not observed weather.
-// It grows over a minute once the boat is 2.5 km off, on the fjord past Älvsborgsbron, so it
-// builds while the boat crosses toward it (A3.5).
-const BoatVoyageRoute boat_voyage_outer = {
-    .shelters = { { "DOCK", { -12, 60 }, 0, 60 }, { "BRIDGE", { 650, -850 }, 1.33f, 150 },
-        { "EAST SHORE", { 3250, -2000 }, .86f, 200 },
-        { "LANGEDRAG", { 3600, -3370 }, 1.57f, 0 } }, // Facing out of the basin.
-    .shelter_count = 4,
-    .arrival_centre = { 3595, -3370 },
-    .arrival_radius = 75,
-    .arrival_speed = 6,
-    .exposure = { .centre = { 4300, -2650 }, .radius = 700, .height = 1.6f, .build = 60 },
-    .exposed_fraction = .8f,
-    .weather_range = 2500,
-};
-
 static void notify(BoatVoyage *voyage, BoatVoyageEvent event, unsigned shelter, double time,
     BoatVoyageEvents *events)
 {

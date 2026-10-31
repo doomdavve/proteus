@@ -59,6 +59,7 @@ static Run autopilot(const BoatWorldResources *world, BoatWater water, const Vec
     Run run = { 0 };
     BoatSession session;
     boat_session_init(&session, world, water);
+    boat_session_restart_voyage(&session, &boat_fixture_voyage_outer);
     session.presentation_enabled = false;
     session.handling = handling;
     session.boat.position = sim(path[0]);
@@ -116,6 +117,7 @@ static float top_speed(const BoatWorldResources *world, BoatWater water, const B
 {
     BoatSession session;
     boat_session_init(&session, world, water);
+    boat_session_restart_voyage(&session, &boat_fixture_voyage_outer);
     session.presentation_enabled = false;
     session.handling = h;
     Vector2 hold = sim((Vector2) { -3850, -2700 });
@@ -132,10 +134,7 @@ static float top_speed(const BoatWorldResources *world, BoatWater water, const B
 int main(void)
 {
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
-    CHECK(outer->voyage == &boat_voyage_outer);
-    CHECK(
-        !boat_location(BOAT_LOCATION_RIVER)->voyage && !boat_location(BOAT_LOCATION_BASIN)->voyage);
-    const BoatVoyageRoute *route = outer->voyage;
+    const BoatVoyageRoute *route = &boat_fixture_voyage_outer;
     BoatWorldResources world;
     CHECK(boat_world_resources_init(&world, outer));
 
@@ -265,6 +264,7 @@ int main(void)
     // cue's sign is the steering direction.
     BoatSession session;
     boat_session_init(&session, &world, water);
+    boat_session_restart_voyage(&session, route);
     session.presentation_enabled = false;
     CHECK(session.voyage.route == route && session.voyage.shelter == 0);
     CHECK(session.world.water.storm.radius == 0); // Calm until the weather begins.

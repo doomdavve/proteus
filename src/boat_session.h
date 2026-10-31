@@ -20,8 +20,8 @@ typedef struct {
     // route outside the outer location. Restarts begin it again at the start shelter.
     BoatVoyage voyage;
     BoatVoyageEvents voyage_events; // Output of the latest step or recovery.
-    // The route that init and restarts begin: the definition's compiled voyage unless the
-    // application replaced it (Lua plugin P1). Borrowed; its owner outlives every use.
+    // The route that restarts begin, set by the session's package or host. NULL for free
+    // boating and rooms. Borrowed; its owner outlives every use.
     const BoatVoyageRoute *voyage_route;
     // Recorded on course ticks while record_runs is set. A finish only updates memory; its
     // save/export waits for boat_session_flush() outside the tick loop.

@@ -71,8 +71,6 @@ typedef struct {
     unsigned count;
 } BoatVoyageEvents;
 
-extern const BoatVoyageRoute boat_voyage_outer;
-
 // At the start shelter at world time TIME. A NULL route disables the voyage.
 void boat_voyage_start(BoatVoyage *voyage, const BoatVoyageRoute *route, double time);
 // Begin ROUTE again at the start shelter at TIME, keeping the weather the boat has already met.

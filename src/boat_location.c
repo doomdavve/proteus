@@ -1,5 +1,4 @@
 #include "boat_location.h"
-#include "boat_voyage.h"
 #include "waterfront_city.h"
 #include "waterfront_outer.h"
 
@@ -37,7 +36,6 @@ static const BoatWorldDefinition locations[BOAT_LOCATION_COUNT] = {
         .current_center = -12,
         .wake_offset = { -140, -220 },
         .upstream = true,
-        .voyage = &boat_voyage_outer,
         .camera_distance = 12,
         .camera_height = 6,
         .far_plane = 4500,
