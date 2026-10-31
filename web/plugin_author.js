@@ -4,6 +4,8 @@
   const encoder = new TextEncoder();
   const FORMAT = 'wake-velocity-plugin';
   const STORAGE = 'wake-velocity-plugin-v1';
+  // Must equal BOAT_PLUGIN_WIRE_VERSION in src/boat_plugin_wire.h; web_plugin_wire checks it.
+  const WIRE_MAGIC = 0x50535437;
   function scenes(manifest) {
     try {
       const data = JSON.parse(manifest);
@@ -79,11 +81,19 @@
       if (job.deadline !== undefined) this.clear(job.deadline);
       if (result && (result.exit === 0 || result.exit === 1)
           && result.bytes instanceof Uint8Array && result.bytes.length >= 8 && result.bytes.length <= 4096
-          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === 0x50535435
+          && new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(0) === WIRE_MAGIC
           && (new DataView(result.bytes.buffer, result.bytes.byteOffset).getUint32(4) === 0) === (result.exit === 0)) {
         job.response = result.bytes.slice(); job.state = result.exit === 0 ? 1 : 2;
-      } else job.state = -1;
-      job.resolve({state: job.state, bytes: job.response, base: job.base});
+      } else {
+        job.state = -1;
+        // An unrecognised reply is a protocol mismatch, not a missed deadline. Keep the two
+        // apart so the panel does not send the next wire bump looking for a slow worker.
+        job.failure = result && result.bytes instanceof Uint8Array
+          ? 'Worker replied with an unrecognised result'
+          : result && typeof result.error === 'string' ? result.error
+          : 'Worker failed or reached its five-second deadline';
+      }
+      job.resolve({state: job.state, bytes: job.response, base: job.base, failure: job.failure});
     }
     status(id) { return this.jobs.get(id)?.state ?? -1; }
     read(id) { return this.jobs.get(id)?.response; }
@@ -99,7 +109,7 @@
   function message(bytes) {
     try {
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-      if (view.getUint32(0) !== 0x50535435) return 'Invalid worker reply';
+      if (view.getUint32(0) !== WIRE_MAGIC) return 'Worker replied with an unrecognised wire version';
       let at = 8;
       const string = () => {
         const length = view.getUint32(at); at += 4;
@@ -111,7 +121,7 @@
       const field = string(), detail = string();
       return [file + (line ? ':' + line : ''), field, detail].filter(Boolean).join(' ')
         || 'Descriptor validated';
-    } catch (_) { return 'Invalid worker reply'; }
+    } catch (_) { return 'Worker replied with an unrecognised wire version'; }
   }
 
   function install(Module, files, getFS, launch, document, window) {
@@ -172,7 +182,7 @@
         if (request !== sequence) return;
         if (!sameBase(pin, base())) throw Error('Voyage changed during validation; stage again');
         if (result.state !== 1) throw Error(result.bytes ? message(result.bytes)
-          : 'Worker failed or reached its five-second deadline');
+          : result.failure || 'Worker failed or reached its five-second deadline');
         transport.prepare(bytes, pin, result.bytes);
         accepted = data;
         const fs = getFS();
@@ -244,5 +254,5 @@
     return transport;
   }
   root.installBoatPluginAuthor = install;
-  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install, scenes};
+  if (typeof module === 'object') module.exports = {bundle, decode, encode, frame, Transport, message, install, scenes, WIRE_MAGIC};
 })(globalThis);

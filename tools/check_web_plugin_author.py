@@ -122,7 +122,7 @@ def main():
                 source = (root / 'plugins' / example / 'main.lua').read_text()
                 page.fill('#plugin-manifest', manifest); page.fill('#plugin-source', source)
                 rejected = stage()
-                assert 'Rejected:' in rejected and ('callbacks' in rejected or 'voyage descriptors' in rejected), rejected
+                assert 'Rejected:' in rejected and 'native-only' in rejected, rejected
             checks.append('capability rejection')
 
             # Repeated validations: each uses and retires its own worker; distinct names avoid the

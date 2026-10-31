@@ -577,6 +577,10 @@ add_test(NAME boat_fleet_render COMMAND boat_fleet_review --check)
 set_tests_properties(boat_fleet_render PROPERTIES LABELS "render;cpu"
   PASS_REGULAR_EXPRESSION "boat_fleet_render=ok")
 find_program(PROTEUS_NODE_EXECUTABLE node)
+add_test(NAME web_plugin_wire COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_web_wire.py)
+set_tests_properties(web_plugin_wire PROPERTIES LABELS "cpu;quick"
+  PASS_REGULAR_EXPRESSION "web_plugin_wire=ok")
 if(PROTEUS_NODE_EXECUTABLE)
   add_test(NAME web_plugin_author COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_plugin_author.cjs)
