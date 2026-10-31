@@ -27,6 +27,12 @@ static const float SPAWN_CALM_VERTICAL_SPEED = .5f;
 bool boat_fleet_init(BoatFleet *fleet, const BoatWorldResources *resources, BoatWater water,
     unsigned life_ticks, float crest_height)
 {
+    return boat_fleet_init_scene(fleet, resources, water, life_ticks, crest_height, NULL);
+}
+
+bool boat_fleet_init_scene(BoatFleet *fleet, const BoatWorldResources *resources, BoatWater water,
+    unsigned life_ticks, float crest_height, const BoatSceneDefinition *scene)
+{
     if (!boat_world_resources_ready(resources) || water.player_wake_enabled)
         return false;
     *fleet = (BoatFleet) { 0 };
@@ -34,6 +40,7 @@ bool boat_fleet_init(BoatFleet *fleet, const BoatWorldResources *resources, Boat
         return false;
     water.objects = &fleet->state.wakes;
     boat_world_init(&fleet->world, resources, water);
+    fleet->world.scene = scene;
     return true;
 }
 

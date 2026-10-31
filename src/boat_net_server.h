@@ -18,11 +18,9 @@ typedef struct {
     uint32_t epoch; // Non-zero session epoch.
     uint32_t first_sequence; // First outgoing sequence on every channel (wrap tests).
     unsigned max_players; // 1..BOAT_FLEET_SLOTS.
-    bool deathmatch; // Capsize deathmatch rounds (docs/DEATHMATCH_PLAN.md) instead of free play.
-    BoatMatchRules match; // Deathmatch rules; ignored in free play.
-    // River sprint rounds (docs/RACE_PLAN.md) instead of free play; needs the river location.
-    bool race;
-    BoatRaceRules race_rules; // Ignored outside race rooms.
+    // The room's package definition, borrowed for the server's lifetime. Its mode, rules, course
+    // and scene replace the compiled defaults; its location must match RESOURCES.
+    const BoatRoomDefinition *room;
     // The room's location, borrowed for the server's lifetime; must be ready.
     const BoatWorldResources *resources;
 } BoatNetServerConfig;
@@ -62,6 +60,7 @@ typedef struct {
 
 typedef struct {
     uint64_t ticks, snapshots, birth_batches, births_sent, bootstraps, bootstrap_bytes;
+    uint64_t definition_bytes; // Encoded room definition bytes sent with each accepted peer.
     uint64_t accepted, rejected[BOAT_NET_REJECT_LIMIT], left, timeouts;
     // Commands stored; repeats of stored ones; packets whose newest command came too late.
     uint64_t commands, duplicate_commands, late_commands, future_commands, stale_life_commands;
@@ -76,6 +75,10 @@ typedef struct {
     BoatNetServerConfig config;
     char token[BOAT_NET_TOKEN_BYTES + 1];
     uint64_t content_digest;
+    const BoatRoomDefinition *room; // CONFIG's borrowed definition.
+    bool deathmatch, race_room; // Derived from ROOM's mode.
+    uint8_t definition[BOAT_ROOM_BYTES_MAX]; // The encoded room definition.
+    uint32_t definition_bytes;
     BoatFleet fleet;
     BoatNetSlotInput inputs[BOAT_FLEET_SLOTS];
     BoatNetSlotControl control[BOAT_FLEET_SLOTS];

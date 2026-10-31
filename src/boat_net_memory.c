@@ -99,6 +99,12 @@ static bool transmit(BoatNetMemory *n, unsigned client, bool down, BoatNetChanne
     stats->sent_bytes += size;
     if (size > stats->max_message)
         stats->max_message = size;
+    if (link->blackout) {
+        // A blackout models an outage: reliable messages are lost too, so neither end hears
+        // anything until it lifts.
+        ++stats->dropped;
+        return true;
+    }
     uint32_t sequence = d->next_sequence[channel]++;
     const BoatNetImpairment *i = &d->impairment;
     if (reliable(channel)) {
@@ -112,7 +118,7 @@ static bool transmit(BoatNetMemory *n, unsigned client, bool down, BoatNetChanne
         }
         return true;
     }
-    if (link->blackout || uniform(n) < i->loss)
+    if (uniform(n) < i->loss)
         return true; // Lost on the way; the sender cannot tell.
     unsigned copies = uniform(n) < i->duplicate ? 2 : 1;
     for (unsigned c = 0; c < copies; ++c) {

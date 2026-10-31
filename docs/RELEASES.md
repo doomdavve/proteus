@@ -197,6 +197,17 @@ same platform workflows at the tagged commit; it does not duplicate their build
 recipes. Only its publication job receives `contents: write`, using GitHub's
 provided token. No personal access token or additional secret is needed.
 
+## Next release (unreleased)
+
+The Rooms package moves the wire to **protocol v9 / physics 9**. Rooms run from a validated
+package definition sent as data: the course, match and combat rules, and the optional authored
+scene. Hello's content digest now covers engine and map content only; harbour contacts travel in
+the definition since PD3. Clients and the room must upgrade together. The hosted room's command
+line is unchanged (`--mode deathmatch --location river`) and now reports
+`proteus.deathmatch` as its package. No deployment has been made from this branch; update
+`wake_velocity_version` and run the Winterfell role at release time as described in the
+[hosting guide](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
+
 ## Status and verification
 
 Current release, 2026-10-30: **[v0.0.23](https://github.com/doomdavve/proteus/releases/tag/v0.0.23)**

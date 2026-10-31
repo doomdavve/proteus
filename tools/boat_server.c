@@ -16,6 +16,7 @@
 #include "boat_net_rtc.h"
 #endif
 #include "boat_net_server.h"
+#include "boat_room_package.h"
 #include "cli_usage.h"
 
 #include <inttypes.h>
@@ -61,6 +62,7 @@ static void usage(FILE *out)
     cli_usage_line(out, "--token TEXT", "Shared join token (default empty)");
     cli_usage_line(out, "--players 1-4", "Seats in the room (default 4)");
     cli_usage_line(out, "--location NAME", "basin|river|outer (default basin; race uses river)");
+    cli_usage_line(out, "--package ID|DIR", "Room package (default: the mode's bundled package)");
     cli_usage_line(out, "--waves", "Gentle crossing waves");
     cli_usage_line(out, "--lan-port N", "LAN search port (default 24681); loopback --bind answers");
     cli_usage_line(out, "", "only this machine, otherwise the local network");
@@ -213,7 +215,7 @@ static int scripted(unsigned long ticks, unsigned long boats, unsigned long repo
         return 1;
     }
     if (rules)
-        boat_combat_enable(&fleet);
+        boat_combat_enable(&fleet, NULL);
     for (unsigned slot = 0; slot < boats; ++slot)
         boat_fleet_request_spawn(&fleet, slot);
     double *cost = malloc(ticks * sizeof(*cost));
@@ -350,10 +352,11 @@ typedef struct {
     bool waves;
     unsigned long players, ticks, report;
     unsigned long peer_timeout; // Seconds; 0 keeps BOAT_NET_TIMEOUT.
-    const BoatMatchRules *rules; // Deathmatch rules, or NULL for free play.
+    const char *package; // --package ID or directory; NULL uses the mode's default.
     bool race, exit_with_stdin, until_empty;
     BoatLocationId location;
     const BoatWorldResources *world; // The location's resources, owned by main.
+    BoatRoomDefinition room; // The loaded package definition.
 } RoomOptions;
 
 static void print_roster(const BoatNetServer *server)
@@ -415,10 +418,7 @@ static int room(const RoomOptions *options)
         .epoch = epoch ? epoch : 1,
         .max_players = (unsigned)options->players,
         .resources = options->world,
-        .deathmatch = options->rules != NULL,
-        .match = options->rules ? *options->rules : (BoatMatchRules) { 0 },
-        .race = options->race,
-        .race_rules = boat_race_default_rules() };
+        .room = &options->room };
     static BoatNetServer server;
     if (!boat_net_server_init(&server, transport, &config)) {
         fprintf(stderr, "boat_server: invalid room configuration.\n");
@@ -446,9 +446,7 @@ static int room(const RoomOptions *options)
         .content_digest = server.content_digest,
         .epoch = config.epoch,
         .port = options->port,
-        .mode = options->race ? BOAT_NET_MODE_RACE
-            : options->rules  ? BOAT_NET_MODE_DEATHMATCH
-                              : BOAT_NET_MODE_FREE,
+        .mode = (uint8_t)options->room.mode,
         .max_players = (uint8_t)options->players,
         .token = options->token[0] != 0 };
     // Answers name a specific bind address; 0.0.0.0 leaves it to the sender's address.
@@ -459,11 +457,10 @@ static int room(const RoomOptions *options)
     printf("boat_server listening on %s:%u (%s, %s water, %s, protocol %d, handling %d, "
            "epoch %08" PRIx32 ", up to %lu players, %s)\n",
         options->bind, (unsigned)options->port, boat_location(options->location)->name,
-        options->waves ? "wave" : "calm",
-        options->race        ? "race"
-            : options->rules ? "deathmatch"
-                             : "free play",
-        BOAT_NET_VERSION, BOAT_PHYSICS_REVISION, config.epoch, options->players, lan_note);
+        options->waves ? "wave" : "calm", boat_room_mode_name(options->room.mode), BOAT_NET_VERSION,
+        BOAT_PHYSICS_REVISION, config.epoch, options->players, lan_note);
+    printf("room package: %s (%s)\n", options->room.id, options->room.name);
+    fflush(stdout);
     fflush(stdout);
     unsigned players = 0;
     unsigned max_mtu = 0;
@@ -664,6 +661,10 @@ int boat_server_main(int argc, char **argv)
             deathmatch = strcmp(value, "deathmatch") == 0;
             race = strcmp(value, "race") == 0;
             ++i;
+        } else if (strcmp(argv[i], "--package") == 0 && value) {
+            room_options.package = value;
+            room_option = true;
+            ++i;
         } else if (strcmp(argv[i], "--round-seconds") == 0 && value
             && parse_count(value, 2, 60ul * 60, &round)) {
             ++i;
@@ -706,6 +707,10 @@ int boat_server_main(int argc, char **argv)
                 "races.\n");
             return 2;
         }
+        if (room_options.package) {
+            fprintf(stderr, "boat_server: --package applies to rooms, not --scripted.\n");
+            return 2;
+        }
         if (room_option || seconds) {
             fprintf(stderr,
                 "boat_server: --scripted runs without a socket; room options "
@@ -730,11 +735,20 @@ int boat_server_main(int argc, char **argv)
     }
     room_options.ticks = seconds ? seconds * BOAT_TICK_HZ : ticks;
     room_options.report = report;
-    room_options.rules = deathmatch ? &rules : NULL;
     room_options.race = race;
     if (!open_world(&world, room_options.location))
         return 1;
     room_options.world = &world;
+    char error[220];
+    if (!boat_room_package_load(room_options.package, deathmatch, race, room_options.location,
+            &world, &room_options.room, error, sizeof(error))) {
+        fprintf(stderr, "boat_server: cannot load the room package: %s\n", error);
+        boat_world_resources_destroy(&world);
+        return 1;
+    }
+    // Rule overrides apply after loading, so clients receive the effective values.
+    if (round)
+        room_options.room.match_rules.round_ticks = round * BOAT_TICK_HZ;
     int status = room(&room_options);
     boat_world_resources_destroy(&world);
     return status;

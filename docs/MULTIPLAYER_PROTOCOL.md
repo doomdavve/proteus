@@ -1,4 +1,4 @@
-# Multiplayer protocol v8
+# Multiplayer protocol v9
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -57,6 +57,15 @@ combat state, and CombatPage (type 21) carries bounded periodic correction pages
 uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
 compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
 
+v9 (2026-10-31) makes rooms package-defined. After Accept and before the world checkpoint the
+authority sends one validated, pointer-free **room definition** (package ID and name, mode,
+location, course and rules, combat values, optional authored scene) as paged data on the reliable
+bootstrap channel. Clients validate and install it without Lua, files or their own copy of the
+course. Hello's content digest now covers only engine and map content; the course, match/combat
+rules and (since PD3) harbour contacts travel in the definition. The RaceState `course` byte is
+removed and `boat_net_race_bind` takes the definition's course. Message types 22–24 carry the
+definition. `BOAT_NET_VERSION` is 9; v1–v8 are incompatible.
+
 v8 (2026-10-30) replaces the fixed four-page combat snapshot with a compact 1–3 page payload.
 The reliable checkpoint keeps its 3716-byte combat section and rules. The compact payload omits
 rules, zero inactive slots and unchanged wide fields, and packs active/recent-echo projectiles
@@ -95,8 +104,8 @@ cannon cubes; birth ticks supply vertical velocity, so no extra checkpoint field
 | Offset | Type | Field | Rule |
 | ---: | --- | --- | --- |
 | 0 | u32 | magic | `0x50424e54` ("PBNT") |
-| 4 | u16 | version | 6. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
-| 6 | u8 | type | 1–21, below |
+| 4 | u16 | version | 9. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
+| 6 | u8 | type | 1–24, below |
 | 7 | u8 | flags | 0 |
 | 8 | u32 | epoch | Room session epoch from Accept; 0 in Hello |
 | 12 | u32 | sequence | Per sender and channel, starting anywhere, wrapping modulo 2³² |
@@ -118,15 +127,16 @@ traffic from an earlier session never reaches a room.
 | 1 state | unreliable, sequenced | InputBatch (up), Snapshot (down), Ping, Pong |
 | 2 births | unreliable, sequenced | WakeBirths |
 | 3 registry | unreliable, unsequenced | CombatPage, tied to a fleet snapshot tick |
-| 4 bootstrap | reliable, ordered | WorldBegin, WorldPage, WorldEnd |
+| 4 bootstrap | reliable, ordered | DefinitionBegin, DefinitionPage, DefinitionEnd, WorldBegin, WorldPage, WorldEnd |
 
 A message on the wrong channel is discarded. Reliable bootstrap traffic cannot hold up new
 snapshots, because they travel on a different channel.
 
-Reliable ordering is per channel: WorldBegin/WorldPage/WorldEnd can arrive before Accept.
-The client holds at most one maximum-sized checkpoint's wire messages (16 pages plus begin
-and end) while awaiting Accept, then processes them using the accepted epoch. Other epochs
-are discarded. This receiver buffering does not change the wire layout or channels.
+Reliable ordering is per channel: DefinitionBegin/DefinitionPage/DefinitionEnd and
+WorldBegin/WorldPage/WorldEnd can arrive before Accept. The client holds one maximum-sized
+definition and one maximum-sized checkpoint (16 pages plus begin and end each) while awaiting
+Accept, then processes them using the accepted epoch. Other epochs are discarded. This receiver
+buffering does not change the wire layout or channels.
 
 ## Messages
 
@@ -155,6 +165,9 @@ are discarded. This receiver buffering does not change the wire layout or channe
 | 19 | RaceState | S→C | room tick | 104 |
 | 20 | RaceEvent | S→C | event tick | 16 |
 | 21 | CombatPage | S→C | matching snapshot tick | 8 + 1024 (pages 0–2), 8 + 980 (page 3) |
+| 22 | DefinitionBegin | S→C | room tick | 20 |
+| 23 | DefinitionPage | S→C | room tick | 8 + 1..1024 |
+| 24 | DefinitionEnd | S→C | room tick | 8 |
 
 ### Hello, Accept, Reject
 
@@ -167,20 +180,13 @@ crossing offset and upstream-traffic enable flag (u64, A3.5j); for each mapped l
 the compiled map's triangle count, then every triangle's three vertex indices and referenced
 XYZ coordinates. Since A3.5i the compiled map is the water alone; the scenery packs are not
 hashed. It then hashes the fleet/wake contract: tick rate, slots, solver passes, spawn
-retry, emitter slots, emission cadence, maximum lifetime, mass and restitution. Finally (v4) it
-hashes the river race course: gate count; the start and every gate's centre, direction and
-half-width; the four grid points; and the ferry source's origin, direction, start offset,
-speed, height, duration, lifetime, wavelength, spread and half-width. The local-storm extension
-also hashes storm centre X/Z at GO, radius, height, start offset, velocity X/Z (floats), then
-the storm recipe revision (u64, currently 3: irregular directional crests), then the ferry
-recipe revision (u64, currently 2: centred crest with a tapered three-wave packet). Last
-(A3.5e) come the harbour obstacles: each moored berth's kind (u64), X, Z and heading; the docked
-ferry's X, Z, heading, length, beam, draught and height; then the harbour contact recipe
-revision (u64, currently 1). This changes
-compatibility without changing message bytes;
-rebuild server and clients together. Storm settings are compiled course data; GO anchors their
-clock in both the authority and prediction. Cloud, rain, lightning and rough water move
-from that shared origin at the authored velocity; no per-player weather position is sent.
+retry, emitter slots, emission cadence, maximum lifetime, mass and restitution, and the cannon
+constants. Last come the weather recipe revisions: the local storm (u64, currently 3:
+irregular directional crests), the ferry (u64, currently 2: centred crest with a tapered
+three-wave packet) and the harbour contact recipe (u64, currently 1). Since v9 the digest no
+longer covers the race course, match or combat rules, or (since PD3) the authored harbour
+berths and ferry: those travel in the room definition. GO anchors the weather clock in both the
+authority and prediction; no per-player weather position is sent.
 `boat_net_content_digest()` defines the exact order. Fingerprinting the whole bundle lets a
 client send Hello before it knows which location the server will select.
 
@@ -203,6 +209,39 @@ revision, `u64` server content digest. Reasons: 1 version, 2 handling revision, 
 
 Four entries of 18 bytes, in slot order: `u8` state (0 empty, 1 joining, 2 playing), then the
 fixed-width name. It is sent whenever a slot changes.
+
+### Room definition
+
+After Accept and before the world checkpoint, the authority sends one canonical room definition
+on the reliable bootstrap channel. The same bytes go to every peer; a resync reuses the ones
+already installed and a reconnect receives them again.
+
+| Message | Payload |
+| --- | --- |
+| DefinitionBegin | `u32` definition ID, `u32` byte count (1–16384), `u16` page count (= `ceil(bytes / 1024)`), `u16` reserved, `u64` FNV-1a 64 of the definition bytes |
+| DefinitionPage | `u32` definition ID, `u16` index, `u16` count, then 1–1024 bytes |
+| DefinitionEnd | `u32` definition ID, `u32` reserved |
+
+Pages must arrive contiguously, in index order; a reordered or missing page fails the install
+instead of entering the world. The definition is a fieldwise, pointer-free encoding:
+
+| Field | Type |
+| --- | --- |
+| version (1) | u8 |
+| mode (0 free, 1 deathmatch, 2 race) | u8 |
+| location (0 basin, 1 river, 2 outer) | u8 |
+| flags: bit 0 has rules, bit 1 has a scene | u8 |
+| package ID and display name | u8 length + printable ASCII |
+| race: start, 1–8 gates, grid, ferry, storm, rules | five `f32` per line; `f64` start times; `f32` weather; `u32` ticks |
+| deathmatch: match rules and combat rules | `u32`/`f32` fields as in the checkpoint's rules |
+| scene, when present | the L1–L4 fieldwise scene (marina, traffic, gulls) |
+
+Map-dependent checks (open water, gate and recovery clearance, authored-contact clearance) run
+on the authority before the room starts. Clients validate only structure and bounds: version,
+mode/location, string lengths, counts, finite floats and enum ranges. The digest detects
+corruption, not authorship. A malformed, oversized, truncated, reordered or digest-mismatched
+definition closes the connection with a clear reason and no world is installed. A deathmatch
+checkpoint whose installed combat rules differ from the definition's closes the same way.
 
 ### World checkpoint
 
@@ -418,9 +457,8 @@ changes: a phase, a gate, a place, a recovery, a parking, a join or a leave.
 | Offset | Type | Field |
 | ---: | --- | --- |
 | 0 | u8 | phase: 0 waiting, 1 grid, 2 countdown, 3 racing, 4 results |
-| 1 | u8 | course: 0 river sprint (the only one) |
-| 2 | u8 | places awarded (≤ 4; equals the finished rows) |
-| 3 | u8 | reserved |
+| 1 | u8 | places awarded (≤ 4; equals the finished rows) |
+| 2 | u16 | reserved |
 | 4 | u16 | automatic recovery delay after a capsize, ticks |
 | 6 | u16 | earliest R after a capsize, ticks (≤ recovery delay) |
 | 8 | u16 | finisher parking delay, ticks |
@@ -527,10 +565,12 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v8 rejects every other version, v1–v7 included; there is no negotiation or
+  protocol version. v9 rejects every other version, v1–v8 included; there is no negotiation or
   migration.
-- A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry or the
-  fleet/wake contract changes the content digest. Either is rejected at Hello.
+- A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
+  cannon constants, the fleet/wake contract or a weather recipe changes the content digest.
+  Either is rejected at Hello. Room content (course, rules, scenes) instead travels in the
+  definition and must validate on the client.
 - CombatPage uses channel 3. Additional registry formats, prediction acknowledgements or remote-input history require a later version.
 
 ## Fixtures
@@ -538,11 +578,11 @@ must not exceed their capacities, and expired ≤ emitted.
 `validate_boat_net` pins:
 
 - golden bytes of a Ping, an InputBatch, a Hello, a MatchState, a MatchEvent, a RaceState and
-  a RaceEvent payload;
+  a RaceEvent payload, and of the room definition's begin/page/end messages;
 - the snapshot size (768), the race GO tick and held flag, slot field offsets and an FNV-1a 64
-  digest of a hand-built snapshot's bytes (`7aa25c376fac8ec5`; v5 was `4de7f51f1c0586cc`, v4's was `9f816f6333e7646f`, v3's
-  `690c711d99578e10`);
-- round trips of all 20 types, rejection of every truncation, and a declared extra byte;
+  digest of a hand-built snapshot's bytes (`7bb4635201d38223`; v8 was `413083c341105850`, v5 was
+  `4de7f51f1c0586cc`, v4's was `9f816f6333e7646f`, v3's `690c711d99578e10`);
+- round trips of all 24 types, rejection of every truncation, and a declared extra byte;
 - header, field, non-finite and range faults, including the room mode, a race room away from
   the river and the MatchState, MatchEvent, RaceState and RaceEvent consistency rules;
 - a deathmatch room on the in-memory transport whose clients, including a mid-round joiner,

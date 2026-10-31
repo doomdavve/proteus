@@ -20,6 +20,7 @@ typedef struct {
     BoatPluginRaceData *race;
     BoatPluginFreeData *free;
     BoatPluginCourseData *course;
+    BoatPluginMatchData *match;
     BoatPluginDiagnostic *diagnostic;
 } Vm;
 
@@ -818,6 +819,29 @@ static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s
     return true;
 }
 
+// Read an optional scene table at SCENE_KEY of the table at ROOT. Absent means no scene.
+static bool read_scene(lua_State *L, Vm *vm, int root, BoatSceneDefinition *s, bool *has_scene)
+{
+    *has_scene = false;
+    lua_pushstring(L, "scene");
+    int scene_type = lua_rawget(L, root);
+    if (scene_type == LUA_TTABLE) {
+        int scene = lua_absindex(L, -1);
+        double version;
+        if (!only(L, vm, scene, "scene", SCENE)
+            || !number(L, vm, scene, "scene", "version", &version) || !scene_marina(L, vm, scene, s)
+            || !scene_traffic(L, vm, scene, s) || !scene_gulls(L, vm, scene, s))
+            return false;
+        *has_scene = true;
+        s->version = version == (double)BOAT_SCENE_VERSION ? BOAT_SCENE_VERSION : 0;
+    } else if (scene_type != LUA_TNIL) {
+        reject(vm, "scene", "must be a table, not a %s", lua_typename(L, scene_type));
+        return false;
+    }
+    lua_pop(L, 1);
+    return true;
+}
+
 // Copy the definition at index 2 into the data, using raw access only: no metamethod runs.
 static int decode(lua_State *L)
 {
@@ -847,23 +871,8 @@ static int decode(lua_State *L)
     lua_pop(L, 1);
     // L1.2 accepts only the versioned scene envelope. Later tasks add marina fields here and
     // validate them with the same copied-data rules.
-    lua_pushstring(L, "scene");
-    int scene_type = lua_rawget(L, 2);
-    if (scene_type == LUA_TTABLE) {
-        int scene = lua_absindex(L, -1);
-        double version;
-        if (!only(L, vm, scene, "scene", SCENE)
-            || !number(L, vm, scene, "scene", "version", &version)
-            || !scene_marina(L, vm, scene, &d->scene) || !scene_traffic(L, vm, scene, &d->scene)
-            || !scene_gulls(L, vm, scene, &d->scene))
-            return 0;
-        d->has_scene = true;
-        d->scene.version = version == (double)BOAT_SCENE_VERSION ? BOAT_SCENE_VERSION : 0;
-    } else if (scene_type != LUA_TNIL) {
-        reject(vm, "scene", "must be a table, not a %s", lua_typename(L, scene_type));
+    if (!read_scene(L, vm, 2, &d->scene, &d->has_scene))
         return 0;
-    }
-    lua_pop(L, 1);
     int voyage = record(L, vm, 2, "", "voyage", VOYAGE, at);
     if (!voyage || !shelters(L, vm, voyage))
         return 0;
@@ -908,7 +917,8 @@ static void failure(
 }
 
 static const char *const RACE_ROOT[] = { "race", NULL };
-static const char *const RACE[] = { "start", "gates", "grid", "source", "storm", "rules", NULL };
+static const char *const RACE[]
+    = { "start", "gates", "grid", "source", "storm", "rules", "scene", NULL };
 static const char *const GATE[] = { BOAT_PLUGIN_GATE_FIELDS, NULL };
 static const char *const POINT[] = { "x", "z", NULL };
 static const char *const SOURCE[] = { BOAT_PLUGIN_SOURCE_FIELDS, NULL };
@@ -995,11 +1005,39 @@ static int decode_race(lua_State *L)
         || !numeric_record(L, vm, race, "race", "storm", STORM, d->storm)
         || !numeric_record(L, vm, race, "race", "rules", RULES, d->rules))
         return 0;
+    if (!read_scene(L, vm, race, &d->scene, &d->has_scene))
+        return 0;
+    return 0;
+}
+
+static const char *const MATCH_ROOT[] = { "match", NULL };
+static const char *const MATCH[] = { "version", "rules", "combat", "scene", NULL };
+static const char *const MATCH_RULES[] = { BOAT_PLUGIN_MATCH_RULE_FIELDS, NULL };
+static const char *const MATCH_COMBAT[] = { BOAT_PLUGIN_COMBAT_FIELDS, NULL };
+
+static int decode_match(lua_State *L)
+{
+    Vm *vm = lua_touserdata(L, 1);
+    if (lua_type(L, 2) != LUA_TTABLE) {
+        reject(vm, "", "the entry must return a table");
+        return 0;
+    }
+    char at[64];
+    if (!only(L, vm, 2, "", MATCH_ROOT))
+        return 0;
+    int match = record(L, vm, 2, "", "match", MATCH, at);
+    BoatPluginMatchData *d = vm->match;
+    if (!match || !number(L, vm, match, at, "version", &d->version)
+        || !numeric_record(L, vm, match, "match", "rules", MATCH_RULES, d->rules)
+        || !numeric_record(L, vm, match, "match", "combat", MATCH_COMBAT, d->combat))
+        return 0;
+    if (!read_scene(L, vm, match, &d->scene, &d->has_scene))
+        return 0;
     return 0;
 }
 
 static const char *const FREE_ROOT[] = { "free", NULL };
-static const char *const FREE[] = { "version", NULL };
+static const char *const FREE[] = { "version", "scene", NULL };
 static const char *const COURSE_ROOT[] = { "course", NULL };
 static const char *const COURSE[] = { "start", "gates", NULL };
 static const char *const COURSE_START[] = { "x", "z", "heading", NULL };
@@ -1016,7 +1054,10 @@ static int decode_free(lua_State *L)
     if (!only(L, vm, 2, "", FREE_ROOT))
         return 0;
     int free = record(L, vm, 2, "", "free", FREE, at);
-    if (!free || !number(L, vm, free, at, "version", &vm->free->version))
+    BoatPluginFreeData *d = vm->free;
+    if (!free || !number(L, vm, free, at, "version", &d->version))
+        return 0;
+    if (!read_scene(L, vm, free, &d->scene, &d->has_scene))
         return 0;
     return 0;
 }
@@ -1076,6 +1117,7 @@ static BoatPluginStatus run(
         vm->race         ? decode_race
             : vm->free   ? decode_free
             : vm->course ? decode_course
+            : vm->match  ? decode_match
                          : decode);
     lua_pushlightuserdata(L, vm);
     lua_pushvalue(L, result);
@@ -1182,6 +1224,34 @@ BoatPluginStatus boat_plugin_lua_course(const char *source, size_t size, const c
     Vm vm = { .limit = limits->memory_bytes,
         .budget = limits->instructions,
         .course = &data,
+        .diagnostic = diagnostic };
+    BoatPluginStatus status;
+    lua_State *L = lua_newstate(allocate, &vm);
+    if (!L) {
+        failure(diagnostic, BOAT_PLUGIN_MEMORY, chunk, "not enough memory for a Lua state");
+        status = BOAT_PLUGIN_MEMORY;
+    } else {
+        ++lua_states;
+        status = run(L, &vm, source, size, chunk);
+        lua_close(L);
+    }
+    diagnostic->cost = (BoatPluginCost) { .instructions = vm.instructions,
+        .entry_instructions = vm.instructions,
+        .peak_bytes = vm.peak,
+        .leaked_bytes = vm.live,
+        .fields = vm.fields };
+    if (status == BOAT_PLUGIN_OK)
+        *out = data;
+    return status;
+}
+
+BoatPluginStatus boat_plugin_lua_match(const char *source, size_t size, const char *chunk,
+    const BoatPluginLimits *limits, BoatPluginMatchData *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginMatchData data = { 0 };
+    Vm vm = { .limit = limits->memory_bytes,
+        .budget = limits->instructions,
+        .match = &data,
         .diagnostic = diagnostic };
     BoatPluginStatus status;
     lua_State *L = lua_newstate(allocate, &vm);

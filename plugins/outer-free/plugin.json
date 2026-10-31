@@ -1,0 +1,10 @@
+{
+  "id": "proteus.outer-free",
+  "name": "Outer river free boating",
+  "api": 1,
+  "kind": "free",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["free.define"],
+  "state_version": 1
+}

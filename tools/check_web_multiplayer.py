@@ -52,18 +52,21 @@ try:
         def key(k):
             page.keyboard.press(k, delay=100)
             page.wait_for_timeout(180)
-        key('ArrowDown')
-        key('Enter')
-        key('ArrowUp')
-        key('Enter')
-        for i in range(40):
-            page.keyboard.press('Backspace', delay=60)
-            page.wait_for_timeout(40)
-        page.keyboard.type(f'ws://127.0.0.1:{ws}', delay=120)
-        page.wait_for_timeout(200)
-        key('Enter')
-        page.screenshot(path=str(args.output / 'join.png'))
-        key('Enter')
+        def join_room():
+            # Always type the local room: the panel's default server is the hosted Winterfell room.
+            key('ArrowDown')
+            key('Enter')
+            key('ArrowDown')  # The join panel: SERVER, URL, CONNECT, BACK.
+            key('Enter')
+            for i in range(40):
+                page.keyboard.press('Backspace', delay=60)
+                page.wait_for_timeout(40)
+            page.keyboard.type(f'ws://127.0.0.1:{ws}', delay=120)
+            page.wait_for_timeout(200)
+            key('Enter')
+            page.screenshot(path=str(args.output / 'join.png'))
+            key('Enter')  # Finishing the URL moves to CONNECT.
+        join_room()
         page.wait_for_timeout(4000)
         page.screenshot(path=str(args.output / 'multiplayer.png'))
         print('RTC ERROR', page.evaluate("Module['boatRtc'].failure()"), flush=True)
@@ -169,10 +172,9 @@ try:
         key('Enter')
         page.wait_for_timeout(1000)
         page.screenshot(path=str(args.output / 'left.png'))
-        key('ArrowDown')
-        key('Enter')
-        key('Enter')
+        join_room()
         page.wait_for_timeout(3000)
+        assert not any('wake.davve.net' in line for line in logs), logs
         assert sum(('Joined as slot' in line for line in logs)) == 2, logs
         assert not errors, errors
         if args.mode != 'race':

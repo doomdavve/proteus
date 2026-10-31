@@ -59,6 +59,11 @@ typedef struct BoatFleet {
 // by the fleet's own pool. False for unready resources or unsupported water/wake recipes.
 bool boat_fleet_init(BoatFleet *fleet, const BoatWorldResources *resources, BoatWater water,
     unsigned life_ticks, float crest_height);
+// As above, also binding the room's authored scene (PD3). The scene is borrowed for the fleet's
+// lifetime, times its copies, checkpoint restores and prediction replays; NULL keeps the compiled
+// harbour defaults.
+bool boat_fleet_init_scene(BoatFleet *fleet, const BoatWorldResources *resources, BoatWater water,
+    unsigned life_ticks, float crest_height, const BoatSceneDefinition *scene);
 // Queue a join or a reset of SLOT. It is placed at an authored safe candidate at a later tick
 // boundary, in request order; repeated requests while pending keep their place.
 bool boat_fleet_request_spawn(BoatFleet *fleet, unsigned slot);

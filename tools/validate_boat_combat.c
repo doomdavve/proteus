@@ -21,7 +21,7 @@ static unsigned launches;
 static void setup(void)
 {
     assert(boat_fleet_init(&f, &resources, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f));
-    boat_combat_enable(&f);
+    boat_combat_enable(&f, NULL);
     Boat b;
     boat_reset(&b);
     b.position = (Vector2) { 0, 0 };

@@ -1,0 +1,13 @@
+{
+  "id": "proteus.harbor-race",
+  "name": "Harbor race",
+  "api": 1,
+  "kind": "race",
+  "entry": "main.lua",
+  "location": "river",
+  "capabilities": [
+    "race.define",
+    "scene.define"
+  ],
+  "state_version": 1
+}

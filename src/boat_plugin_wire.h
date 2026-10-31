@@ -8,7 +8,7 @@
 #include "boat_plugin_host.h"
 #include "boat_plugin_lua.h"
 
-#define BOAT_PLUGIN_WIRE_VERSION 0x50535436u // PST6: kinds and free/course payloads.
+#define BOAT_PLUGIN_WIRE_VERSION 0x50535437u // PST7: match kind and scenes in free/race/match.
 
 typedef struct {
     BoatPluginKind kind;
@@ -19,6 +19,7 @@ typedef struct {
     BoatPluginRaceData race;
     BoatPluginFreeData free;
     BoatPluginCourseData course;
+    BoatPluginMatchData match;
     char source[BOAT_PLUGIN_SOURCE_MAX];
     size_t source_size;
 } BoatPluginDecoded;

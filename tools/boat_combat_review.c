@@ -48,7 +48,7 @@ int main(int argc, char **argv)
     BoatFleet *f = &net.client.fleet;
     if (!boat_fleet_init(f, &resources, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f))
         return 1;
-    boat_combat_enable(f);
+    boat_combat_enable(f, NULL);
     net.client.accept.mode = BOAT_NET_MODE_DEATHMATCH;
     net.client.slot = 0;
     Boat b;

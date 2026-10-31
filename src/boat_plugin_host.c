@@ -19,6 +19,9 @@ static bool load_revision(
     case BOAT_PLUGIN_KIND_COURSE:
         status = boat_plugin_load_course(bundle, NULL, &revision->course, d);
         break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        status = boat_plugin_load_match(bundle, NULL, &revision->match, d);
+        break;
     case BOAT_PLUGIN_KIND_VOYAGE:
     default:
         status = boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d);
@@ -41,6 +44,9 @@ static bool load_revision(
         break;
     case BOAT_PLUGIN_KIND_COURSE:
         status = boat_plugin_course_check_location(&revision->course, host->location, host->map, d);
+        break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        status = boat_plugin_match_check_location(&revision->match, host->location, host->map, d);
         break;
     case BOAT_PLUGIN_KIND_VOYAGE:
     default:
@@ -87,6 +93,9 @@ static void copy_revision(
     case BOAT_PLUGIN_KIND_COURSE:
         out->course = in->course;
         break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        out->match = in->match;
+        break;
     case BOAT_PLUGIN_KIND_VOYAGE:
     default:
         boat_plugin_voyage_copy(&out->voyage, &in->voyage);
@@ -107,6 +116,9 @@ static BoatPluginChange classify(
         break;
     case BOAT_PLUGIN_KIND_COURSE:
         change = boat_plugin_course_classify(&a->course, &b->course);
+        break;
+    case BOAT_PLUGIN_KIND_MATCH:
+        change = boat_plugin_match_classify(&a->match, &b->match);
         break;
     case BOAT_PLUGIN_KIND_VOYAGE:
     default:

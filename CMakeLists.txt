@@ -67,6 +67,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_combat.c src/boat_combat.h src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_race.c src/boat_race.h src/boat_location.c src/boat_location.h src/boat_map.c
   src/boat_map.h src/boat_map_tiles.c src/boat_map_tiles.h
   src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
+  src/boat_room_definition.c src/boat_room_definition.h
   src/boat_scene_definition.c src/boat_scene_definition.h
   src/waterfront_flock.c src/waterfront_flock.h
   src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
@@ -153,8 +154,9 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(boat_plugin_catalog_gen PRIVATE proteus_plugins)
   target_compile_options(boat_plugin_catalog_gen PRIVATE ${PROTEUS_WARNINGS})
   set(BOAT_PLUGIN_PACKAGES
-    plugins/basin-free plugins/river-free plugins/time-trial plugins/langedrag
-    plugins/river-sprint plugins/harbor-life)
+    plugins/basin-free plugins/river-free plugins/outer-free plugins/time-trial
+    plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
+    plugins/harbor-room plugins/harbor-race)
   set(BOAT_PLUGIN_PACKAGE_FILES)
   foreach(package IN LISTS BOAT_PLUGIN_PACKAGES)
     list(APPEND BOAT_PLUGIN_PACKAGE_FILES
@@ -317,7 +319,8 @@ if(NOT EMSCRIPTEN)
   set_tests_properties(boat_directory PROPERTIES LABELS "cpu;quick")
   # The game hosts a room by running itself as `--serve`, boat_server's command line.
   target_sources(wake_velocity PRIVATE tools/wake_velocity_net.c tools/wake_velocity_net.h
-    tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h)
+    tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h
+    tools/boat_room_package.c tools/boat_room_package.h)
 endif()
 
 if(NOT EMSCRIPTEN)
@@ -818,11 +821,14 @@ add_executable(validate_boat_race tools/validate_boat_race.c)
 target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
-add_executable(boat_server tools/boat_server_main.c tools/boat_server.c tools/cli_usage.c)
+add_executable(boat_server tools/boat_server_main.c tools/boat_server.c tools/cli_usage.c
+  tools/boat_room_package.c)
 add_executable(boat_bot tools/boat_bot.c tools/cli_usage.c)
 foreach(target boat_server boat_bot)
   target_link_libraries(${target} PRIVATE proteus_boat_net_enet)
 endforeach()
+# The authority evaluates room packages, but proteus_boat_net itself never links Lua.
+target_link_libraries(boat_server PRIVATE proteus_plugins proteus_plugin_catalog)
 if(PROTEUS_WEBRTC)
   include(cmake/WebRTC.cmake)
 endif()
@@ -898,6 +904,18 @@ set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_
   wake_velocity_host_connect_rejected wake_velocity_port_without_host_rejected PROPERTIES WILL_FAIL TRUE)
 proteus_add_case_tests(boat_net validate_boat_net LABELS core cpu)
 proteus_add_case_tests(boat_net_enet validate_boat_net_enet LABELS cpu)
+# PD2/PD3: a room built from an edited package reaches clients as data.
+add_executable(validate_boat_room_package tools/validate_boat_room_package.c
+  tools/boat_room_package.c)
+target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus_plugin_catalog
+  proteus_boat_net)
+target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# No networked client path may read the compiled river course.
+add_test(NAME boat_room_course_source COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_room_course_source.py)
+set_tests_properties(boat_room_course_source PROPERTIES LABELS "cpu;quick")
 # Event-driven process smoke: boat_server and boat_bot connect, discover and exit. Session rules
 # over the real transport are the boat_net_enet cases, on a virtual clock.
 add_test(NAME boat_net_process COMMAND ${Python3_EXECUTABLE}

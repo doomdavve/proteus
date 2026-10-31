@@ -1,0 +1,10 @@
+{
+  "id": "proteus.deathmatch",
+  "name": "Deathmatch",
+  "api": 1,
+  "kind": "match",
+  "entry": "main.lua",
+  "location": "any",
+  "capabilities": ["match.define"],
+  "state_version": 1
+}

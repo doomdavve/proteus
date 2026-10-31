@@ -724,7 +724,7 @@ int main(int argc, char **argv)
             }
         }
         BoatViewState view = boat_session_view(&session);
-        view.race.course = skill ? preview_course() : NULL;
+        view.race.course = skill ? preview_course() : boat_race_river_course();
         view.race.enabled = true; // The race room's start, checkpoint and finish lines.
         if (skill)
             view.race.next_gate = (uint8_t)(next - 1);

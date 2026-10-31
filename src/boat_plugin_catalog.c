@@ -28,6 +28,7 @@ const BoatPluginCatalogEntry *boat_plugin_catalog_default(BoatPluginKind kind, c
     if (kind == BOAT_PLUGIN_KIND_FREE)
         id = !strcmp(location, "basin")  ? BOAT_PLUGIN_DEFAULT_BASIN_FREE
             : !strcmp(location, "river") ? BOAT_PLUGIN_DEFAULT_RIVER_FREE
+            : !strcmp(location, "outer") ? "proteus.outer-free"
                                          : NULL;
     else if (kind == BOAT_PLUGIN_KIND_VOYAGE && !strcmp(location, "outer"))
         id = BOAT_PLUGIN_DEFAULT_OUTER_VOYAGE;
@@ -35,8 +36,14 @@ const BoatPluginCatalogEntry *boat_plugin_catalog_default(BoatPluginKind kind, c
         id = BOAT_PLUGIN_DEFAULT_BASIN_COURSE;
     else if (kind == BOAT_PLUGIN_KIND_RACE && !strcmp(location, "river"))
         id = BOAT_PLUGIN_DEFAULT_RIVER_RACE;
+    else if (kind == BOAT_PLUGIN_KIND_MATCH)
+        id = BOAT_PLUGIN_DEFAULT_MATCH;
     const BoatPluginCatalogEntry *entry = boat_plugin_catalog_find(id);
-    if (!entry || boat_plugin_kind_parse(entry->kind) != kind || strcmp(entry->location, location))
+    if (!entry || boat_plugin_kind_parse(entry->kind) != kind)
+        return NULL;
+    // A match package without a scene serves every location.
+    bool any = kind == BOAT_PLUGIN_KIND_MATCH && !strcmp(entry->location, "any");
+    if (!any && strcmp(entry->location, location))
         return NULL;
     return entry;
 }

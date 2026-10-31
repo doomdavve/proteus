@@ -7,6 +7,7 @@
 // Every load uses a fresh restricted Lua state that is closed before the call returns.
 #include "boat_course.h"
 #include "boat_location.h"
+#include "boat_match.h"
 #include "boat_race.h"
 #include "boat_scene_definition.h"
 #include "boat_voyage.h"
@@ -33,8 +34,9 @@ typedef enum {
     BOAT_PLUGIN_KIND_FREE,
     BOAT_PLUGIN_KIND_COURSE,
     BOAT_PLUGIN_KIND_RACE,
+    BOAT_PLUGIN_KIND_MATCH, // PD2: a deathmatch room's rules and combat values.
 } BoatPluginKind;
-// The manifest spelling ("voyage", "free", "course" or "race"), or NONE for an unknown one.
+// The manifest spelling ("voyage", "free", "course", "race" or "match"), or NONE for an unknown.
 BoatPluginKind boat_plugin_kind_parse(const char *kind);
 const char *boat_plugin_kind_name(BoatPluginKind kind);
 
@@ -116,15 +118,35 @@ typedef struct {
     BoatPluginManifest manifest;
     BoatRaceCourse course;
     BoatRaceRules rules;
+    // PD3: an optional authored scene. A package with a scene fixes the room's location.
+    bool has_scene;
+    BoatSceneDefinition scene;
+    uint64_t scene_digest; // boat_scene_digest(&scene); zero when absent.
     uint64_t digest;
 } BoatPluginRace;
 
 // PD1: a free-boating session definition. It selects the location and nothing else; the
 // engine's registered default content applies, exactly as an absent subsystem does.
+// PD3: an optional authored scene, which also fixes the location.
 typedef struct {
     BoatPluginManifest manifest;
+    bool has_scene;
+    BoatSceneDefinition scene;
+    uint64_t scene_digest; // boat_scene_digest(&scene); zero when absent.
     uint64_t digest;
 } BoatPluginFree;
+
+// PD2: a deathmatch room's rules and combat values. A package without a scene takes the room's
+// location from the authority's --location; one with a scene fixes it.
+typedef struct {
+    BoatPluginManifest manifest;
+    BoatMatchRules rules;
+    BoatCombatRules combat;
+    bool has_scene;
+    BoatSceneDefinition scene;
+    uint64_t scene_digest; // boat_scene_digest(&scene); zero when absent.
+    uint64_t digest;
+} BoatPluginMatch;
 
 // PD1: a time-trial session definition. The course is the same value the session binds.
 typedef struct {
@@ -139,13 +161,18 @@ BoatPluginStatus boat_plugin_load_free(const BoatPluginBundle *bundle,
     const BoatPluginLimits *limits, BoatPluginFree *out, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
     const BoatPluginLimits *limits, BoatPluginCourse *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_load_match(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginMatch *out, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_race_check_location(const BoatPluginRace *race,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
     const BoatWorldDefinition *location, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_course_check_location(const BoatPluginCourse *course,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_match_check_location(const BoatPluginMatch *match,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
 uint64_t boat_plugin_race_digest(const BoatRaceCourse *course, const BoatRaceRules *rules);
+uint64_t boat_plugin_match_digest(const BoatMatchRules *rules, const BoatCombatRules *combat);
 
 const char *boat_plugin_status_name(BoatPluginStatus status);
 // Parse and check a manifest against the host policy. OUT is written only on success; DIAGNOSTIC
@@ -185,6 +212,8 @@ BoatPluginChange boat_plugin_free_classify(
     const BoatPluginFree *active, const BoatPluginFree *candidate);
 BoatPluginChange boat_plugin_course_classify(
     const BoatPluginCourse *active, const BoatPluginCourse *candidate);
+BoatPluginChange boat_plugin_match_classify(
+    const BoatPluginMatch *active, const BoatPluginMatch *candidate);
 const char *boat_plugin_change_name(BoatPluginChange change);
 // Shelter identity is by ordered ID: a renamed ID or a reordering restarts the voyage.
 BoatPluginChange boat_plugin_classify(
