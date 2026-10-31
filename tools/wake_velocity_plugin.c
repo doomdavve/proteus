@@ -464,13 +464,6 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
 bool wake_plugin_open_catalog(
     WakePlugin *plugin, const BoatPluginCatalogEntry *entry, BoatSession *session)
 {
-#if defined(__EMSCRIPTEN__)
-    (void)plugin;
-    (void)entry;
-    (void)session;
-    fprintf(stderr, "Bundled packages are native-only until browser parity.\n");
-    return false;
-#else
     if (session->voyage_route != session->world.definition->voyage) {
         fprintf(stderr, "Plugin voyage already has an owner; second owner rejected.\n");
         return false;
@@ -479,6 +472,10 @@ bool wake_plugin_open_catalog(
     plugin->directory = entry->id;
     plugin->authoring = false;
     plugin->frame_now = 0;
+#ifdef __EMSCRIPTEN__
+    // The browser stages edits in a worker; there is no executable path.
+    plugin->stage_executable = "browser-worker";
+#endif
     BoatPluginRevision revision;
     if (!boat_plugin_catalog_decode(entry, &revision, &plugin->host.diagnostic)
         || !boat_plugin_host_start_decoded(
@@ -499,7 +496,6 @@ bool wake_plugin_open_catalog(
     report(plugin, "active", false, "", "%s ACTIVE %016llx", active->manifest.name,
         (unsigned long long)entry->digest);
     return true;
-#endif
 }
 
 // Install the held candidate under its policy. True when the session must restart.

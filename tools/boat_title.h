@@ -15,7 +15,7 @@ typedef struct {
     unsigned host_mode; // HOST A ROOM: a BoatTitleHostMode, a boat_location id and the water.
     unsigned host_location;
     bool host_waves;
-    unsigned outer_content; // OUTER content: 0 standard voyage, 1 Harbor life (native only).
+    unsigned outer_content; // OUTER content: 0 standard voyage, 1 Harbor life.
     char message[160]; // Shown under the menu, e.g. why the last connection ended.
 } BoatTitleSettings;
 

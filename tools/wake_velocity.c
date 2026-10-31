@@ -20,9 +20,7 @@
 #include "wake_velocity_drive.h"
 #include "wake_velocity_menu.h"
 #ifdef PROTEUS_BOAT_PLUGINS
-#if !defined(__EMSCRIPTEN__)
 #include "boat_plugin_catalog.h"
-#endif
 #include "wake_command.h"
 #include "wake_console.h"
 #include "wake_velocity_plugin.h"
@@ -696,9 +694,10 @@ static int study(int argc, char **argv)
         goto invalid;
 #endif
     }
-#if defined(PROTEUS_BOAT_PLUGINS) && !defined(__EMSCRIPTEN__)
+#if defined(PROTEUS_BOAT_PLUGINS)
     // PD1: every solo session starts from a build-time catalog entry unless --no-plugins
-    // restores the compiled path. Explicit --package IDs must name this location's kind.
+    // restores the compiled path. Explicit --package IDs must name this location's kind. PD4
+    // uses the same catalog in the browser; it is built into the game Wasm.
     const BoatPluginCatalogEntry *catalog = NULL;
     if (!plugin_path && !no_plugins && !connect_to) {
         BoatPluginKind kind = course              ? BOAT_PLUGIN_KIND_COURSE
@@ -727,7 +726,7 @@ static int study(int argc, char **argv)
     }
 #else
     if (package_id) {
-        fprintf(stderr, "--package is only available in native builds.\n");
+        fprintf(stderr, "--package needs the plugin runtime in this build.\n");
         goto invalid;
     }
 #endif
@@ -875,7 +874,6 @@ static int study(int argc, char **argv)
         }
         plugin_active = true;
     }
-#if !defined(__EMSCRIPTEN__)
     else if (catalog) {
         if (!wake_plugin_open_catalog(&plugin, catalog, &session)) {
             snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
@@ -883,7 +881,6 @@ static int study(int argc, char **argv)
         }
         plugin_active = true;
     }
-#endif
 #if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
