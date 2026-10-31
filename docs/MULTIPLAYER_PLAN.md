@@ -4,6 +4,8 @@ The proposed [room-content loading and distribution plan](ROOM_CONTENT_PLAN.md) 
 map/scenario packages, selected-room content identity, download/cache lifecycle and staged
 admission. It builds on these sessions and plugin P5; current rooms still require matching
 compiled gameplay content. No distribution feature or wire-format change is implemented.
+The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md#pd2--package-defined-rooms) plans package-defined
+rooms and protocol v9.
 
 Current deathmatch extension (2026-10-30): [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27)
 uses protocol v8. Enabled fleet checkpoints remain bounded at 16 KiB (9068 encoded bytes);

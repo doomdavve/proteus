@@ -10,6 +10,8 @@ owns sessions, the [protocol](MULTIPLAYER_PROTOCOL.md) owns wire formats, and th
 Completed: overall scope, join lifecycle and staged direction documented. Next: when this
 track is scheduled, select one existing map/scenario and refine the package and loading
 contract with plugin P5. No implementation order is implied for other active work tracks.
+The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) selects the river race and delivers the
+descriptor part of R1 and R3 on built-in maps; loaded maps (R2) and distribution (R4) stay here.
 
 ## Starting point
 
