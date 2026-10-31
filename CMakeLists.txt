@@ -327,7 +327,8 @@ if(NOT EMSCRIPTEN)
 endif()
 
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
-target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h)
+target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
+  tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h)
 target_link_libraries(wake_velocity PRIVATE proteus_plugins)
 if(NOT EMSCRIPTEN)
   target_link_libraries(wake_velocity PRIVATE proteus_plugin_catalog)
@@ -719,7 +720,7 @@ if(NOT EMSCRIPTEN)
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
   # P4.6 live tool bridge over request files; --serve backs the client's end-to-end checks.
   add_executable(validate_wake_bridge tools/validate_wake_bridge.c tools/wake_velocity_bridge.c
-    tools/wake_velocity_plugin.c)
+    tools/wake_velocity_plugin.c tools/wake_command.c)
   target_link_libraries(validate_wake_bridge PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
   target_compile_options(validate_wake_bridge PRIVATE ${PROTEUS_WARNINGS})
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/wake-bridge-test")
@@ -728,6 +729,19 @@ if(NOT EMSCRIPTEN)
   add_test(NAME wake_velocity_bridge COMMAND validate_wake_bridge)
   set_tests_properties(wake_velocity_bridge PROPERTIES LABELS "cpu"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 30)
+  # PC: the command layer, console input/scrollback and live scene application, headless under a
+  # virtual clock and through the real isolated worker.
+  add_executable(validate_wake_command tools/validate_wake_command.c
+    tools/wake_velocity_plugin.c tools/wake_command.c tools/wake_console.c)
+  target_link_libraries(validate_wake_command PRIVATE proteus_plugins proteus_plugin_catalog
+    proteus_boat_session)
+  target_compile_options(validate_wake_command PRIVATE ${PROTEUS_WARNINGS})
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/wake-command-test")
+  target_compile_definitions(validate_wake_command PRIVATE
+    WAKE_COMMAND_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/wake-command-test")
+  add_test(NAME wake_command COMMAND validate_wake_command)
+  set_tests_properties(wake_command PROPERTIES LABELS "cpu"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} TIMEOUT 60)
   add_test(NAME boat_plugin_author COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_author.py
     --worker $<TARGET_FILE:boat_plugin_worker>
