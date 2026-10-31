@@ -27,9 +27,10 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: P5 authority/prediction/recording contract review** — choose one proven authored
-scenario, then define matching preinstalled content, compatibility, late join and round-boundary
-reload before implementing room integration. Physical-device and human qualification need the
+**Next task: [plugins by default](PLUGIN_DEFAULT_PLAN.md) (planned 2026-10-31), starting with PD1.**
+That plan owns making plugins always on, including the room part of P5: its first room scenario is
+the river race, carried to clients as validated data rather than matching preinstalled source.
+Authority callbacks, commands and session recordings remain P5 work after it. Physical-device and human qualification need the
 user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time
 init/migration still evaluate trusted Lua synchronously. Browser voyages evaluate all imported
@@ -40,7 +41,7 @@ The [location-life track](#location-life-track-proposed-2026-10-30) now gives ma
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
 scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3's native berth/module
 parameterization plus the two-berth `plugins/harbor-life` package are complete. The first
-playable L4.3 harbor gate remains planned. The milestones below are this plan's
+playable L4.3 harbor gate is implemented and awaits human review. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -480,7 +481,8 @@ plugin courses separate best/ghost compatibility keys and preserve legacy files 
 Each milestone is independently reviewable in a separate worktree/PR. Complete the requested
 step and its documentation; the roadmap is not authorization to implement every later track.
 Use existing C fixtures as the parity oracle. Keep native gameplay unchanged with plugins
-disabled and retain a straightforward no-plugin launch. Every implementation handoff runs
+disabled and retain a straightforward no-plugin launch until
+[the plugins-by-default cutover](PLUGIN_DEFAULT_PLAN.md#pd5--cutover) retires this rule. Every implementation handoff runs
 the Debug build and full CTest preset, plus the focused checks below; report unavailable GPU,
 browser, physical input or human-play evidence explicitly.
 
@@ -1767,13 +1769,10 @@ proposal instead of pretending the Lua API can do it.
 
 ## Location-life track (proposed 2026-10-30)
 
-**Status:** planned, with native foundations present; no scene-authoring Lua bindings or
-location-life plugin example implemented. The current grants remain `voyage.define`,
-`race.define`, `objective.hud` and `objective.timers`. Timers can schedule objective work;
-they do not grant control over boats, birds, lights or other scene actors. P4's authoring
-pipeline is available, but completion of P4 does not mean arbitrary scene content is scriptable.
-P4.9 browser objective isolation is implemented; the main queue now proceeds to P5
-authority/prediction/recording contract review. This is a separate capability track, not a
+**Status:** L1.1–L4.3 implemented for native solo use, including the `harbor-life` package and
+the `scene.define` grant; L5–L8 are planned. Timers can schedule objective work; they do not grant
+control over boats, birds, lights or other scene actors. The main queue now follows the
+[plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md). This is a separate capability track, not a
 renumbering of P0–P6 or authorization to implement all slices.
 
 **Intended result:** a location plugin can dress and populate a marina, run harbor traffic
