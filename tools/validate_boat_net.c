@@ -2413,6 +2413,25 @@ static int prediction_network(void)
     return 0;
 }
 
+// A definition the client cannot decode closes it with a reason, installs no world and frees the
+// seat. Corrupting the server's bytes keeps their digest correct, so decoding is what rejects it.
+static int definition_rejected(void)
+{
+    static Room room;
+    CHECK(room_open(&room, 95, (BoatNetServerConfig) { 0 }));
+    room.server.definition[0] ^= 0xff;
+    unsigned a = room_join(&room, "corrupt", NULL, 0);
+    room_run(&room, 1);
+    const BoatNetClient *c = &room.clients[a];
+    CHECK(c->phase == BOAT_NET_CLIENT_CLOSED && !boat_net_client_room(c));
+    CHECK(!boat_net_client_own(c) && c->stats.definition_bytes == 0);
+    CHECK(strstr(boat_net_client_failure(c), "definition") != NULL);
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        CHECK(room.server.slot_peer[i] == -1);
+    room_close(&room);
+    return 0;
+}
+
 static int throttle_detents(void)
 {
     static Room room;
@@ -2780,6 +2799,7 @@ static const TestCase cases[] = {
     SLOW_CASE(throttle_detents),
     TEST_CASE(golden),
     TEST_CASE(room_definition_codec),
+    TEST_CASE(definition_rejected),
     TEST_CASE(codec),
     SLOW_CASE(checkpoints),
     TEST_CASE(deferred_ready),

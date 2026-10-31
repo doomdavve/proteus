@@ -354,6 +354,7 @@ static void definition_fail(BoatNetClient *c, uint8_t reason)
     c->definition_error = reason;
     c->defining = false;
     c->phase = BOAT_NET_CLIENT_CLOSED;
+    c->transport.disconnect(c->transport.context, 0); // Give the seat back now.
 }
 
 static void definition_page(BoatNetClient *c, const BoatNetWorldPage *p)
@@ -497,6 +498,10 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         c->roster = m.roster;
         break;
     case BOAT_NET_DEFINITION_BEGIN:
+        if (c->room_valid) { // Immutable for the connection: fleets borrow its scene.
+            definition_fail(c, 1);
+            break;
+        }
         c->definition_begin = m.definition_begin;
         c->defining = true;
         c->definition_pages_received = 0;
