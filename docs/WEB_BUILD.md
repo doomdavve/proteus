@@ -482,6 +482,9 @@ server; free joins but does not send the headless spawn request, and deathmatch 
 full browser receive queue, both as on the pre-package baseline. Firefox, WebKit, the manual
 three-engine workflow and physical devices were not run. The
 [PD4 result](PLUGIN_DEFAULT_PLAN.md#pd4-result-2026-10-31) owns details and remaining limits.
+A later trial traced the free and deathmatch results to SwiftShader's frame rate and one script key
+press: all modes pass on a real GPU, as the
+[Cutover preparation](PLUGIN_DEFAULT_PLAN.md#settled-from-the-source-and-a-trial-2026-10-31-1) records.
 
 ## WebRTC rooms
 
