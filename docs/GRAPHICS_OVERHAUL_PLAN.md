@@ -5,7 +5,7 @@ for this plan after a review of the GPU drawing path, to iterate on later. Their
 under [decisions](#decisions): the order is "probably right" and the new water layer "sounds
 exciting". That is a steer, not acceptance of any result, and targets and identity rules are still
 a draft to argue with.
-**Next task: G0.**
+**Next task: the user's verdict on the [water look test](#water-look-test--2026-10-31), then G0.**
 
 ## Intended result
 
@@ -214,6 +214,8 @@ From the user, 2026-10-31:
   machine, and no stage needs to hold up on much weaker hardware.
 - **Not a licence for waste:** "no need to be sloppy due to that". Stages still have to earn their
   cost, with budgets and measured gains, even where the M1 Max could absorb it.
+- **Early look test:** run it now as "cheap and prudent", ahead of G0. Done below; its verdict is
+  still the user's.
 
 For the implementer, decided here unless reversed:
 
@@ -224,12 +226,45 @@ For the implementer, decided here unless reversed:
 
 ## Open decisions
 
-1. **Look spike first?** The order starts with work that pays off regardless of the look, and
-   compares the look in G5. A throwaway water-square spike during G0 would test rule 1 earlier, at a
-   small cost. Current choice: keep the order.
+1. **Identity rule 1:** does the [water look test](#water-look-test--2026-10-31) pass, and at what
+   square size? Current lean: 0.5 m. A failure here changes G5, not G1–G4.
 2. **Browser floor:** the hardware floor above was stated for machines generally. Whether browsers
    must hold 60 Hz on the same machine, or may fall back to fewer effects, is not decided. Current
    choice: fallbacks are allowed, and G0's browser measurement informs this.
+
+## Water look test — 2026-10-31
+
+A throwaway test of identity rule 1 on the draft PR branch `spike/water-look`, not for merging. It
+shades each water pixel from the centre of a world-anchored square, whose size doubles with distance
+so that squares stay at least four pixels wide. Captures are river drives at 1280×800.
+
+![Four variants of the river at 3 s](evidence/graphics/water-look-wake.png)
+
+Top: today's 320×200, enlarged; 0.5 m squares. Bottom: high resolution with no squares; 1 m squares.
+A [second sheet](evidence/graphics/water-look-waves.png) compares today with 0.5 m squares in waves.
+
+To run it, from that branch's build and the repository root:
+
+```sh
+PROTEUS_SPIKE_SCALE=4 PROTEUS_SPIKE_REFLECTION=4 PROTEUS_SPIKE_SQUARE=.5 \
+  ./build/wake_velocity --location river --waves
+```
+
+Findings, from stills and three consecutive clip frames. Nobody has judged it in play:
+
+- **The mosaic survives high resolution.** At 0.5 m the water still reads as chunky retro mosaic,
+  while the city, bridge and skyline get sharper. It also matches the sky's existing world-anchored
+  cloud squares.
+- **0.5 m beats 1 m.** At 1 m, reflections begin to dissolve into patches.
+- **No measurable cost.** One Debug `--aa 4x4 --waves` run each on the M1 Max, GPU p50 / p95: today
+  3.48 / 3.94 ms; 4× reflection 3.52 / 3.97 ms; with squares 3.46 / 3.93 ms. These differences are
+  within noise. `final_state` was identical in all three, as expected of a shading-only change.
+- **Defects to fix if adopted.** Thin slivers appear between squares, probably from the
+  derivative-based size picking on triangle edges; a distance-based size should remove them. The
+  squares align to world axes, so they turn into diamonds and zigzags on diagonal headings, which
+  may be charm or noise.
+- **Where it runs out.** Nearby buildings look plainer at high resolution, since nothing equivalent
+  applies to them. Rule 1 covers only water, and G5 must consider the city too.
 
 ## Related work and conflicts
 
@@ -260,3 +295,6 @@ For the implementer, decided here unless reversed:
   No renderer change, no user acceptance. Browser coverage for WebGPU and all gain estimates are
   unverified.
 - 2026-10-31: recorded the user's first reactions under [decisions](#decisions). Documentation only.
+- 2026-10-31: ran the [water look test](#water-look-test--2026-10-31) on `spike/water-look`, at the
+  user's request. Captures, clip frames, benchmark runs and a 120-frame windowed demo that exited
+  cleanly; the suite was not run on the spike, and the on-screen result has not been reviewed.
