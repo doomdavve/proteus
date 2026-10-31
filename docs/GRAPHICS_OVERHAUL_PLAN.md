@@ -5,7 +5,8 @@ for this plan after a review of the GPU drawing path, to iterate on later. Their
 under [decisions](#decisions): the order is "probably right" and the new water layer "sounds
 exciting". That is a steer, not acceptance of any result, and targets and identity rules are still
 a draft to argue with.
-**Next task: the user's verdict on the [water look test](#water-look-test--2026-10-31), then G0.**
+The [water look test](#water-look-test--2026-10-31) rejected water squares and favoured plain high
+resolution. **Next task: G0.**
 
 ## Intended result
 
@@ -23,9 +24,9 @@ they are costly here and push towards the generic look this plan exists to avoid
 
 Check each visual stage against these. Change a rule by editing it here, with the reason.
 
-1. **Chunkiness lives in the world, not the framebuffer.** Water, foam and reflection offsets may
-   be shaded in fixed-size squares anchored to the water surface. They stay crisp and stable at any
-   resolution. 320×200 stays available as a preset.
+1. **Judge it moving.** A look only counts if it holds up in play. World-anchored water squares
+   looked fine in stills and "horrible in-game", so they are out. High resolution without them is
+   welcome, and 320×200 stays available as a preset.
 2. **Water comes first.** It gets the largest share of new frame budget and is the first thing
    reviewed in any capture.
 3. **Toy-like shapes stay.** Keep flat facets, chunky cube foam and spray, and procedural finishes
@@ -178,10 +179,10 @@ Done when: glassy docks and choppy open water read clearly apart in captures, on
 
 ### G5 — Resolution, light and mood
 
-1. **High-resolution preset.** Add world-anchored water squares (identity rule 1) and compare with
-   320×200 side by side, as an option: low resolution stays the default. Changing the default needs
-   explicit user acceptance later; only then update the nearest-neighbour convention in `AGENTS.md`,
-   along with HUD scaling and the guides.
+1. **High-resolution preset.** Offer plain high resolution as an option, starting from the
+   configuration the user liked in the [look test](#water-look-test--2026-10-31): low resolution
+   stays the default. Changing the default needs explicit user acceptance later; only then update
+   the nearest-neighbour convention in `AGENTS.md`, along with HUD scaling and the guides.
 2. **HDR and grading.** Unclamp lighting, add restrained bloom and authored grading per time of day.
 3. **Clustered lights.** Replace the 32-light loop with a CPU-built cluster texture, removing the
    lamp selection and its cap.
@@ -214,8 +215,9 @@ From the user, 2026-10-31:
   machine, and no stage needs to hold up on much weaker hardware.
 - **Not a licence for waste:** "no need to be sloppy due to that". Stages still have to earn their
   cost, with budgets and measured gains, even where the M1 Max could absorb it.
-- **Early look test:** run it now as "cheap and prudent", ahead of G0. Done below; its verdict is
-  still the user's.
+- **Early look test:** run ahead of G0 as "cheap and prudent". After playing it, the user rejected
+  water squares and liked plain high resolution "more than I expected". The default stays low
+  resolution, as above, since they did not ask to change it.
 
 For the implementer, decided here unless reversed:
 
@@ -226,8 +228,9 @@ For the implementer, decided here unless reversed:
 
 ## Open decisions
 
-1. **Identity rule 1:** does the [water look test](#water-look-test--2026-10-31) pass, and at what
-   square size? Current lean: 0.5 m. A failure here changes G5, not G1–G4.
+1. **Bring the high-resolution option forward?** It was simple to run in the spike and the user
+   liked it, so it may not need to wait for G5. It does need real HUD scaling, and it shows off the
+   plainer nearby buildings. Current choice: keep it in G5.
 2. **Browser floor:** the hardware floor above was stated for machines generally. Whether browsers
    must hold 60 Hz on the same machine, or may fall back to fewer effects, is not decided. Current
    choice: fallbacks are allowed, and G0's browser measurement informs this.
@@ -243,14 +246,20 @@ so that squares stay at least four pixels wide. Captures are river drives at 128
 Top: today's 320×200, enlarged; 0.5 m squares. Bottom: high resolution with no squares; 1 m squares.
 A [second sheet](evidence/graphics/water-look-waves.png) compares today with 0.5 m squares in waves.
 
-To run it, from that branch's build and the repository root:
+**User verdict after playing it:** squares fail. "It looks horrible in-game. One screen shot look ok
+but not over temporal space." The surprise was the configuration without them, which the user "liked
+more than I expected", run from that branch's build:
 
 ```sh
-PROTEUS_SPIKE_SCALE=4 PROTEUS_SPIKE_REFLECTION=4 PROTEUS_SPIKE_SQUARE=.5 \
+PROTEUS_SPIKE_SCALE=4 PROTEUS_SPIKE_REFLECTION=4 PROTEUS_SPIKE_SQUARE=0 \
   ./build/wake_velocity --location river --waves
 ```
 
-Findings, from stills and three consecutive clip frames. Nobody has judged it in play:
+That is a 1280×800 scene with a 640×480 nearest-filtered reflection and a 320×200 HUD. Its one Debug
+benchmark run below is about the same as today's `--aa 4x4` path, which also renders 1280×800.
+
+Pre-play findings, kept as history. They came from stills and three consecutive clip frames, and the
+conclusion that the mosaic survives was wrong once the squares moved:
 
 - **The mosaic survives high resolution.** At 0.5 m the water still reads as chunky retro mosaic,
   while the city, bridge and skyline get sharper. It also matches the sky's existing world-anchored
@@ -283,8 +292,9 @@ Findings, from stills and three consecutive clip frames. Nobody has judged it in
 
 - Every stage: the build and `ctest --preset full`, with `PROTEUS_GPU_TESTS=ON` for renderer changes.
 - Engine-only stages (G1, and G2 parts 1 and 3): byte-identical captures at the review stops.
-- Visual stages: inspected captures, a windowed demo, and user review. A passing run is not user
-  acceptance; record them separately.
+- Visual stages: inspected captures, a windowed demo, and user review in play. Stills cannot accept
+  anything that changes over time, as the look test showed. A passing run is not user acceptance;
+  record them separately.
 - Performance claims: Release, repeated runs, stating machine, options and commit.
 - Tests never wait on wall-clock time, per the `test_time` rule.
 
@@ -296,5 +306,7 @@ Findings, from stills and three consecutive clip frames. Nobody has judged it in
   unverified.
 - 2026-10-31: recorded the user's first reactions under [decisions](#decisions). Documentation only.
 - 2026-10-31: ran the [water look test](#water-look-test--2026-10-31) on `spike/water-look`, at the
-  user's request. Captures, clip frames, benchmark runs and a 120-frame windowed demo that exited
-  cleanly; the suite was not run on the spike, and the on-screen result has not been reviewed.
+  user's request: captures, clip frames, benchmark runs and a 120-frame windowed demo that exited
+  cleanly. The suite was not run on the spike.
+- 2026-10-31: the user played it. Water squares rejected, plain high resolution liked. Rule 1 and
+  G5 rewritten to match. This accepts no shipped feature, since nothing has shipped.
