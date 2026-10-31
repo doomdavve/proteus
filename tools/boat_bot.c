@@ -235,10 +235,12 @@ int main(int argc, char **argv)
                 if (own->held) // Grid, countdown or parked: prepare full throttle on the grid.
                     input = (BoatInput) { .throttle_rate
                         = boat_throttle_rate(own->boat.throttle, row->parked ? 0 : 1) };
-                else if (client.race.phase == BOAT_RACE_RACING
-                    || client.race.phase == BOAT_RACE_RESULTS)
-                    input = boat_fleet_bot_race_input(&client.fleet, boat_race_river_course(),
-                        row->gates, row->status != BOAT_RACE_RUNNING, client.slot);
+                else if ((client.race.phase == BOAT_RACE_RACING
+                             || client.race.phase == BOAT_RACE_RESULTS)
+                    && boat_net_client_room(&client))
+                    input = boat_fleet_bot_race_input(&client.fleet,
+                        &boat_net_client_room(&client)->course, row->gates,
+                        row->status != BOAT_RACE_RUNNING, client.slot);
             }
             // Deathmatch and race rooms recover capsized boats themselves.
             if (own->boat.motion_state == BOAT_CAPSIZED

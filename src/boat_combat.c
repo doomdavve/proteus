@@ -36,6 +36,21 @@ BoatCombatRules boat_combat_default_rules(void)
         .grace_ticks = 240 };
 }
 
+bool boat_combat_rules_equal(const BoatCombatRules *a, const BoatCombatRules *b)
+{
+    return a->health == b->health && a->damage == b->damage && a->bullet_speed == b->bullet_speed
+        && a->bullet_range == b->bullet_range && a->grenade_distance == b->grenade_distance
+        && a->wave_height == b->wave_height && a->wave_speed == b->wave_speed
+        && a->wave_range == b->wave_range && a->cannon_pressure == b->cannon_pressure
+        && a->pressure_recovery == b->pressure_recovery && a->torpedo_damage == b->torpedo_damage
+        && a->torpedo_speed == b->torpedo_speed && a->torpedo_range == b->torpedo_range
+        && a->torpedo_ticks == b->torpedo_ticks && a->arming_ticks == b->arming_ticks
+        && a->torpedo_ammo == b->torpedo_ammo && a->fire_ticks == b->fire_ticks
+        && a->heat_ticks == b->heat_ticks && a->cool_ticks == b->cool_ticks
+        && a->grenade_ticks == b->grenade_ticks && a->splash_ticks == b->splash_ticks
+        && a->fuse_ticks == b->fuse_ticks && a->grace_ticks == b->grace_ticks;
+}
+
 float boat_combat_cannon_rise(float age)
 {
     return BOAT_CANNON_LIFT * age - .5f * BOAT_CANNON_GRAVITY * age * age;
@@ -54,10 +69,10 @@ void boat_combat_bind(BoatFleet *f)
     f->world.water.radial = f->state.combat.enabled ? f->state.combat.waves : NULL;
 }
 
-void boat_combat_enable(BoatFleet *f)
+void boat_combat_enable(BoatFleet *f, const BoatCombatRules *rules)
 {
-    f->state.combat
-        = (BoatCombat) { .enabled = true, .firing = true, .rules = boat_combat_default_rules() };
+    BoatCombatRules installed = rules ? *rules : boat_combat_default_rules();
+    f->state.combat = (BoatCombat) { .enabled = true, .firing = true, .rules = installed };
     for (unsigned i = 0; i < BOAT_COMBAT_PLAYERS; ++i)
         boat_combat_spawn(f, i);
     boat_combat_bind(f);

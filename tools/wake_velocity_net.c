@@ -382,8 +382,9 @@ const char *net_study_status(const NetStudy *net)
     unsigned players = 0;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         players += c->roster.slots[i].state != BOAT_NET_ROSTER_EMPTY;
-    snprintf(text, sizeof(text), "NET SLOT %u / %u PLAYERS / RTT %.0f ms / %s%s%s", c->slot + 1,
-        players, c->rtt * 1000, phase_text(c->phase),
+    snprintf(text, sizeof(text), "NET SLOT %u / %u PLAYERS / RTT %.0f ms / %s%s%s%s%s", c->slot + 1,
+        players, c->rtt * 1000, phase_text(c->phase), boat_net_client_room(c) ? " / " : "",
+        boat_net_client_room(c) ? boat_net_client_room(c)->name : "",
         boat_net_client_stale(c, boat_net_clock()) ? " / STALE" : "",
         c->wake_consistent ? "" : " / WAKES REPAIRING");
     return text;
@@ -550,8 +551,12 @@ void net_study_race_view(const NetStudy *net, BoatViewState *view)
 {
     if (!net_study_race(net))
         return;
+    const BoatRoomDefinition *room = boat_net_client_room(&net->client);
+    if (!room)
+        return;
     const BoatNetRaceRow *row = &net->client.race.slots[net->client.slot];
     view->race.enabled = true;
+    view->race.course = &room->course;
     view->race.next_gate = row->current ? row->gates : 0;
 }
 
@@ -571,7 +576,8 @@ static const char *race_time(uint64_t subticks)
 // The authority's rows as a local race over the drawn fleet, for provisional positions.
 static void local_race(const BoatNetClient *c, BoatRace *race, unsigned *entrants)
 {
-    *race = (BoatRace) { .course = *boat_race_river_course(),
+    const BoatRoomDefinition *room = boat_net_client_room(c);
+    *race = (BoatRace) { .course = room ? room->course : (BoatRaceCourse) { 0 },
         .phase = (BoatRacePhase)c->race.phase,
         .placed = c->race.placed };
     *entrants = 0;

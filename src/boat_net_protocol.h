@@ -4,17 +4,18 @@
 #include "boat_fleet.h"
 #include "boat_match.h"
 #include "boat_race.h"
+#include "boat_room_definition.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
-// Multiplayer protocol v7 (deathmatch weapons, mapped rooms, race R2). docs/MULTIPLAYER_PROTOCOL.md
+// Multiplayer protocol v9 (package-defined rooms). docs/MULTIPLAYER_PROTOCOL.md
 // owns the byte tables.
 // Every multi-byte field is big-endian; floats travel as IEEE-754 binary32 bit patterns. Encoders
 // never copy structs, padding, bool or enum representations; decoders validate every field
 // and never write the destination on failure.
 #define BOAT_NET_MAGIC 0x50424e54u // "PBNT"
-#define BOAT_NET_VERSION 8
+#define BOAT_NET_VERSION 9
 #define BOAT_NET_HEADER_BYTES 32
 #define BOAT_NET_MAX_MESSAGE 1100 // Whole message; the transport MTU allows for its headers.
 #define BOAT_NET_MAX_PAYLOAD (BOAT_NET_MAX_MESSAGE - BOAT_NET_HEADER_BYTES)
@@ -30,8 +31,9 @@
 #define BOAT_NET_MESSAGES_PER_SERVICE 128 // Messages handled per service call at most.
 #define BOAT_NET_TIMEOUT 5.0 // Seconds without any message from the other end.
 #define BOAT_NET_HANDSHAKE_TIMEOUT 10.0 // Seconds from connection to an installed world.
-#define BOAT_NET_PAGE_BYTES 1024 // Checkpoint bytes per bootstrap page.
+#define BOAT_NET_PAGE_BYTES 1024 // Checkpoint or definition bytes per bootstrap page.
 #define BOAT_NET_MAX_CHECKPOINT 16384
+#define BOAT_NET_MAX_DEFINITION BOAT_ROOM_BYTES_MAX
 #define BOAT_NET_NAME_BYTES 16
 #define BOAT_NET_TOKEN_BYTES 32
 #define BOAT_NET_BUILD_BYTES 32
@@ -70,6 +72,9 @@ typedef enum {
     BOAT_NET_RACE_STATE = 19,
     BOAT_NET_RACE_EVENT = 20,
     BOAT_NET_COMBAT_PAGE = 21, // Unsequenced bounded pages tied to snapshot tick.
+    BOAT_NET_DEFINITION_BEGIN = 22, // S→C: the room definition, before the world checkpoint.
+    BOAT_NET_DEFINITION_PAGE = 23, // S→C: one bounded piece of the definition bytes.
+    BOAT_NET_DEFINITION_END = 24, // S→C: the definition is complete on this reliable channel.
     BOAT_NET_TYPE_LIMIT
 } BoatNetType;
 
@@ -153,9 +158,6 @@ typedef enum {
     BOAT_NET_MODE_LIMIT
 } BoatNetRoomMode;
 
-// Courses a race room can run; the content digest covers their compiled data.
-typedef enum { BOAT_NET_COURSE_RIVER, BOAT_NET_COURSE_LIMIT } BoatNetRaceCourse;
-
 typedef struct {
     uint8_t slot;
     bool waves;
@@ -193,6 +195,12 @@ typedef struct {
     uint64_t digest; // FNV-1a 64 of the checkpoint bytes.
     uint64_t fleet_hash; // boat_fleet_hash() of the encoded state.
 } BoatNetWorldBegin;
+
+typedef struct {
+    uint32_t definition, bytes;
+    uint16_t pages;
+    uint64_t digest; // FNV-1a 64 of the definition bytes; corruption detection only.
+} BoatNetDefinitionBegin;
 
 typedef struct {
     uint32_t checkpoint;
@@ -258,7 +266,6 @@ typedef struct {
 // Race phase, clock and every slot's row (docs/RACE_PLAN.md); race rooms only.
 typedef struct {
     uint8_t phase; // BoatRacePhase.
-    uint8_t course; // BoatNetRaceCourse.
     uint8_t placed; // Places awarded this round.
     uint16_t recovery_ticks, skip_ticks, park_ticks;
     uint32_t round; // Rounds gridded.
@@ -295,8 +302,9 @@ typedef struct {
         BoatNetReject reject;
         BoatNetRoster roster;
         BoatNetWorldBegin world_begin;
-        BoatNetWorldPage world_page;
-        uint32_t checkpoint; // WORLD_END, READY.
+        BoatNetDefinitionBegin definition_begin;
+        BoatNetWorldPage world_page; // Also DEFINITION_PAGE: the same bounded page layout.
+        uint32_t checkpoint; // WORLD_END, READY, DEFINITION_END.
         BoatNetInputBatch input;
         BoatNetSnapshot snapshot;
         BoatNetWakeBirths births;
@@ -326,9 +334,9 @@ BoatNetRaceEvent boat_net_race_event_of(const BoatRace *race, const BoatRaceEven
 bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState *b);
 // The GO tick a snapshot or checkpoint carries for RACE: zero before its first round.
 uint64_t boat_net_race_go(const BoatRace *race);
-// Bind a race room's course source to FLEET's water for GO (zero removes it), as the authority's
-// race does: the client's mirror and prediction call this with each snapshot's race_go.
-void boat_net_race_bind(BoatFleet *fleet, uint8_t course, uint64_t go);
+// Bind a race room's package course source to FLEET's water for GO (zero removes it), as the
+// authority's race does: the client's mirror and prediction call this with each snapshot's race_go.
+void boat_net_race_bind(BoatFleet *fleet, const BoatRaceCourse *course, uint64_t go);
 
 // Encode MESSAGE (its header payload length is computed) into OUT. Returns the byte count, or
 // zero for a message that does not satisfy the decoder's own validation.
@@ -349,7 +357,8 @@ BoatInput boat_net_command_input(BoatNetCommand command);
 // The command an inactive or silent slot integrates: controls easing toward neutral.
 BoatNetCommand boat_net_neutral_command(const Boat *boat, uint8_t flags);
 
-// Compatibility digest of all compiled locations/shore geometry and the fleet/wake contract.
+// Compatibility digest of all compiled locations/shore geometry, the cannon constants, the
+// fleet/wake contract and the weather recipes. The room supplies the course, rules and contacts.
 uint64_t boat_net_content_digest(void);
 // Canonical digest of the live record set (slot index and every field of live records).
 uint64_t boat_net_wake_digest(const BoatWakeObjects *wakes);

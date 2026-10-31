@@ -20,7 +20,7 @@ typedef struct {
     // next uncleared gate (the gate count once finished).
     struct {
         bool enabled;
-        const struct BoatRaceCourse *course; // Optional frame-borrowed override; NULL uses river.
+        const struct BoatRaceCourse *course; // Frame-borrowed room course; NULL draws no race.
         unsigned char next_gate;
     } race;
 } BoatViewState;

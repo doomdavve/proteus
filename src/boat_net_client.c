@@ -116,14 +116,16 @@ static void check_wakes(BoatNetClient *c, double now)
     c->wake_consistent = consistent;
 }
 
+static void definition_fail(BoatNetClient *c, uint8_t reason);
+
 // Race rooms: the course source runs on the latest round's clock, in the mirror and in the
 // prediction, which also releases grid holds at GO.
 static void bind_race(BoatNetClient *c, uint64_t go)
 {
-    if (c->accept.mode != BOAT_NET_MODE_RACE)
+    if (c->accept.mode != BOAT_NET_MODE_RACE || !c->room_valid)
         return;
     c->race_go = go;
-    boat_net_race_bind(&c->fleet, BOAT_NET_COURSE_RIVER, go);
+    boat_net_race_bind(&c->fleet, &c->room.course, go);
     if (c->predict) {
         c->prediction.fleet.world.water.vessel = c->fleet.world.water.vessel;
         c->prediction.fleet.world.water.storm = c->fleet.world.water.storm;
@@ -138,13 +140,23 @@ static void install(BoatNetClient *c, double now)
     uint64_t race_go = 0;
     const BoatNetWorldBegin *b = &c->begin;
     c->assembling = false;
-    bool complete = c->pages_received == b->pages
-        && boat_net_bytes_digest(c->assembly, b->bytes) == b->digest
-        && boat_net_checkpoint_decode(c->assembly, b->bytes, &state, inputs, &race_go)
-            == BOAT_NET_OK
+    bool decoded = boat_net_checkpoint_decode(c->assembly, b->bytes, &state, inputs, &race_go)
+        == BOAT_NET_OK;
+    if (decoded && c->room_valid && c->room.mode == BOAT_ROOM_MODE_DEATHMATCH
+        && state.combat.enabled
+        && !boat_combat_rules_equal(&state.combat.rules, &c->room.combat_rules)) {
+        definition_fail(c, 2);
+        return;
+    }
+    bool complete = c->room_valid && c->room.mode == c->accept.mode
+        && c->room.location == c->accept.location && c->pages_received == b->pages
+        && boat_net_bytes_digest(c->assembly, b->bytes) == b->digest && decoded
         && boat_fleet_hash(&state) == b->fleet_hash
         && state.wakes.life_ticks == c->accept.wake_life_ticks
-        && state.wakes.crest_height == c->accept.crest_height;
+        && state.wakes.crest_height == c->accept.crest_height
+        && (c->room.mode == BOAT_ROOM_MODE_DEATHMATCH ? state.combat.enabled
+                    && boat_combat_rules_equal(&state.combat.rules, &c->room.combat_rules)
+                                                      : !state.combat.enabled);
     BoatFleet fleet;
     const BoatWorldResources *resources = c->resources && c->accept.location < BOAT_LOCATION_COUNT
         ? &c->resources[c->accept.location]
@@ -152,9 +164,10 @@ static void install(BoatNetClient *c, double now)
     complete = complete && boat_world_resources_ready(resources)
         && resources->definition->id == c->accept.location;
     if (complete)
-        complete = boat_fleet_init(&fleet, resources,
+        complete = boat_fleet_init_scene(&fleet, resources,
             boat_world_test_water(resources->definition, c->accept.waves, false, false),
-            c->accept.wake_life_ticks, c->accept.crest_height);
+            c->accept.wake_life_ticks, c->accept.crest_height,
+            c->room.has_scene ? &c->room.scene : NULL);
     if (!complete) {
         ++c->stats.bootstrap_failures;
         c->resync_at = now;
@@ -334,6 +347,56 @@ static void births(BoatNetClient *c, const BoatNetWakeBirths *b, double now)
         check_wakes(c, now);
 }
 
+// The definition arrives once, before the checkpoint, on the same reliable ordered channel.
+// Pages must be contiguous; the client never trusts the sender's counts or digest.
+static void definition_fail(BoatNetClient *c, uint8_t reason)
+{
+    c->definition_error = reason;
+    c->defining = false;
+    c->phase = BOAT_NET_CLIENT_CLOSED;
+}
+
+static void definition_page(BoatNetClient *c, const BoatNetWorldPage *p)
+{
+    const BoatNetDefinitionBegin *b = &c->definition_begin;
+    if (!c->defining || p->checkpoint != b->definition || p->count != b->pages
+        || p->index != c->definition_pages_received) {
+        definition_fail(c, 1);
+        return;
+    }
+    size_t offset = (size_t)p->index * BOAT_NET_PAGE_BYTES;
+    size_t expected
+        = b->bytes - offset < BOAT_NET_PAGE_BYTES ? b->bytes - offset : BOAT_NET_PAGE_BYTES;
+    if (p->size != expected) {
+        definition_fail(c, 1);
+        return;
+    }
+    memcpy(c->definition_assembly + offset, p->data, p->size);
+    c->definition_page_received[p->index] = true;
+    ++c->definition_pages_received;
+}
+
+static void definition_end(BoatNetClient *c, uint32_t id)
+{
+    const BoatNetDefinitionBegin *b = &c->definition_begin;
+    if (!c->defining || id != b->definition || c->definition_pages_received != b->pages
+        || boat_net_bytes_digest(c->definition_assembly, b->bytes) != b->digest) {
+        definition_fail(c, 1);
+        return;
+    }
+    BoatRoomDefinition room;
+    BoatRoomDiagnostic diagnostic;
+    if (!boat_room_definition_decode(c->definition_assembly, b->bytes, &room, &diagnostic)) {
+        definition_fail(c, 1);
+        return;
+    }
+    c->room = room;
+    c->room_valid = true;
+    c->defining = false;
+    c->room_digest = b->digest;
+    c->stats.definition_bytes += b->bytes;
+}
+
 static void page(BoatNetClient *c, const BoatNetWorldPage *p)
 {
     const BoatNetWorldBegin *b = &c->begin;
@@ -433,6 +496,18 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
     case BOAT_NET_ROSTER:
         c->roster = m.roster;
         break;
+    case BOAT_NET_DEFINITION_BEGIN:
+        c->definition_begin = m.definition_begin;
+        c->defining = true;
+        c->definition_pages_received = 0;
+        memset(c->definition_page_received, 0, sizeof(c->definition_page_received));
+        break;
+    case BOAT_NET_DEFINITION_PAGE:
+        definition_page(c, &m.world_page);
+        break;
+    case BOAT_NET_DEFINITION_END:
+        definition_end(c, m.checkpoint);
+        break;
     case BOAT_NET_WORLD_BEGIN:
         c->begin = m.world_begin;
         c->assembling = true;
@@ -443,8 +518,13 @@ static void message(BoatNetClient *c, const BoatNetEvent *event, double now)
         page(c, &m.world_page);
         break;
     case BOAT_NET_WORLD_END:
-        if (c->assembling && m.checkpoint == c->begin.checkpoint)
-            install(c, now);
+        if (c->assembling && m.checkpoint == c->begin.checkpoint) {
+            if (!c->room_valid || c->room.mode != c->accept.mode
+                || c->room.location != c->accept.location)
+                definition_fail(c, 1);
+            else
+                install(c, now);
+        }
         break;
     case BOAT_NET_COMBAT_PAGE:
     case BOAT_NET_SNAPSHOT:
@@ -514,6 +594,11 @@ double boat_net_client_server_tick(const BoatNetClient *c, double now)
 const BoatFleet *boat_net_client_view(const BoatNetClient *c)
 {
     return c->predict ? &c->prediction.fleet : &c->fleet;
+}
+
+const BoatRoomDefinition *boat_net_client_room(const BoatNetClient *c)
+{
+    return c->room_valid ? &c->room : NULL;
 }
 
 // One command per local tick, aimed at the estimated server tick plus the lead.
@@ -734,6 +819,10 @@ const char *boat_net_client_failure(const BoatNetClient *c)
 {
     if (c->phase == BOAT_NET_CLIENT_REJECTED)
         return boat_net_reject_text(c->reject.reason);
+    if (c->definition_error == 1)
+        return "the room definition was malformed or did not match its digest";
+    if (c->definition_error == 2)
+        return "the room definition and checkpoint combat rules differ";
     if (c->timed_out == 1)
         return "no answer within 10 s (is the room running and its network endpoint reachable?)";
     if (c->timed_out == 2)

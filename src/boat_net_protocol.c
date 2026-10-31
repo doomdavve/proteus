@@ -1,5 +1,4 @@
 #include "boat_net_protocol.h"
-#include "waterfront_harbor.h"
 
 #include <assert.h>
 #include <float.h>
@@ -430,7 +429,15 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         put64(w, m->world_begin.digest);
         put64(w, m->world_begin.fleet_hash);
         break;
+    case BOAT_NET_DEFINITION_BEGIN:
+        put32(w, m->definition_begin.definition);
+        put32(w, m->definition_begin.bytes);
+        put16(w, m->definition_begin.pages);
+        put16(w, 0);
+        put64(w, m->definition_begin.digest);
+        break;
     case BOAT_NET_COMBAT_PAGE:
+    case BOAT_NET_DEFINITION_PAGE:
     case BOAT_NET_WORLD_PAGE:
         put32(w, m->world_page.checkpoint);
         put16(w, m->world_page.index);
@@ -442,6 +449,7 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
         break;
     case BOAT_NET_WORLD_END:
     case BOAT_NET_READY:
+    case BOAT_NET_DEFINITION_END:
         put32(w, m->checkpoint);
         put32(w, 0);
         break;
@@ -540,9 +548,8 @@ static size_t encode_payload(const BoatNetMessage *m, Writer *w)
     case BOAT_NET_RACE_STATE: {
         const BoatNetRaceState *rs = &m->race;
         put8(w, rs->phase);
-        put8(w, rs->course);
         put8(w, rs->placed);
-        put8(w, 0);
+        put16(w, 0);
         put16(w, rs->recovery_ticks);
         put16(w, rs->skip_ticks);
         put16(w, rs->park_ticks);
@@ -711,7 +718,19 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, b->pages == (b->bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
         break;
     }
+    case BOAT_NET_DEFINITION_BEGIN: {
+        BoatNetDefinitionBegin *b = &m->definition_begin;
+        b->definition = get32(r);
+        b->bytes = get32(r);
+        b->pages = get16(r);
+        reserved(r, 2);
+        b->digest = get64(r);
+        expect(r, b->bytes && b->bytes <= BOAT_NET_MAX_DEFINITION);
+        expect(r, b->pages == (b->bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+        break;
+    }
     case BOAT_NET_COMBAT_PAGE:
+    case BOAT_NET_DEFINITION_PAGE:
     case BOAT_NET_WORLD_PAGE: {
         BoatNetWorldPage *p = &m->world_page;
         p->checkpoint = get32(r);
@@ -738,6 +757,7 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
     }
     case BOAT_NET_WORLD_END:
     case BOAT_NET_READY:
+    case BOAT_NET_DEFINITION_END:
         m->checkpoint = get32(r);
         reserved(r, 4);
         break;
@@ -873,11 +893,9 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         BoatNetRaceState *rs = &m->race;
         rs->phase = get8(r);
         expect(r, rs->phase <= BOAT_RACE_RESULTS);
-        rs->course = get8(r);
-        expect(r, rs->course < BOAT_NET_COURSE_LIMIT);
         rs->placed = get8(r);
         expect(r, rs->placed <= BOAT_FLEET_SLOTS);
-        reserved(r, 1);
+        reserved(r, 2);
         rs->recovery_ticks = get16(r);
         rs->skip_ticks = get16(r);
         expect(r, rs->skip_ticks <= rs->recovery_ticks);
@@ -1009,6 +1027,9 @@ BoatNetChannel boat_net_channel(uint8_t type)
     case BOAT_NET_WORLD_BEGIN:
     case BOAT_NET_WORLD_PAGE:
     case BOAT_NET_WORLD_END:
+    case BOAT_NET_DEFINITION_BEGIN:
+    case BOAT_NET_DEFINITION_PAGE:
+    case BOAT_NET_DEFINITION_END:
         return BOAT_NET_BOOTSTRAP;
     default:
         return BOAT_NET_CONTROL;
@@ -1091,10 +1112,6 @@ uint64_t boat_net_content_digest(void)
     if (ready)
         return cached;
     Digest d = { UINT64_C(14695981039346656037) };
-    BoatCombat combat = { .enabled = true, .rules = boat_combat_default_rules() };
-    uint8_t combat_bytes[BOAT_COMBAT_BYTES];
-    boat_combat_encode(&combat, combat_bytes);
-    digest_bytes(&d, combat_bytes, sizeof(combat_bytes));
     digest_float(&d, BOAT_CANNON_LIFT);
     digest_float(&d, BOAT_CANNON_GRAVITY);
     digest_float(&d, BOAT_CANNON_RADIUS);
@@ -1138,49 +1155,12 @@ uint64_t boat_net_content_digest(void)
         digest_u64(&d, contract[i]);
     digest_float(&d, BOAT_FLEET_MASS);
     digest_float(&d, BOAT_CONTACT_RESTITUTION);
-    // Race courses: every client predicts the grid hold and the course source from this data.
-    const BoatRaceCourse *course = boat_race_river_course();
-    const BoatRaceGate *gates[1 + BOAT_RACE_GATES] = { &course->start };
-    for (unsigned i = 0; i < course->gate_count; ++i)
-        gates[1 + i] = &course->gates[i];
-    digest_u64(&d, course->gate_count);
-    for (unsigned i = 0; i <= course->gate_count; ++i) {
-        digest_float(&d, gates[i]->centre.x);
-        digest_float(&d, gates[i]->centre.y);
-        digest_float(&d, gates[i]->direction.x);
-        digest_float(&d, gates[i]->direction.y);
-        digest_float(&d, gates[i]->half_width);
-    }
-    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
-        digest_float(&d, course->grid[i].x);
-        digest_float(&d, course->grid[i].y);
-    }
-    const BoatVesselWake *v = &course->source;
-    const float source[]
-        = { v->origin.x, v->origin.y, v->direction.x, v->direction.y, (float)v->started, v->speed,
-              v->height, v->duration, v->lifetime, v->wavelength, v->spread, v->half_width };
-    for (size_t i = 0; i < sizeof(source) / sizeof(*source); ++i)
-        digest_float(&d, source[i]);
-    const float storm[] = { course->storm.centre.x, course->storm.centre.y, course->storm.radius,
-        course->storm.height, (float)course->storm.started, course->storm.velocity.x,
-        course->storm.velocity.y };
-    for (size_t i = 0; i < sizeof(storm) / sizeof(*storm); ++i)
-        digest_float(&d, storm[i]);
+    // Weather recipe revisions stay engine content. The course, rules and harbour contacts
+    // travel in the room definition instead.
     digest_u64(&d, 3); // Local storm recipe revision (CPU and production GLSL).
     digest_u64(&d, 2); // Ferry recipe revision: centred crest and tapered three-wave packet.
-    // Harbour obstacles on the mapped river locations: moored berths and the docked ferry.
-    const WaterfrontBerth *berths = waterfront_harbor_berths();
-    for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
-        digest_u64(&d, (uint64_t)berths[i].kind);
-        digest_float(&d, berths[i].position.x);
-        digest_float(&d, berths[i].position.z);
-        digest_float(&d, berths[i].heading);
-    }
-    const WaterfrontFerry *ferry = waterfront_harbor_ferry();
-    const float hull[] = { ferry->position.x, ferry->position.z, ferry->heading, ferry->length,
-        ferry->beam, ferry->draft, ferry->height };
-    for (size_t i = 0; i < sizeof(hull) / sizeof(*hull); ++i)
-        digest_float(&d, hull[i]);
+    // Authored harbour contacts travel in the room definition, so only the contact recipe
+    // revision stays in the engine digest.
     digest_u64(&d, 1); // Harbour contact recipe revision: berth hulls, dock and ferry boxes.
     cached = d.value;
     ready = true;
@@ -1491,10 +1471,13 @@ void boat_net_lan_list_expire(BoatNetLanList *list, double now, double age)
 
 uint64_t boat_net_race_go(const BoatRace *race) { return race->round ? race->go_tick : 0; }
 
-void boat_net_race_bind(BoatFleet *fleet, uint8_t course, uint64_t go)
+void boat_net_race_bind(BoatFleet *fleet, const BoatRaceCourse *course, uint64_t go)
 {
-    (void)course; // BOAT_NET_COURSE_RIVER is the only course.
-    BoatRace race = { .round = go != 0, .go_tick = go, .course = *boat_race_river_course() };
+    if (!course) {
+        // Not a race room: the ambient water stays as the fleet was initialised.
+        return;
+    }
+    BoatRace race = { .round = go != 0, .go_tick = go, .course = *course };
     boat_race_bind(&race, fleet);
 }
 
@@ -1504,7 +1487,6 @@ void boat_net_race_state_of(const BoatRace *race, BoatNetRaceState *state)
     bool timed = race->phase == BOAT_RACE_GRID || race->phase == BOAT_RACE_COUNTDOWN
         || race->phase == BOAT_RACE_RESULTS;
     *state = (BoatNetRaceState) { .phase = (uint8_t)race->phase,
-        .course = BOAT_NET_COURSE_RIVER,
         .placed = (uint8_t)race->placed,
         .recovery_ticks
         = (uint16_t)(rules->recovery_ticks < UINT16_MAX ? rules->recovery_ticks : UINT16_MAX),
@@ -1544,10 +1526,9 @@ BoatNetRaceEvent boat_net_race_event_of(const BoatRace *race, const BoatRaceEven
 
 bool boat_net_race_state_equal(const BoatNetRaceState *a, const BoatNetRaceState *b)
 {
-    if (a->phase != b->phase || a->course != b->course || a->placed != b->placed
-        || a->recovery_ticks != b->recovery_ticks || a->skip_ticks != b->skip_ticks
-        || a->park_ticks != b->park_ticks || a->round != b->round || a->phase_end != b->phase_end
-        || a->go_tick != b->go_tick || a->deadline != b->deadline)
+    if (a->phase != b->phase || a->placed != b->placed || a->recovery_ticks != b->recovery_ticks
+        || a->skip_ticks != b->skip_ticks || a->park_ticks != b->park_ticks || a->round != b->round
+        || a->phase_end != b->phase_end || a->go_tick != b->go_tick || a->deadline != b->deadline)
         return false;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
         const BoatNetRaceRow *x = &a->slots[i], *y = &b->slots[i];

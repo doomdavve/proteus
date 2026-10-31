@@ -100,7 +100,7 @@ static float hull_surface(const Mesh3D *mesh, Transform3D hull, float x, float z
 
 static int cannon_attachment(Formation *f)
 {
-    boat_combat_enable(&f->fleet);
+    boat_combat_enable(&f->fleet, NULL);
     BoatWorld world = boat_fleet_world(&f->fleet);
     BoatViewState view = { 0 };
     BoatPresentation presentation = { 0 };

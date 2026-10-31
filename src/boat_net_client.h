@@ -11,7 +11,9 @@
 #define BOAT_NET_SNAPSHOT_SILENCE 10.0 // Hard ceiling without an applied authoritative state.
 #define BOAT_NET_HOLD_INCOMPLETE 0.1 // Seconds a prediction correction waits for missing births.
 #define BOAT_NET_MATCH_FEED 6 // Recent deathmatch or race events kept for the feed.
-#define BOAT_NET_EARLY_BOOTSTRAP (BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES + 2)
+// One definition and one checkpoint can both arrive before Accept: two full page sets plus
+// both ends. Bootstrap and control are separate reliable channels, so this ordering is real.
+#define BOAT_NET_EARLY_BOOTSTRAP (2 * (BOAT_NET_MAX_CHECKPOINT / BOAT_NET_PAGE_BYTES + 2))
 
 typedef struct {
     const char *name, *token, *build;
@@ -45,6 +47,7 @@ typedef struct {
     uint64_t snapshots, stale_snapshots, births_applied, births_duplicate, births_held;
     uint64_t births_dropped, bootstraps, bootstrap_failures, resyncs, decode_errors;
     uint64_t early_bootstrap; // Bootstrap messages held until Accept on the control channel.
+    uint64_t definition_bytes; // Definition bytes that installed successfully.
     uint64_t stale_packets, input_packets, commands, skipped_commands, pings, pongs;
     uint64_t consistent, inconsistent; // Snapshots whose wake digest matched on arrival.
     uint64_t repaired; // Mismatches later cleared by births.
@@ -110,6 +113,15 @@ typedef struct {
     uint32_t epoch;
     unsigned slot;
     BoatNetRoster roster;
+    // The room's package definition, installed before its checkpoint. READY waits for both.
+    BoatNetDefinitionBegin definition_begin;
+    bool defining, room_valid;
+    unsigned definition_pages_received;
+    bool definition_page_received[BOAT_NET_MAX_DEFINITION / BOAT_NET_PAGE_BYTES];
+    uint8_t definition_assembly[BOAT_NET_MAX_DEFINITION];
+    BoatRoomDefinition room;
+    uint64_t room_digest; // FNV-1a 64 of the encoded definition.
+    uint8_t definition_error; // 1 malformed/oversized, 2 checkpoint rules differ.
     // Deathmatch rooms: the authority's scoreboard and events, never predicted.
     bool match_valid;
     BoatNetMatchState match;
@@ -195,6 +207,8 @@ const BoatFleetSlot *boat_net_client_own(const BoatNetClient *client);
 double boat_net_client_server_tick(const BoatNetClient *client, double now);
 // The fleet to draw: the speculative one when predicting, else the mirror.
 const BoatFleet *boat_net_client_view(const BoatNetClient *client);
+// The installed room definition, or NULL before it validates. Read-only for the connection.
+const BoatRoomDefinition *boat_net_client_room(const BoatNetClient *client);
 // Text for a rejection or close, for the console.
 const char *boat_net_client_failure(const BoatNetClient *client);
 

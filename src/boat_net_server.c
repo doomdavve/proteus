@@ -19,36 +19,52 @@ bool boat_net_server_init(
 {
     if (!config || !boat_world_resources_ready(config->resources) || !config->epoch
         || config->max_players < 1 || config->max_players > BOAT_FLEET_SLOTS
-        || (config->token && strlen(config->token) > BOAT_NET_TOKEN_BYTES))
+        || (config->token && strlen(config->token) > BOAT_NET_TOKEN_BYTES) || !config->room
+        || config->room->location != config->resources->definition->id)
         return false;
+    const BoatRoomDefinition *room = config->room;
+    BoatRoomDiagnostic check;
+    if (!boat_room_definition_validate(room, &check))
+        return false;
+    bool deathmatch = room->mode == BOAT_ROOM_MODE_DEATHMATCH;
+    bool race = room->mode == BOAT_ROOM_MODE_RACE;
     BoatMatch match = { 0 };
-    if (config->deathmatch && !boat_match_init(&match, &config->match))
+    if (deathmatch && !boat_match_init(&match, &room->match_rules))
         return false;
-    BoatRace race = { 0 };
-    if (config->race
-        && (config->deathmatch || config->resources->definition->id != BOAT_LOCATION_RIVER
-            || !boat_race_init(&race, &config->race_rules, boat_race_river_course())))
+    BoatRace boat_race = { 0 };
+    if (race && !boat_race_init(&boat_race, &room->race_rules, &room->course))
         return false;
-    *server = (BoatNetServer) { .transport = transport, .config = *config };
+    // Encode once: every accepted client receives this exact definition before its checkpoint.
+    static uint8_t bytes[BOAT_ROOM_BYTES_MAX];
+    size_t size = boat_room_definition_encode(room, bytes, sizeof(bytes));
+    if (!size)
+        return false;
+    *server = (BoatNetServer) { .transport = transport,
+        .config = *config,
+        .room = room,
+        .deathmatch = deathmatch,
+        .race_room = race };
+    memcpy(server->definition, bytes, size);
+    server->definition_bytes = (uint32_t)size;
     text_copy(server->token, config->token, BOAT_NET_TOKEN_BYTES);
     server->config.token = server->token;
     server->content_digest = boat_net_content_digest();
     const BoatWorldDefinition *definition = config->resources->definition;
-    if (!boat_fleet_init(&server->fleet, config->resources,
+    if (!boat_fleet_init_scene(&server->fleet, config->resources,
             boat_world_test_water(definition, config->waves, false, false), BOAT_OBJECT_LIFE_TICKS,
-            BOAT_OBJECT_DEFAULT_HEIGHT))
+            BOAT_OBJECT_DEFAULT_HEIGHT, room->has_scene ? &room->scene : NULL))
         return false;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         server->slot_peer[i] = -1;
     server->backlog_since = -1;
     server->next_checkpoint = 1;
-    if (config->deathmatch)
-        boat_combat_enable(&server->fleet);
+    if (deathmatch)
+        boat_combat_enable(&server->fleet, &room->combat_rules);
     server->match = match;
-    if (config->deathmatch)
+    if (deathmatch)
         boat_net_match_state_of(&server->match, &server->match_sent);
-    server->race = race;
-    if (config->race)
+    server->race = boat_race;
+    if (race)
         boat_net_race_state_of(&server->race, &server->race_sent);
     return true;
 }
@@ -158,7 +174,7 @@ static void drop_peer(BoatNetServer *s, unsigned peer, bool disconnect)
         return;
     bool owned = p->phase >= BOAT_NET_PEER_BOOTSTRAP;
     if (owned) {
-        if (s->config.race)
+        if (s->race_room)
             boat_race_leave(&s->race, &s->fleet, p->slot); // A running entrant becomes DNF.
         else
             boat_fleet_leave(&s->fleet, p->slot);
@@ -179,6 +195,38 @@ static void leave(BoatNetServer *s, unsigned peer, uint8_t reason)
         .leave = reason };
     send_message(s, peer, &m);
     drop_peer(s, peer, true);
+}
+
+static void send_definition(BoatNetServer *s, unsigned peer)
+{
+    // The definition is immutable for the connection: a resync reuses the one already installed.
+    uint32_t id = s->next_checkpoint++;
+    uint16_t pages
+        = (uint16_t)((s->definition_bytes + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+    BoatNetMessage m
+        = { .header = { .type = BOAT_NET_DEFINITION_BEGIN, .tick = s->fleet.state.tick },
+              .definition_begin = { .definition = id,
+                  .bytes = s->definition_bytes,
+                  .pages = pages,
+                  .digest = boat_net_bytes_digest(s->definition, s->definition_bytes) } };
+    send_message(s, peer, &m);
+    for (uint16_t page = 0; page < pages; ++page) {
+        size_t offset = (size_t)page * BOAT_NET_PAGE_BYTES;
+        size_t length = s->definition_bytes - offset < BOAT_NET_PAGE_BYTES
+            ? s->definition_bytes - offset
+            : BOAT_NET_PAGE_BYTES;
+        m = (BoatNetMessage) { .header
+            = { .type = BOAT_NET_DEFINITION_PAGE, .tick = s->fleet.state.tick },
+            .world_page
+            = { .checkpoint = id, .index = page, .count = pages, .size = (uint16_t)length } };
+        memcpy(m.world_page.data, s->definition + offset, length);
+        send_message(s, peer, &m);
+    }
+    m = (BoatNetMessage) {
+        .header = { .type = BOAT_NET_DEFINITION_END, .tick = s->fleet.state.tick }, .checkpoint = id
+    };
+    send_message(s, peer, &m);
+    s->stats.definition_bytes += s->definition_bytes;
 }
 
 static void send_checkpoint(BoatNetServer *s, unsigned peer)
@@ -269,21 +317,22 @@ static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h)
             .max_commands = BOAT_NET_MAX_COMMANDS,
             .max_future = BOAT_NET_MAX_FUTURE_TICKS,
             .tick_hz = BOAT_TICK_HZ,
-            .mode = s->config.race     ? BOAT_NET_MODE_RACE
-                : s->config.deathmatch ? BOAT_NET_MODE_DEATHMATCH
-                                       : BOAT_NET_MODE_FREE,
+            .mode = s->race_room ? BOAT_NET_MODE_RACE
+                : s->deathmatch  ? BOAT_NET_MODE_DEATHMATCH
+                                 : BOAT_NET_MODE_FREE,
             .wake_life_ticks = s->fleet.state.wakes.life_ticks,
             .crest_height = s->fleet.state.wakes.crest_height } };
     send_message(s, peer, &m);
     send_roster(s);
-    if (s->config.deathmatch) {
+    if (s->deathmatch) {
         m = match_state(s); // Join in progress: the current round and scores.
         send_message(s, peer, &m);
     }
-    if (s->config.race) {
+    if (s->race_room) {
         m = race_state(s); // Join in progress: the phase, clock and rows.
         send_message(s, peer, &m);
     }
+    send_definition(s, peer);
     send_checkpoint(s, peer);
 }
 
@@ -387,7 +436,7 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
         if (p->phase == BOAT_NET_PEER_BOOTSTRAP) {
             p->phase = BOAT_NET_PEER_READY;
             // A race places joiners itself: free boating while waiting, else the next grid.
-            if (!s->config.race || !boat_race_join(&s->race, &s->fleet, p->slot))
+            if (!s->race_room || !boat_race_join(&s->race, &s->fleet, p->slot))
                 boat_fleet_request_spawn(&s->fleet, p->slot);
             send_roster(s);
         }
@@ -411,11 +460,11 @@ static void message(BoatNetServer *s, unsigned peer, const BoatNetEvent *event, 
             BoatMatchOutput out = { 0 };
             // A deathmatch may hold a fresh capsize back or score a bailout first; a race
             // recovers behind the last cleared gate on its next observation.
-            if (s->config.race)
+            if (s->race_room)
                 boat_race_reset(&s->race, &s->fleet, p->slot);
-            else if (!s->config.deathmatch || boat_match_reset(&s->match, &s->fleet, p->slot, &out))
+            else if (!s->deathmatch || boat_match_reset(&s->match, &s->fleet, p->slot, &out))
                 boat_fleet_request_spawn(&s->fleet, p->slot);
-            if (s->config.deathmatch)
+            if (s->deathmatch)
                 match_output(s, &out);
         }
         break;
@@ -594,12 +643,12 @@ static void tick(BoatNetServer *s)
         inputs[i] = select_input(s, i, next);
     boat_fleet_step(&s->fleet, inputs);
     s->stats.emission_failures += s->fleet.stats.emission_failures;
-    if (s->config.deathmatch) {
+    if (s->deathmatch) {
         BoatMatchOutput out;
         boat_match_observe(&s->match, &s->fleet, &out);
         match_output(s, &out);
     }
-    if (s->config.race) {
+    if (s->race_room) {
         BoatRaceOutput out;
         boat_race_observe(&s->race, &s->fleet, &out);
         race_output(s, &out);

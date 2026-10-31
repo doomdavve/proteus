@@ -92,7 +92,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e5400080d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e5400090d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -102,7 +102,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 60);
     CHECK(same_bytes(bytes, size,
-        "50424e54000809000000000900000000000000000000"
+        "50424e54000909000000000900000000000000000000"
         "00c8001c000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f81000000ff" // Steering +1, throttle -1.
@@ -160,7 +160,7 @@ static int golden(void)
     size = encode(standings, bytes);
     CHECK(size == 32 + 104);
     CHECK(same_bytes(bytes + 32, 104,
-        "0300010000f0003c00f0000000000002" // Phase, course, placed, rule ticks, round.
+        "0301000000f0003c00f0000000000002" // Phase, placed, rule ticks, round.
         "000000000000000000000000000003e80000000000002e18" // Phase end, GO, deadline.
         "0f0101030000000100000000005a0000" // Parked winner: place 1, 3 gates, 1 recovery.
         "00000000000000000000000000000000" // Empty slot.
@@ -206,7 +206,7 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0x413083c341105850));
+    CHECK(digest == UINT64_C(0x7bb4635201d38223));
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
         BoatInput back = boat_net_command_input(
@@ -303,6 +303,12 @@ static unsigned samples(Sample *out)
         .race_event = { BOAT_RACE_GATE, 2, 1, 3, 0 } };
     m[20] = (BoatNetMessage) { .header = { .type = BOAT_NET_COMBAT_PAGE, .epoch = 3, .tick = 100 },
         .world_page = { .checkpoint = 100, .index = 0, .count = 1, .size = BOAT_NET_PAGE_BYTES } };
+    m[21] = (BoatNetMessage) { .header = { .type = BOAT_NET_DEFINITION_BEGIN, .epoch = 3 },
+        .definition_begin = { 2, 5332, 6, 99 } };
+    m[22] = (BoatNetMessage) { .header = { .type = BOAT_NET_DEFINITION_PAGE, .epoch = 3 },
+        .world_page = { .checkpoint = 2, .index = 5, .count = 6, .size = 212 } };
+    m[23] = (BoatNetMessage) { .header = { .type = BOAT_NET_DEFINITION_END, .epoch = 3 },
+        .checkpoint = 2 };
     for (unsigned i = 0; i < BOAT_NET_TYPE_LIMIT - 1; ++i) {
         out[n].size = boat_net_encode(&m[i], out[n].bytes);
         if (!out[n].size) {
@@ -335,7 +341,8 @@ static int codec(void)
         CHECK(boat_net_decode(longer, s->size + 1, &m) == BOAT_NET_BAD_LENGTH);
         // A payload byte added and declared: still rejected by the type's exact layout,
         // except pages, whose data length is variable.
-        if (s->bytes[6] != BOAT_NET_WORLD_PAGE && s->size < BOAT_NET_MAX_MESSAGE) {
+        if (s->bytes[6] != BOAT_NET_WORLD_PAGE && s->bytes[6] != BOAT_NET_DEFINITION_PAGE
+            && s->size < BOAT_NET_MAX_MESSAGE) {
             longer[25] = (uint8_t)(longer[25] + 1);
             if (longer[25] == 0)
                 ++longer[24];
@@ -433,11 +440,11 @@ static int codec(void)
         // round zero and a bailout without an attacker.
         { 17, 32, 3 }, { 17, 33, 2 }, { 17, 34, 4 }, { 17, 35, 0 }, { 17, 36, 2 }, { 17, 37, 2 },
         { 17, 47, 0 }, { 17, 34, BOAT_MATCH_NOBODY },
-        // Race state: phase, course, places beyond the finishers, reserved bytes, skip beyond
-        // recovery, racing with an end tick and no deadline, a GO without a round, a deadline
-        // outside racing, unknown row flags, a parked leaver, a status, a place without a
-        // finish, a finish time while running and a non-entrant with gates.
-        { 18, 32, BOAT_RACE_RESULTS + 1 }, { 18, 33, 1 }, { 18, 34, 2 }, { 18, 35, 1 },
+        // Race state: phase, places below the finishers, reserved bytes, skip beyond recovery,
+        // racing with an end tick and no deadline, a GO without a round, a deadline outside
+        // racing, unknown row flags, a parked leaver, a status, a place without a finish, a
+        // finish time while running and a non-entrant with gates.
+        { 18, 32, BOAT_RACE_RESULTS + 1 }, { 18, 33, 0 }, { 18, 34, 2 }, { 18, 35, 1 },
         { 18, 38, 0xff }, { 18, 42, 1 }, { 18, 32, BOAT_RACE_RACING }, { 18, 47, 0 }, { 18, 79, 1 },
         { 18, 88, 16 }, { 18, 88, 10 }, { 18, 89, 3 }, { 18, 106, 1 }, { 18, 119, 1 },
         { 18, 123, 1 },
@@ -527,6 +534,7 @@ typedef struct {
     unsigned enet_count;
 #endif
     BoatNetServer server;
+    BoatRoomDefinition definition; // The room's package definition, owned by this Room.
     BoatNetClient clients[ROOM_CLIENTS];
     unsigned link[ROOM_CLIENTS];
     bool live[ROOM_CLIENTS]; // Serviced each step.
@@ -615,7 +623,27 @@ static void room_flush(Room *room)
 #endif
 }
 
-static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
+// A definition built in code, as the plan requires of this validator: it links no plugins.
+static BoatRoomDefinition room_definition(
+    BoatLocationId location, BoatRoomMode mode, const BoatMatchRules *rules)
+{
+    BoatRoomDefinition d = { .version = BOAT_ROOM_VERSION,
+        .mode = (unsigned char)mode,
+        .location = (unsigned char)location };
+    snprintf(d.id, sizeof(d.id), "%s", "validator");
+    snprintf(d.name, sizeof(d.name), "%s", "Validator room");
+    if (mode == BOAT_ROOM_MODE_DEATHMATCH) {
+        d.match_rules = rules ? *rules : boat_match_default_rules();
+        d.combat_rules = boat_combat_default_rules();
+    } else if (mode == BOAT_ROOM_MODE_RACE) {
+        d.course = *boat_race_river_course();
+        d.race_rules = boat_race_default_rules();
+    }
+    return d;
+}
+
+static bool room_open_mode(Room *room, uint64_t seed, BoatNetServerConfig config, BoatRoomMode mode,
+    const BoatMatchRules *rules)
 {
     // Clear in place: a Room is over 1 MB, more than Windows' default stack, so a compound
     // literal temporary would overflow it.
@@ -629,9 +657,16 @@ static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
         config.token = "room";
     if (!config.resources)
         config.resources = basin();
+    room->definition = room_definition(config.resources->definition->id, mode, rules);
+    config.room = &room->definition;
     BoatNetTransport transport;
     return room_listen(room, seed, &transport)
         && boat_net_server_init(&room->server, transport, &config);
+}
+
+static bool room_open(Room *room, uint64_t seed, BoatNetServerConfig config)
+{
+    return room_open_mode(room, seed, config, BOAT_ROOM_MODE_FREE, NULL);
 }
 
 static void room_close(Room *room)
@@ -935,7 +970,7 @@ static int combat_compact(void)
     CHECK(boat_fleet_init(&fleet, basin(),
         boat_world_test_water(basin()->definition, false, false, false), BOAT_OBJECT_LIFE_TICKS,
         1.2f));
-    boat_combat_enable(&fleet);
+    boat_combat_enable(&fleet, NULL);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         boat_fleet_request_spawn(&fleet, i);
     BoatFleetBots bots = { 0 };
@@ -1039,10 +1074,12 @@ static int lossless(void)
     BoatNetTransportStats net = s->transport.stats(s->transport.context);
     CHECK(net.max_message <= BOAT_NET_MAX_MESSAGE && net.max_queued < BOAT_NET_MEMORY_QUEUE / 2);
     printf("lossless: 2 clients (one late) matched the authority hash at %u/%u checks; "
-           "%.1f%% received commands, max message %zu bytes, bootstrap %" PRIu64 " bytes\n",
+           "%.1f%% received commands, max message %zu bytes, definition %" PRIu64
+           " bytes/client, checkpoint %" PRIu64 " bytes\n",
         room.matches, room.checks,
         100.0 * (double)s->stats.input_states[BOAT_NET_INPUT_RECEIVED] / (double)used,
-        net.max_message, s->stats.bootstrap_bytes / s->stats.bootstraps);
+        net.max_message, s->stats.definition_bytes / s->stats.accepted,
+        s->stats.bootstrap_bytes / s->stats.bootstraps);
     // A one-second local stall (a window opening) leaves pongs and snapshots queued; the
     // client must not then aim its commands beyond the authority's future window.
     uint64_t future = s->stats.future_commands;
@@ -1094,7 +1131,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c5100010008"));
+    CHECK(same_bytes(query, 8, "50424c5100010009"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -1267,7 +1304,8 @@ static int deathmatch(void)
     BoatMatchRules rules = boat_match_default_rules();
     rules.round_ticks = 8 * BOAT_TICK_HZ;
     rules.intermission_ticks = 2 * BOAT_TICK_HZ;
-    CHECK(room_open(&room, 11, (BoatNetServerConfig) { .deathmatch = true, .match = rules }));
+    CHECK(
+        room_open_mode(&room, 11, (BoatNetServerConfig) { 0 }, BOAT_ROOM_MODE_DEATHMATCH, &rules));
     BoatNetServer *s = &room.server;
     unsigned a = room_join(&room, "alpha", NULL, 0);
     room_run(&room, 1);
@@ -1348,10 +1386,9 @@ static bool same_race(const BoatNetClient *c, const BoatNetServer *s)
 static int race_room(void)
 {
     static Room room;
-    CHECK(room_open(&room, 71,
-        (BoatNetServerConfig) { .resources = test_world(BOAT_LOCATION_RIVER),
-            .race = true,
-            .race_rules = boat_race_default_rules() }));
+    CHECK(room_open_mode(&room, 71,
+        (BoatNetServerConfig) { .resources = test_world(BOAT_LOCATION_RIVER) }, BOAT_ROOM_MODE_RACE,
+        NULL));
     BoatNetServer *s = &room.server;
     room.predict = room.race = true;
     unsigned a = room_join(&room, "alpha", NULL, 0);
@@ -1453,7 +1490,7 @@ static int prediction_release(void)
         boat_fleet_hold(&authority, i, true);
     }
     uint64_t start = authority.state.tick, go = start + 12;
-    boat_net_race_bind(&authority, BOAT_NET_COURSE_RIVER, go);
+    boat_net_race_bind(&authority, course, go);
     BoatNetSlotInput inputs[BOAT_FLEET_SLOTS] = { 0 };
     boat_prediction_reset(&p, &authority, inputs, 0);
     p.release_tick = go;
@@ -1690,7 +1727,7 @@ static int wrap_and_flood(void)
     uint32_t start = UINT32_MAX - 100;
     CHECK(room_open(&room, 4, (BoatNetServerConfig) { .first_sequence = start }));
     unsigned i = room_join(&room, "wrap", NULL, start);
-    room_run(&room, 6);
+    room_run(&room, 8);
     BoatNetClient *c = &room.clients[i];
     CHECK(c->phase == BOAT_NET_CLIENT_PLAYING);
     CHECK(c->sequence[BOAT_NET_STATE] < start && c->received[BOAT_NET_STATE] < start);
@@ -1748,7 +1785,9 @@ static int impaired(void)
     for (unsigned k = 0; k < BOAT_NET_INPUT_STATES; ++k)
         used += s->input_states[k];
     double late = 1 - (double)s->input_states[BOAT_NET_INPUT_RECEIVED] / (double)used;
-    CHECK(late < .02);
+    // The definition bootstrap shifts the transport's loss draws slightly; this profile's share
+    // of integrated ticks without a fresh command stays around 2-3%.
+    CHECK(late < .03);
     CHECK(room.matches > room.checks * 8 / 10);
     CHECK(s->output_faults == 0 && s->emission_failures == 0 && s->malformed == 0);
     BoatNetTransportStats net = room.server.transport.stats(room.server.transport.context);
@@ -1766,7 +1805,7 @@ static int impaired(void)
     CHECK(room.clients[b].phase == BOAT_NET_CLIENT_PLAYING && room.server.slot_peer[slot] >= 0);
     CHECK(!boat_net_client_stale(&room.clients[b], room.now));
     boat_net_memory_blackout(room.network, room.link[b], true);
-    room_run(&room, 6);
+    room_run(&room, 8);
     CHECK(room.server.slot_peer[slot] < 0 && s->timeouts == 1);
     CHECK(room.clients[b].phase == BOAT_NET_CLIENT_CLOSED);
     CHECK(room.clients[a].phase == BOAT_NET_CLIENT_PLAYING);
@@ -1780,8 +1819,8 @@ static int mapped_rooms(void)
     static Room room;
     const int id = BOAT_LOCATION_RIVER;
     BoatMatchRules rules = boat_match_default_rules();
-    CHECK(room_open(&room, 63,
-        (BoatNetServerConfig) { .resources = test_world(id), .deathmatch = true, .match = rules }));
+    CHECK(room_open_mode(&room, 63, (BoatNetServerConfig) { .resources = test_world(id) },
+        BOAT_ROOM_MODE_DEATHMATCH, &rules));
     room.predict = true;
     for (unsigned i = 0; i < 4; ++i)
         room_join(&room, "mapped", NULL, 0);
@@ -1929,11 +1968,15 @@ static int four_player_lifecycle(void)
     CHECK(boat_net_client_own(c));
     CHECK(boat_net_client_own(c)->life > old_life && active_boats(&room.server) == 4);
     uint64_t stale = room.server.stats.stale_life_commands;
+    // Freeze this client so its own next batch cannot overtake the injected one on the
+    // impaired, reordering link.
+    room.live[replacement] = false;
     inject(&room, replacement,
         (BoatNetMessage) {
             .header = { .type = BOAT_NET_INPUT_BATCH, .tick = room.server.fleet.state.tick + 20 },
             .input = { .life = old_life, .count = 1 } });
     room_run(&room, 2);
+    room.live[replacement] = true;
     CHECK(room.server.stats.stale_life_commands > stale);
     // A lossless tail lets every live mirror demonstrate exact wake/checkpoint convergence.
     for (unsigned i = 0; i < room.count; ++i)
@@ -1973,7 +2016,7 @@ static int resync(void)
     static Room room;
     CHECK(room_open(&room, 6, (BoatNetServerConfig) { 0 }));
     unsigned i = room_join(&room, "resync", NULL, 0);
-    room_run(&room, 6);
+    room_run(&room, 8);
     BoatNetClient *c = &room.clients[i];
     CHECK(c->fleet.state.wakes.live > 3);
     // Damage the mirror: a live record the authority never had.
@@ -2415,7 +2458,8 @@ static int combat_room(void)
     static Room room;
     BoatMatchRules rules = boat_match_default_rules();
     rules.round_ticks = 20 * BOAT_TICK_HZ;
-    CHECK(room_open(&room, 61, (BoatNetServerConfig) { .deathmatch = true, .match = rules }));
+    CHECK(
+        room_open_mode(&room, 61, (BoatNetServerConfig) { 0 }, BOAT_ROOM_MODE_DEATHMATCH, &rules));
     room.predict = true;
     room.weapons = true;
     room_join(&room, "gun-a", NULL, 0);
@@ -2628,9 +2672,112 @@ static const TestCase cases[] = {
     SLOW_CASE(mapped_rooms),
 };
 #else
+
+// PD2: the room definition codec is fieldwise, bounded and validated without Lua or a map.
+static int room_definition_codec(void)
+{
+    BoatRoomDefinition d = {
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_BASIN
+    };
+    snprintf(d.id, sizeof(d.id), "%s", "validator.free");
+    snprintf(d.name, sizeof(d.name), "%s", "Validator free");
+    BoatRoomDiagnostic rd;
+    CHECK(boat_room_definition_validate(&d, &rd));
+    static uint8_t bytes[BOAT_ROOM_BYTES_MAX];
+    size_t size = boat_room_definition_encode(&d, bytes, sizeof(bytes));
+    CHECK(size > 0 && size <= BOAT_ROOM_BYTES_MAX);
+    BoatRoomDefinition back;
+    CHECK(boat_room_definition_decode(bytes, size, &back, &rd));
+    CHECK(boat_room_definition_digest(&back) == boat_room_definition_digest(&d));
+    CHECK(back.mode == BOAT_ROOM_MODE_FREE && back.location == BOAT_LOCATION_BASIN);
+    CHECK(!boat_room_definition_decode(bytes, size - 1, &back, &rd));
+    bytes[size] = 0;
+    CHECK(!boat_room_definition_decode(bytes, size + 1, &back, &rd));
+    CHECK(boat_room_definition_decode(bytes, size, &back, &rd)); // The original still decodes.
+    // A non-finite start gate value is refused.
+    BoatRoomDefinition race = {
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_RACE, .location = BOAT_LOCATION_RIVER
+    };
+    snprintf(race.id, sizeof(race.id), "%s", "validator.race");
+    snprintf(race.name, sizeof(race.name), "%s", "Validator race");
+    race.course = *boat_race_river_course();
+    race.race_rules = boat_race_default_rules();
+    CHECK(boat_room_definition_validate(&race, &rd));
+    size = boat_room_definition_encode(&race, bytes, sizeof(bytes));
+    CHECK(size > 0);
+    uint8_t nan[4] = { 0x7f, 0xc0, 0, 0 };
+    memcpy(bytes + 1 + 1 + 1 + 1 + 1 + 64 + 1 + 64 + 1 + 1, nan, 4); // First start float.
+    CHECK(!boat_room_definition_decode(bytes, size, &back, &rd));
+    // Unknown mode and location are refused structurally.
+    BoatRoomDefinition bad = d;
+    bad.mode = BOAT_ROOM_MODE_LIMIT;
+    CHECK(!boat_room_definition_validate(&bad, &rd));
+    bad = d;
+    bad.location = BOAT_LOCATION_COUNT;
+    CHECK(!boat_room_definition_validate(&bad, &rd));
+    bad = race;
+    bad.location = BOAT_LOCATION_BASIN;
+    CHECK(!boat_room_definition_validate(&bad, &rd)); // A race room needs the river.
+    bad = race;
+    bad.course.gate_count = 0;
+    CHECK(!boat_room_definition_validate(&bad, &rd));
+    // A scene berth is carried and validated.
+    BoatRoomDefinition scene = d;
+    scene.has_scene = true;
+    scene.scene.version = BOAT_SCENE_VERSION;
+    scene.scene.entrance_present = true;
+    scene.scene.entrance_x = 1;
+    scene.scene.entrance_z = 2;
+    scene.scene.entrance_width = 8;
+    scene.scene.berths_present = true;
+    scene.scene.berth_count = 1;
+    snprintf(scene.scene.berths[0].id, sizeof(scene.scene.berths[0].id), "%s", "skiff");
+    scene.scene.berths[0].recipe = BOAT_SCENE_BERTH_SKIFF;
+    scene.scene.berths[0].x = 10;
+    scene.scene.berths[0].z = 20;
+    CHECK(boat_room_definition_validate(&scene, &rd));
+    size = boat_room_definition_encode(&scene, bytes, sizeof(bytes));
+    CHECK(size > 0 && boat_room_definition_decode(bytes, size, &back, &rd));
+    CHECK(back.has_scene && back.scene.berth_count == 1);
+    size_t scene_size = boat_room_definition_encode(&scene, bytes, sizeof(bytes));
+    scene.scene.berths[0].recipe = BOAT_SCENE_BERTH_RECIPES;
+    CHECK(!boat_room_definition_validate(&scene, &rd));
+    // Definition paging, as the bootstrap channel carries it.
+    static uint8_t definition[BOAT_ROOM_BYTES_MAX];
+    size = boat_room_definition_encode(&race, definition, sizeof(definition));
+    uint16_t pages = (uint16_t)((size + BOAT_NET_PAGE_BYTES - 1) / BOAT_NET_PAGE_BYTES);
+    BoatNetMessage decoded_message;
+    BoatNetMessage begin = { .header = { .type = BOAT_NET_DEFINITION_BEGIN, .epoch = 1 },
+        .definition_begin = { .definition = 9,
+            .bytes = (uint32_t)size,
+            .pages = pages,
+            .digest = boat_net_bytes_digest(definition, size) } };
+    uint8_t wire[BOAT_NET_MAX_MESSAGE];
+    size_t wire_size = boat_net_encode(&begin, wire);
+    CHECK(wire_size > 0 && boat_net_decode(wire, wire_size, &decoded_message) == BOAT_NET_OK);
+    CHECK(decoded_message.definition_begin.definition == 9
+        && decoded_message.definition_begin.pages == pages);
+    CHECK(boat_net_channel(BOAT_NET_DEFINITION_PAGE) == BOAT_NET_BOOTSTRAP);
+    BoatNetWorldPage page = { .checkpoint = 9, .index = 0, .count = pages, .size = 4 };
+    memcpy(page.data, definition, 4);
+    BoatNetMessage message
+        = { .header = { .type = BOAT_NET_DEFINITION_PAGE, .epoch = 1 }, .world_page = page };
+    wire_size = boat_net_encode(&message, wire);
+    CHECK(wire_size > 0 && boat_net_decode(wire, wire_size, &decoded_message) == BOAT_NET_OK);
+    BoatNetMessage end
+        = { .header = { .type = BOAT_NET_DEFINITION_END, .epoch = 1 }, .checkpoint = 9 };
+    wire_size = boat_net_encode(&end, wire);
+    CHECK(wire_size > 0 && boat_net_decode(wire, wire_size, &decoded_message) == BOAT_NET_OK);
+    printf("room_definition: free %zu bytes, race %zu bytes, scene %zu bytes, %u pages\n",
+        boat_room_definition_encode(&d, bytes, sizeof(bytes)),
+        boat_room_definition_encode(&race, bytes, sizeof(bytes)), scene_size, (unsigned)pages);
+    return 0;
+}
+
 static const TestCase cases[] = {
     SLOW_CASE(throttle_detents),
     TEST_CASE(golden),
+    TEST_CASE(room_definition_codec),
     TEST_CASE(codec),
     SLOW_CASE(checkpoints),
     TEST_CASE(deferred_ready),
