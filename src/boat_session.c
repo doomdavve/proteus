@@ -98,8 +98,7 @@ void boat_session_recover(BoatSession *session)
 void boat_session_rebind_voyage(BoatSession *session, const BoatVoyageRoute *route)
 {
     session->voyage_route = route;
-    if (session->voyage.route)
-        session->voyage.route = route;
+    session->voyage.route = route;
 }
 
 void boat_session_rebind_voyage_live(BoatSession *session, const BoatVoyageRoute *route,
