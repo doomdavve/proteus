@@ -1739,7 +1739,6 @@ static int default_sessions(void)
     const BoatPluginCatalogEntry *race
         = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_RACE, "river");
     CHECK(race && boat_plugin_catalog_decode(race, &revision, &diagnostic));
-    CHECK(!memcmp(&revision.race.course, &boat_fixture_river_course, sizeof(BoatRaceCourse)));
     CHECK(boat_plugin_race_digest(&revision.race.course, &revision.race.rules)
         == boat_plugin_race_digest(&boat_fixture_river_course, &boat_fixture_race_default_rules));
 

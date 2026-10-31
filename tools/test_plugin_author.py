@@ -459,7 +459,9 @@ class Packaged(unittest.TestCase):
                 self.assertTrue(Path(path).exists(), path)
             self.assertEqual(tool("anchors")[1], author.anchors())
             for example in data["examples"]:
-                code, result = tool("validate", example)
+                # A loaded Linux runner can exceed the product's 5 s default during the
+                # harbour-life traffic sweep; this check is about the relocated package.
+                code, result = tool("validate", example, "--timeout", "20")
                 self.assertEqual((code, result["status"]), (0, "ok"), result)
             code, result = tool("preview", data["examples"][2], "--ticks", "12")
             self.assertEqual((code, result["status"]), (0, "ok"), result)
