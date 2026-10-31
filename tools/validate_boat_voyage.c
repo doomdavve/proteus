@@ -4,6 +4,7 @@
  * at controlled speed and recovers to the last shelter; the bearing cue turns the way right
  * steering turns the boat; and an autopiloted boat from the east shore arrives at Långedrag.
  * A3.5: the exposure is calm until the boat comes within range, then grows smoothly. */
+#include "boat_fixtures.h"
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
@@ -311,10 +312,12 @@ int main(void)
     cabin_session.handling = &boat_handling_cabin;
     boat_session_restart(&cabin_session, flat);
     CHECK(cabin_session.handling == &boat_handling_cabin);
+    boat_session_set_course_definition(&cabin_session, &boat_fixture_course_default);
     boat_session_start_course(&cabin_session);
     CHECK(cabin_session.course.enabled);
     BoatSession course_standard;
     boat_session_init(&course_standard, &world, flat);
+    boat_session_set_course_definition(&course_standard, &boat_fixture_course_default);
     boat_session_start_course(&course_standard);
     cabin_session.presentation_enabled = false;
     course_standard.presentation_enabled = false;

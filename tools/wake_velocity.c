@@ -920,8 +920,9 @@ static int study(int argc, char **argv)
     // A replay or ghost is recorded against one exact course; only the compiled/bundled course
     // may be replayed while other course packages remain playable.
     if ((replay_path || ghost_path)
-        && boat_course_digest(session.course_definition) != boat_course_compiled_digest()) {
-        fprintf(stderr, "--replay and --ghost need the default time-trial course.\n");
+        && (!session.course_definition
+            || boat_course_digest(session.course_definition) != BOAT_COURSE_STANDARD_DIGEST)) {
+        fprintf(stderr, "--replay and --ghost need the standard time-trial course.\n");
         goto cleanup;
     }
     BoatReplayFlag playback_flag = { 0 }, ghost_flag = { 0 };

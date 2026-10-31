@@ -931,10 +931,11 @@ target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # Validators and review tools compare packages against the shipped fixture values.
-foreach(target validate_boat validate_boat_replay validate_boat_core validate_boat_voyage
-    validate_boat_plugin validate_boat_plugin_session validate_boat_plugin_catalog
-    validate_boat_minimap validate_boat_combat validate_boat_match validate_boat_plugin_race
-    validate_boat_race validate_boat_net validate_boat_room_package boat_race_trial boat_hud_review)
+foreach(target validate_boat validate_boat_banking validate_boat_clock validate_boat_world
+    validate_boat_replay validate_boat_core validate_boat_voyage validate_boat_plugin
+    validate_boat_plugin_session validate_boat_plugin_catalog validate_boat_minimap
+    validate_boat_combat validate_boat_match validate_boat_plugin_race validate_boat_race
+    validate_boat_net validate_boat_room_package boat_race_trial boat_hud_review)
   target_link_libraries(${target} PRIVATE proteus_boat_fixtures)
 endforeach()
 # No networked client path may read the compiled river course.

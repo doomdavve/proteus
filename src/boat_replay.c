@@ -360,7 +360,7 @@ bool boat_replay_best_path(
     char *path, size_t size, const char *directory, bool waves, uint64_t course_digest)
 {
     int n;
-    if (course_digest == boat_course_compiled_digest())
+    if (course_digest == BOAT_COURSE_STANDARD_DIGEST)
         n = snprintf(path, size, "%s/course-%s-physics%d.run", directory, waves ? "waves" : "calm",
             BOAT_PHYSICS_REVISION);
     else

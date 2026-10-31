@@ -1,5 +1,6 @@
 /* C3 long-session clock gate: cheap direct-time checks and an opt-in simulated soak. */
 #include "boat_clock.h"
+#include "boat_fixtures.h"
 #include "boat_map.h"
 #include "boat_replay.h"
 #include "boat_session.h"
@@ -185,6 +186,7 @@ static int replay_world_time(void)
     const char *path = replay_path;
     BoatSession session;
     boat_session_init(&session, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    boat_session_set_course_definition(&session, &boat_fixture_course_default);
     boat_session_start_course(&session);
     boat_session_set_tick(&session, 30 * DAY_TICKS + 17);
     Boat *boat = &session.boat;

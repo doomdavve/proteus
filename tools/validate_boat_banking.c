@@ -1,4 +1,5 @@
 #include "boat_banking_fixture.h"
+#include "boat_fixtures.h"
 #include "boat_map.h"
 #include "boat_test_cases.h"
 #include "boat_test_session.h"
@@ -110,6 +111,7 @@ static int validate_core(void)
     CHECK(boat.boat.turn_roll_load == 0);
     boat.boat.turn_roll_load = 3;
     physics_session(&boat, BOAT_LOCATION_BASIN);
+    boat_session_set_course_definition(&boat, &boat_fixture_course_default);
     boat_session_start_course(&boat);
     CHECK(boat.boat.turn_roll_load == 0);
     // Saturated demand is a bounded torque, integrated through angular velocity.

@@ -1,5 +1,7 @@
 #include "boat_session.h"
 
+#include <assert.h>
+
 static void reset(BoatSession *session)
 {
     boat_reset_location(&session->boat, session->world.definition);
@@ -34,8 +36,8 @@ void boat_session_set_course_definition(
 
 void boat_session_start_course(BoatSession *session)
 {
-    const BoatCourseDefinition *definition
-        = session->course_definition ? session->course_definition : &boat_course_default;
+    assert(session->course_definition);
+    const BoatCourseDefinition *definition = session->course_definition;
     boat_reset(&session->boat);
     session->boat.position = definition->start;
     session->boat.heading = definition->heading;

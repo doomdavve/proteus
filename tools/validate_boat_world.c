@@ -2,6 +2,7 @@
  * follows physics without feeding it, at any display rate. S4 basin slice: the session's
  * physical step is the core-only order validate_boat_core uses. W4 extends this file with
  * map/cache lifecycle checks. */
+#include "boat_fixtures.h"
 #include "boat_map.h"
 #include "boat_test_cases.h"
 #include "boat_test_maps.h"
@@ -223,6 +224,7 @@ static int core_order(void)
 {
     static BoatSession session;
     start(&session, 1);
+    boat_session_set_course_definition(&session, &boat_fixture_course_default);
     boat_session_start_course(&session);
     session.presentation_enabled = false;
     BoatWorld world = session.world;
@@ -431,8 +433,10 @@ static bool participant_phase(Participant *p, int phase, Renderer3D *renderer, C
     BoatSession *s = &p->session;
     if (phase == 1)
         boat_session_respawn(s);
-    if (phase == 2 && p->script->course)
+    if (phase == 2 && p->script->course) {
+        boat_session_set_course_definition(s, &boat_fixture_course_default);
         boat_session_start_course(s);
+    }
     if (phase == 2)
         boat_session_restart(s, p->script->restart_water);
     if (phase < 3) {

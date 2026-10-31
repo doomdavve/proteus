@@ -4,6 +4,7 @@
  * that order against the session). */
 #include "boat.h"
 #include "boat_course.h"
+#include "boat_fixtures.h"
 #include "boat_map.h"
 #include "boat_test_world.h"
 #include "raymath.h"
@@ -100,18 +101,19 @@ static int interleaved(void)
 // Swept gate crossings at known fractions, in order, ending in a finish.
 static int course(void)
 {
-    BoatCourse course = { 0 };
-    boat_course_step(&course, BOAT_COURSE_START, (Vector2) { 0, 30 }, 1);
+    BoatCourse course = { .definition = &boat_fixture_course_default };
+    Vector2 start = boat_fixture_course_default.start;
+    boat_course_step(&course, start, (Vector2) { 0, 30 }, 1);
     CHECK(course.next_gate == 0 && course.crossing[0] == -1);
     course.enabled = true;
     boat_course_step(&course, (Vector2) { 13, 40 }, (Vector2) { 13, 30 }, 1);
     CHECK(course.next_gate == 0 && course.elapsed == 0); // Outside the first gate's half-width.
-    boat_course_step(&course, BOAT_COURSE_START, (Vector2) { 0, 30 }, 1);
+    boat_course_step(&course, start, (Vector2) { 0, 30 }, 1);
     CHECK(course.next_gate == 1 && course.crossing[0] == .75 && course.splits[0] == 0);
     CHECK(course.elapsed == .25);
     Vector2 previous = { 0, 30 };
     for (int gate = 1; gate < BOAT_COURSE_GATES; ++gate) {
-        Vector2 centre = boat_course_gates[gate].centre;
+        Vector2 centre = boat_fixture_course_gates[gate].centre;
         Vector2 before = { centre.x, centre.y + 1 }, after = { centre.x, centre.y - 1 };
         boat_course_step(&course, previous, before, 1);
         boat_course_step(&course, before, after, 1);
