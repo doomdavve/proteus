@@ -56,13 +56,13 @@
       this.makeWorker = makeWorker; this.timer = timer; this.clear = clear;
       this.jobs = new Map(); this.serial = 0; this.prepared = null;
     }
-    start(bytes, base) {
-      if (bytes.length > 8 + 4096 + 65536 || this.jobs.size >= 2 || this.serial === 0xffffffff) return 0;
+    start(bytes, base, mode = 'stage') {
+      if (bytes.length > 131072 || this.jobs.size >= 2 || this.serial === 0xffffffff) return 0;
       const id = ++this.serial;
-      const job = {bytes: bytes.slice(), base: base.slice(), state: 0, response: null};
+      const job = {bytes: bytes.slice(), base: base.slice(), state: 0, response: null, mode};
       job.promise = new Promise(resolve => { job.resolve = resolve; });
       this.jobs.set(id, job);
-      if (this.prepared && equal(bytes, this.prepared.bytes)) {
+      if (mode === 'stage' && this.prepared && equal(bytes, this.prepared.bytes)) {
         const prepared = this.prepared; this.prepared = null; // One receipt, one request.
         this.finish(id, sameBase(base, prepared.base) ? prepared.result : null);
         return id;
@@ -71,11 +71,12 @@
         job.worker = this.makeWorker();
         job.worker.onmessage = event => this.finish(id, event.data);
         job.worker.onerror = () => this.finish(id, null);
-        job.deadline = this.timer(() => this.finish(id, null), 5000);
-        job.worker.postMessage({bytes: job.bytes});
+        job.deadline = this.timer(() => this.finish(id, null), 15000);
+        job.worker.postMessage({bytes: job.bytes, mode});
       } catch (_) { this.finish(id, null); }
       return id;
     }
+    query(bytes, base) { return this.start(bytes, base, 'query'); }
     finish(id, result) {
       const job = this.jobs.get(id);
       if (!job || job.state) return; // Late results from canceled/expired workers are inert.
@@ -93,7 +94,7 @@
         job.failure = result && result.bytes instanceof Uint8Array
           ? 'Worker replied with an unrecognised result'
           : result && typeof result.error === 'string' ? result.error
-          : 'Worker failed or reached its five-second deadline';
+          : 'Worker failed or reached its deadline';
       }
       job.resolve({state: job.state, bytes: job.response, base: job.base, failure: job.failure});
     }
@@ -212,11 +213,19 @@
     };
     get('plugin-export').onclick = () => {
       try {
-        const url = URL.createObjectURL(new Blob([encode(current())],
-          {type: 'application/json'}));
-        const link = document.createElement('a'); link.href = url;
-        link.download = 'voyage.wake-plugin.json'; link.click(); URL.revokeObjectURL(url);
+        const data = current();
+        downloadBundle(data.manifest, data.source);
       } catch (error) { show(error.message); }
+    };
+    function downloadBundle(manifestText, sourceText) {
+      const url = URL.createObjectURL(new Blob([encode(bundle(manifestText, sourceText))],
+        {type: 'application/json'}));
+      const link = document.createElement('a'); link.href = url;
+      link.download = 'voyage.wake-plugin.json'; link.click(); URL.revokeObjectURL(url);
+    }
+    // The native console's /save reaches this export path instead of writing a directory.
+    Module.boatPluginExport = (manifestBytes, sourceBytes) => {
+      downloadBundle(new TextDecoder().decode(manifestBytes), new TextDecoder().decode(sourceBytes));
     };
     get('plugin-import').onchange = async event => {
       cancel(); const request = sequence;

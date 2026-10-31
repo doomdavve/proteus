@@ -24,6 +24,23 @@ self.onmessage = async ({data}) => {
         wasmBytes: runtime.boatPluginHeap.buffer.byteLength});
       return;
     }
+    if (data.mode === 'query') {
+      if (!(data.bytes instanceof Uint8Array) || data.bytes.length > 131072)
+        throw Error('Invalid query frame');
+      const create = (await import(data.runtime)).default;
+      let offset = 0;
+      const output = [];
+      const runtime = await create({
+        locateFile: () => data.wasm,
+        stdin: () => offset < data.bytes.length ? data.bytes[offset++] : null,
+        stdout: byte => { if (output.length >= 16384) throw Error('Worker output exceeds limit'); output.push(byte); },
+        stderr: () => {},
+        print: () => {}, printErr: () => {}
+      });
+      const exit = runtime._boat_plugin_query_worker();
+      self.postMessage({exit, bytes: new Uint8Array(output)});
+      return;
+    }
     if (!(data.bytes instanceof Uint8Array) || data.bytes.length > 8 + 4096 + 65536)
       throw Error('Invalid package frame');
     const view = new DataView(data.bytes.buffer, data.bytes.byteOffset, data.bytes.byteLength);

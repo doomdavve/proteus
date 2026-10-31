@@ -116,6 +116,9 @@ installBoatPluginAuthor(Module, Module.boatWebFiles, () => FS, startSession, doc
 canvas.addEventListener('click', () => canvas.focus());
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 canvas.addEventListener('keydown', event => {
+  // The live console reads text through GetCharPressed; preventDefault on keydown suppresses the
+  // keypress that carries a space or another printable character.
+  if (Module.boatConsoleOpen) return;
   if (['Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3', 'F5', 'F6', 'F7'].includes(event.key))
     event.preventDefault();
 });

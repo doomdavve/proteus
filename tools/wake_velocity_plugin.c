@@ -90,8 +90,11 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory)
             boat_plugin_status_name(d.status), d.file, d.field, d.message);
         return NULL;
     }
-    if (strcmp(manifest.kind, "voyage")) {
-        fprintf(stderr, "--plugin requires a voyage; use boat_race_trial for race plugins.\n");
+    BoatPluginKind kind = boat_plugin_kind_parse(manifest.kind);
+    if (kind != BOAT_PLUGIN_KIND_VOYAGE && kind != BOAT_PLUGIN_KIND_FREE
+        && kind != BOAT_PLUGIN_KIND_COURSE) {
+        fprintf(stderr,
+            "--plugin accepts voyage, free and course packages; race and match run in rooms.\n");
         return NULL;
     }
     return boat_location_find(manifest.location);
@@ -467,13 +470,22 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
         break;
     }
     bind_scene(plugin, session);
+    uint64_t digest = 0;
+    switch (plugin->host.kind) {
+    case BOAT_PLUGIN_KIND_VOYAGE: digest = active->voyage.digest; break;
+    case BOAT_PLUGIN_KIND_RACE: digest = active->race.digest; break;
+    case BOAT_PLUGIN_KIND_FREE: digest = active->free.digest; break;
+    case BOAT_PLUGIN_KIND_COURSE: digest = active->course.digest; break;
+    case BOAT_PLUGIN_KIND_MATCH: digest = active->match.digest; break;
+    default: break;
+    }
     report(plugin, "active", false,
 #ifdef __EMSCRIPTEN__
         "PLUGIN PANEL: STAGE / APPLY / UNDO",
 #else
         "F5 RELOAD / F6 UNDO / SAVES RELOAD",
 #endif
-        "%s R1 ACTIVE", active->manifest.name);
+        "%s R1 ACTIVE %016llx", active->manifest.id, (unsigned long long)digest);
     return true;
 }
 
