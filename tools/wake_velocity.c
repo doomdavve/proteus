@@ -23,6 +23,8 @@
 #if !defined(__EMSCRIPTEN__)
 #include "boat_plugin_catalog.h"
 #endif
+#include "wake_command.h"
+#include "wake_console.h"
 #include "wake_velocity_plugin.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_bridge.h"
@@ -181,6 +183,7 @@ static void usage(void)
     cli_usage_line(stdout, "C", "Reset view");
     cli_usage_line(stdout, "F3", "Toggle the debug profiler");
     cli_usage_line(stdout, "F5 / F6 / F7", "Plugin: reload / undo / apply migration or restart");
+    cli_usage_line(stdout, "F2 or `", "Live console: edits apply without a reset; /help, /save");
     puts("");
     cli_usage_line(
         stdout, "Course", "G ghost on/off | L/B last/best replay | Space pause | Enter restart");
@@ -258,6 +261,7 @@ static void draw_help(
         "Hold Shift: low-power maneuvering",
         voyage ? "Hold Backspace 1 s: back to last shelter" : "Hold Backspace 1 s: reset / restart",
         plugin ? "F5: reload plugin | F6: undo | F7: apply" : "",
+        plugin ? "F2 or `: live console (/help, /save)" : "",
         deathmatch ? "Space: water | E: stern wave | Q: torpedo | Tab: scores"
             : race ? "Hold Tab: race standings"
                    : "",
@@ -370,6 +374,15 @@ static double plugin_time(void)
     return GetTime();
 #endif
 }
+
+#ifdef PROTEUS_BOAT_PLUGINS
+static bool console_save(
+    void *context, const WakePlugin *plugin, const char *directory, char *message, size_t capacity)
+{
+    (void)context;
+    return wake_plugin_save(plugin, directory, message, capacity);
+}
+#endif
 
 static int study(int argc, char **argv)
 {
@@ -851,6 +864,10 @@ static int study(int argc, char **argv)
 #ifdef PROTEUS_BOAT_PLUGINS
     // Owns the revisions the session borrows, so it outlives the session (static, like WORLDS).
     static WakePlugin plugin;
+    static WakeConsole console;
+    static WakeCommand command;
+    wake_console_init(&console);
+    wake_command_init(&command, wake_console_print, wake_console_clear, console_save, &console);
     if (plugin_path) {
         if (!wake_plugin_open(&plugin, plugin_path, &session, plugin_time())) {
             snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
@@ -871,11 +888,13 @@ static int study(int argc, char **argv)
     static char stage_executable[2048];
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
         GetFileName(argv[0]));
-    if (plugin_path)
+    if (plugin_active)
         plugin.stage_executable = stage_executable;
     static WakeBridge bridge;
     if (bridge_path && !wake_bridge_open(&bridge, bridge_path, GetTime()))
         goto cleanup;
+    if (bridge_path)
+        wake_bridge_commands(&bridge, &command);
 #endif
 #endif
     if (course)
@@ -1182,21 +1201,88 @@ static int study(int argc, char **argv)
         // typed character, and , . 0 serve as layout-independent alternatives.
         int time_direction = 0;
         bool time_normal = false;
+        bool plugin_restart = false;
+        char console_line[WAKE_CONSOLE_INPUT] = { 0 };
+        // PC: the live console owns typed input while it is open. It is unavailable in rooms
+        // (no package), replays, demos and screenshots.
+        bool console_was_open = false;
+        bool console_just_opened = false;
+#ifdef PROTEUS_BOAT_PLUGINS
+        console_was_open = console.open;
+        bool console_available = false;
+#if !defined(__EMSCRIPTEN__)
+        console_available = plugin_active && !networked && !demo && !screenshot
+            && !session.runs.playing && !menu.open && !help_visible;
+#endif
+        bool console_open_key
+            = IsKeyPressed(KEY_GRAVE) || IsKeyPressed(KEY_F2) || IsKeyPressed(161);
+        if (console_available && !console.open && console_open_key && IsWindowFocused()) {
+            console.open = true;
+            console_was_open = true; // Consume the opening key's own character this frame.
+            console_just_opened = true;
+            plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
+        }
+#endif
         while ((character = GetCharPressed()) != 0) {
+#ifdef PROTEUS_BOAT_PLUGINS
+            if (console.open) {
+                if (!console_just_opened
+                    && wake_console_input(
+                        &console, 0, character, console_line, sizeof(console_line))) {
+                    if (course)
+                        session.runs.practice = true;
+                    plugin_restart |= wake_command_submit(
+                        &command, &plugin, &session, console_line, plugin_time());
+                }
+                continue;
+            }
+#endif
             help_pressed |= character == '?';
             time_direction
                 += (character == ']' || character == '.') - (character == '[' || character == ',');
             time_normal |= character == '\\' || character == '0';
         }
-        time_direction += IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
-        time_normal |= IsKeyPressed(KEY_BACKSLASH);
-        time_direction = time_direction > 0 ? 1 : time_direction < 0 ? -1 : 0;
-        if (help_pressed)
-            help_visible = !help_visible;
+#ifdef PROTEUS_BOAT_PLUGINS
+        if (console.open) {
+            int console_key = 0;
+            if (IsKeyPressed(KEY_ESCAPE))
+                console_key = KEY_ESCAPE;
+            else if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))
+                console_key = KEY_ENTER;
+            else if (IsKeyPressed(KEY_BACKSPACE))
+                console_key = KEY_BACKSPACE;
+            else if (IsKeyPressed(KEY_UP))
+                console_key = KEY_UP;
+            else if (IsKeyPressed(KEY_DOWN))
+                console_key = KEY_DOWN;
+            else if (IsKeyPressed(KEY_PAGE_UP))
+                console_key = KEY_PAGE_UP;
+            else if (IsKeyPressed(KEY_PAGE_DOWN))
+                console_key = KEY_PAGE_DOWN;
+            if (console_key
+                && wake_console_input(
+                    &console, console_key, 0, console_line, sizeof(console_line))) {
+                if (course)
+                    session.runs.practice = true;
+                plugin_restart |= wake_command_submit(
+                    &command, &plugin, &session, console_line, plugin_time());
+            }
+        }
+        if (!console.open) {
+#endif
+            time_direction += IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
+            time_normal |= IsKeyPressed(KEY_BACKSLASH);
+            time_direction = time_direction > 0 ? 1 : time_direction < 0 ? -1 : 0;
+            if (help_pressed)
+                help_visible = !help_visible;
+#ifdef PROTEUS_BOAT_PLUGINS
+        }
+#endif
         // Menu shortcuts release capture without changing steering mode. P preserves fullscreen.
         bool reset_requested = false;
         bool menu_was_open = menu.open;
-        bool menu_pressed = IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P);
+        bool menu_pressed = !console.open && !console_was_open
+            && (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_P));
 #if !defined(__EMSCRIPTEN__)
         if (IsKeyPressed(KEY_F11))
             ToggleBorderlessWindowed();
@@ -1247,6 +1333,8 @@ static int study(int argc, char **argv)
         // A click that resumes play is not also a replay-timeline click.
         bool active = IsWindowFocused() && !help_visible && !menu.open && !menu_was_open;
 #ifdef PROTEUS_BOAT_PLUGINS
+        if (console.open || console_was_open)
+            active = false;
         if (plugin_path && wake_plugin_editing())
             active = false;
 #endif
@@ -1319,6 +1407,15 @@ static int study(int argc, char **argv)
             ? (float)((IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
                   - (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)))
             : (float)(((mobile_buttons & 8) != 0) - ((mobile_buttons & 4) != 0));
+        // The open console takes typed input, but the world keeps running with a neutral helm.
+        bool console_simulating = false;
+#ifdef PROTEUS_BOAT_PLUGINS
+        console_simulating = console.open && !networked && !demo && !session.runs.playing;
+        if (console_simulating) {
+            steering_target = 0;
+            steering_rate = 0;
+        }
+#endif
         if (active && IsKeyPressed(KEY_F3)) {
             profiler_visible = !profiler_visible;
             next_snapshot_time = 0;
@@ -1420,16 +1517,17 @@ static int study(int argc, char **argv)
         reset_requested |= boat_reset_hold_update(
             &reset_hold, IsKeyDown(KEY_BACKSPACE), active && !session.runs.playing, GetFrameTime());
         // A plugin revision changes between this frame's ticks; a new exposure restarts below.
-        bool plugin_restart = false;
 #ifdef PROTEUS_BOAT_PLUGINS
 #if !defined(__EMSCRIPTEN__)
         // Tool requests arrive whether or not the window has focus.
         if (bridge_path)
-            plugin_restart = wake_bridge_frame(&bridge, &plugin, &session, GetTime());
+            plugin_restart |= wake_bridge_frame(&bridge, &plugin, &session, GetTime());
 #endif
-        if (plugin_path)
+        if (plugin_active && plugin.authoring)
             plugin_restart |= wake_plugin_frame(&plugin, &session, active && IsKeyPressed(KEY_F5),
                 active && IsKeyPressed(KEY_F6), active && IsKeyPressed(KEY_F7), plugin_time());
+        if (plugin_active)
+            plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
 #endif
         if (plugin_active && wake_plugin_waiting(&plugin))
             plugin_reset_pending |= reset_requested;
@@ -1438,7 +1536,7 @@ static int study(int argc, char **argv)
             plugin_reset_pending = false;
         }
 #ifdef __EMSCRIPTEN__
-        if (plugin_path)
+        if (plugin_active && plugin.authoring)
             browser_plugin_controls(plugin_reset_pending, menu.open);
 #endif
         if (reset_requested) {
@@ -1504,7 +1602,7 @@ static int study(int argc, char **argv)
             boat_replay_advance(&session.runs, replay_adjusted ? 0 : GetFrameTime(), active);
             metrics.course_replay_ms
                 += (float)((boat_profile_time(true) - course_started_at) * 1000.0);
-        } else if (active) {
+        } else if (active || console_simulating) {
             BoatInput input = {
                 .steering_rate = steering_rate,
             };
@@ -1537,7 +1635,8 @@ static int study(int argc, char **argv)
         } else {
             accumulator = 0;
         }
-        metrics.paused = !active || (session.runs.playing && session.runs.paused);
+        metrics.paused
+            = (!active && !console_simulating) || (session.runs.playing && session.runs.paused);
         metrics.simulation_ms = (float)((boat_profile_time(true) - simulation_started_at) * 1000.0);
         // Course saves wait until the frame's ticks are done.
         double flush_started_at = boat_profile_time(true);
@@ -1597,8 +1696,8 @@ static int study(int argc, char **argv)
                     audio_input.grenade_tick = c->waves[i].born;
         }
 #endif
-        boat_audio_update(
-            &audio, audio_input, active && (!session.runs.playing || !session.runs.paused));
+        boat_audio_update(&audio, audio_input,
+            (active || console_simulating) && (!session.runs.playing || !session.runs.paused));
         if (music_ready) {
             if (active && (!session.runs.playing || !session.runs.paused))
                 ResumeMusicStream(music);
@@ -1728,6 +1827,9 @@ static int study(int argc, char **argv)
                 session.runs.practice ? " / PRACTICE" : "");
             boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
         }
+#ifdef PROTEUS_BOAT_PLUGINS
+        wake_console_draw(&console, width, height);
+#endif
         EndTextureMode();
         BeginDrawing();
         ClearBackground((Color) { 14, 23, 32, 255 });
@@ -1747,7 +1849,7 @@ static int study(int argc, char **argv)
         if (!networked)
             boat_voyage_hud(&session.voyage, &session.boat, live_view.time, GetScreenWidth());
 #ifdef PROTEUS_BOAT_PLUGINS
-        if (plugin_path)
+        if (plugin_active && plugin.authoring)
             wake_plugin_draw(&plugin, 12, (int)destination.y + (height - 48) * scale - 20);
 #endif
         if (notice)
@@ -1796,7 +1898,7 @@ static int study(int argc, char **argv)
             race = networked && net_study_race(net);
 #endif
             draw_help(course, !networked && session.voyage.route, boat_minimap_ready(&minimap),
-                deathmatch, race, networked, plugin_path != NULL);
+                deathmatch, race, networked, plugin_active && plugin.authoring);
         }
         frame_pacer_wait(&pacer);
         EndDrawing();
@@ -1976,6 +2078,8 @@ int main(int argc, char **argv)
 #if defined(PROTEUS_BOAT_PLUGINS) && !defined(__EMSCRIPTEN__)
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
         return boat_plugin_stage_worker();
+    if (argc == 2 && !strcmp(argv[1], "--plugin-query-worker"))
+        return boat_plugin_query_worker();
 #endif
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     if (argc > 1 && !strcmp(argv[1], "--serve"))
