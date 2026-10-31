@@ -9,6 +9,7 @@ parser.add_argument('--build-dir', type=Path, required=True)
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--four-players', action='store_true', help='Fill the room with two native and two browser clients, then reject a fifth.')
 parser.add_argument('--mode', choices=['free', 'deathmatch', 'race'], default='free')
+parser.add_argument('--server-package', help='Bundled room ID or edited package directory for the local server.')
 parser.add_argument('--executable', default='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
 parser.add_argument('--angle', default='metal' if sys.platform == 'darwin' else 'swiftshader',
                     help='Chrome ANGLE backend; software rendering cannot qualify a room.')
@@ -23,7 +24,10 @@ def port(kind):
 udp, ws = (port(socket.SOCK_DGRAM), port(socket.SOCK_STREAM))
 room_log = args.output / 'server.log'
 bot_log = args.output / 'bot.log'
-server = subprocess.Popen([str(args.build_dir.resolve() / 'boat_server'), '--bind', '127.0.0.1', '--port', str(udp), '--rtc-port', str(ws), '--no-lan', '--mode', args.mode, '--location', 'river' if args.mode == 'race' else 'basin', '--seconds', '300'], stdout=room_log.open('w'), stderr=subprocess.STDOUT)
+server_args = [str(args.build_dir.resolve() / 'boat_server'), '--bind', '127.0.0.1', '--port', str(udp), '--rtc-port', str(ws), '--no-lan', '--mode', args.mode, '--location', 'river' if args.mode == 'race' else 'basin', '--seconds', '300']
+if args.server_package:
+    server_args += ['--package', args.server_package]
+server = subprocess.Popen(server_args, stdout=room_log.open('w'), stderr=subprocess.STDOUT)
 for _ in range(100):
     if 'boat_server listening' in room_log.read_text():
         break

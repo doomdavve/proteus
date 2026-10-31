@@ -453,8 +453,65 @@ static unsigned touching(const BoatNetServer *server)
     return count;
 }
 
-// Authored moored boats on the track a bot really drives, sampled from a room without them. Moving
-// craft use the same contact path and clock but are not forced into contact here.
+// Sample the resolved bot track in a room without a scene, so an authored object can be placed
+// exactly where the hull will pass.
+static unsigned track_samples(Vector2 *points, unsigned capacity)
+{
+    static Room room;
+    BoatRoomDefinition d = {
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+    };
+    snprintf(d.id, sizeof(d.id), "scene.track");
+    snprintf(d.name, sizeof(d.name), "Track samples");
+    if (!room_open(&room, &d, true))
+        return 0;
+    unsigned solo = join(&room, "track", true);
+    run(&room, 1);
+    unsigned count = 0;
+    for (; count < capacity; ++count) {
+        run(&room, 2);
+        const BoatFleetSlot *own = boat_net_client_own(&room.clients[solo]);
+        if (!own)
+            break;
+        points[count] = own->boat.position;
+    }
+    boat_net_memory_destroy(room.network);
+    return count;
+}
+
+// Eight small moving loops along that track: a craft is always within two metres of a sample, so
+// the resolved hull must touch one even though the craft is travelling.
+static bool moving_loops(BoatRoomDefinition *d, const Vector2 *points, unsigned count)
+{
+    d->has_scene = true;
+    d->scene.version = BOAT_SCENE_VERSION;
+    d->scene.traffic_present = true;
+    d->scene.traffic.actor_count = count;
+    for (unsigned i = 0; i < count; ++i) {
+        WaterfrontRouteActor *a = &d->scene.traffic.actors[i];
+        snprintf(a->id, sizeof(a->id), "loop_%u", i);
+        a->shape = WATERFRONT_ROUTE_POINTS;
+        a->recipe = WATERFRONT_CRAFT_RUNABOUT;
+        a->retain = 0xff;
+        a->speed = 3;
+        a->phase = 0;
+        // Four 3 m straights between 0.5 m corner arcs, at 3 m/s.
+        a->period = (12 + 3.141592653589793) / 3;
+        a->point_count = 4;
+        a->points[0] = (WaterfrontRoutePoint) { points[i].x - 2, points[i].y - 2, .5f };
+        a->points[1] = (WaterfrontRoutePoint) { points[i].x + 2, points[i].y - 2, .5f };
+        a->points[2] = (WaterfrontRoutePoint) { points[i].x + 2, points[i].y + 2, .5f };
+        a->points[3] = (WaterfrontRoutePoint) { points[i].x - 2, points[i].y + 2, .5f };
+    }
+    BoatRoomDiagnostic rd;
+    if (!boat_room_definition_validate(d, &rd)) {
+        fprintf(stderr, "moving scene invalid: %s: %s\n", rd.field, rd.message);
+        return false;
+    }
+    return true;
+}
+
+// Moored boats on the track a bot really drives, sampled from a room without them.
 static int scene_contact_room(void)
 {
     static Room room;
@@ -506,9 +563,12 @@ static int scene_contact_room(void)
     printf("room_package scene steady: %u contact ticks, own error max %.6f m, %llu/%llu hashes\n",
         contact, c->prediction.stats.max_error, (unsigned long long)room.matches,
         (unsigned long long)(room.matches + room.mismatches));
-    // Without the scene this would be metres. It is about 0.1 mm against exactly zero in a room
-    // with no contact, so contact prediction is close but not bit for bit (recorded in the plan).
-    CHECK(c->prediction.stats.max_error < .001f);
+    // Without the scene this would be metres. The room already has no ambient waves or physical
+    // wake field (the live arcade wake pool is empty), and the first own-slot difference is 12 um
+    // at tick 36, the first berth contact. It reaches 0.126 mm at a later snapshot tick: that is
+    // speculative contact over one 4-tick snapshot interval, not a replay difference. Keep the
+    // bound at about twice the measured contact value.
+    CHECK(c->prediction.stats.max_error < .00025f);
     boat_net_memory_destroy(room.network);
 
     // Loss, reordering and delay, a late joiner and an outage.
@@ -550,8 +610,96 @@ static int scene_contact_room(void)
     return 0;
 }
 
+// An authored moving craft on the same track, contacted by the resolved hull under a steady
+// link. Exact mirror hashes must hold through the contact.
+static int scene_moving_contact_room(void)
+{
+    Vector2 points[8] = { 0 };
+    unsigned samples = track_samples(points, 8);
+    CHECK(samples == 8);
+    BoatRoomDefinition d = {
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+    };
+    snprintf(d.id, sizeof(d.id), "scene.moving");
+    snprintf(d.name, sizeof(d.name), "Moving contact");
+    CHECK(moving_loops(&d, points, samples));
+
+    static Room room;
+    CHECK(room_open(&room, &d, true));
+    unsigned solo = join(&room, "moving", true);
+    BoatNetImpairment steady = { .delay = .03 };
+    boat_net_memory_impair(room.network, room.link[solo], steady, steady);
+    unsigned contact = 0;
+    for (double end = room.now + 25; room.now < end;) {
+        step(&room, (1 + (unsigned)(room.now * 977) % 3) / 240.0);
+        contact += touching(&room.server);
+    }
+    const BoatNetClient *c = &room.clients[solo];
+    CHECK(contact > 0 && room.matches > 0 && room.mismatches == 0);
+    CHECK(room.server.fleet.world.scene == &room.server.config.room->scene);
+    CHECK(c->fleet.world.scene == &c->room.scene);
+    CHECK(c->prediction.fleet.world.scene == &c->room.scene);
+    CHECK(c->prediction.stats.corrections > 0);
+    printf("room_package scene moving: %u contact ticks, own error max %.6f m, %llu/%llu hashes\n",
+        contact, c->prediction.stats.max_error, (unsigned long long)room.matches,
+        (unsigned long long)(room.matches + room.mismatches));
+    CHECK(c->prediction.stats.max_error < .00025f);
+    boat_net_memory_destroy(room.network);
+    return 0;
+}
+
+// A snapshot-stall resync while the authored moving craft is at the hull. The restored mirror
+// keeps the scene and matches the authority exactly afterwards.
+static int scene_resync_contact_room(void)
+{
+    Vector2 points[4] = { 0 };
+    unsigned samples = track_samples(points, 4);
+    CHECK(samples == 4);
+    BoatRoomDefinition d = {
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+    };
+    snprintf(d.id, sizeof(d.id), "scene.resync");
+    snprintf(d.name, sizeof(d.name), "Resync contact");
+    CHECK(moving_loops(&d, points, samples));
+
+    static Room room;
+    CHECK(room_open(&room, &d, true));
+    unsigned solo = join(&room, "resync", true);
+    BoatNetImpairment steady = { .delay = .03 };
+    boat_net_memory_impair(room.network, room.link[solo], steady, steady);
+    unsigned contact = 0;
+    for (double end = room.now + 15; room.now < end && !contact;) {
+        step(&room, (1 + (unsigned)(room.now * 977) % 3) / 240.0);
+        contact += touching(&room.server);
+    }
+    BoatNetClient *c = &room.clients[solo];
+    CHECK(contact > 0 && c->phase == BOAT_NET_CLIENT_PLAYING);
+    unsigned resyncs = (unsigned)c->stats.resyncs;
+    // Silence snapshots while control traffic continues, so the client asks for a checkpoint.
+    room.server.tick_limit = room.server.fleet.state.tick;
+    run(&room, 2.5);
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.resyncs > resyncs);
+    CHECK(c->fleet.world.scene == &c->room.scene);
+    CHECK(c->prediction.fleet.world.scene == &c->room.scene);
+    room.server.tick_limit = 0;
+    unsigned after = 0;
+    for (double end = room.now + 20; room.now < end;) {
+        step(&room, (1 + (unsigned)(room.now * 977) % 3) / 240.0);
+        after += touching(&room.server);
+    }
+    CHECK(after > 0 && room.matches > 0 && room.mismatches == 0);
+    CHECK(c->phase == BOAT_NET_CLIENT_PLAYING && c->stats.decode_errors == 0);
+    printf("room_package scene resync: %llu resyncs, %u contact ticks after, %llu/%llu hashes\n",
+        (unsigned long long)c->stats.resyncs, after, (unsigned long long)room.matches,
+        (unsigned long long)(room.matches + room.mismatches));
+    boat_net_memory_destroy(room.network);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(scene_contact_room),
+    SLOW_CASE(scene_moving_contact_room),
+    SLOW_CASE(scene_resync_contact_room),
     TEST_CASE(catalog_rooms),
     TEST_CASE(race_room),
     TEST_CASE(match_room),
