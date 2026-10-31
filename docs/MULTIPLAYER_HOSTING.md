@@ -9,6 +9,16 @@ The [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) provides the wat
 (hold Space), stern wave grenade (E), torpedo (Q) and optional rearview mirror (V).
 A round starts when two players join. There is no room token or player account requirement.
 
+## Next release: protocol v9
+
+The Rooms package changes the wire to protocol v9. The room and every native/browser client must
+upgrade together. The hosted service line keeps `--mode deathmatch --location river`; the
+authority now loads `proteus.deathmatch` by default and reports it in its startup banner. The
+browser client receives the room definition as data and needs no Lua. No deployment has been
+made from this branch: at release time update `wake_velocity_version` and run the routine
+Winterfell role, then verify a matching native/browser join as in
+[routine deployments](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
+
 ## Join
 
 - Native: use v0.0.23, choose MULTIPLAYER and select WINTERFELL, or enter

@@ -44,10 +44,10 @@ rejected. Strings are non-empty printable ASCII.
 | `id` | 1–63 characters of `a-z 0-9 . _ -`, starting with a letter, e.g. `proteus.langedrag` |
 | `name` | 1–63 printable ASCII characters |
 | `api` | `1` |
-| `kind` | `"voyage"`, `"free"`, `"course"` or `"race"` |
+| `kind` | `"voyage"`, `"free"`, `"course"`, `"race"` or `"match"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
-| `location` | `"outer"` for voyage; `"basin"` for course; `"river"` for race; `"basin"` or `"river"` for free |
-| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, course and race packages use exactly `["free.define"]`, `["course.define"]` or `["race.define"]`. |
+| `location` | `"outer"` for voyage; `"basin"` for course; `"river"` for race; `"basin"`, `"river"` or `"outer"` for free; `"any"` or a compiled location for match |
+| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`. A course package uses exactly `["course.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -69,22 +69,68 @@ files or running the map sweep. `--no-plugins` selects the compiled path tempora
 `--package ID` selects a bundled entry explicitly. The catalog does not exist in the Emscripten
 build until PD4.
 
-The bundled contents are `proteus.basin-free` and `proteus.river-free` (`free`), `proteus.langedrag`
-(the default `outer` voyage), `proteus.harbor-life` (the selectable authored `outer` voyage),
-`proteus.time-trial` (`course`) and `proteus.river-sprint` (`race`). `plugins/langedrag`,
-`plugins/river-sprint`, `plugins/basin-free`, `plugins/river-free` and `plugins/time-trial` are
+The bundled contents are `proteus.basin-free`, `proteus.river-free` and `proteus.outer-free`
+(`free`), `proteus.langedrag` (the default `outer` voyage), `proteus.harbor-life` (the selectable
+authored `outer` voyage), `proteus.time-trial` (`course`), `proteus.river-sprint` (`race`),
+`proteus.deathmatch` (`match`, the deathmatch default at every location),
+`proteus.harbor-room` (a free `outer` room with the Harbor life scene) and
+`proteus.harbor-race` (a river race with an authored obstacle berth). `plugins/langedrag`,
+`plugins/river-sprint`, `plugins/basin-free`, `plugins/river-free`, `plugins/outer-free`,
+`plugins/time-trial`, `plugins/deathmatch`, `plugins/harbor-room` and `plugins/harbor-race` are
 complete package sources; the catalog does not duplicate them.
 
 ## Free schema
 
-A `free` package selects a location and nothing else. Its complete entry is:
+A `free` package selects a location and, when granted `scene.define`, an optional authored scene.
+Its smallest entry is:
 
 ```lua
 return { free = { version = 1 } }
 ```
 
 Absent content means the engine's registered defaults, exactly as an absent subsystem does. The
-location must be `basin` or `river`. Free packages have no scene, objective or callback grant.
+location must be `basin`, `river` or `outer`. A free package has no objective or callback grant;
+a scene is the same envelope described under [the scene contract](#location-life-scene-contract-planned-l11).
+A free package with a scene fixes the room's location; without one it still names its location.
+
+## Match schema
+
+A `match` package defines a deathmatch room's rules and combat values. It selects no map of its
+own: with `"location": "any"` the authority's `--location` chooses the map, while a specific
+location (or an authored scene) fixes it. Its grants are `["match.define"]` optionally followed
+by `"scene.define"`.
+
+```lua
+return {
+  match = {
+    version = 1,
+    rules = {
+      round_ticks = 36000, intermission_ticks = 1200, credit_ticks = 600,
+      grace_ticks = 240, respawn_ticks = 360, skip_ticks = 120,
+      contact_impulse = 1.5, wake_height = .35, min_players = 2
+    },
+    combat = {
+      health = 100, damage = 0, bullet_speed = 94, bullet_range = 70,
+      grenade_distance = 7, wave_height = 4, wave_speed = 10, wave_range = 70,
+      cannon_pressure = .1, pressure_recovery = .22,
+      torpedo_damage = 40, torpedo_speed = 32, torpedo_range = 160,
+      torpedo_ticks = 180, arming_ticks = 30, torpedo_ammo = 3,
+      fire_ticks = 15, heat_ticks = 480, cool_ticks = 360,
+      grenade_ticks = 960, splash_ticks = 36, fuse_ticks = 120, grace_ticks = 240
+    }
+  }
+}
+```
+
+Tick fields are integers. The room's definition carries these effective values; clients compare
+the installed checkpoint's combat rules with them and close on a mismatch instead of opening a
+world. Rule overrides such as `boat_server --round-seconds` apply before the definition is built.
+`plugins/deathmatch` holds today's native defaults and the catalog equality test keeps it so.
+
+The authority evaluates a `match`, `free` or `race` package once at room start (catalog ID or
+directory), validates it against the room's map, and sends the resulting
+[room definition](../docs/MULTIPLAYER_PROTOCOL.md#room-definition) to every client. Clients run
+no plugin code in a room.
 
 ## Course schema
 

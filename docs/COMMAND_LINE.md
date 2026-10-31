@@ -219,6 +219,13 @@ extra arguments. On macOS, a packaged headless room can run as:
 "/Applications/Wake Velocity.app/Contents/MacOS/wake_velocity" --serve --bind 0.0.0.0
 ```
 
+The room runs from a package. With no `--package`, `--mode free` uses the location's free
+package, `--mode deathmatch` uses `proteus.deathmatch` at any location, and `--mode race` uses
+`proteus.river-sprint` on the river. `--package ID|DIR` selects another bundled package by ID or
+evaluates a package directory once at start-up. The authority validates the package, sends the
+resulting definition to clients as data, and refuses to start with a diagnostic if it is
+invalid; rule overrides such as `--round-seconds` then apply to the loaded definition.
+
 The standalone authority defaults to loopback, basin and UDP port 24680. `--bind` selects
 an interface; `0.0.0.0` accepts all interfaces. It runs until Ctrl+C or a `--seconds` /
 `--ticks` limit. `--players 1-4` caps room size, `--waves` enables ambient waves,

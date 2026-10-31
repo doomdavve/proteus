@@ -1,7 +1,7 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **PD1 and PC are merged; the Rooms package (PD2, PD3) is next, and PD4 follows
-as its own package.** Native solo sessions now run from packages
+Status, 2026-10-31: **PD1 and PC are merged; the Rooms package (PD2, PD3) is implemented on
+`feat/plugin-default-rooms` and awaits review; PD4 follows as its own package.** Native solo sessions now run from packages
 compiled at build time, `--plugin` is the separate authoring path, and a temporary
 `--no-plugins` restores compiled content. The live console edits the running session without a
 reset. This document owns the sequence, per-PR status and
@@ -10,16 +10,16 @@ existing plugin contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) ke
 and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: the [Rooms package](#packages), [PD2](#pd2--package-defined-rooms) then
-[PD3](#pd3--authored-scenes-and-revisions-in-rooms), on `feat/plugin-default-rooms`.
+Next task: the [Browser package](PLUGIN_DEFAULT_PLAN.md#packages) (PD4), on
+`feat/plugin-default-browser`, once the Rooms PR merges.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; merged in [#96](https://github.com/doomdavve/proteus/pull/96) |
 | [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31; merged in [#98](https://github.com/doomdavve/proteus/pull/98) without PD4 |
-| [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Not started |
-| [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Not started |
-| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Not started |
+| [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Implemented 2026-10-31 on `feat/plugin-default-rooms`; PR pending |
+| [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Implemented 2026-10-31 on the same branch; round-boundary revisions deferred to v10 |
+| [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Next package |
 | [PD5](#pd5--cutover) | The compiled selection and the off switch are gone | PD3, PD4 | Not started |
 
 ### Packages
@@ -663,6 +663,58 @@ name is shown only after joining.
 **Needs the user:** one two-machine race and one deathmatch on v9, one with a browser client, and
 a hosted cutover at the next release.
 
+
+### PD2 result, 2026-10-31
+
+**Implemented.** `src/boat_room_definition.[ch]` is the core's pointer-free room definition
+(package ID/name, mode, location, course and race rules, match and combat rules, optional scene)
+with a structural validator, a shared `boat_race_course_validate` used by plugin staging and
+rooms, and a canonical fieldwise codec capped at 16 KiB. The new `match` kind and
+`match.define` grant decode `match.rules` and `match.combat`; `plugins/deathmatch` equals
+`boat_match_default_rules` and `boat_combat_default_rules` at every location, and
+`plugins/outer-free` completes the three free locations. `tools/boat_room_package.c` is the
+authority loader: a catalog ID decodes without Lua, a directory is evaluated once with the map
+checks, a package with a scene fixes its location, and a conflicting `--location` refuses to
+start. `boat_server` and `wake_velocity --serve` use it, default by mode/location, apply rule
+overrides after loading, and report the package ID. `boat_combat_enable` now takes the rules.
+`boat_net_server` owns the encoded definition and sends it once per connection on the reliable
+bootstrap channel (DefinitionBegin/Page/End, types 22–24) before the checkpoint; a resync reuses
+it. `boat_net_client` validates and installs it before READY, never enters the world without it,
+and compares a deathmatch checkpoint's combat rules with the definition. Protocol v9 removes the
+race `course` byte and `BoatNetRaceCourse`; `boat_net_race_bind` takes the definition's course;
+Hello's digest no longer covers the course or combat rules. The client status line shows the
+package name.
+
+**Deviations.** Recovery of a match package whose manifest location is `any` is evaluated by
+the authoring worker against the basin map; a room always supplies the real location. The
+`free` and `race` kinds now accept an optional scene (PD3 needs it), so PST moves to 7. The
+in-game HOST panel's package row and the read-only room console `/status` were left out: the
+host already receives the mode's default package with no new flag, and PC's console is gated to
+solo. They remain UI work, not protocol work. A full-fleet prediction hash is not asserted
+against the authority (remote boats are speculative); the room tests require exact mirror
+hashes and bounded own-boat prediction error instead.
+
+**Verification actually run, Apple Silicon/macOS, 2026-10-31.** Debug build from the pinned
+dependency sources, no project warnings. `ctest --preset quick` passed; `ctest --preset full`
+passed all **336 enabled tests** (13 retired field tests disabled, GPU CTests off), including
+`boat_net` and `boat_net_enet` on v9, `boat_net_process`, `boat_room_course_source`,
+`boat_plugin_author`, `boat_plugin_capture`, `plugin_default_parity`, the catalog equality cases
+and `boat_core_boundary`/`boat_net_boundary`. A source check proves no networked client file
+references `boat_race_river_course`. `boat_server --mode deathmatch --location river` with no new
+flag starts on protocol 9 and reports `room package: proteus.deathmatch (Deathmatch)`; free,
+race, outer and `--package proteus.harbor-room` start too. CPU captures of the basin, river and
+the Harbor life outer scene were inspected. `git diff --check` passes.
+
+**Measurements.** Encoded room definitions: basin-free 42 B, river-free 42 B, outer-free 48 B,
+river-sprint 352 B, deathmatch 159 B, harbor-room 877 B, harbor-race 416 B. The constructed
+maximum scene definition is 2,765 B (3 pages), well inside the 16 KiB cap. A lossless two-client
+room sends 29 B of definition per client (the validator's free room) plus the unchanged 5,352 B
+checkpoint. No runtime Lua or map sweep runs for a catalog room.
+
+**Needs the user.** Two-machine race and deathmatch on v9, one with a browser client, and the
+hosted cutover at the next release. Judge whether the package name in the room status line is
+enough until the HOST row and room console arrive.
+
 ## PD3 — authored scenes and revisions in rooms
 
 **Outcome.** Rooms can run authored scenes with berth and traffic contacts in agreement on every
@@ -740,6 +792,50 @@ stop and report. Moored and visual-only room scenes may land alone, with the lim
 
 **Needs the user:** a two-person harbor room with deliberate berth and traffic contact; judge whether
 any correction is visible. Decide whether revisions should be exposed beyond the flag.
+
+
+### PD3 result, 2026-10-31
+
+**Implemented.** The room definition carries the full `BoatSceneDefinition` through the same
+codec; a maximum constructed scene measures 2,765 B. The authority binds its scene in
+`boat_fleet_init_scene`; prediction copies the fleet by value and `boat_fleet_world` copies the
+borrowed pointer, so every mirror and replay evaluates the same contacts. The client binds the
+definition's scene when it installs a world. Ferry and storm poses use the shared tick clock;
+room traffic remains visual-only as before. Authority validation checks the scene against the
+room: berths must be on open water and the scene's contact envelopes must leave the fleet spawn,
+every gate line and every recovery candidate clear. The engine digest no longer includes the
+authored harbour berths or ferry; only the contact recipe revision remains, and a source guard
+proves those values are not read. A room definition with no scene still falls back to the
+compiled harbour contacts, which keeps current default rooms working; an authored scene is
+self-contained and independent of compiled berth values. Builds that change the compiled
+contacts without a scene therefore rely on being the same release, as before. `plugins/harbor-room` is a free `outer` room sharing Harbor
+life's scene, and `plugins/harbor-race` is a river race with an authored obstacle berth clear of
+the course; both join the catalog. `validate_boat_room_package` evaluates edited race and
+deathmatch packages, runs rooms with predicting clients and a mid-race joiner, and compares exact
+mirror hashes.
+
+**Deviations and limits.** Round-boundary revisions (task 6) are **not implemented**. They are
+the package's only new synchronisation mechanism; the plan allows opening the PR without them
+and delivering protocol v10 later. No message types were added for them, so the wire is clean.
+The networked scene is proven through the room-package validator and the shared scene data,
+not a windowed client capture: `--connect` refuses `--screenshot`, so no networked authored-scene
+frame could be captured in this environment. Physical traffic wakes in rooms remain out of scope
+as planned. The client's close-on-malformed-definition branch is covered by the codec rejection
+tests and review, not by injecting a corrupt server.
+
+**Verification actually run, Apple Silicon/macOS, 2026-10-31.** The same Debug build and full
+run as PD2: **336 enabled tests** pass, including `boat_room_package.catalog_rooms`,
+`definition_size`, `race_room`, `match_room`, `boat_net.room_definition_codec`, the four
+bundled room packages and the harbor scene's catalog equality. `race_room` compares 9,058/9,058
+authority hashes at snapshot ticks with predicting clients and a mid-race joiner; `match_room`
+compares 1,705/1,705 with non-default health (150), damage and cannon timing. `catalog_rooms`
+loads and measures every bundled free/match/race package, including the authored-contact
+clearance checks. CPU capture of the Harbor life outer scene was inspected; `--renderer cpu`
+basin and river captures were inspected for regressions. `git diff --check` passes.
+
+**Needs the user.** A two-person harbor room with deliberate berth and traffic contact; judge
+whether any correction is visible. Decide whether revisions should be exposed beyond the
+`--package-reload` idea now that they are deferred to v10.
 
 ## PD4 — browser parity
 

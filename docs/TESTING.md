@@ -325,7 +325,18 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   diagnostics. `plugin_default_parity` captures basin, river, outer and course sessions with
   `--renderer cpu` through the catalog and `--no-plugins` and compares the images byte for byte.
   `boat_replay`'s legacy-best case proves a pre-existing `course-calm-physicsN.run` keeps its
-  path as the best and is not overwritten by an equal or slower run.
+  path as the best and is not overwritten by an equal or slower run. The catalog now also
+  includes the outer free room, `proteus.deathmatch` (whose rules and combat values equal the
+  native defaults at every location) and the two harbor room packages.
+- `boat_room_package` (PD2/PD3) evaluates edited race and deathmatch packages, builds rooms from
+  their definitions and compares every client's mirror hash with the authority at snapshot
+  ticks; predicting clients must correct and stay within the prediction bounds. It also loads
+  every bundled free/match/race package through the authority path, validates the authored scene
+  against the room's spawn and course, and measures each room definition and a maximum scene
+  against the 16 KiB cap. `boat_net.room_definition_codec` covers the fieldwise definition,
+  truncation, trailing bytes, non-finite values, mode/location/rule faults and paging.
+  `boat_room_course_source` rejects any compiled `boat_race_river_course` reference in the
+  networked client files.
 - `boat_map` runs `validate_boat_map` (adventure A1.1/A1.2). It checks explicit map
   descriptions, caller-owned collision caches, failed/zeroed preparation, two river owners and a
   synthetic map alive together, and destroy/recreate. It also matches a river query digest
