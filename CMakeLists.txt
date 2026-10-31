@@ -349,7 +349,6 @@ endif()
 target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
   tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h)
 target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_plugin_catalog)
-target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_PLUGINS=1)
 if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
 endif()
@@ -705,11 +704,6 @@ target_link_libraries(validate_boat_plugin_catalog PRIVATE proteus_plugins prote
 target_compile_options(validate_boat_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_plugin_catalog validate_boat_plugin_catalog LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-# PD1 parity gate: bundled default captures equal the temporary compiled path byte for byte.
-add_test(NAME plugin_default_parity COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_default_parity.py
-  --game $<TARGET_FILE:wake_velocity> --root ${CMAKE_CURRENT_SOURCE_DIR})
-set_tests_properties(plugin_default_parity PROPERTIES LABELS "cpu" TIMEOUT 300)
 add_test(NAME boat_plugin_catalog_invalid COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_catalog_gen.py
   --generator $<TARGET_FILE:boat_plugin_catalog_gen>)
@@ -1267,7 +1261,6 @@ set(PROTEUS_SLOW_TESTS
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
   boat_scenery
   boat_river_benchmark_options boat_river_route boat_river_wave_route boat_voyage
-  plugin_default_parity
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
