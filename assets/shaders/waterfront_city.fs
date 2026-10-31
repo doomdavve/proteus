@@ -12,6 +12,7 @@ uniform float ghostOpacity;
 uniform float ghostPixelScale;
 uniform int groundPass;
 uniform int facadePass;
+uniform int reflectionPass;
 uniform vec3 ambientColor;
 uniform vec3 directionalColor;
 uniform vec3 directionalDirection;
@@ -209,6 +210,8 @@ void main()
     if (facadePass != 0)
         albedo = vec4(facade_albedo(), 1.0) * objectColor;
     if (emissive != 0) {
+        if (reflectionPass != 0 && fragWorldPosition.y < 0.0)
+            discard;
         finalColor = vec4(apply_atmosphere(albedo.rgb), albedo.a);
         return;
     }
@@ -242,4 +245,9 @@ void main()
     // bleach materials.
     vec3 lit = clamp(illumination, 0.0, 1.25);
     finalColor = vec4(apply_atmosphere(min(albedo.rgb * lit, vec3(1.0))), albedo.a);
+    // The mirrored camera sits underwater. Submerged quay walls and hull bottoms
+    // must not occlude the above-water scene or appear as a second shoreline.
+    // Clip after the material derivatives, which need complete fragment quads.
+    if (reflectionPass != 0 && fragWorldPosition.y < 0.0)
+        discard;
 }

@@ -1788,7 +1788,12 @@ static void render_reflection(
     // A reflected view reverses the projected winding. Disable culling for this pass so the
     // separate camera does not require mirrored geometry or per-mesh winding changes.
     rlDisableBackfaceCulling();
+    int reflection_pass = 1;
+    int clip_location = GetShaderLocation(scene->shader, "reflectionPass");
+    SetShaderValue(scene->shader, clip_location, &reflection_pass, SHADER_UNIFORM_INT);
     draw_reflected_scene(scene, frame, scene->city_material, scene->life_material);
+    reflection_pass = 0;
+    SetShaderValue(scene->shader, clip_location, &reflection_pass, SHADER_UNIFORM_INT);
     rlEnableBackfaceCulling();
     EndMode3D();
     EndTextureMode();

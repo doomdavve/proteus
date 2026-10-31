@@ -35,10 +35,21 @@ CTests passed with GPU tests on (15 retired experiments disabled; 76.40 s). Rive
 outer-map and basin GPU frames were inspected; a 360-frame windowed river demo exited
 successfully. The flat-water river comparison measured about +0.58 ms CPU submission
 and +0.10 ms GPU time at the median on M1 Max; the performance guide records full
-figures and limits. Next for this follow-up: user play/review, especially the coarse
-far silhouettes and transition during motion. Human acceptance, other platforms, rough
-water/AA timing and release performance qualification remain unverified. People/cyclists
-06 remains the next numbered city task.
+figures and limits. User play feedback: better, but the coarse far silhouette visibly
+resolves into the detailed near shadow; no additional tuning was requested. Next for
+this follow-up: assess that transition during ordinary play and decide whether the far
+map needs more resolution. Final acceptance, other platforms, rough water/AA timing and
+release performance qualification remain open. People/cyclists 06 remains the next
+numbered city task.
+
+Integration follow-up, 2026-10-31: merged `main` through `5351cf4`, retaining the
+reflection waterline fix from PR #102. The sole conflict was the fixture's check list;
+it now runs both the shadow-cascade and reflection-waterline regressions. Native Debug
+build and all 364 enabled CTests passed with GPU tests on (15 retired experiments
+disabled; 77.86 s), including both regressions. River (18 s) and outer starting-dock GPU
+captures were inspected, and a 360-frame windowed river demo exited successfully.
+Other platforms and human acceptance of the merged result remain unverified. The timing
+figures above predate this reflection merge; no new performance claim is made.
 
 ## Direction
 
