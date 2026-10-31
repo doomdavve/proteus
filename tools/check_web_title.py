@@ -3,6 +3,7 @@
 from playwright.sync_api import sync_playwright
 from pathlib import Path
 import json
+import statistics
 import argparse
 parser = argparse.ArgumentParser(description='Check the shared browser title, settings persistence and repeated sessions.')
 parser.add_argument('--url', default='http://127.0.0.1:8000/')
@@ -15,7 +16,9 @@ with sync_playwright() as p:
     b = p.chromium.launch(executable_path=args.executable, headless=True, args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
     page = b.new_page(viewport={'width': 1280, 'height': 900})
     errors = []
+    workers = []
     page.on('pageerror', lambda e: errors.append(str(e)))
+    page.on('worker', lambda w: workers.append(w))
     page.on('console', lambda m: print(m.type, m.text, flush=True) if m.type in ['error', 'warning'] else None)
     page.add_init_script('window.audioContexts=[];const Original=window.AudioContext;window.AudioContext=class extends Original {constructor(...a){super(...a);audioContexts.push(this);}};')
     page.goto(args.url)
@@ -25,9 +28,10 @@ with sync_playwright() as p:
     page.click('#play')
     page.wait_for_timeout(1600)
 
-    def key(k):
-        page.keyboard.press(k, delay=90)
-        page.wait_for_timeout(200)
+    def key(k, count=1):
+        for _ in range(count):
+            page.keyboard.press(k, delay=90)
+            page.wait_for_timeout(200)
 
     def shot(name):
         page.screenshot(path=str(out / (name + '.png')))
@@ -102,7 +106,70 @@ with sync_playwright() as p:
     key('ArrowDown')  # Back to launcher
     key('Enter')
     page.wait_for_function("!document.getElementById('play').disabled && !document.body.classList.contains('playing')", timeout=20000)
+
+    # PD4: Harbor life is a bundled package in the browser, and the desktop console edits it
+    # through a worker. A plain session creates no worker; opening the console is still free.
+    assert not workers, f'default sessions created {len(workers)} workers'
+    start_before = page.evaluate('performance.now()')
+    page.click('#play')
+    start_ms = page.evaluate('performance.now()') - start_before
+    page.wait_for_timeout(1200)
+    key('Enter')          # SINGLE
+    page.wait_for_timeout(400)
+    key('ArrowUp', 3)     # PLACE
+    key('ArrowRight', 2)  # BASIN -> RIVER -> OUTER
+    key('ArrowDown')      # CONTENT
+    key('ArrowRight')     # HARBOR LIFE
+    key('ArrowDown', 3)   # START
+    key('Enter')
+    page.wait_for_timeout(4000)
+    shot('harbor-life')
+    assert page.evaluate('Module.boatPluginOwner[0]') == 1
+    assert page.evaluate('Module.boatScenery.state("outer")') == 2
+    assert page.evaluate('Module.boatConsoleAvailable') is True
+    harbor = page.evaluate('({owner: Module.boatPluginOwner.slice(), scenery: Module.boatScenery.state("outer")})')
+    page.locator('#canvas').click()
+    key('F2')
+    page.wait_for_timeout(300)
+    assert page.evaluate('Module.boatConsoleOpen') is True
+    shot('console-open')
+    page.keyboard.type('= def.voyage.arrival.max_speed', delay=30)
+    page.wait_for_timeout(300)
+    page.keyboard.press('Enter', delay=80)
+    page.wait_for_function('Module.boatConsoleLines && Module.boatConsoleLines.length > 0',
+        timeout=30000)
+    query_lines = page.evaluate('Module.boatConsoleLines.slice()')
+    assert any('6' in line for line in query_lines), query_lines
+    shot('console-query')
+    assert page.evaluate('Module.boatPluginOwner[0]') == 1
+    with page.expect_download() as saved:
+        page.keyboard.type('/save drafts', delay=30)
+        page.wait_for_timeout(300)
+        page.keyboard.press('Enter', delay=80)
+    exported = out / 'harbor-life.wake-plugin.json'
+    saved.value.save_as(exported)
+    saved_data = json.loads(exported.read_text())
+    assert saved_data['format'] == 'wake-velocity-plugin'
+    assert 'scene' in saved_data['source'] and 'Harbor life' in saved_data['manifest']
+    page.keyboard.type('def.scene.marina.berths[1].x = 15', delay=30)
+    page.wait_for_timeout(300)
+    page.keyboard.press('Enter', delay=80)
+    page.wait_for_function('Module.boatPluginOwner[0] === 2', timeout=30000)
+    page.wait_for_timeout(500)
+    shot('console-edited')
+    assert page.evaluate('Module.boatPluginStage.jobs.size') == 0
+    frame_ms = page.evaluate('''async() => {
+      const samples = []; let last = performance.now();
+      for (let i = 0; i < 30; ++i) {
+        await new Promise(requestAnimationFrame);
+        const now = performance.now(); samples.push(now - last); last = now;
+      }
+      return samples;
+    }''')
+    memory = page.evaluate('performance.memory ? performance.memory.usedJSHeapSize : null')
+    page.close()
     assert not errors, errors
-    (out / 'result.json').write_text(json.dumps({'errors': errors, 'settings': text, 'result': 'ok'}))
-    print('web_title=ok', flush=True)
     b.close()
+    (out / 'result.json').write_text(json.dumps({'errors': errors, 'settings': text,
+        'harbor_life': harbor, 'console_query': query_lines, 'start_ms': round(start_ms, 1), 'frame_ms': {'median': round(statistics.median(frame_ms), 2), 'max': round(max(frame_ms), 2)}, 'used_heap_bytes': memory, 'result': 'ok'}))
+    print('web_title=ok', flush=True)
