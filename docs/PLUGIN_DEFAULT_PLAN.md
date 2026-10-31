@@ -833,6 +833,32 @@ loads and measures every bundled free/match/race package, including the authored
 clearance checks. CPU capture of the Harbor life outer scene was inspected; `--renderer cpu`
 basin and river captures were inspected for regressions. `git diff --check` passes.
 
+**Review after the PR opened, 2026-10-31, Apple Silicon/macOS.** Windows failed
+`boat_net.prediction_network` on a Profile F wake bound. Running that case over 120 seeds on `main` and
+on this branch gave the same spread: both exceed the old wake or remote bounds in about 12% of rows, so
+it is not a regression. The old bounds fitted one random run, and any new message or float difference
+reshuffles its draws. They now sit about twice above the worst seed. That widening also means Profile F
+does not hold `visible_appeared == 0`: on `main` and here a visible wake pops in on about one row in
+eight. The review also fixed the plain race trial losing its race lines, added the missing grid-slot
+clearance check, made a rejected definition disconnect at once and refuse a second definition once
+installed (`boat_net.definition_rejected`).
+
+`boat_room_package.scene_contact_room` now places moored berths on a bot's real track. Prediction holds
+the scene through contact (3,225 ticks near a berth, removing the scene from prediction raises own error
+to 1.02 m) and hashes agree in 1,088 of 1,088 checks on a steady link and 2,577 of 2,654 under Profile F
+with a late joiner and an outage. **Contact prediction is not bit for bit:** own error reaches 0.126 mm
+against exactly zero with no contact. The cause was not investigated. Forced contact with a moving
+craft and contact through a resync (this run had none) remain unproven.
+
+`check_web_multiplayer.py` was stale, so its keys never reached the URL row. It now types the local room
+for both joins, and fails if a log names the hosted room. **Before that fix, one run of the old rejoin
+path from a `main` build joined the hosted Winterfell room briefly as slot 1.** On this branch, a browser
+client with a WebRTC native server joins and rejoins a race (`web_multiplayer=ok`). Free and deathmatch
+join and receive their definitions but stop at a later step of the script, the same step as on `main`,
+which includes deathmatch's `Browser network receive queue is full`. Not run: `--four-players`, an
+edited course in a browser, the manual browser workflow, and the v8 bootstrap and four-client bandwidth
+and tick-cost comparisons that PD2 and PD3 list.
+
 **Needs the user.** A two-person harbor room with deliberate berth and traffic contact; judge
 whether any correction is visible. Decide whether revisions should be exposed beyond the
 `--package-reload` idea now that they are deferred to v10.
