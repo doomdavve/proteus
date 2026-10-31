@@ -108,12 +108,31 @@ static bool answered(const char *id)
     return read_file(name, response, sizeof(response));
 }
 
+// PC console: the payload is one line rather than a bundle.
+static bool send_console(const char *id, const char *line, unsigned long long epoch)
+{
+    char temporary[1024], path[1024];
+    join(temporary, sizeof(temporary), ".request-test");
+    join(path, sizeof(path), "request");
+    FILE *output = fopen(temporary, "wb");
+    if (!output)
+        return false;
+    fprintf(output,
+        "wake-velocity-bridge 1\nid=%s\ntoken=%s\noperation=console\nbase_epoch=%llu\n"
+        "payload=%zu\n\n%s",
+        id, token, epoch, strlen(line), line);
+    if (fclose(output))
+        return false;
+    remove(path);
+    return !rename(temporary, path);
+}
+
 // Reference source with one substring replaced, in its own buffer (four in all).
 static BoatPluginFiles *variant(const char *from, const char *to)
 {
-    static BoatPluginFiles buffers[4];
+    static BoatPluginFiles buffers[8];
     static unsigned used;
-    if (used == 4)
+    if (used == 8)
         return NULL;
     BoatPluginFiles *files = &buffers[used++];
     *files = reference;
@@ -140,6 +159,9 @@ static int serve(WakePlugin *plugin, BoatSession *session, const char *stage)
     plugin->stage_executable = stage;
     if (!wake_bridge_open(&bridge, directory, 0))
         return 1;
+    static WakeCommand command;
+    wake_command_init(&command, NULL, NULL, NULL, NULL);
+    wake_bridge_commands(&bridge, &command);
     // The test writes DIR/stop to end. The clock advances one poll per pass except while
     // staging, whose virtual acceptance deadline must not expire under a fast loop.
     char path[1024];
@@ -166,9 +188,8 @@ int main(int argc, char **argv)
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
         return boat_plugin_stage_worker();
     // The headless bridge server can host the combined harbor-life package for L4.3.
-    const char *package = argc == 3 && !strcmp(argv[1], "--serve-harbor")
-        ? "plugins/harbor-life"
-        : "plugins/langedrag";
+    const char *package = argc == 3 && !strcmp(argv[1], "--serve-harbor") ? "plugins/harbor-life"
+                                                                          : "plugins/langedrag";
     BoatPluginDiagnostic d;
     CHECK(boat_plugin_read(package, NULL, &reference, &d) == BOAT_PLUGIN_OK);
     BoatWorldResources resources;
@@ -190,7 +211,7 @@ int main(int argc, char **argv)
         "response-b2", "response-b3", "response-c1", "response-c2", "response-d1", "response-d2",
         "response-d3", "response-d4", "response-e1", "response-e2", "response-e3", "response-e4",
         "response-e5", "response-f1", "response-f2", "response-f3", "response-f4", "response-f5",
-        "response-a3" };
+        "response-a3", "response-d5", "response-c3", "response-c4" };
     for (unsigned i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
         join(path, sizeof(path), names[i]);
         remove(path);
@@ -203,6 +224,9 @@ int main(int argc, char **argv)
     CHECK(!chmod(directory, 0700));
 #endif
     CHECK(wake_bridge_open(&bridge, directory, 0));
+    static WakeCommand command;
+    wake_command_init(&command, NULL, NULL, NULL, NULL);
+    wake_bridge_commands(&bridge, &command);
     char session_text[512];
     CHECK(read_file("session", session_text, sizeof(session_text)));
     snprintf(token, sizeof(token), "%s", value(session_text, "token"));
@@ -225,6 +249,15 @@ int main(int argc, char **argv)
     CHECK(is("plugin", "proteus.langedrag") && is("staging", "0") && is("held_revision", "0"));
     CHECK(strstr(response, "\ninspect=revision=1 ") && is("tick", "0") && is("shelter", "0"));
     CHECK(!read_file("response-a1", path, sizeof(path))); // Superseded responses are removed.
+
+    // PC: the console operation runs the same command layer and answers with its lines.
+    CHECK(send_console("c3", "/capabilities", 0));
+    CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("c3") && is("status", "ok"));
+    CHECK(strstr(response, "\noutput=voyage.define"));
+    CHECK(send_console("c4", "/status", 99));
+    CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("c4") && is("status", "stale"));
 
     // Pins: a mutation without them is malformed; a stale one changes nothing.
     BoatPluginFiles *rename = variant("name = \"BRIDGE\"", "name = \"ALVSBORG\"");
@@ -254,66 +287,77 @@ int main(int argc, char **argv)
     CHECK(is("revision", "2") && is("epoch", "1") && is("tick", "1"));
     CHECK(!strcmp(session.voyage.route->shelters[1].name, "ALVSBORG"));
 
-    // A route change is held; Apply must name the held revision.
+    // PC: a route change installs live, keeping the boat and progress.
     plugin.stage_executable = NULL; // Synchronous trusted staging answers at once.
     BoatPluginFiles *route = variant("radius = 150", "radius = 120");
     CHECK(route && send("d1", "operation=stage\nbase_revision=2\nbase_epoch=1\n", route));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("d1") && is("outcome", "held") && is("held_revision", "3"));
-    CHECK(is("held_change", "restart_voyage") && is("revision", "2"));
-    CHECK(send("d2", "operation=apply\nheld_revision=2\nbase_epoch=1\n", NULL));
-    CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("d2") && is("status", "stale") && is("held_revision", "3"));
-    CHECK(send("d3", "operation=undo\nbase_revision=2\nbase_epoch=1\n", NULL));
-    CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("d3") && is("status", "conflict"));
-    CHECK(send("d4", "operation=apply\nheld_revision=3\nbase_epoch=1\n", NULL));
-    CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("d4") && is("status", "ok") && is("outcome", "applied"));
-    CHECK(
-        is("revision", "3") && is("epoch", "2") && session.voyage.route->shelters[1].radius == 120);
+    CHECK(answered("d1") && is("outcome", "applied") && is("revision", "3"));
+    CHECK(is("epoch", "2") && session.voyage.route->shelters[1].radius == 120);
 
-    // Undo holds R2 for the same rules; Discard drops it; a second Undo and Apply reinstall it.
-    CHECK(send("e1", "operation=undo\nbase_revision=3\nbase_epoch=2\n", NULL));
+    // A water change is held; Apply must name the held revision.
+    BoatPluginFiles *water = variant("height = 1.6", "height = 1.8");
+    CHECK(water && send("d2", "operation=stage\nbase_revision=3\nbase_epoch=2\n", water));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("e1") && is("outcome", "held") && is("held_revision", "2"));
+    CHECK(answered("d2") && is("outcome", "held") && is("held_revision", "4"));
+    CHECK(is("held_change", "restart_session") && is("revision", "3"));
+    CHECK(send("d3", "operation=apply\nheld_revision=3\nbase_epoch=2\n", NULL));
+    CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("d3") && is("status", "stale") && is("held_revision", "4"));
+    CHECK(send("d4", "operation=undo\nbase_revision=3\nbase_epoch=2\n", NULL));
+    CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("d4") && is("status", "conflict"));
+    CHECK(send("d5", "operation=apply\nheld_revision=4\nbase_epoch=2\n", NULL));
+    CHECK(frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("d5") && is("status", "ok") && is("outcome", "applied"));
+    CHECK(is("revision", "4") && is("epoch", "3"));
+    boat_session_restart(&session, (BoatWater) { 0 }); // As the game does on that answer.
+    CHECK(session.voyage.route->exposure.height == 1.8f);
+
+    // Undo holds R3 for the same restart rules; Discard drops it; a second Undo and Apply
+    // reinstall it.
+    CHECK(send("e1", "operation=undo\nbase_revision=4\nbase_epoch=3\n", NULL));
+    CHECK(!frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("e1") && is("outcome", "held") && is("held_revision", "3"));
     CHECK(is("held_undo", "1"));
-    CHECK(send("e2", "operation=discard\nbase_epoch=2\n", NULL));
+    CHECK(send("e2", "operation=discard\nbase_epoch=3\n", NULL));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
     CHECK(answered("e2") && is("outcome", "discarded") && is("held_revision", "0"));
-    CHECK(send("e3", "operation=discard\nbase_epoch=2\n", NULL));
+    CHECK(send("e3", "operation=discard\nbase_epoch=3\n", NULL));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
     CHECK(answered("e3") && is("status", "conflict"));
-    CHECK(send("e4", "operation=undo\nbase_revision=3\nbase_epoch=2\n", NULL));
+    CHECK(send("e4", "operation=undo\nbase_revision=4\nbase_epoch=3\n", NULL));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(send("e5", "operation=apply\nheld_revision=2\nbase_epoch=2\n", NULL));
-    CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("e5") && is("outcome", "applied") && is("revision", "2") && is("epoch", "3"));
-    CHECK(session.voyage.route->shelters[1].radius == 150);
+    CHECK(send("e5", "operation=apply\nheld_revision=3\nbase_epoch=3\n", NULL));
+    CHECK(frame(&bridge, &plugin, &session, now += .25));
+    CHECK(answered("e5") && is("outcome", "applied") && is("revision", "3") && is("epoch", "4"));
+    boat_session_restart(&session, (BoatWater) { 0 });
+    CHECK(session.voyage.route->shelters[1].radius == 120);
+    CHECK(session.voyage.route->exposure.height == 1.6f);
 
     // A rejected candidate keeps the running revision and reports where it failed.
     BoatPluginFiles *broken = variant("max_speed = 6", "max_speed = 'six'");
-    CHECK(broken && send("f1", "operation=stage\nbase_revision=2\nbase_epoch=3\n", broken));
+    CHECK(broken && send("f1", "operation=stage\nbase_revision=3\nbase_epoch=4\n", broken));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("f1") && is("outcome", "rejected") && is("revision", "2"));
+    CHECK(answered("f1") && is("outcome", "rejected") && is("revision", "3"));
     CHECK(is("diagnostic_field", "voyage.arrival.max_speed"));
     // A water change asks the caller to restart the session.
-    BoatPluginFiles *water = variant("height = 1.6", "height = 1.2");
-    CHECK(water && send("f2", "operation=stage\nbase_revision=2\nbase_epoch=3\n", water));
+    BoatPluginFiles *calmer = variant("height = 1.6", "height = 1.2");
+    CHECK(calmer && send("f2", "operation=stage\nbase_revision=3\nbase_epoch=4\n", calmer));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
     CHECK(answered("f2") && is("held_change", "restart_session"));
-    CHECK(send("f3", "operation=apply\nheld_revision=4\nbase_epoch=3\n", NULL));
+    CHECK(send("f3", "operation=apply\nheld_revision=5\nbase_epoch=4\n", NULL));
     CHECK(frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("f3") && is("outcome", "applied") && is("revision", "4"));
+    CHECK(answered("f3") && is("outcome", "applied") && is("revision", "5"));
     boat_session_restart(&session, (BoatWater) { 0 }); // As the game does on that answer.
     CHECK(session.voyage.route->exposure.height == 1.2f);
 
     // A pending stage is cancelled by Discard and answered.
     plugin.stage_executable = argv[0];
-    CHECK(send("f4", "operation=stage\nbase_revision=4\nbase_epoch=4\n", route));
+    CHECK(send("f4", "operation=stage\nbase_revision=5\nbase_epoch=5\n", route));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
     CHECK(plugin.staging);
-    CHECK(send("f5", "operation=discard\nbase_epoch=4\n", NULL));
+    CHECK(send("f5", "operation=discard\nbase_epoch=5\n", NULL));
     CHECK(!wake_bridge_frame(&bridge, &plugin, &session, now += .25));
     CHECK(answered("f5") && is("outcome", "canceled") && is("staging", "0"));
     CHECK(!frame(&bridge, &plugin, &session, now));
@@ -334,10 +378,10 @@ int main(int argc, char **argv)
         CHECK(!fclose(output));
     }
     plugin.watching = true;
-    boat_plugin_watch_start(&plugin.watch, boat_plugin_read_key(BOAT_PLUGIN_OK, water, NULL), now);
-    CHECK(send("a3", "operation=stage\nbase_revision=4\nbase_epoch=4\n", route));
+    boat_plugin_watch_start(&plugin.watch, boat_plugin_read_key(BOAT_PLUGIN_OK, calmer, NULL), now);
+    CHECK(send("a3", "operation=stage\nbase_revision=5\nbase_epoch=5\n", route));
     CHECK(!frame(&bridge, &plugin, &session, now += .25));
-    CHECK(answered("a3") && is("outcome", "held") && is("held_revision", "5"));
+    CHECK(answered("a3") && is("outcome", "held") && is("held_revision", "6"));
     unsigned requests = plugin.requests;
     for (unsigned i = 0; i < 8; ++i)
         CHECK(!frame(&bridge, &plugin, &session, now += .25));
