@@ -40,7 +40,13 @@ static bool preview(WakePlugin *plugin, const BoatWorldResources *resources, uns
     BoatPluginDiagnostic *d)
 {
     BoatPluginHost *host = &plugin->host;
-    if (host->racing) {
+    if (host->kind != BOAT_PLUGIN_KIND_VOYAGE && host->kind != BOAT_PLUGIN_KIND_RACE) {
+        d->status = BOAT_PLUGIN_RUNTIME;
+        snprintf(
+            d->message, sizeof(d->message), "preview is not available for free or course packages");
+        return false;
+    }
+    if (host->kind == BOAT_PLUGIN_KIND_RACE) {
         BoatFleet *fleet = calloc(1, sizeof(*fleet));
         BoatRace race;
         bool ok = fleet
@@ -183,7 +189,20 @@ int main(int argc, char **argv)
     d = host->diagnostic;
     if (d.status == BOAT_PLUGIN_OK) {
         const BoatPluginRevision *revision = boat_plugin_host_active(host);
-        digest = host->racing ? revision->race.digest : revision->voyage.digest;
+        switch (host->kind) {
+        case BOAT_PLUGIN_KIND_RACE:
+            digest = revision->race.digest;
+            break;
+        case BOAT_PLUGIN_KIND_COURSE:
+            digest = revision->course.digest;
+            break;
+        case BOAT_PLUGIN_KIND_FREE:
+            digest = revision->free.digest;
+            break;
+        default:
+            digest = revision->voyage.digest;
+            break;
+        }
     }
 done:
     printf("{");
@@ -205,7 +224,7 @@ done:
              module_count = 0, vessel_count = 0, flock_count = 0;
     bool traffic_present = false, gulls_present = false;
     uint64_t scene_digest = 0;
-    if (d.status == BOAT_PLUGIN_OK && !host->racing) {
+    if (d.status == BOAT_PLUGIN_OK && host->kind == BOAT_PLUGIN_KIND_VOYAGE) {
         const BoatPluginRevision *active = boat_plugin_host_active(host);
         scene_present = active->voyage.has_scene;
         scene_version = active->voyage.scene.version;
@@ -231,11 +250,10 @@ done:
         berth_count && (module_count || traffic_present || gulls_present) ? "," : "",
         module_count ? "\"marina.modules\"" : "",
         module_count && (traffic_present || gulls_present) ? "," : "",
-        traffic_present ? "\"traffic.vessels\"" : "",
-        traffic_present && gulls_present ? "," : "",
+        traffic_present ? "\"traffic.vessels\"" : "", traffic_present && gulls_present ? "," : "",
         gulls_present ? "\"gulls.flocks\"" : "", berth_count, module_count, vessel_count,
-        flock_count,
-        (unsigned long long)d.cost.instructions, (unsigned long long)d.cost.entry_instructions,
+        flock_count, (unsigned long long)d.cost.instructions,
+        (unsigned long long)d.cost.entry_instructions,
         (unsigned long long)d.cost.callback_instructions, d.cost.peak_bytes, d.cost.leaked_bytes,
         d.cost.fields);
     boat_world_resources_destroy(&resources);

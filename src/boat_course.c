@@ -1,13 +1,58 @@
 #include "boat_course.h"
 
 #include <math.h>
+#include <string.h>
 
 // Northbound gates; offset centres encourage two broad turns across the basin.
 const BoatCourseGate boat_course_gates[BOAT_COURSE_GATES]
     = { { { 0, 35 }, 12 }, { { 22, 7 }, 10 }, { { -22, -23 }, 10 }, { { 0, -53 }, 12 } };
 
+const BoatCourseDefinition boat_course_default = {
+    .start = { 0, 50 },
+    .heading = 0,
+    .gates = { { { 0, 35 }, 12 }, { { 22, 7 }, 10 }, { { -22, -23 }, 10 }, { { 0, -53 }, 12 } },
+};
+
+static void fold(uint64_t *hash, const void *bytes, size_t size)
+{
+    const unsigned char *p = bytes;
+    for (size_t i = 0; i < size; ++i) {
+        *hash ^= p[i];
+        *hash *= 1099511628211ull;
+    }
+}
+
+static void number(uint64_t *hash, float value)
+{
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    unsigned char bytes[4] = { (unsigned char)bits, (unsigned char)(bits >> 8),
+        (unsigned char)(bits >> 16), (unsigned char)(bits >> 24) };
+    fold(hash, bytes, sizeof(bytes));
+}
+
+uint64_t boat_course_digest(const BoatCourseDefinition *definition)
+{
+    if (!definition)
+        definition = &boat_course_default;
+    uint64_t hash = 14695981039346656037ull;
+    number(&hash, definition->start.x);
+    number(&hash, definition->start.y);
+    number(&hash, definition->heading);
+    for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
+        number(&hash, definition->gates[i].centre.x);
+        number(&hash, definition->gates[i].centre.y);
+        number(&hash, definition->gates[i].half_width);
+    }
+    return hash;
+}
+
+uint64_t boat_course_compiled_digest(void) { return boat_course_digest(&boat_course_default); }
+
 void boat_course_step(BoatCourse *course, Vector2 previous, Vector2 position, double dt)
 {
+    const BoatCourseGate *gates
+        = course->definition ? course->definition->gates : boat_course_gates;
     for (int i = 0; i < BOAT_COURSE_GATES; ++i)
         course->crossing[i] = -1;
     if (!course->enabled || course->next_gate == BOAT_COURSE_GATES)
@@ -17,7 +62,7 @@ void boat_course_step(BoatCourse *course, Vector2 previous, Vector2 position, do
     double running_from = course->next_gate > 0 ? 0 : 1;
     double running_until = 1;
     while (course->next_gate < BOAT_COURSE_GATES) {
-        BoatCourseGate gate = boat_course_gates[course->next_gate];
+        BoatCourseGate gate = gates[course->next_gate];
         if (previous.y <= gate.centre.y || position.y > gate.centre.y)
             break;
         double fraction = (previous.y - gate.centre.y) / (previous.y - position.y);

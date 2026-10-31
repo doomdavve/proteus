@@ -118,7 +118,10 @@ static void close_stage(WakePlugin *plugin)
 static void bind_scene(WakePlugin *plugin, BoatSession *session)
 {
     const BoatPluginRevision *revision = boat_plugin_host_active(&plugin->host);
-    session->world.scene = revision->voyage.has_scene ? &revision->voyage.scene : NULL;
+    session->world.scene
+        = plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE && revision->voyage.has_scene
+        ? &revision->voyage.scene
+        : NULL;
 }
 
 static bool scene_differs(const BoatPluginRevision *active, const BoatPluginRevision *candidate)
@@ -286,6 +289,8 @@ void wake_plugin_reset_objective(WakePlugin *plugin, const BoatSession *session)
     plugin->event_count = 0;
     plugin->sequence = 0;
     plugin->objective_pending = false;
+    if (!plugin->host.depth || plugin->host.kind != BOAT_PLUGIN_KIND_VOYAGE)
+        return;
     const BoatPluginRevision *r = boat_plugin_host_active(&plugin->host);
     plugin->objective.timers_enabled = r->voyage.manifest.timers;
     plugin->objective.state_version = r->voyage.manifest.state_version;
@@ -395,6 +400,7 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     // Keep the large revision history out of temporary stack storage on Windows.
     memset(plugin, 0, sizeof(*plugin));
     plugin->directory = directory;
+    plugin->authoring = true;
     plugin->frame_now = now;
     uint64_t key;
     bool read = read_package(plugin, &key) == BOAT_PLUGIN_OK;
@@ -405,6 +411,7 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
     // Callback execution also uses worker receipts; no imported Lua runs on this thread.
     plugin->host.location = session->world.definition;
     plugin->host.map = &session->world.resources->map;
+    plugin->host.kind = BOAT_PLUGIN_KIND_VOYAGE;
     BoatPluginStageJob *launch
         = read ? boat_plugin_stage_start(NULL, &plugin->host, &plugin->files, now) : NULL;
     bool started = launch && boat_plugin_stage_poll(launch, &plugin->host, now) == 1;
@@ -439,6 +446,47 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
 #endif
         "%s R1 ACTIVE %016llx", voyage->manifest.id, (unsigned long long)voyage->digest);
     return true;
+}
+
+bool wake_plugin_open_catalog(
+    WakePlugin *plugin, const BoatPluginCatalogEntry *entry, BoatSession *session)
+{
+#if defined(__EMSCRIPTEN__)
+    (void)plugin;
+    (void)entry;
+    (void)session;
+    fprintf(stderr, "Bundled packages are native-only until browser parity.\n");
+    return false;
+#else
+    if (session->voyage_route != session->world.definition->voyage) {
+        fprintf(stderr, "Plugin voyage already has an owner; second owner rejected.\n");
+        return false;
+    }
+    memset(plugin, 0, sizeof(*plugin));
+    plugin->directory = entry->id;
+    plugin->authoring = false;
+    plugin->frame_now = 0;
+    BoatPluginRevision revision;
+    if (!boat_plugin_catalog_decode(entry, &revision, &plugin->host.diagnostic)
+        || !boat_plugin_host_start_decoded(
+            &plugin->host, session->world.definition, &session->world.resources->map, &revision)) {
+        const BoatPluginDiagnostic *d = &plugin->host.diagnostic;
+        fprintf(stderr, "Package %s: %s error in %s %s: %s\n", entry->id,
+            boat_plugin_status_name(d->status), d->file, d->field, d->message);
+        return false;
+    }
+    const BoatPluginRevision *active = boat_plugin_host_active(&plugin->host);
+    if (plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE) {
+        boat_session_restart_voyage(session, &active->voyage.route);
+        wake_plugin_reset_objective(plugin, session);
+    } else if (plugin->host.kind == BOAT_PLUGIN_KIND_COURSE) {
+        boat_session_set_course_definition(session, &active->course.course);
+    }
+    bind_scene(plugin, session);
+    report(plugin, "active", false, "", "%s ACTIVE %016llx", active->manifest.name,
+        (unsigned long long)entry->digest);
+    return true;
+#endif
 }
 
 // Install the held candidate under its policy. True when the session must restart.
@@ -607,6 +655,8 @@ static bool stage(WakePlugin *plugin, BoatSession *session, bool read_ok, double
 bool wake_plugin_stage_files(
     WakePlugin *plugin, BoatSession *session, const BoatPluginFiles *files, double now)
 {
+    if (!plugin->authoring)
+        return false;
     // Bytes the selected package holds now count as its save, whether or not a poll has seen
     // them yet; other bytes leave polling alone, so a later edit of the directory still stages.
     static BoatPluginFiles disk;
@@ -626,9 +676,13 @@ void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
     if (session) {
         // The session borrowed the plugin's route and scene. Restore both compiled defaults
         // before the host storage may be reused, so re-entry never sees a dangling borrower.
-        session->voyage_route = session->world.definition->voyage;
-        if (session->voyage.route)
-            session->voyage.route = session->voyage_route;
+        if (plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE) {
+            session->voyage_route = session->world.definition->voyage;
+            if (session->voyage.route)
+                session->voyage.route = session->voyage_route;
+        } else if (plugin->host.kind == BOAT_PLUGIN_KIND_COURSE) {
+            boat_session_set_course_definition(session, NULL);
+        }
         session->world.scene = NULL;
     }
 #ifdef __EMSCRIPTEN__
@@ -649,6 +703,8 @@ bool wake_plugin_editing(void)
 bool wake_plugin_frame(
     WakePlugin *plugin, BoatSession *session, bool reload, bool undo, bool apply, double now)
 {
+    if (!plugin->authoring)
+        return false;
     plugin->frame_now = now;
 #ifdef __EMSCRIPTEN__
     unsigned actions = browser_actions();
@@ -797,6 +853,7 @@ static bool preview_session(const BoatSession *s)
 bool wake_plugin_preview_save(WakePluginPreview *c, const WakePlugin *p, const BoatSession *s)
 {
     if (p->staging || p->evaluation || !preview_session(s) || !p->host.depth
+        || p->host.kind != BOAT_PLUGIN_KIND_VOYAGE
         || s->voyage_route != &boat_plugin_host_active(&p->host)->voyage.route
         || s->voyage.route != s->voyage_route)
         return false;

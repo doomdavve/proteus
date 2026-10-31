@@ -39,8 +39,9 @@ Wake Velocity is in active development. Expect some rough edges; the
 ## Build and develop
 
 The game is written in **C17 with raylib**. Boat physics, networking and presentation
-are separate, with a GPU renderer and a CPU reference renderer. Lua plugins let you
-edit voyages and preview race courses while playing. The [authoring tools](docs/PLUGIN_API.md#native-authoring-tools-p41)
+are separate, with a GPU renderer and a CPU reference renderer. Every native solo session starts
+from a package compiled at build time; Lua authoring (`--plugin`) lets you edit voyages and preview
+race courses while playing. The [authoring tools](docs/PLUGIN_API.md#native-authoring-tools-p41)
 provide machine-readable schemas and isolated, deterministic voyage/race previews. Development
 [browser builds](docs/WEB_BUILD.md#plugin-source-bundles-p43) also import/export solo voyages with optional objectives and timers.
 

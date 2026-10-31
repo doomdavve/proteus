@@ -49,7 +49,8 @@ def load_layout():
                 "anchors_name": "tools/plugin_anchors.json",
                 "api_document": "docs/PLUGIN_API.md",
                 "examples": ["plugins/langedrag", "plugins/harbor-life", "plugins/river-sprint",
-                             "plugins/shelter-tour"]}
+                             "plugins/shelter-tour", "plugins/basin-free", "plugins/river-free",
+                             "plugins/time-trial"]}
     with open(path, encoding="utf-8") as stream:
         package = json.load(stream)
     if package.get("layout") != 1:
@@ -73,9 +74,10 @@ def capabilities():
     if LAYOUT["kind"] == "package":
         layout.update(package=LAYOUT["package"], version=LAYOUT["version"])
     return {"protocol": 1, "operations": OPERATIONS, "layout": layout,
-            "kinds": {"voyage": "outer", "race": "river"},
-            "capabilities": ["voyage.define", "scene.define", "race.define", "objective.hud",
-                             "objective.timers"],
+            "kinds": {"voyage": "outer", "free": "basin or river", "course": "basin",
+                      "race": "river"},
+            "capabilities": ["voyage.define", "scene.define", "free.define", "course.define",
+                             "race.define", "objective.hud", "objective.timers"],
             "scene": {"grant": "scene.define", "envelope_version": 1,
                       "supported_subsystems": ["marina.berths", "marina.modules",
                                                "traffic.vessels", "gulls.flocks"],
@@ -345,7 +347,7 @@ class CaptureJob:
         manifest = json.loads(payload[8:8 + manifest_size])
         # The native parser stays authoritative; this only routes the request.
         if not isinstance(manifest, dict) or manifest.get("kind") != "voyage":
-            raise ValueError("capture supports voyage plugins; race capture is unsupported")
+            raise ValueError("capture supports voyage plugins only; free, course and race capture are unsupported")
         if anchor is not None and anchor["location"] != manifest.get("location"):
             raise ValueError(f"anchor {anchor['id']} is not in {manifest.get('location')}")
         self.base_revision = base_revision

@@ -16,8 +16,10 @@ void boat_course_visit(const BoatCourse *course, BoatCourseBoxDraw draw, void *c
 {
     if (!course->enabled)
         return;
+    const BoatCourseGate *gates
+        = course->definition ? course->definition->gates : boat_course_gates;
     for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
-        BoatCourseGate gate = boat_course_gates[i];
+        BoatCourseGate gate = gates[i];
         Color color = gate_color(course, i);
         for (int side = -1; side <= 1; side += 2) {
             float x = -(gate.centre.x + side * gate.half_width);
@@ -71,12 +73,14 @@ void boat_course_hud(const BoatCourse *course, Vector2 position, int width)
         return;
     DrawRectangle(left, 8, 120, 148, (Color) { 14, 23, 32, 245 });
     boat_ui_text("S COURSE", left + 8, 14, 12, RAYWHITE);
+    const BoatCourseGate *gates
+        = course->definition ? course->definition->gates : boat_course_gates;
     for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
-        BoatCourseGate gate = boat_course_gates[i];
+        BoatCourseGate gate = gates[i];
         int x = left + 60 + (int)gate.centre.x;
         int y = 38 + (int)(gate.centre.y + 60);
         if (i > 0) {
-            Vector2 last = boat_course_gates[i - 1].centre;
+            Vector2 last = gates[i - 1].centre;
             DrawLine(left + 60 + (int)last.x, 38 + (int)(last.y + 60), x, y, DARKGRAY);
         }
         DrawLine(x - (int)gate.half_width, y, x + (int)gate.half_width, y, gate_color(course, i));

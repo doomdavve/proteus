@@ -316,6 +316,16 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   and compares the boat, the water and every voyage field at each tick. The
   `wake_velocity_plugin_*` tests render a CPU frame with the plugin and check that `--plugin`
   is refused with a room, the course, another location or a missing package.
+- `boat_plugin_catalog` (PD1) decodes every generated entry and proves it equals evaluating its
+  embedded source, that the basin-free, river-free, outer-voyage and time-trial defaults equal
+  the compiled definitions, and that catalog decoding creates no Lua state (the
+  `boat_plugin_lua_states` counter is unchanged). `boat_plugin_session.catalog_runtime` opens the outer voyage and Harbor life entries and checks
+  that no Lua state, watch, staging worker or authoring panel appears. `boat_plugin_catalog_invalid` runs the
+  build-time generator on objective, bad-schema and duplicate packages and expects its normal
+  diagnostics. `plugin_default_parity` captures basin, river, outer and course sessions with
+  `--renderer cpu` through the catalog and `--no-plugins` and compares the images byte for byte.
+  `boat_replay`'s legacy-best case proves a pre-existing `course-calm-physicsN.run` keeps its
+  path as the best and is not overwritten by an equal or slower run.
 - `boat_map` runs `validate_boat_map` (adventure A1.1/A1.2). It checks explicit map
   descriptions, caller-owned collision caches, failed/zeroed preparation, two river owners and a
   synthetic map alive together, and destroy/recreate. It also matches a river query digest

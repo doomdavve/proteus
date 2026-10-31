@@ -37,6 +37,25 @@ the standard engine. Multiplayer assigns liveries
 by slot. `--soundtrack a-little-boat|acid-wake|off` selects local music. `--mouse-steering`
 starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSIC.md).
 
+### Bundled packages
+
+```sh
+./build/wake_velocity --location river
+./build/wake_velocity --location outer --package proteus.harbor-life
+./build/wake_velocity --course
+./build/wake_velocity --location basin --no-plugins
+```
+
+Every native solo session starts from a package compiled into the executable at build time; the
+default for the basin and river is free boating, for `outer` the Långedrag voyage, and for
+`--course` the basin time trial. `--package ID` selects another bundled package, which must
+belong to the session's location and mode (for example `proteus.harbor-life` on `outer`).
+Launching a package starts no Lua VM, polls no files and shows no authoring panel. The temporary
+`--no-plugins` switch restores the compiled-content path for parity checks. Rooms and the browser
+continue on compiled content until later steps. An unknown ID, or a package for another location,
+fails with an explicit message. The title's single-player panel selects Standard or Harbor life
+for `outer` on native builds.
+
 ### Live Lua authoring
 
 ```sh
@@ -76,12 +95,15 @@ marina berths; a layout change is held for F7 and restarts the session. See the
 ./build/wake_velocity --course --data-dir build/practice-saves
 ```
 
-`--course` selects the basin time trial. `--replay FILE` and `--ghost FILE` imply course
-mode. Replay uses the recording's water preset; an imported ghost must match the selected
-preset. Imported ghosts remain selected across retries while your personal best is tracked
-separately. `--save-run FILE` exports every completed normal-time attempt, including slower
-runs; altered-time practice attempts preserve existing exports and bests. See
-[saved runs](PLAYING.md#saved-runs) for storage and compatibility.
+`--course` selects the basin time trial, which starts from the bundled `proteus.time-trial`
+package. `--replay FILE` and `--ghost FILE` imply course mode. Replay uses the recording's water
+preset; an imported ghost must match the selected preset. Imported ghosts remain selected across
+retries while your personal best is tracked separately. `--save-run FILE` exports every completed
+normal-time attempt, including slower runs; altered-time practice attempts preserve existing
+exports and bests. A course whose gameplay digest equals the compiled S course keeps the
+established `course-*.run` best path; another `--package` course adds its digest to the filename
+and refuses `--replay`/`--ghost`. See [saved runs](PLAYING.md#saved-runs) for storage and
+compatibility.
 
 ## Water settings
 

@@ -37,8 +37,34 @@ typedef struct {
     unsigned gate_count;
     double source[12], storm[8], rules[9];
 } BoatPluginRaceData;
+
+typedef struct {
+    double version;
+} BoatPluginFreeData;
+
+typedef struct {
+    double start[3], gates[BOAT_COURSE_GATES][3];
+    unsigned gate_count;
+} BoatPluginCourseData;
+
+BoatPluginStatus boat_plugin_lua_free(const char *source, size_t size, const char *chunk,
+    const BoatPluginLimits *limits, BoatPluginFreeData *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_lua_course(const char *source, size_t size, const char *chunk,
+    const BoatPluginLimits *limits, BoatPluginCourseData *out, BoatPluginDiagnostic *diagnostic);
+
 BoatPluginStatus boat_plugin_lua_race(const char *source, size_t size, const char *chunk,
     const BoatPluginLimits *limits, BoatPluginRaceData *out, BoatPluginDiagnostic *diagnostic);
+
+// PD1: decode already evaluated free/course data without opening a Lua VM.
+BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
+    const BoatPluginFreeData *data, BoatPluginFree *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_decode_course(const BoatPluginManifest *manifest,
+    const BoatPluginCourseData *data, BoatPluginCourse *out, BoatPluginDiagnostic *diagnostic);
+BoatPluginStatus boat_plugin_decode_race(const BoatPluginManifest *manifest,
+    const BoatPluginRaceData *data, BoatPluginRace *out, BoatPluginDiagnostic *diagnostic);
+
+// How many Lua states this process has created, for the no-Lua runtime gate.
+unsigned boat_plugin_lua_states(void);
 
 // Compile SOURCE as text named CHUNK, run it under LIMITS and copy the voyage it returns.
 // DIAGNOSTIC is required; its cost is filled on every return.

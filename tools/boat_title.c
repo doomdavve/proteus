@@ -104,6 +104,7 @@ typedef enum {
 } SettingsRow;
 typedef enum {
     ROW_SOLO_PLACE,
+    ROW_SOLO_CONTENT,
     ROW_SOLO_WATER,
     ROW_SOLO_EDGES,
     ROW_SOLO_START,
@@ -150,6 +151,7 @@ typedef struct {
     unsigned shown; // The found room the LAN row offers.
     unsigned public_shown;
     double queried;
+    bool solo_content; // The native outer content row is visible in this panel.
     FramePacer pacer;
 } Title;
 
@@ -238,11 +240,19 @@ static void crosshair(int x, int y, Color ink)
 static int row_count(const Title *t)
 {
     return t->panel == PANEL_CREDITS ? 1
-        : t->panel == PANEL_SINGLE   ? SOLO_ROWS
+        : t->panel == PANEL_SINGLE   ? (t->solo_content ? SOLO_ROWS : SOLO_ROWS - 1)
         : t->panel == PANEL_JOIN     ? JOIN_ROWS
         : t->panel == PANEL_HOST     ? HOST_ROWS
         : t->panel == PANEL_SETTINGS ? SETTINGS_ROWS
                                      : MAIN_ROWS;
+}
+
+// A visible SOLO row as its enum value: the content row is hidden except on native outer.
+static int solo_row(const Title *t, int visible)
+{
+    if (t->solo_content || visible < ROW_SOLO_CONTENT)
+        return visible;
+    return visible + 1;
 }
 
 static Rectangle row_bounds(const Title *t, int row)
@@ -277,17 +287,21 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     *label = "";
     value[0] = 0;
     if (t->panel == PANEL_SINGLE) {
-        static const char *labels[SOLO_ROWS] = { "PLACE", "WAVES", "SMOOTHING", "START", "BACK" };
-        *label = labels[row];
-        if (row == ROW_SOLO_PLACE)
+        static const char *labels[SOLO_ROWS]
+            = { "PLACE", "CONTENT", "WAVES", "SMOOTHING", "START", "BACK" };
+        int logical = solo_row(t, row);
+        *label = labels[logical];
+        if (logical == ROW_SOLO_PLACE)
             snprintf(value, size, "< %s >",
                 s->location == BOAT_LOCATION_COUNT       ? "BASIN TRIAL"
                     : s->location == BOAT_LOCATION_OUTER ? "OUTER RIVER"
                     : s->location == BOAT_LOCATION_RIVER ? "RIVER"
                                                          : "BASIN");
-        else if (row == ROW_SOLO_WATER)
+        else if (logical == ROW_SOLO_CONTENT)
+            snprintf(value, size, "< %s >", s->outer_content ? "HARBOR LIFE" : "STANDARD");
+        else if (logical == ROW_SOLO_WATER)
             snprintf(value, size, "< %s >", s->waves ? "ON" : "OFF");
-        else if (row == ROW_SOLO_EDGES)
+        else if (logical == ROW_SOLO_EDGES)
             snprintf(value, size, "< %s >", s->smooth_edges ? "ON" : "OFF");
         return;
     }
@@ -485,6 +499,8 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         hint = "REMEMBERED; ESC MENU OR M SWITCHES IN GAME";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
+    if (!hint && t->panel == PANEL_SINGLE && solo_row(t, t->selected) == ROW_SOLO_CONTENT)
+        hint = s->outer_content ? "AUTHORED MARINA, TRAFFIC AND GULLS" : "THE COMPILED OUTER RIVER";
     char public_hint[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_PUBLIC_SERVER) {
         if (!public_server_count())
@@ -886,17 +902,25 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
             t.shown = (unsigned)((int)(t.shown + t.found.count) + turn) % t.found.count;
         }
-        if (t.panel == PANEL_SINGLE && t.selected <= ROW_SOLO_EDGES) {
-            int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
-                - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
-            if (t.selected == ROW_SOLO_PLACE)
-                s->location
-                    = (s->location + BOAT_LOCATION_COUNT + 1 + turn) % (BOAT_LOCATION_COUNT + 1);
-            else if (t.selected == ROW_SOLO_WATER && turn)
-                s->waves = !s->waves;
-            else if (turn)
-                s->smooth_edges = !s->smooth_edges;
-            activate = false;
+        if (t.panel == PANEL_SINGLE) {
+            int sel = solo_row(&t, t.selected);
+            if (sel <= ROW_SOLO_EDGES) {
+                int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
+                    - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+                if (sel == ROW_SOLO_PLACE) {
+                    s->location = (s->location + BOAT_LOCATION_COUNT + 1 + turn)
+                        % (BOAT_LOCATION_COUNT + 1);
+                    t.solo_content = s->location == BOAT_LOCATION_OUTER;
+                    if (t.selected >= row_count(&t))
+                        t.selected = row_count(&t) - 1;
+                } else if (sel == ROW_SOLO_CONTENT && turn)
+                    s->outer_content = !s->outer_content;
+                else if (sel == ROW_SOLO_WATER && turn)
+                    s->waves = !s->waves;
+                else if (sel == ROW_SOLO_EDGES && turn)
+                    s->smooth_edges = !s->smooth_edges;
+                activate = false;
+            }
         }
         if (t.panel == PANEL_HOST && t.selected <= ROW_WATER) {
             int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
@@ -937,7 +961,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 else
                     back = true;
             } else if (t.panel == PANEL_SINGLE) {
-                if (t.selected == ROW_SOLO_START) {
+                if (solo_row(&t, t.selected) == ROW_SOLO_START) {
                     choice = BOAT_TITLE_SINGLE;
                     chosen = true;
                 } else
@@ -977,7 +1001,12 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     back = true;
             } else if (t.selected == ROW_SINGLE) {
                 t.panel = PANEL_SINGLE;
-                t.selected = ROW_SOLO_START;
+#if !defined(__EMSCRIPTEN__)
+                t.solo_content = s->location == BOAT_LOCATION_OUTER;
+#else
+                t.solo_content = false;
+#endif
+                t.selected = t.solo_content ? ROW_SOLO_START : ROW_SOLO_START - 1;
             } else if (t.selected == ROW_MULTI) {
                 t.panel = PANEL_JOIN;
                 t.selected = ROW_PUBLIC_SERVER;
@@ -1092,6 +1121,8 @@ void boat_title_load(BoatTitleSettings *s)
             s->waves = !strcmp(value, "on");
         else if (!strcmp(line, "smooth_edges"))
             s->smooth_edges = !strcmp(value, "on");
+        else if (!strcmp(line, "outer_content"))
+            s->outer_content = !strcmp(value, "harbor-life");
         else if (!strcmp(line, "host_mode")) {
             for (unsigned i = 0; i < BOAT_TITLE_HOST_MODES; ++i)
                 if (!strcmp(value, host_modes[i]))
@@ -1118,9 +1149,10 @@ void boat_title_save(const BoatTitleSettings *s)
     fprintf(file, "name=%s\naddress=%s\nskin=%s\nmouse_steering=%s\nsoundtrack=%s\n", s->name,
         s->address, boat_skin_name(s->skin), s->mouse_steering ? "on" : "off",
         boat_music(s->soundtrack)->id);
-    fprintf(file, "location=%s\nwaves=%s\nsmooth_edges=%s\n",
+    fprintf(file, "location=%s\nwaves=%s\nsmooth_edges=%s\nouter_content=%s\n",
         s->location == BOAT_LOCATION_COUNT ? "course" : boat_location(s->location)->name,
-        s->waves ? "on" : "off", s->smooth_edges ? "on" : "off");
+        s->waves ? "on" : "off", s->smooth_edges ? "on" : "off",
+        s->outer_content ? "harbor-life" : "standard");
     fprintf(file, "host_mode=%s\nhost_location=%s\nhost_waves=%s\n",
         boat_title_host_mode(s->host_mode), boat_location(s->host_location)->name,
         s->host_waves ? "on" : "off");

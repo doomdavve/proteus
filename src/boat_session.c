@@ -19,18 +19,28 @@ void boat_session_init(BoatSession *session, const BoatWorldResources *resources
 {
     boat_world_init(&session->world, resources, water);
     session->voyage_route = session->world.definition->voyage;
+    session->course_definition = NULL;
     reset(session);
     session->handling = &boat_handling_speedboat;
 }
 
 void boat_session_destroy(BoatSession *session) { boat_replay_runs_destroy(&session->runs); }
 
+void boat_session_set_course_definition(
+    BoatSession *session, const BoatCourseDefinition *definition)
+{
+    session->course_definition = definition;
+}
+
 void boat_session_start_course(BoatSession *session)
 {
+    const BoatCourseDefinition *definition
+        = session->course_definition ? session->course_definition : &boat_course_default;
     boat_reset(&session->boat);
-    session->boat.position = BOAT_COURSE_START;
+    session->boat.position = definition->start;
+    session->boat.heading = definition->heading;
     boat_presentation_reset(&session->presentation);
-    session->course = (BoatCourse) { .enabled = true };
+    session->course = (BoatCourse) { .enabled = true, .definition = definition };
 }
 
 void boat_session_restart(BoatSession *session, BoatWater water)

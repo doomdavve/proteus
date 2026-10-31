@@ -33,6 +33,21 @@ const char *boat_plugin_status_name(BoatPluginStatus status)
     return (unsigned)status < sizeof(names) / sizeof(names[0]) ? names[status] : "unknown";
 }
 
+static const char *const KIND_NAMES[] = { "none", "voyage", "free", "course", "race" };
+
+BoatPluginKind boat_plugin_kind_parse(const char *kind)
+{
+    for (unsigned i = BOAT_PLUGIN_KIND_VOYAGE; i <= BOAT_PLUGIN_KIND_RACE; ++i)
+        if (!strcmp(KIND_NAMES[i], kind))
+            return (BoatPluginKind)i;
+    return BOAT_PLUGIN_KIND_NONE;
+}
+
+const char *boat_plugin_kind_name(BoatPluginKind kind)
+{
+    return (unsigned)kind < sizeof(KIND_NAMES) / sizeof(KIND_NAMES[0]) ? KIND_NAMES[kind] : "none";
+}
+
 static BoatPluginStatus diagnose(BoatPluginDiagnostic *d, BoatPluginStatus status, const char *file,
     const char *field, const char *format, ...)
 {
@@ -110,6 +125,7 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             return diagnose(d, BOAT_PLUGIN_MANIFEST, file, MANIFEST_KEYS[k], "is missing");
     BoatPluginManifest m = { 0 };
     int api, state;
+    BoatPluginKind kind;
     if (!boat_json_text(json, &tokens[at[0]], m.id, sizeof(m.id)) || !identifier(m.id))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "id",
             "must be 1-63 characters of a-z, 0-9, '.', '_' or '-', starting with a letter");
@@ -120,22 +136,33 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         return diagnose(
             d, BOAT_PLUGIN_MANIFEST, file, "api", "must be %d, the supported API", BOAT_PLUGIN_API);
     if (!boat_json_text(json, &tokens[at[3]], m.kind, sizeof(m.kind))
-        || (strcmp(m.kind, "voyage") && strcmp(m.kind, "race")))
-        return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "kind", "must be voyage or race");
+        || (kind = boat_plugin_kind_parse(m.kind)) == BOAT_PLUGIN_KIND_NONE)
+        return diagnose(
+            d, BOAT_PLUGIN_MANIFEST, file, "kind", "must be voyage, free, course or race");
     if (!boat_json_text(json, &tokens[at[4]], m.entry, sizeof(m.entry)) || !plain_file(m.entry)
         || strcmp(m.entry, "main.lua"))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "entry", "must be \"main.lua\"");
+    const char *location = kind == BOAT_PLUGIN_KIND_VOYAGE ? "outer"
+        : kind == BOAT_PLUGIN_KIND_COURSE                  ? "basin"
+        : kind == BOAT_PLUGIN_KIND_RACE                    ? "river"
+                                                           : NULL;
     if (!boat_json_text(json, &tokens[at[5]], m.location, sizeof(m.location))
-        || strcmp(m.location, !strcmp(m.kind, "race") ? "river" : "outer"))
+        || (location ? strcmp(m.location, location)
+                     : strcmp(m.location, "basin") && strcmp(m.location, "river")))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location",
-            "must match kind: outer for voyage, river for race");
-    const char *grant = !strcmp(m.kind, "race") ? "race.define" : "voyage.define";
+            kind == BOAT_PLUGIN_KIND_FREE
+                ? "must be basin or river for free"
+                : "must match kind: outer for voyage, basin for course, river for race");
+    const char *grant = kind == BOAT_PLUGIN_KIND_VOYAGE ? "voyage.define"
+        : kind == BOAT_PLUGIN_KIND_FREE                 ? "free.define"
+        : kind == BOAT_PLUGIN_KIND_COURSE               ? "course.define"
+                                                        : "race.define";
     const jsmntok_t *capabilities = &tokens[at[6]];
     if (capabilities->type != JSMN_ARRAY || capabilities->size < 1
-        || capabilities->size > (!strcmp(m.kind, "race") ? 1 : 4))
+        || capabilities->size > (kind == BOAT_PLUGIN_KIND_VOYAGE ? 4 : 1))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
-            !strcmp(m.kind, "race") ? "must contain exactly race.define"
-                                    : "must contain voyage.define and optional grants");
+            kind == BOAT_PLUGIN_KIND_VOYAGE ? "must contain voyage.define and optional grants"
+                                            : "must contain exactly one kind grant");
     char capability[32];
     if (!boat_json_text(json, &tokens[at[6] + 1], capability, sizeof(capability))
         || strcmp(capability, grant))
@@ -634,8 +661,8 @@ static BoatPluginStatus check_scene_traffic(
                 Vector2 bc, bl, bb;
                 float bhl, bhb;
                 berth_box(berth, bs, &bl, &bb, &bc, &bhl, &bhb);
-                if (box_overlap(centre, length, beam, half_length, half_beam, bc, bl, bb, bhl, bhb,
-                        .3f))
+                if (box_overlap(
+                        centre, length, beam, half_length, half_beam, bc, bl, bb, bhl, bhb, .3f))
                     return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                         "crosses scene.marina.berths[%u]", b + 1);
             }
@@ -645,8 +672,8 @@ static BoatPluginStatus check_scene_traffic(
                 Vector2 mc, ml, mb;
                 float mhl, mhb;
                 module_box(&scene->modules[m], &ml, &mb, &mc, &mhl, &mhb);
-                if (box_overlap(centre, length, beam, half_length, half_beam, mc, ml, mb, mhl, mhb,
-                        .3f))
+                if (box_overlap(
+                        centre, length, beam, half_length, half_beam, mc, ml, mb, mhl, mhb, .3f))
                     return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                         "crosses scene.marina.modules[%u]", m + 1);
             }
@@ -827,4 +854,198 @@ BoatPluginChange boat_plugin_classify(
     for (unsigned i = 0; i < a->shelter_count; ++i)
         renamed |= strcmp(active->shelter_names[i], candidate->shelter_names[i]) != 0;
     return renamed || cosmetic_scene ? BOAT_PLUGIN_RENAMED : BOAT_PLUGIN_UNCHANGED;
+}
+
+// PD1 free and course kinds -------------------------------------------------------------------
+
+BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
+    const BoatPluginFreeData *data, BoatPluginFree *out, BoatPluginDiagnostic *d)
+{
+    if (!(data->version == 1))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "free.version",
+            "must be 1, the supported free schema");
+    BoatPluginFree candidate = { .manifest = *manifest, .digest = 0 };
+    *out = candidate;
+    BoatPluginCost cost = d->cost;
+    *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
+    return BOAT_PLUGIN_OK;
+}
+
+BoatPluginStatus boat_plugin_decode_course(const BoatPluginManifest *manifest,
+    const BoatPluginCourseData *data, BoatPluginCourse *out, BoatPluginDiagnostic *d)
+{
+    Check check = { d, manifest->entry };
+    if (data->gate_count != BOAT_COURSE_GATES)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "course.gates",
+            "requires exactly %d gates", BOAT_COURSE_GATES);
+    if (!coordinates(&check, "course.start", data->start[0], data->start[1])
+        || !finite_in(&check, "course.start.heading", data->start[2], -TAU, TAU, "radians"))
+        return BOAT_PLUGIN_SCHEMA;
+    BoatPluginCourse candidate = { .manifest = *manifest };
+    candidate.course.start = (Vector2) { (float)data->start[0], (float)data->start[1] };
+    candidate.course.heading = (float)data->start[2];
+    float last_y = candidate.course.start.y;
+    for (unsigned i = 0; i < BOAT_COURSE_GATES; ++i) {
+        char path[32], at[64];
+        snprintf(path, sizeof(path), "course.gates[%u]", i + 1);
+        if (!coordinates(&check, path, data->gates[i][0], data->gates[i][1]))
+            return BOAT_PLUGIN_SCHEMA;
+        snprintf(at, sizeof(at), "%s.half_width", path);
+        if (!finite_in(&check, at, data->gates[i][2], 4, 500, "m"))
+            return BOAT_PLUGIN_SCHEMA;
+        BoatCourseGate *gate = &candidate.course.gates[i];
+        gate->centre = (Vector2) { (float)data->gates[i][0], (float)data->gates[i][1] };
+        gate->half_width = (float)data->gates[i][2];
+        // The swept crossing runs southward; gates must lie ahead of the start and in order.
+        if (!(gate->centre.y < last_y - 1))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, path,
+                "must lie at least 1 m south of the previous line");
+        last_y = gate->centre.y;
+    }
+    candidate.digest = boat_course_digest(&candidate.course);
+    *out = candidate;
+    BoatPluginCost cost = d->cost;
+    *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK, .cost = cost };
+    return BOAT_PLUGIN_OK;
+}
+
+static BoatPluginStatus load_manifest(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginDiagnostic *d, BoatPluginManifest *manifest,
+    BoatPluginKind kind)
+{
+    limits = bounded(limits);
+    BoatPluginStatus status
+        = boat_plugin_parse_manifest(bundle->manifest, bundle->manifest_size, limits, manifest, d);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    if (boat_plugin_kind_parse(manifest->kind) != kind)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "kind", "requires a %s host",
+            boat_plugin_kind_name(kind));
+    if (bundle->source_size > limits->source_bytes || bundle->source_size > BOAT_PLUGIN_SOURCE_MAX)
+        return diagnose(d, BOAT_PLUGIN_LIMIT, manifest->entry, "", "is %zu bytes; the limit is %zu",
+            bundle->source_size,
+            limits->source_bytes < BOAT_PLUGIN_SOURCE_MAX ? limits->source_bytes
+                                                          : (size_t)BOAT_PLUGIN_SOURCE_MAX);
+    return BOAT_PLUGIN_OK;
+}
+
+BoatPluginStatus boat_plugin_load_free(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginFree *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    BoatPluginManifest manifest;
+    BoatPluginStatus status = load_manifest(bundle, limits, d, &manifest, BOAT_PLUGIN_KIND_FREE);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    BoatPluginFreeData data;
+    status = boat_plugin_lua_free(
+        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    return boat_plugin_decode_free(&manifest, &data, out, d);
+}
+
+BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
+    const BoatPluginLimits *limits, BoatPluginCourse *out, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    BoatPluginManifest manifest;
+    BoatPluginStatus status = load_manifest(bundle, limits, d, &manifest, BOAT_PLUGIN_KIND_COURSE);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    BoatPluginCourseData data;
+    status = boat_plugin_lua_course(
+        bundle->source, bundle->source_size, manifest.entry, bounded(limits), &data, d);
+    if (status != BOAT_PLUGIN_OK)
+        return status;
+    return boat_plugin_decode_course(&manifest, &data, out, d);
+}
+
+BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
+    const BoatWorldDefinition *location, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    if (!location || strcmp(free->manifest.location, location->name))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "is \"%s\"; this session is at \"%s\"", free->manifest.location,
+            location ? location->name : "none");
+    d->status = BOAT_PLUGIN_OK;
+    return BOAT_PLUGIN_OK;
+}
+
+BoatPluginStatus boat_plugin_course_check_location(const BoatPluginCourse *course,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic)
+{
+    BoatPluginDiagnostic scratch;
+    BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
+    const char *file = course->manifest.entry;
+    if (!location || strcmp(course->manifest.location, location->name))
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "is \"%s\"; this session is at \"%s\"", course->manifest.location,
+            location ? location->name : "none");
+    if (!location->mapped) {
+        float x = location->half_extent.x, z = location->half_extent.y;
+        if (!(fabsf(course->course.start.x) < x && fabsf(course->course.start.y) < z))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "course.start",
+                "must lie inside the %s basin", location->name);
+        for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
+            const BoatCourseGate *g = &course->course.gates[i];
+            char path[32];
+            snprintf(path, sizeof(path), "course.gates[%d]", i + 1);
+            if (!(fabsf(g->centre.x - g->half_width) < x && fabsf(g->centre.x + g->half_width) < x
+                    && fabsf(g->centre.y) < z))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path, "must lie inside the %s basin",
+                    location->name);
+        }
+        d->status = BOAT_PLUGIN_OK;
+        return BOAT_PLUGIN_OK;
+    }
+    if (!map)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "requires a prepared %s map", location->name);
+    if (!boat_map_water(map, course->course.start, 5))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "course.start",
+            "is not open water of the %s map", location->name);
+    for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
+        const BoatCourseGate *g = &course->course.gates[i];
+        char path[32];
+        snprintf(path, sizeof(path), "course.gates[%d]", i + 1);
+        for (int side = -1; side <= 1; ++side) {
+            Vector2 p = { g->centre.x + side * g->half_width, g->centre.y };
+            if (!boat_map_water(map, p, side ? 0 : 5))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                    "is not open water of the %s map", location->name);
+        }
+    }
+    d->status = BOAT_PLUGIN_OK;
+    return BOAT_PLUGIN_OK;
+}
+
+BoatPluginChange boat_plugin_free_classify(
+    const BoatPluginFree *active, const BoatPluginFree *candidate)
+{
+    if (strcmp(active->manifest.id, candidate->manifest.id)
+        || strcmp(active->manifest.kind, candidate->manifest.kind)
+        || strcmp(active->manifest.location, candidate->manifest.location)
+        || active->manifest.api != candidate->manifest.api)
+        return BOAT_PLUGIN_INCOMPATIBLE;
+    return strcmp(active->manifest.name, candidate->manifest.name) ? BOAT_PLUGIN_RENAMED
+                                                                   : BOAT_PLUGIN_UNCHANGED;
+}
+
+BoatPluginChange boat_plugin_course_classify(
+    const BoatPluginCourse *active, const BoatPluginCourse *candidate)
+{
+    if (strcmp(active->manifest.id, candidate->manifest.id)
+        || strcmp(active->manifest.kind, candidate->manifest.kind)
+        || strcmp(active->manifest.location, candidate->manifest.location)
+        || active->manifest.api != candidate->manifest.api)
+        return BOAT_PLUGIN_INCOMPATIBLE;
+    if (active->digest != candidate->digest)
+        return BOAT_PLUGIN_RESTART_SESSION;
+    return strcmp(active->manifest.name, candidate->manifest.name) ? BOAT_PLUGIN_RENAMED
+                                                                   : BOAT_PLUGIN_UNCHANGED;
 }

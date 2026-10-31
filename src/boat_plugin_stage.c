@@ -3,6 +3,7 @@
 #endif
 #include "boat_plugin_stage.h"
 #include "boat_plugin_lua.h"
+#include "boat_plugin_wire.h"
 #include "boat_scene_definition.h"
 #include "boat_world.h"
 
@@ -29,6 +30,8 @@ extern char **environ;
 #endif
 #include <stdio.h>
 
+#define BOAT_PLUGIN_STAGE_RESPONSE_MAX (BOAT_PLUGIN_SOURCE_MAX + 32768u)
+
 // Deliberately fieldwise: network-order unsigned integers and IEEE-754 binary64 values;
 // strings have bounded uint32 lengths, with no NUL on the wire.
 typedef struct {
@@ -52,17 +55,6 @@ static uint64_t integer(Wire *w, uint64_t v, unsigned n)
         if (fwrite(b, 1, n, w->file) != n)
             w->ok = false;
     }
-    return v;
-}
-static double number(Wire *w, double v)
-{
-    uint64_t bits;
-    _Static_assert(sizeof(v) == sizeof(bits), "wire requires binary64 doubles");
-    memcpy(&bits, &v, sizeof(bits));
-    bits = integer(w, bits, 8);
-    memcpy(&v, &bits, sizeof(v));
-    if (!isfinite(v))
-        w->ok = false;
     return v;
 }
 static void string(Wire *w, char *s, size_t capacity)
@@ -95,209 +87,6 @@ static void diagnostic(Wire *w, BoatPluginDiagnostic *d)
     d->cost.leaked_bytes = (size_t)integer(w, d->cost.leaked_bytes, 8);
     d->cost.fields = (unsigned)integer(w, d->cost.fields, 4);
 }
-// L3.2: bounded travelling-craft routes. Counts are checked before any array access and the
-// definition is revalidated after decoding, so a malformed worker cannot install a partial list.
-static void traffic_wire(Wire *w, WaterfrontRouteDefinition *routes)
-{
-    routes->actor_count = (unsigned)integer(w, routes->actor_count, 4);
-    if (routes->actor_count > WATERFRONT_ROUTE_ACTORS) {
-        w->ok = false;
-        return;
-    }
-    for (unsigned i = 0; i < routes->actor_count; ++i) {
-        WaterfrontRouteActor *a = &routes->actors[i];
-        string(w, a->id, sizeof(a->id));
-        a->shape = (unsigned char)integer(w, a->shape, 1);
-        a->recipe = (unsigned char)integer(w, a->recipe, 1);
-        a->retain = (unsigned char)integer(w, a->retain, 1);
-        if (a->retain != 0xff && a->retain > WATERFRONT_ROUTE_ACTORS)
-            w->ok = false;
-        unsigned bridge = (unsigned)integer(w, a->bridge ? 1u : 0u, 1);
-        if (bridge > 1 || a->shape >= WATERFRONT_ROUTE_SHAPES
-            || a->recipe >= WATERFRONT_CRAFT_RECIPES)
-            w->ok = false;
-        a->bridge = bridge != 0;
-        a->speed = (float)number(w, a->speed);
-        a->accel = (float)number(w, a->accel);
-        a->phase = (float)number(w, a->phase);
-        a->period = number(w, a->period);
-        a->point_count = (unsigned)integer(w, a->point_count, 4);
-        a->stop_count = (unsigned)integer(w, a->stop_count, 4);
-        if (a->point_count > WATERFRONT_ROUTE_POINT_CAPACITY
-            || a->stop_count > WATERFRONT_ROUTE_STOPS) {
-            w->ok = false;
-            return;
-        }
-        for (unsigned p = 0; p < a->point_count; ++p) {
-            a->points[p].x = (float)number(w, a->points[p].x);
-            a->points[p].z = (float)number(w, a->points[p].z);
-            a->points[p].radius = (float)number(w, a->points[p].radius);
-        }
-        for (unsigned k = 0; k < a->stop_count; ++k) {
-            string(w, a->stops[k].id, sizeof(a->stops[k].id));
-            a->stops[k].segment = (unsigned char)integer(w, a->stops[k].segment, 1);
-            a->stops[k].dwell = (float)number(w, a->stops[k].dwell);
-        }
-        a->origin_x = (float)number(w, a->origin_x);
-        a->origin_z = (float)number(w, a->origin_z);
-        a->long_radius = (float)number(w, a->long_radius);
-        a->short_radius = (float)number(w, a->short_radius);
-        a->start_distance = (float)number(w, a->start_distance);
-        a->turn_radius = (float)number(w, a->turn_radius);
-    }
-}
-
-// L4.2: bounded flocks and cue intervals. Counts and enums are checked before array access.
-static void flock_wire(Wire *w, WaterfrontFlockDefinition *flocks)
-{
-    flocks->flock_count = (unsigned)integer(w, flocks->flock_count, 4);
-    if (flocks->flock_count > WATERFRONT_FLOCKS) {
-        w->ok = false;
-        return;
-    }
-    for (unsigned i = 0; i < flocks->flock_count; ++i) {
-        WaterfrontFlock *f = &flocks->flocks[i];
-        string(w, f->id, sizeof(f->id));
-        f->recipe = (unsigned char)integer(w, f->recipe, 1);
-        if (f->recipe >= WATERFRONT_FLOCK_RECIPES)
-            w->ok = false;
-        f->x = (float)number(w, f->x);
-        f->z = (float)number(w, f->z);
-        f->count = (unsigned)integer(w, f->count, 4);
-        f->seed = (unsigned)integer(w, f->seed, 4);
-        f->phase = (float)number(w, f->phase);
-        f->radius = (float)number(w, f->radius);
-        f->height = (float)number(w, f->height);
-        f->rate = (float)number(w, f->rate);
-        unsigned follow = (unsigned)integer(w, (unsigned)(f->follow_actor + 1), 1);
-        if (follow > WATERFRONT_ROUTE_ACTORS) {
-            w->ok = false;
-        } else
-            f->follow_actor = (int)follow - 1;
-        if (f->count > WATERFRONT_FLOCK_BIRDS)
-            w->ok = false;
-        unsigned implicit = (unsigned)integer(w, f->implicit_cues ? 1u : 0u, 1);
-        if (implicit > 1)
-            w->ok = false;
-        f->implicit_cues = implicit != 0;
-        f->cue_count = (unsigned)integer(w, f->cue_count, 4);
-        if (f->cue_count > WATERFRONT_FLOCK_CUES) {
-            w->ok = false;
-            return;
-        }
-        for (unsigned c = 0; c < f->cue_count; ++c) {
-            WaterfrontFlockCue *cue = &f->cues[c];
-            cue->start_tick = (unsigned)integer(w, cue->start_tick, 4);
-            cue->end_tick = (unsigned)integer(w, cue->end_tick, 4);
-            cue->fade_ticks = (unsigned)integer(w, cue->fade_ticks, 4);
-            cue->kind = (unsigned char)integer(w, cue->kind, 1);
-            if (cue->kind >= WATERFRONT_FLOCK_CUE_KINDS)
-                w->ok = false;
-            cue->amplitude = (float)number(w, cue->amplitude);
-        }
-    }
-}
-
-// The full pointer-free scene definition, so an isolated worker can return the same identity
-// the in-process decoder produces. Counts are checked before any array access.
-static void scene_wire(Wire *w, BoatSceneDefinition *s)
-{
-    s->version = (unsigned)integer(w, s->version, 4);
-    unsigned flags = (unsigned)integer(w,
-        (s->entrance_present ? 1u : 0u) | (s->berths_present ? 2u : 0u)
-            | (s->modules_present ? 4u : 0u) | (s->traffic_present ? 8u : 0u)
-            | (s->gulls_present ? 16u : 0u),
-        1);
-    if (flags > 31 || s->version > BOAT_SCENE_VERSION) {
-        w->ok = false;
-        return;
-    }
-    s->entrance_present = flags & 1u;
-    s->berths_present = flags & 2u;
-    s->modules_present = flags & 4u;
-    s->traffic_present = flags & 8u;
-    s->gulls_present = flags & 16u;
-    if (s->entrance_present) {
-        s->entrance_x = (float)number(w, s->entrance_x);
-        s->entrance_z = (float)number(w, s->entrance_z);
-        s->entrance_width = (float)number(w, s->entrance_width);
-    }
-    s->berth_count = (unsigned)integer(w, s->berth_count, 4);
-    s->module_count = (unsigned)integer(w, s->module_count, 4);
-    if (s->berth_count > BOAT_SCENE_BERTHS || s->module_count > BOAT_SCENE_MODULES) {
-        w->ok = false;
-        return;
-    }
-    for (unsigned i = 0; i < s->berth_count; ++i) {
-        BoatSceneBerth *b = &s->berths[i];
-        string(w, b->id, sizeof(b->id));
-        b->recipe = (unsigned char)integer(w, b->recipe, 1);
-        b->mooring = (unsigned char)integer(w, b->mooring, 1);
-        if (b->recipe >= BOAT_SCENE_BERTH_RECIPES || b->mooring > BOAT_SCENE_MOORING_PONTOON)
-            w->ok = false;
-        b->x = (float)number(w, b->x);
-        b->z = (float)number(w, b->z);
-        b->heading = (float)number(w, b->heading);
-    }
-    for (unsigned i = 0; i < s->module_count; ++i) {
-        BoatSceneModule *m = &s->modules[i];
-        string(w, m->id, sizeof(m->id));
-        m->kind = (unsigned char)integer(w, m->kind, 1);
-        if (m->kind >= BOAT_SCENE_MODULE_KINDS)
-            w->ok = false;
-        m->x = (float)number(w, m->x);
-        m->z = (float)number(w, m->z);
-        m->heading = (float)number(w, m->heading);
-        m->anchor_x = (float)number(w, m->anchor_x);
-        m->anchor_z = (float)number(w, m->anchor_z);
-        string(w, m->attaches, sizeof(m->attaches));
-    }
-    if (s->traffic_present)
-        traffic_wire(w, &s->traffic);
-    if (s->gulls_present)
-        flock_wire(w, &s->gulls);
-}
-
-static void data_wire(Wire *w, BoatPluginVoyageData *v)
-{
-    unsigned callbacks = (unsigned)integer(w, v->callbacks, 1);
-    unsigned migrates = (unsigned)integer(w, v->migrates, 1);
-    if (callbacks > 1 || migrates > 1)
-        w->ok = false;
-    v->callbacks = callbacks != 0;
-    v->migrates = migrates != 0;
-    unsigned has_scene = (unsigned)integer(w, v->has_scene, 1);
-    if (has_scene > 1)
-        w->ok = false;
-    v->has_scene = has_scene != 0;
-    if (v->has_scene)
-        scene_wire(w, &v->scene);
-    v->shelter_count = (unsigned)integer(w, v->shelter_count, 4);
-    if (v->shelter_count < 2 || v->shelter_count > BOAT_VOYAGE_SHELTERS) {
-        w->ok = false;
-        return;
-    }
-    for (unsigned i = 0; i < v->shelter_count; ++i) {
-        BoatPluginShelterData *s = &v->shelters[i];
-        string(w, s->id, sizeof(s->id));
-        string(w, s->name, sizeof(s->name));
-        s->x = number(w, s->x);
-        s->z = number(w, s->z);
-        s->heading = number(w, s->heading);
-        s->radius = number(w, s->radius);
-    }
-    v->arrival.x = number(w, v->arrival.x);
-    v->arrival.z = number(w, v->arrival.z);
-    v->arrival.radius = number(w, v->arrival.radius);
-    v->arrival.max_speed = number(w, v->arrival.max_speed);
-    v->exposure.x = number(w, v->exposure.x);
-    v->exposure.z = number(w, v->exposure.z);
-    v->exposure.radius = number(w, v->exposure.radius);
-    v->exposure.height = number(w, v->exposure.height);
-    v->exposure.build = number(w, v->exposure.build);
-    v->exposed_fraction = number(w, v->exposed_fraction);
-    v->weather_range = number(w, v->weather_range);
-}
 static bool files_wire(Wire *w, BoatPluginFiles *f)
 {
     f->manifest_size = (size_t)integer(w, f->manifest_size, 4);
@@ -322,25 +111,34 @@ int boat_plugin_stage_worker(void)
     _setmode(_fileno(stdout), _O_BINARY);
 #endif
     BoatPluginFiles *f = calloc(1, sizeof(*f));
-    BoatPluginVoyageData data = { 0 };
-    BoatPluginVoyage voyage;
+    BoatPluginDecoded *decoded = calloc(1, sizeof(*decoded));
+    BoatPluginRevision *revision = calloc(1, sizeof(*revision));
     BoatPluginDiagnostic d = { .status = BOAT_PLUGIN_IO };
     BoatWorldResources resources = { 0 };
     Wire in = { stdin, true, true }, out = { stdout, false, true };
-    if (!f || !files_wire(&in, f))
+    if (!f || !decoded || !revision || !files_wire(&in, f))
         goto done;
     BoatPluginBundle bundle = boat_plugin_bundle(f);
     BoatPluginManifest m;
     if (boat_plugin_parse_manifest(f->manifest, f->manifest_size, NULL, &m, &d) != BOAT_PLUGIN_OK)
         goto done;
-    if (strcmp(m.kind, "voyage")) {
+    BoatPluginKind kind = boat_plugin_kind_parse(m.kind);
+    if (kind == BOAT_PLUGIN_KIND_NONE) {
         d.status = BOAT_PLUGIN_MANIFEST;
         snprintf(d.file, sizeof(d.file), "plugin.json");
         snprintf(d.field, sizeof(d.field), "kind");
-        snprintf(d.message, sizeof(d.message), "this host supports voyage descriptors only");
+        snprintf(d.message, sizeof(d.message), "is not a supported kind");
         goto done;
     }
 #ifdef __EMSCRIPTEN__
+    if (kind != BOAT_PLUGIN_KIND_VOYAGE) {
+        d.status = BOAT_PLUGIN_MANIFEST;
+        snprintf(d.file, sizeof(d.file), "plugin.json");
+        snprintf(d.field, sizeof(d.field), "kind");
+        snprintf(d.message, sizeof(d.message),
+            "%s packages are native-only until browser parity; use a voyage", m.kind);
+        goto done;
+    }
     if (m.scene) {
         d.status = BOAT_PLUGIN_MANIFEST;
         snprintf(d.file, sizeof(d.file), "plugin.json");
@@ -350,19 +148,71 @@ int boat_plugin_stage_worker(void)
         goto done;
     }
 #endif
-    if (boat_plugin_lua_voyage(
-            bundle.source, bundle.source_size, m.entry, &boat_plugin_default_limits, &data, &d)
-            != BOAT_PLUGIN_OK
-        || boat_plugin_decode_voyage(&m, &data, &voyage, &d) != BOAT_PLUGIN_OK)
+    decoded->kind = kind;
+    decoded->manifest_size = f->manifest_size;
+    memcpy(decoded->manifest, f->manifest, f->manifest_size);
+    decoded->source_size = bundle.source_size;
+    memcpy(decoded->source, bundle.source, bundle.source_size);
+    BoatPluginStatus status;
+    switch (kind) {
+    case BOAT_PLUGIN_KIND_VOYAGE:
+        status = boat_plugin_lua_voyage(bundle.source, bundle.source_size, m.entry,
+            &boat_plugin_default_limits, &decoded->voyage, &d);
+        if (status == BOAT_PLUGIN_OK)
+            status = boat_plugin_decode_voyage(&m, &decoded->voyage, &revision->voyage, &d);
+        break;
+    case BOAT_PLUGIN_KIND_RACE:
+        status = boat_plugin_lua_race(bundle.source, bundle.source_size, m.entry,
+            &boat_plugin_default_limits, &decoded->race, &d);
+        if (status == BOAT_PLUGIN_OK)
+            status = boat_plugin_decode_race(&m, &decoded->race, &revision->race, &d);
+        break;
+    case BOAT_PLUGIN_KIND_FREE:
+        status = boat_plugin_lua_free(bundle.source, bundle.source_size, m.entry,
+            &boat_plugin_default_limits, &decoded->free, &d);
+        if (status == BOAT_PLUGIN_OK)
+            status = boat_plugin_decode_free(&m, &decoded->free, &revision->free, &d);
+        break;
+    case BOAT_PLUGIN_KIND_COURSE:
+        status = boat_plugin_lua_course(bundle.source, bundle.source_size, m.entry,
+            &boat_plugin_default_limits, &decoded->course, &d);
+        if (status == BOAT_PLUGIN_OK)
+            status = boat_plugin_decode_course(&m, &decoded->course, &revision->course, &d);
+        break;
+    default:
+        status = BOAT_PLUGIN_MANIFEST;
+        break;
+    }
+    if (status != BOAT_PLUGIN_OK)
         goto done;
+    revision->manifest = m;
     if (!boat_world_resources_init(&resources, boat_location_find(m.location))) {
         d.status = BOAT_PLUGIN_MEMORY;
         goto done;
     }
-    if (boat_plugin_check_location(&voyage, resources.definition, &resources.map, &d)
-        != BOAT_PLUGIN_OK)
+    switch (kind) {
+    case BOAT_PLUGIN_KIND_VOYAGE:
+        status = boat_plugin_check_location(
+            &revision->voyage, resources.definition, &resources.map, &d);
+        break;
+    case BOAT_PLUGIN_KIND_RACE:
+        status = boat_plugin_race_check_location(
+            &revision->race, resources.definition, &resources.map, &d);
+        break;
+    case BOAT_PLUGIN_KIND_FREE:
+        status = boat_plugin_free_check_location(&revision->free, resources.definition, &d);
+        break;
+    case BOAT_PLUGIN_KIND_COURSE:
+        status = boat_plugin_course_check_location(
+            &revision->course, resources.definition, &resources.map, &d);
+        break;
+    default:
+        status = BOAT_PLUGIN_MANIFEST;
+        break;
+    }
+    if (status != BOAT_PLUGIN_OK)
         goto done;
-    if (m.objective) {
+    if (kind == BOAT_PLUGIN_KIND_VOYAGE && m.objective) {
         BoatPluginCost cost = d.cost;
         BoatPluginObjective probe = { .generation = 1,
             .rng = 12345,
@@ -377,13 +227,26 @@ int boat_plugin_stage_worker(void)
             d.cost.peak_bytes = cost.peak_bytes;
     }
 done:
-    integer(&out, 0x50535435, 4); // PST5: flock cues extend PST4; other versions are refused.
+    integer(&out, BOAT_PLUGIN_WIRE_VERSION, 4);
     diagnostic(&out, &d);
-    if (d.status == BOAT_PLUGIN_OK)
-        data_wire(&out, &data);
+    if (d.status == BOAT_PLUGIN_OK) {
+        size_t size = boat_plugin_wire_size(decoded);
+        unsigned char *bytes = size && size <= BOAT_PLUGIN_STAGE_RESPONSE_MAX ? malloc(size) : NULL;
+        size_t written = 0;
+        if (!bytes || !boat_plugin_wire_encode(decoded, bytes, size, &written) || written != size
+            || fwrite(bytes, 1, size, stdout) != size) {
+            d.status = BOAT_PLUGIN_LIMIT;
+            d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_LIMIT };
+            snprintf(d.message, sizeof(d.message), "encoded definition exceeds the response limit");
+            out.ok = false;
+        }
+        free(bytes);
+    }
     if (fflush(stdout))
         out.ok = false;
     boat_world_resources_destroy(&resources);
+    free(revision);
+    free(decoded);
     free(f);
     return out.ok && d.status == BOAT_PLUGIN_OK ? 0 : 1;
 }
@@ -416,7 +279,7 @@ EM_JS(int, browser_status, (unsigned job),
     { return Module.boatPluginStage ? Module.boatPluginStage.status(job) : -1; })
 EM_JS(int, browser_read, (unsigned job, unsigned char *data), {
     const bytes = Module.boatPluginStage.read(job);
-    if (!bytes || bytes.length > 4096)
+    if (!bytes || bytes.length > 163840)
         return -1;
     HEAPU8.set(bytes, data);
     return bytes.length;
@@ -446,9 +309,9 @@ BoatPluginStageJob *boat_plugin_stage_start(
 {
 #ifdef __EMSCRIPTEN__
     (void)executable;
-    if (!isfinite(now) || host->racing)
+    if (!isfinite(now) || host->kind != BOAT_PLUGIN_KIND_VOYAGE)
 #else
-    if (!executable || !isfinite(now) || !host->depth || host->racing)
+    if (!executable || !isfinite(now) || !host->depth)
 #endif
         return NULL;
     BoatPluginStageJob *j = calloc(1, sizeof(*j));
@@ -546,9 +409,12 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
         return 0;
     if (status < 0)
         return failure(j, host, "browser worker failed, canceled or stale");
-    unsigned char bytes[32768];
-    int size = browser_read(j->browser_job, bytes);
+    unsigned char *bytes = malloc(163840);
+    int size = bytes ? browser_read(j->browser_job, bytes) : -1;
     if (size <= 0 || fwrite(bytes, 1, (size_t)size, j->output) != (size_t)size)
+        size = 0;
+    free(bytes);
+    if (!size)
         return failure(j, host, "invalid browser worker response");
     success = status == 1;
     browser_close(j->browser_job);
@@ -574,52 +440,73 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
     j->running = false;
     j->finished = true;
     // Fixed maximum response even if a broken worker writes more.
-    if (fseek(j->output, 0, SEEK_END) || ftell(j->output) > 32768)
+    if (fseek(j->output, 0, SEEK_END) || ftell(j->output) > (long)BOAT_PLUGIN_STAGE_RESPONSE_MAX)
         return failure(j, host, "worker output exceeds limit");
+    long end = ftell(j->output);
     rewind(j->output);
     Wire out = { j->output, true, true };
-    if (integer(&out, 0, 4) != 0x50535435)
+    if (integer(&out, 0, 4) != BOAT_PLUGIN_WIRE_VERSION)
         out.ok = false;
     BoatPluginDiagnostic d = { 0 };
     diagnostic(&out, &d);
-    BoatPluginVoyageData data = { 0 };
-    if (d.status == BOAT_PLUGIN_OK && success)
-        data_wire(&out, &data);
+    long at = ftell(j->output);
+    size_t wire_size = at >= 0 && end >= at ? (size_t)(end - at) : 0;
+    unsigned char *wire
+        = wire_size && wire_size <= BOAT_PLUGIN_STAGE_RESPONSE_MAX ? malloc(wire_size) : NULL;
+    if (wire && fread(wire, 1, wire_size, j->output) != wire_size)
+        wire_size = 0;
     if (!out.ok || fgetc(j->output) != EOF || ferror(j->output)
-        || (d.status == BOAT_PLUGIN_OK) != success)
+        || (d.status == BOAT_PLUGIN_OK) != success) {
+        free(wire);
         return failure(j, host, "invalid isolated worker response");
+    }
     host->diagnostic = d;
     if (!success) {
+        free(wire);
         boat_plugin_host_discard(host);
         return -1;
     }
-    BoatPluginManifest m;
+    BoatPluginDecoded *decoded = calloc(1, sizeof(*decoded));
     BoatPluginRevision *r = calloc(1, sizeof(*r));
-    if (!r)
-        return failure(j, host, "cannot allocate staged revision");
-    bool ok = boat_plugin_parse_manifest(j->files.manifest, j->files.manifest_size, NULL, &m, &d)
-            == BOAT_PLUGIN_OK
-        && !strcmp(m.kind, "voyage")
-        && boat_plugin_decode_voyage(&m, &data, &r->voyage, &d) == BOAT_PLUGIN_OK
-        && boat_plugin_check_location(&r->voyage, host->location, host->map, &d) == BOAT_PLUGIN_OK;
-    if (ok && m.objective) {
-        r->source_size = j->files.source_size;
-        memcpy(r->source, j->files.source, r->source_size);
+    bool ok = wire && decoded && r && boat_plugin_wire_decode(wire, wire_size, decoded, &d)
+        && boat_plugin_decoded_revision(decoded, r, &d);
+    free(wire);
+    if (ok && decoded->kind != host->kind)
+        ok = false;
+    if (ok) {
+        switch (decoded->kind) {
+        case BOAT_PLUGIN_KIND_VOYAGE:
+            ok = boat_plugin_check_location(&r->voyage, host->location, host->map, &d)
+                == BOAT_PLUGIN_OK;
+            break;
+        case BOAT_PLUGIN_KIND_RACE:
+            ok = boat_plugin_race_check_location(&r->race, host->location, host->map, &d)
+                == BOAT_PLUGIN_OK;
+            break;
+        case BOAT_PLUGIN_KIND_FREE:
+            ok = boat_plugin_free_check_location(&r->free, host->location, &d) == BOAT_PLUGIN_OK;
+            break;
+        case BOAT_PLUGIN_KIND_COURSE:
+            ok = boat_plugin_course_check_location(&r->course, host->location, host->map, &d)
+                == BOAT_PLUGIN_OK;
+            break;
+        default:
+            ok = false;
+            break;
+        }
     }
     // A receipt belongs only to this request/host epoch; the public host never accepts a digest
     // or caller-supplied revision as evidence. No Lua runs in this completion path.
     if (ok && !host->depth && !j->base && !j->epoch) {
         // Browser launch consumes a prepared worker receipt; there is no launch-time Lua VM.
-        boat_plugin_voyage_copy(&host->slots[0].voyage, &r->voyage);
-        host->slots[0].source_size = r->source_size;
-        memcpy(host->slots[0].source, r->source, r->source_size);
-        host->slots[0].number = host->numbered = host->depth = 1;
+        ok = boat_plugin_host_start_decoded(host, host->location, host->map, r);
     } else if (ok)
         ok = boat_plugin_host_stage_decoded(host, r, j->base, j->epoch);
     else {
         boat_plugin_host_discard(host);
         host->diagnostic = d;
     }
+    free(decoded);
     free(r);
     return ok ? 1 : -1;
 }

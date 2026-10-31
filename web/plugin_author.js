@@ -10,12 +10,18 @@
       return Array.isArray(data.capabilities) && data.capabilities.includes('scene.define');
     } catch (_) { return false; }
   }
+  function kind(manifest) {
+    try { return JSON.parse(manifest).kind; } catch (_) { return null; }
+  }
   function bundle(manifest, source) {
     if (typeof manifest !== 'string' || typeof source !== 'string') throw Error('Expected source text');
     if (encoder.encode(manifest).length > 4096 || encoder.encode(source).length > 65536)
       throw Error('Package exceeds the 4 KiB manifest or 64 KiB source limit');
     // Native scene authoring is not part of the browser subset; reject before the worker starts.
     if (scenes(manifest)) throw Error('Scene authoring is native-only; browser scene imports are unsupported');
+    const type = kind(manifest);
+    if (type && type !== 'voyage')
+      throw Error(`${type} packages are native-only until browser parity; use a voyage`);
     return {format: FORMAT, version: 1, manifest, source};
   }
   function decode(text) {

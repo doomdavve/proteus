@@ -356,6 +356,19 @@ bool boat_replay_data_directory(char *path, size_t size)
     return n >= 0 && (size_t)n < size;
 }
 
+bool boat_replay_best_path(
+    char *path, size_t size, const char *directory, bool waves, uint64_t course_digest)
+{
+    int n;
+    if (course_digest == boat_course_compiled_digest())
+        n = snprintf(path, size, "%s/course-%s-physics%d.run", directory, waves ? "waves" : "calm",
+            BOAT_PHYSICS_REVISION);
+    else
+        n = snprintf(path, size, "%s/course-%s-physics%d-%016llx.run", directory,
+            waves ? "waves" : "calm", BOAT_PHYSICS_REVISION, (unsigned long long)course_digest);
+    return n >= 0 && (size_t)n < size;
+}
+
 bool boat_replay_play(BoatReplayRuns *runs, const BoatReplay *run)
 {
     if (!run || !run->complete || run->count < 2)

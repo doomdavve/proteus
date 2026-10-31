@@ -1,0 +1,10 @@
+{
+  "id": "proteus.river-free",
+  "name": "River free boating",
+  "api": 1,
+  "kind": "free",
+  "entry": "main.lua",
+  "location": "river",
+  "capabilities": ["free.define"],
+  "state_version": 1
+}

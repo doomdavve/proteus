@@ -8,19 +8,49 @@ static bool load_revision(
     BoatPluginHost *host, const BoatPluginBundle *bundle, BoatPluginRevision *revision)
 {
     BoatPluginDiagnostic *d = &host->diagnostic;
-    BoatPluginStatus status = host->racing
-        ? boat_plugin_load_race(bundle, NULL, &revision->race, d)
-        : boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d);
+    BoatPluginStatus status;
+    switch (host->kind) {
+    case BOAT_PLUGIN_KIND_RACE:
+        status = boat_plugin_load_race(bundle, NULL, &revision->race, d);
+        break;
+    case BOAT_PLUGIN_KIND_FREE:
+        status = boat_plugin_load_free(bundle, NULL, &revision->free, d);
+        break;
+    case BOAT_PLUGIN_KIND_COURSE:
+        status = boat_plugin_load_course(bundle, NULL, &revision->course, d);
+        break;
+    case BOAT_PLUGIN_KIND_VOYAGE:
+    default:
+        status = boat_plugin_load_voyage(bundle, NULL, &revision->voyage, d);
+        break;
+    }
     if (status != BOAT_PLUGIN_OK)
         return false;
+    BoatPluginManifest manifest;
+    if (boat_plugin_parse_manifest(bundle->manifest, bundle->manifest_size, NULL, &manifest, d)
+        != BOAT_PLUGIN_OK)
+        return false;
+    revision->manifest = manifest;
     BoatPluginCost cost = d->cost;
-    status = host->racing
-        ? boat_plugin_race_check_location(&revision->race, host->location, host->map, d)
-        : boat_plugin_check_location(&revision->voyage, host->location, host->map, d);
+    switch (host->kind) {
+    case BOAT_PLUGIN_KIND_RACE:
+        status = boat_plugin_race_check_location(&revision->race, host->location, host->map, d);
+        break;
+    case BOAT_PLUGIN_KIND_FREE:
+        status = boat_plugin_free_check_location(&revision->free, host->location, d);
+        break;
+    case BOAT_PLUGIN_KIND_COURSE:
+        status = boat_plugin_course_check_location(&revision->course, host->location, host->map, d);
+        break;
+    case BOAT_PLUGIN_KIND_VOYAGE:
+    default:
+        status = boat_plugin_check_location(&revision->voyage, host->location, host->map, d);
+        break;
+    }
     d->cost = cost; // Location validation clears diagnostics, but did not undo the Lua work.
     if (status != BOAT_PLUGIN_OK)
         return false;
-    if (!host->racing && revision->voyage.manifest.objective) {
+    if (host->kind == BOAT_PLUGIN_KIND_VOYAGE && revision->voyage.manifest.objective) {
         BoatPluginObjective probe = { .generation = 1,
             .rng = 12345,
             .timers_enabled = revision->voyage.manifest.timers,
@@ -44,24 +74,52 @@ static bool load_revision(
 static void copy_revision(
     BoatPluginHost *host, BoatPluginRevision *out, const BoatPluginRevision *in)
 {
+    out->manifest = in->manifest;
     out->source_size = in->source_size;
     memcpy(out->source, in->source, in->source_size);
-    if (host->racing)
+    switch (host->kind) {
+    case BOAT_PLUGIN_KIND_RACE:
         out->race = in->race;
-    else
+        break;
+    case BOAT_PLUGIN_KIND_FREE:
+        out->free = in->free;
+        break;
+    case BOAT_PLUGIN_KIND_COURSE:
+        out->course = in->course;
+        break;
+    case BOAT_PLUGIN_KIND_VOYAGE:
+    default:
         boat_plugin_voyage_copy(&out->voyage, &in->voyage);
+        break;
+    }
 }
 
 static BoatPluginChange classify(
     const BoatPluginHost *host, const BoatPluginRevision *a, const BoatPluginRevision *b)
 {
-    BoatPluginChange change = host->racing ? boat_plugin_race_classify(&a->race, &b->race)
-                                           : boat_plugin_classify(&a->voyage, &b->voyage);
+    BoatPluginChange change;
+    switch (host->kind) {
+    case BOAT_PLUGIN_KIND_RACE:
+        change = boat_plugin_race_classify(&a->race, &b->race);
+        break;
+    case BOAT_PLUGIN_KIND_FREE:
+        change = boat_plugin_free_classify(&a->free, &b->free);
+        break;
+    case BOAT_PLUGIN_KIND_COURSE:
+        change = boat_plugin_course_classify(&a->course, &b->course);
+        break;
+    case BOAT_PLUGIN_KIND_VOYAGE:
+    default:
+        change = boat_plugin_classify(&a->voyage, &b->voyage);
+        break;
+    }
+    bool voyage = host->kind == BOAT_PLUGIN_KIND_VOYAGE;
     // A gull-cue-only scene edit keeps the session clock even though the source bytes changed.
-    bool cosmetic_gulls = !host->racing && change == BOAT_PLUGIN_RENAMED
-        && a->voyage.has_scene && b->voyage.has_scene
+    bool cosmetic_gulls = voyage && change == BOAT_PLUGIN_RENAMED && a->voyage.has_scene
+        && b->voyage.has_scene
         && boat_scene_same_except_gull_cues(&a->voyage.scene, &b->voyage.scene);
-    if (!host->racing && change < BOAT_PLUGIN_RESTART_VOYAGE && !cosmetic_gulls
+    if (voyage && change < BOAT_PLUGIN_RESTART_VOYAGE && !cosmetic_gulls
+        && (a->voyage.manifest.objective || b->voyage.manifest.objective)
         && (a->voyage.manifest.objective != b->voyage.manifest.objective
             || a->voyage.manifest.timers != b->voyage.manifest.timers
             || a->voyage.manifest.state_version != b->voyage.manifest.state_version
@@ -84,13 +142,29 @@ bool boat_plugin_host_start(BoatPluginHost *host, const BoatWorldDefinition *loc
             bundle->manifest, bundle->manifest_size, NULL, &manifest, &host->diagnostic)
         != BOAT_PLUGIN_OK)
         return false;
-    host->racing = !strcmp(manifest.kind, "race");
+    host->kind = boat_plugin_kind_parse(manifest.kind);
     BoatPluginRevision revision = { 0 };
     if (!load_revision(host, bundle, &revision))
         return false;
     copy_revision(host, &host->slots[0], &revision);
     host->slots[0].number = host->numbered = 1;
     host->depth = 1;
+    return true;
+}
+
+bool boat_plugin_host_start_decoded(BoatPluginHost *host, const BoatWorldDefinition *location,
+    const BoatMap *map, const BoatPluginRevision *revision)
+{
+    memset(host, 0, sizeof(*host));
+    host->kind = boat_plugin_kind_parse(revision->manifest.kind);
+    if (host->kind == BOAT_PLUGIN_KIND_NONE)
+        return false;
+    host->location = location;
+    host->map = map;
+    copy_revision(host, &host->slots[0], revision);
+    host->slots[0].number = host->numbered = 1;
+    host->depth = 1;
+    host->diagnostic = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_OK };
     return true;
 }
 

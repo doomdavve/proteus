@@ -2,6 +2,7 @@
 #define WAKE_VELOCITY_PLUGIN_H
 // Lua plugin P1: the solo session's opt-in voyage plugin (--plugin), its Reload/Undo keys, save
 // polling and authoring panel. Definitions change only between ticks, through wake_plugin_frame.
+#include "boat_plugin_catalog.h"
 #include "boat_plugin_host.h"
 #include "boat_plugin_stage.h"
 #include "boat_session.h"
@@ -26,6 +27,7 @@ typedef struct {
     bool evaluation_migrated;
     BoatPluginStageJob *staging; // Never copied into a preview checkpoint.
     const char *directory;
+    bool authoring; // --plugin DIR: file watch, staging worker, bridge, hotkeys and panel.
     BoatPluginHost host;
     BoatPluginFiles files; // The latest read; staging copies what it keeps.
     BoatPluginWatch watch;
@@ -53,6 +55,10 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory);
 // Read DIRECTORY, check it against SESSION's location and begin its voyage instead of the
 // compiled one. False with the diagnostic printed.
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now);
+// PD1: open a build-time catalog entry as revision 1 without a Lua VM, file watch, staging
+// worker or authoring panel. False with DIAGNOSTIC filled.
+bool wake_plugin_open_catalog(
+    WakePlugin *plugin, const BoatPluginCatalogEntry *entry, BoatSession *session);
 // Cancel/reap pending jobs, restore the session's compiled scene and retire the browser
 // evaluator at session shutdown.
 void wake_plugin_close(WakePlugin *plugin, BoatSession *session);

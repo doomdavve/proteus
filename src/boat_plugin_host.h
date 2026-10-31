@@ -14,15 +14,18 @@
 #define BOAT_PLUGIN_SETTLE 0.3 // A save must stay unchanged this long before it is staged.
 
 typedef struct {
+    BoatPluginManifest manifest; // Canonical copy; the kind-specific record repeats it.
     BoatPluginVoyage voyage;
     BoatPluginRace race; // Used instead of VOYAGE by a river race host.
+    BoatPluginFree free; // Used by a free-boating host.
+    BoatPluginCourse course; // Used by a time-trial host.
     char source[BOAT_PLUGIN_SOURCE_MAX];
     size_t source_size;
     unsigned number; // 1 for the launch revision, then one more for each staged definition.
 } BoatPluginRevision;
 
 typedef struct {
-    bool racing; // One descriptor kind for the lifetime of this host.
+    BoatPluginKind kind; // One descriptor kind for the lifetime of this host.
     const BoatWorldDefinition *location;
     const BoatMap *map; // LOCATION's compiled water, for staging checks.
     // Revisions never move: the session borrows the active one's route until the next commit,
@@ -52,6 +55,11 @@ BoatPluginHostMemory boat_plugin_host_memory(const BoatPluginHost *host);
 // Load, check and activate BUNDLE as revision 1 for LOCATION. False with DIAGNOSTIC filled.
 bool boat_plugin_host_start(BoatPluginHost *host, const BoatWorldDefinition *location,
     const BoatMap *map, const BoatPluginBundle *bundle);
+// PD1 catalog runtime: install an already decoded and build-time validated revision as
+// revision 1. This trusts the same-build catalog generator's receipt; no Lua is evaluated and
+// no map sweep runs. The host's KIND comes from the revision's manifest.
+bool boat_plugin_host_start_decoded(BoatPluginHost *host, const BoatWorldDefinition *location,
+    const BoatMap *map, const BoatPluginRevision *revision);
 const BoatPluginRevision *boat_plugin_host_active(const BoatPluginHost *host);
 const BoatPluginRevision *boat_plugin_host_held(const BoatPluginHost *host);
 // Stage BUNDLE in place of any held candidate. A failure fills DIAGNOSTIC and drops the held

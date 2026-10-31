@@ -46,7 +46,7 @@ bool race_plugin_open(
         fprintf(stderr, "Race plugin: %s:%d %s: %s\n", d.file, d.line, d.field, d.message);
         return false;
     }
-    if (!plugin->host.racing) {
+    if (plugin->host.kind != BOAT_PLUGIN_KIND_RACE) {
         fprintf(stderr, "Race trial requires kind race.\n");
         return false;
     }

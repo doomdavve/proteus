@@ -1,13 +1,13 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-10-30: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, and the full L1.1–L1.4 + L2.1–L2.3 marina path implemented**.
+Status, 2026-10-31: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, and PD1 bundled runtime implemented**.
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages with optional objectives/timers.
-A native solo session can take its outer voyage from a plugin (`--plugin`), reload it
-when the file is saved or on F5, undo, and apply route or water changes with an explicit
-restart. Rooms, the course and replays keep compiled content. The browser offers an opt-in
-[voyage import workflow](#browser-source-bundles-p43). The
+Every native solo session starts from a [bundled package](#bundled-catalog-pd1) compiled at build
+time; `--plugin` remains the file-based authoring path, with save reloading, F5/F6/F7 and the
+authoring panel. Rooms, the browser and the temporary `--no-plugins` switch use compiled content.
+The browser offers an opt-in [voyage import workflow](#browser-source-bundles-p43). The
 [plugin plan](PLUGIN_PLAN.md) owns the staged roadmap; this guide owns the current contract.
 [All plans](README.md).
 
@@ -42,14 +42,70 @@ rejected. Strings are non-empty printable ASCII.
 | `id` | 1–63 characters of `a-z 0-9 . _ -`, starting with a letter, e.g. `proteus.langedrag` |
 | `name` | 1–63 printable ASCII characters |
 | `api` | `1` |
-| `kind` | `"voyage"` or `"race"` |
+| `kind` | `"voyage"`, `"free"`, `"course"` or `"race"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
-| `location` | `"outer"` for voyage; `"river"` for race |
-| `capabilities` | `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`; races use `["race.define"]` |
+| `location` | `"outer"` for voyage; `"basin"` for course; `"river"` for race; `"basin"` or `"river"` for free |
+| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, course and race packages use exactly `["free.define"]`, `["course.define"]` or `["race.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
 package's.
+
+## Bundled catalog (PD1)
+
+`tools/boat_plugin_catalog_gen.c` links `proteus_plugins` and evaluates every bundled package
+during the native build. For each it runs the same checks as staging (manifest, schema, the
+location's map and the full traffic sweep), rejects objective callbacks, and embeds the decoded
+definition, manifest text and source as byte arrays in
+`build/generated/boat_plugin_catalog_data.c`. An invalid package fails the build with its normal
+diagnostic. The generated table and the lookup/decode helpers are `proteus_plugin_catalog`, which
+depends on `proteus_plugins`; the generator never links the catalog.
+
+Lookup is by ID and by default for a kind and location. A native solo session opens its entry
+through `boat_plugin_host_start_decoded`: revision 1 is installed without evaluating Lua, polling
+files or running the map sweep. `--no-plugins` selects the compiled path temporarily, and
+`--package ID` selects a bundled entry explicitly. The catalog does not exist in the Emscripten
+build until PD4.
+
+The bundled contents are `proteus.basin-free` and `proteus.river-free` (`free`), `proteus.langedrag`
+(the default `outer` voyage), `proteus.harbor-life` (the selectable authored `outer` voyage),
+`proteus.time-trial` (`course`) and `proteus.river-sprint` (`race`). `plugins/langedrag`,
+`plugins/river-sprint`, `plugins/basin-free`, `plugins/river-free` and `plugins/time-trial` are
+complete package sources; the catalog does not duplicate them.
+
+## Free schema
+
+A `free` package selects a location and nothing else. Its complete entry is:
+
+```lua
+return { free = { version = 1 } }
+```
+
+Absent content means the engine's registered defaults, exactly as an absent subsystem does. The
+location must be `basin` or `river`. Free packages have no scene, objective or callback grant.
+
+## Course schema
+
+A `course` package defines the basin time trial. It has exactly four gates, all south of the
+start and in strictly decreasing `z`; the gate centre and both edges must be open water.
+
+```lua
+return {
+  course = {
+    start = { x = 0, z = 50, heading = 0 },
+    gates = {
+      { x = 0, z = 35, half_width = 12 },
+      { x = 22, z = 7, half_width = 10 },
+      { x = -22, z = -23, half_width = 10 },
+      { x = 0, z = -53, half_width = 12 },
+    },
+  },
+}
+```
+
+The gameplay digest covers the start, heading and every gate. When it equals the compiled S
+course's digest, saved bests keep `course-{calm|waves}-physicsN.run`; another course adds its
+digest to the name and refuses `--replay`/`--ghost`. `--plugin` still refuses the course.
 
 ## Entry text
 
@@ -437,7 +493,8 @@ wire-format, replay-format or browser-import changes; P5 owns network content co
 
 ## Playing and live authoring (P1)
 
-Native builds only. From the repository root:
+Native builds only. Plain play now opens a [bundled catalog entry](#bundled-catalog-pd1); this
+section is the file-based authoring override:
 
 ```sh
 ./build/wake_velocity --plugin plugins/langedrag
@@ -445,10 +502,10 @@ Native builds only. From the repository root:
 
 `--plugin DIR` selects the manifest's location (`outer`), so `--location` may be omitted; a
 different `--location` is refused. It cannot be combined with `--connect`, `--host`, `--course`,
-`--replay` or `--ghost`. Other solo options (`--start`, `--demo`, `--screenshot`, skins,
-renderers) work as before. If the package does not load at launch, the game prints the
-diagnostic and exits. The reference package is equal to the compiled route, so play is
-unchanged until it is edited. Packaged builds ship it, `shelter-tour` and `river-sprint` under
+`--replay`, `--ghost`, `--package` or `--no-plugins`. Other solo options (`--start`, `--demo`,
+`--screenshot`, skins, renderers) work as before. If the package does not load at launch, the game
+prints the diagnostic and exits. The reference package is equal to the compiled route, so play is
+unchanged until it is edited. Packaged builds ship the bundled package sources under
 `assets/plugins` (macOS: `Wake Velocity.app/Contents/Resources/assets/plugins`), with the
 [authoring tools](#packaged-authoring-tools-p47); copy one somewhere writable and pass that
 directory.
@@ -475,6 +532,8 @@ Staging never changes the running voyage. A candidate is compared with the activ
 | Display names only: manifest `name`, or shelter `name` in descriptor-only packages; ordered shelter IDs and every number identical | Applied at once. The boat, clock, water, wakes and all voyage progress are kept; the HUD shows the new names |
 | Shelter IDs, order, count, position, heading or radius; arrival; `exposed_fraction` | Held until F7, then **restart voyage**: progress, timing and recoveries begin again at the start shelter; the boat, clock, water and any weather already met continue. A boat already inside a shelter or the arrival area is observed by the ordinary rules on the next tick |
 | `exposure` or `weather_range` | Held until F7, then **restart session**: the same full restart as Backspace without a voyage (tick zero, the boat at the spawn, calm water until the weather begins) with the new revision |
+| `course` start, heading or any gate (course packages) | Held until F7, then **restart session**; fairness comes first and a run is never continued across a course edit. The compiled digest keeps existing bests valid; another course changes the saved path |
+| Free package display name | Applied at once; a free package has no other content |
 | Manifest `id`, `kind`, `location` or `api` | Not applied; relaunch to use another plugin |
 
 A failed stage (I/O, manifest, syntax, runtime, memory, budget, schema or map check) keeps the
