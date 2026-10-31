@@ -1262,6 +1262,12 @@ dependencies, no project warnings. `ctest --preset quick` passed all 243 enabled
 disabled, GPU CTests off). That includes the two new room cases, `default_sessions`,
 `compiled_selection_guard`, `boat_plugin_stage`, `boat_server_scripted(_deathmatch)`,
 `boat_race_trial`, the catalog equality cases and the legacy-best case. `git diff --check` passes.
+Linux, macOS and Windows CI passed on the final revision after two review fixes: the race fixture
+comparison uses the gameplay digest instead of a padding-sensitive `memcmp`, and the relocated
+authoring-tools check passes an explicit 20 s validation deadline on a loaded runner. The manual
+`web-plugin.yml` workflow then passed Chromium, Firefox and WebKit ([run
+41253441627](https://github.com/doomdavve/proteus/actions/runs/41253441627)) on the last code
+revision.
 
 Browser checks used the final native WebRTC `boat_server` and the final browser build, Chrome
 headless with `--use-angle=metal`, against local rooms only. `check_web_multiplayer.py` passed
@@ -1296,9 +1302,9 @@ The hosted browser build was reproduced in a scratch directory with `emcmake`, M
 `origin/main` worktree (`b0f1233`) with the clean local `davve-srv` controller and reported
 "Preflight passed. No tag, release or hosting changes made."
 
-**Known limits.** GPU CTests were off. Firefox, WebKit and the manual three-engine
-`web-plugin.yml` workflow were not dispatched; only headless Chromium/Metal was run. No physical
-Safari/iPhone or two-machine room was tried. The four-client bandwidth and tick figures are one
+**Known limits.** GPU CTests were off. Only headless Chromium/Metal was run locally; Firefox and
+WebKit were covered by the manual CI workflow. No physical Safari/iPhone or two-machine room was
+tried. The four-client bandwidth and tick figures are one
 local wall-clock run each, not a budget or a remote-network measurement. The `--four-players`
 extra client still types the local room through the shared helper; it does not exercise the
 hosted directory.
