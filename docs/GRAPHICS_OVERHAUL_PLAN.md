@@ -1,9 +1,11 @@
 # Graphics overhaul plan
 
 Status: proposed 2026-10-31. No stage has started and nothing here is implemented. The user asked
-for this plan after a review of the GPU drawing path, to iterate on later. The plan's direction has
-not been accepted yet: treat the stages, targets and identity rules as a draft to argue with.
-**Next task: settle the [open decisions](#open-decisions), then G0.**
+for this plan after a review of the GPU drawing path, to iterate on later. Their first reaction is
+under [decisions](#decisions): the order is "probably right" and the new water layer "sounds
+exciting". That is a steer, not acceptance of any result, and targets and identity rules are still
+a draft to argue with.
+**Next task: G0.**
 
 ## Intended result
 
@@ -105,9 +107,11 @@ Targets are provisional until G0 sets real budgets. Each stage's gain figures ar
 1. Repeat the benchmark matrix on Release at current `main`, and take an Instruments trace to find
    where submission time goes.
 2. Add a stress scenario: four boats with a saturated wake pool, which today's route does not cover.
-3. Measure a browser and the weakest machine we care about, and decide the supported floor.
+3. Measure the M1 Max as the reference machine, plus a browser on it. Record what the browser
+   build can hold, since its floor is [still open](#open-decisions).
 4. Pick a fixed set of review stops and cameras for before/after captures.
-5. Record per-pass and per-group budgets in this plan.
+5. Record per-pass and per-group budgets in this plan, set well inside the M1 Max's frame time
+   rather than filling it (see [hardware floor](#decisions)).
 
 Done when: every later stage has a number to beat, including worst-case wakes.
 
@@ -175,8 +179,9 @@ Done when: glassy docks and choppy open water read clearly apart in captures, on
 ### G5 — Resolution, light and mood
 
 1. **High-resolution preset.** Add world-anchored water squares (identity rule 1) and compare with
-   320×200 side by side. This needs explicit user acceptance. If accepted, update the
-   nearest-neighbour convention in `AGENTS.md`, along with HUD scaling and the guides.
+   320×200 side by side, as an option: low resolution stays the default. Changing the default needs
+   explicit user acceptance later; only then update the nearest-neighbour convention in `AGENTS.md`,
+   along with HUD scaling and the guides.
 2. **HDR and grading.** Unclamp lighting, add restrained bloom and authored grading per time of day.
 3. **Clustered lights.** Replace the 32-light loop with a CPU-built cluster texture, removing the
    lamp selection and its cap.
@@ -198,17 +203,17 @@ keeping its window, input and audio; rewriting about 1,100 lines of shaders; and
 coverage, which this plan has not checked. That spike decides between one backend and keeping
 WebGL2 as a fallback. Then: compute culling, indirect draws, GPU particles and simulation.
 
-## Open decisions
+## Decisions
 
-For the user:
+From the user, 2026-10-31:
 
-1. **Direction:** is this order right, and are the identity rules the right ones?
-2. **High resolution as the default?** It could stay an option, with 320×200 as the default. This
-   plan assumes both remain available and leaves the default to G5's comparison.
-3. **Look spike first?** The order above starts with work that pays off regardless of the look, and
-   compares the look in G5. A throwaway water-square spike during G0 would test rule 1 earlier, at a
-   small cost. Current choice: keep the order.
-4. **Supported floor:** which weakest GPU and browser must hold 60 Hz? This sets G0's budgets.
+- **Order:** "probably right". Keep the stages as they are.
+- **Default resolution:** low resolution stays the default "until this comes a lot further". New
+  resolutions are options until then.
+- **Hardware floor:** "we don't have to go much below a M1 Max". The M1 Max is the reference
+  machine, and no stage needs to hold up on much weaker hardware.
+- **Not a licence for waste:** "no need to be sloppy due to that". Stages still have to earn their
+  cost, with budgets and measured gains, even where the M1 Max could absorb it.
 
 For the implementer, decided here unless reversed:
 
@@ -216,6 +221,15 @@ For the implementer, decided here unless reversed:
   expected to match them.
 - **Browser parity:** every stage before G6 must also run in the browser build, or state its
   fallback.
+
+## Open decisions
+
+1. **Look spike first?** The order starts with work that pays off regardless of the look, and
+   compares the look in G5. A throwaway water-square spike during G0 would test rule 1 earlier, at a
+   small cost. Current choice: keep the order.
+2. **Browser floor:** the hardware floor above was stated for machines generally. Whether browsers
+   must hold 60 Hz on the same machine, or may fall back to fewer effects, is not decided. Current
+   choice: fallbacks are allowed, and G0's browser measurement informs this.
 
 ## Related work and conflicts
 
@@ -245,3 +259,4 @@ For the implementer, decided here unless reversed:
   three inspected GPU captures (river at 320×200 and `--gpu-aa`, basin at `--gpu-aa`) on `d3467ff`.
   No renderer change, no user acceptance. Browser coverage for WebGPU and all gain estimates are
   unverified.
+- 2026-10-31: recorded the user's first reactions under [decisions](#decisions). Documentation only.
