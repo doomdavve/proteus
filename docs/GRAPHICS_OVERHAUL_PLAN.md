@@ -220,7 +220,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | Package | Deliverable | Implementation dependencies | Brief | Code / human review |
 | --- | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | Measurement and review harness | current main | Prepared | Unstarted; review pending |
-| G1 | Persistent instances and pass culling | G0 budgets and review manifest | Queued in next planning PRs | Unstarted; review pending |
+| [G1](#g1--persistent-instances-and-pass-culling) | Persistent instances and pass culling | G0 budgets and review manifest | Prepared | Unstarted; review pending |
 | G2a | Geometry storage and ownership | G1 | Queued in next planning PRs | Unstarted; review pending |
 | G2b | Distance detail and valid shadow reuse | G2a | Queued in next planning PRs | Unstarted; review pending |
 | G3a | Stamped wake shading | G2b and Batch A verdict resolved | Queued in next planning PRs | Unstarted; review pending |
@@ -291,6 +291,56 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement package G0 in docs/GRAPHICS_OVERHAUL_PLAN.md. Read its execution process and complete the measurement/review harness, repeated Release baseline and budget table. Use one implementation PR, update the plan with actual evidence and limits, and leave human acceptance unclaimed.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G1 — Persistent instances and pass culling
+
+Stage coverage: G1. **Depends on:** G0 budgets and review manifest.
+Human review: Batch A after G2b; agent checks still run here.
+
+**Read first:** `src/renderer_gpu.[ch]` (`draw_colored_mesh`, `draw_life`, `box_in_view`,
+`set_water_uniforms`), `src/waterfront_scene.[ch]`, `assets/shaders/waterfront_city.*`, [3D](3D.md),
+[performance](BOATING_PERFORMANCE.md).
+
+**Tasks, in order:**
+
+1. Cache all shader locations when each shader is loaded, invalidate them on reload/unload, and
+   retain optional-uniform handling. Remove name lookups from per-draw/per-frame paths.
+2. Build a caller-owned instance list from the already evaluated scene frame, grouped by
+   mesh/material and pass-relevant state. Cover cubes, gull parts, boat parts, harbour/traffic
+   pieces and actors; keep cloth dynamic and preserve transparency/order-sensitive paths. Preserve
+   model/normal transforms, per-instance colour, emissive behavior and reflection clipping.
+3. Allocate persistent instance VBO/VAO state with rlgl-compatible divisors; grow at a bounded
+   capacity, reuse storage and release it before context destruction. Avoid DrawMeshInstanced
+   allocation per call. Supply a scalar reference path for validation and a safe initialization-
+   failure fallback.
+4. Cull transformed conservative bounds separately for main, mirrored reflection and both shadow
+   frusta. Include full animation extents. A light behind the main camera can still cast a visible
+   shadow; never reuse the main visibility list for other passes.
+5. Update submission statistics to count actual instanced submissions, instances and multiplied
+   triangle work. Keep historical counter definitions scoped by schema; update validators,
+   performance guide and renderer description.
+
+**Acceptance:** On the same build/platform, scalar and instanced/culling paths produce
+byte-identical G0 captures in every pass, including cloth and reflected/clipped actors. Existing
+tile_culling and GPU lifecycle/view tests pass; add relevant instance-boundary/resource checks. Meet
+G0 submission/CPU p95 ceilings with repeated ordinary/stress measurements and no GPU budget
+regression.
+
+**Limits and stop conditions:** No visual redesign, physics changes, compute, storage buffers or
+direct GL-only dependency that breaks WebGL2. A parity failure is a bug to fix, not a reason to
+widen tolerance.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G1 from docs/GRAPHICS_OVERHAUL_PLAN.md after G0 is ready. Complete cached uniforms, persistent coloured instances and per-pass object culling in one PR; prove scalar/culling parity and measured budget gains. Update the plan; prepare Batch A evidence without requesting a separate human playtest.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
