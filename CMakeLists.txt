@@ -1265,6 +1265,10 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME tile_culling COMMAND boat_water_review --check-culling)
   set_tests_properties(tile_culling PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "tile_culling=ok")
+  # Graphics G1: scalar and instanced objects draw the same bytes in every pass.
+  add_test(NAME instancing_parity COMMAND boat_water_review --check-instancing)
+  set_tests_properties(instancing_parity PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "instancing_parity=ok")
   add_test(NAME gpu_view_lifecycle COMMAND boat_water_review --check-gpu-lifecycle)
   set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}

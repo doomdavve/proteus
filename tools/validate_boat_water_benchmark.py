@@ -20,7 +20,7 @@ WARMUP = 120
 STRESS_WARMUP = 120
 STRESS_FRAMES = 1020
 STATS = ('simulation_ms', 'render_submit_ms', 'present_ms', 'frame_ms', 'frame_interval_ms',
-         'gpu_ms', 'app_submissions', 'scene_triangles', 'map_submissions', 'map_triangles')
+         'gpu_ms', 'app_submissions', 'app_instances', 'scene_triangles', 'map_submissions', 'map_triangles')
 PASSES = ('shadow', 'reflection', 'main')
 GROUPS = ('map', 'water', 'object')
 
@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory() as directory:
     with prefix.with_suffix('.csv').open() as stream:
         rows = list(csv.DictReader(stream))
 
-    assert report['schema_revision'] == 4 and report['mode'] == 'benchmark'
+    assert report['schema_revision'] == 5 and report['mode'] == 'benchmark'
     assert report['scenario'] == 'river-review' and report['route'] == 'river-review'
     assert report['tile_size'] == 1024
     assert report['renderer'] == 'gpu' and report['aa'] == 'off'
@@ -157,6 +157,8 @@ with tempfile.TemporaryDirectory() as directory:
             assert int(row[total]) == by_pass + sky, (i, kind)
         for p in PASSES:
             assert int(row[f'{p}_submissions']) > 0 and int(row[f'{p}_triangles']) > 0, (i, p)
+        # Triangles count every instance; one submission can draw many.
+        assert int(row['app_instances']) >= int(row['app_submissions']), i
         assert int(row['map_triangles']) > 0 and int(row['water_triangles']) > 0, i
         for p in PASSES:
             assert int(row[f'{p}_tiles_culled']) >= 0, (i, p)
@@ -193,7 +195,7 @@ with tempfile.TemporaryDirectory() as directory:
     stress_report = json.loads(stress.with_suffix('.json').read_text())
     with stress.with_suffix('.csv').open() as stream:
         stress_rows = list(csv.DictReader(stream))
-    assert stress_report['schema_revision'] == 4
+    assert stress_report['schema_revision'] == 5
     assert stress_report['scenario'] == 'stress-basin' and stress_report['route'] == 'stress-basin'
     assert stress_report['run_completed'] is True and stress_report['route_completed'] is False
     assert stress_report['final_state'] == expected_stress == final_state(result.stdout)

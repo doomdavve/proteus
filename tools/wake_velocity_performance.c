@@ -1,7 +1,11 @@
 #include "wake_velocity_performance.h"
 
 #include "boat_version.h"
+#if defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
+#else
 #include "external/glad.h"
+#endif
 #include "raylib.h"
 
 #include <errno.h>
@@ -14,6 +18,9 @@
 
 #if defined(_WIN32)
 #include <direct.h>
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI // raylib's Rectangle, CloseWindow and ShowCursor.
+#define NOUSER
 #include <windows.h>
 #define make_dir(path) _mkdir(path)
 #else
@@ -174,12 +181,21 @@ static void write_segment_summaries(FILE *out, const BoatCapture *capture, float
     fputs("\n  ],\n", out);
 }
 
+static const char *gl_string(GLenum name)
+{
+#if !defined(__EMSCRIPTEN__)
+    if (!glGetString)
+        return NULL; // No loaded context: a CPU renderer capture.
+#endif
+    return (const char *)glGetString(name);
+}
+
 static void write_manifest(FILE *out, const BoatCapture *capture, const WakePerformanceInfo *info,
     const BoatCaptureSummary *summary, const char *timestamp)
 {
-    const char *renderer = glGetString ? (const char *)glGetString(GL_RENDERER) : NULL;
-    const char *version = glGetString ? (const char *)glGetString(GL_VERSION) : NULL;
-    const char *vendor = glGetString ? (const char *)glGetString(GL_VENDOR) : NULL;
+    const char *renderer = gl_string(GL_RENDERER);
+    const char *version = gl_string(GL_VERSION);
+    const char *vendor = gl_string(GL_VENDOR);
     Vector2 dpi = IsWindowReady() ? GetWindowScaleDPI() : (Vector2) { 1, 1 };
     fprintf(out, "{\n  \"format\":\"wake-velocity-performance\",\"revision\":%d,\n",
         PERFORMANCE_FORMAT_REVISION);

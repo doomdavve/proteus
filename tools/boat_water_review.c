@@ -768,6 +768,7 @@ BENCH_SELECT(frame, frame_ms, true)
 BENCH_SELECT(interval, interval_ms, frame->has_interval)
 BENCH_SELECT(gpu, gpu_ms, frame->has_gpu)
 BENCH_SELECT(submissions, total.submissions, true)
+BENCH_SELECT(instances, total.instances, true)
 BENCH_SELECT(triangles, total.triangles, true)
 BENCH_SELECT(map_submissions, group[WATERFRONT_GPU_GROUP_MAP].submissions, true)
 BENCH_SELECT(map_triangles, group[WATERFRONT_GPU_GROUP_MAP].triangles, true)
@@ -983,7 +984,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     }
     fputs("frame,warmup,first_tick,end_tick,ticks,destination,x,z,heading,simulation_ms,"
           "render_submit_ms,present_ms,frame_ms,frame_interval_ms,gpu_ms,"
-          "wave_patch_rebuilds,wake_uploads,app_submissions,scene_triangles,"
+          "wave_patch_rebuilds,wake_uploads,app_submissions,app_instances,scene_triangles,"
           "shadow_submissions,shadow_triangles,reflection_submissions,reflection_triangles,"
           "main_submissions,main_triangles,map_submissions,map_triangles,"
           "water_submissions,water_triangles,object_submissions,object_triangles,"
@@ -997,12 +998,12 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
             snprintf(interval, sizeof(interval), "%.9g", (double)f->interval_ms);
         if (f->has_gpu)
             snprintf(gpu_ms, sizeof(gpu_ms), "%.9g", (double)f->gpu_ms);
-        fprintf(csv, "%d,%d,%d,%d,%d,%zu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%s,%d,%zu,%u,%zu", i,
-            i < BENCH_WARMUP, f->first_tick, f->end_tick, f->end_tick - f->first_tick,
+        fprintf(csv, "%d,%d,%d,%d,%d,%zu,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%s,%s,%d,%zu,%u,%u,%zu",
+            i, i < BENCH_WARMUP, f->first_tick, f->end_tick, f->end_tick - f->first_tick,
             f->destination, (double)f->x, (double)f->z, (double)f->heading,
             (double)f->simulation_ms, (double)f->render_ms, (double)f->present_ms,
             (double)f->frame_ms, interval, gpu_ms, f->wave_rebuilds, f->wake_uploads,
-            f->total.submissions, f->total.triangles);
+            f->total.submissions, f->total.instances, f->total.triangles);
         for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
             fprintf(csv, ",%u,%zu", f->pass[pass].submissions, f->pass[pass].triangles);
         for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group)
@@ -1021,7 +1022,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     else
         format_final_state(state, sizeof(state), boat, tick);
     fprintf(json,
-        "{\n  \"schema_revision\":4,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
+        "{\n  \"schema_revision\":5,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
         "  \"scenario\":\"%s\",\"route\":\"%s\",\"route_revision\":1,\"physics_revision\":%d,\n"
         "  \"build\":\"%s\",\"platform\":\"%s\",\n  \"gl_renderer\":",
         stress ? "stress-basin" : "river-review", stress ? "stress-basin" : "river-review",
@@ -1061,6 +1062,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     json_stats(json, "frame_interval_ms", frames, count, scratch, bench_interval);
     json_stats(json, "gpu_ms", frames, count, scratch, bench_gpu);
     json_stats(json, "app_submissions", frames, count, scratch, bench_submissions);
+    json_stats(json, "app_instances", frames, count, scratch, bench_instances);
     json_stats(json, "scene_triangles", frames, count, scratch, bench_triangles);
     json_stats(json, "map_submissions", frames, count, scratch, bench_map_submissions);
     json_stats(json, "map_triangles", frames, count, scratch, bench_map_triangles);
@@ -1155,6 +1157,192 @@ static const ReviewPose review_poses[] = {
     { "outer-map-reload", "map-reload", BOAT_LOCATION_OUTER, { -12, 60 }, 0, 0, 20, 10, 2100, 4,
         120, { 0 }, 0 },
 };
+
+// One rendered frame's parity evidence: the composed image, the mirrored reflection source and both
+// shadow depth maps, so a pass cannot hide a difference the final image happens not to show.
+typedef struct {
+    Image main, reflection;
+    float *near_depth, *far_depth;
+    WaterfrontGpuCount total;
+} ParityFrame;
+
+static float *parity_depth(Texture2D depth, int size)
+{
+    float *values = malloc((size_t)size * (size_t)size * sizeof(*values));
+    if (!values)
+        return NULL;
+    glBindTexture(GL_TEXTURE_2D, depth.id);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, values);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return values;
+}
+
+static bool parity_capture(const BoatGpu *gpu, ParityFrame *frame)
+{
+    const WaterfrontGpuScene *scene = &gpu->scene;
+    frame->main = LoadImageFromTexture(gpu->target.texture);
+    frame->reflection = LoadImageFromTexture(scene->reflection.texture);
+    frame->near_depth = parity_depth(scene->shadow_map.depth, scene->shadow_map_size);
+    frame->far_depth
+        = parity_depth(scene->far_shadow_map.depth, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE);
+    frame->total = waterfront_gpu_stats_total(&scene->stats);
+    return !gpu->failed && frame->main.data && frame->reflection.data && frame->near_depth
+        && frame->far_depth;
+}
+
+static void parity_release(ParityFrame *frame)
+{
+    if (frame->main.data)
+        UnloadImage(frame->main);
+    if (frame->reflection.data)
+        UnloadImage(frame->reflection);
+    free(frame->near_depth);
+    free(frame->far_depth);
+    *frame = (ParityFrame) { 0 };
+}
+
+static size_t parity_differences(const void *a, const void *b, size_t size, size_t element)
+{
+    size_t different = 0;
+    for (size_t i = 0; i < size / element; ++i)
+        different
+            += memcmp((const char *)a + i * element, (const char *)b + i * element, element) != 0;
+    return different;
+}
+
+typedef struct {
+    int frames;
+    unsigned scalar_submissions, instanced_submissions;
+    size_t instances;
+} ParityTotals;
+
+// Fails on any changed byte in any pass, or on a change of the work drawn.
+static bool parity_compare(const BoatGpu *gpu, const ParityFrame *scalar,
+    const ParityFrame *instanced, const char *name, unsigned frame, bool aa, ParityTotals *totals)
+{
+    int near_size = gpu->scene.shadow_map_size, far_size = WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE;
+    size_t differences[4] = {
+        parity_differences(scalar->main.data, instanced->main.data,
+            (size_t)GetPixelDataSize(scalar->main.width, scalar->main.height, scalar->main.format),
+            4),
+        parity_differences(scalar->reflection.data, instanced->reflection.data,
+            (size_t)GetPixelDataSize(
+                scalar->reflection.width, scalar->reflection.height, scalar->reflection.format),
+            4),
+        parity_differences(scalar->near_depth, instanced->near_depth,
+            (size_t)near_size * (size_t)near_size * sizeof(float), sizeof(float)),
+        parity_differences(scalar->far_depth, instanced->far_depth,
+            (size_t)far_size * (size_t)far_size * sizeof(float), sizeof(float)),
+    };
+    totals->scalar_submissions += scalar->total.submissions;
+    totals->instanced_submissions += instanced->total.submissions;
+    totals->instances += instanced->total.instances;
+    ++totals->frames;
+    bool same_work = scalar->total.triangles == instanced->total.triangles
+        && scalar->total.instances == instanced->total.instances;
+    if (!differences[0] && !differences[1] && !differences[2] && !differences[3] && same_work)
+        return true;
+    fprintf(stderr,
+        "instancing changed %s-%u aa=%d main=%zu reflection=%zu near_shadow=%zu far_shadow=%zu "
+        "triangles=%zu/%zu instances=%u/%u\n",
+        name, frame, aa, differences[0], differences[1], differences[2], differences[3],
+        scalar->total.triangles, instanced->total.triangles, scalar->total.instances,
+        instanced->total.instances);
+    return false;
+}
+
+typedef struct {
+    const BoatViewState *view;
+    const BoatPresentation *presentation;
+    const BoatWorld *world;
+    const BoatRivals *rivals;
+    BoatCamera camera;
+} ParityScene;
+
+// Draws one scene scalar, instanced, then instanced with a replay every few objects (the batch
+// capacity boundary), from the same state. The tolerance is zero.
+static bool parity_frame(BoatGpu *gpu, const ParityScene *scene, const char *name, unsigned frame,
+    bool aa, ParityTotals *totals)
+{
+    ParityFrame frames[3] = { 0 };
+    bool ok = true;
+    for (int mode = 0; ok && mode < 3; ++mode) {
+        waterfront_gpu_scene_set_instancing_enabled(&gpu->scene, mode != 0);
+        waterfront_gpu_scene_set_instance_limit(&gpu->scene, mode == 2 ? 3 : 0);
+        boat_gpu_draw_scene(gpu, scene->view, scene->presentation, scene->world, scene->camera,
+            scene->rivals, NULL, NULL, 0);
+        ok = parity_capture(gpu, &frames[mode]);
+    }
+    waterfront_gpu_scene_set_instance_limit(&gpu->scene, 0);
+    ParityTotals boundary = { 0 };
+    ok = ok && parity_compare(gpu, &frames[0], &frames[1], name, frame, aa, totals)
+        && parity_compare(gpu, &frames[0], &frames[2], name, frame, aa, &boundary);
+    for (int mode = 0; mode < 3; ++mode)
+        parity_release(&frames[mode]);
+    return ok;
+}
+
+// G1: every G0 review pose and the four-boat stress scene, on the same build and platform, with AA
+// off and 4x4.
+static int check_instancing(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Instancing parity probe");
+    if (!IsWindowReady())
+        return 1;
+    int result = 1;
+    ParityTotals totals = { 0 };
+    for (int aa = 0; aa < 2; ++aa) {
+        BoatGpu gpu = { 0 };
+        bool ok = boat_gpu_init(&gpu, aa != 0) && gpu.scene.object_batch;
+        for (size_t p = 0; ok && p < sizeof(review_poses) / sizeof(*review_poses); ++p) {
+            const ReviewPose *pose = &review_poses[p];
+            BoatSession session;
+            boat_session_init(&session, test_world(pose->location), boat_water_gentle());
+            BoatPresentation shown = session.presentation;
+            Boat boat = session.boat;
+            boat.position = pose->position;
+            boat.heading = pose->heading;
+            for (unsigned frame = 0; ok && frame < pose->frames; ++frame) {
+                shown.camera_heading = pose->camera_heading + frame * pose->step_heading;
+                const BoatViewState view = { .boat = boat,
+                    .time = (pose->tick + frame * pose->step_ticks) * (double)BOAT_STEP };
+                const ParityScene scene = { &view, &shown, &session.world, NULL,
+                    { .distance = pose->distance, .height = pose->height } };
+                ok = parity_frame(&gpu, &scene, pose->name, frame, aa, &totals);
+                boat.position = Vector2Add(boat.position, pose->step_position);
+                boat.heading += pose->step_heading;
+            }
+            boat_session_destroy(&session);
+        }
+        StressFixture *stress = ok ? malloc(sizeof(*stress)) : NULL;
+        ok = ok && stress && stress_init(stress, true)
+            && stress_advance(stress, STRESS_PREROLL_TICKS);
+        for (unsigned frame = 0; ok && frame < 6; ++frame) {
+            BoatWorld world = stress_world(stress);
+            BoatViewState view = stress_view(stress);
+            BoatRivals rivals = stress_rivals(stress);
+            const ParityScene scene = { &view, &stress->presentations[0], &world, &rivals,
+                { .distance = 26, .height = 16 } };
+            ok = parity_frame(&gpu, &scene, "stress", frame, aa, &totals)
+                && stress_advance(stress, 30);
+        }
+        free(stress); // Like the other stress callers, the fleet lives until the tool exits.
+        boat_gpu_destroy(&gpu);
+        if (!ok)
+            goto cleanup;
+    }
+    if (totals.instanced_submissions >= totals.scalar_submissions)
+        goto cleanup;
+    printf("instancing_parity=ok frames=%d scalar_submissions=%u instanced_submissions=%u "
+           "instances=%zu\n",
+        totals.frames, totals.scalar_submissions, totals.instanced_submissions, totals.instances);
+    result = 0;
+cleanup:
+    test_worlds_close();
+    CloseWindow();
+    return result;
+}
 
 static bool review_pose_clear(const BoatWorldResources *resources, Vector2 position)
 {
@@ -1267,6 +1455,7 @@ int main(int argc, char **argv)
     float tile_size = 0;
     bool no_cull = false;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
+    bool instancing = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
     bool stress_state_only = false;
     for (int i = 1; i < argc; ++i) {
@@ -1292,6 +1481,8 @@ int main(int argc, char **argv)
             gpu_lifecycle = true;
         else if (strcmp(argv[i], "--check-culling") == 0)
             culling = true;
+        else if (strcmp(argv[i], "--check-instancing") == 0)
+            instancing = true;
         else if (strcmp(argv[i], "--check") == 0)
             check = true;
         else if (strcmp(argv[i], "--sequence") == 0)
@@ -1315,6 +1506,7 @@ int main(int argc, char **argv)
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
                  "       boat_water_review --check-gpu-lifecycle | --check-culling\n"
+                 "       boat_water_review --check-instancing\n"
                  "       boat_water_review --stress-state\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--visible] [--tile-size M] [--no-cull]\n"
@@ -1364,11 +1556,12 @@ int main(int argc, char **argv)
     }
     if (review_dir
         && (check || output || sequence || visible || aa_name || pacing || scenario || gpu_check
-            || gpu_views || gpu_lifecycle || culling))
+            || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
-    if (gpu_check || gpu_views || gpu_lifecycle || culling) {
+    if (gpu_check || gpu_views || gpu_lifecycle || culling || instancing) {
         SetTraceLogLevel(LOG_WARNING);
-        return culling      ? check_culling()
+        return instancing   ? check_instancing()
+            : culling       ? check_culling()
             : gpu_lifecycle ? check_gpu_lifecycle()
             : gpu_views     ? check_gpu_views()
                             : check_gpu_water();
