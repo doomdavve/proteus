@@ -1,17 +1,16 @@
 # Graphics overhaul plan
 
-Status, 2026-11-01: **all twelve package briefs prepared; implementation unstarted**. The
-[execution process](#package-execution-process) defines one implementation PR per package and
-three batched human playtests. Prepared briefs include a short kickoff prompt for the next agent.
-**Next implementation: G0**, after its planning instructions are approved. Low resolution remains
-the default; the [look test](#water-look-test--2026-10-31) rejected water squares and favoured plain
-high resolution as an option. Historical measurements and user decisions below remain scoped to
-2026-10-31; no overhaul implementation or result acceptance is claimed.
+Status, 2026-11-01: **three work packages prepared; implementation unstarted**. Each has one
+human playtest and, by default, one implementation PR. The detailed G0–G5c briefs are internal
+checkpoints with focused commits and resumable agent handoffs. G6 remains a conditional study.
+**Next: P1, starting at G0.** See the [work packages](#work-package-register) and
+[execution process](#package-execution-process) for scope, review and boundary-change rules.
 
-The user's native Windows machine is an additional performance evidence source. The new
-[G0w package](#g0w--native-performance-capture-and-windows-to-mac-reports) delivers low-friction
-capture, a portable report bundle and analysis back on the Mac before G1. M1 Max budgets remain
-the reference; actual Windows performance is unqualified until reports are returned.
+Low resolution remains default. The [look test](#water-look-test--2026-10-31) rejected water squares
+and favoured plain high resolution as an option; no overhaul result is accepted. Native Windows
+capture and Mac analysis belong to [P1](#p1--performance-foundations), at its
+[G0w checkpoint](#g0w--native-performance-capture-and-windows-to-mac-reports), before optimization.
+M1 Max budgets remain the reference; Windows performance awaits actual returned reports.
 
 ## Intended result
 
@@ -109,49 +108,106 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-01: this is a **planning delivery**, not a renderer implementation. Twelve
-package briefs, including G0w for native Windows capture, split G0–G6 into one future
-implementation PR apiece; G6 remains conditional.
-**One PR per package means one implementation PR per work package.** Batch package definitions,
-prompts and process changes together in one planning PR; do not create a planning PR per package.
-The initial twelve-PR documentation stack was an interpretation error, not the intended workflow.
-Merge that existing stack in order before implementation. **Next implementation: G0.** No overhaul
-result is user-accepted.
+Status, 2026-11-01: **three work packages, implementation unstarted**. Each package owns one
+human playtest and, by default, one implementation PR. The G0–G5c sections below are ordered
+internal checkpoints, not separate work packages or PR assignments. G6 is a dormant contingency,
+outside the three-package count. **Next: P1, starting at G0.**
+
+Keep package definitions, prompts and process updates together in one planning PR. The original
+twelve-PR planning stack was an interpretation error and is merged; it does not prescribe future
+implementation boundaries. Three PRs is the starting plan, not a guarantee that each aggregate
+change will remain reasonably reviewable. No graphics implementation or result acceptance is claimed.
+
+### Context, checkpoints and code review
+
+A work package may span multiple agent sessions. Do not depend on a single context window or one
+agent remembering earlier decisions. Give a simpler agent the shared constraints, its current
+checkpoint, established interfaces and durable handoff; it does not need the whole conversation.
+Complete the checkpoints in order on the same branch and PR, keeping the package's final acceptance
+in view. An agent can hand off unfinished work without splitting delivery or marking it complete.
+
+At every checkpoint:
+
+1. Work through its numbered tasks in order. Use small, coherent commits for separate ownership,
+   data-format, algorithm and visual changes; do not combine unrelated refactors or squash the
+   review history before review. Keep the build and quick tests passing at stable commits.
+2. Run that checkpoint's specific parity, lifecycle, fallback and performance checks before layering
+   the next feature. A new water layer must not hide a failed stamp comparison; LOD must not hide
+   an ownership/parity error. Use the common full acceptance suite before package handoff.
+3. Update its result with the commit(s), touched interfaces/ownership, decisions, checks actually
+   run and artifact paths/commands. Record old/new budgets and errors where relevant. Leave the
+   next checkpoint/task, unresolved questions and limitations explicit; never write just "done".
+4. If switching agents/context, the next agent reads that result and verifies the checkpoint
+   contract before continuing. Ask Astra for advice when ownership, parity, numerical stability,
+   portability or design scope is unresolved; more context does not replace a sound decision.
+5. Keep a PR review map listing checkpoint → focused commits → verification/artifacts → known risk.
+   Reviewers can review completed checkpoints while implementation continues, then check final
+   integration. Splitting the reading this way helps review, but does not make the total diff small.
+
+A minimal durable checkpoint result contains:
+
+```text
+State: unstarted / in progress / machine-verified / blocked
+Commit(s) and current task:
+Interfaces/owners and decisions to preserve:
+Verification, commands and evidence:
+Unresolved issues / human review still pending:
+Next checkpoint/task and files to read:
+```
+
+### When a delivery boundary needs to change
+
+The first package has the largest scope risk: G0w adds diagnostics/export/packaging infrastructure,
+then G1–G2 change submission, geometry ownership, LOD and shadows. The water and presentation
+packages also cross several renderer concerns. Do not promise that handoff notes solve aggregate
+code-review size, or estimate it from an invented line count.
+
+Use completed checkpoint evidence to judge a split. A concrete reason is an independently useful
+and verified prerequisite that can be reviewed/landed without the remaining renderer changes, or
+an external dependency holding unrelated completed work. The most plausible extra boundary is
+**G0+G0w diagnostics before the remaining P1 rendering work**. A large diff alone is a signal to
+inspect cohesion and reviewability, not an automatic threshold or a reason to restore twelve PRs.
+
+If that boundary is needed, record the actual changed subsystems/commits, independent acceptance
+and reason in this plan, revise the affected work-package boundary explicitly and explain the
+additional PR in the handoff before opening it. Keep completed tasks and pending acceptance clear.
+Do not silently create more packages, deliver a partial package as complete, or add another human
+artistic playtest. Otherwise keep the three-package plan. G6 still requires its own measured trigger.
 
 ### Work loop and delivery
 
-1. Read [AGENTS.md](../AGENTS.md), this process, the assigned brief, [testing](TESTING.md) and
-   its named owners. Confirm symbols against the source; the entry points below were checked on
-   `b0f1233`. Adapt moved code and record the difference rather than creating a parallel subsystem.
-2. Check the package's dependencies and G0 budget/tolerance table. Work in a separate worktree,
-   on `feat/graphics-<package in lowercase>`, from current main if dependencies have merged. If
-   explicitly continuing an unmerged stack, branch from the dependent implementation parent and
-   target it, never main. Merge updated parents into open children before review, per AGENTS.md.
-   Planning-PR order is an editorial stack; it does not grant readiness to implementation packages.
-3. Complete only the assigned package, in the task order below. Use focused commits per coherent
-   task so a simpler agent can checkpoint/recover; keep the build and quick lane green. Do not
-   start the next package automatically. Ask Astra for advice if profiling contradicts the chosen
-   design, a portability decision has no safe fallback, or the conditional G6 trigger is met;
-   record its recommendation and the resulting choice. Routine code decisions need no approval.
-4. Run the common verification below and the package-specific acceptance checks. Fix regressions
-   immediately, even when its human review batch is later. Collect local fixes/docs before opening
-   the implementation PR; push the completed branch and open one PR for the whole package. Do not
-   merge, release or deploy. Human playtesting may remain pending when that PR is opened.
-5. Update this plan's package result and table: current status, completed tasks, next task,
-   exact revision/platform/options, automated evidence, agent-run capture/demo evidence, human
-   verdict and limits. Keep those categories distinct. Update affected live guides in the same PR;
-   search README.md/docs and asset guides for superseded claims. Change docs/README.md only if
-   the area-level summary or next milestone changes, not for every package checkpoint.
-6. The PR body contains scope, validation, measured deltas, remaining limits, the next kickoff
-   prompt and **Needs the user** with the pending batch (or "none yet"). Stop after this package.
-   On pause, leave reproducible commands and unfinished items in its result so another agent can
-   resume. Do not mark a package accepted based on tests, captures or an agent-run demo.
+1. Read [AGENTS.md](../AGENTS.md), this process, the assigned work package, the current checkpoint,
+   [testing](TESTING.md) and its named owners. The detailed entry points originated on `b0f1233`;
+   verify them against current source and record moves rather than creating another subsystem.
+2. Work in a separate worktree on the package branch below, from current main after dependencies
+   merge. If explicitly continuing an unmerged implementation stack, branch from and target its
+   parent, and merge updated parents into open children before review, per AGENTS.md.
+3. Check G0 budgets and numerical tolerances before optimization. P1 creates them at its first
+   checkpoint. Complete only the assigned work package; checkpoints are not automatic stop rules.
+   A missing context window permits a durable handoff and continuation on the same branch.
+4. Open one draft PR once a coherent checkpoint builds and its machine checks pass; keep later
+   checkpoints on that PR. For P1, a G0w checkpoint artifact from this draft supplies the Windows
+   baseline before G1 optimization. Push checkpoint batches rather than every small commit, so CI
+   and intermediate code review remain useful without unnecessary churn. A draft is not acceptance.
+5. Before marking the PR ready, pass all included checkpoint gates, the package acceptance and full
+   suite, update affected live guides, and prepare its one human playtest. A missing hardware run
+   may remain explicitly pending in the PR, but cannot be claimed as qualification. Do not merge,
+   release or deploy; the user reviews/plays and merges. Resolve feedback on this same PR.
+6. Update the work-package status and checkpoint results with current/completed/next task, exact
+   revision/platform/options, automated evidence, agent-observed capture/demo evidence, human
+   verdict and limits. Keep those categories distinct. Search README.md/docs/asset guides for
+   superseded claims; update docs/README.md only when its area-level summary or next milestone changes.
+7. The PR body includes the review map, cumulative measured deltas, final integration checks,
+   remaining limits, the next package prompt and **Needs the user** with its playtest. Stop after
+   the assigned work package. Do not begin the next package until its human gate is recorded and
+   blocking feedback is resolved. A passing test or agent-run demo is not user acceptance.
 
-A dependency means implementation and required machine checks have passed; a named human gate
-also needs an actual recorded verdict with blocking feedback resolved. A missing machine/browser
-measurement may be reported in a PR, but dependent work needing that evidence stays unready.
-If a package would need physics/network changes, a weakened parity gate or an unplanned backend,
-finish independent work, document the issue and report it. Do not silently widen scope.
+A checkpoint dependency means its machine checks pass and its interface/ownership contract is
+recorded; it does not need a separate merged PR. A work-package dependency additionally needs its
+merge and human verdict. Missing machine/browser budgets leave the checks that need them unready;
+the documented Windows hardware exception remains below. If correct work would require physics/
+network changes, weakened parity or an unplanned backend, finish independent work and report the
+issue rather than silently widening scope.
 
 ### Common verification and evidence
 
@@ -171,7 +227,7 @@ sockets; report unavailable checks and rerun with the needed environment rather 
 CPU-only pass qualifies the renderer. Tests use virtual time and assertions about behavior; never
 make frame timings into wall-clock CTest thresholds.
 
-For each render change, inspect G0 before/after captures and short moving sequences, run an
+At each render checkpoint, inspect G0 before/after captures and short moving sequences, run an
 agent-observed windowed demo, and build/smoke WebGL2 with the documented fallback. The browser smoke
 checks shader compilation, resources, effect/fallback activation, resize and teardown; it is not
 human browser acceptance. Follow [WEB_BUILD.md](WEB_BUILD.md) for actual commands and current CI
@@ -194,7 +250,7 @@ GPU equality always means the same platform, backend, build, time, view and opti
 stays a geometry/capture reference, not an oracle for new GPU effects. G1 and lossless G2a substeps
 need byte parity; quantized geometry and texture-resampled water use **predeclared G0 numerical and
 image bounds**, plus motion review. Preserve exact physical inputs/results throughout. Report per-
-pass/group CPU/GPU cost and memory cumulatively against G0 as well as the previous package.
+pass/group CPU/GPU cost and memory cumulatively against G0 and the previous checkpoint/package.
 
 ### Windows performance evidence throughout the overhaul
 
@@ -222,16 +278,16 @@ remote access is needed.
 
 ### Batched human playtesting
 
-Three planned user sessions minimize repeated setup. Each package still supplies its own agent-run
+Three planned user sessions align with P1/P2/P3. Each render checkpoint supplies its own agent-run
 demo and automated/capture evidence. Save comparison toggles or reproducible prior builds until
 its batch is accepted; users must be able to isolate the contributing package. No wall-clock delay
 or test pass supplies a missing verdict. A pending user session does not prevent opening its PR.
 
 | Batch | When | Combined route and questions | What it gates |
 | --- | --- | --- | --- |
-| A — engine and geometry | After G2b | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | G3a and later visual expansion |
-| B — all living water | After G4 | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | G5a and later artistic expansion |
-| C — final presentation | After G5c | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
+| A — engine and geometry | P1 complete (through G2b) | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | P2 |
+| B — all living water | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
+| C — final presentation | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
 
 Batch B deliberately combines G3 and G4 rather than asking for a separate water session between
 them: atlas boundaries/depth/shore foam are easier to judge with persistence in place. Keep a
@@ -243,33 +299,141 @@ For each batch record: revision/branch, launch commands, settings, route, who pl
 actions and unverified platforms. Until that happens write **human review pending**. Keep low
 resolution default throughout; any future default switch requires an explicit separate user decision.
 
-### Package register
+### Work-package register
 
-"Prepared" below describes instructions, not code. All implementation is unstarted. Dependencies
-are implementation dependencies. Execute G0, G0w, then G1 onward in the order below. The original
-eleven planning PRs are stacked G0–G6; the G0w planning follow-up targets that final planning head.
-Its editorial position does not move Windows tooling to the end of implementation.
+These are the three delivery/PR boundaries. Detailed G sections are internal implementation
+checkpoints retained so a simpler model can execute one coherent task at a time. All are unstarted.
 
-| Package | Deliverable | Implementation dependencies | Brief | Code / human review |
+| Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
-| [G0](#g0--measurement-and-review-harness) | Measurement and review harness | current main | Prepared | Unstarted; review pending |
-| [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | Native performance capture and Windows-to-Mac reports | G0 scenarios/report contract | Prepared | Unstarted; Windows hardware reports pending |
-| [G1](#g1--persistent-instances-and-pass-culling) | Persistent instances and pass culling | G0 budgets/review manifest and G0w capture tools | Prepared | Unstarted; review pending |
-| [G2a](#g2a--geometry-storage-and-ownership) | Geometry storage and ownership | G1 | Prepared | Unstarted; review pending |
-| [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | Distance detail and valid shadow reuse | G2a | Prepared | Unstarted; review pending |
-| [G3a](#g3a--stamped-wake-shading) | Stamped wake shading | G2b and Batch A verdict resolved | Prepared | Unstarted; review pending |
-| [G3b](#g3b--foam-history-and-cosmetic-ripples) | Foam history and cosmetic ripples | G3a | Prepared | Unstarted; review pending |
-| [G4](#g4--shore-aware-and-far-water-character) | Shore-aware and far-water character | G3b | Prepared | Unstarted; review pending |
-| [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Prepared | Unstarted; review pending |
-| [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Prepared | Unstarted; review pending |
-| [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | Ambient detail, cube spray and final qualification | G5b | Prepared | Unstarted; review pending |
-| [G6](#g6--conditional-backend-decision-spike) | Conditional backend decision spike | G1–G5 measured results exceed G0 budgets and profiling identifies a backend-limited fix | Prepared | Unstarted; G6 dormant |
+| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | Unstarted; next G0 |
+| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Unstarted; depends on P1 |
+| [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
 
-## Implementation package briefs
+G6 is a conditional backend decision, not a fourth scheduled package. The delivery-boundary rule
+above handles a proven need for an additional prerequisite PR without creating extra playtests.
 
-These briefs refine the stage summaries below. If an older summary uses a provisional gain or
-parity claim, the package-specific gate and measured G0 budget govern. No numeric target is
-qualified until G0 records it.
+### P1 — Performance foundations
+
+**Outcome:** a measured and observable client with reduced submission/geometry cost, ready for
+expanding the water. Read and complete G0, G0w, G1, G2a and G2b in order on one branch/PR by default.
+Start from current main. There is no human acceptance gate between these internal checkpoints.
+
+Preserve the measurement baseline at the G0 commit, then establish the Windows report artifact at
+G0w before optimization. Keep diagnostics, instances/culling, storage, LOD and shadow-reuse commits
+separate so a reviewer can assess their contracts and parity without mentally undoing later work.
+Resource ownership and culling parity must be resolved before downstream optimizations. This is
+the most likely package to need the documented diagnostics/rendering split; justify it from work,
+not from a token budget or the existence of five checkpoint headings.
+
+**Acceptance:** every included checkpoint's machine checks pass; repeated Release results compare
+against G0; lossless captures/physical state stay exact and any allowed lossy detail meets the
+predeclared bounds. Windows collection/analysis tools are packaged and usable, with actual user
+hardware evidence recorded or explicitly pending. Run the full suite, prepare one Batch A route,
+and keep its human verdict separate. Fix blocking feedback before P2 starts.
+
+**Result:** unstarted. Completed: package instructions only. Next: G0 task 1. Verification of the
+implementation, agent playback and human acceptance: none. Known scope risk: diagnostics plus
+multiple renderer ownership/submission changes; see the delivery-boundary rule.
+
+**Kickoff prompt:**
+
+```text
+Implement P1 in docs/GRAPHICS_OVERHAUL_PLAN.md on one worktree/PR by default. Follow the execution
+process and complete G0, G0w, G1, G2a and G2b in order, with focused commits, checkpoint contracts,
+verification and durable handoffs. Open a draft for checkpoint review and the pre-optimization
+Windows artifact; keep subsequent work on it. Report a concrete need for any boundary change.
+Update the plan, prepare Batch A and stop before P2. Do not infer human acceptance from tests.
+```
+
+### P2 — Living water
+
+**Outcome:** stable, lively, shore-aware water with preserved analytic physics and cube foam.
+Depends on P1 merged with Batch A blocking feedback resolved. Complete G3a, G3b and G4 in order on
+one branch/PR by default. Keep a reference/stamp-only path until the combined water is reviewed.
+
+Review the stateless stamp/scroll/fallback contract before persistence; prove fixed-time stability
+and reset behavior before adding geography/depth. Keep map asset changes and depth/pass ordering
+separately reviewable from shader tuning. These checkpoints share water ownership and benefit from
+one combined motion review, but none may conceal a failing prior comparison.
+
+**Acceptance:** all included checkpoint checks, G0 performance/error budgets, unchanged physical
+state, browser fallback and full suite pass. Record cumulative costs against P1/G0 and prepare one
+Batch B for river/outer, with stamp/history/place effects distinguishable. Fix blocking water
+feedback before P3 starts; actual human acceptance stays pending until the user plays it.
+
+**Result:** unstarted. Completed: package instructions only. Next: verify P1/Batch A, then G3a task 1.
+No implementation verification, agent playback or human acceptance. Known risks: field/history
+stability, shore/depth interactions and GL4.1/WebGL2 capability fallbacks.
+
+**Kickoff prompt:**
+
+```text
+Implement P2 in docs/GRAPHICS_OVERHAUL_PLAN.md after P1 and Batch A. Complete G3a, G3b and G4 on
+one worktree/PR by default. Keep each checkpoint's commits, contract, evidence and resume notes
+reviewable; prove stamping before persistence and geography. Preserve analytic physics, cube foam
+and portable fallbacks. Follow the execution process, update the plan, deliver Batch B and stop
+before P3. Do not request separate human playtests for internal checkpoints.
+```
+
+### P3 — Presentation
+
+**Outcome:** optional high resolution with crisp UI, cozy lighting and finishing, qualified as a
+whole on native Mac/Windows and a hardware browser. Depends on P2 merged with Batch B resolved.
+Check SUNSET_PLAN's shared lighting frame and fixed dusk prerequisites **before starting P3**;
+they remain owned there. Report them if missing rather than starting an indefinitely blocked
+presentation PR or inventing another lighting system. Complete G5a, G5b and G5c in order.
+
+Separate sizing/HDR, clustered lighting and asset/particle commits. Review resource lifetime,
+cluster capacity and authored daytime parity before tuning dusk and finishing. Low resolution
+remains default; the final playtest does not implicitly authorize changing it. GPU particle work
+must earn its complexity and remain portable, as G5c specifies.
+
+**Acceptance:** all included checkpoint checks and full suite pass; final G0 comparison includes
+cumulative rendering/memory cost, browser fallbacks and returned native Windows reports analyzed
+on Mac. Prepare one Batch C covering presets/UI, mood, particles and P1/P2 integration regressions.
+Mark the overhaul accepted only after the recorded user verdict and blocking fixes, with platform
+limitations explicit. G6 is opened only if its separate measured trigger is satisfied.
+
+**Result:** unstarted. Completed: package instructions only. Next: verify P2/Batch B and the sunset
+prerequisites, then G5a task 1. No implementation verification, playback or user acceptance. Known
+risks: external sunset dependency, multiple target/light lifetimes and integrated preset behavior.
+
+**Kickoff prompt:**
+
+```text
+Implement P3 in docs/GRAPHICS_OVERHAUL_PLAN.md after P2/Batch B and the stated sunset prerequisites.
+Complete G5a, G5b and G5c on one worktree/PR by default with reviewable commits, checkpoint evidence
+and durable handoffs. Preserve the low-res default and portable fallbacks. Follow the execution
+process, update the plan and deliver Batch C plus cumulative native/browser/Windows qualification.
+Stop after P3; keep any untriggered G6 backend study dormant.
+```
+
+### Checkpoint register
+
+These entries own internal progress, not independent PRs. Read the assigned work package and
+execution process before a checkpoint. Stop at a checkpoint only for a handoff or an unresolved
+gate; otherwise continue within the same package. No checkpoint is verified or accepted yet.
+
+| Checkpoint | Work package | Dependency | Status |
+| --- | --- | --- | --- |
+| [G0](#g0--measurement-and-review-harness) | P1 | current main | Unstarted |
+| [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Unstarted; Windows reports pending |
+| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Unstarted |
+| [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Unstarted |
+| [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Unstarted |
+| [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Unstarted |
+| [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Unstarted |
+| [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Unstarted |
+| [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Unstarted |
+| [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Unstarted |
+| [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | P3 | G5b | Unstarted |
+
+## Detailed implementation checkpoints
+
+These task briefs refine the direction summaries below; checkpoint-specific gates and measured
+G0 budgets govern. Numeric targets stay provisional until G0 records them. Ownership, acceptance
+and fallback requirements are preserved when checkpoints share a delivery PR.
 
 ### G0 — Measurement and review harness
 
@@ -305,7 +469,7 @@ Human review: No human gate; establishes all three review batches.
    Replace provisional G1 targets with measured feasible submission and CPU p95 goals; allocate
    CPU/GPU and memory ceilings per pass/group, reserve explicit water headroom and a margin under
    16.67 ms. Set numerical/image tolerances for lossy geometry and stamped shading before those
-   packages start. Give every later package a baseline and measurable gate; label missing
+   checkpoints start. Give every later checkpoint a baseline and measurable gate; label missing
    measurements as open instead of manufacturing numbers.
 
 **Acceptance:** Benchmark contract tests cover scenario selection, counts, report schema and
@@ -313,29 +477,22 @@ deterministic final physical state. Repeat captures agree on the same platform. 
 browser startup/render and trace evidence are recorded. Budget table has actual numbers and units,
 target revision/platform and measurement commands; timing thresholds stay outside CTest.
 
-**Limits and stop conditions:** If Instruments or a hardware browser cannot run, deliver the harness
-PR with those limits explicit; packages depending on the missing budgets remain unready. The current
-Debug table is history, not a substitute. No look/default change.
+**Limits and stop conditions:** If Instruments or a hardware browser cannot run, retain the harness
+checkpoint with those limits explicit; dependent checkpoints needing those budgets remain unready.
+The current Debug table is history, not a substitute. No look/default change.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement package G0 in docs/GRAPHICS_OVERHAUL_PLAN.md. Read its execution process and complete the measurement/review harness, repeated Release baseline and budget table. Use one implementation PR, update the plan with actual evidence and limits, and leave human acceptance unclaimed.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G0w. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
 
 The G0 benchmark/report schema is the input to G0w; leave its native capture integration to that
-package. Record the Windows baseline as pending until G0w tooling and actual user reports exist;
+checkpoint. Record the Windows baseline as pending until G0w tooling and actual user reports exist;
 no Windows performance evidence is claimed by completing M1/browser measurement alone.
 
 ### G0w — Native performance capture and Windows-to-Mac reports
 
-Stage coverage: G0 tooling and cross-machine evidence for every later package.
+Stage coverage: G0 tooling and cross-machine evidence for every later checkpoint.
 **Depends on:** G0 scenario/manifest and benchmark contract. Implement after G0 and before G1.
 Human review: collect the first Windows baseline when the user has the machine available; repeat
 at batches A/B/C, without adding another full artistic playtest. Tool implementation can be reviewed
@@ -414,7 +571,7 @@ not commands that exist yet.
    another working directory works, including spaces/non-ASCII names. Retain normal launch.bat.
    Produce one portable ZIP with manifest, summary.html, samples.csv/summary.json per run, logs
    and an optional context.png. If compression fails, keep the report folder and explain how to
-   copy it. No automatic upload, installation, release or deployment is part of this package.
+   copy it. No automatic upload, installation, release or deployment is part of this checkpoint.
 7. Add a small standard-library-only Mac/developer analyzer, proposed as
    `tools/compare_performance_reports.py`. Accept an extracted report or ZIP, validate schema and
    bounded contents, and output Markdown plus a standalone HTML frame-time view. Compare run
@@ -444,27 +601,18 @@ summary identifying the actual revision, CPU/GPU, timings/settings and timing co
 hardware run, sampler overhead and user usability verdict only when performed. No screenshot-only
 or successful-build claim satisfies the actual hardware evidence gate.
 
-**Limits and stop conditions:** This package delivers app-level timing/counters, not a native
+**Limits and stop conditions:** This checkpoint delivers app-level timing/counters, not a native
 sampling profiler, GPU debugger or remote-control agent. No dependence on external profiler
 installation, new hosted services or access to the user's Windows machine. The M1 Max remains the
 reference budget; Windows gets a recorded machine-specific baseline, not an invented hardware
-floor. If the Windows hardware/report is unavailable, ship the independently verified tools and
-list that evidence as pending; later packages may proceed against measured M1 budgets but cannot
+floor. If the Windows hardware/report is unavailable, retain the verified tools on the P1 draft and
+list that evidence as pending; later checkpoints may proceed against measured M1 budgets but cannot
 claim Windows qualification. Final integrated acceptance retains the Windows return-report gate.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Windows tooling, captured
-hardware data, Mac comparison and user workflow acceptance are all pending. Next: finish G0,
-implement G0w in one PR, then G1; collect the Windows baseline as soon as the artifact is available.
-
-**Kickoff prompt:**
-
-```text
-Implement G0w in docs/GRAPHICS_OVERHAUL_PLAN.md after G0. Deliver a Windows artifact with one-click
-scripted collection and an in-game export of recent live performance, portable report ZIPs and a
-Mac comparison tool. Follow the detailed scope, metadata/timing rules, packaging and acceptance
-checks in the brief and execution process. Use one worktree/implementation PR, update the plan,
-stop after G0w and report G1 plus pending Windows hardware evidence and human batch gates.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G1. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G1 — Persistent instances and pass culling
 
@@ -504,17 +652,10 @@ regression.
 direct GL-only dependency that breaks WebGL2. A parity failure is a bug to fix, not a reason to
 widen tolerance.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G1 from docs/GRAPHICS_OVERHAUL_PLAN.md after G0 and G0w are ready. Complete cached uniforms, persistent coloured instances and per-pass object culling in one PR; prove scalar/culling parity and measured budget gains. Update the plan; prepare Batch A evidence without requesting a separate human playtest.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G2a. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G2a — Geometry storage and ownership
 
@@ -551,17 +692,10 @@ build/smoke pass.
 scenery-owner release. If quantization cannot meet the predeclared error bound, retain the precise
 attribute and report savings honestly.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G2a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Index/interleave static GPU geometry, shrink only within the declared tolerances, and release unneeded staging data while preserving CPU/shared/dynamic owners. Measure memory and update the plan; carry review evidence forward to Batch A.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G2b. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G2b — Distance detail and valid shadow reuse
 
@@ -601,17 +735,10 @@ checklist; actual human verdict remains separate.
 invalidate caches. A failed human LOD review pauses dependent visual expansion until corrected;
 successful automated checks do not approve popping.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G2b from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add bounded distance detail and safely evaluate near/far static shadow reuse, with measured invalidation and LOD checks. Update the plan and hand off the combined Batch A playtest for G1–G2b.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: Batch A; P2 only after P1 merge and blocking feedback resolution. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G3a — Stamped wake shading
 
@@ -625,7 +752,7 @@ Human review: Batch B after G4.
 **Tasks, in order:**
 
 1. Document which objectWake outputs feed height, slope and foam in both shaders. Keep vertex
-   displacement analytic in this package; replace the fragment shading loop with a sampled cosmetic
+   displacement analytic in this checkpoint; replace the fragment shading loop with a sampled cosmetic
    layer, so hulls retain the existing physical-surface agreement. Report remaining vertex work
    explicitly.
 2. Allocate a bounded boat-following field with world-space coordinates, an integer-texel snapped
@@ -653,17 +780,10 @@ or retired physical field revival. Sampling is allowed bounded shading error, no
 byte-identical images. Do not remove the fallback until it is no longer needed for comparison or
 compatibility.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G3a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Stamp bounded wake shading while retaining analytic vertex displacement and a tested fallback. Prove error/performance/hash gates, update the plan, and save moving review evidence for Batch B.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P2. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G3b. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P2's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G3b — Foam history and cosmetic ripples
 
@@ -704,17 +824,10 @@ web fallback is explicit and exercised.
 ripple solver or GPU displacement. Cap sources/grid work; if the ripple budget fails, reduce its
 cosmetic resolution/extent and record it rather than borrow physics budget.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G3b from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add fixed-time foam memory and cosmetic ripples with bounded sources, stable scroll/reset behavior and analytic hull height. Update the plan with automated/moving evidence for the combined Batch B review.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P2. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G4. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P2's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G4 — Shore-aware and far-water character
 
@@ -760,17 +873,10 @@ browser asset/lazy-load smoke and G0 budgets pass. Batch B records the user verd
 bathymetric truth or autonomous weather gameplay. Batch B acceptance gates G5 artistic expansion;
 prepare the PR even if human play is still pending.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G4 from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Complete presentation water atlas, safe opaque depth, shore treatment and far-water character within G0 budgets. Update asset guides/plan and hand off one Batch B playtest covering G3a–G4.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P2. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: Batch B; P3 only after P2 merge, feedback resolution and sunset readiness. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P2's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G5a — Optional high resolution and restrained HDR
 
@@ -810,17 +916,10 @@ pass; no default-change acceptance is inferred.
 look that the user likes in the old spike does not approve the shipped HDR preset. Sunset
 implementation stays with SUNSET_PLAN.md.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G5a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Ship an optional plain high-resolution preset with crisp HUD plus bounded HDR/bloom/grading and tested LDR fallback. Preserve low-res default, update guides/plan and carry evidence to Batch C.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P3. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G5b. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P3's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G5b — Clustered cozy lighting and dusk water
 
@@ -835,9 +934,9 @@ owner](SUNSET_PLAN.md), [plugins](PLUGIN_PLAN.md).
 **Tasks, in order:**
 
 1. Check SUNSET_PLAN.md first. Its shared caller-owned lighting frame, cache invalidation and fixed
-   afternoon/dusk inputs must be implemented and reviewed before this package is ready. If absent,
+   afternoon/dusk inputs must be implemented and reviewed before this checkpoint is ready. If absent,
    report this prerequisite and do not implement a competing frame or absorb the entire sunset plan.
-   Automatic transitions, room phase ownership and Lua lighting remain outside this package.
+   Automatic transitions, room phase ownership and Lua lighting remain outside this checkpoint.
 2. Build bounded CPU light clusters each frame from the shared evaluated scene, upload lists through
    textures available to GL4.1/WebGL2, and define grid coordinates, list capacity, overflow policy
    and stable light IDs. Replace camera-nearest selection as the normal path; retaining a bounded
@@ -864,17 +963,10 @@ proposed, not delivered. No new gameplay clock, Lua capability, room protocol or
 illumination. If the prerequisite remains unavailable, report G5b/G5c unready; final dusk acceptance
 stays open.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G5b from docs/GRAPHICS_OVERHAUL_PLAN.md only when its SUNSET_PLAN prerequisites are ready. In one PR add bounded texture-backed CPU light clusters and cozy window/lamp water streaks using the shared lighting frame. Update the plan and collect Batch C evidence; do not create another sunset system.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P3. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: G5c. Record commits/contracts/evidence and a resume handoff here; keep
+internal checkpoint work on P3's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G5c — Ambient detail, cube spray and final qualification
 
@@ -918,17 +1010,10 @@ platform checks remain explicitly open.
 requirement. No browser/desktop acceptance from stills alone, no release/deploy, and no
 default-resolution change without a later explicit user decision.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Implement G5c in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add bounded baked AO, optimize cube particles only where measured gains justify it, and complete integrated qualification. Update the plan and deliver the combined Batch C desktop/browser playtest with remaining limits stated.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** unstarted; instructions only. Owner: P3. Implementation verification,
+agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
+After its machine gates: Batch C / final acceptance. Record commits/contracts/evidence and a resume
+handoff here; keep internal checkpoint work on P3's PR unless the delivery-boundary rule explicitly changes it.
 
 ### G6 — Conditional backend decision spike
 
@@ -942,7 +1027,7 @@ guide](WEB_BUILD.md).
 
 **Tasks, in order:**
 
-1. Keep this package dormant by default. Record the failed budget, repeated trace, limiting work and
+1. Keep this checkpoint dormant by default. Record the failed budget, repeated trace, limiting work and
    estimated recoverable time before proposing it. Content tuning or a shader mistake does not
    justify a backend rewrite.
 2. If the trigger is met, consult Astra on whether a spike is justified and record the
@@ -964,24 +1049,16 @@ prototype measurements, with unsupported platforms and integration limits named.
 changes still pass the full suite; default backend remains unchanged. Actual backend migration
 requires a new reviewed plan.
 
-**Limits and stop conditions:** This conditional package is not required to declare G0–G5 complete
+**Limits and stop conditions:** This conditional study is not required to declare G0–G5 complete
 when budgets pass. Planning its brief is not opening or implementing it.
 
-**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
-checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
-this package; stop afterward and report the next package and pending human batch gate.
-
-**Kickoff prompt:**
-
-```text
-Evaluate the G6 trigger in docs/GRAPHICS_OVERHAUL_PLAN.md. If it is unmet, report that G6 remains dormant. If met, get Astra advice and deliver one isolated backend decision-spike PR with current primary-source research and measurements; preserve the shipping backend.
-Follow the worktree, scope, verification and documentation rules in the plan's execution process.
-Stop after this package; report the next package and pending human batch gate.
-```
+**Checkpoint result:** dormant and outside P1–P3. No implementation, measurement or acceptance.
+Next: evaluate the recorded trigger only after the main work; a satisfied trigger needs the bounded
+spike/decision described here, not an automatic shipping-backend migration.
 
 ## Stages
 
-These are direction summaries, not agent task briefs; execute the packages above. Targets are
+These are direction summaries; execute P1–P3 using their detailed checkpoints above. Targets are
 provisional until G0 sets real budgets. Each stage's gain figures are estimates.
 
 ### G0 — Measure and set budgets
@@ -1189,6 +1266,8 @@ life](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)**
 
 ## Log
 
+Earlier package counts and PR assignments below are history, superseded by P1–P3 above.
+
 - 2026-10-31: plan written from the GPU path review. Code reading, the two benchmark runs above and
   three inspected GPU captures (river at 320×200 and `--gpu-aa`, basin at `--gpu-aa`) on `d3467ff`.
   No renderer change, no user acceptance. Browser coverage for WebGPU and all gain estimates are
@@ -1236,7 +1315,7 @@ are not passing CI. No audiovisual review is required for this documentation-onl
 
 Inspected the live F3 profiler (240-frame history), inclusive BoatFrameMetrics, app frame timing,
 existing JSON/CSV benchmark, asynchronous GPU-query implementation and Windows CI packaging.
-The package reuses those owners; none of the proposed capture/export/analyzer tools exists yet.
+The Windows checkpoint reuses those owners; none of the proposed capture/export/analyzer tools exists yet.
 The eleven-package planning verification above is historical evidence for that stack. Follow-up
 verification: 245 local links/anchors, twelve kickoff prompts, balanced fences and
 `git diff --check` pass. On macOS 26.6.2 / AppleClang 21.0.0, Debug configure/build passed with
@@ -1250,3 +1329,24 @@ No native Windows run, portable report, cross-machine comparison or user accepta
 - Process clarification, 2026-11-01: the user meant one PR per implementation work package, with
   package preparation batched in one planning PR. Corrected the execution process accordingly.
   The initial documentation stack is retained as history and merged in order at the user's request.
+
+## Three-package refinement — 2026-11-01
+
+The user likes the three-package overview and asked for judgement on agent context and code-review
+size. Astra reviewed the detailed scope and renderer/profiler ownership. Context is manageable with
+focused checkpoint sessions and durable contracts/handoffs; code-review size remains a separate
+risk, greatest in P1's diagnostics plus renderer changes. Adopted three default delivery PRs and
+human gates, early checkpoint review on the same draft, and a concrete boundary-change rule rather
+than promising three PRs regardless of implementation evidence. G0+G0w is the most plausible extra
+prerequisite boundary. Detailed technical tasks/fallbacks are retained, not deferred or deleted.
+
+Completed: work-package definitions/prompts, checkpoint ownership/results, continuation/review rules,
+Windows baseline delivery within P1, and live overview reconciliation. Next: P1/G0 after planning
+review. Verification on 2026-11-01, at application baseline `6fca6c4`, macOS 26.6.2 / AppleClang 21.0.0:
+Debug configure/build passed with copied pinned dependencies, disconnected fetching and
+`PROTEUS_GPU_TESTS=ON`. No project compiler warnings; bundled stb_vorbis emitted its existing
+pointer-comparison warning. With desktop/local-socket access, `ctest --preset full` passed all
+375 enabled tests, including 28 GPU tests, in 79.89 s; 15 retired wake-field tests remained disabled.
+All twelve detailed task sequences are retained (eleven internal checkpoints plus dormant G6);
+250 local links/anchors, three package prompts, balanced fences and `git diff --check` pass. No graphics
+implementation, new benchmark result, audiovisual review or user acceptance is claimed.
