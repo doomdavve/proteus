@@ -48,6 +48,7 @@ configure_file(assets/title/wake-velocity.png "${WEB_ASSETS}/title/wake-velocity
 configure_file(assets/title/river-backdrop.png "${WEB_ASSETS}/title/river-backdrop.png" COPYONLY)
 configure_file(assets/music/a-little-boat.xm "${WEB_ASSETS}/music/a-little-boat.xm" COPYONLY)
 configure_file(assets/music/a-little-boat-cozy.xm "${WEB_ASSETS}/music/a-little-boat-cozy.xm" COPYONLY)
+configure_file(assets/music/a-little-boat-wander.xm "${WEB_ASSETS}/music/a-little-boat-wander.xm" COPYONLY)
 configure_file(assets/music/acid-wake.xm "${WEB_ASSETS}/music/acid-wake.xm" COPYONLY)
 # The river's scenery pack is preloaded with the page. The outer pack is served next to it and
 # fetched only when a session needs it (web/scenery_loader.js), so river and basin players never
@@ -86,6 +87,7 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat-cozy.xm"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat-wander.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/river/scenery.bin"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/scenery_loader.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"

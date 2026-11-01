@@ -62,7 +62,7 @@ def main():
     for directory in ("shaders", "textures", "title", "fonts"):
         shutil.copytree(build / "assets" / directory, assets / directory)
     (assets / "music").mkdir()
-    for name in ("a-little-boat.xm", "a-little-boat-cozy.xm", "acid-wake.xm"):
+    for name in ("a-little-boat.xm", "a-little-boat-cozy.xm", "a-little-boat-wander.xm", "acid-wake.xm"):
         shutil.copy2(build / "assets/music" / name, assets / "music")
     # The mapped locations' scenery packs, which the game loads at start (A3.5i).
     for name in ("river", "outer"):

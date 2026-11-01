@@ -5,7 +5,8 @@ locations ([Eriksberg location removed](#eriksberg-location-removed--2026-10-25)
 current/scripted-wake options in all locations, default bounded arcade wakes in free boating,
 and a timed S course with recordings, persistent personal bests, ghosts, and replay controls. The study
 has quiet engine/water audio and [selectable XM music](#selectable-soundtracks--2026-10-24):
-the gentle A little boat loop (default), its [Cozy variation](#cozy-soundtrack-variation--2026-11-01), Acid Wake techno, or Off. The
+the gentle A little boat loop (default), its [Cozy](#cozy-soundtrack-variation--2026-11-01) and
+[Wandering](#wandering-soundtrack-variation--2026-11-01) variations, Acid Wake techno, or Off. The
 [stern-wake motion pass](#stern-wake-motion--2026-10-18) and physics Phase D are implemented;
 the user has provisionally accepted Phase D handling and revised player-wake motion,
 with continued evaluation over time.
@@ -1037,3 +1038,45 @@ Next task: listen to the preview and variant in game; qualify browser and packag
 Known limitations: human musical acceptance, sustained listening across the seam,
 focus/replay listening and browser/package qualification remain pending. Automated
 PCM checks and an agent-run demo do not establish these.
+
+
+## Wandering soundtrack variation — 2026-11-01
+
+Implemented: a further `a-little-boat-wander.xm` variation, selected as BOAT: WANDERING
+or `--soundtrack a-little-boat-wander`. It uses exactly Cozy's seven instrument/sample
+blocks, harmony, accompaniment, 76 BPM and 101.05-second loop. Sixteen new two-bar
+piano phrases climb and descend through C4–G5, with small turns, a higher answering
+arc and a gentle return. Two piano voices overlap natural decays; all notes use
+23/64 volume to keep the denser melody subdued. No backing layers or intensities
+change. Shared generator helpers preserve the Cozy module byte for byte. Native,
+web and macOS bundle lists include the variant. The [music workflow](MUSIC.md#a-little-boat--wandering-variation)
+owns regeneration and audition commands.
+
+Current task: implementation and local automated/runtime verification complete.
+Verification, 2026-11-01, Apple Silicon/macOS, Debug:
+
+- Configure/build and final rebuild passed using the existing pinned dependency
+  source caches. One upstream `stb_vorbis.c` pointer comparison warning; no project
+  compiler warnings. GPU tests OFF.
+- `ctest --preset full`: all 351 enabled tests passed in 33.85 seconds with local
+  socket access; 13 retired experiments disabled.
+- `wander_xm_is_valid` passed startup, a 48.58-second seek to order 3, backward
+  reset, finite unclipped PCM and two loop transitions over 205 seconds. Decoded
+  peak: 0.347646.
+- Direct comparison confirmed all seven encoded instrument/sample blocks match
+  Cozy byte for byte and every backing event is unchanged. Both generators were
+  rerun: Cozy's existing XM stayed byte-identical, and Wandering regenerated with
+  SHA-256 `491c2f5050192cf6e7e3e0ea3708a96c723accd746b6bd6445d5fdd1e8ea9af1`.
+- `build/a-little-boat-wander-preview.wav` is a local 110-second stereo 22.05 kHz
+  preview including the first loop boundary (ignored build output). Bar RMS
+  ranges from 0.0358 to 0.0794; maximum adjacent sample delta near the boundary
+  is 0.00299 full scale. These numbers do not establish perceptual smoothness.
+- An agent-run native CPU-rendered `--soundtrack a-little-boat-wander --demo --frames 180`
+  completed with desktop access. Runtime smoke only; no perceptual listening claimed.
+- `git diff --check` and changed documentation links/commands were checked.
+
+Next task: listen to the new melody and its loop transition, then qualify browser
+and packaged playback. This change is stacked on the Cozy branch/PR #126; review
+and merge Cozy before this follow-up.
+Known limitations: perceptual smoothness, human melody approval, focus/replay
+listening and browser/package playback remain unverified.
