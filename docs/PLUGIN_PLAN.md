@@ -28,7 +28,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: the [Cutover package](PLUGIN_DEFAULT_PLAN.md#pd5--cutover) of the [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md). Its PD1, PC, Rooms and Browser packages are merged.**
+**Next marina task: [M1 structures](MARINA_AUTHORING_PLAN.md#m1-structures-and-capacity), selected 2026-11-01 after reviewing #131.** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 Authority callbacks, commands and session recordings remain P5 work after it. Physical-device and human qualification need the
@@ -1797,7 +1797,7 @@ harbor-life layout, its long finger pontoon, gangway and shore equipment, one au
 craft, a retained ferry with an edited dwell, the retained schooner/lift dependency and one
 authored flock with timed feeding/alarm cues. The [2026-11-01 layout result](#eriksberg-marina-layout-2026-11-01)
 owns the current counts and its explicit native gaps.
-Next in this track is L5.1 shared fixed daylight/dusk; L5–L8 remain later work.
+The selected next work is [marina expansion M1](MARINA_AUTHORING_PLAN.md); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
 
 ### Coverage and delivery slices
 
@@ -1910,7 +1910,7 @@ actual owners and document any necessary deviation before implementation:
 #### L1.1 result, 2026-10-30
 
 **Implemented:** the frozen contract and first marina site fixture. The
-[API](PLUGIN_API.md#location-life-scene-contract-planned-l11) owns the proposed package
+[API](PLUGIN_API.md#location-life-scene-contract-l11l43) owns the proposed package
 composition, `scene` schema, replacement/restart semantics, registry, capacities, consumer and
 lifetime inventory. No grant or runtime scene field exists yet; L1.1 is planning evidence only.
 
@@ -2509,8 +2509,7 @@ The package README now separates the authored recipe from the missing native cap
 boat, does the crane/building composition resemble the reference, and does the entrance remain
 clear in motion? No acceptance is inferred from the captures.
 
-**Next in this track: L5.1**, the native fixed day/dusk lighting frame required before scripted
-lighting. The requested L1.1–L4.3 sequence stops here; do not begin L5 without a new direction.
+**Next in this track: [marina expansion M1](MARINA_AUTHORING_PLAN.md#m1-structures-and-capacity)**, selected after reviewing these gaps on 2026-11-01. The new plan owns the five-step implementation sequence. L5 lighting and the other explicitly deferred gaps remain outside this work.
 
 #### L2 — a small marina before a marina editor
 
@@ -2652,8 +2651,7 @@ through the isolated worker and headless live-bridge mailbox, and inspected CPU 
 Refined the authored marina to the seven-berth Eriksberg layout, 2026-11-01, with the
 [result above](#eriksberg-marina-layout-2026-11-01); this is an example/layout change, not a new
 capability milestone.
-Next task for this track: **L5.1**, shared fixed daylight/dusk. The requested L1.1–L4.3 sequence
-stops here.
+Next task for this track: **[marina expansion M1](MARINA_AUTHORING_PLAN.md#m1-structures-and-capacity)**. The requested L1.1–L4.3 sequence is complete; the new five-step marina plan supersedes L5.1 as the selected next work. Lighting remains deferred.
 Known limits: authored route geometry is selected from registered presets; no freeform route
 editor, freeform module mesh editor or physical traffic wake recipe; no floating quay/platform,
 crane/building restyling or per-berth hull colours/dimensions/names; no berth occupancy schedule;
