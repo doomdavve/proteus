@@ -595,3 +595,118 @@ pairs (four applied passes plus the residual check). The bots capsize often, so 
 frequent. These are same-machine engineering measurements with no networking, encoding or
 snapshots. Artifacts: `build/bench/m2/{out-head,out-new,server-release.txt}`. The hour soaks
 were not rerun; the C3 soak hashes no longer apply because the soak drives crossing mode.
+
+## Graphics G0 measurement harness — 2026-11-01
+
+The [graphics overhaul plan](GRAPHICS_OVERHAUL_PLAN.md#g0--measurement-and-review-harness) owns
+the budgets below. This section records the harness, the reference measurements and the
+predeclared gates; it is not a look review or user acceptance.
+
+### Commands
+
+`boat_water_review` keeps its river route and adds a deterministic four-boat stress scenario
+and fixed review poses. `--stress-state` runs the same fixture without a graphics context, so
+its final fleet state can be compared with a GPU benchmark run:
+
+```sh
+./build-release/boat_water_review --benchmark OUT/river-waves-aaoff --aa off --waves
+./build-release/boat_water_review --benchmark OUT/stress-waves-aa4x4 --aa 4x4 --waves \
+  --scenario stress
+./build-release/boat_water_review --stress-state
+./build-release/boat_water_review --review OUT/review
+python3 tools/summarize_graphics_benchmarks.py OUT
+```
+
+The stress fixture puts four fleet boats on separated circles in the basin and runs a seeded
+traffic wake pool. Both 128-record pools are at capacity during measurement (the boat pool
+occasionally dips to 119 live pieces for a wetness gap; its peak is 128). Counts are live wake
+records, not draw calls. `--stress-state` and the benchmark must print identical `final_state`
+text for the same build.
+
+`--review DIR` writes `manifest.json` plus named 320x200 captures for basin hull/wake, river
+quay/bridge/skyline, outer dock/coast, tile-boundary, fast-turn, stop/restart, camera-turn and
+map-reload poses. Each manifest entry records location, world pose, camera, ticks, waves and
+resolution, and the sequence poses capture four frames. The generated manifest for this run is
+kept at `docs/evidence/graphics/g0-review/manifest.json` with selected frames beside it.
+
+### Reference measurements
+
+Apple M1 Max, macOS 26.6.2 / AppleClang 21.0.0, **Release**, hidden and unpaced, at `d0b1970`.
+Three repetitions after the built-in 120-frame warmup; values are the median of the per-run
+p50/p95/p99 statistics. `river` is the existing continuous route; `stress` is the four-boat
+basin fixture. Reports are under `build-release/graphics/g0/` on the measuring machine and are
+not committed.
+
+| Scenario | Water | AA | GPU ms p50/p95/p99 | CPU submit ms p50/p95/p99 | Frame ms p50/p95/p99 |
+| --- | --- | --- | --- | --- | --- |
+| river | waves | 4x4 | 3.45 / 3.85 / 3.96 | 3.87 / 4.30 / 4.53 | 4.62 / 6.09 / 7.35 |
+| river | waves | off | 2.90 / 5.33 / 5.57 | 4.18 / 4.56 / 4.79 | 5.33 / 9.06 / 9.82 |
+| stress | waves | 4x4 | 17.78 / 20.01 / 20.38 | 9.84 / 11.13 / 11.39 | 11.61 / 13.48 / 14.36 |
+| stress | waves | off | 11.75 / 13.88 / 15.14 | 6.90 / 8.20 / 9.24 | 8.51 / 10.08 / 11.43 |
+
+Repeated-run p95 spread was 3.85–3.91 ms GPU for river/waves/4x4 and 19.87–20.05 ms for
+stress/waves/4x4. River/waves/off showed 3.17–5.41 ms GPU p95, so 320x200 GPU comparisons use
+the p50 and the percentiles together rather than p95 alone.
+
+Scene work at p95:
+
+| Scenario | App submissions | Scene triangles | Object submissions | Map submissions |
+| --- | --- | --- | --- | --- |
+| river waves 4x4 | 1,290 | 914 k | 1,190 | 122 |
+| stress waves 4x4 | 813 | 56 k | 809 | 0 |
+
+The reference machine is far from the submission ceiling in the ordinary route, but the
+stress case is GPU-bound by the per-pixel wake loop: 4x4 stress p95 is 20.0 ms, above a 60 Hz
+frame before CPU work. That is the measured reason water shading comes before broad scene
+detail. The ordinary 4x4 route has about 12.8 ms of GPU headroom under 16.67 ms.
+
+### Budgets for P1
+
+These are gates for the implementation checkpoints, measured on the same machine/build with the
+same commands. They are not CTest thresholds.
+
+| Gate | Ceiling | G0 reference |
+| --- | --- | --- |
+| G1 river/waves/4x4 app submissions p95 | ≤ 400 | 1,290 |
+| G1 river/waves/4x4 CPU submission p95 | ≤ 3.2 ms | 4.30 ms |
+| G1 stress/waves/4x4 app submissions p95 | ≤ 300 | 813 |
+| G1 stress/waves/4x4 CPU submission p95 | ≤ 8.0 ms | 11.13 ms |
+| P1 GPU regression, river p95 | ≤ 4.05 ms (+5%) | 3.85 ms |
+| P1 GPU regression, stress p95 | ≤ 21.0 ms (noise band) | 20.01 ms |
+| G2a static map GPU vertex bytes | −45% | 3 unique vertices × 36 B per triangle |
+| G2b river scene triangles p95 | ≤ 650 k | 914 k |
+| P1 frame p95, river 4x4 | ≤ 8.0 ms | 6.09 ms |
+
+The water reserve is the remaining ordinary GPU headroom plus the whole stress delta. P1 may
+not spend it: G3 owns bringing the four-boat stress case to ≤ 16.5 ms at 4x4 and ≤ 12.0 ms at
+320x200. CPU and memory budgets are recorded per pass/group in each checkpoint result.
+
+### Predeclared accuracy bounds
+
+- **Lossless G1 and G2a first phase:** byte-identical GPU capture images at the review poses on
+  the same platform/backend/build/time/options. Physical `final_state` and `state_hash` stay
+  exact. Any difference is a bug to fix, not a tolerance to widen.
+- **Permitted G2a quantization:** position remains 32-bit; decoded normal component error at
+  most 2/255; UV error at most 1e-3 m; material/facet identity unchanged. Review captures may
+  differ by at most 2/255 in one channel and 0.25/255 in the mean. If an attribute cannot meet
+  this, keep it precise and report the savings honestly.
+- **G2b distance detail:** landmarks, bridge openings, shore silhouettes and emissive identity
+  stay present; triangle counts use the measured p95 gate; transitions need moving review and
+  a documented hysteresis band. A still image alone does not approve popping.
+
+### Limits
+
+- The core-basin stress fixture isolates saturated wake shading from shoreline variation; the
+  ordinary river route remains the city/submission measurement.
+- The native Instruments Time Profiler trace covered a visible stress benchmark for 19 s.
+  After startup, sampled CPU work was spread across driver state/uniform setup
+  (`setProgramUniformInner` ~1%, `ShGetUniformLocation` ~0.3%, `DrawMesh` ~0.7%, `MatrixInvert`
+  ~0.3% inclusive) with `draw_water` ~0.6% and `boat_flag_step` ~1.1%. GPU time is not in that
+  trace; the asynchronous `GL_TIME_ELAPSED` results above own that claim. The trace itself is
+  large and stays in `build-release/graphics/g0/stress.trace`.
+- The WebGL2 build was **not** smoked for this checkpoint: `emcc` is not installed in the
+  measuring environment. Browser shader/fallback evidence remains open for the later render
+  checkpoints, not claimed here.
+- No Windows hardware report has returned. Native Windows collection, live export and Mac
+  analysis are implemented and covered by synthetic/local checks; the actual user hardware
+  baseline remains pending under G0w.

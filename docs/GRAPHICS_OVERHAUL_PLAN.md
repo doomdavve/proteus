@@ -1,10 +1,12 @@
 # Graphics overhaul plan
 
-Status, 2026-11-01: **three work packages prepared; implementation unstarted**. Each has one
-human playtest and, by default, one implementation PR. The detailed G0–G5c briefs are internal
-checkpoints with focused commits and resumable agent handoffs. G6 remains a conditional study.
-**Next: P1, starting at G0.** See the [work packages](#work-package-register) and
-[execution process](#package-execution-process) for scope, review and boundary-change rules.
+Status, 2026-11-01: **three work packages prepared; P1 is in progress**. G0 and G0w are
+machine-verified on the M1 Max; the first Windows hardware report and browser smoke remain open.
+Each package has one human playtest and, by default, one implementation PR. The detailed
+G0–G5c briefs are internal checkpoints with focused commits and resumable agent handoffs. G6
+remains a conditional study. **Next: P1/G1 on `feat/graphics-foundations`.** See the
+[work packages](#work-package-register) and [execution
+process](#package-execution-process) for scope, review and boundary-change rules.
 
 Low resolution remains default. The [look test](#water-look-test--2026-10-31) rejected water squares
 and favoured plain high resolution as an option; no overhaul result is accepted. Native Windows
@@ -108,10 +110,10 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-01: **three work packages, implementation unstarted**. Each package owns one
+Status, 2026-11-01: **three work packages, P1 in progress**. Each package owns one
 human playtest and, by default, one implementation PR. The G0–G5c sections below are ordered
 internal checkpoints, not separate work packages or PR assignments. G6 is a dormant contingency,
-outside the three-package count. **Next: P1, starting at G0.**
+outside the three-package count. **Next: P1/G1.**
 
 Keep package definitions, prompts and process updates together in one planning PR. The original
 twelve-PR planning stack was an interpretation error and is merged; it does not prescribe future
@@ -306,7 +308,7 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 
 | Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
-| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | Unstarted; next G0 |
+| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | In progress; G0 and G0w machine-verified, next G1 |
 | [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Unstarted; depends on P1 |
 | [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
 
@@ -332,9 +334,14 @@ predeclared bounds. Windows collection/analysis tools are packaged and usable, w
 hardware evidence recorded or explicitly pending. Run the full suite, prepare one Batch A route,
 and keep its human verdict separate. Fix blocking feedback before P2 starts.
 
-**Result:** unstarted. Completed: package instructions only. Next: G0 task 1. Verification of the
-implementation, agent playback and human acceptance: none. Known scope risk: diagnostics plus
-multiple renderer ownership/submission changes; see the delivery-boundary rule.
+**Result:** in progress. G0 and G0w are machine-verified on the reference Mac; no rendering
+optimization has landed yet. Completed: stress scenario, review-pose manifest, measured G0
+budgets, bounded live capture, portable exports, Windows launcher/Mac analyzer and their tests.
+Next: G1. Implementation verification: build, focused CTest cases and three-repeat Release
+measurements at `d0b1970`/`60c1713`. Agent playback: none yet for P1. Human acceptance: none;
+Batch A has not been run. Known scope risk: diagnostics plus multiple renderer
+ownership/submission changes; see the delivery-boundary rule. No boundary change is currently
+justified: the diagnostics prerequisite is on the same branch and reviewable by checkpoint.
 
 **Kickoff prompt:**
 
@@ -417,8 +424,8 @@ gate; otherwise continue within the same package. No checkpoint is verified or a
 
 | Checkpoint | Work package | Dependency | Status |
 | --- | --- | --- | --- |
-| [G0](#g0--measurement-and-review-harness) | P1 | current main | Unstarted |
-| [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Unstarted; Windows reports pending |
+| [G0](#g0--measurement-and-review-harness) | P1 | current main | Machine-verified on M1 Max; browser smoke and Windows hardware open |
+| [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; Windows hardware baseline pending |
 | [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Unstarted |
 | [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Unstarted |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Unstarted |
@@ -481,14 +488,25 @@ target revision/platform and measurement commands; timing thresholds stay outsid
 checkpoint with those limits explicit; dependent checkpoints needing those budgets remain unready.
 The current Debug table is history, not a substitute. No look/default change.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G0w. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
-
-The G0 benchmark/report schema is the input to G0w; leave its native capture integration to that
-checkpoint. Record the Windows baseline as pending until G0w tooling and actual user reports exist;
-no Windows performance evidence is claimed by completing M1/browser measurement alone.
+**Checkpoint result:**
+- State: machine-verified on the reference Mac; browser smoke and Windows hardware open.
+- Commit(s): `d0b1970` (stress scenario, review manifest, report schema 4). Budgets are recorded
+  in [Boating performance](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
+- Interfaces/owners: `boat_water_review` owns the benchmark scenarios, review poses and their
+  manifest; `BoatFleet`/`BoatWakeObjects` remain the physical/wake owners; the report adds
+  `scenario`, per-frame wake counts and final stress state without changing the river route.
+- Verification, commands and evidence: Release on Apple M1 Max, macOS 26.6.2/AppleClang 21,
+  three repetitions of river/stress × flat/waves × AA off/4x4 after the 120-frame warmup.
+  `boat_benchmark_contract` checks scenario selection, counts, schema, percentiles and exact
+  stress parity (`--stress-state` and benchmark `final_state`). Reference p95: river waves 4x4
+  GPU 3.85 ms / CPU submission 4.30 ms / 1,290 submissions; stress waves 4x4 GPU 20.01 ms /
+  CPU 11.13 ms. Instruments summary and selected review captures are under
+  `docs/evidence/graphics/`.
+- Unresolved issues / human review: WebGL2 smoke was not run because `emcc` is absent; no human
+  look review is implied. Windows hardware evidence is owned by G0w and remains pending.
+- Next checkpoint/task and files to read: G0w task 1, then G1; read
+  `tools/boat_water_review.c`, [Boating performance](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01)
+  and `src/renderer_gpu.c`.
 
 ### G0w — Native performance capture and Windows-to-Mac reports
 
@@ -609,10 +627,27 @@ floor. If the Windows hardware/report is unavailable, retain the verified tools 
 list that evidence as pending; later checkpoints may proceed against measured M1 budgets but cannot
 claim Windows qualification. Final integrated acceptance retains the Windows return-report gate.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G1. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result:**
+- State: tools machine-verified on macOS; a real Windows hardware report is pending.
+- Commit(s): `854d90b` (bounded capture, async GPU identity, F4/`--performance-report`, portable
+  bundle), `60c1713` (Windows collection launcher, Mac analyzer, fixture tests, CI packaging).
+- Interfaces/owners: `src/boat_capture.[ch]` samples and summarizes only, with no I/O or GL;
+  `tools/wake_velocity_performance.[ch]` owns file/GL metadata and bundle writing in the app;
+  `tools/boat_gpu_timer.h` owns asynchronous queries; `boat_capture` and `performance_analyzer`
+  CTest cases cover the contract. Core/net are unchanged and still pass their boundary checks.
+- Verification, commands and evidence: `boat_capture` covers ring ordering/eviction, segment
+  separation, percentile convention and missing GPU samples. `performance_analyzer` covers
+  compatible/incompatible comparisons, ZIP round-trip, schema/bounds/traversal rejection and
+  HTML output using synthetic fixtures. Local scripted export
+  (`wake_velocity --renderer cpu --frames 40 --performance-report ...`) produced a readable ZIP
+  with manifest, summary, CSV, HTML and build metadata. Windows CI now packages the review
+  executable/launcher and runs the relocated CPU-only fixture and analyzer as packaging evidence.
+- Unresolved issues / human review: no Windows machine was available, so no live or repeated
+  controlled Windows report exists; sampler overhead was not measured on Windows. The Windows
+  ZIP is packaging evidence only, never a GPU baseline. User usability of F4/collect launcher
+  is unverified.
+- Next checkpoint/task and files to read: G1 task 1; read `src/renderer_gpu.[ch]` and the G0
+  budget table. Keep the Windows baseline request in the Batch A handoff.
 
 ### G1 — Persistent instances and pass culling
 

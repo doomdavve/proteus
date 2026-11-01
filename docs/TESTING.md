@@ -281,7 +281,18 @@ route completion and exact final-state parity with `--check --waves`. Since A2.1
 it also checks that the per-pass and per-group submission/triangle columns partition the
 totals, apart from the two sky quads. Since A2.3 (schema 3) it also checks the 1,024 m
 default `tile_size`, the per-pass `*_tiles_culled` columns and that the shadow pass culls
-tiles on every row. It asserts no timing thresholds. See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25).
+tiles on every row. Since G0 (schema 4) it also checks the `stress` scenario: the display-free
+`--stress-state` fixture must match the benchmark's exact `final_state`, and both wake pools
+must stay at capacity with reported emitter/piece counts. It asserts no timing thresholds.
+See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25) and the
+[G0 budgets](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
+
+`boat_capture` (`cpu`) owns the bounded live-capture contract: ring ordering/eviction, the
+retained window's span, segment separation, the percentile convention, missing GPU samples and
+directory/ZIP export without overwriting. `performance_analyzer` (`cpu`) runs the stdlib-only
+Mac comparison tool over synthetic fixtures; it covers compatible/incompatible settings,
+ZIP round-trips, schema/sample/NaN bound rejection and unsafe archive members. The fixtures
+contain no hardware or personal capture. Neither test is timing-sensitive.
 
 `frame_pacer` checks the window frame pacer's deadline chain on synthetic clocks: exact
 period boundaries despite oversleep, repayment of a late frame, restart after a stall, and no
