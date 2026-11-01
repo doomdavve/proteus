@@ -21,8 +21,6 @@ with sync_playwright() as playwright:
         if message.type in ['error', 'warning'] else None)
     page.goto(args.url)
     page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-    page.locator('#settings').evaluate('(e) => e.open = true')
-    page.uncheck('#fullscreen')
     page.click('#play')
     page.wait_for_timeout(700)
 

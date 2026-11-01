@@ -40,8 +40,6 @@ with sync_playwright() as p:
                 Module.boatServers.compatible = () => true;
                 Module.boatServers.server = () => ({name: 'AA TEST', description: 'Local room', websocket: url});
             }''', args.room_url)
-            page.locator('#settings').evaluate('(element) => element.open = true')
-            page.uncheck('#fullscreen')
             page.click('#play')
             page.wait_for_timeout(1000)
 

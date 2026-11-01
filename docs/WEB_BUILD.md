@@ -9,8 +9,9 @@ from this date until its 2026-11-01 fix: the title passed free-boating options t
 steering, soundtrack and smoothing. The saved smoothing setting applies to single-player and
 multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
 but the browser may leave fullscreen. BACK TO TITLE returns to setup
-without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The small HTML launcher
-retains fullscreen selection, remembered separately in browser storage. Gameplay/title settings
+without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The HTML launcher shows the screenshot and PLAY; the title, version, repository link and map
+attribution sit in its footer. PLAY starts in the browser tab; fullscreen is controlled in-game.
+Gameplay/title settings
 use the native `title.txt` format through the existing IndexedDB mount; older saves get the new
 river/waves/smoothing defaults. IndexedDB denial still permits play without durable settings.
 
@@ -39,6 +40,55 @@ Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/late
 suspension, measure memory/runtime budgets, and complete internet-play acceptance of the
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
+
+## Minimal landing page, 2026-11-01
+
+Completed: the public launcher contains the river screenshot and one full-width PLAY button.
+WAKE VELOCITY moved to the footer above the version, GitHub repository link and map attribution.
+The HTML Settings menu and its saved fullscreen preference were removed. PLAY starts in the
+browser tab; F11 toggles fullscreen on desktop, and the mobile overlay retains its fullscreen
+button. The browser F11 handler now matches the native shortcut and runs directly in the key
+gesture so the browser can grant fullscreen. Loading/storage errors and the
+conditional iPhone Home Screen hint remain available. Plugin authoring is explicitly enabled
+with `?author`; normal visitors do not see its panel. Browser qualification scripts use this
+entry point where needed and no longer depend on the removed fullscreen checkbox.
+
+`web/river.png` is a real 1920×1200 GPU capture with the Sweden boat, replacing the previous
+960×600 enlarged low-resolution image. It retains the river/bridge area with a closer chase
+composition. Capture recipe in `tools/wake_velocity.c`: temporarily insert
+`if (screenshot && !boat_gpu_resize(&gpu, 1920, 1200)) goto cleanup;` immediately before
+`texture = gpu.target.texture;`, and replace `live_view.skin = skin;` with
+`live_view.skin = screenshot ? BOAT_SKIN_SWEDEN : skin;`. Build `wake_velocity`, then run
+`./build/wake_velocity --gpu --gpu-aa --location river --skin cabin --time 3 --screenshot web/river.png`
+from the repository root. Simulating the cabin run and changing only the rendered boat preserves
+the previous capture's exact pose and camera. Restore both temporary C edits and rebuild
+afterward. These capture-only overrides add no resolution option or gameplay change.
+Reflections, clouds and wakes retain the renderer's current stylization.
+
+User revision, 2026-11-01: PLAY uses a system sans-serif font; the screenshot uses the Sweden
+boat instead of the cabin boat. The river, capture time and resolution are retained. Debug
+build/full CTest passed again (349 enabled tests); the refreshed web package and Chrome
+1280×900/390×844 previews passed with the sans-serif computed font and 1920×1200 image checked.
+Both layouts and the new capture were inspected; no JavaScript errors were reported.
+
+Current status: implemented; verification is recorded below. Next: review the proposed layout
+and capture, then publish through the normal reviewed release/hosting workflow. This change
+does not deploy either public client. On 2026-11-01 the public wake.davve.net and GitHub Pages
+landing HTML files were fetched and their SHA-256 hashes matched exactly.
+
+Verification, 2026-11-01, macOS/Apple Silicon: Debug configure/build and full CTest passed
+(349 enabled tests, 13 retired tests disabled). Networking tests required an unrestricted run
+because the sandbox denied loopback sockets. Emscripten Release `web` target and packaging
+passed; building the unrestricted compiler cache required access outside the sandbox.
+Chrome headless/SwiftShader checked 1280×900 and 390×844 layouts with no horizontal overflow,
+loaded the actual 1920×1200 image, checked footer/repository placement and hidden settings,
+started the real game in the tab despite an old saved fullscreen-on preference, entered and
+left fullscreen with F11, opened the P menu, and loaded the opt-in author example with no
+JavaScript errors. Desktop, mobile and fullscreen-menu captures were inspected. Browser
+qualification scripts compiled, `node --check web/runtime.js` and `git diff --check` passed.
+Physical input, audio listening, Safari/Firefox, mobile fullscreen and user acceptance were
+not checked in this step. The previously modified optional browser suites were updated for
+the removed controls but were not all rerun.
 
 ## Shared app icon, 2026-10-28
 
@@ -147,7 +197,7 @@ with controls over the game on iPhone via LAN HTTP. Portrait was reported stretc
 Forward above Reverse was requested. The current revision renders to the viewport aspect
 ratio, removes the landscape recommendation and stacks the pedals. Both phone-emulated
 portrait/landscape/menu captures were inspected. The Android-emulated check also passes
-implicit orientation access, default fullscreen launch with a running audio context,
+implicit orientation access, the then-default fullscreen launch with a running audio context,
 fullscreen entry/exit, cancellation of a held pedal on exit,
 proportional portrait layout and touch-menu navigation. Android install icons are packaged.
 No physical Android device was available.
@@ -373,7 +423,8 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
 
 ## Plugin source bundles (P4.3)
 
-Development browser builds now include the opt-in **PLUGIN VOYAGE** panel. It imports/exports
+Add `?author` to the browser client URL to reveal the opt-in **PLUGIN VOYAGE** panel
+(for example, `http://localhost:8000/?author`). It imports/exports
 version-1 JSON source bundles, loads the Långedrag example, validates in a disposable Web Worker
 and launches solo voyages, free boating or the basin time trial. Live edits use Stage/reload,
 explicit Apply and Undo; opening the panel pauses solo input. Normal PLAY still opens the shared
@@ -569,7 +620,7 @@ classes, disconnect isolation and aggregate statistics without sockets.
 
 Apple Silicon macOS, Emscripten 6.0.12 MinSizeRel, Chrome headless/SwiftShader: shared title,
 settings/solo panels, two solo sessions, Escape/return, persisted title settings after reload,
-remembered fullscreen preference, launcher return and running audio context passed automation.
+the then-remembered fullscreen preference, launcher return and running audio context passed automation.
 Title, setup, settings, game and Escape-menu captures were inspected. Audio-context state is
 an automated startup check, not human listening acceptance.
 

@@ -5,19 +5,11 @@ const storageLine = document.getElementById('storage');
 const canvas = Module['canvas'];
 const stage = document.getElementById('stage');
 let started = false;
-const fullscreenOption = document.getElementById('fullscreen');
-try {
-  fullscreenOption.checked = localStorage.getItem('wake-velocity-fullscreen') !== 'off';
-} catch (_) {}
-fullscreenOption.addEventListener('change', () => {
-  try { localStorage.setItem('wake-velocity-fullscreen', fullscreenOption.checked ? 'on' : 'off'); } catch (_) {}
-});
 installBoatMouseControls(Module, canvas, document, window);
 installBoatMobileControls(Module, canvas, document, window);
 installBoatRtcTransport(Module);
 installBoatServerDirectory(Module).refresh();
 const canFullscreen = !!stage.requestFullscreen && document.fullscreenEnabled !== false;
-fullscreenOption.disabled = !canFullscreen;
 const screenButton = document.getElementById('screen-button');
 screenButton.hidden = !canFullscreen;
 function enterFullscreen() {
@@ -104,7 +96,6 @@ function startSession(args) {
   playButton.disabled = true;
   document.body.classList.add('playing');
   fitCanvas();
-  if (fullscreenOption.checked) enterFullscreen();
   canvas.focus();
   // Audio initialization and PlayMusicStream happen inside this user gesture.
   callMain(args);
@@ -118,6 +109,11 @@ canvas.addEventListener('contextmenu', event => event.preventDefault());
 canvas.addEventListener('keydown', event => {
   // The live console reads text through GetCharPressed; preventDefault on keydown suppresses the
   // keypress that carries a space or another printable character.
+  if (event.key === 'F11') {
+    event.preventDefault();
+    if (!event.repeat) enterFullscreen();
+    return;
+  }
   if (Module.boatConsoleOpen) return;
   if (['Backspace', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End', 'F3', 'F5', 'F6', 'F7'].includes(event.key))
     event.preventDefault();

@@ -23,8 +23,6 @@ with sync_playwright() as p:
     page.add_init_script('window.audioContexts=[];const Original=window.AudioContext;window.AudioContext=class extends Original {constructor(...a){super(...a);audioContexts.push(this);}};')
     page.goto(args.url)
     page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-    page.locator('#settings').evaluate('(e)=>e.open=true')
-    page.uncheck('#fullscreen')
     page.click('#play')
     page.wait_for_timeout(1600)
 
@@ -94,7 +92,6 @@ with sync_playwright() as p:
     assert page.evaluate('audioContexts.filter(a=>a.state === "running").length===1 && !audioContexts.some(a=>a.state === "suspended")')
     page.reload()
     page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-    assert not page.is_checked('#fullscreen')
     page.click('#play')
     page.wait_for_timeout(700)
     key('ArrowDown')
