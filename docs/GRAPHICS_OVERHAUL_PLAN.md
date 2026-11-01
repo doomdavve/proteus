@@ -222,7 +222,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G0](#g0--measurement-and-review-harness) | Measurement and review harness | current main | Prepared | Unstarted; review pending |
 | [G1](#g1--persistent-instances-and-pass-culling) | Persistent instances and pass culling | G0 budgets and review manifest | Prepared | Unstarted; review pending |
 | [G2a](#g2a--geometry-storage-and-ownership) | Geometry storage and ownership | G1 | Prepared | Unstarted; review pending |
-| G2b | Distance detail and valid shadow reuse | G2a | Queued in next planning PRs | Unstarted; review pending |
+| [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | Distance detail and valid shadow reuse | G2a | Prepared | Unstarted; review pending |
 | G3a | Stamped wake shading | G2b and Batch A verdict resolved | Queued in next planning PRs | Unstarted; review pending |
 | G3b | Foam history and cosmetic ripples | G3a | Queued in next planning PRs | Unstarted; review pending |
 | G4 | Shore-aware and far-water character | G3b | Queued in next planning PRs | Unstarted; review pending |
@@ -388,6 +388,56 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G2a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Index/interleave static GPU geometry, shrink only within the declared tolerances, and release unneeded staging data while preserving CPU/shared/dynamic owners. Measure memory and update the plan; carry review evidence forward to Batch A.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G2b — Distance detail and valid shadow reuse
+
+Stage coverage: G2 parts 2–3. **Depends on:** G2a.
+Human review: Batch A: geometry and submission review.
+
+**Read first:** `src/renderer_gpu.[ch]` (tile drawing and near/far shadow cameras),
+`tools/boat_water_review.c`, [shadow coverage](3D.md#gameplay-shadow-coverage),
+[sunset](SUNSET_PLAN.md).
+
+**Tasks, in order:**
+
+1. Add a small fixed set of static tile LODs, selected using world distance/projected size with
+   hysteresis. Use merged/simple far-building silhouettes or simple impostors; retain landmarks,
+   bridge openings, shore silhouettes and emissive identity. Select per pass from its
+   camera/coverage and keep transition state presentation-only.
+2. Drive deterministic forward/backward threshold crossings and camera turns through the G0 review
+   manifest. Prevent flicker and popping with a documented transition band; avoid temporal blur.
+   Report near/far triangle distributions instead of choosing thresholds from stills alone.
+3. Evaluate static shadow caching against the current two shadow maps. Reuse only with identical
+   light/projection and valid static caster contents/LOD; track map/content/revision, sun, shadow
+   transform and resource size. Both cameras follow the player, so a fixed sun is insufficient. Keep
+   dynamic casters refreshed, combine depth without erasing static shadows and invalidate on
+   teleports, map/edit reload and future lighting changes.
+4. If the moving projections make caching ineffective or splitting static/dynamic depth costs more,
+   retain uncached behavior and record repeated measurements proving that result. Do not ship unsafe
+   caching to tick a checkbox.
+5. Run the ordinary/stress matrix, record memory/triangle/CPU/GPU deltas and prepare Batch A launch
+   commands plus before/after moving clips at transitions.
+
+**Acceptance:** G0 p95 triangle and memory budgets pass without hidden reflection/shadow
+regressions. Lossless shadow reuse matches uncached captures on hits and invalidations. LOD error
+meets G0 silhouette/image bounds; full tests and web smoke pass. Batch A is ready with a dated user
+checklist; actual human verdict remains separate.
+
+**Limits and stop conditions:** No physics/content digest edits. Lighting-frame changes later must
+invalidate caches. A failed human LOD review pauses dependent visual expansion until corrected;
+successful automated checks do not approve popping.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G2b from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add bounded distance detail and safely evaluate near/far static shadow reuse, with measured invalidation and LOD checks. Update the plan and hand off the combined Batch A playtest for G1–G2b.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
