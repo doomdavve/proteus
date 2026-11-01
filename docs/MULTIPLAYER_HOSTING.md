@@ -1,27 +1,18 @@
 # Winterfell internet room
 
-The Winterfell deployment runs released **v0.0.23**, commit
-`11b5e1a75bbf7d43afd331db3e7e520f3ddf855a`, with the optional WebRTC transport enabled.
-The native room, hosted browser and Pages client use protocol v8 / physics 9, including compact
-combat pages. Upgrade native clients to this matching release.
+The Winterfell deployment runs released **v0.0.24**, commit
+`24760a63788f2267a5547e41b00b3e570adbe52f`, with the optional WebRTC transport enabled.
+The native room, hosted browser and Pages client use protocol v9 / physics 9. The room runs the
+`proteus.deathmatch` package and sends clients its definition as data, so the browser needs no Lua.
+Upgrade native clients to this matching release.
 It hosts one shared four-player river deathmatch room for native and browser players.
 The [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) provides the water cannon
 (hold Space), stern wave grenade (E), torpedo (Q) and optional rearview mirror (V).
 A round starts when two players join. There is no room token or player account requirement.
 
-## Next release: protocol v9
-
-The Rooms package changes the wire to protocol v9. The room and every native/browser client must
-upgrade together. The hosted service line keeps `--mode deathmatch --location river`; the
-authority now loads `proteus.deathmatch` by default and reports it in its startup banner. The
-browser client receives the room definition as data and needs no Lua. No deployment has been
-made from this branch: at release time update `wake_velocity_version` and run the routine
-Winterfell role, then verify a matching native/browser join as in
-[routine deployments](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
-
 ## Join
 
-- Native: use v0.0.23, choose MULTIPLAYER and select WINTERFELL, or enter
+- Native: use v0.0.24, choose MULTIPLAYER and select WINTERFELL, or enter
   `wake.davve.net:24680`.
 - Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/) or
   [GitHub Pages](https://doomdavve.github.io/proteus/), press PLAY, choose MULTIPLAYER,
@@ -29,9 +20,9 @@ Winterfell role, then verify a matching native/browser join as in
   URL / CONNECT remain available for manual joining.
 - On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
 
-The native server and hosted browser client are built from the same v0.0.23 tag by the
-`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.23 and uses
-the same public directory and signaling endpoint. The directory reports protocol 8 / physics 9.
+The native server and hosted browser client are built from the same v0.0.24 tag by the
+`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.24 and uses
+the same public directory and signaling endpoint. The directory reports protocol 9 / physics 9.
 Both launchers include public STUN. The public `wake.davve.net` hostname avoids the VPN's
 private `*.winterfell.davve.net` DNS override. Native v0.0.20 includes the connection fix;
 the v0.0.18 connection limitation described in the historical notes no longer applies.
@@ -59,8 +50,8 @@ The controller needs no Proteus checkout, local Emscripten, release artifacts or
 Both builds finish before service/nginx configuration is switched. Upgrades briefly disconnect
 players; repeat deployments reuse the builds and leave a healthy room running.
 
-The v0.0.23 cutover passed through that exact wrapper on 2026-10-30.
-`davve-srv/docs/wake-velocity.md` owns operator commands and deployment evidence; [current verification](#status-and-verification--2026-10-30) records the client checks
+The v0.0.24 cutover passed through that exact wrapper on 2026-11-01.
+`davve-srv/docs/wake-velocity.md` owns operator commands and deployment evidence; [current verification](#status-and-verification--2026-11-01) records the client checks
 and their limits. Do not alternate the baseline role with the standalone Proteus playbook:
 they manage the same service names and ports. The standalone commands below are historical
 reference, not the routine workflow.
@@ -263,6 +254,37 @@ Use `10.0.21.3:24680` for the LAN check. A development build with newer handling
 be rejected; use the release checkout's bot instead. Browser testing must reach the room,
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
+
+## Status and verification — 2026-11-01
+
+The [release command](RELEASES.md#release-command) upgraded Winterfell to **v0.0.24** through
+committed/pushed `davve-srv` pin `89c4037`. Native and browser builds completed before the switch;
+the ordinary wrapper returned `ok=44 changed=9 unreachable=0 failed=0`. This was the first hosted
+build with the Node generator, and it passed. A full repeat deployment was not run for this release.
+Room and relay are active, the service-account checkout matches tagged commit
+`24760a63788f2267a5547e41b00b3e570adbe52f`, and the journal reports room package
+`proteus.deathmatch (Deathmatch)`, protocol 9, handling 9. Both live browser sites report v0.0.24
+and passed Chrome named joining/driving with no page errors; their captures were inspected and show
+the warmup banner and `Deathmatch` in the status line. Public directory metadata is protocol 9 /
+physics 9.
+
+The release's native bot joined while the Pages browser client was still in the room, so the room
+ran one native and one browser player and started round 1. The bot finished consistent with zero
+decode errors, but with one resync and `received_ratio` 0.638, against 0 and 0.953 for v0.0.23. It
+overlapped that browser's departure, which abandoned the round. Four further five-second runs alone
+in the settled room each reported 0 resyncs, zero decode errors and a consistent finish, with
+`received_ratio` 0.902–0.925 and 3.9–7.7 ms RTT. The transition itself was not investigated further.
+The journal also shows one `WebSocket handshake failed` line two seconds after the room started; its
+source was not identified, and later browser joins succeeded.
+
+Evidence: `/private/tmp/proteus-release-v0.0.24/build/releases/v0.0.24/verification.json`,
+`deployment.log`, `native.log`, and `hosted/` / `pages/` browser logs/captures in that directory;
+orchestration log `/private/tmp/proteus-release-v0.0.24.log`.
+These automated checks do not qualify deliberate player contact, physical phones, human
+gameplay/audio, Windows package execution, restrictive networks, independent external-network/TURN
+behavior or long soaks. The [release status](RELEASES.md#status-and-verification) owns the separate
+three-engine plugin qualification result and its limits. Next: a two-person harbor room with
+deliberate contact, human package play and wider multiplayer qualification.
 
 ## Status and verification — 2026-10-30
 

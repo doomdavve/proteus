@@ -38,7 +38,7 @@ controller vault file in place and pass its path rather than copying it.
 For the next version (replace the tag and paths as appropriate), check prerequisites first:
 
 ```sh
-python3 tools/cut_release.py v0.0.24 \
+python3 tools/cut_release.py v0.0.25 \
   --hosting-repo /path/to/clean-davve-srv-worktree \
   --vault-password-file /path/to/davve-srv/ansible/.vault_pass.txt \
   --browser-python /path/to/playwright-venv/bin/python \
@@ -197,16 +197,14 @@ same platform workflows at the tagged commit; it does not duplicate their build
 recipes. Only its publication job receives `contents: write`, using GitHub's
 provided token. No personal access token or additional secret is needed.
 
-## Next release (unreleased)
+## v0.0.24 wire and content changes
 
 The Rooms package moves the wire to **protocol v9 / physics 9**. Rooms run from a validated
 package definition sent as data: the course, match and combat rules, and the optional authored
 scene. Hello's content digest now covers engine and map content only; harbour contacts travel in
 the definition since PD3. Clients and the room must upgrade together. The hosted room's command
 line is unchanged (`--mode deathmatch --location river`) and now reports
-`proteus.deathmatch` as its package. No deployment has been made from this branch; update
-`wake_velocity_version` and run the Winterfell role at release time as described in the
-[hosting guide](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
+`proteus.deathmatch` as its package.
 
 The Cutover package finishes that move for v9. Every native and browser solo session, every room
 and the server now start from a validated package; the compiled-content switch (`--no-plugins`)
@@ -215,13 +213,48 @@ only in `proteus_boat_fixtures`, which validators and review tools link and prod
 not. Existing time-trial bests keep their `course-{calm|waves}-physicsN.run` names because the
 standard digest is pinned. The room-follow-up checks add moving authored-craft and resync contact;
 browser room checks now refuse software rendering, run every join through one local-room helper
-and map the hosted hostname away. Protocol and physics remain v9 / 9, so no wire bump is needed.
-No deployment has been made from this branch; update `wake_velocity_version` and run the
-Winterfell role at release time as usual.
+and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover needed no further wire bump.
 
 ## Status and verification
 
-Current release, 2026-10-30: **[v0.0.23](https://github.com/doomdavve/proteus/releases/tag/v0.0.23)**
+Current release, 2026-11-01: **[v0.0.24](https://github.com/doomdavve/proteus/releases/tag/v0.0.24)**
+is published at `24760a63788f2267a5547e41b00b3e570adbe52f`. The
+[native release](https://github.com/doomdavve/proteus/actions/runs/41293803685) and
+[Pages](https://github.com/doomdavve/proteus/actions/runs/41293803664) workflows passed.
+This release makes packages the only path for play (the [plugins-by-default
+plan](PLUGIN_DEFAULT_PLAN.md)) and moves rooms to protocol v9 / physics 9. Native clients and the
+room must upgrade together.
+
+The source passed Debug configure/build and all **343 enabled CPU CTests** on Apple Silicon/macOS
+(`ctest --preset full`, GPU tests off, 13 retired wake-field cases disabled). The build reported
+raylib's existing bundled stb_vorbis warning. CPU basin, river and outer captures at `--time 3`
+were inspected and their hashes match the [PD5 pins](PLUGIN_DEFAULT_PLAN.md#pd5-result-2026-10-31);
+a 120-frame windowed river GPU demo completed. Both downloaded native ZIPs passed SHA-256, ZIP
+integrity and embedded version/commit checks. The Mac package reports `Uncommitted changes: False`,
+passes strict signature verification, and completed a 120-frame river GPU demo from outside the
+repository. Windows package execution, human input/audio and physical-device acceptance were not
+performed.
+
+The required Winterfell native/browser cutover passed through `davve-srv` pin `89c4037`; room and
+relay are active on the exact tagged commit, and the room reports `proteus.deathmatch`. Both live
+browser sites passed named joining/driving with no page errors. Public metadata is protocol 9 /
+physics 9. The native bot shared the room with the Pages browser client and finished consistent with
+zero decode errors. [Hosting evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-01)
+owns the measurements and deployment limits.
+
+The [three-engine plugin qualification](https://github.com/doomdavve/proteus/actions/runs/41292279884)
+ran on the release commit before tagging and passed Chromium, Firefox and WebKit on attempt 2.
+Attempt 1 passed Chromium and WebKit; Firefox timed out in the objective-recovery check after
+reporting `isolated objective deadline` and a quarantined checkpoint, the same class of failure as
+v0.0.23. No product or test changes were made between attempts. This is the second release in a row
+to need the retry, so Firefox deadline sensitivity remains open and is not treated as resolved.
+Evidence: `/private/tmp/proteus-release-v0.0.24/build/releases/v0.0.24/`, including
+`verification.json`, build/test/deployment logs, package checks and browser captures; orchestration
+log `/private/tmp/proteus-release-v0.0.24.log`.
+Next: a two-person harbor room with deliberate contact, human package/input/audio and wider network
+review; investigate Firefox deadline sensitivity.
+
+Earlier publication evidence, 2026-10-30: **[v0.0.23](https://github.com/doomdavve/proteus/releases/tag/v0.0.23)**
 is published at `11b5e1a75bbf7d43afd331db3e7e520f3ddf855a`. The
 [native release](https://github.com/doomdavve/proteus/actions/runs/41103761378) and
 [Pages](https://github.com/doomdavve/proteus/actions/runs/41103761440) workflows passed.
@@ -255,7 +288,7 @@ Firefox deadline sensitivity remains a qualification limitation.
 Evidence: `/private/tmp/proteus-release-v0.0.23/build/releases/v0.0.23/`, including
 `verification.json`, build/test/deployment logs, package checks and browser captures;
 orchestration log `/private/tmp/proteus-release-v0.0.23.log`.
-Next: human package/input/audio and wider network review; investigate Firefox deadline sensitivity.
+Follow-ups at that release: human package/input/audio and wider network review; investigate Firefox deadline sensitivity.
 
 Earlier publication evidence, 2026-10-28: **[v0.0.21](https://github.com/doomdavve/proteus/releases/tag/v0.0.21)**
 is published at `0cb1921224149ddeb4707e818dd2069096bc9e3d`, after
