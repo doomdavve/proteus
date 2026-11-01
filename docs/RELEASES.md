@@ -254,8 +254,10 @@ log `/private/tmp/proteus-release-v0.0.24.log`.
 User play report, 2026-11-01 (build and platform not stated): a two-person harbor room with
 deliberate contact and deathmatch both worked; jumping over another boat is still not possible, as
 the [deathmatch playtest plan](DEATHMATCH_PLAYTEST_PLAN.md) expects until its vertical-contact steps.
-Next: iPhone run, wider human package/input/audio and network review; investigate Firefox deadline
-sensitivity.
+User iPhone 17 Pro report on v0.0.24, 2026-11-01: Harbor life, tilt, touch steering and switching
+away and back work, with no new errors. Known defects in this release: BASIN TRIAL cannot start from
+the title, on any platform ([fix](https://github.com/doomdavve/proteus/pull/123)), and touch has no weapon controls.
+Next: wider human package/input/audio and network review; investigate Firefox deadline sensitivity.
 
 Earlier publication evidence, 2026-10-30: **[v0.0.23](https://github.com/doomdavve/proteus/releases/tag/v0.0.23)**
 is published at `11b5e1a75bbf7d43afd331db3e7e520f3ddf855a`. The

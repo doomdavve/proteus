@@ -131,7 +131,9 @@ Chrome/SwiftShader check drives touch-only setup, simultaneous steering/throttle
 tilt, menu/reset, portrait resizing and return to title against the actual Wasm build. Add
 `--room-url ws://127.0.0.1:24443` for a matching local WebRTC room; this also checks emitted
 steering/throttle commands and leaving the room.
-Physical iPhone tilt permission, steering feel, audio playback, Safari bars and Home Screen behavior
+Touch offers steering, forward, reverse and the menu only: the water cannon, grenade and torpedo have
+no touch controls, so phones cannot fire in a deathmatch. Physical iPhone tilt and touch steering were
+reported working on an iPhone 17 Pro on 2026-11-01. Audio playback, Safari bars and Home Screen behavior
 still require manual review. Automated emulation is not physical-device or user acceptance.
 Verification on 2026-10-28, Apple Silicon/macOS: the initial native Debug build and full CTest
 preset passed against current main (233 enabled tests; 13 retired wake-field checks disabled),

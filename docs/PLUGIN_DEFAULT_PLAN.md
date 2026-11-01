@@ -10,8 +10,8 @@ contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts
 [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: the user's iPhone run, which decides whether Harbor life becomes the `outer` default;
-`outer` stays on Standard until then. Cutover merged in
+Next task: none in this plan. Making Harbor life the title's `outer` default is in
+[#124](https://github.com/doomdavve/proteus/pull/124). Cutover merged in
 [#108](https://github.com/doomdavve/proteus/pull/108) and shipped as
 [v0.0.24](RELEASES.md#status-and-verification) on 2026-11-01, with the hosted room verified. No
 implementation step remains in this plan; the [PD5 result](#pd5-result-2026-10-31) lists the human
@@ -22,6 +22,14 @@ two-person harbor room with deliberate contact "worked fine", and deathmatch "wo
 still cannot jump over another boat; the
 [deathmatch playtest plan](DEATHMATCH_PLAYTEST_PLAN.md#steps-5a5c--vertical-contacts-and-crossings-during-a-tick)
 owns that.
+
+User iPhone 17 Pro report, 2026-11-01, on v0.0.24: Harbor life "can be default on outer" after
+playing "for quite some time", with no new errors or misbehaviour, though it is less busy than the
+standard scene. Tilt and touch steering work, with existing HTML-control bugs; collisions are "a bit
+buggy in general", not new and not a blocker; switching away and back works. The BASIN TRIAL failure
+found during this run is unrelated to Harbor life: see
+[#123](https://github.com/doomdavve/proteus/pull/123). Touch has no weapon controls, as the
+[browser guide](WEB_BUILD.md#mobile-controls-and-iphone-presentation-2026-10-28) records.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
