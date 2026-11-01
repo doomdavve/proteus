@@ -9,6 +9,7 @@
 #include "rlgl.h"
 
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +27,14 @@ static const Color LAMP_LENS_COLOR = { 255, 218, 132, 255 };
 static const Color HEADLIGHT_LENS_COLOR = { 255, 246, 202, 255 };
 // The generated map uses this colour as its water material identifier.
 static const Color WATER_COLOR = { 45, 79, 104, 255 };
+
+// Distance detail: the fine grid of windows and street furniture, the window spacing whose
+// projected size picks the level, the hysteresis around that distance, and what the far level of
+// street furniture keeps.
+#define WATERFRONT_GPU_DETAIL_CELL 256.0f
+#define DETAIL_WINDOW_SPACING 4.0f
+#define DETAIL_BAND .08f
+#define DETAIL_SMALLEST_BOX 2.0f
 
 static void builder_destroy(MeshBuilder *builder)
 {
@@ -157,12 +166,366 @@ static Mesh builder_finish(MeshBuilder *builder)
     return mesh;
 }
 
+// Static map storage: one interleaved vertex buffer and 16-bit indices per mesh, owned by the GPU.
+// Only complete equal precise attribute tuples of what the surface reads share a vertex, so flat
+// normals, facade UVs and material seams stay separate. The source arrays are released after
+// upload; the map's own scenery, which the CPU renderer, collision and minimap read, is a separate
+// copy that this code never owns.
+typedef struct {
+    float position[3];
+    float texcoord[2];
+    float normal[3];
+    unsigned char color[4];
+} StaticVertex;
+
+// What a map surface's shader reads, which decides how its vertices are stored.
+typedef enum {
+    STATIC_UNLIT, // Emissive: returns before the normal, on a white 1x1 texture.
+    STATIC_FLAT, // Lit on a white 1x1 texture: the coordinates cannot change a pixel.
+    STATIC_GROUND, // Lit, and coordinate x is a small WaterfrontGroundMaterial integer.
+    STATIC_MAPPED, // Lit, with facade wall metres or roof texture coordinates.
+} StaticSurface;
+
+// WebGL2 always treats index 65535 as primitive restart, so 65,535 vertices are addressable.
+#define STATIC_VERTEX_LIMIT 65535
+// Chunks end on this source-vertex boundary, which keeps quads and facade wall pairs together.
+#define STATIC_CHUNK_STEP 6
+// UnloadMesh reads raylib's private MAX_MESH_VERTEX_BUFFERS (9 in 6.0) slots; zero slots are
+// skipped.
+#define STATIC_MESH_VBO_SLOTS 16
+
+// DrawMesh selects its indexed draw by a non-NULL indices pointer, and reads the indices from the
+// bound VAO. This marks a mesh whose indices exist only on the GPU; unload_mesh must not free it.
+static unsigned short static_indices_on_gpu;
+
+// Set while uploading a far detail level, which the storage report counts apart.
+static bool binding_far;
+// Set for the duration of waterfront_gpu_scene_bind, on the render thread.
+static WaterfrontGpuScene *binding_scene;
+
 static void unload_mesh(Mesh *mesh)
 {
+    if (mesh->indices == &static_indices_on_gpu)
+        mesh->indices = NULL;
     if (mesh->vaoId != 0)
         UnloadMesh(*mesh);
     *mesh = (Mesh) { 0 };
 }
+
+static StaticVertex static_vertex(const MeshBuilder *builder, int source)
+{
+    StaticVertex vertex;
+    memset(&vertex, 0, sizeof(vertex)); // Hashed and compared by bytes.
+    memcpy(vertex.position, &builder->positions[source * 3], sizeof(vertex.position));
+    memcpy(vertex.texcoord, &builder->texcoords[source * 2], sizeof(vertex.texcoord));
+    memcpy(vertex.normal, &builder->normals[source * 3], sizeof(vertex.normal));
+    memcpy(vertex.color, &builder->colors[source * 4], sizeof(vertex.color));
+    return vertex;
+}
+
+static unsigned int static_vertex_hash(const StaticVertex *vertex)
+{
+    const unsigned char *bytes = (const unsigned char *)vertex;
+    unsigned int hash = 2166136261u;
+    for (size_t i = 0; i < sizeof(*vertex); ++i)
+        hash = (hash ^ bytes[i]) * 16777619u;
+    return hash;
+}
+
+// Normals are three GL_SHORT integers in an eight-byte slot, read unnormalized: the map shaders
+// renormalize them, and normalized integers decode differently before GL 4.2. *ERROR grows to the
+// worst component error as the shader reads it.
+#define STATIC_NORMAL_TYPE 0x1402
+#define STATIC_NORMAL_BYTES 8
+
+static void static_normal_pack(const float normal[3], short packed[3], float *error)
+{
+    float length = 0;
+    for (int i = 0; i < 3; ++i) {
+        packed[i] = (short)lroundf(Clamp(normal[i], -1.0f, 1.0f) * 32767.0f);
+        length += (float)packed[i] * (float)packed[i];
+    }
+    length = sqrtf(length);
+    for (int i = 0; length > 0 && i < 3; ++i)
+        *error = fmaxf(*error, fabsf((float)packed[i] / length - normal[i]));
+}
+
+// The uploaded form of VERTICES: position and colour, then the normal and coordinates the surface
+// reads. Returns the stride, or 0 if out of memory; the caller frees *OUT.
+static int static_vertices_pack(
+    const StaticVertex *vertices, int count, StaticSurface surface, unsigned char **out)
+{
+    int stride = (int)(sizeof(vertices->position) + sizeof(vertices->color));
+    if (surface != STATIC_UNLIT)
+        stride += STATIC_NORMAL_BYTES;
+    if (surface == STATIC_GROUND)
+        stride += 4;
+    else if (surface == STATIC_MAPPED)
+        stride += (int)sizeof(vertices->texcoord);
+    *out = calloc((size_t)count, (size_t)stride);
+    if (!*out)
+        return 0;
+    for (int i = 0; i < count; ++i) {
+        unsigned char *p = *out + (size_t)i * (size_t)stride;
+        memcpy(p, vertices[i].position, sizeof(vertices[i].position));
+        p += sizeof(vertices[i].position);
+        memcpy(p, vertices[i].color, sizeof(vertices[i].color));
+        p += sizeof(vertices[i].color);
+        if (surface != STATIC_UNLIT) {
+            short normal[3];
+            static_normal_pack(vertices[i].normal, normal, &binding_scene->geometry.normal_error);
+            memcpy(p, normal, sizeof(normal));
+            p += STATIC_NORMAL_BYTES;
+        }
+        if (surface == STATIC_GROUND)
+            *p = (unsigned char)vertices[i].texcoord[0];
+        else if (surface == STATIC_MAPPED)
+            memcpy(p, vertices[i].texcoord, sizeof(vertices[i].texcoord));
+    }
+    return stride;
+}
+
+static Mesh static_mesh_upload(const StaticVertex *vertices, int vertex_count,
+    const unsigned short *indices, int index_count, StaticSurface surface)
+{
+    if (binding_scene->map_upload_limit
+        && binding_scene->geometry.meshes >= binding_scene->map_upload_limit)
+        return (Mesh) { 0 };
+    Mesh mesh = { .vertexCount = index_count,
+        .triangleCount = index_count / 3,
+        .indices = &static_indices_on_gpu };
+    mesh.vboId = calloc(STATIC_MESH_VBO_SLOTS, sizeof(*mesh.vboId));
+    mesh.vaoId = mesh.vboId ? rlLoadVertexArray() : 0;
+    if (!mesh.vaoId) {
+        free(mesh.vboId);
+        return (Mesh) { 0 };
+    }
+    unsigned char *packed = NULL;
+    const int stride = static_vertices_pack(vertices, vertex_count, surface, &packed);
+    rlEnableVertexArray(mesh.vaoId);
+    if (packed)
+        mesh.vboId[0] = rlLoadVertexBuffer(packed, vertex_count * stride, false);
+    free(packed);
+    int offset = 0;
+    rlSetVertexAttribute(
+        RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, 3, RL_FLOAT, false, stride, offset);
+    rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION);
+    offset += (int)sizeof(vertices->position);
+    rlSetVertexAttribute(
+        RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, 4, RL_UNSIGNED_BYTE, true, stride, offset);
+    rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR);
+    offset += (int)sizeof(vertices->color);
+    if (surface != STATIC_UNLIT) {
+        rlSetVertexAttribute(
+            RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 3, STATIC_NORMAL_TYPE, false, stride, offset);
+        rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL);
+        offset += STATIC_NORMAL_BYTES;
+    }
+    if (surface == STATIC_GROUND || surface == STATIC_MAPPED) {
+        rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, 2,
+            surface == STATIC_MAPPED ? RL_FLOAT : RL_UNSIGNED_BYTE, false, stride, offset);
+        rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD);
+    }
+    mesh.vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES]
+        = rlLoadVertexBufferElement(indices, index_count * (int)sizeof(*indices), false);
+    rlDisableVertexArray();
+    rlDisableVertexBuffer();
+    rlDisableVertexBufferElement();
+    if (!mesh.vboId[0] || !mesh.vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES]) {
+        unload_mesh(&mesh);
+        return mesh;
+    }
+    WaterfrontGpuGeometry *geometry = &binding_scene->geometry;
+    ++geometry->meshes;
+    if (binding_far) {
+        geometry->far_triangles += (size_t)index_count / 3;
+        geometry->far_vertex_bytes += (size_t)vertex_count * (size_t)stride;
+        geometry->far_index_bytes += (size_t)index_count * sizeof(*indices);
+        return mesh;
+    }
+    geometry->triangles += (size_t)index_count / 3;
+    geometry->source_vertices += (size_t)index_count;
+    geometry->vertices += (size_t)vertex_count;
+    geometry->vertex_bytes += (size_t)vertex_count * (size_t)stride;
+    geometry->index_bytes += (size_t)index_count * sizeof(*indices);
+    return mesh;
+}
+
+// The review-only copy of one chunk's source range, in the unindexed layout of builder_finish.
+static bool static_mesh_retain(Mesh *mesh, const MeshBuilder *builder, int first, int count)
+{
+    mesh->vertices = malloc((size_t)count * 3 * sizeof(*mesh->vertices));
+    mesh->normals = malloc((size_t)count * 3 * sizeof(*mesh->normals));
+    mesh->texcoords = malloc((size_t)count * 2 * sizeof(*mesh->texcoords));
+    mesh->colors = malloc((size_t)count * 4 * sizeof(*mesh->colors));
+    if (!mesh->vertices || !mesh->normals || !mesh->texcoords || !mesh->colors)
+        return false;
+    memcpy(mesh->vertices, &builder->positions[first * 3], (size_t)count * 3 * sizeof(float));
+    memcpy(mesh->normals, &builder->normals[first * 3], (size_t)count * 3 * sizeof(float));
+    memcpy(mesh->texcoords, &builder->texcoords[first * 2], (size_t)count * 2 * sizeof(float));
+    memcpy(mesh->colors, &builder->colors[first * 4], (size_t)count * 4);
+    binding_scene->geometry.retained_cpu_bytes += (size_t)count * sizeof(StaticVertex);
+    return true;
+}
+
+// Uploads source vertices from FIRST, in order, until the index range is full, and sets *NEXT to
+// the first one left over. Returns a mesh with no VAO on failure.
+static Mesh builder_static_chunk(
+    const MeshBuilder *builder, StaticSurface surface, int first, int *next)
+{
+    int remaining = builder->count - first;
+    int slots = 1 << 8;
+    while (slots < 2 * STATIC_VERTEX_LIMIT && slots < 2 * remaining)
+        slots *= 2;
+    int capacity = remaining < STATIC_VERTEX_LIMIT ? remaining : STATIC_VERTEX_LIMIT;
+    StaticVertex *vertices = malloc((size_t)capacity * sizeof(*vertices));
+    unsigned short *indices = malloc((size_t)remaining * sizeof(*indices));
+    int *table = malloc((size_t)slots * sizeof(*table));
+    Mesh mesh = { 0 };
+    if (!vertices || !indices || !table)
+        goto done;
+    memset(table, 0xff, (size_t)slots * sizeof(*table));
+    int unique = 0, source = first;
+    for (; source < builder->count; ++source) {
+        if ((source - first) % STATIC_CHUNK_STEP == 0
+            && unique + STATIC_CHUNK_STEP > STATIC_VERTEX_LIMIT)
+            break;
+        StaticVertex vertex = static_vertex(builder, source);
+        // What the surface never reads must not split a vertex.
+        if (surface != STATIC_MAPPED)
+            vertex.texcoord[1] = 0;
+        if (surface == STATIC_UNLIT || surface == STATIC_FLAT)
+            vertex.texcoord[0] = 0;
+        if (surface == STATIC_UNLIT)
+            memset(vertex.normal, 0, sizeof(vertex.normal));
+        unsigned int slot = static_vertex_hash(&vertex) & (unsigned int)(slots - 1);
+        while (table[slot] >= 0 && memcmp(&vertices[table[slot]], &vertex, sizeof(vertex)) != 0)
+            slot = (slot + 1) & (unsigned int)(slots - 1);
+        if (table[slot] < 0) {
+            table[slot] = unique;
+            vertices[unique++] = vertex;
+        }
+        indices[source - first] = (unsigned short)table[slot];
+    }
+    mesh = static_mesh_upload(vertices, unique, indices, source - first, surface);
+    if (mesh.vaoId && binding_scene->retain_map_sources
+        && !static_mesh_retain(&mesh, builder, first, source - first))
+        unload_mesh(&mesh);
+    *next = source;
+done:
+    free(vertices);
+    free(indices);
+    free(table);
+    return mesh;
+}
+
+// One static mesh for a map surface that is not tiled. Its source must fit one index range.
+// Consumes the builder.
+static Mesh builder_finish_static(MeshBuilder *builder, StaticSurface surface)
+{
+    int next = 0;
+    Mesh mesh = builder_static_chunk(builder, surface, 0, &next);
+    if (mesh.vaoId && next != builder->count)
+        unload_mesh(&mesh);
+    builder_destroy(builder);
+    return mesh;
+}
+
+// Uniform locations are resolved once per shader and then by hash. These calls sit in the
+// per-frame and per-draw paths; the GL name lookup itself is not repeated there.
+#define LOCATION_CACHE_SLOTS 32
+#define LOCATION_CACHE_ENTRIES 96
+typedef struct {
+    unsigned int hash;
+    int location;
+    char name[48];
+} LocationEntry;
+typedef struct {
+    unsigned int id;
+    int count;
+    LocationEntry entries[LOCATION_CACHE_ENTRIES];
+} LocationCache;
+static LocationCache location_caches[LOCATION_CACHE_SLOTS];
+
+static unsigned int name_hash(const char *name)
+{
+    unsigned int hash = 2166136261u;
+    for (; *name; ++name) {
+        hash ^= (unsigned char)*name;
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+static LocationCache *location_cache(unsigned int id, bool create)
+{
+    LocationCache *free_slot = NULL;
+    for (int i = 0; i < LOCATION_CACHE_SLOTS; ++i) {
+        if (location_caches[i].id == id)
+            return &location_caches[i];
+        if (!location_caches[i].id && !free_slot)
+            free_slot = &location_caches[i];
+    }
+    if (!create || !free_slot)
+        return NULL;
+    *free_slot = (LocationCache) { .id = id };
+    return free_slot;
+}
+
+static void forget_locations(Shader shader)
+{
+    LocationCache *cache = shader.id ? location_cache(shader.id, false) : NULL;
+    if (cache)
+        *cache = (LocationCache) { 0 };
+}
+
+static int cached_location(Shader shader, const char *name)
+{
+    if (shader.id == 0)
+        return -1;
+    LocationCache *cache = location_cache(shader.id, true);
+    unsigned int hash = name_hash(name);
+    if (cache) {
+        for (int i = 0; i < cache->count; ++i)
+            if (cache->entries[i].hash == hash && strcmp(cache->entries[i].name, name) == 0)
+                return cache->entries[i].location;
+    }
+    int location = GetShaderLocation(shader, name);
+    if (cache && cache->count < LOCATION_CACHE_ENTRIES) {
+        LocationEntry *entry = &cache->entries[cache->count++];
+        snprintf(entry->name, sizeof(entry->name), "%s", name);
+        entry->hash = hash;
+        entry->location = location;
+    }
+    return location;
+}
+
+static const char *const known_uniforms[] = { "objectColor", "emissive", "instanced",
+    "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
+    "directionalColor", "directionalDirection", "directionalIntensity", "shadowsEnabled",
+    "lightViewProjection", "shadowMap", "farShadowsEnabled", "farLightViewProjection",
+    "farShadowMap", "localLightCount", "localLightPositionRadius[0]", "localLightColorIntensity[0]",
+    "localLightDirection[0]", "localLightCone[0]", "cameraPosition", "fogColor", "fogStart",
+    "fogEnd", "fogOpacity", "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife",
+    "wakeFieldEnabled", "wakeGrid", "wakeField", "physicalWaves", "radialOrigin", "radialMotion",
+    "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape",
+    "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
+    "objectWakeData", "playerWakeCount", "playerWakeOrigins[0]", "playerWakeParameters[0]",
+    "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
+    "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
+    "reflectionTexture", "surfacePixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
+    "skyScale", "skyEye", "squallArea", "squallHeight", NULL };
+
+// Resolve every name the renderer uses for each shader once, while the program is valid.
+static void prewarm_locations(Shader shader)
+{
+    for (const char *const *name = known_uniforms; *name; ++name)
+        (void)cached_location(shader, *name);
+}
+
+static WaterfrontGpuScene *drawing_scene;
+
+static bool object_batch_create(WaterfrontGpuScene *scene);
 
 // Counter for the pass and group being drawn, set only inside waterfront_gpu_scene_draw on the
 // render thread. NULL outside a scene draw, when submissions are not counted.
@@ -175,6 +538,7 @@ static void submit(Mesh mesh, Material material, Matrix transform, WaterfrontGpu
     if (counting) {
         WaterfrontGpuCount *count = &counting->mesh[counting_pass][group];
         ++count->submissions;
+        ++count->instances;
         count->triangles += (size_t)mesh.triangleCount;
     }
 }
@@ -191,7 +555,13 @@ static void tiled_destroy(WaterfrontGpuTiled *tiled)
         unload_mesh(&tiled->meshes[i]);
     free(tiled->meshes);
     free(tiled->bounds);
+    free(tiled->cells);
     *tiled = (WaterfrontGpuTiled) { 0 };
+}
+
+WaterfrontGpuGeometry waterfront_gpu_scene_geometry(const WaterfrontGpuScene *scene)
+{
+    return scene->geometry;
 }
 
 int waterfront_gpu_tiled_vertices(const WaterfrontGpuTiled *tiled)
@@ -240,6 +610,73 @@ static void draw_tiled(
     }
 }
 
+// Which level of the detailed classes a pass draws.
+typedef enum {
+    DETAIL_ALL_NEAR,
+    DETAIL_ALL_FAR,
+    DETAIL_MAIN,
+    DETAIL_REFLECTION,
+} DetailSource;
+
+static bool detail_cell_is_far(const WaterfrontGpuScene *scene, int cell)
+{
+    if (scene->detail_source == DETAIL_ALL_NEAR)
+        return false;
+    if (scene->detail_source == DETAIL_ALL_FAR)
+        return true;
+    return scene->detail_far[scene->detail_source == DETAIL_REFLECTION][cell] != 0;
+}
+
+// Draws a class with two levels: each cell's near meshes or its far ones.
+static void draw_detailed(const WaterfrontGpuScene *scene, const WaterfrontGpuTiled *near,
+    const WaterfrontGpuTiled *far, Material material)
+{
+    Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    for (int level = 0; level < 2; ++level) {
+        const WaterfrontGpuTiled *tiled = level ? far : near;
+        for (int i = 0; i < tiled->count; ++i) {
+            if (detail_cell_is_far(scene, tiled->cells[i]) != (level == 1))
+                continue;
+            if (scene->culling_disabled || box_in_view(view_projection, tiled->bounds[i]))
+                submit(tiled->meshes[i], material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
+            else if (counting)
+                ++counting->tiles_culled[counting_pass];
+        }
+    }
+}
+
+// One level per cell for this view. A cell goes far beyond the distance at which WINDOW_SPACING
+// fits one presented pixel, plus a band, and returns inside it, less the band, so a camera
+// holding at the threshold cannot flicker between levels. Only horizontal distance from ANCHOR
+// decides: the followed boat while playing, so orbiting the camera around it changes no level.
+static void detail_select(
+    WaterfrontGpuScene *scene, DetailSource source, Vector3 anchor, float fov, float height)
+{
+    scene->detail_source = DETAIL_ALL_NEAR;
+    if (scene->detail_disabled || !scene->detail_far[0])
+        return;
+    scene->detail_source = source;
+    unsigned char *state = scene->detail_far[source == DETAIL_REFLECTION];
+    float focal = height / (2 * tanf(fov * .5f));
+    float threshold = DETAIL_WINDOW_SPACING * focal;
+    float enter = threshold * (1 + DETAIL_BAND), leave = threshold * (1 - DETAIL_BAND);
+    unsigned int far_cells = 0;
+    for (int z = 0; z < scene->detail_rows; ++z) {
+        float low_z = scene->detail_origin.y + (float)z * scene->detail_cell;
+        float dz = fmaxf(fmaxf(low_z - anchor.z, anchor.z - low_z - scene->detail_cell), 0);
+        for (int x = 0; x < scene->detail_columns; ++x) {
+            float low_x = scene->detail_origin.x + (float)x * scene->detail_cell;
+            float dx = fmaxf(fmaxf(low_x - anchor.x, anchor.x - low_x - scene->detail_cell), 0);
+            float distance = sqrtf(dx * dx + dz * dz);
+            unsigned char *far = &state[z * scene->detail_columns + x];
+            *far = *far ? distance > leave : distance > enter;
+            far_cells += *far;
+        }
+    }
+    if (counting)
+        counting->far_cells[counting_pass] = far_cells;
+}
+
 // One builder per render tile for a map class.
 typedef struct {
     MeshBuilder *tiles;
@@ -270,19 +707,14 @@ static size_t builder_vertices(const TiledBuilder *builder)
 }
 
 // Uploads each non-empty tile with its bounds, grown slightly so that rounding never culls a
-// visible edge. Consumes the builder, also on failure.
-static bool tiled_builder_finish(TiledBuilder *builder, WaterfrontGpuTiled *tiled)
+// visible edge. A tile too large for one index range becomes several meshes with the same bounds,
+// drawn in source order. Consumes the builder, also on failure.
+static bool tiled_builder_finish(
+    TiledBuilder *builder, WaterfrontGpuTiled *tiled, StaticSurface surface)
 {
     *tiled = (WaterfrontGpuTiled) { 0 };
-    int used = 0;
-    for (size_t i = 0; i < builder->count; ++i)
-        used += builder->tiles[i].count > 0;
+    int capacity = 0;
     bool ok = true;
-    if (used) {
-        tiled->meshes = calloc((size_t)used, sizeof(*tiled->meshes));
-        tiled->bounds = calloc((size_t)used, sizeof(*tiled->bounds));
-        ok = tiled->meshes && tiled->bounds;
-    }
     for (size_t i = 0; ok && i < builder->count; ++i) {
         MeshBuilder *tile = &builder->tiles[i];
         if (!tile->count)
@@ -295,10 +727,31 @@ static bool tiled_builder_finish(TiledBuilder *builder, WaterfrontGpuTiled *tile
             high = Vector3Max(high, p);
         }
         const Vector3 grow = { .05f, .05f, .05f };
-        tiled->bounds[tiled->count]
-            = (BoundingBox) { Vector3Subtract(low, grow), Vector3Add(high, grow) };
-        tiled->meshes[tiled->count] = builder_finish(tile);
-        ok = tiled->meshes[tiled->count++].vaoId != 0;
+        BoundingBox bounds = { Vector3Subtract(low, grow), Vector3Add(high, grow) };
+        for (int first = 0; ok && first < tile->count;) {
+            if (tiled->count == capacity) {
+                capacity = capacity ? capacity * 2 : 8;
+                Mesh *meshes = realloc(tiled->meshes, (size_t)capacity * sizeof(*meshes));
+                if (meshes)
+                    tiled->meshes = meshes;
+                BoundingBox *all = realloc(tiled->bounds, (size_t)capacity * sizeof(*all));
+                if (all)
+                    tiled->bounds = all;
+                int *cells = realloc(tiled->cells, (size_t)capacity * sizeof(*cells));
+                if (cells)
+                    tiled->cells = cells;
+                ok = meshes && all && cells;
+                if (!ok)
+                    break;
+            }
+            Mesh mesh = builder_static_chunk(tile, surface, first, &first);
+            ok = mesh.vaoId != 0;
+            if (ok) {
+                tiled->meshes[tiled->count] = mesh;
+                tiled->cells[tiled->count] = (int)i;
+                tiled->bounds[tiled->count++] = bounds;
+            }
+        }
     }
     tiled_builder_destroy(builder);
     if (!ok)
@@ -310,6 +763,41 @@ static size_t tile_of(const WaterfrontScenery *scenery, Vector3 a, Vector3 b, Ve
 {
     return boat_map_tiles_owner(
         &scenery->tiles, (Vector2) { (a.x + b.x + c.x) / 3, (a.z + b.z + c.z) / 3 });
+}
+
+// The fine grid of the detailed classes subdivides the render tiles.
+static int detail_factor(const WaterfrontScenery *scenery)
+{
+    return fmaxf(1, ceilf(scenery->tiles.tile_size / WATERFRONT_GPU_DETAIL_CELL));
+}
+
+static size_t detail_cell_count(const WaterfrontScenery *scenery)
+{
+    int factor = detail_factor(scenery);
+    return (size_t)scenery->tiles.columns * (size_t)scenery->tiles.rows * (size_t)(factor * factor);
+}
+
+// The cell holding P, clamped to the edge cells like boat_map_tiles_owner.
+static size_t detail_cell_of(const WaterfrontScenery *scenery, Vector3 p)
+{
+    const BoatMapTiles *tiles = &scenery->tiles;
+    int factor = detail_factor(scenery);
+    float cell = tiles->tile_size / (float)factor;
+    int columns = tiles->columns * factor, rows = tiles->rows * factor;
+    int x = (int)floorf((p.x - tiles->origin.x) / cell);
+    int z = (int)floorf((p.z - tiles->origin.y) / cell);
+    x = x < 0 ? 0 : x >= columns ? columns - 1 : x;
+    z = z < 0 ? 0 : z >= rows ? rows - 1 : z;
+    return (size_t)z * (size_t)columns + (size_t)x;
+}
+
+static bool tiled_builder_finish_far(
+    TiledBuilder *builder, WaterfrontGpuTiled *tiled, StaticSurface surface)
+{
+    binding_far = true;
+    bool ok = tiled_builder_finish(builder, tiled, surface);
+    binding_far = false;
+    return ok;
 }
 
 static bool build_source_mesh(Mesh *mesh, const Mesh3D *source)
@@ -376,24 +864,34 @@ static bool builder_ground_triangle(MeshBuilder *builder, Vector3 a, Vector3 b, 
 
 // Each box belongs to the tile owning its centre.
 static bool build_corner(const WaterfrontScenery *scenery, WaterfrontGpuTiled *opaque,
-    WaterfrontGpuTiled *emissive, TiledBuilder *ground)
+    WaterfrontGpuTiled *opaque_far, WaterfrontGpuTiled *emissive, TiledBuilder *ground)
 {
     size_t count = scenery->count;
     const WaterfrontCornerBox *boxes = scenery->boxes;
     static const unsigned char faces[][3]
         = { { 0, 2, 1 }, { 0, 3, 2 }, { 5, 7, 4 }, { 5, 6, 7 }, { 4, 3, 0 }, { 4, 7, 3 },
               { 1, 6, 5 }, { 1, 2, 6 }, { 3, 6, 2 }, { 3, 7, 6 }, { 4, 1, 5 }, { 4, 0, 1 } };
-    TiledBuilder builders[2] = { 0 };
-    if (!tiled_builder_init(&builders[0], ground->count)
-        || !tiled_builder_init(&builders[1], ground->count)) {
+    TiledBuilder builders[3] = { 0 };
+    if (!tiled_builder_init(&builders[0], detail_cell_count(scenery))
+        || !tiled_builder_init(&builders[1], ground->count)
+        || !tiled_builder_init(&builders[2], detail_cell_count(scenery))) {
         tiled_builder_destroy(&builders[0]);
+        tiled_builder_destroy(&builders[1]);
         return false;
     }
     for (size_t i = 0; i < count; ++i) {
         Vector3 center = { 0 };
-        for (int v = 0; v < 8; ++v)
+        Vector3 low = boxes[i].vertices[0], high = boxes[i].vertices[0];
+        for (int v = 0; v < 8; ++v) {
             center = Vector3Add(center, Vector3Scale(boxes[i].vertices[v], 1 / 8.0f));
+            low = Vector3Min(low, boxes[i].vertices[v]);
+            high = Vector3Max(high, boxes[i].vertices[v]);
+        }
         size_t tile = boat_map_tiles_owner(&scenery->tiles, (Vector2) { center.x, center.z });
+        size_t cell = detail_cell_of(scenery, center);
+        Vector3 size = Vector3Subtract(high, low);
+        // Far, a box under half a presented pixel in every direction is gone, not a landmark.
+        bool far = fmaxf(size.x, fmaxf(size.y, size.z)) >= DETAIL_SMALLEST_BOX;
         for (size_t f = 0; f < sizeof(faces) / sizeof(faces[0]); ++f) {
             Vector3 a = boxes[i].vertices[faces[f][0]], b = boxes[i].vertices[faces[f][1]];
             Vector3 c = boxes[i].vertices[faces[f][2]];
@@ -411,20 +909,27 @@ static bool build_corner(const WaterfrontScenery *scenery, WaterfrontGpuTiled *o
                 else if (ColorIsEqual(color, (Color) { 98, 106, 112, 255 }))
                     finish = WATERFRONT_GROUND_ASPHALT;
             }
-            bool ok = finish
-                ? builder_ground_triangle(&ground->tiles[tile], a, b, c, color, finish)
-                : builder_triangle(&builders[boxes[i].emissive].tiles[tile], a, b, c, color);
+            bool ok;
+            if (finish)
+                ok = builder_ground_triangle(&ground->tiles[tile], a, b, c, color, finish);
+            else if (boxes[i].emissive)
+                ok = builder_triangle(&builders[1].tiles[tile], a, b, c, color);
+            else
+                ok = builder_triangle(&builders[0].tiles[cell], a, b, c, color)
+                    && (!far || builder_triangle(&builders[2].tiles[cell], a, b, c, color));
             if (!ok) {
-                tiled_builder_destroy(&builders[0]);
-                tiled_builder_destroy(&builders[1]);
+                for (int b = 0; b < 3; ++b)
+                    tiled_builder_destroy(&builders[b]);
                 return false;
             }
         }
     }
-    bool opaque_ok = tiled_builder_finish(&builders[0], opaque);
-    bool emissive_ok = tiled_builder_finish(&builders[1], emissive);
-    if (!opaque_ok || !emissive_ok) {
+    bool opaque_ok = tiled_builder_finish(&builders[0], opaque, STATIC_FLAT);
+    bool emissive_ok = tiled_builder_finish(&builders[1], emissive, STATIC_UNLIT);
+    bool far_ok = tiled_builder_finish_far(&builders[2], opaque_far, STATIC_FLAT);
+    if (!opaque_ok || !emissive_ok || !far_ok) {
         tiled_destroy(opaque);
+        tiled_destroy(opaque_far);
         tiled_destroy(emissive);
         return false;
     }
@@ -489,7 +994,7 @@ static bool builder_facade_triangle(
 // its a,c,b / a,d,c pairs adjacent.
 static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *city_mesh,
     WaterfrontGpuTiled *facades, WaterfrontGpuTiled *roofs, WaterfrontGpuTiled *quay, Mesh *water,
-    WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_emissive)
+    WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_far, WaterfrontGpuTiled *corner_emissive)
 {
     const Mesh3D *city = scenery->full->mesh;
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
@@ -553,13 +1058,13 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
                 || !builder_vertices(&builders[CITY_SURFACE_ROOF])
                 || !builder_vertices(&builders[CITY_SURFACE_QUAY]))))
         goto failed;
-    if (!build_corner(scenery, corner, corner_emissive, &builders[CITY_SURFACE_QUAY]))
+    if (!build_corner(scenery, corner, corner_far, corner_emissive, &builders[CITY_SURFACE_QUAY]))
         goto failed;
-    bool ok = tiled_builder_finish(&builders[CITY_SURFACE_FLAT], city_mesh);
-    ok = tiled_builder_finish(&builders[CITY_SURFACE_FACADE], facades) && ok;
-    ok = tiled_builder_finish(&builders[CITY_SURFACE_ROOF], roofs) && ok;
-    ok = tiled_builder_finish(&builders[CITY_SURFACE_QUAY], quay) && ok;
-    *water = builder_finish(&water_builder);
+    bool ok = tiled_builder_finish(&builders[CITY_SURFACE_FLAT], city_mesh, STATIC_FLAT);
+    ok = tiled_builder_finish(&builders[CITY_SURFACE_FACADE], facades, STATIC_MAPPED) && ok;
+    ok = tiled_builder_finish(&builders[CITY_SURFACE_ROOF], roofs, STATIC_MAPPED) && ok;
+    ok = tiled_builder_finish(&builders[CITY_SURFACE_QUAY], quay, STATIC_GROUND) && ok;
+    *water = builder_finish_static(&water_builder, STATIC_FLAT);
     return ok && water->vaoId != 0;
 failed:
     for (size_t i = 0; i < sizeof(builders) / sizeof(builders[0]); ++i)
@@ -568,14 +1073,40 @@ failed:
     return false;
 }
 
-// Windows join the tile of the wall triangle they are derived from.
-static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *mesh)
+// One far window stands for up to two columns on two floors: the same lit area in their mean
+// colour, centred on them.
+typedef struct {
+    Vector3 low, high;
+    float area;
+    int r, g, b, count;
+} WindowBlock;
+
+static bool window_block_flush(MeshBuilder *builder, WindowBlock *block, Vector3 along)
+{
+    if (!block->count)
+        return true;
+    Vector3 center = Vector3Scale(Vector3Add(block->low, block->high), .5f);
+    float side = sqrtf(block->area);
+    Vector3 half = Vector3Scale(along, side * .5f);
+    Vector3 p = Vector3Subtract(center, half), q = Vector3Add(center, half);
+    p.y = q.y = center.y - side * .5f;
+    Vector3 up = { 0, side, 0 };
+    Color color = { (unsigned char)(block->r / block->count),
+        (unsigned char)(block->g / block->count), (unsigned char)(block->b / block->count), 255 };
+    *block = (WindowBlock) { 0 };
+    return builder_quad(builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color);
+}
+
+// Windows join the fine cell of the wall triangle they are derived from, in both levels.
+static bool build_windows(
+    const WaterfrontScenery *scenery, WaterfrontGpuTiled *mesh, WaterfrontGpuTiled *far_mesh)
 {
     const BoatMapDescription *map = scenery->full;
     const Mesh3D *city = map->mesh;
-    TiledBuilder tiled = { 0 };
-    if (!tiled_builder_init(&tiled, boat_map_tiles_count(&scenery->tiles)))
-        return false;
+    TiledBuilder tiled = { 0 }, far_tiled = { 0 };
+    if (!tiled_builder_init(&tiled, detail_cell_count(scenery))
+        || !tiled_builder_init(&far_tiled, detail_cell_count(scenery)))
+        goto failed;
     for (size_t i = 0; i < city->triangle_count; ++i) {
         if (boat_map_is_bridge_triangle(map, i))
             continue;
@@ -589,27 +1120,61 @@ static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *
         float length = Vector3Length(edge);
         Vector3 along = Vector3Scale(edge, 1 / length);
         Vector3 normal = { along.z, 0, -along.x };
-        MeshBuilder *builder = &tiled.tiles[tile_of(scenery, a, c, b)];
-        for (int floor = 0; a.y + 2.5f + floor * 3.2f < c.y - 1; ++floor) {
-            for (int column = 0; 2.5f + column * 4 < length - 1.5f; ++column) {
-                unsigned int seed = (unsigned int)i * 1664525u + (unsigned int)column * 1013904223u
-                    + (unsigned int)floor * 374761393u;
-                Color color = seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
-                    : seed % 7 == 3        ? (Color) { 181, 211, 221, 255 }
-                                           : (Color) { 66, 100, 120, 255 };
-                Vector3 p = Vector3Add(Vector3Add(a, Vector3Scale(along, 2.5f + column * 4)),
-                    Vector3Scale(normal, .035f));
-                p.y = a.y + 1.5f + floor * 3.2f;
-                Vector3 q = Vector3Add(p, Vector3Scale(along, floor == 0 ? 2.2f : 1.5f));
-                Vector3 up = { 0, floor == 0 ? 1.9f : 1.5f, 0 };
-                if (!builder_quad(builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color)) {
-                    tiled_builder_destroy(&tiled);
-                    return false;
+        Vector3 centroid = Vector3Scale(Vector3Add(Vector3Add(a, b), c), 1 / 3.0f);
+        size_t cell = detail_cell_of(scenery, centroid);
+        MeshBuilder *builder = &tiled.tiles[cell];
+        MeshBuilder *far_builder = &far_tiled.tiles[cell];
+        int columns = 0;
+        while (2.5f + (float)columns * 4 < length - 1.5f)
+            ++columns;
+        int floors = 0;
+        while (a.y + 2.5f + (float)floors * 3.2f < c.y - 1)
+            ++floors;
+        for (int block_floor = 0; block_floor < floors; block_floor += 2) {
+            for (int block_column = 0; block_column < columns; block_column += 2) {
+                WindowBlock block = { 0 };
+                for (int floor = block_floor; floor < floors && floor < block_floor + 2; ++floor) {
+                    for (int column = block_column; column < columns && column < block_column + 2;
+                        ++column) {
+                        unsigned int seed = (unsigned int)i * 1664525u
+                            + (unsigned int)column * 1013904223u + (unsigned int)floor * 374761393u;
+                        Color color = seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
+                            : seed % 7 == 3        ? (Color) { 181, 211, 221, 255 }
+                                                   : (Color) { 66, 100, 120, 255 };
+                        Vector3 p = Vector3Add(
+                            Vector3Add(a, Vector3Scale(along, 2.5f + (float)column * 4)),
+                            Vector3Scale(normal, .035f));
+                        p.y = a.y + 1.5f + (float)floor * 3.2f;
+                        float width = floor == 0 ? 2.2f : 1.5f, height = floor == 0 ? 1.9f : 1.5f;
+                        Vector3 q = Vector3Add(p, Vector3Scale(along, width));
+                        Vector3 up = { 0, height, 0 };
+                        if (!builder_quad(
+                                builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color))
+                            goto failed;
+                        Vector3 top = Vector3Add(q, up);
+                        block.low = block.count ? Vector3Min(block.low, Vector3Min(p, top))
+                                                : Vector3Min(p, top);
+                        block.high = block.count ? Vector3Max(block.high, Vector3Max(p, top))
+                                                 : Vector3Max(p, top);
+                        block.area += width * height;
+                        block.r += color.r;
+                        block.g += color.g;
+                        block.b += color.b;
+                        ++block.count;
+                    }
                 }
+                if (!window_block_flush(far_builder, &block, along))
+                    goto failed;
             }
         }
     }
-    return tiled_builder_finish(&tiled, mesh);
+    bool ok = tiled_builder_finish(&tiled, mesh, STATIC_UNLIT);
+    bool far_ok = tiled_builder_finish_far(&far_tiled, far_mesh, STATIC_UNLIT);
+    return ok && far_ok;
+failed:
+    tiled_builder_destroy(&tiled);
+    tiled_builder_destroy(&far_tiled);
+    return false;
 }
 
 static Vector3 crane_point(float x, float y, float z)
@@ -642,7 +1207,7 @@ static bool build_crane(Mesh *mesh, const WaterfrontScenery *scenery)
         || !builder_box(&builder, crane_point(5, 75, 0), crane_point(5, 48, 0), .4f, .4f)
         || !builder_box(&builder, crane_point(2, 48, 0), crane_point(8, 48, 0), 1.5f, 1.5f))
         goto failed;
-    *mesh = builder_finish(&builder);
+    *mesh = builder_finish_static(&builder, STATIC_FLAT);
     return mesh->vaoId != 0;
 failed:
     builder_destroy(&builder);
@@ -817,7 +1382,14 @@ static void unbind_map(WaterfrontGpuScene *scene)
     tiled_destroy(&scene->windows);
     tiled_destroy(&scene->corner);
     tiled_destroy(&scene->corner_emissive);
+    tiled_destroy(&scene->windows_far);
+    tiled_destroy(&scene->corner_far);
+    for (int view = 0; view < 2; ++view) {
+        free(scene->detail_far[view]);
+        scene->detail_far[view] = NULL;
+    }
     unload_mesh(&scene->crane);
+    scene->geometry = (WaterfrontGpuGeometry) { 0 };
     scene->map = NULL;
     scene->river = false;
     scene->cafe_lift = 0;
@@ -830,13 +1402,28 @@ bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScener
         return false;
     if (!scenery->map)
         return true;
-    if (!build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
-            &scene->water, &scene->corner, &scene->corner_emissive)
-        || !build_windows(scenery, &scene->windows)
-        || (scenery->river && !build_crane(&scene->crane, scenery))) {
+    binding_scene = scene;
+    bool built = build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
+                     &scene->water, &scene->corner, &scene->corner_far, &scene->corner_emissive)
+        && build_windows(scenery, &scene->windows, &scene->windows_far)
+        && (!scenery->river || build_crane(&scene->crane, scenery));
+    binding_scene = NULL;
+    if (!built) {
         unbind_map(scene);
         return false;
     }
+    for (int view = 0; view < 2; ++view) {
+        scene->detail_far[view] = calloc(detail_cell_count(scenery), 1);
+        if (!scene->detail_far[view]) {
+            unbind_map(scene);
+            return false;
+        }
+    }
+    int factor = detail_factor(scenery);
+    scene->detail_origin = scenery->tiles.origin;
+    scene->detail_cell = scenery->tiles.tile_size / (float)factor;
+    scene->detail_columns = scenery->tiles.columns * factor;
+    scene->detail_rows = scenery->tiles.rows * factor;
     scene->map = scenery->map;
     scene->river = scenery->river;
     Vector3 cafe = waterfront_corner_position(-2.8f, 0, -6);
@@ -901,6 +1488,7 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     if (!build_unit_cube(&scene->bridge) || !build_unit_cube(&scene->cube)
         || !build_unit_plane(&scene->plane))
         goto failed;
+    (void)object_batch_create(scene); // Scalar drawing remains valid if this fails.
     scene->shadow_map_size = WATERFRONT_GPU_SHADOW_MAP_SIZE;
     if (!create_shadow_map(&scene->shadow_map, scene->shadow_map_size)
         || !create_shadow_map(&scene->far_shadow_map, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE))
@@ -914,6 +1502,10 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     scene->shadows_enabled = true;
     scene->atmosphere_enabled = true;
     scene->reflections_enabled = true;
+    prewarm_locations(scene->shader);
+    prewarm_locations(scene->shadow_shader);
+    prewarm_locations(scene->water_shader);
+    prewarm_locations(scene->sky_shader);
     scene->ready = true;
     return true;
 failed:
@@ -939,23 +1531,329 @@ static void set_object_color(Shader shader, Color color)
         (float)color.b / 255.0f,
         (float)color.a / 255.0f,
     };
-    int location = GetShaderLocation(shader, "objectColor");
+    int location = cached_location(shader, "objectColor");
     if (location >= 0)
         SetShaderValue(shader, location, values, SHADER_UNIFORM_VEC4);
 }
 
 static void set_emissive(Shader shader, bool emissive)
 {
-    int location = GetShaderLocation(shader, "emissive");
+    int location = cached_location(shader, "emissive");
     if (location >= 0) {
         int value = emissive ? 1 : 0;
         SetShaderValue(shader, location, &value, SHADER_UNIFORM_INT);
     }
 }
 
+// Local bounds of transformed object meshes, computed once per VAO. Culling uses each pass's own
+// view volume; the scalar draw order is unchanged for everything that remains visible.
+typedef struct {
+    unsigned int vao;
+    BoundingBox local;
+} ObjectBounds;
+
+typedef struct {
+    ObjectBounds *items;
+    int count, capacity;
+} ObjectBoundsCache;
+
+static bool object_is_culled(WaterfrontGpuScene *scene, const Mesh *mesh, Transform3D transform)
+{
+    if (scene->culling_disabled || !mesh->vertices || mesh->vertexCount <= 0)
+        return false;
+    // Cloth vertices change every frame; their first-frame bounds are not valid.
+    if (mesh->vaoId == scene->player_flag.vaoId || mesh->vaoId == scene->ghost_flag.vaoId)
+        return false;
+    for (int i = 0; i < WATERFRONT_RIVALS; ++i)
+        if (mesh->vaoId == scene->rival_flags[i].vaoId)
+            return false;
+    ObjectBoundsCache *cache = scene->bounds_cache;
+    if (!cache) {
+        cache = calloc(1, sizeof(*cache));
+        if (!cache)
+            return false;
+        scene->bounds_cache = cache;
+    }
+    ObjectBounds *bounds = NULL;
+    for (int i = 0; i < cache->count; ++i)
+        if (cache->items[i].vao == mesh->vaoId) {
+            bounds = &cache->items[i];
+            break;
+        }
+    if (!bounds) {
+        if (cache->count == cache->capacity) {
+            int capacity = cache->capacity ? cache->capacity * 2 : 32;
+            ObjectBounds *items = realloc(cache->items, (size_t)capacity * sizeof(*items));
+            if (!items)
+                return false;
+            cache->items = items;
+            cache->capacity = capacity;
+        }
+        bounds = &cache->items[cache->count++];
+        bounds->vao = mesh->vaoId;
+        Vector3 low = { INFINITY, INFINITY, INFINITY }, high = { -INFINITY, -INFINITY, -INFINITY };
+        for (int i = 0; i < mesh->vertexCount; ++i) {
+            Vector3 point
+                = { mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2] };
+            low = Vector3Min(low, point);
+            high = Vector3Max(high, point);
+        }
+        const Vector3 grow = { .05f, .05f, .05f };
+        bounds->local = (BoundingBox) { Vector3Subtract(low, grow), Vector3Add(high, grow) };
+    }
+    Matrix model = transform_matrix(transform);
+    Vector3 low = { INFINITY, INFINITY, INFINITY }, high = { -INFINITY, -INFINITY, -INFINITY };
+    for (int i = 0; i < 8; ++i) {
+        Vector3 point = { i & 1 ? bounds->local.max.x : bounds->local.min.x,
+            i & 2 ? bounds->local.max.y : bounds->local.min.y,
+            i & 4 ? bounds->local.max.z : bounds->local.min.z };
+        point = Vector3Transform(point, model);
+        low = Vector3Min(low, point);
+        high = Vector3Max(high, point);
+    }
+    Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    return !box_in_view(view_projection, (BoundingBox) { low, high });
+}
+
+// Per-instance attributes, laid out for the fixed locations in waterfront_city.vs and
+// waterfront_shadow.vs. Values are the exact floats the scalar path computes for its uniforms.
+typedef struct {
+    float mvp[16];
+    float model_rows[12];
+    float normal[9];
+    float color[4];
+    float emissive;
+} ObjectInstance;
+
+enum {
+    OBJECT_INSTANCE_CAPACITY = 8192,
+    OBJECT_RUN_CAPACITY = 1024,
+    INSTANCE_LOCATION_MVP = 4,
+    INSTANCE_LOCATION_MODEL = 8,
+    INSTANCE_LOCATION_NORMAL = 11,
+    INSTANCE_LOCATION_COLOR = 14,
+    INSTANCE_LOCATION_EMISSIVE = 15,
+    INSTANCE_LOCATION_END = 16,
+};
+
+// One run draws contiguous submissions of one mesh, so the scalar draw order is unchanged.
+typedef struct {
+    unsigned int vao;
+    int vertex_count, triangle_count;
+    bool indexed;
+    int first, count;
+} ObjectRun;
+
+// Objects recorded between object_batch_begin and object_batch_end. A batch uses one material and
+// spans no other state change. Storage is fixed, and a full batch replays and continues in order.
+typedef struct {
+    ObjectInstance *instances;
+    ObjectRun *runs;
+    unsigned int *prepared_vaos;
+    int instance_count, run_count, prepared_count, prepared_capacity;
+    unsigned int buffer;
+    int buffer_cursor;
+    bool recording;
+    Material material;
+    Matrix view, projection;
+} ObjectBatch;
+
+static bool object_batch_create(WaterfrontGpuScene *scene)
+{
+    // Instanced programs must resolve to the shared VAO layout; otherwise stay scalar.
+    if (rlGetLocationAttrib(scene->shader.id, "instanceMvp") != INSTANCE_LOCATION_MVP
+        || rlGetLocationAttrib(scene->shadow_shader.id, "instanceMvp") != INSTANCE_LOCATION_MVP)
+        return false;
+    ObjectBatch *batch = calloc(1, sizeof(*batch));
+    if (!batch)
+        return false;
+    batch->instances = malloc(OBJECT_INSTANCE_CAPACITY * sizeof(*batch->instances));
+    batch->runs = malloc(OBJECT_RUN_CAPACITY * sizeof(*batch->runs));
+    batch->buffer = batch->instances && batch->runs
+        ? rlLoadVertexBuffer(NULL, OBJECT_INSTANCE_CAPACITY * sizeof(ObjectInstance), true)
+        : 0;
+    if (!batch->buffer) {
+        free(batch->instances);
+        free(batch->runs);
+        free(batch);
+        return false;
+    }
+    scene->object_batch = batch;
+    return true;
+}
+
+static void object_batch_destroy(WaterfrontGpuScene *scene)
+{
+    ObjectBatch *batch = scene->object_batch;
+    if (!batch)
+        return;
+    rlUnloadVertexBuffer(batch->buffer);
+    free(batch->instances);
+    free(batch->runs);
+    free(batch->prepared_vaos);
+    free(batch);
+    scene->object_batch = NULL;
+}
+
+// Points VAO's instance attributes at FIRST in the shared buffer. The VAO keeps the layout, and
+// scalar draws ignore those attributes while `instanced` is zero.
+static void bind_run_attributes(ObjectBatch *batch, unsigned int vao, int first)
+{
+    const int stride = (int)sizeof(ObjectInstance);
+    const int base = first * stride;
+    for (int i = 0; i < 4; ++i)
+        rlSetVertexAttribute(INSTANCE_LOCATION_MVP + i, 4, RL_FLOAT, false, stride,
+            base + (int)offsetof(ObjectInstance, mvp) + i * 4 * (int)sizeof(float));
+    for (int i = 0; i < 3; ++i) {
+        rlSetVertexAttribute(INSTANCE_LOCATION_MODEL + i, 4, RL_FLOAT, false, stride,
+            base + (int)offsetof(ObjectInstance, model_rows) + i * 4 * (int)sizeof(float));
+        rlSetVertexAttribute(INSTANCE_LOCATION_NORMAL + i, 3, RL_FLOAT, false, stride,
+            base + (int)offsetof(ObjectInstance, normal) + i * 3 * (int)sizeof(float));
+    }
+    rlSetVertexAttribute(INSTANCE_LOCATION_COLOR, 4, RL_FLOAT, false, stride,
+        base + (int)offsetof(ObjectInstance, color));
+    rlSetVertexAttribute(INSTANCE_LOCATION_EMISSIVE, 1, RL_FLOAT, false, stride,
+        base + (int)offsetof(ObjectInstance, emissive));
+    for (int i = 0; i < batch->prepared_count; ++i)
+        if (batch->prepared_vaos[i] == vao)
+            return;
+    for (int location = INSTANCE_LOCATION_MVP; location < INSTANCE_LOCATION_END; ++location) {
+        rlEnableVertexAttribute(location);
+        rlSetVertexAttributeDivisor(location, 1);
+    }
+    if (batch->prepared_count == batch->prepared_capacity) {
+        int capacity = batch->prepared_capacity ? batch->prepared_capacity * 2 : 32;
+        unsigned int *vaos = realloc(batch->prepared_vaos, (size_t)capacity * sizeof(*vaos));
+        if (!vaos)
+            return; // Prepared again next time; the VAO state above is already valid.
+        batch->prepared_vaos = vaos;
+        batch->prepared_capacity = capacity;
+    }
+    batch->prepared_vaos[batch->prepared_count++] = vao;
+}
+
+static void object_batch_replay(ObjectBatch *batch)
+{
+    if (batch->instance_count == 0)
+        return;
+    int bytes = batch->instance_count * (int)sizeof(ObjectInstance);
+    if (batch->buffer_cursor + batch->instance_count > OBJECT_INSTANCE_CAPACITY)
+        batch->buffer_cursor = 0;
+    rlUpdateVertexBuffer(
+        batch->buffer, batch->instances, bytes, batch->buffer_cursor * (int)sizeof(ObjectInstance));
+    Shader shader = batch->material.shader;
+    int instanced = cached_location(shader, "instanced");
+    const int enabled = 1, disabled = 0, slot = 0;
+    rlEnableShader(shader.id);
+    rlSetUniform(instanced, &enabled, SHADER_UNIFORM_INT, 1);
+    rlActiveTextureSlot(0);
+    rlEnableTexture(batch->material.maps[MATERIAL_MAP_DIFFUSE].texture.id);
+    rlSetUniform(shader.locs[SHADER_LOC_MAP_DIFFUSE], &slot, SHADER_UNIFORM_INT, 1);
+    for (int i = 0; i < batch->run_count; ++i) {
+        const ObjectRun *run = &batch->runs[i];
+        rlEnableVertexArray(run->vao);
+        rlEnableVertexBuffer(batch->buffer);
+        bind_run_attributes(batch, run->vao, batch->buffer_cursor + run->first);
+        if (run->indexed)
+            rlDrawVertexArrayElementsInstanced(0, run->triangle_count * 3, 0, run->count);
+        else
+            rlDrawVertexArrayInstanced(0, run->vertex_count, run->count);
+        if (counting) {
+            WaterfrontGpuCount *count
+                = &counting->mesh[counting_pass][WATERFRONT_GPU_GROUP_OBJECTS];
+            ++count->submissions;
+            count->instances += (unsigned int)run->count;
+            count->triangles += (size_t)run->triangle_count * (size_t)run->count;
+        }
+    }
+    rlDisableVertexArray();
+    rlDisableVertexBuffer();
+    rlDisableTexture();
+    // Later draws see the uniforms the scalar path would have left behind.
+    const ObjectInstance *last = &batch->instances[batch->instance_count - 1];
+    int emissive = cached_location(shader, "emissive");
+    int color = cached_location(shader, "objectColor");
+    int emissive_value = (int)last->emissive;
+    if (emissive >= 0)
+        rlSetUniform(emissive, &emissive_value, SHADER_UNIFORM_INT, 1);
+    if (color >= 0)
+        rlSetUniform(color, last->color, SHADER_UNIFORM_VEC4, 1);
+    rlSetUniform(instanced, &disabled, SHADER_UNIFORM_INT, 1);
+    rlDisableShader();
+    batch->buffer_cursor += batch->instance_count;
+    batch->instance_count = 0;
+    batch->run_count = 0;
+}
+
+static void object_batch_begin(const WaterfrontGpuScene *scene, Material material)
+{
+    ObjectBatch *batch = scene->object_batch;
+    if (!batch || scene->instancing_disabled)
+        return;
+    batch->recording = true;
+    batch->material = material;
+    batch->view = rlGetMatrixModelview();
+    batch->projection = rlGetMatrixProjection();
+}
+
+static void object_batch_end(const WaterfrontGpuScene *scene)
+{
+    ObjectBatch *batch = scene->object_batch;
+    if (!batch || !batch->recording)
+        return;
+    object_batch_replay(batch);
+    batch->recording = false;
+}
+
+static void object_batch_add(ObjectBatch *batch, int instance_limit, Mesh mesh,
+    Transform3D transform, Color color, bool emissive, bool shaded)
+{
+    if (batch->instance_count == (instance_limit ? instance_limit : OBJECT_INSTANCE_CAPACITY)
+        || (batch->run_count == OBJECT_RUN_CAPACITY
+            && batch->runs[batch->run_count - 1].vao != mesh.vaoId))
+        object_batch_replay(batch);
+    ObjectRun *run = batch->run_count ? &batch->runs[batch->run_count - 1] : NULL;
+    if (!run || run->vao != mesh.vaoId) {
+        run = &batch->runs[batch->run_count++];
+        *run = (ObjectRun) { .vao = mesh.vaoId,
+            .vertex_count = mesh.vertexCount,
+            .triangle_count = mesh.triangleCount,
+            .indexed = mesh.indices != NULL,
+            .first = batch->instance_count };
+    }
+    ++run->count;
+    ObjectInstance *instance = &batch->instances[batch->instance_count++];
+    // The same matrix products, in the same order, as DrawMesh computes for its uniforms.
+    Matrix model = MatrixMultiply(transform_matrix(transform), rlGetMatrixTransform());
+    Matrix mvp = MatrixMultiply(MatrixMultiply(model, batch->view), batch->projection);
+    memcpy(instance->mvp, MatrixToFloatV(mvp).v, sizeof(instance->mvp));
+    instance->color[0] = (float)color.r / 255.0f;
+    instance->color[1] = (float)color.g / 255.0f;
+    instance->color[2] = (float)color.b / 255.0f;
+    instance->color[3] = (float)color.a / 255.0f;
+    instance->emissive = emissive ? 1.0f : 0.0f;
+    if (!shaded)
+        return; // The shadow program reads only the MVP; the skipped fields are never used.
+    const float rows[12] = { model.m0, model.m4, model.m8, model.m12, model.m1, model.m5, model.m9,
+        model.m13, model.m2, model.m6, model.m10, model.m14 };
+    memcpy(instance->model_rows, rows, sizeof(rows));
+    Matrix normal = MatrixTranspose(MatrixInvert(model));
+    const float columns[9] = { normal.m0, normal.m1, normal.m2, normal.m4, normal.m5, normal.m6,
+        normal.m8, normal.m9, normal.m10 };
+    memcpy(instance->normal, columns, sizeof(columns));
+}
+
 static void draw_colored_mesh(
     Mesh mesh, Material material, Transform3D transform, Color color, bool emissive)
 {
+    if (drawing_scene && object_is_culled(drawing_scene, &mesh, transform))
+        return;
+    ObjectBatch *batch = drawing_scene ? drawing_scene->object_batch : NULL;
+    if (batch && batch->recording) {
+        object_batch_add(batch, drawing_scene->instance_limit, mesh, transform, color, emissive,
+            material.shader.id != drawing_scene->shadow_shader.id);
+        return;
+    }
     set_object_color(material.shader, color);
     set_emissive(material.shader, emissive);
     material.maps[MATERIAL_MAP_DIFFUSE].color = color;
@@ -1133,16 +2031,16 @@ static void set_far_shadow_uniforms(const WaterfrontGpuScene *scene, Shader shad
 {
     int enabled = scene->shadows_enabled && scene->far_shadows_active;
     SetShaderValue(
-        shader, GetShaderLocation(shader, "farShadowsEnabled"), &enabled, SHADER_UNIFORM_INT);
+        shader, cached_location(shader, "farShadowsEnabled"), &enabled, SHADER_UNIFORM_INT);
     if (!enabled)
         return;
-    SetShaderValueMatrix(shader, GetShaderLocation(shader, "farLightViewProjection"),
+    SetShaderValueMatrix(shader, cached_location(shader, "farLightViewProjection"),
         scene->far_light_view_projection);
     int slot = 15;
     rlEnableShader(shader.id);
     rlActiveTextureSlot(slot);
     rlEnableTexture(scene->far_shadow_map.depth.id);
-    rlSetUniform(GetShaderLocation(shader, "farShadowMap"), &slot, SHADER_UNIFORM_INT, 1);
+    rlSetUniform(cached_location(shader, "farShadowMap"), &slot, SHADER_UNIFORM_INT, 1);
     rlActiveTextureSlot(0);
 }
 
@@ -1152,29 +2050,29 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
     static const float directional_color[] = { 1.0f, .92f, .74f };
     Vector3 sun = waterfront_sun_direction();
     float directional_direction[] = { sun.x, sun.y, sun.z };
-    int location = GetShaderLocation(scene->shader, "ambientColor");
+    int location = cached_location(scene->shader, "ambientColor");
     if (location >= 0)
         SetShaderValue(scene->shader, location, ambient_color, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "directionalColor");
+    location = cached_location(scene->shader, "directionalColor");
     if (location >= 0)
         SetShaderValue(scene->shader, location, directional_color, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "directionalDirection");
+    location = cached_location(scene->shader, "directionalDirection");
     if (location >= 0)
         SetShaderValue(scene->shader, location, directional_direction, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "directionalIntensity");
+    location = cached_location(scene->shader, "directionalIntensity");
     if (location >= 0) {
         float intensity = .65f;
         SetShaderValue(scene->shader, location, &intensity, SHADER_UNIFORM_FLOAT);
     }
     int shadows_enabled = scene->shadows_enabled && scene->shadow_map.depth.id != 0;
-    location = GetShaderLocation(scene->shader, "shadowsEnabled");
+    location = cached_location(scene->shader, "shadowsEnabled");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &shadows_enabled, SHADER_UNIFORM_INT);
     if (shadows_enabled) {
-        location = GetShaderLocation(scene->shader, "lightViewProjection");
+        location = cached_location(scene->shader, "lightViewProjection");
         if (location >= 0)
             SetShaderValueMatrix(scene->shader, location, scene->light_view_projection);
-        location = GetShaderLocation(scene->shader, "shadowMap");
+        location = cached_location(scene->shader, "shadowMap");
         if (location >= 0) {
             int texture_slot = 10;
             rlEnableShader(scene->shader.id);
@@ -1186,7 +2084,7 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
     }
     set_far_shadow_uniforms(scene, scene->shader);
     int light_count = scene->lighting_enabled ? scene->local_light_count : 0;
-    location = GetShaderLocation(scene->shader, "localLightCount");
+    location = cached_location(scene->shader, "localLightCount");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &light_count, SHADER_UNIFORM_INT);
     if (light_count == 0)
@@ -1219,16 +2117,16 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
         cone[2] = 0;
         cone[3] = 0;
     }
-    location = GetShaderLocation(scene->shader, "localLightPositionRadius[0]");
+    location = cached_location(scene->shader, "localLightPositionRadius[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, positions, SHADER_UNIFORM_VEC4, light_count);
-    location = GetShaderLocation(scene->shader, "localLightColorIntensity[0]");
+    location = cached_location(scene->shader, "localLightColorIntensity[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, colors, SHADER_UNIFORM_VEC4, light_count);
-    location = GetShaderLocation(scene->shader, "localLightDirection[0]");
+    location = cached_location(scene->shader, "localLightDirection[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, directions, SHADER_UNIFORM_VEC4, light_count);
-    location = GetShaderLocation(scene->shader, "localLightCone[0]");
+    location = cached_location(scene->shader, "localLightCone[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, cones, SHADER_UNIFORM_VEC4, light_count);
 }
@@ -1241,22 +2139,22 @@ static void set_atmosphere_uniforms(WaterfrontGpuScene *scene, Vector3 camera_po
     float fog_end = 620.0f;
     float fog_opacity = .38f;
     int atmosphere_enabled = scene->atmosphere_enabled;
-    int location = GetShaderLocation(scene->shader, "cameraPosition");
+    int location = cached_location(scene->shader, "cameraPosition");
     if (location >= 0)
         SetShaderValue(scene->shader, location, camera, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "fogColor");
+    location = cached_location(scene->shader, "fogColor");
     if (location >= 0)
         SetShaderValue(scene->shader, location, fog_color, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "fogStart");
+    location = cached_location(scene->shader, "fogStart");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &fog_start, SHADER_UNIFORM_FLOAT);
-    location = GetShaderLocation(scene->shader, "fogEnd");
+    location = cached_location(scene->shader, "fogEnd");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &fog_end, SHADER_UNIFORM_FLOAT);
-    location = GetShaderLocation(scene->shader, "fogOpacity");
+    location = cached_location(scene->shader, "fogOpacity");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &fog_opacity, SHADER_UNIFORM_FLOAT);
-    location = GetShaderLocation(scene->shader, "atmosphereEnabled");
+    location = cached_location(scene->shader, "atmosphereEnabled");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &atmosphere_enabled, SHADER_UNIFORM_INT);
 }
@@ -1266,28 +2164,28 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     BoatWater water = frame->player_water;
     int objects = water.objects != NULL || water.traffic_objects != NULL;
     float object_life = water.objects ? water.objects->life_ticks / 120.0f : 16;
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "objectWakeEnabled"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "objectWakeEnabled"),
         &objects, SHADER_UNIFORM_INT);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "objectWakeLife"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "objectWakeLife"),
         &object_life, SHADER_UNIFORM_FLOAT);
     int field_enabled = scene->wake_field.id != 0;
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeFieldEnabled"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeFieldEnabled"),
         &field_enabled, SHADER_UNIFORM_INT);
     if (field_enabled) {
         float grid[] = { (float)scene->wake_field.width, (float)scene->wake_field.height,
             scene->wake_spacing };
-        SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeGrid"),
-            grid, SHADER_UNIFORM_VEC3);
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeGrid"), grid,
+            SHADER_UNIFORM_VEC3);
         int slot = 13;
         rlEnableShader(scene->water_shader.id);
         rlActiveTextureSlot(slot);
         rlEnableTexture(scene->wake_field.id);
         rlSetUniform(
-            GetShaderLocation(scene->water_shader, "wakeField"), &slot, SHADER_UNIFORM_INT, 1);
+            cached_location(scene->water_shader, "wakeField"), &slot, SHADER_UNIFORM_INT, 1);
         rlActiveTextureSlot(0);
     }
     int physical_waves = frame->player_active && (field_enabled || boat_water_displaced(water));
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "physicalWaves"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "physicalWaves"),
         &physical_waves, SHADER_UNIFORM_INT);
     float wake_amplitude = frame->player_active ? water.wake_amplitude : 0;
     float radial[32], origins[16], motions[16];
@@ -1297,18 +2195,18 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
             origins[4 * i + j] = radial[8 * i + j];
             motions[4 * i + j] = radial[8 * i + 4 + j];
         }
-    SetShaderValueV(scene->water_shader, GetShaderLocation(scene->water_shader, "radialOrigin"),
+    SetShaderValueV(scene->water_shader, cached_location(scene->water_shader, "radialOrigin"),
         origins, SHADER_UNIFORM_VEC4, 4);
-    SetShaderValueV(scene->water_shader, GetShaderLocation(scene->water_shader, "radialMotion"),
+    SetShaderValueV(scene->water_shader, cached_location(scene->water_shader, "radialMotion"),
         motions, SHADER_UNIFORM_VEC4, 4);
     float storm[12];
     boat_water_storm_uniforms(
         frame->player_active ? water.storm : (BoatStorm) { 0 }, frame->time, storm);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormArea"), storm,
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stormArea"), storm,
         SHADER_UNIFORM_VEC4);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormPhase"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stormPhase"),
         storm + 4, SHADER_UNIFORM_VEC4);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormMotion"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stormMotion"),
         storm + 8, SHADER_UNIFORM_VEC4);
     float vessel[12];
     boat_vessel_wake_uniforms(
@@ -1316,12 +2214,12 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     const char *vessel_uniforms[] = { "vesselOrigin", "vesselMotion", "vesselShape" };
     for (int i = 0; i < 3; ++i)
         SetShaderValue(scene->water_shader,
-            GetShaderLocation(scene->water_shader, vessel_uniforms[i]), vessel + 4 * i,
+            cached_location(scene->water_shader, vessel_uniforms[i]), vessel + 4 * i,
             SHADER_UNIFORM_VEC4);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeAmplitude"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeAmplitude"),
         &wake_amplitude, SHADER_UNIFORM_FLOAT);
     float wake_offset[] = { -water.wake_offset.x, water.wake_offset.y };
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeOffset"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeOffset"),
         wake_offset, SHADER_UNIFORM_VEC2);
     float wake_origins[BOAT_WAKE_SEGMENTS * 4], wake_parameters[BOAT_WAKE_SEGMENTS * 4];
     int wake_count = frame->player_active
@@ -1339,10 +2237,10 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
                 water.traffic_objects, records + players * 4, parameters + players * 4);
         float traffic_life = water.traffic_objects ? water.traffic_objects->life_ticks / 120.0f : 0;
         SetShaderValue(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "objectWakePlayerCount"), &players,
+            cached_location(scene->water_shader, "objectWakePlayerCount"), &players,
             SHADER_UNIFORM_INT);
         SetShaderValue(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "objectWakeTrafficLife"), &traffic_life,
+            cached_location(scene->water_shader, "objectWakeTrafficLife"), &traffic_life,
             SHADER_UNIFORM_FLOAT);
         if (scene->object_wakes.id && scene->object_wakes.width != capacity) {
             UnloadTexture(scene->object_wakes);
@@ -1360,80 +2258,79 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         rlActiveTextureSlot(slot);
         rlEnableTexture(scene->object_wakes.id);
         rlSetUniform(
-            GetShaderLocation(scene->water_shader, "objectWakeData"), &slot, SHADER_UNIFORM_INT, 1);
+            cached_location(scene->water_shader, "objectWakeData"), &slot, SHADER_UNIFORM_INT, 1);
         rlActiveTextureSlot(0);
     }
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "playerWakeCount"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "playerWakeCount"),
         &wake_count, SHADER_UNIFORM_INT);
     if (wake_count && !objects) {
         SetShaderValueV(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "playerWakeOrigins[0]"), wake_origins,
+            cached_location(scene->water_shader, "playerWakeOrigins[0]"), wake_origins,
             SHADER_UNIFORM_VEC4, wake_count);
         SetShaderValueV(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "playerWakeParameters[0]"), wake_parameters,
+            cached_location(scene->water_shader, "playerWakeParameters[0]"), wake_parameters,
             SHADER_UNIFORM_VEC4, wake_count);
     }
     int waterfront_water = frame->player_active && !frame->boating_basin;
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "waterfrontWater"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "waterfrontWater"),
         &waterfront_water, SHADER_UNIFORM_INT);
     float patch[] = { frame->player.hull.position.x, frame->player.hull.position.z,
         BOAT_WATER_PATCH_FULL, BOAT_WATER_PATCH_RADIUS };
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wavePatch"), patch,
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wavePatch"), patch,
         SHADER_UNIFORM_VEC4);
     if (physical_waves) {
         float parameters[12];
         boat_water_wave_uniforms(water, frame->time, parameters);
         SetShaderValueV(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "waveParameters[0]"), parameters,
+            cached_location(scene->water_shader, "waveParameters[0]"), parameters,
             SHADER_UNIFORM_VEC4, 3);
     }
     int shadows = scene->shadows_enabled && frame->player_active;
     Vector3 sun = waterfront_sun_direction();
     float sun_direction[] = { sun.x, sun.y, sun.z };
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "sunDirection"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "sunDirection"),
         sun_direction, SHADER_UNIFORM_VEC3);
-    int shadow_location = GetShaderLocation(scene->water_shader, "shadowsEnabled");
+    int shadow_location = cached_location(scene->water_shader, "shadowsEnabled");
     SetShaderValue(scene->water_shader, shadow_location, &shadows, SHADER_UNIFORM_INT);
     SetShaderValueMatrix(scene->water_shader,
-        GetShaderLocation(scene->water_shader, "lightViewProjection"),
-        scene->light_view_projection);
+        cached_location(scene->water_shader, "lightViewProjection"), scene->light_view_projection);
     if (shadows) {
         int slot = 12;
         rlEnableShader(scene->water_shader.id);
         rlActiveTextureSlot(slot);
         rlEnableTexture(scene->shadow_map.depth.id);
         rlSetUniform(
-            GetShaderLocation(scene->water_shader, "shadowMap"), &slot, SHADER_UNIFORM_INT, 1);
+            cached_location(scene->water_shader, "shadowMap"), &slot, SHADER_UNIFORM_INT, 1);
         rlActiveTextureSlot(0);
     }
     set_far_shadow_uniforms(scene, scene->water_shader);
     float camera[]
         = { frame->camera.position.x, frame->camera.position.y, frame->camera.position.z };
     int reflections_enabled = scene->reflections_enabled;
-    int location = GetShaderLocation(scene->water_shader, "reflectionViewProjection");
+    int location = cached_location(scene->water_shader, "reflectionViewProjection");
     if (location >= 0)
         SetShaderValueMatrix(scene->water_shader, location, scene->reflection_view_projection);
-    location = GetShaderLocation(scene->water_shader, "cameraPosition");
+    location = cached_location(scene->water_shader, "cameraPosition");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, camera, SHADER_UNIFORM_VEC3);
     // Double frame time never reaches a float uniform; upload bounded, reduced payloads.
     float crossing_clock = boat_water_crossing_clock(water, frame->time);
-    location = GetShaderLocation(scene->water_shader, "crossingWakeTime");
+    location = cached_location(scene->water_shader, "crossingWakeTime");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, &crossing_clock, SHADER_UNIFORM_FLOAT);
     float detail_phase[] = { boat_phase(1.5, frame->time), boat_phase(2.1, frame->time) };
-    location = GetShaderLocation(scene->water_shader, "detailRipplePhase");
+    location = cached_location(scene->water_shader, "detailRipplePhase");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, detail_phase, SHADER_UNIFORM_VEC2);
     float reflection_phase[] = { boat_phase(.80, frame->time), boat_phase(.55, frame->time),
         boat_phase(.65, frame->time), boat_phase(.35, frame->time) };
-    location = GetShaderLocation(scene->water_shader, "reflectionRipplePhase");
+    location = cached_location(scene->water_shader, "reflectionRipplePhase");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, reflection_phase, SHADER_UNIFORM_VEC4);
-    location = GetShaderLocation(scene->water_shader, "reflectionsEnabled");
+    location = cached_location(scene->water_shader, "reflectionsEnabled");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, &reflections_enabled, SHADER_UNIFORM_INT);
-    location = GetShaderLocation(scene->water_shader, "reflectionTexture");
+    location = cached_location(scene->water_shader, "reflectionTexture");
     if (location >= 0) {
         int texture_slot = 11;
         rlEnableShader(scene->water_shader.id);
@@ -1450,8 +2347,8 @@ static void draw_ghost(const WaterfrontGpuScene *scene, Material material,
 {
     if (frame->ghost_opacity <= 0)
         return;
-    int opacity = GetShaderLocation(material.shader, "ghostOpacity");
-    int pixel_scale = GetShaderLocation(material.shader, "ghostPixelScale");
+    int opacity = cached_location(material.shader, "ghostOpacity");
+    int pixel_scale = cached_location(material.shader, "ghostPixelScale");
     float scale = (float)width / 320;
     SetShaderValue(material.shader, pixel_scale, &scale, SHADER_UNIFORM_FLOAT);
     SetShaderValue(material.shader, opacity, &frame->ghost_opacity, SHADER_UNIFORM_FLOAT);
@@ -1507,10 +2404,12 @@ static void draw_traffic(const WaterfrontGpuScene *scene, Material material,
     const WaterfrontTrafficFrame *traffic = &frame->traffic;
     bool lights = material.shader.id != scene->shadow_shader.id;
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
+    // Hulls first and then every light cube, so the cubes form one instanced run.
+    for (int i = 0; i < traffic->vessel_count; ++i)
+        draw_colored_mesh(scene->traffic_boats[traffic->mesh[i]], material,
+            traffic->vessels[i].pose, WHITE, false);
     for (int i = 0; i < traffic->vessel_count; ++i) {
         const WaterfrontVesselState *vessel = &traffic->vessels[i];
-        draw_colored_mesh(
-            scene->traffic_boats[traffic->mesh[i]], material, vessel->pose, WHITE, false);
         float size = i >= 3 ? .32f : .18f;
         for (int light = 0; lights && light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
             draw_colored_mesh(scene->cube, material,
@@ -1555,7 +2454,7 @@ static void draw_boat(
     }
 }
 
-static void draw_scenery(
+static void add_scenery(
     const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
 {
     for (int i = 0; i < frame->scenery_count; ++i)
@@ -1563,16 +2462,25 @@ static void draw_scenery(
             scene->cube, material, frame->scenery[i].transform, frame->scenery[i].color, false);
 }
 
-static void draw_life(const WaterfrontGpuScene *scene, Material material,
+static void draw_scenery(
+    const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
+{
+    object_batch_begin(scene, material);
+    add_scenery(scene, frame, material);
+    object_batch_end(scene);
+}
+
+static void add_life(const WaterfrontGpuScene *scene, Material material,
     const WaterfrontSceneFrame *frame, bool emissive)
 {
     if (!frame->boating_basin) {
-        draw_scenery(scene, frame, material);
+        add_scenery(scene, frame, material);
         draw_harbor(scene, material, frame);
         draw_traffic(scene, material, frame, emissive);
     }
-    for (int i = 0; i < frame->gull_count; ++i)
-        for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
+    // By part, so each part's flock forms one instanced run.
+    for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
+        for (int i = 0; i < frame->gull_count; ++i)
             draw_colored_mesh(scene->gull[part], material, frame->gulls[i][part], WHITE, true);
     if (frame->player_active) {
         for (int i = 0; i < frame->lamp_count; ++i) {
@@ -1631,6 +2539,14 @@ static void draw_life(const WaterfrontGpuScene *scene, Material material,
             }
         }
     }
+}
+
+static void draw_life(const WaterfrontGpuScene *scene, Material material,
+    const WaterfrontSceneFrame *frame, bool emissive)
+{
+    object_batch_begin(scene, material);
+    add_life(scene, material, frame, emissive);
+    object_batch_end(scene);
 }
 
 static void draw_crane_lights(const WaterfrontGpuScene *scene, Material material)
@@ -1697,16 +2613,16 @@ static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontS
     Vector3 up = Vector3CrossProduct(right, forward);
     float scale[] = { tanf(camera.vertical_fov * .5f) * aspect, tanf(camera.vertical_fov * .5f) };
     Shader shader = scene->sky_shader;
-    SetShaderValue(shader, GetShaderLocation(shader, "skyForward"), &forward, SHADER_UNIFORM_VEC3);
-    SetShaderValue(shader, GetShaderLocation(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
-    SetShaderValue(shader, GetShaderLocation(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
-    SetShaderValue(shader, GetShaderLocation(shader, "skyScale"), scale, SHADER_UNIFORM_VEC2);
+    SetShaderValue(shader, cached_location(shader, "skyForward"), &forward, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shader, cached_location(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shader, cached_location(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shader, cached_location(shader, "skyScale"), scale, SHADER_UNIFORM_VEC2);
     SetShaderValue(
-        shader, GetShaderLocation(shader, "skyEye"), &camera.position, SHADER_UNIFORM_VEC3);
+        shader, cached_location(shader, "skyEye"), &camera.position, SHADER_UNIFORM_VEC3);
     float area[] = { squall.centre.x, squall.centre.y, squall.radius, squall.grown };
     float heights[] = { squall.base, squall.top };
-    SetShaderValue(shader, GetShaderLocation(shader, "squallArea"), area, SHADER_UNIFORM_VEC4);
-    SetShaderValue(shader, GetShaderLocation(shader, "squallHeight"), heights, SHADER_UNIFORM_VEC2);
+    SetShaderValue(shader, cached_location(shader, "squallArea"), area, SHADER_UNIFORM_VEC4);
+    SetShaderValue(shader, cached_location(shader, "squallHeight"), heights, SHADER_UNIFORM_VEC2);
     if (counting)
         ++counting->sky_quads;
     BeginShaderMode(shader);
@@ -1718,7 +2634,7 @@ static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontS
 
 static void draw_ground(const WaterfrontGpuScene *scene, Material material)
 {
-    int location = GetShaderLocation(scene->shader, "groundPass");
+    int location = cached_location(scene->shader, "groundPass");
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
     draw_tiled(scene, &scene->quay, material);
@@ -1728,7 +2644,7 @@ static void draw_ground(const WaterfrontGpuScene *scene, Material material)
 
 static void draw_facades(const WaterfrontGpuScene *scene, Material material)
 {
-    int location = GetShaderLocation(scene->shader, "facadePass");
+    int location = cached_location(scene->shader, "facadePass");
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
     draw_tiled(scene, &scene->facades, material);
@@ -1750,9 +2666,9 @@ static void draw_reflected_scene(const WaterfrontGpuScene *scene, const Waterfro
     draw_facades(scene, material);
     draw_tiled(scene, &scene->roofs, scene->roof_material);
     draw_ground(scene, material);
-    draw_tiled(scene, &scene->corner, material);
+    draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     set_emissive(scene->shader, true);
-    draw_tiled(scene, &scene->windows, material);
+    draw_detailed(scene, &scene->windows, &scene->windows_far, material);
     draw_tiled(scene, &scene->corner_emissive, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, life, frame->bridge, frame->bridge_color, false);
@@ -1785,11 +2701,14 @@ static void render_reflection(
         camera.fovy * DEG2RAD, aspect, frame->camera.near_plane, frame->camera.far_plane));
     Matrix view = rlGetMatrixModelview();
     Matrix projection = rlGetMatrixProjection();
+    detail_select(scene, DETAIL_REFLECTION,
+        frame->player_active ? frame->camera.target : frame->camera.position, camera.fovy * DEG2RAD,
+        (float)scene->reflection.texture.height);
     // A reflected view reverses the projected winding. Disable culling for this pass so the
     // separate camera does not require mirrored geometry or per-mesh winding changes.
     rlDisableBackfaceCulling();
     int reflection_pass = 1;
-    int clip_location = GetShaderLocation(scene->shader, "reflectionPass");
+    int clip_location = cached_location(scene->shader, "reflectionPass");
     SetShaderValue(scene->shader, clip_location, &reflection_pass, SHADER_UNIFORM_INT);
     draw_reflected_scene(scene, frame, scene->city_material, scene->life_material);
     reflection_pass = 0;
@@ -1827,6 +2746,8 @@ static void draw_shadow_casters(
     const WaterfrontGpuScene *scene, Material material, const WaterfrontSceneFrame *frame)
 {
     if (frame->boating_basin) {
+        // Explicit: inheriting the context's cull state made the first frame differ from the rest.
+        rlDisableBackfaceCulling();
         draw_scenery(scene, frame, material);
         draw_life(scene, material, frame, false);
         return;
@@ -1838,7 +2759,7 @@ static void draw_shadow_casters(
     draw_tiled(scene, &scene->facades, material);
     draw_tiled(scene, &scene->roofs, material);
     draw_tiled(scene, &scene->quay, material);
-    draw_tiled(scene, &scene->corner, material);
+    draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, material, frame->bridge, frame->bridge_color, false);
     // Cars, boats, and lamp poles matter to the road shadow, but their lenses and wake do not.
@@ -1849,7 +2770,7 @@ static void draw_shadow_casters(
 }
 
 static Matrix render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame,
-    RenderTexture2D target, float coverage, int map_size, float light_distance)
+    RenderTexture2D target, float coverage, int map_size, float light_distance, bool far_map)
 {
     Camera3D camera = shadow_camera(frame, coverage, map_size, light_distance);
     RenderTargetState previous = render_target_state();
@@ -1862,6 +2783,8 @@ static Matrix render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontScene
         .25, light_distance * 2 + 200));
     Matrix view = rlGetMatrixModelview();
     Matrix projection = rlGetMatrixProjection();
+    // The far map's 1.5 m texels cannot hold the small boxes the far level drops.
+    scene->detail_source = far_map && !scene->detail_disabled ? DETAIL_ALL_FAR : DETAIL_ALL_NEAR;
     draw_shadow_casters(scene, scene->shadow_material, frame);
     EndMode3D();
     EndTextureMode();
@@ -1876,10 +2799,10 @@ static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *fr
     set_object_color(scene->water_shader, WHITE);
     set_water_uniforms(scene, frame);
     float pixel_scale = fmaxf(1, width / 320.0f);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "surfacePixelScale"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
     int pass = scene->near_water.vaoId ? 1 : 0;
-    int location = GetShaderLocation(scene->water_shader, "waterPatchPass");
+    int location = cached_location(scene->water_shader, "waterPatchPass");
     SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);
     if (scene->water.vaoId)
         submit(scene->water, scene->water_material, MatrixIdentity(), WATERFRONT_GPU_GROUP_WATER);
@@ -1907,17 +2830,20 @@ void waterfront_gpu_scene_draw(
         return;
     }
     counting = &scene->stats;
+    drawing_scene = scene;
     draw_scene(scene, frame, width, height);
+    drawing_scene = NULL;
     counting = NULL;
 }
 
 WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats)
 {
-    WaterfrontGpuCount total = { stats->sky_quads, 2 * (size_t)stats->sky_quads };
+    WaterfrontGpuCount total = { stats->sky_quads, 2 * (size_t)stats->sky_quads, stats->sky_quads };
     for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
         for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group) {
             total.submissions += stats->mesh[pass][group].submissions;
             total.triangles += stats->mesh[pass][group].triangles;
+            total.instances += stats->mesh[pass][group].instances;
         }
     return total;
 }
@@ -1942,10 +2868,10 @@ static void draw_scene(
     scene->far_shadows_active = frame->player_active;
     if (scene->shadows_enabled) {
         scene->light_view_projection = render_shadow_map(scene, frame, scene->shadow_map,
-            frame->player_active ? 96.0f : 500.0f, scene->shadow_map_size, 600);
+            frame->player_active ? 96.0f : 500.0f, scene->shadow_map_size, 600, false);
         if (scene->far_shadows_active)
             scene->far_light_view_projection = render_shadow_map(scene, frame,
-                scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000);
+                scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000, true);
     }
     select_local_lights(scene, frame);
     set_lighting_uniforms(scene);
@@ -1958,6 +2884,9 @@ static void draw_scene(
     set_atmosphere_uniforms(scene, frame->camera.position);
     ClearBackground(BLACK);
     draw_sky(scene, frame->camera, frame->squall, width, height, (float)width / height);
+    detail_select(scene, DETAIL_MAIN,
+        frame->player_active ? frame->camera.target : frame->camera.position,
+        frame->camera.vertical_fov, (float)height / fmaxf(1, scene->detail_scale));
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(frame->camera.vertical_fov,
         (float)width / (float)height, frame->camera.near_plane, frame->camera.far_plane));
@@ -1977,10 +2906,10 @@ static void draw_scene(
     draw_facades(scene, material);
     draw_tiled(scene, &scene->roofs, scene->roof_material);
     draw_ground(scene, material);
-    draw_tiled(scene, &scene->corner, material);
+    draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     draw_water(scene, frame, width);
     set_emissive(scene->shader, true);
-    draw_tiled(scene, &scene->windows, material);
+    draw_detailed(scene, &scene->windows, &scene->windows_far, material);
     draw_tiled(scene, &scene->corner_emissive, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, life_material, frame->bridge, frame->bridge_color, false);
@@ -2002,6 +2931,21 @@ static void draw_scene(
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled)
 {
     scene->culling_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_detail_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->detail_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->instancing_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limit)
+{
+    scene->instance_limit = limit;
 }
 
 void waterfront_gpu_scene_set_lighting_enabled(WaterfrontGpuScene *scene, bool enabled)
@@ -2089,6 +3033,13 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
             UnloadMesh(scene->player_engine[skin]);
     if (scene->plane.vaoId != 0)
         UnloadMesh(scene->plane);
+    object_batch_destroy(scene);
+    if (scene->bounds_cache) {
+        ObjectBoundsCache *cache = scene->bounds_cache;
+        free(cache->items);
+        free(cache);
+        scene->bounds_cache = NULL;
+    }
     if (scene->city_material.maps != NULL) {
         scene->city_material.shader.id = rlGetShaderIdDefault();
         UnloadMaterial(scene->city_material);
@@ -2113,8 +3064,10 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         UnloadTexture(scene->sky_texture);
     if (scene->object_wakes.id != 0)
         UnloadTexture(scene->object_wakes);
-    if (scene->sky_shader.id != 0 && scene->sky_shader.id != rlGetShaderIdDefault())
+    if (scene->sky_shader.id != 0 && scene->sky_shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->sky_shader);
         UnloadShader(scene->sky_shader);
+    }
     if (scene->roof_texture.id != 0)
         UnloadTexture(scene->roof_texture);
     if (scene->shadow_map.id != 0)
@@ -2123,11 +3076,17 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         rlUnloadFramebuffer(scene->far_shadow_map.id);
     if (scene->reflection.id != 0)
         UnloadRenderTexture(scene->reflection);
-    if (scene->shader.id != 0 && scene->shader.id != rlGetShaderIdDefault())
+    if (scene->shader.id != 0 && scene->shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->shader);
         UnloadShader(scene->shader);
-    if (scene->shadow_shader.id != 0 && scene->shadow_shader.id != rlGetShaderIdDefault())
+    }
+    if (scene->shadow_shader.id != 0 && scene->shadow_shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->shadow_shader);
         UnloadShader(scene->shadow_shader);
-    if (scene->water_shader.id != 0 && scene->water_shader.id != rlGetShaderIdDefault())
+    }
+    if (scene->water_shader.id != 0 && scene->water_shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->water_shader);
         UnloadShader(scene->water_shader);
+    }
     *scene = (WaterfrontGpuScene) { 0 };
 }

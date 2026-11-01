@@ -59,7 +59,8 @@ typedef enum {
 
 typedef struct {
     unsigned int submissions;
-    size_t triangles;
+    size_t triangles; // Multiplied by instances: the work the GPU rasterizes.
+    unsigned int instances;
 } WaterfrontGpuCount;
 
 // One map surface class split by render tile (the scenery's catalogue): mesh i covers bounds[i],
@@ -67,16 +68,30 @@ typedef struct {
 typedef struct {
     Mesh *meshes;
     BoundingBox *bounds;
+    int *cells; // The grid cell of each mesh, which selects a detailed class's level.
     int count;
 } WaterfrontGpuTiled;
 
-// Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one
-// raylib DrawMesh, which issues one non-instanced GL draw; sky_quads counts the batched sky
-// quad, flushed as one more draw per pass. These are not driver-reported draw calls.
+// Storage of the static map meshes of the bound map, reported by waterfront_gpu_scene_geometry.
+// Source vertices are three per triangle, what the previous unindexed storage uploaded.
+typedef struct {
+    int meshes;
+    size_t triangles, source_vertices, vertices;
+    size_t vertex_bytes, index_bytes; // Uploaded to the GPU.
+    size_t far_triangles, far_vertex_bytes, far_index_bytes; // Distance detail, also GPU memory.
+    size_t retained_cpu_bytes; // Zero unless the review-only retain_map_sources is set.
+    float normal_error; // Worst decoded normal component error of packing.
+} WaterfrontGpuGeometry;
+
+// Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one GL
+// draw: a raylib DrawMesh, or one instanced run of contiguous objects sharing a mesh; sky_quads
+// counts the batched sky quad, flushed as one more draw per pass. These are not driver-reported
+// draw calls.
 // tiles_culled counts the map tile meshes each pass skipped outside its view volume.
 typedef struct {
     WaterfrontGpuCount mesh[WATERFRONT_GPU_PASS_COUNT][WATERFRONT_GPU_GROUP_COUNT];
     unsigned int tiles_culled[WATERFRONT_GPU_PASS_COUNT];
+    unsigned int far_cells[WATERFRONT_GPU_PASS_COUNT]; // Detail cells drawn far, per map drawn.
     unsigned int sky_quads;
 } WaterfrontGpuStats;
 
@@ -102,6 +117,15 @@ typedef struct {
     WaterfrontGpuTiled windows;
     WaterfrontGpuTiled corner;
     WaterfrontGpuTiled corner_emissive;
+    // Far levels of the two detailed classes, on the same fine grid. Each view chooses per cell.
+    WaterfrontGpuTiled windows_far;
+    WaterfrontGpuTiled corner_far;
+    unsigned char *detail_far[2]; // Presentation-only per-cell level of main and reflection.
+    Vector2 detail_origin;
+    float detail_cell;
+    int detail_columns, detail_rows;
+    int detail_source; // Which level or view's selection the pass being drawn uses.
+    float detail_scale; // Render pixels per presented pixel, for projected size; 0 means 1.
     Mesh crane;
     Mesh bridge;
     Mesh cube;
@@ -140,7 +164,15 @@ typedef struct {
     bool far_shadows_active; // Gameplay only; title keeps its existing single map.
     bool atmosphere_enabled;
     bool reflections_enabled;
-    bool culling_disabled; // Review only: draw every map tile in every pass.
+    bool culling_disabled; // Review only: draw every map tile and object in every pass.
+    bool detail_disabled; // Review only: draw the near level of every detail cell.
+    bool retain_map_sources; // Review only: keep each map mesh's unindexed arrays after upload.
+    int map_upload_limit; // Review only: fail map uploads after this many meshes (0: no limit).
+    WaterfrontGpuGeometry geometry;
+    bool instancing_disabled; // Review only: the scalar reference for instanced object draws.
+    int instance_limit; // Review only: replay a batch sooner than its capacity (0: capacity).
+    void *bounds_cache; // Private local bounds of transformed object meshes, keyed by VAO.
+    void *object_batch; // Private instance storage; NULL falls back to the scalar path.
     bool ready;
     WaterfrontGpuStats stats; // Reset by each draw.
 } WaterfrontGpuScene;
@@ -157,12 +189,17 @@ void waterfront_gpu_scene_set_reflections_enabled(WaterfrontGpuScene *scene, boo
 bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int size);
 // Review only: drawing every tile isolates culling from the per-tile draw order.
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled);
+void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled);
+void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limit);
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);
 void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene);
 WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats);
+// Review only: whether distant cells use the far level.
+void waterfront_gpu_scene_set_detail_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Vertices across all tiles of one class.
 int waterfront_gpu_tiled_vertices(const WaterfrontGpuTiled *tiled);
+WaterfrontGpuGeometry waterfront_gpu_scene_geometry(const WaterfrontGpuScene *scene);
 
 #endif
