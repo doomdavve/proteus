@@ -278,8 +278,9 @@ static int scene_contract(void)
     return 0;
 }
 
-// L2.2: the first two-berth package decodes, validates and carries stable IDs. Invalid geometry
-// is rejected with a field path; an invalid candidate never writes the caller's definition.
+// L2.2: the seven-berth Eriksberg package decodes, validates and carries stable IDs. Invalid
+// geometry is rejected with a field path; an invalid candidate never writes the caller's
+// definition.
 // L3.2: the harbor-life package's authored passing craft and retained default, with semantic
 // failures for route selection, craft recipe, speed/period, capacity and conflicts.
 static const char *harbor_variant(const char *from, const char *to)
@@ -319,8 +320,7 @@ static int scene_traffic(void)
     const WaterfrontRouteActor *ferry = &voyage.scene.traffic.actors[1];
     CHECK(!strcmp(ferry->id, "ferry") && ferry->recipe == WATERFRONT_CRAFT_ALVSNABBEN);
     CHECK(ferry->stop_count == 3 && ferry->stops[0].dwell == 35);
-    CHECK(!strcmp(ferry->stops[0].id, "stenpiren")
-        && !strcmp(ferry->stops[1].id, "lindholmspiren")
+    CHECK(!strcmp(ferry->stops[0].id, "stenpiren") && !strcmp(ferry->stops[1].id, "lindholmspiren")
         && !strcmp(ferry->stops[2].id, "eriksberg"));
     CHECK(ferry->stops[1].dwell < 0 && ferry->stops[2].dwell < 0);
     CHECK(!strcmp(voyage.scene.traffic.actors[2].id, "river_runabout")
@@ -337,8 +337,8 @@ static int scene_traffic(void)
         && flock->cues[1].kind == WATERFRONT_FLOCK_CUE_ALARM);
     CHECK(flock->cues[1].end_tick == 1200 && flock->cues[1].amplitude == 1);
     CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
-    WaterfrontVesselMotion start = waterfront_traffic_motion_routes(
-        &voyage.scene.traffic, 0, passing->phase);
+    WaterfrontVesselMotion start
+        = waterfront_traffic_motion_routes(&voyage.scene.traffic, 0, passing->phase);
     WaterfrontVesselMotion lap = waterfront_traffic_motion_routes(
         &voyage.scene.traffic, 0, passing->phase + passing->period);
     CHECK(Vector3Distance(start.position, lap.position) < .01f);
@@ -413,22 +413,26 @@ static int scene_berths(void)
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
     CHECK(voyage.has_scene && voyage.scene.version == 1);
-    CHECK(voyage.scene.berths_present && voyage.scene.berth_count == 2);
-    CHECK(!strcmp(voyage.scene.berths[0].id, "skiff")
-        && voyage.scene.berths[0].recipe == BOAT_SCENE_BERTH_SKIFF
+    CHECK(voyage.scene.berths_present && voyage.scene.berth_count == 7);
+    CHECK(!strcmp(voyage.scene.berths[0].id, "sailboat_aft")
+        && voyage.scene.berths[0].recipe == BOAT_SCENE_BERTH_SAILBOAT_7M
         && voyage.scene.berths[0].mooring == BOAT_SCENE_MOORING_PONTOON);
     CHECK(!strcmp(voyage.scene.berths[1].id, "runabout")
         && voyage.scene.berths[1].recipe == BOAT_SCENE_BERTH_RUNABOUT);
-    CHECK(voyage.scene.berths[0].x == 13 && voyage.scene.berths[0].z == 167
-        && voyage.scene.berths[1].z == 173);
-    CHECK(voyage.scene.entrance_present && voyage.scene.entrance_x == 6
-        && voyage.scene.entrance_z == 168 && voyage.scene.entrance_width == 8);
-    CHECK(voyage.scene.modules_present && voyage.scene.module_count == 2);
+    CHECK(!strcmp(voyage.scene.berths[6].id, "sailboat_fore")
+        && voyage.scene.berths[6].recipe == BOAT_SCENE_BERTH_SAILBOAT_7M);
+    CHECK(voyage.scene.berths[0].x == 13 && voyage.scene.berths[0].z == 146
+        && voyage.scene.berths[6].z == 176);
+    CHECK(voyage.scene.entrance_present && voyage.scene.entrance_x == 4
+        && voyage.scene.entrance_z == 140 && voyage.scene.entrance_width == 8);
+    CHECK(voyage.scene.modules_present && voyage.scene.module_count == 3);
     CHECK(!strcmp(voyage.scene.modules[0].id, "pier")
-        && voyage.scene.modules[0].kind == BOAT_SCENE_MODULE_PONTOON_SMALL);
+        && voyage.scene.modules[0].kind == BOAT_SCENE_MODULE_PONTOON);
     CHECK(!strcmp(voyage.scene.modules[1].id, "ramp")
         && voyage.scene.modules[1].kind == BOAT_SCENE_MODULE_GANGWAY
         && !strcmp(voyage.scene.modules[1].attaches, "pier"));
+    CHECK(!strcmp(voyage.scene.modules[2].id, "works")
+        && voyage.scene.modules[2].kind == BOAT_SCENE_MODULE_QUAY);
     CHECK(voyage.scene_digest != 0 && voyage.scene_digest == boat_scene_digest(&voyage.scene));
     BoatWorldResources resources;
     CHECK(boat_world_resources_init(&resources, boat_location_find("outer")));
@@ -442,15 +446,15 @@ static int scene_berths(void)
         bool location;
     } cases[] = {
         { "marina = {", "marina = { pontoons = {},", "scene.marina.pontoons", false },
-        { "      entrance = { x = 6, z = 168, width = 8 },\n", "", "scene.marina.entrance", false },
-        { "id = \"runabout\"", "id = \"skiff\"", "scene.marina.berths[2].id", false },
+        { "      entrance = { x = 4, z = 140, width = 8 },\n", "", "scene.marina.entrance", false },
+        { "id = \"runabout\"", "id = \"sailboat_aft\"", "scene.marina.berths[2].id", false },
         { "recipe = \"runabout\"", "recipe = \"yacht\"", "scene.marina.berths[2].recipe", false },
         { "mooring = \"pontoon\"", "mooring = \"quay\"", "scene.marina.berths[1].mooring", false },
-        { "x = 13, z = 173", "x = 32, z = 173", "scene.marina.berths[2]", true },
-        { "x = 13, z = 173", "x = 13, z = 167", "scene.marina.berths[2]", true },
-        { "entrance = { x = 6, z = 168, width = 8 }", "entrance = { x = 13, z = 167, width = 8 }",
+        { "x = 13, z = 176", "x = 32, z = 176", "scene.marina.berths[7]", true },
+        { "x = 13, z = 176", "x = 13, z = 171", "scene.marina.berths[7]", true },
+        { "entrance = { x = 4, z = 140, width = 8 }", "entrance = { x = 13, z = 146, width = 8 }",
             "scene.marina.berths[1]", true },
-        { "x = 13, z = 167", "x = -12, z = 60", "scene.marina.berths[1]", true },
+        { "x = 13, z = 146", "x = -12, z = 60", "scene.marina.berths[1]", true },
     };
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         memcpy(source, files.source, files.source_size);
@@ -506,17 +510,14 @@ static int scene_berths(void)
     struct {
         const char *from, *to, *field;
     } module_cases[] = {
-        { "kind = \"pontoon_small\"", "kind = \"barge\"", "scene.marina.modules[1].kind" },
+        { "kind = \"pontoon\"", "kind = \"barge\"", "scene.marina.modules[1].kind" },
         { "attaches = \"pier\"", "attaches = \"missing\"", "scene.marina.modules[2].attaches" },
-        { "anchor = { x = 34.1, z = 170 }", "anchor = { x = 20, z = 170 }",
+        { "anchor = { x = 34.1, z = 161.5 }", "anchor = { x = 20, z = 161.5 }",
             "scene.marina.modules[2]" },
-        { "anchor = { x = 34.1, z = 170 }", "anchor = { x = 45, z = 170 }",
+        { "anchor = { x = 34.1, z = 161.5 }", "anchor = { x = 45, z = 161.5 }",
             "scene.marina.modules[2]" },
-        { "x = 20, z = 170", "x = 34, z = 170", "scene.marina.modules[1]" },
-        { "modules = {",
-            "modules = { { id='a', kind='pontoon_small', x=20, z=170, heading=0 },"
-            " { id='b', kind='pontoon_small', x=20, z=170, heading=0 },",
-            "scene.marina.modules[2]" },
+        { "x = 20, z = 161.5", "x = 34, z = 161.5", "scene.marina.modules[1]" },
+        { "id = \"works\"", "id = \"pier\"", "scene.marina.modules[3].id" },
         { "modules = {",
             "modules = { { id='a', kind='pontoon_small', x=20, z=170, heading=0 },"
             " { id='b', kind='pontoon_small', x=20, z=180, heading=0 },"
@@ -542,6 +543,7 @@ static int scene_berths(void)
         show(module_cases[i].field, &d);
         if (!strcmp(module_cases[i].field, "scene.marina.modules[1].kind")
             || !strcmp(module_cases[i].field, "scene.marina.modules[2].attaches")
+            || !strcmp(module_cases[i].field, "scene.marina.modules[3].id")
             || !strcmp(module_cases[i].field, "scene.marina.modules"))
             CHECK(status == BOAT_PLUGIN_SCHEMA && !strcmp(d.field, module_cases[i].field));
         else {

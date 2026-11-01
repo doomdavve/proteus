@@ -8,8 +8,8 @@
 #include "boat_test_scenery.h"
 #include "boat_test_session.h"
 #include "boat_view.h"
-#include "waterfront_scene.h"
 #include "raymath.h"
+#include "waterfront_scene.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -53,22 +53,21 @@ static bool player_clear(const BoatSession *session)
     return !waterfront_harbor_contact_height_scene(session->world.scene, boat->position,
                boat->heading, -.4f, 2, session->world.water, boat_session_time(session), NULL)
         && !waterfront_traffic_contact_height_scene(session->world.scene, boat->position,
-            boat->heading, 2, 1.6f, .75f, -.4f, 2, session->world.water,
-            boat_session_time(session), NULL);
+            boat->heading, 2, 1.6f, .75f, -.4f, 2, session->world.water, boat_session_time(session),
+            NULL);
 }
 
 static int drive_approach(BoatSession *session)
 {
-    session->boat.position = (Vector2) { 6, 150 };
+    session->boat.position = (Vector2) { 4, 132 };
     session->boat.heading = (float)PI; // Forward +z, north into the marina.
     for (int tick = 0; tick < 480; ++tick) {
-        BoatInput input = { .throttle_rate = tick < 240 ? .5f : 0,
-            .steering_rate = tick < 240 ? 0 : .12f };
+        BoatInput input = { .throttle_rate = tick < 300 ? .5f : 0 };
         boat_session_step(session, input);
         CHECK(player_clear(session));
         CHECK(isfinite(session->boat.position.x) && isfinite(session->boat.position.y));
     }
-    CHECK(session->boat.position.y > 160);
+    CHECK(session->boat.position.y > 150);
     return 0;
 }
 
@@ -96,7 +95,7 @@ static int measure_render(const BoatSceneDefinition *scene, const BoatSession *s
     BoatViewState view = boat_session_view(source);
     view.scene = scene;
     BoatPresentation presentation = { .camera_heading = 1.5707964f };
-    view.boat.position = (Vector2) { 2, 170 };
+    view.boat.position = (Vector2) { 2, 161 };
     view.boat.heading = 1.5707964f;
     view.boat.velocity = (Vector2) { 0 };
     view.boat.yaw_velocity = 0;
@@ -133,7 +132,7 @@ int main(void)
     const BoatPluginRevision *active = boat_plugin_host_active(&host);
     CHECK(active->voyage.has_scene);
     const BoatSceneDefinition *scene = &active->voyage.scene;
-    CHECK(scene->berth_count == 2 && scene->module_count == 2);
+    CHECK(scene->berth_count == 7 && scene->module_count == 3);
     CHECK(scene->traffic.actor_count == 4 && scene->gulls.flock_count == 1);
 
     BoatSession session;
@@ -147,22 +146,20 @@ int main(void)
     // Inspection values from the same accepted scene and explicit time.
     BoatViewState view = boat_session_view(&session);
     view.scene = scene;
-    view.boat.position = (Vector2) { 2, 170 };
+    view.boat.position = (Vector2) { 2, 161 };
     view.boat.heading = 1.5707964f;
     view.time = 9;
     BoatPresentation presentation = { .camera_heading = 1.5707964f };
     WaterfrontSceneFrame frame;
     boat_scene_frame(&view, &presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
-    CHECK(frame.harbor.berth_count == 2 && frame.harbor.module_count == 2);
+    CHECK(frame.harbor.berth_count == 7 && frame.harbor.module_count == 3);
     CHECK(frame.traffic.vessel_count == 4 && frame.gull_count == 8);
     CHECK(frame.traffic.wake_count > 0);
 
     // Feeding at 3 s is lower than the alarm climb at 9 s for the authored flock.
     WaterfrontSceneFrame feeding, alarm;
-    waterfront_boating_gulls_scene(scene, 3, frame.player.hull.position,
-        (Vector3) { 0 }, &feeding);
-    waterfront_boating_gulls_scene(scene, 9, frame.player.hull.position,
-        (Vector3) { 0 }, &alarm);
+    waterfront_boating_gulls_scene(scene, 3, frame.player.hull.position, (Vector3) { 0 }, &feeding);
+    waterfront_boating_gulls_scene(scene, 9, frame.player.hull.position, (Vector3) { 0 }, &alarm);
     CHECK(feeding.gull_count == 8 && alarm.gull_count == 8);
     CHECK(alarm.gulls[0][0].position.y > feeding.gulls[0][0].position.y + 1);
 
@@ -170,8 +167,7 @@ int main(void)
     double arrive, depart;
     CHECK(waterfront_route_stop_times(&scene->traffic, 1, 0, &arrive, &depart));
     WaterfrontVesselMotion at_stop = waterfront_traffic_motion_routes(&scene->traffic, 1, arrive);
-    WaterfrontVesselMotion after
-        = waterfront_traffic_motion_routes(&scene->traffic, 1, depart + 2);
+    WaterfrontVesselMotion after = waterfront_traffic_motion_routes(&scene->traffic, 1, depart + 2);
     CHECK(Vector3Length(at_stop.velocity) < .01f && Vector3Length(after.velocity) > .1f);
     for (int t = 0; t <= 1200; t += 5) {
         WaterfrontVesselMotion m = waterfront_traffic_motion_routes(&scene->traffic, 1, t);
@@ -182,11 +178,10 @@ int main(void)
     WaterfrontSceneFrame compiled_frame, populated_frame;
     BoatSession compiled_session;
     physics_session(&compiled_session, BOAT_LOCATION_OUTER);
-    CHECK(measure_render(NULL, &compiled_session, "compiled", &baseline50, &baseline95,
-              &compiled_frame)
+    CHECK(measure_render(
+              NULL, &compiled_session, "compiled", &baseline50, &baseline95, &compiled_frame)
         == 0);
-    CHECK(measure_render(scene, &session, "populated", &populated50, &populated95,
-              &populated_frame)
+    CHECK(measure_render(scene, &session, "populated", &populated50, &populated95, &populated_frame)
         == 0);
     // The same camera/input at the supported maxima exercises the bounded worst case without
     // changing the installed package: 7 berths, 4 modules, 8 craft and 4 x 8 birds.
@@ -198,9 +193,8 @@ int main(void)
     }
     maximum.modules_present = true;
     maximum.module_count = BOAT_SCENE_MODULES;
-    static const unsigned char module_kinds[BOAT_SCENE_MODULES]
-        = { BOAT_SCENE_MODULE_PONTOON, BOAT_SCENE_MODULE_PONTOON_SMALL, BOAT_SCENE_MODULE_QUAY,
-              BOAT_SCENE_MODULE_PONTOON };
+    static const unsigned char module_kinds[BOAT_SCENE_MODULES] = { BOAT_SCENE_MODULE_PONTOON,
+        BOAT_SCENE_MODULE_PONTOON_SMALL, BOAT_SCENE_MODULE_QUAY, BOAT_SCENE_MODULE_PONTOON };
     for (unsigned i = 0; i < BOAT_SCENE_MODULES; ++i) {
         maximum.modules[i] = scene->modules[i % scene->module_count];
         maximum.modules[i].kind = module_kinds[i];
@@ -222,8 +216,8 @@ int main(void)
     BoatPluginHostMemory memory = boat_plugin_host_memory(&host);
     unsigned meshes = (unsigned)(frame.harbor.berth_count + frame.harbor.module_count
         + frame.traffic.vessel_count + frame.gull_count * WATERFRONT_GULL_PARTS);
-    unsigned lights = (unsigned)(frame.lamp_count + frame.traffic.vessel_count
-        * WATERFRONT_TRAFFIC_LIGHTS);
+    unsigned lights
+        = (unsigned)(frame.lamp_count + frame.traffic.vessel_count * WATERFRONT_TRAFFIC_LIGHTS);
     printf("harbor_life=ok berths=%d modules=%d vessels=%d flocks=%u birds=%d wakes=%d "
            "meshes=%u lights=%u cars=%d host_revisions=%u host_bytes=%zu retained_source=%zu "
            "baseline_p50=%.3f baseline_p95=%.3f populated_p50=%.3f populated_p95=%.3f "
