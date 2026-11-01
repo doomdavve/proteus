@@ -164,6 +164,100 @@ static void unload_mesh(Mesh *mesh)
     *mesh = (Mesh) { 0 };
 }
 
+// Uniform locations are resolved once per shader and then by hash. These calls sit in the
+// per-frame and per-draw paths; the GL name lookup itself is not repeated there.
+#define LOCATION_CACHE_SLOTS 32
+#define LOCATION_CACHE_ENTRIES 96
+typedef struct {
+    unsigned int hash;
+    int location;
+    char name[48];
+} LocationEntry;
+typedef struct {
+    unsigned int id;
+    int count;
+    LocationEntry entries[LOCATION_CACHE_ENTRIES];
+} LocationCache;
+static LocationCache location_caches[LOCATION_CACHE_SLOTS];
+
+static unsigned int name_hash(const char *name)
+{
+    unsigned int hash = 2166136261u;
+    for (; *name; ++name) {
+        hash ^= (unsigned char)*name;
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+static LocationCache *location_cache(unsigned int id, bool create)
+{
+    LocationCache *free_slot = NULL;
+    for (int i = 0; i < LOCATION_CACHE_SLOTS; ++i) {
+        if (location_caches[i].id == id)
+            return &location_caches[i];
+        if (!location_caches[i].id && !free_slot)
+            free_slot = &location_caches[i];
+    }
+    if (!create || !free_slot)
+        return NULL;
+    *free_slot = (LocationCache) { .id = id };
+    return free_slot;
+}
+
+static void forget_locations(Shader shader)
+{
+    LocationCache *cache = shader.id ? location_cache(shader.id, false) : NULL;
+    if (cache)
+        *cache = (LocationCache) { 0 };
+}
+
+static int cached_location(Shader shader, const char *name)
+{
+    if (shader.id == 0)
+        return -1;
+    LocationCache *cache = location_cache(shader.id, true);
+    unsigned int hash = name_hash(name);
+    if (cache) {
+        for (int i = 0; i < cache->count; ++i)
+            if (cache->entries[i].hash == hash && strcmp(cache->entries[i].name, name) == 0)
+                return cache->entries[i].location;
+    }
+    int location = GetShaderLocation(shader, name);
+    if (cache && cache->count < LOCATION_CACHE_ENTRIES) {
+        LocationEntry *entry = &cache->entries[cache->count++];
+        snprintf(entry->name, sizeof(entry->name), "%s", name);
+        entry->hash = hash;
+        entry->location = location;
+    }
+    return location;
+}
+
+static const char *const known_uniforms[] = { "objectColor", "emissive", "ghostOpacity",
+    "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
+    "directionalColor", "directionalDirection", "directionalIntensity", "shadowsEnabled",
+    "lightViewProjection", "shadowMap", "farShadowsEnabled", "farLightViewProjection",
+    "farShadowMap", "localLightCount", "localLightPositionRadius[0]", "localLightColorIntensity[0]",
+    "localLightDirection[0]", "localLightCone[0]", "cameraPosition", "fogColor", "fogStart",
+    "fogEnd", "fogOpacity", "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife",
+    "wakeFieldEnabled", "wakeGrid", "wakeField", "physicalWaves", "radialOrigin", "radialMotion",
+    "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape",
+    "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
+    "objectWakeData", "playerWakeCount", "playerWakeOrigins[0]", "playerWakeParameters[0]",
+    "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
+    "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
+    "reflectionTexture", "surfacePixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
+    "skyScale", "skyEye", "squallArea", "squallHeight", NULL };
+
+// Resolve every name the renderer uses for each shader once, while the program is valid.
+static void prewarm_locations(Shader shader)
+{
+    for (const char *const *name = known_uniforms; *name; ++name)
+        (void)cached_location(shader, *name);
+}
+
+static WaterfrontGpuScene *drawing_scene;
+
 // Counter for the pass and group being drawn, set only inside waterfront_gpu_scene_draw on the
 // render thread. NULL outside a scene draw, when submissions are not counted.
 static WaterfrontGpuStats *counting;
@@ -914,6 +1008,10 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     scene->shadows_enabled = true;
     scene->atmosphere_enabled = true;
     scene->reflections_enabled = true;
+    prewarm_locations(scene->shader);
+    prewarm_locations(scene->shadow_shader);
+    prewarm_locations(scene->water_shader);
+    prewarm_locations(scene->sky_shader);
     scene->ready = true;
     return true;
 failed:
@@ -939,23 +1037,95 @@ static void set_object_color(Shader shader, Color color)
         (float)color.b / 255.0f,
         (float)color.a / 255.0f,
     };
-    int location = GetShaderLocation(shader, "objectColor");
+    int location = cached_location(shader, "objectColor");
     if (location >= 0)
         SetShaderValue(shader, location, values, SHADER_UNIFORM_VEC4);
 }
 
 static void set_emissive(Shader shader, bool emissive)
 {
-    int location = GetShaderLocation(shader, "emissive");
+    int location = cached_location(shader, "emissive");
     if (location >= 0) {
         int value = emissive ? 1 : 0;
         SetShaderValue(shader, location, &value, SHADER_UNIFORM_INT);
     }
 }
 
+// Local bounds of transformed object meshes, computed once per VAO. Culling uses each pass's own
+// view volume; the scalar draw order is unchanged for everything that remains visible.
+typedef struct {
+    unsigned int vao;
+    BoundingBox local;
+} ObjectBounds;
+
+typedef struct {
+    ObjectBounds *items;
+    int count, capacity;
+} ObjectBoundsCache;
+
+static bool object_is_culled(WaterfrontGpuScene *scene, const Mesh *mesh, Transform3D transform)
+{
+    if (scene->culling_disabled || !mesh->vertices || mesh->vertexCount <= 0)
+        return false;
+    // Cloth vertices change every frame; their first-frame bounds are not valid.
+    if (mesh->vaoId == scene->player_flag.vaoId || mesh->vaoId == scene->ghost_flag.vaoId)
+        return false;
+    for (int i = 0; i < WATERFRONT_RIVALS; ++i)
+        if (mesh->vaoId == scene->rival_flags[i].vaoId)
+            return false;
+    ObjectBoundsCache *cache = scene->bounds_cache;
+    if (!cache) {
+        cache = calloc(1, sizeof(*cache));
+        if (!cache)
+            return false;
+        scene->bounds_cache = cache;
+    }
+    ObjectBounds *bounds = NULL;
+    for (int i = 0; i < cache->count; ++i)
+        if (cache->items[i].vao == mesh->vaoId) {
+            bounds = &cache->items[i];
+            break;
+        }
+    if (!bounds) {
+        if (cache->count == cache->capacity) {
+            int capacity = cache->capacity ? cache->capacity * 2 : 32;
+            ObjectBounds *items = realloc(cache->items, (size_t)capacity * sizeof(*items));
+            if (!items)
+                return false;
+            cache->items = items;
+            cache->capacity = capacity;
+        }
+        bounds = &cache->items[cache->count++];
+        bounds->vao = mesh->vaoId;
+        Vector3 low = { INFINITY, INFINITY, INFINITY }, high = { -INFINITY, -INFINITY, -INFINITY };
+        for (int i = 0; i < mesh->vertexCount; ++i) {
+            Vector3 point
+                = { mesh->vertices[i * 3], mesh->vertices[i * 3 + 1], mesh->vertices[i * 3 + 2] };
+            low = Vector3Min(low, point);
+            high = Vector3Max(high, point);
+        }
+        const Vector3 grow = { .05f, .05f, .05f };
+        bounds->local = (BoundingBox) { Vector3Subtract(low, grow), Vector3Add(high, grow) };
+    }
+    Matrix model = transform_matrix(transform);
+    Vector3 low = { INFINITY, INFINITY, INFINITY }, high = { -INFINITY, -INFINITY, -INFINITY };
+    for (int i = 0; i < 8; ++i) {
+        Vector3 point = { i & 1 ? bounds->local.max.x : bounds->local.min.x,
+            i & 2 ? bounds->local.max.y : bounds->local.min.y,
+            i & 4 ? bounds->local.max.z : bounds->local.min.z };
+        point = Vector3Transform(point, model);
+        low = Vector3Min(low, point);
+        high = Vector3Max(high, point);
+    }
+    Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    return !box_in_view(view_projection, (BoundingBox) { low, high });
+}
+
 static void draw_colored_mesh(
     Mesh mesh, Material material, Transform3D transform, Color color, bool emissive)
 {
+    if (drawing_scene && object_is_culled(drawing_scene, &mesh, transform))
+        return;
     set_object_color(material.shader, color);
     set_emissive(material.shader, emissive);
     material.maps[MATERIAL_MAP_DIFFUSE].color = color;
@@ -1133,16 +1303,16 @@ static void set_far_shadow_uniforms(const WaterfrontGpuScene *scene, Shader shad
 {
     int enabled = scene->shadows_enabled && scene->far_shadows_active;
     SetShaderValue(
-        shader, GetShaderLocation(shader, "farShadowsEnabled"), &enabled, SHADER_UNIFORM_INT);
+        shader, cached_location(shader, "farShadowsEnabled"), &enabled, SHADER_UNIFORM_INT);
     if (!enabled)
         return;
-    SetShaderValueMatrix(shader, GetShaderLocation(shader, "farLightViewProjection"),
+    SetShaderValueMatrix(shader, cached_location(shader, "farLightViewProjection"),
         scene->far_light_view_projection);
     int slot = 15;
     rlEnableShader(shader.id);
     rlActiveTextureSlot(slot);
     rlEnableTexture(scene->far_shadow_map.depth.id);
-    rlSetUniform(GetShaderLocation(shader, "farShadowMap"), &slot, SHADER_UNIFORM_INT, 1);
+    rlSetUniform(cached_location(shader, "farShadowMap"), &slot, SHADER_UNIFORM_INT, 1);
     rlActiveTextureSlot(0);
 }
 
@@ -1152,29 +1322,29 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
     static const float directional_color[] = { 1.0f, .92f, .74f };
     Vector3 sun = waterfront_sun_direction();
     float directional_direction[] = { sun.x, sun.y, sun.z };
-    int location = GetShaderLocation(scene->shader, "ambientColor");
+    int location = cached_location(scene->shader, "ambientColor");
     if (location >= 0)
         SetShaderValue(scene->shader, location, ambient_color, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "directionalColor");
+    location = cached_location(scene->shader, "directionalColor");
     if (location >= 0)
         SetShaderValue(scene->shader, location, directional_color, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "directionalDirection");
+    location = cached_location(scene->shader, "directionalDirection");
     if (location >= 0)
         SetShaderValue(scene->shader, location, directional_direction, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "directionalIntensity");
+    location = cached_location(scene->shader, "directionalIntensity");
     if (location >= 0) {
         float intensity = .65f;
         SetShaderValue(scene->shader, location, &intensity, SHADER_UNIFORM_FLOAT);
     }
     int shadows_enabled = scene->shadows_enabled && scene->shadow_map.depth.id != 0;
-    location = GetShaderLocation(scene->shader, "shadowsEnabled");
+    location = cached_location(scene->shader, "shadowsEnabled");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &shadows_enabled, SHADER_UNIFORM_INT);
     if (shadows_enabled) {
-        location = GetShaderLocation(scene->shader, "lightViewProjection");
+        location = cached_location(scene->shader, "lightViewProjection");
         if (location >= 0)
             SetShaderValueMatrix(scene->shader, location, scene->light_view_projection);
-        location = GetShaderLocation(scene->shader, "shadowMap");
+        location = cached_location(scene->shader, "shadowMap");
         if (location >= 0) {
             int texture_slot = 10;
             rlEnableShader(scene->shader.id);
@@ -1186,7 +1356,7 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
     }
     set_far_shadow_uniforms(scene, scene->shader);
     int light_count = scene->lighting_enabled ? scene->local_light_count : 0;
-    location = GetShaderLocation(scene->shader, "localLightCount");
+    location = cached_location(scene->shader, "localLightCount");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &light_count, SHADER_UNIFORM_INT);
     if (light_count == 0)
@@ -1219,16 +1389,16 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
         cone[2] = 0;
         cone[3] = 0;
     }
-    location = GetShaderLocation(scene->shader, "localLightPositionRadius[0]");
+    location = cached_location(scene->shader, "localLightPositionRadius[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, positions, SHADER_UNIFORM_VEC4, light_count);
-    location = GetShaderLocation(scene->shader, "localLightColorIntensity[0]");
+    location = cached_location(scene->shader, "localLightColorIntensity[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, colors, SHADER_UNIFORM_VEC4, light_count);
-    location = GetShaderLocation(scene->shader, "localLightDirection[0]");
+    location = cached_location(scene->shader, "localLightDirection[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, directions, SHADER_UNIFORM_VEC4, light_count);
-    location = GetShaderLocation(scene->shader, "localLightCone[0]");
+    location = cached_location(scene->shader, "localLightCone[0]");
     if (location >= 0)
         SetShaderValueV(scene->shader, location, cones, SHADER_UNIFORM_VEC4, light_count);
 }
@@ -1241,22 +1411,22 @@ static void set_atmosphere_uniforms(WaterfrontGpuScene *scene, Vector3 camera_po
     float fog_end = 620.0f;
     float fog_opacity = .38f;
     int atmosphere_enabled = scene->atmosphere_enabled;
-    int location = GetShaderLocation(scene->shader, "cameraPosition");
+    int location = cached_location(scene->shader, "cameraPosition");
     if (location >= 0)
         SetShaderValue(scene->shader, location, camera, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "fogColor");
+    location = cached_location(scene->shader, "fogColor");
     if (location >= 0)
         SetShaderValue(scene->shader, location, fog_color, SHADER_UNIFORM_VEC3);
-    location = GetShaderLocation(scene->shader, "fogStart");
+    location = cached_location(scene->shader, "fogStart");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &fog_start, SHADER_UNIFORM_FLOAT);
-    location = GetShaderLocation(scene->shader, "fogEnd");
+    location = cached_location(scene->shader, "fogEnd");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &fog_end, SHADER_UNIFORM_FLOAT);
-    location = GetShaderLocation(scene->shader, "fogOpacity");
+    location = cached_location(scene->shader, "fogOpacity");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &fog_opacity, SHADER_UNIFORM_FLOAT);
-    location = GetShaderLocation(scene->shader, "atmosphereEnabled");
+    location = cached_location(scene->shader, "atmosphereEnabled");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &atmosphere_enabled, SHADER_UNIFORM_INT);
 }
@@ -1266,28 +1436,28 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     BoatWater water = frame->player_water;
     int objects = water.objects != NULL || water.traffic_objects != NULL;
     float object_life = water.objects ? water.objects->life_ticks / 120.0f : 16;
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "objectWakeEnabled"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "objectWakeEnabled"),
         &objects, SHADER_UNIFORM_INT);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "objectWakeLife"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "objectWakeLife"),
         &object_life, SHADER_UNIFORM_FLOAT);
     int field_enabled = scene->wake_field.id != 0;
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeFieldEnabled"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeFieldEnabled"),
         &field_enabled, SHADER_UNIFORM_INT);
     if (field_enabled) {
         float grid[] = { (float)scene->wake_field.width, (float)scene->wake_field.height,
             scene->wake_spacing };
-        SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeGrid"),
-            grid, SHADER_UNIFORM_VEC3);
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeGrid"), grid,
+            SHADER_UNIFORM_VEC3);
         int slot = 13;
         rlEnableShader(scene->water_shader.id);
         rlActiveTextureSlot(slot);
         rlEnableTexture(scene->wake_field.id);
         rlSetUniform(
-            GetShaderLocation(scene->water_shader, "wakeField"), &slot, SHADER_UNIFORM_INT, 1);
+            cached_location(scene->water_shader, "wakeField"), &slot, SHADER_UNIFORM_INT, 1);
         rlActiveTextureSlot(0);
     }
     int physical_waves = frame->player_active && (field_enabled || boat_water_displaced(water));
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "physicalWaves"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "physicalWaves"),
         &physical_waves, SHADER_UNIFORM_INT);
     float wake_amplitude = frame->player_active ? water.wake_amplitude : 0;
     float radial[32], origins[16], motions[16];
@@ -1297,18 +1467,18 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
             origins[4 * i + j] = radial[8 * i + j];
             motions[4 * i + j] = radial[8 * i + 4 + j];
         }
-    SetShaderValueV(scene->water_shader, GetShaderLocation(scene->water_shader, "radialOrigin"),
+    SetShaderValueV(scene->water_shader, cached_location(scene->water_shader, "radialOrigin"),
         origins, SHADER_UNIFORM_VEC4, 4);
-    SetShaderValueV(scene->water_shader, GetShaderLocation(scene->water_shader, "radialMotion"),
+    SetShaderValueV(scene->water_shader, cached_location(scene->water_shader, "radialMotion"),
         motions, SHADER_UNIFORM_VEC4, 4);
     float storm[12];
     boat_water_storm_uniforms(
         frame->player_active ? water.storm : (BoatStorm) { 0 }, frame->time, storm);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormArea"), storm,
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stormArea"), storm,
         SHADER_UNIFORM_VEC4);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormPhase"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stormPhase"),
         storm + 4, SHADER_UNIFORM_VEC4);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "stormMotion"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stormMotion"),
         storm + 8, SHADER_UNIFORM_VEC4);
     float vessel[12];
     boat_vessel_wake_uniforms(
@@ -1316,12 +1486,12 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     const char *vessel_uniforms[] = { "vesselOrigin", "vesselMotion", "vesselShape" };
     for (int i = 0; i < 3; ++i)
         SetShaderValue(scene->water_shader,
-            GetShaderLocation(scene->water_shader, vessel_uniforms[i]), vessel + 4 * i,
+            cached_location(scene->water_shader, vessel_uniforms[i]), vessel + 4 * i,
             SHADER_UNIFORM_VEC4);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeAmplitude"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeAmplitude"),
         &wake_amplitude, SHADER_UNIFORM_FLOAT);
     float wake_offset[] = { -water.wake_offset.x, water.wake_offset.y };
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wakeOffset"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wakeOffset"),
         wake_offset, SHADER_UNIFORM_VEC2);
     float wake_origins[BOAT_WAKE_SEGMENTS * 4], wake_parameters[BOAT_WAKE_SEGMENTS * 4];
     int wake_count = frame->player_active
@@ -1339,10 +1509,10 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
                 water.traffic_objects, records + players * 4, parameters + players * 4);
         float traffic_life = water.traffic_objects ? water.traffic_objects->life_ticks / 120.0f : 0;
         SetShaderValue(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "objectWakePlayerCount"), &players,
+            cached_location(scene->water_shader, "objectWakePlayerCount"), &players,
             SHADER_UNIFORM_INT);
         SetShaderValue(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "objectWakeTrafficLife"), &traffic_life,
+            cached_location(scene->water_shader, "objectWakeTrafficLife"), &traffic_life,
             SHADER_UNIFORM_FLOAT);
         if (scene->object_wakes.id && scene->object_wakes.width != capacity) {
             UnloadTexture(scene->object_wakes);
@@ -1360,80 +1530,79 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         rlActiveTextureSlot(slot);
         rlEnableTexture(scene->object_wakes.id);
         rlSetUniform(
-            GetShaderLocation(scene->water_shader, "objectWakeData"), &slot, SHADER_UNIFORM_INT, 1);
+            cached_location(scene->water_shader, "objectWakeData"), &slot, SHADER_UNIFORM_INT, 1);
         rlActiveTextureSlot(0);
     }
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "playerWakeCount"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "playerWakeCount"),
         &wake_count, SHADER_UNIFORM_INT);
     if (wake_count && !objects) {
         SetShaderValueV(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "playerWakeOrigins[0]"), wake_origins,
+            cached_location(scene->water_shader, "playerWakeOrigins[0]"), wake_origins,
             SHADER_UNIFORM_VEC4, wake_count);
         SetShaderValueV(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "playerWakeParameters[0]"), wake_parameters,
+            cached_location(scene->water_shader, "playerWakeParameters[0]"), wake_parameters,
             SHADER_UNIFORM_VEC4, wake_count);
     }
     int waterfront_water = frame->player_active && !frame->boating_basin;
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "waterfrontWater"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "waterfrontWater"),
         &waterfront_water, SHADER_UNIFORM_INT);
     float patch[] = { frame->player.hull.position.x, frame->player.hull.position.z,
         BOAT_WATER_PATCH_FULL, BOAT_WATER_PATCH_RADIUS };
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "wavePatch"), patch,
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "wavePatch"), patch,
         SHADER_UNIFORM_VEC4);
     if (physical_waves) {
         float parameters[12];
         boat_water_wave_uniforms(water, frame->time, parameters);
         SetShaderValueV(scene->water_shader,
-            GetShaderLocation(scene->water_shader, "waveParameters[0]"), parameters,
+            cached_location(scene->water_shader, "waveParameters[0]"), parameters,
             SHADER_UNIFORM_VEC4, 3);
     }
     int shadows = scene->shadows_enabled && frame->player_active;
     Vector3 sun = waterfront_sun_direction();
     float sun_direction[] = { sun.x, sun.y, sun.z };
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "sunDirection"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "sunDirection"),
         sun_direction, SHADER_UNIFORM_VEC3);
-    int shadow_location = GetShaderLocation(scene->water_shader, "shadowsEnabled");
+    int shadow_location = cached_location(scene->water_shader, "shadowsEnabled");
     SetShaderValue(scene->water_shader, shadow_location, &shadows, SHADER_UNIFORM_INT);
     SetShaderValueMatrix(scene->water_shader,
-        GetShaderLocation(scene->water_shader, "lightViewProjection"),
-        scene->light_view_projection);
+        cached_location(scene->water_shader, "lightViewProjection"), scene->light_view_projection);
     if (shadows) {
         int slot = 12;
         rlEnableShader(scene->water_shader.id);
         rlActiveTextureSlot(slot);
         rlEnableTexture(scene->shadow_map.depth.id);
         rlSetUniform(
-            GetShaderLocation(scene->water_shader, "shadowMap"), &slot, SHADER_UNIFORM_INT, 1);
+            cached_location(scene->water_shader, "shadowMap"), &slot, SHADER_UNIFORM_INT, 1);
         rlActiveTextureSlot(0);
     }
     set_far_shadow_uniforms(scene, scene->water_shader);
     float camera[]
         = { frame->camera.position.x, frame->camera.position.y, frame->camera.position.z };
     int reflections_enabled = scene->reflections_enabled;
-    int location = GetShaderLocation(scene->water_shader, "reflectionViewProjection");
+    int location = cached_location(scene->water_shader, "reflectionViewProjection");
     if (location >= 0)
         SetShaderValueMatrix(scene->water_shader, location, scene->reflection_view_projection);
-    location = GetShaderLocation(scene->water_shader, "cameraPosition");
+    location = cached_location(scene->water_shader, "cameraPosition");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, camera, SHADER_UNIFORM_VEC3);
     // Double frame time never reaches a float uniform; upload bounded, reduced payloads.
     float crossing_clock = boat_water_crossing_clock(water, frame->time);
-    location = GetShaderLocation(scene->water_shader, "crossingWakeTime");
+    location = cached_location(scene->water_shader, "crossingWakeTime");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, &crossing_clock, SHADER_UNIFORM_FLOAT);
     float detail_phase[] = { boat_phase(1.5, frame->time), boat_phase(2.1, frame->time) };
-    location = GetShaderLocation(scene->water_shader, "detailRipplePhase");
+    location = cached_location(scene->water_shader, "detailRipplePhase");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, detail_phase, SHADER_UNIFORM_VEC2);
     float reflection_phase[] = { boat_phase(.80, frame->time), boat_phase(.55, frame->time),
         boat_phase(.65, frame->time), boat_phase(.35, frame->time) };
-    location = GetShaderLocation(scene->water_shader, "reflectionRipplePhase");
+    location = cached_location(scene->water_shader, "reflectionRipplePhase");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, reflection_phase, SHADER_UNIFORM_VEC4);
-    location = GetShaderLocation(scene->water_shader, "reflectionsEnabled");
+    location = cached_location(scene->water_shader, "reflectionsEnabled");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, &reflections_enabled, SHADER_UNIFORM_INT);
-    location = GetShaderLocation(scene->water_shader, "reflectionTexture");
+    location = cached_location(scene->water_shader, "reflectionTexture");
     if (location >= 0) {
         int texture_slot = 11;
         rlEnableShader(scene->water_shader.id);
@@ -1450,8 +1619,8 @@ static void draw_ghost(const WaterfrontGpuScene *scene, Material material,
 {
     if (frame->ghost_opacity <= 0)
         return;
-    int opacity = GetShaderLocation(material.shader, "ghostOpacity");
-    int pixel_scale = GetShaderLocation(material.shader, "ghostPixelScale");
+    int opacity = cached_location(material.shader, "ghostOpacity");
+    int pixel_scale = cached_location(material.shader, "ghostPixelScale");
     float scale = (float)width / 320;
     SetShaderValue(material.shader, pixel_scale, &scale, SHADER_UNIFORM_FLOAT);
     SetShaderValue(material.shader, opacity, &frame->ghost_opacity, SHADER_UNIFORM_FLOAT);
@@ -1697,16 +1866,16 @@ static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontS
     Vector3 up = Vector3CrossProduct(right, forward);
     float scale[] = { tanf(camera.vertical_fov * .5f) * aspect, tanf(camera.vertical_fov * .5f) };
     Shader shader = scene->sky_shader;
-    SetShaderValue(shader, GetShaderLocation(shader, "skyForward"), &forward, SHADER_UNIFORM_VEC3);
-    SetShaderValue(shader, GetShaderLocation(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
-    SetShaderValue(shader, GetShaderLocation(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
-    SetShaderValue(shader, GetShaderLocation(shader, "skyScale"), scale, SHADER_UNIFORM_VEC2);
+    SetShaderValue(shader, cached_location(shader, "skyForward"), &forward, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shader, cached_location(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shader, cached_location(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
+    SetShaderValue(shader, cached_location(shader, "skyScale"), scale, SHADER_UNIFORM_VEC2);
     SetShaderValue(
-        shader, GetShaderLocation(shader, "skyEye"), &camera.position, SHADER_UNIFORM_VEC3);
+        shader, cached_location(shader, "skyEye"), &camera.position, SHADER_UNIFORM_VEC3);
     float area[] = { squall.centre.x, squall.centre.y, squall.radius, squall.grown };
     float heights[] = { squall.base, squall.top };
-    SetShaderValue(shader, GetShaderLocation(shader, "squallArea"), area, SHADER_UNIFORM_VEC4);
-    SetShaderValue(shader, GetShaderLocation(shader, "squallHeight"), heights, SHADER_UNIFORM_VEC2);
+    SetShaderValue(shader, cached_location(shader, "squallArea"), area, SHADER_UNIFORM_VEC4);
+    SetShaderValue(shader, cached_location(shader, "squallHeight"), heights, SHADER_UNIFORM_VEC2);
     if (counting)
         ++counting->sky_quads;
     BeginShaderMode(shader);
@@ -1718,7 +1887,7 @@ static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontS
 
 static void draw_ground(const WaterfrontGpuScene *scene, Material material)
 {
-    int location = GetShaderLocation(scene->shader, "groundPass");
+    int location = cached_location(scene->shader, "groundPass");
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
     draw_tiled(scene, &scene->quay, material);
@@ -1728,7 +1897,7 @@ static void draw_ground(const WaterfrontGpuScene *scene, Material material)
 
 static void draw_facades(const WaterfrontGpuScene *scene, Material material)
 {
-    int location = GetShaderLocation(scene->shader, "facadePass");
+    int location = cached_location(scene->shader, "facadePass");
     int enabled = 1;
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
     draw_tiled(scene, &scene->facades, material);
@@ -1789,7 +1958,7 @@ static void render_reflection(
     // separate camera does not require mirrored geometry or per-mesh winding changes.
     rlDisableBackfaceCulling();
     int reflection_pass = 1;
-    int clip_location = GetShaderLocation(scene->shader, "reflectionPass");
+    int clip_location = cached_location(scene->shader, "reflectionPass");
     SetShaderValue(scene->shader, clip_location, &reflection_pass, SHADER_UNIFORM_INT);
     draw_reflected_scene(scene, frame, scene->city_material, scene->life_material);
     reflection_pass = 0;
@@ -1876,10 +2045,10 @@ static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *fr
     set_object_color(scene->water_shader, WHITE);
     set_water_uniforms(scene, frame);
     float pixel_scale = fmaxf(1, width / 320.0f);
-    SetShaderValue(scene->water_shader, GetShaderLocation(scene->water_shader, "surfacePixelScale"),
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
     int pass = scene->near_water.vaoId ? 1 : 0;
-    int location = GetShaderLocation(scene->water_shader, "waterPatchPass");
+    int location = cached_location(scene->water_shader, "waterPatchPass");
     SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);
     if (scene->water.vaoId)
         submit(scene->water, scene->water_material, MatrixIdentity(), WATERFRONT_GPU_GROUP_WATER);
@@ -1907,7 +2076,9 @@ void waterfront_gpu_scene_draw(
         return;
     }
     counting = &scene->stats;
+    drawing_scene = scene;
     draw_scene(scene, frame, width, height);
+    drawing_scene = NULL;
     counting = NULL;
 }
 
@@ -2089,6 +2260,12 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
             UnloadMesh(scene->player_engine[skin]);
     if (scene->plane.vaoId != 0)
         UnloadMesh(scene->plane);
+    if (scene->bounds_cache) {
+        ObjectBoundsCache *cache = scene->bounds_cache;
+        free(cache->items);
+        free(cache);
+        scene->bounds_cache = NULL;
+    }
     if (scene->city_material.maps != NULL) {
         scene->city_material.shader.id = rlGetShaderIdDefault();
         UnloadMaterial(scene->city_material);
@@ -2113,8 +2290,10 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         UnloadTexture(scene->sky_texture);
     if (scene->object_wakes.id != 0)
         UnloadTexture(scene->object_wakes);
-    if (scene->sky_shader.id != 0 && scene->sky_shader.id != rlGetShaderIdDefault())
+    if (scene->sky_shader.id != 0 && scene->sky_shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->sky_shader);
         UnloadShader(scene->sky_shader);
+    }
     if (scene->roof_texture.id != 0)
         UnloadTexture(scene->roof_texture);
     if (scene->shadow_map.id != 0)
@@ -2123,11 +2302,17 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         rlUnloadFramebuffer(scene->far_shadow_map.id);
     if (scene->reflection.id != 0)
         UnloadRenderTexture(scene->reflection);
-    if (scene->shader.id != 0 && scene->shader.id != rlGetShaderIdDefault())
+    if (scene->shader.id != 0 && scene->shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->shader);
         UnloadShader(scene->shader);
-    if (scene->shadow_shader.id != 0 && scene->shadow_shader.id != rlGetShaderIdDefault())
+    }
+    if (scene->shadow_shader.id != 0 && scene->shadow_shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->shadow_shader);
         UnloadShader(scene->shadow_shader);
-    if (scene->water_shader.id != 0 && scene->water_shader.id != rlGetShaderIdDefault())
+    }
+    if (scene->water_shader.id != 0 && scene->water_shader.id != rlGetShaderIdDefault()) {
+        forget_locations(scene->water_shader);
         UnloadShader(scene->water_shader);
+    }
     *scene = (WaterfrontGpuScene) { 0 };
 }

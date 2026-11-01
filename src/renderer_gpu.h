@@ -140,7 +140,8 @@ typedef struct {
     bool far_shadows_active; // Gameplay only; title keeps its existing single map.
     bool atmosphere_enabled;
     bool reflections_enabled;
-    bool culling_disabled; // Review only: draw every map tile in every pass.
+    bool culling_disabled; // Review only: draw every map tile and object in every pass.
+    void *bounds_cache; // Private local bounds of transformed object meshes, keyed by VAO.
     bool ready;
     WaterfrontGpuStats stats; // Reset by each draw.
 } WaterfrontGpuScene;
