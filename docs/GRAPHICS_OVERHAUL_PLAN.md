@@ -223,7 +223,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G1](#g1--persistent-instances-and-pass-culling) | Persistent instances and pass culling | G0 budgets and review manifest | Prepared | Unstarted; review pending |
 | [G2a](#g2a--geometry-storage-and-ownership) | Geometry storage and ownership | G1 | Prepared | Unstarted; review pending |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | Distance detail and valid shadow reuse | G2a | Prepared | Unstarted; review pending |
-| G3a | Stamped wake shading | G2b and Batch A verdict resolved | Queued in next planning PRs | Unstarted; review pending |
+| [G3a](#g3a--stamped-wake-shading) | Stamped wake shading | G2b and Batch A verdict resolved | Prepared | Unstarted; review pending |
 | G3b | Foam history and cosmetic ripples | G3a | Queued in next planning PRs | Unstarted; review pending |
 | G4 | Shore-aware and far-water character | G3b | Queued in next planning PRs | Unstarted; review pending |
 | G5a | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Queued in next planning PRs | Unstarted; review pending |
@@ -438,6 +438,58 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G2b from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add bounded distance detail and safely evaluate near/far static shadow reuse, with measured invalidation and LOD checks. Update the plan and hand off the combined Batch A playtest for G1–G2b.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G3a — Stamped wake shading
+
+Stage coverage: G3 part 1. **Depends on:** G2b and Batch A verdict resolved.
+Human review: Batch B after G4.
+
+**Read first:** `src/boat_gpu.[ch]`, `src/renderer_gpu.[ch]`, `assets/shaders/waterfront_water.vs`,
+`assets/shaders/waterfront_water.fs`, [wake rewrite](WAKE_REWRITE_PLAN.md),
+[performance](BOATING_PERFORMANCE.md).
+
+**Tasks, in order:**
+
+1. Document which objectWake outputs feed height, slope and foam in both shaders. Keep vertex
+   displacement analytic in this package; replace the fragment shading loop with a sampled cosmetic
+   layer, so hulls retain the existing physical-surface agreement. Report remaining vertex work
+   explicitly.
+2. Allocate a bounded boat-following field with world-space coordinates, an integer-texel snapped
+   origin and a guard/fade band. Stamp current player/rival/traffic wake pieces as bounded quads,
+   preserving their signs, lifetimes, ordering-independent sums and slope/foam units. Clear and
+   rebuild this stateless field each simulated frame; history belongs to G3b.
+3. Probe actual render-target and blend support. Float renderability alone does not prove float
+   blending. Provide a tested RGBA8 encoded path or the existing analytic fragment loop when
+   unsupported; do not blend signed data incorrectly. Support GL4.1 and the WebGL2 shader
+   conversion.
+4. Handle patch edges, scroll, fast movement, teleport, time rewind, map/view changes and context
+   recreation without texture swimming or stale data. Own resources per view and avoid framebuffer
+   feedback/readback. Supply a comparison switch in the review harness.
+5. Compare sampled shading against the reference at fixed world samples and G0 captures using the G0
+   tolerance. Measure the whole field-build plus main/reflection water cost in saturated four-boat
+   cases at both resolutions, including bandwidth and target memory.
+
+**Acceptance:** Repeated four-boat measurements beat the original fragment loop within G0 GPU/memory
+budgets. Analytic height and exact physical final_state/state_hash evidence remain unchanged;
+numerical slope/foam errors meet the declared bound. Lifecycle, edge/scroll/reset and
+supported/fallback browser paths pass; preserve blocky cube foam.
+
+**Limits and stop conditions:** This is cosmetic render data only: no core/net edits, GPU readback
+or retired physical field revival. Sampling is allowed bounded shading error, not a claim of
+byte-identical images. Do not remove the fallback until it is no longer needed for comparison or
+compatibility.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G3a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Stamp bounded wake shading while retaining analytic vertex displacement and a tested fallback. Prove error/performance/hash gates, update the plan, and save moving review evidence for Batch B.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
