@@ -53,15 +53,23 @@ conditional iPhone Home Screen hint remain available. Plugin authoring is explic
 with `?author`; normal visitors do not see its panel. Browser qualification scripts use this
 entry point where needed and no longer depend on the removed fullscreen checkbox.
 
-`web/river.png` is a real 1920×1200 GPU capture with the cabin boat, replacing the previous
+`web/river.png` is a real 1920×1200 GPU capture with the Sweden boat, replacing the previous
 960×600 enlarged low-resolution image. It retains the river/bridge area with a closer chase
-composition. Capture recipe: temporarily insert
+composition. Capture recipe in `tools/wake_velocity.c`: temporarily insert
 `if (screenshot && !boat_gpu_resize(&gpu, 1920, 1200)) goto cleanup;` immediately before
-`texture = gpu.target.texture;` in `tools/wake_velocity.c`, build `wake_velocity`, then run
+`texture = gpu.target.texture;`, and replace `live_view.skin = skin;` with
+`live_view.skin = screenshot ? BOAT_SKIN_SWEDEN : skin;`. Build `wake_velocity`, then run
 `./build/wake_velocity --gpu --gpu-aa --location river --skin cabin --time 3 --screenshot web/river.png`
-from the repository root. Restore the temporary C edit and rebuild afterward. This bypasses
-only the capture target size; it adds no resolution option or gameplay change. Reflections,
-clouds and wakes retain the renderer's current stylization.
+from the repository root. Simulating the cabin run and changing only the rendered boat preserves
+the previous capture's exact pose and camera. Restore both temporary C edits and rebuild
+afterward. These capture-only overrides add no resolution option or gameplay change.
+Reflections, clouds and wakes retain the renderer's current stylization.
+
+User revision, 2026-11-01: PLAY uses a system sans-serif font; the screenshot uses the Sweden
+boat instead of the cabin boat. The river, capture time and resolution are retained. Debug
+build/full CTest passed again (349 enabled tests); the refreshed web package and Chrome
+1280×900/390×844 previews passed with the sans-serif computed font and 1920×1200 image checked.
+Both layouts and the new capture were inspected; no JavaScript errors were reported.
 
 Current status: implemented; verification is recorded below. Next: review the proposed layout
 and capture, then publish through the normal reviewed release/hosting workflow. This change
