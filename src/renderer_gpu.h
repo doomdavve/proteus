@@ -59,7 +59,8 @@ typedef enum {
 
 typedef struct {
     unsigned int submissions;
-    size_t triangles;
+    size_t triangles; // Multiplied by instances: the work the GPU rasterizes.
+    unsigned int instances;
 } WaterfrontGpuCount;
 
 // One map surface class split by render tile (the scenery's catalogue): mesh i covers bounds[i],
@@ -70,9 +71,10 @@ typedef struct {
     int count;
 } WaterfrontGpuTiled;
 
-// Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one
-// raylib DrawMesh, which issues one non-instanced GL draw; sky_quads counts the batched sky
-// quad, flushed as one more draw per pass. These are not driver-reported draw calls.
+// Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one GL
+// draw: a raylib DrawMesh, or one instanced run of contiguous objects sharing a mesh; sky_quads
+// counts the batched sky quad, flushed as one more draw per pass. These are not driver-reported
+// draw calls.
 // tiles_culled counts the map tile meshes each pass skipped outside its view volume.
 typedef struct {
     WaterfrontGpuCount mesh[WATERFRONT_GPU_PASS_COUNT][WATERFRONT_GPU_GROUP_COUNT];
@@ -141,7 +143,10 @@ typedef struct {
     bool atmosphere_enabled;
     bool reflections_enabled;
     bool culling_disabled; // Review only: draw every map tile and object in every pass.
+    bool instancing_disabled; // Review only: the scalar reference for instanced object draws.
+    int instance_limit; // Review only: replay a batch sooner than its capacity (0: capacity).
     void *bounds_cache; // Private local bounds of transformed object meshes, keyed by VAO.
+    void *object_batch; // Private instance storage; NULL falls back to the scalar path.
     bool ready;
     WaterfrontGpuStats stats; // Reset by each draw.
 } WaterfrontGpuScene;
@@ -158,6 +163,8 @@ void waterfront_gpu_scene_set_reflections_enabled(WaterfrontGpuScene *scene, boo
 bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int size);
 // Review only: drawing every tile isolates culling from the per-tile draw order.
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled);
+void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled);
+void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limit);
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);

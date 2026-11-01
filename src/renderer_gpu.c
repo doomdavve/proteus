@@ -9,6 +9,7 @@
 #include "rlgl.h"
 
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -233,8 +234,8 @@ static int cached_location(Shader shader, const char *name)
     return location;
 }
 
-static const char *const known_uniforms[] = { "objectColor", "emissive", "ghostOpacity",
-    "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
+static const char *const known_uniforms[] = { "objectColor", "emissive", "instanced",
+    "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
     "directionalColor", "directionalDirection", "directionalIntensity", "shadowsEnabled",
     "lightViewProjection", "shadowMap", "farShadowsEnabled", "farLightViewProjection",
     "farShadowMap", "localLightCount", "localLightPositionRadius[0]", "localLightColorIntensity[0]",
@@ -258,6 +259,8 @@ static void prewarm_locations(Shader shader)
 
 static WaterfrontGpuScene *drawing_scene;
 
+static bool object_batch_create(WaterfrontGpuScene *scene);
+
 // Counter for the pass and group being drawn, set only inside waterfront_gpu_scene_draw on the
 // render thread. NULL outside a scene draw, when submissions are not counted.
 static WaterfrontGpuStats *counting;
@@ -269,6 +272,7 @@ static void submit(Mesh mesh, Material material, Matrix transform, WaterfrontGpu
     if (counting) {
         WaterfrontGpuCount *count = &counting->mesh[counting_pass][group];
         ++count->submissions;
+        ++count->instances;
         count->triangles += (size_t)mesh.triangleCount;
     }
 }
@@ -995,6 +999,7 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     if (!build_unit_cube(&scene->bridge) || !build_unit_cube(&scene->cube)
         || !build_unit_plane(&scene->plane))
         goto failed;
+    (void)object_batch_create(scene); // Scalar drawing remains valid if this fails.
     scene->shadow_map_size = WATERFRONT_GPU_SHADOW_MAP_SIZE;
     if (!create_shadow_map(&scene->shadow_map, scene->shadow_map_size)
         || !create_shadow_map(&scene->far_shadow_map, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE))
@@ -1121,11 +1126,245 @@ static bool object_is_culled(WaterfrontGpuScene *scene, const Mesh *mesh, Transf
     return !box_in_view(view_projection, (BoundingBox) { low, high });
 }
 
+// Per-instance attributes, laid out for the fixed locations in waterfront_city.vs and
+// waterfront_shadow.vs. Values are the exact floats the scalar path computes for its uniforms.
+typedef struct {
+    float mvp[16];
+    float model_rows[12];
+    float normal[9];
+    float color[4];
+    float emissive;
+} ObjectInstance;
+
+enum {
+    OBJECT_INSTANCE_CAPACITY = 8192,
+    OBJECT_RUN_CAPACITY = 1024,
+    INSTANCE_LOCATION_MVP = 4,
+    INSTANCE_LOCATION_MODEL = 8,
+    INSTANCE_LOCATION_NORMAL = 11,
+    INSTANCE_LOCATION_COLOR = 14,
+    INSTANCE_LOCATION_EMISSIVE = 15,
+    INSTANCE_LOCATION_END = 16,
+};
+
+// One run draws contiguous submissions of one mesh, so the scalar draw order is unchanged.
+typedef struct {
+    unsigned int vao;
+    int vertex_count, triangle_count;
+    bool indexed;
+    int first, count;
+} ObjectRun;
+
+// Objects recorded between object_batch_begin and object_batch_end. A batch uses one material and
+// spans no other state change. Storage is fixed, and a full batch replays and continues in order.
+typedef struct {
+    ObjectInstance *instances;
+    ObjectRun *runs;
+    unsigned int *prepared_vaos;
+    int instance_count, run_count, prepared_count, prepared_capacity;
+    unsigned int buffer;
+    int buffer_cursor;
+    bool recording;
+    Material material;
+    Matrix view, projection;
+} ObjectBatch;
+
+static bool object_batch_create(WaterfrontGpuScene *scene)
+{
+    // Instanced programs must resolve to the shared VAO layout; otherwise stay scalar.
+    if (rlGetLocationAttrib(scene->shader.id, "instanceMvp") != INSTANCE_LOCATION_MVP
+        || rlGetLocationAttrib(scene->shadow_shader.id, "instanceMvp") != INSTANCE_LOCATION_MVP)
+        return false;
+    ObjectBatch *batch = calloc(1, sizeof(*batch));
+    if (!batch)
+        return false;
+    batch->instances = malloc(OBJECT_INSTANCE_CAPACITY * sizeof(*batch->instances));
+    batch->runs = malloc(OBJECT_RUN_CAPACITY * sizeof(*batch->runs));
+    batch->buffer = batch->instances && batch->runs
+        ? rlLoadVertexBuffer(NULL, OBJECT_INSTANCE_CAPACITY * sizeof(ObjectInstance), true)
+        : 0;
+    if (!batch->buffer) {
+        free(batch->instances);
+        free(batch->runs);
+        free(batch);
+        return false;
+    }
+    scene->object_batch = batch;
+    return true;
+}
+
+static void object_batch_destroy(WaterfrontGpuScene *scene)
+{
+    ObjectBatch *batch = scene->object_batch;
+    if (!batch)
+        return;
+    rlUnloadVertexBuffer(batch->buffer);
+    free(batch->instances);
+    free(batch->runs);
+    free(batch->prepared_vaos);
+    free(batch);
+    scene->object_batch = NULL;
+}
+
+// Points VAO's instance attributes at FIRST in the shared buffer. The VAO keeps the layout, and
+// scalar draws ignore those attributes while `instanced` is zero.
+static void bind_run_attributes(ObjectBatch *batch, unsigned int vao, int first)
+{
+    const int stride = (int)sizeof(ObjectInstance);
+    const int base = first * stride;
+    for (int i = 0; i < 4; ++i)
+        rlSetVertexAttribute(INSTANCE_LOCATION_MVP + i, 4, RL_FLOAT, false, stride,
+            base + (int)offsetof(ObjectInstance, mvp) + i * 4 * (int)sizeof(float));
+    for (int i = 0; i < 3; ++i) {
+        rlSetVertexAttribute(INSTANCE_LOCATION_MODEL + i, 4, RL_FLOAT, false, stride,
+            base + (int)offsetof(ObjectInstance, model_rows) + i * 4 * (int)sizeof(float));
+        rlSetVertexAttribute(INSTANCE_LOCATION_NORMAL + i, 3, RL_FLOAT, false, stride,
+            base + (int)offsetof(ObjectInstance, normal) + i * 3 * (int)sizeof(float));
+    }
+    rlSetVertexAttribute(INSTANCE_LOCATION_COLOR, 4, RL_FLOAT, false, stride,
+        base + (int)offsetof(ObjectInstance, color));
+    rlSetVertexAttribute(INSTANCE_LOCATION_EMISSIVE, 1, RL_FLOAT, false, stride,
+        base + (int)offsetof(ObjectInstance, emissive));
+    for (int i = 0; i < batch->prepared_count; ++i)
+        if (batch->prepared_vaos[i] == vao)
+            return;
+    for (int location = INSTANCE_LOCATION_MVP; location < INSTANCE_LOCATION_END; ++location) {
+        rlEnableVertexAttribute(location);
+        rlSetVertexAttributeDivisor(location, 1);
+    }
+    if (batch->prepared_count == batch->prepared_capacity) {
+        int capacity = batch->prepared_capacity ? batch->prepared_capacity * 2 : 32;
+        unsigned int *vaos = realloc(batch->prepared_vaos, (size_t)capacity * sizeof(*vaos));
+        if (!vaos)
+            return; // Prepared again next time; the VAO state above is already valid.
+        batch->prepared_vaos = vaos;
+        batch->prepared_capacity = capacity;
+    }
+    batch->prepared_vaos[batch->prepared_count++] = vao;
+}
+
+static void object_batch_replay(ObjectBatch *batch)
+{
+    if (batch->instance_count == 0)
+        return;
+    int bytes = batch->instance_count * (int)sizeof(ObjectInstance);
+    if (batch->buffer_cursor + batch->instance_count > OBJECT_INSTANCE_CAPACITY)
+        batch->buffer_cursor = 0;
+    rlUpdateVertexBuffer(
+        batch->buffer, batch->instances, bytes, batch->buffer_cursor * (int)sizeof(ObjectInstance));
+    Shader shader = batch->material.shader;
+    int instanced = cached_location(shader, "instanced");
+    const int enabled = 1, disabled = 0, slot = 0;
+    rlEnableShader(shader.id);
+    rlSetUniform(instanced, &enabled, SHADER_UNIFORM_INT, 1);
+    rlActiveTextureSlot(0);
+    rlEnableTexture(batch->material.maps[MATERIAL_MAP_DIFFUSE].texture.id);
+    rlSetUniform(shader.locs[SHADER_LOC_MAP_DIFFUSE], &slot, SHADER_UNIFORM_INT, 1);
+    for (int i = 0; i < batch->run_count; ++i) {
+        const ObjectRun *run = &batch->runs[i];
+        rlEnableVertexArray(run->vao);
+        rlEnableVertexBuffer(batch->buffer);
+        bind_run_attributes(batch, run->vao, batch->buffer_cursor + run->first);
+        if (run->indexed)
+            rlDrawVertexArrayElementsInstanced(0, run->triangle_count * 3, 0, run->count);
+        else
+            rlDrawVertexArrayInstanced(0, run->vertex_count, run->count);
+        if (counting) {
+            WaterfrontGpuCount *count
+                = &counting->mesh[counting_pass][WATERFRONT_GPU_GROUP_OBJECTS];
+            ++count->submissions;
+            count->instances += (unsigned int)run->count;
+            count->triangles += (size_t)run->triangle_count * (size_t)run->count;
+        }
+    }
+    rlDisableVertexArray();
+    rlDisableVertexBuffer();
+    rlDisableTexture();
+    // Later draws see the uniforms the scalar path would have left behind.
+    const ObjectInstance *last = &batch->instances[batch->instance_count - 1];
+    int emissive = cached_location(shader, "emissive");
+    int color = cached_location(shader, "objectColor");
+    int emissive_value = (int)last->emissive;
+    if (emissive >= 0)
+        rlSetUniform(emissive, &emissive_value, SHADER_UNIFORM_INT, 1);
+    if (color >= 0)
+        rlSetUniform(color, last->color, SHADER_UNIFORM_VEC4, 1);
+    rlSetUniform(instanced, &disabled, SHADER_UNIFORM_INT, 1);
+    rlDisableShader();
+    batch->buffer_cursor += batch->instance_count;
+    batch->instance_count = 0;
+    batch->run_count = 0;
+}
+
+static void object_batch_begin(const WaterfrontGpuScene *scene, Material material)
+{
+    ObjectBatch *batch = scene->object_batch;
+    if (!batch || scene->instancing_disabled)
+        return;
+    batch->recording = true;
+    batch->material = material;
+    batch->view = rlGetMatrixModelview();
+    batch->projection = rlGetMatrixProjection();
+}
+
+static void object_batch_end(const WaterfrontGpuScene *scene)
+{
+    ObjectBatch *batch = scene->object_batch;
+    if (!batch || !batch->recording)
+        return;
+    object_batch_replay(batch);
+    batch->recording = false;
+}
+
+static void object_batch_add(ObjectBatch *batch, int instance_limit, Mesh mesh,
+    Transform3D transform, Color color, bool emissive, bool shaded)
+{
+    if (batch->instance_count == (instance_limit ? instance_limit : OBJECT_INSTANCE_CAPACITY)
+        || (batch->run_count == OBJECT_RUN_CAPACITY
+            && batch->runs[batch->run_count - 1].vao != mesh.vaoId))
+        object_batch_replay(batch);
+    ObjectRun *run = batch->run_count ? &batch->runs[batch->run_count - 1] : NULL;
+    if (!run || run->vao != mesh.vaoId) {
+        run = &batch->runs[batch->run_count++];
+        *run = (ObjectRun) { .vao = mesh.vaoId,
+            .vertex_count = mesh.vertexCount,
+            .triangle_count = mesh.triangleCount,
+            .indexed = mesh.indices != NULL,
+            .first = batch->instance_count };
+    }
+    ++run->count;
+    ObjectInstance *instance = &batch->instances[batch->instance_count++];
+    // The same matrix products, in the same order, as DrawMesh computes for its uniforms.
+    Matrix model = MatrixMultiply(transform_matrix(transform), rlGetMatrixTransform());
+    Matrix mvp = MatrixMultiply(MatrixMultiply(model, batch->view), batch->projection);
+    memcpy(instance->mvp, MatrixToFloatV(mvp).v, sizeof(instance->mvp));
+    instance->color[0] = (float)color.r / 255.0f;
+    instance->color[1] = (float)color.g / 255.0f;
+    instance->color[2] = (float)color.b / 255.0f;
+    instance->color[3] = (float)color.a / 255.0f;
+    instance->emissive = emissive ? 1.0f : 0.0f;
+    if (!shaded)
+        return; // The shadow program reads only the MVP; the skipped fields are never used.
+    const float rows[12] = { model.m0, model.m4, model.m8, model.m12, model.m1, model.m5, model.m9,
+        model.m13, model.m2, model.m6, model.m10, model.m14 };
+    memcpy(instance->model_rows, rows, sizeof(rows));
+    Matrix normal = MatrixTranspose(MatrixInvert(model));
+    const float columns[9] = { normal.m0, normal.m1, normal.m2, normal.m4, normal.m5, normal.m6,
+        normal.m8, normal.m9, normal.m10 };
+    memcpy(instance->normal, columns, sizeof(columns));
+}
+
 static void draw_colored_mesh(
     Mesh mesh, Material material, Transform3D transform, Color color, bool emissive)
 {
     if (drawing_scene && object_is_culled(drawing_scene, &mesh, transform))
         return;
+    ObjectBatch *batch = drawing_scene ? drawing_scene->object_batch : NULL;
+    if (batch && batch->recording) {
+        object_batch_add(batch, drawing_scene->instance_limit, mesh, transform, color, emissive,
+            material.shader.id != drawing_scene->shadow_shader.id);
+        return;
+    }
     set_object_color(material.shader, color);
     set_emissive(material.shader, emissive);
     material.maps[MATERIAL_MAP_DIFFUSE].color = color;
@@ -1676,10 +1915,12 @@ static void draw_traffic(const WaterfrontGpuScene *scene, Material material,
     const WaterfrontTrafficFrame *traffic = &frame->traffic;
     bool lights = material.shader.id != scene->shadow_shader.id;
     const Color colors[] = { { 222, 70, 52, 255 }, { 72, 191, 139, 255 }, { 235, 223, 188, 255 } };
+    // Hulls first and then every light cube, so the cubes form one instanced run.
+    for (int i = 0; i < traffic->vessel_count; ++i)
+        draw_colored_mesh(scene->traffic_boats[traffic->mesh[i]], material,
+            traffic->vessels[i].pose, WHITE, false);
     for (int i = 0; i < traffic->vessel_count; ++i) {
         const WaterfrontVesselState *vessel = &traffic->vessels[i];
-        draw_colored_mesh(
-            scene->traffic_boats[traffic->mesh[i]], material, vessel->pose, WHITE, false);
         float size = i >= 3 ? .32f : .18f;
         for (int light = 0; lights && light < WATERFRONT_TRAFFIC_LIGHTS; ++light)
             draw_colored_mesh(scene->cube, material,
@@ -1724,7 +1965,7 @@ static void draw_boat(
     }
 }
 
-static void draw_scenery(
+static void add_scenery(
     const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
 {
     for (int i = 0; i < frame->scenery_count; ++i)
@@ -1732,16 +1973,25 @@ static void draw_scenery(
             scene->cube, material, frame->scenery[i].transform, frame->scenery[i].color, false);
 }
 
-static void draw_life(const WaterfrontGpuScene *scene, Material material,
+static void draw_scenery(
+    const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, Material material)
+{
+    object_batch_begin(scene, material);
+    add_scenery(scene, frame, material);
+    object_batch_end(scene);
+}
+
+static void add_life(const WaterfrontGpuScene *scene, Material material,
     const WaterfrontSceneFrame *frame, bool emissive)
 {
     if (!frame->boating_basin) {
-        draw_scenery(scene, frame, material);
+        add_scenery(scene, frame, material);
         draw_harbor(scene, material, frame);
         draw_traffic(scene, material, frame, emissive);
     }
-    for (int i = 0; i < frame->gull_count; ++i)
-        for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
+    // By part, so each part's flock forms one instanced run.
+    for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
+        for (int i = 0; i < frame->gull_count; ++i)
             draw_colored_mesh(scene->gull[part], material, frame->gulls[i][part], WHITE, true);
     if (frame->player_active) {
         for (int i = 0; i < frame->lamp_count; ++i) {
@@ -1800,6 +2050,14 @@ static void draw_life(const WaterfrontGpuScene *scene, Material material,
             }
         }
     }
+}
+
+static void draw_life(const WaterfrontGpuScene *scene, Material material,
+    const WaterfrontSceneFrame *frame, bool emissive)
+{
+    object_batch_begin(scene, material);
+    add_life(scene, material, frame, emissive);
+    object_batch_end(scene);
 }
 
 static void draw_crane_lights(const WaterfrontGpuScene *scene, Material material)
@@ -1996,6 +2254,8 @@ static void draw_shadow_casters(
     const WaterfrontGpuScene *scene, Material material, const WaterfrontSceneFrame *frame)
 {
     if (frame->boating_basin) {
+        // Explicit: inheriting the context's cull state made the first frame differ from the rest.
+        rlDisableBackfaceCulling();
         draw_scenery(scene, frame, material);
         draw_life(scene, material, frame, false);
         return;
@@ -2084,11 +2344,12 @@ void waterfront_gpu_scene_draw(
 
 WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats)
 {
-    WaterfrontGpuCount total = { stats->sky_quads, 2 * (size_t)stats->sky_quads };
+    WaterfrontGpuCount total = { stats->sky_quads, 2 * (size_t)stats->sky_quads, stats->sky_quads };
     for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
         for (int group = 0; group < WATERFRONT_GPU_GROUP_COUNT; ++group) {
             total.submissions += stats->mesh[pass][group].submissions;
             total.triangles += stats->mesh[pass][group].triangles;
+            total.instances += stats->mesh[pass][group].instances;
         }
     return total;
 }
@@ -2173,6 +2434,16 @@ static void draw_scene(
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled)
 {
     scene->culling_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->instancing_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limit)
+{
+    scene->instance_limit = limit;
 }
 
 void waterfront_gpu_scene_set_lighting_enabled(WaterfrontGpuScene *scene, bool enabled)
@@ -2260,6 +2531,7 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
             UnloadMesh(scene->player_engine[skin]);
     if (scene->plane.vaoId != 0)
         UnloadMesh(scene->plane);
+    object_batch_destroy(scene);
     if (scene->bounds_cache) {
         ObjectBoundsCache *cache = scene->bounds_cache;
         free(cache->items);
