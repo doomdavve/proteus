@@ -672,7 +672,7 @@ same commands. They are not CTest thresholds.
 | G1 river/waves/4x4 app submissions p95 | ≤ 400 | 1,290 |
 | G1 river/waves/4x4 CPU submission p95 | ≤ 3.2 ms | 4.30 ms |
 | G1 stress/waves/4x4 app submissions p95 | ≤ 300 | 813 |
-| G1 stress/waves/4x4 CPU submission p95 | ≤ 8.0 ms | 11.13 ms |
+| G1 stress/waves/4x4 CPU submission p95, visible at 60 Hz (`--visible`) | ≤ 4.0 ms | 2.1 ms at G1; not measured at G0 |
 | P1 GPU regression, river p95 | ≤ 4.05 ms (+5%) | 3.85 ms |
 | P1 GPU regression, stress p95 | ≤ 21.0 ms (noise band) | 20.01 ms |
 | G2a static map GPU vertex bytes | −45% | 3 unique vertices × 36 B per triangle |
@@ -683,7 +683,9 @@ The water reserve is the remaining ordinary GPU headroom plus the whole stress d
 not spend it: G3 owns bringing the four-boat stress case to ≤ 16.5 ms at 4x4 and ≤ 12.0 ms at
 320x200. CPU and memory budgets are recorded per pass/group in each checkpoint result.
 
-G1 results against these gates, and one gate still open, are in
+The stress CPU gate was ≤ 8.0 ms unpaced (G0 reference 11.13 ms) until the owner changed it on
+2026-11-01: most of that time was the driver waiting on the GPU, so it measured GPU back-pressure.
+G1 results against these gates are in
 [its checkpoint result](GRAPHICS_OVERHAUL_PLAN.md#g1--persistent-instances-and-pass-culling).
 Read gate columns against each report's `p95`; `p50` is typically far lower for submissions.
 

@@ -335,11 +335,11 @@ hardware evidence recorded or explicitly pending. Run the full suite, prepare on
 and keep its human verdict separate. Fix blocking feedback before P2 starts.
 
 **Result:** in progress. G0 and G0w are machine-verified on the reference Mac. G1 instancing is
-byte-identical in every pass and meets three of four submission/CPU ceilings; stress CPU submission
-(9.1–9.2 ms, ≤ 8.0) is open as an owner decision because it measures GPU back-pressure. G2a and G2b
+byte-identical in every pass and meets its submission/CPU ceilings, after the owner moved the stress
+CPU gate to a 60 Hz measurement because the unpaced one measured GPU back-pressure. G2a and G2b
 are unstarted. Completed: stress scenario, review-pose manifest, measured G0 budgets, bounded live
 capture, portable exports, Windows launcher/Mac analyzer and their tests; G1 location caching,
-per-pass object culling and persistent instancing. Next: decide the stress CPU gate, then G2a.
+per-pass object culling and persistent instancing. Next: G2a.
 Implementation verification: full GPU-enabled CTest and three-repeat Release measurements; see
 [G1](#g1--persistent-instances-and-pass-culling). Agent playback: one WebGL2 river smoke on the M1
 Max, no native manual playback. Human acceptance: none;
@@ -430,7 +430,7 @@ gate; otherwise continue within the same package. No checkpoint is verified or a
 | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | P1 | current main | Machine-verified on M1 Max; browser smoke and Windows hardware open |
 | [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; Windows hardware baseline pending |
-| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and three of four ceilings machine-verified; stress CPU gate awaits an owner decision |
+| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and submission/CPU ceilings machine-verified; no human review |
 | [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Unstarted |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Unstarted |
 | [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Unstarted |
@@ -692,9 +692,8 @@ direct GL-only dependency that breaks WebGL2. A parity failure is a bug to fix, 
 widen tolerance.
 
 **Checkpoint result:**
-- State: byte parity and three of the four G0 submission/CPU ceilings machine-verified on the M1
-  Max. **One ceiling remains missed:** stress/waves/4x4 CPU submission p95 is 9.1–9.2 ms against
-  ≤ 8.0 ms. See the open decision below. No human review is implied.
+- State: byte parity and all G0 submission/CPU ceilings machine-verified on the M1 Max, with the
+  stress CPU gate as changed by the owner below. No human review is implied.
 - Commit(s): `73e0a1b` caches uniform locations and culls transformed objects per pass. The
   instancing change is on `feat/graphics-g1-instancing`, stacked on this package's branch.
 - Interfaces/owners: `ObjectBatch` in `src/renderer_gpu.c` records `draw_life`/`draw_scenery`
@@ -723,23 +722,24 @@ widen tolerance.
   | --- | --- | --- | --- | --- | --- |
   | river/waves/4x4 | **193** (≤ 400) | 742 | **1.32–1.35 ms** (≤ 3.2) | **1.45–1.48 ms** (≤ 4.05) | 2.46–2.62 ms (≤ 8.0) |
   | river/waves/320x200 | 193 | 742 | 1.31 ms | 1.33–1.34 ms | 2.46–2.48 ms |
-  | stress/waves/4x4 | **76** (≤ 300) | 560 | **9.13–9.17 ms (≤ 8.0: missed)** | **10.28–10.32 ms** (≤ 21) | 12.00–12.09 ms |
+  | stress/waves/4x4 | **76** (≤ 300) | 560 | 9.13–9.17 ms (see the gate change) | **10.28–10.32 ms** (≤ 21) | 12.00–12.09 ms |
   | stress/waves/320x200 | 76 | 560 | 3.71–3.78 ms | 4.64–4.67 ms | 5.86–5.97 ms |
 
 - Correction: earlier revisions of this result quoted 286 and 369 submissions as p95. Those were
   **p50**; the reports' p95 values were 745 and 566, so culling alone had not met either ordinary or
   stress submission ceiling. They also came from a build with an uncommitted culling edit that was
   never part of this branch. These tables replace those numbers.
-- Open decision for the owner: `sample` of the unpaced stress run attributes about 87% of
-  submission to a semaphore wait in the frame's first draw, the driver's frames-in-flight limit,
-  so roughly 1.2 ms is CPU work. The same run paced at 60 Hz reports 2.1 ms. Rotating the wake
-  record texture moved the wait, gaining about 3% unpaced and nothing paced, and was not kept. The
-  ceiling as written measures GPU back-pressure. Reaching it needs less stress GPU work (G3) or a
-  reviewed change to how the gate is measured; this result does not change the ceiling.
+- Gate change, approved by the owner on 2026-11-01: `sample` of the unpaced stress run attributes
+  about 87% of submission to a semaphore wait in the frame's first draw, the driver's
+  frames-in-flight limit, so roughly 1.2 ms is CPU work. Rotating the wake record texture moved the
+  wait, gaining about 3% unpaced and nothing paced, and was not kept. The old ≤ 8.0 ms unpaced
+  ceiling therefore measured GPU back-pressure. The gate now reads the same scenario at 60 Hz
+  (`--visible`), with a ≤ 4.0 ms ceiling because 8.0 ms would no longer catch a regression. Result at
+  `aac4bce`, three repeats, p95: **2.10–2.14 ms**. Unpaced stress CPU stays reported as information.
 - Agent playback: WebGL2 on the M1 Max (Chrome 156, ANGLE Metal, 16 vertex attributes), river,
   4 s of driving: 17,530 instanced draws, 187,011 instances, no page errors or shader warnings, one
   inspected frame correct. The GL error probe did not run. Native manual playback: not performed.
-- Next: the owner's decision above, then G2a. Human review stays in Batch A after G2b.
+- Next: G2a. Human review stays in Batch A after G2b.
 
 ### G2a — Geometry storage and ownership
 
