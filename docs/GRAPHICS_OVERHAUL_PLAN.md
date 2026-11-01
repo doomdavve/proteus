@@ -221,7 +221,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | --- | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | Measurement and review harness | current main | Prepared | Unstarted; review pending |
 | [G1](#g1--persistent-instances-and-pass-culling) | Persistent instances and pass culling | G0 budgets and review manifest | Prepared | Unstarted; review pending |
-| G2a | Geometry storage and ownership | G1 | Queued in next planning PRs | Unstarted; review pending |
+| [G2a](#g2a--geometry-storage-and-ownership) | Geometry storage and ownership | G1 | Prepared | Unstarted; review pending |
 | G2b | Distance detail and valid shadow reuse | G2a | Queued in next planning PRs | Unstarted; review pending |
 | G3a | Stamped wake shading | G2b and Batch A verdict resolved | Queued in next planning PRs | Unstarted; review pending |
 | G3b | Foam history and cosmetic ripples | G3a | Queued in next planning PRs | Unstarted; review pending |
@@ -341,6 +341,53 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G1 from docs/GRAPHICS_OVERHAUL_PLAN.md after G0 is ready. Complete cached uniforms, persistent coloured instances and per-pass object culling in one PR; prove scalar/culling parity and measured budget gains. Update the plan; prepare Batch A evidence without requesting a separate human playtest.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G2a — Geometry storage and ownership
+
+Stage coverage: G2 parts 1. **Depends on:** G1.
+Human review: Batch A after G2b.
+
+**Read first:** `src/renderer_gpu.[ch]` (`MeshBuilder`, `builder_triangle`), `src/boat_gpu.[ch]`,
+`src/boat_model.[ch]`, `src/boat_scenery.[ch]`, [3D](3D.md).
+
+**Tasks, in order:**
+
+1. Audit readers and owners of every vertex/index array before changing storage. Separate uploaded
+   static GPU-only copies from shared scenery used by CPU renderer, minimap, mesh recipes or
+   collision; retain those shared sources.
+2. Create indexed, interleaved GPU storage with explicit attribute types/strides and destruction
+   ownership. Deduplicate only complete equal attribute tuples: position, normal, colour/material,
+   UV. Never weld across flat-normal, facade UV or material seams. Keep uint16 batches within 65,535
+   addressable vertices, or use a validated uint32 index path on both targets.
+3. Land lossless indexing/layout changes first with exact captures. Then shrink attributes only
+   where G0 error bounds permit, documenting representation and decoded error. Keep position
+   accuracy at large world coordinates; avoid packing IDs as interpolated colours accidentally.
+4. Release only unused GPU staging arrays after successful upload. Keep flag cloth writable,
+   borrowed wave patches borrowed and CPU scenery available. Exercise failed upload, bind/unbind,
+   repeated map switches and two simultaneous views.
+5. Report retained CPU bytes, upload bytes and GPU estimates before/after per map, including
+   duplicate-source memory. Update ownership comments and 3D guide.
+
+**Acceptance:** Lossless phase matches exact G0 captures; any later quantization meets G0 numeric
+and image limits with declared exceptions, preserving facets/material IDs. CPU captures and physical
+final states stay exact. Measured memory reductions meet G0 targets; full GPU lifecycle and web
+build/smoke pass.
+
+**Limits and stop conditions:** No LOD, scenery pack format change, physics mesh change or
+scenery-owner release. If quantization cannot meet the predeclared error bound, retain the precise
+attribute and report savings honestly.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G2a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Index/interleave static GPU geometry, shrink only within the declared tolerances, and release unneeded staging data while preserving CPU/shared/dynamic owners. Measure memory and update the plan; carry review evidence forward to Batch A.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
