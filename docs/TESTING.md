@@ -130,6 +130,9 @@ The pixels must be identical, and every pass must cull at least one tile.
 every G0 review pose and six stress frames scalar, instanced and instanced with a replay every
 three objects, with AA off and 4x4. The main image, reflection and both shadow depth maps must be
 byte-identical, with equal instances and triangles and fewer submissions.
+`boat_water_review --geometry` prints each map's static GPU bytes (graphics G2a) and
+`--compare A B` checks two `--review` directories against the G0 image bounds. Neither is a CTest:
+review captures compare only within one platform and build.
 
 The original HUD/control worktree checks below remain legacy numerical fixtures; live pedal
 controls are verified in [the current controls section](#pedal-controls-verification).

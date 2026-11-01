@@ -686,7 +686,8 @@ not spend it: G3 owns bringing the four-boat stress case to ≤ 16.5 ms at 4x4 a
 The stress CPU gate was ≤ 8.0 ms unpaced (G0 reference 11.13 ms) until the owner changed it on
 2026-11-01: most of that time was the driver waiting on the GPU, so it measured GPU back-pressure.
 G1 results against these gates are in
-[its checkpoint result](GRAPHICS_OVERHAUL_PLAN.md#g1--persistent-instances-and-pass-culling).
+[its checkpoint result](GRAPHICS_OVERHAUL_PLAN.md#g1--persistent-instances-and-pass-culling), and
+G2a's in [its result](GRAPHICS_OVERHAUL_PLAN.md#g2a--geometry-storage-and-ownership).
 Read gate columns against each report's `p95`; `p50` is typically far lower for submissions.
 
 ### Predeclared accuracy bounds
@@ -697,7 +698,8 @@ Read gate columns against each report's `p95`; `p50` is typically far lower for 
 - **Permitted G2a quantization:** position remains 32-bit; decoded normal component error at
   most 2/255; UV error at most 1e-3 m; material/facet identity unchanged. Review captures may
   differ by at most 2/255 in one channel and 0.25/255 in the mean. If an attribute cannot meet
-  this, keep it precise and report the savings honestly.
+  this, keep it precise and report the savings honestly. `boat_water_review --compare A B` applies
+  the image limits to two `--review` directories.
 - **G2b distance detail:** landmarks, bridge openings, shore silhouettes and emissive identity
   stay present; triangle counts use the measured p95 gate; transitions need moving review and
   a documented hysteresis band. A still image alone does not approve popping.
