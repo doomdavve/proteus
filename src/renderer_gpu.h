@@ -78,6 +78,7 @@ typedef struct {
     size_t triangles, source_vertices, vertices;
     size_t vertex_bytes, index_bytes; // Uploaded to the GPU.
     size_t retained_cpu_bytes; // Zero unless the review-only retain_map_sources is set.
+    float normal_error; // Worst decoded normal component error of packing.
 } WaterfrontGpuGeometry;
 
 // Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one GL

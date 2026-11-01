@@ -471,6 +471,7 @@ static int check_gpu_lifecycle(void)
     EXPECT(!a.scene.map && a.scene.geometry.meshes == 0);
     a.scene.map_upload_limit = 0;
     EXPECT(MATCHES(&a, 1));
+    EXPECT(a.scene.geometry.normal_error > 0 && a.scene.geometry.normal_error <= 2.0f / 255.0f);
     boat_gpu_destroy(&a);
 #undef MATCHES
 #undef EXPECT
@@ -1372,11 +1373,12 @@ static int report_geometry(void)
         size_t before = geometry.source_vertices * 36;
         size_t after = geometry.vertex_bytes + geometry.index_bytes;
         printf("geometry location=%s meshes=%d triangles=%zu vertices=%zu source_vertices=%zu "
-               "vertex_bytes=%zu index_bytes=%zu retained_cpu_bytes=%zu before_gpu_bytes=%zu "
+               "vertex_bytes=%zu index_bytes=%zu retained_cpu_bytes=%zu normal_error=%.5f "
+               "before_gpu_bytes=%zu "
                "before_cpu_bytes=%zu vertex_change=%.1f%% total_change=%.1f%%\n",
             resources->definition->name, geometry.meshes, geometry.triangles, geometry.vertices,
             geometry.source_vertices, geometry.vertex_bytes, geometry.index_bytes,
-            geometry.retained_cpu_bytes, before, before,
+            geometry.retained_cpu_bytes, geometry.normal_error, before, before,
             before ? 100.0 * ((double)geometry.vertex_bytes / (double)before - 1) : 0,
             before ? 100.0 * ((double)after / (double)before - 1) : 0);
         boat_session_destroy(&session);
@@ -1392,6 +1394,52 @@ static bool review_pose_clear(const BoatWorldResources *resources, Vector2 posit
     if (resources->definition->mapped)
         return boat_map_water(&resources->map, position, 2.5f);
     return fabsf(position.x) < BOAT_BASIN_HALF_X - 3 && fabsf(position.y) < BOAT_BASIN_HALF_Z - 3;
+}
+
+// G2a's predeclared capture bounds: every review image in A against its namesake in B.
+static int compare_captures(const char *a, const char *b)
+{
+    FilePathList files = LoadDirectoryFilesEx(a, ".png", false);
+    int failures = files.count ? 0 : 1, largest = 0;
+    double worst_mean = 0;
+    for (unsigned int i = 0; i < files.count; ++i) {
+        const char *name = GetFileName(files.paths[i]);
+        Image left = LoadImage(files.paths[i]);
+        Image right = LoadImage(TextFormat("%s/%s", b, name));
+        bool same_size
+            = left.data && right.data && left.width == right.width && left.height == right.height;
+        if (!same_size) {
+            printf("compare %s missing or resized\n", name);
+            ++failures;
+        } else {
+            ImageFormat(&left, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+            ImageFormat(&right, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+            const unsigned char *p = left.data, *q = right.data;
+            const size_t channels = (size_t)left.width * (size_t)left.height * 3;
+            size_t total = 0, changed = 0;
+            int max = 0;
+            for (size_t c = 0; c < channels; ++c) {
+                int difference = abs((int)p[c] - (int)q[c]);
+                total += (size_t)difference;
+                changed += difference != 0;
+                if (difference > max)
+                    max = difference;
+            }
+            double mean = (double)total / (double)channels;
+            printf("compare %s max=%d mean=%.4f changed=%.2f%%\n", name, max, mean,
+                100.0 * (double)changed / (double)channels);
+            if (max > 2 || mean > 0.25)
+                ++failures;
+            largest = max > largest ? max : largest;
+            worst_mean = mean > worst_mean ? mean : worst_mean;
+        }
+        UnloadImage(left);
+        UnloadImage(right);
+    }
+    printf("compare images=%u max=%d worst_mean=%.4f over_bound=%d\n", files.count, largest,
+        worst_mean, failures);
+    UnloadDirectoryFiles(files);
+    return failures ? 1 : 0;
 }
 
 // Capture the G0 review manifest and named pose images. The manifest records exactly the
@@ -1528,6 +1576,8 @@ int main(int argc, char **argv)
             instancing = true;
         else if (strcmp(argv[i], "--geometry") == 0)
             geometry = true;
+        else if (strcmp(argv[i], "--compare") == 0 && i + 2 < argc)
+            return compare_captures(argv[i + 1], argv[i + 2]);
         else if (strcmp(argv[i], "--check") == 0)
             check = true;
         else if (strcmp(argv[i], "--sequence") == 0)
@@ -1551,7 +1601,7 @@ int main(int argc, char **argv)
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
                  "       boat_water_review --check-gpu-lifecycle | --check-culling\n"
-                 "       boat_water_review --check-instancing | --geometry\n"
+                 "       boat_water_review --check-instancing | --geometry | --compare A B\n"
                  "       boat_water_review --stress-state\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--visible] [--tile-size M] [--no-cull]\n"
@@ -1572,6 +1622,8 @@ int main(int argc, char **argv)
                  "Visible GPU playback uses 60 Hz; simulation remains 120 Hz.\n"
                  "Named captures use both default and close follow cameras.\n"
                  "--review writes manifest.json and the named pose captures.\n"
+                 "--compare checks each PNG in A against B: channel difference at most 2/255\n"
+                 "  and mean difference at most 0.25/255.\n"
                  "Map data (c) OpenStreetMap contributors, ODbL 1.0.");
             return strcmp(argv[i], "--help") == 0 ? 0 : 2;
         }
