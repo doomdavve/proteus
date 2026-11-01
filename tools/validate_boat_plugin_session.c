@@ -119,7 +119,7 @@ static int harbor_life_scene(void)
     s.presentation_enabled = false;
     CHECK(wake_plugin_open(&p, "plugins/harbor-life", &s, 0));
     const BoatPluginRevision *r1 = boat_plugin_host_active(&p.host);
-    CHECK(r1->voyage.has_scene && r1->voyage.scene.berth_count == 7);
+    CHECK(r1->voyage.has_scene && r1->voyage.scene.berth_count == 12);
     CHECK(s.world.scene == &r1->voyage.scene && boat_session_view(&s).scene == s.world.scene);
     CHECK(s.world.scene->berths[1].z == 151);
     CHECK(s.world.scene->traffic_present && s.world.scene->traffic.actor_count == 4);
@@ -151,11 +151,11 @@ static int harbor_life_scene(void)
     CHECK(s.world.scene->berths[0].z == 146);
 
     // A dock-module edit follows the same live and Undo policy.
-    BoatPluginBundle moved_module = harbor_edit("x = 20, z = 161.5", "x = 20, z = 158");
+    BoatPluginBundle moved_module = harbor_edit("x = 38, z = 173", "x = 38, z = 174");
     CHECK(boat_plugin_host_stage(&p.host, &moved_module));
     CHECK(p.host.change == BOAT_PLUGIN_LIVE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 3));
-    CHECK(s.world.scene->module_count == 3 && s.world.scene->modules[0].z == 158);
+    CHECK(s.world.scene->module_count == 13 && s.world.scene->modules[2].z == 174);
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 4));
     CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.world.scene->modules[0].z == 161.5);
 
@@ -282,7 +282,7 @@ static Vector2 sim(Vector2 east_north) { return (Vector2) { -east_north.x, east_
 static int compiled_parity(void)
 {
     static const Vector2 path[] = { { -3300, -1550 }, { -3850, -2400 }, { -3850, -3150 } };
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatSession lua, compiled;
     CHECK(start(&host, &lua));
     boat_session_init(&compiled, outer(), calm());
@@ -458,7 +458,7 @@ static void observe(BoatSession *session, Vector2 p, Vector2 v)
 
 static int rename_keeps_progress(void)
 {
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatSession session;
     CHECK(start(&host, &session));
     const BoatVoyageRoute *route = session.voyage.route;
@@ -496,7 +496,7 @@ static int rename_keeps_progress(void)
 static int live_from(const char *label, Vector2 place, Vector2 velocity, unsigned shelter,
     bool arrive, const char *from, const char *to)
 {
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatSession session;
     CHECK(start(&host, &session));
     const BoatVoyageRoute *old = session.voyage.route;
@@ -580,7 +580,7 @@ static int restart_voyage_policy(void)
 
 static int restart_session_policy(void)
 {
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatSession session;
     CHECK(start(&host, &session));
     observe(&session, boat_fixture_voyage_outer.exposure.centre, (Vector2) { 5, 0 });
@@ -602,7 +602,7 @@ static int restart_session_policy(void)
 
 static int failed_stage_keeps_active(void)
 {
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatSession session;
     CHECK(start(&host, &session));
     const BoatPluginRevision *active = boat_plugin_host_active(&host);
@@ -645,7 +645,7 @@ static int failed_stage_keeps_active(void)
 
 static int undo_history(void)
 {
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatSession session;
     CHECK(start(&host, &session));
     // r2 renames, r3 changes the route.
@@ -771,7 +771,7 @@ static int save_polling(void)
 // leaves nothing borrowing the host.
 static int repeated_reloads(void)
 {
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatSession session;
     CHECK(start(&host, &session));
     for (int i = 0; i < 96; ++i) {
@@ -858,7 +858,7 @@ static int scene_binding(void)
     boat_session_init(&s, outer(), calm());
     boat_session_init(&independent, outer(), calm());
     s.presentation_enabled = independent.presentation_enabled = false;
-    CHECK(save_scene(NULL, 1));
+    CHECK(save_scene(NULL, BOAT_SCENE_VERSION));
     CHECK(wake_plugin_open(&p, session_dir(), &s, 0));
     const BoatPluginRevision *active = boat_plugin_host_active(&p.host);
     CHECK(active->voyage.has_scene && !boat_scene_has_content(&active->voyage.scene));
@@ -867,14 +867,14 @@ static int scene_binding(void)
     CHECK(strstr(p.status, "R1 ACTIVE"));
 
     // A manifest-only rename applies immediately and rebinds the scene to the new slot.
-    CHECK(save_scene("Langedrag scenes", 1));
+    CHECK(save_scene("Langedrag scenes", BOAT_SCENE_VERSION));
     CHECK(!wake_plugin_frame(&p, &s, true, false, false, 1));
     active = boat_plugin_host_active(&p.host);
     CHECK(active->number == 2 && active->voyage.has_scene);
     CHECK(s.world.scene == &active->voyage.scene && boat_session_view(&s).scene == s.world.scene);
 
     // A broken envelope leaves the running scene and revision intact.
-    CHECK(save_scene("Langedrag scenes", 2));
+    CHECK(save_scene("Langedrag scenes", 1));
     CHECK(!wake_plugin_frame(&p, &s, true, false, false, 2));
     CHECK(p.alert && strstr(p.status, "scene.version") && strstr(p.status, "KEEPING R2"));
     CHECK(boat_plugin_host_active(&p.host)->number == 2
@@ -886,7 +886,7 @@ static int scene_binding(void)
     CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
 
     // Independent sessions own their own scene storage; leaving one leaves the other intact.
-    CHECK(save_scene(NULL, 1));
+    CHECK(save_scene(NULL, BOAT_SCENE_VERSION));
     CHECK(wake_plugin_open(&other, session_dir(), &independent, 4));
     CHECK(independent.world.scene == &boat_plugin_host_active(&other.host)->voyage.scene);
     CHECK(independent.world.scene != s.world.scene);
@@ -1665,7 +1665,7 @@ static int catalog_runtime(void)
     CHECK(boat_plugin_lua_states() == before);
     const BoatPluginRevision *active = boat_plugin_host_active(&p.host);
     CHECK(active->voyage.has_scene && s.world.scene == &active->voyage.scene);
-    CHECK(s.world.scene->berth_count == 7);
+    CHECK(s.world.scene->berth_count == 12);
     wake_plugin_close(&p, &s);
     CHECK(!s.world.scene);
     boat_session_destroy(&s);

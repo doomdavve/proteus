@@ -12,11 +12,11 @@
 #include "boat_test_cases.h"
 #include "boat_world.h"
 
+#include "boat_fixtures.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "boat_fixtures.h"
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -341,7 +341,7 @@ static int definition_size(void)
     d.scene.module_count = BOAT_SCENE_MODULES;
     for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i) {
         BoatSceneBerth *b = &d.scene.berths[i];
-        snprintf(b->id, sizeof(b->id), "berth_%u", i);
+        snprintf(b->id, sizeof(b->id), "berth_%017u", i);
         b->recipe = i % BOAT_SCENE_BERTH_RECIPES;
         b->x = -100.0f + 10.0f * (float)i;
         b->z = 50;
@@ -349,14 +349,17 @@ static int definition_size(void)
     }
     for (unsigned i = 0; i < BOAT_SCENE_MODULES; ++i) {
         BoatSceneModule *m = &d.scene.modules[i];
-        snprintf(m->id, sizeof(m->id), "module_%u", i);
-        m->kind = i == 0 ? BOAT_SCENE_MODULE_PONTOON : BOAT_SCENE_MODULE_GANGWAY;
+        snprintf(m->id, sizeof(m->id), "module_%016u", i);
+        m->kind = i == 0 ? BOAT_SCENE_MODULE_WALKWAY : BOAT_SCENE_MODULE_GANGWAY;
+        m->length = 8;
+        m->width = 2;
+        m->deck_height = .74f;
         m->x = -100.0f + 10.0f * (float)i;
         m->z = 60;
         m->anchor_x = m->x;
         m->anchor_z = m->z + 4;
         if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
-            snprintf(m->attaches, sizeof(m->attaches), "%s", "module_0");
+            snprintf(m->attaches, sizeof(m->attaches), "%s", "module_0000000000000000");
     }
     d.scene.traffic_present = true;
     d.scene.traffic.actor_count = WATERFRONT_ROUTE_ACTORS;
@@ -535,7 +538,7 @@ static int scene_contact_room(void)
         const BoatFleetSlot *own = boat_net_client_own(&room.clients[solo]);
         CHECK(own != NULL);
         BoatSceneBerth *b = &d.scene.berths[i];
-        snprintf(b->id, sizeof(b->id), "berth_%u", i);
+        snprintf(b->id, sizeof(b->id), "berth_%017u", i);
         b->recipe = BOAT_SCENE_BERTH_CRUISER;
         b->x = own->boat.position.x;
         b->z = own->boat.position.y;

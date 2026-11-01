@@ -120,7 +120,7 @@ add_custom_target(web-serve
 # Lua plugins P0 preflight (docs/PLUGIN_API.md): the same validator under Node, reading the
 # source tree through NODERAWFS. Not part of `web` or the site.
 add_executable(validate_boat_plugin tools/validate_boat_plugin.c)
-target_link_libraries(validate_boat_plugin PRIVATE proteus_plugins)
+target_link_libraries(validate_boat_plugin PRIVATE proteus_plugins proteus_boat_fixtures)
 target_compile_options(validate_boat_plugin PRIVATE ${PROTEUS_WARNINGS})
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/boat-plugin-test")
 target_compile_definitions(validate_boat_plugin PRIVATE

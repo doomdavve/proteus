@@ -19,13 +19,13 @@ return {
     exposed_fraction = 0.8,
     weather_range = 2500
   },
-  -- Eriksberg marina: seven hulls in the finger slips of one long pontoon, facing the east bank.
+  -- Eriksberg marina: two rows, twelve hulls and separately dimensioned finger piers.
   -- The entrance stays clear west of the hulls and the approach lane runs north along x = 4.
   -- The passing craft's registered loop stays north of the pontoon, so no berth occupies it.
-  -- The compiled crane/buildings and the missing floating quay/per-boat detail are documented in
+  -- The compiled crane/buildings and the missing per-boat detail are documented in
   -- README.md; they are not expressible through this scene schema yet.
   scene = {
-    version = 1,
+    version = 2,
     marina = {
       entrance = { x = 4, z = 140, width = 8 },
       berths = {
@@ -42,13 +42,46 @@ return {
         { id = "speedboat", recipe = "speedboat", x = 13, z = 171,
           heading = -1.5707964, mooring = "pontoon" },
         { id = "sailboat_fore", recipe = "sailboat_7m", x = 13, z = 176,
-          heading = -1.5707964, mooring = "pontoon" }
+          heading = -1.5707964, mooring = "pontoon" },
+        { id = "row_two_0", recipe = "runabout", x = -15, z = 146,
+          heading = 1.5707964, mooring = "pontoon" },
+        { id = "row_two_1", recipe = "runabout", x = -15, z = 151,
+          heading = 1.5707964, mooring = "pontoon" },
+        { id = "row_two_2", recipe = "runabout", x = -15, z = 156,
+          heading = 1.5707964, mooring = "pontoon" },
+        { id = "row_two_3", recipe = "runabout", x = -15, z = 161,
+          heading = 1.5707964, mooring = "pontoon" },
+        { id = "row_two_4", recipe = "runabout", x = -15, z = 166,
+          heading = 1.5707964, mooring = "pontoon" }
       },
       modules = {
-        { id = "pier", kind = "pontoon", x = 20, z = 161.5, heading = 0 },
-        { id = "ramp", kind = "gangway", anchor = { x = 34.1, z = 161.5 },
+        { id = "pier", kind = "walkway", length = 37, width = 2.35, deck_height = .74,
+          x = 20, z = 161.5, heading = 0 },
+        { id = "ramp", kind = "gangway", length = 12.925, width = 1.5, deck_height = .74,
+          anchor = { x = 34.1, z = 161.5 },
           attaches = "pier" },
-        { id = "works", kind = "quay", x = 38, z = 173, heading = 0 }
+        { id = "works", kind = "quay_deck", length = 8, width = 4, deck_height = 5,
+          x = 38, z = 173, heading = 0 },
+        { id = "row_two", kind = "walkway", x = -22, z = 157, heading = 0,
+          length = 30, width = 2.35, deck_height = .74 },
+        { id = "landing", kind = "platform", x = -22, z = 175, heading = 0,
+          length = 6, width = 6, deck_height = .74, attaches = "row_two" },
+        { id = "finger_a_0", kind = "finger_pier", x = 14.4125, z = 178.5, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "pier" },
+        { id = "finger_a_1", kind = "finger_pier", x = 14.4125, z = 158.5, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "pier" },
+        { id = "finger_a_2", kind = "finger_pier", x = 14.4125, z = 163.5, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "pier" },
+        { id = "finger_a_3", kind = "finger_pier", x = 14.4125, z = 180, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "pier" },
+        { id = "finger_b_0", kind = "finger_pier", x = -16.4125, z = 143, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "row_two" },
+        { id = "finger_b_1", kind = "finger_pier", x = -16.4125, z = 153.5, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "row_two" },
+        { id = "finger_b_2", kind = "finger_pier", x = -16.4125, z = 163.5, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "row_two" },
+        { id = "finger_b_3", kind = "finger_pier", x = -16.4125, z = 171, heading = 1.5707964,
+          length = 8.825, width = .6, deck_height = .74, attaches = "row_two" }
       }
     },
     -- A small craft loops just north of the marina every ~27 s. A present vessel list replaces

@@ -5,7 +5,7 @@
   const FORMAT = 'wake-velocity-plugin';
   const STORAGE = 'wake-velocity-plugin-v1';
   // Must equal BOAT_PLUGIN_WIRE_VERSION in src/boat_plugin_wire.h; web_plugin_wire checks it.
-  const WIRE_MAGIC = 0x50535437;
+  const WIRE_MAGIC = 0x50535438;
   // Harbor life's scene revision measures 5,505 bytes; leave room for larger authored scenes.
   const RESULT_LIMIT = 16384;
   function scenes(manifest) {

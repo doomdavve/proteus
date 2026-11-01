@@ -28,7 +28,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next marina task: [M1 structures](MARINA_AUTHORING_PLAN.md#m1-structures-and-capacity), selected 2026-11-01 after reviewing #131.** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
+**M1 structures are implemented; next marina task: [M2 appearance](MARINA_AUTHORING_PLAN.md#m2-boat-appearance).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 Authority callbacks, commands and session recordings remain P5 work after it. Physical-device and human qualification need the
@@ -41,7 +41,9 @@ Human P3 migration/Undo/recovery acceptance and broader platform timing remain s
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
 scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3's native berth/module
-parameterization plus the seven-berth Eriksberg `plugins/harbor-life` package are complete. The
+parameterization and the original seven-berth Eriksberg package are complete.
+The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
+twelve-berth/two-row package; M2 appearance is next. The
 first playable L4.3 harbor gate is implemented and awaits human review. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
@@ -1797,7 +1799,7 @@ harbor-life layout, its long finger pontoon, gangway and shore equipment, one au
 craft, a retained ferry with an edited dwell, the retained schooner/lift dependency and one
 authored flock with timed feeding/alarm cues. The [2026-11-01 layout result](#eriksberg-marina-layout-2026-11-01)
 owns the current counts and its explicit native gaps.
-The selected next work is [marina expansion M1](MARINA_AUTHORING_PLAN.md); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
+M1 structures are implemented; the selected next work is [marina expansion M2](MARINA_AUTHORING_PLAN.md#m2-boat-appearance); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
 
 ### Coverage and delivery slices
 
@@ -2509,7 +2511,7 @@ The package README now separates the authored recipe from the missing native cap
 boat, does the crane/building composition resemble the reference, and does the entrance remain
 clear in motion? No acceptance is inferred from the captures.
 
-**Next in this track: [marina expansion M1](MARINA_AUTHORING_PLAN.md#m1-structures-and-capacity)**, selected after reviewing these gaps on 2026-11-01. The new plan owns the five-step implementation sequence. L5 lighting and the other explicitly deferred gaps remain outside this work.
+**Next in this track: [marina expansion M2](MARINA_AUTHORING_PLAN.md#m2-boat-appearance)** (M1 structures implemented), selected after reviewing these gaps on 2026-11-01. The new plan owns the five-step implementation sequence. L5 lighting and the other explicitly deferred gaps remain outside this work.
 
 #### L2 — a small marina before a marina editor
 
@@ -2651,7 +2653,7 @@ through the isolated worker and headless live-bridge mailbox, and inspected CPU 
 Refined the authored marina to the seven-berth Eriksberg layout, 2026-11-01, with the
 [result above](#eriksberg-marina-layout-2026-11-01); this is an example/layout change, not a new
 capability milestone.
-Next task for this track: **[marina expansion M1](MARINA_AUTHORING_PLAN.md#m1-structures-and-capacity)**. The requested L1.1–L4.3 sequence is complete; the new five-step marina plan supersedes L5.1 as the selected next work. Lighting remains deferred.
+Next task for this track: **[marina expansion M2](MARINA_AUTHORING_PLAN.md#m2-boat-appearance)**, following implemented M1 structures. The requested L1.1–L4.3 sequence is complete; the new five-step marina plan supersedes L5.1 as the selected next work. Lighting remains deferred.
 Known limits: authored route geometry is selected from registered presets; no freeform route
 editor, freeform module mesh editor or physical traffic wake recipe; no floating quay/platform,
 crane/building restyling or per-berth hull colours/dimensions/names; no berth occupancy schedule;

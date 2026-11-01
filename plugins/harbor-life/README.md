@@ -1,10 +1,9 @@
 # Harbor life
 
 A native solo `outer` package that keeps the Långedrag voyage and replaces the compiled moored
-fleet and dock furniture with a seven-berth Eriksberg marina. The layout follows the real
-Eriksberg shipyard dock: one long floating walkway with three finger piers, a dense row of
-mostly white/cream leisure hulls, and the east-bank quay behind them. The compiled Eriksberg
-crane, apartment blocks and river remain visible around it.
+fleet and dock furniture with a twelve-berth, two-row Eriksberg marina. Two dimensioned
+floating walkways, eight independent finger piers, a floating platform, fixed quay deck and
+shore gangway sit beneath the compiled crane and apartment blocks.
 
 The package also adds a small passing craft on a ~25 s loop just north of the pontoon, retains
 one compiled upstream ferry with an edited Stenpiren dwell, the compiled river runabout and the
@@ -15,11 +14,17 @@ layout, traffic and flock.
 
 ## Layout
 
-Simulation metres use `x = -east`, `z = north`; headings follow the voyage API. The seven hulls
-sit at `x = 13`, `z = 146..176` in 5 m steps, facing east across the slips. The long pontoon is
-at `(20, 161.5)` with its three finger piers reaching toward the hulls. A short `quay` module
-places shore equipment at `(38, 173)`. A gangway runs from land at `(34.1, 161.5)` to the
-pontoon's east-side landing.
+Simulation metres use `x = -east`, `z = north`; headings follow the voyage API. Seven hulls
+sit at `x = 13`, `z = 146..176` in 5 m steps. Five runabouts form the second row at `x = -15`,
+`z = 146..166`. Walkways are at `(20, 161.5)` and `(-22, 157)`; a floating platform joins
+the second walkway at `(-22, 175)`. Eight fingers attach along the two walkways. The fixed
+`quay_deck` stands wholly on land at `(38, 173)`. The gangway runs from land at `(34.1, 161.5)`
+to the first walkway's shore-side midpoint. The rows leave the central approach lane clear.
+
+Scene v2 supports 32 berths and 64 structures. Each structure specifies finite `length`,
+`width` and `deck_height` in metres. Floating `attaches` references an earlier floating parent,
+with an orthogonal edge join and equal deck height; connected pieces share heave. See the
+[API contract](../../docs/PLUGIN_API.md#scene-schema-v2) for ranges and placement rules.
 
 The declared entrance is `(4, 140)`, width 8 m. The approach lane runs north along `x = 4`
 from open water into the marina. The pinned camera bookmark `outer.marina` is `(2, 161)` at
@@ -36,9 +41,8 @@ From the repository root:
 ./build/wake_velocity --plugin plugins/harbor-life --start -6,210,20
 ```
 
-F5 reloads, F6 undoes, and F7 applies a held layout change with a session restart at the
-compiled outer start dock. A layout or traffic edit therefore returns the boat to the start of
-the voyage; travel back to the marina to inspect it. A saved edit stages once it has settled; an
+F5 reloads and F6 undoes. Compatible layout/traffic edits apply live when clear of the player;
+an obstructing edit is held until clear water or an explicit F7 restart. A saved edit stages once it has settled; an
 invalid edit keeps the running revision. To watch the passing craft without moving the marina
 camera, use the `outer.marina-pass` anchor at `(0, 205)` facing the loop.
 
@@ -47,8 +51,7 @@ camera, use the `outer.marina-pass` anchor at `(0, 205)` facing the loop.
 Change a berth's `recipe`, `x`, `z`, `heading`, `mooring`, the entrance, or remove a berth. The
 game checks the hull and wave/mooring envelope against the compiled water, other berths, the
 entrance and the spawn/recovery shelters. Depth is not available in the compiled map, so no
-depth claim is made. A layout change restarts the session rather than moving a hull under the
-boat.
+depth claim is made. Live staging holds an obstructing edit rather than moving a hull under the boat.
 
 `scene.traffic.vessels` is a 0–8 entry replacement for all travelling craft. An entry either
 retains a compiled actor (`{ id = "river_runabout", retain = "river_runabout" }`) or selects a
@@ -91,13 +94,8 @@ native work before Lua can author them:
   select it, move it, recolor it orange, add its lettering or place a new landmark.
 - **Buildings and windows.** The apartment blocks, their windows and the street dressing are
   compiled from the map. There is no building, window-group, sign or street-furniture grant.
-- **A concrete quay or floating platform.** `quay` is a small land-only equipment recipe; there
-  is no authorable pier deck, breakwater, sculpture or floating platform mesh. The large
-  concrete quay on the right of the photograph is not representable.
-- **Dock capacity and finger geometry.** At most seven berths and four modules are accepted, and
-  only `pontoon`, `pontoon_small`, `gangway` and `quay` module kinds exist. The photograph's
-  longer marina with many separate finger walkways and a second row of slips needs more modules
-  (or a different module recipe) and a larger berth budget.
+- **Sculptures and arbitrary meshes.** Dimensioned fixed decks and floating platforms are
+  available, but packages cannot import concrete sculpture or custom mesh geometry.
 - **Per-boat appearance and names.** A berth selects one of seven fixed native hull recipes.
   Lua cannot set length, beam, mast height, hull/deck/trim colours, lettering or a boat name, so
   the fleet cannot match the photograph's individual white sailboats closely.
@@ -131,8 +129,8 @@ native work before Lua can author them:
 The PNG is a display-free reference; it does not establish human acceptance or motion/audio.
 `validate_harbor_life` drives the deterministic approach/idle/departure fixture, checks the
 ferry dwell and gull cue, and reports compiled-versus-populated CPU frame p50/p95 plus
-mesh/light/wake counts and host memory. `validate_scene_site` mirrors the seven-berth water and
-approach geometry without Lua.
+mesh/light/wake counts and host memory. `validate_scene_site` mirrors the expanded marina water and
+placement and rejection rules through native staging of the actual Lua package.
 
 ## Pinned review recipes
 
@@ -145,7 +143,7 @@ python3 tools/plugin_author.py anchors
 
 | Recipe | Camera/start | Time | Watch |
 | --- | --- | --- | --- |
-| Marina slips | `outer.marina` `(2, 161, 90°)` | 3 s | seven hulls, finger piers, gangway, quay equipment |
+| Marina slips | `outer.marina` `(2, 161, 90°)` | 3 s | twelve hulls, two rows, finger piers, gangway, quay deck |
 | Eriksberg composition | `outer.eriksberg` `(-6, 210, 20°)` | 3 s | marina row, apartment blocks, crane overhead |
 | Passing craft | `outer.marina-pass` `(0, 205, 0°)` | 3–12 s | small craft loop and retained river runabout |
 | Gull cue | `outer.marina-pass` or `(4, 215, 0°)` | 2–11 s | feeding pass, then alarm climb |
@@ -183,7 +181,7 @@ Start the game from the repository root and approach the marina:
   --start -6,210,20
 ```
 
-Ask whether the seven-berth row reads as a marina from the boat; whether the crane, buildings
+Ask whether the twelve-berth, two-row layout reads as a marina from the boat; whether the crane, buildings
 and quay composition resemble the reference photograph; whether the entrance remains clear; and
 whether the scene feels alive rather than merely populated. Automated tests and captures do not
 establish this acceptance. Record the platform, renderer, camera, exact package revision and any

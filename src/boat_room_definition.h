@@ -9,7 +9,7 @@
 #include "boat_race.h"
 #include "boat_scene_definition.h"
 
-#define BOAT_ROOM_VERSION 1
+#define BOAT_ROOM_VERSION 2
 #define BOAT_ROOM_ID_BYTES 64
 #define BOAT_ROOM_NAME_BYTES 64
 // The largest encoded definition: a scene, a course and their rules. The codec rejects more.

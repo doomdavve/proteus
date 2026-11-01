@@ -526,17 +526,17 @@ class Worker(unittest.TestCase):
         payload = author.snapshot(ROOT / "plugins/harbor-life")
         code, result = self.run_worker(payload)
         self.assertEqual(code, 0, result)
-        self.assertEqual(result["scene"], {"present": True, "version": 1,
+        self.assertEqual(result["scene"], {"present": True, "version": 2,
             "digest": result["scene"]["digest"], "content": True,
-            "subsystems": ["marina.berths", "marina.modules", "traffic.vessels", "gulls.flocks"], "berths": 7,
-            "modules": 3, "vessels": 4, "flocks": 1})
+            "subsystems": ["marina.berths", "marina.modules", "traffic.vessels", "gulls.flocks"], "berths": 12,
+            "modules": 13, "vessels": 4, "flocks": 1})
         self.assertNotEqual(result["scene"]["digest"], "0000000000000000")
         job = author.ValidationJob(WORKER, payload, 3, 0, operation="preview", ticks=12)
         try:
             job.process.wait(timeout=10)
             self.assertEqual(job.poll(1)["status"], "ok", job.result)
-            self.assertEqual(job.result["evidence"]["scene"]["berths"], 7)
-            self.assertEqual(job.result["evidence"]["scene"]["modules"], 3)
+            self.assertEqual(job.result["evidence"]["scene"]["berths"], 12)
+            self.assertEqual(job.result["evidence"]["scene"]["modules"], 13)
             self.assertEqual(job.result["evidence"]["scene"]["vessels"], 4)
             self.assertEqual(job.result["evidence"]["scene"]["flocks"], 1)
         finally:
@@ -567,8 +567,8 @@ class Worker(unittest.TestCase):
             self.assertEqual(set(manifest), set(data["schemas"]["manifest"]["required"]))
         self.assertEqual(data["schemas"]["race"]["properties"]["gates"]["maxItems"], 8)
         marina = data["schemas"]["scene"]["properties"]["marina"]["properties"]
-        self.assertEqual(marina["berths"]["maxItems"], 7)
-        self.assertEqual(marina["modules"]["maxItems"], 4)
+        self.assertEqual(marina["berths"]["maxItems"], 32)
+        self.assertEqual(marina["modules"]["maxItems"], 64)
         self.assertIn("schema", author.capabilities()["operations"])
         self.assertIn("preview", author.capabilities()["operations"])
 
