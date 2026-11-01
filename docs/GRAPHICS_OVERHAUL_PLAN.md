@@ -697,9 +697,16 @@ widen tolerance.
 - Interfaces/owners: `WaterfrontGpuScene.bounds_cache` owns per-VAO local bounds; flags stay
   excluded because cloth vertices change every frame. `cached_location`/`prewarm_locations` own
   the location cache and forget it on shader unload. No statistics or scenario schema changed.
-- Verification: Debug build warning-clean; `ctest --preset quick` passed 247 tests;
-  `--check-culling` passed with `gpu_culled shadow=16560 reflection=6663 main=7803` and
-  `cpu_culled=2152`.
+- Verification: Debug build warning-clean; `ctest --preset quick` passed 247 tests and the full
+  GPU-enabled suite passed 377 tests. `--check-culling` passed at 144 poses with
+  `gpu_culled shadow=16560 reflection=6663 main=7803` and `cpu_culled=2152`. Release, three
+  repeats on the M1 Max, river/waves/4x4 p95: **2.21 ms GPU, 2.27 ms CPU submission, 286
+  submissions**; river/waves/320x200 p95: 2.02 ms GPU, 2.19 ms CPU. These beat the G0 ordinary
+  ceilings (≤400 submissions, ≤3.2 ms CPU, ≤4.05 ms GPU).
+- Verification gap: four-boat stress/waves/4x4 p95 is 18.69 ms GPU, 10.42 ms CPU and **369
+  submissions**; 320x200 is 12.85 ms GPU and 7.37 ms CPU. The stress submission (≤300) and CPU
+  (≤8.0 ms) ceilings are **not met**, although GPU is inside its 21 ms noise ceiling and the
+  frame p95 is 13.16 ms.
 - Unresolved issues / human review: persistent GPU instancing was implemented and reverted.
   Grouped batches reduced draws to about 161 from 955 on a review pose, but a few coincident or
   shaded pixels differed from the scalar path even after matching per-instance MVP order,
