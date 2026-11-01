@@ -26,6 +26,14 @@ static bool accepted(const BoatPluginVoyage *v, const BoatWorldResources *r)
         && boat_plugin_check_location(v, r->definition, &r->map, &d) == BOAT_PLUGIN_OK;
 }
 
+static bool same_vector(Vector3 a, Vector3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
+
+static bool same_pose(Transform3D a, Transform3D b)
+{
+    return same_vector(a.position, b.position) && same_vector(a.rotation, b.rotation)
+        && same_vector(a.scale, b.scale);
+}
+
 int main(void)
 {
     BoatWorldResources resources;
@@ -108,10 +116,30 @@ int main(void)
     CHECK(boat_scene_validate(&bounds, NULL));
     // Direct/reverse seeks: floating joins remain exact, fixed quay and shore end stay fixed.
     WaterfrontHarborFrame first, later, repeat;
+    memset(&first, 0xa5, sizeof(first));
+    memset(&repeat, 0x5a, sizeof(repeat));
     waterfront_harbor_evaluate_scene(&original.scene, boat_water_gentle(), 0, NULL, &first);
     waterfront_harbor_evaluate_scene(&original.scene, boat_water_gentle(), 7, NULL, &later);
     waterfront_harbor_evaluate_scene(&original.scene, boat_water_gentle(), 0, NULL, &repeat);
-    CHECK(!memcmp(&first, &repeat, sizeof(first)));
+    // Aggregate padding has no defined value after C struct assignments. Compare every
+    // meaningful field exactly, including live array entries, instead of object bytes.
+    CHECK(first.berth_count == repeat.berth_count);
+    CHECK(first.modules_authored == repeat.modules_authored);
+    CHECK(first.module_count == repeat.module_count && first.line_count == repeat.line_count);
+    CHECK(same_pose(first.ferry, repeat.ferry));
+    CHECK(same_pose(first.pontoon, repeat.pontoon));
+    CHECK(same_pose(first.gangway, repeat.gangway));
+    CHECK(same_pose(first.quay, repeat.quay));
+    for (int i = 0; i < first.berth_count; ++i) {
+        CHECK(first.recipes[i] == repeat.recipes[i]);
+        CHECK(same_pose(first.boats[i], repeat.boats[i]));
+    }
+    for (int i = 0; i < first.module_count; ++i) {
+        CHECK(first.modules[i].kind == repeat.modules[i].kind);
+        CHECK(same_pose(first.modules[i].pose, repeat.modules[i].pose));
+    }
+    for (int i = 0; i < first.line_count; ++i)
+        CHECK(same_pose(first.lines[i], repeat.lines[i]));
     CHECK(
         Vector3Distance(first.modules[0].pose.position, later.modules[0].pose.position) > .00001f);
     CHECK(Vector3Distance(first.modules[2].pose.position, later.modules[2].pose.position) == 0);

@@ -303,3 +303,26 @@ without pitch/roll. Camera exclusion is conservative, and fixed decks require la
 rather than supporting arbitrary over-water construction. The two packages still duplicate
 scene data until M5. CPU/GPU captures and scripted window playback are separate from human
 motion/audio review.
+
+### macOS Release CI correction — 2026-11-01
+
+PR #133's initial macOS Release job failed only `scene_site` at the raw `memcmp` of two
+`WaterfrontHarborFrame` results. C aggregate assignments do not guarantee the contents of
+padding bytes, including the gap between a module's one-byte kind and its pose. The seek test
+must compare state rather than the frame's object representation. The initial Windows, Linux
+and browser CI jobs passed at `590e127`; this does not establish macOS Release success.
+
+The corrected test starts the two output buffers with different byte patterns and compares
+all counts/flags, compiled poses, and every active boat/recipe, module kind/pose and line pose
+field by field. Float components still require exact equality; no epsilon or determinism
+requirement was relaxed. Unused capacity and padding are excluded. Production geometry,
+rendering, physics and serialization are unchanged. Next task remains M2 appearance.
+
+The original failure did not reproduce with the local AppleClang 21 Release build, including
+the different buffer patterns; the C representation issue still makes the previous assertion
+invalid. Release was configured with the CI's arm64, deployment-target 13.0, static-library
+and GPU-off options. Its full suite passed 349/349 enabled tests in 52.98 s (13 retired field
+experiments disabled). The Debug build and full preset passed 375/375 enabled tests in
+76.93 s, including 28 GPU tests (15 retired experiments disabled). Both builds had no project
+warnings; `git diff --check` passed. This test/documentation-only correction needs no new
+audiovisual review; human acceptance remains pending.
