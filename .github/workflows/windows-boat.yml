@@ -135,7 +135,7 @@ jobs:
             $launcher = Join-Path (Split-Path $exe) collect-performance.bat
             if (-not (Test-Path $launcher -PathType Leaf)) { throw "Performance launcher is missing" }
             # The Mac analyzer is stdlib-only; validate it on the same synthetic fixture here.
-            python tools/compare_performance_reports.py tools/fixtures/performance/candidate | Out-Null
+            python "$env:GITHUB_WORKSPACE/tools/compare_performance_reports.py" "$env:GITHUB_WORKSPACE/tools/fixtures/performance/candidate" | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "Performance analyzer failed: $LASTEXITCODE" }
             foreach ($fontAsset in @("m5x7.fnt", "m5x7.png", "m3x6.fnt", "m3x6.png")) {
               $fontPath = Join-Path (Split-Path $exe) "assets/fonts/$fontAsset"
