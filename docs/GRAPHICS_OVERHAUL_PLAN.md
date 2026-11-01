@@ -334,12 +334,15 @@ predeclared bounds. Windows collection/analysis tools are packaged and usable, w
 hardware evidence recorded or explicitly pending. Run the full suite, prepare one Batch A route,
 and keep its human verdict separate. Fix blocking feedback before P2 starts.
 
-**Result:** in progress. G0 and G0w are machine-verified on the reference Mac; G1 is blocked on
-its instancing parity/submission contract, so G2a and G2b are unstarted. Completed: stress scenario, review-pose manifest, measured G0
-budgets, bounded live capture, portable exports, Windows launcher/Mac analyzer and their tests;
-G1 location caching and per-pass object culling. Next: resolve the G1 instancing parity/submission
-blocker. Implementation verification: build, focused CTest cases and three-repeat Release
-measurements at `d0b1970`/`60c1713`/`73e0a1b`. Agent playback: none yet for P1. Human acceptance: none;
+**Result:** in progress. G0 and G0w are machine-verified on the reference Mac. G1 instancing is
+byte-identical in every pass and meets three of four submission/CPU ceilings; stress CPU submission
+(9.1–9.2 ms, ≤ 8.0) is open as an owner decision because it measures GPU back-pressure. G2a and G2b
+are unstarted. Completed: stress scenario, review-pose manifest, measured G0 budgets, bounded live
+capture, portable exports, Windows launcher/Mac analyzer and their tests; G1 location caching,
+per-pass object culling and persistent instancing. Next: decide the stress CPU gate, then G2a.
+Implementation verification: full GPU-enabled CTest and three-repeat Release measurements; see
+[G1](#g1--persistent-instances-and-pass-culling). Agent playback: one WebGL2 river smoke on the M1
+Max, no native manual playback. Human acceptance: none;
 Batch A has not been run. Known scope risk: diagnostics plus multiple renderer
 ownership/submission changes; see the delivery-boundary rule. No boundary change is currently
 justified: the diagnostics prerequisite is on the same branch and reviewable by checkpoint.
@@ -427,7 +430,7 @@ gate; otherwise continue within the same package. No checkpoint is verified or a
 | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | P1 | current main | Machine-verified on M1 Max; browser smoke and Windows hardware open |
 | [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; Windows hardware baseline pending |
-| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | In progress: location cache and per-pass object culling landed; instancing blocked on byte parity |
+| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and three of four ceilings machine-verified; stress CPU gate awaits an owner decision |
 | [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Unstarted |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Unstarted |
 | [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Unstarted |
@@ -689,35 +692,54 @@ direct GL-only dependency that breaks WebGL2. A parity failure is a bug to fix, 
 widen tolerance.
 
 **Checkpoint result:**
-- State: blocked on the lossless parity/submission contract; the independent parts are
-  machine-verified on the M1 Max.
-- Commit(s): `73e0a1b` caches every uniform name the renderer uses per shader and culls
-  transformed object meshes separately against each pass's own view projection. `--check-culling`
-  now covers objects as well as map tiles and passes at 144 poses.
-- Interfaces/owners: `WaterfrontGpuScene.bounds_cache` owns per-VAO local bounds; flags stay
-  excluded because cloth vertices change every frame. `cached_location`/`prewarm_locations` own
-  the location cache and forget it on shader unload. No statistics or scenario schema changed.
-- Verification: Debug build warning-clean; `ctest --preset quick` passed 247 tests and the full
-  GPU-enabled suite passed 377 tests. `--check-culling` passed at 144 poses with
-  `gpu_culled shadow=16560 reflection=6663 main=7803` and `cpu_culled=2152`. Release, three
-  repeats on the M1 Max, river/waves/4x4 p95: **2.21 ms GPU, 2.27 ms CPU submission, 286
-  submissions**; river/waves/320x200 p95: 2.02 ms GPU, 2.19 ms CPU. These beat the G0 ordinary
-  ceilings (≤400 submissions, ≤3.2 ms CPU, ≤4.05 ms GPU).
-- Verification gap: four-boat stress/waves/4x4 p95 is 18.69 ms GPU, 10.42 ms CPU and **369
-  submissions**; 320x200 is 12.85 ms GPU and 7.37 ms CPU. The stress submission (≤300) and CPU
-  (≤8.0 ms) ceilings are **not met**, although GPU is inside its 21 ms noise ceiling and the
-  frame p95 is 13.16 ms.
-- Unresolved issues / human review: persistent GPU instancing was implemented and reverted.
-  Grouped batches reduced draws to about 161 from 955 on a review pose, but a few coincident or
-  shaded pixels differed from the scalar path even after matching per-instance MVP order,
-  model/normal transforms and contiguous batching. The lossless G1 gate forbids that difference,
-  so the submission ceiling is **not met** and this checkpoint is not ready to hand off to G2a.
-  A correct solution needs either a parity-safe batching design or a reviewed, predeclared
-  tolerance; neither exists yet. No human review is implied.
-- Next checkpoint/task and files to read: resolve G1 parity/submission first;
-  `src/renderer_gpu.c` (`draw_colored_mesh`, `object_is_culled`, `cached_location`) and
-  [the G0 budget table](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
-  G2a/G2b remain unstarted because their checkpoint dependency is not satisfied.
+- State: byte parity and three of the four G0 submission/CPU ceilings machine-verified on the M1
+  Max. **One ceiling remains missed:** stress/waves/4x4 CPU submission p95 is 9.1–9.2 ms against
+  ≤ 8.0 ms. See the open decision below. No human review is implied.
+- Commit(s): `73e0a1b` caches uniform locations and culls transformed objects per pass. The
+  instancing change is on `feat/graphics-g1-instancing`, stacked on this package's branch.
+- Interfaces/owners: `ObjectBatch` in `src/renderer_gpu.c` records `draw_life`/`draw_scenery`
+  objects and replays contiguous same-mesh runs from one bounded 8,192-instance buffer; a full
+  batch replays early, in order, so storage never grows. Scalar is the reference path
+  (`waterfront_gpu_scene_set_instancing_enabled`) and the fallback if setup fails. Both programs
+  bind instance attributes at fixed locations 4–15 because one VAO serves both. Scalar and
+  instanced draws share one vertex-shader arithmetic path, and colour/emissive are `flat`. Traffic
+  draws hulls before lights and gulls by part, which forms longer runs.
+- Parity root cause: the earlier blocker recorded here was not shown to be an instancing fault.
+  Scalar against scalar failed the same way on the first draw in a process, because the basin
+  shadow path inherited the context's cull state. `draw_shadow_casters` now sets it explicitly.
+  The reverted prototype was not preserved, so its own differences cannot be re-examined.
+- Verification (2026-11-01, M1 Max, macOS, GL 4.1 Metal): `boat_water_review --check-instancing`
+  (`instancing_parity`) compares scalar, instanced and instanced with a replay every three
+  objects, at zero tolerance, across main, reflection and both shadow depth maps, on every G0 review
+  pose and six stress frames, with AA off and 4x4: 74 frames, 33,790 → 11,128 submissions at the
+  same 33,790 instances and equal triangles. 30 of 31 review captures are byte-identical to the
+  pre-instancing build; `basin-hull-0` differs only by the first-frame cull fix. `tile_culling`
+  passes at 144 poses. Full GPU-enabled CTest: 378 of 378 run tests passed. Windows CI and browser
+  fixes for G0w are in the same stack; the browser target was built locally with Emscripten 6.0.12.
+- Measurements, three Release repeats, hidden and unpaced, p95
+  ([summary](evidence/graphics/g1/instancing-summary.json)):
+
+  | Scenario | Submissions | Instances | CPU submission | GPU | Frame |
+  | --- | --- | --- | --- | --- | --- |
+  | river/waves/4x4 | **193** (≤ 400) | 742 | **1.32–1.35 ms** (≤ 3.2) | **1.45–1.48 ms** (≤ 4.05) | 2.46–2.62 ms (≤ 8.0) |
+  | river/waves/320x200 | 193 | 742 | 1.31 ms | 1.33–1.34 ms | 2.46–2.48 ms |
+  | stress/waves/4x4 | **76** (≤ 300) | 560 | **9.13–9.17 ms (≤ 8.0: missed)** | **10.28–10.32 ms** (≤ 21) | 12.00–12.09 ms |
+  | stress/waves/320x200 | 76 | 560 | 3.71–3.78 ms | 4.64–4.67 ms | 5.86–5.97 ms |
+
+- Correction: earlier revisions of this result quoted 286 and 369 submissions as p95. Those were
+  **p50**; the reports' p95 values were 745 and 566, so culling alone had not met either ordinary or
+  stress submission ceiling. They also came from a build with an uncommitted culling edit that was
+  never part of this branch. These tables replace those numbers.
+- Open decision for the owner: `sample` of the unpaced stress run attributes about 87% of
+  submission to a semaphore wait in the frame's first draw, the driver's frames-in-flight limit,
+  so roughly 1.2 ms is CPU work. The same run paced at 60 Hz reports 2.1 ms. Rotating the wake
+  record texture moved the wait, gaining about 3% unpaced and nothing paced, and was not kept. The
+  ceiling as written measures GPU back-pressure. Reaching it needs less stress GPU work (G3) or a
+  reviewed change to how the gate is measured; this result does not change the ceiling.
+- Agent playback: WebGL2 on the M1 Max (Chrome 156, ANGLE Metal, 16 vertex attributes), river,
+  4 s of driving: 17,530 instanced draws, 187,011 instances, no page errors or shader warnings, one
+  inspected frame correct. The GL error probe did not run. Native manual playback: not performed.
+- Next: the owner's decision above, then G2a. Human review stays in Batch A after G2b.
 
 ### G2a — Geometry storage and ownership
 

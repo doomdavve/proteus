@@ -126,6 +126,10 @@ must leave the existing renderable targets intact.
 renders 144 river poses (512 m and 1 km tiles, six route stops, four headings, default, close
 and overview cameras) culled and unculled, on the GPU with waves and on the CPU on flat water.
 The pixels must be identical, and every pass must cull at least one tile.
+`instancing_parity` (`boat_water_review --check-instancing`, `gpu`, about 6 s; graphics G1) draws
+every G0 review pose and six stress frames scalar, instanced and instanced with a replay every
+three objects, with AA off and 4x4. The main image, reflection and both shadow depth maps must be
+byte-identical, with equal instances and triangles and fewer submissions.
 
 The original HUD/control worktree checks below remain legacy numerical fixtures; live pedal
 controls are verified in [the current controls section](#pedal-controls-verification).

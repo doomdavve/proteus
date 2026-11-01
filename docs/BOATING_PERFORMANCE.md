@@ -157,8 +157,10 @@ The CSV also has per-frame wave-patch rebuilds and wake uploads, and, since
 [A2.1](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a21-result-2026-10-25) (`schema_revision` 2),
 the scene's application work: `app_submissions` and `scene_triangles`, split by pass
 (`shadow_`, `reflection_`, `main_`) and by group (`map_`, `water_`, `object_`), each as
-`*_submissions` and `*_triangles`. A submission is one `DrawMesh` in
-`waterfront_gpu_scene_draw`, which raylib issues as one non-instanced GL draw. The totals
+`*_submissions` and `*_triangles`. Before schema 5 a submission was one `DrawMesh`, one
+non-instanced GL draw. Since schema 5 (graphics G1) it is one GL draw in
+`waterfront_gpu_scene_draw`, which may be an instanced run: `app_instances` counts the objects
+drawn and triangles are multiplied by instances, so triangle totals remain comparable. The totals
 add one batched sky quad (two triangles) for each of the reflection and main passes. They
 exclude the AA downsample and the window blit. The JSON gives p50/p95/p99/
 max and mean over the measured frames, using sorted index
@@ -680,6 +682,10 @@ same commands. They are not CTest thresholds.
 The water reserve is the remaining ordinary GPU headroom plus the whole stress delta. P1 may
 not spend it: G3 owns bringing the four-boat stress case to ≤ 16.5 ms at 4x4 and ≤ 12.0 ms at
 320x200. CPU and memory budgets are recorded per pass/group in each checkpoint result.
+
+G1 results against these gates, and one gate still open, are in
+[its checkpoint result](GRAPHICS_OVERHAUL_PLAN.md#g1--persistent-instances-and-pass-culling).
+Read gate columns against each report's `p95`; `p50` is typically far lower for submissions.
 
 ### Predeclared accuracy bounds
 
