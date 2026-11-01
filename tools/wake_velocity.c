@@ -1,4 +1,6 @@
+#if !defined(__EMSCRIPTEN__)
 #include "external/glad.h"
+#endif
 
 #include "boat_assets.h"
 #include "boat_audio.h"
@@ -80,10 +82,13 @@ EM_JS(float, boat_web_mobile_target, (void), { return Module['boatMobile']['targ
 EM_JS(int, boat_web_mouse_state, (int wanted, int available),
     { return Module['boatMouse']['state'](wanted, available); })
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
+// clang-format would split JavaScript's === into == =.
+// clang-format off
 EM_JS(int, boat_web_physical_keyboard, (void), {
     return (window.matchMedia && window.matchMedia('(pointer: fine)').matches)
-        || (navigator.maxTouchPoints || 0) == = 0;
+        || (navigator.maxTouchPoints || 0) === 0;
 })
+// clang-format on
 EM_JS(void, boat_web_console_state, (bool open, bool available, bool focused), {
     Module.boatConsoleOpen = !!open;
     Module.boatConsoleAvailable = !!available;
@@ -1839,7 +1844,7 @@ static int study(int argc, char **argv)
         }
         if (performance_timed) {
             rlDrawRenderBatchActive();
-            glEndQuery(GL_TIME_ELAPSED);
+            boat_gpu_timer_end();
         }
         if (!gpu_enabled)
             UpdateTexture(texture, pixels);
