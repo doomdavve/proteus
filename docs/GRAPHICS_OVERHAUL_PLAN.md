@@ -225,7 +225,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | Distance detail and valid shadow reuse | G2a | Prepared | Unstarted; review pending |
 | [G3a](#g3a--stamped-wake-shading) | Stamped wake shading | G2b and Batch A verdict resolved | Prepared | Unstarted; review pending |
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | Foam history and cosmetic ripples | G3a | Prepared | Unstarted; review pending |
-| G4 | Shore-aware and far-water character | G3b | Queued in next planning PRs | Unstarted; review pending |
+| [G4](#g4--shore-aware-and-far-water-character) | Shore-aware and far-water character | G3b | Prepared | Unstarted; review pending |
 | G5a | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Queued in next planning PRs | Unstarted; review pending |
 | G5b | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Queued in next planning PRs | Unstarted; review pending |
 | G5c | Ambient detail, cube spray and final qualification | G5b | Queued in next planning PRs | Unstarted; review pending |
@@ -541,6 +541,62 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G3b from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add fixed-time foam memory and cosmetic ripples with bounded sources, stable scroll/reset behavior and analytic hull height. Update the plan with automated/moving evidence for the combined Batch B review.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G4 — Shore-aware and far-water character
+
+Stage coverage: G4. **Depends on:** G3b.
+Human review: Batch B: living water and place.
+
+**Read first:** `tools/map_pack.py`, `src/boat_scenery.[ch]`, `src/renderer_gpu.[ch]`,
+`assets/shaders/waterfront_water.*` (`exposure`), `cmake/Web.cmake`, [river guide](river/README.md),
+[web](WEB_BUILD.md), [protocol](MULTIPLAYER_PROTOCOL.md).
+
+**Tasks, in order:**
+
+1. Bake a bounded per-map presentation atlas of shore distance, approximate depth, shelter and chop
+   for river and outer. Document units, bounds, resolution, deterministic generation and whether
+   depth is authored/estimated; do not describe it as surveyed bathymetry. Use existing water
+   polygons/land consistently and keep shore distance valid around islands/narrow quays.
+2. Keep the atlas presentation-only and outside the physics/network content digest. Choose a
+   versioned optional scenery extension or sidecar with validated sizes/ranges and a legacy
+   fallback. Update pack loading, native packaging and lazy outer/browser assets together; leave
+   compiled water and collision untouched.
+3. Provide an opaque scene depth source available before water rendering. Use a
+   separate/resolved/copied readable source, never sample an attachment being written. Define
+   near/far/reversed projection conversion as applicable and handle reflection cameras separately.
+   Add shore fade, depth tint and restrained quay foam without leaking foreground depth into distant
+   water.
+4. Replace hand-written exposure with atlas sampling where available, feeding shelter/chop into
+   cosmetic shading and G3 ripple boundaries. Preserve the analytic physical wave surface and the
+   legacy fallback when data/depth is absent.
+5. Add deterministic far-water gusts, chunky sun glitter and approaching squall patterns from
+   explicit presentation time/existing weather strength. No new physical weather system. Verify
+   stability at oblique headings and patch/atlas boundaries; avoid resurrecting the rejected water-
+   square pattern.
+6. Capture sheltered/open river and outer comparisons, low/high resolution and storms/calm. Measure
+   atlas/opaque-depth/field costs together and prepare the Batch B route and settings with toggles
+   for each effect.
+
+**Acceptance:** Atlas bake/load bounds, deterministic output, legacy/malformed asset handling and
+depth reconstruction checks pass; room digest and physical hashes are unchanged. River/outer visibly
+distinguish docks from open water; no water/shore seam or depth-feedback artifacts. Full tests,
+browser asset/lazy-load smoke and G0 budgets pass. Batch B records the user verdict separately.
+
+**Limits and stop conditions:** No map collision changes, network compatibility changes, inferred
+bathymetric truth or autonomous weather gameplay. Batch B acceptance gates G5 artistic expansion;
+prepare the PR even if human play is still pending.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G4 from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Complete presentation water atlas, safe opaque depth, shore treatment and far-water character within G0 budgets. Update asset guides/plan and hand off one Batch B playtest covering G3a–G4.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
