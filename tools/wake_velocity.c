@@ -104,6 +104,7 @@ static void usage(void)
     cli_usage_line(stdout, "(no arguments)", "Open the title screen: single player, multiplayer,");
     cli_usage_line(stdout, "", "settings and credits");
     cli_usage_line(stdout, "--title", "Open the title screen explicitly");
+    cli_usage_line(stdout, "--title-start PLACE", "Start a PLACE as the title's START does (tests)");
     cli_usage_line(stdout, "--course", "Timed S course in the basin");
     cli_usage_line(stdout, "--replay FILE", "Watch a saved course run");
     cli_usage_line(stdout, "--ghost FILE", "Race a compatible saved run");
@@ -2014,14 +2015,17 @@ invalid:
     return 1;
 }
 
-// Single player from the title: free boating on the river, as the macOS app used to start.
-static int title_single(const BoatTitleSettings *settings)
+// Single player from the title: free boating, as the macOS app used to start, or the basin trial,
+// which has no current or crossing wake. EXTRA options follow the title's own.
+static int title_single(const BoatTitleSettings *settings, int extra_count, char **extra)
 {
-    char *arguments[24] = { "wake_velocity", "--current", "--crossing-wake" };
-    int count = 3;
+    char *arguments[32] = { "wake_velocity" };
+    int count = 1;
     if (settings->location == BOAT_LOCATION_COUNT)
         arguments[count++] = "--course";
     else {
+        arguments[count++] = "--current";
+        arguments[count++] = "--crossing-wake";
         arguments[count++] = "--location";
         arguments[count++] = (char *)boat_location(settings->location)->name;
     }
@@ -2039,9 +2043,34 @@ static int title_single(const BoatTitleSettings *settings)
     arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
     if (settings->mouse_steering)
         arguments[count++] = "--mouse-steering";
+    for (int i = 0; i < extra_count && count < 31; ++i)
+        arguments[count++] = extra[i];
     arguments[count] = NULL;
     study_mouse_steering = settings->mouse_steering;
     return study(count, arguments);
+}
+
+// --title-start PLACE [OPTIONS]: the title's START with default settings and no menu, so a test
+// proves that every PLACE the panel offers opens. PLACE is basin, river, outer, outer-standard,
+// outer-harbor-life or basin-trial.
+static int title_start(int argc, char **argv)
+{
+    BoatTitleSettings settings;
+    boat_title_defaults(&settings);
+    const char *place = argv[2];
+    const BoatWorldDefinition *location = boat_location_find(place);
+    if (location)
+        settings.location = location->id;
+    else if (!strcmp(place, "basin-trial"))
+        settings.location = BOAT_LOCATION_COUNT;
+    else if (!strcmp(place, "outer-standard") || !strcmp(place, "outer-harbor-life")) {
+        settings.location = BOAT_LOCATION_OUTER;
+        settings.outer_content = !strcmp(place, "outer-harbor-life");
+    } else {
+        fprintf(stderr, "--title-start: unknown place %s.\n", place);
+        return 1;
+    }
+    return title_single(&settings, argc - 3, argv + 3);
 }
 
 #ifdef PROTEUS_BOAT_NET
@@ -2094,6 +2123,8 @@ int main(int argc, char **argv)
     if (argc > 1 && !strcmp(argv[1], "--serve"))
         return boat_server_main(argc - 1, argv + 1); // A hosted room: no window, audio or assets.
 #endif
+    if (argc > 2 && !strcmp(argv[1], "--title-start"))
+        return title_start(argc, argv);
     bool capture = argc == 4 && !strcmp(argv[1], "--title") && !strcmp(argv[2], "--screenshot");
     if (argc != 1 && !(argc == 2 && !strcmp(argv[1], "--title")) && !capture)
         return study(argc, argv);
@@ -2124,7 +2155,7 @@ int main(int argc, char **argv)
     SetExitKey(KEY_NULL);
     for (BoatTitleChoice choice; (choice = boat_title_run(&settings)) != BOAT_TITLE_EXIT;) {
         boat_title_save(&settings);
-        if (choice == BOAT_TITLE_SINGLE && title_single(&settings))
+        if (choice == BOAT_TITLE_SINGLE && title_single(&settings, 0, NULL))
             snprintf(settings.message, sizeof(settings.message), "%s",
                 study_failure[0] ? study_failure : "Single player stopped.");
 #ifdef PROTEUS_BOAT_NET

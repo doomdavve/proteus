@@ -1074,7 +1074,7 @@ static bool settings_path(char *path, size_t size)
     return n > 0 && (size_t)n < size;
 }
 
-void boat_title_load(BoatTitleSettings *s)
+void boat_title_defaults(BoatTitleSettings *s)
 {
     *s = (BoatTitleSettings) { .name = "player",
         .skin = BOAT_SKIN_SWEDEN,
@@ -1087,6 +1087,11 @@ void boat_title_load(BoatTitleSettings *s)
 #else
     snprintf(s->address, sizeof(s->address), "127.0.0.1:%d", BOAT_NET_PORT);
 #endif
+}
+
+void boat_title_load(BoatTitleSettings *s)
+{
+    boat_title_defaults(s);
     char path[4096], line[160];
     FILE *file = settings_path(path, sizeof(path)) ? fopen(path, "r") : NULL;
     if (!file)

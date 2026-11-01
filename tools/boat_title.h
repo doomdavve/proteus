@@ -35,6 +35,7 @@ typedef enum {
 // The command-line spelling of a host mode: free, deathmatch or race.
 const char *boat_title_host_mode(unsigned mode);
 
+void boat_title_defaults(BoatTitleSettings *settings);
 // Remembered between launches in the per-user data directory; defaults when absent.
 void boat_title_load(BoatTitleSettings *settings);
 void boat_title_save(const BoatTitleSettings *settings);

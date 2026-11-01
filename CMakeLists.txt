@@ -909,6 +909,22 @@ add_test(NAME boat_bot_snapshots_with_seconds_rejected
   COMMAND boat_bot --connect 127.0.0.1:24680 --snapshots 3 --seconds 2)
 add_test(NAME boat_server_scripted_until_empty_rejected
   COMMAND boat_server --scripted --until-empty)
+# Every PLACE the title offers opens its package through the title's own arguments.
+foreach(place_package
+    "basin=proteus.basin-free" "river=proteus.river-free" "outer-standard=proteus.langedrag"
+    "outer-harbor-life=proteus.harbor-life" "basin-trial=proteus.time-trial")
+  string(REPLACE "=" ";" place_package "${place_package}")
+  list(GET place_package 0 place)
+  list(GET place_package 1 package)
+  add_test(NAME wake_velocity_title_start.${place}
+    COMMAND wake_velocity --title-start ${place} --renderer cpu
+      --screenshot ${CMAKE_CURRENT_BINARY_DIR}/title_start_${place}.png --time 0.1
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  set_tests_properties(wake_velocity_title_start.${place} PROPERTIES TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "Plugin ${package}:")
+endforeach()
+add_test(NAME wake_velocity_title_start_rejected COMMAND wake_velocity --title-start nowhere)
+set_tests_properties(wake_velocity_title_start_rejected PROPERTIES WILL_FAIL TRUE)
 add_test(NAME boat_net_study_mode_rejected COMMAND wake_velocity --connect 127.0.0.1:24680 --waves)
 add_test(NAME boat_net_study_name_rejected COMMAND wake_velocity --name lonely)
 add_test(NAME boat_net_study_skin_rejected
@@ -1300,7 +1316,10 @@ set(PROTEUS_SLOW_TESTS
   waterfront_actors
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_river_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
-  boat_river_screenshot)
+  boat_river_screenshot
+  wake_velocity_title_start.basin wake_velocity_title_start.river
+  wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
+  wake_velocity_title_start.basin-trial)
 
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)
