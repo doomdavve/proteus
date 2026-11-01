@@ -98,7 +98,7 @@ def main():
                 cdp.send('HeapProfiler.collectGarbage')
                 return cdp.send('Runtime.getHeapUsage')['usedSize']
 
-            page.goto(args.url)
+            page.goto(args.url + ('&' if '?' in args.url else '?') + 'author')
             ready()
             if chromium:
                 cdp = context.new_cdp_session(page)
@@ -160,8 +160,6 @@ def main():
             page.fill('#plugin-manifest', original['manifest']); page.fill('#plugin-source', original['source'])
             assert 'Voyage staged' in stage()
             shot('staged')
-            page.locator('#settings').evaluate('(e) => e.open = true')
-            page.uncheck('#fullscreen')
             page.evaluate('''() => {
               window.authorFrames = 0;
               const state = Module.boatMouse.state;
@@ -300,7 +298,7 @@ def main():
                 kind_context = browser.new_context(viewport={'width': 1100, 'height': 900})
                 page = kind_context.new_page()
                 watch(page)
-                page.goto(args.url); ready()
+                page.goto(args.url + ('&' if '?' in args.url else '?') + 'author'); ready()
                 page.fill('#plugin-manifest', (root / 'plugins' / example / 'plugin.json').read_text())
                 page.fill('#plugin-source', (root / 'plugins' / example / 'main.lua').read_text())
                 assert 'Voyage staged' in stage(), example
@@ -320,7 +318,7 @@ def main():
               Storage.prototype.setItem = function(){throw Error('denied')};''')
             page = denied.new_page()
             watch(page)
-            page.goto(args.url); ready()
+            page.goto(args.url + ('&' if '?' in args.url else '?') + 'author'); ready()
             assert 'Voyage staged' in stage()
             assert 'unavailable' in page.locator('#plugin-storage').inner_text()
             shot('storage-denied')

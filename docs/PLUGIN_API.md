@@ -1356,7 +1356,8 @@ recovery acceptance remains open.
 
 ## Browser source bundles (P4.3)
 
-In a built/served browser client, expand **PLUGIN VOYAGE** below the launcher. Load the example
+In a built/served browser client, add `?author` to the URL (for example,
+`http://localhost:8000/?author`), then expand **PLUGIN VOYAGE** below the launcher. Load the example
 or import a `*.wake-plugin.json` source bundle, edit `plugin.json`/`main.lua`, then select
 **Stage / reload**. **Play staged voyage** enters the package's solo session directly. The browser
 accepts the `voyage`, `free` and `course` kinds with their normal grants, optionally followed by

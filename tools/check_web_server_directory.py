@@ -38,8 +38,6 @@ with sync_playwright() as p:
         page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
         page.wait_for_function("Module['boatServers'].status().includes('UNAVAILABLE')" if args.unavailable
                                else "Module['boatServers'].count() > 0")
-        page.locator('#settings').evaluate('(element)=>element.open=true')
-        page.uncheck('#fullscreen')
         page.click('#play')
         page.wait_for_timeout(700)
 

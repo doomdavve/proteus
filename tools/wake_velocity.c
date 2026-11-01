@@ -291,9 +291,7 @@ static void draw_help(
         "+/-: zoom | PgUp/PgDn: height",
         "C: reset camera | F3: profiler | F4: performance report",
         networked ? "" : "[ / ] or , / .: time 0.25x..8x | \\ or 0: 1x",
-#if !defined(__EMSCRIPTEN__)
         "F11: fullscreen",
-#endif
         course ? "Altered live time: practice, no best/export" : "",
 #if defined(__EMSCRIPTEN__)
         "P: menu in fullscreen | Back to title: setup",
