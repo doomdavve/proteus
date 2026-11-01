@@ -1,12 +1,12 @@
 # Graphics overhaul plan
 
-Status: proposed 2026-10-31. No stage has started and nothing here is implemented. The user asked
-for this plan after a review of the GPU drawing path, to iterate on later. Their first reaction is
-under [decisions](#decisions): the order is "probably right" and the new water layer "sounds
-exciting". That is a steer, not acceptance of any result, and targets and identity rules are still
-a draft to argue with.
-The [water look test](#water-look-test--2026-10-31) rejected water squares and favoured plain high
-resolution. **Next task: G0.**
+Status, 2026-11-01: **implementation unstarted; package preparation in progress**. The
+[execution process](#package-execution-process) defines one implementation PR per package and
+three batched human playtests. Prepared briefs include a short kickoff prompt for the next agent.
+**Next implementation: G0**, after its planning instructions are approved. Low resolution remains
+the default; the [look test](#water-look-test--2026-10-31) rejected water squares and favoured plain
+high resolution as an option. Historical measurements and user decisions below remain scoped to
+2026-10-31; no overhaul implementation or result acceptance is claimed.
 
 ## Intended result
 
@@ -90,7 +90,8 @@ Findings from reading the code:
 ### Platform limits
 
 Compute shaders, storage buffers and multi-draw indirect need GL 4.3. macOS stops at 4.1 and the web
-build is ES 3.0 (WebGL2), so a fully GPU-driven pipeline needs a new backend; see [G6](#g6--backend-decision).
+build is ES 3.0 (WebGL2), so a fully GPU-driven pipeline needs a new backend; see
+[G6](#g6--backend-decision).
 Everything before G6 is designed to work on both. Watch points for that work:
 
 - `DrawMeshInstanced` allocates and uploads a new instance buffer on each call and carries only a
@@ -101,9 +102,203 @@ Everything before G6 is designed to work on both. Watch points for that work:
 - Shaders are `#version 330` and converted for the web in `cmake/Web.cmake`, so new shader features
   must survive that step.
 
+## Package execution process
+
+Status, 2026-11-01: this is a **planning delivery**, not a renderer implementation. Eleven
+package briefs split G0–G6 into one future implementation PR apiece; G6 remains conditional.
+The planning PRs themselves form a documentation stack, each adding one brief and kickoff prompt.
+Merge that stack in order before implementation, or branch an implementation from the approved
+planning head and target that parent while it remains open. Do not confuse a planning PR with the
+implementation PR it prepares. **Next implementation: G0.** No overhaul result is user-accepted.
+
+### Work loop and delivery
+
+1. Read [AGENTS.md](../AGENTS.md), this process, the assigned brief, [testing](TESTING.md) and
+   its named owners. Confirm symbols against the source; the entry points below were checked on
+   `b0f1233`. Adapt moved code and record the difference rather than creating a parallel subsystem.
+2. Check the package's dependencies and G0 budget/tolerance table. Work in a separate worktree,
+   on `feat/graphics-<package in lowercase>`, from current main if dependencies have merged. If
+   explicitly continuing an unmerged stack, branch from the dependent implementation parent and
+   target it, never main. Merge updated parents into open children before review, per AGENTS.md.
+   Planning-PR order is an editorial stack; it does not grant readiness to implementation packages.
+3. Complete only the assigned package, in the task order below. Use focused commits per coherent
+   task so a simpler agent can checkpoint/recover; keep the build and quick lane green. Do not
+   start the next package automatically. Ask Astra for advice if profiling contradicts the chosen
+   design, a portability decision has no safe fallback, or the conditional G6 trigger is met;
+   record its recommendation and the resulting choice. Routine code decisions need no approval.
+4. Run the common verification below and the package-specific acceptance checks. Fix regressions
+   immediately, even when its human review batch is later. Collect local fixes/docs before opening
+   the implementation PR; push the completed branch and open one PR for the whole package. Do not
+   merge, release or deploy. Human playtesting may remain pending when that PR is opened.
+5. Update this plan's package result and table: current status, completed tasks, next task,
+   exact revision/platform/options, automated evidence, agent-run capture/demo evidence, human
+   verdict and limits. Keep those categories distinct. Update affected live guides in the same PR;
+   search README.md/docs and asset guides for superseded claims. Change docs/README.md only if
+   the area-level summary or next milestone changes, not for every package checkpoint.
+6. The PR body contains scope, validation, measured deltas, remaining limits, the next kickoff
+   prompt and **Needs the user** with the pending batch (or "none yet"). Stop after this package.
+   On pause, leave reproducible commands and unfinished items in its result so another agent can
+   resume. Do not mark a package accepted based on tests, captures or an agent-run demo.
+
+A dependency means implementation and required machine checks have passed; a named human gate
+also needs an actual recorded verdict with blocking feedback resolved. A missing machine/browser
+measurement may be reported in a PR, but dependent work needing that evidence stays unready.
+If a package would need physics/network changes, a weakened parity gate or an unplanned backend,
+finish independent work, document the issue and report it. Do not silently widen scope.
+
+### Common verification and evidence
+
+Every implementation package runs a warning-clean Debug build and full enabled CTest suite:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=ON
+cmake --build build -j
+ctest --preset quick
+ctest --preset full
+```
+
+The first configure fetches pinned dependencies. Existing `build/_deps/*-src` may be copied from
+the main checkout into the worktree, then configure with `-DFETCHCONTENT_FULLY_DISCONNECTED=ON`.
+Keep build output out of Git. GPU cases require a graphics context and socket cases require local
+sockets; report unavailable checks and rerun with the needed environment rather than claiming a
+CPU-only pass qualifies the renderer. Tests use virtual time and assertions about behavior; never
+make frame timings into wall-clock CTest thresholds.
+
+For each render change, inspect G0 before/after captures and short moving sequences, run an
+agent-observed windowed demo, and build/smoke WebGL2 with the documented fallback. The browser smoke
+checks shader compilation, resources, effect/fallback activation, resize and teardown; it is not
+human browser acceptance. Follow [WEB_BUILD.md](WEB_BUILD.md) for actual commands and current CI
+lanes. Use local/offline play; no hosted-room join is needed. Full manual browser/device review is
+batched at C, unless an earlier regression makes it necessary. Native/browser timing claims require
+real hardware, identified browser/GL renderer, Release and repeated runs. Null GPU timer results stay
+null. State exact input sequences when comparing physical `final_state` or `state_hash`.
+
+Use G0's checked-in manifest/commands after it exists. Existing baseline commands are:
+
+```sh
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DPROTEUS_GPU_TESTS=ON
+cmake --build build-release -j
+mkdir -p build-release/graphics
+./build-release/boat_water_review --benchmark build-release/graphics/waves-aaoff --aa off --waves
+./build-release/boat_water_review --benchmark build-release/graphics/waves-aa4x4 --aa 4x4 --waves
+```
+
+GPU equality always means the same platform, backend, build, time, view and options. CPU output
+stays a geometry/capture reference, not an oracle for new GPU effects. G1 and lossless G2a substeps
+need byte parity; quantized geometry and texture-resampled water use **predeclared G0 numerical and
+image bounds**, plus motion review. Preserve exact physical inputs/results throughout. Report per-
+pass/group CPU/GPU cost and memory cumulatively against G0 as well as the previous package.
+
+### Batched human playtesting
+
+Three planned user sessions minimize repeated setup. Each package still supplies its own agent-run
+demo and automated/capture evidence. Save comparison toggles or reproducible prior builds until
+its batch is accepted; users must be able to isolate the contributing package. No wall-clock delay
+or test pass supplies a missing verdict. A pending user session does not prevent opening its PR.
+
+| Batch | When | Combined route and questions | What it gates |
+| --- | --- | --- | --- |
+| A — engine and geometry | After G2b | G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | G3a and later visual expansion |
+| B — all living water | After G4 | G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | G5a and later artistic expansion |
+| C — final presentation | After G5c | G5a/G5b/G5c: native and hardware browser at low/high presets, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
+
+Batch B deliberately combines G3 and G4 rather than asking for a separate water session between
+them: atlas boundaries/depth/shore foam are easier to judge with persistence in place. Keep a
+stamp-only comparison to distinguish causes; fix any observed failure before adding more effects.
+If that interaction cannot be isolated or feedback would invalidate downstream work, schedule a
+focused earlier check and record why. Do not expand a batch to include unrelated gameplay work.
+
+For each batch record: revision/branch, launch commands, settings, route, who played, date, verdict,
+actions and unverified platforms. Until that happens write **human review pending**. Keep low
+resolution default throughout; any future default switch requires an explicit separate user decision.
+
+### Package register
+
+"Prepared" below describes instructions, not code. All implementation is unstarted. Dependencies
+are implementation dependencies; the eleven planning PRs are stacked in this listed order.
+
+| Package | Deliverable | Implementation dependencies | Brief | Code / human review |
+| --- | --- | --- | --- | --- |
+| [G0](#g0--measurement-and-review-harness) | Measurement and review harness | current main | Prepared | Unstarted; review pending |
+| G1 | Persistent instances and pass culling | G0 budgets and review manifest | Queued in next planning PRs | Unstarted; review pending |
+| G2a | Geometry storage and ownership | G1 | Queued in next planning PRs | Unstarted; review pending |
+| G2b | Distance detail and valid shadow reuse | G2a | Queued in next planning PRs | Unstarted; review pending |
+| G3a | Stamped wake shading | G2b and Batch A verdict resolved | Queued in next planning PRs | Unstarted; review pending |
+| G3b | Foam history and cosmetic ripples | G3a | Queued in next planning PRs | Unstarted; review pending |
+| G4 | Shore-aware and far-water character | G3b | Queued in next planning PRs | Unstarted; review pending |
+| G5a | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Queued in next planning PRs | Unstarted; review pending |
+| G5b | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Queued in next planning PRs | Unstarted; review pending |
+| G5c | Ambient detail, cube spray and final qualification | G5b | Queued in next planning PRs | Unstarted; review pending |
+| G6 | Conditional backend decision spike | G1–G5 measured results exceed G0 budgets and profiling identifies a backend-limited fix | Queued in next planning PRs | Unstarted; G6 dormant |
+
+## Implementation package briefs
+
+These briefs refine the stage summaries below. If an older summary uses a provisional gain or
+parity claim, the package-specific gate and measured G0 budget govern. No numeric target is
+qualified until G0 records it.
+
+### G0 — Measurement and review harness
+
+Stage coverage: G0. **Depends on:** current main.
+Human review: No human gate; establishes all three review batches.
+
+**Read first:** `tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`,
+`src/renderer_gpu.[ch]`, [performance](BOATING_PERFORMANCE.md), [testing](TESTING.md).
+
+**Tasks, in order:**
+
+1. Extend the existing benchmark rather than create a second timing tool. Preserve its default river
+   route and report contract. Add a deterministic four-boat stress scenario with saturated
+   player/traffic wake records; report emitter and active-piece counts so the load is proven. Keep
+   fixture setup in review/presentation code, with unchanged production physics.
+2. Add repeatable basin, river and outer review poses: close hull/wake, quay/bridge, long river
+   skyline, sheltered dock and open coast. Record map, world position, camera, tick, wave/weather
+   options and resolution in a manifest. Include movement through a tile boundary, fast turn,
+   stop/restart, camera turn and teleport/map reload. Add capture/replay commands for the manifest;
+   do not invent flags in documentation before implementing them.
+3. Build Release on a recorded main commit including the merged near/far shadows. Run at least three
+   repetitions after the same warmup of flat/waves × AA off/4x4 × ordinary/stress route. Record
+   p50/p95/p99, sample availability, frame interval, CPU submission, GPU, pass/group
+   submissions/triangles, and CPU/GPU mesh/target memory estimates. Separate unpaced throughput from
+   visible paced behavior.
+4. Take an Instruments Time Profiler trace for the visible river/stress path. Identify whether
+   uniform lookup, draw submission, uploads or shader work is actually limiting. Build and smoke the
+   WebGL2 browser on the M1 Max; report browser/version, renderer and unsupported timers. Measure
+   equivalent ordinary/stress browser workloads with the same scenario inputs and in-app counters,
+   including frame intervals, CPU submission and available GPU timers; add a small browser review
+   entry point if needed. Do not substitute SwiftShader for a hardware browser performance claim.
+5. Publish the review manifest, command matrix and compact results in this plan/performance guide.
+   Replace provisional G1 targets with measured feasible submission and CPU p95 goals; allocate
+   CPU/GPU and memory ceilings per pass/group, reserve explicit water headroom and a margin under
+   16.67 ms. Set numerical/image tolerances for lossy geometry and stamped shading before those
+   packages start. Give every later package a baseline and measurable gate; label missing
+   measurements as open instead of manufacturing numbers.
+
+**Acceptance:** Benchmark contract tests cover scenario selection, counts, report schema and
+deterministic final physical state. Repeat captures agree on the same platform. Full suite passes;
+browser startup/render and trace evidence are recorded. Budget table has actual numbers and units,
+target revision/platform and measurement commands; timing thresholds stay outside CTest.
+
+**Limits and stop conditions:** If Instruments or a hardware browser cannot run, deliver the harness
+PR with those limits explicit; packages depending on the missing budgets remain unready. The current
+Debug table is history, not a substitute. No look/default change.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement package G0 in docs/GRAPHICS_OVERHAUL_PLAN.md. Read its execution process and complete the measurement/review harness, repeated Release baseline and budget table. Use one implementation PR, update the plan with actual evidence and limits, and leave human acceptance unclaimed.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
 ## Stages
 
-Targets are provisional until G0 sets real budgets. Each stage's gain figures are estimates.
+These are direction summaries, not agent task briefs; execute the packages above. Targets are
+provisional until G0 sets real budgets. Each stage's gain figures are estimates.
 
 ### G0 — Measure and set budgets
 
@@ -127,7 +322,8 @@ No visual change.
    gulls, boats and harbour pieces.
 3. Cull objects per pass, using the existing `box_in_view` test.
 
-Done when: captures are byte-identical at the review stops, `tile_culling` still passes, and
+Done when: same-platform GPU captures are byte-identical at the G0 review stops, `tile_culling`
+still passes, and
 submissions fall below about 150 with submission p95 near 1 ms (estimate, to be revised by G0). The
 `app_submissions` definition in the performance guide is updated, since one draw is no longer one
 object.
@@ -138,7 +334,8 @@ object.
    consumer needs them. Flag cloth still updates its arrays.
 2. Add distance detail: merged or simplified distant tiles and impostors for far buildings, to pull
    down p95 triangles. This one is allowed a visual change.
-3. Cache static shadow casters where the sun is fixed, and reassess once the sunset work moves it.
+3. Evaluate static shadow reuse with valid light, projection and caster keys; a fixed sun alone
+   is insufficient because the near/far shadow cameras move. See G2b for measured skip criteria.
 
 Done when: map memory and p95 triangles have measured reductions, with no popping visible on the
 review route.
@@ -149,7 +346,7 @@ The largest gain for both speed and identity. Add a boat-following, world-anchor
 height, foam and ripples.
 
 1. **Stamp wakes.** Draw wake pieces as small additive quads into the texture, replacing the
-   per-pixel `objectWake` loop. Visually equivalent to today.
+   fragment `objectWake` loop within G0 shading tolerances. The vertex loop stays analytic in G3a.
 2. **Foam memory.** Surface foam lingers, drifts and fades instead of following only the current
    crest. It adds to the boat's cube foam and never replaces it.
 3. **Ripples.** Run a small wave simulation in a fragment shader, so that ripples bounce off quays
@@ -171,8 +368,8 @@ unchanged, and the user has played it and judged the water.
 ### G4 — Water with a sense of place
 
 1. Extend `tools/map_pack.py` to bake a per-map water map: shore distance, depth, shelter and chop.
-   This generalizes the hand-written `exposure()`. Decide whether it joins the network content
-   digest; presentation-only data should not break room compatibility.
+   This generalizes the hand-written `exposure()`. Keep it outside the network content
+   digest: presentation-only data must not break room compatibility.
 2. Make scene depth available under the water, for shore fade, depth tint and quay foam.
 3. Far-water life: wind gusts crossing the surface, a chunky sun glitter path, squalls visible on
    the water as they approach.
@@ -190,7 +387,8 @@ Done when: glassy docks and choppy open water read clearly apart in captures, on
 3. **Clustered lights.** Replace the 32-light loop with a CPU-built cluster texture, removing the
    lamp selection and its cap.
 4. **Dusk on the water.** Hundreds of windows and lamps as long stepped streaks in the reflection.
-   Depends on the [gameplay sunset](SUNSET_PLAN.md) shared lighting frame.
+   Requires the [gameplay sunset](SUNSET_PLAN.md) shared lighting frame and fixed dusk input,
+   currently unimplemented; G5b must wait for that prerequisite.
 5. **Finishing.** Baked ambient occlusion in the scenery pack; GPU particles for foam and spray
    within what the platform allows, keeping the cubes' look and lifetimes.
 
@@ -280,13 +478,14 @@ conclusion that the mosaic survives was wrong once the squares moved:
 
 ## Related work and conflicts
 
-- **[#103](https://github.com/doomdavve/proteus/pull/103), open at the time of writing,** adds a
+- **[#103](https://github.com/doomdavve/proteus/pull/103), merged before package planning,** adds a
   second distant shadow map. Its own Debug comparison moves submissions from 1,006 to 1,249 and CPU
-  submission from 3.756 to 4.334 ms, which raises the case for G1. G0 should measure after it
-  settles, and G2's shadow caching must account for it.
+  submission from 3.756 to 4.334 ms, which raises the case for G1. G0 must measure the merged
+implementation, and G2b shadow reuse must account for both maps.
 - **[Gameplay sunset](SUNSET_PLAN.md)** owns the shared lighting frame. G5 builds on it rather than
   adding another.
-- **[Living city](LIVING_CITY_PLAN.md) and [plugin location life](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)**
+- **[Living city](LIVING_CITY_PLAN.md) and [plugin location
+life](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)**
   add more actors, which G1 should make cheap.
 - **[Boating performance](BOATING_PERFORMANCE.md)** owns the benchmark contract, and
   [the 3D guide](3D.md) the renderer description. Update them as stages land.
@@ -294,8 +493,10 @@ conclusion that the mosaic survives was wrong once the squares moved:
 ## Verification policy
 
 - Every stage: the build and `ctest --preset full`, with `PROTEUS_GPU_TESTS=ON` for renderer changes.
-- Engine-only stages (G1, and G2 parts 1 and 3): byte-identical captures at the review stops.
-- Visual stages: inspected captures, a windowed demo, and user review in play. Stills cannot accept
+- G1 and lossless geometry/shadow reuse: same-platform byte-identical captures at the review
+  stops. Quantized geometry and stamped shading use predeclared G0 error bounds, per the briefs.
+- Visual packages: inspected captures and a windowed demo per PR, with human review batched
+  at A/B/C in the execution process. Stills cannot accept
   anything that changes over time, as the look test showed. A passing run is not user acceptance;
   record them separately.
 - Performance claims: Release, repeated runs, stating machine, options and commit.
@@ -313,3 +514,29 @@ conclusion that the mosaic survives was wrong once the squares moved:
   cleanly. The suite was not run on the spike.
 - 2026-10-31: the user played it. Water squares rejected, plain high resolution liked. Rule 1 and
   G5 rewritten to match. This accepts no shipped feature, since nothing has shipped.
+
+- 2026-11-01: split the direction into eleven agent-sized package briefs and an explicit
+  one-package/one-implementation-PR process; planning delivery itself is a documentation stack.
+  Astra reviewed boundaries and the shader/geometry/shadow/platform acceptance traps. Human
+  playtesting is batched at geometry, combined living water and final presentation. G6 stays dormant;
+  sunset prerequisites stay owned by SUNSET_PLAN.md. No renderer implementation, new performance
+  result, audiovisual review or user acceptance is claimed. Planning verification is recorded below.
+
+## Planning verification — 2026-11-01
+
+Package entry points, stage coverage, dependencies and current sunset/shadow ownership were checked
+against `b0f1233`. Local links and example commands are checked in the planning worktree.
+Verification on 2026-11-01, macOS 26.6.2 / AppleClang 21.0.0, unchanged application code at
+`b0f1233` in `/private/tmp/proteus-graphics-packages`: Debug configure/build succeeded using copied
+pinned dependencies and `-DFETCHCONTENT_FULLY_DISCONNECTED=ON -DPROTEUS_GPU_TESTS=ON`. No project
+compiler warnings; bundled raylib's stb_vorbis emitted one pointer-comparison warning. The initial
+sandboxed suite hit local-socket restrictions and was stopped during graphics checks. A complete
+rerun with desktop/socket access passed **365 enabled tests, including 28 GPU tests**, in 81.63 s;
+15 retired wake-field tests remained disabled. This is regression evidence for unchanged code,
+not verification of the unimplemented graphics packages. Local Markdown links/anchors, package
+coverage, kickoff prompts, balanced fences and `git diff --check` pass for the planning documents;
+command options were checked against current sources and the configure/build/full-preset commands
+were executed. No browser build, new performance measurement or audiovisual review was performed
+for this documentation-only change. Human package/batch acceptance remains pending.
+Markdown-only PRs deliberately skip native CI under current workflow path filters; skipped checks
+are not passing CI. No audiovisual review is required for this documentation-only stack.
