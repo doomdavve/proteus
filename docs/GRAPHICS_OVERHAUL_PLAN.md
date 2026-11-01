@@ -308,7 +308,7 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 
 | Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
-| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | In progress; G0 and G0w machine-verified, next G1 |
+| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A human review and Windows report pending |
 | [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Unstarted; depends on P1 |
 | [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
 
@@ -334,15 +334,18 @@ predeclared bounds. Windows collection/analysis tools are packaged and usable, w
 hardware evidence recorded or explicitly pending. Run the full suite, prepare one Batch A route,
 and keep its human verdict separate. Fix blocking feedback before P2 starts.
 
-**Result:** in progress. G0 and G0w are machine-verified on the reference Mac. G1 instancing is
+**Result:** machine gates met, human review pending. G0 and G0w are machine-verified on the reference Mac. G1 instancing is
 byte-identical in every pass and meets its submission/CPU ceilings, after the owner moved the stress
 CPU gate to a 60 Hz measurement because the unpaced one measured GPU back-pressure. G2a storage
-meets its −45% vertex-byte gate and capture bounds; G2b is unstarted. Completed: stress scenario, review-pose manifest, measured G0 budgets, bounded live
+meets its −45% vertex-byte gate and capture bounds. G2b meets the river triangle gate and keeps
+shadows uncached on measurement. Completed: stress scenario, review-pose manifest, measured G0 budgets, bounded live
 capture, portable exports, Windows launcher/Mac analyzer and their tests; G1 location caching,
-per-pass object culling and persistent instancing; G2a indexed, per-surface map storage. Next: G2b.
+per-pass object culling and persistent instancing; G2a indexed, per-surface map storage; G2b far
+levels and the [Batch A checklist](#batch-a-checklist-prepared-2026-11-01-human-review-pending).
+Next: the user's Batch A.
 Implementation verification: full GPU-enabled CTest and three-repeat Release measurements; see
 [G1](#g1--persistent-instances-and-pass-culling). Agent playback: one WebGL2 river smoke on the M1
-Max, no native manual playback. Human acceptance: none;
+Max at G1 and each of G2a and G2b, no native manual playback by the agent. Human acceptance: none;
 Batch A has not been run. Known scope risk: diagnostics plus multiple renderer
 ownership/submission changes; see the delivery-boundary rule. No boundary change is currently
 justified: the diagnostics prerequisite is on the same branch and reviewable by checkpoint.
@@ -431,8 +434,8 @@ gate; otherwise continue within the same package. No checkpoint is verified or a
 | [G0](#g0--measurement-and-review-harness) | P1 | current main | Machine-verified on M1 Max; browser smoke and Windows hardware open |
 | [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; Windows hardware baseline pending |
 | [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and submission/CPU ceilings machine-verified; no human review |
-| [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Machine-verified on M1 Max; captures within G0 bounds, vertex bytes −58.7% river, −52.3% outer; CI and Batch A pending |
-| [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Unstarted |
+| [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Machine-verified on M1 Max; captures within G0 bounds, vertex bytes −58.7% river, −52.3% outer; Batch A pending |
+| [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Machine-verified on M1 Max; river p95 triangles 880 k → 492 k; shadow reuse measured and rejected; Batch A pending |
 | [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Unstarted |
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Unstarted |
 | [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Unstarted |
@@ -835,7 +838,7 @@ are not in the table, and peak bind memory was not measured.
 - Limits: measured only on the M1 Max and one WebGL2 browser. Unlit vertices leave the normal
   attribute disabled and the vertex shader normalizes a zero vector into a varying that the emissive
   path never reads; Windows and Linux drivers have not run this on real hardware beyond CI.
-- Next: G2b's task 1. Human review stays in Batch A after G2b.
+- G2b followed; see its result. Human review stays in Batch A after G2b.
 
 ### G2b — Distance detail and valid shadow reuse
 
@@ -875,10 +878,88 @@ checklist; actual human verdict remains separate.
 invalidate caches. A failed human LOD review pauses dependent visual expansion until corrected;
 successful automated checks do not approve popping.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: Batch A; P2 only after P1 merge and blocking feedback resolution. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result (2026-11-01, M1 Max):** machine gates met; human review pending in Batch A.
+Implementation: distant windows and street furniture draw at a far level per 256 m cell, chosen
+per view with an 8% hysteresis band; shadow maps stay uncached. See
+[distance detail](3D.md#distance-detail) and
+[the numbers](evidence/graphics/g2b/summary.json).
+
+- **Where the triangles were:** windows 173 k and street furniture 89 k of the river's 347 k.
+  Finer render tiles alone cannot pay for them: 256 m reaches 514 k but 674 submissions and 3.28 ms
+  of GPU time, because time here follows submissions more than triangles. So only those two
+  classes use the fine grid.
+- **Gates, river route p95, three Release repeats, 4x4:** scene triangles 880 k → 492 k (≤ 650 k;
+  shadow 229 k, reflection 125 k, main 137 k), submissions 202 → 270 (≤ 400), CPU 1.29 ms (≤ 3.2),
+  GPU 1.42–1.66 ms (≤ 4.05; 1.25–1.36 at G2a), frame 2.23–2.74 ms (≤ 8). GPU time rose slightly
+  though triangles fell 44%: this reduction meets the budget, not a frame-time problem on this
+  machine. A 512 m cell reached only 647 k and switches larger pieces at once.
+- **Stress:** 76 submissions, GPU 10.10–10.69 ms (≤ 21). Paced CPU alternated with a G2a build:
+  G2b 2.73–3.01 ms, G2a 2.56–3.01 ms (≤ 4.0). The basin has no map cells; G2a's earlier 1.8 ms
+  and single runs up to 6.3 ms under concurrent load show this figure moves with the machine,
+  so compare it interleaved. `--stress-state` unchanged, `tick=4438 hash=8d9af1216d2cf172`.
+- **Memory:** far levels add 4.9 MB river and 11.1 MB outer. Vertex bytes with them still meet
+  G2a's gate: −47.2% river, −45.7% outer, the latter narrowly. No CPU copies are retained.
+- **Images:** `--no-detail` against the G2a tip: worst 2/255, mean below 0.0001/255, from moved
+  draw order. Far against near at review poses: worst mean 0.074/255, a few horizon pixels up to
+  75/255 where a merged window replaces separate ones. The 2/255 limit is G2a's and does not
+  apply; the G0 bound for this change is presence and moving review. A montage of the four worst
+  distant poses shows no missing landmark, bridge or shore. Over 3,020 route frames, the far-near
+  difference has mean p95 0.053/255 and its largest frame-to-frame jump is 0.09/255.
+- **Transitions:** `detail_transitions` passed: 0 level changes while orbiting, 62 forward and 52
+  backward switches, 0 flickers, repeated round trips end alike, and no cell loses its windows.
+- **Shadow reuse rejected, per task 4:** neither map kept an identical transform on any of 6,000
+  route frames, because the snap covers the map plane and the target still slides along the light
+  axis. Removing that would not pay: skipping every far static caster, more than a cache could
+  save, saved 115 k triangles but no GPU time beyond run noise (1.60–1.99 ms against 1.68–1.83 ms).
+  A cache would add a depth copy, a texture and invalidation risk. Near reuse has no case while
+  moving, as the target moves about 0.28 m per frame across 0.09 m texels.
+- **Test noise found and bounded:** `tile_culling` failed intermittently from G2a's `9bd930a` (5
+  of 24 runs; 0 of 30 on `main`, 0 of 24 at `ee1f458`), always one pixel by 1/255 at one overview
+  pose. Two identical draws with culling on for both also differ (6 of 48), so culling is not the
+  cause; float normals hid it (0 of 36) by moving that pixel off a rounding boundary, and the source
+  of the sub-LSB repeat-draw noise is not identified. The zero normal, omitted unlit attributes
+  and a four-component attribute were each tested and ruled out. Float normals would cost G2a's
+  memory, so the GPU comparison now allows at most 1/255 in at most four pixels; CPU stays exact.
+  Same-build byte-identity claims in other checks stay, but this noise can reach them.
+- **Automated:** Debug GPU CTest on the merged tree: 379/379 active passed (15 disabled), warning-clean;
+  `tile_culling` 30/30 and `instancing_parity` 12/12 in soaks. CPU captures 31/31 byte-identical. WebGL2 river smoke in
+  Chrome 156 on ANGLE Metal after merging `main`: no GL errors or page errors, frame inspected.
+- **Agent playback:** captures, one browser smoke and the clip's numbers only, no native play.
+  **Human acceptance: pending, Batch A below.**
+- **Limits:** one machine and browser; no Windows report. The gate is measured on the river route
+  only, and the outer map has no route benchmark. A level switch is one frame with no fade, so only
+  a person can judge popping. Output taller than 200 presented pixels moves the switch out and
+  keeps more triangles. The route never holds at a switch for long; the check covers that case.
+- **Next:** Batch A, then P2 after P1 merges and blocking feedback is resolved.
+
+#### Batch A checklist (prepared 2026-11-01; human review pending)
+
+Revision: the tip of `feat/graphics-foundations`, in `../proteus-graphics-foundations`, built
+into `build-release`. Run from that directory. Add `--no-far-detail` to any command to compare.
+
+```sh
+./build-release/wake_velocity --location river --gpu-aa
+./build-release/wake_velocity --location outer --gpu-aa
+./build-release/wake_velocity
+./build-release/wake_velocity --location river
+```
+
+The third is the basin; the fourth is the default no-AA path. F3 shows the profiler.
+Side-by-side clip of the review route, full detail left and far right, not committed:
+`build-release/graphics/g2b/batch-a-near-left-far-right.mp4`.
+
+1. River long views: look along the river from the quay and drive toward the distant city.
+2. Forward and backward crossings: approach far buildings about 700–800 m away, then reverse.
+   Do lit windows or furniture visibly pop? Does anything flicker if you hover there?
+3. Camera turns: orbit and whip the camera at speed. Levels should not change.
+4. Bridge and quay: pass under the bridge and along the quays. Openings, piers, crane and shore edge.
+5. Reflections: watch reflected buildings, boats and actors. Anything missing or jumping?
+6. Both shadow ranges: drive with shadows crossing the near/far blend, about 40 m ahead. Any trails,
+   gaps or changed facets? Far shadows of small street furniture are gone by design.
+7. Basin and outer: same questions; outer has the most windows, especially upstream.
+8. Windows hardware report, when available: `collect-performance.bat`.
+
+Record revision, commands, settings, route, player, date, verdict, actions and unverified platforms.
 
 ### G3a — Stamped wake shading
 

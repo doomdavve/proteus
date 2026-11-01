@@ -176,7 +176,7 @@ JSON records `tile_size` and the CSV adds `shadow_tiles_culled`, `reflection_til
 `main_tiles_culled`, the tile meshes each pass skipped. `--tile-size M` (64–65,536 m, default
 1,024) sets the render tile edge for the benchmark and for `--output` captures, and
 `--no-cull` (captures only) draws every tile in the same order, for isolating culling
-from draw order. The voyage checks hull clearance at each frame pose. `--check` covers every
+from draw order; `--no-detail` draws every detail cell near. The voyage checks hull clearance at each frame pose. `--check` covers every
 tick, and the matching final state shows the benchmark followed the same trajectory.
 
 This is a fixed two-tick **render workload**. It does not exercise the app's real-time
@@ -687,7 +687,9 @@ The stress CPU gate was ≤ 8.0 ms unpaced (G0 reference 11.13 ms) until the own
 2026-11-01: most of that time was the driver waiting on the GPU, so it measured GPU back-pressure.
 G1 results against these gates are in
 [its checkpoint result](GRAPHICS_OVERHAUL_PLAN.md#g1--persistent-instances-and-pass-culling), and
-G2a's in [its result](GRAPHICS_OVERHAUL_PLAN.md#g2a--geometry-storage-and-ownership).
+G2a's in [its result](GRAPHICS_OVERHAUL_PLAN.md#g2a--geometry-storage-and-ownership), and G2b's
+in [its result](GRAPHICS_OVERHAUL_PLAN.md#g2b--distance-detail-and-valid-shadow-reuse). The paced
+stress CPU figure moves with machine load, so compare it interleaved against a control build.
 Read gate columns against each report's `p95`; `p50` is typically far lower for submissions.
 
 ### Predeclared accuracy bounds

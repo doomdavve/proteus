@@ -125,7 +125,13 @@ must leave the existing renderable targets intact.
 `tile_culling` (`boat_water_review --check-culling`, `gpu`, about 9 s; adventure A2.3)
 renders 144 river poses (512 m and 1 km tiles, six route stops, four headings, default, close
 and overview cameras) culled and unculled, on the GPU with waves and on the CPU on flat water.
-The pixels must be identical, and every pass must cull at least one tile.
+The CPU pixels must be identical. The GPU images may differ by at most 1/255 in at most four
+pixels, the noise measured between two identical culled draws (6 of 48 runs, one pixel, 2026-11-01).
+Every pass must cull at least one tile.
+`detail_transitions` (`boat_water_review --check-detail`, `gpu`; graphics G2b) drives a river view
+through the distance-detail threshold. Orbiting the boat must change no level, a cell that just
+switched must hold under small camera movement, repeated out-and-back trips must end alike, and
+every cell with windows must keep them far. It prints the switch counts and near/far cells.
 `instancing_parity` (`boat_water_review --check-instancing`, `gpu`, about 6 s; graphics G1) draws
 every G0 review pose and six stress frames scalar, instanced and instanced with a replay every
 three objects, with AA off and 4x4. The main image, reflection and both shadow depth maps must be
