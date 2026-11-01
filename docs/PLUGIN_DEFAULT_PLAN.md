@@ -1302,6 +1302,22 @@ The hosted browser build was reproduced in a scratch directory with `emcmake`, M
 `origin/main` worktree (`b0f1233`) with the clean local `davve-srv` controller and reported
 "Preflight passed. No tag, release or hosting changes made."
 
+**Review fixes, 2026-11-01.** A review found that a free or course revision's union was read as a
+voyage route, so renaming such a package (new with `eaf3123`) or applying a course edit (already
+present before this package) crashed on the next tick. `commit` now passes a route only for voyage
+hosts. A course edit also never reached the session: the session now follows the active revision's
+course, and an applied edit selects that course's best file (`boat_replay_runs_select_best`) so it
+cannot overwrite another course's best. New `wake_command` and `boat_replay` cases
+pin this. `compiled_selection_guard` never matched executables on macOS because Mach-O symbols carry
+a leading underscore; it now strips it, and `compiled_selection_guard_detects` is a negative control.
+Stale compiled-content comments were corrected.
+
+Verified after these fixes, Apple Silicon/macOS, 2026-11-01: `ctest --preset quick` passed 244 tests
+and `ctest --preset full` passed all 343 enabled tests with local sockets (13 retired tests disabled,
+GPU CTests off). Removing the route check makes `wake_command` segfault. The five CPU captures above
+still match their pins. The restart's best-file selection in `wake_velocity.c` was not driven in a
+window, and local browser rooms were not rerun.
+
 **Known limits.** GPU CTests were off. Only headless Chromium/Metal was run locally; Firefox and
 WebKit were covered by the manual CI workflow. No physical Safari/iPhone or two-machine room was
 tried. The four-client bandwidth and tick figures are one

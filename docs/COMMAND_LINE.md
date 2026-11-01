@@ -125,7 +125,8 @@ retries while your personal best is tracked separately. `--save-run FILE` export
 normal-time attempt, including slower runs; altered-time practice attempts preserve existing
 exports and bests. A course whose gameplay digest equals the standard S course keeps the
 established `course-*.run` best path; another `--package` course adds its digest to the filename
-and refuses `--replay`/`--ghost`. See [saved runs](PLAYING.md#saved-runs) for storage and
+and refuses `--replay`/`--ghost`. Applying an edited course restarts on it with that course's own
+best and no imported ghost or last run; Undo selects the earlier course's best again. See [saved runs](PLAYING.md#saved-runs) for storage and
 compatibility.
 
 ## Water settings

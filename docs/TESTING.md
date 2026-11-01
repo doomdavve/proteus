@@ -326,7 +326,8 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   `boat_plugin_catalog_invalid` runs the build-time generator on objective, bad-schema and
   duplicate packages and expects its normal diagnostics. `compiled_selection_guard` rejects the
   removed compiled symbols and the fixture library in production sources, CMake targets and the
-  built `wake_velocity`/`boat_server` symbols. `boat_replay`'s legacy-best case proves a
+  built `wake_velocity`/`boat_server` symbols; `compiled_selection_guard_detects` is its negative
+  control, where a validator linking the fixtures must trip the executable check. `boat_replay`'s legacy-best case proves a
   pre-existing `course-calm-physicsN.run` keeps its path as the best under
   `BOAT_COURSE_STANDARD_DIGEST` and is not overwritten by an equal or slower run. The catalog
   also includes the outer free room, `proteus.deathmatch` (whose rules and combat values equal

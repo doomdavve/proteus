@@ -1,4 +1,4 @@
--- The outer location's Långedrag voyage, as compiled into boat_voyage_outer (src/boat_voyage.c).
+-- The outer location's Långedrag voyage, equal to the fixture in tools/boat_fixtures.c.
 -- Simulation metres: x = -east, z = north. Headings are radians; forward is (sin, -cos).
 -- The first shelter is the start and the last is the destination's, reached only by arriving.
 return {
