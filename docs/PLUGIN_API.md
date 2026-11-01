@@ -90,7 +90,7 @@ return { free = { version = 1 } }
 
 Absent content means the engine's registered defaults, exactly as an absent subsystem does. The
 location must be `basin`, `river` or `outer`. A free package has no objective or callback grant;
-a scene is the same envelope described under [the scene contract](#location-life-scene-contract-planned-l11).
+a scene is the same envelope described under [the scene contract](#location-life-scene-contract-l11l43).
 A free package with a scene fixes the room's location; without one it still names its location.
 
 ## Match schema
