@@ -112,10 +112,11 @@ Everything before G6 is designed to work on both. Watch points for that work:
 Status, 2026-11-01: this is a **planning delivery**, not a renderer implementation. Twelve
 package briefs, including G0w for native Windows capture, split G0–G6 into one future
 implementation PR apiece; G6 remains conditional.
-The planning PRs themselves form a documentation stack, each adding one brief and kickoff prompt.
-Merge that stack in order before implementation, or branch an implementation from the approved
-planning head and target that parent while it remains open. Do not confuse a planning PR with the
-implementation PR it prepares. **Next implementation: G0.** No overhaul result is user-accepted.
+**One PR per package means one implementation PR per work package.** Batch package definitions,
+prompts and process changes together in one planning PR; do not create a planning PR per package.
+The initial twelve-PR documentation stack was an interpretation error, not the intended workflow.
+Merge that existing stack in order before implementation. **Next implementation: G0.** No overhaul
+result is user-accepted.
 
 ### Work loop and delivery
 
@@ -1245,3 +1246,7 @@ The full CTest preset passed all 365 enabled tests, including 28 GPU cases, in 8
 and local-socket access; 15 retired wake-field cases remained disabled. Application code is unchanged.
 Markdown-only native CI remains skipped by existing workflow filters.
 No native Windows run, portable report, cross-machine comparison or user acceptance is claimed.
+
+- Process clarification, 2026-11-01: the user meant one PR per implementation work package, with
+  package preparation batched in one planning PR. Corrected the execution process accordingly.
+  The initial documentation stack is retained as history and merged in order at the user's request.
