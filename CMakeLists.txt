@@ -241,10 +241,44 @@ target_link_libraries(validate_frame_pacer PRIVATE proteus_frame_pacer)
 target_compile_options(validate_frame_pacer PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME frame_pacer COMMAND validate_frame_pacer)
 
+add_executable(validate_boat_capture tools/validate_boat_capture.c
+  tools/wake_velocity_performance.c src/boat_capture.c)
+target_include_directories(validate_boat_capture PRIVATE ${raylib_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/src "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(validate_boat_capture PRIVATE raylib)
+target_compile_options(validate_boat_capture PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_capture COMMAND validate_boat_capture ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(boat_capture PROPERTIES LABELS "cpu")
+
+# G0w report metadata: keep the revision and configuration explicit. Multi-config generators
+# leave CMAKE_BUILD_TYPE empty, so record that fact instead of guessing a configuration.
+execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  OUTPUT_VARIABLE PROTEUS_BUILD_REV OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT PROTEUS_BUILD_REV)
+  set(PROTEUS_BUILD_REV unknown)
+endif()
+execute_process(COMMAND git status --porcelain --untracked-files=no
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} OUTPUT_VARIABLE PROTEUS_BUILD_DIRTY)
+if(PROTEUS_BUILD_DIRTY)
+  string(APPEND PROTEUS_BUILD_REV "-dirty")
+endif()
+if(NOT CMAKE_BUILD_TYPE)
+  set(PROTEUS_BUILD_CONFIG "multi-config")
+else()
+  set(PROTEUS_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
+endif()
+
 add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/boat_title.c
-  tools/cli_usage.c src/profiler.c src/boat_audio.c src/xm_audio.c)
+  tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
+  src/xm_audio.c src/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer)
+target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
+target_compile_definitions(wake_velocity PRIVATE
+  WAKE_PERFORMANCE_REVISION="${PROTEUS_BUILD_REV}"
+  WAKE_PERFORMANCE_BUILD_CONFIG="${PROTEUS_BUILD_CONFIG}"
+  WAKE_PERFORMANCE_PLATFORM="${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}"
+  WAKE_PERFORMANCE_COMPILER="${CMAKE_C_COMPILER_ID}-${CMAKE_C_COMPILER_VERSION}")
 # Share the web packager's version convention. Source archives can supply an explicit value.
 set(PROTEUS_VERSION "" CACHE STRING "Build version displayed on the title (empty uses Git)")
 if(PROTEUS_VERSION STREQUAL "")
@@ -538,6 +572,9 @@ add_test(NAME release_command COMMAND ${Python3_EXECUTABLE}
 set_tests_properties(release_command PROPERTIES LABELS "cpu")
 add_test(NAME web_endpoint_configuration COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_configure_web_endpoint.py)
+add_test(NAME performance_analyzer COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_compare_performance_reports.py)
+set_tests_properties(performance_analyzer PROPERTIES LABELS "cpu")
 set_tests_properties(web_endpoint_configuration PROPERTIES LABELS "cpu")
 add_test(NAME boat_benchmark_contract COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_benchmark.py $<TARGET_FILE:boat_benchmark>)

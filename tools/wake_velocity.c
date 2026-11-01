@@ -1,10 +1,15 @@
+#include "external/glad.h"
+
 #include "boat_assets.h"
 #include "boat_audio.h"
+#include "boat_capture.h"
 #include "boat_course_view.h"
 #include "boat_gpu.h"
+#include "boat_gpu_timer.h"
 #include "boat_hud.h"
 #include "boat_minimap.h"
 #include "boat_music.h"
+#include "boat_plugin_catalog.h"
 #include "boat_profile.h"
 #include "boat_rearview.h"
 #include "boat_replay.h"
@@ -17,11 +22,11 @@
 #include "boat_ui.h"
 #include "boat_voyage_view.h"
 #include "cli_usage.h"
-#include "wake_velocity_drive.h"
-#include "wake_velocity_menu.h"
-#include "boat_plugin_catalog.h"
 #include "wake_command.h"
 #include "wake_console.h"
+#include "wake_velocity_drive.h"
+#include "wake_velocity_menu.h"
+#include "wake_velocity_performance.h"
 #include "wake_velocity_plugin.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_bridge.h"
@@ -38,6 +43,7 @@
 #include "frame_pacer.h"
 #include "profiler.h"
 #include "raymath.h"
+#include "rlgl.h"
 #include "xm_audio.h"
 
 #include <math.h>
@@ -76,7 +82,7 @@ EM_JS(int, boat_web_mouse_state, (int wanted, int available),
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
 EM_JS(int, boat_web_physical_keyboard, (void), {
     return (window.matchMedia && window.matchMedia('(pointer: fine)').matches)
-        || (navigator.maxTouchPoints || 0) === 0;
+        || (navigator.maxTouchPoints || 0) == = 0;
 })
 EM_JS(void, boat_web_console_state, (bool open, bool available, bool focused), {
     Module.boatConsoleOpen = !!open;
@@ -104,7 +110,8 @@ static void usage(void)
     cli_usage_line(stdout, "(no arguments)", "Open the title screen: single player, multiplayer,");
     cli_usage_line(stdout, "", "settings and credits");
     cli_usage_line(stdout, "--title", "Open the title screen explicitly");
-    cli_usage_line(stdout, "--title-start PLACE", "Start a PLACE as the title's START does (tests)");
+    cli_usage_line(
+        stdout, "--title-start PLACE", "Start a PLACE as the title's START does (tests)");
     cli_usage_line(stdout, "--course", "Timed S course in the basin");
     cli_usage_line(stdout, "--replay FILE", "Watch a saved course run");
     cli_usage_line(stdout, "--ghost FILE", "Race a compatible saved run");
@@ -149,6 +156,9 @@ static void usage(void)
     cli_usage_line(stdout, "--gpu-aa", "4x supersampling");
     cli_usage_line(stdout, "--no-vsync", "Pace at exactly 60 Hz");
     cli_usage_line(stdout, "--profiler", "Show the debug profiler at startup");
+    cli_usage_line(stdout, "--performance-report PATH",
+        "Write a performance bundle at exit (PATH must not exist)");
+    cli_usage_line(stdout, "--no-performance-capture", "Disable the rolling live capture");
     cli_usage_line(stdout, "--verbose", "Log graphics/window and resource startup");
 
     cli_usage_section(stdout, "CAPTURES AND AUTOMATION");
@@ -187,6 +197,7 @@ static void usage(void)
     cli_usage_line(stdout, "+/-, PageUp/PageDown", "Camera closer/farther, higher/lower");
     cli_usage_line(stdout, "C", "Reset view");
     cli_usage_line(stdout, "F3", "Toggle the debug profiler");
+    cli_usage_line(stdout, "F4", "Export the recent performance report");
     cli_usage_line(stdout, "F5 / F6 / F7", "Plugin: reload / undo / apply migration or restart");
     cli_usage_line(stdout, "F2 or `", "Live console: edits apply without a reset; /help, /save");
     puts("");
@@ -273,7 +284,7 @@ static void draw_help(
         deathmatch ? "V: toggle rearview mirror (starts hidden)" : "",
         minimap ? "N: map in corner / large chart / off" : "",
         "+/-: zoom | PgUp/PgDn: height",
-        "C: reset camera | F3: profiler",
+        "C: reset camera | F3: profiler | F4: performance report",
         networked ? "" : "[ / ] or , / .: time 0.25x..8x | \\ or 0: 1x",
 #if !defined(__EMSCRIPTEN__)
         "F11: fullscreen",
@@ -383,7 +394,8 @@ static double plugin_time(void)
 #if defined(__EMSCRIPTEN__)
 EM_JS(int, browser_plugin_export,
     (const unsigned char *manifest, unsigned manifest_size, const unsigned char *source,
-        unsigned source_size), {
+        unsigned source_size),
+    {
         if (!Module.boatPluginExport)
             return 0;
         Module.boatPluginExport(HEAPU8.slice(manifest, manifest + manifest_size),
@@ -433,6 +445,31 @@ static void select_course_best(BoatSession *session, const char *data_dir, bool 
         fprintf(stderr, "%s: %s\n", session->runs.notice, session->runs.best_path);
 }
 
+static void performance_query_complete(void *context, unsigned long long frame, double milliseconds)
+{
+    BoatCaptureSample *sample = boat_capture_sample(context, frame);
+    if (!sample)
+        return; // The sample left the rolling window before its query completed.
+    sample->gpu_ms = (float)milliseconds;
+    sample->has_gpu = true;
+    sample->gpu_pending = false;
+}
+
+// Snapshot the retained samples before writing, and never wait for a pending GPU query: the
+// export itself is outside the measured window and cannot become the hitch it describes.
+static bool export_performance(BoatCapture *capture, const WakePerformanceInfo *info,
+    const char *destination, char *notice, size_t notice_size)
+{
+    char written[4096], error[512];
+    bool ok = wake_performance_export(
+        capture, info, destination, written, sizeof(written), error, sizeof(error));
+    if (ok)
+        snprintf(notice, notice_size, "Performance report: %s (F4 again for another)", written);
+    else
+        snprintf(notice, notice_size, "Performance report failed: %s", error);
+    return ok;
+}
+
 static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
@@ -453,6 +490,8 @@ static int study(int argc, char **argv)
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
     bool gpu_enabled = true, gpu_aa = false;
     bool profiler_visible = false;
+    const char *performance_report = NULL;
+    bool performance_capture = true;
     bool vsync = true;
     bool verbose = false;
     int frame_limit = 0;
@@ -501,6 +540,12 @@ static int study(int argc, char **argv)
             gpu_aa = true;
         } else if (strcmp(argv[i], "--profiler") == 0) {
             profiler_visible = true;
+        } else if (strcmp(argv[i], "--performance-report") == 0 && i + 1 < argc) {
+            performance_report = argv[++i];
+            if (!*performance_report)
+                goto invalid;
+        } else if (strcmp(argv[i], "--no-performance-capture") == 0) {
+            performance_capture = false;
         } else if (strcmp(argv[i], "--no-vsync") == 0) {
             vsync = false;
         } else if (strcmp(argv[i], "--wake-field") == 0) {
@@ -705,8 +750,7 @@ static int study(int argc, char **argv)
         goto invalid;
     }
     if (plugin_path && package_id) {
-        fprintf(
-            stderr, "--plugin is the file-based authoring path; it cannot take --package.\n");
+        fprintf(stderr, "--plugin is the file-based authoring path; it cannot take --package.\n");
         goto invalid;
     }
     if (package_id && connect_to) {
@@ -900,8 +944,7 @@ static int study(int argc, char **argv)
             goto cleanup;
         }
         plugin_active = true;
-    }
-    else if (catalog) {
+    } else if (catalog) {
         if (!wake_plugin_open_catalog(&plugin, catalog, &session)) {
             snprintf(study_failure, sizeof(study_failure), "%s", plugin.host.diagnostic.message);
             goto cleanup;
@@ -1065,7 +1108,8 @@ static int study(int argc, char **argv)
         // CSS sizing belongs to the page; mobile gameplay adapts the drawing buffer below.
         SetConfigFlags(0);
 #else
-        SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+        SetConfigFlags(screenshot || performance_report ? FLAG_WINDOW_HIDDEN
+                                                        : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 #endif
         InitWindow(width * 3, height * 3, "Wake Velocity");
         if (!IsWindowReady())
@@ -1181,6 +1225,17 @@ static int study(int argc, char **argv)
     VirtualSize size = { width, height };
     double frame_started_at = boat_profile_time(true);
     double next_snapshot_time = 0;
+    // G0w: live capture is independent of the F3 overlay. Its ring, GPU queries and the export
+    // path belong to the application, not the simulation or network.
+    BoatCapture capture = { 0 };
+    BoatGpuTimer performance_timer = { 0 };
+    unsigned long long performance_serial = 0;
+    double previous_performance_start = -1;
+    double performance_notice_until = 0;
+    int performance_segment_map = -1;
+    char performance_notice[512] = "";
+    if (performance_capture && gpu_enabled)
+        boat_gpu_timer_init(&performance_timer);
     result = 0;
     while (!WindowShouldClose() && (!frame_limit || frames < frame_limit)) {
 #if defined(__EMSCRIPTEN__)
@@ -1431,6 +1486,7 @@ static int study(int argc, char **argv)
             profiler_visible = !profiler_visible;
             next_snapshot_time = 0;
         }
+        bool performance_request = active && IsKeyPressed(KEY_F4);
         if (active && boat_minimap_ready(&minimap) && IsKeyPressed(KEY_N))
             minimap_mode = boat_minimap_next(minimap_mode);
 #ifdef PROTEUS_BOAT_NET
@@ -1759,6 +1815,9 @@ static int study(int argc, char **argv)
         }
         metrics.course_replay_ms += (float)((boat_profile_time(true) - ghost_started_at) * 1000.0);
         double scene_started_at = boat_profile_time(true);
+        unsigned long long performance_frame = performance_serial++;
+        bool performance_timed = performance_capture && gpu_enabled
+            && boat_gpu_timer_begin(&performance_timer, performance_frame);
         // A joined room may select a location whose pack the browser has not fetched yet.
         if (!scenery_ready(view_world->definition, assets)) {
             fprintf(stderr, "Cannot load the %s scenery.\n", view_world->definition->name);
@@ -1777,6 +1836,10 @@ static int study(int argc, char **argv)
                        ghost_view_flag, ghost_opacity)) {
             result = 1;
             break;
+        }
+        if (performance_timed) {
+            rlDrawRenderBatchActive();
+            glEndQuery(GL_TIME_ELAPSED);
         }
         if (!gpu_enabled)
             UpdateTexture(texture, pixels);
@@ -1899,6 +1962,8 @@ static int study(int argc, char **argv)
             profiler_draw(&profiler, &snapshot, size);
         if (profiler_visible)
             boat_profile_draw(&boat_snapshot, 12, 355);
+        if (performance_notice[0] && GetTime() < performance_notice_until)
+            boat_ui_text(performance_notice, 12, 40, 10, RAYWHITE);
         if (menu.open) {
             DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color) { 8, 15, 22, 120 });
             boat_menu_draw(&menu, menu_camera, mouse_steering, networked);
@@ -1916,6 +1981,103 @@ static int study(int argc, char **argv)
         EndDrawing();
         metrics.present_ms = (float)((boat_profile_time(true) - present_started_at) * 1000.0);
         metrics.frame_ms = (float)((boat_profile_time(true) - frame_started_at) * 1000.0);
+        if (performance_capture) {
+            if (performance_segment_map < 0)
+                performance_segment_map = (int)view_world->definition->id;
+            else if (performance_segment_map != (int)view_world->definition->id) {
+                performance_segment_map = (int)view_world->definition->id;
+                boat_capture_segment(&capture);
+            }
+            BoatCaptureSample sample = {
+                .time = boat_profile_time(true),
+                .serial = performance_frame,
+                .interval_ms = previous_performance_start >= 0
+                    ? (float)((current_frame_started_at - previous_performance_start) * 1000.0)
+                    : 0,
+                .frame_ms = metrics.frame_ms,
+                .simulation_ms = metrics.simulation_ms,
+                .physics_ms = metrics.physics_ms,
+                .audio_ms = metrics.audio_ms,
+                .render_ms = metrics.snapshot_render_ms,
+                .present_ms = metrics.present_ms,
+                .discarded_ms = metrics.discarded_active_ms,
+                .ticks = metrics.ticks,
+                .map = view_world->definition->id,
+                .preset = gpu_aa ? 1 : 0,
+                .segment = capture.segment,
+                .x = session.boat.position.x,
+                .z = session.boat.position.y,
+                .heading = session.boat.heading,
+                .camera_heading = session.presentation.camera_heading,
+                .speed = Vector2Length(session.boat.velocity),
+                .focused = IsWindowFocused(),
+                .active = active,
+                .paused = !active,
+                .gpu_pending = performance_timed,
+            };
+            if (gpu_enabled) {
+                WaterfrontGpuCount total = waterfront_gpu_stats_total(&gpu.scene.stats);
+                sample.app_submissions = total.submissions;
+                sample.scene_triangles = total.triangles;
+                for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT && pass < BOAT_CAPTURE_PASSES;
+                    ++pass)
+                    for (int group = 0;
+                        group < WATERFRONT_GPU_GROUP_COUNT && group < BOAT_CAPTURE_GROUPS;
+                        ++group) {
+                        WaterfrontGpuCount count = gpu.scene.stats.mesh[pass][group];
+                        sample.pass_submissions[pass] += count.submissions;
+                        sample.pass_triangles[pass] += count.triangles;
+                        sample.group_submissions[group] += count.submissions;
+                        sample.group_triangles[group] += count.triangles;
+                    }
+            }
+            const BoatWakeObjects *pool = objects ? object_study_wakes(objects) : NULL;
+            if (pool) {
+                sample.wake_live = pool->live;
+                sample.wake_peak_live = pool->peak_live;
+                sample.wake_emitters = BOAT_OBJECT_BOATS;
+            }
+            sample.traffic_wake_live
+                = objects && objects->traffic_enabled ? objects->traffic.live : 0;
+            boat_capture_add(&capture, &sample);
+            previous_performance_start = current_frame_started_at;
+            boat_gpu_timer_poll(&performance_timer, performance_query_complete, &capture, false);
+            if (performance_request) {
+                char directory[4096], destination[4096];
+                if (!wake_performance_default_directory(directory, sizeof(directory)))
+                    snprintf(directory, sizeof(directory), ".");
+                wake_performance_default_name(directory, destination, sizeof(destination), true);
+                WakePerformanceInfo info = {
+                    .capture_kind = demo || screenshot || frame_limit ? "scripted" : "live",
+                    .map_name = view_world->definition->name,
+                    .preset_name = gpu_aa ? "gpu-aa" : "default",
+                    .vsync = vsync,
+                    .aa = gpu_aa,
+                    .fullscreen = IsWindowFullscreen(),
+                    .waves = waves,
+                    .wake_objects = objects != NULL,
+                    .lighting = gpu_enabled,
+                    .shadows = gpu_enabled,
+                    .reflections = gpu_enabled,
+                    .window_width = GetScreenWidth(),
+                    .window_height = GetScreenHeight(),
+                    .render_width = GetRenderWidth(),
+                    .render_height = GetRenderHeight(),
+                    .scene_width = width,
+                    .scene_height = height,
+                    .reflection_width = WATERFRONT_GPU_REFLECTION_WIDTH,
+                    .reflection_height = WATERFRONT_GPU_REFLECTION_HEIGHT,
+                    .monitor_refresh_hz = GetMonitorRefreshRate(GetCurrentMonitor()),
+                };
+                export_performance(
+                    &capture, &info, destination, performance_notice, sizeof(performance_notice));
+                performance_notice_until = GetTime() + 10;
+            }
+        } else if (performance_request) {
+            snprintf(performance_notice, sizeof(performance_notice),
+                "Performance capture is disabled (--no-performance-capture)");
+            performance_notice_until = GetTime() + 6;
+        }
         boat_profile_add(&boat_profile, metrics);
         profiler_add(&profiler, metrics.frame_ms, metrics.snapshot_render_ms, metrics.present_ms);
         ++frames;
@@ -1931,6 +2093,43 @@ static int study(int argc, char **argv)
             net_ready_sent = true;
         }
 #endif
+    }
+    if (performance_report) {
+        if (!performance_capture || !capture.count) {
+            fprintf(stderr, "No performance samples were captured; the report was not written.\n");
+            result = 1;
+        } else {
+            WakePerformanceInfo info = {
+                .capture_kind = demo || frame_limit ? "scripted" : "live",
+                .map_name = view_world->definition->name,
+                .preset_name = gpu_aa ? "gpu-aa" : "default",
+                .vsync = vsync,
+                .aa = gpu_aa,
+                .fullscreen = IsWindowFullscreen(),
+                .waves = waves,
+                .wake_objects = objects != NULL,
+                .lighting = gpu_enabled,
+                .shadows = gpu_enabled,
+                .reflections = gpu_enabled,
+                .window_width = GetScreenWidth(),
+                .window_height = GetScreenHeight(),
+                .render_width = GetRenderWidth(),
+                .render_height = GetRenderHeight(),
+                .scene_width = width,
+                .scene_height = height,
+                .reflection_width = WATERFRONT_GPU_REFLECTION_WIDTH,
+                .reflection_height = WATERFRONT_GPU_REFLECTION_HEIGHT,
+                .monitor_refresh_hz = GetMonitorRefreshRate(GetCurrentMonitor()),
+            };
+            char written[4096], error[512];
+            if (wake_performance_export(&capture, &info, performance_report, written,
+                    sizeof(written), error, sizeof(error))) {
+                printf("performance_report %s\n", written);
+            } else {
+                fprintf(stderr, "Performance report failed: %s\n", error);
+                result = 1;
+            }
+        }
     }
 cleanup:
     study_mouse_steering = mouse_steering;
@@ -1980,6 +2179,8 @@ cleanup:
         wake_plugin_close(&plugin, &session);
     boat_session_flush(&session);
     boat_session_destroy(&session);
+    if (performance_timer.supported)
+        boat_gpu_timer_destroy(&performance_timer);
     if (window_ready) {
         boat_ui_unload();
 #if defined(__EMSCRIPTEN__)
