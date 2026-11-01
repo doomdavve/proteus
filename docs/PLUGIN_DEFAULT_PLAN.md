@@ -1316,7 +1316,9 @@ Verified after these fixes, Apple Silicon/macOS, 2026-11-01: `ctest --preset qui
 and `ctest --preset full` passed all 343 enabled tests with local sockets (13 retired tests disabled,
 GPU CTests off). Removing the route check makes `wake_command` segfault. The five CPU captures above
 still match their pins. The restart's best-file selection in `wake_velocity.c` was not driven in a
-window, and local browser rooms were not rerun.
+window, and local browser rooms were not rerun. On `25619cc`, Linux, macOS and Windows CI passed, and
+the manual `web-plugin.yml` workflow passed Chromium, Firefox and WebKit ([run
+41288764544](https://github.com/doomdavve/proteus/actions/runs/41288764544)).
 
 **Known limits.** GPU CTests were off. Only headless Chromium/Metal was run locally; Firefox and
 WebKit were covered by the manual CI workflow. No physical Safari/iPhone or two-machine room was
