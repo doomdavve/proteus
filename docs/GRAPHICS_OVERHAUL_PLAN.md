@@ -334,11 +334,12 @@ predeclared bounds. Windows collection/analysis tools are packaged and usable, w
 hardware evidence recorded or explicitly pending. Run the full suite, prepare one Batch A route,
 and keep its human verdict separate. Fix blocking feedback before P2 starts.
 
-**Result:** in progress. G0 and G0w are machine-verified on the reference Mac; no rendering
-optimization has landed yet. Completed: stress scenario, review-pose manifest, measured G0
-budgets, bounded live capture, portable exports, Windows launcher/Mac analyzer and their tests.
-Next: G1. Implementation verification: build, focused CTest cases and three-repeat Release
-measurements at `d0b1970`/`60c1713`. Agent playback: none yet for P1. Human acceptance: none;
+**Result:** in progress. G0 and G0w are machine-verified on the reference Mac; G1 is blocked on
+its instancing parity/submission contract, so G2a and G2b are unstarted. Completed: stress scenario, review-pose manifest, measured G0
+budgets, bounded live capture, portable exports, Windows launcher/Mac analyzer and their tests;
+G1 location caching and per-pass object culling. Next: resolve the G1 instancing parity/submission
+blocker. Implementation verification: build, focused CTest cases and three-repeat Release
+measurements at `d0b1970`/`60c1713`/`73e0a1b`. Agent playback: none yet for P1. Human acceptance: none;
 Batch A has not been run. Known scope risk: diagnostics plus multiple renderer
 ownership/submission changes; see the delivery-boundary rule. No boundary change is currently
 justified: the diagnostics prerequisite is on the same branch and reviewable by checkpoint.
@@ -426,7 +427,7 @@ gate; otherwise continue within the same package. No checkpoint is verified or a
 | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | P1 | current main | Machine-verified on M1 Max; browser smoke and Windows hardware open |
 | [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; Windows hardware baseline pending |
-| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Unstarted |
+| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | In progress: location cache and per-pass object culling landed; instancing blocked on byte parity |
 | [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Unstarted |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Unstarted |
 | [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Unstarted |
@@ -687,10 +688,29 @@ regression.
 direct GL-only dependency that breaks WebGL2. A parity failure is a bug to fix, not a reason to
 widen tolerance.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P1. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G2a. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P1's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result:**
+- State: blocked on the lossless parity/submission contract; the independent parts are
+  machine-verified on the M1 Max.
+- Commit(s): `73e0a1b` caches every uniform name the renderer uses per shader and culls
+  transformed object meshes separately against each pass's own view projection. `--check-culling`
+  now covers objects as well as map tiles and passes at 144 poses.
+- Interfaces/owners: `WaterfrontGpuScene.bounds_cache` owns per-VAO local bounds; flags stay
+  excluded because cloth vertices change every frame. `cached_location`/`prewarm_locations` own
+  the location cache and forget it on shader unload. No statistics or scenario schema changed.
+- Verification: Debug build warning-clean; `ctest --preset quick` passed 247 tests;
+  `--check-culling` passed with `gpu_culled shadow=16560 reflection=6663 main=7803` and
+  `cpu_culled=2152`.
+- Unresolved issues / human review: persistent GPU instancing was implemented and reverted.
+  Grouped batches reduced draws to about 161 from 955 on a review pose, but a few coincident or
+  shaded pixels differed from the scalar path even after matching per-instance MVP order,
+  model/normal transforms and contiguous batching. The lossless G1 gate forbids that difference,
+  so the submission ceiling is **not met** and this checkpoint is not ready to hand off to G2a.
+  A correct solution needs either a parity-safe batching design or a reviewed, predeclared
+  tolerance; neither exists yet. No human review is implied.
+- Next checkpoint/task and files to read: resolve G1 parity/submission first;
+  `src/renderer_gpu.c` (`draw_colored_mesh`, `object_is_culled`, `cached_location`) and
+  [the G0 budget table](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
+  G2a/G2b remain unstarted because their checkpoint dependency is not satisfied.
 
 ### G2a — Geometry storage and ownership
 
