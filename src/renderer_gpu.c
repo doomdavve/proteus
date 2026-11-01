@@ -28,6 +28,14 @@ static const Color HEADLIGHT_LENS_COLOR = { 255, 246, 202, 255 };
 // The generated map uses this colour as its water material identifier.
 static const Color WATER_COLOR = { 45, 79, 104, 255 };
 
+// Distance detail: the fine grid of windows and street furniture, the window spacing whose
+// projected size picks the level, the hysteresis around that distance, and what the far level of
+// street furniture keeps.
+#define WATERFRONT_GPU_DETAIL_CELL 256.0f
+#define DETAIL_WINDOW_SPACING 4.0f
+#define DETAIL_BAND .08f
+#define DETAIL_SMALLEST_BOX 2.0f
+
 static void builder_destroy(MeshBuilder *builder)
 {
     free(builder->positions);
@@ -190,6 +198,8 @@ typedef enum {
 // bound VAO. This marks a mesh whose indices exist only on the GPU; unload_mesh must not free it.
 static unsigned short static_indices_on_gpu;
 
+// Set while uploading a far detail level, which the storage report counts apart.
+static bool binding_far;
 // Set for the duration of waterfront_gpu_scene_bind, on the render thread.
 static WaterfrontGpuScene *binding_scene;
 
@@ -327,6 +337,12 @@ static Mesh static_mesh_upload(const StaticVertex *vertices, int vertex_count,
     }
     WaterfrontGpuGeometry *geometry = &binding_scene->geometry;
     ++geometry->meshes;
+    if (binding_far) {
+        geometry->far_triangles += (size_t)index_count / 3;
+        geometry->far_vertex_bytes += (size_t)vertex_count * (size_t)stride;
+        geometry->far_index_bytes += (size_t)index_count * sizeof(*indices);
+        return mesh;
+    }
     geometry->triangles += (size_t)index_count / 3;
     geometry->source_vertices += (size_t)index_count;
     geometry->vertices += (size_t)vertex_count;
@@ -539,6 +555,7 @@ static void tiled_destroy(WaterfrontGpuTiled *tiled)
         unload_mesh(&tiled->meshes[i]);
     free(tiled->meshes);
     free(tiled->bounds);
+    free(tiled->cells);
     *tiled = (WaterfrontGpuTiled) { 0 };
 }
 
@@ -591,6 +608,73 @@ static void draw_tiled(
         else if (counting)
             ++counting->tiles_culled[counting_pass];
     }
+}
+
+// Which level of the detailed classes a pass draws.
+typedef enum {
+    DETAIL_ALL_NEAR,
+    DETAIL_ALL_FAR,
+    DETAIL_MAIN,
+    DETAIL_REFLECTION,
+} DetailSource;
+
+static bool detail_cell_is_far(const WaterfrontGpuScene *scene, int cell)
+{
+    if (scene->detail_source == DETAIL_ALL_NEAR)
+        return false;
+    if (scene->detail_source == DETAIL_ALL_FAR)
+        return true;
+    return scene->detail_far[scene->detail_source == DETAIL_REFLECTION][cell] != 0;
+}
+
+// Draws a class with two levels: each cell's near meshes or its far ones.
+static void draw_detailed(const WaterfrontGpuScene *scene, const WaterfrontGpuTiled *near,
+    const WaterfrontGpuTiled *far, Material material)
+{
+    Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    for (int level = 0; level < 2; ++level) {
+        const WaterfrontGpuTiled *tiled = level ? far : near;
+        for (int i = 0; i < tiled->count; ++i) {
+            if (detail_cell_is_far(scene, tiled->cells[i]) != (level == 1))
+                continue;
+            if (scene->culling_disabled || box_in_view(view_projection, tiled->bounds[i]))
+                submit(tiled->meshes[i], material, MatrixIdentity(), WATERFRONT_GPU_GROUP_MAP);
+            else if (counting)
+                ++counting->tiles_culled[counting_pass];
+        }
+    }
+}
+
+// One level per cell for this view. A cell goes far beyond the distance at which WINDOW_SPACING
+// fits one presented pixel, plus a band, and returns inside it, less the band, so a camera
+// holding at the threshold cannot flicker between levels. Only horizontal distance from ANCHOR
+// decides: the followed boat while playing, so orbiting the camera around it changes no level.
+static void detail_select(
+    WaterfrontGpuScene *scene, DetailSource source, Vector3 anchor, float fov, float height)
+{
+    scene->detail_source = DETAIL_ALL_NEAR;
+    if (scene->detail_disabled || !scene->detail_far[0])
+        return;
+    scene->detail_source = source;
+    unsigned char *state = scene->detail_far[source == DETAIL_REFLECTION];
+    float focal = height / (2 * tanf(fov * .5f));
+    float threshold = DETAIL_WINDOW_SPACING * focal;
+    float enter = threshold * (1 + DETAIL_BAND), leave = threshold * (1 - DETAIL_BAND);
+    unsigned int far_cells = 0;
+    for (int z = 0; z < scene->detail_rows; ++z) {
+        float low_z = scene->detail_origin.y + (float)z * scene->detail_cell;
+        float dz = fmaxf(fmaxf(low_z - anchor.z, anchor.z - low_z - scene->detail_cell), 0);
+        for (int x = 0; x < scene->detail_columns; ++x) {
+            float low_x = scene->detail_origin.x + (float)x * scene->detail_cell;
+            float dx = fmaxf(fmaxf(low_x - anchor.x, anchor.x - low_x - scene->detail_cell), 0);
+            float distance = sqrtf(dx * dx + dz * dz);
+            unsigned char *far = &state[z * scene->detail_columns + x];
+            *far = *far ? distance > leave : distance > enter;
+            far_cells += *far;
+        }
+    }
+    if (counting)
+        counting->far_cells[counting_pass] = far_cells;
 }
 
 // One builder per render tile for a map class.
@@ -653,7 +737,10 @@ static bool tiled_builder_finish(
                 BoundingBox *all = realloc(tiled->bounds, (size_t)capacity * sizeof(*all));
                 if (all)
                     tiled->bounds = all;
-                ok = meshes && all;
+                int *cells = realloc(tiled->cells, (size_t)capacity * sizeof(*cells));
+                if (cells)
+                    tiled->cells = cells;
+                ok = meshes && all && cells;
                 if (!ok)
                     break;
             }
@@ -661,6 +748,7 @@ static bool tiled_builder_finish(
             ok = mesh.vaoId != 0;
             if (ok) {
                 tiled->meshes[tiled->count] = mesh;
+                tiled->cells[tiled->count] = (int)i;
                 tiled->bounds[tiled->count++] = bounds;
             }
         }
@@ -675,6 +763,41 @@ static size_t tile_of(const WaterfrontScenery *scenery, Vector3 a, Vector3 b, Ve
 {
     return boat_map_tiles_owner(
         &scenery->tiles, (Vector2) { (a.x + b.x + c.x) / 3, (a.z + b.z + c.z) / 3 });
+}
+
+// The fine grid of the detailed classes subdivides the render tiles.
+static int detail_factor(const WaterfrontScenery *scenery)
+{
+    return fmaxf(1, ceilf(scenery->tiles.tile_size / WATERFRONT_GPU_DETAIL_CELL));
+}
+
+static size_t detail_cell_count(const WaterfrontScenery *scenery)
+{
+    int factor = detail_factor(scenery);
+    return (size_t)scenery->tiles.columns * (size_t)scenery->tiles.rows * (size_t)(factor * factor);
+}
+
+// The cell holding P, clamped to the edge cells like boat_map_tiles_owner.
+static size_t detail_cell_of(const WaterfrontScenery *scenery, Vector3 p)
+{
+    const BoatMapTiles *tiles = &scenery->tiles;
+    int factor = detail_factor(scenery);
+    float cell = tiles->tile_size / (float)factor;
+    int columns = tiles->columns * factor, rows = tiles->rows * factor;
+    int x = (int)floorf((p.x - tiles->origin.x) / cell);
+    int z = (int)floorf((p.z - tiles->origin.y) / cell);
+    x = x < 0 ? 0 : x >= columns ? columns - 1 : x;
+    z = z < 0 ? 0 : z >= rows ? rows - 1 : z;
+    return (size_t)z * (size_t)columns + (size_t)x;
+}
+
+static bool tiled_builder_finish_far(
+    TiledBuilder *builder, WaterfrontGpuTiled *tiled, StaticSurface surface)
+{
+    binding_far = true;
+    bool ok = tiled_builder_finish(builder, tiled, surface);
+    binding_far = false;
+    return ok;
 }
 
 static bool build_source_mesh(Mesh *mesh, const Mesh3D *source)
@@ -741,24 +864,34 @@ static bool builder_ground_triangle(MeshBuilder *builder, Vector3 a, Vector3 b, 
 
 // Each box belongs to the tile owning its centre.
 static bool build_corner(const WaterfrontScenery *scenery, WaterfrontGpuTiled *opaque,
-    WaterfrontGpuTiled *emissive, TiledBuilder *ground)
+    WaterfrontGpuTiled *opaque_far, WaterfrontGpuTiled *emissive, TiledBuilder *ground)
 {
     size_t count = scenery->count;
     const WaterfrontCornerBox *boxes = scenery->boxes;
     static const unsigned char faces[][3]
         = { { 0, 2, 1 }, { 0, 3, 2 }, { 5, 7, 4 }, { 5, 6, 7 }, { 4, 3, 0 }, { 4, 7, 3 },
               { 1, 6, 5 }, { 1, 2, 6 }, { 3, 6, 2 }, { 3, 7, 6 }, { 4, 1, 5 }, { 4, 0, 1 } };
-    TiledBuilder builders[2] = { 0 };
-    if (!tiled_builder_init(&builders[0], ground->count)
-        || !tiled_builder_init(&builders[1], ground->count)) {
+    TiledBuilder builders[3] = { 0 };
+    if (!tiled_builder_init(&builders[0], detail_cell_count(scenery))
+        || !tiled_builder_init(&builders[1], ground->count)
+        || !tiled_builder_init(&builders[2], detail_cell_count(scenery))) {
         tiled_builder_destroy(&builders[0]);
+        tiled_builder_destroy(&builders[1]);
         return false;
     }
     for (size_t i = 0; i < count; ++i) {
         Vector3 center = { 0 };
-        for (int v = 0; v < 8; ++v)
+        Vector3 low = boxes[i].vertices[0], high = boxes[i].vertices[0];
+        for (int v = 0; v < 8; ++v) {
             center = Vector3Add(center, Vector3Scale(boxes[i].vertices[v], 1 / 8.0f));
+            low = Vector3Min(low, boxes[i].vertices[v]);
+            high = Vector3Max(high, boxes[i].vertices[v]);
+        }
         size_t tile = boat_map_tiles_owner(&scenery->tiles, (Vector2) { center.x, center.z });
+        size_t cell = detail_cell_of(scenery, center);
+        Vector3 size = Vector3Subtract(high, low);
+        // Far, a box under half a presented pixel in every direction is gone, not a landmark.
+        bool far = fmaxf(size.x, fmaxf(size.y, size.z)) >= DETAIL_SMALLEST_BOX;
         for (size_t f = 0; f < sizeof(faces) / sizeof(faces[0]); ++f) {
             Vector3 a = boxes[i].vertices[faces[f][0]], b = boxes[i].vertices[faces[f][1]];
             Vector3 c = boxes[i].vertices[faces[f][2]];
@@ -776,20 +909,27 @@ static bool build_corner(const WaterfrontScenery *scenery, WaterfrontGpuTiled *o
                 else if (ColorIsEqual(color, (Color) { 98, 106, 112, 255 }))
                     finish = WATERFRONT_GROUND_ASPHALT;
             }
-            bool ok = finish
-                ? builder_ground_triangle(&ground->tiles[tile], a, b, c, color, finish)
-                : builder_triangle(&builders[boxes[i].emissive].tiles[tile], a, b, c, color);
+            bool ok;
+            if (finish)
+                ok = builder_ground_triangle(&ground->tiles[tile], a, b, c, color, finish);
+            else if (boxes[i].emissive)
+                ok = builder_triangle(&builders[1].tiles[tile], a, b, c, color);
+            else
+                ok = builder_triangle(&builders[0].tiles[cell], a, b, c, color)
+                    && (!far || builder_triangle(&builders[2].tiles[cell], a, b, c, color));
             if (!ok) {
-                tiled_builder_destroy(&builders[0]);
-                tiled_builder_destroy(&builders[1]);
+                for (int b = 0; b < 3; ++b)
+                    tiled_builder_destroy(&builders[b]);
                 return false;
             }
         }
     }
     bool opaque_ok = tiled_builder_finish(&builders[0], opaque, STATIC_FLAT);
     bool emissive_ok = tiled_builder_finish(&builders[1], emissive, STATIC_UNLIT);
-    if (!opaque_ok || !emissive_ok) {
+    bool far_ok = tiled_builder_finish_far(&builders[2], opaque_far, STATIC_FLAT);
+    if (!opaque_ok || !emissive_ok || !far_ok) {
         tiled_destroy(opaque);
+        tiled_destroy(opaque_far);
         tiled_destroy(emissive);
         return false;
     }
@@ -854,7 +994,7 @@ static bool builder_facade_triangle(
 // its a,c,b / a,d,c pairs adjacent.
 static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *city_mesh,
     WaterfrontGpuTiled *facades, WaterfrontGpuTiled *roofs, WaterfrontGpuTiled *quay, Mesh *water,
-    WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_emissive)
+    WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_far, WaterfrontGpuTiled *corner_emissive)
 {
     const Mesh3D *city = scenery->full->mesh;
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
@@ -918,7 +1058,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
                 || !builder_vertices(&builders[CITY_SURFACE_ROOF])
                 || !builder_vertices(&builders[CITY_SURFACE_QUAY]))))
         goto failed;
-    if (!build_corner(scenery, corner, corner_emissive, &builders[CITY_SURFACE_QUAY]))
+    if (!build_corner(scenery, corner, corner_far, corner_emissive, &builders[CITY_SURFACE_QUAY]))
         goto failed;
     bool ok = tiled_builder_finish(&builders[CITY_SURFACE_FLAT], city_mesh, STATIC_FLAT);
     ok = tiled_builder_finish(&builders[CITY_SURFACE_FACADE], facades, STATIC_MAPPED) && ok;
@@ -933,14 +1073,40 @@ failed:
     return false;
 }
 
-// Windows join the tile of the wall triangle they are derived from.
-static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *mesh)
+// One far window stands for up to two columns on two floors: the same lit area in their mean
+// colour, centred on them.
+typedef struct {
+    Vector3 low, high;
+    float area;
+    int r, g, b, count;
+} WindowBlock;
+
+static bool window_block_flush(MeshBuilder *builder, WindowBlock *block, Vector3 along)
+{
+    if (!block->count)
+        return true;
+    Vector3 center = Vector3Scale(Vector3Add(block->low, block->high), .5f);
+    float side = sqrtf(block->area);
+    Vector3 half = Vector3Scale(along, side * .5f);
+    Vector3 p = Vector3Subtract(center, half), q = Vector3Add(center, half);
+    p.y = q.y = center.y - side * .5f;
+    Vector3 up = { 0, side, 0 };
+    Color color = { (unsigned char)(block->r / block->count),
+        (unsigned char)(block->g / block->count), (unsigned char)(block->b / block->count), 255 };
+    *block = (WindowBlock) { 0 };
+    return builder_quad(builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color);
+}
+
+// Windows join the fine cell of the wall triangle they are derived from, in both levels.
+static bool build_windows(
+    const WaterfrontScenery *scenery, WaterfrontGpuTiled *mesh, WaterfrontGpuTiled *far_mesh)
 {
     const BoatMapDescription *map = scenery->full;
     const Mesh3D *city = map->mesh;
-    TiledBuilder tiled = { 0 };
-    if (!tiled_builder_init(&tiled, boat_map_tiles_count(&scenery->tiles)))
-        return false;
+    TiledBuilder tiled = { 0 }, far_tiled = { 0 };
+    if (!tiled_builder_init(&tiled, detail_cell_count(scenery))
+        || !tiled_builder_init(&far_tiled, detail_cell_count(scenery)))
+        goto failed;
     for (size_t i = 0; i < city->triangle_count; ++i) {
         if (boat_map_is_bridge_triangle(map, i))
             continue;
@@ -954,27 +1120,61 @@ static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *
         float length = Vector3Length(edge);
         Vector3 along = Vector3Scale(edge, 1 / length);
         Vector3 normal = { along.z, 0, -along.x };
-        MeshBuilder *builder = &tiled.tiles[tile_of(scenery, a, c, b)];
-        for (int floor = 0; a.y + 2.5f + floor * 3.2f < c.y - 1; ++floor) {
-            for (int column = 0; 2.5f + column * 4 < length - 1.5f; ++column) {
-                unsigned int seed = (unsigned int)i * 1664525u + (unsigned int)column * 1013904223u
-                    + (unsigned int)floor * 374761393u;
-                Color color = seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
-                    : seed % 7 == 3        ? (Color) { 181, 211, 221, 255 }
-                                           : (Color) { 66, 100, 120, 255 };
-                Vector3 p = Vector3Add(Vector3Add(a, Vector3Scale(along, 2.5f + column * 4)),
-                    Vector3Scale(normal, .035f));
-                p.y = a.y + 1.5f + floor * 3.2f;
-                Vector3 q = Vector3Add(p, Vector3Scale(along, floor == 0 ? 2.2f : 1.5f));
-                Vector3 up = { 0, floor == 0 ? 1.9f : 1.5f, 0 };
-                if (!builder_quad(builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color)) {
-                    tiled_builder_destroy(&tiled);
-                    return false;
+        Vector3 centroid = Vector3Scale(Vector3Add(Vector3Add(a, b), c), 1 / 3.0f);
+        size_t cell = detail_cell_of(scenery, centroid);
+        MeshBuilder *builder = &tiled.tiles[cell];
+        MeshBuilder *far_builder = &far_tiled.tiles[cell];
+        int columns = 0;
+        while (2.5f + (float)columns * 4 < length - 1.5f)
+            ++columns;
+        int floors = 0;
+        while (a.y + 2.5f + (float)floors * 3.2f < c.y - 1)
+            ++floors;
+        for (int block_floor = 0; block_floor < floors; block_floor += 2) {
+            for (int block_column = 0; block_column < columns; block_column += 2) {
+                WindowBlock block = { 0 };
+                for (int floor = block_floor; floor < floors && floor < block_floor + 2; ++floor) {
+                    for (int column = block_column; column < columns && column < block_column + 2;
+                        ++column) {
+                        unsigned int seed = (unsigned int)i * 1664525u
+                            + (unsigned int)column * 1013904223u + (unsigned int)floor * 374761393u;
+                        Color color = seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
+                            : seed % 7 == 3        ? (Color) { 181, 211, 221, 255 }
+                                                   : (Color) { 66, 100, 120, 255 };
+                        Vector3 p = Vector3Add(
+                            Vector3Add(a, Vector3Scale(along, 2.5f + (float)column * 4)),
+                            Vector3Scale(normal, .035f));
+                        p.y = a.y + 1.5f + (float)floor * 3.2f;
+                        float width = floor == 0 ? 2.2f : 1.5f, height = floor == 0 ? 1.9f : 1.5f;
+                        Vector3 q = Vector3Add(p, Vector3Scale(along, width));
+                        Vector3 up = { 0, height, 0 };
+                        if (!builder_quad(
+                                builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color))
+                            goto failed;
+                        Vector3 top = Vector3Add(q, up);
+                        block.low = block.count ? Vector3Min(block.low, Vector3Min(p, top))
+                                                : Vector3Min(p, top);
+                        block.high = block.count ? Vector3Max(block.high, Vector3Max(p, top))
+                                                 : Vector3Max(p, top);
+                        block.area += width * height;
+                        block.r += color.r;
+                        block.g += color.g;
+                        block.b += color.b;
+                        ++block.count;
+                    }
                 }
+                if (!window_block_flush(far_builder, &block, along))
+                    goto failed;
             }
         }
     }
-    return tiled_builder_finish(&tiled, mesh, STATIC_UNLIT);
+    bool ok = tiled_builder_finish(&tiled, mesh, STATIC_UNLIT);
+    bool far_ok = tiled_builder_finish_far(&far_tiled, far_mesh, STATIC_UNLIT);
+    return ok && far_ok;
+failed:
+    tiled_builder_destroy(&tiled);
+    tiled_builder_destroy(&far_tiled);
+    return false;
 }
 
 static Vector3 crane_point(float x, float y, float z)
@@ -1182,6 +1382,12 @@ static void unbind_map(WaterfrontGpuScene *scene)
     tiled_destroy(&scene->windows);
     tiled_destroy(&scene->corner);
     tiled_destroy(&scene->corner_emissive);
+    tiled_destroy(&scene->windows_far);
+    tiled_destroy(&scene->corner_far);
+    for (int view = 0; view < 2; ++view) {
+        free(scene->detail_far[view]);
+        scene->detail_far[view] = NULL;
+    }
     unload_mesh(&scene->crane);
     scene->geometry = (WaterfrontGpuGeometry) { 0 };
     scene->map = NULL;
@@ -1198,14 +1404,26 @@ bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScener
         return true;
     binding_scene = scene;
     bool built = build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
-                     &scene->water, &scene->corner, &scene->corner_emissive)
-        && build_windows(scenery, &scene->windows)
+                     &scene->water, &scene->corner, &scene->corner_far, &scene->corner_emissive)
+        && build_windows(scenery, &scene->windows, &scene->windows_far)
         && (!scenery->river || build_crane(&scene->crane, scenery));
     binding_scene = NULL;
     if (!built) {
         unbind_map(scene);
         return false;
     }
+    for (int view = 0; view < 2; ++view) {
+        scene->detail_far[view] = calloc(detail_cell_count(scenery), 1);
+        if (!scene->detail_far[view]) {
+            unbind_map(scene);
+            return false;
+        }
+    }
+    int factor = detail_factor(scenery);
+    scene->detail_origin = scenery->tiles.origin;
+    scene->detail_cell = scenery->tiles.tile_size / (float)factor;
+    scene->detail_columns = scenery->tiles.columns * factor;
+    scene->detail_rows = scenery->tiles.rows * factor;
     scene->map = scenery->map;
     scene->river = scenery->river;
     Vector3 cafe = waterfront_corner_position(-2.8f, 0, -6);
@@ -2448,9 +2666,9 @@ static void draw_reflected_scene(const WaterfrontGpuScene *scene, const Waterfro
     draw_facades(scene, material);
     draw_tiled(scene, &scene->roofs, scene->roof_material);
     draw_ground(scene, material);
-    draw_tiled(scene, &scene->corner, material);
+    draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     set_emissive(scene->shader, true);
-    draw_tiled(scene, &scene->windows, material);
+    draw_detailed(scene, &scene->windows, &scene->windows_far, material);
     draw_tiled(scene, &scene->corner_emissive, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, life, frame->bridge, frame->bridge_color, false);
@@ -2483,6 +2701,9 @@ static void render_reflection(
         camera.fovy * DEG2RAD, aspect, frame->camera.near_plane, frame->camera.far_plane));
     Matrix view = rlGetMatrixModelview();
     Matrix projection = rlGetMatrixProjection();
+    detail_select(scene, DETAIL_REFLECTION,
+        frame->player_active ? frame->camera.target : frame->camera.position, camera.fovy * DEG2RAD,
+        (float)scene->reflection.texture.height);
     // A reflected view reverses the projected winding. Disable culling for this pass so the
     // separate camera does not require mirrored geometry or per-mesh winding changes.
     rlDisableBackfaceCulling();
@@ -2538,7 +2759,7 @@ static void draw_shadow_casters(
     draw_tiled(scene, &scene->facades, material);
     draw_tiled(scene, &scene->roofs, material);
     draw_tiled(scene, &scene->quay, material);
-    draw_tiled(scene, &scene->corner, material);
+    draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, material, frame->bridge, frame->bridge_color, false);
     // Cars, boats, and lamp poles matter to the road shadow, but their lenses and wake do not.
@@ -2549,7 +2770,7 @@ static void draw_shadow_casters(
 }
 
 static Matrix render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame,
-    RenderTexture2D target, float coverage, int map_size, float light_distance)
+    RenderTexture2D target, float coverage, int map_size, float light_distance, bool far_map)
 {
     Camera3D camera = shadow_camera(frame, coverage, map_size, light_distance);
     RenderTargetState previous = render_target_state();
@@ -2562,6 +2783,8 @@ static Matrix render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontScene
         .25, light_distance * 2 + 200));
     Matrix view = rlGetMatrixModelview();
     Matrix projection = rlGetMatrixProjection();
+    // The far map's 1.5 m texels cannot hold the small boxes the far level drops.
+    scene->detail_source = far_map && !scene->detail_disabled ? DETAIL_ALL_FAR : DETAIL_ALL_NEAR;
     draw_shadow_casters(scene, scene->shadow_material, frame);
     EndMode3D();
     EndTextureMode();
@@ -2645,10 +2868,10 @@ static void draw_scene(
     scene->far_shadows_active = frame->player_active;
     if (scene->shadows_enabled) {
         scene->light_view_projection = render_shadow_map(scene, frame, scene->shadow_map,
-            frame->player_active ? 96.0f : 500.0f, scene->shadow_map_size, 600);
+            frame->player_active ? 96.0f : 500.0f, scene->shadow_map_size, 600, false);
         if (scene->far_shadows_active)
             scene->far_light_view_projection = render_shadow_map(scene, frame,
-                scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000);
+                scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000, true);
     }
     select_local_lights(scene, frame);
     set_lighting_uniforms(scene);
@@ -2661,6 +2884,9 @@ static void draw_scene(
     set_atmosphere_uniforms(scene, frame->camera.position);
     ClearBackground(BLACK);
     draw_sky(scene, frame->camera, frame->squall, width, height, (float)width / height);
+    detail_select(scene, DETAIL_MAIN,
+        frame->player_active ? frame->camera.target : frame->camera.position,
+        frame->camera.vertical_fov, (float)height / fmaxf(1, scene->detail_scale));
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(frame->camera.vertical_fov,
         (float)width / (float)height, frame->camera.near_plane, frame->camera.far_plane));
@@ -2680,10 +2906,10 @@ static void draw_scene(
     draw_facades(scene, material);
     draw_tiled(scene, &scene->roofs, scene->roof_material);
     draw_ground(scene, material);
-    draw_tiled(scene, &scene->corner, material);
+    draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     draw_water(scene, frame, width);
     set_emissive(scene->shader, true);
-    draw_tiled(scene, &scene->windows, material);
+    draw_detailed(scene, &scene->windows, &scene->windows_far, material);
     draw_tiled(scene, &scene->corner_emissive, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, life_material, frame->bridge, frame->bridge_color, false);
@@ -2705,6 +2931,11 @@ static void draw_scene(
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled)
 {
     scene->culling_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_detail_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->detail_disabled = !enabled;
 }
 
 void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled)

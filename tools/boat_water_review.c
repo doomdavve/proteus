@@ -299,6 +299,125 @@ static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size);
 // in four headings and three cameras, both tile sizes draw the same GPU (with waves) and CPU
 // (flat water, whose full-map wave surface would dominate the run) pixels with culling on and
 // off, and each pass culls some tiles somewhere.
+// --no-detail: review and benchmark runs draw the near level of every detail cell.
+static bool no_detail;
+
+static int count_detail_changes(const WaterfrontGpuScene *scene, const unsigned char *previous)
+{
+    int changes = 0;
+    for (int i = 0; i < scene->detail_columns * scene->detail_rows; ++i)
+        changes += previous[i] != scene->detail_far[0][i];
+    return changes;
+}
+
+// G2b: drives one GPU view through the detail threshold. Orbiting the boat changes no level, the
+// band holds a camera jittering around a switch, repeated round trips end alike, and every cell
+// with windows keeps them far.
+static int check_detail(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Distance detail probe");
+    if (!IsWindowReady())
+        return 1;
+    BoatGpu gpu = { 0 };
+    BoatSession session;
+    boat_session_init(&session, test_world(BOAT_LOCATION_RIVER), boat_water_gentle());
+    int result = 1, cells = 0;
+    unsigned char *previous = NULL, *start = NULL, *switched = NULL;
+    if (!boat_gpu_init(&gpu, false))
+        goto cleanup;
+    BoatViewState view = { .boat = session.boat, .time = 12 };
+    view.boat.position = (Vector2) { 250, -500 };
+    BoatPresentation presentation = session.presentation;
+    const BoatCamera camera = BOAT_CAMERA_DEFAULT;
+    boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
+    cells = gpu.scene.detail_columns * gpu.scene.detail_rows;
+    previous = malloc((size_t)cells);
+    start = malloc((size_t)cells);
+    switched = malloc((size_t)cells);
+    if (gpu.failed || !cells || !previous || !start || !switched)
+        goto cleanup;
+
+    // Every near cell of a detailed class that holds windows has far windows.
+    for (int i = 0; i < gpu.scene.windows.count; ++i) {
+        bool found = false;
+        for (int f = 0; !found && f < gpu.scene.windows_far.count; ++f)
+            found = gpu.scene.windows_far.cells[f] == gpu.scene.windows.cells[i];
+        if (!found) {
+            fprintf(stderr, "detail: cell %d lost its windows\n", gpu.scene.windows.cells[i]);
+            goto cleanup;
+        }
+    }
+
+    // Turning in place.
+    memcpy(previous, gpu.scene.detail_far[0], (size_t)cells);
+    int turn_changes = 0;
+    for (int heading = 0; heading < 64; ++heading) {
+        view.boat.heading = (float)heading * PI / 32;
+        presentation.camera_heading = view.boat.heading;
+        boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
+        turn_changes += count_detail_changes(&gpu.scene, previous);
+        memcpy(previous, gpu.scene.detail_far[0], (size_t)cells);
+    }
+
+    // Out along a straight line and back, twice: both round trips end alike, whatever the band
+    // kept from the fresh start. A cell that just switched holds under small camera movement.
+    view.boat.heading = 0;
+    presentation.camera_heading = 0;
+    int switches[2] = { 0 }, flickers = 0, frames = 0;
+    size_t main_near = 0, main_far = 0;
+    for (int trip = 0; trip < 2; ++trip) {
+        if (trip == 1)
+            memcpy(start, gpu.scene.detail_far[0], (size_t)cells);
+        for (int direction = 0; direction < 2; ++direction)
+            for (int step = 0; step <= 400; ++step) {
+                int at = direction ? 400 - step : step;
+                view.boat.position = (Vector2) { 250, -500 + (float)at * 2 };
+                boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
+                int changes = count_detail_changes(&gpu.scene, previous);
+                switches[direction] += changes;
+                main_far += gpu.scene.stats.far_cells[WATERFRONT_GPU_PASS_MAIN];
+                main_near += (size_t)cells - gpu.scene.stats.far_cells[WATERFRONT_GPU_PASS_MAIN];
+                ++frames;
+                if (changes) {
+                    Vector2 held = view.boat.position;
+                    memcpy(switched, gpu.scene.detail_far[0], (size_t)cells);
+                    for (int jitter = 0; jitter < 6; ++jitter) {
+                        view.boat.position
+                            = (Vector2) { held.x, held.y + (jitter & 1 ? 1.5f : -1.5f) };
+                        boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
+                        for (int i = 0; i < cells; ++i)
+                            flickers += previous[i] != switched[i]
+                                && gpu.scene.detail_far[0][i] != switched[i];
+                    }
+                    view.boat.position = held;
+                    boat_gpu_draw(&gpu, &view, &presentation, &session.world, camera);
+                }
+                memcpy(previous, gpu.scene.detail_far[0], (size_t)cells);
+            }
+    }
+    bool returned = memcmp(start, gpu.scene.detail_far[0], (size_t)cells) == 0;
+    if (turn_changes || !switches[0] || !switches[1] || !returned || flickers) {
+        fprintf(stderr, "detail: turn=%d forward=%d backward=%d returned=%d flickers=%d\n",
+            turn_changes, switches[0], switches[1], returned, flickers);
+        goto cleanup;
+    }
+    printf("detail_check=ok cells=%d turn_changes=0 forward_switches=%d backward_switches=%d "
+           "flickers=0 frames=%d mean_far_cells=%.1f mean_near_cells=%.1f\n",
+        cells, switches[0], switches[1], frames, (double)main_far / frames,
+        (double)main_near / frames);
+    result = 0;
+cleanup:
+    free(previous);
+    free(start);
+    free(switched);
+    boat_gpu_destroy(&gpu);
+    boat_session_destroy(&session);
+    test_worlds_close();
+    CloseWindow();
+    return result;
+}
+
 static int check_culling(void)
 {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
@@ -864,6 +983,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         error = "graphics initialization failed";
         goto cleanup;
     }
+    waterfront_gpu_scene_set_detail_enabled(&gpu.scene, !no_detail);
     if (stress
         && (!stress_init(&stress_fixture, waves)
             || !stress_advance(&stress_fixture, STRESS_PREROLL_TICKS))) {
@@ -1382,6 +1502,21 @@ static int report_geometry(void)
             geometry.retained_cpu_bytes, geometry.normal_error, before, before,
             before ? 100.0 * ((double)geometry.vertex_bytes / (double)before - 1) : 0,
             before ? 100.0 * ((double)after / (double)before - 1) : 0);
+        const struct {
+            const char *name;
+            const WaterfrontGpuTiled *tiled;
+        } classes[] = { { "city", &gpu.scene.city }, { "facades", &gpu.scene.facades },
+            { "roofs", &gpu.scene.roofs }, { "quay", &gpu.scene.quay },
+            { "corner", &gpu.scene.corner }, { "corner_far", &gpu.scene.corner_far },
+            { "windows", &gpu.scene.windows }, { "windows_far", &gpu.scene.windows_far },
+            { "corner_emissive", &gpu.scene.corner_emissive } };
+        for (size_t c = 0; c < sizeof(classes) / sizeof(*classes); ++c) {
+            size_t triangles = 0;
+            for (int m = 0; m < classes[c].tiled->count; ++m)
+                triangles += (size_t)classes[c].tiled->meshes[m].triangleCount;
+            printf("geometry_class location=%s class=%s meshes=%d triangles=%zu\n",
+                resources->definition->name, classes[c].name, classes[c].tiled->count, triangles);
+        }
         boat_session_destroy(&session);
     }
     boat_gpu_destroy(&gpu);
@@ -1463,6 +1598,7 @@ static int review(const char *directory, bool use_gpu)
         InitWindow(320, 200, "Proteus / graphics review poses");
         if (!IsWindowReady() || !boat_gpu_init(&gpu, true))
             goto cleanup;
+        waterfront_gpu_scene_set_detail_enabled(&gpu.scene, !no_detail);
     } else if (!prepare_tiles(&cpu_view.scenery, 0)) {
         goto cleanup;
     }
@@ -1549,6 +1685,7 @@ int main(int argc, char **argv)
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
+    bool detail = false;
     bool stress_state_only = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
@@ -1587,6 +1724,10 @@ int main(int argc, char **argv)
             visible = true;
         else if (strcmp(argv[i], "--pacing") == 0 && i + 1 < argc)
             pacing = argv[++i];
+        else if (strcmp(argv[i], "--no-detail") == 0)
+            no_detail = true;
+        else if (strcmp(argv[i], "--check-detail") == 0)
+            detail = true;
         else if (strcmp(argv[i], "--no-cull") == 0)
             no_cull = true;
         else if (strcmp(argv[i], "--tile-size") == 0 && i + 1 < argc) {
@@ -1656,11 +1797,12 @@ int main(int argc, char **argv)
         && (check || output || sequence || visible || aa_name || pacing || scenario || gpu_check
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
-    if (gpu_check || gpu_views || gpu_lifecycle || culling || instancing || geometry) {
+    if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry) {
         SetTraceLogLevel(LOG_WARNING);
         return geometry     ? report_geometry()
             : instancing    ? check_instancing()
             : culling       ? check_culling()
+            : detail        ? check_detail()
             : gpu_lifecycle ? check_gpu_lifecycle()
             : gpu_views     ? check_gpu_views()
                             : check_gpu_water();

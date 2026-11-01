@@ -68,6 +68,7 @@ typedef struct {
 typedef struct {
     Mesh *meshes;
     BoundingBox *bounds;
+    int *cells; // The grid cell of each mesh, which selects a detailed class's level.
     int count;
 } WaterfrontGpuTiled;
 
@@ -77,6 +78,7 @@ typedef struct {
     int meshes;
     size_t triangles, source_vertices, vertices;
     size_t vertex_bytes, index_bytes; // Uploaded to the GPU.
+    size_t far_triangles, far_vertex_bytes, far_index_bytes; // Distance detail, also GPU memory.
     size_t retained_cpu_bytes; // Zero unless the review-only retain_map_sources is set.
     float normal_error; // Worst decoded normal component error of packing.
 } WaterfrontGpuGeometry;
@@ -89,6 +91,7 @@ typedef struct {
 typedef struct {
     WaterfrontGpuCount mesh[WATERFRONT_GPU_PASS_COUNT][WATERFRONT_GPU_GROUP_COUNT];
     unsigned int tiles_culled[WATERFRONT_GPU_PASS_COUNT];
+    unsigned int far_cells[WATERFRONT_GPU_PASS_COUNT]; // Detail cells drawn far, per map drawn.
     unsigned int sky_quads;
 } WaterfrontGpuStats;
 
@@ -114,6 +117,15 @@ typedef struct {
     WaterfrontGpuTiled windows;
     WaterfrontGpuTiled corner;
     WaterfrontGpuTiled corner_emissive;
+    // Far levels of the two detailed classes, on the same fine grid. Each view chooses per cell.
+    WaterfrontGpuTiled windows_far;
+    WaterfrontGpuTiled corner_far;
+    unsigned char *detail_far[2]; // Presentation-only per-cell level of main and reflection.
+    Vector2 detail_origin;
+    float detail_cell;
+    int detail_columns, detail_rows;
+    int detail_source; // Which level or view's selection the pass being drawn uses.
+    float detail_scale; // Render pixels per presented pixel, for projected size; 0 means 1.
     Mesh crane;
     Mesh bridge;
     Mesh cube;
@@ -153,6 +165,7 @@ typedef struct {
     bool atmosphere_enabled;
     bool reflections_enabled;
     bool culling_disabled; // Review only: draw every map tile and object in every pass.
+    bool detail_disabled; // Review only: draw the near level of every detail cell.
     bool retain_map_sources; // Review only: keep each map mesh's unindexed arrays after upload.
     int map_upload_limit; // Review only: fail map uploads after this many meshes (0: no limit).
     WaterfrontGpuGeometry geometry;
@@ -183,6 +196,8 @@ void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);
 void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene);
 WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats);
+// Review only: whether distant cells use the far level.
+void waterfront_gpu_scene_set_detail_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Vertices across all tiles of one class.
 int waterfront_gpu_tiled_vertices(const WaterfrontGpuTiled *tiled);
 WaterfrontGpuGeometry waterfront_gpu_scene_geometry(const WaterfrontGpuScene *scene);

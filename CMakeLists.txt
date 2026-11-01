@@ -1265,6 +1265,10 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME tile_culling COMMAND boat_water_review --check-culling)
   set_tests_properties(tile_culling PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "tile_culling=ok")
+  # Graphics G2b: turning changes no detail level, and crossing the band out and back ends even.
+  add_test(NAME detail_transitions COMMAND boat_water_review --check-detail)
+  set_tests_properties(detail_transitions PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "detail_check=ok")
   # Graphics G1: scalar and instanced objects draw the same bytes in every pass.
   add_test(NAME instancing_parity COMMAND boat_water_review --check-instancing)
   set_tests_properties(instancing_parity PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
