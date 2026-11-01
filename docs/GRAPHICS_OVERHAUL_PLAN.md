@@ -227,7 +227,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | Foam history and cosmetic ripples | G3a | Prepared | Unstarted; review pending |
 | [G4](#g4--shore-aware-and-far-water-character) | Shore-aware and far-water character | G3b | Prepared | Unstarted; review pending |
 | [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Prepared | Unstarted; review pending |
-| G5b | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Queued in next planning PRs | Unstarted; review pending |
+| [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Prepared | Unstarted; review pending |
 | G5c | Ambient detail, cube spray and final qualification | G5b | Queued in next planning PRs | Unstarted; review pending |
 | G6 | Conditional backend decision spike | G1–G5 measured results exceed G0 budgets and profiling identifies a backend-limited fix | Queued in next planning PRs | Unstarted; G6 dormant |
 
@@ -647,6 +647,60 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G5a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Ship an optional plain high-resolution preset with crisp HUD plus bounded HDR/bloom/grading and tested LDR fallback. Preserve low-res default, update guides/plan and carry evidence to Batch C.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G5b — Clustered cozy lighting and dusk water
+
+Stage coverage: G5 parts 3–4. **Depends on:** G5a; external sunset shared frame and fixed dusk
+prerequisites below.
+Human review: Batch C after G5c.
+
+**Read first:** `src/renderer_gpu.[ch]` (`select_local_lights`), `src/waterfront_scene.[ch]`,
+`assets/shaders/waterfront_city.*`, `assets/shaders/waterfront_water.*`, [sunset
+owner](SUNSET_PLAN.md), [plugins](PLUGIN_PLAN.md).
+
+**Tasks, in order:**
+
+1. Check SUNSET_PLAN.md first. Its shared caller-owned lighting frame, cache invalidation and fixed
+   afternoon/dusk inputs must be implemented and reviewed before this package is ready. If absent,
+   report this prerequisite and do not implement a competing frame or absorb the entire sunset plan.
+   Automatic transitions, room phase ownership and Lua lighting remain outside this package.
+2. Build bounded CPU light clusters each frame from the shared evaluated scene, upload lists through
+   textures available to GL4.1/WebGL2, and define grid coordinates, list capacity, overflow policy
+   and stable light IDs. Replace camera-nearest selection as the normal path; retaining a bounded
+   per-cluster list is allowed, silently retaining a global cap of 32 is not.
+3. Use the same light properties for city, water and mirrored reflection. Construct clusters for
+   each view/camera or transform queries consistently; prevent lights popping at cluster boundaries.
+   Provide a conservative capped-light fallback when allocation/capability limits require it,
+   recording dropped lights and overflow.
+4. Add warm building windows and quay lamps from existing scenery/presentation fixtures with stable
+   authored placement. Render long stepped water streaks using the shared dusk frame and the
+   approved water normals. Respect occlusion/shore masking, preserve navigation/boats/weapons in
+   storm and dusk, and invalidate static shadows/sky caches with lighting changes.
+5. Measure hundreds-of-lights stress at both presets, including cluster build/upload, reflection and
+   water shader costs. Prepare afternoon/dusk comparisons using fixed explicit phases and record
+   fallback differences without changing any simulation or room setting.
+
+**Acceptance:** Cluster indexing/capacity/overflow and stable assignment tests pass, with boundary
+and reflected-light captures. Daytime/reference fallback parity remains within declared limits; dusk
+windows/streaks are readable and stable moving. Full suite, WebGL2 build/smoke and G0 CPU/GPU/memory
+ceilings pass; Batch C is prepared, not accepted.
+
+**Limits and stop conditions:** External sunset work is a real readiness gate; it is currently
+proposed, not delivered. No new gameplay clock, Lua capability, room protocol or dynamic global
+illumination. If the prerequisite remains unavailable, report G5b/G5c unready; final dusk acceptance
+stays open.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G5b from docs/GRAPHICS_OVERHAUL_PLAN.md only when its SUNSET_PLAN prerequisites are ready. In one PR add bounded texture-backed CPU light clusters and cozy window/lamp water streaks using the shared lighting frame. Update the plan and collect Batch C evidence; do not create another sunset system.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
