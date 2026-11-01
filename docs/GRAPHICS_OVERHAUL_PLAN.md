@@ -226,7 +226,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G3a](#g3a--stamped-wake-shading) | Stamped wake shading | G2b and Batch A verdict resolved | Prepared | Unstarted; review pending |
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | Foam history and cosmetic ripples | G3a | Prepared | Unstarted; review pending |
 | [G4](#g4--shore-aware-and-far-water-character) | Shore-aware and far-water character | G3b | Prepared | Unstarted; review pending |
-| G5a | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Queued in next planning PRs | Unstarted; review pending |
+| [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Prepared | Unstarted; review pending |
 | G5b | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Queued in next planning PRs | Unstarted; review pending |
 | G5c | Ambient detail, cube spray and final qualification | G5b | Queued in next planning PRs | Unstarted; review pending |
 | G6 | Conditional backend decision spike | G1–G5 measured results exceed G0 budgets and profiling identifies a backend-limited fix | Queued in next planning PRs | Unstarted; G6 dormant |
@@ -597,6 +597,56 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G4 from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Complete presentation water atlas, safe opaque depth, shore treatment and far-water character within G0 budgets. Update asset guides/plan and hand off one Batch B playtest covering G3a–G4.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G5a — Optional high resolution and restrained HDR
+
+Stage coverage: G5 parts 1–2. **Depends on:** G4 and Batch B verdict resolved.
+Human review: Batch C after G5c.
+
+**Read first:** `src/boat_gpu.[ch]`, `src/renderer_gpu.[ch]`, `tools/wake_velocity.c`,
+`assets/shaders/`, `cmake/Web.cmake`, [3D](3D.md), [web](WEB_BUILD.md), [boating](BOATING_PLAN.md).
+
+**Tasks, in order:**
+
+1. Add a supported plain high-resolution preset based on the accepted spike configuration: 1280×800
+   scene, independently sized 640×480 reflection and a crisp 320×200 logical HUD. Trace existing
+   render/presentation settings and expose one coherent user option; do not ship spike environment
+   variables.
+2. Keep low resolution the default. Decouple scene resolution, HUD logical size, reflection size and
+   window/framebuffer size with explicit resource ownership. Preserve integer-scaled nearest
+   filtering for the low preset and readable HUD at supported window/DPI/browser resize/fullscreen
+   sizes. Keep existing AA semantics documented.
+3. Add HDR-capable scene targets and retain unclamped authored lighting until presentation.
+   Introduce bounded restrained bloom and a compact grading structure for named lighting phases. Use
+   the existing daytime phase; integrate the future shared lighting frame when available rather than
+   invent a second time-of-day clock.
+4. Probe renderability/filter/blend requirements and fall back to the existing LDR presentation on
+   unsupported WebGL2 devices. Keep authored saturation and contrast, no grey filmic tonemapping or
+   temporal accumulation. Record which effects are disabled in the fallback.
+5. Exercise target allocation failure, repeated preset/resize changes, two views, captures and
+   browser canvas/DPI behavior. Update actual controls/settings/CLI/help in user guides and add a
+   review comparison at both presets; measure total frame and postprocess memory/cost.
+
+**Acceptance:** Default low-res output remains exact with new optional processing disabled. HUD
+positions/hit targets and scene/reflection sizing pass focused checks. Native/browser high preset
+and LDR fallback load and resize correctly. Full tests, G0 budgets and moving/capture comparisons
+pass; no default-change acceptance is inferred.
+
+**Limits and stop conditions:** No default-resolution or AGENTS.md convention change. A high-res
+look that the user likes in the old spike does not approve the shipped HDR preset. Sunset
+implementation stays with SUNSET_PLAN.md.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G5a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Ship an optional plain high-resolution preset with crisp HUD plus bounded HDR/bloom/grading and tested LDR fallback. Preserve low-res default, update guides/plan and carry evidence to Batch C.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
