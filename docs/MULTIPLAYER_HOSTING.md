@@ -280,11 +280,12 @@ source was not identified, and later browser joins succeeded.
 Evidence: `/private/tmp/proteus-release-v0.0.24/build/releases/v0.0.24/verification.json`,
 `deployment.log`, `native.log`, and `hosted/` / `pages/` browser logs/captures in that directory;
 orchestration log `/private/tmp/proteus-release-v0.0.24.log`.
-These automated checks do not qualify deliberate player contact, physical phones, human
-gameplay/audio, Windows package execution, restrictive networks, independent external-network/TURN
+These automated checks do not qualify physical phones, human gameplay/audio, Windows package execution, restrictive networks, independent external-network/TURN
 behavior or long soaks. The [release status](RELEASES.md#status-and-verification) owns the separate
-three-engine plugin qualification result and its limits. Next: a two-person harbor room with
-deliberate contact, human package play and wider multiplayer qualification.
+three-engine plugin qualification result and its limits. The user later reported that a two-person
+harbor room with deliberate contact and deathmatch both worked (2026-11-01; build, platform and
+whether either used this room were not stated). Next: wider human package play and multiplayer
+qualification.
 
 ## Status and verification — 2026-10-30
 

@@ -10,11 +10,18 @@ contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts
 [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: the user plays one two-person harbor room with deliberate contact. Cutover merged in
+Next task: the user's iPhone run, which decides whether Harbor life becomes the `outer` default;
+`outer` stays on Standard until then. Cutover merged in
 [#108](https://github.com/doomdavve/proteus/pull/108) and shipped as
 [v0.0.24](RELEASES.md#status-and-verification) on 2026-11-01, with the hosted room verified. No
-implementation step remains in this plan. `outer` stays on Standard until that play check and an
-iPhone run are done; the [PD5 result](#pd5-result-2026-10-31) lists the human checks.
+implementation step remains in this plan; the [PD5 result](#pd5-result-2026-10-31) lists the human
+checks.
+
+User play report, 2026-11-01, after the v0.0.24 release (build and platform not stated): a
+two-person harbor room with deliberate contact "worked fine", and deathmatch "worked well". The user
+still cannot jump over another boat; the
+[deathmatch playtest plan](DEATHMATCH_PLAYTEST_PLAN.md#steps-5a5c--vertical-contacts-and-crossings-during-a-tick)
+owns that.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |

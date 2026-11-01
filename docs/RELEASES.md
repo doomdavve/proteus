@@ -251,8 +251,11 @@ to need the retry, so Firefox deadline sensitivity remains open and is not treat
 Evidence: `/private/tmp/proteus-release-v0.0.24/build/releases/v0.0.24/`, including
 `verification.json`, build/test/deployment logs, package checks and browser captures; orchestration
 log `/private/tmp/proteus-release-v0.0.24.log`.
-Next: a two-person harbor room with deliberate contact, human package/input/audio and wider network
-review; investigate Firefox deadline sensitivity.
+User play report, 2026-11-01 (build and platform not stated): a two-person harbor room with
+deliberate contact and deathmatch both worked; jumping over another boat is still not possible, as
+the [deathmatch playtest plan](DEATHMATCH_PLAYTEST_PLAN.md) expects until its vertical-contact steps.
+Next: iPhone run, wider human package/input/audio and network review; investigate Firefox deadline
+sensitivity.
 
 Earlier publication evidence, 2026-10-30: **[v0.0.23](https://github.com/doomdavve/proteus/releases/tag/v0.0.23)**
 is published at `11b5e1a75bbf7d43afd331db3e7e520f3ddf855a`. The
