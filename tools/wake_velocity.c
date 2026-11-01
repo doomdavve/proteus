@@ -119,8 +119,8 @@ static void usage(void)
         stdout, "--start X,Z[,DEGREES]", "Place the boat on mapped water (heading 0 faces -Z)");
     cli_usage_line(stdout, "--skin NAME", "sweden|finland|denmark|norway|explorer|cabin");
     cli_usage_line(stdout, "", "default sweden; explorer and cabin have their own engines");
-    cli_usage_line(
-        stdout, "--soundtrack NAME", "a-little-boat|acid-wake|off (default a-little-boat)");
+    cli_usage_line(stdout, "--soundtrack NAME",
+        "a-little-boat|a-little-boat-cozy|acid-wake|off (default a-little-boat)");
     cli_usage_line(stdout, "--mouse-steering", "Start with captured mouse steering");
     cli_usage_line(stdout, "--plugin DIR", "Solo voyage from a Lua plugin");
     cli_usage_line(stdout, "", "Saves reload; F5 reload, F6 undo, F7 apply migration/restart");

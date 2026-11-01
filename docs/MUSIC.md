@@ -27,12 +27,39 @@ the dedicated generator (regeneration replaces tracker edits). CMake bundles it 
 to the other music and `boating_xm_is_valid` checks decoder loading/reset, seeking,
 finite unclipped samples, and continued sound across two loop boundaries.
 
+### A little boat — Cozy variation
+
+[A little boat — Cozy](../assets/music/a-little-boat-cozy.xm) is a separate 32-bar,
+76 BPM / speed 6 variation (101.05 seconds). It keeps the original C-major harmonic
+cycle and call/answer contour, with a lower, sparse piano melody, lightly staggered
+ukulele chords, occasional kalimba and woodwind replies, soft brushed percussion,
+and warm pads over the original synthesized bass sample. All voices are instrumental
+PCM synthesis approximations, including the upright-style piano and acoustic plucks;
+there are no recorded acoustic instruments or vocals. Fixed low levels, soft attacks
+and alternating pad channels let tails overlap chord changes and the loop boundary.
+There are no builds, fills or intensity changes. Playback volume is 0.35.
+
+```sh
+python3 tools/generate_cozy_music.py
+cmake --build build -j
+./build/validate_xm assets/music/a-little-boat-cozy.xm --cozy
+./build/wake_velocity --soundtrack a-little-boat-cozy
+```
+
+The deterministic generator writes only this variant's XM and reuses the existing
+encoding helpers and bass synthesis. Existing tracks and sample WAVs are untouched.
+Regeneration replaces tracker edits. `cozy_xm_is_valid` checks fresh-load playback,
+48.58-second seeking and backward reset, and 205 seconds of finite unclipped PCM
+through two loop boundaries. Native/macOS and web asset lists include the variant;
+packaged and browser playback still need qualification. Musical acceptance is pending;
+see the [variant's verification record](BOATING_PLAN.md#cozy-soundtrack-variation--2026-11-01).
+
 ### Acid Wake and soundtrack selection
 
 Choose SETTINGS → SOUNDTRACK on the native title, or Soundtrack in the browser launcher's
-Settings before PLAY. The choices are A LITTLE BOAT, ACID WAKE and OFF. Native settings
+Settings before PLAY. The choices are A LITTLE BOAT, ACID WAKE, LITTLE BOAT: COZY and OFF. Native settings
 persist in `title.txt` and apply to both single player and multiplayer; the choice is local
-to each listener. Direct command-line sessions accept `--soundtrack a-little-boat|acid-wake|off`
+to each listener. Direct command-line sessions accept `--soundtrack a-little-boat|a-little-boat-cozy|acid-wake|off`
 and default to A little boat. Off leaves the engine and water mix active.
 
 [Acid Wake](../assets/music/acid-wake.xm) is an original 64-bar D-minor acid techno piece
@@ -54,7 +81,7 @@ untouched. Eight bar-long bass phrase samples preserve continuous slide/filter g
 edit their notes and synthesis in the generator, or rearrange phrases, drums and levels in
 FastTracker. Regeneration replaces edits to this XM. `acid_xm_is_valid` checks fresh-load
 start, seeking, finite unclipped PCM and two loop boundaries over 235 seconds. Native
-packaging copies the asset directory; the browser build explicitly preloads both tracks.
+packaging copies the asset directory; the browser build explicitly preloads all three tracks.
 Implementation and verification status belong to the
 [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 

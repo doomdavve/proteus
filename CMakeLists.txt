@@ -1272,6 +1272,8 @@ endif()
 
 add_test(NAME boating_xm_is_valid
   COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm --background)
+add_test(NAME cozy_xm_is_valid
+  COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat-cozy.xm --cozy)
 add_test(NAME acid_xm_is_valid
   COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm --acid)
 
@@ -1306,7 +1308,7 @@ endforeach()
 # in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
   release_command
-  acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
+  cozy_xm_is_valid acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
