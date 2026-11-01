@@ -724,6 +724,15 @@ if(NOT EMSCRIPTEN)
     --source-dir ${CMAKE_CURRENT_SOURCE_DIR} --nm ${CMAKE_NM}
     --binary $<TARGET_FILE:wake_velocity> --binary $<TARGET_FILE:boat_server>)
   set_tests_properties(compiled_selection_guard PROPERTIES LABELS "cpu;quick" TIMEOUT 60)
+  if(CMAKE_NM AND NOT MSVC)
+    # Negative control: a validator that links the fixtures must trip the executable check.
+    add_test(NAME compiled_selection_guard_detects COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compiled_selection.py
+      --source-dir ${CMAKE_CURRENT_SOURCE_DIR} --nm ${CMAKE_NM}
+      --binary $<TARGET_FILE:validate_boat_voyage>)
+    set_tests_properties(compiled_selection_guard_detects PROPERTIES LABELS "cpu;quick" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "contains boat_fixture_voyage_outer")
+  endif()
 endif()
 # P3.3b display-free objective inspection and native checkpoint/seek review.
 add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)

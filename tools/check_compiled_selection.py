@@ -94,12 +94,17 @@ if args.binary and nm:
         if result.returncode != 0:
             failures.append(f'{binary}: nm failed: {result.stderr.strip()}')
             continue
-        symbols = set(re.findall(r'\b([A-Za-z_][A-Za-z0-9_]*)\b', result.stdout))
-        for symbol in (*REMOVED, 'boat_fixture_voyage_outer', 'boat_fixture_course_default',
+        # Mach-O prefixes every C symbol with an underscore.
+        symbols = set(re.findall(r'\b_?([A-Za-z_][A-Za-z0-9_]*)\b', result.stdout))
+        for symbol in (*REMOVED, 'boat_fixture_voyage_outer', 'boat_fixture_course_gates',
+                'boat_fixture_course_default',
                 'boat_fixture_river_course', 'boat_fixture_race_default_rules',
                 'boat_fixture_match_default_rules', 'boat_fixture_combat_default_rules'):
             if symbol in symbols:
                 failures.append(f'{binary}: contains {symbol}')
+
+if args.binary and not nm:
+    print(f'compiled_selection: {args.nm} not found; executables not checked')
 
 if failures:
     for failure in failures:
