@@ -53,8 +53,6 @@ try:
         page.on('pageerror', lambda e: errors.append(str(e)))
         page.goto(args.url)
         page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-        page.locator('#settings').evaluate('(e)=>e.open=true')
-        page.uncheck('#fullscreen')
         page.click('#play')
         page.wait_for_timeout(700)
 
@@ -110,8 +108,6 @@ try:
                 extra.goto(args.url)
                 extra.bring_to_front()
                 extra.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-                extra.locator('#settings').evaluate('(e)=>e.open=true')
-                extra.uncheck('#fullscreen')
                 extra.click('#play')
                 extra.wait_for_timeout(500)
                 join_room(extra, extra_logs)

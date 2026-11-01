@@ -32,8 +32,6 @@ def main():
                 and 'favicon.ico' not in message.text else None)
         page.goto(args.url)
         page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-        page.locator('#settings').evaluate('(element) => element.open = true')
-        page.uncheck('#fullscreen')
         page.click('#play')
         page.wait_for_function("Module['boatMouse'] && document.activeElement === Module.canvas")
         # Shared title -> single-player setup -> start (default river).

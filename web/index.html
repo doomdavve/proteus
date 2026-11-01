@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101e25">
-  <meta name="description" content="Proteus Boating — WebGL 2 boating game.">
+  <meta name="description" content="Wake Velocity — a boating game on Gothenburg’s river.">
   <title>Wake Velocity</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
@@ -19,9 +19,8 @@
     .launch-layout { width: min(880px, 100%); margin: auto; padding: 24px 0; }
     h1 { margin: 0 0 16px; font-size: 12px; font-weight: 500; letter-spacing: .22em; color: #afc2c4; }
     .preview { aspect-ratio: 16 / 9; border: 1px solid #43565b; background: #426779 url('river.png') center 48% / cover; }
-    .controls { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-top: 16px; align-items: start; }
-    button, select, summary { font: inherit; }
-    #play { width: 100%; min-height: 64px; display: flex; align-items: center; justify-content: center; gap: 14px; border: 1px solid #e5edcd; border-radius: 2px; background: #dbe7b3; color: #1b302f; font-size: 16px; font-weight: 700; letter-spacing: .18em; cursor: pointer; box-shadow: inset 0 -4px 0 #b6c58e; }
+    button, summary { font: inherit; }
+    #play { margin-top: 16px; width: 100%; min-height: 64px; display: flex; align-items: center; justify-content: center; gap: 14px; border: 1px solid #e5edcd; border-radius: 2px; background: #dbe7b3; color: #1b302f; font-size: 16px; font-weight: 700; letter-spacing: .18em; cursor: pointer; box-shadow: inset 0 -4px 0 #b6c58e; }
     #play::before { content: ''; width: 0; height: 0; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 11px solid currentColor; }
     #play:hover:enabled { background: #ebf3cf; }
     #play:active:enabled { box-shadow: none; transform: translateY(1px); }
@@ -29,19 +28,13 @@
     details { position: relative; }
     summary { min-height: 64px; padding: 0 18px; display: flex; align-items: center; gap: 10px; border: 1px solid #43565b; border-radius: 2px; color: #bfcdcd; background: #192c34; cursor: pointer; list-style: none; font-size: 11px; letter-spacing: .08em; }
     summary::-webkit-details-marker { display: none; }
-    summary svg { width: 17px; height: 17px; }
     summary:hover, details[open] summary { border-color: #a9bdbb; color: #edf2eb; }
-    .settings { position: absolute; z-index: 1; right: 0; bottom: calc(100% + 12px); width: 260px; padding: 20px; border: 1px solid #52666b; background: #14262f; box-shadow: 0 12px 32px #0006; }
-    .location { display: block; margin-bottom: 8px; color: #afc2c4; font-size: 11px; letter-spacing: .1em; }
-    select { width: 100%; padding: 10px; border: 1px solid #43565b; border-radius: 2px; background: #192c34; color: #edf2eb; }
-    .options { display: grid; gap: 14px; margin-top: 20px; }
-    .options label { display: flex; gap: 10px; align-items: center; cursor: pointer; }
-    input { accent-color: #d8e4ac; width: 16px; height: 16px; margin: 0; }
     :focus-visible { outline: 2px solid #e1eeb6; outline-offset: 5px; }
     #status, #storage { color: #a9bdbb; font-size: 11px; margin: 12px 0 0; }
     #status:empty, #storage:empty { display: none; }
     footer { padding-top: 24px; text-align: center; color: #8fa6a9; font-size: 10px; }
-    #version { display: block; margin-bottom: 6px; }
+    footer h1 { margin-bottom: 6px; }
+    .footer-meta { margin: 0 0 6px; }
     a { color: inherit; text-underline-offset: 3px; }
     #stage { display: none; background: #000; position: fixed; inset: 0; align-items: center; justify-content: center; }
     body.playing { overflow: hidden; overscroll-behavior: none; background: #000; }
@@ -62,7 +55,7 @@
     .mobile-left { left: max(8px, env(safe-area-inset-left)); }
     .mobile-right { flex-direction: column-reverse; right: max(8px, env(safe-area-inset-right)); }
     #mobile-controls, #canvas { touch-action: none; user-select: none; -webkit-user-select: none; }
-    #iphone-tip { max-width: 52ch; color: #afc2c4; }
+    #iphone-tip { max-width: 52ch; margin: 12px auto 0; color: #afc2c4; }
     canvas { display: block; image-rendering: pixelated; }
     #canvas:focus { outline: none; }
     @media (pointer: coarse) {
@@ -73,7 +66,6 @@
       #launcher { padding: 20px; }
       .preview { aspect-ratio: 4 / 3; }
       summary { padding: 0 14px; }
-      summary span { display: none; }
     }
     #plugin-tools { margin: 12px 32px; z-index: 3; }
     #plugin-tools summary { min-height: 36px; }
@@ -92,30 +84,20 @@
 <body>
   <div id="launcher">
     <main class="launch-layout">
-      <h1>WAKE VELOCITY</h1>
       <div class="preview" role="img" aria-label="Boats and reflections beneath Gothenburg’s bridge"></div>
-      <div class="controls">
-        <button id="play" disabled>LOADING</button>
-        <details id="settings">
-          <summary aria-label="Settings" title="Settings">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6"/></svg>
-            <span>SETTINGS</span>
-          </summary>
-          <div class="settings">
-            <div class="options">
-              <label><input id="fullscreen" type="checkbox" checked> Fullscreen</label>
-            </div>
-          </div>
-        </details>
-      </div>
+      <button id="play" disabled>LOADING</button>
       <p id="status" role="status">Loading…</p>
       <p id="storage" role="status"></p>
+    </main>
+    <footer>
+      <h1>WAKE VELOCITY</h1>
+      <p class="footer-meta"><span id="version">Version @WEB_VERSION@</span> · <a href="https://github.com/doomdavve/proteus">GitHub</a></p>
+      Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> · ODbL
       <p id="iphone-tip" hidden>iPhone: for more screen space, use Safari’s Share → Add to Home Screen
         → Open as Web App, then launch from its icon. Tilt is enabled separately after starting.</p>
-    </main>
-    <footer><span id="version">Version @WEB_VERSION@</span>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> · ODbL</footer>
+    </footer>
   </div>
-  <details id="plugin-tools">
+  <details id="plugin-tools" hidden>
     <summary>PLUGIN VOYAGE</summary>
     <div id="plugin-panel">
       <p>Solo voyages, free boating and the basin time trial. Import a source bundle or edit the
@@ -153,6 +135,8 @@
     </div>
   </div>
   <script>
+    // Authoring is an explicit workspace, separate from the public launcher.
+    document.getElementById('plugin-tools').hidden = !new URLSearchParams(location.search).has('author');
     const webFiles = @WEB_FILES@;
     var Module = {
       canvas: document.getElementById('canvas'),

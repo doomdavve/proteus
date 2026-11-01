@@ -71,8 +71,6 @@ def check_objectives(browser, args, root, errors, logs):
     def ready():
         page.wait_for_function("!document.getElementById('plugin-stage').disabled", timeout=60000)
         page.locator('#plugin-tools').evaluate('(e) => e.open = true')
-        page.locator('#settings').evaluate('(e) => e.open = true')
-        page.uncheck('#fullscreen')
 
     def stage(m, s):
         page.fill('#plugin-manifest', json.dumps(m)); page.fill('#plugin-source', s)
@@ -119,7 +117,7 @@ def check_objectives(browser, args, root, errors, logs):
         page.evaluate('holdObjective=false; heldObjective(); heldObjective=null')
 
     try:
-        page.goto(args.url); ready(); stage(manifest, source)
+        page.goto(args.url + ('&' if '?' in args.url else '?') + 'author'); ready(); stage(manifest, source)
         page.click('#plugin-play')
         page.wait_for_function('Module.boatPluginCheckpoint?.initialized')
         cold = page.evaluate('({n:Module.boatPluginObjective.completed, ms:Module.boatPluginObjective.totalMs, evalMs:Module.boatPluginObjective.evalTotalMs})')

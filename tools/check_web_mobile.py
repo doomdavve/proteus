@@ -39,17 +39,10 @@ with sync_playwright() as p:
         page.add_init_script('delete window.DeviceOrientationEvent.requestPermission;')
     page.goto(args.url)
     page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-    page.locator('#settings').evaluate('(e) => e.open = true')
-    if not args.android:
-        page.uncheck('#fullscreen')
     page.locator('#play').tap()
     page.wait_for_timeout(1600)
-    if args.android:
-        page.wait_for_function('document.fullscreenElement !== null')
-        page.wait_for_function('testAudioContexts.some(c => c.state === "running")')
-        page.evaluate('document.exitFullscreen()')
-        page.wait_for_function('document.fullscreenElement === null')
-        page.wait_for_timeout(300)
+    assert page.evaluate('document.fullscreenElement === null')
+    page.wait_for_function('testAudioContexts.some(c => c.state === "running")')
 
     def tap_scene(x, y):
         box = page.locator('#canvas').bounding_box()

@@ -29,8 +29,6 @@ with sync_playwright() as p:
     page.on('request', lambda r: scenery.append(r.url) if '/scenery-' in r.url else None)
     page.goto(args.url)
     page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
-    page.locator('#settings').evaluate('(e)=>e.open=true')
-    page.uncheck('#fullscreen')
     page.click('#play')
     page.wait_for_timeout(1600)
 
