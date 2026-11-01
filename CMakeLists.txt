@@ -911,8 +911,9 @@ add_test(NAME boat_server_scripted_until_empty_rejected
   COMMAND boat_server --scripted --until-empty)
 # Every PLACE the title offers opens its package through the title's own arguments.
 foreach(place_package
-    "basin=proteus.basin-free" "river=proteus.river-free" "outer-standard=proteus.langedrag"
-    "outer-harbor-life=proteus.harbor-life" "basin-trial=proteus.time-trial")
+    "basin=proteus.basin-free" "river=proteus.river-free" "outer=proteus.harbor-life"
+    "outer-standard=proteus.langedrag" "outer-harbor-life=proteus.harbor-life"
+    "basin-trial=proteus.time-trial")
   string(REPLACE "=" ";" place_package "${place_package}")
   list(GET place_package 0 place)
   list(GET place_package 1 package)
@@ -1317,7 +1318,7 @@ set(PROTEUS_SLOW_TESTS
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_river_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
   boat_river_screenshot
-  wake_velocity_title_start.basin wake_velocity_title_start.river
+  wake_velocity_title_start.basin wake_velocity_title_start.river wake_velocity_title_start.outer
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
   wake_velocity_title_start.basin-trial)
 

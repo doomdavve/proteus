@@ -53,7 +53,9 @@ Launching a package starts no Lua VM, polls no files and shows no authoring pane
 compiled-content switch: every solo session takes this path. Browser solo sessions use the same
 catalog, built into the game Wasm; rooms receive their definition as data. An unknown ID, or a
 package for another location, fails with an explicit message. The title's single-player
-panel selects Standard or Harbor life for `outer` on native and web builds. `--title-start PLACE`
+panel selects Harbor life (its default since 2026-11-01) or Standard for `outer` on native and web
+builds. `--location outer` on the command line still starts `proteus.langedrag`, the catalog default,
+which keeps scripted captures and pinned digests stable. `--title-start PLACE`
 takes the title's START path with default settings, without the menu, so tests can prove each PLACE
 opens (`basin`, `river`, `outer`, `outer-standard`, `outer-harbor-life`, `basin-trial`); further
 options follow it.

@@ -2059,6 +2059,7 @@ static int title_start(int argc, char **argv)
     boat_title_defaults(&settings);
     const char *place = argv[2];
     const BoatWorldDefinition *location = boat_location_find(place);
+    // Plain "outer" keeps the title's default content.
     if (location)
         settings.location = location->id;
     else if (!strcmp(place, "basin-trial"))
