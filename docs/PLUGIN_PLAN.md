@@ -1,8 +1,9 @@
 # Lua gameplay plugins and live authoring
 
-Status, 2026-10-30: **P0–P3 implemented for trusted native solo authoring.** Native solo `outer` sessions load and
-live-edit the Långedrag voyage; the local river trial now loads race descriptors through the
-same restricted evaluator and revision host. The compiled race remains the network default.
+Status, 2026-10-31 (updated for PD5): **P0–P3 implemented for trusted native solo authoring.**
+Native solo `outer` sessions load and live-edit the Långedrag voyage; the local river trial loads
+race descriptors through the same restricted evaluator and revision host. Rooms now use validated
+package definitions sent as data; this plan's authoring path remains native solo.
 P3.1 provides atomic objective transactions and P3.2 connects lossless native voyage events
 to an opt-in shelter-tour objective with a native HUD row. P3.3a adds deterministic tick timers
 and their checkpoint/reload contract. P3.3b adds schema-aware native migration, explicit
@@ -440,9 +441,9 @@ broader path from preinstalled packages to downloaded maps/scenarios. P5 supplie
 authority, prediction and revision contract; its initial matching-preinstalled-package scope
 remains unchanged. Automatic distribution and downloaded-script trust are later gates.
 
-P0–P4 are solo/local authoring. Existing rooms continue using their compiled content. Reject
-plugin gameplay in connected/hosted modes until the protocol integration is implemented;
-having Lua on both machines does not establish compatibility.
+P0–P4 are solo/local authoring. Rooms now run validated package definitions as data; clients do
+not evaluate room Lua. Reject plugin gameplay callbacks in connected/hosted modes until P5
+implements them; having Lua on both machines does not establish compatibility.
 
 P5 must add a bounded content contract: API and interpreter/build identity, bundle and decoded
 definition hashes, active revision/generation, effective tick, required native capabilities,
@@ -1317,7 +1318,8 @@ qualification remain open.
 
 Implemented browser import/reload/export for an explicitly limited capability subset:
 **solo `outer` voyage descriptors (`voyage.define`, schema 1)**. Objectives/timers and race
-imports reject before entry evaluation; rooms and recordings retain compiled content.
+imports reject before entry evaluation; rooms and recordings retained compiled content at that
+revision (rooms have since moved to package definitions; recordings remain native).
 This resolves the import gate for descriptors without extending the trusted native callback
 execution contract to browser imports.
 

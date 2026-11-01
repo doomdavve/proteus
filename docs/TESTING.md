@@ -316,18 +316,22 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   session with identical input to Långedrag and compares the boat, the water and every voyage
   field at each tick. The `wake_velocity_plugin_*` tests render a CPU frame with the plugin and
   check that `--plugin` is refused with a room, the course, another location or a missing package.
-- `boat_plugin_catalog` (PD1) decodes every generated entry and proves it equals evaluating its
-  embedded source, that the basin-free, river-free, outer-voyage and time-trial defaults equal
-  the compiled definitions, and that catalog decoding creates no Lua state (the
-  `boat_plugin_lua_states` counter is unchanged). `boat_plugin_session.catalog_runtime` opens the outer voyage and Harbor life entries and checks
-  that no Lua state, watch, staging worker or authoring panel appears. `boat_plugin_catalog_invalid` runs the
-  build-time generator on objective, bad-schema and duplicate packages and expects its normal
-  diagnostics. `plugin_default_parity` captures basin, river, outer and course sessions with
-  `--renderer cpu` through the catalog and `--no-plugins` and compares the images byte for byte.
-  `boat_replay`'s legacy-best case proves a pre-existing `course-calm-physicsN.run` keeps its
-  path as the best and is not overwritten by an equal or slower run. The catalog now also
-  includes the outer free room, `proteus.deathmatch` (whose rules and combat values equal the
-  native defaults at every location) and the two harbor room packages.
+- `boat_plugin_catalog` (PD1/PD5) decodes every generated entry and proves it equals evaluating
+  its embedded source, that the basin-free, river-free, outer-voyage and time-trial defaults equal
+  the shipped `proteus_boat_fixtures` values, and that catalog decoding creates no Lua state (the
+  `boat_plugin_lua_states` counter is unchanged). `boat_plugin_session.catalog_runtime` opens the
+  outer voyage and Harbor life entries and checks that no Lua state, watch, staging worker or
+  authoring panel appears. `boat_plugin_session.default_sessions` opens every default through the
+  game's catalog selection and compares its route, course, rules and scene with the fixtures.
+  `boat_plugin_catalog_invalid` runs the build-time generator on objective, bad-schema and
+  duplicate packages and expects its normal diagnostics. `compiled_selection_guard` rejects the
+  removed compiled symbols and the fixture library in production sources, CMake targets and the
+  built `wake_velocity`/`boat_server` symbols; `compiled_selection_guard_detects` is its negative
+  control, where a validator linking the fixtures must trip the executable check. `boat_replay`'s legacy-best case proves a
+  pre-existing `course-calm-physicsN.run` keeps its path as the best under
+  `BOAT_COURSE_STANDARD_DIGEST` and is not overwritten by an equal or slower run. The catalog
+  also includes the outer free room, `proteus.deathmatch` (whose rules and combat values equal
+  the fixtures at every location) and the two harbor room packages.
 - `boat_room_package` (PD2/PD3) evaluates edited race and deathmatch packages, builds rooms from
   their definitions and compares every client's mirror hash with the authority at snapshot
   ticks; predicting clients must correct and stay within the prediction bounds. It also loads

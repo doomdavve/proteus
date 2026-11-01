@@ -1,5 +1,6 @@
 /* PD1: every bundled catalog entry equals evaluating its embedded source; the free, outer and
  * time-trial defaults equal the compiled definitions; and catalog decoding starts no Lua VM. */
+#include "boat_fixtures.h"
 #include "boat_plugin_catalog.h"
 #include "boat_plugin_lua.h"
 #include "boat_plugin_wire.h"
@@ -126,11 +127,12 @@ static int defaults_match_compiled(void)
     BoatPluginRevision r;
     BoatPluginDiagnostic d = { 0 };
     CHECK(boat_plugin_catalog_decode(outer, &r, &d));
-    CHECK(r.voyage.digest == boat_plugin_route_digest(&boat_voyage_outer));
-    CHECK(r.voyage.route.shelter_count == boat_voyage_outer.shelter_count);
+    CHECK(r.voyage.digest == boat_plugin_route_digest(&boat_fixture_voyage_outer));
+    CHECK(r.voyage.route.shelter_count == boat_fixture_voyage_outer.shelter_count);
+    CHECK(boat_course_digest(&boat_fixture_course_default) == BOAT_COURSE_STANDARD_DIGEST);
     CHECK(boat_plugin_catalog_decode(course, &r, &d));
-    CHECK(r.course.digest == boat_course_compiled_digest());
-    CHECK(!memcmp(&r.course.course, &boat_course_default, sizeof(BoatCourseDefinition)));
+    CHECK(r.course.digest == BOAT_COURSE_STANDARD_DIGEST);
+    CHECK(!memcmp(&r.course.course, &boat_fixture_course_default, sizeof(BoatCourseDefinition)));
     // Unknown kinds and locations have no default.
     const BoatPluginCatalogEntry *outer_free
         = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "outer");
@@ -143,8 +145,8 @@ static int defaults_match_compiled(void)
             = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_MATCH, name);
         CHECK(match && !strcmp(match->id, "proteus.deathmatch"));
         CHECK(boat_plugin_catalog_decode(match, &r, &d));
-        BoatMatchRules rules = boat_match_default_rules();
-        BoatCombatRules combat = boat_combat_default_rules();
+        BoatMatchRules rules = boat_fixture_match_default_rules;
+        BoatCombatRules combat = boat_fixture_combat_default_rules;
         CHECK(boat_plugin_match_digest(&r.match.rules, &r.match.combat)
             == boat_plugin_match_digest(&rules, &combat));
     }

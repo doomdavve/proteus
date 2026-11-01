@@ -15,7 +15,8 @@ args.output.mkdir(parents=True, exist_ok=True)
 
 with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=args.executable, headless=True,
-                               args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
+                               args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader',
+                                     '--host-resolver-rules=MAP wake.davve.net ~NOTFOUND'])
     try:
         for smooth in (True, False):
             context = browser.new_context(viewport={'width': 1280, 'height': 900})
@@ -76,6 +77,7 @@ with sync_playwright() as p:
             page.keyboard.up('w')
             page.screenshot(path=str(args.output / f'multiplayer-{label}.png'))
             assert not errors, errors
+            assert not any('wake.davve.net' in line for line in logs), logs
             assert not any('Failed to compile' in line or 'Failed to link' in line for line in logs), logs
             (args.output / f'console-{label}.log').write_text('\n'.join(logs))
             print(f'multiplayer smoothing={label}: render viewports {sizes}', flush=True)

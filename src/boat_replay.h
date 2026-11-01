@@ -56,7 +56,7 @@ void boat_replay_destroy(BoatReplay *run);
 bool boat_replay_load(BoatReplay *run, const char *path);
 bool boat_replay_save(const BoatReplay *run, const char *path);
 bool boat_replay_data_directory(char *path, size_t size);
-// PD1: the saved best path. The compiled course keeps its established
+// PD1: the saved best path. The standard course keeps its established
 // "course-{calm|waves}-physicsN.run" name, so existing bests stay valid; any other course adds
 // its digest. False when the path does not fit.
 bool boat_replay_best_path(
@@ -94,5 +94,9 @@ void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatRe
     const BoatCourse *course, bool waves);
 // Write the pending best/export and report the finish notice; nothing when none is pending.
 void boat_replay_runs_flush(BoatReplayRuns *runs);
+// Replace best and best_path with those of COURSE_DIGEST; flush first. False, with a notice, when
+// that course's saved best is damaged or for other water. The opponent changes at the next reset.
+bool boat_replay_runs_select_best(
+    BoatReplayRuns *runs, const char *directory, bool waves, uint64_t course_digest);
 
 #endif

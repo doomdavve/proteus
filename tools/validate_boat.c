@@ -1,3 +1,4 @@
+#include "boat_fixtures.h"
 #include "boat_map.h"
 #include "boat_reset_hold.h"
 #include "boat_steering.h"
@@ -636,9 +637,11 @@ static int validate_course(void)
 {
     BoatSession boat;
     physics_session(&boat, BOAT_LOCATION_BASIN);
+    boat_session_set_course_definition(&boat, &boat_fixture_course_default);
     boat_session_start_course(&boat);
     CHECK(boat.course.enabled && boat.course.next_gate == 0);
-    CHECK(boat.boat.position.x == 0 && boat.boat.position.y > boat_course_gates[0].centre.y);
+    CHECK(boat.boat.position.x == 0
+        && boat.boat.position.y > boat_fixture_course_gates[0].centre.y);
     for (int i = 0; i < 120; ++i)
         boat_session_step(&boat, (BoatInput) { 0 });
     CHECK(boat.course.elapsed == 0);
@@ -669,6 +672,7 @@ static int validate_course(void)
     boat_course_step(course, (Vector2) { 0, 50 }, (Vector2) { 0, -60 }, 10);
     CHECK(course->elapsed == finished);
     physics_session(&boat, BOAT_LOCATION_BASIN);
+    boat_session_set_course_definition(&boat, &boat_fixture_course_default);
     boat_session_start_course(&boat);
     CHECK(course->elapsed == 0 && course->next_gate == 0);
     // Integration: powered movement starts the timer on the fixed simulation ticks.

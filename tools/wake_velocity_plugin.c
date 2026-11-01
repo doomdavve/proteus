@@ -409,7 +409,7 @@ void wake_plugin_after_tick(WakePlugin *plugin, const BoatSession *session)
 
 bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *session, double now)
 {
-    if (session->voyage_route != session->world.definition->voyage) {
+    if (session->voyage_route != NULL) {
         fprintf(stderr, "Plugin voyage already has an owner; second owner rejected.\n");
         return false;
     }
@@ -492,7 +492,7 @@ bool wake_plugin_open(WakePlugin *plugin, const char *directory, BoatSession *se
 bool wake_plugin_open_catalog(
     WakePlugin *plugin, const BoatPluginCatalogEntry *entry, BoatSession *session)
 {
-    if (session->voyage_route != session->world.definition->voyage) {
+    if (session->voyage_route != NULL) {
         fprintf(stderr, "Plugin voyage already has an owner; second owner rejected.\n");
         return false;
     }
@@ -573,6 +573,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
 #endif
     }
     bool scene_restart = change == BOAT_PLUGIN_RESTART_SESSION && held
+        && plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
         && scene_differs(boat_plugin_host_active(&plugin->host), held);
     const BoatPluginRevision *previous = boat_plugin_host_active(&plugin->host);
     const char *shelter_id = plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
@@ -583,7 +584,11 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     if (!revision)
         return false;
     bind_scene(plugin, session);
-    const BoatVoyageRoute *route = &revision->voyage.route;
+    // Only a voyage host's revision holds a route; the record is a union selected by kind.
+    const BoatVoyageRoute *route
+        = plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE ? &revision->voyage.route : NULL;
+    if (plugin->host.kind == BOAT_PLUGIN_KIND_COURSE)
+        boat_session_set_course_definition(session, &revision->course.course);
     const char *how = undo ? "UNDONE TO" : "ACTIVE";
     switch (change) {
     case BOAT_PLUGIN_UNCHANGED:
@@ -741,12 +746,12 @@ void wake_plugin_close(WakePlugin *plugin, BoatSession *session)
         plugin->query = NULL;
     }
     if (session) {
-        // The session borrowed the plugin's route and scene. Restore both compiled defaults
-        // before the host storage may be reused, so re-entry never sees a dangling borrower.
+        // The session borrowed the plugin's route and scene. Clear both before the host storage
+        // may be reused, so re-entry never sees a dangling borrower.
         if (plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE) {
-            session->voyage_route = session->world.definition->voyage;
+            session->voyage_route = NULL;
             if (session->voyage.route)
-                session->voyage.route = session->voyage_route;
+                session->voyage.route = NULL;
         } else if (plugin->host.kind == BOAT_PLUGIN_KIND_COURSE) {
             boat_session_set_course_definition(session, NULL);
         }

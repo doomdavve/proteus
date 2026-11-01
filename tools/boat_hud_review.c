@@ -1,3 +1,4 @@
+#include "boat_fixtures.h"
 #include "boat_hud.h"
 #include "boat_voyage_view.h"
 #include "raylib.h"
@@ -51,7 +52,7 @@ int main(int argc, char **argv)
             }
         } else if (!strcmp(argv[i], "--voyage") && i + 1 < argc) {
             const char *name = argv[++i];
-            const BoatVoyageRoute *route = &boat_voyage_outer;
+            const BoatVoyageRoute *route = &boat_fixture_voyage_outer;
             boat_voyage_start(&voyage, route, 0);
             voyage.shelter = 2;
             boat.position = route->shelters[2].position;

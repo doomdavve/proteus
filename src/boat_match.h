@@ -74,8 +74,6 @@ typedef struct {
     bool spawn[BOAT_FLEET_SLOTS]; // Spawn requests for the caller to queue on the fleet.
 } BoatMatchOutput;
 
-// 5 min rounds, 10 s intermission, 5 s credit window, 2 s grace, 3 s respawn (R after 1 s).
-BoatMatchRules boat_match_default_rules(void);
 // False for rules without a round, a credit window or a positive threshold.
 bool boat_match_init(BoatMatch *match, const BoatMatchRules *rules);
 // After each boat_fleet_step: presence and lives, touches, capsizes, respawns and rounds.

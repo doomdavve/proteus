@@ -6,12 +6,18 @@
  * Review: --screenshot FILE [--mode corner|chart] [--location river|outer]
  * [--background SCENE.png] [--at X,Z,HEADING] [--shelter N] [--scale N] writes one composition,
  * over a 320x200 scene capture when given and nearest-scaled N times, without opening a window. */
+#include "boat_fixtures.h"
 #include "boat_minimap.h"
 #include "boat_test_scenery.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static const BoatVoyageRoute *route_for(const BoatWorldDefinition *location)
+{
+    return location->id == BOAT_LOCATION_OUTER ? &boat_fixture_voyage_outer : NULL;
+}
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -52,7 +58,7 @@ static int review(int argc, char **argv)
     BoatMinimapMode mode = BOAT_MINIMAP_CORNER;
     int scale = 1;
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_OUTER);
-    const BoatVoyageRoute *route = location->voyage;
+    const BoatVoyageRoute *route = route_for(location);
     Vector2 at = route->shelters[0].position;
     float heading = route->shelters[0].heading;
     BoatVoyage voyage;
@@ -91,7 +97,7 @@ static int review(int argc, char **argv)
         return 1;
     }
     const Image *frame
-        = boat_minimap_compose(&minimap, mode, location->voyage ? &voyage : NULL, at, heading);
+        = boat_minimap_compose(&minimap, mode, route_for(location) ? &voyage : NULL, at, heading);
     Image scene = background ? LoadImage(background)
                              : GenImageColor(WIDTH, HEIGHT, (Color) { 14, 23, 32, 255 });
     ImageFormat(&scene, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
@@ -143,8 +149,8 @@ int main(int argc, char **argv)
             CHECK(watery(pixel(&layer->base, (Vector2) { spawn.x - TRIM, spawn.y - TRIM })));
             Vector2 inland = boat_minimap_project(&minimap, mode, (Vector2) { 0, 700 });
             CHECK(!watery(pixel(&layer->base, (Vector2) { inland.x - TRIM, inland.y - TRIM })));
-            if (location->voyage) {
-                const BoatVoyageRoute *route = location->voyage;
+            if (route_for(location)) {
+                const BoatVoyageRoute *route = route_for(location);
                 for (unsigned i = 0; i < route->shelter_count; ++i) {
                     Vector2 p = boat_minimap_project(&minimap, mode, route->shelters[i].position);
                     CHECK(p.x >= TRIM && p.y >= TRIM && p.x < layer->frame.width - TRIM
@@ -155,8 +161,8 @@ int main(int argc, char **argv)
         }
 
         BoatVoyage voyage = { 0 };
-        if (location->voyage)
-            boat_voyage_start(&voyage, location->voyage, 0);
+        if (route_for(location))
+            boat_voyage_start(&voyage, route_for(location), 0);
         for (int mode = BOAT_MINIMAP_CORNER; mode <= BOAT_MINIMAP_CHART; ++mode) {
             Image trim = ImageCopy(minimap.layers[mode].frame);
             const Image *frame = boat_minimap_compose(&minimap, mode, &voyage, location->spawn, 0);
@@ -175,8 +181,8 @@ int main(int argc, char **argv)
             CHECK(same(pixel(frame, boat), OWN_SHIP));
             CHECK(same(pixel(frame, (Vector2) { boat.x, boat.y + 4 }), OWN_SHIP));
             CHECK(!same(pixel(frame, (Vector2) { boat.x + 4, boat.y + 4 }), OWN_SHIP));
-            if (location->voyage) {
-                const BoatVoyageRoute *route = location->voyage;
+            if (route_for(location)) {
+                const BoatVoyageRoute *route = route_for(location);
                 Vector2 goal = boat_minimap_project(&minimap, mode, route->arrival_centre);
                 CHECK(same(pixel(frame, goal), CHART_MAGENTA));
             }

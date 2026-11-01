@@ -24,11 +24,22 @@ function connect() {
 connect();
 assert.deepEqual(peer.channels.map(c => c.ordered), [true, false, false, false, true]);
 assert.deepEqual(peer.channels.map(c => c.maxRetransmits), [undefined, 0, 0, 0, undefined]);
-// Disposable overflow is bounded; reliable overflow produces a clean disconnect.
+// Disposable overflow is bounded. A reliable message makes room by dropping the oldest
+// disposable event, and reliable order survives.
+peer.channels[0].onmessage({ data: new Uint8Array([1]).buffer }); // reliable A
+peer.channels[1].onmessage({ data: new Uint8Array([2]).buffer }); // oldest disposable
+peer.channels[0].onmessage({ data: new Uint8Array([3]).buffer }); // reliable B
 for (let i = 0; i < 300; ++i) peer.channels[1].onmessage({ data: new Uint8Array([i]).buffer });
-let count = 0; while (rtc.poll()) ++count;
-assert.equal(count, 256);
-for (let i = 0; i < 257; ++i) peer.channels[0].onmessage({ data: new Uint8Array([i]).buffer });
+peer.channels[0].onmessage({ data: new Uint8Array([4]).buffer }); // reliable C, drops the oldest
+let queued = [];
+for (let event = rtc.poll(); event; event = rtc.poll()) queued.push(event);
+assert.equal(queued.length, 256);
+assert.deepEqual(queued.filter(e => e.channel === 0).map(e => e.data[0]), [1, 3, 4]);
+assert.equal(queued.filter(e => e.channel === 1).length, 253);
+// A queue that is entirely reliable has nothing disposable to drop and disconnects cleanly.
+connect();
+for (let i = 0; i < 256; ++i) peer.channels[0].onmessage({ data: new Uint8Array([i]).buffer });
+peer.channels[0].onmessage({ data: new Uint8Array([1]).buffer });
 assert.equal(rtc.poll().kind, 2);
 assert.match(rtc.failure(), /queue is full/);
 connect();

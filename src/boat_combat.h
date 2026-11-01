@@ -75,7 +75,6 @@ bool boat_combat_compact_decode(BoatCombat *combat, const uint8_t *bytes, size_t
     uint64_t tick, const BoatCombatRules *rules);
 
 struct BoatFleet;
-BoatCombatRules boat_combat_default_rules(void);
 // Fieldwise equality, independent of padding: the checkpoint's rules must equal the room's.
 bool boat_combat_rules_equal(const BoatCombatRules *a, const BoatCombatRules *b);
 void boat_combat_enable(struct BoatFleet *fleet, const BoatCombatRules *rules);

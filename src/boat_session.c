@@ -1,5 +1,7 @@
 #include "boat_session.h"
 
+#include <assert.h>
+
 static void reset(BoatSession *session)
 {
     boat_reset_location(&session->boat, session->world.definition);
@@ -18,7 +20,7 @@ static void reset(BoatSession *session)
 void boat_session_init(BoatSession *session, const BoatWorldResources *resources, BoatWater water)
 {
     boat_world_init(&session->world, resources, water);
-    session->voyage_route = session->world.definition->voyage;
+    session->voyage_route = NULL;
     session->course_definition = NULL;
     reset(session);
     session->handling = &boat_handling_speedboat;
@@ -30,12 +32,14 @@ void boat_session_set_course_definition(
     BoatSession *session, const BoatCourseDefinition *definition)
 {
     session->course_definition = definition;
+    if (session->course.enabled)
+        session->course.definition = definition;
 }
 
 void boat_session_start_course(BoatSession *session)
 {
-    const BoatCourseDefinition *definition
-        = session->course_definition ? session->course_definition : &boat_course_default;
+    assert(session->course_definition);
+    const BoatCourseDefinition *definition = session->course_definition;
     boat_reset(&session->boat);
     session->boat.position = definition->start;
     session->boat.heading = definition->heading;
@@ -96,8 +100,7 @@ void boat_session_recover(BoatSession *session)
 void boat_session_rebind_voyage(BoatSession *session, const BoatVoyageRoute *route)
 {
     session->voyage_route = route;
-    if (session->voyage.route)
-        session->voyage.route = route;
+    session->voyage.route = route;
 }
 
 void boat_session_rebind_voyage_live(BoatSession *session, const BoatVoyageRoute *route,

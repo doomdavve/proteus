@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "boat_fixtures.h"
 
 static BoatWorldResources resources;
 static BoatFleet f;
@@ -21,7 +22,7 @@ static unsigned launches;
 static void setup(void)
 {
     assert(boat_fleet_init(&f, &resources, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f));
-    boat_combat_enable(&f, NULL);
+    boat_combat_enable(&f, &boat_fixture_combat_default_rules);
     Boat b;
     boat_reset(&b);
     b.position = (Vector2) { 0, 0 };
@@ -208,7 +209,7 @@ static void hits(void)
     assert(f.state.combat.players[1].health == 0 && f.state.combat.players[1].killer == 0);
     assert(f.state.combat.players[0].damage[1] == 100);
     BoatMatch m;
-    BoatMatchRules r = boat_match_default_rules();
+    BoatMatchRules r = boat_fixture_match_default_rules;
     BoatMatchOutput out;
     assert(boat_match_init(&m, &r));
     m.phase = BOAT_MATCH_PLAYING;
@@ -307,7 +308,7 @@ static void cannon(void)
     }
     assert(f.state.slots[1].boat.motion_state == BOAT_CAPSIZED);
     BoatMatch m;
-    BoatMatchRules r = boat_match_default_rules();
+    BoatMatchRules r = boat_fixture_match_default_rules;
     r.grace_ticks = 0;
     BoatMatchOutput out;
     assert(boat_match_init(&m, &r));
@@ -455,7 +456,7 @@ static void attribution(void)
     target();
     f.state.combat.rules.grace_ticks = 0;
     BoatMatch m;
-    BoatMatchRules r = boat_match_default_rules();
+    BoatMatchRules r = boat_fixture_match_default_rules;
     r.grace_ticks = 0;
     BoatMatchOutput out;
     assert(boat_match_init(&m, &r));
@@ -478,7 +479,7 @@ static void attribution(void)
 
 static void wave(void)
 {
-    BoatCombatRules rules = boat_combat_default_rules();
+    BoatCombatRules rules = boat_fixture_combat_default_rules;
     BoatRadialWave w = { .active = true,
         .height = rules.wave_height,
         .speed = rules.wave_speed,

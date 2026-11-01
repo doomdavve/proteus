@@ -1,17 +1,17 @@
 # Plugins by default: implementation plan
 
-Status, 2026-10-31: **PD1, PC, Rooms and the Browser package are merged; Cutover (PD5) is prepared and
-next.** Native and browser solo sessions now run from
-packages compiled at build time, `--plugin` is the separate authoring path, and a temporary
-`--no-plugins` restores compiled content. The live console edits the running session without a
-reset, natively and in desktop browsers. This document owns the sequence, per-PR status and
-acceptance for that move. The [plugin plan](PLUGIN_PLAN.md) and [API](PLUGIN_API.md) keep the
-existing plugin contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts,
-and the [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
+Status, 2026-10-31: **PD1, PC, Rooms, Browser and Cutover (PD5) are implemented on
+`feat/plugin-default-cutover`, ready for review.** Native and browser solo sessions run from
+packages compiled at build time, `--plugin` is the separate authoring path, and there is no
+compiled-content switch. The live console edits the running session without a reset, natively
+and in desktop browsers. This document owns the sequence, per-PR status and acceptance for that
+move. The [plugin plan](PLUGIN_PLAN.md) and [API](PLUGIN_API.md) keep the existing plugin
+contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts, and the
+[room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: the [Cutover package](#packages), [PD5](#pd5--cutover), on
-`feat/plugin-default-cutover`, from current `main`.
+Next task: the user merges the Cutover PR and cuts the next release. No implementation step
+remains in this plan; the [PD5 result](#pd5-result-2026-10-31) lists the human checks.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ Next task: the [Cutover package](#packages), [PD5](#pd5--cutover), on
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100) |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100); round-boundary revisions deferred to v10; [follow-ups](#rooms-follow-ups) open |
 | [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Implemented 2026-10-31; merged in [#106](https://github.com/doomdavve/proteus/pull/106) |
-| [PD5](#pd5--cutover) | The room gaps a release needs are closed; the compiled selection and the off switch are gone | PD3, PD4 | Next package; [prepared](#settled-from-the-source-and-a-trial-2026-10-31-1) on `381e802` |
+| [PD5](#pd5--cutover) | The room gaps a release needs are closed; the compiled selection and the off switch are gone | PD3, PD4 | Implemented 2026-10-31 on `feat/plugin-default-cutover`; ready for review |
 
 ### Packages
 
@@ -31,7 +31,7 @@ remaining **package is one branch and one PR**. The step sections below stay the
 | --- | --- | --- | --- | --- |
 | Done | **Rooms** | PD2, PD3 | `feat/plugin-default-rooms` | One protocol bump and one hosted cutover instead of two. PD3 only extends the definition PD2 introduces. |
 | Done | **Browser** | PD4 | `feat/plugin-default-browser` | The rest of the original Solo package. [#98](https://github.com/doomdavve/proteus/pull/98) delivered PC alone. |
-| Next | **Cutover** | PD5 | `feat/plugin-default-cutover` | Proves the last room gaps first, then removes the fallback that those proofs and the other packages still compare against, and leaves one releasable tree. |
+| Done | **Cutover** | PD5 | `feat/plugin-default-cutover` | Proves the last room gaps first, then removes the fallback that those proofs and the other packages still compare against, and leaves one releasable tree. |
 
 Rooms goes before Browser because rooms are the largest remaining gap and the riskiest work, while
 browser solo already works on compiled content. They do not depend on each other: a browser room client
@@ -1221,6 +1221,116 @@ hits a stop rule.
 **Needs the user:** merge, cut the release, verify the hosted room and make the Harbor life decision. Still open
 from earlier packages: a two-person harbor room with deliberate contact, Harbor life and normal play on an iPhone
 and physical Safari, and a browser marina play check. None of these blocks the PR.
+
+### PD5 result, 2026-10-31
+
+**Implemented.** `tools/check_web_multiplayer.py` now uses one local-room join helper for every
+client, adds a 100 ms torpedo press delay, maps `wake.davve.net` to `NOTFOUND`, rejects any page
+log naming the hosted room, chooses Metal on macOS and SwiftShader elsewhere, and refuses to
+qualify a room below 20 fps. `web/rtc_transport.js` drops the oldest disposable event when a
+reliable message meets a full queue and fails only when every queued event is reliable; the Node
+contract covers both cases. `WEB_BUILD.md` records that a hidden tab leaves the room.
+`boat_room_package.scene_moving_contact_room` and `scene_resync_contact_room` force contact with an
+authored moving craft and through a snapshot-stall resync; the steady contact bound is tightened
+to 0.00025 m.
+
+`--no-plugins`, `PROTEUS_BOAT_PLUGINS` and `plugin_default_parity` are gone. `proteus_boat_fixtures`
+(`tools/boat_fixtures.[ch]`) holds the shipped voyage, course, race course and rule values for
+validators only. `BOAT_COURSE_STANDARD_DIGEST` (`0xa27ccadf8bd7a754`) keeps legacy best paths and
+the `--replay`/`--ghost` gate; an enabled course requires a bound definition. `BoatWorldDefinition`
+and sessions have no compiled voyage, and `boat_combat_enable` requires rules. `boat_server
+--scripted` and `boat_race_trial` decode the catalog (`proteus.deathmatch` and
+`proteus.river-sprint`). `boat_plugin_session.default_sessions` opens every default through the
+catalog selection and compares route, course, rules and scene with the fixtures;
+`compiled_selection_guard` rejects the removed symbols and the fixture library in production
+sources, CMake targets and the built `wake_velocity`/`boat_server` symbols. The guard fails when a
+production source includes `boat_fixtures.h`.
+
+**Deviations.** The plan expected `cut_release.py --check` to stop at a behind hosting baseline;
+the local clean `davve-srv` checkout was at `db996af`/`origin/main`, so the full preflight passed
+and made no tag, output or hosting change. The hosted-build reproduction also pinned the Lua
+source and used `FETCHCONTENT_FULLY_DISCONNECTED=ON`; the role passes only the raylib source and
+normally fetches Lua. The moving-contact fixture uses small authored loops sampled from the bot's
+resolved track so the test is deterministic rather than a particular ferry timetable. The 0.126 mm
+prediction error remains; it is speculative contact over a snapshot interval, not a replay
+difference (below). Harbor life stays a title choice because no user acceptance was recorded
+before this package; `outer` still defaults to Standard.
+
+**Verification actually run, Apple Silicon/macOS, 2026-10-31.** Debug build from the pinned
+dependencies, no project warnings. `ctest --preset quick` passed all 243 enabled tests;
+`ctest --preset full` passed all **342 enabled tests** with local sockets (13 retired field tests
+disabled, GPU CTests off). That includes the two new room cases, `default_sessions`,
+`compiled_selection_guard`, `boat_plugin_stage`, `boat_server_scripted(_deathmatch)`,
+`boat_race_trial`, the catalog equality cases and the legacy-best case. `git diff --check` passes.
+Linux, macOS and Windows CI passed on the final revision after two review fixes: the race fixture
+comparison uses the gameplay digest instead of a padding-sensitive `memcmp`, and the relocated
+authoring-tools check passes an explicit 20 s validation deadline on a loaded runner. The manual
+`web-plugin.yml` workflow then passed Chromium, Firefox and WebKit ([run
+41253441627](https://github.com/doomdavve/proteus/actions/runs/41253441627)) on the last code
+revision.
+
+Browser checks used the final native WebRTC `boat_server` and the final browser build, Chrome
+headless with `--use-angle=metal`, against local rooms only. `check_web_multiplayer.py` passed
+`free`, `race`, `deathmatch`, `--four-players` and an edited race directory (`--server-package`),
+at 60.5–60.9 measured fps. The edited race joined and rejoined with two resets and no decode
+errors. Every run mapped `wake.davve.net` to `NOTFOUND`; no page log named the hosted room.
+
+**Task 4 pins, before and after removal, Debug CPU captures at `--time 3` (SHA-256).** Basin
+`02c13bc38ac31b57200572209614b4e6a40c8f2c97c5f4b586a92f224e9116be`; river
+`015b41c0c0a4bcbbb86f65feb92e0f62fd05e260d991ccd6791dce1215159bb8`; outer
+`ad4a277fc752c2be1cfd4c446429db11827f06c189b0b8cae6bf0c7d156cebb5`; course
+`ebb830e1558a7b0d71089dccbfe8e465fdc1d85e37571e22b5523e1100cc5430`; harbor-life
+`f95630596bee40aa7a347174952348cd7ad00ad108194dac43cb054687b9018e`. Every capture was
+byte-identical after removal. Route digest `e8509272172cb7c4`; standard course digest
+`a27ccadf8bd7a754`; Hello content digest `7d466f9f85a9d4d4`; all unchanged. Game Wasm went from
+2,003,169 to 2,002,389 raw bytes, 978,247 to 978,105 gzip and 779,912 to 778,288 Brotli.
+`check_web_wasm.py` still reports no Lua in the game Wasm.
+
+**Measurements.** The steady authored-contact room has no ambient waves and its live arcade wake
+pool is empty. The first own-slot difference is 12 µm at tick 36, the first berth contact; the
+maximum is 0.126 mm at a later snapshot tick, so the bound is now 0.00025 m. Four-client 12 s room
+runs: plain river 879.7 kbit/s, `service_ms_per_tick` 0.1005, bootstrap 5,352 B/client;
+`proteus.harbor-room` 884.2 kbit/s, 0.1530 ms, 5,352 B/client. The v0.0.23 v8 worktree's river room
+measured 859.9 kbit/s, 0.0826 ms and the same 5,352 B/client bootstrap. Single wall-clock runs are
+evidence, not budgets. Release CPU three-second outer drives after one warm-up: 0.794, 0.797,
+0.797, 0.797 s (mean 0.796); bundled Harbor life 0.796, 0.795, 0.799, 0.797 s (mean 0.797), both
+matching PD1's 0.79 s.
+
+The hosted browser build was reproduced in a scratch directory with `emcmake`, MinSizeRel and
+`env -i` carrying only `PATH`, `HOME`, `EMSDK` and `EM_CONFIG`; `--target web` passed with
+`web_wasm_lua=absent`. `tools/cut_release.py v0.0.24 --check` passed from a clean detached
+`origin/main` worktree (`b0f1233`) with the clean local `davve-srv` controller and reported
+"Preflight passed. No tag, release or hosting changes made."
+
+**Review fixes, 2026-11-01.** A review found that a free or course revision's union was read as a
+voyage route, so renaming such a package (new with `eaf3123`) or applying a course edit (already
+present before this package) crashed on the next tick. `commit` now passes a route only for voyage
+hosts. A course edit also never reached the session: the session now follows the active revision's
+course, and an applied edit selects that course's best file (`boat_replay_runs_select_best`) so it
+cannot overwrite another course's best. New `wake_command` and `boat_replay` cases
+pin this. `compiled_selection_guard` never matched executables on macOS because Mach-O symbols carry
+a leading underscore; it now strips it, and `compiled_selection_guard_detects` is a negative control.
+Stale compiled-content comments were corrected.
+
+Verified after these fixes, Apple Silicon/macOS, 2026-11-01: `ctest --preset quick` passed 244 tests
+and `ctest --preset full` passed all 343 enabled tests with local sockets (13 retired tests disabled,
+GPU CTests off). Removing the route check makes `wake_command` segfault. The five CPU captures above
+still match their pins. The restart's best-file selection in `wake_velocity.c` was not driven in a
+window, and local browser rooms were not rerun. On `25619cc`, Linux, macOS and Windows CI passed, and
+the manual `web-plugin.yml` workflow passed Chromium, Firefox and WebKit ([run
+41288764544](https://github.com/doomdavve/proteus/actions/runs/41288764544)).
+
+**Known limits.** GPU CTests were off. Only headless Chromium/Metal was run locally; Firefox and
+WebKit were covered by the manual CI workflow. No physical Safari/iPhone or two-machine room was
+tried. The four-client bandwidth and tick figures are one
+local wall-clock run each, not a budget or a remote-network measurement. The `--four-players`
+extra client still types the local room through the shared helper; it does not exercise the
+hosted directory.
+
+**Needs the user.** Merge, cut the release, verify the hosted room and decide whether Harbor life
+should replace Standard for `outer`. Still open from earlier packages: a two-person harbor room
+with deliberate berth and traffic contact, Harbor life and normal play on an iPhone/physical
+Safari, and a browser marina play check.
 
 ## Interactions with other tracks
 

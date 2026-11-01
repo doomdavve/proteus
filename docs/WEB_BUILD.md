@@ -528,8 +528,11 @@ optional dependency is MPL-2.0, with its own dependency licenses; default releas
 has not been extended to distribute this optional endpoint. Do not treat a local optional
 build as a qualified relocatable release package.
 
-The JS receive queue holds at most 256 events; disposable overflow drops updates and reliable
-overflow disconnects. Both adapters bound application sends at 64 KiB per channel and refuse
+The JS receive queue holds at most 256 events. Disposable overflow drops updates, and a reliable
+message arriving into a full queue drops the oldest disposable event first; only a queue with
+nothing disposable left disconnects. A hidden browser tab stops running frames and therefore
+leaves the room; returning to it reconnects from the title. Both adapters bound application sends
+at 64 KiB per channel and refuse
 messages over the protocol's 1100-byte limit. Native polling rejects excess pending accepts,
 oversize signaling/messages and excessive receive backlog. Library/kernel allocations and
 on-wire bandwidth still require measurement against the multiplayer plan's budgets.

@@ -208,6 +208,17 @@ line is unchanged (`--mode deathmatch --location river`) and now reports
 `wake_velocity_version` and run the Winterfell role at release time as described in the
 [hosting guide](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
 
+The Cutover package finishes that move for v9. Every native and browser solo session, every room
+and the server now start from a validated package; the compiled-content switch (`--no-plugins`)
+and the compiled voyage, course, race course and rule selection are gone. The shipped values live
+only in `proteus_boat_fixtures`, which validators and review tools link and production targets do
+not. Existing time-trial bests keep their `course-{calm|waves}-physicsN.run` names because the
+standard digest is pinned. The room-follow-up checks add moving authored-craft and resync contact;
+browser room checks now refuse software rendering, run every join through one local-room helper
+and map the hosted hostname away. Protocol and physics remain v9 / 9, so no wire bump is needed.
+No deployment has been made from this branch; update `wake_velocity_version` and run the
+Winterfell role at release time as usual.
+
 ## Status and verification
 
 Current release, 2026-10-30: **[v0.0.23](https://github.com/doomdavve/proteus/releases/tag/v0.0.23)**

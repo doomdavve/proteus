@@ -14,10 +14,9 @@ static Color gate_color(const BoatCourse *course, int gate)
 
 void boat_course_visit(const BoatCourse *course, BoatCourseBoxDraw draw, void *context)
 {
-    if (!course->enabled)
+    if (!course->enabled || !course->definition)
         return;
-    const BoatCourseGate *gates
-        = course->definition ? course->definition->gates : boat_course_gates;
+    const BoatCourseGate *gates = course->definition->gates;
     for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
         BoatCourseGate gate = gates[i];
         Color color = gate_color(course, i);
@@ -55,7 +54,7 @@ void boat_course_draw(const BoatCourse *course, Renderer3D *renderer)
 
 void boat_course_hud(const BoatCourse *course, Vector2 position, int width)
 {
-    if (!course->enabled)
+    if (!course->enabled || !course->definition)
         return;
     int centiseconds = (int)(course->elapsed * 100);
     DrawRectangle(8, 8, 224, 62, (Color) { 14, 23, 32, 245 });
@@ -73,8 +72,7 @@ void boat_course_hud(const BoatCourse *course, Vector2 position, int width)
         return;
     DrawRectangle(left, 8, 120, 148, (Color) { 14, 23, 32, 245 });
     boat_ui_text("S COURSE", left + 8, 14, 12, RAYWHITE);
-    const BoatCourseGate *gates
-        = course->definition ? course->definition->gates : boat_course_gates;
+    const BoatCourseGate *gates = course->definition->gates;
     for (int i = 0; i < BOAT_COURSE_GATES; ++i) {
         BoatCourseGate gate = gates[i];
         int x = left + 60 + (int)gate.centre.x;

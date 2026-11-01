@@ -85,6 +85,13 @@ target_include_directories(proteus_boat_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/
 target_link_libraries(proteus_boat_core PUBLIC raylib)
 target_compile_options(proteus_boat_core PRIVATE ${PROTEUS_WARNINGS})
 
+# Fixture data for validators and review tools: the shipped voyage, course, race course and rule
+# values that packages replace. Production targets never link this library.
+add_library(proteus_boat_fixtures STATIC tools/boat_fixtures.c tools/boat_fixtures.h)
+target_include_directories(proteus_boat_fixtures PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+target_link_libraries(proteus_boat_fixtures PUBLIC proteus_boat_core)
+target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
+
 # Scenery packs: each mapped location's whole bake (assets/geometry/<location>/scenery.bin), loaded
 # at run time for presentation. The core keeps only the compiled water, so it never reads them.
 add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h)
@@ -260,7 +267,8 @@ target_include_directories(wake_velocity PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/ge
 add_executable(boat_race_trial tools/boat_race_trial.c tools/boat_vessel_wake_gpu.c
   tools/boat_race_plugin.c tools/boat_race_plugin.h)
 target_include_directories(boat_race_trial PRIVATE ${raylib_SOURCE_DIR}/src)
-target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu proteus_plugins)
+target_link_libraries(boat_race_trial PRIVATE proteus_boat_drive proteus_gpu proteus_plugins
+  proteus_plugin_catalog)
 target_compile_options(boat_race_trial PRIVATE ${PROTEUS_WARNINGS})
 
 # Shared multiplayer codec, authority/client sessions, prediction and memory/multiplexed
@@ -341,7 +349,8 @@ endif()
 
 if(NOT EMSCRIPTEN)
   add_executable(boat_combat_review tools/boat_combat_review.c tools/wake_velocity_net.c src/boat_audio.c)
-  target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu proteus_boat_net_enet)
+  target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
+    proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
 endif()
 
@@ -349,7 +358,6 @@ endif()
 target_sources(wake_velocity PRIVATE tools/wake_velocity_plugin.c tools/wake_velocity_plugin.h
   tools/wake_command.c tools/wake_command.h tools/wake_console.c tools/wake_console.h)
 target_link_libraries(wake_velocity PRIVATE proteus_plugins proteus_plugin_catalog)
-target_compile_definitions(wake_velocity PRIVATE PROTEUS_BOAT_PLUGINS=1)
 if(NOT EMSCRIPTEN)
   target_sources(wake_velocity PRIVATE tools/wake_velocity_bridge.c tools/wake_velocity_bridge.h)
 endif()
@@ -705,15 +713,27 @@ target_link_libraries(validate_boat_plugin_catalog PRIVATE proteus_plugins prote
 target_compile_options(validate_boat_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_plugin_catalog validate_boat_plugin_catalog LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-# PD1 parity gate: bundled default captures equal the temporary compiled path byte for byte.
-add_test(NAME plugin_default_parity COMMAND ${Python3_EXECUTABLE}
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_plugin_default_parity.py
-  --game $<TARGET_FILE:wake_velocity> --root ${CMAKE_CURRENT_SOURCE_DIR})
-set_tests_properties(plugin_default_parity PROPERTIES LABELS "cpu" TIMEOUT 300)
 add_test(NAME boat_plugin_catalog_invalid COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_plugin_catalog_gen.py
   --generator $<TARGET_FILE:boat_plugin_catalog_gen>)
 set_tests_properties(boat_plugin_catalog_invalid PROPERTIES LABELS "cpu" TIMEOUT 120)
+if(NOT EMSCRIPTEN)
+  # PD5: compiled selection is gone from production sources and executables; fixtures are test-only.
+  add_test(NAME compiled_selection_guard COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compiled_selection.py
+    --source-dir ${CMAKE_CURRENT_SOURCE_DIR} --nm ${CMAKE_NM}
+    --binary $<TARGET_FILE:wake_velocity> --binary $<TARGET_FILE:boat_server>)
+  set_tests_properties(compiled_selection_guard PROPERTIES LABELS "cpu;quick" TIMEOUT 60)
+  if(CMAKE_NM AND NOT MSVC)
+    # Negative control: a validator that links the fixtures must trip the executable check.
+    add_test(NAME compiled_selection_guard_detects COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compiled_selection.py
+      --source-dir ${CMAKE_CURRENT_SOURCE_DIR} --nm ${CMAKE_NM}
+      --binary $<TARGET_FILE:validate_boat_voyage>)
+    set_tests_properties(compiled_selection_guard_detects PROPERTIES LABELS "cpu;quick" TIMEOUT 60
+      PASS_REGULAR_EXPRESSION "contains boat_fixture_voyage_outer")
+  endif()
+endif()
 # P3.3b display-free objective inspection and native checkpoint/seek review.
 add_executable(boat_plugin_review tools/boat_plugin_review.c tools/wake_velocity_plugin.c)
 target_link_libraries(boat_plugin_review PRIVATE proteus_plugins proteus_plugin_catalog proteus_boat_session)
@@ -929,6 +949,15 @@ target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus
 target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# Validators and review tools compare packages against the shipped fixture values.
+foreach(target validate_boat validate_boat_banking validate_boat_clock validate_boat_world
+    validate_boat_replay validate_boat_core validate_boat_voyage validate_boat_plugin
+    validate_boat_plugin_session validate_boat_plugin_catalog validate_boat_minimap
+    validate_boat_combat validate_boat_match validate_boat_plugin_race validate_boat_race
+    validate_boat_race_plugin validate_boat_net validate_boat_net_enet validate_boat_room_package
+    boat_race_trial boat_hud_review boat_fleet_review)
+  target_link_libraries(${target} PRIVATE proteus_boat_fixtures)
+endforeach()
 # No networked client path may read the compiled river course.
 add_test(NAME boat_room_course_source COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_room_course_source.py)
@@ -1267,7 +1296,6 @@ set(PROTEUS_SLOW_TESTS
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
   boat_scenery
   boat_river_benchmark_options boat_river_route boat_river_wave_route boat_voyage
-  plugin_default_parity
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot

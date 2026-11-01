@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "boat_fixtures.h"
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -633,11 +634,11 @@ static BoatRoomDefinition room_definition(
     snprintf(d.id, sizeof(d.id), "%s", "validator");
     snprintf(d.name, sizeof(d.name), "%s", "Validator room");
     if (mode == BOAT_ROOM_MODE_DEATHMATCH) {
-        d.match_rules = rules ? *rules : boat_match_default_rules();
-        d.combat_rules = boat_combat_default_rules();
+        d.match_rules = rules ? *rules : boat_fixture_match_default_rules;
+        d.combat_rules = boat_fixture_combat_default_rules;
     } else if (mode == BOAT_ROOM_MODE_RACE) {
-        d.course = *boat_race_river_course();
-        d.race_rules = boat_race_default_rules();
+        d.course = *(&boat_fixture_river_course);
+        d.race_rules = boat_fixture_race_default_rules;
     }
     return d;
 }
@@ -799,7 +800,7 @@ static void room_step(Room *room, double dt)
                 input = (BoatInput) { .throttle_rate
                     = boat_throttle_rate(view->state.slots[c->slot].boat.throttle, 1) };
             else if (c->race.phase >= BOAT_RACE_RACING)
-                input = boat_fleet_bot_race_input(view, boat_race_river_course(), row->gates,
+                input = boat_fleet_bot_race_input(view, (&boat_fixture_river_course), row->gates,
                     row->status != BOAT_RACE_RUNNING, c->slot);
         }
         if (room->keyboard) {
@@ -878,7 +879,7 @@ static int deferred_ready(void)
 static int combat_compact(void)
 {
     const uint64_t tick = 100000;
-    BoatCombat combat = { .enabled = true, .firing = true, .rules = boat_combat_default_rules() };
+    BoatCombat combat = { .enabled = true, .firing = true, .rules = boat_fixture_combat_default_rules };
     for (unsigned i = 0; i < BOAT_COMBAT_PLAYERS; ++i) {
         BoatCombatPlayer *p = &combat.players[i];
         p->health = combat.rules.health - (float)i;
@@ -970,7 +971,7 @@ static int combat_compact(void)
     CHECK(boat_fleet_init(&fleet, basin(),
         boat_world_test_water(basin()->definition, false, false, false), BOAT_OBJECT_LIFE_TICKS,
         1.2f));
-    boat_combat_enable(&fleet, NULL);
+    boat_combat_enable(&fleet, &boat_fixture_combat_default_rules);
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         boat_fleet_request_spawn(&fleet, i);
     BoatFleetBots bots = { 0 };
@@ -1301,7 +1302,7 @@ static bool same_match(const BoatNetClient *c, const BoatNetServer *s)
 static int deathmatch(void)
 {
     static Room room;
-    BoatMatchRules rules = boat_match_default_rules();
+    BoatMatchRules rules = boat_fixture_match_default_rules;
     rules.round_ticks = 8 * BOAT_TICK_HZ;
     rules.intermission_ticks = 2 * BOAT_TICK_HZ;
     CHECK(
@@ -1480,7 +1481,7 @@ static int prediction_release(void)
     CHECK(boat_fleet_init(&authority, river,
         boat_world_test_water(river->definition, false, false, false), BOAT_OBJECT_LIFE_TICKS,
         BOAT_OBJECT_DEFAULT_HEIGHT));
-    const BoatRaceCourse *course = boat_race_river_course();
+    const BoatRaceCourse *course = (&boat_fixture_river_course);
     for (unsigned i = 0; i < 2; ++i) {
         Boat boat;
         boat_reset(&boat);
@@ -1535,7 +1536,7 @@ static int prediction_owners(void)
     static BoatPrediction p[2];
     CHECK(boat_world_resources_init(&kept, river) && boat_world_resources_init(&released, river));
     const BoatWorldResources *owners[2] = { &kept, &released };
-    const BoatRaceCourse *course = boat_race_river_course();
+    const BoatRaceCourse *course = (&boat_fixture_river_course);
     BoatNetSlotInput inputs[BOAT_FLEET_SLOTS] = { 0 };
     for (int r = 0; r < 2; ++r) {
         CHECK(boat_fleet_init(&authority[r], owners[r], boat_water_gentle(), BOAT_OBJECT_LIFE_TICKS,
@@ -1818,7 +1819,7 @@ static int mapped_rooms(void)
 {
     static Room room;
     const int id = BOAT_LOCATION_RIVER;
-    BoatMatchRules rules = boat_match_default_rules();
+    BoatMatchRules rules = boat_fixture_match_default_rules;
     CHECK(room_open_mode(&room, 63, (BoatNetServerConfig) { .resources = test_world(id) },
         BOAT_ROOM_MODE_DEATHMATCH, &rules));
     room.predict = true;
@@ -2477,7 +2478,7 @@ static int throttle_detents(void)
 static int combat_room(void)
 {
     static Room room;
-    BoatMatchRules rules = boat_match_default_rules();
+    BoatMatchRules rules = boat_fixture_match_default_rules;
     rules.round_ticks = 20 * BOAT_TICK_HZ;
     CHECK(
         room_open_mode(&room, 61, (BoatNetServerConfig) { 0 }, BOAT_ROOM_MODE_DEATHMATCH, &rules));
@@ -2721,8 +2722,8 @@ static int room_definition_codec(void)
     };
     snprintf(race.id, sizeof(race.id), "%s", "validator.race");
     snprintf(race.name, sizeof(race.name), "%s", "Validator race");
-    race.course = *boat_race_river_course();
-    race.race_rules = boat_race_default_rules();
+    race.course = *(&boat_fixture_river_course);
+    race.race_rules = boat_fixture_race_default_rules;
     CHECK(boat_room_definition_validate(&race, &rd));
     size = boat_room_definition_encode(&race, bytes, sizeof(bytes));
     CHECK(size > 0);

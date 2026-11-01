@@ -1,4 +1,4 @@
--- The compiled S course as data. The digest matches boat_course_default, so existing personal
+-- The standard S course. The digest matches BOAT_COURSE_STANDARD_DIGEST, so existing personal
 -- bests keep their established file name.
 return {
   course = {

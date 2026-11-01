@@ -3,16 +3,6 @@
 #include <math.h>
 #include <string.h>
 
-// Northbound gates; offset centres encourage two broad turns across the basin.
-const BoatCourseGate boat_course_gates[BOAT_COURSE_GATES]
-    = { { { 0, 35 }, 12 }, { { 22, 7 }, 10 }, { { -22, -23 }, 10 }, { { 0, -53 }, 12 } };
-
-const BoatCourseDefinition boat_course_default = {
-    .start = { 0, 50 },
-    .heading = 0,
-    .gates = { { { 0, 35 }, 12 }, { { 22, 7 }, 10 }, { { -22, -23 }, 10 }, { { 0, -53 }, 12 } },
-};
-
 static void fold(uint64_t *hash, const void *bytes, size_t size)
 {
     const unsigned char *p = bytes;
@@ -34,7 +24,7 @@ static void number(uint64_t *hash, float value)
 uint64_t boat_course_digest(const BoatCourseDefinition *definition)
 {
     if (!definition)
-        definition = &boat_course_default;
+        return 0;
     uint64_t hash = 14695981039346656037ull;
     number(&hash, definition->start.x);
     number(&hash, definition->start.y);
@@ -47,16 +37,13 @@ uint64_t boat_course_digest(const BoatCourseDefinition *definition)
     return hash;
 }
 
-uint64_t boat_course_compiled_digest(void) { return boat_course_digest(&boat_course_default); }
-
 void boat_course_step(BoatCourse *course, Vector2 previous, Vector2 position, double dt)
 {
-    const BoatCourseGate *gates
-        = course->definition ? course->definition->gates : boat_course_gates;
     for (int i = 0; i < BOAT_COURSE_GATES; ++i)
         course->crossing[i] = -1;
-    if (!course->enabled || course->next_gate == BOAT_COURSE_GATES)
+    if (!course->enabled || !course->definition || course->next_gate == BOAT_COURSE_GATES)
         return;
+    const BoatCourseGate *gates = course->definition->gates;
     // Swept crossings avoid missed gates at speed. Fractions account for the portions of the
     // start/finish ticks actually spent on course, independent of the frame rate.
     double running_from = course->next_gate > 0 ? 0 : 1;

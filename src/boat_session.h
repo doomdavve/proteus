@@ -20,8 +20,8 @@ typedef struct {
     // route outside the outer location. Restarts begin it again at the start shelter.
     BoatVoyage voyage;
     BoatVoyageEvents voyage_events; // Output of the latest step or recovery.
-    // The route that init and restarts begin: the definition's compiled voyage unless the
-    // application replaced it (Lua plugin P1). Borrowed; its owner outlives every use.
+    // The route that restarts begin, set by the session's package or host. NULL for free
+    // boating and rooms. Borrowed; its owner outlives every use.
     const BoatVoyageRoute *voyage_route;
     // Recorded on course ticks while record_runs is set. A finish only updates memory; its
     // save/export waits for boat_session_flush() outside the tick loop.
@@ -31,7 +31,7 @@ typedef struct {
     // restarts keep it. Course ticks always use the speedboat, so runs and bests compare.
     const BoatHandling *handling;
     // PD1: the time trial's start and gates. Borrowed from the selected package revision and
-    // outliving the session; NULL selects the compiled course.
+    // outliving the session; NULL for no course. An enabled course requires one.
     const BoatCourseDefinition *course_definition;
 } BoatSession;
 
@@ -44,7 +44,7 @@ void boat_session_destroy(BoatSession *session);
 // Enable the course and put a reset boat and presentation at its start.
 void boat_session_start_course(BoatSession *session);
 // Select the course before boat_session_start_course(): the definition is borrowed and must
-// outlive every use. NULL restores the compiled S course.
+// outlive every use. A running course follows it; NULL leaves no course to start.
 void boat_session_set_course_definition(
     BoatSession *session, const BoatCourseDefinition *definition);
 // A new attempt in the same location: flush, reinitialize clock, WATER, boat and presentation

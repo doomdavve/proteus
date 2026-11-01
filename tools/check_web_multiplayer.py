@@ -2,17 +2,21 @@
 """Optional Playwright check against a served Wasm build and WebRTC-enabled native build."""
 from playwright.sync_api import sync_playwright
 from pathlib import Path
-import subprocess, time, socket, argparse
+import subprocess, sys, time, socket, argparse
 parser = argparse.ArgumentParser(description='Check mixed native/browser play, reset, leave and rejoin.')
 parser.add_argument('--url', default='http://127.0.0.1:8000/')
 parser.add_argument('--build-dir', type=Path, required=True)
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--four-players', action='store_true', help='Fill the room with two native and two browser clients, then reject a fifth.')
 parser.add_argument('--mode', choices=['free', 'deathmatch', 'race'], default='free')
+parser.add_argument('--server-package', help='Bundled room ID or edited package directory for the local server.')
 parser.add_argument('--executable', default='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+parser.add_argument('--angle', default='metal' if sys.platform == 'darwin' else 'swiftshader',
+                    help='Chrome ANGLE backend; software rendering cannot qualify a room.')
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 
+HOSTED = 'wake.davve.net'
 def port(kind):
     with socket.socket(socket.AF_INET, kind) as s:
         s.bind(('127.0.0.1', 0))
@@ -20,7 +24,10 @@ def port(kind):
 udp, ws = (port(socket.SOCK_DGRAM), port(socket.SOCK_STREAM))
 room_log = args.output / 'server.log'
 bot_log = args.output / 'bot.log'
-server = subprocess.Popen([str(args.build_dir.resolve() / 'boat_server'), '--bind', '127.0.0.1', '--port', str(udp), '--rtc-port', str(ws), '--no-lan', '--mode', args.mode, '--location', 'river' if args.mode == 'race' else 'basin', '--seconds', '300'], stdout=room_log.open('w'), stderr=subprocess.STDOUT)
+server_args = [str(args.build_dir.resolve() / 'boat_server'), '--bind', '127.0.0.1', '--port', str(udp), '--rtc-port', str(ws), '--no-lan', '--mode', args.mode, '--location', 'river' if args.mode == 'race' else 'basin', '--seconds', '300']
+if args.server_package:
+    server_args += ['--package', args.server_package]
+server = subprocess.Popen(server_args, stdout=room_log.open('w'), stderr=subprocess.STDOUT)
 for _ in range(100):
     if 'boat_server listening' in room_log.read_text():
         break
@@ -36,7 +43,9 @@ if args.four_players:
     bots.append(subprocess.Popen([str(args.build_dir.resolve() / 'boat_bot'), *(['--hunt'] if args.mode == 'deathmatch' else []), '--connect', f'127.0.0.1:{udp}', '--name', 'native2', '--predict', '--seconds', '300'], stdout=(args.output / 'bot2.log').open('w'), stderr=subprocess.STDOUT))
 try:
     with sync_playwright() as p:
-        b = p.chromium.launch(executable_path=args.executable, headless=True, args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
+        b = p.chromium.launch(executable_path=args.executable, headless=True, args=[
+            f'--use-angle={args.angle}', '--enable-unsafe-swiftshader',
+            f'--host-resolver-rules=MAP {HOSTED} ~NOTFOUND'])
         page = b.new_page(viewport={'width': 1280, 'height': 900})
         logs = []
         errors = []
@@ -49,28 +58,49 @@ try:
         page.click('#play')
         page.wait_for_timeout(700)
 
-        def key(k):
-            page.keyboard.press(k, delay=100)
-            page.wait_for_timeout(180)
-        def join_room():
+        def key(target, k):
+            target.keyboard.press(k, delay=100)
+            target.wait_for_timeout(180)
+
+        def join_room(target, room_logs, shot=None):
             # Always type the local room: the panel's default server is the hosted Winterfell room.
-            key('ArrowDown')
-            key('Enter')
-            key('ArrowDown')  # The join panel: SERVER, URL, CONNECT, BACK.
-            key('Enter')
+            # From the main menu, SINGLE is selected: MOVE TO MULTIPLAYER, OPEN, MOVE TO URL,
+            # EDIT; from the join panel the rows are SERVER, URL, CONNECT, BACK.
+            key(target, 'ArrowDown')
+            key(target, 'Enter')
+            key(target, 'ArrowDown')
+            key(target, 'Enter')
             for i in range(40):
-                page.keyboard.press('Backspace', delay=60)
-                page.wait_for_timeout(40)
-            page.keyboard.type(f'ws://127.0.0.1:{ws}', delay=120)
-            page.wait_for_timeout(200)
-            key('Enter')
-            page.screenshot(path=str(args.output / 'join.png'))
-            key('Enter')  # Finishing the URL moves to CONNECT.
-        join_room()
-        page.wait_for_timeout(4000)
+                target.keyboard.press('Backspace', delay=60)
+                target.wait_for_timeout(40)
+            target.keyboard.type(f'ws://127.0.0.1:{ws}', delay=120)
+            target.wait_for_timeout(200)
+            key(target, 'Enter')
+            if shot:
+                target.screenshot(path=str(args.output / shot))
+            key(target, 'Enter')  # Finishing the URL moves to CONNECT.
+            target.wait_for_timeout(4000)
+            assert not any(HOSTED in line for line in room_logs), room_logs
+
+        def frame_rate(target):
+            return target.evaluate("""async () => await new Promise(resolve => {
+                const started = performance.now(); let frames = 0;
+                function tick(now) {
+                    ++frames;
+                    if (now - started >= 1000) resolve(frames * 1000 / (now - started));
+                    else requestAnimationFrame(tick);
+                }
+                requestAnimationFrame(tick);
+            })""")
+
+        join_room(page, logs, 'join.png')
         page.screenshot(path=str(args.output / 'multiplayer.png'))
         print('RTC ERROR', page.evaluate("Module['boatRtc'].failure()"), flush=True)
         assert any(('Joined as slot' in line for line in logs)), logs
+        fps = frame_rate(page)
+        print('FRAME RATE', round(fps, 1), 'fps', flush=True)
+        if fps < 20:
+            raise SystemExit(f'too slow to qualify a room: {fps:.1f} fps (angle {args.angle})')
         extra_pages = []
         if args.four_players:
             for number in range(1):
@@ -84,26 +114,17 @@ try:
                 extra.uncheck('#fullscreen')
                 extra.click('#play')
                 extra.wait_for_timeout(500)
-                for button in ['ArrowDown', 'Enter', 'ArrowUp', 'Enter']:
-                    extra.keyboard.press(button, delay=100)
-                    extra.wait_for_timeout(180)
-                for _ in range(30):
-                    extra.keyboard.press('Backspace', delay=250)
-                    extra.wait_for_timeout(150)
-                extra.keyboard.type(f'ws://127.0.0.1:{ws}', delay=250)
-                for _ in range(2):
-                    extra.keyboard.press('Enter', delay=100)
-                    extra.wait_for_timeout(180)
-                extra.wait_for_timeout(3000)
+                join_room(extra, extra_logs)
                 assert any('Joined as slot' in line for line in extra_logs), extra_logs
-                extra_pages.append(extra)
+                assert not any(HOSTED in line for line in extra_logs), extra_logs
+                extra_pages.append((extra, extra_logs))
             rejected = subprocess.run([str(args.build_dir.resolve() / 'boat_bot'), *(['--hunt'] if args.mode == 'deathmatch' else []), '--connect', f'127.0.0.1:{udp}', '--name', 'fifth', '--seconds', '2', '--expect-reject'], capture_output=True, text=True, timeout=15)
             (args.output / 'full-room-rejected.log').write_text(rejected.stdout + rejected.stderr)
             assert rejected.returncode == 0, rejected.stdout + rejected.stderr
             assert 'players: 4' in room_log.read_text(), room_log.read_text()
             page.bring_to_front()
             page.screenshot(path=str(args.output / 'four-players.png'))
-            for extra in extra_pages:
+            for extra, extra_logs in extra_pages:
                 extra.close()
             page.bring_to_front()
             page.locator('#canvas').focus()
@@ -142,7 +163,9 @@ try:
             page.keyboard.press('e', delay=80)
             page.wait_for_timeout(300)
             page.screenshot(path=str(args.output / 'grenade-flight.png'))
-            page.keyboard.press('q')
+            page.keyboard.press('q', delay=100)
+            page.wait_for_timeout(300)
+            page.screenshot(path=str(args.output / 'grenade-press.png'))
             page.wait_for_timeout(1400)
             page.screenshot(path=str(args.output / 'grenade-burst.png'))
             counters = page.evaluate('({gun:combatCounters.gun,grenades:combatCounters.grenades.size,torpedoes:combatCounters.torpedoes.size,pages:combatCounters.pages})')
@@ -158,25 +181,25 @@ try:
             page.wait_for_timeout(1800)
         page.keyboard.up('Backspace')
         page.wait_for_timeout(1500)
-        key('Escape')
-        for _ in range(3): key('ArrowDown')
+        key(page, 'Escape')
+        for _ in range(3): key(page, 'ArrowDown')
         page.screenshot(path=str(args.output / 'menu-reset.png'))
-        key('Enter')
+        key(page, 'Enter')
         if args.mode != 'race':
             page.wait_for_function('spawnRequests === 2', timeout=6000)
         page.wait_for_timeout(1500)
-        key('Escape')
+        key(page, 'Escape')
         page.screenshot(path=str(args.output / 'menu.png'))
-        key('ArrowDown')
-        key('ArrowDown')
-        key('ArrowDown')
-        key('ArrowDown')
-        key('Enter')
+        key(page, 'ArrowDown')
+        key(page, 'ArrowDown')
+        key(page, 'ArrowDown')
+        key(page, 'ArrowDown')
+        key(page, 'Enter')
         page.wait_for_timeout(1000)
         page.screenshot(path=str(args.output / 'left.png'))
-        join_room()
+        join_room(page, logs)
         page.wait_for_timeout(3000)
-        assert not any('wake.davve.net' in line for line in logs), logs
+        assert not any(HOSTED in line for line in logs), logs
         assert sum(('Joined as slot' in line for line in logs)) == 2, logs
         assert not errors, errors
         if args.mode != 'race':

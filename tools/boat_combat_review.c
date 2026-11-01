@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "boat_fixtures.h"
 
 int main(int argc, char **argv)
 {
@@ -48,7 +49,7 @@ int main(int argc, char **argv)
     BoatFleet *f = &net.client.fleet;
     if (!boat_fleet_init(f, &resources, (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS, 1.8f))
         return 1;
-    boat_combat_enable(f, NULL);
+    boat_combat_enable(f, &boat_fixture_combat_default_rules);
     net.client.accept.mode = BOAT_NET_MODE_DEATHMATCH;
     net.client.slot = 0;
     Boat b;

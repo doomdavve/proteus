@@ -1,5 +1,5 @@
--- Today's compiled deathmatch defaults. This package adds no scene, so the room's --location
--- picks the map. The catalog equality test keeps these values equal to the native defaults.
+-- The shipped deathmatch rules. This package adds no scene, so the room's --location picks the
+-- map. The catalog equality test keeps these values equal to tools/boat_fixtures.c.
 return {
   match = {
     version = 1,

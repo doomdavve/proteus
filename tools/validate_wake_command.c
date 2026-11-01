@@ -369,6 +369,91 @@ static void test_commands(const char *executable)
     boat_world_resources_destroy(&worlds);
 }
 
+// Replace TEXT once in BYTES of CAPACITY, holding SIZE bytes.
+static void edit_bytes(char *bytes, size_t *size, size_t capacity, const char *text, const char *to)
+{
+    char *at = strstr(bytes, text);
+    CHECK(at != NULL, "edit target %s", text);
+    if (!at)
+        return;
+    size_t tail = *size - (size_t)(at - bytes) - strlen(text);
+    CHECK(*size - strlen(text) + strlen(to) < capacity, "edit fits");
+    memmove(at + strlen(to), at + strlen(text), tail + 1);
+    memcpy(at, to, strlen(to));
+    *size = *size - strlen(text) + strlen(to);
+}
+
+static void step_ticks(BoatSession *target, unsigned ticks)
+{
+    for (unsigned i = 0; i < ticks; ++i)
+        CHECK(boat_session_step(target, (BoatInput) { 0 }), "tick %u", i);
+}
+
+// A revision's record is a union selected by kind: free and course revisions hold no route, so
+// their edits must never start a voyage.
+static void test_non_voyage_revisions(void)
+{
+    static WakePlugin plugin;
+    static BoatSession session;
+    static BoatPluginFiles files;
+    BoatWorldResources worlds = { 0 };
+    const char *directories[] = { "plugins/basin-free", "plugins/time-trial" };
+    for (unsigned kind = 0; kind < 2; ++kind) {
+        const BoatWorldDefinition *location = wake_plugin_location(directories[kind]);
+        CHECK(location && boat_world_resources_init(&worlds, location), "%s", directories[kind]);
+        boat_session_init(&session, &worlds, boat_world_test_water(location, false, false, false));
+        CHECK(wake_plugin_open(&plugin, directories[kind], &session, 0), "open %s: %s",
+            directories[kind], plugin.host.diagnostic.message);
+        bool course = plugin.host.kind == BOAT_PLUGIN_KIND_COURSE;
+        CHECK(course == (kind == 1), "kind %u", plugin.host.kind);
+        if (course)
+            boat_session_start_course(&session);
+
+        files = plugin.files;
+        files.manifest[files.manifest_size] = 0;
+        files.source[files.source_size] = 0;
+        edit_bytes(files.manifest, &files.manifest_size, sizeof(files.manifest), "\"name\": \"",
+            "\"name\": \"Renamed ");
+        wake_plugin_stage_files(&plugin, &session, &files, 1);
+        CHECK(boat_plugin_host_active(&plugin.host)->number == 2, "rename applies now");
+        CHECK(!session.voyage.route && !session.voyage_route, "rename starts no voyage");
+        step_ticks(&session, 10);
+        boat_session_recover(&session);
+        step_ticks(&session, 10);
+        if (course) {
+            const BoatCourseDefinition *bound = &boat_plugin_host_active(&plugin.host)->course.course;
+            CHECK(session.course_definition == bound && session.course.definition == bound,
+                "rename follows the active revision");
+
+            edit_bytes(files.source, &files.source_size, sizeof(files.source), "half_width = 12",
+                "half_width = 13");
+            wake_plugin_stage_files(&plugin, &session, &files, 2);
+            CHECK(boat_plugin_host_held(&plugin.host), "a course edit is held");
+            CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 2), "apply restarts");
+            boat_session_restart(&session, session.world.water);
+            CHECK(session.course.enabled && session.course.definition == session.course_definition,
+                "restart keeps the course");
+            CHECK(session.course.definition->gates[0].half_width == 13, "restart uses the edit");
+            CHECK(!session.voyage.route && !session.voyage_route, "restart starts no voyage");
+            step_ticks(&session, 10);
+            CHECK(boat_course_digest(session.course_definition) != BOAT_COURSE_STANDARD_DIGEST,
+                "the edit is another course");
+
+            wake_plugin_frame(&plugin, &session, false, true, false, 3);
+            if (boat_plugin_host_held(&plugin.host))
+                CHECK(wake_plugin_frame(&plugin, &session, false, false, true, 3), "undo restarts");
+            boat_session_restart(&session, session.world.water);
+            CHECK(boat_course_digest(session.course_definition) == BOAT_COURSE_STANDARD_DIGEST,
+                "undo returns to the standard course");
+            step_ticks(&session, 10);
+        }
+        wake_plugin_close(&plugin, &session);
+        CHECK(!session.voyage.route && !session.course_definition, "close leaves no borrower");
+        boat_session_destroy(&session);
+        boat_world_resources_destroy(&worlds);
+    }
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--plugin-stage-worker"))
@@ -379,6 +464,7 @@ int main(int argc, char **argv)
     test_source();
     test_commands(argv[0]);
     test_live_scene(argv[0]);
+    test_non_voyage_revisions();
     if (failures) {
         fprintf(stderr, "%u wake_command failure(s)\n", failures);
         return 1;

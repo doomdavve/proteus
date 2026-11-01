@@ -4,59 +4,12 @@
 
 #include <math.h>
 
-// Shortened river sprint: a committed slalom, with a close middle chicane. Gates alternate
-// across the river so their openings cannot be joined by a nearly straight racing line.
-static const BoatRaceCourse RIVER = {
-    .start = { { -180, -250 }, { .786f, -.618f }, 40 },
-    .gates = { { { -72.3f, -376.6f }, { .830f, -.558f }, 18 },
-        { { 99.7f, -371.8f }, { .830f, -.558f }, 18 },
-        { { 146.2f, -535.5f }, { .830f, -.558f }, 16 },
-        { { 315.3f, -516.9f }, { .830f, -.558f }, 16 },
-        { { 375.9f, -678.0f }, { .830f, -.558f }, 18 },
-        { { 520.1f, -678.5f }, { .830f, -.558f }, 20 },
-        { { 588.5f, -767.2f }, { .767f, -.641f }, 158 } },
-    .gate_count = 7,
-    // 8 m/s down-course: passes (345,-600) at GO+45 s, meeting the pack after the chicane.
-    .storm = { .centre = { 46.2f, -399.12f },
-        .velocity = { 6.64f, -4.464f },
-        .radius = 140,
-        .height = 1.6f },
-    // 12 m behind the start line, 14 m apart across it.
-    .grid
-    = { { -202.4f, -259.1f }, { -193.8f, -248.1f }, { -185.1f, -237.1f }, { -176.5f, -226.1f } },
-    .source = { .origin = { -118.966f, -498.230f },
-        .direction = { .617822f, .786318f },
-        .started = -12,
-        .speed = 12,
-        .height = 3,
-        .duration = 24,
-        .lifetime = 40,
-        .wavelength = 8,
-        .spread = 3,
-        .half_width = 14 },
-};
-
 // Recovery candidates behind an anchor gate (ahead of it after a finish), in lateral order.
 static const float RECOVERY_BACK[] = { 25, 45 };
 static const float RECOVERY_SIDE[] = { 0, -18, 18, -36, 36, -54, 54 };
 // Parking past the finish, facing back up-course: off the finish line's centre first.
 static const float PARK_AHEAD[] = { 70, 100 };
 static const float PARK_SIDE[] = { -40, 40, -80, 80, -120, 120, 0 };
-
-BoatRaceRules boat_race_default_rules(void)
-{
-    return (BoatRaceRules) { .grid_ticks = 1 * BOAT_TICK_HZ,
-        .countdown_ticks = 3 * BOAT_TICK_HZ,
-        .results_ticks = 8 * BOAT_TICK_HZ,
-        .after_winner_ticks = 15 * BOAT_TICK_HZ,
-        .cap_ticks = 90 * BOAT_TICK_HZ,
-        .recovery_ticks = 2 * BOAT_TICK_HZ,
-        .skip_ticks = BOAT_TICK_HZ / 2,
-        .park_ticks = 2 * BOAT_TICK_HZ,
-        .min_players = 2 };
-}
-
-const BoatRaceCourse *boat_race_river_course(void) { return &RIVER; }
 
 static bool gate_valid(BoatRaceGate *gate)
 {

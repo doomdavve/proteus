@@ -6,6 +6,7 @@
 #include "boat_test_world.h"
 
 #include <stdio.h>
+#include "boat_fixtures.h"
 
 #define CHECK(test)                                                                                \
     do {                                                                                           \
@@ -21,7 +22,7 @@ static BoatMatchOutput out;
 
 static BoatMatchRules rules(void)
 {
-    BoatMatchRules r = boat_match_default_rules();
+    BoatMatchRules r = boat_fixture_match_default_rules;
     r.round_ticks = 60 * BOAT_TICK_HZ;
     return r;
 }

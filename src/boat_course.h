@@ -6,16 +6,16 @@
 #include <stdint.h>
 
 #define BOAT_COURSE_GATES 4
-// Boat position at the start of each attempt, facing the first gate.
-#define BOAT_COURSE_START ((Vector2) { 0, 50 })
+// The shipped time trial's digest. Saved bests keep the plain file name only for this course.
+#define BOAT_COURSE_STANDARD_DIGEST UINT64_C(0xa27ccadf8bd7a754)
 
 typedef struct {
     Vector2 centre;
     float half_width;
 } BoatCourseGate;
 
-// PD1: the time trial's start and gates are values bound into the session. The compiled
-// definition below remains the default and the reference for saved-run compatibility.
+// PD1: the time trial's start and gates are values bound into the session. The definition is
+// borrowed by BoatCourse; an enabled course requires one.
 typedef struct {
     Vector2 start;
     float heading;
@@ -29,16 +29,12 @@ typedef struct {
     double splits[BOAT_COURSE_GATES];
     // Crossings on the most recent simulation tick, -1 when absent.
     double crossing[BOAT_COURSE_GATES];
-    // Borrowed start/gates; NULL selects the compiled definition above.
+    // Borrowed start/gates; required whenever the course is enabled.
     const BoatCourseDefinition *definition;
 } BoatCourse;
 
-extern const BoatCourseGate boat_course_gates[BOAT_COURSE_GATES];
-extern const BoatCourseDefinition boat_course_default;
 // FNV-1a over the start, heading and every gate, with float bits least significant first.
 uint64_t boat_course_digest(const BoatCourseDefinition *definition);
-// The compiled definition's digest, for saved-run path compatibility.
-uint64_t boat_course_compiled_digest(void);
 void boat_course_step(BoatCourse *course, Vector2 previous, Vector2 position, double dt);
 
 #endif

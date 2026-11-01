@@ -360,7 +360,7 @@ bool boat_replay_best_path(
     char *path, size_t size, const char *directory, bool waves, uint64_t course_digest)
 {
     int n;
-    if (course_digest == boat_course_compiled_digest())
+    if (course_digest == BOAT_COURSE_STANDARD_DIGEST)
         n = snprintf(path, size, "%s/course-%s-physics%d.run", directory, waves ? "waves" : "calm",
             BOAT_PHYSICS_REVISION);
     else
@@ -464,6 +464,25 @@ void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatRe
     }
     runs->export_last = !runs->practice && runs->export_path != NULL;
     runs->report_finish = true;
+}
+
+bool boat_replay_runs_select_best(
+    BoatReplayRuns *runs, const char *directory, bool waves, uint64_t course_digest)
+{
+    boat_replay_destroy(&runs->best);
+    if (!boat_replay_best_path(
+            runs->best_path, sizeof(runs->best_path), directory, waves, course_digest)) {
+        runs->best_path[0] = 0;
+        return true;
+    }
+    if (!FileExists(runs->best_path))
+        return true;
+    if (!boat_replay_load(&runs->best, runs->best_path) || runs->best.waves != waves) {
+        boat_replay_destroy(&runs->best);
+        runs->notice = "Saved best is incompatible or damaged; ignored";
+        return false;
+    }
+    return true;
 }
 
 void boat_replay_runs_flush(BoatReplayRuns *runs)

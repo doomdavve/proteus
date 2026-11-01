@@ -4,6 +4,7 @@
  * at controlled speed and recovers to the last shelter; the bearing cue turns the way right
  * steering turns the boat; and an autopiloted boat from the east shore arrives at Långedrag.
  * A3.5: the exposure is calm until the boat comes within range, then grows smoothly. */
+#include "boat_fixtures.h"
 #include "boat_session.h"
 #include "boat_steering.h"
 #include "boat_throttle.h"
@@ -58,6 +59,7 @@ static Run autopilot(const BoatWorldResources *world, BoatWater water, const Vec
     Run run = { 0 };
     BoatSession session;
     boat_session_init(&session, world, water);
+    boat_session_restart_voyage(&session, &boat_fixture_voyage_outer);
     session.presentation_enabled = false;
     session.handling = handling;
     session.boat.position = sim(path[0]);
@@ -115,6 +117,7 @@ static float top_speed(const BoatWorldResources *world, BoatWater water, const B
 {
     BoatSession session;
     boat_session_init(&session, world, water);
+    boat_session_restart_voyage(&session, &boat_fixture_voyage_outer);
     session.presentation_enabled = false;
     session.handling = h;
     Vector2 hold = sim((Vector2) { -3850, -2700 });
@@ -131,10 +134,7 @@ static float top_speed(const BoatWorldResources *world, BoatWater water, const B
 int main(void)
 {
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
-    CHECK(outer->voyage == &boat_voyage_outer);
-    CHECK(
-        !boat_location(BOAT_LOCATION_RIVER)->voyage && !boat_location(BOAT_LOCATION_BASIN)->voyage);
-    const BoatVoyageRoute *route = outer->voyage;
+    const BoatVoyageRoute *route = &boat_fixture_voyage_outer;
     BoatWorldResources world;
     CHECK(boat_world_resources_init(&world, outer));
 
@@ -264,6 +264,7 @@ int main(void)
     // cue's sign is the steering direction.
     BoatSession session;
     boat_session_init(&session, &world, water);
+    boat_session_restart_voyage(&session, route);
     session.presentation_enabled = false;
     CHECK(session.voyage.route == route && session.voyage.shelter == 0);
     CHECK(session.world.water.storm.radius == 0); // Calm until the weather begins.
@@ -311,10 +312,12 @@ int main(void)
     cabin_session.handling = &boat_handling_cabin;
     boat_session_restart(&cabin_session, flat);
     CHECK(cabin_session.handling == &boat_handling_cabin);
+    boat_session_set_course_definition(&cabin_session, &boat_fixture_course_default);
     boat_session_start_course(&cabin_session);
     CHECK(cabin_session.course.enabled);
     BoatSession course_standard;
     boat_session_init(&course_standard, &world, flat);
+    boat_session_set_course_definition(&course_standard, &boat_fixture_course_default);
     boat_session_start_course(&course_standard);
     cabin_session.presentation_enabled = false;
     course_standard.presentation_enabled = false;

@@ -21,10 +21,20 @@ function installBoatRtcTransport(module) {
     events.push({ kind: 2 }); // BOAT_NET_EVENT_DISCONNECT
   }
   function reliable(channel) { return channel === 0 || channel === 4; }
+  function disposable(event) { return event.kind !== 3 || !reliable(event.channel); }
   function enqueue(event) {
     if (events.length >= limit) {
-      if (reliable(event.channel)) fail('Browser network receive queue is full.');
-      return;
+      // A stalled tab catches up behind disposable snapshots. Drop the oldest one for a reliable
+      // message instead of ending the session; reliable order is unchanged. Only a queue that is
+      // entirely reliable cannot make room.
+      const oldest = event.kind === 3 && reliable(event.channel)
+        ? events.findIndex(disposable) : -1;
+      if (oldest < 0) {
+        if (event.kind === 3 && reliable(event.channel))
+          fail('Browser network receive queue is full.');
+        return;
+      }
+      events.splice(oldest, 1);
     }
     events.push(event);
   }
