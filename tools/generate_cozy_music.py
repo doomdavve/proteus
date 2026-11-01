@@ -51,8 +51,9 @@ def acoustic(kind):
                          release_seconds=2 if kind == "pad" else .12)
 
 
-def pattern(index):
-    cells = [[event() for _ in range(CHANNELS)] for _ in range(64)]
+def pattern(index, piano_phrases=None):
+    channels = CHANNELS + 2 if piano_phrases is not None else CHANNELS
+    cells = [[event() for _ in range(channels)] for _ in range(64)]
     # Retain the original's C-major, two-bar harmonic rhythm and call/answer contour.
     chords = [(37, (53, 56, 58)), (44, (51, 56, 60)),
               (42, (53, 58, 61)), (37, (53, 56, 58)),
@@ -81,6 +82,14 @@ def pattern(index):
             if note:
                 cells[start + 4 + j * 6][0] = event(note - 12, 1, 0x2b - (j % 2) * 2,
                                                    8, 120)
+        if piano_phrases is not None:
+            # Alternate melodies replace only the piano lane; accompaniment is shared.
+            for row in range(start, start + 32):
+                cells[row][0] = event()
+            for j, (row, note) in enumerate(piano_phrases[half]):
+                # Two piano voices let neighbouring notes decay together naturally.
+                lane = 0 if j % 2 == 0 else CHANNELS
+                cells[start + row][lane] = event(note, 1, 0x27, 8, 120)
         # Occasional replies leave breathing space around the piano.
         cells[start + 14][4] = event(chord[1] + 12, 3, 0x20, 8, 158)
         if ci in (1, 3, 5, 7):
@@ -92,20 +101,24 @@ def pattern(index):
     return struct.pack("<IBHH", 9, 0, 64, len(data)) + data
 
 
-def main():
+def write_module(filename, title, pattern_fn=pattern, channels=CHANNELS):
     names = ("piano", "ukulele", "kalimba", "pad", "woodwind", "brush")
-    out = bytearray(b"Extended Module: " + fixed("A little boat - cozy", 20) + b"\x1a")
+    out = bytearray(b"Extended Module: " + fixed(title, 20) + b"\x1a")
     out += fixed("Proteus generator", 20) + struct.pack("<HI", 0x0104, 276)
-    out += struct.pack("<8H", 8, 0, CHANNELS, 8, 7, 1, 6, BPM)
+    out += struct.pack("<8H", 8, 0, channels, 8, 7, 1, 6, BPM)
     out += bytes(range(8)).ljust(256, b"\0")
     for index in range(8):
-        out += pattern(index)
+        out += pattern_fn(index)
     for name in names:
         out += instrument(name, acoustic(name))
     out += instrument("warm bass", voice("bass"))
-    path = MUSIC_DIR / "a-little-boat-cozy.xm"
+    path = MUSIC_DIR / filename
     path.write_bytes(out)
     print(f"{path}: {32 * 4 * 60 / BPM:.2f}s loop, {BPM} BPM")
+
+
+def main():
+    write_module("a-little-boat-cozy.xm", "A little boat - cozy")
 
 
 if __name__ == "__main__":
