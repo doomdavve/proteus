@@ -1,6 +1,6 @@
 # Graphics overhaul plan
 
-Status, 2026-11-01: **implementation unstarted; package preparation in progress**. The
+Status, 2026-11-01: **all eleven package briefs prepared; implementation unstarted**. The
 [execution process](#package-execution-process) defines one implementation PR per package and
 three batched human playtests. Prepared briefs include a short kickoff prompt for the next agent.
 **Next implementation: G0**, after its planning instructions are approved. Low resolution remains
@@ -229,7 +229,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Prepared | Unstarted; review pending |
 | [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Prepared | Unstarted; review pending |
 | [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | Ambient detail, cube spray and final qualification | G5b | Prepared | Unstarted; review pending |
-| G6 | Conditional backend decision spike | G1–G5 measured results exceed G0 budgets and profiling identifies a backend-limited fix | Queued in next planning PRs | Unstarted; G6 dormant |
+| [G6](#g6--conditional-backend-decision-spike) | Conditional backend decision spike | G1–G5 measured results exceed G0 budgets and profiling identifies a backend-limited fix | Prepared | Unstarted; G6 dormant |
 
 ## Implementation package briefs
 
@@ -752,6 +752,55 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G5c in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add bounded baked AO, optimize cube particles only where measured gains justify it, and complete integrated qualification. Update the plan and deliver the combined Batch C desktop/browser playtest with remaining limits stated.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G6 — Conditional backend decision spike
+
+Stage coverage: G6. **Depends on:** G1–G5 measured results exceed G0 budgets and profiling
+identifies a backend-limited fix.
+Human review: Only if opened; no routine fourth playtest.
+
+**Read first:** [G0 results](#g0--measurement-and-review-harness),
+[performance](BOATING_PERFORMANCE.md), [3D](3D.md), `src/renderer_gpu.[ch]`, [web
+guide](WEB_BUILD.md).
+
+**Tasks, in order:**
+
+1. Keep this package dormant by default. Record the failed budget, repeated trace, limiting work and
+   estimated recoverable time before proposing it. Content tuning or a shader mistake does not
+   justify a backend rewrite.
+2. If the trigger is met, consult Astra on whether a spike is justified and record the
+   recommendation and decision here. Research current primary WebGPU/wgpu-native/Dawn and browser
+   documentation at that time; this plan makes no present compatibility claim.
+3. Create an isolated minimal experiment retaining raylib input/window/audio while drawing
+   representative indexed/instanced city geometry, water targets and one cosmetic update. Prove
+   resource/surface lifetime and shader translations for the representative path; estimate remaining
+   shader port rather than porting the whole game.
+4. Measure the identified workload and startup/target memory on the same M1 Max and a real browser.
+   Compare one-backend versus WebGL2-fallback costs, platform/toolchain coverage and build/package
+   implications. Include a no-migration option.
+5. Deliver a decision report and a bounded follow-up implementation plan only if warranted. The
+   spike PR must not replace the shipping backend or quietly commit to compute culling/indirect
+   draws/particles/simulation.
+
+**Acceptance:** A recorded go/no-go recommendation is supported by the trigger evidence and
+prototype measurements, with unsupported platforms and integration limits named. Any shipping-code
+changes still pass the full suite; default backend remains unchanged. Actual backend migration
+requires a new reviewed plan.
+
+**Limits and stop conditions:** This conditional package is not required to declare G0–G5 complete
+when budgets pass. Planning its brief is not opening or implementing it.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Evaluate the G6 trigger in docs/GRAPHICS_OVERHAUL_PLAN.md. If it is unmet, report that G6 remains dormant. If met, get Astra advice and deliver one isolated backend decision-spike PR with current primary-source research and measurements; preserve the shipping backend.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
