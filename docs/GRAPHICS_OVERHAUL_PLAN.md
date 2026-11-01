@@ -738,7 +738,11 @@ widen tolerance.
   `aac4bce`, three repeats, p95: **2.10–2.14 ms**. Unpaced stress CPU stays reported as information.
 - Agent playback: WebGL2 on the M1 Max (Chrome 156, ANGLE Metal, 16 vertex attributes), river,
   4 s of driving: 17,530 instanced draws, 187,011 instances, no page errors or shader warnings, one
-  inspected frame correct. The GL error probe did not run. Native manual playback: not performed.
+  inspected frame correct. The GL error probe did not run.
+- Early user play, 2026-11-01 (M1 Max, native, outer map, 960x600, 4x SSAA, 120 Hz display): smooth,
+  and nothing looked different from before that the user could see. F3 showed 120.1 FPS, scene
+  2.3 ms mean and 3.9 ms p95. This is not Batch A acceptance, and the other maps' results were not
+  reported.
 - Next: G2a. Human review stays in Batch A after G2b.
 
 ### G2a — Geometry storage and ownership
