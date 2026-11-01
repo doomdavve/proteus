@@ -228,7 +228,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G4](#g4--shore-aware-and-far-water-character) | Shore-aware and far-water character | G3b | Prepared | Unstarted; review pending |
 | [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Prepared | Unstarted; review pending |
 | [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Prepared | Unstarted; review pending |
-| G5c | Ambient detail, cube spray and final qualification | G5b | Queued in next planning PRs | Unstarted; review pending |
+| [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | Ambient detail, cube spray and final qualification | G5b | Prepared | Unstarted; review pending |
 | G6 | Conditional backend decision spike | G1–G5 measured results exceed G0 budgets and profiling identifies a backend-limited fix | Queued in next planning PRs | Unstarted; G6 dormant |
 
 ## Implementation package briefs
@@ -701,6 +701,57 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G5b from docs/GRAPHICS_OVERHAUL_PLAN.md only when its SUNSET_PLAN prerequisites are ready. In one PR add bounded texture-backed CPU light clusters and cozy window/lamp water streaks using the shared lighting frame. Update the plan and collect Batch C evidence; do not create another sunset system.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G5c — Ambient detail, cube spray and final qualification
+
+Stage coverage: G5 part 5 and qualification. **Depends on:** G5b.
+Human review: Batch C: resolution, mood and final integrated review.
+
+**Read first:** `tools/map_pack.py`, `src/boat_scenery.[ch]`, `src/renderer_gpu.[ch]`,
+`src/boat_gpu.[ch]`, particle recipes in `src/waterfront_scene.[ch]`, [3D](3D.md),
+[testing](TESTING.md).
+
+**Tasks, in order:**
+
+1. Bake compact static ambient occlusion into presentation scenery data only. Use deterministic
+   geometry-based inputs, document units/range and avoid baking direct sun or dynamic actors. Extend
+   optional asset version/loading/fallback conventions established in G4; preserve legacy assets,
+   flat facets and authored colours.
+2. Keep existing cube foam/spray shape, emission timing and lifetimes. Profile the G1-instanced
+   particle path before moving simulation. Where justified, use bounded persistent buffers and
+   fragment/vertex or transform-feedback techniques supported by GL4.1/WebGL2; retain CPU evaluation
+   where the portable GPU path offers no measured gain. No compute dependency before G6.
+3. Provide reference comparisons for particle age/position/size/colour across emission, fast turn,
+   airborne/landing and expiry. Presentation randomness uses deterministic seeds and explicit time.
+   Keep per-view cleanup, bounds and all core/net physical states unchanged.
+4. Run the final G0 Release matrix and compare to both G0 and the preceding package. Summarize
+   cumulative CPU/GPU/memory, submissions/triangles, water cost, preset/browser fallbacks and
+   outstanding budgets. Investigate regressions rather than hiding them behind new baselines.
+5. Prepare one Batch C run covering presets/HUD, calm/storm/day/dusk river and outer, lamps/streaks,
+   AO silhouettes and cube foam in motion. Revisit Batch A LOD transitions and Batch B water to
+   catch interactions. Update the owning plan and affected guides with only actual evidence, user
+   feedback and next task.
+
+**Acceptance:** Bake/load/fallback and meaningful particle lifecycle/parity checks pass; full native
+suite and browser build/smoke pass. AO is subtle and stable, cube foam signature/lifetime survives,
+physical hashes remain exact and G0 budgets are met. Final user desktop/browser play verdict is
+recorded separately; unresolved dusk or platform checks remain explicitly open.
+
+**Limits and stop conditions:** GPU particles are an optimization to earn, not a compute rewrite
+requirement. No browser/desktop acceptance from stills alone, no release/deploy, and no
+default-resolution change without a later explicit user decision.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G5c in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add bounded baked AO, optimize cube particles only where measured gains justify it, and complete integrated qualification. Update the plan and deliver the combined Batch C desktop/browser playtest with remaining limits stated.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
