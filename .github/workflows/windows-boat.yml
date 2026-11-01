@@ -40,7 +40,7 @@ jobs:
 
       - name: Build Wake Velocity, room server and validators
         run: |
-          $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net', 'validate_boat_directory', 'validate_boat_plugin', 'validate_boat_plugin_session', 'validate_boat_plugin_state', 'boat_plugin_worker', 'validate_boat_plugin_stage', 'validate_boat_plugin_eval', 'validate_wake_bridge', 'validate_boat_plugin_race', 'validate_boat_race_plugin', 'boat_race_trial', 'boat_plugin_bench'
+          $targets = 'wake_velocity', 'boat_server', 'boat_bot', 'validate_boat', 'validate_boat_net', 'validate_boat_directory', 'validate_boat_plugin', 'validate_boat_plugin_session', 'validate_boat_plugin_state', 'boat_plugin_worker', 'validate_boat_plugin_stage', 'validate_boat_plugin_eval', 'validate_wake_bridge', 'validate_boat_plugin_race', 'validate_boat_race_plugin', 'boat_race_trial', 'boat_plugin_bench', 'boat_water_review'
           cmake --build build-win --config Release --target $targets --parallel 2>&1 |
             Tee-Object -FilePath build-win/build.log
           if ($LASTEXITCODE -ne 0) {
@@ -92,6 +92,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Plugin tools packaging failed: $LASTEXITCODE" }
           Copy-Item tools/windows/launch.bat $package
           Copy-Item tools/windows/host.bat $package
+          Copy-Item tools/windows/collect-performance.bat $package
+          Copy-Item build-win/Release/boat_water_review.exe $package
           Copy-Item tools/windows/README.txt $package
           Copy-Item build-win/_deps/raylib-src/LICENSE "$package/raylib-LICENSE.txt"
           Copy-Item build-win/_deps/raylib-src/src/external/glfw/LICENSE.md "$package/glfw-LICENSE.md"
@@ -122,6 +124,19 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Packaged plugin capture failed: $LASTEXITCODE" }
             & $exe --serve --scripted --ticks 240
             if ($LASTEXITCODE -ne 0) { throw "Relocated boat server failed: $LASTEXITCODE" }
+            # G0w packaging evidence: the graphics review fixture is CPU-only and must run from
+            # the relocated package; a software-rendered CI benchmark is not a GPU baseline.
+            $review = Join-Path (Split-Path $exe) boat_water_review.exe
+            $state = & $review --stress-state
+            if ($LASTEXITCODE -ne 0) { throw "Relocated stress fixture failed: $LASTEXITCODE" }
+            if (($state -join "`n") -notmatch 'wake_live=128') { throw "Stress fixture did not saturate its wake pool" }
+            & $review --help | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Relocated review help failed: $LASTEXITCODE" }
+            $launcher = Join-Path (Split-Path $exe) collect-performance.bat
+            if (-not (Test-Path $launcher -PathType Leaf)) { throw "Performance launcher is missing" }
+            # The Mac analyzer is stdlib-only; validate it on the same synthetic fixture here.
+            python tools/compare_performance_reports.py tools/fixtures/performance/candidate | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Performance analyzer failed: $LASTEXITCODE" }
             foreach ($fontAsset in @("m5x7.fnt", "m5x7.png", "m3x6.fnt", "m3x6.png")) {
               $fontPath = Join-Path (Split-Path $exe) "assets/fonts/$fontAsset"
               if (-not (Test-Path $fontPath -PathType Leaf)) {

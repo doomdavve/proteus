@@ -1,0 +1,32 @@
+G0 Instruments Time Profiler summary — 2026-11-01
+=================================================
+
+Machine: Apple M1 Max, macOS 26.6.2, Xcode 16.0 (17F113)
+Command: xcrun xctrace record --template 'Time Profiler' \
+  --launch -- ./build-release/boat_water_review \
+  --benchmark build-release/graphics/g0/trace-stress --aa off --waves \
+  --scenario stress --visible --pacing deadline
+Trace: build-release/graphics/g0/stress.trace (not committed; 19.1 s, exit 0)
+
+Sampled main-thread CPU after startup (percent of retained samples; startup,
+scenery decompression and process initialisation excluded):
+
+  setProgramUniformInner                     0.95 %
+  DrawMesh                                   0.70 % inclusive
+  draw_water                                 0.60 % inclusive
+  ShGetUniformLocation                       0.32 %
+  waterfront_gpu_scene_draw                  0.35 %
+  MatrixInvert                               0.32 %
+  draw_colored_mesh                          0.25 %
+  boat_flag_step                             1.12 %
+
+Driver state/uniform/texture/pipeline entry points fill the remaining leaf
+samples (gleUpdateDeferredStateGL3, GLDContextRec::updateUniformBindings,
+loadCurrentPipelinePrograms, setTexturesAndSamplersInternal and similar).
+
+Interpretation: the CPU submission path is dominated by per-draw driver state
+and uniform work, with name-based uniform lookup a measurable but smaller part.
+The stress case's total GPU time (20.0 ms p95 at 4x4) is not visible to this
+CPU profiler; the asynchronous GL_TIME_ELAPSED measurements in
+BOATING_PERFORMANCE.md own that claim. This supports caching locations,
+reducing draw count and reusing buffers before broad shader rewrites.
