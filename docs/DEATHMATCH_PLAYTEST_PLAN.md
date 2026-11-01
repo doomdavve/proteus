@@ -12,6 +12,11 @@ and boats should be able to pass above/below one another. Free-boating difficult
 open feel decision. This feedback supersedes earlier acceptance as the next tuning task,
 without invalidating the earlier recorded playtests.
 
+User report, 2026-11-01, after v0.0.24 (build and platform not stated): deathmatch "worked well",
+and contact in a two-person harbor room worked, but a boat still cannot jump over another boat. No
+step of this plan has been implemented yet, so that matches steps 4–5c rather than being a new
+finding.
+
 ## Execution contract
 
 Execute one numbered step per PR. Use a separate worktree, keep the main checkout available

@@ -10,8 +10,18 @@ contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts
 [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: the user merges the Cutover PR and cuts the next release. No implementation step
-remains in this plan; the [PD5 result](#pd5-result-2026-10-31) lists the human checks.
+Next task: the user's iPhone run, which decides whether Harbor life becomes the `outer` default;
+`outer` stays on Standard until then. Cutover merged in
+[#108](https://github.com/doomdavve/proteus/pull/108) and shipped as
+[v0.0.24](RELEASES.md#status-and-verification) on 2026-11-01, with the hosted room verified. No
+implementation step remains in this plan; the [PD5 result](#pd5-result-2026-10-31) lists the human
+checks.
+
+User play report, 2026-11-01, after the v0.0.24 release (build and platform not stated): a
+two-person harbor room with deliberate contact "worked fine", and deathmatch "worked well". The user
+still cannot jump over another boat; the
+[deathmatch playtest plan](DEATHMATCH_PLAYTEST_PLAN.md#steps-5a5c--vertical-contacts-and-crossings-during-a-tick)
+owns that.
 
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
@@ -20,7 +30,7 @@ remains in this plan; the [PD5 result](#pd5-result-2026-10-31) lists the human c
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100) |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100); round-boundary revisions deferred to v10; [follow-ups](#rooms-follow-ups) open |
 | [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Implemented 2026-10-31; merged in [#106](https://github.com/doomdavve/proteus/pull/106) |
-| [PD5](#pd5--cutover) | The room gaps a release needs are closed; the compiled selection and the off switch are gone | PD3, PD4 | Implemented 2026-10-31 on `feat/plugin-default-cutover`; ready for review |
+| [PD5](#pd5--cutover) | The room gaps a release needs are closed; the compiled selection and the off switch are gone | PD3, PD4 | Implemented 2026-10-31; merged in [#108](https://github.com/doomdavve/proteus/pull/108); released as v0.0.24 |
 
 ### Packages
 
@@ -1194,7 +1204,7 @@ hits a stop rule.
 8. **Harbor life stays a title choice** unless the user's acceptance is recorded here before you start. It has not
    been as of this writing, so do not change the default `outer` package, and say so in the PR.
 9. **Prepare the release.**
-   - Update [RELEASES.md's next-release notes](RELEASES.md#next-release-unreleased) for this package.
+   - Update [RELEASES.md's release notes](RELEASES.md#v0024-wire-and-content-changes) for this package.
    - Reproduce the hosted browser build locally in a scratch directory: the role's `emcmake` command with
      `emsdk_env.sh` sourced, then `cmake --build ... --target web` under `env -i` with only `PATH`, `HOME`, `EMSDK`
      and `EM_CONFIG`. Read `../davve-srv/ansible/roles/wake_velocity/tasks/main.yml` for the exact commands, and do
