@@ -71,6 +71,15 @@ typedef struct {
     int count;
 } WaterfrontGpuTiled;
 
+// Storage of the static map meshes of the bound map, reported by waterfront_gpu_scene_geometry.
+// Source vertices are three per triangle, what the previous unindexed storage uploaded.
+typedef struct {
+    int meshes;
+    size_t triangles, source_vertices, vertices;
+    size_t vertex_bytes, index_bytes; // Uploaded to the GPU.
+    size_t retained_cpu_bytes; // Zero unless the review-only retain_map_sources is set.
+} WaterfrontGpuGeometry;
+
 // Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one GL
 // draw: a raylib DrawMesh, or one instanced run of contiguous objects sharing a mesh; sky_quads
 // counts the batched sky quad, flushed as one more draw per pass. These are not driver-reported
@@ -143,6 +152,9 @@ typedef struct {
     bool atmosphere_enabled;
     bool reflections_enabled;
     bool culling_disabled; // Review only: draw every map tile and object in every pass.
+    bool retain_map_sources; // Review only: keep each map mesh's unindexed arrays after upload.
+    int map_upload_limit; // Review only: fail map uploads after this many meshes (0: no limit).
+    WaterfrontGpuGeometry geometry;
     bool instancing_disabled; // Review only: the scalar reference for instanced object draws.
     int instance_limit; // Review only: replay a batch sooner than its capacity (0: capacity).
     void *bounds_cache; // Private local bounds of transformed object meshes, keyed by VAO.
@@ -172,5 +184,6 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene);
 WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats);
 // Vertices across all tiles of one class.
 int waterfront_gpu_tiled_vertices(const WaterfrontGpuTiled *tiled);
+WaterfrontGpuGeometry waterfront_gpu_scene_geometry(const WaterfrontGpuScene *scene);
 
 #endif

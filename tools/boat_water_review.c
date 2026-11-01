@@ -464,6 +464,14 @@ static int check_gpu_lifecycle(void)
         resize_reference = (Image) { 0 };
         boat_gpu_destroy(&a);
     }
+    // G2a: a failed map upload leaves nothing bound, and the same view then recovers exactly.
+    EXPECT(boat_gpu_init(&a, false));
+    a.scene.map_upload_limit = 5;
+    EXPECT(!gpu_frame(&a, &sessions[1], &frame));
+    EXPECT(!a.scene.map && a.scene.geometry.meshes == 0);
+    a.scene.map_upload_limit = 0;
+    EXPECT(MATCHES(&a, 1));
+    boat_gpu_destroy(&a);
 #undef MATCHES
 #undef EXPECT
     printf("gpu_lifecycle=ok views=river-a,river-b-arcade,harbor,basin cycles=%d "
@@ -1344,6 +1352,41 @@ cleanup:
     return result;
 }
 
+// G2a: the static map storage of each location, against the unindexed storage it replaced, which
+// uploaded and also retained 36 bytes for each of three vertices per triangle.
+static int report_geometry(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Geometry report");
+    BoatGpu gpu = { 0 };
+    int result = !IsWindowReady() || !boat_gpu_init(&gpu, false);
+    const BoatLocationId locations[] = { BOAT_LOCATION_RIVER, BOAT_LOCATION_OUTER };
+    for (size_t i = 0; !result && i < sizeof(locations) / sizeof(*locations); ++i) {
+        const BoatWorldResources *resources = test_world(locations[i]);
+        BoatSession session;
+        boat_session_init(&session, resources, boat_water_gentle());
+        boat_gpu_draw(&gpu, SESSION_VIEW(&session), &session.presentation, &session.world,
+            BOAT_CAMERA_DEFAULT);
+        result = gpu.failed;
+        WaterfrontGpuGeometry geometry = waterfront_gpu_scene_geometry(&gpu.scene);
+        size_t before = geometry.source_vertices * 36;
+        size_t after = geometry.vertex_bytes + geometry.index_bytes;
+        printf("geometry location=%s meshes=%d triangles=%zu vertices=%zu source_vertices=%zu "
+               "vertex_bytes=%zu index_bytes=%zu retained_cpu_bytes=%zu before_gpu_bytes=%zu "
+               "before_cpu_bytes=%zu vertex_change=%.1f%% total_change=%.1f%%\n",
+            resources->definition->name, geometry.meshes, geometry.triangles, geometry.vertices,
+            geometry.source_vertices, geometry.vertex_bytes, geometry.index_bytes,
+            geometry.retained_cpu_bytes, before, before,
+            before ? 100.0 * ((double)geometry.vertex_bytes / (double)before - 1) : 0,
+            before ? 100.0 * ((double)after / (double)before - 1) : 0);
+        boat_session_destroy(&session);
+    }
+    boat_gpu_destroy(&gpu);
+    test_worlds_close();
+    CloseWindow();
+    return result;
+}
+
 static bool review_pose_clear(const BoatWorldResources *resources, Vector2 position)
 {
     if (resources->definition->mapped)
@@ -1455,7 +1498,7 @@ int main(int argc, char **argv)
     float tile_size = 0;
     bool no_cull = false;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
-    bool instancing = false;
+    bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
     bool stress_state_only = false;
     for (int i = 1; i < argc; ++i) {
@@ -1483,6 +1526,8 @@ int main(int argc, char **argv)
             culling = true;
         else if (strcmp(argv[i], "--check-instancing") == 0)
             instancing = true;
+        else if (strcmp(argv[i], "--geometry") == 0)
+            geometry = true;
         else if (strcmp(argv[i], "--check") == 0)
             check = true;
         else if (strcmp(argv[i], "--sequence") == 0)
@@ -1506,7 +1551,7 @@ int main(int argc, char **argv)
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
                  "       boat_water_review --check-gpu-lifecycle | --check-culling\n"
-                 "       boat_water_review --check-instancing\n"
+                 "       boat_water_review --check-instancing | --geometry\n"
                  "       boat_water_review --stress-state\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--visible] [--tile-size M] [--no-cull]\n"
@@ -1558,9 +1603,10 @@ int main(int argc, char **argv)
         && (check || output || sequence || visible || aa_name || pacing || scenario || gpu_check
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
-    if (gpu_check || gpu_views || gpu_lifecycle || culling || instancing) {
+    if (gpu_check || gpu_views || gpu_lifecycle || culling || instancing || geometry) {
         SetTraceLogLevel(LOG_WARNING);
-        return instancing   ? check_instancing()
+        return geometry     ? report_geometry()
+            : instancing    ? check_instancing()
             : culling       ? check_culling()
             : gpu_lifecycle ? check_gpu_lifecycle()
             : gpu_views     ? check_gpu_views()

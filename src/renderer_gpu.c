@@ -158,11 +158,180 @@ static Mesh builder_finish(MeshBuilder *builder)
     return mesh;
 }
 
+// Static map storage: one interleaved vertex buffer and 16-bit indices per mesh, owned by the GPU.
+// Only complete equal attribute tuples share a vertex, so flat normals, facade UVs and material
+// seams stay separate. The source arrays are released after upload; the map's own scenery, which
+// the CPU renderer, collision and minimap read, is a separate copy that this code never owns.
+typedef struct {
+    float position[3];
+    float texcoord[2];
+    float normal[3];
+    unsigned char color[4];
+} StaticVertex;
+
+// WebGL2 always treats index 65535 as primitive restart, so 65,535 vertices are addressable.
+#define STATIC_VERTEX_LIMIT 65535
+// Chunks end on this source-vertex boundary, which keeps quads and facade wall pairs together.
+#define STATIC_CHUNK_STEP 6
+// UnloadMesh reads raylib's private MAX_MESH_VERTEX_BUFFERS (9 in 6.0) slots; zero slots are
+// skipped.
+#define STATIC_MESH_VBO_SLOTS 16
+
+// DrawMesh selects its indexed draw by a non-NULL indices pointer, and reads the indices from the
+// bound VAO. This marks a mesh whose indices exist only on the GPU; unload_mesh must not free it.
+static unsigned short static_indices_on_gpu;
+
+// Set for the duration of waterfront_gpu_scene_bind, on the render thread.
+static WaterfrontGpuScene *binding_scene;
+
 static void unload_mesh(Mesh *mesh)
 {
+    if (mesh->indices == &static_indices_on_gpu)
+        mesh->indices = NULL;
     if (mesh->vaoId != 0)
         UnloadMesh(*mesh);
     *mesh = (Mesh) { 0 };
+}
+
+static StaticVertex static_vertex(const MeshBuilder *builder, int source)
+{
+    StaticVertex vertex;
+    memset(&vertex, 0, sizeof(vertex)); // Hashed and compared by bytes.
+    memcpy(vertex.position, &builder->positions[source * 3], sizeof(vertex.position));
+    memcpy(vertex.texcoord, &builder->texcoords[source * 2], sizeof(vertex.texcoord));
+    memcpy(vertex.normal, &builder->normals[source * 3], sizeof(vertex.normal));
+    memcpy(vertex.color, &builder->colors[source * 4], sizeof(vertex.color));
+    return vertex;
+}
+
+static unsigned int static_vertex_hash(const StaticVertex *vertex)
+{
+    const unsigned char *bytes = (const unsigned char *)vertex;
+    unsigned int hash = 2166136261u;
+    for (size_t i = 0; i < sizeof(*vertex); ++i)
+        hash = (hash ^ bytes[i]) * 16777619u;
+    return hash;
+}
+
+static Mesh static_mesh_upload(
+    const StaticVertex *vertices, int vertex_count, const unsigned short *indices, int index_count)
+{
+    if (binding_scene->map_upload_limit
+        && binding_scene->geometry.meshes >= binding_scene->map_upload_limit)
+        return (Mesh) { 0 };
+    Mesh mesh = { .vertexCount = index_count,
+        .triangleCount = index_count / 3,
+        .indices = &static_indices_on_gpu };
+    mesh.vboId = calloc(STATIC_MESH_VBO_SLOTS, sizeof(*mesh.vboId));
+    mesh.vaoId = mesh.vboId ? rlLoadVertexArray() : 0;
+    if (!mesh.vaoId) {
+        free(mesh.vboId);
+        return (Mesh) { 0 };
+    }
+    const int stride = (int)sizeof(StaticVertex);
+    rlEnableVertexArray(mesh.vaoId);
+    mesh.vboId[0] = rlLoadVertexBuffer(vertices, vertex_count * stride, false);
+    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, 3, RL_FLOAT, false, stride,
+        (int)offsetof(StaticVertex, position));
+    rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION);
+    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, 2, RL_FLOAT, false, stride,
+        (int)offsetof(StaticVertex, texcoord));
+    rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD);
+    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 3, RL_FLOAT, false, stride,
+        (int)offsetof(StaticVertex, normal));
+    rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL);
+    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, 4, RL_UNSIGNED_BYTE, true, stride,
+        (int)offsetof(StaticVertex, color));
+    rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR);
+    mesh.vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES]
+        = rlLoadVertexBufferElement(indices, index_count * (int)sizeof(*indices), false);
+    rlDisableVertexArray();
+    rlDisableVertexBuffer();
+    rlDisableVertexBufferElement();
+    if (!mesh.vboId[0] || !mesh.vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES]) {
+        unload_mesh(&mesh);
+        return mesh;
+    }
+    WaterfrontGpuGeometry *geometry = &binding_scene->geometry;
+    ++geometry->meshes;
+    geometry->triangles += (size_t)index_count / 3;
+    geometry->source_vertices += (size_t)index_count;
+    geometry->vertices += (size_t)vertex_count;
+    geometry->vertex_bytes += (size_t)vertex_count * sizeof(StaticVertex);
+    geometry->index_bytes += (size_t)index_count * sizeof(*indices);
+    return mesh;
+}
+
+// The review-only copy of one chunk's source range, in the unindexed layout of builder_finish.
+static bool static_mesh_retain(Mesh *mesh, const MeshBuilder *builder, int first, int count)
+{
+    mesh->vertices = malloc((size_t)count * 3 * sizeof(*mesh->vertices));
+    mesh->normals = malloc((size_t)count * 3 * sizeof(*mesh->normals));
+    mesh->texcoords = malloc((size_t)count * 2 * sizeof(*mesh->texcoords));
+    mesh->colors = malloc((size_t)count * 4 * sizeof(*mesh->colors));
+    if (!mesh->vertices || !mesh->normals || !mesh->texcoords || !mesh->colors)
+        return false;
+    memcpy(mesh->vertices, &builder->positions[first * 3], (size_t)count * 3 * sizeof(float));
+    memcpy(mesh->normals, &builder->normals[first * 3], (size_t)count * 3 * sizeof(float));
+    memcpy(mesh->texcoords, &builder->texcoords[first * 2], (size_t)count * 2 * sizeof(float));
+    memcpy(mesh->colors, &builder->colors[first * 4], (size_t)count * 4);
+    binding_scene->geometry.retained_cpu_bytes += (size_t)count * sizeof(StaticVertex);
+    return true;
+}
+
+// Uploads source vertices from FIRST, in order, until the index range is full, and sets *NEXT to
+// the first one left over. Returns a mesh with no VAO on failure.
+static Mesh builder_static_chunk(const MeshBuilder *builder, int first, int *next)
+{
+    int remaining = builder->count - first;
+    int slots = 1 << 8;
+    while (slots < 2 * STATIC_VERTEX_LIMIT && slots < 2 * remaining)
+        slots *= 2;
+    int capacity = remaining < STATIC_VERTEX_LIMIT ? remaining : STATIC_VERTEX_LIMIT;
+    StaticVertex *vertices = malloc((size_t)capacity * sizeof(*vertices));
+    unsigned short *indices = malloc((size_t)remaining * sizeof(*indices));
+    int *table = malloc((size_t)slots * sizeof(*table));
+    Mesh mesh = { 0 };
+    if (!vertices || !indices || !table)
+        goto done;
+    memset(table, 0xff, (size_t)slots * sizeof(*table));
+    int unique = 0, source = first;
+    for (; source < builder->count; ++source) {
+        if ((source - first) % STATIC_CHUNK_STEP == 0
+            && unique + STATIC_CHUNK_STEP > STATIC_VERTEX_LIMIT)
+            break;
+        StaticVertex vertex = static_vertex(builder, source);
+        unsigned int slot = static_vertex_hash(&vertex) & (unsigned int)(slots - 1);
+        while (table[slot] >= 0 && memcmp(&vertices[table[slot]], &vertex, sizeof(vertex)) != 0)
+            slot = (slot + 1) & (unsigned int)(slots - 1);
+        if (table[slot] < 0) {
+            table[slot] = unique;
+            vertices[unique++] = vertex;
+        }
+        indices[source - first] = (unsigned short)table[slot];
+    }
+    mesh = static_mesh_upload(vertices, unique, indices, source - first);
+    if (mesh.vaoId && binding_scene->retain_map_sources
+        && !static_mesh_retain(&mesh, builder, first, source - first))
+        unload_mesh(&mesh);
+    *next = source;
+done:
+    free(vertices);
+    free(indices);
+    free(table);
+    return mesh;
+}
+
+// One static mesh for a map surface that is not tiled. Its source must fit one index range.
+// Consumes the builder.
+static Mesh builder_finish_static(MeshBuilder *builder)
+{
+    int next = 0;
+    Mesh mesh = builder_static_chunk(builder, 0, &next);
+    if (mesh.vaoId && next != builder->count)
+        unload_mesh(&mesh);
+    builder_destroy(builder);
+    return mesh;
 }
 
 // Uniform locations are resolved once per shader and then by hash. These calls sit in the
@@ -292,6 +461,11 @@ static void tiled_destroy(WaterfrontGpuTiled *tiled)
     *tiled = (WaterfrontGpuTiled) { 0 };
 }
 
+WaterfrontGpuGeometry waterfront_gpu_scene_geometry(const WaterfrontGpuScene *scene)
+{
+    return scene->geometry;
+}
+
 int waterfront_gpu_tiled_vertices(const WaterfrontGpuTiled *tiled)
 {
     int count = 0;
@@ -368,19 +542,13 @@ static size_t builder_vertices(const TiledBuilder *builder)
 }
 
 // Uploads each non-empty tile with its bounds, grown slightly so that rounding never culls a
-// visible edge. Consumes the builder, also on failure.
+// visible edge. A tile too large for one index range becomes several meshes with the same bounds,
+// drawn in source order. Consumes the builder, also on failure.
 static bool tiled_builder_finish(TiledBuilder *builder, WaterfrontGpuTiled *tiled)
 {
     *tiled = (WaterfrontGpuTiled) { 0 };
-    int used = 0;
-    for (size_t i = 0; i < builder->count; ++i)
-        used += builder->tiles[i].count > 0;
+    int capacity = 0;
     bool ok = true;
-    if (used) {
-        tiled->meshes = calloc((size_t)used, sizeof(*tiled->meshes));
-        tiled->bounds = calloc((size_t)used, sizeof(*tiled->bounds));
-        ok = tiled->meshes && tiled->bounds;
-    }
     for (size_t i = 0; ok && i < builder->count; ++i) {
         MeshBuilder *tile = &builder->tiles[i];
         if (!tile->count)
@@ -393,10 +561,27 @@ static bool tiled_builder_finish(TiledBuilder *builder, WaterfrontGpuTiled *tile
             high = Vector3Max(high, p);
         }
         const Vector3 grow = { .05f, .05f, .05f };
-        tiled->bounds[tiled->count]
-            = (BoundingBox) { Vector3Subtract(low, grow), Vector3Add(high, grow) };
-        tiled->meshes[tiled->count] = builder_finish(tile);
-        ok = tiled->meshes[tiled->count++].vaoId != 0;
+        BoundingBox bounds = { Vector3Subtract(low, grow), Vector3Add(high, grow) };
+        for (int first = 0; ok && first < tile->count;) {
+            if (tiled->count == capacity) {
+                capacity = capacity ? capacity * 2 : 8;
+                Mesh *meshes = realloc(tiled->meshes, (size_t)capacity * sizeof(*meshes));
+                if (meshes)
+                    tiled->meshes = meshes;
+                BoundingBox *all = realloc(tiled->bounds, (size_t)capacity * sizeof(*all));
+                if (all)
+                    tiled->bounds = all;
+                ok = meshes && all;
+                if (!ok)
+                    break;
+            }
+            Mesh mesh = builder_static_chunk(tile, first, &first);
+            ok = mesh.vaoId != 0;
+            if (ok) {
+                tiled->meshes[tiled->count] = mesh;
+                tiled->bounds[tiled->count++] = bounds;
+            }
+        }
     }
     tiled_builder_destroy(builder);
     if (!ok)
@@ -657,7 +842,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     ok = tiled_builder_finish(&builders[CITY_SURFACE_FACADE], facades) && ok;
     ok = tiled_builder_finish(&builders[CITY_SURFACE_ROOF], roofs) && ok;
     ok = tiled_builder_finish(&builders[CITY_SURFACE_QUAY], quay) && ok;
-    *water = builder_finish(&water_builder);
+    *water = builder_finish_static(&water_builder);
     return ok && water->vaoId != 0;
 failed:
     for (size_t i = 0; i < sizeof(builders) / sizeof(builders[0]); ++i)
@@ -740,7 +925,7 @@ static bool build_crane(Mesh *mesh, const WaterfrontScenery *scenery)
         || !builder_box(&builder, crane_point(5, 75, 0), crane_point(5, 48, 0), .4f, .4f)
         || !builder_box(&builder, crane_point(2, 48, 0), crane_point(8, 48, 0), 1.5f, 1.5f))
         goto failed;
-    *mesh = builder_finish(&builder);
+    *mesh = builder_finish_static(&builder);
     return mesh->vaoId != 0;
 failed:
     builder_destroy(&builder);
@@ -916,6 +1101,7 @@ static void unbind_map(WaterfrontGpuScene *scene)
     tiled_destroy(&scene->corner);
     tiled_destroy(&scene->corner_emissive);
     unload_mesh(&scene->crane);
+    scene->geometry = (WaterfrontGpuGeometry) { 0 };
     scene->map = NULL;
     scene->river = false;
     scene->cafe_lift = 0;
@@ -928,10 +1114,13 @@ bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScener
         return false;
     if (!scenery->map)
         return true;
-    if (!build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
-            &scene->water, &scene->corner, &scene->corner_emissive)
-        || !build_windows(scenery, &scene->windows)
-        || (scenery->river && !build_crane(&scene->crane, scenery))) {
+    binding_scene = scene;
+    bool built = build_city(scenery, &scene->city, &scene->facades, &scene->roofs, &scene->quay,
+                     &scene->water, &scene->corner, &scene->corner_emissive)
+        && build_windows(scenery, &scene->windows)
+        && (!scenery->river || build_crane(&scene->crane, scenery));
+    binding_scene = NULL;
+    if (!built) {
         unbind_map(scene);
         return false;
     }
