@@ -224,7 +224,7 @@ are implementation dependencies; the eleven planning PRs are stacked in this lis
 | [G2a](#g2a--geometry-storage-and-ownership) | Geometry storage and ownership | G1 | Prepared | Unstarted; review pending |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | Distance detail and valid shadow reuse | G2a | Prepared | Unstarted; review pending |
 | [G3a](#g3a--stamped-wake-shading) | Stamped wake shading | G2b and Batch A verdict resolved | Prepared | Unstarted; review pending |
-| G3b | Foam history and cosmetic ripples | G3a | Queued in next planning PRs | Unstarted; review pending |
+| [G3b](#g3b--foam-history-and-cosmetic-ripples) | Foam history and cosmetic ripples | G3a | Prepared | Unstarted; review pending |
 | G4 | Shore-aware and far-water character | G3b | Queued in next planning PRs | Unstarted; review pending |
 | G5a | Optional high resolution and restrained HDR | G4 and Batch B verdict resolved | Queued in next planning PRs | Unstarted; review pending |
 | G5b | Clustered cozy lighting and dusk water | G5a; external sunset shared frame and fixed dusk prerequisites below | Queued in next planning PRs | Unstarted; review pending |
@@ -490,6 +490,57 @@ this package; stop afterward and report the next package and pending human batch
 
 ```text
 Implement G3a in docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Stamp bounded wake shading while retaining analytic vertex displacement and a tested fallback. Prove error/performance/hash gates, update the plan, and save moving review evidence for Batch B.
+Follow the worktree, scope, verification and documentation rules in the plan's execution process.
+Stop after this package; report the next package and pending human batch gate.
+```
+
+### G3b — Foam history and cosmetic ripples
+
+Stage coverage: G3 parts 2–3. **Depends on:** G3a.
+Human review: Batch B after G4.
+
+**Read first:** G3a field owner/shaders, `src/waterfront_scene.[ch]`, `src/waterfront_harbor.[ch]`,
+`src/waterfront_flock.[ch]`, [wake constraints](WAKE_REWRITE_PLAN.md).
+
+**Tasks, in order:**
+
+1. Add separate ping-pong foam/history and ripple state under the G3a owner. Advance on explicit
+   simulated fixed substeps with a bounded catch-up policy. Define coefficients, world spacing and
+   stable timestep together; pause must freeze it and repeated fixed-step inputs must reproduce
+   captures.
+2. Advect and decay foam with bounded presentation flow, seed it from the stamped wake and expose a
+   few named tunables. Preserve independent cube-foam emission and lifetime; a persistent white
+   carpet is a failure.
+3. Add bounded fragment-shader ripple propagation with obstacle masks for local quays/hulls. Use
+   available shoreline geometry for the initial mask; G4 enriches it. Feed existing gull contacts
+   and rain events when present, or deterministic presentation fixtures without adding a
+   weather/gameplay system. Define what hull movement displaces and prevent injected energy from
+   growing without bound.
+4. Keep ripple/foam effects in shading; analytic vertex height remains authoritative. Scroll history
+   consistently by whole texels, clear exposed strips, reset on rewind/teleport/content change and
+   isolate each view. Add deterministic pre-roll to captures; define a bounded restore/replay policy
+   rather than using wall time.
+5. Exercise straight wake, overlapping wakes, stop/turn, wake decay, quay/hull bounce, rain/gull
+   fixtures, patch seam and reset cases. Record peak field work and memory in the G0 stress suite,
+   including byte-format fallback behavior.
+
+**Acceptance:** Fixed-time replay, pause/resume, scroll/reset and stability tests pass without
+wall-clock waits. No physical hash/height changes. Memory and total water time fit G0 budgets in
+ordinary and saturated cases. Clips show the history and ripple effect and leave cube foam readable;
+web fallback is explicit and exercised.
+
+**Limits and stop conditions:** No automatic weather cycle, new gull behavior, physical collision
+ripple solver or GPU displacement. Cap sources/grid work; if the ripple budget fails, reduce its
+cosmetic resolution/extent and record it rather than borrow physics budget.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Automated implementation
+checks, agent-run playback and human acceptance: none yet. Next: satisfy dependencies, then execute
+this package; stop afterward and report the next package and pending human batch gate.
+
+**Kickoff prompt:**
+
+```text
+Implement G3b from docs/GRAPHICS_OVERHAUL_PLAN.md in one PR. Add fixed-time foam memory and cosmetic ripples with bounded sources, stable scroll/reset behavior and analytic hull height. Update the plan with automated/moving evidence for the combined Batch B review.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
