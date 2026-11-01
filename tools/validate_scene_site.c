@@ -1,32 +1,47 @@
-// L1.1 planned marina site fixture. It uses only compiled water and native hull recipes,
-// so it can check the selected coordinates before any scene grant exists.
+// Site fixture for the harbor-life Eriksberg marina. It mirrors the package layout in
+// plugins/harbor-life/main.lua so the water/shore geometry can be checked without Lua, and uses
+// the same registered hull and module recipes as staging.
 #include "boat_location.h"
 #include "boat_map.h"
-#include "boat_model.h"
+#include "boat_scene_definition.h"
 #include "boat_world.h"
+#include "waterfront_harbor.h"
 
 #include <math.h>
 #include <stdio.h>
 
-// Simulation metres: x = -east, z = north. The two berths reuse the first two compiled
-// recipes and the compiled marina's positions, so their water clearance has a long history.
+// Simulation metres: x = -east, z = north. Seven hulls lie in the finger slips of one long
+// pontoon along the east bank; the passing craft's registered loop stays north of the pontoon.
 static const struct {
-    BoatModelKind kind;
+    BoatSceneBerthRecipe recipe;
     const char *id;
     float x, z, heading;
 } berths[] = {
-    { BOAT_MODEL_SKIFF, "skiff", 13, 167, -3.14159265f / 2 },
-    { BOAT_MODEL_RUNABOUT, "runabout", 13, 173, -3.14159265f / 2 },
+    { BOAT_SCENE_BERTH_SAILBOAT_7M, "sailboat_aft", 13, 146, -3.14159265f / 2 },
+    { BOAT_SCENE_BERTH_RUNABOUT, "runabout", 13, 151, -3.14159265f / 2 },
+    { BOAT_SCENE_BERTH_SAILBOAT, "sailboat", 13, 156, -3.14159265f / 2 },
+    { BOAT_SCENE_BERTH_CRUISER, "cruiser", 13, 161, -3.14159265f / 2 },
+    { BOAT_SCENE_BERTH_SAILBOAT_7M, "sailboat_mid", 13, 166, -3.14159265f / 2 },
+    { BOAT_SCENE_BERTH_SPEEDBOAT, "speedboat", 13, 171, -3.14159265f / 2 },
+    { BOAT_SCENE_BERTH_SAILBOAT_7M, "sailboat_fore", 13, 176, -3.14159265f / 2 },
 };
 #define BERTH_COUNT (sizeof(berths) / sizeof(berths[0]))
 
-static const float pontoon_x = 20, pontoon_z = 170, pontoon_length = 14, pontoon_beam = 2.35f;
-static const float gangway_anchor_x = 34.1f, gangway_anchor_z = 170;
-// The pontoon's west-side landing in renderer coordinates is (-21, 170) at z = 170.
-static const float gangway_landing_x = 21, gangway_landing_z = 170;
-static const float entrance_x = 6, entrance_z = 168;
-// A navigable boat pose facing north into the marina, used by --start and plugin anchors.
-static const float bookmark_x = 2, bookmark_z = 170, bookmark_heading = 1.5707964f;
+static const struct {
+    BoatSceneModuleKind kind;
+    const char *id;
+    float x, z, heading, anchor_x, anchor_z;
+    const char *attaches;
+} modules[] = {
+    { BOAT_SCENE_MODULE_PONTOON, "pier", 20, 161.5f, 0, 0, 0, NULL },
+    { BOAT_SCENE_MODULE_GANGWAY, "ramp", 0, 0, 0, 34.1f, 161.5f, "pier" },
+    { BOAT_SCENE_MODULE_QUAY, "works", 38, 173, 0, 0, 0, NULL },
+};
+#define MODULE_COUNT (sizeof(modules) / sizeof(modules[0]))
+
+static const float entrance_x = 4, entrance_z = 140, entrance_width = 8;
+// A navigable boat pose facing east across the slips, used by --start and plugin anchors.
+static const float bookmark_x = 2, bookmark_z = 161, bookmark_heading = 1.5707964f;
 
 static int failures;
 
@@ -99,7 +114,7 @@ int main(void)
     const BoatMap *map = &resources.map;
     BoatModelSpec specs[BERTH_COUNT];
     for (unsigned i = 0; i < BERTH_COUNT; ++i) {
-        specs[i] = boat_model_preset(berths[i].kind);
+        specs[i] = boat_scene_berth_spec(berths[i].recipe);
         // Native contact pads 0.45 m for wave attitude and fenders, plus 0.9 m longitudinal.
         char what[96];
         snprintf(what, sizeof(what), "berth %s hull is open water", berths[i].id);
@@ -109,21 +124,49 @@ int main(void)
         snprintf(what, sizeof(what), "berth %s centre has 4 m clear water", berths[i].id);
         check(water(map, berths[i].x, berths[i].z, 4), what);
     }
-    check(!overlap(berths[0].x, berths[0].z, berths[0].heading, specs[0].length * .5f,
-              specs[0].beam * .5f, berths[1].x, berths[1].z, berths[1].heading,
-              specs[1].length * .5f, specs[1].beam * .5f, .45f),
-        "the two hull envelopes are separate");
-    check(box_water(map, pontoon_x, pontoon_z, 0, pontoon_length * .5f + .9f,
-              pontoon_beam * .5f + .45f, .5f),
-        "the small pontoon is open water");
-    check(!water(map, gangway_anchor_x, gangway_anchor_z, 0), "the gangway shore anchor is land");
-    check(water(map, gangway_landing_x, gangway_landing_z, 0),
-        "the gangway pontoon landing is water");
-    check(hypotf(gangway_anchor_x - gangway_landing_x, gangway_anchor_z - gangway_landing_z) >= 2
-            && hypotf(gangway_anchor_x - gangway_landing_x, gangway_anchor_z - gangway_landing_z)
-                <= 20,
-        "the gangway span is 2..20 m");
-    for (float z = 150; z <= 176; z += 2) {
+    for (unsigned i = 0; i < BERTH_COUNT; ++i)
+        for (unsigned j = i + 1; j < BERTH_COUNT; ++j) {
+            char what[96];
+            snprintf(
+                what, sizeof(what), "hulls %s and %s are separate", berths[i].id, berths[j].id);
+            check(!overlap(berths[i].x, berths[i].z, berths[i].heading, specs[i].length * .5f,
+                      specs[i].beam * .5f, berths[j].x, berths[j].z, berths[j].heading,
+                      specs[j].length * .5f, specs[j].beam * .5f, .45f),
+                what);
+        }
+    for (unsigned i = 0; i < MODULE_COUNT; ++i) {
+        char what[96];
+        if (modules[i].kind == BOAT_SCENE_MODULE_GANGWAY) {
+            // The landing is the pontoon's east-side attachment in simulation X/Z.
+            const float landing_x = 20 + 1.175f, landing_z = 161.5f;
+            float span = hypotf(modules[i].anchor_x - landing_x, modules[i].anchor_z - landing_z);
+            snprintf(what, sizeof(what), "gangway %s shore anchor is land", modules[i].id);
+            check(!water(map, modules[i].anchor_x, modules[i].anchor_z, 0), what);
+            snprintf(what, sizeof(what), "gangway %s landing is water", modules[i].id);
+            check(water(map, landing_x, landing_z, 0), what);
+            snprintf(what, sizeof(what), "gangway %s span is 2..20 m", modules[i].id);
+            check(span >= 2 && span <= 20, what);
+            continue;
+        }
+        WaterfrontModuleSpec spec = waterfront_harbor_module_spec(modules[i].kind);
+        snprintf(what, sizeof(what), "module %s is placed on its required surface", modules[i].id);
+        if (modules[i].kind == BOAT_SCENE_MODULE_QUAY)
+            check(!water(map, modules[i].x, modules[i].z, 0), what);
+        else
+            check(box_water(map, modules[i].x, modules[i].z, modules[i].heading,
+                      spec.length * .5f + .9f, spec.beam * .5f + .45f, .5f),
+                what);
+        for (unsigned b = 0; b < BERTH_COUNT; ++b) {
+            snprintf(what, sizeof(what), "module %s clears berth %s", modules[i].id, berths[b].id);
+            check(!overlap(modules[i].x, modules[i].z, modules[i].heading, spec.length * .5f,
+                      spec.beam * .5f, berths[b].x, berths[b].z, berths[b].heading,
+                      specs[b].length * .5f, specs[b].beam * .5f, .3f),
+                what);
+        }
+    }
+    check(water(map, entrance_x, entrance_z, entrance_width * .5f),
+        "the declared entrance has half its width clear");
+    for (float z = 132; z <= 180; z += 2) {
         char what[96];
         snprintf(what, sizeof(what), "approach lane at z %.0f is open water", z);
         check(water(map, entrance_x, z, 3), what);
@@ -147,12 +190,9 @@ int main(void)
                 berths[i].heading, specs[i].length * .5f + .9f, specs[i].beam * .5f + .45f, .5f),
             what);
     }
-    check(water(map, entrance_x, entrance_z, 4), "the declared entrance has 4 m clear water");
     boat_world_resources_destroy(&resources);
-    printf("scene_site berths=%u pontoon=%.1fx%.1f gangway=%.1fm bookmark=%.0f,%.0f "
-           "failures=%d\n",
-        (unsigned)BERTH_COUNT, pontoon_length, pontoon_beam,
-        (double)hypotf(gangway_anchor_x - gangway_landing_x, gangway_anchor_z - gangway_landing_z),
-        bookmark_x, bookmark_z, failures);
+    printf("scene_site berths=%u modules=%u bookmark=%.0f,%.0f failures=%d\n",
+        (unsigned)BERTH_COUNT, (unsigned)MODULE_COUNT, (double)bookmark_x, (double)bookmark_z,
+        failures);
     return failures ? 1 : 0;
 }

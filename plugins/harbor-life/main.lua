@@ -19,22 +19,36 @@ return {
     exposed_fraction = 0.8,
     weather_range = 2500
   },
-  -- The first editable marina slice: two moored hulls beside a small authored pontoon. The entrance
-  -- stays clear of both hulls and the approach lane runs north along x = 6.
+  -- Eriksberg marina: seven hulls in the finger slips of one long pontoon, facing the east bank.
+  -- The entrance stays clear west of the hulls and the approach lane runs north along x = 4.
+  -- The passing craft's registered loop stays north of the pontoon, so no berth occupies it.
+  -- The compiled crane/buildings and the missing floating quay/per-boat detail are documented in
+  -- README.md; they are not expressible through this scene schema yet.
   scene = {
     version = 1,
     marina = {
-      entrance = { x = 6, z = 168, width = 8 },
+      entrance = { x = 4, z = 140, width = 8 },
       berths = {
-        { id = "skiff", recipe = "skiff", x = 13, z = 167, heading = -1.5707964,
-          mooring = "pontoon" },
-        { id = "runabout", recipe = "runabout", x = 13, z = 173, heading = -1.5707964,
-          mooring = "pontoon" }
+        { id = "sailboat_aft", recipe = "sailboat_7m", x = 13, z = 146,
+          heading = -1.5707964, mooring = "pontoon" },
+        { id = "runabout", recipe = "runabout", x = 13, z = 151,
+          heading = -1.5707964, mooring = "pontoon" },
+        { id = "sailboat", recipe = "sailboat", x = 13, z = 156,
+          heading = -1.5707964, mooring = "pontoon" },
+        { id = "cruiser", recipe = "cruiser", x = 13, z = 161,
+          heading = -1.5707964, mooring = "pontoon" },
+        { id = "sailboat_mid", recipe = "sailboat_7m", x = 13, z = 166,
+          heading = -1.5707964, mooring = "pontoon" },
+        { id = "speedboat", recipe = "speedboat", x = 13, z = 171,
+          heading = -1.5707964, mooring = "pontoon" },
+        { id = "sailboat_fore", recipe = "sailboat_7m", x = 13, z = 176,
+          heading = -1.5707964, mooring = "pontoon" }
       },
       modules = {
-        { id = "pier", kind = "pontoon_small", x = 20, z = 170, heading = 0 },
-        { id = "ramp", kind = "gangway", anchor = { x = 34.1, z = 170 },
-          attaches = "pier" }
+        { id = "pier", kind = "pontoon", x = 20, z = 161.5, heading = 0 },
+        { id = "ramp", kind = "gangway", anchor = { x = 34.1, z = 161.5 },
+          attaches = "pier" },
+        { id = "works", kind = "quay", x = 38, z = 173, heading = 0 }
       }
     },
     -- A small craft loops just north of the marina every ~27 s. A present vessel list replaces

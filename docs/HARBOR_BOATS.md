@@ -95,6 +95,14 @@ land anchor and named pontoon attachment. Authored berth ropes use the nearest a
 a present empty module list disables the compiled dock furniture. The ferry and bridge remain
 independent compiled actors.
 
+Eriksberg marina layout (2026-11-01): `plugins/harbor-life` now fills all seven authored berths
+with a mostly white/cream leisure fleet in the finger slips of one 37 m pontoon, and adds shore
+equipment at `(38, 173)`. The entrance moved to `(4, 140)` so the approach lane clears the longer
+row; the passing craft's registered loop stays north of the pontoon. A fourth module slot remains
+free. The package README records what the scene API still cannot express, including the compiled
+crane/buildings, a floating quay platform, per-boat appearance, berth occupancy schedules and
+gameplay lighting.
+
 Player contacts reuse the shoreline's forgiving contact response with stationary, padded
 oriented envelopes for moored hulls, main pontoon, fingers, and gangway. Envelopes include
 fenders/outboards and allowance for gentle wave attitude; they do not simulate two moving

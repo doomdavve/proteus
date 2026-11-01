@@ -83,9 +83,9 @@ static const BoatWorldResources *outer(void)
     return &outer_world;
 }
 
-// L2.2: the two-berth package installs its layout, holds a physical edit for an explicit session
-// restart, restores it through Undo, and rejects an unsafe berth without touching the active
-// scene. The berth list is the one the physics/renderers borrow.
+// L2.2: the seven-berth package installs its layout, holds a physical edit for an explicit
+// session restart, restores it through Undo, and rejects an unsafe berth without touching the
+// active scene. The berth list is the one the physics/renderers borrow.
 static BoatPluginFiles harbor_files;
 static bool harbor_read;
 static BoatPluginBundle harbor_edit(const char *from, const char *to)
@@ -119,9 +119,9 @@ static int harbor_life_scene(void)
     s.presentation_enabled = false;
     CHECK(wake_plugin_open(&p, "plugins/harbor-life", &s, 0));
     const BoatPluginRevision *r1 = boat_plugin_host_active(&p.host);
-    CHECK(r1->voyage.has_scene && r1->voyage.scene.berth_count == 2);
+    CHECK(r1->voyage.has_scene && r1->voyage.scene.berth_count == 7);
     CHECK(s.world.scene == &r1->voyage.scene && boat_session_view(&s).scene == s.world.scene);
-    CHECK(s.world.scene->berths[1].z == 173);
+    CHECK(s.world.scene->berths[1].z == 151);
     CHECK(s.world.scene->traffic_present && s.world.scene->traffic.actor_count == 4);
     CHECK(!strcmp(s.world.scene->traffic.actors[0].id, "passing")
         && s.world.scene->traffic.actors[0].speed == 4);
@@ -135,29 +135,29 @@ static int harbor_life_scene(void)
 
     // PC: a berth edit installs live between ticks; the boat, clock and boat position carry on.
     uint64_t tick_before = s.tick;
-    BoatPluginBundle moved = harbor_edit("x = 13, z = 173", "x = 13, z = 179");
+    BoatPluginBundle moved = harbor_edit("x = 13, z = 146", "x = 13, z = 143");
     CHECK(boat_plugin_host_stage(&p.host, &moved));
     CHECK(p.host.change == BOAT_PLUGIN_LIVE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 1));
     CHECK(boat_plugin_host_active(&p.host)->number == 2 && s.tick == tick_before);
     CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
-    CHECK(s.world.scene->berths[1].z == 179);
+    CHECK(s.world.scene->berths[0].z == 143);
     CHECK(strstr(p.status, "R2 ACTIVE, live") && strstr(p.detail, "BOAT KEPT"));
 
     // Undo restores the layout live as well, with the boat kept.
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 2));
     CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.tick == tick_before);
     CHECK(s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
-    CHECK(s.world.scene->berths[1].z == 173);
+    CHECK(s.world.scene->berths[0].z == 146);
 
     // A dock-module edit follows the same live and Undo policy.
-    BoatPluginBundle moved_module = harbor_edit("x = 20, z = 170", "x = 20, z = 166");
+    BoatPluginBundle moved_module = harbor_edit("x = 20, z = 161.5", "x = 20, z = 158");
     CHECK(boat_plugin_host_stage(&p.host, &moved_module));
     CHECK(p.host.change == BOAT_PLUGIN_LIVE);
     CHECK(!wake_plugin_frame(&p, &s, false, false, false, 3));
-    CHECK(s.world.scene->module_count == 2 && s.world.scene->modules[0].z == 166);
+    CHECK(s.world.scene->module_count == 3 && s.world.scene->modules[0].z == 158);
     CHECK(!wake_plugin_frame(&p, &s, false, true, false, 4));
-    CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.world.scene->modules[0].z == 170);
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.world.scene->modules[0].z == 161.5);
 
     // A traffic timetable edit is live too: actors are evaluated at the current time.
     BoatPluginBundle moved_craft = harbor_edit(
@@ -198,10 +198,10 @@ static int harbor_life_scene(void)
 
     // An unsafe berth (ashore) is rejected and leaves the active revision and scene intact.
     unsigned active_before_bad = boat_plugin_host_active(&p.host)->number;
-    BoatPluginBundle bad = harbor_edit("x = 13, z = 173", "x = 32, z = 173");
+    BoatPluginBundle bad = harbor_edit("x = 13, z = 146", "x = 32, z = 146");
     CHECK(!boat_plugin_host_stage(&p.host, &bad));
     CHECK(p.host.diagnostic.status == BOAT_PLUGIN_SCHEMA);
-    CHECK(!strcmp(p.host.diagnostic.field, "scene.marina.berths[2]"));
+    CHECK(!strcmp(p.host.diagnostic.field, "scene.marina.berths[1]"));
     CHECK(boat_plugin_host_active(&p.host)->number == active_before_bad
         && s.world.scene == &boat_plugin_host_active(&p.host)->voyage.scene);
     boat_session_destroy(&s);
@@ -1665,7 +1665,7 @@ static int catalog_runtime(void)
     CHECK(boat_plugin_lua_states() == before);
     const BoatPluginRevision *active = boat_plugin_host_active(&p.host);
     CHECK(active->voyage.has_scene && s.world.scene == &active->voyage.scene);
-    CHECK(s.world.scene->berth_count == 2);
+    CHECK(s.world.scene->berth_count == 7);
     wake_plugin_close(&p, &s);
     CHECK(!s.world.scene);
     boat_session_destroy(&s);
@@ -1719,8 +1719,7 @@ static int default_sessions(void)
     CHECK(wake_plugin_open_catalog(&p, course_entry, &s));
     CHECK(s.course_definition == &boat_plugin_host_active(&p.host)->course.course);
     CHECK(boat_course_digest(s.course_definition) == BOAT_COURSE_STANDARD_DIGEST);
-    CHECK(!memcmp(s.course_definition, &boat_fixture_course_default,
-        sizeof(BoatCourseDefinition)));
+    CHECK(!memcmp(s.course_definition, &boat_fixture_course_default, sizeof(BoatCourseDefinition)));
     boat_session_start_course(&s);
     CHECK(Vector2Equals(s.boat.position, boat_fixture_course_default.start));
     wake_plugin_close(&p, &s);
