@@ -4,7 +4,8 @@
 
 Implemented in the isolated `web-parity` worktree, 2026-10-25: the browser enters the shared
 Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER opens PLACE (River, Basin,
-Basin trial), WAVES, SMOOTHING and START. SETTINGS remembers name, single-player boat livery,
+Basin trial), WAVES, SMOOTHING and START. (Basin trial could not start from the title in any build
+from this date until its 2026-11-01 fix: the title passed free-boating options the course rejects.) SETTINGS remembers name, single-player boat livery,
 steering, soundtrack and smoothing. The saved smoothing setting applies to single-player and
 multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
 but the browser may leave fullscreen. BACK TO TITLE returns to setup
