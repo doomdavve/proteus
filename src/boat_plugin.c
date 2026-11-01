@@ -4,6 +4,7 @@
 #include "boat_plugin_lua.h"
 #include "raymath.h"
 #include "waterfront_harbor.h"
+#include "waterfront_outer.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -539,7 +540,7 @@ static bool box_contains(Vector2 centre, Vector2 length, Vector2 beam, float hal
 static void module_box(const BoatSceneModule *m, Vector2 *length, Vector2 *beam, Vector2 *centre,
     float *half_length, float *half_beam)
 {
-    WaterfrontModuleSpec spec = waterfront_harbor_module_spec(m->kind);
+    WaterfrontModuleSpec spec = (WaterfrontModuleSpec) { m->length, m->width, m->deck_height };
     *length = (Vector2) { sinf(m->heading), -cosf(m->heading) };
     *beam = (Vector2) { cosf(m->heading), sinf(m->heading) };
     *centre = (Vector2) { m->x, m->z };
@@ -547,8 +548,30 @@ static void module_box(const BoatSceneModule *m, Vector2 *length, Vector2 *beam,
     *half_beam = spec.beam * .5f;
 }
 
-static BoatPluginStatus check_scene_modules(
-    const BoatPluginVoyage *voyage, const BoatMap *map, BoatPluginDiagnostic *d)
+static bool module_surface(const BoatMap *map, const BoatSceneModule *m)
+{
+    bool water = m->kind != BOAT_SCENE_MODULE_QUAY;
+    if (boat_map_water(map, (Vector2) { m->x, m->z }, 0) != water)
+        return false;
+    float c = cosf(m->heading), s = sinf(m->heading);
+    const Vector3 *vertices = map->description->mesh->vertices;
+    for (size_t i = 0; i < map->shore_count; ++i) {
+        Vector2 edge[2];
+        unsigned indices[2] = { map->shore[i].a, map->shore[i].b };
+        for (unsigned j = 0; j < 2; ++j) {
+            float dx = -vertices[indices[j]].x - m->x;
+            float dz = vertices[indices[j]].z - m->z;
+            edge[j] = (Vector2) { dx * c + dz * s, -dx * s + dz * c };
+        }
+        if (boat_map_polygon_near_rect(edge, 2, (Vector2) { -m->width * .5f, -m->length * .5f },
+                (Vector2) { m->width * .5f, m->length * .5f }, .05f))
+            return false;
+    }
+    return true;
+}
+
+static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
 {
     const BoatSceneDefinition *scene = &voyage->scene;
     Vector2 centre[BOAT_SCENE_MODULES], length[BOAT_SCENE_MODULES], beam[BOAT_SCENE_MODULES];
@@ -563,10 +586,11 @@ static BoatPluginStatus check_scene_modules(
             if (!target)
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "attaches to a missing pontoon");
-            Vector2 landing = { target->x + 1.175f * cosf(target->heading),
-                target->z + 1.175f * sinf(target->heading) };
+            Vector2 landing = { target->x + target->width * .5f * cosf(target->heading),
+                target->z + target->width * .5f * sinf(target->heading) };
             float span = hypotf(m->anchor_x - landing.x, m->anchor_z - landing.y);
-            if (span < BOAT_SCENE_GANGWAY_MIN_LENGTH || span > BOAT_SCENE_GANGWAY_MAX_LENGTH)
+            if (span < BOAT_SCENE_GANGWAY_MIN_LENGTH || span > BOAT_SCENE_GANGWAY_MAX_LENGTH
+                || fabsf(span - m->length) > .05f)
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "gangway span %.1f m is outside 2..20 m", span);
             if (boat_map_water(map, (Vector2) { m->anchor_x, m->anchor_z }, 0))
@@ -575,18 +599,55 @@ static BoatPluginStatus check_scene_modules(
             if (!boat_map_water(map, landing, 0))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "gangway landing is not water");
-            continue;
-        }
-        module_box(m, &length[i], &beam[i], &centre[i], &half_length[i], &half_beam[i]);
-        solid[i] = true;
-        if (m->kind == BOAT_SCENE_MODULE_QUAY) {
-            if (boat_map_water(map, centre[i], 0))
+            Vector2 delta = { m->anchor_x - landing.x, m->anchor_z - landing.y };
+            if (fabsf(delta.x * -sinf(target->heading) + delta.y * cosf(target->heading)) > .01f
+                || delta.x * cosf(target->heading) + delta.y * sinf(target->heading) <= 0)
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                    "quay module must stand on land");
-        } else if (!box_water(
-                       map, centre[i], length[i], beam[i], half_length[i], half_beam[i], .5f))
+                    "gangway must approach perpendicular to the target's shore-side edge");
+            centre[i]
+                = (Vector2) { (m->anchor_x + landing.x) * .5f, (m->anchor_z + landing.y) * .5f };
+            length[i] = (Vector2) { delta.x / span, delta.y / span };
+            beam[i] = (Vector2) { -length[i].y, length[i].x };
+            half_length[i] = span * .5f;
+            half_beam[i] = m->width * .5f;
+        } else
+            module_box(m, &length[i], &beam[i], &centre[i], &half_length[i], &half_beam[i]);
+        solid[i] = true;
+        if (box_contains(
+                centre[i], length[i], beam[i], half_length[i], half_beam[i], location->spawn, 4))
+            return diagnose(
+                d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path, "blocks spawn and restart");
+        for (unsigned j = 0; j < voyage->route.shelter_count; ++j)
+            if (box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
+                    voyage->route.shelters[j].position, 4))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "blocks a recovery shelter");
+        if (scene->entrance_present
+            && box_contains(centre[i], length[i], beam[i], half_length[i], half_beam[i],
+                (Vector2) { scene->entrance_x, scene->entrance_z }, scene->entrance_width * .5f))
             return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
-                "pontoon module is not open water of the compiled map");
+                "blocks the declared marina entrance");
+        if (m->kind != BOAT_SCENE_MODULE_GANGWAY && !module_surface(map, m))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                "module footprint crosses shore or lacks its required land/water support");
+        if (m->kind == BOAT_SCENE_MODULE_QUAY) {
+            // Outer terrain is the same compiled bilinear lattice used by presentation.
+            // Require a 30 cm cap above every sampled support point; shore coverage is exact.
+            unsigned rows = (unsigned)ceilf(m->length * 2), columns = (unsigned)ceilf(m->width * 2);
+            for (unsigned row = 0; row <= rows; ++row)
+                for (unsigned col = 0; col <= columns; ++col) {
+                    float u = m->length * ((float)row / rows - .5f);
+                    float v = m->width * ((float)col / columns - .5f);
+                    float x = m->x + length[i].x * u + beam[i].x * v;
+                    float z = m->z + length[i].y * u + beam[i].y * v;
+                    float ground = location->id == BOAT_LOCATION_OUTER
+                        ? waterfront_outer_ground(-x, z)
+                        : 3.5f;
+                    if (ground + .3f > m->deck_height + .001f)
+                        return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                            "deck must clear its land support by at least .3 m");
+                }
+        }
         for (unsigned b = 0; b < scene->berth_count; ++b) {
             const BoatSceneBerth *berth = &scene->berths[b];
             BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)berth->recipe);
@@ -606,9 +667,9 @@ static BoatPluginStatus check_scene_modules(
         float best = INFINITY;
         for (unsigned i = 0; i < scene->module_count; ++i) {
             const BoatSceneModule *m = &scene->modules[i];
-            if (m->kind != BOAT_SCENE_MODULE_PONTOON && m->kind != BOAT_SCENE_MODULE_PONTOON_SMALL)
+            if (m->kind == BOAT_SCENE_MODULE_GANGWAY || m->kind == BOAT_SCENE_MODULE_QUAY)
                 continue;
-            best = fminf(best, hypotf(berth->x - m->x, berth->z - m->z));
+            best = fminf(best, boat_scene_module_distance(m, berth->x, berth->z));
         }
         if (best > 20) {
             char path[32];
@@ -623,8 +684,16 @@ static BoatPluginStatus check_scene_modules(
                 continue;
             char path[32];
             snprintf(path, sizeof(path), "scene.marina.modules[%u]", j + 1);
-            if (box_overlap(centre[i], length[i], beam[i], half_length[i], half_beam[i], centre[j],
-                    length[j], beam[j], half_length[j], half_beam[j], .3f))
+            bool joined = !strcmp(scene->modules[j].attaches, scene->modules[i].id)
+                || !strcmp(scene->modules[i].attaches, scene->modules[j].id);
+            bool near = box_overlap(centre[i], length[i], beam[i], half_length[i], half_beam[i],
+                centre[j], length[j], beam[j], half_length[j], half_beam[j], .02f);
+            bool penetrates = box_overlap(centre[i], length[i], beam[i], half_length[i],
+                half_beam[i], centre[j], length[j], beam[j], half_length[j], half_beam[j], -.02f);
+            if (joined && !near)
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
+                    "attachment must meet its parent's boundary");
+            if (penetrates || (near && !joined))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "overlaps scene.marina.modules[%u]", i + 1);
         }
@@ -778,7 +847,7 @@ static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, voyage->manifest.entry, path,
                     "overlaps scene.marina.berths[%u] with no hull clearance", i + 1);
         }
-    if (scene->modules_present && check_scene_modules(voyage, map, d) != BOAT_PLUGIN_OK)
+    if (scene->modules_present && check_scene_modules(voyage, location, map, d) != BOAT_PLUGIN_OK)
         return d->status;
     if (check_scene_traffic(voyage, map, d) != BOAT_PLUGIN_OK)
         return d->status;

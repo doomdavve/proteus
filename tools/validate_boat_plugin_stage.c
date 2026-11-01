@@ -165,7 +165,7 @@ int main(int argc, char **argv)
     CHECK(scene_files
         && boat_plugin_read("plugins/harbor-life", NULL, scene_files, &d) == BOAT_PLUGIN_OK);
     BoatPluginBundle scene_bundle = boat_plugin_bundle(scene_files);
-    BoatPluginHost scene_host;
+    static BoatPluginHost scene_host;
     CHECK(boat_plugin_host_start(&scene_host, resources.definition, &resources.map, &scene_bundle));
     CHECK(boat_plugin_host_active(&scene_host)->voyage.has_scene);
     uint64_t scene_digest = boat_plugin_host_active(&scene_host)->voyage.scene_digest;
@@ -177,8 +177,8 @@ int main(int argc, char **argv)
     CHECK(job && completed(job, &scene_host) == 1);
     CHECK(scene_host.change == BOAT_PLUGIN_RENAMED && boat_plugin_host_held(&scene_host));
     const BoatPluginVoyage *held_scene = &boat_plugin_host_held(&scene_host)->voyage;
-    CHECK(held_scene->has_scene && held_scene->scene.version == 1);
-    CHECK(held_scene->scene.berth_count == 7 && held_scene->scene.module_count == 3);
+    CHECK(held_scene->has_scene && held_scene->scene.version == BOAT_SCENE_VERSION);
+    CHECK(held_scene->scene.berth_count == 12 && held_scene->scene.module_count == 13);
     CHECK(held_scene->scene.traffic_present && held_scene->scene.traffic.actor_count == 4);
     CHECK(!strcmp(held_scene->scene.traffic.actors[0].id, "passing"));
     CHECK(held_scene->scene.gulls_present && held_scene->scene.gulls.flock_count == 1

@@ -8,7 +8,7 @@
 #define WATERFRONT_HARBOR_BOATS 7
 #define WATERFRONT_FERRY_LINES 4
 #define WATERFRONT_HARBOR_LINES                                                                    \
-    (WATERFRONT_HARBOR_BOATS * 4 + BOAT_SCENE_MODULES * 6 + WATERFRONT_FERRY_LINES * 2)
+    (BOAT_SCENE_BERTHS * 4 + BOAT_SCENE_MODULES * 6 + WATERFRONT_FERRY_LINES * 2)
 
 typedef struct {
     char id[BOAT_SCENE_TEXT]; // Compiled IDs are for diagnostics and parity; authored IDs are
@@ -37,8 +37,8 @@ typedef struct {
 } WaterfrontModuleSpec;
 
 typedef struct {
-    Transform3D boats[WATERFRONT_HARBOR_BOATS];
-    unsigned char recipes[WATERFRONT_HARBOR_BOATS]; // Mesh recipe per drawn boat.
+    Transform3D boats[BOAT_SCENE_BERTHS];
+    unsigned char recipes[BOAT_SCENE_BERTHS]; // Mesh recipe per drawn boat.
     int berth_count;
     Transform3D ferry;
     // Compiled dock furniture (NULL/length-zero authored-module scenes use modules instead).
@@ -65,9 +65,6 @@ const Mesh3D *waterfront_harbor_recipe_mesh(unsigned recipe);
 const Mesh3D *waterfront_harbor_boat_mesh(int index); // Compiled index wrapper.
 const Mesh3D *waterfront_harbor_pontoon_mesh(void);
 const Mesh3D *waterfront_harbor_quay_mesh(void);
-// L2.3 registered module recipes.
-WaterfrontModuleSpec waterfront_harbor_module_spec(unsigned kind);
-const Mesh3D *waterfront_harbor_module_mesh(unsigned kind);
 const WaterfrontFerry *waterfront_harbor_ferry(void);
 const Mesh3D *waterfront_harbor_ferry_mesh(void);
 // Stateless shared pose/rope evaluation. Flat water stays still; waves use boat_water_query.

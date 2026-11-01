@@ -127,12 +127,14 @@ int main(void)
     BoatWorldResources resources;
     CHECK(boat_world_resources_init(&resources, location));
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
-    BoatPluginHost host;
+    static BoatPluginHost host;
+    double stage_start = now_ms();
     CHECK(boat_plugin_host_start(&host, resources.definition, &resources.map, &bundle));
+    printf("initial_stage_ms=%.3f source_bytes=%zu\n", now_ms() - stage_start, files.source_size);
     const BoatPluginRevision *active = boat_plugin_host_active(&host);
     CHECK(active->voyage.has_scene);
     const BoatSceneDefinition *scene = &active->voyage.scene;
-    CHECK(scene->berth_count == 7 && scene->module_count == 3);
+    CHECK(scene->berth_count == 12 && scene->module_count == 13);
     CHECK(scene->traffic.actor_count == 4 && scene->gulls.flock_count == 1);
 
     BoatSession session;
@@ -152,7 +154,7 @@ int main(void)
     BoatPresentation presentation = { .camera_heading = 1.5707964f };
     WaterfrontSceneFrame frame;
     boat_scene_frame(&view, &presentation, &session.world, BOAT_CAMERA_DEFAULT, &frame);
-    CHECK(frame.harbor.berth_count == 7 && frame.harbor.module_count == 3);
+    CHECK(frame.harbor.berth_count == 12 && frame.harbor.module_count == 13);
     CHECK(frame.traffic.vessel_count == 4 && frame.gull_count == 8);
     CHECK(frame.traffic.wake_count > 0);
 
@@ -189,15 +191,15 @@ int main(void)
     while (maximum.berth_count < BOAT_SCENE_BERTHS) {
         unsigned next = maximum.berth_count;
         maximum.berths[next] = maximum.berths[next % 2];
+        snprintf(maximum.berths[next].id, sizeof(maximum.berths[next].id), "b%u", next);
         maximum.berth_count = next + 1;
     }
     maximum.modules_present = true;
     maximum.module_count = BOAT_SCENE_MODULES;
-    static const unsigned char module_kinds[BOAT_SCENE_MODULES] = { BOAT_SCENE_MODULE_PONTOON,
-        BOAT_SCENE_MODULE_PONTOON_SMALL, BOAT_SCENE_MODULE_QUAY, BOAT_SCENE_MODULE_PONTOON };
     for (unsigned i = 0; i < BOAT_SCENE_MODULES; ++i) {
         maximum.modules[i] = scene->modules[i % scene->module_count];
-        maximum.modules[i].kind = module_kinds[i];
+        maximum.modules[i].kind = BOAT_SCENE_MODULE_WALKWAY;
+        maximum.modules[i].attaches[0] = 0;
         snprintf(maximum.modules[i].id, sizeof(maximum.modules[i].id), "m%u", i);
     }
     maximum.traffic.actor_count = WATERFRONT_ROUTE_ACTORS;

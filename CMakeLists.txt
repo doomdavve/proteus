@@ -1156,7 +1156,7 @@ target_compile_options(validate_harbor PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME harbor_geometry COMMAND validate_harbor)
 
-# L1.1 planned marina site: compiled-water and native hull-recipe checks before scene grants.
+# M1 marina site: shipped layout, dimension/attachment rejection and maximum-capacity checks.
 add_executable(validate_scene_site tools/validate_scene_site.c)
 add_executable(validate_harbor_life tools/validate_harbor_life.c)
 target_link_libraries(validate_harbor_life PRIVATE proteus_plugins proteus_boat_session)
@@ -1164,11 +1164,11 @@ target_compile_options(validate_harbor_life PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME harbor_life_qualification COMMAND validate_harbor_life)
 set_tests_properties(harbor_life_qualification PROPERTIES LABELS "cpu;slow"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(validate_scene_site PRIVATE proteus_boat_core)
+target_link_libraries(validate_scene_site PRIVATE proteus_plugins proteus_boat_session)
 target_compile_options(validate_scene_site PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME scene_site COMMAND validate_scene_site)
-set_tests_properties(scene_site PROPERTIES LABELS "core;cpu;quick")
+set_tests_properties(scene_site PROPERTIES LABELS "cpu;slow" WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(validate_traffic tools/validate_traffic.c)
 target_link_libraries(validate_traffic PRIVATE proteus_boat_session)
@@ -1313,7 +1313,7 @@ set(PROTEUS_SLOW_TESTS
   boat_scenery
   boat_river_benchmark_options boat_river_route boat_river_wave_route boat_voyage
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
-  waterfront_actors
+  waterfront_actors scene_site harbor_life_qualification
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_river_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
   boat_river_screenshot

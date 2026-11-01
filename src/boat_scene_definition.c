@@ -92,9 +92,23 @@ static bool unique(const BoatSceneDefinition *scene, unsigned berth, unsigned mo
         if (!strcmp(scene->berths[i].id, id))
             return fail(d, field, "repeats an existing scene ID");
     for (unsigned i = 0; i < module; ++i)
-        if (!strcmp(scene->modules[i].id, id))
+        if (!strncmp(scene->modules[i].id, id, BOAT_SCENE_TEXT))
             return fail(d, field, "repeats an existing scene ID");
     return true;
+}
+
+static bool joined_edges(const BoatSceneModule *parent, const BoatSceneModule *child)
+{
+    float angle = child->heading - parent->heading;
+    float c = fabsf(cosf(angle)), s = fabsf(sinf(angle));
+    if (fminf(c, s) > .001f)
+        return false;
+    float dx = child->x - parent->x, dz = child->z - parent->z;
+    float x = fabsf(dx * cosf(parent->heading) + dz * sinf(parent->heading));
+    float z = fabsf(-dx * sinf(parent->heading) + dz * cosf(parent->heading));
+    float w = parent->width * .5f + (child->width * c + child->length * s) * .5f;
+    float l = parent->length * .5f + (child->length * c + child->width * s) * .5f;
+    return (fabsf(x - w) <= .01f && l - z >= .25f) || (fabsf(z - l) <= .01f && w - x >= .25f);
 }
 
 bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *diagnostic)
@@ -103,11 +117,11 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
     if (!scene)
         return fail(diagnostic, "", "is missing");
     if (scene->version != BOAT_SCENE_VERSION)
-        return fail(diagnostic, "scene.version", "must be 1");
+        return fail(diagnostic, "scene.version", "must be 2");
     if (scene->berth_count > BOAT_SCENE_BERTHS)
-        return fail(diagnostic, "scene.marina.berths", "exceeds the seven-berth capacity");
+        return fail(diagnostic, "scene.marina.berths", "exceeds the 32-berth capacity");
     if (scene->module_count > BOAT_SCENE_MODULES)
-        return fail(diagnostic, "scene.marina.modules", "exceeds the four-module capacity");
+        return fail(diagnostic, "scene.marina.modules", "exceeds the 64-module capacity");
     if (!scene->berths_present && scene->berth_count)
         return fail(diagnostic, "scene.marina.berths", "is absent but has entries");
     if (!scene->modules_present && scene->module_count)
@@ -154,8 +168,7 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         if (!waterfront_route_validate(&scene->traffic, &route))
             return fail(diagnostic, route.field, route.message);
         for (unsigned i = 0; i < scene->traffic.actor_count; ++i)
-            if (scene->traffic.actors[i].retain == 0xff
-                && !(scene->traffic.actors[i].speed > 0))
+            if (scene->traffic.actors[i].retain == 0xff && !(scene->traffic.actors[i].speed > 0))
                 return fail(diagnostic, "scene.traffic.vessels",
                     "an authored craft needs a positive speed");
     }
@@ -178,15 +191,20 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         indexed(at, sizeof(at), "scene.marina.modules", i + 1, ".kind");
         if (m->kind >= BOAT_SCENE_MODULE_KINDS)
             return fail(diagnostic, at, "is not a registered module kind");
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".x");
+        indexed(at, sizeof(at), "scene.marina.modules", i + 1, ".x");
         if (!finite_in(m->x, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT))
             return fail(diagnostic, at, "must be finite within 20000 m");
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".z");
+        indexed(at, sizeof(at), "scene.marina.modules", i + 1, ".z");
         if (!finite_in(m->z, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT))
             return fail(diagnostic, at, "must be finite within 20000 m");
-        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".heading");
+        indexed(at, sizeof(at), "scene.marina.modules", i + 1, ".heading");
         if (!finite_in(m->heading, -6.28318531f, 6.28318531f))
             return fail(diagnostic, at, "must be finite within one turn");
+        if (!finite_in(m->length, .5f, 60) || !finite_in(m->width, .5f, 20)
+            || !finite_in(m->deck_height, m->kind == BOAT_SCENE_MODULE_QUAY ? 3.8f : .25f,
+                m->kind == BOAT_SCENE_MODULE_QUAY ? 8 : 2))
+            return fail(diagnostic, path,
+                "length .5..60 m, width .5..20 m, deck_height .25..2 m (quay: 3.8..8 m)");
         if (m->kind == BOAT_SCENE_MODULE_GANGWAY) {
             indexed(at, sizeof(at), "scene.marina.modules", i + 1, ".anchor");
             if (!finite_in(m->anchor_x, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT)
@@ -197,12 +215,25 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
                 || !boat_scene_identifier(m->attaches))
                 return fail(diagnostic, at, "must name a pontoon module");
             const BoatSceneModule *target = boat_scene_find_module(scene, m->attaches);
-            if (!target
-                || (target->kind != BOAT_SCENE_MODULE_PONTOON
-                    && target->kind != BOAT_SCENE_MODULE_PONTOON_SMALL))
-                return fail(diagnostic, at, "must name a pontoon or pontoon_small module");
-        } else if (m->attaches[0])
-            return fail(diagnostic, at, "is only valid for a gangway");
+            if (!target || fabsf(target->deck_height - m->deck_height) > .001f
+                || target->kind == BOAT_SCENE_MODULE_GANGWAY
+                || target->kind == BOAT_SCENE_MODULE_QUAY)
+                return fail(diagnostic, at, "must name a floating module");
+        } else if (m->attaches[0]) {
+            indexed(at, sizeof(at), "scene.marina.modules", i + 1, ".attaches");
+            if (!bounded_text(m->attaches, sizeof(m->attaches))
+                || !boat_scene_identifier(m->attaches))
+                return fail(diagnostic, at, "must name an earlier floating module");
+            const BoatSceneModule *parent = boat_scene_find_module(scene, m->attaches);
+            if (!parent || parent >= m || parent->kind == BOAT_SCENE_MODULE_QUAY
+                || parent->kind == BOAT_SCENE_MODULE_GANGWAY || m->kind == BOAT_SCENE_MODULE_QUAY
+                || fabsf(parent->deck_height - m->deck_height) > .001f)
+                return fail(
+                    diagnostic, at, "requires an earlier floating parent at the same deck height");
+            if (!joined_edges(parent, m))
+                return fail(diagnostic, at,
+                    "must share at least .25 m of boundary with its parent; joins are orthogonal");
+        }
     }
     return true;
 }
@@ -212,8 +243,7 @@ bool boat_scene_has_content(const BoatSceneDefinition *scene)
     return scene
         && (scene->berths_present || scene->modules_present || scene->entrance_present
             || scene->traffic_present || scene->gulls_present || scene->berth_count
-            || scene->module_count || scene->traffic.actor_count
-            || scene->gulls.flock_count);
+            || scene->module_count || scene->traffic.actor_count || scene->gulls.flock_count);
 }
 
 static void fold(uint64_t *hash, const void *bytes, size_t size)
@@ -278,6 +308,9 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
         value(&hash, "module.x", m->x);
         value(&hash, "module.z", m->z);
         value(&hash, "module.heading", m->heading);
+        value(&hash, "module.length", m->length);
+        value(&hash, "module.width", m->width);
+        value(&hash, "module.deck_height", m->deck_height);
         value(&hash, "module.anchor.x", m->anchor_x);
         value(&hash, "module.anchor.z", m->anchor_z);
         fold(&hash, "module.attaches", 16);
@@ -332,7 +365,7 @@ bool boat_scene_berth_recipe_from_name(const char *name, BoatSceneBerthRecipe *r
 const char *boat_scene_module_kind_name(BoatSceneModuleKind kind)
 {
     static const char *const names[BOAT_SCENE_MODULE_KINDS]
-        = { "pontoon", "pontoon_small", "gangway", "quay" };
+        = { "walkway", "platform", "gangway", "quay_deck", "finger_pier" };
     return kind < BOAT_SCENE_MODULE_KINDS ? names[kind] : "unknown";
 }
 
@@ -387,6 +420,14 @@ BoatModelSpec boat_scene_berth_spec(BoatSceneBerthRecipe recipe)
     return spec;
 }
 
+float boat_scene_module_distance(const BoatSceneModule *m, float x, float z)
+{
+    float dx = x - m->x, dz = z - m->z;
+    float c = cosf(m->heading), s = sinf(m->heading);
+    return hypotf(fmaxf(0, fabsf(dx * c + dz * s) - m->width * .5f),
+        fmaxf(0, fabsf(-dx * s + dz * c) - m->length * .5f));
+}
+
 const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, const char *id)
 {
     if (!scene || !id)
@@ -402,7 +443,7 @@ const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, 
     if (!scene || !id)
         return NULL;
     for (unsigned i = 0; i < scene->module_count; ++i)
-        if (!strcmp(scene->modules[i].id, id))
+        if (!strncmp(scene->modules[i].id, id, BOAT_SCENE_TEXT))
             return &scene->modules[i];
     return NULL;
 }

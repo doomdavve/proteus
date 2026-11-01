@@ -12,10 +12,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BOAT_SCENE_VERSION 1
+#define BOAT_SCENE_VERSION 2
 #define BOAT_SCENE_TEXT 24 // ID and attachment capacity, including the terminator.
-#define BOAT_SCENE_BERTHS 7
-#define BOAT_SCENE_MODULES 4
+#define BOAT_SCENE_BERTHS 32
+#define BOAT_SCENE_MODULES 64
 #define BOAT_SCENE_HALF_EXTENT 20000.0f
 #define BOAT_SCENE_ENTRANCE_MIN_WIDTH 4.0f
 #define BOAT_SCENE_ENTRANCE_MAX_WIDTH 40.0f
@@ -34,10 +34,11 @@ typedef enum {
 } BoatSceneBerthRecipe;
 
 typedef enum {
-    BOAT_SCENE_MODULE_PONTOON,
-    BOAT_SCENE_MODULE_PONTOON_SMALL,
+    BOAT_SCENE_MODULE_WALKWAY,
+    BOAT_SCENE_MODULE_PLATFORM,
     BOAT_SCENE_MODULE_GANGWAY,
     BOAT_SCENE_MODULE_QUAY,
+    BOAT_SCENE_MODULE_FINGER,
     BOAT_SCENE_MODULE_KINDS
 } BoatSceneModuleKind;
 
@@ -58,10 +59,11 @@ typedef struct {
 typedef struct {
     char id[BOAT_SCENE_TEXT];
     unsigned char kind; // BoatSceneModuleKind
-    float x, z; // Pontoon/quay centre in simulation metres; gangway shore anchor.
+    float x, z; // Piece centre in simulation metres; gangway shore anchor.
     float heading;
+    float length, width, deck_height; // Metres; top above calm water (quay: world Y).
     float anchor_x, anchor_z; // Gangway shore anchor in simulation metres.
-    char attaches[BOAT_SCENE_TEXT]; // Gangway target pontoon ID.
+    char attaches[BOAT_SCENE_TEXT]; // Gangway target or earlier floating parent; edge-to-edge join.
 } BoatSceneModule;
 
 // A present subsystem replaces its whole compiled collection. An absent one keeps the compiled
@@ -108,6 +110,9 @@ bool boat_scene_mooring_from_name(const char *name, BoatSceneMooring *mooring);
 // Registered native hull recipe. No authored dimensions or vertices.
 BoatModelSpec boat_scene_berth_spec(BoatSceneBerthRecipe recipe);
 BoatModelKind boat_scene_berth_kind(BoatSceneBerthRecipe recipe);
+
+// Distance in simulation metres to a non-gangway module footprint.
+float boat_scene_module_distance(const BoatSceneModule *module, float x, float z);
 
 const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, const char *id);
 const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, const char *id);

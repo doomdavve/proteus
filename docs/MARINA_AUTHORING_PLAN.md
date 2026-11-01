@@ -1,11 +1,11 @@
 # Marina authoring expansion
 
-Status, 2026-11-01: **planned; implementation has not started.** This plan records the
+Status, 2026-11-01: **M1 implemented; M2 appearance is next.** This plan records the
 user's decisions after reviewing the gaps in [PR #131](https://github.com/doomdavve/proteus/pull/131).
 It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
 
-Completed task: scope and five-step execution plan written. Next task: **M1 structures**.
+Completed task: **M1 structures and capacity**. Next task: **M2 boat appearance**.
 Verification evidence and limitations are recorded below; agreeing to features is not visual
 or gameplay acceptance of an implementation.
 
@@ -33,8 +33,8 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 
 | Step | Result | Depends on | Status |
 | --- | --- | --- | --- |
-| M1 | Configurable marina structures and tested larger capacities | Merged #131 | Planned; next |
-| M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Planned |
+| M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
+| M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Planned; next |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Planned |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
@@ -219,3 +219,87 @@ documentation-only change. Windows/Linux/browser builds and GPU tests were not r
 Known limitations: proposed fields, exact budgets and module syntax are not yet an API.
 The implementation must choose and document these within the agreed scope. Performance,
 CPU/GPU appearance, docking quality and cross-platform behavior remain unverified.
+
+
+## M1 implementation — 2026-11-01
+
+Implemented scene v2 with dimensioned `walkway`, `finger_pier`, `platform`, `quay_deck` and
+`gangway` pieces. Length .5–60 m, width .5–20 m and floating deck top .25–2 m are finite metres;
+fixed quay tops are world Y=3.8–8 m. A gangway declares its 2–20 m horizontal span and landing
+height; position/heading derive from its land anchor and named shore-side midpoint. The
+[API](PLUGIN_API.md#scene-schema-v2) owns the full contract.
+
+Floating pieces anchor their X/Z and share their root's wave heave, staying level for exact
+joins. An optional earlier floating parent defines an orthogonal boundary join with ≥.25 m
+shared edge and equal deck height; cycles, detachment and penetration reject. Gangways keep
+the shore end fixed on actual compiled terrain. Fixed quay footprints require land throughout,
+with a .3 m cap above sampled terrain. Shoreline-segment/rectangle tests catch thin shore
+intrusions. Hulls, structures, the declared entrance width and spawn/recovery areas retain
+clearance. Contacts and camera exclusions use authored footprints; conservative vertical
+camera bounds include wave excursion. Berth ropes use the nearest floating footprint.
+
+Both bundled marinas now have twelve hulls in two rows and thirteen structures: two walkways,
+eight independent fingers, a platform, a fixed quay deck and a shore gangway. `harbor-race`
+also migrates. Existing ferry dwell, schooner/bridge coordination and gulls remain. Source
+bundles, discovery, schemas, native workers/catalog and the browser stage wire use the same
+contract. Removed `pontoon`, `pontoon_small` and `quay` module spellings reject. Staging PST8,
+room definition v2 and multiplayer v10 reject old content/pairs; no hosting deployment is
+part of this change.
+
+Capacity audit: 32 berths, 64 modules, 520 line transforms; the seven compiled hulls and seven
+recipe mesh slots stay separate from authored capacity. Unit-box instances add no per-piece
+mesh owner. `BoatSceneDefinition` grows 7,944 → 14,032 bytes; `WaterfrontHarborFrame` grows
+2,740 → 22,624 bytes. Ten retained host slots grow 743,272 → 804,152 bytes (+60,880). The stage
+job's existing ≤80 KiB assertion still passes and its source+32 KiB response buffer is unchanged.
+The production game owner and catalog/staging allocations remain static/heap-owned. Validator
+revision hosts now use static storage so their extra 60 KiB does not consume the native stack;
+individual scene copies are 14 KiB and shared harbor frames 22 KiB. The existing Wasm game/worker
+1 MiB stacks and Node catalog 8 MiB stack remain unchanged.
+The maximum room fixture uses 23-character berth/module IDs and 63 gangway references; its
+8,840-byte definition fits the 16,384-byte cap in nine pages. A placed 32/64 fjord fixture
+validates alongside the shipped traffic; a separate runtime rope stress uses 514/520 segments.
+The CPU stress renders all berth/module slots plus eight craft and 32 birds. These are fixed
+bounds, not dynamic growth or a new allocation/cache system.
+
+Cost experiment, macOS/Apple Silicon, Debug, 320×200 CPU, `outer.marina` camera, 180 virtual
+frames per sample, same harness in parent `1e92637` and this worktree:
+
+| Scene | Parent CPU p50 / p95 | M1 CPU p50 / p95 |
+| --- | --- | --- |
+| Compiled control | 9.429 / 9.799 ms | 9.460 / 9.739 ms |
+| Bundled marina (7/3 → 12/13 berths/modules) | 9.843 / 10.129 ms | 9.762 / 10.139 ms |
+| Full slot render stress (7/4 → 32/64, eight craft, 32 birds) | 11.468 / 11.799 ms | 12.316 / 12.771 ms |
+
+One initial native host-stage sample was 797.400 ms parent / 811.988 ms M1 (4,383 / 6,820
+source bytes). Most staging cost remains the existing 4,160 s traffic timetable proof. These
+are local observations, not cross-platform targets or timing assertions. The larger stress
+adds about 1 ms at p95; the normal package stays within observed run variation. M1's populated
+scene reports 53 hull/module/bird mesh instances, 37 lights and 48 wakes; the stress has 200
+such mesh instances before lines/scenery. Authored modules share the existing unit box (12
+triangles each, 768 at capacity), without per-instance CPU/GPU mesh uploads.
+
+Verification, 2026-11-01, Apple Silicon/macOS, Debug with `PROTEUS_GPU_TESTS=ON`: configure and
+build passed without project warnings; **375/375 enabled CTests passed in 80.75 s**, including
+28 GPU checks; 15 retired wake-field experiments remain disabled. The site
+validator proves legal joins, dimensions, capacity+1, ID/attachment failures, shoreline and
+terrain violations, unsafe overlaps, entrance obstruction, atomic native host rejection,
+direct/reverse wave seeks, fixed landing, contacts/camera and the placed maximum fixture.
+Room bootstrap, native workers, Apply/Undo, catalog, browser wire and ferry/bridge tests are
+included in the full suite. The Emscripten MinSizeRel `web` target built and packaged with Lua
+absent from the game Wasm. The optional Node/Wasm validator passes `scene_contract` and
+`scene_berths`; its missing test-fixture linkage was restored in `cmake/Web.cmake`. Schema
+metadata tests, browser wire checks and compiled-selection guards passed after the final
+metadata/build-file edits. All 366 local links/anchors in seven changed documents resolve.
+CPU/GPU `outer.marina` and `outer.eriksberg` wave captures at 7 s,
+CPU second-row and both-row approach views, and a 300-frame GPU `--waves --demo` run completed;
+frames were inspected. Numerical wave-time checks cover 0/7/reverse-to-0 directly. The earlier
+sandboxed network/GPU attempt was rerun with desktop and local socket access. Changed local
+links and `git diff --check` pass.
+
+Remaining limits: no Windows/Linux build or fresh
+interactive browser/device qualification; no human visual/gameplay acceptance, depth proof,
+terrain editing, arbitrary meshes or M2–M5 behavior. Floating assemblies intentionally heave
+without pitch/roll. Camera exclusion is conservative, and fixed decks require land underneath
+rather than supporting arbitrary over-water construction. The two packages still duplicate
+scene data until M5. CPU/GPU captures and scripted window playback are separate from human
+motion/audio review.

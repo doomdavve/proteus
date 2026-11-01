@@ -89,19 +89,20 @@ registered dock modules; authored quay mooring is not exposed.
 L2.2 (2026-10-30) wires the accepted scene into `BoatWorld` and `BoatViewState`, so the same
 berth list drives hull contacts, the CPU/GPU harbor pass and the shared scene frame. The first
 `plugins/harbor-life` package exposes two berths; `scene.marina.berths` is validated against
-water, pairwise clearance, the entrance and restart shelters. L2.3 adds registered dock modules:
+water, pairwise clearance, the entrance and restart shelters. L2.3 originally added registered dock modules (superseded by M1 below):
 a 14 m `pontoon_small`, the existing long pontoon and local quay recipe, and a gangway with a
 land anchor and named pontoon attachment. Authored berth ropes use the nearest authored pontoon;
 a present empty module list disables the compiled dock furniture. The ferry and bridge remain
 independent compiled actors.
 
-Eriksberg marina layout (2026-11-01): `plugins/harbor-life` now fills all seven authored berths
-with a mostly white/cream leisure fleet in the finger slips of one 37 m pontoon, and adds shore
-equipment at `(38, 173)`. The entrance moved to `(4, 140)` so the approach lane clears the longer
-row; the passing craft's registered loop stays north of the pontoon. A fourth module slot remains
-free. The package README records what the scene API still cannot express, including the compiled
-crane/buildings, a floating quay platform, per-boat appearance, berth occupancy schedules and
-gameplay lighting.
+M1 marina structures (2026-11-01): `harbor-life` and `harbor-room` now place twelve boats in
+two rows with 13 independently dimensioned structures: two walkways, eight fingers, a floating
+platform, land-supported fixed quay deck and anchored gangway. Scene v2 accepts 32 berths and
+64 pieces, replacing the old fixed pontoon recipes. Level floating assemblies share their root
+wave heave for continuous joins; their X/Z anchors stay fixed. Fixed decks require land under
+the whole footprint; gangway shore endpoints stay fixed. Contacts and both renderers use the
+same dimensions. See the [API](PLUGIN_API.md#scene-schema-v2) and
+[M1 evidence](MARINA_AUTHORING_PLAN.md#m1-implementation--2026-11-01).
 
 Player contacts reuse the shoreline's forgiving contact response with stationary, padded
 oriented envelopes for moored hulls, main pontoon, fingers, and gangway. Envelopes include

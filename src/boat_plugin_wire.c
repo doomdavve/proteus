@@ -227,6 +227,9 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
         m->x = (float)number(w, m->x);
         m->z = (float)number(w, m->z);
         m->heading = (float)number(w, m->heading);
+        m->length = (float)number(w, m->length);
+        m->width = (float)number(w, m->width);
+        m->deck_height = (float)number(w, m->deck_height);
         m->anchor_x = (float)number(w, m->anchor_x);
         m->anchor_z = (float)number(w, m->anchor_z);
         string(w, m->attaches, sizeof(m->attaches));

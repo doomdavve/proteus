@@ -39,7 +39,7 @@ MATH_SYMBOL = re.compile(
     r"fmod|remainder|floor|ceil|round|trunc|l?lround|l?lrint|rint|nearbyint|fabs|fmin|fmax|copysign|fma|"
     r"ldexp|frexp|modf)[fl]?")
 RUNTIME_SYMBOL = re.compile(
-    r"malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|bzero|strcmp|"
+    r"malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|bzero|strcmp|strncmp|"
     r"strlen|qsort|clock|_?_assert\w*|__\w*chk\w*|__stack_chk_\w+|__chkstk\w*|"
     r"__sincosf?_stret|vDSP_\w+|abort")
 
