@@ -159,8 +159,8 @@ static Mesh builder_finish(MeshBuilder *builder)
 }
 
 // Static map storage: one interleaved vertex buffer and 16-bit indices per mesh, owned by the GPU.
-// Only complete equal attribute tuples share a vertex, so flat normals, facade UVs and material
-// seams stay separate. The source arrays are released after upload; the map's own scenery, which
+// Only complete equal attribute tuples of what the surface reads share a vertex, so flat normals,
+// facade UVs and material seams stay separate. The source arrays are released after upload; the map's own scenery, which
 // the CPU renderer, collision and minimap read, is a separate copy that this code never owns.
 typedef struct {
     float position[3];
@@ -168,6 +168,13 @@ typedef struct {
     float normal[3];
     unsigned char color[4];
 } StaticVertex;
+
+// What a map surface reads from its coordinates, which decides how they are stored.
+typedef enum {
+    STATIC_UV_NONE, // A white 1x1 texture: the coordinates cannot change a pixel.
+    STATIC_UV_MATERIAL, // Ground: x is a small WaterfrontGroundMaterial integer.
+    STATIC_UV_FLOAT, // Facade wall metres and roof texture mapping.
+} StaticUv;
 
 // WebGL2 always treats index 65535 as primitive restart, so 65,535 vertices are addressable.
 #define STATIC_VERTEX_LIMIT 65535
@@ -213,8 +220,38 @@ static unsigned int static_vertex_hash(const StaticVertex *vertex)
     return hash;
 }
 
-static Mesh static_mesh_upload(
-    const StaticVertex *vertices, int vertex_count, const unsigned short *indices, int index_count)
+// The uploaded form of VERTICES: position, normal, colour, then what the surface reads of its
+// coordinates. Returns the stride, or 0 if out of memory; the caller frees *OUT.
+static int static_vertices_pack(
+    const StaticVertex *vertices, int count, StaticUv uv, unsigned char **out)
+{
+    int stride
+        = (int)(sizeof(vertices->position) + sizeof(vertices->normal) + sizeof(vertices->color));
+    if (uv == STATIC_UV_FLOAT)
+        stride += (int)sizeof(vertices->texcoord);
+    else if (uv == STATIC_UV_MATERIAL)
+        stride += 4;
+    *out = calloc((size_t)count, (size_t)stride);
+    if (!*out)
+        return 0;
+    for (int i = 0; i < count; ++i) {
+        unsigned char *p = *out + (size_t)i * (size_t)stride;
+        memcpy(p, vertices[i].position, sizeof(vertices[i].position));
+        p += sizeof(vertices[i].position);
+        memcpy(p, vertices[i].normal, sizeof(vertices[i].normal));
+        p += sizeof(vertices[i].normal);
+        memcpy(p, vertices[i].color, sizeof(vertices[i].color));
+        p += sizeof(vertices[i].color);
+        if (uv == STATIC_UV_FLOAT)
+            memcpy(p, vertices[i].texcoord, sizeof(vertices[i].texcoord));
+        else if (uv == STATIC_UV_MATERIAL)
+            *p = (unsigned char)vertices[i].texcoord[0];
+    }
+    return stride;
+}
+
+static Mesh static_mesh_upload(const StaticVertex *vertices, int vertex_count,
+    const unsigned short *indices, int index_count, StaticUv uv)
 {
     if (binding_scene->map_upload_limit
         && binding_scene->geometry.meshes >= binding_scene->map_upload_limit)
@@ -228,21 +265,30 @@ static Mesh static_mesh_upload(
         free(mesh.vboId);
         return (Mesh) { 0 };
     }
-    const int stride = (int)sizeof(StaticVertex);
+    unsigned char *packed = NULL;
+    const int stride = static_vertices_pack(vertices, vertex_count, uv, &packed);
     rlEnableVertexArray(mesh.vaoId);
-    mesh.vboId[0] = rlLoadVertexBuffer(vertices, vertex_count * stride, false);
-    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, 3, RL_FLOAT, false, stride,
-        (int)offsetof(StaticVertex, position));
+    if (packed)
+        mesh.vboId[0] = rlLoadVertexBuffer(packed, vertex_count * stride, false);
+    free(packed);
+    int offset = 0;
+    rlSetVertexAttribute(
+        RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, 3, RL_FLOAT, false, stride, offset);
     rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION);
-    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, 2, RL_FLOAT, false, stride,
-        (int)offsetof(StaticVertex, texcoord));
-    rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD);
-    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 3, RL_FLOAT, false, stride,
-        (int)offsetof(StaticVertex, normal));
+    offset += (int)sizeof(vertices->position);
+    rlSetVertexAttribute(
+        RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 3, RL_FLOAT, false, stride, offset);
     rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL);
-    rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, 4, RL_UNSIGNED_BYTE, true, stride,
-        (int)offsetof(StaticVertex, color));
+    offset += (int)sizeof(vertices->normal);
+    rlSetVertexAttribute(
+        RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, 4, RL_UNSIGNED_BYTE, true, stride, offset);
     rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR);
+    offset += (int)sizeof(vertices->color);
+    if (uv != STATIC_UV_NONE) {
+        rlSetVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, 2,
+            uv == STATIC_UV_FLOAT ? RL_FLOAT : RL_UNSIGNED_BYTE, false, stride, offset);
+        rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD);
+    }
     mesh.vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES]
         = rlLoadVertexBufferElement(indices, index_count * (int)sizeof(*indices), false);
     rlDisableVertexArray();
@@ -257,7 +303,7 @@ static Mesh static_mesh_upload(
     geometry->triangles += (size_t)index_count / 3;
     geometry->source_vertices += (size_t)index_count;
     geometry->vertices += (size_t)vertex_count;
-    geometry->vertex_bytes += (size_t)vertex_count * sizeof(StaticVertex);
+    geometry->vertex_bytes += (size_t)vertex_count * (size_t)stride;
     geometry->index_bytes += (size_t)index_count * sizeof(*indices);
     return mesh;
 }
@@ -281,7 +327,7 @@ static bool static_mesh_retain(Mesh *mesh, const MeshBuilder *builder, int first
 
 // Uploads source vertices from FIRST, in order, until the index range is full, and sets *NEXT to
 // the first one left over. Returns a mesh with no VAO on failure.
-static Mesh builder_static_chunk(const MeshBuilder *builder, int first, int *next)
+static Mesh builder_static_chunk(const MeshBuilder *builder, StaticUv uv, int first, int *next)
 {
     int remaining = builder->count - first;
     int slots = 1 << 8;
@@ -301,6 +347,10 @@ static Mesh builder_static_chunk(const MeshBuilder *builder, int first, int *nex
             && unique + STATIC_CHUNK_STEP > STATIC_VERTEX_LIMIT)
             break;
         StaticVertex vertex = static_vertex(builder, source);
+        if (uv != STATIC_UV_FLOAT) // Coordinates nothing reads must not split a vertex.
+            vertex.texcoord[1] = 0;
+        if (uv == STATIC_UV_NONE)
+            vertex.texcoord[0] = 0;
         unsigned int slot = static_vertex_hash(&vertex) & (unsigned int)(slots - 1);
         while (table[slot] >= 0 && memcmp(&vertices[table[slot]], &vertex, sizeof(vertex)) != 0)
             slot = (slot + 1) & (unsigned int)(slots - 1);
@@ -310,7 +360,7 @@ static Mesh builder_static_chunk(const MeshBuilder *builder, int first, int *nex
         }
         indices[source - first] = (unsigned short)table[slot];
     }
-    mesh = static_mesh_upload(vertices, unique, indices, source - first);
+    mesh = static_mesh_upload(vertices, unique, indices, source - first, uv);
     if (mesh.vaoId && binding_scene->retain_map_sources
         && !static_mesh_retain(&mesh, builder, first, source - first))
         unload_mesh(&mesh);
@@ -324,10 +374,10 @@ done:
 
 // One static mesh for a map surface that is not tiled. Its source must fit one index range.
 // Consumes the builder.
-static Mesh builder_finish_static(MeshBuilder *builder)
+static Mesh builder_finish_static(MeshBuilder *builder, StaticUv uv)
 {
     int next = 0;
-    Mesh mesh = builder_static_chunk(builder, 0, &next);
+    Mesh mesh = builder_static_chunk(builder, uv, 0, &next);
     if (mesh.vaoId && next != builder->count)
         unload_mesh(&mesh);
     builder_destroy(builder);
@@ -544,7 +594,7 @@ static size_t builder_vertices(const TiledBuilder *builder)
 // Uploads each non-empty tile with its bounds, grown slightly so that rounding never culls a
 // visible edge. A tile too large for one index range becomes several meshes with the same bounds,
 // drawn in source order. Consumes the builder, also on failure.
-static bool tiled_builder_finish(TiledBuilder *builder, WaterfrontGpuTiled *tiled)
+static bool tiled_builder_finish(TiledBuilder *builder, WaterfrontGpuTiled *tiled, StaticUv uv)
 {
     *tiled = (WaterfrontGpuTiled) { 0 };
     int capacity = 0;
@@ -575,7 +625,7 @@ static bool tiled_builder_finish(TiledBuilder *builder, WaterfrontGpuTiled *tile
                 if (!ok)
                     break;
             }
-            Mesh mesh = builder_static_chunk(tile, first, &first);
+            Mesh mesh = builder_static_chunk(tile, uv, first, &first);
             ok = mesh.vaoId != 0;
             if (ok) {
                 tiled->meshes[tiled->count] = mesh;
@@ -704,8 +754,8 @@ static bool build_corner(const WaterfrontScenery *scenery, WaterfrontGpuTiled *o
             }
         }
     }
-    bool opaque_ok = tiled_builder_finish(&builders[0], opaque);
-    bool emissive_ok = tiled_builder_finish(&builders[1], emissive);
+    bool opaque_ok = tiled_builder_finish(&builders[0], opaque, STATIC_UV_NONE);
+    bool emissive_ok = tiled_builder_finish(&builders[1], emissive, STATIC_UV_NONE);
     if (!opaque_ok || !emissive_ok) {
         tiled_destroy(opaque);
         tiled_destroy(emissive);
@@ -838,11 +888,11 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         goto failed;
     if (!build_corner(scenery, corner, corner_emissive, &builders[CITY_SURFACE_QUAY]))
         goto failed;
-    bool ok = tiled_builder_finish(&builders[CITY_SURFACE_FLAT], city_mesh);
-    ok = tiled_builder_finish(&builders[CITY_SURFACE_FACADE], facades) && ok;
-    ok = tiled_builder_finish(&builders[CITY_SURFACE_ROOF], roofs) && ok;
-    ok = tiled_builder_finish(&builders[CITY_SURFACE_QUAY], quay) && ok;
-    *water = builder_finish_static(&water_builder);
+    bool ok = tiled_builder_finish(&builders[CITY_SURFACE_FLAT], city_mesh, STATIC_UV_NONE);
+    ok = tiled_builder_finish(&builders[CITY_SURFACE_FACADE], facades, STATIC_UV_FLOAT) && ok;
+    ok = tiled_builder_finish(&builders[CITY_SURFACE_ROOF], roofs, STATIC_UV_FLOAT) && ok;
+    ok = tiled_builder_finish(&builders[CITY_SURFACE_QUAY], quay, STATIC_UV_MATERIAL) && ok;
+    *water = builder_finish_static(&water_builder, STATIC_UV_NONE);
     return ok && water->vaoId != 0;
 failed:
     for (size_t i = 0; i < sizeof(builders) / sizeof(builders[0]); ++i)
@@ -892,7 +942,7 @@ static bool build_windows(const WaterfrontScenery *scenery, WaterfrontGpuTiled *
             }
         }
     }
-    return tiled_builder_finish(&tiled, mesh);
+    return tiled_builder_finish(&tiled, mesh, STATIC_UV_NONE);
 }
 
 static Vector3 crane_point(float x, float y, float z)
@@ -925,7 +975,7 @@ static bool build_crane(Mesh *mesh, const WaterfrontScenery *scenery)
         || !builder_box(&builder, crane_point(5, 75, 0), crane_point(5, 48, 0), .4f, .4f)
         || !builder_box(&builder, crane_point(2, 48, 0), crane_point(8, 48, 0), 1.5f, 1.5f))
         goto failed;
-    *mesh = builder_finish_static(&builder);
+    *mesh = builder_finish_static(&builder, STATIC_UV_NONE);
     return mesh->vaoId != 0;
 failed:
     builder_destroy(&builder);
