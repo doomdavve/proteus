@@ -159,6 +159,8 @@ static void usage(void)
     cli_usage_line(stdout, "--renderer gpu|cpu", "Renderer (default gpu)");
     cli_usage_line(stdout, "--gpu", "Alias for --renderer gpu");
     cli_usage_line(stdout, "--gpu-aa", "4x supersampling");
+    cli_usage_line(
+        stdout, "--no-far-detail", "Draw distant scenery at full detail, for comparison");
     cli_usage_line(stdout, "--no-vsync", "Pace at exactly 60 Hz");
     cli_usage_line(stdout, "--profiler", "Show the debug profiler at startup");
     cli_usage_line(stdout, "--performance-report PATH",
@@ -491,7 +493,7 @@ static int study(int argc, char **argv)
     bool wake_objects = false, object_crossing = false, object_tuning = false;
     unsigned object_life = BOAT_OBJECT_LIFE_TICKS;
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
-    bool gpu_enabled = true, gpu_aa = false;
+    bool gpu_enabled = true, gpu_aa = false, far_detail = true;
     bool profiler_visible = false;
     const char *performance_report = NULL;
     bool performance_capture = true;
@@ -541,6 +543,8 @@ static int study(int argc, char **argv)
             gpu_enabled = true;
         } else if (strcmp(argv[i], "--gpu-aa") == 0) {
             gpu_aa = true;
+        } else if (strcmp(argv[i], "--no-far-detail") == 0) {
+            far_detail = false;
         } else if (strcmp(argv[i], "--profiler") == 0) {
             profiler_visible = true;
         } else if (strcmp(argv[i], "--performance-report") == 0 && i + 1 < argc) {
@@ -1140,6 +1144,7 @@ static int study(int argc, char **argv)
             fprintf(stderr, "Could not initialize GPU boating resources.\n");
             goto cleanup;
         }
+        waterfront_gpu_scene_set_detail_enabled(&gpu.scene, far_detail);
         texture = gpu.target.texture;
         if (screenshot) {
             boat_gpu_draw_with_ghost(&gpu, view, view_presentation, view_world, camera_settings,

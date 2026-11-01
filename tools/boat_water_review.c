@@ -310,6 +310,22 @@ static int count_detail_changes(const WaterfrontGpuScene *scene, const unsigned 
     return changes;
 }
 
+// Two identical draws of one overview pose can differ by 1/255 in one pixel on the M1 Max, with
+// culling on for both: repeat-draw noise on a rounding boundary. A wrongly culled tile exceeds
+// this.
+static bool same_but_for_noise(Image a, Image b)
+{
+    const Color *p = a.data, *q = b.data;
+    int changed = 0;
+    for (int i = 0; i < a.width * a.height; ++i) {
+        int r = abs(p[i].r - q[i].r), g = abs(p[i].g - q[i].g), bl = abs(p[i].b - q[i].b);
+        if (r > 1 || g > 1 || bl > 1)
+            return false;
+        changed += r || g || bl;
+    }
+    return changed <= 4;
+}
+
 // G2b: drives one GPU view through the detail threshold. Orbiting the boat changes no level, the
 // band holds a camera jittering around a switch, repeated round trips end alike, and every cell
 // with windows keeps them far.
@@ -464,7 +480,8 @@ static int check_culling(void)
                         if (pass == 0)
                             cpu_culled += cpu.stats.boxes_culled;
                     }
-                    ok = ok && images[0].data && images[1].data && same_image(images[0], images[1])
+                    ok = ok && images[0].data && images[1].data
+                        && same_but_for_noise(images[0], images[1])
                         && memcmp(culled_pixels, full_pixels, sizeof(full_pixels)) == 0;
                     if (!ok)
                         fprintf(stderr, "culling changed tile=%g stop=%s heading=%d camera=%zu\n",
@@ -1494,11 +1511,13 @@ static int report_geometry(void)
         size_t before = geometry.source_vertices * 36;
         size_t after = geometry.vertex_bytes + geometry.index_bytes;
         printf("geometry location=%s meshes=%d triangles=%zu vertices=%zu source_vertices=%zu "
-               "vertex_bytes=%zu index_bytes=%zu retained_cpu_bytes=%zu normal_error=%.5f "
+               "vertex_bytes=%zu index_bytes=%zu far_triangles=%zu far_vertex_bytes=%zu "
+               "far_index_bytes=%zu retained_cpu_bytes=%zu normal_error=%.5f "
                "before_gpu_bytes=%zu "
                "before_cpu_bytes=%zu vertex_change=%.1f%% total_change=%.1f%%\n",
             resources->definition->name, geometry.meshes, geometry.triangles, geometry.vertices,
             geometry.source_vertices, geometry.vertex_bytes, geometry.index_bytes,
+            geometry.far_triangles, geometry.far_vertex_bytes, geometry.far_index_bytes,
             geometry.retained_cpu_bytes, geometry.normal_error, before, before,
             before ? 100.0 * ((double)geometry.vertex_bytes / (double)before - 1) : 0,
             before ? 100.0 * ((double)after / (double)before - 1) : 0);
@@ -1686,6 +1705,7 @@ int main(int argc, char **argv)
     bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
     bool detail = false;
+    int sequence_ticks = SAMPLE_TICKS;
     bool stress_state_only = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
@@ -1720,6 +1740,8 @@ int main(int argc, char **argv)
             check = true;
         else if (strcmp(argv[i], "--sequence") == 0)
             sequence = true;
+        else if (strcmp(argv[i], "--sequence-ticks") == 0 && i + 1 < argc)
+            sequence_ticks = atoi(argv[++i]);
         else if (strcmp(argv[i], "--visible") == 0)
             visible = true;
         else if (strcmp(argv[i], "--pacing") == 0 && i + 1 < argc)
@@ -1746,7 +1768,8 @@ int main(int argc, char **argv)
                  "       boat_water_review --check-instancing | --geometry | --compare A B\n"
                  "       boat_water_review --stress-state\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
-                 "                         [--sequence] [--visible] [--tile-size M] [--no-cull]\n"
+                 "                         [--sequence] [--sequence-ticks N] [--visible]\n"
+                 "                         [--tile-size M] [--no-cull] [--no-detail]\n"
                  "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--scenario river|stress] [--waves]\n"
@@ -1868,6 +1891,7 @@ int main(int argc, char **argv)
                 || !prepare_tiles(&gpu.scenery, tile_size))
                 goto cleanup;
             waterfront_gpu_scene_set_culling_enabled(&gpu.scene, !no_cull);
+            waterfront_gpu_scene_set_detail_enabled(&gpu.scene, !no_detail);
             if (visible)
                 SetTargetFPS(60);
         }
@@ -1951,7 +1975,7 @@ int main(int argc, char **argv)
         }
         // CPU wave tessellation is deliberately expensive: sample five-second intervals
         // plus every named stop. GPU captures the continuous ten-Hz review sequence.
-        int sample_ticks = use_gpu ? (visible ? 2 : SAMPLE_TICKS) : 600;
+        int sample_ticks = use_gpu ? (visible ? 2 : sequence_ticks) : 600;
         if (!check && (ticks % sample_ticks == 0 || finished)) {
             fprintf(csv, "%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3f,%zu\n", ticks,
                 ticks * (double)BOAT_STEP, boat->position.x, boat->position.y, boat->heading,
