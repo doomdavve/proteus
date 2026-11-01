@@ -741,8 +741,8 @@ widen tolerance.
   inspected frame correct. The GL error probe did not run.
 - Early user play, 2026-11-01 (M1 Max, native, outer map, 960x600, 4x SSAA, 120 Hz display): smooth,
   and nothing looked different from before that the user could see. F3 showed 120.1 FPS, scene
-  2.3 ms mean and 3.9 ms p95. The user then reported that the river works too. This is not Batch A
-  acceptance, and no basin result was reported.
+  2.3 ms mean and 3.9 ms p95. The user then reported that the river works and the basin looks good. This is
+  not Batch A acceptance.
 - Next: G2a. Human review stays in Batch A after G2b.
 
 ### G2a — Geometry storage and ownership
