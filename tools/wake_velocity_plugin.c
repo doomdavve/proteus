@@ -573,6 +573,7 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
 #endif
     }
     bool scene_restart = change == BOAT_PLUGIN_RESTART_SESSION && held
+        && plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
         && scene_differs(boat_plugin_host_active(&plugin->host), held);
     const BoatPluginRevision *previous = boat_plugin_host_active(&plugin->host);
     const char *shelter_id = plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE
@@ -583,7 +584,11 @@ static bool commit(WakePlugin *plugin, BoatSession *session)
     if (!revision)
         return false;
     bind_scene(plugin, session);
-    const BoatVoyageRoute *route = &revision->voyage.route;
+    // Only a voyage host's revision holds a route; the record is a union selected by kind.
+    const BoatVoyageRoute *route
+        = plugin->host.kind == BOAT_PLUGIN_KIND_VOYAGE ? &revision->voyage.route : NULL;
+    if (plugin->host.kind == BOAT_PLUGIN_KIND_COURSE)
+        boat_session_set_course_definition(session, &revision->course.course);
     const char *how = undo ? "UNDONE TO" : "ACTIVE";
     switch (change) {
     case BOAT_PLUGIN_UNCHANGED:

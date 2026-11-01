@@ -466,6 +466,25 @@ void boat_replay_runs_step(BoatReplayRuns *runs, BoatReplaySample before, BoatRe
     runs->report_finish = true;
 }
 
+bool boat_replay_runs_select_best(
+    BoatReplayRuns *runs, const char *directory, bool waves, uint64_t course_digest)
+{
+    boat_replay_destroy(&runs->best);
+    if (!boat_replay_best_path(
+            runs->best_path, sizeof(runs->best_path), directory, waves, course_digest)) {
+        runs->best_path[0] = 0;
+        return true;
+    }
+    if (!FileExists(runs->best_path))
+        return true;
+    if (!boat_replay_load(&runs->best, runs->best_path) || runs->best.waves != waves) {
+        boat_replay_destroy(&runs->best);
+        runs->notice = "Saved best is incompatible or damaged; ignored";
+        return false;
+    }
+    return true;
+}
+
 void boat_replay_runs_flush(BoatReplayRuns *runs)
 {
     if (runs->save_best

@@ -418,6 +418,20 @@ static bool console_save(
 #endif
 }
 
+// The personal best of the session's course, from DATA_DIR or the default data directory.
+static void select_course_best(BoatSession *session, const char *data_dir, bool waves)
+{
+    char directory[1800];
+    session->runs.best_path[0] = 0;
+    if (!data_dir && !boat_replay_data_directory(directory, sizeof(directory))) {
+        boat_replay_destroy(&session->runs.best);
+        return;
+    }
+    if (!boat_replay_runs_select_best(&session->runs, data_dir ? data_dir : directory, waves,
+            boat_course_digest(session->course_definition)))
+        fprintf(stderr, "%s: %s\n", session->runs.notice, session->runs.best_path);
+}
+
 static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
@@ -699,7 +713,7 @@ static int study(int argc, char **argv)
         goto invalid;
     }
     if (plugin_path) {
-        // Rooms and course recordings keep compiled definitions until they can carry revisions.
+        // Rooms carry no package revisions, and recordings pin the standard course.
         if (connect_to || course || replay_path || ghost_path) {
             fprintf(stderr,
                 "--plugin is solo free boating; it cannot join or host a room or use the "
@@ -917,7 +931,7 @@ static int study(int argc, char **argv)
         session.handling = &boat_handling_cabin;
     if (objects)
         object_study_reset(objects, &session, object_crossing, object_life, object_height);
-    // A replay or ghost is recorded against one exact course; only the compiled/bundled course
+    // A replay or ghost is recorded against one exact course; only the standard course
     // may be replayed while other course packages remain playable.
     if ((replay_path || ghost_path)
         && (!session.course_definition
@@ -968,20 +982,7 @@ static int study(int argc, char **argv)
         session.world.water = study_water(location, waves, current, crossing_wake, player_wake);
     }
     if (course) {
-        char directory[1800];
-        if (data_dir || boat_replay_data_directory(directory, sizeof(directory))) {
-            if (!boat_replay_best_path(session.runs.best_path, sizeof(session.runs.best_path),
-                    data_dir ? data_dir : directory, waves,
-                    boat_course_digest(session.course_definition)))
-                session.runs.best_path[0] = 0;
-        }
-        if (session.runs.best_path[0] && FileExists(session.runs.best_path)
-            && (!boat_replay_load(&session.runs.best, session.runs.best_path)
-                || session.runs.best.waves != waves)) {
-            boat_replay_destroy(&session.runs.best);
-            session.runs.notice = "Saved best is incompatible or damaged; ignored";
-            fprintf(stderr, "%s: %s\n", session.runs.notice, session.runs.best_path);
-        }
+        select_course_best(&session, data_dir, waves);
         if (ghost_path
             && (!boat_replay_load(&session.runs.reference, ghost_path)
                 || session.runs.reference.waves != waves)) {
@@ -1592,6 +1593,13 @@ static int study(int argc, char **argv)
             thrust_target = 0;
             boat_session_restart(
                 &session, study_water(location, waves, current, crossing_wake, player_wake));
+            if (course && plugin_restart) {
+                // An applied course edit is another course: its runs and bests are its own.
+                boat_replay_destroy(&session.runs.last);
+                boat_replay_destroy(&session.runs.reference);
+                select_course_best(&session, data_dir, waves);
+                boat_replay_runs_reset(&session.runs);
+            }
             if (wake) {
                 boat_wake_player_reset(wake);
                 session.world.wake_field = boat_wake_player_field(wake);

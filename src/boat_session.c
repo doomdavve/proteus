@@ -32,6 +32,8 @@ void boat_session_set_course_definition(
     BoatSession *session, const BoatCourseDefinition *definition)
 {
     session->course_definition = definition;
+    if (session->course.enabled)
+        session->course.definition = definition;
 }
 
 void boat_session_start_course(BoatSession *session)

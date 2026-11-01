@@ -461,6 +461,25 @@ static int legacy_best(const char *directory, const BoatReplay *fast)
         boat_replay_runs_destroy(&runs);
     }
     boat_replay_destroy(&slow);
+
+    // An applied course edit selects that course's own best and never touches another's.
+    BoatReplayRuns runs = { 0 };
+    CHECK(boat_replay_runs_select_best(&runs, directory, false, changed));
+    CHECK(!runs.best.complete && !strcmp(runs.best_path, other));
+    CHECK(boat_replay_save(fast, other));
+    CHECK(boat_replay_runs_select_best(&runs, directory, false, changed));
+    CHECK(runs.best.complete && !strcmp(runs.best_path, other));
+    CHECK(boat_replay_runs_select_best(&runs, directory, false, BOAT_COURSE_STANDARD_DIGEST));
+    CHECK(runs.best.complete && !strcmp(runs.best_path, legacy));
+    FILE *damaged = fopen(other, "w");
+    CHECK(damaged != NULL);
+    fputs("not a run\n", damaged);
+    fclose(damaged);
+    runs.notice = NULL;
+    CHECK(!boat_replay_runs_select_best(&runs, directory, false, changed));
+    CHECK(!runs.best.complete && runs.notice != NULL);
+    remove(other);
+    boat_replay_runs_destroy(&runs);
     return 0;
 }
 
