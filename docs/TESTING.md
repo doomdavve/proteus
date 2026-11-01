@@ -241,9 +241,9 @@ Existing detent/scroll helpers remain numerical/review fixtures, not live contro
 
 ## Routine checks
 
-Boating music checks are `boating_xm_is_valid` (A little boat) and `acid_xm_is_valid`
-(Acid Wake): fresh decoder startup, seeking, finite unclipped PCM and two loop boundaries.
-The Acid Wake check renders 235 seconds at 132 BPM. These do not establish listening
+Boating music checks are `boating_xm_is_valid` (A little boat), `cozy_xm_is_valid`
+(A little boat — Cozy) and `acid_xm_is_valid` (Acid Wake): fresh decoder startup, seeking, finite unclipped PCM and two loop boundaries.
+The Cozy check renders 205 seconds at 76 BPM; Acid Wake renders 235 seconds at 132 BPM. These do not establish listening
 acceptance or menu interaction; see [boating music evidence](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
 The [arcade stability candidate](ARCADE_STABILITY.md) extends the `wake_objects` cases

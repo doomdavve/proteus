@@ -5,7 +5,7 @@ locations ([Eriksberg location removed](#eriksberg-location-removed--2026-10-25)
 current/scripted-wake options in all locations, default bounded arcade wakes in free boating,
 and a timed S course with recordings, persistent personal bests, ghosts, and replay controls. The study
 has quiet engine/water audio and [selectable XM music](#selectable-soundtracks--2026-10-24):
-the gentle A little boat loop (default), Acid Wake techno, or Off. The
+the gentle A little boat loop (default), its [Cozy variation](#cozy-soundtrack-variation--2026-11-01), Acid Wake techno, or Off. The
 [stern-wake motion pass](#stern-wake-motion--2026-10-18) and physics Phase D are implemented;
 the user has provisionally accepted Phase D handling and revised player-wake motion,
 with continued evaluation over time.
@@ -997,3 +997,43 @@ south bank opposite Eriksberg
 180-frame windowed demo at that start. These approximate the reported area south of Karlatornet;
 the exact screenshot pose was not recovered. No human acceptance or browser/Windows/Linux
 verification is claimed. Next: review CI and have the user revisit the original ledge.
+
+
+## Cozy soundtrack variation — 2026-11-01
+
+Implemented: a separate `a-little-boat-cozy.xm`, selectable as LITTLE BOAT: COZY in
+SETTINGS → SOUNDTRACK and via `--soundtrack a-little-boat-cozy`. The original remains
+the default. The 32-bar, 76 BPM / speed 6 loop lasts 101.05 seconds, retaining the
+original harmony and related piano phrases with ukulele, kalimba, warm pads, brushed
+snare and sparse woodwind replies. These are synthesized PCM approximations; the
+bass and XM helpers reuse existing synthesis. No source samples or accepted tracks
+are overwritten. The [music guide](MUSIC.md#a-little-boat--cozy-variation) owns the
+regeneration and audition commands. macOS packaging now copies all selectable tracks,
+and the web preload list includes the variant.
+
+Current task: implementation and local automated/runtime verification complete.
+Verification, 2026-11-01, Apple Silicon/macOS, Debug:
+
+- Configure and full build passed using the existing pinned raylib/Lua/ENet source
+  caches. One upstream `stb_vorbis.c` tautological pointer comparison warning; no
+  project compiler warnings. The final source rebuild passed.
+- `ctest --preset full`: all 350 enabled tests passed in 31.35 seconds; 13 retired
+  experiments disabled. GPU tests were OFF. The first sandboxed run could not open
+  local sockets; the complete rerun with local socket access passed.
+- `cozy_xm_is_valid` passed fresh-load startup, seeking to order 3 at 48.58 seconds,
+  backward reset and two complete loops in 205 seconds. Decoded peak: 0.321701.
+  Regeneration was byte-identical (SHA-256
+  `368fcff6fca5984e6a3d5e33d202b1c77f73cc6ff36b6587f35f1619f59f5d75`).
+- A 110-second, stereo 22.05 kHz WAV preview includes the first loop transition:
+  `build/a-little-boat-cozy-preview.wav` (ignored local output). Measured bar RMS
+  ranges from 0.0342 to 0.0681; adjacent samples around the loop seam differ by at
+  most 0.00089 full scale. These measurements do not establish musical smoothness.
+- An agent-run native CPU-rendered `--soundtrack a-little-boat-cozy --demo --frames 180`
+  completed successfully with desktop access. The earlier sandboxed desktop attempt
+  stalled and was stopped. This is runtime smoke evidence, not perceptual listening.
+- `git diff --check` and changed documentation links/commands were checked.
+
+Next task: listen to the preview and variant in game; qualify browser and packaged playback.
+Known limitations: human musical acceptance, sustained listening across the seam,
+focus/replay listening and browser/package qualification remain pending. Automated
+PCM checks and an agent-run demo do not establish these.
