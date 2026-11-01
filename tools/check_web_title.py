@@ -118,9 +118,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(400)
     key('ArrowUp', 3)     # PLACE
     key('ArrowRight', 2)  # BASIN -> RIVER -> OUTER
-    key('ArrowDown')      # CONTENT
-    key('ArrowRight')     # HARBOR LIFE
-    key('ArrowDown', 3)   # START
+    key('ArrowDown', 4)   # CONTENT (HARBOR LIFE by default), WAVES, SMOOTHING, START
     key('Enter')
     page.wait_for_timeout(4000)
     shot('harbor-life')

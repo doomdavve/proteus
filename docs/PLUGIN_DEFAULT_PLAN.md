@@ -1254,7 +1254,10 @@ normally fetches Lua. The moving-contact fixture uses small authored loops sampl
 resolved track so the test is deterministic rather than a particular ferry timetable. The 0.126 mm
 prediction error remains; it is speculative contact over a snapshot interval, not a replay
 difference (below). Harbor life stays a title choice because no user acceptance was recorded
-before this package; `outer` still defaults to Standard.
+before this package; `outer` still defaulted to Standard. Later, 2026-11-01: after the user's iPhone
+run, Harbor life became the title's default for `outer`. The setting moved to the key `outer_scene`
+because every earlier save recorded `outer_content=standard` whether or not it was chosen. The catalog
+default for `--location outer` stays `proteus.langedrag`.
 
 **Verification actually run, Apple Silicon/macOS, 2026-10-31.** Debug build from the pinned
 dependencies, no project warnings. `ctest --preset quick` passed all 243 enabled tests;

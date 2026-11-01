@@ -1081,7 +1081,8 @@ void boat_title_defaults(BoatTitleSettings *s)
         .host_location = BOAT_LOCATION_RIVER,
         .location = BOAT_LOCATION_RIVER,
         .waves = true,
-        .smooth_edges = true };
+        .smooth_edges = true,
+        .outer_content = 1 };
 #if defined(__EMSCRIPTEN__)
     snprintf(s->address, sizeof(s->address), "ws://127.0.0.1:24682");
 #else
@@ -1122,7 +1123,7 @@ void boat_title_load(BoatTitleSettings *s)
             s->waves = !strcmp(value, "on");
         else if (!strcmp(line, "smooth_edges"))
             s->smooth_edges = !strcmp(value, "on");
-        else if (!strcmp(line, "outer_content"))
+        else if (!strcmp(line, "outer_scene")) // Not the old outer_content: every save held it.
             s->outer_content = !strcmp(value, "harbor-life");
         else if (!strcmp(line, "host_mode")) {
             for (unsigned i = 0; i < BOAT_TITLE_HOST_MODES; ++i)
@@ -1150,7 +1151,7 @@ void boat_title_save(const BoatTitleSettings *s)
     fprintf(file, "name=%s\naddress=%s\nskin=%s\nmouse_steering=%s\nsoundtrack=%s\n", s->name,
         s->address, boat_skin_name(s->skin), s->mouse_steering ? "on" : "off",
         boat_music(s->soundtrack)->id);
-    fprintf(file, "location=%s\nwaves=%s\nsmooth_edges=%s\nouter_content=%s\n",
+    fprintf(file, "location=%s\nwaves=%s\nsmooth_edges=%s\nouter_scene=%s\n",
         s->location == BOAT_LOCATION_COUNT ? "course" : boat_location(s->location)->name,
         s->waves ? "on" : "off", s->smooth_edges ? "on" : "off",
         s->outer_content ? "harbor-life" : "standard");
