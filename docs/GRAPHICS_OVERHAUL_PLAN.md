@@ -1,12 +1,17 @@
 # Graphics overhaul plan
 
-Status, 2026-11-01: **all eleven package briefs prepared; implementation unstarted**. The
+Status, 2026-11-01: **all twelve package briefs prepared; implementation unstarted**. The
 [execution process](#package-execution-process) defines one implementation PR per package and
 three batched human playtests. Prepared briefs include a short kickoff prompt for the next agent.
 **Next implementation: G0**, after its planning instructions are approved. Low resolution remains
 the default; the [look test](#water-look-test--2026-10-31) rejected water squares and favoured plain
 high resolution as an option. Historical measurements and user decisions below remain scoped to
 2026-10-31; no overhaul implementation or result acceptance is claimed.
+
+The user's native Windows machine is an additional performance evidence source. The new
+[G0w package](#g0w--native-performance-capture-and-windows-to-mac-reports) delivers low-friction
+capture, a portable report bundle and analysis back on the Mac before G1. M1 Max budgets remain
+the reference; actual Windows performance is unqualified until reports are returned.
 
 ## Intended result
 
@@ -104,8 +109,9 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-01: this is a **planning delivery**, not a renderer implementation. Eleven
-package briefs split G0–G6 into one future implementation PR apiece; G6 remains conditional.
+Status, 2026-11-01: this is a **planning delivery**, not a renderer implementation. Twelve
+package briefs, including G0w for native Windows capture, split G0–G6 into one future
+implementation PR apiece; G6 remains conditional.
 The planning PRs themselves form a documentation stack, each adding one brief and kickoff prompt.
 Merge that stack in order before implementation, or branch an implementation from the approved
 planning head and target that parent while it remains open. Do not confuse a planning PR with the
@@ -189,6 +195,30 @@ need byte parity; quantized geometry and texture-resampled water use **predeclar
 image bounds**, plus motion review. Preserve exact physical inputs/results throughout. Report per-
 pass/group CPU/GPU cost and memory cumulatively against G0 as well as the previous package.
 
+### Windows performance evidence throughout the overhaul
+
+G0w makes the report path available before optimization starts. The default workflow is download
+one Windows CI artifact, extract it, double-click Collect performance, then copy its ZIP to the
+Mac. An in-game Export performance report action captures recent real play, including a hitch
+that happened before the action. Both outputs include structured samples and a readable summary;
+a profiler screenshot is optional context. Details and acceptance live in the G0w brief.
+
+Collect a Windows baseline as soon as G0w is available. Reuse its launcher and live export during
+the three existing human batches, on the exact candidate commit, with the original resolution and
+pacing settings recorded. An agent supplies the CI artifact/commit, short instructions and Mac
+comparison command in each batch handoff. On each implementation PR, keep capture metadata and
+new renderer counters/effects compatible with the report schema; validate with local/synthetic
+reports even if the user has not rerun Windows. Do not require a fresh full Windows matrix per PR.
+
+A user hardware capture is a data-collection step, not a fourth full artistic review. Prefer one
+short default collection and rerun only the affected scenario or changed preset; the full matrix
+remains opt-in. Compare code revisions on the same Windows machine/settings; show Windows/Mac
+side by side without interpreting the different hardware as a code regression. If Windows access
+is unavailable, record the missing evidence and keep measuring M1; do not invent Windows timings
+or treat CI/software rendering as hardware qualification. Final Batch C requires returned native
+Windows reports, analyzed on the Mac, alongside desktop/browser review. No automated upload or
+remote access is needed.
+
 ### Batched human playtesting
 
 Three planned user sessions minimize repeated setup. Each package still supplies its own agent-run
@@ -198,9 +228,9 @@ or test pass supplies a missing verdict. A pending user session does not prevent
 
 | Batch | When | Combined route and questions | What it gates |
 | --- | --- | --- | --- |
-| A — engine and geometry | After G2b | G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | G3a and later visual expansion |
-| B — all living water | After G4 | G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | G5a and later artistic expansion |
-| C — final presentation | After G5c | G5a/G5b/G5c: native and hardware browser at low/high presets, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
+| A — engine and geometry | After G2b | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | G3a and later visual expansion |
+| B — all living water | After G4 | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | G5a and later artistic expansion |
+| C — final presentation | After G5c | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
 
 Batch B deliberately combines G3 and G4 rather than asking for a separate water session between
 them: atlas boundaries/depth/shore foam are easier to judge with persistence in place. Keep a
@@ -215,12 +245,15 @@ resolution default throughout; any future default switch requires an explicit se
 ### Package register
 
 "Prepared" below describes instructions, not code. All implementation is unstarted. Dependencies
-are implementation dependencies; the eleven planning PRs are stacked in this listed order.
+are implementation dependencies. Execute G0, G0w, then G1 onward in the order below. The original
+eleven planning PRs are stacked G0–G6; the G0w planning follow-up targets that final planning head.
+Its editorial position does not move Windows tooling to the end of implementation.
 
 | Package | Deliverable | Implementation dependencies | Brief | Code / human review |
 | --- | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | Measurement and review harness | current main | Prepared | Unstarted; review pending |
-| [G1](#g1--persistent-instances-and-pass-culling) | Persistent instances and pass culling | G0 budgets and review manifest | Prepared | Unstarted; review pending |
+| [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | Native performance capture and Windows-to-Mac reports | G0 scenarios/report contract | Prepared | Unstarted; Windows hardware reports pending |
+| [G1](#g1--persistent-instances-and-pass-culling) | Persistent instances and pass culling | G0 budgets/review manifest and G0w capture tools | Prepared | Unstarted; review pending |
 | [G2a](#g2a--geometry-storage-and-ownership) | Geometry storage and ownership | G1 | Prepared | Unstarted; review pending |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | Distance detail and valid shadow reuse | G2a | Prepared | Unstarted; review pending |
 | [G3a](#g3a--stamped-wake-shading) | Stamped wake shading | G2b and Batch A verdict resolved | Prepared | Unstarted; review pending |
@@ -295,9 +328,146 @@ Follow the worktree, scope, verification and documentation rules in the plan's e
 Stop after this package; report the next package and pending human batch gate.
 ```
 
+The G0 benchmark/report schema is the input to G0w; leave its native capture integration to that
+package. Record the Windows baseline as pending until G0w tooling and actual user reports exist;
+no Windows performance evidence is claimed by completing M1/browser measurement alone.
+
+### G0w — Native performance capture and Windows-to-Mac reports
+
+Stage coverage: G0 tooling and cross-machine evidence for every later package.
+**Depends on:** G0 scenario/manifest and benchmark contract. Implement after G0 and before G1.
+Human review: collect the first Windows baseline when the user has the machine available; repeat
+at batches A/B/C, without adding another full artistic playtest. Tool implementation can be reviewed
+before that hardware run; Windows performance remains unqualified until actual reports return.
+
+**Read first:** `src/profiler.[ch]`, `src/boat_profile.[ch]`, `tools/wake_velocity.c`,
+`tools/boat_water_review.c`, `tools/validate_boat_water_benchmark.py`, `src/renderer_gpu.[ch]`,
+`CMakeLists.txt`, `.github/workflows/windows-boat.yml`, `.github/workflows/release.yml`,
+`tools/windows/{launch.bat,README.txt}`, [performance](BOATING_PERFORMANCE.md),
+[testing](TESTING.md) and [releases](RELEASES.md). Proposed new tool names below are design targets,
+not commands that exist yet.
+
+**User workflow to deliver:**
+
+1. On the Mac, the developer supplies the Windows Release artifact from the implementation PR's
+   CI run, identified by commit. No release/publication is required. Download/extract it on Windows.
+2. Double-click the included **Collect performance** launcher. It runs the G0 ordinary/four-boat
+   scenarios with warmup and repeated measured runs, then opens a report folder. Aim for a short
+   default run of a few minutes, with the full G0 matrix available separately. The run is bounded,
+   states progress, allows cancellation and preserves useful completed results on failure.
+3. For a hitch during normal play, use **Export performance report** in the profiler UI or its
+   documented shortcut. It saves the recent rolling history immediately; no need to reproduce the
+   issue after pressing Record. A short success message shows the output location and how to open
+   it. This works with the overlay hidden and does not reset the boat or change graphics settings.
+4. Copy the generated ZIP to the Mac by any ordinary file-transfer method, then attach it to the
+   development task or point the agent at it. No account linking, telemetry upload or remote service
+   is required. Open the included HTML summary directly; the Mac comparison command can compare
+   two report bundles or Windows/Mac runs and write a Markdown summary with frame-time plots.
+
+**Tasks, in order:**
+
+1. Define a versioned report manifest and reuse the G0 JSON/CSV field definitions, units and
+   percentile convention. Keep `capture_kind` (`scripted` or `live`) and scenario/input identity
+   explicit: live driving is evidence for a hitch, not a controlled cross-machine benchmark.
+   Capture commit/version, clean/dirty state when known, actual Release/Debug configuration and
+   compiler. Fix multi-config build metadata: `${CMAKE_BUILD_TYPE}` is empty for typical MSVC
+   multi-config builds, so do not label those runs from that value alone.
+2. Extend the native live client with a bounded rolling sampler, enabled by default at measured
+   low overhead, independent of F3 visibility. Target the most recent 30 seconds, with a fixed
+   memory/frame-count cap and actual duration/count recorded if truncated. Reuse BoatFrameMetrics
+   for frame wall, simulation/physics, audio, render and present/wait; add frame-start intervals,
+   discarded time/tick counts, active/focus/pause state and renderer pass/group counters. Include
+   simulation time/tick, map, player/camera pose and active weather/wake counts to locate a spike
+   in the world. Keep
+   nested inclusive timings distinct; never sum physics into simulation twice or call render
+   submission CPU time a GPU duration. Mark settings/map/pacing changes per segment rather than
+   averaging incompatible modes together. Export raw ordered samples, p50/p95/p99/max and hitch
+   counts relative to the recorded target interval, not just FPS or a picture of the overlay.
+3. Reuse/factor the benchmark's asynchronous GPU timer where useful, with per-frame IDs linking
+   delayed samples to their originating frame. Do not block, use `glFinish`, or read GPU data just
+   to complete a live export. Missing/unsupported/pending GPU timings stay null, with coverage and
+   skip counts. Record measurement scope, collection overhead, counter availability and whether
+   timing includes extra views. Preserve the difference between GPU rendering, CPU work and
+   presentation wait; these reports are not proof of scan-out latency or driver call-stack cost.
+4. Add the profiler action and an explicit output-path option suitable for scripted tests. Snapshot
+   completed samples on request, write outside the measured render interval and mark any export
+   disturbance so it cannot masquerade as an original hitch. A context screenshot is optional and
+   likewise excluded from timing; structured data is mandatory. Handle repeat exports, a full ring,
+   startup/empty history, canceled runs and unavailable/unwritable paths without losing gameplay.
+   Never overwrite older bundles. Use a writable per-user report directory, not the executable
+   directory, and show its actual path. Keep file I/O in app/tool owners, outside core/net and the
+   sampling/statistics helpers. Share the native capture path with macOS so it can be tested here.
+5. Gather bounded system/session metadata without extra installations: Windows version, CPU,
+   memory, GPU/driver, actual GL vendor/renderer/version, monitor refresh, window/framebuffer/scene/
+   reflection sizes, DPI, fullscreen/VSync/pacer/AA/preset and enabled water/light effects. Prefer
+   the active GL adapter identity to an arbitrary first GPU; preserve a distinction if the OS
+   reports multiple adapters. Unsupported queries are explicit unknowns. Reuse build.txt and
+   packaged assets/version identity. Record timestamps for correlating an optional later trace;
+   exclude unrelated machine/user/network inventory and omit absolute personal paths from reports.
+6. Package the review executable, required assets, launcher and a plain-language README in the
+   existing Windows PR artifact; use the same mechanism for release packages when later cut.
+   The user must not need Visual Studio, a developer checkout, Python or an external profiler.
+   A small `.bat` launcher may invoke native tools and built-in PowerShell archive/metadata
+   commands; provide quoted paths and propagate exit status. Set executable/asset paths from the
+   launcher's directory and write reports to the user directory, so launching from Explorer or
+   another working directory works, including spaces/non-ASCII names. Retain normal launch.bat.
+   Produce one portable ZIP with manifest, summary.html, samples.csv/summary.json per run, logs
+   and an optional context.png. If compression fails, keep the report folder and explain how to
+   copy it. No automatic upload, installation, release or deployment is part of this package.
+7. Add a small standard-library-only Mac/developer analyzer, proposed as
+   `tools/compare_performance_reports.py`. Accept an extracted report or ZIP, validate schema and
+   bounded contents, and output Markdown plus a standalone HTML frame-time view. Compare run
+   distributions and repeated-run variation, show same-scenario/settings deltas, mark mismatches
+   and missing GPU samples, and refuse a numerical regression verdict for incompatible runs.
+   Different machines can be shown side by side; do not call their absolute difference a code
+   regression. Do not require executable content in returned reports or a Windows trace viewer on
+   the Mac. Check in tiny synthetic fixtures, not personal/hardware captures or large trace files.
+8. Document actual implemented actions, artifact download, expected duration, output locations,
+   copy-back and Mac comparison commands in the performance guide, Windows README and testing
+   guide. Explain a short initial baseline and a focused rerun path, so the user need not run the
+   entire matrix for every hitch. Measure sampler off/on overhead with repeated Release runs,
+   report memory cap and worst export interruption, and make the toggle available for diagnosis.
+   If aggregate samples cannot explain a bottleneck, record the next specific Windows CPU/GPU
+   trace question and a verified tool recipe in the guide; do not make deep tracing a prerequisite
+   for the basic capture workflow.
+
+**Acceptance:** Serialization/ring ordering, time/cap truncation, inclusive timing labels,
+segmentation, missing/delayed GPU queries, repeated/unwritable export, archive/schema rejection and
+comparison compatibility have meaningful automated checks using synthetic/virtual inputs. Build
+and full CTest pass; prove unchanged simulation/final states with capture on/off. Native macOS
+export/import works, and the standard Windows CI runner validates launcher packaging, metadata,
+portable paths and report/analyzer round-trip with CPU/synthetic data. A software-rendered CI run
+is packaging evidence, never the user's Windows GPU baseline. Real Windows play must return at
+least one live report and three repeats of matched G0 ordinary/stress runs, with a readable Mac
+summary identifying the actual revision, CPU/GPU, timings/settings and timing coverage. Record
+hardware run, sampler overhead and user usability verdict only when performed. No screenshot-only
+or successful-build claim satisfies the actual hardware evidence gate.
+
+**Limits and stop conditions:** This package delivers app-level timing/counters, not a native
+sampling profiler, GPU debugger or remote-control agent. No dependence on external profiler
+installation, new hosted services or access to the user's Windows machine. The M1 Max remains the
+reference budget; Windows gets a recorded machine-specific baseline, not an invented hardware
+floor. If the Windows hardware/report is unavailable, ship the independently verified tools and
+list that evidence as pending; later packages may proceed against measured M1 budgets but cannot
+claim Windows qualification. Final integrated acceptance retains the Windows return-report gate.
+
+**Result:** instructions prepared 2026-11-01; implementation unstarted. Windows tooling, captured
+hardware data, Mac comparison and user workflow acceptance are all pending. Next: finish G0,
+implement G0w in one PR, then G1; collect the Windows baseline as soon as the artifact is available.
+
+**Kickoff prompt:**
+
+```text
+Implement G0w in docs/GRAPHICS_OVERHAUL_PLAN.md after G0. Deliver a Windows artifact with one-click
+scripted collection and an in-game export of recent live performance, portable report ZIPs and a
+Mac comparison tool. Follow the detailed scope, metadata/timing rules, packaging and acceptance
+checks in the brief and execution process. Use one worktree/implementation PR, update the plan,
+stop after G0w and report G1 plus pending Windows hardware evidence and human batch gates.
+```
+
 ### G1 — Persistent instances and pass culling
 
-Stage coverage: G1. **Depends on:** G0 budgets and review manifest.
+Stage coverage: G1. **Depends on:** G0 budgets/review manifest and G0w capture tools.
 Human review: Batch A after G2b; agent checks still run here.
 
 **Read first:** `src/renderer_gpu.[ch]` (`draw_colored_mesh`, `draw_life`, `box_in_view`,
@@ -340,7 +510,7 @@ this package; stop afterward and report the next package and pending human batch
 **Kickoff prompt:**
 
 ```text
-Implement G1 from docs/GRAPHICS_OVERHAUL_PLAN.md after G0 is ready. Complete cached uniforms, persistent coloured instances and per-pass object culling in one PR; prove scalar/culling parity and measured budget gains. Update the plan; prepare Batch A evidence without requesting a separate human playtest.
+Implement G1 from docs/GRAPHICS_OVERHAUL_PLAN.md after G0 and G0w are ready. Complete cached uniforms, persistent coloured instances and per-pass object culling in one PR; prove scalar/culling parity and measured budget gains. Update the plan; prepare Batch A evidence without requesting a separate human playtest.
 Follow the worktree, scope, verification and documentation rules in the plan's execution process.
 Stop after this package; report the next package and pending human batch gate.
 ```
@@ -727,7 +897,9 @@ Human review: Batch C: resolution, mood and final integrated review.
 3. Provide reference comparisons for particle age/position/size/colour across emission, fast turn,
    airborne/landing and expiry. Presentation randomness uses deterministic seeds and explicit time.
    Keep per-view cleanup, bounds and all core/net physical states unchanged.
-4. Run the final G0 Release matrix and compare to both G0 and the preceding package. Summarize
+4. Run the final G0 Release matrix and compare to both G0 and the preceding package. Supply the
+   matching Windows artifact and obtain a G0w scripted/live report for Mac analysis against its
+   initial Windows baseline; record exact commit/settings and any missing hardware evidence. Summarize
    cumulative CPU/GPU/memory, submissions/triangles, water cost, preset/browser fallbacks and
    outstanding budgets. Investigate regressions rather than hiding them behind new baselines.
 5. Prepare one Batch C run covering presets/HUD, calm/storm/day/dusk river and outer, lamps/streaks,
@@ -737,8 +909,9 @@ Human review: Batch C: resolution, mood and final integrated review.
 
 **Acceptance:** Bake/load/fallback and meaningful particle lifecycle/parity checks pass; full native
 suite and browser build/smoke pass. AO is subtle and stable, cube foam signature/lifetime survives,
-physical hashes remain exact and G0 budgets are met. Final user desktop/browser play verdict is
-recorded separately; unresolved dusk or platform checks remain explicitly open.
+physical hashes remain exact and G0 budgets are met. Returned native Windows reports are analyzed
+on the Mac. Final user desktop/browser play verdict is recorded separately; unresolved dusk or
+platform checks remain explicitly open.
 
 **Limits and stop conditions:** GPU particles are an optimization to earn, not a compute rewrite
 requirement. No browser/desktop acceptance from stills alone, no release/deploy, and no
@@ -816,7 +989,8 @@ provisional until G0 sets real budgets. Each stage's gain figures are estimates.
    where submission time goes.
 2. Add a stress scenario: four boats with a saturated wake pool, which today's route does not cover.
 3. Measure the M1 Max as the reference machine, plus a browser on it. Record what the browser
-   build can hold, since its floor is [still open](#open-decisions).
+   build can hold, since its floor is [still open](#open-decisions). G0w then supplies native Windows
+   capture/return tooling and a user-machine baseline; it executes before G1.
 4. Pick a fixed set of review stops and cameras for before/after captures.
 5. Record per-pass and per-group budgets in this plan, set well inside the M1 Max's frame time
    rather than filling it (see [hardware floor](#decisions)).
@@ -1032,6 +1206,12 @@ life](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)**
   sunset prerequisites stay owned by SUNSET_PLAN.md. No renderer implementation, new performance
   result, audiovisual review or user acceptance is claimed. Planning verification is recorded below.
 
+- 2026-11-01: added G0w at the user's request for native Windows performance information returned
+  to the Mac. The twelve-package execution order is G0, G0w, G1 onward. The brief owns one-click
+  benchmark collection, recent live-play export, portable ZIPs, Mac comparison, packaging and
+  real-hardware evidence; A/B/C reuse it without extra full playtests. Tooling and Windows hardware
+  measurements are unimplemented/unverified. The follow-up is a documentation-only planning PR.
+
 ## Planning verification — 2026-11-01
 
 Package entry points, stage coverage, dependencies and current sunset/shadow ownership were checked
@@ -1050,3 +1230,18 @@ were executed. No browser build, new performance measurement or audiovisual revi
 for this documentation-only change. Human package/batch acceptance remains pending.
 Markdown-only PRs deliberately skip native CI under current workflow path filters; skipped checks
 are not passing CI. No audiovisual review is required for this documentation-only stack.
+
+## Windows capture planning follow-up verification — 2026-11-01
+
+Inspected the live F3 profiler (240-frame history), inclusive BoatFrameMetrics, app frame timing,
+existing JSON/CSV benchmark, asynchronous GPU-query implementation and Windows CI packaging.
+The package reuses those owners; none of the proposed capture/export/analyzer tools exists yet.
+The eleven-package planning verification above is historical evidence for that stack. Follow-up
+verification: 245 local links/anchors, twelve kickoff prompts, balanced fences and
+`git diff --check` pass. On macOS 26.6.2 / AppleClang 21.0.0, Debug configure/build passed with
+copied pinned dependencies, `FETCHCONTENT_FULLY_DISCONNECTED=ON` and `PROTEUS_GPU_TESTS=ON`.
+There were no project compiler warnings; bundled stb_vorbis emitted its pointer-comparison warning.
+The full CTest preset passed all 365 enabled tests, including 28 GPU cases, in 80.50 s with desktop
+and local-socket access; 15 retired wake-field cases remained disabled. Application code is unchanged.
+Markdown-only native CI remains skipped by existing workflow filters.
+No native Windows run, portable report, cross-machine comparison or user acceptance is claimed.
