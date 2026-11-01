@@ -2,6 +2,7 @@
 #include "boat_test_scenery.h"
 #include "external/glad.h"
 
+#include "boat_fleet.h"
 #include "boat_gpu.h"
 #include "boat_map.h"
 #include "boat_profile.h"
@@ -10,6 +11,7 @@
 #include "frame_pacer.h"
 #include "raymath.h"
 #include "rlgl.h"
+#include "waterfront_traffic.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -504,6 +506,153 @@ static void format_final_state(char *out, size_t size, const Boat *boat, int tic
         (double)boat->roll, (double)boat->throttle, (double)boat->wheel, boat->landings);
 }
 
+// G0 four-boat stress: four fleet boats on the open basin, each circling its own centre so all
+// four wake emitters fill, plus a saturated scenery traffic pool. The basin keeps the fixture
+// collision-safe and independent of shoreline variation; the ordinary river route remains the
+// submission/triangle measurement. Production physics is unchanged; only the scripted inputs
+// and the review camera are fixtures.
+#define STRESS_PREROLL_TICKS 2400
+#define STRESS_WARMUP_FRAMES 120
+#define STRESS_MEASURED_FRAMES 900
+#define STRESS_FRAMES (STRESS_WARMUP_FRAMES + STRESS_MEASURED_FRAMES)
+#define STRESS_TICKS_PER_FRAME 2
+
+typedef struct {
+    BoatFleet fleet;
+    BoatPresentation presentations[BOAT_FLEET_SLOTS];
+    BoatWakeObjects traffic; // The scenery traffic pool; the player shader samples both pools.
+    bool traffic_ready;
+    uint64_t ticks; // Fixture tick, including the pre-roll.
+} StressFixture;
+
+static const Vector2 stress_centres[BOAT_FLEET_SLOTS]
+    = { { -60, -40 }, { 60, -40 }, { -60, 40 }, { 60, 40 } };
+#define STRESS_CIRCLE_RADIUS 20.0f
+
+static BoatInput stress_input(const Boat *boat, unsigned slot, uint64_t tick)
+{
+    float phase = (float)tick * .0028f + (float)slot * (2 * PI / BOAT_FLEET_SLOTS);
+    Vector2 target = Vector2Add(stress_centres[slot],
+        (Vector2) { STRESS_CIRCLE_RADIUS * cosf(phase), STRESS_CIRCLE_RADIUS * sinf(phase) });
+    Vector2 delta = Vector2Subtract(target, boat->position);
+    float desired = atan2f(delta.x, -delta.y);
+    float error = remainderf(desired - boat->heading, 2 * PI);
+    float wheel = Clamp(1.6f * error - .8f * boat->yaw_velocity, -.8f, .8f);
+    float thrust = .72f;
+    return (BoatInput) { .steering_rate = Clamp((wheel - boat->wheel) / BOAT_STEP, -1, 1),
+        .throttle_rate
+        = Clamp((thrust - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) };
+}
+
+static bool stress_init(StressFixture *fixture, bool waves)
+{
+    *fixture = (StressFixture) { 0 };
+    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    if (!boat_fleet_init(&fixture->fleet, test_world(BOAT_LOCATION_BASIN),
+            boat_world_test_water(basin, waves, false, false), BOAT_OBJECT_LIFE_TICKS,
+            BOAT_OBJECT_DEFAULT_HEIGHT))
+        return false;
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
+        boat_fleet_place(&fixture->fleet, i,
+            (Boat) { .position = stress_centres[i],
+                .heading = (float)i * (2 * PI / BOAT_FLEET_SLOTS),
+                .throttle = .55f });
+        boat_presentation_reset(&fixture->presentations[i]);
+    }
+    fixture->traffic_ready = waterfront_traffic_wakes_init(&fixture->traffic, 0);
+    return fixture->traffic_ready;
+}
+
+// One fixed tick for every boat, then the traffic pool and cosmetic followers. The pool holds
+// each emitter's thirty-two live pieces, so a completed pre-roll proves saturated counts.
+static bool stress_step(StressFixture *fixture)
+{
+    BoatInput inputs[BOAT_FLEET_SLOTS];
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        inputs[i] = stress_input(&fixture->fleet.state.slots[i].boat, i, fixture->fleet.state.tick);
+    if (!boat_fleet_step(&fixture->fleet, inputs) || fixture->fleet.stats.emission_failures)
+        return false;
+    double now = boat_fleet_time(&fixture->fleet);
+    if (!waterfront_traffic_wakes_step(&fixture->traffic, now))
+        return false;
+    BoatWorld world = boat_fleet_world(&fixture->fleet);
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
+        boat_presentation_step(
+            &fixture->presentations[i], &fixture->fleet.state.slots[i].boat, &world, now);
+    ++fixture->ticks;
+    return true;
+}
+
+static bool stress_advance(StressFixture *fixture, unsigned ticks)
+{
+    for (unsigned i = 0; i < ticks; ++i)
+        if (!stress_step(fixture))
+            return false;
+    return true;
+}
+
+// The player view of slot 0 and the other three slots as rivals; WORLD borrows both pools.
+static BoatWorld stress_world(const StressFixture *fixture)
+{
+    BoatWorld world = boat_fleet_world(&fixture->fleet);
+    world.water.traffic_objects = &fixture->traffic;
+    return world;
+}
+
+static BoatViewState stress_view(const StressFixture *fixture)
+{
+    return (BoatViewState) { .boat = fixture->fleet.state.slots[0].boat,
+        .time = boat_fleet_time(&fixture->fleet) };
+}
+
+static BoatRivals stress_rivals(const StressFixture *fixture)
+{
+    BoatRivals rivals = { 0 };
+    for (unsigned i = 1; i < BOAT_FLEET_SLOTS; ++i) {
+        rivals.boats[rivals.count++]
+            = (BoatRival) { .view = { .boat = fixture->fleet.state.slots[i].boat,
+                                .time = boat_fleet_time(&fixture->fleet),
+                                .skin = i },
+                  .presentation = &fixture->presentations[i] };
+    }
+    return rivals;
+}
+
+// Exact fleet digest and per-slot pose. The wake counts prove the stress load reached capacity.
+static void format_stress_state(char *out, size_t size, const StressFixture *fixture)
+{
+    int used = snprintf(out, size,
+        "tick=%llu hash=%016llx wake_live=%u wake_peak=%u "
+        "wake_emitted=%llu wake_expired=%llu traffic_live=%u traffic_peak=%u traffic_emitted=%llu",
+        (unsigned long long)fixture->fleet.state.tick,
+        (unsigned long long)boat_fleet_hash(&fixture->fleet.state), fixture->fleet.state.wakes.live,
+        fixture->fleet.state.wakes.peak_live,
+        (unsigned long long)fixture->fleet.state.wakes.emitted,
+        (unsigned long long)fixture->fleet.state.wakes.expired, fixture->traffic.live,
+        fixture->traffic.peak_live, (unsigned long long)fixture->traffic.emitted);
+    for (unsigned i = 0; i < BOAT_FLEET_SLOTS && used > 0 && (size_t)used < size; ++i) {
+        const Boat *boat = &fixture->fleet.state.slots[i].boat;
+        used += snprintf(out + used, size - (size_t)used, " slot%u=%a,%a,%a,%a", i,
+            (double)boat->position.x, (double)boat->position.y, (double)boat->heading,
+            (double)boat->velocity.x);
+    }
+}
+
+// Display-free fixture state for the benchmark contract: the same pre-roll and measured ticks.
+static int stress_state(void)
+{
+    StressFixture fixture;
+    char state[1024];
+    // The benchmark draws frame zero without stepping, then two ticks per later frame.
+    if (!stress_init(&fixture, true) || !stress_advance(&fixture, STRESS_PREROLL_TICKS)
+        || !stress_advance(&fixture, (STRESS_FRAMES - 1) * STRESS_TICKS_PER_FRAME))
+        return 1;
+    format_stress_state(state, sizeof(state), &fixture);
+    printf("stress_state %s\n", state);
+    test_worlds_close();
+    return 0;
+}
+
 #define BENCH_WARMUP 120
 #define BENCH_FRAMES (MAX_TICKS / 2 + 2)
 #define BENCH_DEADLINE_MS (1000.0 / 60.0)
@@ -512,6 +661,7 @@ static void format_final_state(char *out, size_t size, const Boat *boat, int tic
 typedef struct {
     int first_tick, end_tick, wave_rebuilds;
     size_t destination, wake_uploads;
+    unsigned wake_live, wake_peak_live, wake_emitters, traffic_wake_live;
     float x, z, heading;
     float simulation_ms, render_ms, present_ms, frame_ms, interval_ms, gpu_ms;
     bool has_interval, has_gpu;
@@ -656,10 +806,10 @@ static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size)
             scenery, boat_location(BOAT_LOCATION_RIVER)->map, tile_size);
 }
 
-static int benchmark(
-    const char *prefix, bool waves, bool aa, bool visible, const char *pacing, float tile_size)
+static int benchmark(const char *prefix, bool waves, bool aa, bool visible, const char *pacing,
+    float tile_size, bool stress)
 {
-    char csv_path[4096], json_path[4096], state[512];
+    char csv_path[4096], json_path[4096], state[1024];
     snprintf(csv_path, sizeof(csv_path), "%s.csv", prefix);
     snprintf(json_path, sizeof(json_path), "%s.json", prefix);
     // Fail on an unusable prefix before the voyage; both reports are rewritten at the end.
@@ -675,11 +825,14 @@ static int benchmark(
     float *scratch = calloc(BENCH_FRAMES, sizeof(*scratch));
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
-    boat_session_init(
-        &session, test_world(BOAT_LOCATION_RIVER), waves ? boat_water_gentle() : (BoatWater) { 0 });
-    const Boat *boat = &session.boat;
-    const BoatCamera camera
-        = { .distance = location->camera_distance, .height = location->camera_height };
+    StressFixture stress_fixture;
+    if (!stress)
+        boat_session_init(&session, test_world(BOAT_LOCATION_RIVER),
+            waves ? boat_water_gentle() : (BoatWater) { 0 });
+    const Boat *boat = stress ? &stress_fixture.fleet.state.slots[0].boat : &session.boat;
+    const BoatCamera camera = stress
+        ? (BoatCamera) { .distance = 26, .height = 16 }
+        : (BoatCamera) { .distance = location->camera_distance, .height = location->camera_height };
     BoatGpu gpu = { 0 };
     GpuTimer timer = { 0 };
     const char *error = NULL;
@@ -696,10 +849,19 @@ static int benchmark(
     }
     SetConfigFlags(!visible ? FLAG_WINDOW_HIDDEN : vsync ? FLAG_VSYNC_HINT : 0);
     InitWindow(960, 600, "Proteus / boat water benchmark");
-    if (!IsWindowReady() || !boat_gpu_init(&gpu, aa) || !prepare_tiles(&gpu.scenery, tile_size)) {
+    if (!IsWindowReady() || !boat_gpu_init(&gpu, aa)
+        || (!stress && !prepare_tiles(&gpu.scenery, tile_size))) {
         error = "graphics initialization failed";
         goto cleanup;
     }
+    if (stress
+        && (!stress_init(&stress_fixture, waves)
+            || !stress_advance(&stress_fixture, STRESS_PREROLL_TICKS))) {
+        error = "stress fixture failed";
+        goto cleanup;
+    }
+    if (stress)
+        tick = (int)stress_fixture.fleet.state.tick;
     if (visible && strcmp(pacing, "cap") == 0) {
         SetTargetFPS(60);
         snprintf(pacing_name, sizeof(pacing_name), "SetTargetFPS(60)");
@@ -719,17 +881,34 @@ static int benchmark(
         BenchFrame *frame = &frames[count];
         frame->first_tick = tick;
         double start = boat_profile_time(false);
-        if (count > 0)
+        if (stress) {
+            if (count > 0 && !stress_advance(&stress_fixture, STRESS_TICKS_PER_FRAME)) {
+                error = "stress fixture failed";
+                goto cleanup;
+            }
+            tick = (int)stress_fixture.fleet.state.tick;
+            finished = count + 1 >= STRESS_FRAMES;
+        } else if (count > 0) {
             do {
                 drive(&session, &destination);
                 ++tick;
                 finished = route_finished(boat, destination);
             } while (tick % 2 && !finished);
+        }
         double simulated = boat_profile_time(false);
         int rebuilds = gpu.wave_rebuilds;
         size_t uploads = gpu.wake_uploads;
         bool timed = gpu_timer_begin(&timer, count);
-        boat_gpu_draw(&gpu, SESSION_VIEW(&session), &session.presentation, &session.world, camera);
+        if (stress) {
+            BoatWorld world = stress_world(&stress_fixture);
+            BoatViewState view = stress_view(&stress_fixture);
+            BoatRivals rivals = stress_rivals(&stress_fixture);
+            boat_gpu_draw_scene(&gpu, &view, &stress_fixture.presentations[0], &world, camera,
+                &rivals, NULL, NULL, 0);
+        } else {
+            boat_gpu_draw(
+                &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, camera);
+        }
         rlDrawRenderBatchActive();
         if (timed)
             glEndQuery(GL_TIME_ELAPSED);
@@ -754,24 +933,39 @@ static int benchmark(
         frame->interval_ms = count > 0 ? (float)((start - previous_start) * 1000) : 0;
         frame->wave_rebuilds = gpu.wave_rebuilds - rebuilds;
         frame->wake_uploads = gpu.wake_uploads - uploads;
+        if (stress) {
+            frame->wake_live = stress_fixture.fleet.state.wakes.live;
+            frame->wake_peak_live = stress_fixture.fleet.state.wakes.peak_live;
+            frame->wake_emitters = BOAT_FLEET_SLOTS;
+            frame->traffic_wake_live = stress_fixture.traffic.live;
+        }
         bench_count(frame, &gpu.scene.stats);
         previous_start = start;
         gpu_timer_poll(&timer, frames, false);
         ++count;
-        // Frame poses only; --check covers every tick and the report's final state proves
-        // that this run followed the same trajectory.
-        if (!hull_clear(boat)) {
-            error = "route too close to shore";
-            goto cleanup;
-        }
-        if (finished)
-            break;
-        if (tick >= MAX_TICKS || count == BENCH_FRAMES) {
-            error = "route did not finish";
-            goto cleanup;
+        if (stress) {
+            if (finished)
+                break;
+            if (count == BENCH_FRAMES) {
+                error = "stress run exceeded its frame capacity";
+                goto cleanup;
+            }
+        } else {
+            // Frame poses only; --check covers every tick and the report's final state proves
+            // that this run followed the same trajectory.
+            if (!hull_clear(boat)) {
+                error = "route too close to shore";
+                goto cleanup;
+            }
+            if (finished)
+                break;
+            if (tick >= MAX_TICKS || count == BENCH_FRAMES) {
+                error = "route did not finish";
+                goto cleanup;
+            }
         }
         if (visible && WindowShouldClose()) {
-            error = "window closed before the route finished";
+            error = "window closed before the run finished";
             goto cleanup;
         }
     }
@@ -793,7 +987,8 @@ static int benchmark(
           "shadow_submissions,shadow_triangles,reflection_submissions,reflection_triangles,"
           "main_submissions,main_triangles,map_submissions,map_triangles,"
           "water_submissions,water_triangles,object_submissions,object_triangles,"
-          "shadow_tiles_culled,reflection_tiles_culled,main_tiles_culled\n",
+          "shadow_tiles_culled,reflection_tiles_culled,main_tiles_culled,"
+          "wake_live,wake_peak_live,wake_emitters,traffic_wake_live\n",
         csv);
     for (int i = 0; i < count; ++i) {
         const BenchFrame *f = &frames[i];
@@ -814,13 +1009,22 @@ static int benchmark(
             fprintf(csv, ",%u,%zu", f->group[group].submissions, f->group[group].triangles);
         for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
             fprintf(csv, ",%u", f->culled[pass]);
-        fputc('\n', csv);
+        fprintf(csv, ",%u,%u,%u,%u\n", f->wake_live, f->wake_peak_live, f->wake_emitters,
+            f->traffic_wake_live);
     }
-    format_final_state(state, sizeof(state), boat, tick);
+    unsigned traffic_peak = 0;
+    for (int i = 0; i < count; ++i)
+        traffic_peak = frames[i].traffic_wake_live > traffic_peak ? frames[i].traffic_wake_live
+                                                                  : traffic_peak;
+    if (stress)
+        format_stress_state(state, sizeof(state), &stress_fixture);
+    else
+        format_final_state(state, sizeof(state), boat, tick);
     fprintf(json,
-        "{\n  \"schema_revision\":3,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
-        "  \"route\":\"river-review\",\"route_revision\":1,\"physics_revision\":%d,\n"
+        "{\n  \"schema_revision\":4,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
+        "  \"scenario\":\"%s\",\"route\":\"%s\",\"route_revision\":1,\"physics_revision\":%d,\n"
         "  \"build\":\"%s\",\"platform\":\"%s\",\n  \"gl_renderer\":",
+        stress ? "stress-basin" : "river-review", stress ? "stress-basin" : "river-review",
         BOAT_PHYSICS_REVISION, BOAT_BENCH_BUILD, BOAT_BENCH_PLATFORM);
     json_string(json, renderer_name);
     fputs(",\"gl_version\":", json);
@@ -843,11 +1047,13 @@ static int benchmark(
         "\"tick_hz\":120,\"ticks_per_frame\":2,\n"
         "  \"frames\":%d,\"warmup_frames\":%d,\"measured_frames\":%d,\"total_ticks\":%d,"
         "\"warmup_end_tick\":%d,\n"
-        "  \"route_completed\":true,\"destination\":%zu,\"final_state\":\"%s\",\n"
+        "  \"run_completed\":true,\"route_completed\":%s,\"destination\":%zu,"
+        "\"final_state\":\"%s\",\n"
         "  \"deadline_ms\":%.9g,\"deadline_rule\":\"value > deadline_ms\","
         "\"frame_deadline_misses\":%d,\"interval_deadline_misses\":%d,\n",
         count, BENCH_WARMUP, count - BENCH_WARMUP, tick, frames[BENCH_WARMUP - 1].end_tick,
-        destination, state, BENCH_DEADLINE_MS, frame_misses, interval_misses);
+        stress ? "false" : "true", destination, state, BENCH_DEADLINE_MS, frame_misses,
+        interval_misses);
     json_stats(json, "simulation_ms", frames, count, scratch, bench_simulation);
     json_stats(json, "render_submit_ms", frames, count, scratch, bench_render);
     json_stats(json, "present_ms", frames, count, scratch, bench_present);
@@ -858,19 +1064,37 @@ static int benchmark(
     json_stats(json, "scene_triangles", frames, count, scratch, bench_triangles);
     json_stats(json, "map_submissions", frames, count, scratch, bench_map_submissions);
     json_stats(json, "map_triangles", frames, count, scratch, bench_map_triangles);
+    if (stress) {
+        fprintf(json,
+            "  \"wake_objects\":{\"emitters\":%u,\"boat_pool_capacity\":%d,\"live\":%u,"
+            "\"peak_live\":%u,\"emitted\":%llu,\"expired\":%llu,"
+            "\"traffic_live\":%u,\"traffic_peak_live\":%u,\"traffic_emitted\":%llu},\n"
+            "  \"wake_objects_note\":\"Four fleet emitters share one 128-slot boat pool; the "
+            "traffic pool adds a second 128-record texture row. Counts are live records, not "
+            "draw calls.\",\n",
+            BOAT_FLEET_SLOTS, BOAT_OBJECT_CAPACITY, stress_fixture.fleet.state.wakes.live,
+            stress_fixture.fleet.state.wakes.peak_live,
+            (unsigned long long)stress_fixture.fleet.state.wakes.emitted,
+            (unsigned long long)stress_fixture.fleet.state.wakes.expired,
+            stress_fixture.traffic.live, traffic_peak,
+            (unsigned long long)stress_fixture.traffic.emitted);
+    } else {
+        fputs("  \"wake_objects\":null,\n", json);
+    }
     fprintf(json,
         "  \"gpu_timer\":%s,\"gpu_samples\":%d,\"gpu_samples_skipped\":%d,\n"
         "  \"wave_patch_rebuilds\":%d,\"wave_patch_rebuilds_measured\":%d,"
         "\"wave_vertex_capacity\":%d,\"wave_peak_triangles\":%d,\n"
         "  \"submission_counter\":\"waterfront_gpu_scene_draw DrawMesh calls plus batched sky "
         "quads; excludes the AA downsample and presentation\",\"driver_draw_calls\":null\n}\n",
-        timer.supported ? "\"GL_TIME_ELAPSED around boat_gpu_draw, asynchronous\"" : "null",
+        timer.supported ? "\"GL_TIME_ELAPSED around the scene draw, asynchronous\"" : "null",
         gpu_samples, timer.supported ? count - BENCH_WARMUP - gpu_samples : 0, gpu.wave_rebuilds,
         measured_rebuilds, gpu.wave_capacity, gpu.wave_peak_triangles);
     ok = !ferror(csv) && !ferror(json);
-    printf("benchmark aa=%s preset=%s window=%s frames=%d warmup=%d ticks=%d gpu_samples=%d\n",
-        aa ? "4x4" : "off", waves ? "waves" : "flat", visible ? "visible" : "hidden", count,
-        BENCH_WARMUP, tick, gpu_samples);
+    printf("benchmark scenario=%s aa=%s preset=%s window=%s frames=%d warmup=%d ticks=%d "
+           "gpu_samples=%d\n",
+        stress ? "stress-basin" : "river-review", aa ? "4x4" : "off", waves ? "waves" : "flat",
+        visible ? "visible" : "hidden", count, BENCH_WARMUP, tick, gpu_samples);
     printf("final_state %s\n", state);
 cleanup:
     if (error)
@@ -894,19 +1118,168 @@ cleanup:
     return ok ? 0 : bench_fail(error ? error : "cannot write report");
 }
 
+// G0 review poses: fixed map, boat pose and camera, with explicit ticks. Motion cases advance the
+// pose between captures so the sequence shows movement rather than a reused still.
+typedef struct {
+    const char *name, *kind;
+    BoatLocationId location;
+    Vector2 position;
+    float heading, camera_heading, distance, height;
+    unsigned tick, frames, step_ticks;
+    Vector2 step_position; // Added once per captured frame, renderer X/Z.
+    float step_heading; // Added once per captured frame.
+} ReviewPose;
+
+static const ReviewPose review_poses[] = {
+    { "basin-hull", "static", BOAT_LOCATION_BASIN, { 0, 10 }, 0, 0, 8, 4, 360, 1, 0, { 0 }, 0 },
+    { "basin-wake", "static", BOAT_LOCATION_BASIN, { 0, -20 }, 0, 0, 16, 9, 1080, 1, 0, { 0 }, 0 },
+    { "river-quay", "static", BOAT_LOCATION_RIVER, { -24, -70 }, -.3f, -.3f, 12, 6, 600, 1, 0,
+        { 0 }, 0 },
+    { "river-bridge", "static", BOAT_LOCATION_RIVER, { 250, -500 }, .85f, .85f, 14, 6, 900, 1, 0,
+        { 0 }, 0 },
+    { "river-skyline", "static", BOAT_LOCATION_RIVER, { 650, -850 }, 1.0f, 1.0f + PI, 44, 22, 1200,
+        1, 0, { 0 }, 0 },
+    { "outer-dock", "static", BOAT_LOCATION_OUTER, { -12, 60 }, 0, 0, 12, 6, 600, 1, 0, { 0 }, 0 },
+    { "outer-coast", "static", BOAT_LOCATION_OUTER, { -24, -70 }, -.4f, -.4f, 36, 18, 1200, 1, 0,
+        { 0 }, 0 },
+    { "river-tile-boundary", "tile-boundary", BOAT_LOCATION_RIVER, { 1100, -950 }, -1.79f, -1.79f,
+        30, 14, 1500, 4, 30, { -40, 9 }, 0 },
+    { "river-fast-turn", "fast-turn", BOAT_LOCATION_RIVER, { 250, -500 }, -.4f, -.4f, 22, 10, 300,
+        4, 30, { 3, 2 }, .45f },
+    { "river-stop", "stop-restart", BOAT_LOCATION_RIVER, { -15, -180 }, 2.2f, 2.2f, 16, 8, 180, 4,
+        360, { 0 }, 0 },
+    { "river-camera-turn", "camera-turn", BOAT_LOCATION_RIVER, { -15, -180 }, 2.2f, 2.2f, 20, 10,
+        180, 4, 30, { 0 }, 0 },
+    { "river-map-reload", "map-reload", BOAT_LOCATION_RIVER, { -12, 60 }, 0, 0, 20, 10, 2100, 4,
+        120, { 0 }, 0 },
+    { "outer-map-reload", "map-reload", BOAT_LOCATION_OUTER, { -12, 60 }, 0, 0, 20, 10, 2100, 4,
+        120, { 0 }, 0 },
+};
+
+static bool review_pose_clear(const BoatWorldResources *resources, Vector2 position)
+{
+    if (resources->definition->mapped)
+        return boat_map_water(&resources->map, position, 2.5f);
+    return fabsf(position.x) < BOAT_BASIN_HALF_X - 3 && fabsf(position.y) < BOAT_BASIN_HALF_Z - 3;
+}
+
+// Capture the G0 review manifest and named pose images. The manifest records exactly the
+// location, world pose, camera, ticks, water and resolution used, plus the reproducible command.
+static int review(const char *directory, bool use_gpu)
+{
+    char path[2048], manifest_path[2048];
+    if (!DirectoryExists(directory) && MakeDirectory(directory) != 0)
+        return bench_fail("cannot create the review directory (its parent must exist)");
+    snprintf(manifest_path, sizeof(manifest_path), "%s/manifest.json", directory);
+    FILE *manifest = fopen(manifest_path, "w");
+    if (!manifest)
+        return bench_fail("cannot create the review manifest");
+    BoatGpu gpu = { 0 };
+    Renderer3D cpu = { 0 };
+    BoatCpuView cpu_view = { 0 };
+    int result = 1;
+    if (use_gpu) {
+        SetConfigFlags(FLAG_WINDOW_HIDDEN);
+        InitWindow(320, 200, "Proteus / graphics review poses");
+        if (!IsWindowReady() || !boat_gpu_init(&gpu, true))
+            goto cleanup;
+    } else if (!prepare_tiles(&cpu_view.scenery, 0)) {
+        goto cleanup;
+    }
+    fprintf(manifest,
+        "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
+        "  \"renderer\":\"%s\",\"resolution\":[320,200],\"gpu_aa\":%s,\"physics_revision\":%d,\n"
+        "  \"clock\":\"explicit pose tick * BOAT_STEP; presentation only\",\n"
+        "  \"check_command\":\"boat_water_review --check\",\n"
+        "  \"capture_command\":\"boat_water_review --review DIR --renderer %s\",\n"
+        "  \"poses\":[\n",
+        use_gpu ? "gpu" : "cpu", use_gpu ? "true" : "false", BOAT_PHYSICS_REVISION,
+        use_gpu ? "gpu" : "cpu");
+    for (size_t p = 0; p < sizeof(review_poses) / sizeof(*review_poses); ++p) {
+        const ReviewPose *pose = &review_poses[p];
+        const BoatWorldResources *resources = test_world(pose->location);
+        BoatSession session;
+        boat_session_init(&session, resources, boat_water_gentle());
+        BoatPresentation shown = session.presentation;
+        Boat inspection = session.boat;
+        inspection.position = pose->position;
+        inspection.heading = pose->heading;
+        shown.camera_heading = pose->camera_heading;
+        printf("review %s location=%s kind=%s frames=%u\n", pose->name, resources->definition->name,
+            pose->kind, pose->frames);
+        fprintf(manifest,
+            "    {\"name\":\"%s\",\"kind\":\"%s\",\"location\":\"%s\","
+            "\"position\":[%.6g,%.6g],\"heading\":%.9g,\"camera\":{"
+            "\"distance\":%.6g,\"height\":%.6g,\"heading\":%.9g},"
+            "\"tick\":%u,\"frames\":%u,\"step_ticks\":%u,\"step_position\":"
+            "[%.6g,%.6g],\"step_heading\":%.9g,\"waves\":true,"
+            "\"resolution\":[320,200],\"captures\":[",
+            pose->name, pose->kind, resources->definition->name, (double)pose->position.x,
+            (double)pose->position.y, (double)pose->heading, (double)pose->distance,
+            (double)pose->height, (double)pose->camera_heading, pose->tick, pose->frames,
+            pose->step_ticks, (double)pose->step_position.x, (double)pose->step_position.y,
+            (double)pose->step_heading);
+        for (unsigned frame = 0; frame < pose->frames; ++frame) {
+            if (!review_pose_clear(resources, inspection.position)) {
+                fputs("\n  ],\n  \"error\":\"pose is not clear of land\"\n}\n", manifest);
+                boat_session_destroy(&session);
+                goto cleanup;
+            }
+            shown.camera_heading = pose->camera_heading + frame * pose->step_heading;
+            const BoatCamera camera = { .distance = pose->distance, .height = pose->height };
+            double time = (pose->tick + frame * pose->step_ticks) * (double)BOAT_STEP;
+            snprintf(path, sizeof(path), "%s/%s-%u.png", directory, pose->name, frame);
+            if (!capture(&gpu, &cpu, &cpu_view, &inspection, time, &shown, &session.world, camera,
+                    use_gpu, path)) {
+                fputs("\n  ],\n  \"error\":\"capture failed\"\n}\n", manifest);
+                boat_session_destroy(&session);
+                goto cleanup;
+            }
+            fprintf(manifest, "%s\"%s-%u.png\"", frame ? "," : "", pose->name, frame);
+            inspection.position = Vector2Add(inspection.position, pose->step_position);
+            inspection.heading += pose->step_heading;
+        }
+        fprintf(manifest, "]},\n");
+        boat_session_destroy(&session);
+    }
+    fputs("  ]\n}\n", manifest);
+    result = 0;
+cleanup:
+    if (fclose(manifest))
+        result = 1;
+    boat_cpu_view_destroy(&cpu_view);
+    renderer3d_destroy(&cpu);
+    if (use_gpu && IsWindowReady()) {
+        boat_gpu_destroy(&gpu);
+        CloseWindow();
+    }
+    test_worlds_close();
+    if (result)
+        remove(manifest_path);
+    return result ? bench_fail("review capture failed") : 0;
+}
+
 int main(int argc, char **argv)
 {
     test_scenery_load();
     const char *output = NULL, *bench = NULL, *aa_name = NULL, *pacing = NULL;
+    const char *scenario = NULL, *review_dir = NULL;
     float tile_size = 0;
     bool no_cull = false;
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
+    bool stress_state_only = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--output") == 0 && i + 1 < argc)
             output = argv[++i];
         else if (strcmp(argv[i], "--benchmark") == 0 && i + 1 < argc)
             bench = argv[++i];
+        else if (strcmp(argv[i], "--scenario") == 0 && i + 1 < argc)
+            scenario = argv[++i];
+        else if (strcmp(argv[i], "--stress-state") == 0)
+            stress_state_only = true;
+        else if (strcmp(argv[i], "--review") == 0 && i + 1 < argc)
+            review_dir = argv[++i];
         else if (strcmp(argv[i], "--aa") == 0 && i + 1 < argc)
             aa_name = argv[++i];
         else if (strcmp(argv[i], "--waves") == 0)
@@ -942,28 +1315,40 @@ int main(int argc, char **argv)
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
                  "       boat_water_review --check-gpu-lifecycle | --check-culling\n"
+                 "       boat_water_review --stress-state\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--visible] [--tile-size M] [--no-cull]\n"
+                 "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
-                 "                         [--waves] [--visible [--pacing cap|deadline|vsync]]\n"
+                 "                         [--scenario river|stress] [--waves]\n"
+                 "                         [--visible [--pacing cap|deadline|vsync]]\n"
                  "                         [--tile-size M]\n"
                  "--tile-size: render tile edge, 64..65536 m (default 1024).\n"
+                 "--scenario river: the existing river route; stress: four basin boats with\n"
+                 "  saturated boat and traffic wake pools (deterministic pre-roll).\n"
+                 "--stress-state prints the stress fixture's final physical state without a\n"
+                 "  window; --benchmark --scenario stress must report the same state.\n"
                  "Visible benchmark pacing: cap = SetTargetFPS(60) (default), deadline = 60 Hz\n"
                  "deadline chain, vsync = the game's vsync with a backstop above the refresh.\n"
                  "Benchmark writes PREFIX.json and PREFIX.csv: two ticks per frame, 120 warmup.\n"
                  "GPU uses existing 4x AA. GPU sequence: 10 Hz; CPU samples: five seconds.\n"
                  "Visible GPU playback uses 60 Hz; simulation remains 120 Hz.\n"
                  "Named captures use both default and close follow cameras.\n"
+                 "--review writes manifest.json and the named pose captures.\n"
                  "Map data (c) OpenStreetMap contributors, ODbL 1.0.");
             return strcmp(argv[i], "--help") == 0 ? 0 : 2;
         }
     }
-    if (bench || aa_name || pacing) {
-        const char *problem = !bench ? "--aa and --pacing require --benchmark"
+    if (stress_state_only)
+        return argc > 2 ? 2 : stress_state();
+    if (bench || aa_name || pacing || scenario) {
+        const char *problem = !bench ? "--aa, --pacing and --scenario require --benchmark"
             : !aa_name               ? "--benchmark requires --aa off|4x4"
             : strcmp(aa_name, "off") && strcmp(aa_name, "4x4") ? "--aa must be off or 4x4"
-            : check || gpu_check || gpu_views || gpu_lifecycle || output || sequence
-            ? "--benchmark excludes --check, --check-gpu*, --output and --sequence"
+            : scenario && strcmp(scenario, "river") && strcmp(scenario, "stress")
+            ? "--scenario must be river or stress"
+            : check || gpu_check || gpu_views || gpu_lifecycle || output || sequence || review_dir
+            ? "--benchmark excludes --check, --check-gpu*, --output, --review and --sequence"
             : !use_gpu ? "--benchmark supports only --renderer gpu"
             : !*bench || strlen(bench) > 4000 || bench[strlen(bench) - 1] == '/'
             ? "--benchmark needs a file prefix of 1..4000 bytes"
@@ -977,6 +1362,10 @@ int main(int argc, char **argv)
             return 2;
         }
     }
+    if (review_dir
+        && (check || output || sequence || visible || aa_name || pacing || scenario || gpu_check
+            || gpu_views || gpu_lifecycle || culling))
+        return 2;
     if (gpu_check || gpu_views || gpu_lifecycle || culling) {
         SetTraceLogLevel(LOG_WARNING);
         return culling      ? check_culling()
@@ -984,7 +1373,7 @@ int main(int argc, char **argv)
             : gpu_views     ? check_gpu_views()
                             : check_gpu_water();
     }
-    if (!check && !output && !bench)
+    if (!check && !output && !bench && !review_dir)
         return 2;
     SetTraceLogLevel(LOG_WARNING);
     // These samples distinguish navigable space under the deck from solid legs.
@@ -999,8 +1388,10 @@ int main(int argc, char **argv)
         return 1;
     }
     if (bench)
-        return benchmark(
-            bench, waves, strcmp(aa_name, "4x4") == 0, visible, pacing ? pacing : "cap", tile_size);
+        return benchmark(bench, waves, strcmp(aa_name, "4x4") == 0, visible,
+            pacing ? pacing : "cap", tile_size, scenario && strcmp(scenario, "stress") == 0);
+    if (review_dir)
+        return review(review_dir, use_gpu);
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
     BoatSession session;
     boat_session_init(
