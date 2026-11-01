@@ -805,7 +805,8 @@ the coordinates a surface reads), `9bd930a` (normals by surface, `--compare`). E
 | outer, before | 1,360,411 | — | 4,081,233 | 146,924,388 + 0 | 146,924,388 | | |
 | outer, after | 1,360,411 | 210 | 3,191,362 | 70,143,732 + 8,162,466 | 0 | **−52.3%** | −46.7% |
 
-"Before" is the gate's reference of three unique 36 B vertices per triangle; the CPU kept that same
+The basin has no static map meshes, so its report is all zeros. "Before" is the gate's reference of
+three unique 36 B vertices per triangle; the CPU kept that same
 copy after upload. Upload bytes equal the vertex + index column. Duplicate-source memory for these
 meshes is now zero outside the review-only option; scenery and the transient builders during bind
 are not in the table, and peak bind memory was not measured.
@@ -819,7 +820,7 @@ are not in the table, and peak bind memory was not measured.
   −51.5% outer, but flipped single AA samples across the hard shadow-bias test in `directional_shadow`:
   up to 6/255 at isolated pixels in 15 of 31 captures. Keeping precise facade, roof and ground
   normals still left 3/255, so the release form uses 16 bits and pays for it by dropping the normal
-  from windows, half of the outer map's vertices.
+  from windows, about 45% of the river and outer vertices together.
 - Frame gates at `9bd930a` (Release, 4x4, three repeats, p95): river 202 submissions (≤ 400),
   1.19–1.27 ms CPU (≤ 3.2), 1.25–1.36 ms GPU (≤ 4.05); stress 76 submissions (≤ 300), 10.34–10.57 ms
   GPU (≤ 21), 1.78–1.83 ms CPU at 60 Hz (≤ 4.0), unpaced 9.25–9.72 ms for information. Chunking moved

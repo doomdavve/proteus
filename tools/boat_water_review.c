@@ -1361,7 +1361,8 @@ static int report_geometry(void)
     InitWindow(320, 200, "Geometry report");
     BoatGpu gpu = { 0 };
     int result = !IsWindowReady() || !boat_gpu_init(&gpu, false);
-    const BoatLocationId locations[] = { BOAT_LOCATION_RIVER, BOAT_LOCATION_OUTER };
+    const BoatLocationId locations[]
+        = { BOAT_LOCATION_BASIN, BOAT_LOCATION_RIVER, BOAT_LOCATION_OUTER };
     for (size_t i = 0; !result && i < sizeof(locations) / sizeof(*locations); ++i) {
         const BoatWorldResources *resources = test_world(locations[i]);
         BoatSession session;
