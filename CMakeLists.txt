@@ -1279,6 +1279,10 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME wake_stamp COMMAND boat_water_review --check-wake-stamp)
   set_tests_properties(wake_stamp PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "wake_stamp=ok")
+  # Graphics G3b: foam history and ripples: replay, pause, catch-up, resets, scroll, stability.
+  add_test(NAME water_history COMMAND boat_water_review --check-water-history)
+  set_tests_properties(water_history PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "water_history=ok")
   add_test(NAME gpu_view_lifecycle COMMAND boat_water_review --check-gpu-lifecycle)
   set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}

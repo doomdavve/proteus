@@ -21,7 +21,7 @@ STRESS_WARMUP = 120
 STRESS_FRAMES = 1020
 STATS = ('simulation_ms', 'render_submit_ms', 'present_ms', 'frame_ms', 'frame_interval_ms',
          'gpu_ms', 'app_submissions', 'app_instances', 'scene_triangles', 'map_submissions', 'map_triangles',
-         'wake_stamp_pieces', 'wake_stamp_outside', 'wake_stamp_texels')
+         'wake_stamp_pieces', 'wake_stamp_outside', 'wake_stamp_texels', 'water_history_substeps')
 PASSES = ('shadow', 'reflection', 'main')
 GROUPS = ('map', 'water', 'object')
 
@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory() as directory:
     with prefix.with_suffix('.csv').open() as stream:
         rows = list(csv.DictReader(stream))
 
-    assert report['schema_revision'] == 6 and report['mode'] == 'benchmark'
+    assert report['schema_revision'] == 7 and report['mode'] == 'benchmark'
     assert report['scenario'] == 'river-review' and report['route'] == 'river-review'
     assert report['tile_size'] == 1024
     assert report['renderer'] == 'gpu' and report['aa'] == 'off'
@@ -128,6 +128,12 @@ with tempfile.TemporaryDirectory() as directory:
     # float blending is unavailable.
     assert shading['field_bytes'] in (0, 1024 * 1024 * 8)
     assert shading['mode'] == 'analytic' or shading['field_bytes'] > 0
+    history = report['water_history']
+    assert history['mode'] in ('history', 'off')
+    assert history['field_size'] == 512 and history['spacing_m'] == 0.25
+    # Two RGBA16F states and the RGBA8 shore mask; none without float targets.
+    assert history['field_bytes'] in (0, 512 * 512 * 20)
+    assert history['mode'] == 'off' or history['field_bytes'] > 0
 
     frames = report['frames']
     assert len(rows) == frames and report['warmup_frames'] == WARMUP
@@ -203,7 +209,7 @@ with tempfile.TemporaryDirectory() as directory:
     stress_report = json.loads(stress.with_suffix('.json').read_text())
     with stress.with_suffix('.csv').open() as stream:
         stress_rows = list(csv.DictReader(stream))
-    assert stress_report['schema_revision'] == 6
+    assert stress_report['schema_revision'] == 7
     assert stress_report['scenario'] == 'stress-basin' and stress_report['route'] == 'stress-basin'
     assert stress_report['run_completed'] is True and stress_report['route_completed'] is False
     assert stress_report['final_state'] == expected_stress == final_state(result.stdout)
@@ -237,6 +243,13 @@ with tempfile.TemporaryDirectory() as directory:
         for i, row in enumerate(stress_rows):
             assert int(row['wake_stamp_pieces']) > 0, i
             assert int(row['wake_stamp_texels']) > 0, i
+    # Each two-tick frame is one 60 Hz history substep after the first frame's reset and
+    # 60-substep pre-roll; the stress fixture never jumps, rewinds or teleports.
+    if stress_report['water_history']['mode'] == 'history':
+        assert stress_report['water_history']['resets'] == 1
+        assert stress_report['water_history']['substeps'] == STRESS_FRAMES - 1 + 60
+        assert int(stress_rows[0]['water_history_substeps']) == 60
+        assert all(int(row['water_history_substeps']) == 1 for row in stress_rows[1:])
     assert stress_report['gpu_samples'] == sum(
         1 for row in stress_rows[STRESS_WARMUP:] if row['gpu_ms'])
 print('river benchmark rows, warmup, percentiles, route completion and final-state parity pass; '
