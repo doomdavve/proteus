@@ -129,6 +129,8 @@ static int check_gpu_water(void)
         goto cleanup;
     waterfront_gpu_scene_set_reflections_enabled(&gpu.scene, false);
     waterfront_gpu_scene_set_shadows_enabled(&gpu.scene, false);
+    // Gust patches cross the walk below by design; this probes the exposure field alone.
+    waterfront_gpu_scene_set_far_water_enabled(&gpu.scene, false);
     BoatWater water = boat_water_gentle();
     water.amplitude = 1e-8f;
     water.crossing[0].amplitude = water.crossing[1].amplitude = 0;
@@ -313,6 +315,8 @@ static bool no_water_history;
 static bool no_scene_depth;
 // --no-water-atlas: the hand-written exposure field instead of the G4 map atlas.
 static bool no_water_atlas;
+// --no-far-water: no G4 gusts, sun glitter or squall water.
+static bool no_far_water;
 
 static bool apply_scene_options(WaterfrontGpuScene *scene)
 {
@@ -321,6 +325,7 @@ static bool apply_scene_options(WaterfrontGpuScene *scene)
     waterfront_gpu_scene_set_water_history_enabled(scene, !no_water_history);
     waterfront_gpu_scene_set_scene_depth_enabled(scene, !no_scene_depth);
     waterfront_gpu_scene_set_water_atlas_enabled(scene, !no_water_atlas);
+    waterfront_gpu_scene_set_far_water_enabled(scene, !no_far_water);
     if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
         return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
     return true;
@@ -2282,6 +2287,64 @@ cleanup:
     return result;
 }
 
+// G4 playback: a boat crossing the outer harbour toward the sun at 6 m/s while the camera swings
+// 35 degrees either side, all G4 layers left and the G3b water (no atlas, depth copy or far
+// water) right. SQUALL adds a weather squall approaching from 900 m ahead.
+static int place_clip(const char *directory, int frames, bool squall)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Water place clip");
+    if (!IsWindowReady())
+        return 1;
+    int result = 1;
+    BoatGpu gpu = { 0 };
+    const int width = 320, height = 200; // The default resolution.
+    Image strip = GenImageColor(2 * width, height, BLACK);
+    BoatSession session;
+    boat_session_init(&session, test_world(BOAT_LOCATION_OUTER), boat_water_gentle());
+    if (squall)
+        session.world.water.storm = (BoatStorm) { .centre = { 24, -970 },
+            .velocity = { 0, 9 },
+            .radius = 450,
+            .height = .5f,
+            .started = 0,
+            .build = 10 };
+    const BoatCamera camera = { .distance = 22, .height = 9 };
+    if (!boat_gpu_init(&gpu, true) || !boat_gpu_resize(&gpu, width, height))
+        goto cleanup;
+    for (int frame = 0; frame < frames; ++frame) {
+        double time = frame / 60.0;
+        BoatViewState view = { .boat = session.boat, .time = time };
+        view.boat.position = (Vector2) { -24, -70 - 6 * (float)time };
+        view.boat.heading = 0;
+        session.presentation.camera_heading = .6f * sinf((float)time * .35f);
+        for (int k = 0; k < 2; ++k) {
+            waterfront_gpu_scene_set_water_atlas_enabled(&gpu.scene, k == 0);
+            waterfront_gpu_scene_set_scene_depth_enabled(&gpu.scene, k == 0);
+            waterfront_gpu_scene_set_far_water_enabled(&gpu.scene, k == 0);
+            boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
+            Image image = LoadImageFromTexture(gpu.target.texture);
+            ImageFlipVertical(&image);
+            ImageFlipHorizontal(&image);
+            ImageDraw(&strip, image, (Rectangle) { 0, 0, (float)width, (float)height },
+                (Rectangle) { (float)(k * width), 0, (float)width, (float)height }, WHITE);
+            UnloadImage(image);
+        }
+        char path[4096];
+        snprintf(path, sizeof(path), "%s/frame%04d.png", directory, frame);
+        if (!ExportImage(strip, path))
+            goto cleanup;
+    }
+    printf("place_clip frames=%d squall=%d atlas=%u\n", frames, squall, gpu.scene.water_atlas.id);
+    result = 0;
+cleanup:
+    UnloadImage(strip);
+    boat_gpu_destroy(&gpu);
+    boat_session_destroy(&session);
+    CloseWindow();
+    return result;
+}
+
 static int check_instancing(void)
 {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
@@ -2556,7 +2619,8 @@ int main(int argc, char **argv)
     bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
     bool detail = false, wake_stamp = false, water_history = false, scene_depth = false;
-    const char *clip_dir = NULL;
+    const char *clip_dir = NULL, *place_dir = NULL;
+    bool place_squall = false;
     int clip_frames = 0;
     int sequence_ticks = SAMPLE_TICKS;
     bool stress_state_only = false;
@@ -2617,11 +2681,17 @@ int main(int argc, char **argv)
             no_scene_depth = true;
         else if (strcmp(argv[i], "--no-water-atlas") == 0)
             no_water_atlas = true;
+        else if (strcmp(argv[i], "--no-far-water") == 0)
+            no_far_water = true;
         else if (strcmp(argv[i], "--check-scene-depth") == 0)
             scene_depth = true;
         else if (strcmp(argv[i], "--history-clip") == 0 && i + 2 < argc) {
             clip_dir = argv[++i];
             clip_frames = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--place-clip") == 0 && i + 3 < argc) {
+            place_dir = argv[++i];
+            clip_frames = atoi(argv[++i]);
+            place_squall = strcmp(argv[++i], "squall") == 0;
         } else if (strcmp(argv[i], "--check-detail") == 0)
             detail = true;
         else if (strcmp(argv[i], "--no-cull") == 0)
@@ -2646,9 +2716,11 @@ int main(int argc, char **argv)
                  "                         [--tile-size M] [--no-cull] [--no-detail]\n"
                  "       Any GPU run: [--analytic-wakes] [--stamp-size N] [--stamp-spacing M]\n"
                  "                    [--no-water-history] [--no-scene-depth] [--no-water-atlas]\n"
+                 "                    [--no-far-water]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
+                 "       boat_water_review --place-clip DIR FRAMES calm|squall\n"
                  "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--scenario river|stress] [--waves]\n"
@@ -2661,8 +2733,11 @@ int main(int argc, char **argv)
                  "--no-scene-depth shades water without the copy of opaque depth.\n"
                  "--no-water-atlas shades water from the hand-written dock exposure, not the\n"
                  "  map's baked atlas.\n"
+                 "--no-far-water draws water without gusts, sun glitter or squall water.\n"
                  "--history-clip writes FRAMES (1..3600) 60 Hz stress frames to DIR, history\n"
                  "  left and stamp-only right, plus the final history field as history.png.\n"
+                 "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"
+                 "  G4 water left and G3b water right; squall brings a weather squall in.\n"
                  "--scenario river: the existing river route; stress: four basin boats with\n"
                  "  saturated boat and traffic wake pools (deterministic pre-roll).\n"
                  "--stress-state prints the stress fixture's final physical state without a\n"
@@ -2708,8 +2783,12 @@ int main(int argc, char **argv)
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
     if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry
-        || wake_stamp || water_history || scene_depth || clip_dir) {
+        || wake_stamp || water_history || scene_depth || clip_dir || place_dir) {
         SetTraceLogLevel(LOG_WARNING);
+        if (place_dir)
+            return clip_frames > 0 && clip_frames <= 3600
+                ? place_clip(place_dir, clip_frames, place_squall)
+                : 2;
         if (clip_dir)
             return clip_frames > 0 && clip_frames <= 3600 ? history_clip(clip_dir, clip_frames) : 2;
         return scene_depth  ? check_scene_depth()

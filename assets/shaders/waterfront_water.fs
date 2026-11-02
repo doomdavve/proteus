@@ -491,6 +491,65 @@ vec3 shoreShade(vec3 color)
     color *= 1.0 + 0.10 * band;
     return mix(color, vec3(0.70, 0.82, 0.84), 0.55 * band * smoothstep(0.25, 0.7, lap));
 }
+// G4 far-water life, presentation only. gustWaves and glitterWaves hold X/Z wavenumbers and a
+// CPU-reduced phase; squallWater the sky squall's centre X/Z, radius and growth.
+uniform int farWaterEnabled;
+uniform vec4 gustWaves[4];
+uniform vec4 glitterWaves[5];
+uniform vec4 squallWater;
+
+// 0..1: dark, matte gust patches drifting downwind over exposed water, and the ruffled water
+// under and just ahead of a grown squall.
+float gustAmount(vec2 p, float exposed)
+{
+    if (farWaterEnabled == 0 || waterfrontWater == 0) return 0.0;
+    // A gentle warp keeps the summed waves from reading as a regular pattern.
+    vec2 q = p + 9.0 * vec2(sin(p.y * 0.061 + 1.3), sin(p.x * 0.053 + 0.4))
+        + 3.0 * vec2(sin(p.y * 0.23 + p.x * 0.07), sin(p.x * 0.19 - p.y * 0.05));
+    float sum = 0.0;
+    for (int i = 0; i < 4; ++i)
+        sum += sin(dot(gustWaves[i].xy, q) - gustWaves[i].z);
+    float gust = smoothstep(1.3, 2.5, sum) * smoothstep(0.35, 0.8, exposed);
+    if (squallWater.w > 0.0 && squallWater.z > 0.0) {
+        float d = length(p - squallWater.xy) / squallWater.z;
+        gust = max(gust, 0.9 * squallWater.w * (1.0 - smoothstep(0.8, 1.7, d)));
+    }
+    return gust;
+}
+
+// The squall's shade on the water beneath it, 0..1.
+float squallShade(vec2 p)
+{
+    if (farWaterEnabled == 0 || waterfrontWater == 0 || squallWater.w <= 0.0
+        || squallWater.z <= 0.0) return 0.0;
+    return squallWater.w * (1.0 - smoothstep(0.6, 1.4, length(p - squallWater.xy) / squallWater.z));
+}
+
+// Chunky sun glitter: short oblique waves tilt the surface, and where one throws the sun into
+// the eye inside the broad path toward it, the pixel lights fully. Farther pixels average more
+// facets, so the threshold widens with the footprint and the path stays sparkling.
+float sunGlitter(vec3 normal, vec3 viewDirection, float footprint, float exposed)
+{
+    if (farWaterEnabled == 0 || waterfrontWater == 0) return 0.0;
+    vec3 sun = normalize(sunDirection);
+    float path = smoothstep(0.90, 0.985, dot(reflect(-viewDirection, normal), sun));
+    if (path <= 0.0) return 0.0;
+    vec2 p = fragWorldPosition.xz;
+    p += 0.9 * vec2(sin(p.y * 0.83 + 2.0 * sin(p.x * 0.31)), sin(p.x * 0.71 + 2.0 * sin(p.y * 0.37)));
+    vec2 tilt = vec2(0.0);
+    for (int i = 0; i < 5; ++i) {
+        vec2 k = glitterWaves[i].xy;
+        tilt += k / length(k) * cos(dot(k, p) - glitterWaves[i].z);
+    }
+    vec3 facet = normalize(vec3(normal.x - 0.11 * tilt.x, normal.y, normal.z - 0.11 * tilt.y));
+    float align = dot(reflect(-viewDirection, facet), sun);
+    float threshold = 1.0 - 0.0012 * (1.0 + 3.0 * min(footprint, 4.0));
+    // Close up a glint band spans many pixels and reads as a worm, not a point; a grown squall
+    // hides the sun everywhere.
+    float distance = length(cameraPosition - fragWorldPosition);
+    return path * step(threshold, align) * mix(0.35, 1.0, exposed)
+        * smoothstep(10.0, 35.0, distance) * (1.0 - 0.9 * squallWater.w);
+}
 float waveCrestFoam(vec3 wave, float k)
 {
     float kh = k * wave.x;
@@ -508,6 +567,8 @@ void main()
     vec3 base = texture(texture0, fragTexCoord).rgb * objectColor.rgb * fragColor.rgb;
     vec3 normal = normalize(fragWorldNormal);
     float exposed = exposure(fragWorldPosition.xz);
+    float gust = gustAmount(fragWorldPosition.xz, exposed);
+    float shade = squallShade(fragWorldPosition.xz);
     vec3 wake = vec3(0.0);
     vec3 vessel = vesselWake(fragWorldPosition.xz).xyz;
     vec3 storm = stormWave(fragWorldPosition.xz).xyz;
@@ -541,7 +602,7 @@ void main()
         float shortRipple = dot(crossing, fragWorldPosition.xz) * 3.7 - detailRipplePhase.y;
         vec2 detail = wind * cos(longRipple) * resolved(1.65, footprint)
             + crossing * cos(shortRipple) * 0.45 * resolved(3.7, footprint);
-        vec2 slope = normal.xz + detail * mix(0.004, 0.035, exposed);
+        vec2 slope = normal.xz + detail * mix(0.004, 0.035, exposed) * (1.0 + 1.2 * gust);
         normal = normalize(vec3(slope.x, normal.y, slope.y));
         base *= mix(vec3(0.97, 1.01, 1.0), vec3(1.04, 1.07, 0.98), exposed);
         // Estimated shallows warm and lighten a little; the last metres before a shore lighten.
@@ -551,6 +612,7 @@ void main()
         float shore = (1.0 - smoothstep(0.5, 4.0, place.x)) * weight;
         base = mix(base, base * vec3(1.06, 1.10, 1.0) + vec3(0.02, 0.03, 0.01), 0.35 * shallow);
         base *= 1.0 + 0.06 * shore;
+        base *= (1.0 - 0.14 * gust) * (1.0 - 0.18 * shade);
     }
     // Ripples read clearest on sheltered, glassy water and break up in chop.
     vec2 ripples = historySlope(fragWorldPosition.xz, footprint)
@@ -588,6 +650,7 @@ void main()
     if (waterfrontWater != 0)
         reflectionAmount = mix(0.13, mix(0.38, 0.25, exposed),
             (1.0 - viewDot) * (1.0 - viewDot));
+    reflectionAmount *= 1.0 - 0.5 * gust;
     vec3 color = mix(base, reflection * vec3(0.96, 0.99, 1.0), reflectionAmount * coverage);
     if (physicalWaves != 0) {
         vec3 halfVector = normalize(viewDirection + normalize(sunDirection));
@@ -612,5 +675,7 @@ void main()
     }
     color = mix(color, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
     color = shoreShade(color);
+    color = mix(color, vec3(1.0, 0.96, 0.84), 0.75 * sunGlitter(normal, viewDirection, footprint,
+        exposed) * (1.0 - shade));
     finalColor = vec4(color * waterShadow(), 1.0);
 }

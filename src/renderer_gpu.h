@@ -169,6 +169,7 @@ typedef struct {
     Texture2D water_atlas;
     float water_atlas_rect[4]; // Origin X/Z, 1/extent X/Z, renderer metres.
     bool water_atlas_disabled; // Review: the hand-written exposure even with an atlas.
+    bool far_water_disabled; // Review: no G4 gusts, sun glitter or squall water.
     RenderTexture2D reflection;
     Matrix light_view_projection;
     Matrix far_light_view_projection;
@@ -219,6 +220,8 @@ void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limi
 void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: replace the stamped field with one of SIZE texels per side at SPACING metres.
 bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing);
+// Review: draw water without (or again with) G4 gusts, sun glitter and squall water.
+void waterfront_gpu_scene_set_far_water_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: shade water from the hand-written exposure instead of (or again from) the map atlas.
 void waterfront_gpu_scene_set_water_atlas_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: shade water without (or again with) the copy of opaque depth.

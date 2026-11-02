@@ -2228,6 +2228,20 @@ static void set_atmosphere_uniforms(WaterfrontGpuScene *scene, Vector3 camera_po
 static bool stamp_active(const WaterfrontGpuScene *scene);
 static bool history_active(const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame);
 
+// Far-water gusts: oblique waves of 57..131 m in renderer X/Z, in radians per metre, whose sum
+// the shader thresholds into patches; none shares an axis or a simple ratio with another, so the
+// pattern never settles into a lattice. They drift with the cosmetic wind.
+#define GUST_WAVES 4
+#define GLITTER_WAVES 5
+static const float GUST_WIND[2] = { -.6f, -.8f };
+static const float GUST_SPEED = 4.5f; // Metres per second.
+static const float gust_waves[GUST_WAVES][2]
+    = { { .1054f, .0322f }, { -.0272f, .0747f }, { -.0424f, -.0455f }, { .0187f, -.0442f } };
+// Sun glitter: short waves of 0.9..1.8 m at unrelated angles that tilt the surface toward the sun;
+// the shader also warps their coordinates, so the glints never line up into rows.
+static const float glitter_waves[GLITTER_WAVES][2] = { { 4.415f, 1.874f }, { -.716f, 5.828f },
+    { -3.177f, 1.761f }, { -5.791f, -3.480f }, { 1.648f, -3.882f } };
+
 static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
 {
     BoatWater water = frame->player_water;
@@ -2411,6 +2425,40 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     location = cached_location(scene->water_shader, "detailRipplePhase");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, detail_phase, SHADER_UNIFORM_VEC2);
+    // G4 far-water life, presentation only: gust patches carried downwind and sun glitter, each
+    // a few oblique waves whose phases are reduced on the CPU, and the squall's water footprint.
+    int far_water = !scene->far_water_disabled;
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "farWaterEnabled"),
+        &far_water, SHADER_UNIFORM_INT);
+    if (far_water) {
+        float gusts[4 * GUST_WAVES], glitter[4 * GLITTER_WAVES];
+        for (int i = 0; i < GUST_WAVES; ++i) {
+            const float *k = gust_waves[i];
+            double rate = (k[0] * GUST_WIND[0] + k[1] * GUST_WIND[1]) * GUST_SPEED;
+            gusts[4 * i] = k[0];
+            gusts[4 * i + 1] = k[1];
+            gusts[4 * i + 2] = boat_phase(rate, frame->time);
+            gusts[4 * i + 3] = 0;
+        }
+        for (int i = 0; i < GLITTER_WAVES; ++i) {
+            const float *k = glitter_waves[i];
+            // Deep-water dispersion, omega = sqrt(g |k|), so short glints move faster.
+            double rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1]));
+            glitter[4 * i] = k[0];
+            glitter[4 * i + 1] = k[1];
+            glitter[4 * i + 2] = boat_phase(rate, frame->time);
+            glitter[4 * i + 3] = 0;
+        }
+        SetShaderValueV(scene->water_shader, cached_location(scene->water_shader, "gustWaves[0]"),
+            gusts, SHADER_UNIFORM_VEC4, GUST_WAVES);
+        SetShaderValueV(scene->water_shader,
+            cached_location(scene->water_shader, "glitterWaves[0]"), glitter, SHADER_UNIFORM_VEC4,
+            GLITTER_WAVES);
+        float squall[] = { frame->squall.centre.x, frame->squall.centre.y, frame->squall.radius,
+            frame->squall.grown };
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "squallWater"),
+            squall, SHADER_UNIFORM_VEC4);
+    }
     float reflection_phase[] = { boat_phase(.80, frame->time), boat_phase(.55, frame->time),
         boat_phase(.65, frame->time), boat_phase(.35, frame->time) };
     location = cached_location(scene->water_shader, "reflectionRipplePhase");
@@ -3174,6 +3222,11 @@ void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool
 bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing)
 {
     return waterfront_wake_stamp_resize(&scene->wake_stamp, size, spacing);
+}
+
+void waterfront_gpu_scene_set_far_water_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->far_water_disabled = !enabled;
 }
 
 void waterfront_gpu_scene_set_water_atlas_enabled(WaterfrontGpuScene *scene, bool enabled)
