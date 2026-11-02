@@ -1,0 +1,203 @@
+{
+ "note": "G4, M1 Max, Release, boat_water_review at bddd335, 2026-11-03, three interleaved repeats. 'g4' is the default; 'g3b' is --no-water-atlas --no-scene-depth --no-far-water. The stress fixture is the basin, where only the depth copy applies (no atlas or far water); the river route has all three.",
+ "stress": {
+  "aa_4x4": {
+   "gpu_ms_p95": {
+    "g4": [
+     3.805,
+     3.798,
+     3.761
+    ],
+    "g3b": [
+     3.533,
+     3.453,
+     3.468
+    ]
+   },
+   "gpu_ms_p50": {
+    "g4": [
+     3.358,
+     3.367,
+     3.325
+    ],
+    "g3b": [
+     3.121,
+     3.063,
+     3.061
+    ]
+   },
+   "frame_ms_p95": {
+    "g4": [
+     5.774,
+     5.051,
+     4.701
+    ],
+    "g3b": [
+     5.265,
+     4.527,
+     4.415
+    ]
+   },
+   "final_state": {
+    "g4": "tick=4438 hash=8d9af1216d2cf172",
+    "g3b": "tick=4438 hash=8d9af1216d2cf172"
+   }
+  },
+  "aa_off": {
+   "gpu_ms_p95": {
+    "g4": [
+     3.159,
+     3.094,
+     3.072
+    ],
+    "g3b": [
+     2.901,
+     2.878,
+     2.863
+    ]
+   },
+   "gpu_ms_p50": {
+    "g4": [
+     2.743,
+     2.703,
+     2.697
+    ],
+    "g3b": [
+     2.508,
+     2.477,
+     2.468
+    ]
+   },
+   "frame_ms_p95": {
+    "g4": [
+     4.85,
+     4.034,
+     4.104
+    ],
+    "g3b": [
+     4.344,
+     3.857,
+     3.899
+    ]
+   },
+   "final_state": {
+    "g4": "tick=4438 hash=8d9af1216d2cf172",
+    "g3b": "tick=4438 hash=8d9af1216d2cf172"
+   }
+  }
+ },
+ "river": {
+  "aa_4x4": {
+   "gpu_ms_p95": {
+    "g4": [
+     1.788,
+     1.776,
+     1.756
+    ],
+    "g3b": [
+     1.839,
+     1.735,
+     1.723
+    ]
+   },
+   "gpu_ms_p50": {
+    "g4": [
+     1.437,
+     1.427,
+     1.429
+    ],
+    "g3b": [
+     1.411,
+     1.332,
+     1.331
+    ]
+   },
+   "frame_ms_p95": {
+    "g4": [
+     2.829,
+     2.662,
+     2.555
+    ],
+    "g3b": [
+     2.774,
+     2.474,
+     2.341
+    ]
+   },
+   "final_state": {
+    "g4": "tick=12073 x=0x1.10152p+10",
+    "g3b": "tick=12073 x=0x1.10152p+10"
+   }
+  },
+  "aa_off": {
+   "gpu_ms_p95": {
+    "g4": [
+     1.576,
+     1.493,
+     1.522
+    ],
+    "g3b": [
+     1.577,
+     1.494,
+     1.489
+    ]
+   },
+   "gpu_ms_p50": {
+    "g4": [
+     1.199,
+     1.126,
+     1.124
+    ],
+    "g3b": [
+     1.149,
+     1.054,
+     1.095
+    ]
+   },
+   "frame_ms_p95": {
+    "g4": [
+     2.743,
+     2.469,
+     2.415
+    ],
+    "g3b": [
+     2.731,
+     2.345,
+     2.284
+    ]
+   },
+   "final_state": {
+    "g4": "tick=12073 x=0x1.10152p+10",
+    "g3b": "tick=12073 x=0x1.10152p+10"
+   }
+  }
+ },
+ "check": {
+  "scene_depth": "copied=1 disabled=1 fallback=1 atlas=1 changed=377 darker=0 largest=153",
+  "gpu_water_surface": "exposure walk from the dock through the mouth changes by at most 1/255 per 10 m step with the atlas",
+  "water_atlas": {
+   "river": {
+    "size": [
+     615,
+     494
+    ],
+    "spacing_m": 4,
+    "bytes": 229319
+   },
+   "outer": {
+    "size": [
+     1190,
+     778
+    ],
+    "spacing_m": 8,
+    "bytes": 377321
+   }
+  },
+  "suite": "Debug full preset 384/384 passed, 15 disabled"
+ },
+ "web": {
+  "browser": "Chrome 156, ANGLE Metal",
+  "river_smoke": "430 depth blits, no blit or GL errors, no shader failures",
+  "lazy_load": "tools/check_web_scenery.py: one outer pack and one water-atlas-outer request, none on a second session, no errors"
+ }
+}

@@ -52,8 +52,8 @@ with sync_playwright() as p:
         cdp.send('Network.emulateNetworkConditions', {
             'offline': False, 'latency': 50, 'uploadThroughput': -1,
             'downloadThroughput': args.throttle_kbps * 1024})
-    for _ in range(3):
-        key('ArrowDown')
+    for _ in range(4):
+        key('ArrowDown')  # PLACE -> CONTENT, WAVES, SMOOTHING, START
     key('Enter')  # START
     page.wait_for_timeout(1500 if args.throttle_kbps else 150)
     shot('loading')
