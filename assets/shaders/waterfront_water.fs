@@ -422,6 +422,44 @@ vec2 historySlope(vec2 world, float footprint)
     return vec2(east - west, north - south) / (2.0 * texel * extent)
         * historySlopeGain * fade * resolvedRipple;
 }
+// G4: a copy of the opaque depth drawn before the water, for the water in front of quay walls
+// and other submerged geometry. Only geometry behind the surface counts, so an object in front
+// of the water never shades it. Raylib's projection is conventional (not reversed) GL depth.
+uniform int sceneDepthEnabled;
+uniform sampler2D sceneDepth;
+uniform vec4 sceneDepthParams; // Near, far, 1/width, 1/height of the target.
+float linearDepth(float depth)
+{
+    float n = sceneDepthParams.x, f = sceneDepthParams.y;
+    return 2.0 * n * f / (f + n - (depth * 2.0 - 1.0) * (f - n));
+}
+// Metres of water along the view axis between this fragment and the opaque scene behind it:
+// a quay wall or bank below the surface. -1 when unknown or nothing opaque is behind it.
+float waterBehind()
+{
+    if (sceneDepthEnabled == 0) return -1.0;
+    float opaque = texture(sceneDepth, gl_FragCoord.xy * sceneDepthParams.zw).r;
+    if (opaque >= 1.0) return -1.0;
+    float behind = linearDepth(opaque) - linearDepth(gl_FragCoord.z);
+    return behind < 0.0 ? -1.0 : behind;
+}
+// Water lapping at a submerged wall: a broken, slowly moving light band about two metres wide.
+// The scene has no river bed, so open water never has anything behind it. The reflection pass
+// draws no water, so only the main camera reads the copy.
+vec3 shoreShade(vec3 color)
+{
+    float behind = waterBehind();
+    if (behind < 0.0) return color;
+    // 24-bit depth from a 0.15 m near plane still resolves about 4 cm at 300 m; the band widens
+    // with distance so it keeps about a pixel there.
+    float distance = length(cameraPosition - fragWorldPosition);
+    float band = (1.0 - smoothstep(0.2, 2.0 + 0.015 * distance, behind))
+        * (1.0 - smoothstep(250.0, 400.0, distance));
+    float lap = 0.5 + 0.5 * sin(fragWorldPosition.x * 1.9 + fragWorldPosition.z * 1.3
+        + 1.5 * sin(fragWorldPosition.z * 0.7 - fragWorldPosition.x * 0.4) + detailRipplePhase.x);
+    color *= 1.0 + 0.10 * band;
+    return mix(color, vec3(0.70, 0.82, 0.84), 0.55 * band * smoothstep(0.25, 0.7, lap));
+}
 float waveCrestFoam(vec3 wave, float k)
 {
     float kh = k * wave.x;
@@ -483,7 +521,7 @@ void main()
         base *= 1.0 + 0.35 * dot(ripples, vec2(0.7));
     }
     if (reflectionsEnabled == 0) {
-        base = mix(base, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
+        base = shoreShade(mix(base, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam));
         finalColor = vec4(base * waterShadow(), 1.0);
         return;
     }
@@ -533,5 +571,6 @@ void main()
         color = mix(color, vec3(0.65, 0.78, 0.80), foam);
     }
     color = mix(color, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
+    color = shoreShade(color);
     finalColor = vec4(color * waterShadow(), 1.0);
 }

@@ -516,7 +516,7 @@ static const char *const known_uniforms[] = { "objectColor", "emissive", "instan
     "reflectionTexture", "surfacePixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
     "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
     "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
-    NULL };
+    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -1343,17 +1343,18 @@ static Shader load_sky_shader(const char *fragment_shader_path)
     return LoadShader(NULL, path);
 }
 
-static bool create_shadow_map(RenderTexture2D *target, int size)
+// A framebuffer with only a WIDTH x HEIGHT depth texture: shadow maps and the scene depth copy.
+static bool create_depth_target(RenderTexture2D *target, int width, int height)
 {
     *target = (RenderTexture2D) { 0 };
     target->id = rlLoadFramebuffer();
     if (target->id == 0)
         return false;
-    target->texture.width = size;
-    target->texture.height = size;
-    target->depth.id = rlLoadTextureDepth(size, size, false);
-    target->depth.width = size;
-    target->depth.height = size;
+    target->texture.width = width;
+    target->texture.height = height;
+    target->depth.id = rlLoadTextureDepth(width, height, false);
+    target->depth.width = width;
+    target->depth.height = height;
     target->depth.mipmaps = 1;
     if (target->depth.id == 0) {
         rlUnloadFramebuffer(target->id);
@@ -1372,6 +1373,34 @@ static bool create_shadow_map(RenderTexture2D *target, int size)
     }
     SetTextureFilter(target->depth, TEXTURE_FILTER_POINT);
     return true;
+}
+
+static bool create_shadow_map(RenderTexture2D *target, int size)
+{
+    return create_depth_target(target, size, size);
+}
+
+// Copy the active render texture's depth, holding the opaque scene so far, into a texture the
+// water shader can read while it writes the original. The default framebuffer has no readable
+// depth, so drawing there keeps the water's fallback.
+static void copy_scene_depth(WaterfrontGpuScene *scene, int width, int height)
+{
+    scene->scene_depth_valid = false;
+    unsigned int source = rlGetActiveFramebuffer();
+    if (scene->scene_depth_disabled || source == 0 || width <= 0 || height <= 0)
+        return;
+    if (scene->scene_depth.texture.width != width || scene->scene_depth.texture.height != height) {
+        if (scene->scene_depth.id != 0)
+            rlUnloadFramebuffer(scene->scene_depth.id);
+        if (!create_depth_target(&scene->scene_depth, width, height))
+            return;
+    }
+    rlDrawRenderBatchActive();
+    rlBindFramebuffer(RL_READ_FRAMEBUFFER, source);
+    rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, scene->scene_depth.id);
+    rlBlitFramebuffer(0, 0, width, height, 0, 0, width, height, 0x00000100); // GL_DEPTH_BUFFER_BIT
+    rlEnableFramebuffer(source);
+    scene->scene_depth_valid = true;
 }
 
 static void unbind_map(WaterfrontGpuScene *scene)
@@ -2929,10 +2958,30 @@ static void prepare_water_history(WaterfrontGpuScene *scene, const WaterfrontSce
     scene->stats.history_resets = scene->water_history.resets != resets;
 }
 
-static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width)
+static void draw_water(
+    WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
 {
+    copy_scene_depth(scene, width, height);
     set_object_color(scene->water_shader, WHITE);
     set_water_uniforms(scene, frame);
+    int depth = scene->scene_depth_valid;
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "sceneDepthEnabled"),
+        &depth, SHADER_UNIFORM_INT);
+    // Without a copy the sampler shares unit 0 with the material texture.
+    int depth_slot = depth ? 7 : 0;
+    rlEnableShader(scene->water_shader.id);
+    rlSetUniform(
+        cached_location(scene->water_shader, "sceneDepth"), &depth_slot, SHADER_UNIFORM_INT, 1);
+    if (depth) {
+        float parameters[]
+            = { frame->camera.near_plane, frame->camera.far_plane, 1.0f / width, 1.0f / height };
+        SetShaderValue(scene->water_shader,
+            cached_location(scene->water_shader, "sceneDepthParams"), parameters,
+            SHADER_UNIFORM_VEC4);
+        rlActiveTextureSlot(depth_slot);
+        rlEnableTexture(scene->scene_depth.depth.id);
+        rlActiveTextureSlot(0);
+    }
     float pixel_scale = fmaxf(1, width / 320.0f);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
@@ -3030,7 +3079,7 @@ static void draw_scene(
     rlEnableBackfaceCulling();
     if (frame->boating_basin) {
         draw_scenery(scene, frame, material);
-        draw_water(scene, frame, width);
+        draw_water(scene, frame, width, height);
         rlDisableBackfaceCulling();
         draw_life(scene, life_material, frame, true);
         draw_ghost(scene, life_material, frame, width);
@@ -3044,7 +3093,7 @@ static void draw_scene(
     draw_tiled(scene, &scene->roofs, scene->roof_material);
     draw_ground(scene, material);
     draw_detailed(scene, &scene->corner, &scene->corner_far, material);
-    draw_water(scene, frame, width);
+    draw_water(scene, frame, width, height);
     set_emissive(scene->shader, true);
     draw_detailed(scene, &scene->windows, &scene->windows_far, material);
     draw_tiled(scene, &scene->corner_emissive, material);
@@ -3093,6 +3142,11 @@ void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool
 bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing)
 {
     return waterfront_wake_stamp_resize(&scene->wake_stamp, size, spacing);
+}
+
+void waterfront_gpu_scene_set_scene_depth_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->scene_depth_disabled = !enabled;
 }
 
 void waterfront_gpu_scene_set_water_history_enabled(WaterfrontGpuScene *scene, bool enabled)
@@ -3228,6 +3282,8 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         rlUnloadFramebuffer(scene->shadow_map.id);
     if (scene->far_shadow_map.id != 0)
         rlUnloadFramebuffer(scene->far_shadow_map.id);
+    if (scene->scene_depth.id != 0)
+        rlUnloadFramebuffer(scene->scene_depth.id);
     if (scene->reflection.id != 0)
         UnloadRenderTexture(scene->reflection);
     if (scene->shader.id != 0 && scene->shader.id != rlGetShaderIdDefault()) {

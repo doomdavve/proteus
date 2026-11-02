@@ -159,6 +159,11 @@ typedef struct {
     Texture2D sky_texture;
     RenderTexture2D shadow_map;
     RenderTexture2D far_shadow_map;
+    // G4: a copy of the main pass's opaque depth taken just before water draws, for shore and
+    // quay shading. Never the attachment being written; absent outside a render texture.
+    RenderTexture2D scene_depth;
+    bool scene_depth_valid; // Copied for the water now being drawn.
+    bool scene_depth_disabled; // Review: water shading without the depth copy.
     RenderTexture2D reflection;
     Matrix light_view_projection;
     Matrix far_light_view_projection;
@@ -209,6 +214,8 @@ void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limi
 void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: replace the stamped field with one of SIZE texels per side at SPACING metres.
 bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing);
+// Review: shade water without (or again with) the copy of opaque depth.
+void waterfront_gpu_scene_set_scene_depth_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: turn the foam history and ripples off (stamp-only shading) or back on.
 void waterfront_gpu_scene_set_water_history_enabled(WaterfrontGpuScene *scene, bool enabled);
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);

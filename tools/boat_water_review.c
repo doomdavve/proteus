@@ -309,12 +309,15 @@ static int stamp_size = WATERFRONT_WAKE_STAMP_SIZE;
 static float stamp_spacing = WATERFRONT_WAKE_STAMP_SPACING;
 // --no-water-history: stamp-only water shading, without G3b foam history and ripples.
 static bool no_water_history;
+// --no-scene-depth: water shading without the G4 copy of opaque depth.
+static bool no_scene_depth;
 
 static bool apply_scene_options(WaterfrontGpuScene *scene)
 {
     waterfront_gpu_scene_set_detail_enabled(scene, !no_detail);
     waterfront_gpu_scene_set_wake_stamp_enabled(scene, !analytic_wakes);
     waterfront_gpu_scene_set_water_history_enabled(scene, !no_water_history);
+    waterfront_gpu_scene_set_scene_depth_enabled(scene, !no_scene_depth);
     if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
         return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
     return true;
@@ -1910,6 +1913,70 @@ static WaterfrontWaterHistoryInput history_drive(int frame, const Mesh *water)
     return input;
 }
 
+// G4: the water reads a copy of opaque depth only inside a render texture. At the outer dock the
+// copy finds the quay walls below the surface and lightens a band along them; nothing else in
+// the frame changes, and drawing to the default framebuffer keeps the fallback.
+static int check_scene_depth(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Scene depth");
+    if (!IsWindowReady())
+        return 1;
+    int result = 1;
+    BoatGpu gpu = { 0 };
+    Image with = { 0 }, without = { 0 };
+    if (!boat_gpu_init(&gpu, true))
+        goto cleanup;
+    BoatSession session;
+    boat_session_init(&session, test_world(BOAT_LOCATION_OUTER), boat_water_gentle());
+    BoatViewState view = { .boat = session.boat, .time = 600 * (double)BOAT_STEP };
+    view.boat.position = (Vector2) { -12, 60 };
+    view.boat.heading = 0;
+    session.presentation.camera_heading = 0;
+    const BoatCamera camera = { .distance = 12, .height = 6 };
+    boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
+    bool copied = gpu.scene.scene_depth_valid;
+    with = LoadImageFromTexture(gpu.target.texture);
+    waterfront_gpu_scene_set_scene_depth_enabled(&gpu.scene, false);
+    boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
+    bool disabled = !gpu.scene.scene_depth_valid;
+    without = LoadImageFromTexture(gpu.target.texture);
+    waterfront_gpu_scene_set_scene_depth_enabled(&gpu.scene, true);
+    WaterfrontSceneFrame frame;
+    boat_scene_frame(&view, &session.presentation, &session.world, camera, &frame);
+    BeginDrawing();
+    waterfront_gpu_scene_draw(&gpu.scene, &frame, 320, 200);
+    EndDrawing();
+    bool fallback = !gpu.scene.scene_depth_valid;
+    if (!with.data || !without.data || with.width != without.width || with.height != without.height)
+        goto cleanup;
+    int changed = 0, darker = 0, largest = 0;
+    for (int y = 0; y < with.height; ++y)
+        for (int x = 0; x < with.width; ++x) {
+            Color a = GetImageColor(with, x, y), b = GetImageColor(without, x, y);
+            int delta = (a.r - b.r) + (a.g - b.g) + (a.b - b.b);
+            changed += delta != 0;
+            darker += delta < -3;
+            largest = abs(delta) > largest ? abs(delta) : largest;
+        }
+    printf("scene_depth copied=%d disabled=%d fallback=%d changed=%d darker=%d largest=%d\n",
+        copied, disabled, fallback, changed, darker, largest);
+    // The band is a few pixels along each quay: present, bounded, and a lightening.
+    if (!copied || !disabled || !fallback || changed < 100 || changed > 320 * 200 / 20
+        || darker > changed / 20 || largest > 300) {
+        fprintf(stderr, "Scene depth shading out of bounds.\n");
+        goto cleanup;
+    }
+    puts("scene_depth=ok");
+    result = 0;
+cleanup:
+    UnloadImage(with);
+    UnloadImage(without);
+    boat_gpu_destroy(&gpu);
+    CloseWindow();
+    return result;
+}
+
 static int check_water_history(void)
 {
 #define EXPECT(test)                                                                               \
@@ -2422,17 +2489,17 @@ static int review(const char *directory, bool use_gpu)
         printf("review %s location=%s kind=%s frames=%u\n", pose->name, resources->definition->name,
             pose->kind, pose->frames);
         fprintf(manifest,
-            "    {\"name\":\"%s\",\"kind\":\"%s\",\"location\":\"%s\","
+            "%s    {\"name\":\"%s\",\"kind\":\"%s\",\"location\":\"%s\","
             "\"position\":[%.6g,%.6g],\"heading\":%.9g,\"camera\":{"
             "\"distance\":%.6g,\"height\":%.6g,\"heading\":%.9g},"
             "\"tick\":%u,\"frames\":%u,\"step_ticks\":%u,\"step_position\":"
             "[%.6g,%.6g],\"step_heading\":%.9g,\"waves\":true,"
             "\"resolution\":[320,200],\"captures\":[",
-            pose->name, pose->kind, resources->definition->name, (double)pose->position.x,
-            (double)pose->position.y, (double)pose->heading, (double)pose->distance,
-            (double)pose->height, (double)pose->camera_heading, pose->tick, pose->frames,
-            pose->step_ticks, (double)pose->step_position.x, (double)pose->step_position.y,
-            (double)pose->step_heading);
+            p ? ",\n" : "", pose->name, pose->kind, resources->definition->name,
+            (double)pose->position.x, (double)pose->position.y, (double)pose->heading,
+            (double)pose->distance, (double)pose->height, (double)pose->camera_heading, pose->tick,
+            pose->frames, pose->step_ticks, (double)pose->step_position.x,
+            (double)pose->step_position.y, (double)pose->step_heading);
         for (unsigned frame = 0; frame < pose->frames; ++frame) {
             if (!review_pose_clear(resources, inspection.position)) {
                 fputs("\n  ],\n  \"error\":\"pose is not clear of land\"\n}\n", manifest);
@@ -2453,10 +2520,10 @@ static int review(const char *directory, bool use_gpu)
             inspection.position = Vector2Add(inspection.position, pose->step_position);
             inspection.heading += pose->step_heading;
         }
-        fprintf(manifest, "]},\n");
+        fprintf(manifest, "]}");
         boat_session_destroy(&session);
     }
-    fputs("  ]\n}\n", manifest);
+    fputs("\n  ]\n}\n", manifest);
     result = 0;
 cleanup:
     if (fclose(manifest))
@@ -2483,7 +2550,7 @@ int main(int argc, char **argv)
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
-    bool detail = false, wake_stamp = false, water_history = false;
+    bool detail = false, wake_stamp = false, water_history = false, scene_depth = false;
     const char *clip_dir = NULL;
     int clip_frames = 0;
     int sequence_ticks = SAMPLE_TICKS;
@@ -2541,6 +2608,10 @@ int main(int argc, char **argv)
             water_history = true;
         else if (strcmp(argv[i], "--no-water-history") == 0)
             no_water_history = true;
+        else if (strcmp(argv[i], "--no-scene-depth") == 0)
+            no_scene_depth = true;
+        else if (strcmp(argv[i], "--check-scene-depth") == 0)
+            scene_depth = true;
         else if (strcmp(argv[i], "--history-clip") == 0 && i + 2 < argc) {
             clip_dir = argv[++i];
             clip_frames = atoi(argv[++i]);
@@ -2567,8 +2638,9 @@ int main(int argc, char **argv)
                  "                         [--sequence] [--sequence-ticks N] [--visible]\n"
                  "                         [--tile-size M] [--no-cull] [--no-detail]\n"
                  "       Any GPU run: [--analytic-wakes] [--stamp-size N] [--stamp-spacing M]\n"
-                 "                    [--no-water-history]\n"
+                 "                    [--no-water-history] [--no-scene-depth]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
+                 "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
                  "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
@@ -2579,6 +2651,7 @@ int main(int argc, char **argv)
                  "--analytic-wakes shades object wakes with the reference per-piece loop; by\n"
                  "  default they sample the stamped field (1024 texels of 0.25 m).\n"
                  "--no-water-history shades stamp-only water, without foam history and ripples.\n"
+                 "--no-scene-depth shades water without the copy of opaque depth.\n"
                  "--history-clip writes FRAMES (1..3600) 60 Hz stress frames to DIR, history\n"
                  "  left and stamp-only right, plus the final history field as history.png.\n"
                  "--scenario river: the existing river route; stress: four basin boats with\n"
@@ -2626,19 +2699,20 @@ int main(int argc, char **argv)
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
     if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry
-        || wake_stamp || water_history || clip_dir) {
+        || wake_stamp || water_history || scene_depth || clip_dir) {
         SetTraceLogLevel(LOG_WARNING);
         if (clip_dir)
             return clip_frames > 0 && clip_frames <= 3600 ? history_clip(clip_dir, clip_frames) : 2;
-        return water_history ? check_water_history()
-            : wake_stamp     ? check_wake_stamp()
-            : geometry       ? report_geometry()
-            : instancing     ? check_instancing()
-            : culling        ? check_culling()
-            : detail         ? check_detail()
-            : gpu_lifecycle  ? check_gpu_lifecycle()
-            : gpu_views      ? check_gpu_views()
-                             : check_gpu_water();
+        return scene_depth  ? check_scene_depth()
+            : water_history ? check_water_history()
+            : wake_stamp    ? check_wake_stamp()
+            : geometry      ? report_geometry()
+            : instancing    ? check_instancing()
+            : culling       ? check_culling()
+            : detail        ? check_detail()
+            : gpu_lifecycle ? check_gpu_lifecycle()
+            : gpu_views     ? check_gpu_views()
+                            : check_gpu_water();
     }
     if (!check && !output && !bench && !review_dir)
         return 2;
