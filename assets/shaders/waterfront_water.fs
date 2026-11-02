@@ -392,6 +392,36 @@ vec3 wakeFieldSample(vec2 world) {
 // Presentation-only crest proxy. For a sinusoid, kh/length(kh, gradient) is its
 // phase independent of amplitude: increasing height cannot widen the pale band.
 // The energy gate keeps gentle swells clear. Keep boat_water_mesh.c in sync.
+// G3b foam history and cosmetic ripples around the boat: R foam, G ripple height. Shading only;
+// the analytic vertex height stays authoritative.
+uniform int historyEnabled;
+uniform sampler2D historyField;
+uniform vec4 historyRect; // Origin X/Z, 1/extent, edge fade in metres.
+uniform float historySlopeGain;
+float historyFoam = 0.0;
+vec2 historySlope(vec2 world, float footprint)
+{
+    if (historyEnabled == 0) return vec2(0.0);
+    vec2 uv = (world - historyRect.xy) * historyRect.z;
+    float extent = 1.0 / historyRect.z;
+    vec2 edge = min(uv, vec2(1.0) - uv) * extent;
+    float fade = smoothstep(0.0, historyRect.w, min(edge.x, edge.y));
+    if (fade <= 0.0) return vec2(0.0);
+    float texel = 1.0 / float(textureSize(historyField, 0).x);
+    vec4 here = textureLod(historyField, uv, 0.0);
+    float east = textureLod(historyField, uv + vec2(texel, 0.0), 0.0).g;
+    float west = textureLod(historyField, uv - vec2(texel, 0.0), 0.0).g;
+    float north = textureLod(historyField, uv + vec2(0.0, texel), 0.0).g;
+    float south = textureLod(historyField, uv - vec2(0.0, texel), 0.0).g;
+    // Lace instead of a sheet: a fixed world pattern raises the threshold foam must pass.
+    float lace = 0.5 + 0.25 * sin(world.x * 2.7 + 1.3 * sin(world.y * 1.9))
+        * sin(world.y * 3.1 + 1.1 * sin(world.x * 2.3));
+    historyFoam = fade * smoothstep(lace - 0.2, lace + 0.15, here.r);
+    // Ripples finer than a pixel would shimmer; fade them with the pixel footprint.
+    float resolvedRipple = 1.0 - smoothstep(0.35, 0.9, footprint);
+    return vec2(east - west, north - south) / (2.0 * texel * extent)
+        * historySlopeGain * fade * resolvedRipple;
+}
 float waveCrestFoam(vec3 wave, float k)
 {
     float kh = k * wave.x;
@@ -446,7 +476,14 @@ void main()
         normal = normalize(vec3(slope.x, normal.y, slope.y));
         base *= mix(vec3(0.97, 1.01, 1.0), vec3(1.04, 1.07, 0.98), exposed);
     }
+    vec2 ripples = historySlope(fragWorldPosition.xz, footprint);
+    if (historyEnabled != 0) {
+        normal = normalize(vec3(normal.x - ripples.x * normal.y, normal.y,
+            normal.z - ripples.y * normal.y));
+        base *= 1.0 + 0.35 * dot(ripples, vec2(0.7));
+    }
     if (reflectionsEnabled == 0) {
+        base = mix(base, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
         finalColor = vec4(base * waterShadow(), 1.0);
         return;
     }
@@ -495,5 +532,6 @@ void main()
         if (stormArea.w > 0.0) color *= 1.0-0.32*stormShade;
         color = mix(color, vec3(0.65, 0.78, 0.80), foam);
     }
+    color = mix(color, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
     finalColor = vec4(color * waterShadow(), 1.0);
 }

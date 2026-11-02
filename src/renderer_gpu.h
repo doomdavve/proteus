@@ -4,6 +4,7 @@
 #include "waterfront_corner.h"
 #include "waterfront_scene.h"
 #include "waterfront_wake_stamp.h"
+#include "waterfront_water_history.h"
 
 #include "raylib.h"
 
@@ -96,6 +97,8 @@ typedef struct {
     unsigned int sky_quads;
     unsigned int wake_pieces, wake_outside; // Object wake pieces and those shaded analytically.
     size_t wake_texels; // Texels the stamped pieces cover; zero when the field is reused.
+    unsigned history_substeps; // Fixed water history substeps run this frame.
+    unsigned history_resets; // 1 when the history reset and pre-rolled this frame.
 } WaterfrontGpuStats;
 
 // GPU-owned waterfront resources. They must be created, bound and destroyed while a
@@ -124,6 +127,8 @@ typedef struct {
     float object_life, object_traffic_life;
     WaterfrontWakeStamp wake_stamp; // Sampled wake shading; analytic when unsupported.
     bool wake_stamp_disabled; // Review: shade every piece analytically, the reference.
+    WaterfrontWaterHistory water_history; // Foam history and ripples; none when unsupported.
+    bool water_history_disabled; // Review: stamp-only water, the G3a comparison.
     WaterfrontGpuTiled windows;
     WaterfrontGpuTiled corner;
     WaterfrontGpuTiled corner_emissive;
@@ -204,6 +209,8 @@ void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limi
 void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: replace the stamped field with one of SIZE texels per side at SPACING metres.
 bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing);
+// Review: turn the foam history and ripples off (stamp-only shading) or back on.
+void waterfront_gpu_scene_set_water_history_enabled(WaterfrontGpuScene *scene, bool enabled);
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);

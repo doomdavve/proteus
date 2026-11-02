@@ -216,6 +216,7 @@ target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
 
 # GPU renderers, linked only by graphics executables.
 add_library(proteus_gpu STATIC src/boat_gpu.c src/renderer_gpu.c src/waterfront_wake_stamp.c
+  src/waterfront_water_history.c
   src/boat_rearview.c src/boat_rearview.h)
 target_link_libraries(proteus_gpu PUBLIC proteus_render)
 target_compile_options(proteus_gpu PRIVATE ${PROTEUS_WARNINGS})
