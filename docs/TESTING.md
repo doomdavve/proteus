@@ -157,6 +157,14 @@ hull must stay finite and within the height limit, with peak energy in the last 
 times that of the 15 s before. Without float targets nothing runs. In the stress scene it checks
 resets and substeps, that history changes the image, and that drawing leaves the physical state
 unchanged.
+`scene_depth` (`boat_water_review --check-scene-depth`, `gpu`, about 1.5 s; graphics G4) draws
+the outer dock with and without the opaque depth copy. The copy must be taken inside the render
+texture and skipped when disabled or drawing to the default framebuffer; the outer map must bind
+its water atlas. The quay band must change between 100 pixels and 5% of the frame, and almost
+only lighten.
+`water_atlas_river` and `water_atlas_outer` (`water_atlas_bake --check`; graphics G4) rebake each
+map's water atlas and require the committed sidecar byte for byte. `validate_boat_scenery`
+also rejects malformed, truncated, foreign-map and out-of-range atlases.
 `boat_water_review --geometry` prints each map's static GPU bytes (graphics G2a) and
 `--compare A B` checks two `--review` directories against the G0 image bounds. Neither is a CTest:
 review captures compare only within one platform and build.

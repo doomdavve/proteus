@@ -33,6 +33,7 @@ solo free boating; timed courses use the standard engine and multiplayer assigns
 | PageUp / PageDown | Raise / lower camera |
 | C | Restore default camera |
 | F3 | Toggle profiler |
+| F8 (GPU) | Step through water layers for graphics review: all, no far-water life, G3 only, stamp only, analytic wakes |
 | `` ` `` or F2 (native solo) | Live Lua console; `/help` lists commands and `/save DIR` writes a package |
 
 Holding both thrust directions selects neutral. Reverse power is weaker than forward;

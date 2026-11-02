@@ -111,6 +111,10 @@ game shows LOADING OUTER RIVER with its percentage. A second outer session reuse
 `tools/package_web.py` prints the initial and on-demand bytes. Before A3.5i the page downloaded
 about 6.3 MB gzipped before play; now about 2.9 MB, plus 3.3 MB for the outer river (5.3 MB
 since A3.5f extended it upstream past Hisingsbron; the pack is already DEFLATE-compressed).
+Since graphics G4 each map also has a water atlas sidecar (`water_atlas.bin`, about 0.2 MB river
+and 0.4 MB outer). The river's is preloaded; the outer one is packaged as
+`water-atlas-outer-<hash>.bin` and fetched after its scenery pack, best effort: without it the
+water keeps its hand-written shading.
 
 Check it against a served build (Playwright and Chrome; the script is optional and not in CTest):
 
