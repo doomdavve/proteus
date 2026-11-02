@@ -3,6 +3,7 @@
 
 #include "waterfront_corner.h"
 #include "waterfront_scene.h"
+#include "waterfront_wake_stamp.h"
 
 #include "raylib.h"
 
@@ -93,6 +94,8 @@ typedef struct {
     unsigned int tiles_culled[WATERFRONT_GPU_PASS_COUNT];
     unsigned int far_cells[WATERFRONT_GPU_PASS_COUNT]; // Detail cells drawn far, per map drawn.
     unsigned int sky_quads;
+    unsigned int wake_pieces, wake_outside; // Object wake pieces and those shaded analytically.
+    size_t wake_texels; // Texels the stamped pieces cover; zero when the field is reused.
 } WaterfrontGpuStats;
 
 // GPU-owned waterfront resources. They must be created, bound and destroyed while a
@@ -114,6 +117,13 @@ typedef struct {
     Texture2D wake_field; // Borrowed, immutable for the complete draw; owned by BoatGpu.
     float wake_spacing;
     Texture2D object_wakes; // Owned compact object records; not a sampled water height field.
+    // Records of the frame being drawn: player and traffic pieces, and, in a third row, the
+    // indices of the pieces the stamped field cannot shade.
+    float *object_records;
+    int object_count, object_players, object_outside;
+    float object_life, object_traffic_life;
+    WaterfrontWakeStamp wake_stamp; // Sampled wake shading; analytic when unsupported.
+    bool wake_stamp_disabled; // Review: shade every piece analytically, the reference.
     WaterfrontGpuTiled windows;
     WaterfrontGpuTiled corner;
     WaterfrontGpuTiled corner_emissive;
@@ -190,6 +200,10 @@ bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int siz
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limit);
+// Review: shade object wakes from the stamped field (default when supported) or analytically.
+void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool enabled);
+// Review: replace the stamped field with one of SIZE texels per side at SPACING metres.
+bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing);
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);

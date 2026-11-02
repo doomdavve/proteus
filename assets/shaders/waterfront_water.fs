@@ -219,7 +219,8 @@ vec3 crossingWake(vec2 world, float clock)
 }
 
 
-// BEGIN OBJECT RECIPE -- same signed ridge and derivatives as boat_wake_objects.c.
+// BEGIN OBJECT RECIPE -- same signed ridge and derivatives as boat_wake_objects.c and the
+// piece in waterfront_wake_stamp.fs.
 uniform int objectWakeEnabled;
 uniform float objectWakeLife;
 uniform int objectWakePlayerCount;
@@ -261,14 +262,38 @@ vec3 objectWakePiece(vec2 p, vec4 a, vec4 b, float life)
     objectCrestFoam+=clamp(b.z/1.8,0.0,1.0)*window*envelope*narrow*narrow*narrow*breakup;
     return b.z*vec3(envelope*window*shape,gradient);
 }
+// The stamped field holds the same sums as the loop below, sampled bilinearly from RGBA16F
+// texels: height, world X/Z slope and crest foam. Fragments outside its guard evaluate only
+// the pieces the CPU found reaching past it, listed in the record texture's third row.
+uniform int stampEnabled;
+uniform sampler2D stampField;
+uniform vec4 stampRect; // Origin X/Z, 1/extent, half-texel guard in UV.
+uniform int stampOutsideCount;
+vec3 objectWakeRecord(vec2 p, int i)
+{
+    return objectWakePiece(p,texelFetch(objectWakeData,ivec2(i,0),0),
+        texelFetch(objectWakeData,ivec2(i,1),0),
+        i>=objectWakePlayerCount && objectWakeTrafficLife>0.0 ? objectWakeTrafficLife : objectWakeLife);
+}
 vec3 objectWake(vec2 p)
 {
     vec3 result=vec3(0.0);
+    if (stampEnabled != 0) {
+        vec2 uv=(p-stampRect.xy)*stampRect.z;
+        if (all(greaterThanEqual(uv,vec2(stampRect.w))) && all(lessThanEqual(uv,vec2(1.0-stampRect.w)))) {
+            vec4 s=textureLod(stampField,uv,0.0);
+            objectCrestFoam=s.w;
+            return s.xyz;
+        }
+        for (int i=0; i<256; ++i) {
+            if (i>=stampOutsideCount) break;
+            result+=objectWakeRecord(p,int(texelFetch(objectWakeData,ivec2(i,2),0).x));
+        }
+        return result;
+    }
     for (int i=0; i<256; ++i) {
         if (i>=playerWakeCount) break;
-        result+=objectWakePiece(p,texelFetch(objectWakeData,ivec2(i,0),0),
-            texelFetch(objectWakeData,ivec2(i,1),0),
-            i>=objectWakePlayerCount && objectWakeTrafficLife>0.0 ? objectWakeTrafficLife : objectWakeLife);
+        result+=objectWakeRecord(p,i);
     }
     return result;
 }
