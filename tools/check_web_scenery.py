@@ -23,10 +23,11 @@ with sync_playwright() as p:
     browser = p.chromium.launch(executable_path=args.executable, headless=True,
                                 args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
     page = browser.new_page(viewport={'width': 1280, 'height': 900})
-    errors, scenery = [], []
+    errors, scenery, atlases = [], [], []
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.on('console', lambda m: print(m.type, m.text, flush=True) if m.type in ['error', 'warning'] else None)
     page.on('request', lambda r: scenery.append(r.url) if '/scenery-' in r.url else None)
+    page.on('request', lambda r: atlases.append(r.url) if '/water-atlas-' in r.url else None)
     page.goto(args.url)
     page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
     page.click('#play')
@@ -40,7 +41,7 @@ with sync_playwright() as p:
         page.screenshot(path=str(out / (name + '.png')))
 
     shot('title')
-    assert not scenery, f'outer pack requested before any session: {scenery}'
+    assert not scenery and not atlases, f'outer files requested before any session: {scenery} {atlases}'
     key('Enter')  # SINGLE PLAYER
     for _ in range(3):
         key('ArrowUp')  # START -> PLACE
@@ -62,6 +63,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(4000)
     shot('outer')
     assert len(scenery) == 1, f'expected one outer pack request, saw {scenery}'
+    assert len(atlases) == 1, f'expected one outer water atlas request, saw {atlases}'
     sizes = page.evaluate("performance.getEntriesByType('resource').filter(e => e.name.includes('/scenery-'))"
                           ".map(e => ({name: e.name, bytes: e.transferSize, ms: e.duration}))")
     print('FETCH', sizes, flush=True)
@@ -74,9 +76,9 @@ with sync_playwright() as p:
     key('Enter')  # START
     page.wait_for_timeout(3000)
     shot('outer-again')
-    assert len(scenery) == 1, f'the second outer session fetched again: {scenery}'
+    assert len(scenery) == 1 and len(atlases) == 1, f'the second outer session fetched again: {scenery} {atlases}'
     assert not errors, errors
-    (out / 'result.json').write_text(json.dumps({'errors': errors, 'requests': scenery,
+    (out / 'result.json').write_text(json.dumps({'errors': errors, 'requests': scenery, 'atlas_requests': atlases,
                                                  'fetch': sizes, 'result': 'ok'}))
     print('web_scenery=ok', flush=True)
     browser.close()

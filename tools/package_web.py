@@ -62,10 +62,10 @@ def main():
     files["plugin_example.json"] = example_name
     # Packs the page fetches on demand, by their asset path (web/scenery_loader.js).
     lazy = args.build_dir / "web-lazy"
-    for path in sorted(lazy.glob("geometry/*/scenery.bin")):
+    for path in sorted(lazy.glob("geometry/*/*.bin")):
         content = path.read_bytes()
         digest = hashlib.sha256(content).hexdigest()[:16]
-        name = f"scenery-{path.parent.name}-{digest}.bin"
+        name = f"{path.stem.replace('_', '-')}-{path.parent.name}-{digest}.bin"
         (site / name).write_bytes(content)
         files[path.relative_to(lazy).as_posix()] = name
     template = (root / "web/index.html").read_text()
@@ -82,7 +82,7 @@ def main():
     shutil.copyfile(args.lua_license or args.build_dir / "lua-LICENSE.txt", site / "lua-LICENSE.txt")
     # Remove outputs from earlier builds only, never unrelated files.
     for pattern in ("wake_velocity-*.js", "wake_velocity-*.wasm", "wake_velocity-*.data",
-                    "scenery-*.bin", "plugin_stage-*.js", "plugin_stage-*.wasm",
+                    "scenery-*.bin", "water-atlas-*.bin", "plugin_stage-*.js", "plugin_stage-*.wasm",
                     "plugin_worker-*.js", "plugin_example-*.json"):
         for path in site.glob(pattern):
             if path.name not in files.values():

@@ -55,6 +55,12 @@ configure_file(assets/geometry/river/scenery.bin "${WEB_ASSETS}/geometry/river/s
   COPYONLY)
 configure_file(assets/geometry/outer/scenery.bin
   "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/outer/scenery.bin" COPYONLY)
+# Water atlases (graphics G4) travel with their packs: preloaded for the river, fetched with the
+# outer pack. A missing atlas only loses the atlas shading.
+configure_file(assets/geometry/river/water_atlas.bin
+  "${WEB_ASSETS}/geometry/river/water_atlas.bin" COPYONLY)
+configure_file(assets/geometry/outer/water_atlas.bin
+  "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/outer/water_atlas.bin" COPYONLY)
 
 set_target_properties(wake_velocity PROPERTIES SUFFIX ".js")
 # Asyncify is raylib's supported way to yield from its existing synchronous loop.
@@ -85,6 +91,7 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/river/scenery.bin"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/river/water_atlas.bin"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/scenery_loader.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js"
