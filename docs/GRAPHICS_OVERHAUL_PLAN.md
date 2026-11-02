@@ -1,10 +1,10 @@
 # Graphics overhaul plan
 
-Status, 2026-11-01: **three work packages prepared; P1 is in progress**. G0 and G0w are
-machine-verified on the M1 Max; the first Windows hardware report and browser smoke remain open.
-Each package has one human playtest and, by default, one implementation PR. The detailed
-G0–G5c briefs are internal checkpoints with focused commits and resumable agent handoffs. G6
-remains a conditional study. **Next: P1/G1 on `feat/graphics-foundations`.** See the
+Status, 2026-11-02: **P1 is complete and Batch A accepted on Mac**; the first Windows hardware
+report remains open. Each package has one human playtest and, by default, one implementation PR.
+The detailed G0–G5c briefs are internal checkpoints with focused commits and resumable agent
+handoffs. G6 remains a conditional study. **Next: P2/G3a on `feat/graphics-water`** after P1
+merges. See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -110,10 +110,10 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-01: **three work packages, P1 in progress**. Each package owns one
+Status, 2026-11-02: **P1 complete, Batch A accepted on Mac; P2 next**. Each package owns one
 human playtest and, by default, one implementation PR. The G0–G5c sections below are ordered
 internal checkpoints, not separate work packages or PR assignments. G6 is a dormant contingency,
-outside the three-package count. **Next: P1/G1.**
+outside the three-package count. **Next: P2/G3a.**
 
 Keep package definitions, prompts and process updates together in one planning PR. The original
 twelve-PR planning stack was an interpretation error and is merged; it does not prescribe future
@@ -287,7 +287,7 @@ or test pass supplies a missing verdict. A pending user session does not prevent
 
 | Batch | When | Combined route and questions | What it gates |
 | --- | --- | --- | --- |
-| A — engine and geometry | P1 complete (through G2b) | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | P2 |
+| A — engine and geometry (accepted on Mac 2026-11-02) | P1 complete (through G2b) | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | P2 |
 | B — all living water | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
 | C — final presentation | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
 
@@ -308,8 +308,8 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 
 | Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
-| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A human review and Windows report pending |
-| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Unstarted; depends on P1 |
+| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows report pending |
+| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Unstarted; P1 and Batch A resolved, starts after P1 merges |
 | [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
 
 G6 is a conditional backend decision, not a fourth scheduled package. The delivery-boundary rule
@@ -334,19 +334,19 @@ predeclared bounds. Windows collection/analysis tools are packaged and usable, w
 hardware evidence recorded or explicitly pending. Run the full suite, prepare one Batch A route,
 and keep its human verdict separate. Fix blocking feedback before P2 starts.
 
-**Result:** machine gates met, human review pending. G0 and G0w are machine-verified on the reference Mac. G1 instancing is
+**Result:** machine gates met; Batch A accepted on Mac 2026-11-02 with no blocking feedback. G0 and G0w are machine-verified on the reference Mac. G1 instancing is
 byte-identical in every pass and meets its submission/CPU ceilings, after the owner moved the stress
 CPU gate to a 60 Hz measurement because the unpaced one measured GPU back-pressure. G2a storage
 meets its −45% vertex-byte gate and capture bounds. G2b meets the river triangle gate and keeps
 shadows uncached on measurement. Completed: stress scenario, review-pose manifest, measured G0 budgets, bounded live
 capture, portable exports, Windows launcher/Mac analyzer and their tests; G1 location caching,
 per-pass object culling and persistent instancing; G2a indexed, per-surface map storage; G2b far
-levels and the [Batch A checklist](#batch-a-checklist-prepared-2026-11-01-human-review-pending).
-Next: the user's Batch A.
+levels, the [Batch A checklist](#batch-a-checklist-prepared-2026-11-01) and its
+[verdict](#batch-a-verdict-2026-11-02). Next: merge P1, then P2/G3a.
 Implementation verification: full GPU-enabled CTest and three-repeat Release measurements; see
 [G1](#g1--persistent-instances-and-pass-culling). Agent playback: one WebGL2 river smoke on the M1
-Max at G1 and each of G2a and G2b, no native manual playback by the agent. Human acceptance: none;
-Batch A has not been run. Known scope risk: diagnostics plus multiple renderer
+Max at G1 and each of G2a and G2b, no native manual playback by the agent. Human acceptance:
+Batch A on Mac, 2026-11-02; Windows unverified. Known scope risk: diagnostics plus multiple renderer
 ownership/submission changes; see the delivery-boundary rule. No boundary change is currently
 justified: the diagnostics prerequisite is on the same branch and reviewable by checkpoint.
 
@@ -376,7 +376,8 @@ state, browser fallback and full suite pass. Record cumulative costs against P1/
 Batch B for river/outer, with stamp/history/place effects distinguishable. Fix blocking water
 feedback before P3 starts; actual human acceptance stays pending until the user plays it.
 
-**Result:** unstarted. Completed: package instructions only. Next: verify P1/Batch A, then G3a task 1.
+**Result:** unstarted. Completed: package instructions only. P1/Batch A resolved 2026-11-02 with no
+blocking feedback. Next: G3a task 1 once P1 has merged.
 No implementation verification, agent playback or human acceptance. Known risks: field/history
 stability, shore/depth interactions and GL4.1/WebGL2 capability fallbacks.
 
@@ -427,15 +428,15 @@ Stop after P3; keep any untriggered G6 backend study dormant.
 
 These entries own internal progress, not independent PRs. Read the assigned work package and
 execution process before a checkpoint. Stop at a checkpoint only for a handoff or an unresolved
-gate; otherwise continue within the same package. No checkpoint is verified or accepted yet.
+gate; otherwise continue within the same package. P1's checkpoints are accepted through Batch A on Mac.
 
 | Checkpoint | Work package | Dependency | Status |
 | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | P1 | current main | Machine-verified on M1 Max; browser smoke and Windows hardware open |
 | [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; Windows hardware baseline pending |
-| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and submission/CPU ceilings machine-verified; no human review |
-| [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Machine-verified on M1 Max; captures within G0 bounds, vertex bytes −58.7% river, −52.3% outer; Batch A pending |
-| [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Machine-verified on M1 Max; river p95 triangles 880 k → 492 k; shadow reuse measured and rejected; Batch A pending |
+| [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and submission/CPU ceilings machine-verified; Batch A accepted on Mac |
+| [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Machine-verified on M1 Max; captures within G0 bounds, vertex bytes −58.7% river, −52.3% outer; Batch A accepted on Mac |
+| [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Machine-verified on M1 Max; river p95 triangles 880 k → 492 k; shadow reuse measured and rejected; Batch A accepted on Mac |
 | [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Unstarted |
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Unstarted |
 | [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Unstarted |
@@ -878,7 +879,7 @@ checklist; actual human verdict remains separate.
 invalidate caches. A failed human LOD review pauses dependent visual expansion until corrected;
 successful automated checks do not approve popping.
 
-**Checkpoint result (2026-11-01, M1 Max):** machine gates met; human review pending in Batch A.
+**Checkpoint result (2026-11-01, M1 Max):** machine gates met; Batch A accepted on Mac 2026-11-02.
 Implementation: distant windows and street furniture draw at a far level per 256 m cell, chosen
 per view with an 8% hysteresis band; shadow maps stay uncached. See
 [distance detail](3D.md#distance-detail) and
@@ -925,14 +926,14 @@ per view with an 8% hysteresis band; shadow maps stay uncached. See
   `tile_culling` 30/30 and `instancing_parity` 12/12 in soaks. CPU captures 31/31 byte-identical. WebGL2 river smoke in
   Chrome 156 on ANGLE Metal after merging `main`: no GL errors or page errors, frame inspected.
 - **Agent playback:** captures, one browser smoke and the clip's numbers only, no native play.
-  **Human acceptance: pending, Batch A below.**
+  **Human acceptance: Batch A on Mac, 2026-11-02; see the verdict below.**
 - **Limits:** one machine and browser; no Windows report. The gate is measured on the river route
   only, and the outer map has no route benchmark. A level switch is one frame with no fade, so only
   a person can judge popping. Output taller than 200 presented pixels moves the switch out and
   keeps more triangles. The route never holds at a switch for long; the check covers that case.
-- **Next:** Batch A, then P2 after P1 merges and blocking feedback is resolved.
+- **Next:** P2 after P1 merges; Batch A raised no blocking feedback.
 
-#### Batch A checklist (prepared 2026-11-01; human review pending)
+#### Batch A checklist (prepared 2026-11-01)
 
 Revision: the tip of `feat/graphics-foundations`, in `../proteus-graphics-foundations`, built
 into `build-release`. Run from that directory. Add `--no-far-detail` to any command to compare.
@@ -960,6 +961,18 @@ Side-by-side clip of the review route, full detail left and far right, not commi
 8. Windows hardware report, when available: `collect-performance.bat`.
 
 Record revision, commands, settings, route, player, date, verdict, actions and unverified platforms.
+
+#### Batch A verdict (2026-11-02)
+
+- **Revision and settings:** the `feat/graphics-foundations` tip as prepared above (`1abd532`),
+  Release build on the M1 Max, with the commands and the side-by-side clip listed in the checklist.
+- **Route:** the checklist's river, bridge/quay, crossing, camera, reflection and shadow items.
+- **Player and verdict:** the project owner, 2026-11-02: "Everything looks ok to me!" No popping,
+  flicker, missing actors, shadow trails or missing far furniture shadows were reported.
+- **Actions:** none required; P1 may merge and P2 may start.
+- **Unverified:** Windows hardware (no `collect-performance.bat` report yet) and hardware browsers
+  beyond the agent's WebGL2 smoke. The verdict does not record which of the basin and outer
+  commands were played.
 
 ### G3a — Stamped wake shading
 
