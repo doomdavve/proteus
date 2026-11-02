@@ -28,7 +28,7 @@ owns the current contract. [All plans](README.md).
 Completed task: **P4.9 browser objective isolation**, following
 [P4.8 automated target/browser qualification](#p48-result-2026-10-30); see the
 [P4.9 result](#p49-result-2026-10-30). Prior results retain their dated verification evidence.
-**Next task: the [Cutover package](PLUGIN_DEFAULT_PLAN.md#pd5--cutover) of the [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md). Its PD1, PC, Rooms and Browser packages are merged.**
+**M1 structures are implemented; next marina task: [M2 appearance](MARINA_AUTHORING_PLAN.md#m2-boat-appearance).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
 Authority callbacks, commands and session recordings remain P5 work after it. Physical-device and human qualification need the
@@ -41,8 +41,10 @@ Human P3 migration/Undo/recovery acceptance and broader platform timing remain s
 The [location-life track](#location-life-track-proposed-2026-10-30) now gives marina,
 traffic/ferry, tram, wildlife and lighting authoring explicit implementation gates; L1.1's
 scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3's native berth/module
-parameterization plus the two-berth `plugins/harbor-life` package are complete. The first
-playable L4.3 harbor gate is implemented and awaits human review. The milestones below are this plan's
+parameterization and the original seven-berth Eriksberg package are complete.
+The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
+twelve-berth/two-row package; M2 appearance is next. The
+first playable L4.3 harbor gate is implemented and awaits human review. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -1792,10 +1794,12 @@ with a departing ferry and nearby gulls, followed by an evening variant when lig
 Planning update, 2026-10-30: the [execution guide](#execution-guide-for-a-smaller-implementation-model)
 breaks L1–L8 into individually scoped tasks, with proposed starting decisions, source owners,
 failure cases and acceptance evidence. **L1.1–L4.3 are complete; the first playable harbor gate is
-implemented and awaits human review.** `scene.define` installs and stages the two-berth harbor-life
-layout, its small pontoon and gangway, one authored passing craft, a retained ferry with an edited
-dwell, the retained schooner/lift dependency and one authored flock with timed feeding/alarm cues.
-Next in this track is L5.1 shared fixed daylight/dusk; L5–L8 remain later work.
+implemented and awaits human review.** `scene.define` installs and stages the seven-berth Eriksberg
+harbor-life layout, its long finger pontoon, gangway and shore equipment, one authored passing
+craft, a retained ferry with an edited dwell, the retained schooner/lift dependency and one
+authored flock with timed feeding/alarm cues. The [2026-11-01 layout result](#eriksberg-marina-layout-2026-11-01)
+owns the current counts and its explicit native gaps.
+M1 structures are implemented; the selected next work is [marina expansion M2](MARINA_AUTHORING_PLAN.md#m2-boat-appearance); L5–L8 remain deferred. The new plan owns the agreed structures, boat customization, routes, occupancy and local modules.
 
 ### Coverage and delivery slices
 
@@ -1908,7 +1912,7 @@ actual owners and document any necessary deviation before implementation:
 #### L1.1 result, 2026-10-30
 
 **Implemented:** the frozen contract and first marina site fixture. The
-[API](PLUGIN_API.md#location-life-scene-contract-planned-l11) owns the proposed package
+[API](PLUGIN_API.md#location-life-scene-contract-l11l43) owns the proposed package
 composition, `scene` schema, replacement/restart semantics, registry, capacities, consumer and
 lifetime inventory. No grant or runtime scene field exists yet; L1.1 is planning evidence only.
 
@@ -2469,8 +2473,45 @@ Verification, 2026-10-30, Apple Silicon/macOS, Debug (`PROTEUS_GPU_TESTS=OFF`):
 boat, the entrance stays clear, and the result feels alive rather than populated; also inspect
 bird/building/berth clipping in motion. No human acceptance is inferred from tests.
 
-**Next in this track: L5.1**, the native fixed day/dusk lighting frame required before scripted
-lighting. The requested L1.1–L4.3 sequence stops here; do not begin L5 without a new direction.
+#### Eriksberg marina layout, 2026-11-01
+
+**Request:** use a real Eriksberg shipyard-dock photograph as the target for harbor life and flag
+what the plugin/scene API cannot express.
+
+**Implemented:** `plugins/harbor-life` and the mirrored `harbor-room` scene now use all seven
+authored berths in one 37 m pontoon's finger slips, a mostly white/cream leisure fleet, shore
+equipment at `(38, 173)`, the entrance at `(4, 140)` and both the close slips and
+`outer.eriksberg` composition anchors. The passing craft's registered loop stays north of the
+pontoon; the four-vessel timetable, retained schooner/lift and eight-bird flock are unchanged.
+The package README now separates the authored recipe from the missing native capabilities.
+
+- **Validation:** `validate_scene_site` checks the seven hull envelopes, pairwise clearance, the
+  pontoon/quay, the gangway land/water ends, the entrance and the approach lane against the
+  compiled `outer` water. `validate_harbor_life` stages the real package, drives `x = 4` from
+  `z = 132`, checks player clearance every tick, backs out, and inspects the combined frame.
+- **Measured on this host (Apple Silicon/macOS, Debug, 320×200 CPU, 180 frames, camera
+  `(2, 161, 90°)`):** compiled p50/p95 **9.171/9.410 ms**, populated **9.513/9.786 ms**,
+  supported-maximum scene **11.094/11.359 ms**. The populated frame has 7 berths, 3 modules,
+  4 travelling craft (48 traffic wake patches), 1 flock/8 birds, 38 meshes, 37 attached lights
+  and 20 cars; the host retained one revision and 743,272 reserved bytes. The maximum scene
+  occupies 7,944 bytes. These are CPU render timings, not GPU or frame-pacing acceptance.
+- **Captures:** CPU `outer.marina` and `outer.eriksberg` frames show the marina row, apartment
+  blocks and the compiled crane; `outer.marina-pass` and the bridge review remain usable.
+  GPU/windowed motion was not run in this pass.
+- **Gaps recorded, not implemented:** the crane and buildings are compiled and not restylable;
+  there is no floating platform/arbitrary mesh; capacity is seven berths/four modules with four
+  module kinds; hulls use seven fixed recipes with no per-berth colour/dimension/mast/name;
+  berth occupancy has no arrival/departure schedule; traffic routes are presets; gameplay
+  lighting is fixed daylight; people/trams/seals need native actors; and `harbor-room` duplicates
+  the scene because there is no composition/include. The
+  [package README](../plugins/harbor-life/README.md#what-the-scene-api-cannot-express-yet) owns
+  the detailed list.
+
+**Human review is pending:** does the seven-berth row read as the Eriksberg marina from the
+boat, does the crane/building composition resemble the reference, and does the entrance remain
+clear in motion? No acceptance is inferred from the captures.
+
+**Next in this track: [marina expansion M2](MARINA_AUTHORING_PLAN.md#m2-boat-appearance)** (M1 structures implemented), selected after reviewing these gaps on 2026-11-01. The new plan owns the five-step implementation sequence. L5 lighting and the other explicitly deferred gaps remain outside this work.
 
 #### L2 — a small marina before a marina editor
 
@@ -2609,13 +2650,16 @@ marina flock; cue-only edits keep time while flock layout follows restart.
 Completed L4.3, 2026-10-30: combined the package into the first playable harbor qualification,
 added the deterministic approach/idle/departure fixture and measurements, exercised the package
 through the isolated worker and headless live-bridge mailbox, and inspected CPU captures.
-Next task for this track: **L5.1**, shared fixed daylight/dusk. The requested L1.1–L4.3 sequence
-stops here.
+Refined the authored marina to the seven-berth Eriksberg layout, 2026-11-01, with the
+[result above](#eriksberg-marina-layout-2026-11-01); this is an example/layout change, not a new
+capability milestone.
+Next task for this track: **[marina expansion M2](MARINA_AUTHORING_PLAN.md#m2-boat-appearance)**, following implemented M1 structures. The requested L1.1–L4.3 sequence is complete; the new five-step marina plan supersedes L5.1 as the selected next work. Lighting remains deferred.
 Known limits: authored route geometry is selected from registered presets; no freeform route
-editor, freeform module mesh editor or physical traffic wake recipe; no boarding/passenger
-simulation; no tram closure interlock; depth is unverified; GPU/windowed motion and bird/building
-clipping review could not run in this environment; and no tram/seal recipes, gameplay dusk,
-building activity or human scene acceptance are implemented or claimed.
+editor, freeform module mesh editor or physical traffic wake recipe; no floating quay/platform,
+crane/building restyling or per-berth hull colours/dimensions/names; no berth occupancy schedule;
+no boarding/passenger simulation; no tram closure interlock; depth is unverified; GPU/windowed
+motion and bird/building clipping review could not run in this environment; and no tram/seal
+recipes, gameplay dusk, building activity or human scene acceptance are implemented or claimed.
 
 Execution-guide verification, 2026-10-30, Apple Silicon/macOS, documentation-only: Debug
 configure reused the pinned raylib/Lua/ENet source trees; build passed with no project

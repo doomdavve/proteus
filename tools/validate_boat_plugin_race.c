@@ -6,9 +6,9 @@
 #include "boat_test_world.h"
 #include "raymath.h"
 
+#include "boat_fixtures.h"
 #include <stdio.h>
 #include <string.h>
-#include "boat_fixtures.h"
 
 #define CHECK(x)                                                                                   \
     do {                                                                                           \
@@ -121,7 +121,7 @@ static int rejects(void)
 
 static int reload_and_undo(void)
 {
-    BoatPluginHost host;
+    static BoatPluginHost host;
     BoatPluginBundle b = original();
     CHECK(boat_plugin_host_start(&host, river()->definition, &river()->map, &b)
         && host.kind == BOAT_PLUGIN_KIND_RACE);

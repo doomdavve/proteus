@@ -105,20 +105,26 @@ def schema():
          "then": {"properties": {"state_version": {"const": 1}}}},
         {"if": {"properties": {"capabilities": {"const": ["voyage.define", "scene.define"]}}},
          "then": {"properties": {"state_version": {"const": 1}}}}]
-    # L2.2 exposes marina berths; registered dock modules remain a planned projection so
-    # discovery does not claim fields the decoder still rejects.
+    # M1: dimensioned marina pieces, with shape-specific required fields.
     berth = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
                     "recipe": {"enum": ["skiff", "runabout", "sailboat", "cruiser", "speedboat",
                                         "sailboat_7m", "workboat"]},
                     **point, "heading": number(-math.tau, math.tau, "radians"),
                     "mooring": {"enum": ["pontoon", "none"]}})
-    module = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
-                     "kind": {"enum": ["pontoon", "pontoon_small", "gangway", "quay"]},
-                     **point, "heading": number(-math.tau, math.tau, "radians"),
-                     "anchor": record(point), "attaches": text(23)})
+    module_common = {"id": text(23, r"^[a-z][a-z0-9_]*$"),
+                     "length": number(.5, 60, "metres"), "width": number(.5, 20, "metres")}
+    floating = {**module_common, "kind": {"enum": ["walkway", "platform", "finger_pier"]},
+                **point, "heading": number(-math.tau, math.tau, "radians"),
+                "deck_height": number(.25, 2, "metres above calm water"), "attaches": text(23)}
+    module = {"oneOf": [object_schema(floating, required=[k for k in floating if k != "attaches"]),
+        record({**module_common, "kind": {"const": "quay_deck"}, **point,
+                "heading": number(-math.tau, math.tau, "radians"),
+                "deck_height": number(3.8, 8, "world Y metres")}),
+        record({**module_common, "kind": {"const": "gangway"}, "anchor": record(point),
+                "attaches": text(23), "deck_height": number(.25, 2, "landing height metres")})]}
     marina = object_schema({"entrance": record({**point, "width": number(4, 40, "metres")}),
-                            "berths": sequence(berth, 0, 7),
-                            "modules": sequence(module, 0, 4)}, required=())
+                            "berths": sequence(berth, 0, 32),
+                            "modules": sequence(module, 0, 64)}, required=())
     routes = ["river_runabout", "river_cruiser", "river_sailboat", "river_ferry", "alvsnabben",
               "frihamnen", "schooner", "marina_pass"]
     craft = ["runabout", "cruiser", "sailboat", "ferry", "alvsnabben", "frihamnen", "schooner",
@@ -147,7 +153,7 @@ def schema():
                     "radius": number(.5, 200, "metres"), "height": number(.5, 200, "metres"),
                     "rate": number(-5, 5, "turns/second"), "cues": sequence(cue, 0, 16)})
     gulls = object_schema({"flocks": sequence(flock, 0, 4)}, required=("flocks",))
-    scene = object_schema({"version": {"const": 1}, "marina": marina, "traffic": traffic,
+    scene = object_schema({"version": {"const": 2}, "marina": marina, "traffic": traffic,
                            "gulls": gulls}, required=("version",))
     match_rules = record({"round_ticks": number(1, 432000, "120 Hz ticks", True),
                           "intermission_ticks": number(0, 432000, "120 Hz ticks", True),
@@ -210,13 +216,16 @@ def schema():
                     "Last shelter radius 0; others >0; last shelter inside arrival",
                     "No shelter in exposed water; first shelter equals selected location spawn",
                     "Shelters have 8m water clearance; arrival 20m"],
-                "scene": ["marina.berths is 0..7; missing berths keeps the compiled collection",
-                    "marina.modules is 0..4; missing modules keeps the compiled dock furniture",
+                "scene": ["marina.berths is 0..32; missing berths keeps the compiled collection",
+                    "marina.modules is 0..64; missing modules keeps the compiled dock furniture",
                     "Berth/module IDs are unique scene-wide; recipes are registered native hulls",
                     "Hull plus mooring excursion must clear compiled water, other berths, the",
                     "declared entrance and the spawn/recovery shelters; depth is unverified",
-                    "Pontoon/quay footprints must clear each other; gangways need a land anchor,",
-                    "water landing, 2..20 m span and an existing pontoon target",
+                    "Solid footprints must clear shore, other structures, hulls, entrance and recovery areas",
+                    "Floating parents precede children; orthogonal edge joins share >=.25 m boundary",
+                    "Joined decks have equal height and share root wave heave; penetration rejects",
+                    "Quay decks require land throughout and a .3 m cap above sampled terrain",
+                    "Gangways need a land anchor, floating target and perpendicular 2..20 m horizontal span",
                     "scene.traffic.vessels is 0..8; a present list replaces all travelling craft",
                     "Retain entries copy a compiled actor and may override its named stop dwells;",
                     "authored entries select a registered route and recipe. Stop IDs must match",

@@ -251,8 +251,10 @@ static const char *const VESSEL[]
 static const char *const STOP[] = { "id", "dwell", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
 static const char *const BERTH[] = { "id", "recipe", "x", "z", "heading", "mooring", NULL };
-static const char *const MODULE[] = { "id", "kind", "x", "z", "heading", NULL };
-static const char *const GANGWAY[] = { "id", "kind", "anchor", "attaches", NULL };
+static const char *const MODULE[]
+    = { "id", "kind", "x", "z", "heading", "length", "width", "deck_height", "attaches", NULL };
+static const char *const GANGWAY[]
+    = { "id", "kind", "anchor", "attaches", "length", "width", "deck_height", NULL };
 static const char *const ANCHOR[] = { "x", "z", NULL };
 static const char *const VOYAGE[]
     = { "shelters", "arrival", "exposure", "exposed_fraction", "weather_range", NULL };
@@ -451,6 +453,14 @@ static bool scene_modules(lua_State *L, Vm *vm, int marina, BoatSceneDefinition 
             return false;
         }
         m->kind = (unsigned char)k;
+        double length_m, width_m, deck_m;
+        if (!number(L, vm, entry, path, "length", &length_m)
+            || !number(L, vm, entry, path, "width", &width_m)
+            || !number(L, vm, entry, path, "deck_height", &deck_m))
+            return false;
+        m->length = (float)length_m;
+        m->width = (float)width_m;
+        m->deck_height = (float)deck_m;
         if (k == BOAT_SCENE_MODULE_GANGWAY) {
             if (!only(L, vm, entry, path, GANGWAY)
                 || !string(L, vm, entry, path, "id", m->id, sizeof(m->id))
@@ -483,6 +493,12 @@ static bool scene_modules(lua_State *L, Vm *vm, int marina, BoatSceneDefinition 
             m->x = (float)x;
             m->z = (float)z;
             m->heading = (float)heading;
+            char attach_path[64];
+            int attach_type = field(L, entry, "attaches", path, attach_path);
+            lua_pop(L, 1);
+            if (attach_type != LUA_TNIL
+                && !string(L, vm, entry, path, "attaches", m->attaches, sizeof(m->attaches)))
+                return false;
         }
         lua_pop(L, 1);
     }

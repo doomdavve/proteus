@@ -146,18 +146,18 @@ static int scene_contract(void)
           "\"api\": 1, \"kind\": \"voyage\", \"entry\": \"main.lua\", \"location\": "
           "\"outer\", \"capabilities\": [\"voyage.define\", \"scene.define\"], "
           "\"state_version\": 1}";
-    const char *with_scene = variant("return {", "return { scene = { version = 1 },");
+    const char *with_scene = variant("return {", "return { scene = { version = 2 },");
     BoatPluginVoyage voyage;
     BoatPluginDiagnostic d;
     CHECK(
         load(scene_manifest, with_scene, strlen(with_scene), NULL, &voyage, &d) == BOAT_PLUGIN_OK);
-    CHECK(voyage.has_scene && voyage.scene.version == 1);
+    CHECK(voyage.has_scene && voyage.scene.version == BOAT_SCENE_VERSION);
     CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
     CHECK(!boat_scene_has_content(&voyage.scene));
     CHECK(voyage.digest == boat_plugin_route_digest(&boat_fixture_voyage_outer));
 
     // Omitted and granted-but-absent envelopes keep the compiled scene.
-    CHECK(load_source(variant("return {", "return { scene = { version = 1 },"), &voyage, &d)
+    CHECK(load_source(variant("return {", "return { scene = { version = 2 },"), &voyage, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene"));
     CHECK(load_source(variant("return {", "return {"), &voyage, &d) == BOAT_PLUGIN_OK);
@@ -172,11 +172,11 @@ static int scene_contract(void)
               strlen(variant("return {", "return { scene = {},")), NULL, &voyage, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.version"));
-    const char *bad_version = variant("return {", "return { scene = { version = 2 },");
+    const char *bad_version = variant("return {", "return { scene = { version = 1 },");
     CHECK(load(scene_manifest, bad_version, strlen(bad_version), NULL, &voyage, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.version"));
-    const char *unknown = variant("return {", "return { scene = { version = 1, galley = {} },");
+    const char *unknown = variant("return {", "return { scene = { version = 2, galley = {} },");
     CHECK(load(scene_manifest, unknown, strlen(unknown), NULL, &voyage, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.galley"));
     const char *not_table = variant("return {", "return { scene = 1,");
@@ -264,6 +264,9 @@ static int scene_contract(void)
     scene.module_count = 1;
     strcpy(scene.modules[0].id, "ramp");
     scene.modules[0].kind = BOAT_SCENE_MODULE_GANGWAY;
+    scene.modules[0].length = 12.925f;
+    scene.modules[0].width = 1.5f;
+    scene.modules[0].deck_height = .74f;
     scene.modules[0].x = scene.modules[0].anchor_x = 34.1f;
     scene.modules[0].z = scene.modules[0].anchor_z = 170;
     strcpy(scene.modules[0].attaches, "missing");
@@ -278,8 +281,9 @@ static int scene_contract(void)
     return 0;
 }
 
-// L2.2: the first two-berth package decodes, validates and carries stable IDs. Invalid geometry
-// is rejected with a field path; an invalid candidate never writes the caller's definition.
+// L2.2: the seven-berth Eriksberg package decodes, validates and carries stable IDs. Invalid
+// geometry is rejected with a field path; an invalid candidate never writes the caller's
+// definition.
 // L3.2: the harbor-life package's authored passing craft and retained default, with semantic
 // failures for route selection, craft recipe, speed/period, capacity and conflicts.
 static const char *harbor_variant(const char *from, const char *to)
@@ -319,8 +323,7 @@ static int scene_traffic(void)
     const WaterfrontRouteActor *ferry = &voyage.scene.traffic.actors[1];
     CHECK(!strcmp(ferry->id, "ferry") && ferry->recipe == WATERFRONT_CRAFT_ALVSNABBEN);
     CHECK(ferry->stop_count == 3 && ferry->stops[0].dwell == 35);
-    CHECK(!strcmp(ferry->stops[0].id, "stenpiren")
-        && !strcmp(ferry->stops[1].id, "lindholmspiren")
+    CHECK(!strcmp(ferry->stops[0].id, "stenpiren") && !strcmp(ferry->stops[1].id, "lindholmspiren")
         && !strcmp(ferry->stops[2].id, "eriksberg"));
     CHECK(ferry->stops[1].dwell < 0 && ferry->stops[2].dwell < 0);
     CHECK(!strcmp(voyage.scene.traffic.actors[2].id, "river_runabout")
@@ -337,8 +340,8 @@ static int scene_traffic(void)
         && flock->cues[1].kind == WATERFRONT_FLOCK_CUE_ALARM);
     CHECK(flock->cues[1].end_tick == 1200 && flock->cues[1].amplitude == 1);
     CHECK(voyage.scene_digest == boat_scene_digest(&voyage.scene));
-    WaterfrontVesselMotion start = waterfront_traffic_motion_routes(
-        &voyage.scene.traffic, 0, passing->phase);
+    WaterfrontVesselMotion start
+        = waterfront_traffic_motion_routes(&voyage.scene.traffic, 0, passing->phase);
     WaterfrontVesselMotion lap = waterfront_traffic_motion_routes(
         &voyage.scene.traffic, 0, passing->phase + passing->period);
     CHECK(Vector3Distance(start.position, lap.position) < .01f);
@@ -412,23 +415,27 @@ static int scene_berths(void)
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     BoatPluginVoyage voyage;
     CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
-    CHECK(voyage.has_scene && voyage.scene.version == 1);
-    CHECK(voyage.scene.berths_present && voyage.scene.berth_count == 2);
-    CHECK(!strcmp(voyage.scene.berths[0].id, "skiff")
-        && voyage.scene.berths[0].recipe == BOAT_SCENE_BERTH_SKIFF
+    CHECK(voyage.has_scene && voyage.scene.version == BOAT_SCENE_VERSION);
+    CHECK(voyage.scene.berths_present && voyage.scene.berth_count == 12);
+    CHECK(!strcmp(voyage.scene.berths[0].id, "sailboat_aft")
+        && voyage.scene.berths[0].recipe == BOAT_SCENE_BERTH_SAILBOAT_7M
         && voyage.scene.berths[0].mooring == BOAT_SCENE_MOORING_PONTOON);
     CHECK(!strcmp(voyage.scene.berths[1].id, "runabout")
         && voyage.scene.berths[1].recipe == BOAT_SCENE_BERTH_RUNABOUT);
-    CHECK(voyage.scene.berths[0].x == 13 && voyage.scene.berths[0].z == 167
-        && voyage.scene.berths[1].z == 173);
-    CHECK(voyage.scene.entrance_present && voyage.scene.entrance_x == 6
-        && voyage.scene.entrance_z == 168 && voyage.scene.entrance_width == 8);
-    CHECK(voyage.scene.modules_present && voyage.scene.module_count == 2);
+    CHECK(!strcmp(voyage.scene.berths[6].id, "sailboat_fore")
+        && voyage.scene.berths[6].recipe == BOAT_SCENE_BERTH_SAILBOAT_7M);
+    CHECK(voyage.scene.berths[0].x == 13 && voyage.scene.berths[0].z == 146
+        && voyage.scene.berths[6].z == 176);
+    CHECK(voyage.scene.entrance_present && voyage.scene.entrance_x == 4
+        && voyage.scene.entrance_z == 140 && voyage.scene.entrance_width == 8);
+    CHECK(voyage.scene.modules_present && voyage.scene.module_count == 13);
     CHECK(!strcmp(voyage.scene.modules[0].id, "pier")
-        && voyage.scene.modules[0].kind == BOAT_SCENE_MODULE_PONTOON_SMALL);
+        && voyage.scene.modules[0].kind == BOAT_SCENE_MODULE_WALKWAY);
     CHECK(!strcmp(voyage.scene.modules[1].id, "ramp")
         && voyage.scene.modules[1].kind == BOAT_SCENE_MODULE_GANGWAY
         && !strcmp(voyage.scene.modules[1].attaches, "pier"));
+    CHECK(!strcmp(voyage.scene.modules[2].id, "works")
+        && voyage.scene.modules[2].kind == BOAT_SCENE_MODULE_QUAY);
     CHECK(voyage.scene_digest != 0 && voyage.scene_digest == boat_scene_digest(&voyage.scene));
     BoatWorldResources resources;
     CHECK(boat_world_resources_init(&resources, boat_location_find("outer")));
@@ -442,15 +449,15 @@ static int scene_berths(void)
         bool location;
     } cases[] = {
         { "marina = {", "marina = { pontoons = {},", "scene.marina.pontoons", false },
-        { "      entrance = { x = 6, z = 168, width = 8 },\n", "", "scene.marina.entrance", false },
-        { "id = \"runabout\"", "id = \"skiff\"", "scene.marina.berths[2].id", false },
+        { "      entrance = { x = 4, z = 140, width = 8 },\n", "", "scene.marina.entrance", false },
+        { "id = \"runabout\"", "id = \"sailboat_aft\"", "scene.marina.berths[2].id", false },
         { "recipe = \"runabout\"", "recipe = \"yacht\"", "scene.marina.berths[2].recipe", false },
         { "mooring = \"pontoon\"", "mooring = \"quay\"", "scene.marina.berths[1].mooring", false },
-        { "x = 13, z = 173", "x = 32, z = 173", "scene.marina.berths[2]", true },
-        { "x = 13, z = 173", "x = 13, z = 167", "scene.marina.berths[2]", true },
-        { "entrance = { x = 6, z = 168, width = 8 }", "entrance = { x = 13, z = 167, width = 8 }",
+        { "x = 13, z = 176", "x = 32, z = 176", "scene.marina.berths[7]", true },
+        { "x = 13, z = 176", "x = 13, z = 171", "scene.marina.berths[7]", true },
+        { "entrance = { x = 4, z = 140, width = 8 }", "entrance = { x = 13, z = 146, width = 8 }",
             "scene.marina.berths[1]", true },
-        { "x = 13, z = 167", "x = -12, z = 60", "scene.marina.berths[1]", true },
+        { "x = 13, z = 146", "x = -12, z = 60", "scene.marina.berths[1]", true },
     };
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         memcpy(source, files.source, files.source_size);
@@ -482,48 +489,33 @@ static int scene_berths(void)
     }
     // Capacity + 1 is rejected by the Lua list decoder before native validation.
     BoatPluginVoyage too_many;
-    CHECK(load(files.manifest,
-              "return { scene = { version = 1, marina = { berths = { {}, {}, {}, {}, {}, {}, {}, "
-              "{} } } },"
-              " voyage = { shelters = { { id='a', name='A', x=0, z=0, heading=0, radius=9 },"
-              " { id='b', name='B', x=3600, z=-3370, heading=0, radius=0 } },"
-              " arrival={ x=3595, z=-3370, radius=75, max_speed=6 },"
-              " exposure={ x=4300, z=-2650, radius=700, height=1.6, build=60 },"
-              " exposed_fraction=.8, weather_range=2500 } }",
-              strlen("return { scene = { version = 1, marina = { berths = { {}, {}, {}, {}, {}, "
-                     "{}, {}, {} } } },"
-                     " voyage = { shelters = { { id='a', name='A', x=0, z=0, heading=0, radius=9 },"
-                     " { id='b', name='B', x=3600, z=-3370, heading=0, radius=0 } },"
-                     " arrival={ x=3595, z=-3370, radius=75, max_speed=6 },"
-                     " exposure={ x=4300, z=-2650, radius=700, height=1.6, build=60 },"
-                     " exposed_fraction=.8, weather_range=2500 } }"),
-              NULL, &too_many, &d)
+    const char *capacity = variant("return {",
+        "return { scene = { version = 2, marina = { berths = (function() local t={} for i=1,33 do "
+        "t[i]={} end return t end)() } },");
+    CHECK(load(files.manifest, capacity, strlen(capacity), NULL, &too_many, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.marina.berths"));
+    capacity = variant("return {",
+        "return { scene = { version = 2, marina = { modules = (function() local t={} for i=1,65 do "
+        "t[i]={} end return t end)() } },");
+    CHECK(load(files.manifest, capacity, strlen(capacity), NULL, &too_many, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    CHECK(!strcmp(d.field, "scene.marina.modules"));
 
     // L2.3 modules: the small pontoon and gangway decode; malformed, detached, overlapping and
     // over-budget modules reject with their field paths.
     struct {
         const char *from, *to, *field;
     } module_cases[] = {
-        { "kind = \"pontoon_small\"", "kind = \"barge\"", "scene.marina.modules[1].kind" },
+        { "kind = \"walkway\"", "kind = \"barge\"", "scene.marina.modules[1].kind" },
         { "attaches = \"pier\"", "attaches = \"missing\"", "scene.marina.modules[2].attaches" },
-        { "anchor = { x = 34.1, z = 170 }", "anchor = { x = 20, z = 170 }",
+        { "anchor = { x = 34.1, z = 161.5 }", "anchor = { x = 20, z = 161.5 }",
             "scene.marina.modules[2]" },
-        { "anchor = { x = 34.1, z = 170 }", "anchor = { x = 45, z = 170 }",
+        { "anchor = { x = 34.1, z = 161.5 }", "anchor = { x = 45, z = 161.5 }",
             "scene.marina.modules[2]" },
-        { "x = 20, z = 170", "x = 34, z = 170", "scene.marina.modules[1]" },
-        { "modules = {",
-            "modules = { { id='a', kind='pontoon_small', x=20, z=170, heading=0 },"
-            " { id='b', kind='pontoon_small', x=20, z=170, heading=0 },",
-            "scene.marina.modules[2]" },
-        { "modules = {",
-            "modules = { { id='a', kind='pontoon_small', x=20, z=170, heading=0 },"
-            " { id='b', kind='pontoon_small', x=20, z=180, heading=0 },"
-            " { id='c', kind='pontoon_small', x=20, z=190, heading=0 },"
-            " { id='d', kind='pontoon_small', x=20, z=200, heading=0 },"
-            " { id='e', kind='pontoon_small', x=20, z=210, heading=0 },",
-            "scene.marina.modules" },
+        { "x = 20, z = 161.5", "x = 34, z = 161.5", "scene.marina.modules[6].attaches" },
+        { "id = \"works\"", "id = \"pier\"", "scene.marina.modules[3].id" },
+
     };
     for (size_t i = 0; i < sizeof(module_cases) / sizeof(module_cases[0]); ++i) {
         memcpy(source, files.source, files.source_size);
@@ -542,6 +534,8 @@ static int scene_berths(void)
         show(module_cases[i].field, &d);
         if (!strcmp(module_cases[i].field, "scene.marina.modules[1].kind")
             || !strcmp(module_cases[i].field, "scene.marina.modules[2].attaches")
+            || !strcmp(module_cases[i].field, "scene.marina.modules[6].attaches")
+            || !strcmp(module_cases[i].field, "scene.marina.modules[3].id")
             || !strcmp(module_cases[i].field, "scene.marina.modules"))
             CHECK(status == BOAT_PLUGIN_SCHEMA && !strcmp(d.field, module_cases[i].field));
         else {

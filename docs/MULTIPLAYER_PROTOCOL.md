@@ -1,4 +1,4 @@
-# Multiplayer protocol v9
+# Multiplayer protocol v10
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -57,6 +57,12 @@ combat state, and CombatPage (type 21) carries bounded periodic correction pages
 uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
 compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
 
+v10 (2026-11-01) versions the dimensioned marina contract: room definition v2 contains scene
+v2 with up to 32 berths and 64 modules. Each module adds `f32` length, width and deck height
+between heading and anchor coordinates. Kinds are walkway=0, platform=1, gangway=2,
+quay_deck=3 and finger_pier=4. Attachments may also name earlier floating parents. Old pairs
+reject at handshake; old scene/room definitions reject before installation.
+
 v9 (2026-10-31) makes rooms package-defined. After Accept and before the world checkpoint the
 authority sends one validated, pointer-free **room definition** (package ID and name, mode,
 location, course and rules, combat values, optional authored scene) as paged data on the reliable
@@ -104,7 +110,7 @@ cannon cubes; birth ticks supply vertical velocity, so no extra checkpoint field
 | Offset | Type | Field | Rule |
 | ---: | --- | --- | --- |
 | 0 | u32 | magic | `0x50424e54` ("PBNT") |
-| 4 | u16 | version | 9. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
+| 4 | u16 | version | 10. Any other value is a version mismatch (a Hello gets Reject `VERSION`) |
 | 6 | u8 | type | 1–24, below |
 | 7 | u8 | flags | 0 |
 | 8 | u32 | epoch | Room session epoch from Accept; 0 in Hello |
@@ -227,7 +233,7 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 
 | Field | Type |
 | --- | --- |
-| version (1) | u8 |
+| version (2) | u8 |
 | mode (0 free, 1 deathmatch, 2 race) | u8 |
 | location (0 basin, 1 river, 2 outer) | u8 |
 | flags: bit 0 has rules, bit 1 has a scene | u8 |
@@ -565,7 +571,7 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v9 rejects every other version, v1–v8 included; there is no negotiation or
+  protocol version. v10 rejects every other version, v1–v9 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
   cannon constants, the fleet/wake contract or a weather recipe changes the content digest.

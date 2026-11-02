@@ -343,6 +343,9 @@ static void scene_wire(RoomWire *w, BoatSceneDefinition *s)
         m->x = real32(w, m->x);
         m->z = real32(w, m->z);
         m->heading = real32(w, m->heading);
+        m->length = real32(w, m->length);
+        m->width = real32(w, m->width);
+        m->deck_height = real32(w, m->deck_height);
         m->anchor_x = real32(w, m->anchor_x);
         m->anchor_z = real32(w, m->anchor_z);
         text(w, m->attaches, sizeof(m->attaches));

@@ -1,4 +1,5 @@
 #include "waterfront_harbor.h"
+#include "waterfront_outer.h"
 
 #include "raymath.h"
 
@@ -35,7 +36,7 @@ static const WaterfrontFerry ferry = { { 237, 0, -376 }, 2.865f, 155, 28, 6.3f, 
 static const Color timber = { 154, 123, 84, 255 };
 static const Color rubber = { 44, 52, 55, 255 };
 static const Color steel = { 128, 144, 146, 255 };
-static BoatModel boats[BOAT_SCENE_BERTH_RECIPES], pontoon, small_pontoon, quay, ferry_model;
+static BoatModel boats[BOAT_SCENE_BERTH_RECIPES], pontoon, quay, ferry_model;
 static bool initialized;
 
 const WaterfrontBerth *waterfront_harbor_berths(void) { return berths; }
@@ -227,19 +228,6 @@ static void initialize(void)
             &pontoon, (Vector3) { 1.05f, 1.04f, z }, (Vector3) { .16f, .10f, .38f }, steel);
     }
     build_ferry(&ferry_model);
-    // A small two-berth pontoon recipe. The long compiled pontoon keeps its fingers; this one is
-    // a plain 14 m walkway with three east-side cleats.
-    boat_model_begin(&small_pontoon);
-    boat_model_box(&small_pontoon, (Vector3) { 0, .26f, 0 }, (Vector3) { 2.1f, .7f, 14 }, rubber);
-    for (int i = 0; i < 21; ++i)
-        boat_model_box(&small_pontoon, (Vector3) { 0, .65f, -6.6f + i * .66f },
-            (Vector3) { 2.35f, .12f, .62f }, timber);
-    for (int i = -4; i <= 4; i += 4) {
-        boat_model_box(&small_pontoon, (Vector3) { 1.05f, .87f, (float)i },
-            (Vector3) { .14f, .35f, .14f }, steel);
-        boat_model_box(&small_pontoon, (Vector3) { 1.05f, 1.04f, (float)i },
-            (Vector3) { .16f, .10f, .38f }, steel);
-    }
     boat_model_begin(&quay);
     // East quay working berth: grounded gear, a coiled hose and an equipment stack. Vertices are
     // local to (50, 3.5, 35), so an authored quay can move and rotate the recipe.
@@ -286,36 +274,6 @@ const Mesh3D *waterfront_harbor_quay_mesh(void)
     return &quay.mesh;
 }
 
-WaterfrontModuleSpec waterfront_harbor_module_spec(unsigned kind)
-{
-    switch (kind) {
-    case BOAT_SCENE_MODULE_PONTOON:
-        return (WaterfrontModuleSpec) { 37, 2.35f, 1.05f };
-    case BOAT_SCENE_MODULE_PONTOON_SMALL:
-        return (WaterfrontModuleSpec) { 14, 2.35f, 1.05f };
-    case BOAT_SCENE_MODULE_GANGWAY:
-        return (WaterfrontModuleSpec) { 1.5f, 1.5f, .35f };
-    case BOAT_SCENE_MODULE_QUAY:
-        return (WaterfrontModuleSpec) { 10, 6, 1.1f };
-    default:
-        return (WaterfrontModuleSpec) { 0 };
-    }
-}
-
-const Mesh3D *waterfront_harbor_module_mesh(unsigned kind)
-{
-    initialize();
-    switch (kind) {
-    case BOAT_SCENE_MODULE_PONTOON:
-        return &pontoon.mesh;
-    case BOAT_SCENE_MODULE_PONTOON_SMALL:
-        return &small_pontoon.mesh;
-    case BOAT_SCENE_MODULE_QUAY:
-        return &quay.mesh;
-    default:
-        return NULL;
-    }
-}
 const Mesh3D *waterfront_harbor_ferry_mesh(void)
 {
     initialize();
@@ -379,9 +337,9 @@ static int nearest_pontoon(const BoatSceneDefinition *scene, Vector3 position)
     float distance = INFINITY;
     for (unsigned i = 0; i < scene->module_count; ++i) {
         const BoatSceneModule *m = &scene->modules[i];
-        if (m->kind != BOAT_SCENE_MODULE_PONTOON && m->kind != BOAT_SCENE_MODULE_PONTOON_SMALL)
+        if (m->kind == BOAT_SCENE_MODULE_GANGWAY || m->kind == BOAT_SCENE_MODULE_QUAY)
             continue;
-        float d = hypotf(position.x + m->x, position.z - m->z); // Renderer X is -source X.
+        float d = boat_scene_module_distance(m, -position.x, position.z);
         if (d < distance) {
             distance = d;
             best = (int)i;
@@ -390,23 +348,48 @@ static int nearest_pontoon(const BoatSceneDefinition *scene, Vector3 position)
     return best;
 }
 
+// Floating assemblies are anchored in X/Z and share their root's heave. Keeping them level
+// gives an exact rigid join at every time, including direct/reverse seeks.
+static Transform3D module_pose(
+    const BoatSceneDefinition *scene, unsigned index, BoatWater water, double time)
+{
+    const BoatSceneModule *m = &scene->modules[index], *root = m;
+    for (unsigned n = 0; root->attaches[0] && n < scene->module_count; ++n) {
+        const BoatSceneModule *parent = boat_scene_find_module(scene, root->attaches);
+        if (!parent || parent->kind == BOAT_SCENE_MODULE_GANGWAY)
+            break;
+        root = parent;
+    }
+    float heave = 0;
+    if (m->kind != BOAT_SCENE_MODULE_QUAY) {
+        Transform3D wave = boat_water_pose(water, time, (Vector3) { -root->x, 0, root->z },
+            root->heading, root->length, root->width);
+        heave = wave.position.y;
+    }
+    float bottom = m->kind == BOAT_SCENE_MODULE_QUAY ? 0 : -.3f;
+    return (Transform3D) { .position = { -m->x, heave + (m->deck_height + bottom) * .5f, m->z },
+        .rotation = { 0, m->heading, 0 },
+        .scale = { m->width, m->deck_height - bottom, m->length } };
+}
+
+static Vector3 module_landing(
+    const BoatSceneDefinition *scene, unsigned index, BoatWater water, double time)
+{
+    const BoatSceneModule *m = &scene->modules[index];
+    Transform3D pose = module_pose(scene, index, water, time);
+    return (Vector3) { -m->x - m->width * .5f * cosf(m->heading),
+        pose.position.y + pose.scale.y * .5f, m->z - m->width * .5f * sinf(m->heading) };
+}
+
 static void evaluate_modules(const BoatSceneDefinition *scene, BoatWater water, double time,
     float (*ground)(float x, float z), WaterfrontHarborFrame *frame)
 {
     frame->module_count = (int)scene->module_count;
     for (unsigned i = 0; i < scene->module_count; ++i) {
         const BoatSceneModule *m = &scene->modules[i];
-        if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
-            continue;
-        WaterfrontModuleSpec spec = waterfront_harbor_module_spec(m->kind);
-        Vector3 position = { -m->x, 0, m->z };
-        if (m->kind == BOAT_SCENE_MODULE_QUAY) {
-            position.y = ground ? ground(position.x, position.z) : 3.5f;
-            frame->modules[i] = (WaterfrontModuleFrame) { m->kind,
-                { .position = position, .rotation = { 0, m->heading, 0 }, .scale = { 1, 1, 1 } } };
-        } else
-            frame->modules[i] = (WaterfrontModuleFrame) { m->kind,
-                boat_water_pose(water, time, position, m->heading, spec.length, spec.beam) };
+        if (m->kind != BOAT_SCENE_MODULE_GANGWAY)
+            frame->modules[i]
+                = (WaterfrontModuleFrame) { m->kind, module_pose(scene, i, water, time) };
     }
     for (unsigned i = 0; i < scene->module_count; ++i) {
         const BoatSceneModule *m = &scene->modules[i];
@@ -415,11 +398,10 @@ static void evaluate_modules(const BoatSceneDefinition *scene, BoatWater water, 
         int target = module_index(scene, m->attaches);
         if (target < 0)
             continue;
-        Vector3 landing = waterfront_harbor_attachment(
-            frame->modules[target].pose, (Vector3) { -1.175f, .74f, 0 });
+        Vector3 landing = module_landing(scene, (unsigned)target, water, time);
         Vector3 shore = { -m->anchor_x, (ground ? ground(-m->anchor_x, m->anchor_z) : 3.5f) + .07f,
             m->anchor_z };
-        frame->modules[i] = (WaterfrontModuleFrame) { m->kind, segment(shore, landing, 1.5f) };
+        frame->modules[i] = (WaterfrontModuleFrame) { m->kind, segment(shore, landing, m->width) };
         frame->modules[i].pose.scale.y = .18f;
         for (int side = -1; side <= 1; side += 2) {
             Vector3 a = shore, b = landing;
@@ -494,14 +476,17 @@ void waterfront_harbor_evaluate_scene(const BoatSceneDefinition *scene, BoatWate
                     int pier = nearest_pontoon(scene, berth.position);
                     if (pier < 0)
                         continue;
-                    WaterfrontModuleSpec ps
-                        = waterfront_harbor_module_spec(scene->modules[pier].kind);
+                    WaterfrontModuleSpec ps = (WaterfrontModuleSpec) { scene->modules[pier].length,
+                        scene->modules[pier].width, scene->modules[pier].deck_height };
                     Transform3D pose = frame->modules[pier].pose;
                     Vector3 local = Vector3Transform(Vector3Subtract(berth.position, pose.position),
                         MatrixInvert(MatrixRotateXYZ(pose.rotation)));
-                    float reach = ps.length * .5f - 1;
-                    anchor = waterfront_harbor_attachment(
-                        pose, (Vector3) { 1.05f, 1.04f, Clamp(local.z + end * 2, -reach, reach) });
+                    float reach = fmaxf(0, ps.length * .5f - .2f);
+                    float deck = pose.scale.y * .5f;
+                    pose.scale = (Vector3) { 1, 1, 1 };
+                    anchor = waterfront_harbor_attachment(pose,
+                        (Vector3) { local.x < 0 ? -ps.beam * .5f : ps.beam * .5f, deck,
+                            Clamp(local.z + end * 2, -reach, reach) });
                 } else {
                     float reach = 37 * .5f - 1;
                     float local = Clamp(berth.position.z - dock_center.z + end * 2, -reach, reach);
@@ -614,44 +599,38 @@ static bool module_contact(const BoatSceneDefinition *scene, Vector2 p, float cl
 {
     for (unsigned i = 0; i < scene->module_count; ++i) {
         const BoatSceneModule *m = &scene->modules[i];
-        if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
-            continue;
-        WaterfrontModuleSpec spec = waterfront_harbor_module_spec(m->kind);
-        Vector2 centre = { -m->x, m->z };
-        Vector2 world_normal;
-        if (m->kind == BOAT_SCENE_MODULE_QUAY) {
-            if (bottom > 6 || top < -.5f)
+        Transform3D pose;
+        float high, low;
+        if (m->kind == BOAT_SCENE_MODULE_GANGWAY) {
+            int target = module_index(scene, m->attaches);
+            if (target < 0)
                 continue;
-            if (obstacle(p, centre, (Vector2) { spec.length * .5f, spec.beam * .5f }, m->heading,
-                    clearance, &world_normal)) {
-                if (normal)
-                    *normal = world_normal;
-                return true;
-            }
-            continue;
+            Vector3 landing = module_landing(scene, (unsigned)target, water, time);
+            Vector3 shore = { -m->anchor_x,
+                (water.upstream ? waterfront_outer_ground(-m->anchor_x, m->anchor_z) : 3.5f) + .07f,
+                m->anchor_z };
+            float dx = landing.x - shore.x, dz = landing.z - shore.z;
+            float span2 = dx * dx + dz * dz;
+            float along = span2 > 0
+                ? Clamp(((p.x - shore.x) * dx + (p.y - shore.z) * dz) / span2, 0, 1)
+                : 0;
+            float height = Lerp(shore.y, landing.y, along);
+            pose = segment(shore, landing, m->width);
+            pose.rotation.y = atan2f(dx, dz);
+            pose.scale.z = sqrtf(span2);
+            low = height - .2f;
+            high = height + 1; // Include the drawn handrails.
+        } else {
+            pose = module_pose(scene, i, water, time);
+            low = pose.position.y - pose.scale.y * .5f;
+            high = pose.position.y + pose.scale.y * .5f;
         }
-        Transform3D pose = boat_water_pose(
-            water, time, (Vector3) { centre.x, 0, centre.y }, m->heading, spec.length, spec.beam);
-        float low = pose.position.y - .6f, high = pose.position.y + spec.height;
-        if (bottom <= high && top >= low) {
-            if (obstacle(p, centre, (Vector2) { spec.beam * .5f + .45f, spec.length * .5f + .9f },
-                    m->heading, clearance, &world_normal)) {
-                if (normal)
-                    *normal = world_normal;
-                return true;
-            }
-            if (m->kind == BOAT_SCENE_MODULE_PONTOON)
-                for (int finger = 0; finger < 3; ++finger) {
-                    Vector3 at = waterfront_harbor_attachment(
-                        pose, (Vector3) { 4.6f, 0, -12 + finger * 12 });
-                    if (obstacle(p, (Vector2) { at.x, at.z }, (Vector2) { 4.1f, 1 }, m->heading,
-                            clearance, &world_normal)) {
-                        if (normal)
-                            *normal = world_normal;
-                        return true;
-                    }
-                }
-        }
+        // Include excursion and a little edge clearance, with the same authored footprint.
+        if (bottom <= high + .25f && top >= low - .25f
+            && obstacle(p, (Vector2) { pose.position.x, pose.position.z },
+                (Vector2) { pose.scale.x * .5f, pose.scale.z * .5f }, pose.rotation.y, clearance,
+                normal))
+            return true;
     }
     return false;
 }
@@ -659,46 +638,14 @@ static bool module_contact(const BoatSceneDefinition *scene, Vector2 p, float cl
 static bool module_camera(
     const BoatSceneDefinition *scene, Vector3 p, float clearance, BoatWater water, double time)
 {
-    for (unsigned i = 0; i < scene->module_count; ++i) {
-        const BoatSceneModule *m = &scene->modules[i];
-        WaterfrontModuleSpec spec = waterfront_harbor_module_spec(m->kind);
-        if (m->kind == BOAT_SCENE_MODULE_GANGWAY) {
-            // Test the ramp's centreline as a conservative camera volume.
-            int target = module_index(scene, m->attaches);
-            if (target < 0)
-                continue;
-            const BoatSceneModule *pier = &scene->modules[target];
-            WaterfrontModuleSpec ps = waterfront_harbor_module_spec(pier->kind);
-            Transform3D pose = boat_water_pose(
-                water, time, (Vector3) { -pier->x, 0, pier->z }, pier->heading, ps.length, ps.beam);
-            Vector3 landing = waterfront_harbor_attachment(pose, (Vector3) { -1.175f, .74f, 0 });
-            Vector3 shore = { -m->anchor_x, 3.57f, m->anchor_z };
-            Vector3 delta = Vector3Subtract(landing, shore);
-            float length2 = Vector3LengthSqr(delta);
-            float t = length2 > 0
-                ? Clamp(Vector3DotProduct(Vector3Subtract(p, shore), delta) / length2, 0, 1)
-                : 0;
-            if (Vector3Distance(p, Vector3Add(shore, Vector3Scale(delta, t))) < 1.0f + clearance)
-                return false;
-            continue;
-        }
-        Vector2 centre = { -m->x, m->z };
-        float low, high;
-        if (m->kind == BOAT_SCENE_MODULE_QUAY)
-            low = -.5f, high = 6;
-        else {
-            Transform3D pose = boat_water_pose(water, time, (Vector3) { centre.x, 0, centre.y },
-                m->heading, spec.length, spec.beam);
-            low = pose.position.y - .6f;
-            high = pose.position.y + spec.height;
-        }
-        if (p.y < high + clearance && p.y > low - clearance
-            && obstacle((Vector2) { p.x, p.z }, centre,
-                (Vector2) { spec.beam * .5f + .5f, spec.length * .5f + 1 }, m->heading, clearance,
-                NULL))
-            return false;
-    }
-    return true;
+    // Camera API has no clock: cover the supported vertical wave excursion conservatively.
+    if (module_contact(scene, (Vector2) { p.x, p.z }, clearance, p.y - clearance - 2,
+            p.y + clearance + 2, water, time, NULL))
+        return false;
+    // This clock-free API also covers the outer terrain's fixed gangway endpoints.
+    water.upstream = true;
+    return !module_contact(scene, (Vector2) { p.x, p.z }, clearance, p.y - clearance - 2,
+        p.y + clearance + 2, water, time, NULL);
 }
 
 bool waterfront_harbor_contact_height_scene(const BoatSceneDefinition *scene, Vector2 position,

@@ -34,7 +34,7 @@ return {
     -- A moored obstacle behind the start line, clear of every gate and recovery point. A room
     -- with this scene must carry it to clients as data.
     scene = {
-      version = 1,
+      version = 2,
       marina = {
         entrance = { x = -117, z = -192, width = 8 },
         berths = {
@@ -42,7 +42,7 @@ return {
             mooring = "pontoon" }
         },
         modules = {
-          { id = "pier", kind = "pontoon_small", x = -110, z = -199, heading = 0 }
+          { id = "pier", kind = "platform", length = 14, width = 2.35, deck_height = .74, x = -110, z = -199, heading = 0 }
         }
       }
     }

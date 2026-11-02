@@ -227,7 +227,7 @@ static void test_live_scene(const char *executable)
     // Moving a berth under the boat holds the edit and never displaces the boat. The edit
     // commits at the first clear boundary after the boat leaves.
     double held_now = now + 1;
-    a.boat.position = (Vector2) { 13, 173 };
+    a.boat.position = (Vector2) { 13, 151 };
     a.boat.heading = 0;
     const BoatSceneDefinition *before = &boat_plugin_host_active(&edited.host)->voyage.scene;
     float heading_before = before->berths[1].heading;
@@ -249,7 +249,7 @@ static void test_live_scene(const char *executable)
         "the new heading is active");
 
     // Undo restores the prior scene with the boat kept; consumers read the reverted envelope.
-    Vector2 contact = { 13, 173 };
+    Vector2 contact = { 13, 151 };
     Vector2 normal;
     CHECK(
         waterfront_harbor_contact_height_scene(&boat_plugin_host_active(&edited.host)->voyage.scene,
@@ -421,7 +421,8 @@ static void test_non_voyage_revisions(void)
         boat_session_recover(&session);
         step_ticks(&session, 10);
         if (course) {
-            const BoatCourseDefinition *bound = &boat_plugin_host_active(&plugin.host)->course.course;
+            const BoatCourseDefinition *bound
+                = &boat_plugin_host_active(&plugin.host)->course.course;
             CHECK(session.course_definition == bound && session.course.definition == bound,
                 "rename follows the active revision");
 

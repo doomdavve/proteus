@@ -182,7 +182,7 @@ void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
             if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
                 renderer3d_draw_box(r, m->pose, (Color) { 154, 123, 84, 255 });
             else
-                renderer3d_draw_mesh(r, waterfront_harbor_module_mesh(m->kind), m->pose);
+                renderer3d_draw_box(r, m->pose, (Color) { 154, 123, 84, 255 });
         }
     } else {
         renderer3d_draw_mesh(r, waterfront_harbor_quay_mesh(), frame->quay);

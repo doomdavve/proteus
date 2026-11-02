@@ -8,7 +8,7 @@
 #include "boat_plugin_host.h"
 #include "boat_plugin_lua.h"
 
-#define BOAT_PLUGIN_WIRE_VERSION 0x50535437u // PST7: match kind and scenes in free/race/match.
+#define BOAT_PLUGIN_WIRE_VERSION 0x50535438u // PST8: dimensioned marina structures (scene v2).
 
 typedef struct {
     BoatPluginKind kind;

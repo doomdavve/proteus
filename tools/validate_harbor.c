@@ -224,12 +224,13 @@ int main(void)
     WaterfrontHarborFrame compiled_again;
     waterfront_harbor_evaluate_scene(NULL, (BoatWater) { 0 }, 0, NULL, &compiled_again);
     CHECK(!memcmp(&flat, &compiled_again, sizeof(flat)));
-    BoatSceneDefinition zero = { .version = 1, .berths_present = true };
+    BoatSceneDefinition zero = { .version = BOAT_SCENE_VERSION, .berths_present = true };
     WaterfrontHarborFrame empty;
     waterfront_harbor_evaluate_scene(&zero, (BoatWater) { 0 }, 0, NULL, &empty);
     CHECK(empty.berth_count == 0 && empty.line_count == 6 + WATERFRONT_FERRY_LINES * 2);
 
-    BoatSceneDefinition two = { .version = 1, .berths_present = true, .berth_count = 2 };
+    BoatSceneDefinition two
+        = { .version = BOAT_SCENE_VERSION, .berths_present = true, .berth_count = 2 };
     two.berths[0] = (BoatSceneBerth) { .id = "skiff",
         .recipe = BOAT_SCENE_BERTH_SKIFF,
         .mooring = BOAT_SCENE_MOORING_PONTOON,
@@ -294,8 +295,9 @@ int main(void)
     CHECK(!waterfront_harbor_contact_height_scene(
         &two, (Vector2) { 13, 179 }, .35f, -.4f, 2, (BoatWater) { 0 }, 0, NULL));
 
-    BoatSceneDefinition seven
-        = { .version = 1, .berths_present = true, .berth_count = WATERFRONT_HARBOR_BOATS };
+    BoatSceneDefinition seven = { .version = BOAT_SCENE_VERSION,
+        .berths_present = true,
+        .berth_count = WATERFRONT_HARBOR_BOATS };
     for (int i = 0; i < WATERFRONT_HARBOR_BOATS; ++i) {
         const WaterfrontBerth *source = &berths[i];
         seven.berths[i] = (BoatSceneBerth) { .recipe = source->recipe,
@@ -321,11 +323,19 @@ int main(void)
     BoatSceneDefinition marina = two;
     marina.modules_present = true;
     marina.module_count = 2;
-    marina.modules[0] = (BoatSceneModule) {
-        .id = "pier", .kind = BOAT_SCENE_MODULE_PONTOON_SMALL, .x = 20, .z = 170, .heading = 0
-    };
+    marina.modules[0] = (BoatSceneModule) { .id = "pier",
+        .length = 14,
+        .width = 2.35f,
+        .deck_height = .74f,
+        .kind = BOAT_SCENE_MODULE_PLATFORM,
+        .x = 20,
+        .z = 170,
+        .heading = 0 };
     marina.modules[1] = (BoatSceneModule) { .id = "ramp",
         .kind = BOAT_SCENE_MODULE_GANGWAY,
+        .length = 12.925f,
+        .width = 1.5f,
+        .deck_height = .74f,
         .x = 34.1f,
         .z = 170,
         .anchor_x = 34.1f,
@@ -333,14 +343,14 @@ int main(void)
         .attaches = "pier" };
     WaterfrontHarborFrame modular;
     waterfront_harbor_evaluate_scene(&marina, boat_water_gentle(), 0, NULL, &modular);
-    CHECK(modular.module_count == 2 && modular.modules[0].kind == BOAT_SCENE_MODULE_PONTOON_SMALL
+    CHECK(modular.module_count == 2 && modular.modules[0].kind == BOAT_SCENE_MODULE_PLATFORM
         && modular.modules[1].kind == BOAT_SCENE_MODULE_GANGWAY);
     CHECK(modular.line_count == 2 * 4 + 6 + WATERFRONT_FERRY_LINES * 2);
     Transform3D pier = modular.modules[0].pose;
     Vector3 anchor = waterfront_harbor_attachment(modular.lines[7], (Vector3) { 0, 0, .5f });
     Vector3 local = Vector3Transform(
         Vector3Subtract(anchor, pier.position), MatrixInvert(MatrixRotateXYZ(pier.rotation)));
-    CHECK(fabsf(local.x - 1.05f) < .25f && fabsf(local.z) < 7);
+    CHECK(fabsf(local.x - 1.175f) < .25f && fabsf(local.z) < 7);
     Vector3 shore = waterfront_harbor_attachment(modular.lines[1], (Vector3) { 0, 0, .5f });
     Vector3 landing = waterfront_harbor_attachment(modular.lines[2], (Vector3) { 0, 0, .5f });
     WaterfrontHarborFrame modular_later;
