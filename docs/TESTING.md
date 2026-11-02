@@ -144,6 +144,19 @@ listed outside pieces equal both pools beyond the field. Presented stamped and a
 captures must stay within the image bounds. It also checks that an identical redraw reuses the
 field, and that a teleport, rewind and new context each rebuild a correct one. The analytic
 switch must draw no field.
+`water_history` (`boat_water_review --check-water-history`, `gpu`, about 3 s; graphics G3b)
+drives the foam history and ripples with fixtures on irregular frame times and reads the state
+back. Two histories given the same inputs must match bit for bit, and so must a reset history
+and a fresh one. A repeated time must run nothing and leave the state alone. A quarter-second
+gap may run only the catch-up limit; a larger jump, rewind, teleport or content change must
+reset with pre-roll. The shore mask must be open over a water rectangle and closed beyond it,
+with no foam or height on closed texels or inside the hull disc. Stamped foam must halve within
+1.5 times its half-life and fall below 5% within 5 s. Scrolling one block must move foam exactly
+with the world and leave the new strip empty. A minute of rain, a bobbing contact and a fast
+hull must stay finite and within the height limit, with peak energy in the last 15 s at most 1.5
+times that of the 15 s before. Without float targets nothing runs. In the stress scene it checks
+resets and substeps, that history changes the image, and that drawing leaves the physical state
+unchanged.
 `boat_water_review --geometry` prints each map's static GPU bytes (graphics G2a) and
 `--compare A B` checks two `--review` directories against the G0 image bounds. Neither is a CTest:
 review captures compare only within one platform and build.

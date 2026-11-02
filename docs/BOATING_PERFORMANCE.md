@@ -180,7 +180,9 @@ from draw order; `--no-detail` draws every detail cell near. Schema 6 (graphics 
 `wake_shading` (`stamped` or `analytic`, field size, spacing, bytes and builds) and the
 `wake_stamp_pieces`, `wake_stamp_outside` and `wake_stamp_texels` statistics and CSV columns;
 `--analytic-wakes` selects the reference loop, and `--stamp-size N` with `--stamp-spacing M`
-measures another field. The voyage checks hull clearance at each frame pose. `--check` covers every
+measures another field. Schema 7 (graphics G3b) adds `water_history` (`history` or `off`,
+field size, spacing, bytes, substeps and resets) and the `water_history_substeps` statistic and
+CSV column; `--no-water-history` turns it off. The voyage checks hull clearance at each frame pose. `--check` covers every
 tick, and the matching final state shows the benchmark followed the same trajectory.
 
 This is a fixed two-tick **render workload**. It does not exercise the app's real-time
