@@ -46,6 +46,16 @@ Lua voyage plugins: copy a folder from assets\plugins somewhere writable and run
 Saving its files reloads the voyage. The authoring folder holds the plugin authoring tools
 (Python 3.10 or newer, not included); see authoring\README.txt.
 
+Performance reports (graphics development): double-click collect-performance.bat to run the
+controlled ordinary river and four-boat stress benchmark, three repeats each. A few minutes
+later it opens a folder in Documents\Wake Velocity\performance and writes a ZIP beside it;
+copy that ZIP back to the Mac. Pass "full" on the command line for the complete matrix
+(flat/waves x AA off/4x4), or "check" to verify the fixture without a GPU context. For a hitch
+during normal play, press F4: the recent 30 seconds are written to the same report folder, and
+the path appears briefly on screen. F4 works with the overlay hidden and does not reset the boat.
+Run .\wake_velocity.exe --help for the matching --performance-report and
+--no-performance-capture options.
+
 When reporting issues, include build.txt, Windows version, GPU model, and
 whether the problem also happens without --gpu-aa.
 

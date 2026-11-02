@@ -4,10 +4,10 @@ in vec2 fragTexCoord;
 in vec4 fragColor;
 in vec3 fragWorldPosition;
 in vec3 fragWorldNormal;
+flat in vec4 fragObjectColor;
+flat in int fragEmissive;
 
 uniform sampler2D texture0;
-uniform vec4 objectColor;
-uniform int emissive;
 uniform float ghostOpacity;
 uniform float ghostPixelScale;
 uniform int groundPass;
@@ -204,12 +204,12 @@ void main()
         finalColor = vec4(90.0 / 255.0, 240.0 / 255.0, 1.0, 1.0);
         return;
     }
-    vec4 albedo = texture(texture0, fragTexCoord) * objectColor * fragColor;
+    vec4 albedo = texture(texture0, fragTexCoord) * fragObjectColor * fragColor;
     if (groundPass != 0)
-        albedo = vec4(ground_albedo(), fragColor.a) * objectColor;
+        albedo = vec4(ground_albedo(), fragColor.a) * fragObjectColor;
     if (facadePass != 0)
-        albedo = vec4(facade_albedo(), 1.0) * objectColor;
-    if (emissive != 0) {
+        albedo = vec4(facade_albedo(), 1.0) * fragObjectColor;
+    if (fragEmissive != 0) {
         if (reflectionPass != 0 && fragWorldPosition.y < 0.0)
             discard;
         finalColor = vec4(apply_atmosphere(albedo.rgb), albedo.a);

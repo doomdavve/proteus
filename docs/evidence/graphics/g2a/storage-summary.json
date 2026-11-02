@@ -1,0 +1,98 @@
+{
+ "note": "G2a storage at 9bd930a, M1 Max, Release, boat_water_review; p95 figures. paced = stress --visible at 60 Hz",
+ "geometry": {
+  "river": {
+   "triangles": 347390,
+   "meshes": 59,
+   "vertices": 729850,
+   "source_vertices": 1042170,
+   "vertex_bytes": 15488392,
+   "index_bytes": 2084340,
+   "retained_cpu_bytes": 0,
+   "before_bytes": 37518120,
+   "normal_error": 2e-05
+  },
+  "outer": {
+   "triangles": 1360411,
+   "meshes": 210,
+   "vertices": 3191362,
+   "source_vertices": 4081233,
+   "vertex_bytes": 70143732,
+   "index_bytes": 8162466,
+   "retained_cpu_bytes": 0,
+   "before_bytes": 146924388,
+   "normal_error": 2e-05
+  }
+ },
+ "captures_against_g1_merge": {
+  "images": 31,
+  "worst_channel": 1,
+  "worst_mean": 0.0001,
+  "exact_images": 10
+ },
+ "runs": {
+  "paced1": {
+   "app_submissions": 76,
+   "render_submit_ms": 1.789,
+   "gpu_ms": 11.734,
+   "frame_ms": 17.082,
+   "final_state": "tick=4438 hash=b90f2c7deb3c966f wake_live=128 wake_peak=128 wake_emitted=280 wake_expired=152 traffic_live=128 traffic_peak=128 traffic_emitted=420 slot0=-0x1.3bc26p+6,-0x1.c22918p+4,-0x1.7b672p-1,-0x1.3ed42ep+3 slot1=0x1.8115e2p+5,-0x1.d7880ap+5,0x1.a8e276p-1,0x1.0e3802p+3 slot2=-0x1.48781cp+5,0x1.c22c66p+4,0x1.334858p+1,0x1.3ecf26p+3 slot3=0x1.1f74dap+6,0x1.d7883ep+5,-0x1.27e6fap+1,-0x1.0e385p+3"
+  },
+  "paced2": {
+   "app_submissions": 76,
+   "render_submit_ms": 1.834,
+   "gpu_ms": 11.986,
+   "frame_ms": 17.056,
+   "final_state": "tick=4438 hash=b90f2c7deb3c966f wake_live=128 wake_peak=128 wake_emitted=280 wake_expired=152 traffic_live=128 traffic_peak=128 traffic_emitted=420 slot0=-0x1.3bc26p+6,-0x1.c22918p+4,-0x1.7b672p-1,-0x1.3ed42ep+3 slot1=0x1.8115e2p+5,-0x1.d7880ap+5,0x1.a8e276p-1,0x1.0e3802p+3 slot2=-0x1.48781cp+5,0x1.c22c66p+4,0x1.334858p+1,0x1.3ecf26p+3 slot3=0x1.1f74dap+6,0x1.d7883ep+5,-0x1.27e6fap+1,-0x1.0e385p+3"
+  },
+  "paced3": {
+   "app_submissions": 76,
+   "render_submit_ms": 1.784,
+   "gpu_ms": 12.129,
+   "frame_ms": 17.052,
+   "final_state": "tick=4438 hash=b90f2c7deb3c966f wake_live=128 wake_peak=128 wake_emitted=280 wake_expired=152 traffic_live=128 traffic_peak=128 traffic_emitted=420 slot0=-0x1.3bc26p+6,-0x1.c22918p+4,-0x1.7b672p-1,-0x1.3ed42ep+3 slot1=0x1.8115e2p+5,-0x1.d7880ap+5,0x1.a8e276p-1,0x1.0e3802p+3 slot2=-0x1.48781cp+5,0x1.c22c66p+4,0x1.334858p+1,0x1.3ecf26p+3 slot3=0x1.1f74dap+6,0x1.d7883ep+5,-0x1.27e6fap+1,-0x1.0e385p+3"
+  },
+  "river1": {
+   "app_submissions": 202,
+   "render_submit_ms": 1.187,
+   "gpu_ms": 1.249,
+   "frame_ms": 2.346,
+   "final_state": "tick=12072 x=0x1.1012b4p+10 z=-0x1.d9cadap+9 vx=0x1.05ace4p+4 vz=-0x1.afc88ap+1 heading=0x1.5e0cc8p+0 yaw_velocity=-0x1.18c98p-15 height=0x1.99999ap-5 vertical_velocity=0x1.4ba612p-25 pitch=0x1.aceeb8p-5 roll=-0x1.867a46p-15 throttle=0x1.333334p-1 wheel=-0x1.ae72ccp-17 landings=0"
+  },
+  "river2": {
+   "app_submissions": 202,
+   "render_submit_ms": 1.263,
+   "gpu_ms": 1.355,
+   "frame_ms": 2.427,
+   "final_state": "tick=12072 x=0x1.1012b4p+10 z=-0x1.d9cadap+9 vx=0x1.05ace4p+4 vz=-0x1.afc88ap+1 heading=0x1.5e0cc8p+0 yaw_velocity=-0x1.18c98p-15 height=0x1.99999ap-5 vertical_velocity=0x1.4ba612p-25 pitch=0x1.aceeb8p-5 roll=-0x1.867a46p-15 throttle=0x1.333334p-1 wheel=-0x1.ae72ccp-17 landings=0"
+  },
+  "river3": {
+   "app_submissions": 202,
+   "render_submit_ms": 1.267,
+   "gpu_ms": 1.358,
+   "frame_ms": 2.554,
+   "final_state": "tick=12072 x=0x1.1012b4p+10 z=-0x1.d9cadap+9 vx=0x1.05ace4p+4 vz=-0x1.afc88ap+1 heading=0x1.5e0cc8p+0 yaw_velocity=-0x1.18c98p-15 height=0x1.99999ap-5 vertical_velocity=0x1.4ba612p-25 pitch=0x1.aceeb8p-5 roll=-0x1.867a46p-15 throttle=0x1.333334p-1 wheel=-0x1.ae72ccp-17 landings=0"
+  },
+  "stress1": {
+   "app_submissions": 76,
+   "render_submit_ms": 9.253,
+   "gpu_ms": 10.341,
+   "frame_ms": 11.593,
+   "final_state": "tick=4438 hash=b90f2c7deb3c966f wake_live=128 wake_peak=128 wake_emitted=280 wake_expired=152 traffic_live=128 traffic_peak=128 traffic_emitted=420 slot0=-0x1.3bc26p+6,-0x1.c22918p+4,-0x1.7b672p-1,-0x1.3ed42ep+3 slot1=0x1.8115e2p+5,-0x1.d7880ap+5,0x1.a8e276p-1,0x1.0e3802p+3 slot2=-0x1.48781cp+5,0x1.c22c66p+4,0x1.334858p+1,0x1.3ecf26p+3 slot3=0x1.1f74dap+6,0x1.d7883ep+5,-0x1.27e6fap+1,-0x1.0e385p+3"
+  },
+  "stress2": {
+   "app_submissions": 76,
+   "render_submit_ms": 9.719,
+   "gpu_ms": 10.566,
+   "frame_ms": 12.356,
+   "final_state": "tick=4438 hash=b90f2c7deb3c966f wake_live=128 wake_peak=128 wake_emitted=280 wake_expired=152 traffic_live=128 traffic_peak=128 traffic_emitted=420 slot0=-0x1.3bc26p+6,-0x1.c22918p+4,-0x1.7b672p-1,-0x1.3ed42ep+3 slot1=0x1.8115e2p+5,-0x1.d7880ap+5,0x1.a8e276p-1,0x1.0e3802p+3 slot2=-0x1.48781cp+5,0x1.c22c66p+4,0x1.334858p+1,0x1.3ecf26p+3 slot3=0x1.1f74dap+6,0x1.d7883ep+5,-0x1.27e6fap+1,-0x1.0e385p+3"
+  },
+  "stress3": {
+   "app_submissions": 76,
+   "render_submit_ms": 9.381,
+   "gpu_ms": 10.385,
+   "frame_ms": 12.07,
+   "final_state": "tick=4438 hash=b90f2c7deb3c966f wake_live=128 wake_peak=128 wake_emitted=280 wake_expired=152 traffic_live=128 traffic_peak=128 traffic_emitted=420 slot0=-0x1.3bc26p+6,-0x1.c22918p+4,-0x1.7b672p-1,-0x1.3ed42ep+3 slot1=0x1.8115e2p+5,-0x1.d7880ap+5,0x1.a8e276p-1,0x1.0e3802p+3 slot2=-0x1.48781cp+5,0x1.c22c66p+4,0x1.334858p+1,0x1.3ecf26p+3 slot3=0x1.1f74dap+6,0x1.d7883ep+5,-0x1.27e6fap+1,-0x1.0e385p+3"
+  }
+ }
+}

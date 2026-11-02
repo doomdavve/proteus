@@ -1,0 +1,43 @@
+{
+ "note": "G2b, M1 Max, Release, boat_water_review, 4x4 AA; p95 figures unless noted, 2026-11-01",
+ "river_route": {
+  "scene_triangles": {"g2a": 880443, "g2b": 491730, "gate": 650000},
+  "by_pass": {"shadow": 228750, "reflection": 124840, "main": 137390},
+  "app_submissions": {"g2a": 202, "g2b": 270, "gate": 400},
+  "cpu_ms": {"g2b_repeats": [1.294, 1.286, 1.285], "gate": 3.2},
+  "gpu_ms": {"g2b_repeats": [1.415, 1.661, 1.640], "gate": 4.05},
+  "frame_ms": {"g2b_repeats": [2.231, 2.736, 2.662], "gate": 8.0}
+ },
+ "render_grid_sweep_without_levels": {
+  "1024": {"triangles": 880440, "submissions": 202, "gpu_ms": 1.297},
+  "512": {"triangles": 713270, "submissions": 324, "gpu_ms": 1.824},
+  "256": {"triangles": 514270, "submissions": 674, "gpu_ms": 3.279},
+  "128": {"triangles": 452300, "submissions": 1628, "gpu_ms": 6.271}
+ },
+ "detail_cell_with_levels": {
+  "512": {"triangles": 646680, "submissions": 214, "gpu_ms": 1.400},
+  "256": {"triangles": 489010, "submissions": 270, "gpu_ms": 1.597}
+ },
+ "stress": {
+  "app_submissions": 76,
+  "gpu_ms_repeats": [10.687, 10.102, 10.136],
+  "paced_cpu_ms_interleaved": {"g2a_164a693": [3.014, 2.785, 2.562, 2.799], "g2b": [3.009, 2.757, 2.776, 2.729], "gate": 4.0},
+  "state": "tick=4438 hash=8d9af1216d2cf172"
+ },
+ "memory_bytes": {
+  "river": {"vertex": 15489184, "index": 2084340, "far_vertex": 4321192, "far_index": 604908, "before": 37518120, "vertex_change_with_far": "-47.2%"},
+  "outer": {"vertex": 70142212, "index": 8162466, "far_vertex": 9621968, "far_index": 1502088, "before": 146924388, "vertex_change_with_far": "-45.7%"}
+ },
+ "captures": {
+  "no_detail_vs_g2a": {"images": 31, "worst_channel": 2, "worst_mean": 0.0},
+  "far_vs_near": {"images": 31, "worst_channel": 75, "worst_mean": 0.0741},
+  "cpu_identical": "31/31"
+ },
+ "route_clip_far_vs_near": {"frames": 3020, "mean_p50": 0.0210, "mean_p95": 0.0527, "mean_max": 0.0727, "largest_frame_to_frame_jump": 0.09},
+ "shadow_reuse": {
+  "identical_transform_frames": {"near": "0/6000", "far": "0/6000"},
+  "skipping_all_far_static_casters": {"triangles_saved": 115090, "gpu_ms_full": [1.875, 1.987, 1.597], "gpu_ms_skip": [1.832, 1.689, 1.676]},
+  "decision": "uncached"
+ },
+ "transition_check": "cells=144 turn_changes=0 forward_switches=62 backward_switches=52 flickers=0 frames=1604"
+}

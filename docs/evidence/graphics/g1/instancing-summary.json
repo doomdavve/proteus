@@ -1,0 +1,437 @@
+{
+ "note": "G1 instanced renderer, three-repeat Release runs, boat_water_review --benchmark",
+ "runs": [
+  {
+   "scenario": "river-review",
+   "aa": "4x4",
+   "repeat": 1,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 107,
+    "p95": 193
+   },
+   "app_instances": {
+    "p50": 284,
+    "p95": 742
+   },
+   "scene_triangles": {
+    "p50": 275237,
+    "p95": 897709
+   },
+   "render_submit_ms": {
+    "p50": 1.02399945,
+    "p95": 1.31999981
+   },
+   "gpu_ms": {
+    "p50": 1.05987501,
+    "p95": 1.44562495
+   },
+   "frame_ms": {
+    "p50": 1.38099957,
+    "p95": 2.61500001
+   },
+   "present_ms": {
+    "p50": 0.191999599,
+    "p95": 1.38499963
+   }
+  },
+  {
+   "scenario": "river-review",
+   "aa": "4x4",
+   "repeat": 2,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 107,
+    "p95": 193
+   },
+   "app_instances": {
+    "p50": 284,
+    "p95": 742
+   },
+   "scene_triangles": {
+    "p50": 275237,
+    "p95": 897709
+   },
+   "render_submit_ms": {
+    "p50": 1.09700024,
+    "p95": 1.33999991
+   },
+   "gpu_ms": {
+    "p50": 1.19562602,
+    "p95": 1.46329105
+   },
+   "frame_ms": {
+    "p50": 1.54700041,
+    "p95": 2.46399927
+   },
+   "present_ms": {
+    "p50": 0.289000571,
+    "p95": 1.24999976
+   }
+  },
+  {
+   "scenario": "river-review",
+   "aa": "4x4",
+   "repeat": 3,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 107,
+    "p95": 193
+   },
+   "app_instances": {
+    "p50": 284,
+    "p95": 742
+   },
+   "scene_triangles": {
+    "p50": 275237,
+    "p95": 897709
+   },
+   "render_submit_ms": {
+    "p50": 1.09599996,
+    "p95": 1.35499978
+   },
+   "gpu_ms": {
+    "p50": 1.19487405,
+    "p95": 1.4835
+   },
+   "frame_ms": {
+    "p50": 1.55000019,
+    "p95": 2.48699999
+   },
+   "present_ms": {
+    "p50": 0.291000128,
+    "p95": 1.26599991
+   }
+  },
+  {
+   "scenario": "river-review",
+   "aa": "off",
+   "repeat": 1,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 107,
+    "p95": 193
+   },
+   "app_instances": {
+    "p50": 284,
+    "p95": 742
+   },
+   "scene_triangles": {
+    "p50": 275237,
+    "p95": 897709
+   },
+   "render_submit_ms": {
+    "p50": 1.0259999,
+    "p95": 1.30699944
+   },
+   "gpu_ms": {
+    "p50": 1.044626,
+    "p95": 1.33512402
+   },
+   "frame_ms": {
+    "p50": 1.50199986,
+    "p95": 2.46000004
+   },
+   "present_ms": {
+    "p50": 0.304999769,
+    "p95": 1.29400003
+   }
+  },
+  {
+   "scenario": "river-review",
+   "aa": "off",
+   "repeat": 2,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 107,
+    "p95": 193
+   },
+   "app_instances": {
+    "p50": 284,
+    "p95": 742
+   },
+   "scene_triangles": {
+    "p50": 275237,
+    "p95": 897709
+   },
+   "render_submit_ms": {
+    "p50": 1.03300071,
+    "p95": 1.3139993
+   },
+   "gpu_ms": {
+    "p50": 1.05708396,
+    "p95": 1.33424997
+   },
+   "frame_ms": {
+    "p50": 1.5059998,
+    "p95": 2.48499966
+   },
+   "present_ms": {
+    "p50": 0.304999769,
+    "p95": 1.31200063
+   }
+  },
+  {
+   "scenario": "river-review",
+   "aa": "off",
+   "repeat": 3,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 107,
+    "p95": 193
+   },
+   "app_instances": {
+    "p50": 284,
+    "p95": 742
+   },
+   "scene_triangles": {
+    "p50": 275237,
+    "p95": 897709
+   },
+   "render_submit_ms": {
+    "p50": 1.03799999,
+    "p95": 1.31099951
+   },
+   "gpu_ms": {
+    "p50": 1.04537499,
+    "p95": 1.32850003
+   },
+   "frame_ms": {
+    "p50": 1.51299965,
+    "p95": 2.48499966
+   },
+   "present_ms": {
+    "p50": 0.305999994,
+    "p95": 1.30599928
+   }
+  },
+  {
+   "scenario": "stress-basin",
+   "aa": "4x4",
+   "repeat": 1,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 64,
+    "p95": 76
+   },
+   "app_instances": {
+    "p50": 363,
+    "p95": 560
+   },
+   "scene_triangles": {
+    "p50": 45420,
+    "p95": 50958
+   },
+   "render_submit_ms": {
+    "p50": 7.72999954,
+    "p95": 9.15700054
+   },
+   "gpu_ms": {
+    "p50": 9.33833313,
+    "p95": 10.2805004
+   },
+   "frame_ms": {
+    "p50": 9.31599998,
+    "p95": 12.0889997
+   },
+   "present_ms": {
+    "p50": 0.620000064,
+    "p95": 2.49799991
+   }
+  },
+  {
+   "scenario": "stress-basin",
+   "aa": "4x4",
+   "repeat": 2,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 64,
+    "p95": 76
+   },
+   "app_instances": {
+    "p50": 363,
+    "p95": 560
+   },
+   "scene_triangles": {
+    "p50": 45420,
+    "p95": 50958
+   },
+   "render_submit_ms": {
+    "p50": 7.76399946,
+    "p95": 9.13000011
+   },
+   "gpu_ms": {
+    "p50": 9.27841568,
+    "p95": 10.300251
+   },
+   "frame_ms": {
+    "p50": 9.38000011,
+    "p95": 12.0539999
+   },
+   "present_ms": {
+    "p50": 0.616000056,
+    "p95": 2.48500061
+   }
+  },
+  {
+   "scenario": "stress-basin",
+   "aa": "4x4",
+   "repeat": 3,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 64,
+    "p95": 76
+   },
+   "app_instances": {
+    "p50": 363,
+    "p95": 560
+   },
+   "scene_triangles": {
+    "p50": 45420,
+    "p95": 50958
+   },
+   "render_submit_ms": {
+    "p50": 7.71899986,
+    "p95": 9.16700077
+   },
+   "gpu_ms": {
+    "p50": 9.30037498,
+    "p95": 10.3232918
+   },
+   "frame_ms": {
+    "p50": 9.35099888,
+    "p95": 12.0009995
+   },
+   "present_ms": {
+    "p50": 0.616000056,
+    "p95": 2.48699999
+   }
+  },
+  {
+   "scenario": "stress-basin",
+   "aa": "off",
+   "repeat": 1,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 64,
+    "p95": 76
+   },
+   "app_instances": {
+    "p50": 363,
+    "p95": 560
+   },
+   "scene_triangles": {
+    "p50": 45420,
+    "p95": 50958
+   },
+   "render_submit_ms": {
+    "p50": 2.8760004,
+    "p95": 3.75900054
+   },
+   "gpu_ms": {
+    "p50": 3.8200829,
+    "p95": 4.63887501
+   },
+   "frame_ms": {
+    "p50": 4.30199957,
+    "p95": 5.85700035
+   },
+   "present_ms": {
+    "p50": 0.440000564,
+    "p95": 2.11999941
+   }
+  },
+  {
+   "scenario": "stress-basin",
+   "aa": "off",
+   "repeat": 2,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 64,
+    "p95": 76
+   },
+   "app_instances": {
+    "p50": 363,
+    "p95": 560
+   },
+   "scene_triangles": {
+    "p50": 45420,
+    "p95": 50958
+   },
+   "render_submit_ms": {
+    "p50": 2.87299967,
+    "p95": 3.7820003
+   },
+   "gpu_ms": {
+    "p50": 3.82524991,
+    "p95": 4.640625
+   },
+   "frame_ms": {
+    "p50": 4.3100009,
+    "p95": 5.86800003
+   },
+   "present_ms": {
+    "p50": 0.504000127,
+    "p95": 2.01200032
+   }
+  },
+  {
+   "scenario": "stress-basin",
+   "aa": "off",
+   "repeat": 3,
+   "pacing": "unpaced",
+   "window": "hidden",
+   "gl_renderer": "Apple M1 Max",
+   "app_submissions": {
+    "p50": 64,
+    "p95": 76
+   },
+   "app_instances": {
+    "p50": 363,
+    "p95": 560
+   },
+   "scene_triangles": {
+    "p50": 45420,
+    "p95": 50958
+   },
+   "render_submit_ms": {
+    "p50": 2.86099958,
+    "p95": 3.70700002
+   },
+   "gpu_ms": {
+    "p50": 3.82712412,
+    "p95": 4.66574907
+   },
+   "frame_ms": {
+    "p50": 4.29099989,
+    "p95": 5.96500015
+   },
+   "present_ms": {
+    "p50": 0.518999994,
+    "p95": 2.05700016
+   }
+  }
+ ]
+}

@@ -163,6 +163,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
         frame.ghost_flag = pose.flag;
     }
     RenderTexture2D target = gpu->supersampled.id ? gpu->supersampled : gpu->target;
+    gpu->scene.detail_scale = gpu->supersampled.id ? 4 : 1;
     Mesh original_water = gpu->scene.water;
     if (!mapped) {
         if (!gpu->basin_water.vaoId)

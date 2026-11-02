@@ -1,0 +1,142 @@
+{
+ "format": "wake-velocity-performance",
+ "revision": 1,
+ "capture_kind": "scripted",
+ "captured_at": "2026-11-01T12:00:00Z",
+ "tool": {
+  "name": "wake_velocity",
+  "version": "synthetic",
+  "commit": "deadbee",
+  "build_configuration": "Release/release",
+  "platform": "Darwin/arm64",
+  "compiler": "synthetic"
+ },
+ "system": {
+  "cpu": "synthetic",
+  "memory_bytes": null,
+  "gl_vendor": "Apple",
+  "gl_renderer": "Apple M1 Max",
+  "gl_version": "4.1 synthetic",
+  "monitor_refresh_hz": 60,
+  "dpi": [
+   1.0,
+   1.0
+  ]
+ },
+ "session": {
+  "map": "river",
+  "preset": "default",
+  "vsync": true,
+  "aa": false,
+  "fullscreen": false,
+  "window": [
+   960,
+   600
+  ],
+  "framebuffer": [
+   960,
+   600
+  ],
+  "scene": [
+   320,
+   200
+  ],
+  "reflection": [
+   160,
+   120
+  ],
+  "effects": {
+   "waves": true,
+   "wake_objects": true,
+   "lighting": true,
+   "shadows": true,
+   "reflections": true
+  }
+ },
+ "sampling": {
+  "capacity": 1800,
+  "samples": 12,
+  "total_frames": 12,
+  "duration_s": 0.2004,
+  "truncated": true,
+  "scope": "synthetic fixture; not hardware evidence",
+  "gpu": {
+   "samples": 12,
+   "missing": 0,
+   "scope": "asynchronous scene draw"
+  }
+ },
+ "target_interval_ms": 16.6667,
+ "hitch_count": 0,
+ "summary": {
+  "frame_ms": {
+   "samples": 12,
+   "mean": 16.241666666666667,
+   "p50": 16.2,
+   "p95": 16.5,
+   "p99": 16.5,
+   "max": 16.6
+  },
+  "interval_ms": {
+   "samples": 12,
+   "mean": 16.241666666666667,
+   "p50": 16.2,
+   "p95": 16.5,
+   "p99": 16.5,
+   "max": 16.6
+  },
+  "simulation_ms": {
+   "samples": 12,
+   "mean": 2.0302083333333334,
+   "p50": 2.025,
+   "p95": 2.0625,
+   "p99": 2.0625,
+   "max": 2.075
+  },
+  "render_submit_ms": {
+   "samples": 12,
+   "mean": 2.0302083333333334,
+   "p50": 2.025,
+   "p95": 2.0625,
+   "p99": 2.0625,
+   "max": 2.075
+  },
+  "present_ms": {
+   "samples": 12,
+   "mean": 2.0302083333333334,
+   "p50": 2.025,
+   "p95": 2.0625,
+   "p99": 2.0625,
+   "max": 2.075
+  },
+  "gpu_ms": {
+   "samples": 12,
+   "mean": 5.413888888888889,
+   "p50": 5.3999999999999995,
+   "p95": 5.5,
+   "p99": 5.5,
+   "max": 5.533333333333334
+  }
+ },
+ "segments": [
+  {
+   "id": 0,
+   "map": 0,
+   "preset": 0,
+   "samples": 12,
+   "duration_s": 0.2004,
+   "hitches": 0,
+   "frame_ms": {
+    "p50": 16.2,
+    "p95": 16.5,
+    "p99": 16.5
+   },
+   "interval_ms": {
+    "p50": 16.2,
+    "p95": 16.5,
+    "p99": 16.5
+   }
+  }
+ ],
+ "limitations": "synthetic fixture for analyzer tests"
+}
