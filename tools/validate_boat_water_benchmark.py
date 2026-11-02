@@ -20,7 +20,8 @@ WARMUP = 120
 STRESS_WARMUP = 120
 STRESS_FRAMES = 1020
 STATS = ('simulation_ms', 'render_submit_ms', 'present_ms', 'frame_ms', 'frame_interval_ms',
-         'gpu_ms', 'app_submissions', 'app_instances', 'scene_triangles', 'map_submissions', 'map_triangles')
+         'gpu_ms', 'app_submissions', 'app_instances', 'scene_triangles', 'map_submissions', 'map_triangles',
+         'wake_stamp_pieces', 'wake_stamp_outside', 'wake_stamp_texels')
 PASSES = ('shadow', 'reflection', 'main')
 GROUPS = ('map', 'water', 'object')
 
@@ -106,7 +107,7 @@ with tempfile.TemporaryDirectory() as directory:
     with prefix.with_suffix('.csv').open() as stream:
         rows = list(csv.DictReader(stream))
 
-    assert report['schema_revision'] == 5 and report['mode'] == 'benchmark'
+    assert report['schema_revision'] == 6 and report['mode'] == 'benchmark'
     assert report['scenario'] == 'river-review' and report['route'] == 'river-review'
     assert report['tile_size'] == 1024
     assert report['renderer'] == 'gpu' and report['aa'] == 'off'
@@ -120,6 +121,13 @@ with tempfile.TemporaryDirectory() as directory:
     assert report['final_state'] == expected_state == final_state(result.stdout)
     assert report['driver_draw_calls'] is None and report['submission_counter']
     assert report['wake_objects'] is None
+    shading = report['wake_shading']
+    assert shading['mode'] in ('stamped', 'analytic')
+    assert shading['field_size'] == 1024 and shading['spacing_m'] == 0.25
+    # The field stays allocated when the analytic reference is selected; it is absent only when
+    # float blending is unavailable.
+    assert shading['field_bytes'] in (0, 1024 * 1024 * 8)
+    assert shading['mode'] == 'analytic' or shading['field_bytes'] > 0
 
     frames = report['frames']
     assert len(rows) == frames and report['warmup_frames'] == WARMUP
@@ -195,7 +203,7 @@ with tempfile.TemporaryDirectory() as directory:
     stress_report = json.loads(stress.with_suffix('.json').read_text())
     with stress.with_suffix('.csv').open() as stream:
         stress_rows = list(csv.DictReader(stream))
-    assert stress_report['schema_revision'] == 5
+    assert stress_report['schema_revision'] == 6
     assert stress_report['scenario'] == 'stress-basin' and stress_report['route'] == 'stress-basin'
     assert stress_report['run_completed'] is True and stress_report['route_completed'] is False
     assert stress_report['final_state'] == expected_stress == final_state(result.stdout)
@@ -222,6 +230,13 @@ with tempfile.TemporaryDirectory() as directory:
             assert int(row[total]) == by_pass + sky, (i, kind)
     for name in STATS:
         percentiles(stress_report, stress_rows, name, STRESS_WARMUP)
+    # A stamped run places every live piece of both pools each frame and rebuilds the field
+    # whenever the records change, which they do every two-tick frame.
+    if stress_report['wake_shading']['mode'] == 'stamped':
+        assert stress_report['wake_shading']['builds'] == STRESS_FRAMES
+        for i, row in enumerate(stress_rows):
+            assert int(row['wake_stamp_pieces']) > 0, i
+            assert int(row['wake_stamp_texels']) > 0, i
     assert stress_report['gpu_samples'] == sum(
         1 for row in stress_rows[STRESS_WARMUP:] if row['gpu_ms'])
 print('river benchmark rows, warmup, percentiles, route completion and final-state parity pass; '

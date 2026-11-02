@@ -176,7 +176,11 @@ JSON records `tile_size` and the CSV adds `shadow_tiles_culled`, `reflection_til
 `main_tiles_culled`, the tile meshes each pass skipped. `--tile-size M` (64–65,536 m, default
 1,024) sets the render tile edge for the benchmark and for `--output` captures, and
 `--no-cull` (captures only) draws every tile in the same order, for isolating culling
-from draw order; `--no-detail` draws every detail cell near. The voyage checks hull clearance at each frame pose. `--check` covers every
+from draw order; `--no-detail` draws every detail cell near. Schema 6 (graphics G3a) adds
+`wake_shading` (`stamped` or `analytic`, field size, spacing, bytes and builds) and the
+`wake_stamp_pieces`, `wake_stamp_outside` and `wake_stamp_texels` statistics and CSV columns;
+`--analytic-wakes` selects the reference loop, and `--stamp-size N` with `--stamp-spacing M`
+measures another field. The voyage checks hull clearance at each frame pose. `--check` covers every
 tick, and the matching final state shows the benchmark followed the same trajectory.
 
 This is a fixed two-tick **render workload**. It does not exercise the app's real-time
@@ -705,6 +709,17 @@ Read gate columns against each report's `p95`; `p50` is typically far lower for 
 - **G2b distance detail:** landmarks, bridge openings, shore silhouettes and emissive identity
   stay present; triangle counts use the measured p95 gate; transitions need moving review and
   a documented hysteresis band. A still image alone does not approve popping.
+- **G3a stamped wake shading,** declared 2026-11-02 before the GPU comparison first ran. They
+  come from sampling the CPU wake reference bilinearly at 0.25 m with four boats circling at 9 and
+  14 m/s (worst: slope RMS 0.0067, maximum 0.105; foam RMS 0.0087, maximum 0.154), plus a margin
+  for 16-bit storage. At 200,000 fixed world points inside the field, where either side has
+  wake, of the saturated four-boat fixture: height RMS ≤ 0.004 m and maximum ≤ 0.05 m (height
+  only gates foam; vertices stay analytic), slope-vector RMS ≤ 0.012 and maximum ≤ 0.15, and
+  crest foam (clamped to 0..1) RMS ≤ 0.012 and maximum ≤ 0.2. Outside the field, the listed
+  pieces must equal both pools exactly. Presented 320x200 captures of the stamped and analytic
+  paths may differ by a mean ≤ 0.5/255 per channel and a 99.9th percentile ≤ 32/255; foam
+  edges can move by a texel, so there is no per-pixel maximum, and motion goes to Batch B.
+  Physical `final_state` stays exact. `wake_stamp` enforces all of these.
 
 ### Limits
 

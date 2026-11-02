@@ -1274,6 +1274,10 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME instancing_parity COMMAND boat_water_review --check-instancing)
   set_tests_properties(instancing_parity PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "instancing_parity=ok")
+  # Graphics G3a: the stamped wake field against the analytic pieces, lifecycle and switch.
+  add_test(NAME wake_stamp COMMAND boat_water_review --check-wake-stamp)
+  set_tests_properties(wake_stamp PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "wake_stamp=ok")
   add_test(NAME gpu_view_lifecycle COMMAND boat_water_review --check-gpu-lifecycle)
   set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}

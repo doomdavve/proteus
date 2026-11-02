@@ -136,6 +136,14 @@ every cell with windows must keep them far. It prints the switch counts and near
 every G0 review pose and six stress frames scalar, instanced and instanced with a replay every
 three objects, with AA off and 4x4. The main image, reflection and both shadow depth maps must be
 byte-identical, with equal instances and triangles and fewer submissions.
+`wake_stamp` (`boat_water_review --check-wake-stamp`, `gpu`, about 3 s; graphics G3a) reads
+the stamped wake field back at three moments of the saturated four-boat fixture. It compares the
+field with the CPU pieces at 200,000 fixed world points against the
+[predeclared bounds](BOATING_PERFORMANCE.md#predeclared-accuracy-bounds), and checks that the
+listed outside pieces equal both pools beyond the field. Presented stamped and analytic
+captures must stay within the image bounds. It also checks that an identical redraw reuses the
+field, and that a teleport, rewind and new context each rebuild a correct one. The analytic
+switch must draw no field.
 `boat_water_review --geometry` prints each map's static GPU bytes (graphics G2a) and
 `--compare A B` checks two `--review` directories against the G0 image bounds. Neither is a CTest:
 review captures compare only within one platform and build.

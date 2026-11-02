@@ -301,6 +301,20 @@ static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size);
 // off, and each pass culls some tiles somewhere.
 // --no-detail: review and benchmark runs draw the near level of every detail cell.
 static bool no_detail;
+// --analytic-wakes: shade object wakes with the reference loop instead of the stamped field.
+// --stamp-size/--stamp-spacing: another field for measurement (default 1024 texels, 0.25 m).
+static bool analytic_wakes;
+static int stamp_size = WATERFRONT_WAKE_STAMP_SIZE;
+static float stamp_spacing = WATERFRONT_WAKE_STAMP_SPACING;
+
+static bool apply_scene_options(WaterfrontGpuScene *scene)
+{
+    waterfront_gpu_scene_set_detail_enabled(scene, !no_detail);
+    waterfront_gpu_scene_set_wake_stamp_enabled(scene, !analytic_wakes);
+    if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
+        return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
+    return true;
+}
 
 static int count_detail_changes(const WaterfrontGpuScene *scene, const unsigned char *previous)
 {
@@ -812,6 +826,8 @@ typedef struct {
     bool has_interval, has_gpu;
     WaterfrontGpuCount total, pass[WATERFRONT_GPU_PASS_COUNT], group[WATERFRONT_GPU_GROUP_COUNT];
     unsigned int culled[WATERFRONT_GPU_PASS_COUNT];
+    unsigned int stamp_pieces, stamp_outside;
+    size_t stamp_texels;
 } BenchFrame;
 
 // Asynchronous GL_TIME_ELAPSED samples. A busy slot skips that frame instead of waiting.
@@ -917,10 +933,16 @@ BENCH_SELECT(instances, total.instances, true)
 BENCH_SELECT(triangles, total.triangles, true)
 BENCH_SELECT(map_submissions, group[WATERFRONT_GPU_GROUP_MAP].submissions, true)
 BENCH_SELECT(map_triangles, group[WATERFRONT_GPU_GROUP_MAP].triangles, true)
+BENCH_SELECT(stamp_pieces, stamp_pieces, true)
+BENCH_SELECT(stamp_outside, stamp_outside, true)
+BENCH_SELECT(stamp_texels, stamp_texels, true)
 
 static void bench_count(BenchFrame *frame, const WaterfrontGpuStats *stats)
 {
     frame->total = waterfront_gpu_stats_total(stats);
+    frame->stamp_pieces = stats->wake_pieces;
+    frame->stamp_outside = stats->wake_outside;
+    frame->stamp_texels = stats->wake_texels;
     for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
         frame->culled[pass] = stats->tiles_culled[pass];
     for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
@@ -1000,7 +1022,10 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         error = "graphics initialization failed";
         goto cleanup;
     }
-    waterfront_gpu_scene_set_detail_enabled(&gpu.scene, !no_detail);
+    if (!apply_scene_options(&gpu.scene)) {
+        error = "wake stamp field unavailable";
+        goto cleanup;
+    }
     if (stress
         && (!stress_init(&stress_fixture, waves)
             || !stress_advance(&stress_fixture, STRESS_PREROLL_TICKS))) {
@@ -1135,7 +1160,8 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
           "main_submissions,main_triangles,map_submissions,map_triangles,"
           "water_submissions,water_triangles,object_submissions,object_triangles,"
           "shadow_tiles_culled,reflection_tiles_culled,main_tiles_culled,"
-          "wake_live,wake_peak_live,wake_emitters,traffic_wake_live\n",
+          "wake_live,wake_peak_live,wake_emitters,traffic_wake_live,"
+          "wake_stamp_pieces,wake_stamp_outside,wake_stamp_texels\n",
         csv);
     for (int i = 0; i < count; ++i) {
         const BenchFrame *f = &frames[i];
@@ -1156,8 +1182,8 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
             fprintf(csv, ",%u,%zu", f->group[group].submissions, f->group[group].triangles);
         for (int pass = 0; pass < WATERFRONT_GPU_PASS_COUNT; ++pass)
             fprintf(csv, ",%u", f->culled[pass]);
-        fprintf(csv, ",%u,%u,%u,%u\n", f->wake_live, f->wake_peak_live, f->wake_emitters,
-            f->traffic_wake_live);
+        fprintf(csv, ",%u,%u,%u,%u,%u,%u,%zu\n", f->wake_live, f->wake_peak_live, f->wake_emitters,
+            f->traffic_wake_live, f->stamp_pieces, f->stamp_outside, f->stamp_texels);
     }
     unsigned traffic_peak = 0;
     for (int i = 0; i < count; ++i)
@@ -1168,7 +1194,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     else
         format_final_state(state, sizeof(state), boat, tick);
     fprintf(json,
-        "{\n  \"schema_revision\":5,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
+        "{\n  \"schema_revision\":6,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
         "  \"scenario\":\"%s\",\"route\":\"%s\",\"route_revision\":1,\"physics_revision\":%d,\n"
         "  \"build\":\"%s\",\"platform\":\"%s\",\n  \"gl_renderer\":",
         stress ? "stress-basin" : "river-review", stress ? "stress-basin" : "river-review",
@@ -1212,6 +1238,16 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     json_stats(json, "scene_triangles", frames, count, scratch, bench_triangles);
     json_stats(json, "map_submissions", frames, count, scratch, bench_map_submissions);
     json_stats(json, "map_triangles", frames, count, scratch, bench_map_triangles);
+    const WaterfrontWakeStamp *stamp = &gpu.scene.wake_stamp;
+    bool stamped = stamp->supported && !gpu.scene.wake_stamp_disabled;
+    fprintf(json,
+        "  \"wake_shading\":{\"mode\":\"%s\",\"field_size\":%d,\"spacing_m\":%.9g,"
+        "\"field_bytes\":%zu,\"builds\":%llu},\n",
+        stamped ? "stamped" : "analytic", stamp->size, (double)stamp->spacing,
+        waterfront_wake_stamp_bytes(stamp), stamp->builds);
+    json_stats(json, "wake_stamp_pieces", frames, count, scratch, bench_stamp_pieces);
+    json_stats(json, "wake_stamp_outside", frames, count, scratch, bench_stamp_outside);
+    json_stats(json, "wake_stamp_texels", frames, count, scratch, bench_stamp_texels);
     if (stress) {
         fprintf(json,
             "  \"wake_objects\":{\"emitters\":%u,\"boat_pool_capacity\":%d,\"live\":%u,"
@@ -1430,6 +1466,295 @@ static bool parity_frame(BoatGpu *gpu, const ParityScene *scene, const char *nam
 
 // G1: every G0 review pose and the four-boat stress scene, on the same build and platform, with AA
 // off and 4x4.
+// G3a stamped wake shading against the analytic pieces, on the saturated four-boat fixture.
+// Predeclared bounds (docs/BOATING_PERFORMANCE.md): fixed world samples inside the field, and
+// presented captures of the stamped and analytic paths. Reading the field back is test-only.
+#define STAMP_SAMPLES 200000
+#define STAMP_BOUND_HEIGHT_RMS .004
+#define STAMP_BOUND_HEIGHT_MAX .05
+#define STAMP_BOUND_SLOPE_RMS .012
+#define STAMP_BOUND_SLOPE_MAX .15
+#define STAMP_BOUND_FOAM_RMS .012
+#define STAMP_BOUND_FOAM_MAX .2
+#define STAMP_BOUND_IMAGE_MEAN .5 // Per channel, /255.
+#define STAMP_BOUND_IMAGE_P999 32 // 99.9th percentile channel difference, /255.
+
+typedef struct {
+    double height_sq, slope_sq, foam_sq, height_max, slope_max, foam_max;
+    int samples;
+} StampError;
+
+// The shader's height, slope and crest foam of both pools at shader world X/Z. Shader X is
+// physics -X, so its slope along X changes sign.
+static Vector4 stamp_reference(
+    const BoatWakeObjects *player, const BoatWakeObjects *traffic, float x, float z)
+{
+    Vector2 p = { -x, z };
+    BoatWakeObjectSample a = boat_wake_objects_query(player, p);
+    BoatWakeObjectSample b = boat_wake_objects_query(traffic, p);
+    return (Vector4) { a.height + b.height, -(a.gradient.x + b.gradient.x),
+        a.gradient.y + b.gradient.y, a.crest_foam + b.crest_foam };
+}
+
+static Vector4 stamp_bilinear(const float *texels, int size, float u, float v)
+{
+    float tx = u * size - .5f, tz = v * size - .5f;
+    int x = (int)floorf(tx), z = (int)floorf(tz);
+    float fx = tx - x, fz = tz - z;
+    float out[4] = { 0 };
+    for (int c = 0; c < 4; ++c) {
+        const float *t = texels + c;
+        float bottom = t[4 * (z * size + x)] * (1 - fx) + t[4 * (z * size + x + 1)] * fx;
+        float top = t[4 * ((z + 1) * size + x)] * (1 - fx) + t[4 * ((z + 1) * size + x + 1)] * fx;
+        out[c] = bottom * (1 - fz) + top * fz;
+    }
+    return (Vector4) { out[0], out[1], out[2], out[3] };
+}
+
+static bool stamp_read(const WaterfrontWakeStamp *stamp, float *texels)
+{
+    glBindTexture(GL_TEXTURE_2D, stamp->target.texture.id);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, texels);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return glGetError() == GL_NO_ERROR;
+}
+
+// Sample the read-back field at fixed world points inside its guard, where either side has wake.
+static StampError stamp_errors(const WaterfrontWakeStamp *stamp, const float *texels,
+    const BoatWakeObjects *player, const BoatWakeObjects *traffic)
+{
+    StampError e = { 0 };
+    float rect[4];
+    waterfront_wake_stamp_rect(stamp, rect);
+    unsigned seed = 12345;
+    for (int i = 0; i < STAMP_SAMPLES; ++i) {
+        float uv[2];
+        for (int k = 0; k < 2; ++k) {
+            seed = seed * 1664525u + 1013904223u;
+            uv[k] = rect[3] + (1 - 2 * rect[3]) * (float)(seed >> 8) / 16777216.0f;
+        }
+        float x = rect[0] + uv[0] / rect[2], z = rect[1] + uv[1] / rect[2];
+        Vector4 r = stamp_reference(player, traffic, x, z);
+        Vector4 g = stamp_bilinear(texels, stamp->size, uv[0], uv[1]);
+        if (r.x == 0 && r.y == 0 && r.z == 0 && r.w == 0 && g.x == 0 && g.y == 0 && g.w == 0)
+            continue;
+        double dh = fabs(g.x - r.x), ds = hypot(g.y - r.y, g.z - r.z);
+        double df = fabs(fminf(fmaxf(g.w, 0), 1) - fminf(fmaxf(r.w, 0), 1));
+        e.height_sq += dh * dh;
+        e.slope_sq += ds * ds;
+        e.foam_sq += df * df;
+        e.height_max = fmax(e.height_max, dh);
+        e.slope_max = fmax(e.slope_max, ds);
+        e.foam_max = fmax(e.foam_max, df);
+        ++e.samples;
+    }
+    return e;
+}
+
+static bool stamp_within(StampError e, const char *label)
+{
+    double n = e.samples ? e.samples : 1;
+    double hr = sqrt(e.height_sq / n), sr = sqrt(e.slope_sq / n), fr = sqrt(e.foam_sq / n);
+    printf("wake_stamp %s samples=%d height_rms=%.5f height_max=%.4f slope_rms=%.5f "
+           "slope_max=%.4f foam_rms=%.5f foam_max=%.4f\n",
+        label, e.samples, hr, e.height_max, sr, e.slope_max, fr, e.foam_max);
+    return e.samples > 1000 && hr <= STAMP_BOUND_HEIGHT_RMS
+        && e.height_max <= STAMP_BOUND_HEIGHT_MAX && sr <= STAMP_BOUND_SLOPE_RMS
+        && e.slope_max <= STAMP_BOUND_SLOPE_MAX && fr <= STAMP_BOUND_FOAM_RMS
+        && e.foam_max <= STAMP_BOUND_FOAM_MAX;
+}
+
+// Keep only the packed records whose indices are listed: player pool first, then traffic, in
+// boat_wake_objects_pack order.
+static void stamp_keep(BoatWakeObjects *pool, int first, const float *listed, int count)
+{
+    int index = first;
+    for (unsigned i = 0; i < BOAT_OBJECT_CAPACITY; ++i) {
+        if (!pool->objects[i].amplitude)
+            continue;
+        bool keep = false;
+        for (int k = 0; k < count; ++k)
+            keep |= (int)listed[4 * k] == index;
+        if (!keep)
+            pool->objects[i].amplitude = 0;
+        ++index;
+    }
+}
+
+// Pieces not listed as outside must vanish outside the guard: there, the listed pieces alone
+// equal both pools. Samples run along a ring just beyond the sampled area.
+static bool stamp_outside_exact(const WaterfrontGpuScene *scene, const BoatWakeObjects *player,
+    const BoatWakeObjects *traffic, int *checked)
+{
+    static BoatWakeObjects kept_player, kept_traffic;
+    kept_player = *player;
+    kept_traffic = *traffic;
+    // The stress fixture has both pools: three rows of 256 vec4s.
+    const float *listed = scene->object_records + 8 * BOAT_OBJECT_CAPACITY * 2;
+    stamp_keep(&kept_player, 0, listed, scene->object_outside);
+    stamp_keep(&kept_traffic, scene->object_players, listed, scene->object_outside);
+    float rect[4];
+    waterfront_wake_stamp_rect(&scene->wake_stamp, rect);
+    float extent = 1 / rect[2];
+    *checked = 0;
+    for (int i = 0; i < 4000; ++i) {
+        float t = i / 4000.0f, margin = .1f + 30 * (float)(i % 7) / 6;
+        float along = -margin + (extent + 2 * margin) * t;
+        float x, z;
+        switch (i % 4) {
+        case 0:
+            x = rect[0] + along, z = rect[1] - margin;
+            break;
+        case 1:
+            x = rect[0] + along, z = rect[1] + extent + margin;
+            break;
+        case 2:
+            x = rect[0] - margin, z = rect[1] + along;
+            break;
+        default:
+            x = rect[0] + extent + margin, z = rect[1] + along;
+            break;
+        }
+        Vector4 all = stamp_reference(player, traffic, x, z);
+        Vector4 kept = stamp_reference(&kept_player, &kept_traffic, x, z);
+        *checked += all.x != 0 || all.w != 0;
+        if (fabsf(all.x - kept.x) > 1e-5f || fabsf(all.y - kept.y) > 1e-5f
+            || fabsf(all.z - kept.z) > 1e-5f || fabsf(all.w - kept.w) > 1e-5f)
+            return false;
+    }
+    return true;
+}
+
+static void stamp_draw(BoatGpu *gpu, const StressFixture *fixture, BoatCamera camera)
+{
+    BoatWorld world = stress_world(fixture);
+    BoatViewState view = stress_view(fixture);
+    BoatRivals rivals = stress_rivals(fixture);
+    boat_gpu_draw_scene(
+        gpu, &view, &fixture->presentations[0], &world, camera, &rivals, NULL, NULL, 0);
+}
+
+static bool stamp_images(
+    BoatGpu *gpu, const StressFixture *fixture, BoatCamera camera, double *mean, int *p999)
+{
+    Image images[2];
+    for (int k = 0; k < 2; ++k) {
+        waterfront_gpu_scene_set_wake_stamp_enabled(&gpu->scene, k == 0);
+        stamp_draw(gpu, fixture, camera);
+        images[k] = LoadImageFromTexture(gpu->target.texture);
+    }
+    waterfront_gpu_scene_set_wake_stamp_enabled(&gpu->scene, true);
+    bool ok = images[0].data && images[1].data;
+    int histogram[256] = { 0 }, values = images[0].width * images[0].height * 3;
+    double sum = 0;
+    for (int i = 0; ok && i < images[0].width * images[0].height; ++i)
+        for (int c = 0; c < 3; ++c) {
+            int d = abs(((unsigned char *)images[0].data)[4 * i + c]
+                - ((unsigned char *)images[1].data)[4 * i + c]);
+            ++histogram[d];
+            sum += d;
+        }
+    *mean = sum / values;
+    int below = 0;
+    *p999 = 0;
+    while (*p999 < 255 && (below += histogram[*p999]) < values * .999)
+        ++*p999;
+    UnloadImage(images[0]);
+    UnloadImage(images[1]);
+    return ok;
+}
+
+static int check_wake_stamp(void)
+{
+#define EXPECT(test)                                                                               \
+    do {                                                                                           \
+        if (!(test)) {                                                                             \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #test);                             \
+            goto cleanup;                                                                          \
+        }                                                                                          \
+    } while (0)
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Wake stamp probe");
+    if (!IsWindowReady())
+        return 1;
+    int result = 1;
+    BoatGpu gpu = { 0 };
+    static StressFixture fixture;
+    float *texels
+        = malloc(sizeof(float) * 4 * WATERFRONT_WAKE_STAMP_SIZE * WATERFRONT_WAKE_STAMP_SIZE);
+    const BoatCamera camera = { .distance = 26, .height = 16 };
+    EXPECT(texels && boat_gpu_init(&gpu, true) && boat_gpu_resize(&gpu, 320, 200));
+    EXPECT(gpu.scene.wake_stamp.supported);
+    EXPECT(stress_init(&fixture, true) && stress_advance(&fixture, STRESS_PREROLL_TICKS));
+    // Three moments of the saturated fixture: sampled values, the outside list and the image.
+    for (int moment = 0; moment < 3; ++moment) {
+        stamp_draw(&gpu, &fixture, camera);
+        const BoatWakeObjects *player = &fixture.fleet.state.wakes;
+        EXPECT(gpu.scene.object_count >= 200 && gpu.scene.stats.wake_texels > 0);
+        EXPECT(stamp_read(&gpu.scene.wake_stamp, texels));
+        char label[32];
+        snprintf(label, sizeof(label), "moment%d", moment);
+        EXPECT(stamp_within(
+            stamp_errors(&gpu.scene.wake_stamp, texels, player, &fixture.traffic), label));
+        int checked;
+        EXPECT(stamp_outside_exact(&gpu.scene, player, &fixture.traffic, &checked));
+        printf("wake_stamp %s outside=%d of %d ring_samples_with_wake=%d\n", label,
+            gpu.scene.object_outside, gpu.scene.object_count, checked);
+        double mean;
+        int p999;
+        EXPECT(stamp_images(&gpu, &fixture, camera, &mean, &p999));
+        printf("wake_stamp %s image_mean=%.4f image_p999=%d\n", label, mean, p999);
+        EXPECT(mean <= STAMP_BOUND_IMAGE_MEAN && p999 <= STAMP_BOUND_IMAGE_P999);
+        EXPECT(stress_advance(&fixture, 360));
+    }
+    // An identical redraw reuses the field; new records rebuild it, and so does a moved origin.
+    unsigned long long builds = gpu.scene.wake_stamp.builds;
+    stamp_draw(&gpu, &fixture, camera);
+    EXPECT(gpu.scene.wake_stamp.builds == builds + 1);
+    stamp_draw(&gpu, &fixture, camera);
+    EXPECT(gpu.scene.wake_stamp.builds == builds + 1 && gpu.scene.stats.wake_texels == 0);
+    int origin_x = gpu.scene.wake_stamp.origin_x;
+    Boat moved = fixture.fleet.state.slots[0].boat;
+    fixture.fleet.state.slots[0].boat.position.x += 300;
+    stamp_draw(&gpu, &fixture, camera);
+    fixture.fleet.state.slots[0].boat = moved;
+    EXPECT(gpu.scene.wake_stamp.builds == builds + 2 && gpu.scene.wake_stamp.origin_x != origin_x);
+    EXPECT(stamp_read(&gpu.scene.wake_stamp, texels));
+    EXPECT(stamp_within(
+        stamp_errors(&gpu.scene.wake_stamp, texels, &fixture.fleet.state.wakes, &fixture.traffic),
+        "teleport"));
+    // Rewinding to an earlier tick rebuilds from those records, with nothing left from later.
+    EXPECT(stress_init(&fixture, true) && stress_advance(&fixture, STRESS_PREROLL_TICKS));
+    stamp_draw(&gpu, &fixture, camera);
+    EXPECT(stamp_read(&gpu.scene.wake_stamp, texels));
+    EXPECT(stamp_within(
+        stamp_errors(&gpu.scene.wake_stamp, texels, &fixture.fleet.state.wakes, &fixture.traffic),
+        "rewind"));
+    // The reference switch draws no field.
+    builds = gpu.scene.wake_stamp.builds;
+    EXPECT(stress_advance(&fixture, 2));
+    waterfront_gpu_scene_set_wake_stamp_enabled(&gpu.scene, false);
+    stamp_draw(&gpu, &fixture, camera);
+    waterfront_gpu_scene_set_wake_stamp_enabled(&gpu.scene, true);
+    EXPECT(gpu.scene.wake_stamp.builds == builds && gpu.scene.stats.wake_texels == 0);
+    // A new context's resources probe and stamp again.
+    boat_gpu_destroy(&gpu);
+    EXPECT(boat_gpu_init(&gpu, true) && boat_gpu_resize(&gpu, 320, 200));
+    stamp_draw(&gpu, &fixture, camera);
+    EXPECT(gpu.scene.wake_stamp.builds == 1 && stamp_read(&gpu.scene.wake_stamp, texels));
+    EXPECT(stamp_within(
+        stamp_errors(&gpu.scene.wake_stamp, texels, &fixture.fleet.state.wakes, &fixture.traffic),
+        "recreated"));
+    puts("wake_stamp=ok");
+    result = 0;
+cleanup:
+    free(texels);
+    boat_gpu_destroy(&gpu);
+    CloseWindow();
+    return result;
+}
+#undef EXPECT
+
 static int check_instancing(void)
 {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
@@ -1615,9 +1940,8 @@ static int review(const char *directory, bool use_gpu)
     if (use_gpu) {
         SetConfigFlags(FLAG_WINDOW_HIDDEN);
         InitWindow(320, 200, "Proteus / graphics review poses");
-        if (!IsWindowReady() || !boat_gpu_init(&gpu, true))
+        if (!IsWindowReady() || !boat_gpu_init(&gpu, true) || !apply_scene_options(&gpu.scene))
             goto cleanup;
-        waterfront_gpu_scene_set_detail_enabled(&gpu.scene, !no_detail);
     } else if (!prepare_tiles(&cpu_view.scenery, 0)) {
         goto cleanup;
     }
@@ -1704,7 +2028,7 @@ int main(int argc, char **argv)
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
-    bool detail = false;
+    bool detail = false, wake_stamp = false;
     int sequence_ticks = SAMPLE_TICKS;
     bool stress_state_only = false;
     for (int i = 1; i < argc; ++i) {
@@ -1748,6 +2072,14 @@ int main(int argc, char **argv)
             pacing = argv[++i];
         else if (strcmp(argv[i], "--no-detail") == 0)
             no_detail = true;
+        else if (strcmp(argv[i], "--analytic-wakes") == 0)
+            analytic_wakes = true;
+        else if (strcmp(argv[i], "--stamp-size") == 0 && i + 1 < argc)
+            stamp_size = atoi(argv[++i]);
+        else if (strcmp(argv[i], "--stamp-spacing") == 0 && i + 1 < argc)
+            stamp_spacing = (float)atof(argv[++i]);
+        else if (strcmp(argv[i], "--check-wake-stamp") == 0)
+            wake_stamp = true;
         else if (strcmp(argv[i], "--check-detail") == 0)
             detail = true;
         else if (strcmp(argv[i], "--no-cull") == 0)
@@ -1770,12 +2102,15 @@ int main(int argc, char **argv)
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
                  "                         [--sequence] [--sequence-ticks N] [--visible]\n"
                  "                         [--tile-size M] [--no-cull] [--no-detail]\n"
+                 "       Any GPU run: [--analytic-wakes] [--stamp-size N] [--stamp-spacing M]\n"
                  "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--scenario river|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"
                  "                         [--tile-size M]\n"
                  "--tile-size: render tile edge, 64..65536 m (default 1024).\n"
+                 "--analytic-wakes shades object wakes with the reference per-piece loop; by\n"
+                 "  default they sample the stamped field (1024 texels of 0.25 m).\n"
                  "--scenario river: the existing river route; stress: four basin boats with\n"
                  "  saturated boat and traffic wake pools (deterministic pre-roll).\n"
                  "--stress-state prints the stress fixture's final physical state without a\n"
@@ -1820,9 +2155,11 @@ int main(int argc, char **argv)
         && (check || output || sequence || visible || aa_name || pacing || scenario || gpu_check
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
-    if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry) {
+    if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry
+        || wake_stamp) {
         SetTraceLogLevel(LOG_WARNING);
-        return geometry     ? report_geometry()
+        return wake_stamp   ? check_wake_stamp()
+            : geometry      ? report_geometry()
             : instancing    ? check_instancing()
             : culling       ? check_culling()
             : detail        ? check_detail()
@@ -1891,7 +2228,8 @@ int main(int argc, char **argv)
                 || !prepare_tiles(&gpu.scenery, tile_size))
                 goto cleanup;
             waterfront_gpu_scene_set_culling_enabled(&gpu.scene, !no_cull);
-            waterfront_gpu_scene_set_detail_enabled(&gpu.scene, !no_detail);
+            if (!apply_scene_options(&gpu.scene))
+                goto cleanup;
             if (visible)
                 SetTargetFPS(60);
         }
