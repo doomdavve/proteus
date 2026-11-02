@@ -94,7 +94,8 @@ target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
 
 # Scenery packs: each mapped location's whole bake (assets/geometry/<location>/scenery.bin), loaded
 # at run time for presentation. The core keeps only the compiled water, so it never reads them.
-add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h)
+add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h
+  src/boat_water_atlas.c src/boat_water_atlas.h)
 target_link_libraries(proteus_boat_scenery PUBLIC proteus_boat_core)
 # Validators and review tools load the packs from the source tree (tools/boat_test_scenery.h).
 target_compile_definitions(proteus_boat_scenery INTERFACE PROTEUS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
@@ -849,6 +850,15 @@ set_tests_properties(boat_scenery PROPERTIES PASS_REGULAR_EXPRESSION "boat_scene
 add_test(NAME map_pack COMMAND ${Python3_EXECUTABLE} -I
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/map_pack.py --self-test)
 set_tests_properties(map_pack PROPERTIES PASS_REGULAR_EXPRESSION "map pack fixtures OK")
+# Graphics G4: each map's water atlas sidecar rebakes byte for byte from its compiled water.
+add_executable(water_atlas_bake tools/water_atlas_bake.c)
+target_link_libraries(water_atlas_bake PRIVATE proteus_render)
+target_compile_options(water_atlas_bake PRIVATE ${PROTEUS_WARNINGS})
+foreach(map river outer)
+  add_test(NAME water_atlas_${map} COMMAND water_atlas_bake --map ${map}
+    --check ${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/${map}/water_atlas.bin)
+  set_tests_properties(water_atlas_${map} PROPERTIES PASS_REGULAR_EXPRESSION "water_atlas=ok")
+endforeach()
 
 add_executable(validate_boat_minimap tools/validate_boat_minimap.c)
 target_link_libraries(validate_boat_minimap PRIVATE proteus_render)

@@ -1,4 +1,5 @@
 #include "boat_scenery.h"
+#include "boat_water_atlas.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -145,8 +146,12 @@ bool boat_scenery_load_location(const BoatWorldDefinition *location, const char 
     if (location && !location->mapped)
         return true;
     char path[4096];
-    return boat_scenery_path(location, assets, path, sizeof(path))
-        && boat_scenery_load(location->map, path);
+    if (!boat_scenery_path(location, assets, path, sizeof(path))
+        || !boat_scenery_load(location->map, path))
+        return false;
+    // The water atlas is optional: without a valid one the shaders keep their fallback.
+    boat_water_atlas_load_location(location, assets);
+    return true;
 }
 
 bool boat_scenery_load_all(const char *assets)
@@ -165,6 +170,7 @@ size_t boat_scenery_bytes(const BoatMapDescription *map)
 
 void boat_scenery_unload(void)
 {
+    boat_water_atlas_unload();
     for (size_t i = 0; i < BOAT_LOCATION_COUNT; ++i) {
         free(loaded[i].payload);
         loaded[i] = (Scenery) { 0 };

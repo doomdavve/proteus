@@ -2,6 +2,7 @@
  * water before the land, and is what the renderers draw; a missing, malformed or mismatched pack
  * loads nothing, and a compiled map without its pack draws nothing rather than bare water. */
 #include "boat_test_scenery.h"
+#include "boat_water_atlas.h"
 #include "waterfront_city.h"
 #include "waterfront_corner.h"
 #include "waterfront_outer.h"
@@ -21,6 +22,7 @@
 
 #define OUTER_PACK PROTEUS_SOURCE_DIR "/assets/geometry/outer/scenery.bin"
 #define RIVER_PACK PROTEUS_SOURCE_DIR "/assets/geometry/river/scenery.bin"
+#define RIVER_ATLAS PROTEUS_SOURCE_DIR "/assets/geometry/river/water_atlas.bin"
 
 static unsigned char *read_file(const char *path, size_t *size)
 {
@@ -44,6 +46,13 @@ static void put32(unsigned char *p, uint32_t v)
 {
     for (int i = 0; i < 4; ++i)
         p[i] = (unsigned char)(v >> (8 * i));
+}
+
+// Loading COPY (SIZE bytes) as the river's water atlas fails and leaves it unloaded.
+static bool atlas_rejected(const unsigned char *copy, size_t size)
+{
+    return !boat_water_atlas_load_bytes(&waterfront_city_river_map, copy, size)
+        && !boat_water_atlas_of(&waterfront_city_river_map);
 }
 
 // Loading COPY (SIZE bytes) as the outer map's scenery fails and leaves it unloaded.
@@ -141,6 +150,51 @@ int main(void)
         && scenery.full == full && scenery.map == &waterfront_outer_map && scenery.river);
     waterfront_scenery_destroy(&scenery);
     CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/"));
+
+    // G4 water atlases: each location's sidecar loads with its pack, sized and keyed to it.
+    const BoatWaterAtlas *river_atlas = boat_water_atlas_of(river->map);
+    const BoatWaterAtlas *outer_atlas = boat_water_atlas_of(outer->map);
+    CHECK(river_atlas && outer_atlas && !boat_water_atlas_of(basin->map));
+    CHECK(river_atlas->spacing == 4 && outer_atlas->spacing == 8);
+    CHECK(boat_water_atlas_key(river->map) != boat_water_atlas_key(outer->map));
+    // Land texels are zero; water texels have a shore distance.
+    int land = 0, wet = 0;
+    for (int i = 0; i < river_atlas->width * river_atlas->height; ++i) {
+        const unsigned char *t = river_atlas->texels + 4 * i;
+        land += t[0] == 0 && !(t[1] | t[2] | t[3]);
+        wet += t[0] > 0;
+    }
+    CHECK(land > 0 && wet > 0 && land + wet == river_atlas->width * river_atlas->height);
+    boat_scenery_unload();
+    CHECK(!boat_water_atlas_of(river->map) && !boat_water_atlas_of(outer->map));
+    CHECK(!boat_water_atlas_load_location(river, "/nonexistent/")
+        && !boat_water_atlas_of(river->map));
+    CHECK(!boat_water_atlas_load_location(basin, PROTEUS_SOURCE_DIR "/assets/"));
+    // Malformed, stale and mismatched atlases load nothing.
+    size_t atlas_size = 0;
+    unsigned char *atlas = read_file(RIVER_ATLAS, &atlas_size);
+    CHECK(atlas && atlas_size > BOAT_WATER_ATLAS_HEADER);
+    unsigned char *bad = malloc(atlas_size + 1);
+    CHECK(bad);
+    CHECK(atlas_rejected(atlas, BOAT_WATER_ATLAS_HEADER - 1)
+        && atlas_rejected(atlas, atlas_size - 1));
+    memcpy(bad, atlas, atlas_size);
+    bad[atlas_size] = 0;
+    CHECK(atlas_rejected(bad, atlas_size + 1)); // Trailing bytes.
+    const size_t fields[]
+        = { 0, 4, 8, 12, 24, 28, 36, 44 }; // Magic, version, sizes, spacing, key, payload, zero.
+    const uint32_t values[] = { 0, 2, 4097, 1, 0, 1, 4, 1 };
+    for (size_t f = 0; f < sizeof(fields) / sizeof(fields[0]); ++f) {
+        memcpy(bad, atlas, atlas_size);
+        put32(bad + fields[f], values[f]);
+        CHECK(atlas_rejected(bad, atlas_size));
+    }
+    CHECK(!boat_water_atlas_load_bytes(outer->map, atlas, atlas_size)); // Another map's water.
+    CHECK(boat_water_atlas_load_bytes(river->map, atlas, atlas_size)
+        && boat_water_atlas_of(river->map));
+    boat_water_atlas_unload();
+    free(bad);
+    free(atlas);
 
     boat_scenery_unload();
     CHECK(!boat_scenery_of(&waterfront_outer_map) && !boat_scenery_of(&waterfront_city_river_map));
