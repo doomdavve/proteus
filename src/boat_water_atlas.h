@@ -24,6 +24,8 @@
 //      up to 200 m (1 when every direction meets land at once).
 //   A: chop, 0..1 * 255: the mean open fetch upwind of the cosmetic wind, (0.6, 0.8) in X/Z,
 //      and 22.5 degrees either side, each up to 600 m.
+// Land within two texels of water carries the mean shelter and chop of the water around it, so
+// bilinear sampling at the shore stays meaningful; land never has a shore distance or depth.
 #define BOAT_WATER_ATLAS_MAGIC 0x54415750u // "PWAT"
 #define BOAT_WATER_ATLAS_VERSION 1u
 #define BOAT_WATER_ATLAS_HEADER 48

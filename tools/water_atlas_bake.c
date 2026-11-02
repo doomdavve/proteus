@@ -27,10 +27,14 @@ static const float directions[DIRECTIONS][2] = { { 1, 0 }, { .92387953f, .382683
     { -.92387953f, -.38268343f }, { -.70710678f, -.70710678f }, { -.38268343f, -.92387953f },
     { 0, -1 }, { .38268343f, -.92387953f }, { .70710678f, -.70710678f },
     { .92387953f, -.38268343f } };
-// Upwind of the shaders' cosmetic wind, which moves ripples along (-0.6, -0.8), and 22.5 degrees
-// either side of it, so fetch varies smoothly instead of in streaks behind each corner.
-static const float upwind[3][2]
-    = { { .6f, .8f }, { .24818098f, .96871368f }, { .86047446f, .50949356f } };
+#define UPWIND 9
+#define BLUR_METRES 24.0f // Half-width of each box pass that smooths shelter and chop.
+// Upwind of the shaders' cosmetic wind, which moves ripples along (-0.6, -0.8), and up to 30
+// degrees either side of it in 7.5 degree steps, so fetch varies smoothly behind each corner.
+static const float upwind[UPWIND][2]
+    = { { .91961524f, .39282032f }, { .86047447f, .50949357f }, { .78661073f, .61744923f },
+          { .69928787f, .71484017f }, { .6f, .8f }, { .49044596f, .87147160f },
+          { .37250026f, .92803209f }, { .24818097f, .96871369f }, { .11961524f, .99282032f } };
 
 typedef struct {
     int width, height;
@@ -146,12 +150,15 @@ static unsigned char *bake(const BoatMapDescription *description, float spacing,
     r.width = (int)ceilf((hi_x - r.origin_x) / spacing) + 1;
     r.height = (int)ceilf((hi_z - r.origin_z) / spacing) + 1;
     unsigned char *texels = NULL, *file = NULL;
+    float *fields = NULL, *blurred = NULL; // Shelter and chop per texel before quantizing.
     if (r.width > BOAT_WATER_ATLAS_MAX_SIZE || r.height > BOAT_WATER_ATLAS_MAX_SIZE)
         goto done;
     size_t count = (size_t)r.width * r.height;
     r.water = calloc(count, 1);
     texels = calloc(count, 4);
-    if (!r.water || !texels)
+    fields = calloc(count, 2 * sizeof(float));
+    blurred = calloc(count, 2 * sizeof(float));
+    if (!r.water || !texels || !fields || !blurred)
         goto done;
     for (int j = 0; j < r.height; ++j)
         for (int i = 0; i < r.width; ++i) {
@@ -173,19 +180,73 @@ static unsigned char *bake(const BoatMapDescription *description, float spacing,
                 open += fetch(&r, i, j, directions[d], BOAT_WATER_ATLAS_SHELTER_FETCH);
             float shelter = 1 - open / (DIRECTIONS * BOAT_WATER_ATLAS_SHELTER_FETCH);
             float chop = 0;
-            for (int d = 0; d < 3; ++d)
+            for (int d = 0; d < UPWIND; ++d)
                 chop += fetch(&r, i, j, upwind[d], BOAT_WATER_ATLAS_CHOP_FETCH);
-            chop /= 3 * BOAT_WATER_ATLAS_CHOP_FETCH;
+            chop /= UPWIND * BOAT_WATER_ATLAS_CHOP_FETCH;
+            fields[2 * ((size_t)j * r.width + i)] = shelter;
+            fields[2 * ((size_t)j * r.width + i) + 1] = chop;
             unsigned char *t = texels + 4 * ((size_t)j * r.width + i);
             int shore_units = (int)(shore * BOAT_WATER_ATLAS_SHORE_SCALE + .5f);
             int depth_units = (int)(depth * BOAT_WATER_ATLAS_DEPTH_SCALE + .5f);
             t[0] = (unsigned char)(shore_units < 1 ? 1 : shore_units > 255 ? 255 : shore_units);
             t[1] = (unsigned char)(depth_units > 255 ? 255 : depth_units);
-            t[2] = unit(shelter);
-            t[3] = unit(chop);
             ++water_texels;
-            shelter_sum += shelter;
-            chop_sum += chop;
+        }
+    // Two water-only box passes along each axis blur shelter and chop over about BLUR_METRES, so
+    // a ray grazing a pier corner does not leave a step behind it.
+    int radius = (int)(BLUR_METRES / spacing + .5f);
+    for (int pass = 0; pass < 4; ++pass) {
+        bool along_x = pass % 2 == 0;
+        for (size_t k = 0; k < count; ++k) {
+            int i = (int)(k % (size_t)r.width), j = (int)(k / (size_t)r.width);
+            if (!raster_water(&r, i, j))
+                continue;
+            float sum[2] = { 0, 0 };
+            int n = 0;
+            for (int o = -radius; o <= radius; ++o) {
+                int ii = along_x ? i + o : i, jj = along_x ? j : j + o;
+                if (!raster_water(&r, ii, jj))
+                    continue;
+                const float *f = fields + 2 * ((size_t)jj * r.width + ii);
+                sum[0] += f[0];
+                sum[1] += f[1];
+                ++n;
+            }
+            blurred[2 * k] = sum[0] / n;
+            blurred[2 * k + 1] = sum[1] / n;
+        }
+        for (size_t k = 0; k < count; ++k)
+            if (r.water[k])
+                memcpy(fields + 2 * k, blurred + 2 * k, 2 * sizeof(float));
+    }
+    for (size_t k = 0; k < count; ++k) {
+        if (!r.water[k])
+            continue;
+        texels[4 * k + 2] = unit(fields[2 * k]);
+        texels[4 * k + 3] = unit(fields[2 * k + 1]);
+        shelter_sum += fields[2 * k];
+        chop_sum += fields[2 * k + 1];
+    }
+    // Land within two texels of water takes the mean shelter and chop of the water around it, so
+    // bilinear sampling at the shore does not mix in zeros; its R and G stay zero.
+    for (int j = 0; j < r.height; ++j)
+        for (int i = 0; i < r.width; ++i) {
+            if (raster_water(&r, i, j))
+                continue;
+            unsigned shelter = 0, chop = 0, n = 0;
+            for (int dj = -2; dj <= 2; ++dj)
+                for (int di = -2; di <= 2; ++di)
+                    if (raster_water(&r, i + di, j + dj)) {
+                        const unsigned char *w = texels + 4 * ((size_t)(j + dj) * r.width + i + di);
+                        shelter += w[2];
+                        chop += w[3];
+                        ++n;
+                    }
+            if (n) {
+                unsigned char *t = texels + 4 * ((size_t)j * r.width + i);
+                t[2] = (unsigned char)((shelter + n / 2) / n);
+                t[3] = (unsigned char)((chop + n / 2) / n);
+            }
         }
     if (preview_path && !preview(texels, r.width, r.height, preview_path))
         goto done;
@@ -209,6 +270,8 @@ static unsigned char *bake(const BoatMapDescription *description, float spacing,
 done:
     free(r.water);
     free(texels);
+    free(fields);
+    free(blurred);
     boat_map_destroy(&map);
     return file;
 }

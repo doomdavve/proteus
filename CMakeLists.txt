@@ -1293,7 +1293,8 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME water_history COMMAND boat_water_review --check-water-history)
   set_tests_properties(water_history PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "water_history=ok")
-  # Graphics G4: the opaque depth copy shades quay water, only lightens, and falls back.
+  # Graphics G4: the opaque depth copy shades quay water, only lightens, and falls back; the
+  # outer map binds its water atlas.
   add_test(NAME scene_depth COMMAND boat_water_review --check-scene-depth)
   set_tests_properties(scene_depth PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "scene_depth=ok")

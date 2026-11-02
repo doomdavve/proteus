@@ -157,11 +157,11 @@ int main(void)
     CHECK(river_atlas && outer_atlas && !boat_water_atlas_of(basin->map));
     CHECK(river_atlas->spacing == 4 && outer_atlas->spacing == 8);
     CHECK(boat_water_atlas_key(river->map) != boat_water_atlas_key(outer->map));
-    // Land texels are zero; water texels have a shore distance.
+    // Land texels have no shore distance or depth; water texels have a shore distance.
     int land = 0, wet = 0;
     for (int i = 0; i < river_atlas->width * river_atlas->height; ++i) {
         const unsigned char *t = river_atlas->texels + 4 * i;
-        land += t[0] == 0 && !(t[1] | t[2] | t[3]);
+        land += t[0] == 0 && t[1] == 0;
         wet += t[0] > 0;
     }
     CHECK(land > 0 && wet > 0 && land + wet == river_atlas->width * river_atlas->height);

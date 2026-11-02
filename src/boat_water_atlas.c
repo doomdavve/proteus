@@ -130,10 +130,10 @@ bool boat_water_atlas_load_bytes(const BoatMapDescription *map, const void *byte
         free(texels);
         return false;
     }
-    // Land texels carry nothing: a value elsewhere means the file was not baked this way.
+    // Land texels have no depth: a value there means the file was not baked this way.
     for (uint32_t i = 0; i < width * height; ++i) {
         const unsigned char *t = texels + 4 * i;
-        if (t[0] == 0 && (t[1] | t[2] | t[3])) {
+        if (t[0] == 0 && t[1]) {
             free(texels);
             return false;
         }

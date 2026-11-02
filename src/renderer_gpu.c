@@ -1,5 +1,6 @@
 #include "renderer_gpu.h"
 #include "boat_clock.h"
+#include "boat_water_atlas.h"
 #include "boat_water_mesh.h"
 #include "waterfront_city.h"
 #include "waterfront_corner.h"
@@ -1420,6 +1421,9 @@ static void unbind_map(WaterfrontGpuScene *scene)
         scene->detail_far[view] = NULL;
     }
     unload_mesh(&scene->crane);
+    if (scene->water_atlas.id != 0)
+        UnloadTexture(scene->water_atlas);
+    scene->water_atlas = (Texture2D) { 0 };
     scene->geometry = (WaterfrontGpuGeometry) { 0 };
     scene->map = NULL;
     scene->river = false;
@@ -1457,6 +1461,20 @@ bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScener
     scene->detail_rows = scenery->tiles.rows * factor;
     scene->map = scenery->map;
     scene->river = scenery->river;
+    // The atlas is optional; without one the water keeps its hand-written exposure.
+    const BoatWaterAtlas *atlas = boat_water_atlas_of(scenery->map);
+    if (atlas) {
+        Image image = { (void *)atlas->texels, atlas->width, atlas->height, 1,
+            PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+        scene->water_atlas = LoadTextureFromImage(image);
+        SetTextureFilter(scene->water_atlas, TEXTURE_FILTER_BILINEAR);
+        SetTextureWrap(scene->water_atlas, TEXTURE_WRAP_CLAMP);
+        float extent_x = atlas->width * atlas->spacing, extent_z = atlas->height * atlas->spacing;
+        scene->water_atlas_rect[0] = atlas->origin_x;
+        scene->water_atlas_rect[1] = atlas->origin_z;
+        scene->water_atlas_rect[2] = 1 / extent_x;
+        scene->water_atlas_rect[3] = 1 / extent_z;
+    }
     Vector3 cafe = waterfront_corner_position(-2.8f, 0, -6);
     scene->cafe_lift = waterfront_scenery_ground(scenery, cafe.x, cafe.z) - 3.5f;
     return true;
@@ -2982,6 +3000,20 @@ static void draw_water(
         rlEnableTexture(scene->scene_depth.depth.id);
         rlActiveTextureSlot(0);
     }
+    int atlas = scene->water_atlas.id != 0 && !scene->water_atlas_disabled;
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "atlasEnabled"),
+        &atlas, SHADER_UNIFORM_INT);
+    int atlas_slot = atlas ? 6 : 0; // Unit 10 holds the city shader's shadow map.
+    rlEnableShader(scene->water_shader.id);
+    rlSetUniform(
+        cached_location(scene->water_shader, "waterAtlas"), &atlas_slot, SHADER_UNIFORM_INT, 1);
+    if (atlas) {
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "atlasRect"),
+            scene->water_atlas_rect, SHADER_UNIFORM_VEC4);
+        rlActiveTextureSlot(atlas_slot);
+        rlEnableTexture(scene->water_atlas.id);
+        rlActiveTextureSlot(0);
+    }
     float pixel_scale = fmaxf(1, width / 320.0f);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
@@ -3142,6 +3174,11 @@ void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool
 bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing)
 {
     return waterfront_wake_stamp_resize(&scene->wake_stamp, size, spacing);
+}
+
+void waterfront_gpu_scene_set_water_atlas_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->water_atlas_disabled = !enabled;
 }
 
 void waterfront_gpu_scene_set_scene_depth_enabled(WaterfrontGpuScene *scene, bool enabled)

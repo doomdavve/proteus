@@ -71,14 +71,45 @@ float waterShadow()
     return mix(0.55, 1.0, shadow_visibility(0.00018));
 }
 
+// G4: the bound map's baked water atlas, renderer X/Z: R shore distance (m * 4), G estimated
+// depth (m * 10), B shelter, A chop; see src/boat_water_atlas.h. atlasRect holds the origin and
+// 1/extent. Without one, the hand-written dock field below stands in.
+uniform int atlasEnabled;
+uniform sampler2D waterAtlas;
+uniform vec4 atlasRect;
+
+// Shore metres, depth metres, shelter, chop; and in W the weight of the atlas, which blends to
+// the hand-written field over the outermost 1% of its extent and is 0 without one.
+vec4 atlasPlace(vec2 p, out float weight)
+{
+    weight = 0.0;
+    if (atlasEnabled == 0) return vec4(64.0, 25.0, 0.0, 1.0);
+    vec2 uv = (p - atlasRect.xy) * atlasRect.zw;
+    vec2 edge = min(uv, vec2(1.0) - uv);
+    weight = smoothstep(0.0, 0.01, min(edge.x, edge.y));
+    vec4 t = texture(waterAtlas, clamp(uv, vec2(0.0), vec2(1.0)));
+    return vec4(t.r * 63.75, t.g * 25.5, t.b, t.a);
+}
+
 // Authored shelter around the narrow dock. It opens gradually across the mouth;
 // water elsewhere on the river remains exposed. This field changes shading only.
-float exposure(vec2 p)
+float handExposure(vec2 p)
 {
     float dockAxis = 12.0 - 0.09 * p.y;
     float inDock = 1.0 - smoothstep(28.0, 100.0, abs(p.x - dockAxis));
     float northOfMouth = smoothstep(-190.0, -55.0, p.y);
     return 1.0 - 0.82 * inDock * northOfMouth;
+}
+
+// 0.18 in a closed dock to 1 on open water. The atlas maps upwind fetch (chop) onto the hand
+// field's range, and land closing in all round (shelter) calms it further.
+float exposure(vec2 p)
+{
+    float weight;
+    vec4 place = atlasPlace(p, weight);
+    float atlas = 0.18 + 0.82 * smoothstep(0.10, 0.65, place.w)
+        * (1.0 - 0.4 * smoothstep(0.3, 0.8, place.z));
+    return mix(handExposure(p), atlas, weight);
 }
 
 float resolved(float frequency, float footprint)
@@ -513,8 +544,17 @@ void main()
         vec2 slope = normal.xz + detail * mix(0.004, 0.035, exposed);
         normal = normalize(vec3(slope.x, normal.y, slope.y));
         base *= mix(vec3(0.97, 1.01, 1.0), vec3(1.04, 1.07, 0.98), exposed);
+        // Estimated shallows warm and lighten a little; the last metres before a shore lighten.
+        float weight;
+        vec4 place = atlasPlace(fragWorldPosition.xz, weight);
+        float shallow = (1.0 - smoothstep(0.8, 2.0, place.y)) * weight;
+        float shore = (1.0 - smoothstep(0.5, 4.0, place.x)) * weight;
+        base = mix(base, base * vec3(1.06, 1.10, 1.0) + vec3(0.02, 0.03, 0.01), 0.35 * shallow);
+        base *= 1.0 + 0.06 * shore;
     }
-    vec2 ripples = historySlope(fragWorldPosition.xz, footprint);
+    // Ripples read clearest on sheltered, glassy water and break up in chop.
+    vec2 ripples = historySlope(fragWorldPosition.xz, footprint)
+        * (waterfrontWater != 0 ? mix(1.25, 0.85, exposed) : 1.0);
     if (historyEnabled != 0) {
         normal = normalize(vec3(normal.x - ripples.x * normal.y, normal.y,
             normal.z - ripples.y * normal.y));

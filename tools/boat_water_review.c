@@ -311,6 +311,8 @@ static float stamp_spacing = WATERFRONT_WAKE_STAMP_SPACING;
 static bool no_water_history;
 // --no-scene-depth: water shading without the G4 copy of opaque depth.
 static bool no_scene_depth;
+// --no-water-atlas: the hand-written exposure field instead of the G4 map atlas.
+static bool no_water_atlas;
 
 static bool apply_scene_options(WaterfrontGpuScene *scene)
 {
@@ -318,6 +320,7 @@ static bool apply_scene_options(WaterfrontGpuScene *scene)
     waterfront_gpu_scene_set_wake_stamp_enabled(scene, !analytic_wakes);
     waterfront_gpu_scene_set_water_history_enabled(scene, !no_water_history);
     waterfront_gpu_scene_set_scene_depth_enabled(scene, !no_scene_depth);
+    waterfront_gpu_scene_set_water_atlas_enabled(scene, !no_water_atlas);
     if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
         return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
     return true;
@@ -1936,6 +1939,7 @@ static int check_scene_depth(void)
     const BoatCamera camera = { .distance = 12, .height = 6 };
     boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
     bool copied = gpu.scene.scene_depth_valid;
+    bool atlas = gpu.scene.water_atlas.id != 0; // The outer map binds its baked water atlas.
     with = LoadImageFromTexture(gpu.target.texture);
     waterfront_gpu_scene_set_scene_depth_enabled(&gpu.scene, false);
     boat_gpu_draw(&gpu, &view, &session.presentation, &session.world, camera);
@@ -1959,10 +1963,11 @@ static int check_scene_depth(void)
             darker += delta < -3;
             largest = abs(delta) > largest ? abs(delta) : largest;
         }
-    printf("scene_depth copied=%d disabled=%d fallback=%d changed=%d darker=%d largest=%d\n",
-        copied, disabled, fallback, changed, darker, largest);
+    printf("scene_depth copied=%d disabled=%d fallback=%d atlas=%d changed=%d darker=%d "
+           "largest=%d\n",
+        copied, disabled, fallback, atlas, changed, darker, largest);
     // The band is a few pixels along each quay: present, bounded, and a lightening.
-    if (!copied || !disabled || !fallback || changed < 100 || changed > 320 * 200 / 20
+    if (!copied || !disabled || !fallback || !atlas || changed < 100 || changed > 320 * 200 / 20
         || darker > changed / 20 || largest > 300) {
         fprintf(stderr, "Scene depth shading out of bounds.\n");
         goto cleanup;
@@ -2610,6 +2615,8 @@ int main(int argc, char **argv)
             no_water_history = true;
         else if (strcmp(argv[i], "--no-scene-depth") == 0)
             no_scene_depth = true;
+        else if (strcmp(argv[i], "--no-water-atlas") == 0)
+            no_water_atlas = true;
         else if (strcmp(argv[i], "--check-scene-depth") == 0)
             scene_depth = true;
         else if (strcmp(argv[i], "--history-clip") == 0 && i + 2 < argc) {
@@ -2638,7 +2645,7 @@ int main(int argc, char **argv)
                  "                         [--sequence] [--sequence-ticks N] [--visible]\n"
                  "                         [--tile-size M] [--no-cull] [--no-detail]\n"
                  "       Any GPU run: [--analytic-wakes] [--stamp-size N] [--stamp-spacing M]\n"
-                 "                    [--no-water-history] [--no-scene-depth]\n"
+                 "                    [--no-water-history] [--no-scene-depth] [--no-water-atlas]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
@@ -2652,6 +2659,8 @@ int main(int argc, char **argv)
                  "  default they sample the stamped field (1024 texels of 0.25 m).\n"
                  "--no-water-history shades stamp-only water, without foam history and ripples.\n"
                  "--no-scene-depth shades water without the copy of opaque depth.\n"
+                 "--no-water-atlas shades water from the hand-written dock exposure, not the\n"
+                 "  map's baked atlas.\n"
                  "--history-clip writes FRAMES (1..3600) 60 Hz stress frames to DIR, history\n"
                  "  left and stamp-only right, plus the final history field as history.png.\n"
                  "--scenario river: the existing river route; stress: four basin boats with\n"

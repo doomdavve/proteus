@@ -164,6 +164,11 @@ typedef struct {
     RenderTexture2D scene_depth;
     bool scene_depth_valid; // Copied for the water now being drawn.
     bool scene_depth_disabled; // Review: water shading without the depth copy.
+    // G4: the bound map's water atlas (shore, depth, shelter, chop) as a bilinear RGBA8 texture;
+    // id 0 without one, and the water keeps its hand-written exposure.
+    Texture2D water_atlas;
+    float water_atlas_rect[4]; // Origin X/Z, 1/extent X/Z, renderer metres.
+    bool water_atlas_disabled; // Review: the hand-written exposure even with an atlas.
     RenderTexture2D reflection;
     Matrix light_view_projection;
     Matrix far_light_view_projection;
@@ -214,6 +219,8 @@ void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limi
 void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: replace the stamped field with one of SIZE texels per side at SPACING metres.
 bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing);
+// Review: shade water from the hand-written exposure instead of (or again from) the map atlas.
+void waterfront_gpu_scene_set_water_atlas_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: shade water without (or again with) the copy of opaque depth.
 void waterfront_gpu_scene_set_scene_depth_enabled(WaterfrontGpuScene *scene, bool enabled);
 // Review: turn the foam history and ripples off (stamp-only shading) or back on.
