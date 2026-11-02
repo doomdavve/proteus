@@ -1,0 +1,232 @@
+{
+ "note": "G3a, M1 Max, Release, boat_water_review, p95 unless noted, 2026-11-02. 'analytic' is --analytic-wakes on the G3a build; 'p1' is the merged P1 tip dd02c47 before G3a.",
+ "stress": {
+  "4x4": {
+   "gpu_ms_p95": {
+    "p1": [
+     10.368,
+     10.427,
+     10.382
+    ],
+    "analytic": [
+     9.624,
+     9.695,
+     9.688
+    ],
+    "stamped": [
+     3.313,
+     3.296,
+     3.301
+    ]
+   },
+   "gpu_ms_p50": {
+    "p1": [
+     9.351,
+     9.353,
+     9.319
+    ],
+    "analytic": [
+     8.759,
+     8.812,
+     8.8
+    ],
+    "stamped": [
+     2.879,
+     2.865,
+     2.89
+    ]
+   },
+   "frame_ms_p95": {
+    "analytic": [
+     11.529,
+     11.603,
+     11.658
+    ],
+    "stamped": [
+     5.283,
+     4.822,
+     5.037
+    ]
+   },
+   "gate_gpu_ms": 16.5,
+   "state": "tick=4438 hash=8d9af1216d2cf172"
+  },
+  "off": {
+   "gpu_ms_p95": {
+    "p1": [
+     4.707,
+     4.653,
+     4.665
+    ],
+    "analytic": [
+     4.66,
+     4.662,
+     4.66
+    ],
+    "stamped": [
+     2.763,
+     2.767,
+     2.772
+    ]
+   },
+   "gpu_ms_p50": {
+    "p1": [
+     3.823,
+     3.825,
+     3.838
+    ],
+    "analytic": [
+     3.945,
+     3.955,
+     3.956
+    ],
+    "stamped": [
+     2.345,
+     2.357,
+     2.346
+    ]
+   },
+   "frame_ms_p95": {
+    "analytic": [
+     6.103,
+     6.188,
+     6.214
+    ],
+    "stamped": [
+     4.321,
+     4.287,
+     4.468
+    ]
+   },
+   "gate_gpu_ms": 12.0,
+   "state": "tick=4438 hash=8d9af1216d2cf172"
+  },
+  "field": {
+   "bytes": 8388608,
+   "size": 1024,
+   "spacing_m": 0.25,
+   "pieces_p95": 256,
+   "outside_p95": 179,
+   "stamped_texels_p95": 790375,
+   "builds": 1020,
+   "frames": 1020,
+   "near_patch_peak_triangles": 38864
+  }
+ },
+ "field_size_4x4": {
+  "512 x 0.25 m": {
+   "gpu_ms_p95": [
+    4.946,
+    4.868
+   ],
+   "gpu_ms_p50": [
+    3.936,
+    3.939
+   ],
+   "outside_p95": 228,
+   "texels_p95": 790375,
+   "bytes": 2097152
+  },
+  "1024 x 0.25 m": {
+   "gpu_ms_p95": [
+    3.313,
+    3.296,
+    3.301
+   ],
+   "gpu_ms_p50": [
+    2.879,
+    2.865,
+    2.89
+   ],
+   "outside_p95": 179,
+   "texels_p95": 790375,
+   "bytes": 8388608
+  },
+  "2048 x 0.25 m": {
+   "gpu_ms_p95": [
+    3.298,
+    3.291
+   ],
+   "gpu_ms_p50": [
+    2.809,
+    2.828
+   ],
+   "outside_p95": 77,
+   "texels_p95": 790375,
+   "bytes": 33554432
+  },
+  "2048 x 0.125 m": {
+   "gpu_ms_p95": [
+    3.318,
+    3.336
+   ],
+   "gpu_ms_p50": [
+    2.907,
+    2.911
+   ],
+   "outside_p95": 179,
+   "texels_p95": 3162225,
+   "bytes": 33554432
+  }
+ },
+ "river_route_4x4": {
+  "gpu_ms_p95": {
+   "analytic": [
+    1.78,
+    1.759,
+    1.787
+   ],
+   "stamped": [
+    1.803,
+    1.788,
+    1.802
+   ]
+  },
+  "field_builds": 0,
+  "note": "the river route has no object wakes, so nothing is stamped"
+ },
+ "wake_stamp_check": {
+  "moment0": {
+   "samples": 30789,
+   "height_rms": 0.00164,
+   "height_max": 0.0355,
+   "slope_rms": 0.004,
+   "slope_max": 0.0515,
+   "foam_rms": 0.0049,
+   "foam_max": 0.0733,
+   "image_mean": 0.0479,
+   "image_p999": 3,
+   "outside": "155 of 247"
+  },
+  "moment1": {
+   "samples": 38462,
+   "height_rms": 0.00156,
+   "slope_rms": 0.00407,
+   "slope_max": 0.0526,
+   "foam_rms": 0.00488,
+   "foam_max": 0.0794,
+   "image_mean": 0.0477,
+   "image_p999": 3
+  },
+  "moment2": {
+   "samples": 41049,
+   "height_rms": 0.00151,
+   "slope_rms": 0.00396,
+   "slope_max": 0.0563,
+   "foam_rms": 0.0048,
+   "foam_max": 0.0752,
+   "image_mean": 0.0362,
+   "image_p999": 2
+  },
+  "bounds": {
+   "height_rms": 0.004,
+   "height_max": 0.05,
+   "slope_rms": 0.012,
+   "slope_max": 0.15,
+   "foam_rms": 0.012,
+   "foam_max": 0.2,
+   "image_mean": 0.5,
+   "image_p999": 32
+  }
+ }
+}
