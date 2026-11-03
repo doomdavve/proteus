@@ -8,6 +8,7 @@
 #include "waterfront_city.h"
 #include "waterfront_flock.h"
 #include "waterfront_harbor.h"
+#include "waterfront_lighting.h"
 #include "waterfront_traffic.h"
 
 // Renderer-independent authored data and time evaluation for the waterfront.
@@ -94,6 +95,7 @@ typedef struct {
     BoatFlagSurface ghost_flag;
     double time; // World seconds; GPU uploads only reduced float phases and bounded clocks.
     WaterfrontSquall squall; // Drawn in the sky pass only.
+    WaterfrontLighting lighting; // Daytime from evaluation; the caller may choose another.
     Transform3D bridge;
     Color bridge_color;
     WaterfrontCarState cars[WATERFRONT_CAR_COUNT];
@@ -139,14 +141,16 @@ WaterfrontStreet waterfront_scene_street(int index);
 Vector3 waterfront_scene_street_position(
     WaterfrontStreet street, float distance, Vector3 *direction);
 
-// Borrowed static panorama, shared by CPU sky rays and the GPU sky shader. Do not unload.
+// Borrowed static panorama under LIGHTING, shared by CPU sky rays and the GPU sky shader. Do
+// not unload. It is repainted when another light's sky differs, which invalidates earlier
+// borrowed pixels; a GPU owner uploads its copy and compares the light before reusing it.
 // U is atan2(direction.x, direction.z) / (2*pi) + 0.5; V is (1-direction.y) / 2.
-Vector3 waterfront_sun_direction(void);
-Image waterfront_sky_image(void);
-void waterfront_sky_draw(Color *pixels, int width, int height, View3D camera);
+Image waterfront_sky_image(const WaterfrontLighting *lighting);
+void waterfront_sky_draw(
+    Color *pixels, int width, int height, View3D camera, const WaterfrontLighting *lighting);
 // The sky with SQUALL over it, seen from the camera.
-void waterfront_sky_draw_squall(
-    Color *pixels, int width, int height, View3D camera, WaterfrontSquall squall);
+void waterfront_sky_draw_squall(Color *pixels, int width, int height, View3D camera,
+    WaterfrontSquall squall, const WaterfrontLighting *lighting);
 // SKY along the unit RAY from EYE, behind SQUALL's cloud and rain.
 Color waterfront_squall_sky(Color sky, Vector3 eye, Vector3 ray, WaterfrontSquall squall);
 

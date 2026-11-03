@@ -44,6 +44,25 @@ bool waterfront_window_wall(Color color, Vector3 a, Vector3 c, Vector3 b)
     return waterfront_building_wall(color) && fabsf(b.y - a.y) <= .001f && c.y - a.y >= 5.5f;
 }
 
+unsigned int waterfront_window_seed(size_t triangle, int column, int floor)
+{
+    return (unsigned int)triangle * 1664525u + (unsigned int)column * 1013904223u
+        + (unsigned int)floor * 374761393u;
+}
+
+Color waterfront_window_glass(unsigned int seed)
+{
+    return seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
+        : seed % 7 == 3 ? (Color) { 181, 211, 221, 255 }
+                        : (Color) { 66, 100, 120, 255 };
+}
+
+// About three in eight, mixed independently of the glass colour.
+bool waterfront_window_occupied(unsigned int seed)
+{
+    return ((seed ^ (seed >> 15)) * 2654435761u) >> 29 < 3;
+}
+
 #define SCENERY_MAX_BOXES 16384
 
 // Ground queries are only used during construction. Keep the actual map as the

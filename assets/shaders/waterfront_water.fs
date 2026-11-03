@@ -16,6 +16,12 @@ uniform float crossingWakeTime; // Gated scripted clock; -1 after its finite sup
 uniform vec2 detailRipplePhase; // Long and short exposed-water detail ripples.
 uniform vec4 reflectionRipplePhase; // Four timeline reflection ripple components.
 uniform vec3 sunDirection;
+// The frame's light: body and foam multiplier, brightness left in sun shadow, glitter colour
+// (zero hides it) and specular highlight multiplier. Daytime is 1, 0.55, warm white and 1.
+uniform vec3 waterLight;
+uniform float waterShadowFloor;
+uniform vec3 glintColor;
+uniform vec3 highlightTint;
 uniform int physicalWaves;
 uniform float wakeAmplitude;
 uniform vec2 wakeOffset; // World X/Z translation of the scripted source.
@@ -68,7 +74,7 @@ float shadow_visibility(float bias)
 float waterShadow()
 {
     if (shadowsEnabled == 0) return 1.0;
-    return mix(0.55, 1.0, shadow_visibility(0.00018));
+    return mix(waterShadowFloor, 1.0, shadow_visibility(0.00018));
 }
 
 // G4: the bound map's baked water atlas, renderer X/Z: R shore distance (m * 4), G estimated
@@ -493,7 +499,8 @@ vec3 shoreShade(vec3 color)
     float lap = 0.5 + 0.5 * sin(fragWorldPosition.x * 1.9 + fragWorldPosition.z * 1.3
         + 1.5 * sin(fragWorldPosition.z * 0.7 - fragWorldPosition.x * 0.4) + detailRipplePhase.x);
     color *= 1.0 + 0.10 * band;
-    return mix(color, vec3(0.70, 0.82, 0.84), 0.55 * band * smoothstep(0.25, 0.7, lap));
+    return mix(color, vec3(0.70, 0.82, 0.84) * waterLight,
+        0.55 * band * smoothstep(0.25, 0.7, lap));
 }
 // G4 far-water life, presentation only. gustWaves and glitterWaves hold X/Z wavenumbers and a
 // CPU-reduced phase; squallWater the sky squall's centre X/Z, radius and growth.
@@ -562,7 +569,7 @@ void main()
     float boatDistance = length(fragWorldPosition.xz - wavePatch.xy);
     if (waterPatchPass == 1 && (wakeFieldEnabled != 0 || boatDistance < wavePatch.w)) discard;
     if (waterPatchPass == 2 && wakeFieldEnabled == 0 && boatDistance >= wavePatch.w) discard;
-    vec3 base = texture(texture0, fragTexCoord).rgb * objectColor.rgb * fragColor.rgb;
+    vec3 base = texture(texture0, fragTexCoord).rgb * objectColor.rgb * fragColor.rgb * waterLight;
     vec3 normal = normalize(fragWorldNormal);
     float exposed = exposure(fragWorldPosition.xz);
     float gust = gustAmount(fragWorldPosition.xz, exposed);
@@ -620,7 +627,7 @@ void main()
         base *= 1.0 + 0.35 * dot(ripples, vec2(0.7));
     }
     if (reflectionsEnabled == 0) {
-        base = shoreShade(mix(base, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam));
+        base = shoreShade(mix(base, vec3(0.65, 0.78, 0.80) * waterLight, 0.55 * historyFoam));
         finalColor = vec4(base * waterShadow(), 1.0);
         return;
     }
@@ -653,7 +660,7 @@ void main()
         vec3 halfVector = normalize(viewDirection + normalize(sunDirection));
         vec3 highlight = waterfrontWater != 0 ? vec3(0.09, 0.10, 0.085) * mix(0.25, 1.0, exposed)
             : vec3(0.28, 0.25, 0.17);
-        color += highlight * pow(max(dot(normal, halfVector), 0.0), 96.0);
+        color += highlight * highlightTint * pow(max(dot(normal, halfVector), 0.0), 96.0);
     }
     if (wakeAmplitude > 0.0 || playerWakeCount > 0 || wakeFieldEnabled != 0 || vesselMotion.y > 0.0 || stormArea.w > 0.0 || radial.x > 0.0) {
         float wakeHeight = wake.x - vessel.x - storm.x;
@@ -668,11 +675,12 @@ void main()
         vec2 stormDelta = (fragWorldPosition.xz-stormArea.xy)/max(stormArea.z,1.0);
         float stormShade = pow(max(0.0,1.0-dot(stormDelta,stormDelta)),2.0);
         if (stormArea.w > 0.0) color *= 1.0-0.32*stormShade;
-        color = mix(color, vec3(0.65, 0.78, 0.80), foam);
+        color = mix(color, vec3(0.65, 0.78, 0.80) * waterLight, foam);
     }
-    color = mix(color, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
+    color = mix(color, vec3(0.65, 0.78, 0.80) * waterLight, 0.55 * historyFoam);
     color = shoreShade(color);
-    color = mix(color, vec3(1.0, 0.96, 0.84), 0.75 * sunGlitter(normal, viewDirection, footprint,
-        exposed));
+    if (any(greaterThan(glintColor, vec3(0.0))))
+        color = mix(color, glintColor, 0.75 * sunGlitter(normal, viewDirection, footprint,
+            exposed));
     finalColor = vec4(color * waterShadow(), 1.0);
 }
