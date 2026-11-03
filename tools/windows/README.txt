@@ -56,6 +56,19 @@ the path appears briefly on screen. F4 works with the overlay hidden and does no
 Run .\wake_velocity.exe --help for the matching --performance-report and
 --no-performance-capture options.
 
+Choosing the GPU (PCs with integrated and dedicated graphics):
+Windows may select integrated graphics even when a GeForce/Radeon dedicated GPU is installed.
+Open Settings > System > Display > Graphics, add the desktop app from this extracted package,
+then choose Options > High performance (check the GPU name), save, and restart the app.
+Set wake_velocity.exe for gameplay AND boat_water_review.exe for collect-performance.bat;
+setting launch.bat or collect-performance.bat does not select the benchmark executable's GPU.
+If you extract a new release to another folder, check the preference for the new EXE paths.
+
+Verify the result in a new report: benchmark JSON files contain gl_renderer; F4 report ZIPs
+contain manifest.json with system.gl_renderer. It should name the intended GPU. Keep reports
+from different GPUs separate, and include the actual renderer when reporting performance.
+A GPU listed in Task Manager alone does not establish which GPU rendered this application.
+
 When reporting issues, include build.txt, Windows version, GPU model, and
 whether the problem also happens without --gpu-aa.
 
