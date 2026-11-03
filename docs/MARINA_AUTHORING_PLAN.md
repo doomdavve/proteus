@@ -1,11 +1,14 @@
 # Marina authoring expansion
 
-Status, 2026-11-01: **M1 implemented; M2 appearance is next.** This plan records the
+Status, 2026-11-03: **M1 implemented and merged in
+[PR #133](https://github.com/doomdavve/proteus/pull/133); M2 appearance is prepared for
+implementation.** This plan records the
 user's decisions after reviewing the gaps in [PR #131](https://github.com/doomdavve/proteus/pull/131).
 It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
 
-Completed task: **M1 structures and capacity**. Next task: **M2 boat appearance**.
+Completed implementation: **M1 structures and capacity**. Completed preparation: the
+[M2 execution package](#m2-execution-package--2026-11-03). Next task: **implement M2 boat appearance**.
 Verification evidence and limitations are recorded below; agreeing to features is not visual
 or gameplay acceptance of an implementation.
 
@@ -34,7 +37,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | Step | Result | Depends on | Status |
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
-| M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Planned; next |
+| M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Prepared; implementation next |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Planned |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
@@ -106,6 +109,140 @@ Acceptance:
   have explicit validation behavior. Maximum dimensions still pass placement checks.
 - Ropes, camera clearance and player contact match each customized hull. Inspect lettering
   from both sides, near/far and under wave motion in CPU/GPU captures and a windowed demo.
+
+### M2 execution package — 2026-11-03
+
+The user selected M2 as the next preparation task. Baseline: merged `main` at `6e78e5c`,
+confirmed against GitHub on 2026-11-03; no plugin implementation PR was open. P0–P4.9 and the
+plugins-by-default cutover are implemented. P5 authority callbacks/prediction/recordings remain
+the next main-plugin milestone, independent of this selected marina queue. M1's dated results
+below establish implementation and automated checks; human marina acceptance remains pending.
+
+This package prepares one M2 implementation worktree/PR. Start `feat/marina-m2-appearance`
+from current `main` after this preparation merges. If starting before then, branch from
+`docs/marina-m2-preparation` and target it, following the stacking rules above. M3 routes, M4 vessel
+identity/occupancy and M5 modules remain outside M2; customize moored scene berths now without
+introducing their future service model. The player's craft, travelling craft and docked ro-pax
+ferry keep their existing recipes.
+
+#### Grounded integration points
+
+| Owner at the baseline | Current behavior and M2 work |
+| --- | --- |
+| [`boat_model.[ch]`](../src/boat_model.h) | `BoatModelSpec` already has length, beam, mast height and hull/deck/trim colors. `BoatModel` is caller-owned, capped at 1,024 triangles and must not be copied after initialization because its mesh points into its own arrays. Resolve overrides before generation; add bounded hull lettering without copying initialized mesh views. |
+| [`boat_scene_definition.[ch]`](../src/boat_scene_definition.h), [`boat_plugin_lua.c`](../src/boat_plugin_lua.c) | `BoatSceneBerth` stores recipe/placement/mooring only. Add pointer-free appearance data, strict Lua decoding, structural validation and explicit-field digests. Keep IDs separate from painted names. |
+| [`boat_plugin.c`](../src/boat_plugin.c), [`waterfront_harbor.[ch]`](../src/waterfront_harbor.h) | Placement, traffic clearance, water pose, ropes, contacts and camera bounds obtain a spec by recipe. Route every authored-berth consumer through one resolved spec, including discovery's reported hull dimensions. Preserve the existing excursion margins. |
+| [`boat_view.[ch]`](../src/boat_view.h), [`waterfront.c`](../src/waterfront.c), [`renderer_gpu.[ch]`](../src/renderer_gpu.h) | CPU harbor drawing indexes static recipe meshes; GPU scene bind uploads seven recipe meshes and drawing indexes `frame.recipes`. Add view-owned bounded per-boat resources, revision refresh and destruction. A transform alone cannot supply different colors or names to two boats sharing a recipe. |
+| [`boat_plugin_wire.c`](../src/boat_plugin_wire.c), [`boat_room_definition.c`](../src/boat_room_definition.c), [`plugin_author.js`](../web/plugin_author.js) | Native/browser staging and the room codec encode scene fields explicitly. Carry appearance through both codecs and the browser decoder; update magic/version checks, catalog generation, source export and content identity together. Clients continue consuming data without Lua. |
+| [`plugin_schema.py`](../tools/plugin_schema.py), [`PLUGIN_API.md`](PLUGIN_API.md), [`HARBOR_BOATS.md`](HARBOR_BOATS.md) | Schemas, discovery and guides currently promise fixed recipes. Update live claims with the implemented contract; retain dated baseline findings as history. |
+
+#### Proposed contract for implementation
+
+These are concrete engineering defaults for the implementation, **not a currently supported
+API**. Prove the ranges and geometry budget in the first commit; record any necessary change
+here and in the final API together rather than silently advertising an unverified range.
+
+- Add an optional berth `appearance` record with optional `length`, `beam`, `mast_height`,
+  `hull`, `deck`, `trim` and `name`. Missing values inherit the registered recipe. Missing
+  appearance produces the existing hull without lettering. Reject unknown keys and wrong
+  types without coercion. Keep defaults canonical in decoded data so implicit and explicit
+  equivalent appearances have the same semantic identity.
+- Length and beam are metres, each initially restricted to 0.75–1.25 times that berth recipe's
+  dimensions, within the native generator's 3–40 m and 1–10 m limits. Scale cabin length and
+  longitudinal cabin offset with length; retain recipe freeboard, draft and cabin height.
+  Validate the complete resolved spec and attachment geometry, not just the two scalars.
+  Limits describe supported shapes, not permission to overlap the existing slips: site checks
+  still reject an oversized hull at an unsuitable berth. Use a separate clear-water fixture
+  to demonstrate valid maximum-size placement.
+- Only `sailboat` and `sailboat_7m` accept a mast override. Propose a finite height from
+  `freeboard + 2` through 12 m, measured above the calm waterline as in `BoatModelSpec`.
+  Reject zero and mast fields on other recipes; mast removal is outside this slice.
+- Colors are dense RGB triples of integers 0–255, stored as opaque native colors. Reject
+  alpha, fractions, missing/extra channels and out-of-range values. Do not add custom materials.
+- A present name is 1–16 ASCII characters from `A–Z`, `0–9`, space, period, hyphen and apostrophe,
+  with at least one letter/digit. An absent name disables lettering. Reject unsupported bytes,
+  embedded NULs and overlong names; do not truncate or silently transliterate. Accented and
+  lowercase lettering are an explicit M2 limitation. Use bundled pixel glyphs and native
+  geometry with a deterministic contrasting color derived from the hull color.
+- Paint the name on both hull sides, readable from each side, inside a defined hull-side
+  region. Fit the full accepted name uniformly into that region without wrapping. Glyph panels
+  must follow the generated hull surface, pose, depth, clipping, lighting and GPU reflection/
+  shadow policy; a screen-space label or a flat panel hovering outside a tapered hull fails
+  this gate. At distance the name may become too small to read; no floating replacement label.
+
+The existing ferry `glyph`/`lettering` helper in `waterfront_harbor.c` covers only the letters
+in “VINGA LINE” and assumes a constant ferry beam. Reuse the geometry approach where useful,
+but it is not a complete font or a placement solution for small tapered hulls. Count worst-case
+glyph runs on both sides plus the most expensive recipe. Prove the final mesh cap, including
+failure behavior, before selecting a larger fixed capacity or separate lettering storage.
+
+#### Implementation sequence and completion gates
+
+All rows below are **pending**. Use focused commits in one PR; do not mark M2 complete after
+only the native generator or codec works.
+
+| Commit | Work and evidence required before moving on |
+| --- | --- |
+| 1. Definition and resolved geometry | Implement canonical appearance, one resolver, validation/digest and native lettering. Demonstrate two instances of one recipe, min/max dimensions/masts, name/color rejection and worst-case triangle counts. Run the build and quick lane. |
+| 2. Revision and data paths | Connect Lua, staging wire, room codec/bootstrap, browser decode, schema/discovery and catalog generation. Migrate every bundled scene and fixture that uses the changed schema, including `harbor-life`, `harbor-room` and `harbor-race`. Test appearance-only digest differences, round trips, malformed/truncated data, old-version rejection, failed staging and Apply/Undo. |
+| 3. Runtime owners and rendering | Bind the resolved spec to every placement/traffic sweep, pose/rope/contact/camera consumer and both draw paths. CPU/GPU view owners hold bounded meshes keyed by resolved appearance. Rebuild/upload on accepted appearance changes, never per frame; remove stale slots and destroy all resources with their view. Exercise independent views and repeated reload/Undo/removal. |
+| 4. Example and qualification | Give at least two boats sharing a recipe different dimensions, palettes and names in the mirrored marina packages. Keep the entrance, retained ferries and bridge schedule valid. Finish current guides/schema assertions, full native checks, browser build/contracts, room integration, captures, windowed demo and measured resource costs. Record pending human acceptance separately. |
+
+At this baseline the compatibility versions are scene v2, staging PST8, room definition v2
+and multiplayer v10. Plan coordinated bumps to scene v3, PST9, room v3 and multiplayer v11
+if those numbers are still free when implementation begins. Update the owning
+[protocol document](MULTIPLAYER_PROTOCOL.md) and all version-dependent fixtures/checks in the
+same PR; do not add a compatibility decoder. Confirm that maximum names/colors/dimensions
+with 32 berths, 64 structures, longest IDs and a race course fit the current 16,384-byte room
+definition and staging response/page limits. Audit retained host slots, game/worker stacks,
+CPU mesh bytes and GPU vertex/index bytes. Report actual sizes rather than carrying M1's
+measurements forward as M2 evidence.
+
+Color/name changes must not reset progress, displace the player or reuse another boat's mesh.
+Dimension changes use the existing safe live-layout policy: accept only when the player is
+clear, otherwise hold the candidate. Undo follows the same rule. Detect changed appearance
+by explicit fields/content identity, not a scene pointer that the host can reuse. Keep any
+candidate mesh construction/upload failure from partially replacing the active resources;
+the old revision must remain usable. Test interleaved independent worlds/views, destroy and
+recreate one owner, shrink/grow/empty berth lists and repeated Apply/Undo so stale hulls,
+double frees, leaked uploads and pointer aliases cannot hide behind one successful frame.
+
+#### Verification to run for M2
+
+Extend the existing validators: `validate_harbor`, `validate_scene_site`,
+`validate_boat_plugin`, `validate_boat_plugin_stage`, `validate_boat_plugin_session`,
+`validate_boat_plugin_catalog` and `validate_boat_room_package`. Assert declared fields and
+mesh contents rather than struct padding. Include the production console/native worker and
+browser import/reload/Undo paths, not just a direct resolver call. Exercise existing GPU view
+binding/lifecycle tests with distinct customized appearances. Follow
+[the testing guide](TESTING.md) for test names/labels and run Debug configure/build plus
+`ctest --preset full`; `quick` is the commit loop. Keep clocks virtual.
+
+Build/package the Emscripten target and run Node browser-authoring contracts. Run the full
+Chromium/Firefox/WebKit authoring workflow once on the final implementation revision because
+both scene wire and resource lifetime change; keep it manual-only as agreed in
+[the browser CI guide](WEB_BUILD.md#browser-authoring-ci-lanes-2026-10-30). Verify matching
+native/browser room clients receive distinct appearance data and reject old protocol pairs.
+Record unavailable platform/device evidence explicitly; do not claim a release or deployment.
+
+Capture CPU/GPU overview frames at `outer.marina` and `outer.eriksberg`, close views from
+both sides of the two customized hulls, a far view and multiple wave times including a reverse
+seek. Inspect text orientation, hull occlusion, ropes and conservative contact/camera bounds.
+Run a windowed wave demo and an actual Apply/Undo/name/dimension edit sequence. Record scripted
+playback separately from human visual/gameplay acceptance. Compare unchanged, customized and
+maximum-count scenes at the same camera/time/options: CPU/GPU p50/p95, staging/Apply cost,
+triangle/upload counts and retained bytes. These are measurements outside CTest, not timing
+assertions. Add exact reproducible capture commands to the package guide when the fixture exists.
+
+Preparation verification, 2026-11-03, Apple Silicon/macOS: Debug configure reused the pinned
+raylib/Lua/ENet source trees; build passed with one upstream `stb_vorbis.c` warning and no
+project warnings. Full `ctest --preset full` passed **354/354 enabled tests in 32.83 s**, with
+local socket access, 13 retired wake-field tests disabled and `PROTEUS_GPU_TESTS=OFF`. All
+16 local file/anchor links in this plan resolve; `git diff --check` passed. No new audiovisual
+review was needed for this documentation-only preparation; Windows/Linux, GPU and interactive
+browser/device checks were not rerun. No M2 code, appearance data, serialization, lettering,
+performance or visual acceptance is implemented by this preparation. The proposed API and
+budgets above remain subject to the implementation's validation and geometry proof.
 
 ## M3: authored routes and docking motion
 
