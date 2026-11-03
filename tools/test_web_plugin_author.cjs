@@ -99,6 +99,15 @@ async function main() {
   assert.equal(t.jobs.size, 0); assert.equal(timers.size, 0);
   assert.equal(message(new Uint8Array()), 'Worker replied with an unrecognised wire version');
   assert.equal(t.start(new Uint8Array(131073), base), 0);
+  // M2 maximum scenes retain full source in the reply; the old 16 KiB cap rejected them.
+  for (const size of [16385, 163840, 163841]) {
+    const request = t.start(framed, base);
+    const bytes = new Uint8Array(size);
+    bytes.set(response().bytes);
+    workers.at(-1).onmessage({data: {exit: 0, bytes}});
+    assert.equal(t.status(request), size <= 163840 ? 1 : -1);
+    t.close(request);
+  }
   // Objective transitions reuse Wasm, but never share an outstanding callback or its result.
   const ow = [], otimers = new Map(); let onow = 0, timerId = 0;
   const o = new ObjectiveTransport({now: () => onow,

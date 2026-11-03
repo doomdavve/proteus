@@ -93,7 +93,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e54000a0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e54000b0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -103,7 +103,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 60);
     CHECK(same_bytes(bytes, size,
-        "50424e54000a09000000000900000000000000000000"
+        "50424e54000b09000000000900000000000000000000"
         "00c8001c000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f81000000ff" // Steering +1, throttle -1.
@@ -207,7 +207,7 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0xa77172fe53f6adb6));
+    CHECK(digest == UINT64_C(0xf2ec800e81b56e79)); // v11 header; snapshot payload unchanged.
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
         BoatInput back = boat_net_command_input(
@@ -1133,7 +1133,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c510001000a"));
+    CHECK(same_bytes(query, 8, "50424c510001000b"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;

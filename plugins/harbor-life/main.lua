@@ -25,7 +25,7 @@ return {
   -- The compiled crane/buildings and the missing per-boat detail are documented in
   -- README.md; they are not expressible through this scene schema yet.
   scene = {
-    version = 2,
+    version = 3,
     marina = {
       entrance = { x = 4, z = 140, width = 8 },
       berths = {

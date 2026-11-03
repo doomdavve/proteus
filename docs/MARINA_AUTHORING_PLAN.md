@@ -248,8 +248,9 @@ budgets above remain subject to the implementation's validation and geometry pro
 
 In progress on `feat/marina-m2-appearance`, based on merged preparation `807bfb3`.
 Completed: row 1's native appearance definition, shared resolver, canonical defaults, explicit
-digest fields and hull-surface lettering. Next: row 2, Lua and serialization integration.
-Rows 2–4 remain pending; no supported Lua appearance API or rendered package is claimed yet.
+digest fields and hull-surface lettering, plus row 2's Lua/schema/discovery, PST9 worker/catalog,
+scene/room v3 and multiplayer v11 data paths. Next: row 3, runtime consumers and view-owned meshes.
+Rows 3–4 remain pending; rendered package appearance is not yet claimed.
 
 The complete bundled 3×5 alphabet/digit/punctuation set, repeated through the 16-character
 limit on every registered berth recipe at both dimension/mast boundaries, produces at most
@@ -263,6 +264,16 @@ geometry bounds, winding, palette/mast/name rejection, canonical digests and ind
 storage. The initial sandboxed quick run failed socket-only ENet checks; the socket-enabled
 rerun is the authoritative quick-lane result. Full-suite, GPU/browser and human acceptance
 remain pending for the integrated implementation.
+
+Row 2 verification: Debug build, `scene_appearance`, room maximum-size/round-trip and Node
+browser transport checks pass. The maximum room definition is 10,152 / 16,384 bytes (10 pages);
+the maximum scene with a full 64 KiB source occupies 80,124 staging bytes. This exposed the
+browser worker/transport's former 16 KiB reply limit; stage replies now use the Wasm host's
+163,840-byte read cap, with at/above-boundary Node checks. Query replies retain their 16 KiB
+worker limit. The browser decodes scene bodies in the shared C/Wasm codec; JavaScript checks
+the transport magic/framing rather than implementing another scene decoder. Protocol golden
+fixtures pin the new v11 header and unchanged payload. The updated quick lane passes 249
+enabled tests with local sockets. Interactive browser/resource lifetime checks remain pending.
 
 ## M3: authored routes and docking motion
 

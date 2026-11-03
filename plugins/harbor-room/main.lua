@@ -1,7 +1,7 @@
 -- Shared marina scene copied from harbor-life until M5 package modules.
 return { free = { version = 1,
 scene = {
-    version = 2,
+    version = 3,
     marina = {
       entrance = { x = 4, z = 140, width = 8 },
       berths = {

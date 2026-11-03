@@ -10,6 +10,7 @@
 #include "boat_map.h"
 #include "boat_plugin.h"
 #include "boat_plugin_io.h"
+#include "boat_plugin_wire.h"
 #include "boat_test_cases.h"
 #include "boat_world.h"
 #include "raymath.h"
@@ -146,7 +147,7 @@ static int scene_contract(void)
           "\"api\": 1, \"kind\": \"voyage\", \"entry\": \"main.lua\", \"location\": "
           "\"outer\", \"capabilities\": [\"voyage.define\", \"scene.define\"], "
           "\"state_version\": 1}";
-    const char *with_scene = variant("return {", "return { scene = { version = 2 },");
+    const char *with_scene = variant("return {", "return { scene = { version = 3 },");
     BoatPluginVoyage voyage;
     BoatPluginDiagnostic d;
     CHECK(
@@ -157,7 +158,7 @@ static int scene_contract(void)
     CHECK(voyage.digest == boat_plugin_route_digest(&boat_fixture_voyage_outer));
 
     // Omitted and granted-but-absent envelopes keep the compiled scene.
-    CHECK(load_source(variant("return {", "return { scene = { version = 2 },"), &voyage, &d)
+    CHECK(load_source(variant("return {", "return { scene = { version = 3 },"), &voyage, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene"));
     CHECK(load_source(variant("return {", "return {"), &voyage, &d) == BOAT_PLUGIN_OK);
@@ -176,7 +177,7 @@ static int scene_contract(void)
     CHECK(load(scene_manifest, bad_version, strlen(bad_version), NULL, &voyage, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.version"));
-    const char *unknown = variant("return {", "return { scene = { version = 2, galley = {} },");
+    const char *unknown = variant("return {", "return { scene = { version = 3, galley = {} },");
     CHECK(load(scene_manifest, unknown, strlen(unknown), NULL, &voyage, &d) == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.galley"));
     const char *not_table = variant("return {", "return { scene = 1,");
@@ -407,6 +408,81 @@ static int scene_traffic(void)
     return 0;
 }
 
+static int scene_appearance(void)
+{
+    static BoatPluginFiles files;
+    static char source[BOAT_PLUGIN_SOURCE_MAX + 1];
+    static BoatPluginDecoded decoded, back;
+    static BoatPluginRevision revision;
+    static unsigned char wire[32768];
+    BoatPluginDiagnostic d;
+    CHECK(boat_plugin_read("plugins/harbor-life", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    const char *valid = "{ length = 5.2, beam = 2, hull = { 0, 128, 255 }, deck = { 1, 2, 3 }, "
+                        "trim = { 9, 8, 7 }, name = \"SEA-1\" }";
+    int size = snprintf(source, sizeof(source),
+        "local d = (function()\n%.*s\nend)()\nd.scene.marina.berths[2].appearance = %s\nreturn d\n",
+        (int)files.source_size, files.source, valid);
+    CHECK(size > 0 && (size_t)size < sizeof(source));
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    bundle.source = source;
+    bundle.source_size = (size_t)size;
+    BoatPluginVoyage voyage;
+    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    BoatModelSpec spec = boat_scene_berth_resolve(&voyage.scene.berths[1]);
+    CHECK(spec.length == 5.2f && spec.beam == 2 && spec.hull.a == 255 && spec.hull.b == 255);
+    CHECK(!strcmp(spec.name, "SEA-1"));
+    CHECK(voyage.scene_digest != 0);
+    decoded.kind = BOAT_PLUGIN_KIND_VOYAGE;
+    memcpy(decoded.manifest, files.manifest, files.manifest_size);
+    decoded.manifest_size = files.manifest_size;
+    memcpy(decoded.source, source, (size_t)size);
+    decoded.source_size = (size_t)size;
+    CHECK(boat_plugin_lua_voyage(
+              source, (size_t)size, "@main.lua", &boat_plugin_default_limits, &decoded.voyage, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_parse_manifest(files.manifest, files.manifest_size, NULL, &decoded.parsed, &d)
+        == BOAT_PLUGIN_OK);
+    size_t encoded;
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
+    CHECK(boat_plugin_decoded_revision(&back, &revision, &d));
+    CHECK(revision.voyage.scene_digest == voyage.scene_digest);
+    BoatModelSpec resolved = boat_scene_berth_resolve(&revision.voyage.scene.berths[1]);
+    CHECK(boat_model_spec_equal(&resolved, &spec));
+    CHECK(!boat_plugin_wire_decode(wire, encoded - 1, &back, &d));
+    wire[3] ^= 1; // PST8 from the previous build.
+    CHECK(!boat_plugin_wire_decode(wire, encoded, &back, &d));
+    wire[3] ^= 1;
+    struct {
+        const char *value, *field;
+    } invalid[] = { { "{ length = 0 }", "length" }, { "{ length = 1e-300 }", "length" },
+        { "{ length = math.huge }", "length" }, { "{ length = 9 }", "length" },
+        { "{ beam = 0 }", "beam" }, { "{ beam = '2' }", "beam" },
+        { "{ mast_height = 4 }", "mast_height" }, { "{ unknown = 1 }", "unknown" },
+        { "{ hull = { 1, 2 } }", "hull" }, { "{ hull = { 1, 2, 3, 4 } }", "hull" },
+        { "{ hull = { 1, 2, 256 } }", "hull" }, { "{ hull = { 1, 2, -1 } }", "hull" },
+        { "{ hull = { 1, 2, 2.5 } }", "hull" }, { "{ hull = { 1, 2, '3' } }", "hull" },
+        { "{ hull = { 1, 2, 3, extra = 1 } }", "hull" }, { "{ name = '' }", "name" },
+        { "{ name = 'lowercase' }", "name" }, { "{ name = 'AAAAAAAAAAAAAAAAA' }", "name" },
+        { "{ name = 'A' .. string.char(0) .. 'B' }", "name" },
+        { "{ name = string.char(195, 133) }", "name" }, { "{ name = '---' }", "name" } };
+    for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        size = snprintf(source, sizeof(source),
+            "local d = (function()\n%.*s\nend)()\nd.scene.marina.berths[2].appearance = %s\nreturn "
+            "d\n",
+            (int)files.source_size, files.source, invalid[i].value);
+        CHECK(size > 0 && (size_t)size < sizeof(source));
+        bundle.source_size = (size_t)size;
+        uint64_t previous = voyage.scene_digest;
+        BoatPluginStatus status = boat_plugin_load_voyage(&bundle, NULL, &voyage, &d);
+        if (status != BOAT_PLUGIN_SCHEMA || !strstr(d.field, invalid[i].field))
+            show(invalid[i].value, &d);
+        CHECK(status == BOAT_PLUGIN_SCHEMA && strstr(d.field, invalid[i].field));
+        CHECK(voyage.scene_digest == previous);
+    }
+    return 0;
+}
+
 static int scene_berths(void)
 {
     static BoatPluginFiles files;
@@ -490,13 +566,13 @@ static int scene_berths(void)
     // Capacity + 1 is rejected by the Lua list decoder before native validation.
     BoatPluginVoyage too_many;
     const char *capacity = variant("return {",
-        "return { scene = { version = 2, marina = { berths = (function() local t={} for i=1,33 do "
+        "return { scene = { version = 3, marina = { berths = (function() local t={} for i=1,33 do "
         "t[i]={} end return t end)() } },");
     CHECK(load(files.manifest, capacity, strlen(capacity), NULL, &too_many, &d)
         == BOAT_PLUGIN_SCHEMA);
     CHECK(!strcmp(d.field, "scene.marina.berths"));
     capacity = variant("return {",
-        "return { scene = { version = 2, marina = { modules = (function() local t={} for i=1,65 do "
+        "return { scene = { version = 3, marina = { modules = (function() local t={} for i=1,65 do "
         "t[i]={} end return t end)() } },");
     CHECK(load(files.manifest, capacity, strlen(capacity), NULL, &too_many, &d)
         == BOAT_PLUGIN_SCHEMA);
@@ -1015,6 +1091,7 @@ static const TestCase cases[] = {
     TEST_CASE(manifests),
     TEST_CASE(scene_contract),
     TEST_CASE(scene_berths),
+    TEST_CASE(scene_appearance),
     TEST_CASE(scene_traffic),
     TEST_CASE(memory_exhaustion),
     TEST_CASE(instruction_budget),

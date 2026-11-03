@@ -117,7 +117,7 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
     if (!scene)
         return fail(diagnostic, "", "is missing");
     if (scene->version != BOAT_SCENE_VERSION)
-        return fail(diagnostic, "scene.version", "must be 2");
+        return fail(diagnostic, "scene.version", "must be 3");
     if (scene->berth_count > BOAT_SCENE_BERTHS)
         return fail(diagnostic, "scene.marina.berths", "exceeds the 32-berth capacity");
     if (scene->module_count > BOAT_SCENE_MODULES)

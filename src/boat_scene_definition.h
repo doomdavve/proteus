@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BOAT_SCENE_VERSION 2
+#define BOAT_SCENE_VERSION 3
 #define BOAT_SCENE_TEXT 24 // ID and attachment capacity, including the terminator.
 #define BOAT_SCENE_BERTHS 32
 #define BOAT_SCENE_MODULES 64

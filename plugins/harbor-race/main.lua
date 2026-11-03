@@ -34,7 +34,7 @@ return {
     -- A moored obstacle behind the start line, clear of every gate and recovery point. A room
     -- with this scene must carry it to clients as data.
     scene = {
-      version = 2,
+      version = 3,
       marina = {
         entrance = { x = -117, z = -192, width = 8 },
         berths = {

@@ -8,6 +8,7 @@
 #include "boat_net_transport.h"
 #include "boat_plugin.h"
 #include "boat_plugin_io.h"
+#include "boat_plugin_wire.h"
 #include "boat_room_package.h"
 #include "boat_test_cases.h"
 #include "boat_world.h"
@@ -346,6 +347,14 @@ static int definition_size(void)
         b->x = -100.0f + 10.0f * (float)i;
         b->z = 50;
         b->heading = .1f * i;
+        BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+        b->appearance = (BoatSceneAppearance) { .length = spec.length * 1.25f,
+            .beam = spec.beam * 1.25f,
+            .mast_height = spec.mast_height > 0 ? 12 : 0,
+            .hull = { 255, 254, 253, 255 },
+            .deck = { 1, 2, 3, 255 },
+            .trim = { 4, 5, 6, 255 },
+            .name = "MAXIMUM-NAME-123" };
     }
     for (unsigned i = 0; i < BOAT_SCENE_MODULES; ++i) {
         BoatSceneModule *m = &d.scene.modules[i];
@@ -403,6 +412,26 @@ static int definition_size(void)
     CHECK(boat_room_definition_decode(bytes, size, &back, &rd));
     CHECK(boat_room_definition_digest(&back) == boat_room_definition_digest(&d));
     CHECK(size < BOAT_ROOM_BYTES_MAX);
+    static BoatPluginDecoded stage, restored;
+    static BoatPluginFiles files;
+    static unsigned char stage_bytes[BOAT_PLUGIN_SOURCE_MAX + 32768u];
+    BoatPluginDiagnostic pd;
+    CHECK(boat_plugin_read("plugins/harbor-room", NULL, &files, &pd) == BOAT_PLUGIN_OK);
+    stage.kind = BOAT_PLUGIN_KIND_FREE;
+    stage.manifest_size = files.manifest_size;
+    memcpy(stage.manifest, files.manifest, files.manifest_size);
+    memset(stage.source, ' ', sizeof(stage.source));
+    stage.source_size = sizeof(stage.source);
+    stage.free.version = 1;
+    stage.free.has_scene = true;
+    stage.free.scene = d.scene;
+    size_t stage_size;
+    CHECK(boat_plugin_wire_encode(&stage, stage_bytes, sizeof(stage_bytes), &stage_size));
+    CHECK(boat_plugin_wire_decode(stage_bytes, stage_size, &restored, &pd));
+    CHECK(boat_scene_digest(&stage.free.scene) == boat_scene_digest(&restored.free.scene));
+    CHECK(stage_size + 1024 < 163840); // Browser reply cap includes bounded diagnostics.
+    printf("room_package stage: maximum scene + full source %zu bytes, scene=%zu room=%zu\n",
+        stage_size, sizeof(BoatSceneDefinition), sizeof(BoatRoomDefinition));
     // Truncation, a trailing byte and a corrupt digest are rejected.
     CHECK(!boat_room_definition_decode(bytes, size - 1, &back, &rd));
     bytes[size] = 0;
