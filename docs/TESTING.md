@@ -181,6 +181,14 @@ mirror reproduce their frames; failed HDR allocations present the 8-bit frame ex
 synthetic 3.5 spot blooms only a few pixels and clamps; and the HUD overlay composites like
 drawing over the scene. `boat_screen` and `waterfront_grade` (quick) check the layout sizes and
 the grades.
+`light_clusters` (`boat_water_review --check-light-clusters`, `gpu`, about 1 s; graphics G5b)
+draws the river at dusk, without and with 600 review lights, at low and high resolution. Each
+clustered frame must equal `--light-reference` (every light tested at every pixel) byte for byte,
+also after a rear-view mirror pass, with no dropped, clipped or overflowing lights; the daytime
+fallback frame stays within one 8-bit step of the clustered one; and the capped fallback must
+account for every light it leaves out. `waterfront_lights` (quick) checks the cluster slots, rank
+order, submission-order independence, overflow, capacity, packing and, at 20,000 points, that
+each slot list finds exactly the lights reaching the point.
 `water_atlas_river` and `water_atlas_outer` (`water_atlas_bake --check`; graphics G4) rebake each
 map's water atlas and require the committed sidecar byte for byte. `validate_boat_scenery`
 also rejects malformed, truncated, foreign-map and out-of-range atlases.

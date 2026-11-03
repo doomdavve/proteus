@@ -117,5 +117,6 @@ phases are untested visually. The title keeps its own grade.
 
 **Next task:** step 3 (transition, controls and ownership), which needs the user's
 decisions on names, defaults and the title phase; don't start it unasked. The graphics
-overhaul's P3 may now build on the merged frame, and its G5b dusk work on the approved
-presets.
+overhaul's G5b builds its dusk lamplight, streaks and harbour lamps on the frame's window
+light (machine-verified 2026-11-03 on `feat/graphics-presentation`; see
+[the plan](GRAPHICS_OVERHAUL_PLAN.md#g5b--clustered-cozy-lighting-and-dusk-water)).

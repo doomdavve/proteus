@@ -627,6 +627,32 @@ within noise. The HDR targets hold 14,976,000 bytes at 1280×800 (`hdr_bytes`). 
 far below G0's stress 4×4 reference of 20.01 ms GPU p95. No Windows, browser-timing or visible
 paced run was made for this checkpoint.
 
+## Graphics G5b clustered lights — 2026-11-03
+
+Release, Apple M1 Max, macOS, hidden 960×600 window, `--waves --aa off`, two interleaved runs
+against a control build of the G5a commit (`477251a`). GPU is `GL_TIME_ELAPSED` around the scene
+draw; `light_build_us` is one CPU cluster build and pack, timed over 50 repeats of the final
+frame's lights. Ranges are the two runs (ms):
+
+| Run | River GPU p50 / p95 | Stress GPU p50 / p95 | River lights / upload rows / build |
+| --- | --- | --- | --- |
+| control low, day | 1.18–1.20 / 1.57–1.58 | 2.75 / 3.14–3.15 | — |
+| low, day | 1.28–1.34 / 1.68–1.69 | 2.77–2.78 / 3.17–3.19 | 29 / 33 / 8 µs |
+| low, dusk | 1.31–1.34 / 1.74–1.77 | 2.89–2.90 / 3.35–3.36 | 42 / 34 / 9 µs |
+| low, dusk, 600 stress lights | 1.51 / 1.97–2.04 | 2.89–2.90 / 3.34–3.35 | 642 / 40 / 42 µs |
+| control high (HDR), day | 1.65–1.76 / 2.15–2.38 | 3.54 / 4.00–4.05 | — |
+| high, day | 1.72–1.76 / 2.26–2.36 | 3.62 / 4.08 | 29 / 33 / 8 µs |
+| high, dusk | 2.17–2.19 / 2.58–2.59 | 4.01–4.02 / 4.55–4.57 | 42 / 34 / 9 µs |
+| high, dusk, 600 stress lights | 2.81 / 3.17–3.19 | 4.01–4.02 / 4.53–4.58 | 642 / 40 / 43 µs |
+| high, dusk, 600, `--light-fallback` | 2.07–2.09 / 2.56–2.57 | 3.94–3.95 / 4.48 | 29 of 642 kept |
+
+The stress scenario is the basin, which has no local lights; its dusk cost is the water's streak
+taps (+0.1 ms low, +0.45 ms high p50). By day the clusters cost about 0.1 ms on the river at low
+resolution and are within noise at high. 600 extra lights add about 0.6 ms p50 at high dusk, with
+no slot overflow; the fallback is cheaper because it shades 29 lights and gives the water none.
+Every run of a scenario ended in the same `final_state`. All runs stay far below G0's stress 4×4
+reference of 20.01 ms GPU p95. No Windows, browser-timing or visible paced run was made.
+
 ## Windows active GPU check — 2026-11-03
 
 Before collecting, follow [Windows GPU selection](WINDOWS_BUILD.md#select-and-verify-the-active-gpu)
