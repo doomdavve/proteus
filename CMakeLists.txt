@@ -210,7 +210,8 @@ add_library(proteus_render STATIC
   src/boat_voyage_view.c src/boat_voyage_view.h src/boat_minimap.c src/boat_minimap.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
-  src/waterfront_lighting.c src/waterfront_lighting.h src/waterfront_scene.c)
+  src/waterfront_lighting.c src/waterfront_lighting.h src/waterfront_scene.c
+  src/boat_screen.c src/boat_screen.h)
 target_link_libraries(proteus_render PUBLIC proteus_boat_core proteus_boat_scenery)
 target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROTEUS_WARM_MENU}>)
 target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
@@ -1245,6 +1246,10 @@ add_executable(validate_waterfront_lighting tools/validate_waterfront_lighting.c
 target_link_libraries(validate_waterfront_lighting PRIVATE proteus_render)
 target_compile_options(validate_waterfront_lighting PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME waterfront_lighting COMMAND validate_waterfront_lighting)
+add_executable(validate_boat_screen tools/validate_boat_screen.c)
+target_link_libraries(validate_boat_screen PRIVATE proteus_render)
+target_compile_options(validate_boat_screen PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_screen COMMAND validate_boat_screen)
 add_test(NAME starter_xm_is_valid
   COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/starter.xm
 )

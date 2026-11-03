@@ -213,6 +213,9 @@ void waterfront_gpu_scene_set_shadows_enabled(WaterfrontGpuScene *scene, bool en
 void waterfront_gpu_scene_set_atmosphere_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_reflections_enabled(WaterfrontGpuScene *scene, bool enabled);
 bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int size);
+// Reallocate the water reflection target (initially 160x120, nearest-filtered). Failure keeps the
+// existing target. Dimensions are bounded to 1..2048.
+bool waterfront_gpu_scene_set_reflection_size(WaterfrontGpuScene *scene, int width, int height);
 // Review only: drawing every tile isolates culling from the per-tile draw order.
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled);

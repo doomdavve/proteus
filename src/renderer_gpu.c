@@ -3327,6 +3327,25 @@ bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int siz
     return true;
 }
 
+bool waterfront_gpu_scene_set_reflection_size(WaterfrontGpuScene *scene, int width, int height)
+{
+    if (width < 1 || height < 1 || width > 2048 || height > 2048)
+        return false;
+    if (scene->reflection.texture.width == width && scene->reflection.texture.height == height)
+        return true;
+    RenderTexture2D replacement = LoadRenderTexture(width, height);
+    if (!IsRenderTextureValid(replacement)) {
+        if (replacement.id != 0)
+            UnloadRenderTexture(replacement);
+        return false;
+    }
+    SetTextureFilter(replacement.texture, TEXTURE_FILTER_POINT);
+    if (scene->reflection.id != 0)
+        UnloadRenderTexture(scene->reflection);
+    scene->reflection = replacement;
+    return true;
+}
+
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene)
 {
     return scene->shadow_map.depth;
