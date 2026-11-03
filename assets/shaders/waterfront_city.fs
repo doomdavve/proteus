@@ -39,6 +39,13 @@ uniform vec4 localLightPositionRadius[32];
 uniform vec4 localLightColorIntensity[32];
 uniform vec4 localLightDirection[32];
 uniform vec4 localLightCone[32];
+// G5b clusters (waterfront_lights.h): 0 the capped uniform list above, 1 the slot list of each
+// point, 2 every clustered light (the reference the slot lists must match exactly).
+uniform int lightClusterMode;
+uniform highp sampler2D lightClusters; // Float records: keep full precision on the web.
+uniform int lightClusterCount;
+uniform vec4 lightClusterLayout; // Cell metres, grid slots per axis, slot base, index base.
+uniform float emissiveGain; // Above 1 only for an HDR target at dusk.
 
 out vec4 finalColor;
 
@@ -198,6 +205,60 @@ float directional_shadow(vec3 normal)
     return shadow_visibility(bias);
 }
 
+vec3 localLight(vec4 positionRadius, vec4 colorIntensity, vec4 direction, vec4 cone,
+    vec3 normal)
+{
+    vec3 delta = positionRadius.xyz - fragWorldPosition;
+    float radius = positionRadius.w;
+    float distance = length(delta);
+    if (distance >= radius)
+        return vec3(0.0);
+    vec3 towardLight = delta / max(distance, 0.001);
+    float incidence = max(0.0, dot(normal, towardLight));
+    float attenuation = 1.0 - distance / radius;
+    float spot = 1.0;
+    if (cone.y >= 0.0)
+        spot = smoothstep(cone.y, cone.x, dot(normalize(direction.xyz), -towardLight));
+    return colorIntensity.rgb * (colorIntensity.a * incidence * attenuation * attenuation * spot);
+}
+
+vec4 lightTexel(int index)
+{
+    return texelFetch(lightClusters, ivec2(index % 256, index / 256), 0);
+}
+
+vec3 clusterLight(int light, vec3 normal)
+{
+    int base = light * 4;
+    return localLight(lightTexel(base), lightTexel(base + 1), lightTexel(base + 2),
+        lightTexel(base + 3), normal);
+}
+
+void addLocalLights(inout vec3 illumination, vec3 normal)
+{
+    if (lightClusterMode == 0) {
+        for (int index = 0; index < localLightCount; ++index)
+            illumination += localLight(localLightPositionRadius[index],
+                localLightColorIntensity[index], localLightDirection[index],
+                localLightCone[index], normal);
+        return;
+    }
+    if (lightClusterMode == 2) {
+        for (int light = 0; light < lightClusterCount; ++light)
+            illumination += clusterLight(light, normal);
+        return;
+    }
+    vec2 cell = mod(floor(fragWorldPosition.xz / lightClusterLayout.x), lightClusterLayout.y);
+    int slot = int(cell.y) * int(lightClusterLayout.y) + int(cell.x);
+    vec4 header = lightTexel(int(lightClusterLayout.z) + slot);
+    int offset = int(header.x), count = int(header.y);
+    for (int k = 0; k < count; ++k) {
+        int at = offset + k;
+        vec4 packed = lightTexel(int(lightClusterLayout.w) + at / 4);
+        illumination += clusterLight(int(packed[at % 4]), normal);
+    }
+}
+
 void main()
 {
     if (ghostOpacity > 0.0) {
@@ -223,7 +284,9 @@ void main()
                     mix(albedo.rgb * windowDark, windowLit, fragColor.a), windowLight);
             albedo.a = 1.0;
         }
-        finalColor = vec4(apply_atmosphere(albedo.rgb), albedo.a);
+        // The 8-bit reflection keeps unit gain; its streaks come from the water.
+        float gain = reflectionPass != 0 ? 1.0 : emissiveGain;
+        finalColor = vec4(apply_atmosphere(albedo.rgb * gain), albedo.a);
         return;
     }
 
@@ -231,25 +294,7 @@ void main()
     float directional = max(0.0, dot(normal, normalize(directionalDirection)));
     vec3 illumination = ambientColor
         + directionalColor * directionalIntensity * directional * directional_shadow(normal);
-    for (int index = 0; index < localLightCount; ++index) {
-        vec3 delta = localLightPositionRadius[index].xyz - fragWorldPosition;
-        float radius = localLightPositionRadius[index].w;
-        float distance = length(delta);
-        if (distance >= radius)
-            continue;
-        vec3 towardLight = delta / max(distance, 0.001);
-        float incidence = max(0.0, dot(normal, towardLight));
-        float attenuation = 1.0 - distance / radius;
-        float spot = 1.0;
-        float outerCone = localLightCone[index].y;
-        if (outerCone >= 0.0) {
-            float cone = dot(normalize(localLightDirection[index].xyz), -towardLight);
-            float innerCone = localLightCone[index].x;
-            spot = smoothstep(outerCone, innerCone, cone);
-        }
-        illumination += localLightColorIntensity[index].rgb
-            * (localLightColorIntensity[index].a * incidence * attenuation * attenuation * spot);
-    }
+    addLocalLights(illumination, normal);
 
     // Preserve the full output palette while retaining the low-resolution framebuffer. Clamp
     // illumination before multiplying albedo, rather than adding white, so nearby lamps do not

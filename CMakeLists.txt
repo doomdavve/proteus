@@ -211,7 +211,8 @@ add_library(proteus_render STATIC
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
   src/waterfront_lighting.c src/waterfront_lighting.h src/waterfront_scene.c
-  src/boat_screen.c src/boat_screen.h src/waterfront_grade.c src/waterfront_grade.h)
+  src/boat_screen.c src/boat_screen.h src/waterfront_grade.c src/waterfront_grade.h
+  src/waterfront_lights.c src/waterfront_lights.h)
 target_link_libraries(proteus_render PUBLIC proteus_boat_core proteus_boat_scenery)
 target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROTEUS_WARM_MENU}>)
 target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
@@ -1254,6 +1255,10 @@ add_executable(validate_waterfront_grade tools/validate_waterfront_grade.c)
 target_link_libraries(validate_waterfront_grade PRIVATE proteus_render)
 target_compile_options(validate_waterfront_grade PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME waterfront_grade COMMAND validate_waterfront_grade)
+add_executable(validate_waterfront_lights tools/validate_waterfront_lights.c)
+target_link_libraries(validate_waterfront_lights PRIVATE proteus_render)
+target_compile_options(validate_waterfront_lights PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME waterfront_lights COMMAND validate_waterfront_lights)
 add_test(NAME starter_xm_is_valid
   COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/starter.xm
 )
@@ -1298,6 +1303,10 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME presentation COMMAND boat_water_review --check-presentation)
   set_tests_properties(presentation PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "presentation=ok")
+  # Graphics G5b: clustered lights match every light tested everywhere, and the fallback.
+  add_test(NAME light_clusters COMMAND boat_water_review --check-light-clusters)
+  set_tests_properties(light_clusters PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "light_clusters=ok")
   # Graphics G1: scalar and instanced objects draw the same bytes in every pass.
   add_test(NAME instancing_parity COMMAND boat_water_review --check-instancing)
   set_tests_properties(instancing_parity PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu

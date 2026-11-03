@@ -2,7 +2,8 @@
 
 // G5a presentation of the HDR scene into the 8-bit target. Bloom blurs the light above the
 // grade's threshold through a short dual-filter chain at half, quarter and eighth size; the
-// composite adds it, applies the compact grade and clamps. There is no tone curve.
+// composite scales light above 1 back to the clamp with its hue, adds the bloom, applies the
+// compact grade and clamps. There is no other tone curve.
 in vec2 fragTexCoord;
 uniform sampler2D texture0; // This pass's source.
 uniform sampler2D bloomTexture; // Composite: the half-size bloom level.
@@ -71,7 +72,11 @@ void main()
         finalColor = vec4(up(fragTexCoord), 1.0);
         return;
     }
+    // Light above 1 keeps its hue: scale it back to the clamp instead of clipping each channel,
+    // so a warm lamp stays warm and only its bloom shows the excess. Colours within 1 pass as
+    // they are.
     vec3 color = texture(texture0, fragTexCoord).rgb;
+    color /= max(1.0, max(color.r, max(color.g, color.b)));
     color += texture(bloomTexture, fragTexCoord).rgb * bloomParameters.z;
     color *= gradeParameters.x;
     color = color * gradeGain + gradeLift * max(1.0 - color, 0.0);

@@ -2,6 +2,7 @@
 #define PROTEUS_RENDERER_GPU_H
 
 #include "waterfront_corner.h"
+#include "waterfront_lights.h"
 #include "waterfront_scene.h"
 #include "waterfront_wake_stamp.h"
 #include "waterfront_water_history.h"
@@ -182,6 +183,20 @@ typedef struct {
     Material shadow_material;
     Material water_material;
     Texture2D roof_texture;
+    // G5b clustered local lights (waterfront_lights.h), uploaded as an RGBA32F texture. Without
+    // the clusters or their texture, the capped uniform list below is the fallback: the closest
+    // lights to the shot, by class, and no lamplight on the water.
+    WaterfrontLightClusters *light_clusters;
+    float *light_texels;
+    Texture2D light_texture;
+    bool light_clusters_active; // This frame shades from the clusters.
+    bool light_clusters_disabled; // Review: the capped uniform fallback.
+    bool light_reference; // Review: shade every clustered light, ignoring the slot lists.
+    int stress_lights; // Review: extra synthetic lights around the shot.
+    WaterfrontLightStats light_stats; // This frame's submissions, drops and overflow.
+    int light_rows; // Texture rows uploaded this frame.
+    int fallback_dropped; // Lights the capped fallback left out this frame (or behind the eye).
+    bool emissive_hdr; // The target keeps light above 1: dusk lenses and windows exceed it.
     WaterfrontGpuLight local_lights[WATERFRONT_GPU_MAX_LOCAL_LIGHTS];
     int local_light_ids[WATERFRONT_GPU_MAX_LOCAL_LIGHTS];
     int local_light_count;

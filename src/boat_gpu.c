@@ -375,6 +375,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
         : gpu->supersampled.id   ? gpu->supersampled
                                  : gpu->target;
     gpu->scene.detail_scale = gpu->supersampled.id ? 4 : 1;
+    gpu->scene.emissive_hdr = hdr;
     Mesh original_water = gpu->scene.water;
     if (!mapped) {
         if (!gpu->basin_water.vaoId)

@@ -319,6 +319,11 @@ static bool no_scene_depth;
 static bool no_water_atlas;
 // --no-far-water: no G4 gusts, sun glitter or squall water.
 static bool no_far_water;
+// --light-fallback: the capped uniform light list instead of the G5b clusters.
+// --light-reference: every clustered light at every pixel, ignoring the slot lists.
+// --stress-lights N: N extra review lights around the shot.
+static bool light_fallback, light_reference;
+static int stress_lights;
 // --daylight: review poses at a fixed presentation phase (default day).
 static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
 // --resolution and --hdr: the presentation preset of review and benchmark GPU views, sized for
@@ -352,9 +357,29 @@ static bool apply_scene_options(WaterfrontGpuScene *scene)
     waterfront_gpu_scene_set_scene_depth_enabled(scene, !no_scene_depth);
     waterfront_gpu_scene_set_water_atlas_enabled(scene, !no_water_atlas);
     waterfront_gpu_scene_set_far_water_enabled(scene, !no_far_water);
+    scene->light_clusters_disabled = light_fallback;
+    scene->light_reference = light_reference;
+    scene->stress_lights = stress_lights;
     if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
         return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
     return true;
+}
+
+// The last frame's G5b light submission: clusters or the capped fallback, and every drop.
+static void json_lights(FILE *out, const WaterfrontGpuScene *scene)
+{
+    const WaterfrontLightStats *l = &scene->light_stats;
+    fprintf(out,
+        "{\"mode\":\"%s\",\"submitted\":%d,\"kept\":%d,\"dropped\":%d,\"clipped\":%d,"
+        "\"overflowed_slots\":%d,\"dropped_assignments\":%d,\"busiest_slot\":%d,"
+        "\"indices\":%d,\"upload_rows\":%d,\"fallback_kept\":%d,\"fallback_dropped\":%d}",
+        scene->light_clusters_active ? (scene->light_reference ? "reference" : "clusters")
+                                     : "fallback",
+        l->submitted, scene->light_clusters_active ? scene->light_clusters->light_count : 0,
+        l->dropped_lights, l->clipped_lights, l->overflowed_slots, l->dropped_assignments,
+        l->busiest_slot, scene->light_clusters_active ? scene->light_clusters->index_count : 0,
+        scene->light_rows, scene->light_clusters_active ? 0 : scene->local_light_count,
+        scene->fallback_dropped);
 }
 
 static int count_detail_changes(const WaterfrontGpuScene *scene, const unsigned char *previous)
@@ -779,6 +804,109 @@ cleanup:;
     }
     CloseWindow();
     return result;
+}
+
+// G5b: clustered lights shade exactly as every light tested at every pixel (so no light pops at a
+// slot boundary, in the view or its reflection), hundreds of review lights fit without overflow,
+// and the capped fallback records what it drops while daytime keeps the clustered frame.
+static int check_light_clusters(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Light cluster probe");
+    if (!IsWindowReady())
+        return 1;
+    static BoatWorldResources owner;
+    static BoatSession session;
+    BoatGpu gpu = { 0 };
+    BoatRearview mirror = { 0 };
+    Image clustered = { 0 }, frame = { 0 };
+    int result = 1, fallback_distance = -1, stress_kept = 0, stress_dropped = 0;
+    bool ready = false;
+#undef EXPECT
+#undef RELEASE
+#define EXPECT(test)                                                                               \
+    do {                                                                                           \
+        if (!(test)) {                                                                             \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #test);                             \
+            goto cleanup;                                                                          \
+        }                                                                                          \
+    } while (0)
+#define RELEASE(image) (UnloadImage(image), (image) = (Image) { 0 })
+    EXPECT(boat_world_resources_init(&owner, boat_location(BOAT_LOCATION_RIVER)));
+    boat_session_init(&session, &owner, boat_water_gentle());
+    ready = true;
+    for (int t = 0; t < 480; ++t)
+        boat_session_step(&session, (BoatInput) { .steering_rate = .3f, .throttle_rate = 1 });
+    EXPECT(boat_gpu_init(&gpu, false));
+    WaterfrontGpuScene *scene = &gpu.scene;
+    // Daytime: every authored light fits the capped list, so the fallback draws the same frame.
+    EXPECT(gpu_frame(&gpu, &session, &clustered) && scene->light_clusters_active);
+    EXPECT(scene->light_stats.submitted > 0 && scene->light_stats.dropped_lights == 0);
+    scene->light_clusters_disabled = true;
+    EXPECT(gpu_frame(&gpu, &session, &frame) && !scene->light_clusters_active);
+    // Lights behind the camera are left out too; they reach nothing it sees.
+    EXPECT(scene->local_light_count + scene->fallback_dropped == scene->light_stats.submitted);
+    fallback_distance = image_distance(clustered, frame);
+    EXPECT(fallback_distance >= 0 && fallback_distance <= 1);
+    RELEASE(frame);
+    RELEASE(clustered);
+    scene->light_clusters_disabled = false;
+    // Dusk, then dusk with hundreds of review lights, at both presets: the slot lists draw
+    // exactly the reference that shades every light everywhere.
+    gpu.daylight = WATERFRONT_DAYLIGHT_DUSK;
+    BoatScreenLayout layouts[] = { boat_screen_layout(BOAT_RESOLUTION_LOW, 320, 200, 960, 600),
+        boat_screen_layout(BOAT_RESOLUTION_HIGH, 320, 200, 1280, 800) };
+    for (int stress = 0; stress < 2; ++stress) {
+        scene->stress_lights = stress ? 600 : 0;
+        for (int preset = 0; preset < 2; ++preset) {
+            bool hdr = preset == 1 && waterfront_gpu_scene_float_blending(scene);
+            EXPECT(layout_frame(&gpu, &session, layouts[preset], hdr, &clustered));
+            EXPECT(scene->light_clusters_active && scene->light_stats.overflowed_slots == 0);
+            EXPECT(
+                scene->light_stats.clipped_lights == 0 && scene->light_stats.dropped_lights == 0);
+            EXPECT(scene->light_clusters->light_count == scene->light_stats.submitted);
+            scene->light_reference = true;
+            EXPECT(gpu_frame(&gpu, &session, &frame) && same_image(clustered, frame));
+            RELEASE(frame);
+            scene->light_reference = false;
+            // The rear-view mirror rebuilds the lists from its own frame; the view's frame
+            // returns unchanged.
+            EXPECT(boat_rearview_update(&mirror, &gpu, SESSION_VIEW(&session),
+                &session.presentation, &session.world, NULL));
+            EXPECT(gpu_frame(&gpu, &session, &frame) && same_image(clustered, frame));
+            RELEASE(frame);
+            RELEASE(clustered);
+        }
+    }
+    stress_kept = scene->light_clusters->light_count;
+    EXPECT(stress_kept >= 600 && scene->light_stats.busiest_slot <= WATERFRONT_LIGHT_CELL_LIGHTS);
+    // The capped fallback keeps at most 32 (headlight places stay empty in play) and records
+    // every other light.
+    scene->light_clusters_disabled = true;
+    EXPECT(gpu_frame(&gpu, &session, &frame) && !scene->light_clusters_active);
+    stress_dropped = scene->fallback_dropped;
+    EXPECT(scene->local_light_count <= WATERFRONT_GPU_MAX_LOCAL_LIGHTS);
+    EXPECT(scene->light_stats.submitted == stress_kept);
+    EXPECT(stress_dropped == stress_kept - scene->local_light_count);
+    RELEASE(frame);
+    printf("light_clusters=ok fallback_distance=%d stress_lights=%d fallback_dropped=%d\n",
+        fallback_distance, stress_kept, stress_dropped);
+    result = 0;
+cleanup:
+    if (clustered.data)
+        UnloadImage(clustered);
+    if (frame.data)
+        UnloadImage(frame);
+    boat_rearview_destroy(&mirror);
+    boat_gpu_destroy(&gpu);
+    if (ready) {
+        boat_session_destroy(&session);
+        boat_world_resources_destroy(&owner);
+    }
+    CloseWindow();
+    return result;
+#undef RELEASE
+#undef EXPECT
 }
 
 // A1.5: GPU views with private owners and waves, so both patch caches build. Two river owners,
@@ -1288,6 +1416,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         error = "presentation preset unavailable";
         goto cleanup;
     }
+    gpu.daylight = review_daylight;
     if (stress
         && (!stress_init(&stress_fixture, waves)
             || !stress_advance(&stress_fixture, STRESS_PREROLL_TICKS))) {
@@ -1456,6 +1585,23 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         format_stress_state(state, sizeof(state), &stress_fixture);
     else
         format_final_state(state, sizeof(state), boat, tick);
+    // CPU cost of one cluster build and pack, repeated over the final frame's lights.
+    double light_build_us = 0;
+    if (gpu.scene.light_clusters_active) {
+        static WaterfrontLightClusters rebuilt;
+        static float texels[WATERFRONT_LIGHT_TEXELS * 4];
+        const WaterfrontLightClusters *source = gpu.scene.light_clusters;
+        enum { REBUILDS = 50 };
+        double begin = boat_profile_time(false);
+        for (int r = 0; r < REBUILDS; ++r) {
+            waterfront_lights_begin(&rebuilt);
+            for (int i = 0; i < source->light_count; ++i)
+                waterfront_lights_add(&rebuilt, source->lights[i]);
+            waterfront_lights_build(&rebuilt);
+            waterfront_lights_pack(&rebuilt, texels);
+        }
+        light_build_us = (boat_profile_time(false) - begin) * 1e6 / REBUILDS;
+    }
     fprintf(json,
         "{\n  \"schema_revision\":7,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
         "  \"scenario\":\"%s\",\"route\":\"%s\",\"route_revision\":1,\"physics_revision\":%d,\n"
@@ -1465,6 +1611,9 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     json_string(json, renderer_name);
     fputs(",\"gl_version\":", json);
     json_string(json, gl_version);
+    fprintf(json, ",\n  \"daylight\":%.6g,\"stress_lights\":%d,\"light_build_us\":%.6g,\"lights\":",
+        (double)review_daylight, gpu.scene.stress_lights, light_build_us);
+    json_lights(json, &gpu.scene);
     fprintf(json,
         ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\","
         "\"tile_size\":%.9g,\n"
@@ -2789,7 +2938,7 @@ static int review(const char *directory, bool use_gpu)
     }
     gpu.daylight = cpu_view.daylight = review_daylight;
     fprintf(manifest,
-        "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
+        "{\n  \"schema_revision\":2,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
         "  \"daylight\":%.6g,\n"
         "  \"renderer\":\"%s\",\"resolution\":[%d,%d],\"gpu_aa\":%s,\"hdr\":%s,"
         "\"physics_revision\":%d,\n"
@@ -2847,7 +2996,12 @@ static int review(const char *directory, bool use_gpu)
             inspection.position = Vector2Add(inspection.position, pose->step_position);
             inspection.heading += pose->step_heading;
         }
-        fprintf(manifest, "]}");
+        fprintf(manifest, "]");
+        if (use_gpu) {
+            fputs(",\"lights\":", manifest);
+            json_lights(manifest, &gpu.scene);
+        }
+        fprintf(manifest, "}");
         boat_session_destroy(&session);
     }
     fputs("\n  ]\n}\n", manifest);
@@ -2877,7 +3031,7 @@ int main(int argc, char **argv)
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
-    bool presentation_check = false;
+    bool presentation_check = false, light_clusters_check = false;
     bool detail = false, wake_stamp = false, water_history = false, scene_depth = false;
     const char *clip_dir = NULL, *place_dir = NULL;
     bool place_squall = false;
@@ -2909,6 +3063,8 @@ int main(int argc, char **argv)
             culling = true;
         else if (strcmp(argv[i], "--check-presentation") == 0)
             presentation_check = true;
+        else if (strcmp(argv[i], "--check-light-clusters") == 0)
+            light_clusters_check = true;
         else if (strcmp(argv[i], "--check-instancing") == 0)
             instancing = true;
         else if (strcmp(argv[i], "--geometry") == 0)
@@ -2945,7 +3101,17 @@ int main(int argc, char **argv)
             no_water_atlas = true;
         else if (strcmp(argv[i], "--no-far-water") == 0)
             no_far_water = true;
-        else if (strcmp(argv[i], "--clip-aa") == 0 && i + 1 < argc) {
+        else if (strcmp(argv[i], "--light-fallback") == 0)
+            light_fallback = true;
+        else if (strcmp(argv[i], "--light-reference") == 0)
+            light_reference = true;
+        else if (strcmp(argv[i], "--stress-lights") == 0 && i + 1 < argc) {
+            stress_lights = atoi(argv[++i]);
+            if (stress_lights < 0 || stress_lights > WATERFRONT_LIGHTS_MAX) {
+                fprintf(stderr, "--stress-lights takes 0..%d.\n", WATERFRONT_LIGHTS_MAX);
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--clip-aa") == 0 && i + 1 < argc) {
             const char *name = argv[++i];
             if (strcmp(name, "off") && strcmp(name, "4x4")) {
                 fprintf(stderr, "--clip-aa takes off or 4x4.\n");
@@ -2995,7 +3161,7 @@ int main(int argc, char **argv)
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
                  "       boat_water_review --check-gpu-lifecycle | --check-culling\n"
-                 "       boat_water_review --check-presentation\n"
+                 "       boat_water_review --check-presentation | --check-light-clusters\n"
                  "       boat_water_review --check-instancing | --geometry | --compare A B\n"
                  "       boat_water_review --stress-state\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
@@ -3003,7 +3169,8 @@ int main(int argc, char **argv)
                  "                         [--tile-size M] [--no-cull] [--no-detail]\n"
                  "       Any GPU run: [--analytic-wakes] [--stamp-size N] [--stamp-spacing M]\n"
                  "                    [--no-water-history] [--no-scene-depth] [--no-water-atlas]\n"
-                 "                    [--no-far-water]\n"
+                 "                    [--no-far-water] [--light-fallback] [--light-reference]\n"
+                 "                    [--stress-lights N]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
@@ -3014,6 +3181,7 @@ int main(int argc, char **argv)
                  "                         [--resolution low|high] [--hdr on|off]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--resolution low|high] [--hdr on|off] (with --aa off)\n"
+                 "                         [--daylight day|sunset|dusk|0..1]\n"
                  "                         [--scenario river|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"
                  "                         [--tile-size M]\n"
@@ -3025,6 +3193,9 @@ int main(int argc, char **argv)
                  "--no-water-atlas shades water from the hand-written dock exposure, not the\n"
                  "  map's baked atlas.\n"
                  "--no-far-water draws water without gusts, sun glitter or squall water.\n"
+                 "--light-fallback draws the capped uniform light list instead of the clustered\n"
+                 "  lights; --light-reference shades every clustered light at every pixel;\n"
+                 "  --stress-lights adds N (0..1024) review lights on a 12 m lattice.\n"
                  "--history-clip writes FRAMES (1..3600) 60 Hz stress frames to DIR, history\n"
                  "  left and stamp-only right, plus the final history field as history.png.\n"
                  "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"
@@ -3082,8 +3253,8 @@ int main(int argc, char **argv)
         return 2;
     }
     if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry
-        || presentation_check || wake_stamp || water_history || scene_depth || clip_dir
-        || place_dir) {
+        || presentation_check || light_clusters_check || wake_stamp || water_history || scene_depth
+        || clip_dir || place_dir) {
         SetTraceLogLevel(LOG_WARNING);
         if (place_dir)
             return clip_frames > 0 && clip_frames <= 3600
@@ -3091,17 +3262,18 @@ int main(int argc, char **argv)
                 : 2;
         if (clip_dir)
             return clip_frames > 0 && clip_frames <= 3600 ? history_clip(clip_dir, clip_frames) : 2;
-        return presentation_check ? check_presentation()
-            : scene_depth         ? check_scene_depth()
-            : water_history       ? check_water_history()
-            : wake_stamp          ? check_wake_stamp()
-            : geometry            ? report_geometry()
-            : instancing          ? check_instancing()
-            : culling             ? check_culling()
-            : detail              ? check_detail()
-            : gpu_lifecycle       ? check_gpu_lifecycle()
-            : gpu_views           ? check_gpu_views()
-                                  : check_gpu_water();
+        return presentation_check  ? check_presentation()
+            : light_clusters_check ? check_light_clusters()
+            : scene_depth          ? check_scene_depth()
+            : water_history        ? check_water_history()
+            : wake_stamp           ? check_wake_stamp()
+            : geometry             ? report_geometry()
+            : instancing           ? check_instancing()
+            : culling              ? check_culling()
+            : detail               ? check_detail()
+            : gpu_lifecycle        ? check_gpu_lifecycle()
+            : gpu_views            ? check_gpu_views()
+                                   : check_gpu_water();
     }
     if (!check && !output && !bench && !review_dir)
         return 2;
