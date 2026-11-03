@@ -162,6 +162,8 @@ static void usage(void)
     cli_usage_line(stdout, "--gpu-aa", "4x supersampling");
     cli_usage_line(stdout, "--resolution low|high",
         "Scene pixels: 320x200 (default) or up to 1280x800; high is GPU only, without --gpu-aa");
+    cli_usage_line(stdout, "--hdr on|off",
+        "HDR scene with restrained bloom and grade (default: on at high resolution)");
     cli_usage_line(stdout, "--daylight day|sunset|dusk", "Fixed light for review (default day)");
     cli_usage_line(
         stdout, "--no-far-detail", "Draw distant scenery at full detail, for comparison");
@@ -495,6 +497,17 @@ static void apply_water_layer(BoatGpu *gpu, int layer)
     waterfront_gpu_scene_set_wake_stamp_enabled(&gpu->scene, layer < 4);
 }
 
+// The performance capture's preset: default, gpu-aa, high (with HDR), high-ldr or hdr.
+static const char *presentation_preset(bool aa, BoatResolution resolution, const BoatGpu *gpu)
+{
+    bool hdr = boat_gpu_hdr_active(gpu);
+    return aa               ? "gpu-aa"
+        : resolution && hdr ? "high"
+        : resolution        ? "high-ldr"
+        : hdr               ? "hdr"
+                            : "default";
+}
+
 // Size the GPU scene and its reflection for LAYOUT; failure keeps the previous targets.
 static bool apply_screen_layout(BoatGpu *gpu, BoatScreenLayout layout)
 {
@@ -523,6 +536,7 @@ static int study(int argc, char **argv)
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
     bool gpu_enabled = true, gpu_aa = false, far_detail = true;
     BoatResolution resolution = BOAT_RESOLUTION_LOW;
+    int hdr_option = -1; // --hdr; unset follows the resolution.
     float daylight_phase = WATERFRONT_DAYLIGHT_DAY;
     bool profiler_visible = false;
     const char *performance_report = NULL;
@@ -577,6 +591,11 @@ static int study(int argc, char **argv)
         } else if (strcmp(argv[i], "--resolution") == 0 && i + 1 < argc) {
             if (!boat_resolution_parse(argv[++i], &resolution))
                 goto invalid;
+        } else if (strcmp(argv[i], "--hdr") == 0 && i + 1 < argc) {
+            const char *value = argv[++i];
+            if (strcmp(value, "on") && strcmp(value, "off"))
+                goto invalid;
+            hdr_option = !strcmp(value, "on");
         } else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
             if (!waterfront_daylight_parse(argv[++i], &daylight_phase))
                 goto invalid;
@@ -858,6 +877,11 @@ static int study(int argc, char **argv)
     }
     if (resolution == BOAT_RESOLUTION_HIGH && (!gpu_enabled || gpu_aa)) {
         fprintf(stderr, "--resolution high needs the GPU renderer and replaces --gpu-aa.\n");
+        goto invalid;
+    }
+    bool hdr = hdr_option < 0 ? resolution == BOAT_RESOLUTION_HIGH : hdr_option;
+    if (hdr && (!gpu_enabled || gpu_aa)) {
+        fprintf(stderr, "--hdr on needs the GPU renderer without --gpu-aa.\n");
         goto invalid;
     }
     if (course && (location->mapped || demo)) {
@@ -1203,6 +1227,8 @@ static int study(int argc, char **argv)
                 boat_resolution_name(resolution));
             goto cleanup;
         }
+        if (hdr && !boat_gpu_set_hdr(&gpu, true))
+            fprintf(stderr, "HDR is unavailable here; presenting the 8-bit scene.\n");
         texture = gpu.target.texture;
         if (screenshot) {
             boat_gpu_draw_with_ghost(&gpu, view, view_presentation, view_world, camera_settings,
@@ -1441,7 +1467,8 @@ static int study(int argc, char **argv)
         int scale = layout.scale;
         Rectangle destination = layout.destination;
         // A failed high-resolution reallocation keeps drawing at the previous size.
-        if (gpu_enabled && resolution != BOAT_RESOLUTION_LOW && apply_screen_layout(&gpu, layout))
+        if (gpu_enabled && (resolution != BOAT_RESOLUTION_LOW || hdr)
+            && apply_screen_layout(&gpu, layout))
             texture = gpu.target.texture;
         Camera2D menu_camera = { .offset = { destination.x + (width - 320) * scale / 2,
                                      destination.y + (height - 200) * scale / 2 },
@@ -1927,10 +1954,11 @@ static int study(int argc, char **argv)
             snapshot = profiler_snapshot(&profiler, (float)live_view.time, size, destination);
             boat_snapshot = boat_profile_snapshot(&boat_profile);
             snapshot.scene_label = location->name;
-            snapshot.renderer_label = !gpu_enabled   ? "CPU"
-                : gpu_aa                             ? "GPU 4x SSAA"
-                : resolution == BOAT_RESOLUTION_HIGH ? "GPU high"
-                                                     : "GPU";
+            snapshot.renderer_label = !gpu_enabled ? "CPU"
+                : gpu_aa                           ? "GPU 4x SSAA"
+                : boat_gpu_hdr_active(&gpu)        ? (resolution ? "GPU high HDR" : "GPU HDR")
+                : resolution                       ? "GPU high"
+                                                   : "GPU";
             snapshot.texture_upload_kib = gpu_enabled ? (wake ? 384
                                                                 : objects ? 4
                                                                           : 0)
@@ -2152,9 +2180,7 @@ static int study(int argc, char **argv)
                 WakePerformanceInfo info = {
                     .capture_kind = demo || screenshot || frame_limit ? "scripted" : "live",
                     .map_name = view_world->definition->name,
-                    .preset_name = gpu_aa                    ? "gpu-aa"
-                        : resolution == BOAT_RESOLUTION_HIGH ? "high"
-                                                             : "default",
+                    .preset_name = presentation_preset(gpu_aa, resolution, &gpu),
                     .vsync = vsync,
                     .aa = gpu_aa,
                     .fullscreen = IsWindowFullscreen(),
@@ -2206,7 +2232,7 @@ static int study(int argc, char **argv)
             WakePerformanceInfo info = {
                 .capture_kind = demo || frame_limit ? "scripted" : "live",
                 .map_name = view_world->definition->name,
-                .preset_name = gpu_aa ? "gpu-aa" : "default",
+                .preset_name = presentation_preset(gpu_aa, resolution, &gpu),
                 .vsync = vsync,
                 .aa = gpu_aa,
                 .fullscreen = IsWindowFullscreen(),

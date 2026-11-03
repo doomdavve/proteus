@@ -213,6 +213,8 @@ void waterfront_gpu_scene_set_shadows_enabled(WaterfrontGpuScene *scene, bool en
 void waterfront_gpu_scene_set_atmosphere_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_reflections_enabled(WaterfrontGpuScene *scene, bool enabled);
 bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int size);
+// Whether float render targets accept blending (the wake stamp's probe).
+bool waterfront_gpu_scene_float_blending(const WaterfrontGpuScene *scene);
 // Reallocate the water reflection target (initially 160x120, nearest-filtered). Failure keeps the
 // existing target. Dimensions are bounded to 1..2048.
 bool waterfront_gpu_scene_set_reflection_size(WaterfrontGpuScene *scene, int width, int height);

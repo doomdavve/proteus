@@ -3327,6 +3327,11 @@ bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int siz
     return true;
 }
 
+bool waterfront_gpu_scene_float_blending(const WaterfrontGpuScene *scene)
+{
+    return scene->wake_stamp.blending;
+}
+
 bool waterfront_gpu_scene_set_reflection_size(WaterfrontGpuScene *scene, int width, int height)
 {
     if (width < 1 || height < 1 || width > 2048 || height > 2048)

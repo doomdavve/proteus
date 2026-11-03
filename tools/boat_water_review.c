@@ -7,6 +7,8 @@
 #include "boat_gpu.h"
 #include "boat_map.h"
 #include "boat_profile.h"
+#include "boat_rearview.h"
+#include "boat_screen.h"
 #include "boat_test_maps.h"
 #include "boat_test_session.h"
 #include "frame_pacer.h"
@@ -541,6 +543,220 @@ static int check_culling(void)
 cleanup:
     boat_session_destroy(&session);
     boat_session_destroy(&flat);
+    CloseWindow();
+    return result;
+}
+
+static Color image_pixel(Image image, int x, int y)
+{
+    return ((const Color *)image.data)[y * image.width + x];
+}
+
+// Largest colour channel difference between two RGBA8 images of one size, ignoring alpha (a
+// straight-alpha draw into a target leaves its own alpha); -1 when they differ in size.
+static int image_distance(Image a, Image b)
+{
+    if (a.width != b.width || a.height != b.height || a.format != b.format)
+        return -1;
+    const unsigned char *p = a.data, *q = b.data;
+    int largest = 0;
+    for (size_t i = 0, n = (size_t)a.width * (size_t)a.height * 4; i < n; ++i) {
+        int d = i % 4 == 3 ? 0 : abs((int)p[i] - (int)q[i]);
+        largest = d > largest ? d : largest;
+    }
+    return largest;
+}
+
+static bool near_color(Color a, Color b, int tolerance)
+{
+    return abs(a.r - b.r) <= tolerance && abs(a.g - b.g) <= tolerance && abs(a.b - b.b) <= tolerance
+        && abs(a.a - b.a) <= tolerance;
+}
+
+// Draw a session frame into GPU at LAYOUT's sizes, with or without HDR.
+static bool layout_frame(
+    BoatGpu *gpu, const BoatSession *session, BoatScreenLayout layout, bool hdr, Image *image)
+{
+    if (!boat_gpu_resize(gpu, layout.scene_width, layout.scene_height)
+        || !waterfront_gpu_scene_set_reflection_size(
+            &gpu->scene, layout.reflection_width, layout.reflection_height)
+        || boat_gpu_set_hdr(gpu, hdr) != hdr)
+        return false;
+    return gpu_frame(gpu, session, image);
+}
+
+// G5a: high resolution, HDR and its fallback. The bloom chain spreads only light above 1 and
+// clamps it; a neutral grade keeps daytime within one 8-bit step of the 8-bit scene; failed HDR
+// allocations present that scene exactly; repeated preset and size changes and a second view
+// reproduce their frames; and the HUD overlay composites like drawing over the scene.
+static int check_presentation(void)
+{
+    SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    InitWindow(320, 200, "Presentation probe");
+    if (!IsWindowReady())
+        return 1;
+    static BoatWorldResources owner;
+    static BoatSession session;
+    BoatGpu gpu = { 0 }, other = { 0 };
+    BoatRearview mirror = { 0 };
+    Image low = { 0 }, high = { 0 }, high_ldr = { 0 }, frame = { 0 }, bloom = { 0 };
+    RenderTexture2D scene = { 0 }, overlay = { 0 }, direct = { 0 }, composite = { 0 };
+    int result = 1, hdr_distance = -1;
+    size_t hdr_bytes = 0;
+    bool ready = false;
+#define EXPECT(test)                                                                               \
+    do {                                                                                           \
+        if (!(test)) {                                                                             \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #test);                             \
+            goto cleanup;                                                                          \
+        }                                                                                          \
+    } while (0)
+#define RELEASE(image) (UnloadImage(image), (image) = (Image) { 0 })
+    EXPECT(boat_world_resources_init(&owner, boat_location(BOAT_LOCATION_RIVER)));
+    boat_session_init(&session, &owner, boat_water_gentle());
+    ready = true;
+    for (int t = 0; t < 480; ++t)
+        boat_session_step(&session, (BoatInput) { .steering_rate = .3f, .throttle_rate = 1 });
+    BoatScreenLayout low_layout = boat_screen_layout(BOAT_RESOLUTION_LOW, 320, 200, 960, 600);
+    BoatScreenLayout high_layout = boat_screen_layout(BOAT_RESOLUTION_HIGH, 320, 200, 1280, 800);
+    EXPECT(boat_gpu_init(&gpu, false));
+    if (!waterfront_gpu_scene_float_blending(&gpu.scene)) {
+        // The fallback: HDR stays off and the 8-bit frame is presented.
+        EXPECT(!boat_gpu_set_hdr(&gpu, true) && !boat_gpu_hdr_active(&gpu));
+        printf("presentation=ok hdr=unsupported\n");
+        result = 0;
+        goto cleanup;
+    }
+    EXPECT(layout_frame(&gpu, &session, low_layout, false, &low));
+    EXPECT(layout_frame(&gpu, &session, high_layout, false, &high_ldr));
+    EXPECT(high_ldr.width == 1280 && high_ldr.height == 800);
+    EXPECT(gpu.scene.reflection.texture.width == 640);
+    EXPECT(layout_frame(&gpu, &session, high_layout, true, &high));
+    EXPECT(boat_gpu_hdr_active(&gpu));
+    hdr_bytes = boat_gpu_hdr_bytes(&gpu);
+    EXPECT(hdr_bytes == (size_t)1280 * 800 * 12 + (640 * 400 + 320 * 200 + 160 * 100) * 8);
+    // No daytime light exceeds 1, so HDR differs only by 16-bit storage rounding.
+    hdr_distance = image_distance(high, high_ldr);
+    EXPECT(hdr_distance >= 0 && hdr_distance <= 1);
+    // Repeated preset changes reproduce each preset's frame.
+    for (int cycle = 0; cycle < 3; ++cycle) {
+        EXPECT(layout_frame(&gpu, &session, low_layout, false, &frame));
+        EXPECT(same_image(low, frame) && !boat_gpu_hdr_active(&gpu));
+        RELEASE(frame);
+        EXPECT(layout_frame(&gpu, &session, high_layout, true, &frame) && same_image(high, frame));
+        RELEASE(frame);
+        // A window size between presets, then back.
+        BoatScreenLayout middle = boat_screen_layout(BOAT_RESOLUTION_HIGH, 320, 200, 1000, 700);
+        EXPECT(layout_frame(&gpu, &session, middle, true, &frame) && frame.width == 960);
+        RELEASE(frame);
+    }
+    // A second view and the rear-view mirror leave the HDR view's frame unchanged.
+    EXPECT(boat_gpu_init(&other, false) && gpu_frame(&other, &session, &frame));
+    EXPECT(same_image(low, frame));
+    RELEASE(frame);
+    EXPECT(layout_frame(&gpu, &session, high_layout, true, &frame) && same_image(high, frame));
+    RELEASE(frame);
+    EXPECT(boat_rearview_update(
+        &mirror, &gpu, SESSION_VIEW(&session), &session.presentation, &session.world, NULL));
+    EXPECT(gpu_frame(&gpu, &session, &frame) && same_image(high, frame));
+    RELEASE(frame);
+    // A failed HDR allocation presents the 8-bit frame exactly, and a later request recovers.
+    gpu.hdr_allocation_failures = 1;
+    EXPECT(boat_gpu_resize(&gpu, 960, 600) && !boat_gpu_hdr_active(&gpu));
+    EXPECT(boat_gpu_resize(&gpu, 1280, 800) && gpu_frame(&gpu, &session, &frame));
+    EXPECT(same_image(high_ldr, frame));
+    RELEASE(frame);
+    gpu.hdr_allocation_failures = 1;
+    EXPECT(!boat_gpu_set_hdr(&gpu, true) && !boat_gpu_hdr_active(&gpu));
+    EXPECT(gpu_frame(&gpu, &session, &frame) && same_image(high_ldr, frame));
+    RELEASE(frame);
+    EXPECT(boat_gpu_set_hdr(&gpu, true) && gpu_frame(&gpu, &session, &frame));
+    EXPECT(same_image(high, frame));
+    RELEASE(frame);
+    EXPECT(!boat_gpu_resize(&gpu, 2049, 800) && boat_gpu_hdr_active(&gpu));
+    // Bloom: a 0.5 field with one 2x2 spot of 3.5. The spot clamps, its light spreads a few
+    // pixels (about 6/255 three pixels out) and is gone within 16, and the field is unchanged.
+    EXPECT(boat_gpu_resize(&gpu, 320, 200) && boat_gpu_hdr_active(&gpu));
+    BeginTextureMode(gpu.hdr_target);
+    ClearBackground((Color) { 128, 64, 32, 255 });
+    rlSetBlendFactors(RL_ONE, RL_ONE, RL_FUNC_ADD);
+    BeginBlendMode(BLEND_CUSTOM);
+    for (int i = 0; i < 3; ++i)
+        DrawRectangle(160, 100, 2, 2, WHITE);
+    EndBlendMode();
+    EndTextureMode();
+    boat_gpu_present_hdr(&gpu, 0);
+    bloom = LoadImageFromTexture(gpu.target.texture);
+    EXPECT(bloom.data);
+    // The image is bottom-up like the target; rows here are symmetric about the spot.
+    Color spot = image_pixel(bloom, 160, 99), corner = image_pixel(bloom, 4, 4);
+    Color field = { 128, 64, 32, 255 };
+    EXPECT(spot.r == 255 && spot.g == 255 && spot.b == 255);
+    EXPECT(near_color(corner, field, 1));
+    EXPECT(near_color(image_pixel(bloom, 200, 99), field, 1));
+    Color near = image_pixel(bloom, 164, 99), edge = image_pixel(bloom, 176, 99);
+    EXPECT(near.r > field.r + 3 && near.g > field.g + 3 && near.b > field.b + 3);
+    EXPECT(near_color(edge, field, 1));
+    // The HUD overlay: a translucent panel over the scene, drawn directly and composited.
+    scene = LoadRenderTexture(64, 40);
+    overlay = LoadRenderTexture(16, 10);
+    direct = LoadRenderTexture(64, 40);
+    composite = LoadRenderTexture(64, 40);
+    EXPECT(IsRenderTextureValid(scene) && IsRenderTextureValid(overlay));
+    EXPECT(IsRenderTextureValid(direct) && IsRenderTextureValid(composite));
+    Color backdrop = { 40, 120, 200, 255 }, panel = { 230, 180, 40, 150 };
+    Color text = { 250, 250, 250, 255 };
+    BeginTextureMode(scene);
+    ClearBackground(backdrop);
+    EndTextureMode();
+    BeginTextureMode(overlay);
+    boat_screen_begin_overlay();
+    DrawRectangle(2, 2, 8, 6, panel);
+    DrawRectangle(4, 4, 2, 2, panel);
+    DrawRectangle(5, 5, 1, 1, text);
+    boat_screen_end_overlay();
+    EndTextureMode();
+    BeginTextureMode(direct);
+    ClearBackground(backdrop);
+    rlScalef(4, 4, 1);
+    DrawRectangle(2, 2, 8, 6, panel);
+    DrawRectangle(4, 4, 2, 2, panel);
+    DrawRectangle(5, 5, 1, 1, text);
+    EndTextureMode();
+    BoatScreenLayout hud = boat_screen_layout(BOAT_RESOLUTION_HIGH, 16, 10, 64, 40);
+    BeginTextureMode(composite);
+    ClearBackground(BLACK);
+    boat_screen_present_overlay(&hud, scene.texture, overlay.texture);
+    EndTextureMode();
+    Image expected = LoadImageFromTexture(direct.texture);
+    Image actual = LoadImageFromTexture(composite.texture);
+    int hud_distance = image_distance(expected, actual);
+    bool hud_drawn = !near_color(image_pixel(actual, 16, 16), backdrop, 8);
+    UnloadImage(expected);
+    UnloadImage(actual);
+    // The composite flips the scene horizontally like every GPU scene; the backdrop is uniform.
+    EXPECT(hud_drawn && hud_distance >= 0 && hud_distance <= 1);
+#undef RELEASE
+#undef EXPECT
+    printf("presentation=ok hdr_distance=%d hdr_bytes=%zu hud_distance=%d\n", hdr_distance,
+        hdr_bytes, hud_distance);
+    result = 0;
+cleanup:;
+    Image images[] = { low, high, high_ldr, frame, bloom };
+    for (size_t i = 0; i < sizeof(images) / sizeof(images[0]); ++i)
+        if (images[i].data)
+            UnloadImage(images[i]);
+    RenderTexture2D targets[] = { scene, overlay, direct, composite };
+    for (size_t i = 0; i < sizeof(targets) / sizeof(targets[0]); ++i)
+        if (targets[i].id)
+            UnloadRenderTexture(targets[i]);
+    boat_rearview_destroy(&mirror);
+    boat_gpu_destroy(&gpu);
+    boat_gpu_destroy(&other);
+    if (ready) {
+        boat_session_destroy(&session);
+        boat_world_resources_destroy(&owner);
+    }
     CloseWindow();
     return result;
 }
@@ -2625,6 +2841,7 @@ int main(int argc, char **argv)
     bool use_gpu = true, waves = false, check = false, sequence = false, visible = false;
     bool instancing = false, geometry = false;
     bool gpu_check = false, gpu_views = false, gpu_lifecycle = false, culling = false;
+    bool presentation_check = false;
     bool detail = false, wake_stamp = false, water_history = false, scene_depth = false;
     const char *clip_dir = NULL, *place_dir = NULL;
     bool place_squall = false;
@@ -2654,6 +2871,8 @@ int main(int argc, char **argv)
             gpu_lifecycle = true;
         else if (strcmp(argv[i], "--check-culling") == 0)
             culling = true;
+        else if (strcmp(argv[i], "--check-presentation") == 0)
+            presentation_check = true;
         else if (strcmp(argv[i], "--check-instancing") == 0)
             instancing = true;
         else if (strcmp(argv[i], "--geometry") == 0)
@@ -2728,6 +2947,7 @@ int main(int argc, char **argv)
         } else {
             puts("Usage: boat_water_review --check [--waves] | --check-gpu | --check-gpu-views\n"
                  "       boat_water_review --check-gpu-lifecycle | --check-culling\n"
+                 "       boat_water_review --check-presentation\n"
                  "       boat_water_review --check-instancing | --geometry | --compare A B\n"
                  "       boat_water_review --stress-state\n"
                  "       boat_water_review --output DIR [--renderer cpu|gpu] [--waves]\n"
@@ -2805,7 +3025,8 @@ int main(int argc, char **argv)
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
     if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry
-        || wake_stamp || water_history || scene_depth || clip_dir || place_dir) {
+        || presentation_check || wake_stamp || water_history || scene_depth || clip_dir
+        || place_dir) {
         SetTraceLogLevel(LOG_WARNING);
         if (place_dir)
             return clip_frames > 0 && clip_frames <= 3600
@@ -2813,16 +3034,17 @@ int main(int argc, char **argv)
                 : 2;
         if (clip_dir)
             return clip_frames > 0 && clip_frames <= 3600 ? history_clip(clip_dir, clip_frames) : 2;
-        return scene_depth  ? check_scene_depth()
-            : water_history ? check_water_history()
-            : wake_stamp    ? check_wake_stamp()
-            : geometry      ? report_geometry()
-            : instancing    ? check_instancing()
-            : culling       ? check_culling()
-            : detail        ? check_detail()
-            : gpu_lifecycle ? check_gpu_lifecycle()
-            : gpu_views     ? check_gpu_views()
-                            : check_gpu_water();
+        return presentation_check ? check_presentation()
+            : scene_depth         ? check_scene_depth()
+            : water_history       ? check_water_history()
+            : wake_stamp          ? check_wake_stamp()
+            : geometry            ? report_geometry()
+            : instancing          ? check_instancing()
+            : culling             ? check_culling()
+            : detail              ? check_detail()
+            : gpu_lifecycle       ? check_gpu_lifecycle()
+            : gpu_views           ? check_gpu_views()
+                                  : check_gpu_water();
     }
     if (!check && !output && !bench && !review_dir)
         return 2;

@@ -211,7 +211,7 @@ add_library(proteus_render STATIC
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
   src/waterfront_lighting.c src/waterfront_lighting.h src/waterfront_scene.c
-  src/boat_screen.c src/boat_screen.h)
+  src/boat_screen.c src/boat_screen.h src/waterfront_grade.c src/waterfront_grade.h)
 target_link_libraries(proteus_render PUBLIC proteus_boat_core proteus_boat_scenery)
 target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROTEUS_WARM_MENU}>)
 target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
@@ -1250,6 +1250,10 @@ add_executable(validate_boat_screen tools/validate_boat_screen.c)
 target_link_libraries(validate_boat_screen PRIVATE proteus_render)
 target_compile_options(validate_boat_screen PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_screen COMMAND validate_boat_screen)
+add_executable(validate_waterfront_grade tools/validate_waterfront_grade.c)
+target_link_libraries(validate_waterfront_grade PRIVATE proteus_render)
+target_compile_options(validate_waterfront_grade PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME waterfront_grade COMMAND validate_waterfront_grade)
 add_test(NAME starter_xm_is_valid
   COMMAND validate_xm ${CMAKE_CURRENT_SOURCE_DIR}/assets/music/starter.xm
 )
@@ -1290,6 +1294,10 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME detail_transitions COMMAND boat_water_review --check-detail)
   set_tests_properties(detail_transitions PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "detail_check=ok")
+  # Graphics G5a: high resolution, HDR bloom and fallback, preset changes and the HUD overlay.
+  add_test(NAME presentation COMMAND boat_water_review --check-presentation)
+  set_tests_properties(presentation PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "presentation=ok")
   # Graphics G1: scalar and instanced objects draw the same bytes in every pass.
   add_test(NAME instancing_parity COMMAND boat_water_review --check-instancing)
   set_tests_properties(instancing_parity PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu

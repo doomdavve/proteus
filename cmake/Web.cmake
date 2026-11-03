@@ -6,7 +6,8 @@ set(WEB_ASSETS "${CMAKE_CURRENT_BINARY_DIR}/web-assets")
 file(GLOB WEB_SHADERS CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/waterfront_*.vs"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/waterfront_*.fs"
-  "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/gpu_downsample.fs")
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/gpu_downsample.fs"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/gpu_post.fs")
 foreach(shader IN LISTS WEB_SHADERS)
   get_filename_component(name "${shader}" NAME)
   file(READ "${shader}" source)
@@ -22,8 +23,9 @@ foreach(shader IN LISTS WEB_SHADERS)
     string(SUBSTRING "${source}" ${wake_end} -1 suffix)
     set(source "${prefix}const int wakeFieldEnabled = 0;\nvec3 wakeFieldSample(vec2 p) { return vec3(0.0); }\nfloat wakeVertexHeight(vec2 p) { return 0.0; }\n${suffix}")
   endif()
-  # These two fragments use raylib's default vertex shader (mediump varyings).
-  if(name STREQUAL "waterfront_sky.fs" OR name STREQUAL "gpu_downsample.fs")
+  # These fragments use raylib's default vertex shader (mediump varyings).
+  if(name STREQUAL "waterfront_sky.fs" OR name STREQUAL "gpu_downsample.fs"
+      OR name STREQUAL "gpu_post.fs")
     set(precision mediump)
   else()
     set(precision highp)
