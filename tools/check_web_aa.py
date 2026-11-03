@@ -50,10 +50,10 @@ with sync_playwright() as p:
             key('ArrowDown')
             key('ArrowDown')
             key('Enter')
-            for _ in range(2):  # STEERING to SMOOTHING
+            for _ in range(2):  # STEERING to PICTURE
                 key('ArrowDown')
             if not smooth:
-                key('ArrowRight')
+                key('ArrowLeft')  # SMOOTH -> PIXEL (Right would select HIGH RES)
             label = 'on' if smooth else 'off'
             page.screenshot(path=str(args.output / f'settings-{label}.png'))
             key('Escape')

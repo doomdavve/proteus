@@ -56,6 +56,16 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
+// The canvas buffer's multiple of the logical frame: 3, or the high scene's own scale, which
+// shrinks for tall mobile frames so the buffer holds no more pixels than the scene.
+static int web_window_scale(BoatResolution resolution, int width, int height)
+{
+    int scale = boat_resolution_window_scale(resolution);
+    return resolution == BOAT_RESOLUTION_LOW
+        ? scale
+        : boat_screen_layout(resolution, width, height, width * scale, height * scale).scene_scale;
+}
+
 EM_JS(void, browser_plugin_controls, (bool pending, bool menu_open), {
     Module.boatPluginResetPending = !!pending;
     Module.boatPluginMenuOpen = !!menu_open;
@@ -1199,6 +1209,17 @@ static int study(int argc, char **argv)
         SetWindowMinSize(width, height);
     }
     window_ready = true;
+#if defined(__EMSCRIPTEN__)
+    // The canvas keeps the size the title or a previous session left; high resolution draws
+    // into a buffer of its own scale (CSS still fits the page).
+    {
+        int window_scale = web_window_scale(resolution, width, height);
+        if (GetScreenWidth() < width * window_scale) {
+            SetWindowSize(width * window_scale, height * window_scale);
+            boat_web_fit_canvas();
+        }
+    }
+#endif
     if (!boat_ui_load())
         goto cleanup;
 #if defined(__EMSCRIPTEN__)
@@ -1336,7 +1357,7 @@ static int study(int argc, char **argv)
         int next_height = boat_web_viewport_size(1);
         if (gpu_enabled && (next_width != width || next_height != height)) {
             RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
-            int window_scale = boat_resolution_window_scale(resolution);
+            int window_scale = web_window_scale(resolution, next_width, next_height);
             BoatScreenLayout next_layout = boat_screen_layout(resolution, next_width, next_height,
                 next_width * window_scale, next_height * window_scale);
             if (!IsRenderTextureValid(next_frame) || !apply_screen_layout(&gpu, next_layout)) {

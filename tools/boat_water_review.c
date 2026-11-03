@@ -321,6 +321,26 @@ static bool no_water_atlas;
 static bool no_far_water;
 // --daylight: review poses at a fixed presentation phase (default day).
 static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
+// --resolution and --hdr: the presentation preset of review and benchmark GPU views, sized for
+// a 1280x800 window (low: 320x200; high: a 1280x800 scene and 640x480 reflection). HDR follows
+// the resolution unless set.
+static BoatResolution review_resolution = BOAT_RESOLUTION_LOW;
+static int review_hdr = -1;
+
+static bool review_hdr_on(void)
+{
+    return review_hdr < 0 ? review_resolution == BOAT_RESOLUTION_HIGH : review_hdr != 0;
+}
+
+static bool apply_review_preset(BoatGpu *gpu)
+{
+    BoatScreenLayout layout = boat_screen_layout(review_resolution, 320, 200, 1280, 800);
+    return boat_gpu_resize(gpu, layout.scene_width, layout.scene_height)
+        && waterfront_gpu_scene_set_reflection_size(
+            &gpu->scene, layout.reflection_width, layout.reflection_height)
+        && boat_gpu_set_hdr(gpu, review_hdr_on()) == review_hdr_on();
+}
+
 // --clip-aa: place-clip supersampling, 4x4 (default) or off.
 static bool clip_aa = true;
 
@@ -1264,6 +1284,10 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         error = "wake stamp field unavailable";
         goto cleanup;
     }
+    if (!apply_review_preset(&gpu)) {
+        error = "presentation preset unavailable";
+        goto cleanup;
+    }
     if (stress
         && (!stress_init(&stress_fixture, waves)
             || !stress_advance(&stress_fixture, STRESS_PREROLL_TICKS))) {
@@ -1444,11 +1468,15 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     fprintf(json,
         ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\","
         "\"tile_size\":%.9g,\n"
+        "  \"resolution\":\"%s\",\"hdr\":%s,\"hdr_bytes\":%zu,\"reflection_size\":[%d,%d],\n"
         "  \"window_size\":[960,600],\"framebuffer_size\":[%d,%d],"
         "\"virtual_resolution\":[320,200],\"internal_resolution\":[%d,%d],\n"
         "  \"pacing\":\"%s\",\"vsync_hint\":%s,\"monitor_refresh_hz\":",
         aa ? "4x4" : "off", waves ? "waves" : "flat", visible ? "visible" : "hidden",
-        (double)gpu.scenery.tile_size, render_width, render_height, aa ? 1280 : 320, aa ? 800 : 200,
+        (double)gpu.scenery.tile_size, boat_resolution_name(review_resolution),
+        boat_gpu_hdr_active(&gpu) ? "true" : "false", boat_gpu_hdr_bytes(&gpu),
+        gpu.scene.reflection.texture.width, gpu.scene.reflection.texture.height, render_width,
+        render_height, aa ? 1280 : gpu.target.texture.width, aa ? 800 : gpu.target.texture.height,
         pacing_name, vsync ? "true" : "false");
     if (refresh > 0)
         fprintf(json, "%d", refresh);
@@ -1523,9 +1551,10 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         gpu_samples, timer.supported ? count - BENCH_WARMUP - gpu_samples : 0, gpu.wave_rebuilds,
         measured_rebuilds, gpu.wave_capacity, gpu.wave_peak_triangles);
     ok = !ferror(csv) && !ferror(json);
-    printf("benchmark scenario=%s aa=%s preset=%s window=%s frames=%d warmup=%d ticks=%d "
-           "gpu_samples=%d\n",
+    printf("benchmark scenario=%s aa=%s preset=%s resolution=%s hdr=%s window=%s frames=%d "
+           "warmup=%d ticks=%d gpu_samples=%d\n",
         stress ? "stress-basin" : "river-review", aa ? "4x4" : "off", waves ? "waves" : "flat",
+        boat_resolution_name(review_resolution), boat_gpu_hdr_active(&gpu) ? "on" : "off",
         visible ? "visible" : "hidden", count, BENCH_WARMUP, tick, gpu_samples);
     printf("final_state %s\n", state);
 cleanup:
@@ -2751,7 +2780,9 @@ static int review(const char *directory, bool use_gpu)
     if (use_gpu) {
         SetConfigFlags(FLAG_WINDOW_HIDDEN);
         InitWindow(320, 200, "Proteus / graphics review poses");
-        if (!IsWindowReady() || !boat_gpu_init(&gpu, true) || !apply_scene_options(&gpu.scene))
+        bool aa = review_resolution == BOAT_RESOLUTION_LOW && !review_hdr_on();
+        if (!IsWindowReady() || !boat_gpu_init(&gpu, aa) || !apply_scene_options(&gpu.scene)
+            || !apply_review_preset(&gpu))
             goto cleanup;
     } else if (!prepare_tiles(&cpu_view.scenery, 0)) {
         goto cleanup;
@@ -2760,13 +2791,17 @@ static int review(const char *directory, bool use_gpu)
     fprintf(manifest,
         "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
         "  \"daylight\":%.6g,\n"
-        "  \"renderer\":\"%s\",\"resolution\":[320,200],\"gpu_aa\":%s,\"physics_revision\":%d,\n"
+        "  \"renderer\":\"%s\",\"resolution\":[%d,%d],\"gpu_aa\":%s,\"hdr\":%s,"
+        "\"physics_revision\":%d,\n"
         "  \"clock\":\"explicit pose tick * BOAT_STEP; presentation only\",\n"
         "  \"check_command\":\"boat_water_review --check\",\n"
         "  \"capture_command\":\"boat_water_review --review DIR --renderer %s\",\n"
         "  \"poses\":[\n",
-        (double)review_daylight, use_gpu ? "gpu" : "cpu", use_gpu ? "true" : "false",
-        BOAT_PHYSICS_REVISION, use_gpu ? "gpu" : "cpu");
+        (double)review_daylight, use_gpu ? "gpu" : "cpu", use_gpu ? gpu.target.texture.width : 320,
+        use_gpu ? gpu.target.texture.height : 200,
+        use_gpu && gpu.supersampled.id ? "true" : "false",
+        boat_gpu_hdr_active(&gpu) ? "true" : "false", BOAT_PHYSICS_REVISION,
+        use_gpu ? "gpu" : "cpu");
     for (size_t p = 0; p < sizeof(review_poses) / sizeof(*review_poses); ++p) {
         const ReviewPose *pose = &review_poses[p];
         const BoatWorldResources *resources = test_world(pose->location);
@@ -2785,12 +2820,13 @@ static int review(const char *directory, bool use_gpu)
             "\"distance\":%.6g,\"height\":%.6g,\"heading\":%.9g},"
             "\"tick\":%u,\"frames\":%u,\"step_ticks\":%u,\"step_position\":"
             "[%.6g,%.6g],\"step_heading\":%.9g,\"waves\":true,"
-            "\"resolution\":[320,200],\"captures\":[",
+            "\"resolution\":[%d,%d],\"captures\":[",
             p ? ",\n" : "", pose->name, pose->kind, resources->definition->name,
             (double)pose->position.x, (double)pose->position.y, (double)pose->heading,
             (double)pose->distance, (double)pose->height, (double)pose->camera_heading, pose->tick,
             pose->frames, pose->step_ticks, (double)pose->step_position.x,
-            (double)pose->step_position.y, (double)pose->step_heading);
+            (double)pose->step_position.y, (double)pose->step_heading,
+            use_gpu ? gpu.target.texture.width : 320, use_gpu ? gpu.target.texture.height : 200);
         for (unsigned frame = 0; frame < pose->frames; ++frame) {
             if (!review_pose_clear(resources, inspection.position)) {
                 fputs("\n  ],\n  \"error\":\"pose is not clear of land\"\n}\n", manifest);
@@ -2916,6 +2952,18 @@ int main(int argc, char **argv)
                 return 2;
             }
             clip_aa = strcmp(name, "4x4") == 0;
+        } else if (strcmp(argv[i], "--resolution") == 0 && i + 1 < argc) {
+            if (!boat_resolution_parse(argv[++i], &review_resolution)) {
+                fprintf(stderr, "--resolution takes low or high.\n");
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--hdr") == 0 && i + 1 < argc) {
+            const char *value = argv[++i];
+            if (strcmp(value, "on") && strcmp(value, "off")) {
+                fprintf(stderr, "--hdr takes on or off.\n");
+                return 2;
+            }
+            review_hdr = strcmp(value, "on") == 0;
         } else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
             if (!waterfront_daylight_parse(argv[++i], &review_daylight)) {
                 fprintf(stderr, "--daylight takes day, sunset, dusk or 0..1.\n");
@@ -2963,7 +3011,9 @@ int main(int argc, char **argv)
                  "                         [--clip-aa off|4x4] [--daylight ...]\n"
                  "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
                  "                         [--daylight day|sunset|dusk|0..1]\n"
+                 "                         [--resolution low|high] [--hdr on|off]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
+                 "                         [--resolution low|high] [--hdr on|off] (with --aa off)\n"
                  "                         [--scenario river|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"
                  "                         [--tile-size M]\n"
@@ -3010,6 +3060,8 @@ int main(int argc, char **argv)
             : !use_gpu ? "--benchmark supports only --renderer gpu"
             : !*bench || strlen(bench) > 4000 || bench[strlen(bench) - 1] == '/'
             ? "--benchmark needs a file prefix of 1..4000 bytes"
+            : review_hdr_on() && strcmp(aa_name, "off")
+            ? "--resolution high and --hdr need --aa off"
             : pacing && !visible ? "--pacing requires --visible"
             : pacing && strcmp(pacing, "cap") && strcmp(pacing, "deadline")
                 && strcmp(pacing, "vsync")
@@ -3024,6 +3076,11 @@ int main(int argc, char **argv)
         && (check || output || sequence || visible || aa_name || pacing || scenario || gpu_check
             || gpu_views || gpu_lifecycle || culling || instancing))
         return 2;
+    if ((review_resolution != BOAT_RESOLUTION_LOW || review_hdr >= 0)
+        && (!use_gpu || !(review_dir || bench))) {
+        fprintf(stderr, "--resolution and --hdr apply to GPU --review and --benchmark runs.\n");
+        return 2;
+    }
     if (gpu_check || gpu_views || gpu_lifecycle || culling || detail || instancing || geometry
         || presentation_check || wake_stamp || water_history || scene_depth || clip_dir
         || place_dir) {
