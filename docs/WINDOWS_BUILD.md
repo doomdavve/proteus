@@ -88,6 +88,33 @@ same as on macOS: use `--renderer cpu` explicitly for the software reference.
 See the [main controls and replay guide](PLAYING.md) for the full interface.
 Workflow build/CPU checks do not establish a successful human Windows playthrough.
 
+## Select and verify the active GPU
+
+On a PC with integrated and dedicated graphics, check which GPU actually renders the app
+before interpreting performance. Windows can select integrated graphics even when a dedicated
+card is installed. In **Settings → System → Display → Graphics**, add each desktop executable
+from the extracted package, select **Options → High performance**, check that the named GPU is
+the intended card, save, and restart the app. Configure both:
+
+- `wake_velocity.exe` for gameplay and F4 reports.
+- `boat_water_review.exe` for `collect-performance.bat` benchmarks.
+
+Select the executables themselves; a preference on the `.bat` launcher does not configure the
+benchmark executable. Recheck the executable paths after extracting another release elsewhere.
+Verify with a fresh report: benchmark JSON has `gl_renderer`; an F4 report's `manifest.json`
+has `system.gl_renderer`. Do not infer the renderer from the installed card or Task Manager's
+GPU inventory, or compare different active GPUs as a code regression.
+
+See [Microsoft's per-app graphics preference instructions](https://support.microsoft.com/en-us/windows/hardware/display-graphics/optimizations-for-windowed-games-in-windows-11)
+and [NVIDIA's explanation of Windows GPU preference precedence](https://www.nvidia.com/content/Control-Panel-Help/vLatest/en-us/mergedProjects/nv3d/Setting_the_Preferred_Graphics_Processor.htm).
+These references describe GPU selection; Wake Velocity uses OpenGL.
+The packaged `README.txt` carries the same selection/check instructions.
+
+2026-11-03: the first returned Windows benchmark collections identify `AMD Radeon(TM) Graphics`
+on a machine the user reports has an RTX 4070 Super. They establish AMD-renderer measurements,
+not RTX performance. A subsequent full rerun verifies NVIDIA selection; see
+[AMD/GeForce results and the deferred river hitch](BOATING_PERFORMANCE.md#windows-full-matrices-and-deferred-river-hitch--2026-11-03).
+
 ## Connect an existing checkout to GitHub
 
 Create an empty GitHub repository without a generated README, license, or gitignore.

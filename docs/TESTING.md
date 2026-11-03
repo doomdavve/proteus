@@ -66,10 +66,22 @@ after restart. All clocks are virtual. The [boating plan](BOATING_PLAN.md#play-t
 owns implementation status and manual review limits.
 
 The Linux, macOS and Windows Actions builds run on pull requests and pushes to `main`, skipping
-events that change only Markdown files. Any non-Markdown change runs the normal builds and tests,
-including on mixed documentation and code pull requests. Manual workflow runs and the macOS and
+events that change only Markdown files or `README.txt` files (including packaged READMEs).
+Other changes run the normal builds and tests, including mixed documentation/code pull requests.
+The filter deliberately names `README.txt` rather than all `.txt` files so `CMakeLists.txt`
+and other build inputs still trigger CI. Manual workflow runs and the macOS and
 Windows release builds remain available regardless of these filters. GitHub does not create a
-successful check for a skipped workflow; do not require these checks for Markdown-only pull requests.
+successful check for a skipped workflow; do not require these checks for documentation-only pull
+requests covered by these filters.
+
+2026-11-03 workflow filter follow-up: PR #135 included `tools/windows/README.txt` and therefore
+started all three native builds under the former Markdown-only filter. The push/PR filters now
+exclude plain-text READMEs too. Completed: aligned Linux/macOS/Windows filters; release, manual
+and reusable triggers remain unchanged. Next: verify skipped native CI on a subsequent docs-only
+PR. Local trigger checks cover the #135 file list, root/nested Markdown and READMEs, mixed code,
+`CMakeLists.txt`, script and workflow changes. On macOS, Debug configure/build and
+`ctest --preset full` passed all 351 enabled tests (13 disabled, `PROTEUS_GPU_TESTS=OFF`),
+with socket access for network tests. GitHub skip behavior awaits a new docs-only event.
 
 Multiplayer M2's local authority and M3's protocol and transport have display-free checks
 (see [below](#core-boundary-gate) and [network checks](#network-checks)). The M3 suite covers

@@ -1,10 +1,13 @@
 # Graphics overhaul plan
 
 Status, 2026-11-03: **P1 is merged and Batch A accepted on Mac; P2 is machine-verified**: G3a,
-G3b and G4 are on `feat/graphics-water`, and Batch B was accepted on Mac (outer and basin) 2026-11-03. The first Windows hardware report remains open. Each
-package has one human playtest and, by default, one implementation PR. The detailed G0–G5c briefs
-are internal checkpoints with focused commits and resumable agent handoffs. G6 remains a
-conditional study. **Next: merge P2 (the user's call), then P3/G5a once sunset readiness allows.** See the
+G3b and G4 are on `feat/graphics-water`, and Batch B was accepted on Mac (outer and basin)
+2026-11-03. The first Windows hardware AMD and verified RTX 4070 SUPER full matrices are saved;
+a recurring GeForce river hitch is open, with investigation deferred by the user on 2026-11-03.
+Each package has one human playtest and, by default, one implementation PR. The detailed G0–G5c
+briefs are internal checkpoints with focused commits and resumable agent handoffs. G6 remains a
+conditional study. **Next: merge P2 (the user's call), then P3/G5a once sunset readiness
+allows.** See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -12,7 +15,8 @@ Low resolution remains default. The [look test](#water-look-test--2026-10-31) re
 and favoured plain high resolution as an option; no overhaul result is accepted. Native Windows
 capture and Mac analysis belong to [P1](#p1--performance-foundations), at its
 [G0w checkpoint](#g0w--native-performance-capture-and-windows-to-mac-reports), before optimization.
-M1 Max budgets remain the reference; Windows performance awaits actual returned reports.
+M1 Max budgets remain the reference; [returned AMD/GeForce results and the deferred hitch](BOATING_PERFORMANCE.md#windows-full-matrices-and-deferred-river-hitch--2026-11-03)
+record this Windows build separately from later checkpoint qualification.
 
 ## Intended result
 
@@ -308,7 +312,7 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 
 | Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
-| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows report pending |
+| [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows AMD/GeForce matrices saved; river hitch deferred |
 | [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | All checkpoints machine-verified on M1 Max; Batch B accepted on Mac (outer, basin) 2026-11-03; Windows report pending |
 | [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
 
@@ -445,7 +449,7 @@ Mac; G3a is machine-verified, with human review in Batch B.
 | Checkpoint | Work package | Dependency | Status |
 | --- | --- | --- | --- |
 | [G0](#g0--measurement-and-review-harness) | P1 | current main | Machine-verified on M1 Max; browser smoke and Windows hardware open |
-| [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; Windows hardware baseline pending |
+| [G0w](#g0w--native-performance-capture-and-windows-to-mac-reports) | P1 | G0 | Tools machine-verified; AMD/GeForce matrices saved; river hitch deferred |
 | [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and submission/CPU ceilings machine-verified; Batch A accepted on Mac |
 | [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Machine-verified on M1 Max; captures within G0 bounds, vertex bytes −58.7% river, −52.3% outer; Batch A accepted on Mac |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Machine-verified on M1 Max; river p95 triangles 880 k → 492 k; shadow reuse measured and rejected; Batch A accepted on Mac |
@@ -523,7 +527,8 @@ The current Debug table is history, not a substitute. No look/default change.
   CPU 11.13 ms. Instruments summary and selected review captures are under
   `docs/evidence/graphics/`.
 - Unresolved issues / human review: WebGL2 smoke was not run because `emcc` is absent; no human
-  look review is implied. Windows hardware evidence is owned by G0w and remains pending.
+  look review is implied. Windows hardware evidence is owned by G0w; returned AMD reports
+  are linked there alongside the GeForce matrix and deferred river hitch.
 - Next checkpoint/task and files to read: G0w task 1, then G1; read
   `tools/boat_water_review.c`, [Boating performance](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01)
   and `src/renderer_gpu.c`.
@@ -648,7 +653,8 @@ list that evidence as pending; later checkpoints may proceed against measured M1
 claim Windows qualification. Final integrated acceptance retains the Windows return-report gate.
 
 **Checkpoint result:**
-- State: tools machine-verified on macOS; a real Windows hardware report is pending.
+- State: tools machine-verified on macOS; AMD/verified GeForce full matrices returned
+  2026-11-03 and saved below. Recurring GeForce river hitch open; investigation deferred.
 - Commit(s): `854d90b` (bounded capture, async GPU identity, F4/`--performance-report`, portable
   bundle), `60c1713` (Windows collection launcher, Mac analyzer, fixture tests, CI packaging).
 - Interfaces/owners: `src/boat_capture.[ch]` samples and summarizes only, with no I/O or GL;
@@ -662,12 +668,37 @@ claim Windows qualification. Final integrated acceptance retains the Windows ret
   (`wake_velocity --renderer cpu --frames 40 --performance-report ...`) produced a readable ZIP
   with manifest, summary, CSV, HTML and build metadata. Windows CI now packages the review
   executable/launcher and runs the relocated CPU-only fixture and analyzer as packaging evidence.
-- Unresolved issues / human review: no Windows machine was available, so no live or repeated
-  controlled Windows report exists; sampler overhead was not measured on Windows. The Windows
-  ZIP is packaging evidence only, never a GPU baseline. User usability of F4/collect launcher
-  is unverified.
-- Next checkpoint/task and files to read: G1 task 1; read `src/renderer_gpu.[ch]` and the G0
-  budget table. Keep the Windows baseline request in the Batch A handoff.
+- Unresolved issues / human review: live F4 export, sampler overhead and visible/paced gameplay
+  remain unqualified on Windows. The recurring GeForce river hitch is deferred, not resolved.
+  CI ZIP checks remain packaging evidence only.
+- Next checkpoint/task: retain the hitch for later reproduction/profiling; no investigation now
+  by explicit user direction. Continue the graphics plan separately from this deferred issue.
+
+**Earlier Windows documentation follow-up, 2026-11-03 (pending checks superseded below):**
+completed packaged README and Windows guide
+instructions to select each executable's GPU, restart and verify `gl_renderer` in a fresh report.
+The first two collections measure AMD graphics despite the reported installed RTX 4070 Super;
+see [measurements and archive verification](BOATING_PERFORMANCE.md#windows-active-gpu-check--2026-11-03).
+At that handoff, full matrices and NVIDIA selection were pending; both are now recorded below.
+No Windows manual play or new human acceptance is claimed. Documentation source/command checks were performed on the Mac;
+macOS Debug configure/build and `ctest --preset full` with `PROTEUS_GPU_TESTS=OFF` passed
+all 351 enabled tests (13 disabled) after rerunning outside the socket-restricted sandbox.
+The later rerun below verifies NVIDIA renderer selection on the user's machine.
+
+**Windows result retention and deferred issue, 2026-11-03:** completed analysis of both full
+matrices and saved all 60 run summaries, archive SHA-256 identities and exact deadline samples
+under [Windows evidence](evidence/graphics/windows-2026-11-03/README.md). The user-set preference
+is verified by the GeForce renderer identity. The [performance result](BOATING_PERFORMANCE.md#windows-full-matrices-and-deferred-river-hitch--2026-11-03)
+owns measurements and limits. The 12 GeForce river repetitions each have one 46.7–67.6 ms
+CPU submission hitch; stress has none. Cause unknown, investigation explicitly deferred by the
+user; no fix, profiling or new playback performed. Next when resumed: reproduce and profile
+that interval using the saved run/frame identifiers. Raw ZIP/full CSV retention remains local
+to the supplied Downloads archives; complete JSON summaries and selected CSV fields are in Git.
+Live F4/overhead and visible-play qualification remain open. Verification: ZIP CRCs, duplicate
+bytes, row/deadline counts, settings/state comparisons and saved-summary round trips checked
+on the Mac. Debug configure/build and `ctest --preset full` passed all 351 enabled tests
+(13 disabled, `PROTEUS_GPU_TESTS=OFF`, socket access enabled for network tests), 2026-11-03.
+No new human acceptance is claimed.
 
 ### G1 — Persistent instances and pass culling
 

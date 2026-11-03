@@ -604,6 +604,86 @@ frequent. These are same-machine engineering measurements with no networking, en
 snapshots. Artifacts: `build/bench/m2/{out-head,out-new,server-release.txt}`. The hour soaks
 were not rerun; the C3 soak hashes no longer apply because the soak drives crossing mode.
 
+## Windows active GPU check — 2026-11-03
+
+Before collecting, follow [Windows GPU selection](WINDOWS_BUILD.md#select-and-verify-the-active-gpu)
+for both `wake_velocity.exe` and `boat_water_review.exe`. Read `gl_renderer` from the benchmark
+JSON (or `system.gl_renderer` in the live report manifest). Record the actual renderer with
+the build/settings; a different installed GPU does not establish which device ran the test.
+Run `.\collect-performance.bat full` for flat/waves × AA off/4x4 × river/stress,
+three repetitions each (24 runs). The default is waves/AA off only (six runs).
+
+Returned archives: `collect-30675-25827.zip` and `collect-28144-18884.zip.zip`. The latter contains
+two collection ZIPs; its `collect-30675-25827.zip` is byte-identical to the standalone archive.
+There are two unique collections, each with three river and three stress runs. All identify
+`7e3e4b9//MSVC-19.44.35229.0`, Windows/AMD64, `AMD Radeon(TM) Graphics`, OpenGL 3.3,
+320×200 internal resolution, waves, AA off, hidden/unpaced. The user reports an RTX 4070 Super
+in the PC; these results do not measure that card. Raw archives remain with the supplied local
+Downloads files and are not committed.
+
+| Scenario | Frame p95 (ms) | GPU p95 (ms) | CPU submission p95 (ms) |
+| --- | --- | --- | --- |
+| River | 2.659 / 2.733 | 2.389 / 2.403 | 0.905 / 0.926 |
+| Four-boat stress | 5.925 / 5.919 | 5.642 / 5.642 | 1.196 / 1.188 |
+
+Each cell gives the median of three per-run p95 values, first collection / second collection.
+All 12 runs completed; all six runs per scenario have identical final state strings, with no
+skipped GPU samples. One measured frame exceeded 16.67 ms: second collection, river repeat 3,
+frame 2825, frame time 30.774 ms, presentation 29.924 ms and GPU 1.243 ms. This locates the
+stall in presentation timing but does not establish its system/driver cause. CPU/GPU timing
+intervals overlap and must not be added.
+
+Verification: ZIP contents, duplicate bytes, JSON summaries and CSV samples inspected on the Mac
+2026-11-03. This is returned hardware benchmark evidence, not manual gameplay, motion/audio
+acceptance, or a pre-optimization G0 baseline. The subsequent full matrices and verified NVIDIA
+selection are recorded below; live F4 export and capture overhead remain open.
+
+## Windows full matrices and deferred river hitch — 2026-11-03
+
+[Saved evidence](evidence/graphics/windows-2026-11-03/README.md) retains all 60 run JSON summaries
+from the four unique returned collections, source ZIP checksums, the full comparison table and
+[source CSV deadline samples](evidence/graphics/windows-2026-11-03/deadline-misses.md).
+Raw ZIPs/full CSV traces remain in the supplied Downloads archives; they are not committed.
+
+`collect-167-25388.zip` is the AMD full matrix; `collect-4498-243.zip` is the repeat after setting
+Windows' graphics preference. All 24 rerun reports identify
+`NVIDIA GeForce RTX 4070 SUPER/PCIe/SSE2`, OpenGL `3.3.0 NVIDIA 610.88`.
+Both matrices use `7e3e4b9//MSVC-19.44.35229.0`, hidden/unpaced, with 120 warmup frames and
+three repetitions of river/stress × flat/waves × AA off/4x4. Corresponding final states and
+settings match; each matrix has 81,810 measured frames, with no skipped GPU samples.
+
+Waves enabled; cells are medians of the three per-run p95 values:
+
+| Scenario / internal resolution | AMD frame ms | GeForce frame ms | GeForce GPU ms |
+| --- | --- | --- | --- |
+| River / 320×200 | 3.038 | 1.451 | 0.192 |
+| River / 1280×800 | 10.540 | 1.452 | 0.317 |
+| Stress / 320×200 | 6.531 | 2.658 | 0.853 |
+| Stress / 1280×800 | 11.736 | 2.624 | 1.000 |
+
+The weak response of GeForce frame time to increased resolution suggests CPU simulation and
+submission/driver work dominate steady performance here. The reports do not isolate transfer
+costs. Timing intervals overlap and their percentiles must not be added.
+
+**Known issue: recurring GeForce river hitch — open, investigation deferred by user direction
+2026-11-03.** Each of the 12 river runs has exactly one measured frame above 16.67 ms:
+46.687–67.567 ms, predominantly CPU render submission (46.522–67.428 ms), with only
+0.100–0.241 ms GPU time at those samples. They occur at frames 3725–4299, destination 4,
+at varying positions. None of the 12 GeForce stress runs has a frame deadline miss; neither
+does the AMD full matrix. The separate initial AMD presentation hitch remains recorded above.
+
+The cause is unknown. No diagnosis, fix, additional profiling or visible gameplay check was
+performed. When investigation resumes, reproduce on the saved build/GPU/settings and profile
+the CPU render-submission interval using the source run/frame identifiers in the evidence.
+This is a deferred task, not a request for another collection now. Do not call the GeForce
+baseline hitch-free based on p95/p99. Visible/paced play, F4 export/overhead and newer rendering
+revisions remain unqualified; the Windows matrices do not replace the M1 budget gates or
+constitute user acceptance of motion/audio.
+
+Verification on the Mac, 2026-11-03: ZIP CRCs and duplicate bytes; all 60 JSON summaries and
+CSV total/measured row counts/frame deadline counts; matching full-matrix settings and final
+states. Evidence retention is documented in the linked README.
+
 ## Graphics G0 measurement harness — 2026-11-01
 
 The [graphics overhaul plan](GRAPHICS_OVERHAUL_PLAN.md#g0--measurement-and-review-harness) owns
@@ -736,6 +816,7 @@ Read gate columns against each report's `p95`; `p50` is typically far lower for 
 - The WebGL2 build was **not** smoked for this checkpoint: `emcc` is not installed in the
   measuring environment. Browser shader/fallback evidence remains open for the later render
   checkpoints, not claimed here.
-- No Windows hardware report has returned. Native Windows collection, live export and Mac
-  analysis are implemented and covered by synthetic/local checks; the actual user hardware
-  baseline remains pending under G0w.
+- The first Windows hardware reports have returned; see the
+  [AMD renderer results and GPU-selection limit](#windows-active-gpu-check--2026-11-03).
+  AMD/NVIDIA full matrices are saved; the recurring NVIDIA river hitch is deferred, and
+  visible-play/live-export qualification remains open under G0w.
