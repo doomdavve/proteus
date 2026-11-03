@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths-ignore:
       - '**/*.md'
+      - '**/README.txt'
   pull_request:
     paths-ignore:
       - '**/*.md'
+      - '**/README.txt'
   workflow_dispatch:
   workflow_call:
 
