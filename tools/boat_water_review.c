@@ -224,6 +224,65 @@ static bool same_image(Image a, Image b)
 
 // A1.4: each GPU view binds its scene to the map it draws. Two views draw the river and the
 // synthetic harbor interleaved; destroying or recreating one leaves the other's frame unchanged.
+static bool harbor_appearance_owners(WaterfrontGpuScene *a, WaterfrontGpuScene *b)
+{
+    static BoatSceneDefinition definition = { .version = BOAT_SCENE_VERSION,
+        .berths_present = true,
+        .berth_count = 2,
+        .berths = { { .recipe = BOAT_SCENE_BERTH_RUNABOUT,
+                        .appearance = { .length = 5.2f, .name = "SEA-1" } },
+            { .recipe = BOAT_SCENE_BERTH_RUNABOUT,
+                .appearance = { .length = 6.6f, .name = "SEA-2" } } } };
+    WaterfrontHarborFrame frame;
+    waterfront_harbor_evaluate_scene(&definition, (BoatWater) { 0 }, 0, NULL, &frame);
+    if (!waterfront_gpu_scene_bind_harbor(a, &frame)
+        || !waterfront_gpu_scene_bind_harbor(b, &frame))
+        return false;
+    unsigned av = a->harbor_custom[0].vaoId, bv = b->harbor_custom[0].vaoId;
+    unsigned uploads = a->harbor_uploads;
+    if (!av || !bv || av == bv || a->harbor_models.boats[0] == b->harbor_models.boats[0]
+        || !waterfront_gpu_scene_bind_harbor(a, &frame) || a->harbor_uploads != uploads)
+        return false;
+    frame.specs[0].hull.r++;
+    frame.specs[1].hull.r++;
+    a->harbor_upload_limit = 1; // The second upload fails after the first has succeeded.
+    bool rejected = !waterfront_gpu_scene_bind_harbor(a, &frame);
+    a->harbor_upload_limit = 0;
+    if (!rejected || a->harbor_custom[0].vaoId != av || a->harbor_uploads != uploads
+        || b->harbor_custom[0].vaoId != bv)
+        return false;
+    for (unsigned cycle = 0; cycle < 32; ++cycle) {
+        frame.berth_count = 2;
+        frame.specs[0].hull.r = (unsigned char)cycle;
+        if (!waterfront_gpu_scene_bind_harbor(a, &frame) || b->harbor_custom[0].vaoId != bv)
+            return false;
+        frame.berth_count = cycle % 2;
+        if (!waterfront_gpu_scene_bind_harbor(a, &frame) || a->harbor_custom[1].vaoId
+            || (frame.berth_count == 0 && a->harbor_custom[0].vaoId))
+            return false;
+    }
+    frame.berth_count = BOAT_SCENE_BERTHS;
+    for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i) {
+        frame.recipes[i] = BOAT_SCENE_BERTH_RUNABOUT;
+        frame.specs[i] = frame.specs[0];
+        frame.specs[i].hull.r = (unsigned char)i;
+    }
+    if (!waterfront_gpu_scene_bind_harbor(a, &frame))
+        return false;
+    size_t vertices = 0;
+    for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i) {
+        if (!a->harbor_custom[i].vaoId)
+            return false;
+        vertices += (size_t)a->harbor_custom[i].vertexCount;
+    }
+    uploads = a->harbor_uploads;
+    if (!waterfront_gpu_scene_bind_harbor(a, &frame) || a->harbor_uploads != uploads)
+        return false;
+    printf("gpu_harbor_appearance=ok cycles=32 max_vertices=%zu retained_cpu=%zu uploads=%u\n",
+        vertices, waterfront_harbor_models_bytes(&a->harbor_models), uploads);
+    return true;
+}
+
 static int check_gpu_views(void)
 {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
@@ -252,6 +311,7 @@ static int check_gpu_views(void)
         }                                                                                          \
     } while (0)
     EXPECT(gpu_frame(&a, &river, &first));
+    EXPECT(harbor_appearance_owners(&a.scene, &b.scene));
     EXPECT(a.scene.map == &waterfront_city_river_map && a.scene.river && a.scene.crane.vaoId);
     EXPECT(gpu_frame(&b, &other, &harbor_frame));
     EXPECT(b.scene.map == &test_harbor_map && !b.scene.river && !b.scene.crane.vaoId);

@@ -155,6 +155,7 @@ int main(int argc, char **argv)
     Renderer3D cpu = { 0 };
     BoatWaterMeshCache water_mesh = { 0 };
     WaterfrontScenery scenery = { 0 };
+    WaterfrontHarborModels harbor_models = { 0 };
     WaterfrontGpuScene scene = { 0 };
     RenderTexture2D target = { 0 }, resolved = { 0 };
     Shader downsample = { 0 };
@@ -257,7 +258,10 @@ int main(int argc, char **argv)
                     &cpu, surface, (Transform3D) { .scale = { 1, 1, 1 } });
             }
             waterfront_draw_traffic(&cpu, &frame.traffic);
-            waterfront_draw_harbor(&cpu, &frame.harbor);
+            if (!waterfront_draw_harbor(&cpu, &harbor_models, &frame.harbor)) {
+                result = 1;
+                break;
+            }
         }
         if (window) {
             double elapsed = (GetTime() - start) * 1000;
@@ -315,6 +319,7 @@ cleanup:
     free(pixels);
     boat_water_mesh_cache_destroy(&water_mesh);
     waterfront_scenery_destroy(&scenery);
+    waterfront_harbor_models_destroy(&harbor_models);
     if (window)
         CloseWindow();
     return result;

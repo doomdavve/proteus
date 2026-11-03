@@ -186,8 +186,13 @@ void waterfront_draw_traffic(Renderer3D *r, const WaterfrontTrafficFrame *frame)
         renderer3d_draw_mesh(r, waterfront_upstream_span_mesh(), frame->lift_pose);
 }
 
-void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
+bool waterfront_draw_harbor(
+    Renderer3D *r, WaterfrontHarborModels *models, const WaterfrontHarborFrame *frame)
 {
+    WaterfrontHarborModels candidate;
+    if (!waterfront_harbor_models_prepare(&candidate, models, frame))
+        return false;
+    waterfront_harbor_models_commit(models, &candidate);
     if (frame->modules_authored) {
         for (int i = 0; i < frame->module_count; ++i) {
             const WaterfrontModuleFrame *m = &frame->modules[i];
@@ -203,9 +208,11 @@ void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
     }
     renderer3d_draw_mesh(r, waterfront_harbor_ferry_mesh(), frame->ferry);
     for (int i = 0; i < frame->berth_count; ++i)
-        renderer3d_draw_mesh(r, waterfront_harbor_recipe_mesh(frame->recipes[i]), frame->boats[i]);
+        renderer3d_draw_mesh(
+            r, waterfront_harbor_models_mesh(models, (unsigned)i), frame->boats[i]);
     for (int i = 0; i < frame->line_count; ++i)
         renderer3d_draw_box(r, frame->lines[i], (Color) { 169, 153, 113, 255 });
+    return true;
 }
 
 bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Color *pixels,

@@ -2,7 +2,7 @@
 
 Status, 2026-11-03: **M1 implemented and merged in
 [PR #133](https://github.com/doomdavve/proteus/pull/133); M2 appearance is prepared for
-implementation; M2's native definition/geometry work is in progress.** This plan records the
+implementation; M2 integration is in progress.** This plan records the
 user's decisions after reviewing the gaps in [PR #131](https://github.com/doomdavve/proteus/pull/131).
 It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
@@ -249,8 +249,8 @@ budgets above remain subject to the implementation's validation and geometry pro
 In progress on `feat/marina-m2-appearance`, based on merged preparation `807bfb3`.
 Completed: row 1's native appearance definition, shared resolver, canonical defaults, explicit
 digest fields and hull-surface lettering, plus row 2's Lua/schema/discovery, PST9 worker/catalog,
-scene/room v3 and multiplayer v11 data paths. Next: row 3, runtime consumers and view-owned meshes.
-Rows 3–4 remain pending; rendered package appearance is not yet claimed.
+scene/room v3 and multiplayer v11 data paths, and row 3's runtime consumers/view-owned meshes.
+Next: row 4, mirrored example and integrated qualification. M2 remains in progress.
 
 The complete bundled 3×5 alphabet/digit/punctuation set, repeated through the 16-character
 limit on every registered berth recipe at both dimension/mast boundaries, produces at most
@@ -274,6 +274,23 @@ worker limit. The browser decodes scene bodies in the shared C/Wasm codec; JavaS
 the transport magic/framing rather than implementing another scene decoder. Protocol golden
 fixtures pin the new v11 header and unchanged payload. The updated quick lane passes 249
 enabled tests with local sockets. Interactive browser/resource lifetime checks remain pending.
+
+Row 3: the shared resolved spec now supplies berth/site/traffic/spawn checks, water pose,
+ropes, contacts, camera bounds and CPU/GPU draw resources. Customized meshes belong to each
+view; unchanged frames borrow their current mesh, while default boats borrow immutable recipe
+meshes. Replacement first builds the complete CPU set, then uploads the complete GPU set and
+commits together. A failed build/upload retains the old resource set and reports draw failure;
+it does not roll back a previously accepted gameplay revision. Undo can still restore that
+revision. GPU bounds cached by VAO are invalidated after replacement because IDs can be reused.
+Shrinking/removing berths releases obsolete models/uploads, and view destruction releases all.
+
+Row 3 verification on macOS: Debug build, all 250 enabled quick tests and `gpu_view_binding`
+pass with socket/desktop access. The new `harbor_view` drives 96 change/remove/restore cycles,
+independent owners, failure after partial candidate construction, no-rebuild repeats and custom
+contact/camera bounds. The GPU binding check drives 32 cycles, 32 customized slots, independent
+views, no-reupload repeats and a forced second-upload failure after the first succeeds; the
+old views remain intact. Package captures, production worker/console appearance edits,
+integrated full-suite/browser checks and human acceptance remain row 4 work.
 
 ## M3: authored routes and docking motion
 

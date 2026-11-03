@@ -251,7 +251,9 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
         gpu->scene.near_water = *mesh;
     }
     BeginTextureMode(target);
-    waterfront_gpu_scene_draw(&gpu->scene, &frame, target.texture.width, target.texture.height);
+    if (!waterfront_gpu_scene_draw(
+            &gpu->scene, &frame, target.texture.width, target.texture.height))
+        gpu->failed = true;
     float overcast = boat_view_overcast(view, world);
     if (overcast > 0) {
         Color tint = BOAT_VIEW_STORM_LIGHT;

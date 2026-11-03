@@ -132,6 +132,7 @@ int main(void)
     CHECK(same_pose(first.quay, repeat.quay));
     for (int i = 0; i < first.berth_count; ++i) {
         CHECK(first.recipes[i] == repeat.recipes[i]);
+        CHECK(boat_model_spec_equal(&first.specs[i], &repeat.specs[i]));
         CHECK(same_pose(first.boats[i], repeat.boats[i]));
     }
     for (int i = 0; i < first.module_count; ++i) {
