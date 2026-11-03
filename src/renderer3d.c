@@ -40,6 +40,10 @@ bool renderer3d_begin(
     r->right = Vector3Normalize(right);
     r->up = Vector3CrossProduct(r->forward, r->right);
     r->light_direction = Vector3Normalize(light_direction);
+    r->ambient = 0.30f;
+    r->diffuse = 0.70f;
+    r->tint = (Vector3) { 1, 1, 1 };
+    r->emissive_tint = (Vector3) { 1, 1, 1 };
     r->focal_length = (float)height * 0.5f / tanf(camera.vertical_fov * 0.5f);
     for (size_t i = 0; i < count; ++i)
         r->depth[i] = 0.0f;
@@ -216,12 +220,16 @@ static void draw_mesh_list(Renderer3D *r, const Mesh3D *mesh, const unsigned int
         if (Vector3DotProduct(normal, Vector3Subtract(r->camera.position, world[0])) <= 0)
             continue;
         ++r->stats.front_triangles;
-        float brightness = emissive
-            ? 1
-            : 0.30f + 0.70f * fmaxf(0, Vector3DotProduct(normal, r->light_direction));
-        Color color = { (unsigned char)(triangle->color.r * brightness),
-            (unsigned char)(triangle->color.g * brightness),
-            (unsigned char)(triangle->color.b * brightness), 255 };
+        Vector3 light = r->emissive_tint;
+        if (!emissive) {
+            float brightness
+                = r->ambient + r->diffuse * fmaxf(0, Vector3DotProduct(normal, r->light_direction));
+            light = (Vector3) { fminf(1, brightness * r->tint.x), fminf(1, brightness * r->tint.y),
+                fminf(1, brightness * r->tint.z) };
+        }
+        Color color = { (unsigned char)(triangle->color.r * light.x),
+            (unsigned char)(triangle->color.g * light.y),
+            (unsigned char)(triangle->color.b * light.z), 255 };
         Vector3 buffers[2][12];
         for (int j = 0; j < 3; ++j)
             buffers[0][j] = world_to_view(r, world[j]);

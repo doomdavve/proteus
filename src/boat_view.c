@@ -726,14 +726,19 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     for (int i = 0; i < width * height; ++i)
         pixels[i] = (Color) { 21, 36, 48, 255 };
     View3D camera = boat_camera(boat, presentation, world->definition, camera_settings);
+    WaterfrontLighting lighting = waterfront_lighting(cpu->daylight);
     if (world->definition->mapped) {
         if (!waterfront_scenery_bind(&cpu->scenery, world->definition->map)
             || !waterfront_draw_boating(renderer, &cpu->scenery, pixels, width, height, camera,
-                boat_world_displaced(world), boat_view_squall(world, time)))
+                boat_world_displaced(world), boat_view_squall(world, time), &lighting))
             return false;
     } else {
+        // The basin has no sky here and keeps its own light direction; it shares the shading.
         if (!renderer3d_begin(renderer, pixels, width, height, camera, (Vector3) { -1, 3, 2 }))
             return false;
+        renderer->ambient = lighting.cpu_ambient;
+        renderer->diffuse = lighting.cpu_direct;
+        renderer->tint = lighting.cpu_tint;
 
         if (!boat_world_displaced(world)) {
             box(renderer, (Vector3) { 0, -0.6f, 0 }, (Vector3) { 2 * half.x, 1, 2 * half.y },
@@ -752,13 +757,17 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
                   time, water_visible, renderer);
         if (!surface)
             return false;
+        renderer->emissive_tint = lighting.water;
         renderer3d_draw_emissive_mesh(renderer, surface, (Transform3D) { .scale = { 1, 1, 1 } });
+        renderer->emissive_tint = (Vector3) { 1, 1, 1 };
     }
     if (world->definition->mapped) {
         WaterfrontTrafficFrame traffic;
         waterfront_traffic_evaluate_routes(
             view->scene && view->scene->traffic_present ? &view->scene->traffic : NULL,
             world->water, time, &traffic);
+        // Wakes and gulls are self-coloured; navigation lights keep their own colour.
+        renderer->emissive_tint = lighting.unlit;
         waterfront_draw_traffic(renderer, &traffic);
         WaterfrontHarborFrame harbor;
         waterfront_harbor_evaluate_scene(view->scene, world->water, time,
@@ -772,6 +781,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
             for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
                 renderer3d_draw_emissive_mesh(
                     renderer, waterfront_gull_mesh(part), birds.gulls[i][part]);
+        renderer->emissive_tint = (Vector3) { 1, 1, 1 };
     }
     for (int i = 0; i < BOAT_WATER_PARTICLES; ++i) {
         const BoatWaterParticle *p = &presentation->water[i];

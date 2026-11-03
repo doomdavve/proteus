@@ -151,6 +151,7 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     }
     static WaterfrontSceneFrame frame; // Large; drawing is single-threaded.
     boat_scene_frame(view, presentation, world, camera, &frame);
+    frame.lighting = waterfront_lighting(gpu->daylight);
     boat_scene_rivals(rivals, world, view->time, &frame);
     if (ghost && opacity > 0) {
         WaterfrontPlayerState pose = { 0 };

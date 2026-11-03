@@ -28,8 +28,6 @@ static Vector3 sky_mix(Vector3 a, Vector3 b, float t)
     return Vector3Lerp(a, b, t * t * (3 - 2 * t));
 }
 
-Vector3 waterfront_sun_direction(void) { return Vector3Normalize((Vector3) { .10f, .48f, -.87f }); }
-
 // A fixed cloud deck sampled in world X/Z, so square tiles recede toward the horizon.
 static float cloud_hash(int x, int z)
 {
@@ -52,28 +50,39 @@ static bool cloud_tile(float x, float z)
     return Lerp(a, b, tz) * .85f + cloud_hash(tile_x + 137, tile_z - 59) * .15f > .59f;
 }
 
-Image waterfront_sky_image(void)
+// Painted once per distinct sky: a change of light repaints the shared panorama.
+Image waterfront_sky_image(const WaterfrontLighting *lighting)
 {
     enum { WIDTH = 1024, HEIGHT = 512 };
     static Color pixels[WIDTH * HEIGHT];
     static bool ready;
-    if (!ready) {
-        Vector3 sun = waterfront_sun_direction();
+    static WaterfrontLighting painted;
+    if (!ready || !waterfront_lighting_same_sky(&painted, lighting)) {
+        const WaterfrontLighting *l = lighting;
+        Vector3 sun = l->sun_direction;
+        float sun_azimuth = atan2f(sun.x, sun.z);
         for (int y = 0; y < HEIGHT; ++y) {
             float elevation = 1 - 2 * ((float)y + .5f) / HEIGHT;
             for (int x = 0; x < WIDTH; ++x) {
                 float azimuth = (((float)x + .5f) / WIDTH - .5f) * 2 * PI;
-                Vector3 color = sky_mix(
-                    (Vector3) { 186, 229, 244 }, (Vector3) { 66, 158, 226 }, elevation / .85f);
-                float sun_x
-                    = remainderf(azimuth - atan2f(sun.x, sun.z), 2 * PI) * sqrtf(1 - sun.y * sun.y);
+                Vector3 color = sky_mix(l->sky_horizon, l->sky_zenith, elevation / l->sky_gradient);
+                float bearing = remainderf(azimuth - sun_azimuth, 2 * PI);
+                if (l->glow_strength > 0) {
+                    // Low sunlight along the horizon, strongest under the sun and fading
+                    // around to the opposite sky.
+                    float along = Clamp(1 - fabsf(bearing) / 1.7f, 0, 1);
+                    float low = Clamp(1 - fabsf(elevation - fmaxf(sun.y, 0)) / .28f, 0, 1);
+                    color = sky_mix(
+                        color, l->horizon_glow, l->glow_strength * along * along * low * low);
+                }
+                float sun_x = bearing * sqrtf(1 - sun.y * sun.y);
                 float sun_y = (elevation - sun.y) / sqrtf(1 - sun.y * sun.y);
                 float sun_distance = sqrtf(sun_x * sun_x + sun_y * sun_y);
                 // A warm, crisp disc with a quiet halo, anchored to the lighting direction.
-                color = sky_mix(color, (Vector3) { 255, 237, 165 },
-                    .24f * (1 - Clamp(sun_distance / .16f, 0, 1)));
-                color = sky_mix(color, (Vector3) { 255, 244, 184 },
-                    Clamp((.047f - sun_distance) / .004f, 0, 1));
+                color = sky_mix(color, l->sun_halo,
+                    l->halo_strength * (1 - Clamp(sun_distance / l->halo_radius, 0, 1)));
+                color = sky_mix(color, l->sun_disc,
+                    l->disc_strength * Clamp((.047f - sun_distance) / .004f, 0, 1));
                 if (elevation > .075f) {
                     float horizontal = sqrtf(1 - elevation * elevation) / elevation;
                     float cx = sinf(azimuth) * horizontal;
@@ -83,8 +92,7 @@ Image waterfront_sky_image(void)
                     bool underside = cloud_tile(cx, cz);
                     bool rim = cloud_tile(cx * 1.035f, cz * 1.035f);
                     if (underside || rim) {
-                        Vector3 cloud
-                            = underside ? (Vector3) { 225, 242, 244 } : (Vector3) { 205, 225, 238 };
+                        Vector3 cloud = underside ? l->cloud_underside : l->cloud_rim;
                         color = sky_mix(color, cloud, (elevation - .075f) / .10f);
                     }
                 }
@@ -96,6 +104,7 @@ Image waterfront_sky_image(void)
                           (unsigned char)roundf(Clamp(color.z + grain, 0, 255)), 255 };
             }
         }
+        painted = *lighting;
         ready = true;
     }
     return (Image) { .data = pixels,
@@ -105,9 +114,10 @@ Image waterfront_sky_image(void)
         .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
 }
 
-void waterfront_sky_draw(Color *pixels, int width, int height, View3D camera)
+void waterfront_sky_draw(
+    Color *pixels, int width, int height, View3D camera, const WaterfrontLighting *lighting)
 {
-    waterfront_sky_draw_squall(pixels, width, height, camera, (WaterfrontSquall) { 0 });
+    waterfront_sky_draw_squall(pixels, width, height, camera, (WaterfrontSquall) { 0 }, lighting);
 }
 
 // The cloud's edge at height fraction H (0 at the base, 1 at the tops), relative to the radius:
@@ -176,10 +186,10 @@ Color waterfront_squall_sky(Color sky, Vector3 eye, Vector3 ray, WaterfrontSqual
     return ColorLerp(sky, (Color) { 98, 108, 120, 255 }, fminf(rain, .85f));
 }
 
-void waterfront_sky_draw_squall(
-    Color *pixels, int width, int height, View3D camera, WaterfrontSquall squall)
+void waterfront_sky_draw_squall(Color *pixels, int width, int height, View3D camera,
+    WaterfrontSquall squall, const WaterfrontLighting *lighting)
 {
-    Image sky = waterfront_sky_image();
+    Image sky = waterfront_sky_image(lighting);
     const Color *colors = sky.data;
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 right = Vector3Normalize(Vector3CrossProduct(camera.up, forward));
@@ -320,6 +330,7 @@ void waterfront_scene_evaluate_ground_scene(const BoatSceneDefinition *scene, do
         .position = { 11, 7, 126 }, .rotation = { 0, -.08f, 0 }, .scale = { 68, 1, 3 }
     };
     frame->bridge_color = (Color) { 119, 128, 145, 255 };
+    frame->lighting = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
     evaluate_actors(scene, time, water, ground, frame);
 }
 
@@ -395,8 +406,8 @@ void waterfront_boating_gulls_scene(const BoatSceneDefinition *scene, double tim
 {
     _Static_assert(WATERFRONT_FLOCK_MAX_BIRDS == WATERFRONT_HARBOR_GULLS,
         "flock and scene gull capacities must agree");
-    _Static_assert(WATERFRONT_FLOCK_PARTS == WATERFRONT_GULL_PARTS,
-        "flock and scene gull parts must agree");
+    _Static_assert(
+        WATERFRONT_FLOCK_PARTS == WATERFRONT_GULL_PARTS, "flock and scene gull parts must agree");
     WaterfrontFlockFrame gulls;
     waterfront_flock_evaluate(scene && scene->gulls_present ? &scene->gulls : NULL,
         scene && scene->traffic_present ? &scene->traffic : NULL, time, player, velocity, &gulls);

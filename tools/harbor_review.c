@@ -15,7 +15,8 @@
 
 static void usage(void)
 {
-    puts("Usage: harbor_review [--view marina|workboat|overview|launch|traffic|ferry|bridge] [--renderer "
+    puts("Usage: harbor_review [--view marina|workboat|overview|launch|traffic|ferry|bridge] "
+         "[--renderer "
          "cpu|gpu]\n"
          "       [--waves] [--time SECONDS] [--screenshot FILE] [--frames COUNT]\n"
          "       [--resolution 320x180|320x200|320x240]\n"
@@ -241,7 +242,7 @@ int main(int argc, char **argv)
             EndTextureMode();
         } else {
             if (!waterfront_draw_boating(&cpu, &scenery, pixels, 320, height, frame.camera, waves,
-                    (WaterfrontSquall) { 0 })) {
+                    (WaterfrontSquall) { 0 }, &frame.lighting)) {
                 result = 1;
                 break;
             }

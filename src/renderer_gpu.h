@@ -157,6 +157,7 @@ typedef struct {
     Shader water_shader;
     Shader sky_shader;
     Texture2D sky_texture;
+    WaterfrontLighting sky_lighting; // The light sky_texture was painted under.
     RenderTexture2D shadow_map;
     RenderTexture2D far_shadow_map;
     // G4: a copy of the main pass's opaque depth taken just before water draws, for shore and

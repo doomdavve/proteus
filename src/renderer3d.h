@@ -54,6 +54,10 @@ typedef struct {
     Vector3 up;
     Vector3 forward;
     Vector3 light_direction; // World-space direction toward the light, normalized by begin.
+    // Flat shading: (ambient + diffuse * N.L) * tint, at most 1. Begin sets .30, .70 and white.
+    float ambient, diffuse;
+    Vector3 tint;
+    Vector3 emissive_tint; // Multiplies unlit colours, at most 1; begin sets white.
     float focal_length;
     float ghost_opacity; // Zero normally; 0..1 draws cyan screen-door coverage.
     PointLight3D point_light; // Disabled by begin; set before drawing the frame.

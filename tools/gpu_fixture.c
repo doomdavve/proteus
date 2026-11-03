@@ -551,13 +551,14 @@ static bool verify_sky_targets(WaterfrontGpuScene *scene)
                     .top = 2400,
                     .grown = .8f };
             }
-            waterfront_sky_draw_squall(reference, width, height, frame.camera, frame.squall);
+            waterfront_sky_draw_squall(
+                reference, width, height, frame.camera, frame.squall, &frame.lighting);
             if (squall) {
                 // The case must show the squall: compare with the plain panorama.
                 Color *plain = malloc((size_t)width * height * sizeof(*plain));
                 int changed = 0;
                 if (plain) {
-                    waterfront_sky_draw(plain, width, height, frame.camera);
+                    waterfront_sky_draw(plain, width, height, frame.camera, &frame.lighting);
                     for (int i = 0; i < width * height; ++i)
                         changed += abs(plain[i].r - reference[i].r) > 12;
                     free(plain);

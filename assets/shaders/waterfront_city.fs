@@ -29,6 +29,11 @@ uniform float fogStart;
 uniform float fogEnd;
 uniform float fogOpacity;
 uniform int atmosphereEnabled;
+// Windows pass: vertex alpha is the occupied share. Zero window light keeps daytime glass.
+uniform int windowPass;
+uniform float windowLight;
+uniform vec3 windowLit;
+uniform vec3 windowDark;
 uniform int localLightCount;
 uniform vec4 localLightPositionRadius[32];
 uniform vec4 localLightColorIntensity[32];
@@ -212,6 +217,12 @@ void main()
     if (fragEmissive != 0) {
         if (reflectionPass != 0 && fragWorldPosition.y < 0.0)
             discard;
+        if (windowPass != 0) {
+            if (windowLight > 0.0)
+                albedo.rgb = mix(albedo.rgb,
+                    mix(albedo.rgb * windowDark, windowLit, fragColor.a), windowLight);
+            albedo.a = 1.0;
+        }
         finalColor = vec4(apply_atmosphere(albedo.rgb), albedo.a);
         return;
     }

@@ -90,9 +90,24 @@ static void light_box(Renderer3D *r, Vector3 position, Vector3 scale, Color colo
         r, (Transform3D) { .position = position, .scale = scale }, &material);
 }
 
+// Daytime glass, toward warm occupied rooms and darkened empty ones as the window light rises.
+static Color window_color(unsigned int seed, const WaterfrontLighting *lighting)
+{
+    Color glass = waterfront_window_glass(seed);
+    float t = lighting->window_light;
+    if (!(t > 0))
+        return glass;
+    Vector3 day = { glass.r, glass.g, glass.b };
+    Vector3 night = waterfront_window_occupied(seed) ? Vector3Scale(lighting->window_lit, 255)
+                                                     : Vector3Multiply(day, lighting->window_dark);
+    Vector3 c = Vector3Lerp(day, night, t);
+    return (Color) { (unsigned char)roundf(Clamp(c.x, 0, 255)),
+        (unsigned char)roundf(Clamp(c.y, 0, 255)), (unsigned char)roundf(Clamp(c.z, 0, 255)), 255 };
+}
+
 // Windows of the land triangles of one tile, in index order.
-static void windows(
-    Renderer3D *r, const BoatMapDescription *map, const unsigned int *triangles, size_t count)
+static void windows(Renderer3D *r, const BoatMapDescription *map, const unsigned int *triangles,
+    size_t count, const WaterfrontLighting *lighting)
 {
     // Each imported wall starts with a triangle a,c,b (two base vertices).
     // Derive inset windows from that edge, preserving arbitrary facade orientation.
@@ -117,11 +132,8 @@ static void windows(
             continue;
         for (int floor = 0; a.y + 2.5f + floor * 3.2f < c.y - 1; ++floor) {
             for (int column = 0; 2.5f + column * 4 < length - 1.5f; ++column) {
-                unsigned int seed = (unsigned int)i * 1664525u + (unsigned int)column * 1013904223u
-                    + (unsigned int)floor * 374761393u;
-                Color color = seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
-                    : seed % 7 == 3        ? (Color) { 181, 211, 221, 255 }
-                                           : (Color) { 66, 100, 120, 255 };
+                unsigned int seed = waterfront_window_seed(i, column, floor);
+                Color color = window_color(seed, lighting);
                 Vector3 p = Vector3Add(Vector3Add(a, Vector3Scale(along, 2.5f + column * 4)),
                     Vector3Scale(normal, .035f));
                 p.y = a.y + 1.5f + floor * 3.2f;
@@ -197,13 +209,17 @@ void waterfront_draw_harbor(Renderer3D *r, const WaterfrontHarborFrame *frame)
 }
 
 bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Color *pixels,
-    int width, int height, View3D camera, bool omit_water, WaterfrontSquall squall)
+    int width, int height, View3D camera, bool omit_water, WaterfrontSquall squall,
+    const WaterfrontLighting *lighting)
 {
     if (!scenery->ready || !scenery->map)
         return false;
-    waterfront_sky_draw_squall(pixels, width, height, camera, squall);
-    if (!renderer3d_begin(r, pixels, width, height, camera, waterfront_sun_direction()))
+    waterfront_sky_draw_squall(pixels, width, height, camera, squall, lighting);
+    if (!renderer3d_begin(r, pixels, width, height, camera, lighting->sun_direction))
         return false;
+    r->ambient = lighting->cpu_ambient;
+    r->diffuse = lighting->cpu_direct;
+    r->tint = lighting->cpu_tint;
     // Flat water first, then the land of each tile in view; land triangles keep their index
     // order within a tile. Windows below follow the same tiles. Window quads stand 3.5 cm
     // off their wall, so the test grows each tile's box by more than that.
@@ -235,7 +251,7 @@ bool waterfront_draw_boating(Renderer3D *r, const WaterfrontScenery *scenery, Co
         if (tile->land_count
             && renderer3d_box_visible(
                 r, Vector3Subtract(tile->land_min, grow), Vector3Add(tile->land_max, grow)))
-            windows(r, scenery->full, &tiles->land[tile->land_first], tile->land_count);
+            windows(r, scenery->full, &tiles->land[tile->land_first], tile->land_count, lighting);
     }
     if (scenery->river)
         crane(r, scenery);

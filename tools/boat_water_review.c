@@ -317,6 +317,10 @@ static bool no_scene_depth;
 static bool no_water_atlas;
 // --no-far-water: no G4 gusts, sun glitter or squall water.
 static bool no_far_water;
+// --daylight: review poses at a fixed presentation phase (default day).
+static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
+// --clip-aa: place-clip supersampling, 4x4 (default) or off.
+static bool clip_aa = true;
 
 static bool apply_scene_options(WaterfrontGpuScene *scene)
 {
@@ -2310,8 +2314,9 @@ static int place_clip(const char *directory, int frames, bool squall)
             .started = 0,
             .build = 10 };
     const BoatCamera camera = { .distance = 22, .height = 9 };
-    if (!boat_gpu_init(&gpu, true) || !boat_gpu_resize(&gpu, width, height))
+    if (!boat_gpu_init(&gpu, clip_aa) || !boat_gpu_resize(&gpu, width, height))
         goto cleanup;
+    gpu.daylight = review_daylight;
     for (int frame = 0; frame < frames; ++frame) {
         double time = frame / 60.0;
         BoatViewState view = { .boat = session.boat, .time = time };
@@ -2535,15 +2540,17 @@ static int review(const char *directory, bool use_gpu)
     } else if (!prepare_tiles(&cpu_view.scenery, 0)) {
         goto cleanup;
     }
+    gpu.daylight = cpu_view.daylight = review_daylight;
     fprintf(manifest,
         "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
+        "  \"daylight\":%.6g,\n"
         "  \"renderer\":\"%s\",\"resolution\":[320,200],\"gpu_aa\":%s,\"physics_revision\":%d,\n"
         "  \"clock\":\"explicit pose tick * BOAT_STEP; presentation only\",\n"
         "  \"check_command\":\"boat_water_review --check\",\n"
         "  \"capture_command\":\"boat_water_review --review DIR --renderer %s\",\n"
         "  \"poses\":[\n",
-        use_gpu ? "gpu" : "cpu", use_gpu ? "true" : "false", BOAT_PHYSICS_REVISION,
-        use_gpu ? "gpu" : "cpu");
+        (double)review_daylight, use_gpu ? "gpu" : "cpu", use_gpu ? "true" : "false",
+        BOAT_PHYSICS_REVISION, use_gpu ? "gpu" : "cpu");
     for (size_t p = 0; p < sizeof(review_poses) / sizeof(*review_poses); ++p) {
         const ReviewPose *pose = &review_poses[p];
         const BoatWorldResources *resources = test_world(pose->location);
@@ -2683,7 +2690,19 @@ int main(int argc, char **argv)
             no_water_atlas = true;
         else if (strcmp(argv[i], "--no-far-water") == 0)
             no_far_water = true;
-        else if (strcmp(argv[i], "--check-scene-depth") == 0)
+        else if (strcmp(argv[i], "--clip-aa") == 0 && i + 1 < argc) {
+            const char *name = argv[++i];
+            if (strcmp(name, "off") && strcmp(name, "4x4")) {
+                fprintf(stderr, "--clip-aa takes off or 4x4.\n");
+                return 2;
+            }
+            clip_aa = strcmp(name, "4x4") == 0;
+        } else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
+            if (!waterfront_daylight_parse(argv[++i], &review_daylight)) {
+                fprintf(stderr, "--daylight takes day, sunset, dusk or 0..1.\n");
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--check-scene-depth") == 0)
             scene_depth = true;
         else if (strcmp(argv[i], "--history-clip") == 0 && i + 2 < argc) {
             clip_dir = argv[++i];
@@ -2721,7 +2740,9 @@ int main(int argc, char **argv)
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
                  "       boat_water_review --place-clip DIR FRAMES calm|squall\n"
+                 "                         [--clip-aa off|4x4] [--daylight ...]\n"
                  "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
+                 "                         [--daylight day|sunset|dusk|0..1]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--scenario river|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"
@@ -2738,6 +2759,7 @@ int main(int argc, char **argv)
                  "  left and stamp-only right, plus the final history field as history.png.\n"
                  "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"
                  "  G4 water left and G3b water right; squall brings a weather squall in.\n"
+                 "  --clip-aa off draws it without supersampling; --daylight sets the light.\n"
                  "--scenario river: the existing river route; stress: four basin boats with\n"
                  "  saturated boat and traffic wake pools (deterministic pre-roll).\n"
                  "--stress-state prints the stress fixture's final physical state without a\n"

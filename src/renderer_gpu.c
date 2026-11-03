@@ -435,7 +435,7 @@ static Mesh builder_finish_static(MeshBuilder *builder, StaticSurface surface)
 // Uniform locations are resolved once per shader and then by hash. These calls sit in the
 // per-frame and per-draw paths; the GL name lookup itself is not repeated there.
 #define LOCATION_CACHE_SLOTS 32
-#define LOCATION_CACHE_ENTRIES 96
+#define LOCATION_CACHE_ENTRIES 128
 typedef struct {
     unsigned int hash;
     int location;
@@ -517,7 +517,9 @@ static const char *const known_uniforms[] = { "objectColor", "emissive", "instan
     "reflectionTexture", "surfacePixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
     "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
     "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
-    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", NULL };
+    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
+    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
+    "glintSparkle", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -1081,7 +1083,7 @@ failed:
 typedef struct {
     Vector3 low, high;
     float area;
-    int r, g, b, count;
+    int r, g, b, occupied, count;
 } WindowBlock;
 
 static bool window_block_flush(MeshBuilder *builder, WindowBlock *block, Vector3 along)
@@ -1095,7 +1097,8 @@ static bool window_block_flush(MeshBuilder *builder, WindowBlock *block, Vector3
     p.y = q.y = center.y - side * .5f;
     Vector3 up = { 0, side, 0 };
     Color color = { (unsigned char)(block->r / block->count),
-        (unsigned char)(block->g / block->count), (unsigned char)(block->b / block->count), 255 };
+        (unsigned char)(block->g / block->count), (unsigned char)(block->b / block->count),
+        (unsigned char)(255 * block->occupied / block->count) };
     *block = (WindowBlock) { 0 };
     return builder_quad(builder, p, Vector3Add(p, up), Vector3Add(q, up), q, color);
 }
@@ -1139,11 +1142,11 @@ static bool build_windows(
                 for (int floor = block_floor; floor < floors && floor < block_floor + 2; ++floor) {
                     for (int column = block_column; column < columns && column < block_column + 2;
                         ++column) {
-                        unsigned int seed = (unsigned int)i * 1664525u
-                            + (unsigned int)column * 1013904223u + (unsigned int)floor * 374761393u;
-                        Color color = seed % 7 < 3 ? (Color) { 138, 185, 204, 255 }
-                            : seed % 7 == 3        ? (Color) { 181, 211, 221, 255 }
-                                                   : (Color) { 66, 100, 120, 255 };
+                        unsigned int seed = waterfront_window_seed(i, column, floor);
+                        Color color = waterfront_window_glass(seed);
+                        // Alpha carries occupancy to the windows pass, which draws opaque.
+                        bool occupied = waterfront_window_occupied(seed);
+                        color.a = occupied ? 255 : 0;
                         Vector3 p = Vector3Add(
                             Vector3Add(a, Vector3Scale(along, 2.5f + (float)column * 4)),
                             Vector3Scale(normal, .035f));
@@ -1163,6 +1166,7 @@ static bool build_windows(
                         block.r += color.r;
                         block.g += color.g;
                         block.b += color.b;
+                        block.occupied += occupied;
                         ++block.count;
                     }
                 }
@@ -1506,7 +1510,8 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
         || !IsShaderValid(scene->water_shader) || scene->water_shader.id == rlGetShaderIdDefault()
         || !IsShaderValid(scene->sky_shader) || scene->sky_shader.id == rlGetShaderIdDefault())
         goto failed;
-    scene->sky_texture = LoadTextureFromImage(waterfront_sky_image());
+    scene->sky_lighting = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
+    scene->sky_texture = LoadTextureFromImage(waterfront_sky_image(&scene->sky_lighting));
     if (!IsTextureValid(scene->sky_texture))
         goto failed;
     SetTextureFilter(scene->sky_texture, TEXTURE_FILTER_POINT);
@@ -2110,11 +2115,11 @@ static void set_far_shadow_uniforms(const WaterfrontGpuScene *scene, Shader shad
     rlActiveTextureSlot(0);
 }
 
-static void set_lighting_uniforms(WaterfrontGpuScene *scene)
+static void set_lighting_uniforms(WaterfrontGpuScene *scene, const WaterfrontLighting *lighting)
 {
-    static const float ambient_color[] = { .48f, .57f, .65f };
-    static const float directional_color[] = { 1.0f, .92f, .74f };
-    Vector3 sun = waterfront_sun_direction();
+    float ambient_color[] = { lighting->ambient.x, lighting->ambient.y, lighting->ambient.z };
+    float directional_color[] = { lighting->direct.x, lighting->direct.y, lighting->direct.z };
+    Vector3 sun = lighting->sun_direction;
     float directional_direction[] = { sun.x, sun.y, sun.z };
     int location = cached_location(scene->shader, "ambientColor");
     if (location >= 0)
@@ -2126,10 +2131,18 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
     if (location >= 0)
         SetShaderValue(scene->shader, location, directional_direction, SHADER_UNIFORM_VEC3);
     location = cached_location(scene->shader, "directionalIntensity");
-    if (location >= 0) {
-        float intensity = .65f;
-        SetShaderValue(scene->shader, location, &intensity, SHADER_UNIFORM_FLOAT);
-    }
+    if (location >= 0)
+        SetShaderValue(scene->shader, location, &lighting->direct_intensity, SHADER_UNIFORM_FLOAT);
+    // Only the windows pass reads these; zero window light keeps daytime glass.
+    float window_lit[] = { lighting->window_lit.x, lighting->window_lit.y, lighting->window_lit.z };
+    float window_dark[]
+        = { lighting->window_dark.x, lighting->window_dark.y, lighting->window_dark.z };
+    SetShaderValue(scene->shader, cached_location(scene->shader, "windowLight"),
+        &lighting->window_light, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(scene->shader, cached_location(scene->shader, "windowLit"), window_lit,
+        SHADER_UNIFORM_VEC3);
+    SetShaderValue(scene->shader, cached_location(scene->shader, "windowDark"), window_dark,
+        SHADER_UNIFORM_VEC3);
     int shadows_enabled = scene->shadows_enabled && scene->shadow_map.depth.id != 0;
     location = cached_location(scene->shader, "shadowsEnabled");
     if (location >= 0)
@@ -2197,13 +2210,14 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene)
         SetShaderValueV(scene->shader, location, cones, SHADER_UNIFORM_VEC4, light_count);
 }
 
-static void set_atmosphere_uniforms(WaterfrontGpuScene *scene, Vector3 camera_position)
+static void set_atmosphere_uniforms(
+    WaterfrontGpuScene *scene, Vector3 camera_position, const WaterfrontLighting *lighting)
 {
-    static const float fog_color[] = { 186.0f / 255.0f, 229.0f / 255.0f, 244.0f / 255.0f };
+    float fog_color[] = { lighting->fog.x, lighting->fog.y, lighting->fog.z };
     float camera[] = { camera_position.x, camera_position.y, camera_position.z };
-    float fog_start = 145.0f;
-    float fog_end = 620.0f;
-    float fog_opacity = .38f;
+    float fog_start = lighting->fog_start;
+    float fog_end = lighting->fog_end;
+    float fog_opacity = lighting->fog_opacity;
     int atmosphere_enabled = scene->atmosphere_enabled;
     int location = cached_location(scene->shader, "cameraPosition");
     if (location >= 0)
@@ -2389,10 +2403,26 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
             SHADER_UNIFORM_VEC4, 3);
     }
     int shadows = scene->shadows_enabled && frame->player_active;
-    Vector3 sun = waterfront_sun_direction();
+    const WaterfrontLighting *lighting = &frame->lighting;
+    Vector3 sun = lighting->sun_direction;
     float sun_direction[] = { sun.x, sun.y, sun.z };
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "sunDirection"),
         sun_direction, SHADER_UNIFORM_VEC3);
+    float water_light[] = { lighting->water.x, lighting->water.y, lighting->water.z };
+    float glint[] = { lighting->glint.x, lighting->glint.y, lighting->glint.z };
+    float highlight[] = { lighting->highlight.x, lighting->highlight.y, lighting->highlight.z };
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "waterLight"),
+        water_light, SHADER_UNIFORM_VEC3);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "waterShadowFloor"),
+        &lighting->water_shadow, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "glintColor"), glint,
+        SHADER_UNIFORM_VEC3);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "highlightTint"),
+        highlight, SHADER_UNIFORM_VEC3);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "glintSheen"),
+        &lighting->glint_sheen, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "glintSparkle"),
+        &lighting->glint_sparkle, SHADER_UNIFORM_FLOAT);
     int shadow_location = cached_location(scene->water_shader, "shadowsEnabled");
     SetShaderValue(scene->water_shader, shadow_location, &shadows, SHADER_UNIFORM_INT);
     SetShaderValueMatrix(scene->water_shader,
@@ -2443,7 +2473,7 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         for (int i = 0; i < GLITTER_WAVES; ++i) {
             const float *k = glitter_waves[i];
             // Deep-water dispersion, omega = sqrt(g |k|), so short glints move faster.
-            double rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1]));
+            double rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1])) * lighting->glint_speed;
             glitter[4 * i] = k[0];
             glitter[4 * i + 1] = k[1];
             glitter[4 * i + 2] = boat_phase(rate, frame->time);
@@ -2607,10 +2637,13 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
         draw_harbor(scene, material, frame);
         draw_traffic(scene, material, frame, emissive);
     }
-    // By part, so each part's flock forms one instanced run.
+    // By part, so each part's flock forms one instanced run. Gulls are self-coloured.
+    Vector3 unlit = frame->lighting.unlit;
+    Color gull = { (unsigned char)(255 * unlit.x), (unsigned char)(255 * unlit.y),
+        (unsigned char)(255 * unlit.z), 255 };
     for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
         for (int i = 0; i < frame->gull_count; ++i)
-            draw_colored_mesh(scene->gull[part], material, frame->gulls[i][part], WHITE, true);
+            draw_colored_mesh(scene->gull[part], material, frame->gulls[i][part], gull, true);
     if (frame->player_active) {
         for (int i = 0; i < frame->lamp_count; ++i) {
             const WaterfrontLampState *lamp = &frame->lamps[i];
@@ -2781,6 +2814,16 @@ static void draw_facades(const WaterfrontGpuScene *scene, Material material)
     SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
 }
 
+static void draw_windows(const WaterfrontGpuScene *scene, Material material)
+{
+    int location = cached_location(scene->shader, "windowPass");
+    int enabled = 1;
+    SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
+    draw_detailed(scene, &scene->windows, &scene->windows_far, material);
+    enabled = 0;
+    SetShaderValue(scene->shader, location, &enabled, SHADER_UNIFORM_INT);
+}
+
 static void draw_reflected_scene(const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame,
     Material material, Material life)
 {
@@ -2797,7 +2840,7 @@ static void draw_reflected_scene(const WaterfrontGpuScene *scene, const Waterfro
     draw_ground(scene, material);
     draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     set_emissive(scene->shader, true);
-    draw_detailed(scene, &scene->windows, &scene->windows_far, material);
+    draw_windows(scene, material);
     draw_tiled(scene, &scene->corner_emissive, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, life, frame->bridge, frame->bridge_color, false);
@@ -2853,7 +2896,7 @@ static Camera3D shadow_camera(
     const WaterfrontSceneFrame *frame, float coverage, int map_size, float light_distance)
 {
     const float texel_size = coverage / map_size;
-    Vector3 light_direction = waterfront_sun_direction();
+    Vector3 light_direction = frame->lighting.sun_direction;
     Vector3 right = Vector3Normalize(Vector3CrossProduct((Vector3) { 0, 1, 0 }, light_direction));
     Vector3 up = Vector3CrossProduct(light_direction, right);
     Vector3 target = frame->camera.target;
@@ -3115,6 +3158,10 @@ WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats)
 static void draw_scene(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
 {
+    if (!waterfront_lighting_same_sky(&scene->sky_lighting, &frame->lighting)) {
+        UpdateTexture(scene->sky_texture, waterfront_sky_image(&frame->lighting).data);
+        scene->sky_lighting = frame->lighting;
+    }
     if (frame->player_active)
         update_flag_mesh(&scene->player_flag, &frame->player.flag, frame->player.skin);
     if (frame->ghost_opacity > 0)
@@ -3140,14 +3187,14 @@ static void draw_scene(
                 scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000, true);
     }
     select_local_lights(scene, frame);
-    set_lighting_uniforms(scene);
+    set_lighting_uniforms(scene, &frame->lighting);
     counting_pass = WATERFRONT_GPU_PASS_REFLECTION;
     if (scene->reflections_enabled) {
-        set_atmosphere_uniforms(scene, reflection_camera(frame).position);
+        set_atmosphere_uniforms(scene, reflection_camera(frame).position, &frame->lighting);
         render_reflection(scene, frame, (float)width / height);
     }
     counting_pass = WATERFRONT_GPU_PASS_MAIN;
-    set_atmosphere_uniforms(scene, frame->camera.position);
+    set_atmosphere_uniforms(scene, frame->camera.position, &frame->lighting);
     ClearBackground(BLACK);
     draw_sky(scene, frame->camera, frame->squall, width, height, (float)width / height);
     detail_select(scene, DETAIL_MAIN,
@@ -3175,7 +3222,7 @@ static void draw_scene(
     draw_detailed(scene, &scene->corner, &scene->corner_far, material);
     draw_water(scene, frame, width, height);
     set_emissive(scene->shader, true);
-    draw_detailed(scene, &scene->windows, &scene->windows_far, material);
+    draw_windows(scene, material);
     draw_tiled(scene, &scene->corner_emissive, material);
     if (scene->river)
         draw_colored_mesh(scene->bridge, life_material, frame->bridge, frame->bridge_color, false);

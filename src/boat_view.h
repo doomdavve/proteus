@@ -54,6 +54,7 @@ typedef struct {
 typedef struct {
     BoatWaterMeshCache water_mesh;
     WaterfrontScenery scenery;
+    float daylight; // Presentation phase, 0 (day, the zero default) .. 1 (dusk).
 } BoatCpuView;
 
 // Safe on a zeroed or destroyed view.

@@ -425,8 +425,10 @@ on Mac. Prepare one Batch C covering presets/UI, mood, particles and P1/P2 integ
 Mark the overhaul accepted only after the recorded user verdict and blocking fixes, with platform
 limitations explicit. G6 is opened only if its separate measured trigger is satisfied.
 
-**Result:** unstarted. Completed: package instructions only. Next: verify P2/Batch B and the sunset
-prerequisites, then G5a task 1. No implementation verification, playback or user acceptance. Known
+**Result:** unstarted. Completed: package instructions only. Sunset readiness (2026-11-03): the
+shared lighting frame (`WaterfrontLighting` on the scene frame, byte-identical daytime) and fixed
+sunset/dusk presets are implemented on `feat/sunset-lighting` but not merged or user-reviewed;
+see [SUNSET_PLAN](SUNSET_PLAN.md#current-status). Next: that merge and review, then G5a task 1. No implementation verification, playback or user acceptance. Known
 risks: external sunset dependency, multiple target/light lifetimes and integrated preset behavior.
 
 **Kickoff prompt:**
@@ -1324,6 +1326,11 @@ and basin the same day. Owner: P2.
   roughness lowered to a gust's (0.5). The lace pattern, two crossed waves that cut foam into
   round cells, is now stretched along the drift and tears foam into strands (checked in the
   history and squall clips), then included in Batch B.
+- **After Batch B, 2026-11-03:** reviewing the sunset presets, the user found the low-sun glitter
+  "basically static noise" without `--gpu-aa` and allowed calmer daytime glitter too. On
+  `feat/sunset-lighting`, daytime keeps about half the sparkles at half speed and fades them
+  where a pixel covers several facets, so G4's accepted glitter changed; see
+  [SUNSET_PLAN](SUNSET_PLAN.md#current-status) for the measurements. Not yet played.
 - **Next:** P2 merge.
 
 #### Batch B request
