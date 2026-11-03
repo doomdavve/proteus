@@ -112,7 +112,8 @@ The packaged `README.txt` carries the same selection/check instructions.
 
 2026-11-03: the first returned Windows benchmark collections identify `AMD Radeon(TM) Graphics`
 on a machine the user reports has an RTX 4070 Super. They establish AMD-renderer measurements,
-not RTX performance. See [the report evidence and remaining checks](BOATING_PERFORMANCE.md#windows-active-gpu-check--2026-11-03).
+not RTX performance. A subsequent full rerun verifies NVIDIA selection; see
+[AMD/GeForce results and the deferred river hitch](BOATING_PERFORMANCE.md#windows-full-matrices-and-deferred-river-hitch--2026-11-03).
 
 ## Connect an existing checkout to GitHub
 
