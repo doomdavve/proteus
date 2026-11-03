@@ -1,10 +1,10 @@
 # Graphics overhaul plan
 
 Status, 2026-11-03: **P1 is merged and Batch A accepted on Mac; P2 is machine-verified**: G3a,
-G3b and G4 are on `feat/graphics-water`, awaiting Batch B. The first Windows hardware report remains open. Each
+G3b and G4 are on `feat/graphics-water`, and Batch B was accepted on Mac (outer and basin) 2026-11-03. The first Windows hardware report remains open. Each
 package has one human playtest and, by default, one implementation PR. The detailed G0–G5c briefs
 are internal checkpoints with focused commits and resumable agent handoffs. G6 remains a
-conditional study. **Next: Batch B (human playtest of P2).** See the
+conditional study. **Next: merge P2 (the user's call), then P3/G5a once sunset readiness allows.** See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -110,10 +110,10 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-03: **P1 merged, Batch A accepted on Mac; P2 machine-verified, Batch B pending**. Each package owns one
+Status, 2026-11-03: **P1 merged, Batch A accepted on Mac; P2 machine-verified, Batch B accepted on Mac**. Each package owns one
 human playtest and, by default, one implementation PR. The G0–G5c sections below are ordered
 internal checkpoints, not separate work packages or PR assignments. G6 is a dormant contingency,
-outside the three-package count. **Next: Batch B.**
+outside the three-package count. **Next: P2 merge, then P3.**
 
 Keep package definitions, prompts and process updates together in one planning PR. The original
 twelve-PR planning stack was an interpretation error and is merged; it does not prescribe future
@@ -288,7 +288,7 @@ or test pass supplies a missing verdict. A pending user session does not prevent
 | Batch | When | Combined route and questions | What it gates |
 | --- | --- | --- | --- |
 | A — engine and geometry (accepted on Mac 2026-11-02) | P1 complete (through G2b) | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | P2 |
-| B — all living water | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
+| B — all living water (accepted on Mac, outer and basin, 2026-11-03) | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
 | C — final presentation | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
 
 Batch B deliberately combines G3 and G4 rather than asking for a separate water session between
@@ -309,7 +309,7 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 | Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
 | [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows report pending |
-| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | All checkpoints machine-verified on M1 Max; Batch B pending |
+| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | All checkpoints machine-verified on M1 Max; Batch B accepted on Mac (outer, basin) 2026-11-03; Windows report pending |
 | [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
 
 G6 is a conditional backend decision, not a fourth scheduled package. The delivery-boundary rule
@@ -386,7 +386,8 @@ history and fallback checked. [G4](#g4--shore-aware-and-far-water-character), wa
 depth contact and far-water life, machine-verified: river GPU p95 within noise, four-boat basin
 stress +0.3 ms (the depth copy), atlases 0.23 and 0.38 MB on disk, physical state unchanged,
 WebGL2 depth blit and outer atlas lazy load checked. Cumulative stress GPU p95 at 4x4 against P1:
-9.6–9.7 → 3.76–3.81 ms. Next: Batch B ([request](#batch-b-request)). Agent playback: captures,
+9.6–9.7 → 3.76–3.81 ms. Batch B ([request](#batch-b-request)) accepted on Mac 2026-11-03 for outer
+and basin. Next: P2 merge, the user's call. Agent playback: captures,
 clips, windowed native demos and WebGL2 smokes; no human acceptance until Batch B. Known risks:
 glitter and gust strength judged only from stills and clips, the basin's open mask, and no
 Windows report.
@@ -448,9 +449,9 @@ Mac; G3a is machine-verified, with human review in Batch B.
 | [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and submission/CPU ceilings machine-verified; Batch A accepted on Mac |
 | [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Machine-verified on M1 Max; captures within G0 bounds, vertex bytes −58.7% river, −52.3% outer; Batch A accepted on Mac |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Machine-verified on M1 Max; river p95 triangles 880 k → 492 k; shadow reuse measured and rejected; Batch A accepted on Mac |
-| [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Machine-verified on M1 Max; stress GPU p95 at 4x4 9.7 → 3.3 ms; Batch B pending |
-| [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Machine-verified on M1 Max; stress GPU p95 +0.1 ms, 5 MB; Batch B pending |
-| [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Machine-verified on M1 Max; river GPU p95 within noise, basin +0.3 ms for the depth copy; Batch B pending |
+| [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Machine-verified on M1 Max; stress GPU p95 at 4x4 9.7 → 3.3 ms; Batch B accepted on Mac (outer, basin) |
+| [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Machine-verified on M1 Max; stress GPU p95 +0.1 ms, 5 MB; Batch B accepted on Mac (outer, basin) |
+| [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Machine-verified on M1 Max; river GPU p95 within noise, basin +0.3 ms for the depth copy; Batch B accepted on Mac (outer, basin) |
 | [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Unstarted |
 | [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Unstarted |
 | [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | P3 | G5b | Unstarted |
@@ -1241,8 +1242,8 @@ browser asset/lazy-load smoke and G0 budgets pass. Batch B records the user verd
 bathymetric truth or autonomous weather gameplay. Batch B acceptance gates G5 artistic expansion;
 prepare the PR even if human play is still pending.
 
-**Checkpoint result:** machine-verified on M1 Max, 2026-11-03; human acceptance pending in
-Batch B. Owner: P2.
+**Checkpoint result:** machine-verified on M1 Max, 2026-11-03; Batch B accepted on Mac for outer
+and basin the same day. Owner: P2.
 
 - **Commits:** `0de6d78` (bake and load water atlases), `e54ad5b` (web packaging), `08076fa`
   (opaque depth copy and quay contact), `eed48bd` (atlas exposure), `4f530b5` (gusts, glitter and
@@ -1291,12 +1292,15 @@ Batch B. Owner: P2.
   nothing else, and 90% gust roughness. The water-only shadow is removed and the squall's
   roughness lowered to a gust's (0.5). The lace pattern, two crossed waves that cut foam into
   round cells, is now stretched along the drift and tears foam into strands (checked in the
-  history and squall clips). Not yet seen by the user.
-- **Next:** Batch B.
+  history and squall clips), then included in Batch B.
+- **Next:** P2 merge.
 
 #### Batch B request
 
-Prepared 2026-11-03 on `feat/graphics-water` (draft PR #134); not yet played. Build the branch and
+Verdict, 2026-11-03: **approved** by the user on Mac, playing `feat/graphics-water` at `dce6683`
+or later (draft PR #134) on the outer river and the basin, "the only locations that really
+matter right now". The river location was not played; there is no Windows report. Request as
+prepared: build the branch and
 run from the repository root:
 
 ```sh
