@@ -44,6 +44,7 @@ static WaterfrontLighting day(void)
         .glint = { 1.0f, .96f, .84f },
         .highlight = { 1, 1, 1 },
         .window_dark = { 1, 1, 1 },
+        .unlit = { 1, 1, 1 },
     };
 }
 
@@ -61,7 +62,7 @@ static WaterfrontLighting sunset(void)
         .cpu_tint = { 1.0f, .78f, .62f },
         .sky_horizon = { 252, 176, 116 },
         .sky_zenith = { 60, 86, 156 },
-        .sky_gradient = .70f,
+        .sky_gradient = .45f,
         .sun_halo = { 255, 190, 110 },
         .sun_disc = { 255, 234, 172 },
         .horizon_glow = { 255, 132, 72 },
@@ -75,13 +76,14 @@ static WaterfrontLighting sunset(void)
         .fog_start = 130.0f,
         .fog_end = 600.0f,
         .fog_opacity = .42f,
-        .water = { .86f, .72f, .70f },
+        .water = { .72f, .68f, .86f },
         .water_shadow = .70f,
         .glint = { 1.0f, .70f, .38f },
         .highlight = { 1.0f, .62f, .34f },
         .window_light = .25f,
         .window_lit = { 1.0f, .80f, .48f },
         .window_dark = { .92f, .82f, .80f },
+        .unlit = { .92f, .76f, .68f },
     };
 }
 
@@ -92,12 +94,12 @@ static WaterfrontLighting dusk(void)
     return (WaterfrontLighting) {
         .phase = WATERFRONT_DAYLIGHT_DUSK,
         .sun_direction = sun_at(-5 * DEG2RAD),
-        .ambient = { .20f, .30f, .48f },
+        .ambient = { .16f, .25f, .42f },
         .direct = { .90f, .50f, .40f },
         .direct_intensity = 0,
         .cpu_ambient = .55f,
         .cpu_direct = .25f,
-        .cpu_tint = { .36f, .52f, .80f },
+        .cpu_tint = { .30f, .46f, .74f },
         .sky_horizon = { 104, 118, 168 },
         .sky_zenith = { 22, 36, 84 },
         .sky_gradient = .80f,
@@ -113,11 +115,12 @@ static WaterfrontLighting dusk(void)
         .fog_start = 100.0f,
         .fog_end = 520.0f,
         .fog_opacity = .50f,
-        .water = { .40f, .58f, .86f },
+        .water = { .46f, .70f, .94f },
         .water_shadow = 1,
         .window_light = 1,
         .window_lit = { 1.0f, .80f, .45f },
         .window_dark = { .30f, .40f, .60f },
+        .unlit = { .40f, .50f, .72f },
     };
 }
 
@@ -158,6 +161,7 @@ static WaterfrontLighting mix(WaterfrontLighting a, WaterfrontLighting b, float 
         .window_light = Lerp(a.window_light, b.window_light, t),
         .window_lit = mix3(a.window_lit, b.window_lit, t),
         .window_dark = mix3(a.window_dark, b.window_dark, t),
+        .unlit = mix3(a.unlit, b.unlit, t),
     };
 }
 

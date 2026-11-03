@@ -317,6 +317,8 @@ static bool no_scene_depth;
 static bool no_water_atlas;
 // --no-far-water: no G4 gusts, sun glitter or squall water.
 static bool no_far_water;
+// --daylight: review poses at a fixed presentation phase (default day).
+static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
 
 static bool apply_scene_options(WaterfrontGpuScene *scene)
 {
@@ -2535,15 +2537,17 @@ static int review(const char *directory, bool use_gpu)
     } else if (!prepare_tiles(&cpu_view.scenery, 0)) {
         goto cleanup;
     }
+    gpu.daylight = cpu_view.daylight = review_daylight;
     fprintf(manifest,
         "{\n  \"schema_revision\":1,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
+        "  \"daylight\":%.6g,\n"
         "  \"renderer\":\"%s\",\"resolution\":[320,200],\"gpu_aa\":%s,\"physics_revision\":%d,\n"
         "  \"clock\":\"explicit pose tick * BOAT_STEP; presentation only\",\n"
         "  \"check_command\":\"boat_water_review --check\",\n"
         "  \"capture_command\":\"boat_water_review --review DIR --renderer %s\",\n"
         "  \"poses\":[\n",
-        use_gpu ? "gpu" : "cpu", use_gpu ? "true" : "false", BOAT_PHYSICS_REVISION,
-        use_gpu ? "gpu" : "cpu");
+        (double)review_daylight, use_gpu ? "gpu" : "cpu", use_gpu ? "true" : "false",
+        BOAT_PHYSICS_REVISION, use_gpu ? "gpu" : "cpu");
     for (size_t p = 0; p < sizeof(review_poses) / sizeof(*review_poses); ++p) {
         const ReviewPose *pose = &review_poses[p];
         const BoatWorldResources *resources = test_world(pose->location);
@@ -2683,7 +2687,12 @@ int main(int argc, char **argv)
             no_water_atlas = true;
         else if (strcmp(argv[i], "--no-far-water") == 0)
             no_far_water = true;
-        else if (strcmp(argv[i], "--check-scene-depth") == 0)
+        else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
+            if (!waterfront_daylight_parse(argv[++i], &review_daylight)) {
+                fprintf(stderr, "--daylight takes day, sunset, dusk or 0..1.\n");
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--check-scene-depth") == 0)
             scene_depth = true;
         else if (strcmp(argv[i], "--history-clip") == 0 && i + 2 < argc) {
             clip_dir = argv[++i];
@@ -2722,6 +2731,7 @@ int main(int argc, char **argv)
                  "       boat_water_review --history-clip DIR FRAMES\n"
                  "       boat_water_review --place-clip DIR FRAMES calm|squall\n"
                  "       boat_water_review --review DIR [--renderer cpu|gpu]\n"
+                 "                         [--daylight day|sunset|dusk|0..1]\n"
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--scenario river|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"

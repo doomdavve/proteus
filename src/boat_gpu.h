@@ -20,6 +20,7 @@ typedef struct {
     float *wake_upload;
     double wake_upload_seconds;
     size_t wake_uploads;
+    float daylight; // Presentation phase, 0 (day; init resets it) .. 1 (dusk).
     bool failed;
 
 } BoatGpu;

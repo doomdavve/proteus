@@ -2632,10 +2632,13 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
         draw_harbor(scene, material, frame);
         draw_traffic(scene, material, frame, emissive);
     }
-    // By part, so each part's flock forms one instanced run.
+    // By part, so each part's flock forms one instanced run. Gulls are self-coloured.
+    Vector3 unlit = frame->lighting.unlit;
+    Color gull = { (unsigned char)(255 * unlit.x), (unsigned char)(255 * unlit.y),
+        (unsigned char)(255 * unlit.z), 255 };
     for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
         for (int i = 0; i < frame->gull_count; ++i)
-            draw_colored_mesh(scene->gull[part], material, frame->gulls[i][part], WHITE, true);
+            draw_colored_mesh(scene->gull[part], material, frame->gulls[i][part], gull, true);
     if (frame->player_active) {
         for (int i = 0; i < frame->lamp_count; ++i) {
             const WaterfrontLampState *lamp = &frame->lamps[i];

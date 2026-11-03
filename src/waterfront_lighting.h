@@ -41,6 +41,8 @@ typedef struct {
     // the others by window_dark.
     float window_light;
     Vector3 window_lit, window_dark;
+    // Multiplies self-coloured surfaces that are not lights, such as gulls and traffic wakes.
+    Vector3 unlit;
 } WaterfrontLighting;
 
 // The light at PHASE (clamped to 0..1), interpolating day, sunset and dusk. Each fixed phase

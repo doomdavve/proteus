@@ -766,6 +766,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         waterfront_traffic_evaluate_routes(
             view->scene && view->scene->traffic_present ? &view->scene->traffic : NULL,
             world->water, time, &traffic);
+        // Wakes and gulls are self-coloured; navigation lights keep their own colour.
+        renderer->emissive_tint = lighting.unlit;
         waterfront_draw_traffic(renderer, &traffic);
         WaterfrontHarborFrame harbor;
         waterfront_harbor_evaluate_scene(view->scene, world->water, time,
@@ -779,6 +781,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
             for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
                 renderer3d_draw_emissive_mesh(
                     renderer, waterfront_gull_mesh(part), birds.gulls[i][part]);
+        renderer->emissive_tint = (Vector3) { 1, 1, 1 };
     }
     for (int i = 0; i < BOAT_WATER_PARTICLES; ++i) {
         const BoatWaterParticle *p = &presentation->water[i];
