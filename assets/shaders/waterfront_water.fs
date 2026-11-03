@@ -444,9 +444,13 @@ vec2 historySlope(vec2 world, float footprint)
     float west = textureLod(historyField, uv - vec2(texel, 0.0), 0.0).g;
     float north = textureLod(historyField, uv + vec2(0.0, texel), 0.0).g;
     float south = textureLod(historyField, uv - vec2(0.0, texel), 0.0).g;
-    // Lace instead of a sheet: a fixed world pattern raises the threshold foam must pass.
-    float lace = 0.5 + 0.25 * sin(world.x * 2.7 + 1.3 * sin(world.y * 1.9))
-        * sin(world.y * 3.1 + 1.1 * sin(world.x * 2.3));
+    // Strands instead of a sheet: a fixed world pattern raises the threshold foam must pass. It
+    // is stretched along the foam's drift, (-0.6, -0.8), so foam tears into meandering streaks
+    // about 2 m apart and broken every few metres, not round cells.
+    float along = dot(world, vec2(-0.6, -0.8)), across = dot(world, vec2(0.8, -0.6));
+    float lace = 0.5 + 0.25
+        * sin(across * 3.4 + 1.6 * sin(along * 0.45) + 0.8 * sin(along * 1.3 + across * 0.7))
+        * (0.6 + 0.4 * sin(along * 0.9 + 2.0 * sin(across * 1.1)));
     historyFoam = fade * smoothstep(lace - 0.2, lace + 0.15, here.r);
     // Ripples finer than a pixel would shimmer; fade them with the pixel footprint.
     float resolvedRipple = 1.0 - smoothstep(0.35, 0.9, footprint);
@@ -499,7 +503,9 @@ uniform vec4 glitterWaves[5];
 uniform vec4 squallWater;
 
 // 0..1: dark, matte gust patches drifting downwind over exposed water, and the ruffled water
-// under and just ahead of a grown squall.
+// under and just ahead of a grown squall. Roughness, not shade: wind ripples too small to draw
+// reflect less of the bright sky, so the water there reads darker. A squall darkens no lighting,
+// so the water beneath it gets no shadow of its own.
 float gustAmount(vec2 p, float exposed)
 {
     if (farWaterEnabled == 0 || waterfrontWater == 0) return 0.0;
@@ -512,17 +518,9 @@ float gustAmount(vec2 p, float exposed)
     float gust = smoothstep(1.3, 2.5, sum) * smoothstep(0.35, 0.8, exposed);
     if (squallWater.w > 0.0 && squallWater.z > 0.0) {
         float d = length(p - squallWater.xy) / squallWater.z;
-        gust = max(gust, 0.9 * squallWater.w * (1.0 - smoothstep(0.8, 1.7, d)));
+        gust = max(gust, 0.5 * squallWater.w * (1.0 - smoothstep(0.8, 1.7, d)));
     }
     return gust;
-}
-
-// The squall's shade on the water beneath it, 0..1.
-float squallShade(vec2 p)
-{
-    if (farWaterEnabled == 0 || waterfrontWater == 0 || squallWater.w <= 0.0
-        || squallWater.z <= 0.0) return 0.0;
-    return squallWater.w * (1.0 - smoothstep(0.6, 1.4, length(p - squallWater.xy) / squallWater.z));
 }
 
 // Chunky sun glitter: short oblique waves tilt the surface, and where one throws the sun into
@@ -568,7 +566,6 @@ void main()
     vec3 normal = normalize(fragWorldNormal);
     float exposed = exposure(fragWorldPosition.xz);
     float gust = gustAmount(fragWorldPosition.xz, exposed);
-    float shade = squallShade(fragWorldPosition.xz);
     vec3 wake = vec3(0.0);
     vec3 vessel = vesselWake(fragWorldPosition.xz).xyz;
     vec3 storm = stormWave(fragWorldPosition.xz).xyz;
@@ -612,7 +609,7 @@ void main()
         float shore = (1.0 - smoothstep(0.5, 4.0, place.x)) * weight;
         base = mix(base, base * vec3(1.06, 1.10, 1.0) + vec3(0.02, 0.03, 0.01), 0.35 * shallow);
         base *= 1.0 + 0.06 * shore;
-        base *= (1.0 - 0.14 * gust) * (1.0 - 0.18 * shade);
+        base *= 1.0 - 0.14 * gust;
     }
     // Ripples read clearest on sheltered, glassy water and break up in chop.
     vec2 ripples = historySlope(fragWorldPosition.xz, footprint)
@@ -676,6 +673,6 @@ void main()
     color = mix(color, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
     color = shoreShade(color);
     color = mix(color, vec3(1.0, 0.96, 0.84), 0.75 * sunGlitter(normal, viewDirection, footprint,
-        exposed) * (1.0 - shade));
+        exposed));
     finalColor = vec4(color * waterShadow(), 1.0);
 }

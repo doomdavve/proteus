@@ -1285,6 +1285,13 @@ Batch B. Owner: P2.
 - **Limits:** one machine and one browser; no Windows report. The quay band is restrained and
   only where quay walls continue below the surface. Gusts and glitter are tuned from stills and
   clips, not play. The CPU renderer has none of G4.
+- **Early feedback, 2026-11-03** (from the clips, before Batch B): the user liked the glitter, asked
+  why the water darkens under a squall, and found lingering foam "a bit too round". The squall
+  stacked the A3.5 storm light, the storm patch's shade, a water-only 18% shadow that dimmed
+  nothing else, and 90% gust roughness. The water-only shadow is removed and the squall's
+  roughness lowered to a gust's (0.5). The lace pattern, two crossed waves that cut foam into
+  round cells, is now stretched along the drift and tears foam into strands (checked in the
+  history and squall clips). Not yet seen by the user.
 - **Next:** Batch B.
 
 #### Batch B request
