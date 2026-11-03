@@ -71,15 +71,15 @@ Design and API notes are in [3D.md](3D.md#scene-lighting).
 
 - Sunset: sun 7° above the horizon on the daytime bearing; warm direct light, cool
   violet fill, an orange horizon with a glow and halo under the sun, warm cloud undersides,
-  orange haze, blue-violet water with a warm glitter path, long shadows and a few warm
-  windows.
+  orange haze, blue-violet water with a warm, dashed road of light toward the sun and a few
+  slow sparkles, long shadows and a few warm windows.
 - Dusk: sun 5° below the horizon, so no direct light, glitter or water shadow; deep blue
   scenery after the title grade (land darker than water), a lavender horizon with a fading
   pink afterglow, dark cloud deck and warm occupied windows (about three in eight).
 
 **Verification (2026-11-03, M1 Max, macOS, Debug with `PROTEUS_GPU_TESTS=ON`):**
 
-- Daytime parity: all 29 `boat_water_review --review` poses in each renderer and
+- Daytime parity (before the calmer glitter below): all 29 `boat_water_review --review` poses in each renderer and
   `wake_velocity --screenshot ... --time 3` for basin, river and outer in CPU and GPU are
   byte-identical to `main` at `90b3e92`.
 - `waterfront_lighting` (quick lane): exact day constants and preset returns, no step larger
@@ -90,6 +90,18 @@ Design and API notes are in [3D.md](3D.md#scene-lighting).
   windowed 600-frame outer `--demo` runs at sunset and dusk exited cleanly. These are agent
   checks, not user acceptance.
 - `ctest --preset full`: 385 of 385 enabled tests passed (GPU tests included).
+
+**Calmer glitter (2026-11-03, after the user's first look):** the user found the sunset
+reflection "basically static noise" without `--gpu-aa` and "far from soothing" with it, and
+then allowed calmer daytime glitter too. Sunset/dusk now draw the road of light described in
+[3D.md](3D.md#place-aware-water) with 30% of the sparkles at 40% speed; daytime keeps 55% at
+55% speed. Measured with `boat_water_review --place-clip DIR 120 calm --clip-aa off|4x4
+--daylight ...` on rows 38–110 (the glitter band) against the clip's no-far-water control (mean
+frame-to-frame change above the control; share of pixels changing by more than 32): sunset
+without AA 3.32 → 0.50 and 6.6% → 1.9%; with AA 1.42 → 0.34; day without AA 0.77 → 0.44 and
+2.7% → 2.1%. Daytime captures are therefore no longer byte-identical in GPU glitter areas
+(16 river/outer review poses); CPU captures and the basin still are. Agent-inspected clips
+only; the change needs the user's play in motion.
 
 **Known limitations:** user visual review not done; storm/squall readability, course and
 weapon visibility at sunset/dusk not reviewed; the squall's own cloud and rain colours and

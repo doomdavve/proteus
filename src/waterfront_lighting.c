@@ -43,10 +43,18 @@ static WaterfrontLighting day(void)
         .water_shadow = .55f,
         .glint = { 1.0f, .96f, .84f },
         .highlight = { 1, 1, 1 },
+        .glint_sparkle = .55f,
+        .glint_speed = .55f,
         .window_dark = { 1, 1, 1 },
         .unlit = { 1, 1, 1 },
     };
 }
+
+// A low sun's glitter is calm: a soft road of light with a few slow sparkles. Dusk keeps the
+// same character, so blends from sunset change only its colour.
+#define SUNSET_SHEEN .55f
+#define SUNSET_SPARKLE .30f
+#define SUNSET_SPEED .40f
 
 // Warm, low sun: long shadows, a glowing horizon under it and a glitter path toward it.
 static WaterfrontLighting sunset(void)
@@ -80,6 +88,9 @@ static WaterfrontLighting sunset(void)
         .water_shadow = .70f,
         .glint = { 1.0f, .70f, .38f },
         .highlight = { 1.0f, .62f, .34f },
+        .glint_sheen = SUNSET_SHEEN,
+        .glint_sparkle = SUNSET_SPARKLE,
+        .glint_speed = SUNSET_SPEED,
         .window_light = .25f,
         .window_lit = { 1.0f, .80f, .48f },
         .window_dark = { .92f, .82f, .80f },
@@ -117,6 +128,9 @@ static WaterfrontLighting dusk(void)
         .fog_opacity = .50f,
         .water = { .46f, .70f, .94f },
         .water_shadow = 1,
+        .glint_sheen = SUNSET_SHEEN,
+        .glint_sparkle = SUNSET_SPARKLE,
+        .glint_speed = SUNSET_SPEED,
         .window_light = 1,
         .window_lit = { 1.0f, .80f, .45f },
         .window_dark = { .30f, .40f, .60f },
@@ -158,6 +172,9 @@ static WaterfrontLighting mix(WaterfrontLighting a, WaterfrontLighting b, float 
         .water_shadow = Lerp(a.water_shadow, b.water_shadow, t),
         .glint = mix3(a.glint, b.glint, t),
         .highlight = mix3(a.highlight, b.highlight, t),
+        .glint_sheen = Lerp(a.glint_sheen, b.glint_sheen, t),
+        .glint_sparkle = Lerp(a.glint_sparkle, b.glint_sparkle, t),
+        .glint_speed = Lerp(a.glint_speed, b.glint_speed, t),
         .window_light = Lerp(a.window_light, b.window_light, t),
         .window_lit = mix3(a.window_lit, b.window_lit, t),
         .window_dark = mix3(a.window_dark, b.window_dark, t),

@@ -518,7 +518,8 @@ static const char *const known_uniforms[] = { "objectColor", "emissive", "instan
     "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
     "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
     "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
-    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", NULL };
+    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
+    "glintSparkle", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -2418,6 +2419,10 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         SHADER_UNIFORM_VEC3);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "highlightTint"),
         highlight, SHADER_UNIFORM_VEC3);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "glintSheen"),
+        &lighting->glint_sheen, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "glintSparkle"),
+        &lighting->glint_sparkle, SHADER_UNIFORM_FLOAT);
     int shadow_location = cached_location(scene->water_shader, "shadowsEnabled");
     SetShaderValue(scene->water_shader, shadow_location, &shadows, SHADER_UNIFORM_INT);
     SetShaderValueMatrix(scene->water_shader,
@@ -2468,7 +2473,7 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         for (int i = 0; i < GLITTER_WAVES; ++i) {
             const float *k = glitter_waves[i];
             // Deep-water dispersion, omega = sqrt(g |k|), so short glints move faster.
-            double rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1]));
+            double rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1])) * lighting->glint_speed;
             glitter[4 * i] = k[0];
             glitter[4 * i + 1] = k[1];
             glitter[4 * i + 2] = boat_phase(rate, frame->time);

@@ -22,6 +22,9 @@ uniform vec3 waterLight;
 uniform float waterShadowFloor;
 uniform vec3 glintColor;
 uniform vec3 highlightTint;
+// Glitter character: sun road strength (0 by day) and the share of sparkles kept.
+uniform float glintSheen;
+uniform float glintSparkle;
 uniform int physicalWaves;
 uniform float wakeAmplitude;
 uniform vec2 wakeOffset; // World X/Z translation of the scripted source.
@@ -552,8 +555,34 @@ float sunGlitter(vec3 normal, vec3 viewDirection, float footprint, float exposed
     // Close up a glint band spans many pixels and reads as a worm, not a point; a grown squall
     // hides the sun everywhere.
     float distance = length(cameraPosition - fragWorldPosition);
-    return path * step(threshold, align) * mix(0.35, 1.0, exposed)
+    float sparkle = path * step(threshold, align) * mix(0.35, 1.0, exposed)
         * smoothstep(10.0, 35.0, distance) * (1.0 - 0.9 * squallWater.w);
+    if (glintSparkle >= 1.0) return sparkle;
+    // A calm glitter keeps fewer sparkles, and only where a pixel resolves single facets:
+    // farther away they would average into the path, and alone they read as static.
+    float keep = step(fract(dot(floor(p * 1.7), vec2(0.6180, 0.3819)) * 7.31), glintSparkle);
+    return sparkle * keep * (1.0 - smoothstep(1.5, 4.5, footprint));
+}
+// The calm glitter's road of light: the sun mirrored in a gently rippled surface, narrow across
+// and long toward the horizon, in a few hard steps of brightness rather than a smooth glow or a
+// per-pixel threshold, so it reads as pixels and shimmers slowly instead of flickering.
+float sunSheen(vec3 normal, vec3 viewDirection, float exposed)
+{
+    if (glintSheen <= 0.0 || farWaterEnabled == 0 || waterfrontWater == 0) return 0.0;
+    vec3 sun = normalize(sunDirection);
+    vec3 calm = normalize(mix(normal, vec3(0.0, 1.0, 0.0), 0.35));
+    vec3 r = reflect(-viewDirection, calm);
+    vec2 across = normalize(r.xz), toward = normalize(sun.xz);
+    float bearing = abs(atan(across.x * toward.y - across.y * toward.x, dot(across, toward)));
+    float rise = abs(asin(clamp(r.y, -1.0, 1.0)) - asin(sun.y));
+    float road = (1.0 - smoothstep(0.035, 0.09, bearing)) * (1.0 - smoothstep(0.06, 0.40, rise));
+    float distance = length(cameraPosition - fragWorldPosition);
+    // Broken into slow dashes across the road, drifting toward the viewer like swell.
+    vec2 w = fragWorldPosition.xz, side = vec2(-toward.y, toward.x);
+    float swell = sin(dot(w, toward) * 1.3 + 1.6 * sin(dot(w, side) * 0.45) + detailRipplePhase.x);
+    road *= mix(0.4, 1.0, step(-0.25, swell));
+    road *= mix(0.6, 1.0, exposed) * smoothstep(10.0, 35.0, distance) * (1.0 - 0.9 * squallWater.w);
+    return glintSheen * floor(road * 3.0 + 0.35) / 3.0;
 }
 float waveCrestFoam(vec3 wave, float k)
 {
@@ -679,8 +708,10 @@ void main()
     }
     color = mix(color, vec3(0.65, 0.78, 0.80) * waterLight, 0.55 * historyFoam);
     color = shoreShade(color);
-    if (any(greaterThan(glintColor, vec3(0.0))))
-        color = mix(color, glintColor, 0.75 * sunGlitter(normal, viewDirection, footprint,
-            exposed));
+    if (any(greaterThan(glintColor, vec3(0.0)))) {
+        float glint = 0.75 * sunGlitter(normal, viewDirection, footprint, exposed);
+        if (glintSheen > 0.0) glint = max(glint, sunSheen(normal, viewDirection, exposed));
+        color = mix(color, glintColor, glint);
+    }
     finalColor = vec4(color * waterShadow(), 1.0);
 }

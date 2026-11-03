@@ -37,6 +37,9 @@ typedef struct {
     Vector3 water;
     float water_shadow;
     Vector3 glint, highlight;
+    // Glitter character: a road of reflected sun (0 by day), the share of single-pixel sparkles
+    // kept (below 1 they also fade out with distance) and their wave speed.
+    float glint_sheen, glint_sparkle, glint_speed;
     // Windows: 0 shows daytime glass; 1 lights occupied windows in window_lit and multiplies
     // the others by window_dark.
     float window_light;

@@ -1326,6 +1326,11 @@ and basin the same day. Owner: P2.
   roughness lowered to a gust's (0.5). The lace pattern, two crossed waves that cut foam into
   round cells, is now stretched along the drift and tears foam into strands (checked in the
   history and squall clips), then included in Batch B.
+- **After Batch B, 2026-11-03:** reviewing the sunset presets, the user found the low-sun glitter
+  "basically static noise" without `--gpu-aa` and allowed calmer daytime glitter too. On
+  `feat/sunset-lighting`, daytime keeps about half the sparkles at half speed and fades them
+  where a pixel covers several facets, so G4's accepted glitter changed; see
+  [SUNSET_PLAN](SUNSET_PLAN.md#current-status) for the measurements. Not yet played.
 - **Next:** P2 merge.
 
 #### Batch B request
