@@ -1,12 +1,13 @@
 # Graphics overhaul plan
 
-Status, 2026-11-03: **P1 is complete and Batch A accepted on Mac**; the first Windows hardware
-AMD and verified RTX 4070 SUPER full matrices are saved. A recurring GeForce river hitch is
-open, with investigation deferred by the user on 2026-11-03.
-Each package has one human playtest and, by default, one implementation PR.
-The detailed G0–G5c briefs are internal checkpoints with focused commits and resumable agent
-handoffs. G6 remains a conditional study. **Next: P2/G3a on `feat/graphics-water`** after P1
-merges. See the
+Status, 2026-11-03: **P1 is merged and Batch A accepted on Mac; P2 is machine-verified**: G3a,
+G3b and G4 are on `feat/graphics-water`, and Batch B was accepted on Mac (outer and basin)
+2026-11-03. The first Windows hardware AMD and verified RTX 4070 SUPER full matrices are saved;
+a recurring GeForce river hitch is open, with investigation deferred by the user on 2026-11-03.
+Each package has one human playtest and, by default, one implementation PR. The detailed G0–G5c
+briefs are internal checkpoints with focused commits and resumable agent handoffs. G6 remains a
+conditional study. **Next: merge P2 (the user's call), then P3/G5a once sunset readiness
+allows.** See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -113,10 +114,10 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-02: **P1 complete, Batch A accepted on Mac; P2 next**. Each package owns one
+Status, 2026-11-03: **P1 merged, Batch A accepted on Mac; P2 machine-verified, Batch B accepted on Mac**. Each package owns one
 human playtest and, by default, one implementation PR. The G0–G5c sections below are ordered
 internal checkpoints, not separate work packages or PR assignments. G6 is a dormant contingency,
-outside the three-package count. **Next: P2/G3a.**
+outside the three-package count. **Next: P2 merge, then P3.**
 
 Keep package definitions, prompts and process updates together in one planning PR. The original
 twelve-PR planning stack was an interpretation error and is merged; it does not prescribe future
@@ -291,7 +292,7 @@ or test pass supplies a missing verdict. A pending user session does not prevent
 | Batch | When | Combined route and questions | What it gates |
 | --- | --- | --- | --- |
 | A — engine and geometry (accepted on Mac 2026-11-02) | P1 complete (through G2b) | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | P2 |
-| B — all living water | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
+| B — all living water (accepted on Mac, outer and basin, 2026-11-03) | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
 | C — final presentation | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
 
 Batch B deliberately combines G3 and G4 rather than asking for a separate water session between
@@ -312,7 +313,7 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 | Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
 | [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows AMD/GeForce matrices saved; river hitch deferred |
-| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Unstarted; P1 and Batch A resolved, starts after P1 merges |
+| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | All checkpoints machine-verified on M1 Max; Batch B accepted on Mac (outer, basin) 2026-11-03; Windows report pending |
 | [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
 
 G6 is a conditional backend decision, not a fourth scheduled package. The delivery-boundary rule
@@ -379,10 +380,21 @@ state, browser fallback and full suite pass. Record cumulative costs against P1/
 Batch B for river/outer, with stamp/history/place effects distinguishable. Fix blocking water
 feedback before P3 starts; actual human acceptance stays pending until the user plays it.
 
-**Result:** unstarted. Completed: package instructions only. P1/Batch A resolved 2026-11-02 with no
-blocking feedback. Next: G3a task 1 once P1 has merged.
-No implementation verification, agent playback or human acceptance. Known risks: field/history
-stability, shore/depth interactions and GL4.1/WebGL2 capability fallbacks.
+**Result:** in progress. P1 merged (`dd02c47`) with Batch A resolved 2026-11-02. Completed:
+[G3a](#g3a--stamped-wake-shading), stamped wake shading, machine-verified on the M1 Max: four-boat
+stress GPU p95 9.6–9.7 → 3.3 ms at 4x4 and 4.66 → 2.77 ms at 320x200, physical state unchanged,
+float-blend probe and analytic fallback checked in WebGL2. [G3b](#g3b--foam-history-and-cosmetic-ripples),
+foam history and cosmetic ripples, machine-verified: about +0.1 ms stress GPU p95 (3.30–3.33 →
+3.41–3.45 ms at 4x4), 5 MB, physical state unchanged, deterministic replay and resets, WebGL2
+history and fallback checked. [G4](#g4--shore-aware-and-far-water-character), water atlas, quay
+depth contact and far-water life, machine-verified: river GPU p95 within noise, four-boat basin
+stress +0.3 ms (the depth copy), atlases 0.23 and 0.38 MB on disk, physical state unchanged,
+WebGL2 depth blit and outer atlas lazy load checked. Cumulative stress GPU p95 at 4x4 against P1:
+9.6–9.7 → 3.76–3.81 ms. Batch B ([request](#batch-b-request)) accepted on Mac 2026-11-03 for outer
+and basin. Next: P2 merge, the user's call. Agent playback: captures,
+clips, windowed native demos and WebGL2 smokes; no human acceptance until Batch B. Known risks:
+glitter and gust strength judged only from stills and clips, the basin's open mask, and no
+Windows report.
 
 **Kickoff prompt:**
 
@@ -431,7 +443,8 @@ Stop after P3; keep any untriggered G6 backend study dormant.
 
 These entries own internal progress, not independent PRs. Read the assigned work package and
 execution process before a checkpoint. Stop at a checkpoint only for a handoff or an unresolved
-gate; otherwise continue within the same package. P1's checkpoints are accepted through Batch A on Mac.
+gate; otherwise continue within the same package. P1's checkpoints are accepted through Batch A on
+Mac; G3a is machine-verified, with human review in Batch B.
 
 | Checkpoint | Work package | Dependency | Status |
 | --- | --- | --- | --- |
@@ -440,9 +453,9 @@ gate; otherwise continue within the same package. P1's checkpoints are accepted 
 | [G1](#g1--persistent-instances-and-pass-culling) | P1 | G0 budgets and G0w tools | Byte parity and submission/CPU ceilings machine-verified; Batch A accepted on Mac |
 | [G2a](#g2a--geometry-storage-and-ownership) | P1 | G1 | Machine-verified on M1 Max; captures within G0 bounds, vertex bytes −58.7% river, −52.3% outer; Batch A accepted on Mac |
 | [G2b](#g2b--distance-detail-and-valid-shadow-reuse) | P1 | G2a | Machine-verified on M1 Max; river p95 triangles 880 k → 492 k; shadow reuse measured and rejected; Batch A accepted on Mac |
-| [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Unstarted |
-| [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Unstarted |
-| [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Unstarted |
+| [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Machine-verified on M1 Max; stress GPU p95 at 4x4 9.7 → 3.3 ms; Batch B accepted on Mac (outer, basin) |
+| [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Machine-verified on M1 Max; stress GPU p95 +0.1 ms, 5 MB; Batch B accepted on Mac (outer, basin) |
+| [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Machine-verified on M1 Max; river GPU p95 within noise, basin +0.3 ms for the depth copy; Batch B accepted on Mac (outer, basin) |
 | [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Unstarted |
 | [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Unstarted |
 | [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | P3 | G5b | Unstarted |
@@ -1044,10 +1057,66 @@ or retired physical field revival. Sampling is allowed bounded shading error, no
 byte-identical images. Do not remove the fallback until it is no longer needed for comparison or
 compatibility.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P2. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G3b. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P2's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result (2026-11-02, M1 Max):** machine gates met; human review pending in Batch B.
+Commits: `676b12f` (field, stamp shader, sampled water shading, probe and fallback), `89d5439`
+(review switch, schema 6 statistics, `wake_stamp` check and declared bounds). The numbers are in
+[the summary](evidence/graphics/g3a/summary.json); the design is in
+[stamped wake shading](3D.md#stamped-wake-shading).
+
+- **Task 1, what feeds what:** object-wake height feeds vertex displacement, the foam gate and
+  the patch fade's slope term; slope feeds the normal and thus brightness, reflection offset and
+  highlight; crest foam feeds only the fragment's foam band. Vertex height stays analytic: up to
+  38,864 near-patch triangles a frame in the stress fixture still loop over all live pieces in
+  the vertex shader. That loop, not the fragment one, is the remaining per-piece GPU work.
+- **Interfaces and ownership:** `WaterfrontWakeStamp` (`src/waterfront_wake_stamp.[ch]`) is
+  owned by each `WaterfrontGpuScene`, created with it and destroyed with it, so each view and
+  context owns its field. `prepare_object_wakes` packs the records once a draw, places and
+  stamps before any pass, and restores the caller's target; the record texture gained a third
+  row listing the outside pieces. Texture unit 9 is the field; 14 and 15 belong to the stamp
+  shader while it runs. G3b's history should stay under this owner.
+- **Decisions:** 1024 texels of 0.25 m (256 m, 8 MB RGBA16F) centred on the player and snapped
+  to whole texels. Instead of fading at the edge, the guard is half a texel; outside it the
+  shader evaluates only the pieces whose support reaches past it, so far wakes, including other
+  boats' and traffic, keep exact shading. Each piece stamps one or two bounded quads around its
+  ring band. Pieces sum by additive blending, so their order has no effect. Identical records
+  reuse the field, which the rear-view mirror's second draw does. A field of 512 texels was
+  slower (outside pieces 228 of 256, GPU p95 4.9 ms); 2048 texels cost 32 MB for the same p95;
+  0.125 m spacing over 256 m stamped 3.2 M texels for no gain.
+- **Gates, stress, three Release repeats each:** GPU p95 at 4x4 9.62–9.70 ms with the analytic
+  loop against 3.30–3.31 ms stamped (P1 tip 10.37–10.43; G3 gate ≤ 16.5); at 320x200
+  4.66 against 2.76–2.77 ms (P1 tip 4.65–4.71; gate ≤ 12.0). Frame p95 at 4x4 11.5–11.7 →
+  4.8–5.3 ms. `final_state` stays `tick=4438 hash=8d9af1216d2cf172`. The river route has no
+  object wakes and is unchanged (1.79–1.80 against 1.76–1.79 ms).
+- **Field build, bandwidth and memory:** p95 256 pieces placed, 790 k texels stamped, rebuilt
+  every two-tick frame (1,020 of 1,020). Moving from 0.25 to 0.125 m quadrupled stamped texels
+  and moved GPU p50 by about 0.1 ms, so the build is a small part of the total. Per build, the
+  clear writes 8 MB and blending reads and writes about 12.6 MB, roughly 1.3 GB/s at 60 Hz. Water
+  fragments inside the field read one bilinear sample. Memory: the 8 MB field plus 4 KB for the
+  third record row. The 179 of 256 pieces reaching past the field (p95) keep a loop for far
+  fragments; that cost is included above.
+- **Accuracy, `wake_stamp`, three moments:** height RMS 0.0015–0.0016 m (bound 0.004), slope
+  RMS 0.0040–0.0041 and maximum ≤ 0.056 (0.012 and 0.15), foam RMS 0.0048–0.0049 and maximum
+  ≤ 0.080 (0.012 and 0.2). Presented captures: mean 0.036–0.048/255, 99.9th percentile 2–3/255
+  (0.5 and 32). The outside list matched both pools exactly on rings beyond the field. Teleport,
+  rewind and a new context rebuilt fields within bounds; an identical redraw stamped nothing.
+  Game GPU captures at `--time 8` against the P1 tip: basin mean 0.046/255, river 0.059/255.
+- **Portability:** WebGL2 river smoke in Chrome 156 on ANGLE Metal: the probe passed, the
+  1024² RGBA16F field was created, 304 additive stamp passes ran, no GL or shader errors, frame
+  inspected. With the float colour-buffer extensions hidden, only the 1x1 probe target was
+  created, nothing was stamped, and the frame drew through the analytic loop without errors.
+  GL 4.1 on macOS is the native path above. Apple's driver warned about samplers on empty units
+  until every stamp-shader sampler was given a texture; the final build logs none.
+- **Automated:** Debug GPU-enabled CTest, full preset, 380/380 passed (15 disabled),
+  warning-clean, including `wake_stamp`, `wake_objects_gpu` (now reading three record rows) and
+  the schema 6 benchmark contract. A Release rerun on the final commit matched: stress GPU p95
+  3.30 against 9.61 ms at 4x4 and 2.75 against 4.66 ms at 320x200, same state hash.
+- **Agent playback:** windowed `--demo` runs of river and basin, 1,200 frames each, exited
+  cleanly with no warnings; inspected captures and two browser smokes. No human review.
+- **Limits:** one machine and one browser; no Windows report. Foam edges can move by up to a
+  texel against the analytic loop, so motion needs Batch B. The field does not cover the whole
+  stress view, which keeps an analytic loop for distant wakes. The vertex loop remains.
+- **Next:** G3b task 1, foam history under this owner. Keep `--analytic-wakes` as the
+  stamp-only comparison for Batch B.
 
 ### G3b — Foam history and cosmetic ripples
 
@@ -1088,10 +1157,77 @@ web fallback is explicit and exercised.
 ripple solver or GPU displacement. Cap sources/grid work; if the ripple budget fails, reduce its
 cosmetic resolution/extent and record it rather than borrow physics budget.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P2. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G4. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P2's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result (2026-11-02):** machine-verified on the M1 Max; human review pending in
+Batch B. Owner: P2, on draft PR #134.
+
+- **State:** machine-verified. Commits `02fa6bf` (history owner, shaders and renderer),
+  `69ba462` (check, schema 7 benchmark, review clip) and the docs commit that records this.
+- **Interfaces and owners:** `src/waterfront_water_history.[ch]` owns the history: two
+  512x512 RGBA16F ping-pong states (R foam, G ripple height, B previous height) and an RGBA8
+  shore mask, 0.25 m texels over 128 m around the player, 5 MB. `waterfront_water_history.vs/.fs`
+  runs a substep (mode 0) or fills (mode 1, clears and the mask). `renderer_gpu.c` owns one per
+  scene, advances it in `prepare_water_history()` right after the stamped field is built, and
+  binds it to the water shader on unit 8. `WaterfrontWaterHistoryTuning` names the tunables;
+  `waterfront_gpu_scene_set_water_history_enabled()` and `--no-water-history` give stamp-only
+  water. [3D.md](3D.md#foam-history-and-ripples) describes the design.
+- **Decisions:**
+  - Time: substep index `floor(time * 60 + 1e-4)`; game clocks land exactly on boundaries, and
+    without the tolerance frames split into 0 and 2 substeps. A draw runs at most four substeps
+    and drops older time. The first draw, a rewind, a forward jump over 0.5 s, a centre move
+    over 32 m, a hull-count change or a new map resets and pre-rolls 60 substeps. The jump limit
+    started at 2 s; `gpu_view_lifecycle` showed one `BoatGpu` switching between two river
+    sessions 2 s apart, which must look like a fresh view, so it is 0.5 s.
+  - Views are isolated per scene; the mirror's redraw at the same time runs nothing.
+  - Foam keeps the larger of its drifted, decayed value (half-life 1.1 s) and the stamped crest
+    foam scaled as the shader shows it. Seeding by maximum, not by adding, prevents a carpet.
+    It renders as lace through a fixed world pattern; cube foam is untouched.
+  - Ripples: damped wave equation at 3 m/s (Courant number 0.2; energy half-life 1.6 s),
+    heights clamped to ±0.08 m. Closed mask texels and 1.3 m hull discs hold zero height.
+    Hull pulses sit beside each shoulder: a pulse ahead of the bow was erased by the hull's own
+    disc as it advanced, and a constant push built a single ridge, so the shoulder impulse is
+    phased by distance run along the heading (6 m period) to emit wavelets of about 1–2 m.
+    Rain uses a hash of texel and substep inside the squall footprint (0.05 drops/m²/s).
+  - Gulls never fly below about 1.4 m, so there are no real surface contacts; the contact input
+    (a slow bob) is exercised only by fixtures. No new gull behavior.
+  - The mask draws the bound map's water mesh from above. The basin has no water mesh, so its
+    texels are all open and its walls do not reflect; G4 enriches the mask.
+  - Raylib's GLES grayscale target is luminance, which WebGL2 cannot render into, so the mask
+    is RGBA8.
+- **Gates, Release, three interleaved repeats** ([summary](evidence/graphics/g3b/summary.json)):
+  stress GPU p95 at 4x4 3.30–3.33 ms stamp-only against 3.41–3.45 ms with history (G3 gate
+  ≤ 16.5); at 320x200 2.73–2.76 against 2.88–2.89 ms (gate ≤ 12.0). River route GPU p95 1.71–1.79
+  against 1.77–1.79 ms at 4x4 and 1.50–1.55 against 1.54–1.60 ms at 320x200, within noise.
+  `final_state` is unchanged in both (`hash=8d9af1216d2cf172`; river `tick=12073`). Each two-tick
+  frame runs one substep (one 512² pass). The reset frame runs 60 substeps plus the mask: stress
+  frame 0 took 20.7–22.0 ms of GPU against 13.7–15.3 ms stamp-only, a one-off hitch on each reset.
+- **Check, `water_history`:** replay is bit-identical; pause runs nothing; a 0.25 s gap runs four
+  substeps; jump, rewind, teleport and content change reset; a reset history equals a fresh
+  one. Mask open over the fixture water and closed past it, no wet closed or hull texels. Foam
+  half-life 1.10 s (bound 1.65), 3.9% left after 5 s (bound 5%). Scrolling one block moved
+  foam exactly, the new strip empty. A minute of rain, contact and an 11 m/s hull stayed finite
+  and clamped, with peak energy 5.25 then 5.24 over successive 15 s windows (bound ×1.5). The
+  dense replay fixture reaches the 0.08 m clamp; the stress scene peaks at 0.018 m. Fallback
+  runs nothing. In the scene: one reset with pre-roll, one substep per frame, none on a repeated
+  frame, a visibly different image, and an unchanged physical state.
+- **Portability:** WebGL2 river smoke in Chrome 156 on ANGLE Metal: both 512² RGBA16F states
+  and the RGBA8 mask were created, no GL or shader errors, frame inspected. With float colour
+  buffers hidden, no history targets were created and the frame drew stamp-only, without
+  errors. GL 4.1 on macOS is the native path.
+- **Automated:** Debug GPU-enabled CTest, full preset, 381/381 passed (15 disabled), including
+  `water_history`, `gpu_view_lifecycle` and the schema 7 benchmark contract.
+- **Agent playback:** 640x400 review clip of the stress fixture at 60 Hz, history left and
+  stamp-only right, 10 s
+  (`boat_water_review --history-clip DIR 600`, encoded as
+  `build-release/graphics/g3b/history-left-stamp-only-right.mp4`), plus the final history field
+  as an image. Frames show lace foam along passed crests, ripples beside and behind the hull and
+  readable cube foam. In the close chase view the ripples mostly lie under the cube trail.
+  Windowed Debug `--demo` runs of river and basin, 1,200 frames each, exited cleanly with no
+  warnings. No human review.
+- **Limits:** one machine and one browser; no Windows report. Ripples are subtle and partly hidden
+  by cube foam; strength needs Batch B in motion. The basin has an open mask. A reset costs a
+  one-off GPU spike of about 6 ms. Rain impulses appear only under a grown squall.
+- **Next:** G4 task 1. Keep `--no-water-history` and `--analytic-wakes` for Batch B's
+  stamp-only and history comparisons.
 
 ### G4 — Shore-aware and far-water character
 
@@ -1137,10 +1273,83 @@ browser asset/lazy-load smoke and G0 budgets pass. Batch B records the user verd
 bathymetric truth or autonomous weather gameplay. Batch B acceptance gates G5 artistic expansion;
 prepare the PR even if human play is still pending.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P2. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: Batch B; P3 only after P2 merge, feedback resolution and sunset readiness. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P2's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result:** machine-verified on M1 Max, 2026-11-03; Batch B accepted on Mac for outer
+and basin the same day. Owner: P2.
+
+- **Commits:** `0de6d78` (bake and load water atlases), `e54ad5b` (web packaging), `08076fa`
+  (opaque depth copy and quay contact), `eed48bd` (atlas exposure), `4f530b5` (gusts, glitter and
+  squall water), `bddd335` (F8 water layers and docs).
+- **Contract:** `assets/geometry/<map>/water_atlas.bin` is an optional, versioned sidecar ("PWAT"
+  v1, `src/boat_water_atlas.h`) baked deterministically in C from the compiled water and keyed to
+  it: shore distance, estimated depth (a bank profile, not bathymetry), shelter and chop; river
+  615×494 at 4 m, outer 1190×778 at 8 m. Physics, the server and the content digest never read
+  it; missing, stale or malformed atlases load nothing and the hand-written field stays. The
+  water reads a blitted copy of the main pass's depth (never the attachment being written;
+  conventional GL depth; none outside a render texture; the reflection pass draws no water).
+  Far-water life uses CPU-reduced phases and the existing squall only. Ripple boundaries stay
+  the 0.25 m mesh mask: atlas texels of 4–8 m are too coarse for them, so shelter scales ripple
+  visibility instead. Details: [3D notes](3D.md#place-aware-water).
+- **Costs** (Release, three interleaved repeats, `--benchmark`, all G4 against
+  `--no-water-atlas --no-scene-depth --no-far-water`): stress GPU p95 at 4x4 3.76–3.81 against
+  3.45–3.53 ms, at 320x200 3.07–3.16 against 2.86–2.90 ms; the basin runs only the depth copy, so
+  that is its cost. River GPU p95 at 4x4 1.76–1.79 against 1.72–1.84 ms, at 320x200 1.49–1.58
+  against 1.49–1.58 ms. Gates (≤ 16.5 and ≤ 12.0 ms) hold. `final_state` unchanged
+  (`hash=8d9af1216d2cf172`; river `tick=12073`). GPU memory: atlases 1.2 and 3.7 MB as RGBA8, the
+  depth copy one depth texture at the target size. Evidence:
+  `docs/evidence/graphics/g4/summary.json`.
+- **Checks:** `water_atlas_river`/`water_atlas_outer` rebake byte for byte;
+  `validate_boat_scenery` rejects malformed, truncated, foreign and out-of-range atlases;
+  `scene_depth` (copy taken, disabled and default-framebuffer fallbacks, 377 lightened quay
+  pixels, none darker, outer atlas bound); `gpu_water_surface` walks the dock mouth with the
+  atlas at ≤ 1/255 per 10 m (this caught stepped chop, now blurred in the bake). Debug full
+  preset 384/384 passed (15 disabled).
+- **Portability:** Chrome 156 on ANGLE Metal: 430 depth blits with no GL or shader errors;
+  `tools/check_web_scenery.py` saw one outer pack and one outer atlas request, none on a second
+  session, no errors (the script's menu steps were updated for the SMOOTHING row).
+- **Agent playback:** review captures with each layer switched off (`build/graphics/g4/`), and
+  320x200 clips at 60 Hz of an outer-harbour crossing toward the sun with the camera swinging
+  ±35°, all G4 left and G3b right (`boat_water_review --place-clip DIR 1200 calm` and
+  `DIR 1800 squall`, encoded as `build-release/graphics/g4/calm.mp4` and `squall.mp4`). An
+  early glitter draft formed rows of dashes and gusts 150–400 m across; both were retuned
+  (five warped waves; 57–131 m gusts) before these clips. A unit clash (the atlas on the city
+  shader's shadow unit) was caught in captures and fixed. Windowed Debug `--demo` runs of river
+  and outer, 1,200 frames each, exited cleanly with no warnings. No human review.
+- **Limits:** one machine and one browser; no Windows report. The quay band is restrained and
+  only where quay walls continue below the surface. Gusts and glitter are tuned from stills and
+  clips, not play. The CPU renderer has none of G4.
+- **Early feedback, 2026-11-03** (from the clips, before Batch B): the user liked the glitter, asked
+  why the water darkens under a squall, and found lingering foam "a bit too round". The squall
+  stacked the A3.5 storm light, the storm patch's shade, a water-only 18% shadow that dimmed
+  nothing else, and 90% gust roughness. The water-only shadow is removed and the squall's
+  roughness lowered to a gust's (0.5). The lace pattern, two crossed waves that cut foam into
+  round cells, is now stretched along the drift and tears foam into strands (checked in the
+  history and squall clips), then included in Batch B.
+- **Next:** P2 merge.
+
+#### Batch B request
+
+Verdict, 2026-11-03: **approved** by the user on Mac, playing `feat/graphics-water` at `dce6683`
+or later (draft PR #134) on the outer river and the basin, "the only locations that really
+matter right now". The river location was not played; there is no Windows report. Request as
+prepared: build the branch and
+run from the repository root:
+
+```sh
+./build/wake_velocity --location river
+./build/wake_velocity --location outer
+```
+
+Route: in each, leave the dock at speed, turn hard and stop beside a quay, then cross open water
+toward the sun (heading roughly north on the minimap). On the outer river visit a sheltered
+harbour and open water. Press F8 to step back through the layers (all → no far-water life → G3
+only → stamp only → analytic wakes) at any point to compare. Try the high-resolution option too.
+For a squall, keep going on the outer river: its default Långedrag voyage grows a weather squall
+over the open water toward Långedrag (it builds over a minute once the voyage starts it).
+
+Questions: Is the water alive and cozy, and stable while moving and turning? Do docks read glassy
+and open water choppy? Is the quay lapping visible but restrained? Do gusts, glitter and the
+squall's water look natural, with no squares or rows? Are the cube foam and its lifetimes intact?
+Any seams at the atlas edge or around the boat's wave patch?
 
 ### G5a — Optional high resolution and restrained HDR
 

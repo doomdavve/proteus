@@ -695,7 +695,8 @@ static void runtime(bool graphics, bool visible)
         physics[60], physics[113], render[60], frames[60], frames[113], frames[119]);
     CHECK(w.live > 0 && w.peak_live <= BOAT_OBJECT_CAPACITY);
     if (graphics) {
-        float expected[BOAT_OBJECT_CAPACITY * 8] = { 0 }, actual[BOAT_OBJECT_CAPACITY * 8];
+        // The third texture row lists the pieces the stamped field cannot shade.
+        float expected[BOAT_OBJECT_CAPACITY * 8] = { 0 }, actual[BOAT_OBJECT_CAPACITY * 12];
         boat_wake_objects_pack(&w, expected, expected + BOAT_OBJECT_CAPACITY * 4);
         CHECK(gpu.scene.object_wakes.id != 0);
         CHECK(gpu.scene.object_wakes.width == BOAT_OBJECT_CAPACITY);
@@ -709,7 +710,7 @@ static void runtime(bool graphics, bool visible)
         boat_gpu_draw(
             &gpu, SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT);
         CHECK(!gpu.failed && gpu.scene.object_wakes.width == BOAT_OBJECT_CAPACITY * 2);
-        float paired[BOAT_OBJECT_CAPACITY * 16] = { 0 }, uploaded[BOAT_OBJECT_CAPACITY * 16];
+        float paired[BOAT_OBJECT_CAPACITY * 16] = { 0 }, uploaded[BOAT_OBJECT_CAPACITY * 24];
         float *parameters = paired + BOAT_OBJECT_CAPACITY * 8;
         int players = boat_wake_objects_pack(&w, paired, parameters);
         boat_wake_objects_pack(&scenery, paired + players * 4, parameters + players * 4);

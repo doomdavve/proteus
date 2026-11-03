@@ -94,7 +94,8 @@ target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
 
 # Scenery packs: each mapped location's whole bake (assets/geometry/<location>/scenery.bin), loaded
 # at run time for presentation. The core keeps only the compiled water, so it never reads them.
-add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h)
+add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h
+  src/boat_water_atlas.c src/boat_water_atlas.h)
 target_link_libraries(proteus_boat_scenery PUBLIC proteus_boat_core)
 # Validators and review tools load the packs from the source tree (tools/boat_test_scenery.h).
 target_compile_definitions(proteus_boat_scenery INTERFACE PROTEUS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
@@ -215,7 +216,9 @@ target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROT
 target_compile_options(proteus_render PRIVATE ${PROTEUS_WARNINGS})
 
 # GPU renderers, linked only by graphics executables.
-add_library(proteus_gpu STATIC src/boat_gpu.c src/renderer_gpu.c src/boat_rearview.c src/boat_rearview.h)
+add_library(proteus_gpu STATIC src/boat_gpu.c src/renderer_gpu.c src/waterfront_wake_stamp.c
+  src/waterfront_water_history.c
+  src/boat_rearview.c src/boat_rearview.h)
 target_link_libraries(proteus_gpu PUBLIC proteus_render)
 target_compile_options(proteus_gpu PRIVATE ${PROTEUS_WARNINGS})
 
@@ -847,6 +850,15 @@ set_tests_properties(boat_scenery PROPERTIES PASS_REGULAR_EXPRESSION "boat_scene
 add_test(NAME map_pack COMMAND ${Python3_EXECUTABLE} -I
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/map_pack.py --self-test)
 set_tests_properties(map_pack PROPERTIES PASS_REGULAR_EXPRESSION "map pack fixtures OK")
+# Graphics G4: each map's water atlas sidecar rebakes byte for byte from its compiled water.
+add_executable(water_atlas_bake tools/water_atlas_bake.c)
+target_link_libraries(water_atlas_bake PRIVATE proteus_render)
+target_compile_options(water_atlas_bake PRIVATE ${PROTEUS_WARNINGS})
+foreach(map river outer)
+  add_test(NAME water_atlas_${map} COMMAND water_atlas_bake --map ${map}
+    --check ${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/${map}/water_atlas.bin)
+  set_tests_properties(water_atlas_${map} PROPERTIES PASS_REGULAR_EXPRESSION "water_atlas=ok")
+endforeach()
 
 add_executable(validate_boat_minimap tools/validate_boat_minimap.c)
 target_link_libraries(validate_boat_minimap PRIVATE proteus_render)
@@ -1273,6 +1285,19 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME instancing_parity COMMAND boat_water_review --check-instancing)
   set_tests_properties(instancing_parity PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
     PASS_REGULAR_EXPRESSION "instancing_parity=ok")
+  # Graphics G3a: the stamped wake field against the analytic pieces, lifecycle and switch.
+  add_test(NAME wake_stamp COMMAND boat_water_review --check-wake-stamp)
+  set_tests_properties(wake_stamp PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "wake_stamp=ok")
+  # Graphics G3b: foam history and ripples: replay, pause, catch-up, resets, scroll, stability.
+  add_test(NAME water_history COMMAND boat_water_review --check-water-history)
+  set_tests_properties(water_history PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "water_history=ok")
+  # Graphics G4: the opaque depth copy shades quay water, only lightens, and falls back; the
+  # outer map binds its water atlas.
+  add_test(NAME scene_depth COMMAND boat_water_review --check-scene-depth)
+  set_tests_properties(scene_depth PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu
+    PASS_REGULAR_EXPRESSION "scene_depth=ok")
   add_test(NAME gpu_view_lifecycle COMMAND boat_water_review --check-gpu-lifecycle)
   set_tests_properties(gpu_view_lifecycle PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_river_benchmark_contract COMMAND ${Python3_EXECUTABLE}

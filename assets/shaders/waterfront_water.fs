@@ -71,14 +71,45 @@ float waterShadow()
     return mix(0.55, 1.0, shadow_visibility(0.00018));
 }
 
+// G4: the bound map's baked water atlas, renderer X/Z: R shore distance (m * 4), G estimated
+// depth (m * 10), B shelter, A chop; see src/boat_water_atlas.h. atlasRect holds the origin and
+// 1/extent. Without one, the hand-written dock field below stands in.
+uniform int atlasEnabled;
+uniform sampler2D waterAtlas;
+uniform vec4 atlasRect;
+
+// Shore metres, depth metres, shelter, chop; and in W the weight of the atlas, which blends to
+// the hand-written field over the outermost 1% of its extent and is 0 without one.
+vec4 atlasPlace(vec2 p, out float weight)
+{
+    weight = 0.0;
+    if (atlasEnabled == 0) return vec4(64.0, 25.0, 0.0, 1.0);
+    vec2 uv = (p - atlasRect.xy) * atlasRect.zw;
+    vec2 edge = min(uv, vec2(1.0) - uv);
+    weight = smoothstep(0.0, 0.01, min(edge.x, edge.y));
+    vec4 t = texture(waterAtlas, clamp(uv, vec2(0.0), vec2(1.0)));
+    return vec4(t.r * 63.75, t.g * 25.5, t.b, t.a);
+}
+
 // Authored shelter around the narrow dock. It opens gradually across the mouth;
 // water elsewhere on the river remains exposed. This field changes shading only.
-float exposure(vec2 p)
+float handExposure(vec2 p)
 {
     float dockAxis = 12.0 - 0.09 * p.y;
     float inDock = 1.0 - smoothstep(28.0, 100.0, abs(p.x - dockAxis));
     float northOfMouth = smoothstep(-190.0, -55.0, p.y);
     return 1.0 - 0.82 * inDock * northOfMouth;
+}
+
+// 0.18 in a closed dock to 1 on open water. The atlas maps upwind fetch (chop) onto the hand
+// field's range, and land closing in all round (shelter) calms it further.
+float exposure(vec2 p)
+{
+    float weight;
+    vec4 place = atlasPlace(p, weight);
+    float atlas = 0.18 + 0.82 * smoothstep(0.10, 0.65, place.w)
+        * (1.0 - 0.4 * smoothstep(0.3, 0.8, place.z));
+    return mix(handExposure(p), atlas, weight);
 }
 
 float resolved(float frequency, float footprint)
@@ -219,7 +250,8 @@ vec3 crossingWake(vec2 world, float clock)
 }
 
 
-// BEGIN OBJECT RECIPE -- same signed ridge and derivatives as boat_wake_objects.c.
+// BEGIN OBJECT RECIPE -- same signed ridge and derivatives as boat_wake_objects.c and the
+// piece in waterfront_wake_stamp.fs.
 uniform int objectWakeEnabled;
 uniform float objectWakeLife;
 uniform int objectWakePlayerCount;
@@ -261,14 +293,38 @@ vec3 objectWakePiece(vec2 p, vec4 a, vec4 b, float life)
     objectCrestFoam+=clamp(b.z/1.8,0.0,1.0)*window*envelope*narrow*narrow*narrow*breakup;
     return b.z*vec3(envelope*window*shape,gradient);
 }
+// The stamped field holds the same sums as the loop below, sampled bilinearly from RGBA16F
+// texels: height, world X/Z slope and crest foam. Fragments outside its guard evaluate only
+// the pieces the CPU found reaching past it, listed in the record texture's third row.
+uniform int stampEnabled;
+uniform sampler2D stampField;
+uniform vec4 stampRect; // Origin X/Z, 1/extent, half-texel guard in UV.
+uniform int stampOutsideCount;
+vec3 objectWakeRecord(vec2 p, int i)
+{
+    return objectWakePiece(p,texelFetch(objectWakeData,ivec2(i,0),0),
+        texelFetch(objectWakeData,ivec2(i,1),0),
+        i>=objectWakePlayerCount && objectWakeTrafficLife>0.0 ? objectWakeTrafficLife : objectWakeLife);
+}
 vec3 objectWake(vec2 p)
 {
     vec3 result=vec3(0.0);
+    if (stampEnabled != 0) {
+        vec2 uv=(p-stampRect.xy)*stampRect.z;
+        if (all(greaterThanEqual(uv,vec2(stampRect.w))) && all(lessThanEqual(uv,vec2(1.0-stampRect.w)))) {
+            vec4 s=textureLod(stampField,uv,0.0);
+            objectCrestFoam=s.w;
+            return s.xyz;
+        }
+        for (int i=0; i<256; ++i) {
+            if (i>=stampOutsideCount) break;
+            result+=objectWakeRecord(p,int(texelFetch(objectWakeData,ivec2(i,2),0).x));
+        }
+        return result;
+    }
     for (int i=0; i<256; ++i) {
         if (i>=playerWakeCount) break;
-        result+=objectWakePiece(p,texelFetch(objectWakeData,ivec2(i,0),0),
-            texelFetch(objectWakeData,ivec2(i,1),0),
-            i>=objectWakePlayerCount && objectWakeTrafficLife>0.0 ? objectWakeTrafficLife : objectWakeLife);
+        result+=objectWakeRecord(p,i);
     }
     return result;
 }
@@ -367,6 +423,131 @@ vec3 wakeFieldSample(vec2 world) {
 // Presentation-only crest proxy. For a sinusoid, kh/length(kh, gradient) is its
 // phase independent of amplitude: increasing height cannot widen the pale band.
 // The energy gate keeps gentle swells clear. Keep boat_water_mesh.c in sync.
+// G3b foam history and cosmetic ripples around the boat: R foam, G ripple height. Shading only;
+// the analytic vertex height stays authoritative.
+uniform int historyEnabled;
+uniform sampler2D historyField;
+uniform vec4 historyRect; // Origin X/Z, 1/extent, edge fade in metres.
+uniform float historySlopeGain;
+float historyFoam = 0.0;
+vec2 historySlope(vec2 world, float footprint)
+{
+    if (historyEnabled == 0) return vec2(0.0);
+    vec2 uv = (world - historyRect.xy) * historyRect.z;
+    float extent = 1.0 / historyRect.z;
+    vec2 edge = min(uv, vec2(1.0) - uv) * extent;
+    float fade = smoothstep(0.0, historyRect.w, min(edge.x, edge.y));
+    if (fade <= 0.0) return vec2(0.0);
+    float texel = 1.0 / float(textureSize(historyField, 0).x);
+    vec4 here = textureLod(historyField, uv, 0.0);
+    float east = textureLod(historyField, uv + vec2(texel, 0.0), 0.0).g;
+    float west = textureLod(historyField, uv - vec2(texel, 0.0), 0.0).g;
+    float north = textureLod(historyField, uv + vec2(0.0, texel), 0.0).g;
+    float south = textureLod(historyField, uv - vec2(0.0, texel), 0.0).g;
+    // Strands instead of a sheet: a fixed world pattern raises the threshold foam must pass. It
+    // is stretched along the foam's drift, (-0.6, -0.8), so foam tears into meandering streaks
+    // about 2 m apart and broken every few metres, not round cells.
+    float along = dot(world, vec2(-0.6, -0.8)), across = dot(world, vec2(0.8, -0.6));
+    float lace = 0.5 + 0.25
+        * sin(across * 3.4 + 1.6 * sin(along * 0.45) + 0.8 * sin(along * 1.3 + across * 0.7))
+        * (0.6 + 0.4 * sin(along * 0.9 + 2.0 * sin(across * 1.1)));
+    historyFoam = fade * smoothstep(lace - 0.2, lace + 0.15, here.r);
+    // Ripples finer than a pixel would shimmer; fade them with the pixel footprint.
+    float resolvedRipple = 1.0 - smoothstep(0.35, 0.9, footprint);
+    return vec2(east - west, north - south) / (2.0 * texel * extent)
+        * historySlopeGain * fade * resolvedRipple;
+}
+// G4: a copy of the opaque depth drawn before the water, for the water in front of quay walls
+// and other submerged geometry. Only geometry behind the surface counts, so an object in front
+// of the water never shades it. Raylib's projection is conventional (not reversed) GL depth.
+uniform int sceneDepthEnabled;
+uniform sampler2D sceneDepth;
+uniform vec4 sceneDepthParams; // Near, far, 1/width, 1/height of the target.
+float linearDepth(float depth)
+{
+    float n = sceneDepthParams.x, f = sceneDepthParams.y;
+    return 2.0 * n * f / (f + n - (depth * 2.0 - 1.0) * (f - n));
+}
+// Metres of water along the view axis between this fragment and the opaque scene behind it:
+// a quay wall or bank below the surface. -1 when unknown or nothing opaque is behind it.
+float waterBehind()
+{
+    if (sceneDepthEnabled == 0) return -1.0;
+    float opaque = texture(sceneDepth, gl_FragCoord.xy * sceneDepthParams.zw).r;
+    if (opaque >= 1.0) return -1.0;
+    float behind = linearDepth(opaque) - linearDepth(gl_FragCoord.z);
+    return behind < 0.0 ? -1.0 : behind;
+}
+// Water lapping at a submerged wall: a broken, slowly moving light band about two metres wide.
+// The scene has no river bed, so open water never has anything behind it. The reflection pass
+// draws no water, so only the main camera reads the copy.
+vec3 shoreShade(vec3 color)
+{
+    float behind = waterBehind();
+    if (behind < 0.0) return color;
+    // 24-bit depth from a 0.15 m near plane still resolves about 4 cm at 300 m; the band widens
+    // with distance so it keeps about a pixel there.
+    float distance = length(cameraPosition - fragWorldPosition);
+    float band = (1.0 - smoothstep(0.2, 2.0 + 0.015 * distance, behind))
+        * (1.0 - smoothstep(250.0, 400.0, distance));
+    float lap = 0.5 + 0.5 * sin(fragWorldPosition.x * 1.9 + fragWorldPosition.z * 1.3
+        + 1.5 * sin(fragWorldPosition.z * 0.7 - fragWorldPosition.x * 0.4) + detailRipplePhase.x);
+    color *= 1.0 + 0.10 * band;
+    return mix(color, vec3(0.70, 0.82, 0.84), 0.55 * band * smoothstep(0.25, 0.7, lap));
+}
+// G4 far-water life, presentation only. gustWaves and glitterWaves hold X/Z wavenumbers and a
+// CPU-reduced phase; squallWater the sky squall's centre X/Z, radius and growth.
+uniform int farWaterEnabled;
+uniform vec4 gustWaves[4];
+uniform vec4 glitterWaves[5];
+uniform vec4 squallWater;
+
+// 0..1: dark, matte gust patches drifting downwind over exposed water, and the ruffled water
+// under and just ahead of a grown squall. Roughness, not shade: wind ripples too small to draw
+// reflect less of the bright sky, so the water there reads darker. A squall darkens no lighting,
+// so the water beneath it gets no shadow of its own.
+float gustAmount(vec2 p, float exposed)
+{
+    if (farWaterEnabled == 0 || waterfrontWater == 0) return 0.0;
+    // A gentle warp keeps the summed waves from reading as a regular pattern.
+    vec2 q = p + 9.0 * vec2(sin(p.y * 0.061 + 1.3), sin(p.x * 0.053 + 0.4))
+        + 3.0 * vec2(sin(p.y * 0.23 + p.x * 0.07), sin(p.x * 0.19 - p.y * 0.05));
+    float sum = 0.0;
+    for (int i = 0; i < 4; ++i)
+        sum += sin(dot(gustWaves[i].xy, q) - gustWaves[i].z);
+    float gust = smoothstep(1.3, 2.5, sum) * smoothstep(0.35, 0.8, exposed);
+    if (squallWater.w > 0.0 && squallWater.z > 0.0) {
+        float d = length(p - squallWater.xy) / squallWater.z;
+        gust = max(gust, 0.5 * squallWater.w * (1.0 - smoothstep(0.8, 1.7, d)));
+    }
+    return gust;
+}
+
+// Chunky sun glitter: short oblique waves tilt the surface, and where one throws the sun into
+// the eye inside the broad path toward it, the pixel lights fully. Farther pixels average more
+// facets, so the threshold widens with the footprint and the path stays sparkling.
+float sunGlitter(vec3 normal, vec3 viewDirection, float footprint, float exposed)
+{
+    if (farWaterEnabled == 0 || waterfrontWater == 0) return 0.0;
+    vec3 sun = normalize(sunDirection);
+    float path = smoothstep(0.90, 0.985, dot(reflect(-viewDirection, normal), sun));
+    if (path <= 0.0) return 0.0;
+    vec2 p = fragWorldPosition.xz;
+    p += 0.9 * vec2(sin(p.y * 0.83 + 2.0 * sin(p.x * 0.31)), sin(p.x * 0.71 + 2.0 * sin(p.y * 0.37)));
+    vec2 tilt = vec2(0.0);
+    for (int i = 0; i < 5; ++i) {
+        vec2 k = glitterWaves[i].xy;
+        tilt += k / length(k) * cos(dot(k, p) - glitterWaves[i].z);
+    }
+    vec3 facet = normalize(vec3(normal.x - 0.11 * tilt.x, normal.y, normal.z - 0.11 * tilt.y));
+    float align = dot(reflect(-viewDirection, facet), sun);
+    float threshold = 1.0 - 0.0012 * (1.0 + 3.0 * min(footprint, 4.0));
+    // Close up a glint band spans many pixels and reads as a worm, not a point; a grown squall
+    // hides the sun everywhere.
+    float distance = length(cameraPosition - fragWorldPosition);
+    return path * step(threshold, align) * mix(0.35, 1.0, exposed)
+        * smoothstep(10.0, 35.0, distance) * (1.0 - 0.9 * squallWater.w);
+}
 float waveCrestFoam(vec3 wave, float k)
 {
     float kh = k * wave.x;
@@ -384,6 +565,7 @@ void main()
     vec3 base = texture(texture0, fragTexCoord).rgb * objectColor.rgb * fragColor.rgb;
     vec3 normal = normalize(fragWorldNormal);
     float exposed = exposure(fragWorldPosition.xz);
+    float gust = gustAmount(fragWorldPosition.xz, exposed);
     vec3 wake = vec3(0.0);
     vec3 vessel = vesselWake(fragWorldPosition.xz).xyz;
     vec3 storm = stormWave(fragWorldPosition.xz).xyz;
@@ -417,11 +599,28 @@ void main()
         float shortRipple = dot(crossing, fragWorldPosition.xz) * 3.7 - detailRipplePhase.y;
         vec2 detail = wind * cos(longRipple) * resolved(1.65, footprint)
             + crossing * cos(shortRipple) * 0.45 * resolved(3.7, footprint);
-        vec2 slope = normal.xz + detail * mix(0.004, 0.035, exposed);
+        vec2 slope = normal.xz + detail * mix(0.004, 0.035, exposed) * (1.0 + 1.2 * gust);
         normal = normalize(vec3(slope.x, normal.y, slope.y));
         base *= mix(vec3(0.97, 1.01, 1.0), vec3(1.04, 1.07, 0.98), exposed);
+        // Estimated shallows warm and lighten a little; the last metres before a shore lighten.
+        float weight;
+        vec4 place = atlasPlace(fragWorldPosition.xz, weight);
+        float shallow = (1.0 - smoothstep(0.8, 2.0, place.y)) * weight;
+        float shore = (1.0 - smoothstep(0.5, 4.0, place.x)) * weight;
+        base = mix(base, base * vec3(1.06, 1.10, 1.0) + vec3(0.02, 0.03, 0.01), 0.35 * shallow);
+        base *= 1.0 + 0.06 * shore;
+        base *= 1.0 - 0.14 * gust;
+    }
+    // Ripples read clearest on sheltered, glassy water and break up in chop.
+    vec2 ripples = historySlope(fragWorldPosition.xz, footprint)
+        * (waterfrontWater != 0 ? mix(1.25, 0.85, exposed) : 1.0);
+    if (historyEnabled != 0) {
+        normal = normalize(vec3(normal.x - ripples.x * normal.y, normal.y,
+            normal.z - ripples.y * normal.y));
+        base *= 1.0 + 0.35 * dot(ripples, vec2(0.7));
     }
     if (reflectionsEnabled == 0) {
+        base = shoreShade(mix(base, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam));
         finalColor = vec4(base * waterShadow(), 1.0);
         return;
     }
@@ -448,6 +647,7 @@ void main()
     if (waterfrontWater != 0)
         reflectionAmount = mix(0.13, mix(0.38, 0.25, exposed),
             (1.0 - viewDot) * (1.0 - viewDot));
+    reflectionAmount *= 1.0 - 0.5 * gust;
     vec3 color = mix(base, reflection * vec3(0.96, 0.99, 1.0), reflectionAmount * coverage);
     if (physicalWaves != 0) {
         vec3 halfVector = normalize(viewDirection + normalize(sunDirection));
@@ -470,5 +670,9 @@ void main()
         if (stormArea.w > 0.0) color *= 1.0-0.32*stormShade;
         color = mix(color, vec3(0.65, 0.78, 0.80), foam);
     }
+    color = mix(color, vec3(0.65, 0.78, 0.80), 0.55 * historyFoam);
+    color = shoreShade(color);
+    color = mix(color, vec3(1.0, 0.96, 0.84), 0.75 * sunGlitter(normal, viewDirection, footprint,
+        exposed));
     finalColor = vec4(color * waterShadow(), 1.0);
 }

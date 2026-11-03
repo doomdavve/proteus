@@ -13,29 +13,40 @@ Module['boatScenery'] = (() => {
       if (loads[name] && loads[name].state !== -1)
         return;
       const load = (loads[name] = { state: 1, received: 0, total: 0 });
-      const url = Module['locateFile'](`geometry/${name}/scenery.bin`, '');
-      fetch(url)
-        .then(async response => {
-          if (!response.ok)
-            throw new Error(`${url}: HTTP ${response.status}`);
+      // The pack, then its optional water atlas (graphics G4) next to it in the file system.
+      const fetchInto = async (file, target, counted) => {
+        const url = Module['locateFile'](`geometry/${name}/${file}`, '');
+        const response = await fetch(url);
+        if (!response.ok)
+          throw new Error(`${url}: HTTP ${response.status}`);
+        if (counted)
           load.total = Number(response.headers.get('Content-Length')) || 0;
-          const reader = response.body.getReader();
-          const chunks = [];
-          for (;;) {
-            const { done, value } = await reader.read();
-            if (done)
-              break;
-            chunks.push(value);
+        const reader = response.body.getReader();
+        const chunks = [];
+        let received = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done)
+            break;
+          chunks.push(value);
+          received += value.length;
+          if (counted)
             load.received += value.length;
-          }
-          const bytes = new Uint8Array(load.received);
-          let at = 0;
-          for (const chunk of chunks) {
-            bytes.set(chunk, at);
-            at += chunk.length;
-          }
-          FS.mkdirTree(path.slice(0, path.lastIndexOf('/')));
-          FS.writeFile(path, bytes);
+        }
+        const bytes = new Uint8Array(received);
+        let at = 0;
+        for (const chunk of chunks) {
+          bytes.set(chunk, at);
+          at += chunk.length;
+        }
+        FS.mkdirTree(target.slice(0, target.lastIndexOf('/')));
+        FS.writeFile(target, bytes);
+      };
+      const atlas = path.slice(0, path.lastIndexOf('/') + 1) + 'water_atlas.bin';
+      fetchInto('scenery.bin', path, true)
+        .then(() => fetchInto('water_atlas.bin', atlas, false).catch(error =>
+          console.warn('Water atlas', name, error)))
+        .then(() => {
           load.state = 2;
         })
         .catch(error => {

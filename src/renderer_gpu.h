@@ -3,6 +3,8 @@
 
 #include "waterfront_corner.h"
 #include "waterfront_scene.h"
+#include "waterfront_wake_stamp.h"
+#include "waterfront_water_history.h"
 
 #include "raylib.h"
 
@@ -93,6 +95,10 @@ typedef struct {
     unsigned int tiles_culled[WATERFRONT_GPU_PASS_COUNT];
     unsigned int far_cells[WATERFRONT_GPU_PASS_COUNT]; // Detail cells drawn far, per map drawn.
     unsigned int sky_quads;
+    unsigned int wake_pieces, wake_outside; // Object wake pieces and those shaded analytically.
+    size_t wake_texels; // Texels the stamped pieces cover; zero when the field is reused.
+    unsigned history_substeps; // Fixed water history substeps run this frame.
+    unsigned history_resets; // 1 when the history reset and pre-rolled this frame.
 } WaterfrontGpuStats;
 
 // GPU-owned waterfront resources. They must be created, bound and destroyed while a
@@ -114,6 +120,15 @@ typedef struct {
     Texture2D wake_field; // Borrowed, immutable for the complete draw; owned by BoatGpu.
     float wake_spacing;
     Texture2D object_wakes; // Owned compact object records; not a sampled water height field.
+    // Records of the frame being drawn: player and traffic pieces, and, in a third row, the
+    // indices of the pieces the stamped field cannot shade.
+    float *object_records;
+    int object_count, object_players, object_outside;
+    float object_life, object_traffic_life;
+    WaterfrontWakeStamp wake_stamp; // Sampled wake shading; analytic when unsupported.
+    bool wake_stamp_disabled; // Review: shade every piece analytically, the reference.
+    WaterfrontWaterHistory water_history; // Foam history and ripples; none when unsupported.
+    bool water_history_disabled; // Review: stamp-only water, the G3a comparison.
     WaterfrontGpuTiled windows;
     WaterfrontGpuTiled corner;
     WaterfrontGpuTiled corner_emissive;
@@ -144,6 +159,17 @@ typedef struct {
     Texture2D sky_texture;
     RenderTexture2D shadow_map;
     RenderTexture2D far_shadow_map;
+    // G4: a copy of the main pass's opaque depth taken just before water draws, for shore and
+    // quay shading. Never the attachment being written; absent outside a render texture.
+    RenderTexture2D scene_depth;
+    bool scene_depth_valid; // Copied for the water now being drawn.
+    bool scene_depth_disabled; // Review: water shading without the depth copy.
+    // G4: the bound map's water atlas (shore, depth, shelter, chop) as a bilinear RGBA8 texture;
+    // id 0 without one, and the water keeps its hand-written exposure.
+    Texture2D water_atlas;
+    float water_atlas_rect[4]; // Origin X/Z, 1/extent X/Z, renderer metres.
+    bool water_atlas_disabled; // Review: the hand-written exposure even with an atlas.
+    bool far_water_disabled; // Review: no G4 gusts, sun glitter or squall water.
     RenderTexture2D reflection;
     Matrix light_view_projection;
     Matrix far_light_view_projection;
@@ -190,6 +216,18 @@ bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int siz
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limit);
+// Review: shade object wakes from the stamped field (default when supported) or analytically.
+void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool enabled);
+// Review: replace the stamped field with one of SIZE texels per side at SPACING metres.
+bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing);
+// Review: draw water without (or again with) G4 gusts, sun glitter and squall water.
+void waterfront_gpu_scene_set_far_water_enabled(WaterfrontGpuScene *scene, bool enabled);
+// Review: shade water from the hand-written exposure instead of (or again from) the map atlas.
+void waterfront_gpu_scene_set_water_atlas_enabled(WaterfrontGpuScene *scene, bool enabled);
+// Review: shade water without (or again with) the copy of opaque depth.
+void waterfront_gpu_scene_set_scene_depth_enabled(WaterfrontGpuScene *scene, bool enabled);
+// Review: turn the foam history and ripples off (stamp-only shading) or back on.
+void waterfront_gpu_scene_set_water_history_enabled(WaterfrontGpuScene *scene, bool enabled);
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);
 void waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);

@@ -1,5 +1,6 @@
 #include "renderer_gpu.h"
 #include "boat_clock.h"
+#include "boat_water_atlas.h"
 #include "boat_water_mesh.h"
 #include "waterfront_city.h"
 #include "waterfront_corner.h"
@@ -514,7 +515,9 @@ static const char *const known_uniforms[] = { "objectColor", "emissive", "instan
     "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
     "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
     "reflectionTexture", "surfacePixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
-    "skyScale", "skyEye", "squallArea", "squallHeight", NULL };
+    "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
+    "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
+    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -1341,17 +1344,18 @@ static Shader load_sky_shader(const char *fragment_shader_path)
     return LoadShader(NULL, path);
 }
 
-static bool create_shadow_map(RenderTexture2D *target, int size)
+// A framebuffer with only a WIDTH x HEIGHT depth texture: shadow maps and the scene depth copy.
+static bool create_depth_target(RenderTexture2D *target, int width, int height)
 {
     *target = (RenderTexture2D) { 0 };
     target->id = rlLoadFramebuffer();
     if (target->id == 0)
         return false;
-    target->texture.width = size;
-    target->texture.height = size;
-    target->depth.id = rlLoadTextureDepth(size, size, false);
-    target->depth.width = size;
-    target->depth.height = size;
+    target->texture.width = width;
+    target->texture.height = height;
+    target->depth.id = rlLoadTextureDepth(width, height, false);
+    target->depth.width = width;
+    target->depth.height = height;
     target->depth.mipmaps = 1;
     if (target->depth.id == 0) {
         rlUnloadFramebuffer(target->id);
@@ -1372,6 +1376,34 @@ static bool create_shadow_map(RenderTexture2D *target, int size)
     return true;
 }
 
+static bool create_shadow_map(RenderTexture2D *target, int size)
+{
+    return create_depth_target(target, size, size);
+}
+
+// Copy the active render texture's depth, holding the opaque scene so far, into a texture the
+// water shader can read while it writes the original. The default framebuffer has no readable
+// depth, so drawing there keeps the water's fallback.
+static void copy_scene_depth(WaterfrontGpuScene *scene, int width, int height)
+{
+    scene->scene_depth_valid = false;
+    unsigned int source = rlGetActiveFramebuffer();
+    if (scene->scene_depth_disabled || source == 0 || width <= 0 || height <= 0)
+        return;
+    if (scene->scene_depth.texture.width != width || scene->scene_depth.texture.height != height) {
+        if (scene->scene_depth.id != 0)
+            rlUnloadFramebuffer(scene->scene_depth.id);
+        if (!create_depth_target(&scene->scene_depth, width, height))
+            return;
+    }
+    rlDrawRenderBatchActive();
+    rlBindFramebuffer(RL_READ_FRAMEBUFFER, source);
+    rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, scene->scene_depth.id);
+    rlBlitFramebuffer(0, 0, width, height, 0, 0, width, height, 0x00000100); // GL_DEPTH_BUFFER_BIT
+    rlEnableFramebuffer(source);
+    scene->scene_depth_valid = true;
+}
+
 static void unbind_map(WaterfrontGpuScene *scene)
 {
     tiled_destroy(&scene->city);
@@ -1389,6 +1421,9 @@ static void unbind_map(WaterfrontGpuScene *scene)
         scene->detail_far[view] = NULL;
     }
     unload_mesh(&scene->crane);
+    if (scene->water_atlas.id != 0)
+        UnloadTexture(scene->water_atlas);
+    scene->water_atlas = (Texture2D) { 0 };
     scene->geometry = (WaterfrontGpuGeometry) { 0 };
     scene->map = NULL;
     scene->river = false;
@@ -1426,9 +1461,37 @@ bool waterfront_gpu_scene_bind(WaterfrontGpuScene *scene, const WaterfrontScener
     scene->detail_rows = scenery->tiles.rows * factor;
     scene->map = scenery->map;
     scene->river = scenery->river;
+    // The atlas is optional; without one the water keeps its hand-written exposure.
+    const BoatWaterAtlas *atlas = boat_water_atlas_of(scenery->map);
+    if (atlas) {
+        Image image = { (void *)atlas->texels, atlas->width, atlas->height, 1,
+            PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+        scene->water_atlas = LoadTextureFromImage(image);
+        SetTextureFilter(scene->water_atlas, TEXTURE_FILTER_BILINEAR);
+        SetTextureWrap(scene->water_atlas, TEXTURE_WRAP_CLAMP);
+        float extent_x = atlas->width * atlas->spacing, extent_z = atlas->height * atlas->spacing;
+        scene->water_atlas_rect[0] = atlas->origin_x;
+        scene->water_atlas_rect[1] = atlas->origin_z;
+        scene->water_atlas_rect[2] = 1 / extent_x;
+        scene->water_atlas_rect[3] = 1 / extent_z;
+    }
     Vector3 cafe = waterfront_corner_position(-2.8f, 0, -6);
     scene->cafe_lift = waterfront_scenery_ground(scenery, cafe.x, cafe.z) - 3.5f;
     return true;
+}
+
+static bool init_wake_stamp(
+    WaterfrontGpuScene *scene, const char *fragment_shader_path, int size, float spacing)
+{
+    const char *slash = strrchr(fragment_shader_path, '/');
+    char directory[1024];
+    if (slash == NULL || (size_t)(slash - fragment_shader_path) >= sizeof(directory))
+        return false;
+    snprintf(directory, sizeof(directory), "%.*s", (int)(slash - fragment_shader_path),
+        fragment_shader_path);
+    return waterfront_wake_stamp_init(&scene->wake_stamp, directory, size, spacing)
+        && waterfront_water_history_init(
+            &scene->water_history, directory, scene->wake_stamp.blending);
 }
 
 bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_shader_path)
@@ -1496,6 +1559,11 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     if (!IsRenderTextureValid(scene->reflection))
         goto failed;
     SetTextureFilter(scene->reflection.texture, TEXTURE_FILTER_POINT);
+    scene->object_records = MemAlloc(sizeof(float) * 4 * 3 * 2 * BOAT_OBJECT_CAPACITY);
+    if (!scene->object_records
+        || !init_wake_stamp(
+            scene, fragment_shader_path, WATERFRONT_WAKE_STAMP_SIZE, WATERFRONT_WAKE_STAMP_SPACING))
+        goto failed;
     scene->lighting_enabled = true;
     scene->shadows_enabled = true;
     scene->atmosphere_enabled = true;
@@ -2157,6 +2225,23 @@ static void set_atmosphere_uniforms(WaterfrontGpuScene *scene, Vector3 camera_po
         SetShaderValue(scene->shader, location, &atmosphere_enabled, SHADER_UNIFORM_INT);
 }
 
+static bool stamp_active(const WaterfrontGpuScene *scene);
+static bool history_active(const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame);
+
+// Far-water gusts: oblique waves of 57..131 m in renderer X/Z, in radians per metre, whose sum
+// the shader thresholds into patches; none shares an axis or a simple ratio with another, so the
+// pattern never settles into a lattice. They drift with the cosmetic wind.
+#define GUST_WAVES 4
+#define GLITTER_WAVES 5
+static const float GUST_WIND[2] = { -.6f, -.8f };
+static const float GUST_SPEED = 4.5f; // Metres per second.
+static const float gust_waves[GUST_WAVES][2]
+    = { { .1054f, .0322f }, { -.0272f, .0747f }, { -.0424f, -.0455f }, { .0187f, -.0442f } };
+// Sun glitter: short waves of 0.9..1.8 m at unrelated angles that tilt the surface toward the sun;
+// the shader also warps their coordinates, so the glints never line up into rows.
+static const float glitter_waves[GLITTER_WAVES][2] = { { 4.415f, 1.874f }, { -.716f, 5.828f },
+    { -3.177f, 1.761f }, { -5.791f, -3.480f }, { 1.648f, -3.882f } };
+
 static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
 {
     BoatWater water = frame->player_water;
@@ -2224,39 +2309,59 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         ? boat_water_wake_uniforms(water, frame->time, wake_origins, wake_parameters)
         : 0;
     if (objects && frame->player_active) {
-        float records[BOAT_OBJECT_CAPACITY * 16] = { 0 };
-        int capacity = BOAT_OBJECT_CAPACITY * (water.traffic_objects ? 2 : 1);
-        float *parameters = records + capacity * 4;
-        int players
-            = water.objects ? boat_wake_objects_pack(water.objects, records, parameters) : 0;
-        wake_count = players;
-        if (water.traffic_objects)
-            wake_count += boat_wake_objects_pack(
-                water.traffic_objects, records + players * 4, parameters + players * 4);
-        float traffic_life = water.traffic_objects ? water.traffic_objects->life_ticks / 120.0f : 0;
+        wake_count = scene->object_count;
         SetShaderValue(scene->water_shader,
-            cached_location(scene->water_shader, "objectWakePlayerCount"), &players,
+            cached_location(scene->water_shader, "objectWakePlayerCount"), &scene->object_players,
             SHADER_UNIFORM_INT);
         SetShaderValue(scene->water_shader,
-            cached_location(scene->water_shader, "objectWakeTrafficLife"), &traffic_life,
-            SHADER_UNIFORM_FLOAT);
-        if (scene->object_wakes.id && scene->object_wakes.width != capacity) {
-            UnloadTexture(scene->object_wakes);
-            scene->object_wakes = (Texture2D) { 0 };
-        }
-        if (!scene->object_wakes.id) {
-            Image image = { records, capacity, 2, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
-            scene->object_wakes = LoadTextureFromImage(image);
-            SetTextureFilter(scene->object_wakes, TEXTURE_FILTER_POINT);
-        } else {
-            UpdateTexture(scene->object_wakes, records);
-        }
+            cached_location(scene->water_shader, "objectWakeTrafficLife"),
+            &scene->object_traffic_life, SHADER_UNIFORM_FLOAT);
         int slot = 14;
         rlEnableShader(scene->water_shader.id);
         rlActiveTextureSlot(slot);
         rlEnableTexture(scene->object_wakes.id);
         rlSetUniform(
             cached_location(scene->water_shader, "objectWakeData"), &slot, SHADER_UNIFORM_INT, 1);
+        rlActiveTextureSlot(0);
+    }
+    int stamp = objects && frame->player_active && stamp_active(scene);
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stampEnabled"),
+        &stamp, SHADER_UNIFORM_INT);
+    // Without a field the sampler shares unit 0 with the material texture, never an empty unit.
+    int stamp_slot = stamp ? 9 : 0;
+    rlEnableShader(scene->water_shader.id);
+    rlSetUniform(
+        cached_location(scene->water_shader, "stampField"), &stamp_slot, SHADER_UNIFORM_INT, 1);
+    if (stamp) {
+        float rect[4];
+        waterfront_wake_stamp_rect(&scene->wake_stamp, rect);
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "stampRect"), rect,
+            SHADER_UNIFORM_VEC4);
+        SetShaderValue(scene->water_shader,
+            cached_location(scene->water_shader, "stampOutsideCount"), &scene->object_outside,
+            SHADER_UNIFORM_INT);
+        rlActiveTextureSlot(stamp_slot);
+        rlEnableTexture(scene->wake_stamp.target.texture.id);
+        rlActiveTextureSlot(0);
+    }
+    int history = history_active(scene, frame) && scene->water_history.valid;
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "historyEnabled"),
+        &history, SHADER_UNIFORM_INT);
+    // Without history the sampler shares unit 0 with the material texture, as stampField does.
+    int history_slot = history ? 8 : 0;
+    rlEnableShader(scene->water_shader.id);
+    rlSetUniform(
+        cached_location(scene->water_shader, "historyField"), &history_slot, SHADER_UNIFORM_INT, 1);
+    if (history) {
+        float rect[4];
+        waterfront_water_history_rect(&scene->water_history, rect);
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "historyRect"),
+            rect, SHADER_UNIFORM_VEC4);
+        SetShaderValue(scene->water_shader,
+            cached_location(scene->water_shader, "historySlopeGain"),
+            &scene->water_history.tuning.ripple_slope_gain, SHADER_UNIFORM_FLOAT);
+        rlActiveTextureSlot(history_slot);
+        rlEnableTexture(waterfront_water_history_texture(&scene->water_history).id);
         rlActiveTextureSlot(0);
     }
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "playerWakeCount"),
@@ -2320,6 +2425,40 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
     location = cached_location(scene->water_shader, "detailRipplePhase");
     if (location >= 0)
         SetShaderValue(scene->water_shader, location, detail_phase, SHADER_UNIFORM_VEC2);
+    // G4 far-water life, presentation only: gust patches carried downwind and sun glitter, each
+    // a few oblique waves whose phases are reduced on the CPU, and the squall's water footprint.
+    int far_water = !scene->far_water_disabled;
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "farWaterEnabled"),
+        &far_water, SHADER_UNIFORM_INT);
+    if (far_water) {
+        float gusts[4 * GUST_WAVES], glitter[4 * GLITTER_WAVES];
+        for (int i = 0; i < GUST_WAVES; ++i) {
+            const float *k = gust_waves[i];
+            double rate = (k[0] * GUST_WIND[0] + k[1] * GUST_WIND[1]) * GUST_SPEED;
+            gusts[4 * i] = k[0];
+            gusts[4 * i + 1] = k[1];
+            gusts[4 * i + 2] = boat_phase(rate, frame->time);
+            gusts[4 * i + 3] = 0;
+        }
+        for (int i = 0; i < GLITTER_WAVES; ++i) {
+            const float *k = glitter_waves[i];
+            // Deep-water dispersion, omega = sqrt(g |k|), so short glints move faster.
+            double rate = sqrt(9.81 * sqrt(k[0] * k[0] + k[1] * k[1]));
+            glitter[4 * i] = k[0];
+            glitter[4 * i + 1] = k[1];
+            glitter[4 * i + 2] = boat_phase(rate, frame->time);
+            glitter[4 * i + 3] = 0;
+        }
+        SetShaderValueV(scene->water_shader, cached_location(scene->water_shader, "gustWaves[0]"),
+            gusts, SHADER_UNIFORM_VEC4, GUST_WAVES);
+        SetShaderValueV(scene->water_shader,
+            cached_location(scene->water_shader, "glitterWaves[0]"), glitter, SHADER_UNIFORM_VEC4,
+            GLITTER_WAVES);
+        float squall[] = { frame->squall.centre.x, frame->squall.centre.y, frame->squall.radius,
+            frame->squall.grown };
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "squallWater"),
+            squall, SHADER_UNIFORM_VEC4);
+    }
     float reflection_phase[] = { boat_phase(.80, frame->time), boat_phase(.55, frame->time),
         boat_phase(.65, frame->time), boat_phase(.35, frame->time) };
     location = cached_location(scene->water_shader, "reflectionRipplePhase");
@@ -2784,10 +2923,145 @@ static Matrix render_shadow_map(WaterfrontGpuScene *scene, const WaterfrontScene
     return MatrixMultiply(view, projection);
 }
 
-static void draw_water(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width)
+static bool stamp_active(const WaterfrontGpuScene *scene)
 {
+    return scene->wake_stamp.supported && !scene->wake_stamp_disabled;
+}
+
+// Pack this frame's object wake records, upload them and rebuild the stamped field from them
+// before any pass binds a render target of its own.
+static void prepare_object_wakes(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
+{
+    BoatWater water = frame->player_water;
+    scene->object_count = scene->object_players = scene->object_outside = 0;
+    if (!frame->player_active || (!water.objects && !water.traffic_objects))
+        return;
+    int capacity = BOAT_OBJECT_CAPACITY * (water.traffic_objects ? 2 : 1);
+    float *records = scene->object_records;
+    memset(records, 0, sizeof(float) * 4 * 3 * capacity);
+    float *parameters = records + capacity * 4, *outside = records + capacity * 8;
+    int players = water.objects ? boat_wake_objects_pack(water.objects, records, parameters) : 0;
+    int count = players;
+    if (water.traffic_objects)
+        count += boat_wake_objects_pack(
+            water.traffic_objects, records + players * 4, parameters + players * 4);
+    scene->object_count = count;
+    scene->object_players = players;
+    scene->object_life = water.objects ? water.objects->life_ticks / 120.0f : 16;
+    scene->object_traffic_life
+        = water.traffic_objects ? water.traffic_objects->life_ticks / 120.0f : 0;
+    if (stamp_active(scene)) {
+        Vector2 centre = { frame->player.hull.position.x, frame->player.hull.position.z };
+        scene->object_outside = waterfront_wake_stamp_place(&scene->wake_stamp, centre, records,
+            parameters, count, players, scene->object_life, scene->object_traffic_life, outside);
+    }
+    if (scene->object_wakes.id && scene->object_wakes.width != capacity) {
+        UnloadTexture(scene->object_wakes);
+        scene->object_wakes = (Texture2D) { 0 };
+    }
+    if (!scene->object_wakes.id) {
+        Image image = { records, capacity, 3, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
+        scene->object_wakes = LoadTextureFromImage(image);
+        SetTextureFilter(scene->object_wakes, TEXTURE_FILTER_POINT);
+    } else {
+        UpdateTexture(scene->object_wakes, records);
+    }
+    if (!stamp_active(scene))
+        return;
+    unsigned long long builds = scene->wake_stamp.builds;
+    RenderTargetState previous = render_target_state();
+    waterfront_wake_stamp_build(&scene->wake_stamp, scene->object_wakes, players,
+        scene->object_life, scene->object_traffic_life);
+    restore_render_target(previous);
+    scene->stats.wake_pieces = (unsigned)scene->wake_stamp.pieces;
+    scene->stats.wake_outside = (unsigned)scene->object_outside;
+    scene->stats.wake_texels = scene->wake_stamp.builds != builds ? scene->wake_stamp.texels : 0;
+}
+
+static bool history_active(const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
+{
+    return frame->player_active && scene->water_history.supported && !scene->water_history_disabled;
+}
+
+// Advance the foam history and ripples to this frame's simulated time, after the stamped field
+// that seeds them is built and before any pass binds a render target of its own.
+static void prepare_water_history(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
+{
+    if (!history_active(scene, frame))
+        return;
+    WaterfrontWaterHistoryInput input = {
+        .time = frame->time,
+        .content = (uint64_t)(uintptr_t)scene->map * 31 + scene->water.vaoId * 2
+            + (frame->boating_basin ? 1 : 0),
+        .centre = { frame->player.hull.position.x, frame->player.hull.position.z },
+        .rain = { frame->squall.centre.x, frame->squall.centre.y, frame->squall.radius,
+            frame->squall.grown },
+        .water = scene->water.vaoId ? &scene->water : NULL,
+    };
+    // Hull discs in a fixed slot order: the player, then the rivals.
+    const Transform3D *hulls[1 + WATERFRONT_RIVALS] = { &frame->player.hull };
+    int hull_count = 1;
+    for (int i = 0; i < frame->rival_count && i < WATERFRONT_RIVALS; ++i)
+        hulls[hull_count++] = &frame->rivals[i].hull;
+    for (int i = 0; i < hull_count; ++i)
+        input.hulls[input.hull_count++]
+            = (Vector3) { hulls[i]->position.x, hulls[i]->position.z, 1.3f };
+    // Gulls touching the surface bob in it; today's flocks stay above it.
+    for (int i = 0;
+        i < frame->gull_count && input.contact_count < WATERFRONT_WATER_HISTORY_CONTACTS; ++i)
+        if (frame->gulls[i][0].position.y < .4f)
+            input.contacts[input.contact_count++]
+                = (Vector2) { frame->gulls[i][0].position.x, frame->gulls[i][0].position.z };
+    if (scene->object_count && stamp_active(scene) && scene->wake_stamp.valid) {
+        input.stamp = scene->wake_stamp.target.texture.id;
+        waterfront_wake_stamp_rect(&scene->wake_stamp, input.stamp_rect);
+    }
+    unsigned long long resets = scene->water_history.resets;
+    RenderTargetState previous = render_target_state();
+    scene->stats.history_substeps
+        = (unsigned)waterfront_water_history_advance(&scene->water_history, &input);
+    restore_render_target(previous);
+    scene->stats.history_resets = scene->water_history.resets != resets;
+}
+
+static void draw_water(
+    WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
+{
+    copy_scene_depth(scene, width, height);
     set_object_color(scene->water_shader, WHITE);
     set_water_uniforms(scene, frame);
+    int depth = scene->scene_depth_valid;
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "sceneDepthEnabled"),
+        &depth, SHADER_UNIFORM_INT);
+    // Without a copy the sampler shares unit 0 with the material texture.
+    int depth_slot = depth ? 7 : 0;
+    rlEnableShader(scene->water_shader.id);
+    rlSetUniform(
+        cached_location(scene->water_shader, "sceneDepth"), &depth_slot, SHADER_UNIFORM_INT, 1);
+    if (depth) {
+        float parameters[]
+            = { frame->camera.near_plane, frame->camera.far_plane, 1.0f / width, 1.0f / height };
+        SetShaderValue(scene->water_shader,
+            cached_location(scene->water_shader, "sceneDepthParams"), parameters,
+            SHADER_UNIFORM_VEC4);
+        rlActiveTextureSlot(depth_slot);
+        rlEnableTexture(scene->scene_depth.depth.id);
+        rlActiveTextureSlot(0);
+    }
+    int atlas = scene->water_atlas.id != 0 && !scene->water_atlas_disabled;
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "atlasEnabled"),
+        &atlas, SHADER_UNIFORM_INT);
+    int atlas_slot = atlas ? 6 : 0; // Unit 10 holds the city shader's shadow map.
+    rlEnableShader(scene->water_shader.id);
+    rlSetUniform(
+        cached_location(scene->water_shader, "waterAtlas"), &atlas_slot, SHADER_UNIFORM_INT, 1);
+    if (atlas) {
+        SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "atlasRect"),
+            scene->water_atlas_rect, SHADER_UNIFORM_VEC4);
+        rlActiveTextureSlot(atlas_slot);
+        rlEnableTexture(scene->water_atlas.id);
+        rlActiveTextureSlot(0);
+    }
     float pixel_scale = fmaxf(1, width / 320.0f);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
@@ -2854,6 +3128,8 @@ static void draw_scene(
         .projection = CAMERA_PERSPECTIVE };
     Material material = scene->city_material;
     Material life_material = scene->life_material;
+    prepare_object_wakes(scene, frame);
+    prepare_water_history(scene, frame);
     counting_pass = WATERFRONT_GPU_PASS_SHADOW;
     scene->far_shadows_active = frame->player_active;
     if (scene->shadows_enabled) {
@@ -2883,7 +3159,7 @@ static void draw_scene(
     rlEnableBackfaceCulling();
     if (frame->boating_basin) {
         draw_scenery(scene, frame, material);
-        draw_water(scene, frame, width);
+        draw_water(scene, frame, width, height);
         rlDisableBackfaceCulling();
         draw_life(scene, life_material, frame, true);
         draw_ghost(scene, life_material, frame, width);
@@ -2897,7 +3173,7 @@ static void draw_scene(
     draw_tiled(scene, &scene->roofs, scene->roof_material);
     draw_ground(scene, material);
     draw_detailed(scene, &scene->corner, &scene->corner_far, material);
-    draw_water(scene, frame, width);
+    draw_water(scene, frame, width, height);
     set_emissive(scene->shader, true);
     draw_detailed(scene, &scene->windows, &scene->windows_far, material);
     draw_tiled(scene, &scene->corner_emissive, material);
@@ -2936,6 +3212,36 @@ void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool
 void waterfront_gpu_scene_set_instance_limit(WaterfrontGpuScene *scene, int limit)
 {
     scene->instance_limit = limit;
+}
+
+void waterfront_gpu_scene_set_wake_stamp_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->wake_stamp_disabled = !enabled;
+}
+
+bool waterfront_gpu_scene_set_wake_stamp_size(WaterfrontGpuScene *scene, int size, float spacing)
+{
+    return waterfront_wake_stamp_resize(&scene->wake_stamp, size, spacing);
+}
+
+void waterfront_gpu_scene_set_far_water_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->far_water_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_water_atlas_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->water_atlas_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_scene_depth_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->scene_depth_disabled = !enabled;
+}
+
+void waterfront_gpu_scene_set_water_history_enabled(WaterfrontGpuScene *scene, bool enabled)
+{
+    scene->water_history_disabled = !enabled;
 }
 
 void waterfront_gpu_scene_set_lighting_enabled(WaterfrontGpuScene *scene, bool enabled)
@@ -3053,6 +3359,9 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         UnloadTexture(scene->sky_texture);
     if (scene->object_wakes.id != 0)
         UnloadTexture(scene->object_wakes);
+    MemFree(scene->object_records);
+    waterfront_wake_stamp_destroy(&scene->wake_stamp);
+    waterfront_water_history_destroy(&scene->water_history);
     if (scene->sky_shader.id != 0 && scene->sky_shader.id != rlGetShaderIdDefault()) {
         forget_locations(scene->sky_shader);
         UnloadShader(scene->sky_shader);
@@ -3063,6 +3372,8 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         rlUnloadFramebuffer(scene->shadow_map.id);
     if (scene->far_shadow_map.id != 0)
         rlUnloadFramebuffer(scene->far_shadow_map.id);
+    if (scene->scene_depth.id != 0)
+        rlUnloadFramebuffer(scene->scene_depth.id);
     if (scene->reflection.id != 0)
         UnloadRenderTexture(scene->reflection);
     if (scene->shader.id != 0 && scene->shader.id != rlGetShaderIdDefault()) {

@@ -475,6 +475,20 @@ static bool export_performance(BoatCapture *capture, const WakePerformanceInfo *
     return ok;
 }
 
+// Graphics review (Batch B): F8 steps back through the water layers on the GPU renderer.
+static const char *const water_layer_names[] = { "WATER: ALL", "WATER: NO FAR LIFE",
+    "WATER: G3 ONLY", "WATER: STAMP ONLY", "WATER: ANALYTIC WAKES" };
+#define WATER_LAYERS (int)(sizeof(water_layer_names) / sizeof(*water_layer_names))
+
+static void apply_water_layer(BoatGpu *gpu, int layer)
+{
+    waterfront_gpu_scene_set_far_water_enabled(&gpu->scene, layer < 1);
+    waterfront_gpu_scene_set_water_atlas_enabled(&gpu->scene, layer < 2);
+    waterfront_gpu_scene_set_scene_depth_enabled(&gpu->scene, layer < 2);
+    waterfront_gpu_scene_set_water_history_enabled(&gpu->scene, layer < 3);
+    waterfront_gpu_scene_set_wake_stamp_enabled(&gpu->scene, layer < 4);
+}
+
 static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
@@ -911,6 +925,7 @@ static int study(int argc, char **argv)
     Renderer3D renderer = { 0 };
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     BoatGpu gpu = { 0 };
+    int water_layer = 0, water_layer_label = 0; // F8; label frames left.
     BoatRearview mirror = { 0 };
     // Every mapped location, solo or room; hidden until N.
     BoatMinimap minimap = { 0 };
@@ -1494,6 +1509,11 @@ static int study(int argc, char **argv)
             profiler_visible = !profiler_visible;
             next_snapshot_time = 0;
         }
+        if (active && gpu_enabled && IsKeyPressed(KEY_F8)) {
+            water_layer = (water_layer + 1) % WATER_LAYERS;
+            apply_water_layer(&gpu, water_layer);
+            water_layer_label = 180;
+        }
         bool performance_request = active && IsKeyPressed(KEY_F4);
         if (active && boat_minimap_ready(&minimap) && IsKeyPressed(KEY_N))
             minimap_mode = boat_minimap_next(minimap_mode);
@@ -1908,6 +1928,11 @@ static int study(int argc, char **argv)
             boat_ui_text("MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10,
                 (Color) { 218, 223, 202, 255 });
 #endif
+        if (water_layer_label > 0) {
+            --water_layer_label;
+            boat_ui_text(
+                water_layer_names[water_layer], 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
+        }
         if (!networked && !session.runs.playing
             && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {
             const char *time_label = TextFormat("TIME %.2gx%s", boat_time_rate(time_speed_index),

@@ -148,6 +148,35 @@ every cell with windows must keep them far. It prints the switch counts and near
 every G0 review pose and six stress frames scalar, instanced and instanced with a replay every
 three objects, with AA off and 4x4. The main image, reflection and both shadow depth maps must be
 byte-identical, with equal instances and triangles and fewer submissions.
+`wake_stamp` (`boat_water_review --check-wake-stamp`, `gpu`, about 3 s; graphics G3a) reads
+the stamped wake field back at three moments of the saturated four-boat fixture. It compares the
+field with the CPU pieces at 200,000 fixed world points against the
+[predeclared bounds](BOATING_PERFORMANCE.md#predeclared-accuracy-bounds), and checks that the
+listed outside pieces equal both pools beyond the field. Presented stamped and analytic
+captures must stay within the image bounds. It also checks that an identical redraw reuses the
+field, and that a teleport, rewind and new context each rebuild a correct one. The analytic
+switch must draw no field.
+`water_history` (`boat_water_review --check-water-history`, `gpu`, about 3 s; graphics G3b)
+drives the foam history and ripples with fixtures on irregular frame times and reads the state
+back. Two histories given the same inputs must match bit for bit, and so must a reset history
+and a fresh one. A repeated time must run nothing and leave the state alone. A quarter-second
+gap may run only the catch-up limit; a larger jump, rewind, teleport or content change must
+reset with pre-roll. The shore mask must be open over a water rectangle and closed beyond it,
+with no foam or height on closed texels or inside the hull disc. Stamped foam must halve within
+1.5 times its half-life and fall below 5% within 5 s. Scrolling one block must move foam exactly
+with the world and leave the new strip empty. A minute of rain, a bobbing contact and a fast
+hull must stay finite and within the height limit, with peak energy in the last 15 s at most 1.5
+times that of the 15 s before. Without float targets nothing runs. In the stress scene it checks
+resets and substeps, that history changes the image, and that drawing leaves the physical state
+unchanged.
+`scene_depth` (`boat_water_review --check-scene-depth`, `gpu`, about 1.5 s; graphics G4) draws
+the outer dock with and without the opaque depth copy. The copy must be taken inside the render
+texture and skipped when disabled or drawing to the default framebuffer; the outer map must bind
+its water atlas. The quay band must change between 100 pixels and 5% of the frame, and almost
+only lighten.
+`water_atlas_river` and `water_atlas_outer` (`water_atlas_bake --check`; graphics G4) rebake each
+map's water atlas and require the committed sidecar byte for byte. `validate_boat_scenery`
+also rejects malformed, truncated, foreign-map and out-of-range atlases.
 `boat_water_review --geometry` prints each map's static GPU bytes (graphics G2a) and
 `--compare A B` checks two `--review` directories against the G0 image bounds. Neither is a CTest:
 review captures compare only within one platform and build.
