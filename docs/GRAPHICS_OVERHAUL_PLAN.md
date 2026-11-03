@@ -1520,8 +1520,10 @@ stays open.
   `check_web_resolution.py` (SwiftShader) passes HDR, fallback and mobile rotation through the
   cluster path. Release timings are in
   [Boating performance](BOATING_PERFORMANCE.md#graphics-g5b-clustered-lights--2026-11-03).
-- Unresolved / pending: human look (Batch C) of dusk windows, streaks, lamplight and the new
-  fixtures, including in motion; no browser dusk (the web build has no daylight option), Windows,
+- User's first look (2026-11-03, Mac, informal): "dusk looks amazing now." This is not Batch C
+  acceptance.
+- Unresolved / pending: Batch C review of dusk windows, streaks, lamplight and the new fixtures,
+  including in motion; no browser dusk (the web build has no daylight option), Windows,
   hardware-GPU browser or device check; the fallback is forced by option, not a real driver
   failure; storm/course/weapon readability at dusk not reviewed.
 - Next: G5c task 1.
