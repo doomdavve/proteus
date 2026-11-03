@@ -1,7 +1,7 @@
 # Sunset and dusk in gameplay
 
-Status, 2026-11-03: steps 1 and 2 implemented and machine-verified on branch
-`feat/sunset-lighting`; fixed sunset/dusk await the user's visual review. The user liked
+Status, 2026-11-03: steps 1 and 2 merged to `main` (#138) and the fixed sunset and dusk
+presets approved by the user; step 3 awaits their decisions. The user liked
 the dusk river in title mock-up B and asked for sunset in the game; this document owns that
 work. Gameplay stays daytime by default. Sunset and dusk are reachable only through the
 review option `--daylight`; there is no game setting, transition or day/night cycle.
@@ -30,7 +30,7 @@ whether a session transitions automatically after visual review.
    Trace consumers through `waterfront_scene`, CPU `renderer3d`/`waterfront` and GPU
    `renderer_gpu`, including river/outer scenery and water. Sky panorama caching must
    follow the supplied lighting value rather than the current fixed ready-once sky.
-2. **Fixed sunset and dusk (implemented 2026-11-03; visual review pending).** Feed the same lighting frame into both renderers and their
+2. **Fixed sunset and dusk (implemented and approved by the user 2026-11-03).** Feed the same lighting frame into both renderers and their
    water/reflection paths. Add warm low-angle sunlight and a restrained horizon glow;
    keep blue dusk's sky/cloud contrast and warm occupied windows. Do not fake gameplay
    sunset with the title's screen-space palette or authored window coordinates.
@@ -103,7 +103,11 @@ without AA 3.32 → 0.50 and 6.6% → 1.9%; with AA 1.42 → 0.34; day without A
 (16 river/outer review poses); CPU captures and the basin still are. Agent-inspected clips
 only; the change needs the user's play in motion.
 
-**Known limitations:** user visual review not done; storm/squall readability, course and
+**User acceptance (2026-11-03):** the user approved the fixed sunset and dusk presets
+("I'm approving dusk and sunset"), after the calmer glitter that #138 merged. Which locations and platform they played was not stated.
+This approves the fixed presets only, not a transition, setting or default.
+
+**Known limitations:** storm/squall readability, course and
 weapon visibility at sunset/dusk not reviewed; the squall's own cloud and rain colours and
 the overcast overlay are unchanged; the CPU basin has no sky and keeps its own light
 direction; the CPU textured-box material path is unlit by the frame; the shadow maps still
@@ -111,8 +115,7 @@ render at dusk; a panorama repaint costs about 25 ms (Debug), which a transition
 paying every frame; no frame-cost measurement, browser or Windows check yet; intermediate
 phases are untested visually. The title keeps its own grade.
 
-**Next task:** the user reviews fixed sunset and dusk at the river bridge, basin and outer
-coast (`./build/wake_velocity --location outer --daylight sunset` and `dusk`). After
-approval or tuning, step 3 (transition, controls and ownership) needs the user's decisions
-on names, defaults and the title phase. The graphics overhaul's P3 may build on the frame
-once this lands; its G5b dusk work waits for the approved presets.
+**Next task:** step 3 (transition, controls and ownership), which needs the user's
+decisions on names, defaults and the title phase; don't start it unasked. The graphics
+overhaul's P3 may now build on the merged frame, and its G5b dusk work on the approved
+presets.
