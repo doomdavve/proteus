@@ -598,6 +598,40 @@ frequent. These are same-machine engineering measurements with no networking, en
 snapshots. Artifacts: `build/bench/m2/{out-head,out-new,server-release.txt}`. The hour soaks
 were not rerun; the C3 soak hashes no longer apply because the soak drives crossing mode.
 
+## Windows active GPU check — 2026-11-03
+
+Before collecting, follow [Windows GPU selection](WINDOWS_BUILD.md#select-and-verify-the-active-gpu)
+for both `wake_velocity.exe` and `boat_water_review.exe`. Read `gl_renderer` from the benchmark
+JSON (or `system.gl_renderer` in the live report manifest). Record the actual renderer with
+the build/settings; a different installed GPU does not establish which device ran the test.
+Run `.\collect-performance.bat full` for flat/waves × AA off/4x4 × river/stress,
+three repetitions each (24 runs). The default is waves/AA off only (six runs).
+
+Returned archives: `collect-30675-25827.zip` and `collect-28144-18884.zip.zip`. The latter contains
+two collection ZIPs; its `collect-30675-25827.zip` is byte-identical to the standalone archive.
+There are two unique collections, each with three river and three stress runs. All identify
+`7e3e4b9//MSVC-19.44.35229.0`, Windows/AMD64, `AMD Radeon(TM) Graphics`, OpenGL 3.3,
+320×200 internal resolution, waves, AA off, hidden/unpaced. The user reports an RTX 4070 Super
+in the PC; these results do not measure that card. Raw archives remain with the supplied local
+Downloads files and are not committed.
+
+| Scenario | Frame p95 (ms) | GPU p95 (ms) | CPU submission p95 (ms) |
+| --- | --- | --- | --- |
+| River | 2.659 / 2.733 | 2.389 / 2.403 | 0.905 / 0.926 |
+| Four-boat stress | 5.925 / 5.919 | 5.642 / 5.642 | 1.196 / 1.188 |
+
+Each cell gives the median of three per-run p95 values, first collection / second collection.
+All 12 runs completed; all six runs per scenario have identical final state strings, with no
+skipped GPU samples. One measured frame exceeded 16.67 ms: second collection, river repeat 3,
+frame 2825, frame time 30.774 ms, presentation 29.924 ms and GPU 1.243 ms. This locates the
+stall in presentation timing but does not establish its system/driver cause. CPU/GPU timing
+intervals overlap and must not be added.
+
+Verification: ZIP contents, duplicate bytes, JSON summaries and CSV samples inspected on the Mac
+2026-11-03. This is returned hardware benchmark evidence, not manual gameplay, motion/audio
+acceptance, or a pre-optimization G0 baseline. Full matrix, verified NVIDIA selection, live F4
+export and capture overhead on Windows remain open; the user is running the full matrix.
+
 ## Graphics G0 measurement harness — 2026-11-01
 
 The [graphics overhaul plan](GRAPHICS_OVERHAUL_PLAN.md#g0--measurement-and-review-harness) owns
@@ -719,6 +753,6 @@ Read gate columns against each report's `p95`; `p50` is typically far lower for 
 - The WebGL2 build was **not** smoked for this checkpoint: `emcc` is not installed in the
   measuring environment. Browser shader/fallback evidence remains open for the later render
   checkpoints, not claimed here.
-- No Windows hardware report has returned. Native Windows collection, live export and Mac
-  analysis are implemented and covered by synthetic/local checks; the actual user hardware
-  baseline remains pending under G0w.
+- The first Windows hardware reports have returned; see the
+  [AMD renderer results and GPU-selection limit](#windows-active-gpu-check--2026-11-03).
+  NVIDIA, full-matrix and live-export qualification remain open under G0w.
