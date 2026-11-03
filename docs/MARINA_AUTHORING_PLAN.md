@@ -2,7 +2,7 @@
 
 Status, 2026-11-03: **M1 implemented and merged in
 [PR #133](https://github.com/doomdavve/proteus/pull/133); M2 appearance is prepared for
-implementation.** This plan records the
+implementation; M2's native definition/geometry work is in progress.** This plan records the
 user's decisions after reviewing the gaps in [PR #131](https://github.com/doomdavve/proteus/pull/131).
 It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
@@ -178,7 +178,7 @@ failure behavior, before selecting a larger fixed capacity or separate lettering
 
 #### Implementation sequence and completion gates
 
-All rows below are **pending**. Use focused commits in one PR; do not mark M2 complete after
+The implementation status below tracks these rows. Use focused commits in one PR; do not mark M2 complete after
 only the native generator or codec works.
 
 | Commit | Work and evidence required before moving on |
@@ -243,6 +243,26 @@ review was needed for this documentation-only preparation; Windows/Linux, GPU an
 browser/device checks were not rerun. No M2 code, appearance data, serialization, lettering,
 performance or visual acceptance is implemented by this preparation. The proposed API and
 budgets above remain subject to the implementation's validation and geometry proof.
+
+### M2 implementation status — 2026-11-03
+
+In progress on `feat/marina-m2-appearance`, based on merged preparation `807bfb3`.
+Completed: row 1's native appearance definition, shared resolver, canonical defaults, explicit
+digest fields and hull-surface lettering. Next: row 2, Lua and serialization integration.
+Rows 2–4 remain pending; no supported Lua appearance API or rendered package is claimed yet.
+
+The complete bundled 3×5 alphabet/digit/punctuation set, repeated through the 16-character
+limit on every registered berth recipe at both dimension/mast boundaries, produces at most
+894 triangles. The existing 1,024-triangle cap therefore stays unchanged. A `BoatModel` remains
+53,280 bytes; `BoatSceneDefinition` grows to 15,440 bytes. Lettering follows the forward hull
+side plane, reads correctly from each side and uses native opaque geometry. Visual inspection
+and runtime resource/serialization qualification remain pending.
+
+Row 1 verification on Apple Silicon/macOS: Debug build and `validate_harbor` pass, including
+geometry bounds, winding, palette/mast/name rejection, canonical digests and independent model
+storage. The initial sandboxed quick run failed socket-only ENet checks; the socket-enabled
+rerun is the authoritative quick-lane result. Full-suite, GPU/browser and human acceptance
+remain pending for the integrated implementation.
 
 ## M3: authored routes and docking motion
 

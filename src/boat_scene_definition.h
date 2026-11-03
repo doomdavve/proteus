@@ -49,11 +49,20 @@ typedef enum {
 } BoatSceneMooring;
 
 typedef struct {
+    // Zero dimensions or all-zero colors inherit the recipe. Lua rejects explicit zero
+    // dimensions; its decoder canonicalizes explicit recipe defaults back to these sentinels.
+    float length, beam, mast_height;
+    Color hull, deck, trim;
+    char name[BOAT_MODEL_NAME_BYTES];
+} BoatSceneAppearance;
+
+typedef struct {
     char id[BOAT_SCENE_TEXT];
     unsigned char recipe; // BoatSceneBerthRecipe
     unsigned char mooring; // BoatSceneMooring
     float x, z; // Simulation metres.
     float heading; // Renderer radians; forward is (sin, -cos).
+    BoatSceneAppearance appearance;
 } BoatSceneBerth;
 
 typedef struct {
@@ -109,6 +118,9 @@ const char *boat_scene_mooring_name(BoatSceneMooring mooring);
 bool boat_scene_mooring_from_name(const char *name, BoatSceneMooring *mooring);
 // Registered native hull recipe. No authored dimensions or vertices.
 BoatModelSpec boat_scene_berth_spec(BoatSceneBerthRecipe recipe);
+// One resolved spec for geometry, clearance, ropes, contacts and every renderer.
+BoatModelSpec boat_scene_berth_resolve(const BoatSceneBerth *berth);
+void boat_scene_berth_canonicalize(BoatSceneBerth *berth);
 BoatModelKind boat_scene_berth_kind(BoatSceneBerthRecipe recipe);
 
 // Distance in simulation metres to a non-gangway module footprint.
