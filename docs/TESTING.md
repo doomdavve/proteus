@@ -174,6 +174,13 @@ the outer dock with and without the opaque depth copy. The copy must be taken in
 texture and skipped when disabled or drawing to the default framebuffer; the outer map must bind
 its water atlas. The quay band must change between 100 pixels and 5% of the frame, and almost
 only lighten.
+`presentation` (`boat_water_review --check-presentation`, `gpu`, about 3 s; graphics G5a) draws
+the river at low and high resolution with and without HDR. Daytime HDR stays within one 8-bit step
+of the 8-bit scene; repeated preset and window-size changes, a second view and the rear-view
+mirror reproduce their frames; failed HDR allocations present the 8-bit frame exactly; a
+synthetic 3.5 spot blooms only a few pixels and clamps; and the HUD overlay composites like
+drawing over the scene. `boat_screen` and `waterfront_grade` (quick) check the layout sizes and
+the grades.
 `water_atlas_river` and `water_atlas_outer` (`water_atlas_bake --check`; graphics G4) rebake each
 map's water atlas and require the committed sidecar byte for byte. `validate_boat_scenery`
 also rejects malformed, truncated, foreign-map and out-of-range atlases.

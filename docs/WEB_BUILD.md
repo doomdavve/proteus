@@ -4,10 +4,10 @@
 
 Implemented in the isolated `web-parity` worktree, 2026-10-25: the browser enters the shared
 Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER opens PLACE (River, Basin,
-Basin trial), WAVES, SMOOTHING and START. (Basin trial could not start from the title in any build
+Basin trial), WAVES, PICTURE (SMOOTHING before graphics G5a) and START. (Basin trial could not start from the title in any build
 from this date until its 2026-11-01 fix: the title passed free-boating options the course rejects.) SETTINGS remembers name, single-player boat livery,
-steering, soundtrack and smoothing. The saved smoothing setting applies to single-player and
-multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
+steering, soundtrack and PICTURE. The saved PICTURE (PIXEL, SMOOTH or HIGH RES) applies to
+single-player and multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
 but the browser may leave fullscreen. BACK TO TITLE returns to setup
 without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The HTML launcher shows the screenshot and PLAY; the title, version, repository link and map
 attribution sit in its footer. PLAY starts in the browser tab; fullscreen is controlled in-game.
@@ -215,6 +215,30 @@ Home Screen installation, performance and human audio/steering review remain pen
 Next: collect that physical-device feedback. Automated emulation does not establish hardware
 or user acceptance. The first sandboxed full suite could not open local sockets; rerunning
 with socket access passed.
+
+## High resolution and HDR, 2026-11-03
+
+Graphics [G5a](GRAPHICS_OVERHAUL_PLAN.md#g5a--optional-high-resolution-and-restrained-hdr) turns
+the title's SMOOTHING row into PICTURE: PIXEL (`smooth_edges=off`), SMOOTH (`smooth_edges=on`,
+the default) or HIGH RES (`resolution=high`, which launches `--resolution high`). A HIGH RES
+session sizes the canvas buffer to the high scene's scale (4× the logical frame, less for tall
+mobile frames so no side exceeds 2,048), renders the scene there with a 4× reflection and
+composites the logical HUD over it. HDR and its bloom need float render targets with blending
+(`EXT_color_buffer_float`); without them the session prints "HDR is unavailable here" and
+presents the same high-resolution scene in 8 bits.
+
+The optional browser check plays HIGH RES on the river with float targets, with them hidden, and
+through a mobile rotation, and checks the WebGL viewports and the saved setting:
+
+```sh
+python3 tools/check_web_resolution.py --url http://127.0.0.1:8000/ --output build-web/resolution
+```
+
+Verification on 2026-11-03, M1 Max/macOS, headless Chrome with SwiftShader against a local
+MinSizeRel build: the check passes. HDR rendered 1280×800 with the 640×480 reflection and the
+640/320/160 bloom chain; the fallback the same scene without bloom; the mobile session 1732×800
+landscape and 640×1386 portrait. Captures were inspected. No hardware-GPU browser timing, Firefox,
+Safari or physical device was checked.
 
 ## Multiplayer anti-aliasing, 2026-10-27
 

@@ -604,6 +604,29 @@ frequent. These are same-machine engineering measurements with no networking, en
 snapshots. Artifacts: `build/bench/m2/{out-head,out-new,server-release.txt}`. The hour soaks
 were not rerun; the C3 soak hashes no longer apply because the soak drives crossing mode.
 
+## Graphics G5a presentation presets — 2026-11-03
+
+Release, Apple M1 Max, macOS, hidden 960×600 window, `--waves`, two interleaved repetitions
+against a control build of `main` (`6e78e5c`); GPU is `GL_TIME_ELAPSED` around the scene draw,
+which includes the HDR bloom and composite. Ranges are the two runs (ms):
+
+| Preset (`boat_water_review --benchmark`) | Scene | River GPU p50 / p95 | Stress GPU p50 / p95 |
+| --- | --- | --- | --- |
+| control `--aa off` | 320×200 | 1.12–1.16 / 1.53–1.87 | 2.81–2.88 / 3.43–3.66 |
+| `--aa off` | 320×200 | 1.20–1.21 / 1.58–2.28 | 2.80–2.86 / 3.40–3.58 |
+| control `--aa 4x4` | 1280×800 → 320×200 | 1.69–1.76 / 2.38–2.53 | 3.38–3.41 / 4.16–4.17 |
+| `--aa 4x4` | 1280×800 → 320×200 | 1.69–1.83 / 2.38–2.82 | 3.34–3.41 / 4.11–4.20 |
+| `--aa off --resolution high --hdr off` | 1280×800 | 1.63–1.69 / 2.22–2.58 | 3.36 / 4.06–4.11 |
+| `--aa off --resolution high` (HDR) | 1280×800 | 1.60–1.88 / 2.14–3.03 | 3.64–3.65 / 5.27–5.39 |
+
+Low resolution and 4×4 match the control within run-to-run noise, and every run of a scenario
+ends in the same `final_state`. High resolution without HDR costs about the same as today's 4×4
+supersampling, which renders as many scene pixels. HDR adds about 0.3 ms p50 and 1.2 ms p95 in
+the four-boat stress scene (16-bit scene, depth copy and the bloom chain); river differences are
+within noise. The HDR targets hold 14,976,000 bytes at 1280×800 (`hdr_bytes`). Everything stays
+far below G0's stress 4×4 reference of 20.01 ms GPU p95. No Windows, browser-timing or visible
+paced run was made for this checkpoint.
+
 ## Windows active GPU check — 2026-11-03
 
 Before collecting, follow [Windows GPU selection](WINDOWS_BUILD.md#select-and-verify-the-active-gpu)

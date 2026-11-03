@@ -5,8 +5,8 @@ accepted on Mac (outer and basin) 2026-11-03. The first Windows hardware AMD and
 a recurring GeForce river hitch is open, with investigation deferred by the user on 2026-11-03.
 Each package has one human playtest and, by default, one implementation PR. The detailed G0–G5c
 briefs are internal checkpoints with focused commits and resumable agent handoffs. G6 remains a
-conditional study. **Next: P3/G5a**; its sunset prerequisites (the shared lighting frame and
-approved fixed sunset/dusk presets) are on `main`. See the
+conditional study. **P3 is in progress** on `feat/graphics-presentation`: G5a (optional high
+resolution and HDR) is machine-verified. **Next: G5b**, then G5c and Batch C. See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -113,10 +113,10 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-03: **P1 merged, Batch A accepted on Mac; P2 machine-verified, Batch B accepted on Mac**. Each package owns one
+Status, 2026-11-03: **P1 and P2 merged (Batches A and B accepted on Mac); P3 in progress**. Each package owns one
 human playtest and, by default, one implementation PR. The G0–G5c sections below are ordered
 internal checkpoints, not separate work packages or PR assignments. G6 is a dormant contingency,
-outside the three-package count. **Next: P2 merge, then P3.**
+outside the three-package count. **Next: G5b within P3.**
 
 Keep package definitions, prompts and process updates together in one planning PR. The original
 twelve-PR planning stack was an interpretation error and is merged; it does not prescribe future
@@ -313,7 +313,7 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 | --- | --- | --- | --- | --- |
 | [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows AMD/GeForce matrices saved; river hitch deferred |
 | [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Merged (#134); Batch B accepted on Mac (outer, basin) 2026-11-03; Windows report pending |
-| [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; P2 merged and sunset prerequisites met |
+| [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | In progress: G5a machine-verified on M1 Max; next G5b |
 
 G6 is a conditional backend decision, not a fourth scheduled package. The delivery-boundary rule
 above handles a proven need for an additional prerequisite PR without creating extra playtests.
@@ -424,11 +424,14 @@ on Mac. Prepare one Batch C covering presets/UI, mood, particles and P1/P2 integ
 Mark the overhaul accepted only after the recorded user verdict and blocking fixes, with platform
 limitations explicit. G6 is opened only if its separate measured trigger is satisfied.
 
-**Result:** unstarted. Completed: package instructions only. Sunset readiness (2026-11-03): the
-shared lighting frame (`WaterfrontLighting` on the scene frame) and fixed sunset/dusk presets
-merged to `main` in #138 and the user approved the presets; see
-[SUNSET_PLAN](SUNSET_PLAN.md#current-status). Next: G5a task 1. No implementation verification, playback or user acceptance. Known
-risks: external sunset dependency, multiple target/light lifetimes and integrated preset behavior.
+**Result:** in progress. Sunset readiness (2026-11-03): the shared lighting frame
+(`WaterfrontLighting` on the scene frame) and fixed sunset/dusk presets merged to `main` in #138
+and the user approved the presets; see [SUNSET_PLAN](SUNSET_PLAN.md#current-status). Completed:
+[G5a](#g5a--optional-high-resolution-and-restrained-hdr), machine-verified on the M1 Max (high
+resolution, HDR with an 8-bit fallback, low resolution byte-identical to `main`). Next: G5b task 1.
+Agent playback: captures, window captures, windowed demos and a WebGL2 smoke; no human review
+until Batch C. Known risks: HDR blooms nothing until G5b authors light above 1, and multiple
+target/light lifetimes and integrated preset behavior.
 
 **Kickoff prompt:**
 
@@ -457,7 +460,7 @@ Mac; G3a is machine-verified, with human review in Batch B.
 | [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Machine-verified on M1 Max; stress GPU p95 at 4x4 9.7 → 3.3 ms; Batch B accepted on Mac (outer, basin) |
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Machine-verified on M1 Max; stress GPU p95 +0.1 ms, 5 MB; Batch B accepted on Mac (outer, basin) |
 | [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Machine-verified on M1 Max; river GPU p95 within noise, basin +0.3 ms for the depth copy; Batch B accepted on Mac (outer, basin) |
-| [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Unstarted |
+| [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Machine-verified on M1 Max; low byte-identical to `main`; high + HDR stress GPU p95 5.3 ms; WebGL2 smoke with fallback |
 | [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Unstarted |
 | [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | P3 | G5b | Unstarted |
 
@@ -1397,10 +1400,45 @@ pass; no default-change acceptance is inferred.
 look that the user likes in the old spike does not approve the shipped HDR preset. Sunset
 implementation stays with SUNSET_PLAN.md.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P3. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G5b. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P3's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result (2026-11-03):**
+
+- State: machine-verified on the M1 Max; human review is Batch C.
+- Commits: `1091192` (high-resolution preset, logical HUD overlay, title PICTURE,
+  `--frame-capture`), `4ac26d3` (HDR targets, bloom, grade, fallback, `--check-presentation`),
+  `5e3035f` (review/benchmark options, browser canvas sizing, `check_web_resolution.py`).
+- Interfaces/owners and decisions to preserve: `boat_screen` owns sizes from the logical frame and
+  window (`BoatScreenLayout`; low unchanged, high = the window's integer scale up to 4, no side
+  above 2,048, reflection grown by the same factor) and the premultiplied HUD overlay. `BoatGpu`
+  owns the HDR target, depth and bloom chain (`boat_gpu_set_hdr`, `boat_gpu_present_hdr`) and
+  reallocates them with the target; the scene owns its reflection
+  (`waterfront_gpu_scene_set_reflection_size`). `waterfront_grade` evaluates a neutral grade per
+  daylight phase from the lighting frame's phase; no second clock. The user option is the title's
+  PICTURE row (PIXEL, SMOOTH, HIGH RES, saved as `smooth_edges` and `resolution`) and the CLI's
+  `--resolution low|high` and `--hdr on|off`; high replaces `--gpu-aa`. The scene renders at the
+  window's own scale, so a 960×600 window gets a 960×600 scene. The mirror and supersampling
+  stay 8-bit.
+- Decision for review: no current light exceeds 1 (measured: day/sunset/dusk peaks 0.96–1.00 in
+  river, outer and basin), because the city shader's `min(…, 1)` is an authored palette clamp
+  against bleaching, glitter mixes toward a colour and the sky is an 8-bit panorama. G5a keeps
+  those, so bloom is inert until G5b authors brighter lamps/windows; removing the clamp would bloom
+  every sunlit white hull. Grades stay neutral so the approved sunset and dusk do not shift.
+- Verification: Debug full suite with `PROTEUS_GPU_TESTS=ON`, 388 of 388 enabled tests (one
+  earlier full run under concurrent Release builds failed `instancing_parity` once; it passed
+  eight direct runs on both trees and the full rerun). `presentation` (bloom 3.5 spot: +28/255
+  beside it, gone by 16 px; daytime HDR within 1/255; preset cycles, second view, mirror and
+  failed allocations exact; HUD overlay within 1/255), `boat_screen`, `waterfront_grade`.
+  Low-resolution parity: 40 captures (`--screenshot` CPU/GPU/`--gpu-aa` for basin, river, outer
+  and `--review`) byte-identical to `main` at `6e78e5c`. High review poses in day/sunset/dusk and
+  windowed `--demo --frames 240 --frame-capture` at both presets inspected. WebGL2:
+  `check_web_resolution.py` (SwiftShader) passes HDR, hidden-float fallback and mobile rotation;
+  see [web](WEB_BUILD.md#high-resolution-and-hdr-2026-11-03). Release timings and memory are in
+  [Boating performance](BOATING_PERFORMANCE.md#graphics-g5a-presentation-presets--2026-11-03).
+- Unresolved / pending: human look (Batch C), whether bloom should ever show at day; HiDPI
+  (Retina) framebuffers are not enabled, so macOS upscales a 1280×800 window; no Windows,
+  hardware-GPU browser, Firefox/Safari or physical device check; the GPU-allocation failure is
+  injected (`hdr_allocation_failures`), not a real driver failure.
+- Next: G5b task 1; read `src/boat_gpu.c` (HDR), `src/waterfront_grade.c`,
+  `assets/shaders/waterfront_city.fs` and [3D](3D.md#resolution-and-hdr-presentation).
 
 ### G5b — Clustered cozy lighting and dusk water
 
@@ -1440,7 +1478,8 @@ windows/streaks are readable and stable moving. Full suite, WebGL2 build/smoke a
 ceilings pass; Batch C is prepared, not accepted.
 
 **Limits and stop conditions:** External sunset work is a real readiness gate; the frame and the
-approved fixed presets were delivered in #138 (2026-11-03). No new gameplay clock, Lua capability, room protocol or dynamic global
+approved fixed presets were delivered in #138 (2026-11-03). G5a's HDR blooms only light above 1,
+and none is authored yet; lamps and windows brighter than 1 belong here and need review. No new gameplay clock, Lua capability, room protocol or dynamic global
 illumination. If the prerequisite remains unavailable, report G5b/G5c unready; final dusk acceptance
 stays open.
 
@@ -1674,7 +1713,7 @@ For the implementer, decided here unless reversed:
 
 1. **Bring the high-resolution option forward?** It was simple to run in the spike and the user
    liked it, so it may not need to wait for G5. It does need real HUD scaling, and it shows off the
-   plainer nearby buildings. Current choice: keep it in G5.
+   plainer nearby buildings. Resolved: kept in G5; G5a implemented it on 2026-11-03.
 2. **Browser floor:** the hardware floor above was stated for machines generally. Whether browsers
    must hold 60 Hz on the same machine, or may fall back to fewer effects, is not decided. Current
    choice: fallbacks are allowed, and G0's browser measurement informs this.

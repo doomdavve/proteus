@@ -371,9 +371,9 @@ they do not describe the current logo, footer or selected-row appearance.
 
 | Entry | Current behavior | Later work |
 | --- | --- | --- |
-| Single Player | Opens River, Basin or Basin trial plus waves/smoothing setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
+| Single Player | Opens River, Basin or Basin trial plus waves/PICTURE setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
 | Multiplayer | Public server selection, native LAN/host flow and manual address joining; browser WebRTC joining. | Broader platform/network qualification remains owned by the multiplayer plans. |
-| Settings | Name, boat, steering, soundtrack and smoothing. | Volume and display controls remain deferred. |
+| Settings | Name, boat, steering, soundtrack and PICTURE (PIXEL, SMOOTH or HIGH RES; the SMOOTHING row until graphics G5a). | Volume and further display controls remain deferred. |
 | Credits | Vertical roll: Thanks to, fonts, map data, libraries and Proteus, over an animated water grid; BACK or Escape returns to the main menu. | Physical navigation and browser qualification remain open. |
 | Exit | Close the native program. | On the web, replace with “Back to launcher” if the page launcher remains; browser tabs cannot be closed reliably by game code. |
 
