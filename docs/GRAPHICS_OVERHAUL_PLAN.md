@@ -294,7 +294,7 @@ or test pass supplies a missing verdict. A pending user session does not prevent
 | --- | --- | --- | --- |
 | A — engine and geometry (accepted on Mac 2026-11-02) | P1 complete (through G2b) | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | P2 |
 | B — all living water (accepted on Mac, outer and basin, 2026-11-03) | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
-| C — final presentation | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
+| C — final presentation (Mac look approved apart from performance, 2026-11-04; Windows and browser open) | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
 
 Batch B deliberately combines G3 and G4 rather than asking for a separate water session between
 them: atlas boundaries/depth/shore foam are easier to judge with persistence in place. Keep a
@@ -435,7 +435,9 @@ resolution, HDR with an 8-bit fallback, low resolution byte-identical to `main`)
 streaks, harbour lamps; daytime byte-identical until the 2026-11-04 far-shadow fix, which
 deliberately changes distant facades) and [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification)
 (baked ambient occlusion, particles kept on the CPU after profiling, final Release matrix within
-every G0 budget). Next: [Batch C](#batch-c-request). Agent playback: captures,
+every G0 budget). Batch C on Mac: look approved apart from performance (2026-11-04); Windows
+report and hardware browser open. Next: the outer performance follow-up, stacked on this PR.
+Agent playback: captures,
 window captures, windowed demos and a WebGL2 smoke; no human review until Batch C. Known risks:
 the dusk streaks key on warm colour rather than an emission mask, and multiple target/light
 lifetimes and integrated preset behavior.
@@ -1644,11 +1646,18 @@ default-resolution change without a later explicit user decision.
   work after P3 to bring outer down; the method decides how far. Candidates, unmeasured: the
   outer shadow pass, distance detail for outer terrain and buildings, and the reflection's
   triangle load. Add an outer scenario to the benchmark first.
-- Next: Batch C.
+- Next: the outer performance follow-up (see
+  [Outer performance follow-up](#outer-performance-follow-up)); Batch C's Windows report.
 
 #### Batch C request
 
-Not yet played. Build `feat/graphics-presentation` (draft PR #140) and run from the repository
+Verdict so far, 2026-11-04: on Mac, the user played `feat/graphics-presentation` (draft PR #140,
+at `5d08497` or later) and reported "Outside of performance, everything looks like expected on
+the branch". The performance part is the outer high-resolution finding above, accepted at 60 Hz
+with follow-up work. Still open for final acceptance: the returned Windows report and a
+hardware-browser look; which routes, presets and toggles were played was not stated.
+
+Request as prepared: build `feat/graphics-presentation` (draft PR #140) and run from the repository
 root; outer and basin matter most, the river is optional:
 
 ```sh
