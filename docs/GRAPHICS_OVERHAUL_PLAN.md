@@ -1706,8 +1706,8 @@ the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no 
 - **Candidate, needs the user in motion:** 512 m detail cells with 2,048 m tiles reach outer
   high 1.90 / 2.34 ms at 145 submissions. G2b kept 256 m because a 512 m cell switches larger
   pieces of windows and street furniture at once; whether that pops is the user's call.
-- **Next:** the user's outer play on this branch found nothing outside performance (2026-11-04);
-  the 512 m cell size and the macOS full-screen toggle below are the open candidates. Further candidates: fewer reflection
+- **Next:** the user has played this branch full-screen and windowed (below); the 512 m cell
+  size and a macOS full-screen toggle are the open candidates. Further candidates: fewer reflection
   submissions (it repeats the main pass's classes), and the macOS vsync behaviour if 120 Hz on
   the Mac matters. The user suggested macOS Game Mode (2026-11-04). Apple's
   [Game Mode page](https://support.apple.com/en-us/105118) says it turns on only when a game enters
