@@ -110,7 +110,9 @@ Trädgårdsföreningen, hard to port at Slussen into Stora Hamnkanalen, under th
 Bommen, a short way down the river, and home through Rosenlundskanalen past Feskekörka. Each stop
 shows its name and a short caption as you pass, and the tour ends when you come alongside the
 pier at 2 m/s or less. The loop is 3.7 km, about 15 minutes in the Grodan at full speed; the canals
-are narrow and the Grodan is long, so slow down before the corners.
+are narrow and the Grodan is long, so slow down before the corners. The tour passes under 16
+bridges, the lowest Stora Bommens Bro; their heights are estimates. Under a bridge the camera drops
+below the deck to keep the boat in view.
 
 A squall builds offshore as you approach the outer fjord. The eastern shore offers
 calmer water. The chart shows shelters, the destination and the exposed area; its blue

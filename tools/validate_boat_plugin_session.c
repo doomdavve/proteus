@@ -12,6 +12,7 @@
 #include "boat_throttle.h"
 #include "raymath.h"
 #include "wake_velocity_plugin.h"
+#include "waterfront_outer.h"
 #include "waterfront_traffic.h"
 
 #include <math.h>
@@ -1837,8 +1838,9 @@ static int drive_tour(const BoatHandling *handling, BoatHull footprint, double *
     float scale = boat_handling_grodan.thrust / handling->thrust;
 
     unsigned leg = 0, last = route->shelter_count - 1, order = 0;
-    int touching = 0;
-    bool in_order = true;
+    int touching = 0, bridges = 0;
+    bool in_order = true, covered = false;
+    float lowest = INFINITY;
     uint64_t limit = (uint64_t)(3600 / BOAT_TICK_SECONDS);
     while (!s.voyage.arrived && s.tick < limit) {
         // Advance past legs whose end the boat's projection has passed.
@@ -1905,17 +1907,25 @@ static int drive_tour(const BoatHandling *handling, BoatHull footprint, double *
                             Vector2Scale(right, side * footprint.half_beam))),
                     0);
         touching += touch;
+        // GH2: the bridges the tour passes under and the lowest underside over the boat.
+        float overhead = waterfront_outer_overhead(-s.boat.position.x, s.boat.position.y);
+        bridges += isfinite(overhead) && !covered;
+        covered = isfinite(overhead);
+        lowest = fminf(lowest, overhead);
     }
     double minutes = s.tick * BOAT_TICK_SECONDS / 60;
-    printf("tour=%s stops=%u/%u minutes=%.1f touching_ticks=%d at=(%.0f, %.0f) leg=%u\n",
+    printf("tour=%s stops=%u/%u minutes=%.1f touching_ticks=%d at=(%.0f, %.0f) leg=%u "
+           "bridges=%d lowest=%.2f\n",
         s.voyage.arrived ? "arrived" : "unfinished", s.voyage.shelter, last, minutes, touching,
-        -s.boat.position.x, s.boat.position.y, leg);
+        -s.boat.position.x, s.boat.position.y, leg, bridges, lowest);
     bool arrived = s.voyage.arrived && s.voyage.shelter == last;
     wake_plugin_close(&p, &s);
     boat_session_destroy(&s);
     *minutes_out = minutes;
     CHECK(arrived && in_order);
     CHECK(touching == 0);
+    // Every canal bridge on the route; Stora Bommens Bro is the lowest.
+    CHECK(bridges >= 10 && lowest >= 1.7f);
     return 0;
 }
 

@@ -27,6 +27,7 @@
 #define BRIDGE_TRIANGLES 4388 // The manifest's river_overlay.bridge_triangles.
 #define DRESSING_TRIANGLES 66764 // The manifest's dressing.triangles (cranes, masts, marks, trees).
 #define LANDMARK_TRIANGLES 2773 // A3.5j: baked landmarks, excluding the runtime lift span.
+#define CANAL_BRIDGE_TRIANGLES 7324 // GH2: the manifest's dressing.canal_bridges.triangles.
 static const Vector2 route[] = { { 12, 60 }, { 24, -70 }, { 15, -180 }, { -250, -500 },
     { -650, -850 }, { -1100, -960 }, { -3300, -1550 }, { -3850, -2400 }, { -3850, -3150 },
     { -3700, -3310 }, { -3620, -3380 } };
@@ -75,10 +76,10 @@ int main(void)
     // A3.3: the river's bridge triangles start the authored range, which the A3.5a dressing
     // (cranes, masts, marks and trees beyond the crop) and A3.5g's landmarks complete. Since
     // A3.5f the dressing's buildings come before it, with the river's, so the renderers give
-    // them windows.
+    // them windows. GH2's canal bridges close it.
     CHECK(scenery->bridge_first_triangle < scenery->mesh->triangle_count);
     CHECK(scenery->mesh->triangle_count - scenery->bridge_first_triangle
-        == BRIDGE_TRIANGLES + DRESSING_TRIANGLES + LANDMARK_TRIANGLES);
+        == BRIDGE_TRIANGLES + DRESSING_TRIANGLES + LANDMARK_TRIANGLES + CANAL_BRIDGE_TRIANGLES);
     CHECK(!boat_map_is_bridge_triangle(scenery, scenery->bridge_first_triangle - 1));
     CHECK(boat_map_is_bridge_triangle(scenery, scenery->bridge_first_triangle));
 
@@ -175,6 +176,13 @@ int main(void)
     CHECK(!boat_map_water(&map, sim((Vector2) { 3000, 3000 }), 0));
     CHECK(!boat_map_water(&map, sim((Vector2) { 4300, 2350 }), 0));
     CHECK(!boat_map_water(&map, sim((Vector2) { 12, 60 + 400 }), 0));
+
+    // GH2: the canal bridges' undersides over renderer X/Z. Open sky over the river spawn, Stora
+    // Bommens Bro (the Grodan tour's BOMMEN stop) at its 1.75 m, and no bridges in the basin.
+    CHECK(waterfront_overhead(&waterfront_outer_map) == waterfront_outer_overhead);
+    CHECK(!waterfront_overhead(boat_location(BOAT_LOCATION_BASIN)->map));
+    CHECK(isinf(waterfront_outer_overhead(-outer->spawn.x, outer->spawn.y)));
+    CHECK(fabsf(waterfront_outer_overhead(2976.1f, 1006.0f) - 1.75f) < .01f);
 
     printf("boat_outer_map=ok water=%zu edges=%zu leg_samples=%zu wet=%zu dry=%zu bytes=%zu\n",
         map.water_count, map.shore_count, legs, wet, dry, boat_map_bytes(&map));

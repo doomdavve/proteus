@@ -23,4 +23,20 @@ typedef float (*WaterfrontGround)(float x, float z);
 // any other map: the river keeps the kit's own flat 3.5 m ground, and other maps have no kit.
 WaterfrontGround waterfront_kit_ground(const BoatMapDescription *map);
 
+// GH2: a canal bridge deck in renderer X/Z (east, north): the span runs along the unit axis UX/UZ
+// from station S0 to S1 about the centre, over water from WET0 to WET1, and HALF_WIDTH either
+// side. The underside stands UNDER above the water at the middle of the water and SPRING at its
+// quays (a parabola between, equal for a beam); TOP is the deck's walking surface.
+typedef struct {
+    float x, z, ux, uz, s0, s1, wet0, wet1, half_width, under, spring, top;
+} WaterfrontBridge;
+
+// The lowest bridge underside over renderer X/Z, or INFINITY under open sky. The heights are
+// estimates (docs/GOTHENBURG_HARBOUR_PLAN.md GH2).
+float waterfront_outer_overhead(float x, float z);
+
+typedef float (*WaterfrontOverhead)(float x, float z);
+// The bridge undersides over MAP: waterfront_outer_overhead for the outer map, NULL otherwise.
+WaterfrontOverhead waterfront_overhead(const BoatMapDescription *map);
+
 #endif

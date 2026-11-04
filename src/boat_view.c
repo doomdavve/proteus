@@ -18,6 +18,9 @@ static const float CAMERA_BASE_FOV = 55 * DEG2RAD;
 static const float CAMERA_SPEED_FOV = 7 * DEG2RAD;
 static const float CAMERA_SPEED_START = 4.0f;
 static const float CAMERA_SPEED_FULL = 18.0f;
+// GH2: under a bridge the eye keeps its line to a point this high over the boat this far below
+// the deck, and never drops below the last height.
+static const float CAMERA_BOAT_SIGHT = .9f, CAMERA_DECK_MARGIN = .3f, CAMERA_LOWEST = 1.0f;
 
 void boat_player_pose(
     const BoatViewState *view, const BoatFlag *flag, WaterfrontPlayerState *player)
@@ -88,6 +91,18 @@ static View3D boat_camera(const Boat *boat, const BoatPresentation *presentation
         = { -sinf(presentation->camera_heading), 0, -cosf(presentation->camera_heading) };
     Vector3 eye = Vector3Subtract(boat_position, Vector3Scale(follow, camera_settings.distance));
     eye.y = camera_settings.height;
+    // GH2: under a canal bridge the eye drops until its line to the boat passes below the deck.
+    // Each covered point B metres aft bounds the eye's height; the bound loosens smoothly to
+    // nothing as the deck reaches the boat, so the view needs no history.
+    WaterfrontOverhead overhead = waterfront_overhead(definition->map);
+    for (float b = .5f; overhead && b <= camera_settings.distance; b += .5f) {
+        Vector3 p = Vector3Subtract(boat_position, Vector3Scale(follow, b));
+        float under = overhead(p.x, p.z) - CAMERA_DECK_MARGIN;
+        if (isfinite(under))
+            eye.y = fminf(eye.y,
+                CAMERA_BOAT_SIGHT + (under - CAMERA_BOAT_SIGHT) * camera_settings.distance / b);
+    }
+    eye.y = fmaxf(eye.y, CAMERA_LOWEST);
     Vector3 look_at = Vector3Add(boat_position, Vector3Scale(follow, 5));
     look_at.y = 0.6f;
     return (View3D) { .position = eye,
