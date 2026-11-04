@@ -31,12 +31,12 @@ F3: toggle profiler overlay
 Esc: menu (resume, steering, controls, back to title); single player pauses, rooms
   keep running with your boat idle. Esc on the title quits.
 
-Explicit options skip the title. The river with 4x4 supersampling, from PowerShell:
-  .\wake_velocity.exe --location river --gpu --gpu-aa
+Explicit options skip the title. The outer river with 4x4 supersampling, from PowerShell:
+  .\wake_velocity.exe --location outer --gpu --gpu-aa
 
 If GPU startup fails, launch from PowerShell to read the diagnostic output.
 CPU rendering is also available:
-  .\wake_velocity.exe --renderer cpu --location river
+  .\wake_velocity.exe --renderer cpu --location outer
 
 Use --location basin for the handling basin. Add --waves for gentle
 waves in either location. Run .\wake_velocity.exe --help for course and replay options.
@@ -74,5 +74,5 @@ whether the problem also happens without --gpu-aa.
 
 Map data (c) OpenStreetMap contributors, ODbL 1.0:
 https://www.openstreetmap.org/copyright
-Source details: assets/geometry/river/manifest.json
+Source details: assets/geometry/outer/manifest.json and assets/geometry/river/manifest.json
 raylib, GLFW and ENet license notices are included alongside this file.

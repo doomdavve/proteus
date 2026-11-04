@@ -9,6 +9,7 @@
  */
 #include "boat_location.h"
 #include "boat_map.h"
+#include "boat_test_location.h"
 #include "boat_water_atlas.h"
 #include "raylib.h"
 
@@ -295,7 +296,7 @@ int main(int argc, char **argv)
     const BoatWorldDefinition *location = NULL;
     float spacing = 0;
     if (name && strcmp(name, "river") == 0) {
-        location = boat_location(BOAT_LOCATION_RIVER);
+        location = test_location(TEST_RIVER);
         spacing = 4;
     } else if (name && strcmp(name, "outer") == 0) {
         location = boat_location(BOAT_LOCATION_OUTER);

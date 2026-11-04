@@ -19,7 +19,7 @@ typedef struct {
     // revisions (each with a possible scene) inside the fixed native owner budget.
     union {
         BoatPluginVoyage voyage;
-        BoatPluginRace race; // Used instead of VOYAGE by a river race host.
+        BoatPluginRace race; // Used instead of VOYAGE by a race host.
         BoatPluginFree free; // Used by a free-boating host.
         BoatPluginCourse course; // Used by a time-trial host.
         BoatPluginMatch match; // Used by a room authority.

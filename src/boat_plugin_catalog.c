@@ -27,15 +27,14 @@ const BoatPluginCatalogEntry *boat_plugin_catalog_default(BoatPluginKind kind, c
         return NULL;
     if (kind == BOAT_PLUGIN_KIND_FREE)
         id = !strcmp(location, "basin")  ? BOAT_PLUGIN_DEFAULT_BASIN_FREE
-            : !strcmp(location, "river") ? BOAT_PLUGIN_DEFAULT_RIVER_FREE
             : !strcmp(location, "outer") ? "proteus.outer-free"
                                          : NULL;
     else if (kind == BOAT_PLUGIN_KIND_VOYAGE && !strcmp(location, "outer"))
         id = BOAT_PLUGIN_DEFAULT_OUTER_VOYAGE;
     else if (kind == BOAT_PLUGIN_KIND_COURSE && !strcmp(location, "basin"))
         id = BOAT_PLUGIN_DEFAULT_BASIN_COURSE;
-    else if (kind == BOAT_PLUGIN_KIND_RACE && !strcmp(location, "river"))
-        id = BOAT_PLUGIN_DEFAULT_RIVER_RACE;
+    else if (kind == BOAT_PLUGIN_KIND_RACE && !strcmp(location, "outer"))
+        id = BOAT_PLUGIN_DEFAULT_RACE;
     else if (kind == BOAT_PLUGIN_KIND_MATCH)
         id = BOAT_PLUGIN_DEFAULT_MATCH;
     const BoatPluginCatalogEntry *entry = boat_plugin_catalog_find(id);

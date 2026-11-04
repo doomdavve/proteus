@@ -145,17 +145,16 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "entry", "must be \"main.lua\"");
     if (!boat_json_text(json, &tokens[at[5]], m.location, sizeof(m.location)))
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location", "must be a string");
-    bool known_location = !strcmp(m.location, "basin") || !strcmp(m.location, "river")
-        || !strcmp(m.location, "outer");
+    bool known_location = !strcmp(m.location, "basin") || !strcmp(m.location, "outer");
     bool location_ok = kind == BOAT_PLUGIN_KIND_VOYAGE ? !strcmp(m.location, "outer")
         : kind == BOAT_PLUGIN_KIND_COURSE              ? !strcmp(m.location, "basin")
-        : kind == BOAT_PLUGIN_KIND_RACE                ? !strcmp(m.location, "river")
+        : kind == BOAT_PLUGIN_KIND_RACE                ? !strcmp(m.location, "outer")
         : kind == BOAT_PLUGIN_KIND_MATCH ? known_location || !strcmp(m.location, "any")
                                          : known_location;
     if (!location_ok)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "location",
-            "must be any or a compiled location for match, basin or river for free, outer for "
-            "voyage, basin for course, river for race");
+            "must be any or a compiled location for match, basin or outer for free, outer for "
+            "voyage, basin for course, outer for race");
     const char *grant = kind == BOAT_PLUGIN_KIND_VOYAGE ? "voyage.define"
         : kind == BOAT_PLUGIN_KIND_FREE                 ? "free.define"
         : kind == BOAT_PLUGIN_KIND_COURSE               ? "course.define"

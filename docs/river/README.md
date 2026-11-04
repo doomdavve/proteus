@@ -1,5 +1,10 @@
 # Älvsborgsbron river expansion
 
+**Retired as a location, 2026-11-04.** The outer map holds this crop's water in the same frame,
+so `--location river` was removed; the crop's data remains the river kit's layout source and a
+validator fixture. See the [retirement plan](../RIVER_RETIREMENT_PLAN.md). The rest of this record
+is history; its commands now use `--location outer`.
+
 Status, 2026-10-18: opt-in river location implemented, with a shared CPU/GPU bridge
 blockout and grounded road approaches. Both deterministic river traversal presets pass.
 Bridge/shoreline/building detail and a human handling/camera playthrough remain open;
@@ -15,8 +20,8 @@ inventory, physical route, CPU/GPU captures and checksums.
 [All plans](../README.md).
 
 ```sh
-./build/wake_velocity --location river --gpu-aa
-./build/wake_velocity --location river --gpu-aa --waves
+./build/wake_velocity --location outer --gpu-aa
+./build/wake_velocity --location outer --gpu-aa --waves
 ```
 
 Leave the dock and follow the river southwest to the bridge. The river view defaults

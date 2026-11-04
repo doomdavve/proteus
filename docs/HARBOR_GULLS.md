@@ -35,10 +35,10 @@ Run from the repository root:
 
 ```sh
 mkdir -p build/living-city/gulls
-./build/wake_velocity --location river --gpu-aa --demo --frames 360
-./build/wake_velocity --renderer cpu --location river --time 0 --screenshot build/living-city/gulls/dock-start.png
-./build/wake_velocity --location river --gpu-aa --time 0 --screenshot build/living-city/gulls/dock-gpu.png
-./build/wake_velocity --location river --camera-height 6
+./build/wake_velocity --location outer --gpu-aa --demo --frames 360
+./build/wake_velocity --renderer cpu --location outer --time 0 --screenshot build/living-city/gulls/dock-start.png
+./build/wake_velocity --location outer --gpu-aa --time 0 --screenshot build/living-city/gulls/dock-gpu.png
+./build/wake_velocity --location outer --camera-height 6
 ```
 
 The default opening view shows the nearest flock ahead of the boat. Lower the chase camera

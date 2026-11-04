@@ -1,4 +1,4 @@
-# Multiplayer protocol v11
+# Multiplayer protocol v12
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -56,6 +56,13 @@ request, slot blocks gain that request, checkpoints optionally append the comple
 combat state, and CombatPage (type 21) carries bounded periodic correction pages. MatchEvent
 uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
 compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
+
+v12 (2026-11-04) retires the river location into the outer map, which holds the same water in
+the same frame. Accept's and the room definition's location byte is now 0 basin or 1 outer
+(v5–v11 sent outer as 2 and river as 1), and a race room's location must be outer. The content
+digest covers only basin and outer; the Eriksberg crop stays in the build as presentation and
+validator data and is not hashed. Message layouts and room definition v3 are otherwise unchanged.
+Rebuild all peers: v1–v11 are incompatible.
 
 v11 (2026-11-03, M2) adds per-berth appearance in room definition v3 / scene v3. Each berth
 appends `f32` length, beam and mast height, three four-byte RGBA colors (hull, deck, trim),
@@ -212,8 +219,8 @@ or boat exists.
 
 Accept: `u8` slot (0–3), `u8` waves (0/1), `u8` snapshot interval (4), `u8` birth interval (12),
 `u8` input interval (2), `u8` commands per batch (12), `u8` future window (24), `u8` room mode
-(0 free, 1 deathmatch, 2 race; v1 reserved; a race room's location must be the river),
-`u16` tick rate (must be 120), `u8` location (0 basin, 1 river, 2 outer; v5), `u8` reserved,
+(0 free, 1 deathmatch, 2 race; v1 reserved; a race room's location must be outer),
+`u16` tick rate (must be 120), `u8` location (0 basin, 1 outer; v12), `u8` reserved,
 `u32` wake lifetime ticks (240–1920),
 `f32` crest height (0.1–3). The header epoch is the room's epoch.
 
@@ -245,7 +252,7 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 | --- | --- |
 | version (3) | u8 |
 | mode (0 free, 1 deathmatch, 2 race) | u8 |
-| location (0 basin, 1 river, 2 outer) | u8 |
+| location (0 basin, 1 outer; v12) | u8 |
 | flags: bit 0 has rules, bit 1 has a scene | u8 |
 | package ID and display name | u8 length + printable ASCII |
 | race: start, 1–8 gates, grid, ferry, storm, rules | five `f32` per line; `f64` start times; `f32` weather; `u32` ticks |

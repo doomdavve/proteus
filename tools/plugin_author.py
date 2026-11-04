@@ -49,7 +49,7 @@ def load_layout():
                 "anchors_name": "tools/plugin_anchors.json",
                 "api_document": "docs/PLUGIN_API.md",
                 "examples": ["plugins/langedrag", "plugins/harbor-life", "plugins/river-sprint",
-                             "plugins/shelter-tour", "plugins/basin-free", "plugins/river-free",
+                             "plugins/shelter-tour", "plugins/basin-free",
                              "plugins/time-trial"]}
     with open(path, encoding="utf-8") as stream:
         package = json.load(stream)
@@ -74,8 +74,8 @@ def capabilities():
     if LAYOUT["kind"] == "package":
         layout.update(package=LAYOUT["package"], version=LAYOUT["version"])
     return {"protocol": 1, "operations": OPERATIONS, "layout": layout,
-            "kinds": {"voyage": "outer", "free": "basin, river or outer", "course": "basin",
-                      "race": "river", "match": "any or a compiled location"},
+            "kinds": {"voyage": "outer", "free": "basin or outer", "course": "basin",
+                      "race": "outer", "match": "any or a compiled location"},
             "capabilities": ["voyage.define", "scene.define", "free.define", "course.define",
                              "race.define", "match.define", "objective.hud",
                              "objective.timers"],
@@ -113,7 +113,7 @@ def capabilities():
             "preview": {"max_ticks": 72000, "fixtures": ["voyage-calm-steer-v1", "race-four-grid-v1"]},
             "browser": {"capabilities": ["voyage.define", "free.define", "course.define",
                                          "scene.define"],
-                        "locations": ["basin", "river", "outer"],
+                        "locations": ["basin", "outer"],
                         "bundle_format": "wake-velocity-plugin", "bundle_version": 1,
                         "result_bytes": 16384},
             "capture": {"kinds": ["voyage"], "renderer": "cpu", "max_seconds": 60,

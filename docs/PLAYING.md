@@ -90,13 +90,13 @@ reset/recovery action to get moving again.
 
 ## Explore
 
-The river starts in the Eriksberg dock, with moored craft, moving traffic and gulls.
-Leave the dock and follow the river southwest towards Älvsborgsbron. The basin provides
-an open practice area. Player wakes are rideable; crossing your own trail or another
+The outer river (the title's default PLACE) starts in the Eriksberg dock, with moored craft,
+moving traffic and gulls. Leave the dock and follow the river southwest towards Älvsborgsbron.
+The basin provides an open practice area. Player wakes are rideable; crossing your own trail or another
 boat's wake can launch you into the air. Steering still provides modest yaw in flight,
 while automatic stabilization helps the boat land upright.
 
-For the larger map and solo voyage, launch with `--location outer` (see
+The same map holds the solo voyage (`--location outer` from the command line; see
 [launch options](COMMAND_LINE.md#locations-and-voyages)). It extends upstream past
 Lindholmen, Lilla Bommen and Hisingsbron, and out towards Långedrag. Follow the destination
 arrow and arrive in Långedrag's old harbour at 6 m/s or less. Passing a shelter sets your

@@ -115,7 +115,6 @@ class CaptureLifecycle(unittest.TestCase):
                                 ("langedrag", {"camera": {"distance": 7}}),
                                 ("langedrag", {"camera": {"height": 37}}),
                                 ("langedrag", {"expected_bundle": "stale"}),
-                                ("langedrag", {"anchor": author.find_anchor("river.sprint-start")}),
                                 ("river-sprint", {"anchor": bridge})]:
             with self.assertRaises(ValueError, msg=(package, kwargs)):
                 self.job(package, **kwargs)
@@ -128,7 +127,7 @@ class CaptureLifecycle(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         for anchor in data["anchors"]:
             self.assertTrue(anchor["id"].startswith(anchor["location"] + "."))
-            self.assertIn(anchor["location"], ("outer", "river"))
+            self.assertEqual(anchor["location"], "outer")
         self.assertIn("capture", author.capabilities()["operations"])
         self.assertNotIn("capture", author.capabilities()["unsupported"])
 

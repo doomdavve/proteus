@@ -9,7 +9,7 @@ parser.add_argument('--build-dir', type=Path, required=True)
 parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--four-players', action='store_true', help='Fill the room with two native and two browser clients, then reject a fifth.')
 parser.add_argument('--mode', choices=['free', 'deathmatch', 'race'], default='free')
-parser.add_argument('--location', choices=['basin', 'river', 'outer'],
+parser.add_argument('--location', choices=['basin', 'outer'],
                     help='Room location override, e.g. outer for proteus.harbor-room.')
 parser.add_argument('--server-package', help='Bundled room ID or edited package directory for the local server.')
 parser.add_argument('--executable', default='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')

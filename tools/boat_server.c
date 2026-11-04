@@ -54,14 +54,14 @@ static void usage(FILE *out)
     cli_usage_line(out, "--mode free", "Shared free boating (default)");
     cli_usage_line(
         out, "--mode deathmatch", "Timed rounds: +1 defeat, -1 self-capsize, 3 s respawn");
-    cli_usage_line(out, "--mode race", "River sprint: gridded start, 3 s countdown, places");
+    cli_usage_line(out, "--mode race", "River sprint on outer: gridded start, countdown, places");
 
     cli_usage_section(out, "ROOM");
     cli_usage_line(out, "--bind IPV4", "Listen address (default 127.0.0.1; use a LAN address)");
     cli_usage_line(out, "--port N", "UDP port (default 24680)");
     cli_usage_line(out, "--token TEXT", "Shared join token (default empty)");
     cli_usage_line(out, "--players 1-4", "Seats in the room (default 4)");
-    cli_usage_line(out, "--location NAME", "basin|river|outer (default basin; race uses river)");
+    cli_usage_line(out, "--location NAME", "basin|outer (default basin; race uses outer)");
     cli_usage_line(out, "--package ID|DIR", "Room package (default: the mode's bundled package)");
     cli_usage_line(out, "--waves", "Gentle crossing waves");
     cli_usage_line(out, "--lan-port N", "LAN search port (default 24681); loopback --bind answers");
@@ -671,7 +671,11 @@ int boat_server_main(int argc, char **argv)
         } else if (strcmp(argv[i], "--location") == 0 && value) {
             const BoatWorldDefinition *location = boat_location_find(value);
             if (!location) {
-                fprintf(stderr, "boat_server: unknown location '%s'.\n", value);
+                fprintf(stderr,
+                    strcmp(value, "river") ? "boat_server: unknown location '%s'.\n"
+                                           : "boat_server: the %s location is retired; "
+                                             "--location outer holds its water.\n",
+                    value);
                 return 2;
             }
             room_options.location = location->id;
@@ -691,12 +695,12 @@ int boat_server_main(int argc, char **argv)
         fprintf(stderr, "boat_server: --round-seconds needs --mode deathmatch.\n");
         return 2;
     }
-    if (race && location_given && room_options.location != BOAT_LOCATION_RIVER) {
-        fprintf(stderr, "boat_server: --mode race runs on the river location.\n");
+    if (race && location_given && room_options.location != BOAT_LOCATION_OUTER) {
+        fprintf(stderr, "boat_server: --mode race runs on the outer location.\n");
         return 2;
     }
     if (race)
-        room_options.location = BOAT_LOCATION_RIVER;
+        room_options.location = BOAT_LOCATION_OUTER;
     if (scripted_mode) {
         if (race) {
             fprintf(stderr,

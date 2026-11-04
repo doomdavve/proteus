@@ -54,7 +54,7 @@ static void drive(CoreRun *run, int tick)
 static void start(CoreRun *run, int index)
 {
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
-    const BoatWorldDefinition *definition = index == 2 ? boat_location(BOAT_LOCATION_RIVER) : basin;
+    const BoatWorldDefinition *definition = index == 2 ? test_location(TEST_RIVER) : basin;
     BoatWater water = { .player_wake_enabled = true };
     if (index == 1) {
         water = boat_world_test_water(basin, true, true, false);
@@ -152,7 +152,7 @@ static int water(void)
 // envelopes block berths.
 static int shoreline(void)
 {
-    const BoatWorldDefinition *definition = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *definition = test_location(TEST_RIVER);
     BoatWorldResources river;
     CHECK(boat_world_resources_init(&river, definition));
     Vector2 normal = { 0 };

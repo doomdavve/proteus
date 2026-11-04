@@ -518,7 +518,7 @@ int main(void)
     const float headings[] = { -PI / 2, PI / 2, atan2f(across.x, across.y) };
     for (int test = 0; test < 3; ++test) {
         BoatSession boat;
-        boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(TEST_RIVER), (BoatWater) { 0 });
         boat.boat.position = starts[test];
         boat.boat.heading = boat.presentation.camera_heading = headings[test];
         boat.boat.velocity

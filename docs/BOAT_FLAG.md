@@ -66,7 +66,7 @@ or exactly match continuous playback. Identical fresh seeks are repeatable.
 Run these commands from the repository root after building:
 
 ```sh
-./build/wake_velocity --location river --gpu-aa --waves --demo --frames 300
+./build/wake_velocity --location outer --gpu-aa --waves --demo --frames 300
 ./build/boat_flag_review --renderer gpu --scenario cruise --time 3 --frames 300
 ./build/boat_flag_review --scenario idle --time 5 --screenshot build/flag-idle.png
 ./build/boat_flag_review --scenario reverse --time 5 --screenshot build/flag-reverse.png

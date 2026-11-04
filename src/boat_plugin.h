@@ -112,7 +112,7 @@ typedef struct BoatPluginVoyage {
     uint64_t digest; // boat_plugin_route_digest(&route).
 } BoatPluginVoyage;
 
-// P2: pointer-free owned river race definition. DIGEST covers gameplay only; the manifest
+// P2: pointer-free owned race definition. DIGEST covers gameplay only; the manifest
 // name is the display label and can change without restarting a run.
 typedef struct {
     BoatPluginManifest manifest;

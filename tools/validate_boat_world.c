@@ -57,7 +57,7 @@ static void start(BoatSession *session, int index)
     else if (index == 1)
         boat_session_init(session, test_world(BOAT_LOCATION_BASIN), waves);
     else
-        boat_session_init(session, test_world(BOAT_LOCATION_RIVER), mapped);
+        boat_session_init(session, test_world(TEST_RIVER), mapped);
 }
 
 static bool same_physics(const BoatSession *a, const BoatSession *b)
@@ -292,12 +292,11 @@ static int render_rates(void)
 // the synthetic harbor draw interleaved; destroying one leaves the others' frames unchanged.
 static int view_binding(void)
 {
-    const BoatWorldDefinition definition
-        = test_harbor_definition(boat_location(BOAT_LOCATION_RIVER));
+    const BoatWorldDefinition definition = test_harbor_definition(test_location(TEST_RIVER));
     BoatWorldResources harbor;
     CHECK(boat_world_resources_init(&harbor, &definition));
     BoatSession river, other;
-    boat_session_init(&river, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    boat_session_init(&river, test_world(TEST_RIVER), (BoatWater) { 0 });
     boat_session_init(&other, &harbor, (BoatWater) { 0 });
     Renderer3D ra = { 0 }, rb = { 0 }, rc = { 0 };
     BoatCpuView a = { 0 }, b = { 0 }, c = { 0 };
@@ -466,7 +465,7 @@ static void participant_end(Participant *p)
 static int lifecycle(void)
 {
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = test_location(TEST_RIVER);
     const BoatWorldDefinition harbor = test_harbor_definition(river);
     BoatWater waves = boat_world_test_water(basin, true, true, false), gentle = boat_water_gentle();
     waves.player_wake_enabled = gentle.player_wake_enabled = true;

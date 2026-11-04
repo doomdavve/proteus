@@ -93,7 +93,7 @@ static int golden(void)
         bytes);
     CHECK(size == 40);
     CHECK(same_bytes(bytes, size,
-        "50424e54000b0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
+        "50424e54000c0d0001020304a0b0c0d01122334455667788000800000000000001020304050607"
         "08"));
     BoatNetMessage input = { .header = { .type = BOAT_NET_INPUT_BATCH, .epoch = 9, .tick = 200 },
         .input = { .life = 7, .count = 2, .snapshot_tick = 100 } };
@@ -103,7 +103,7 @@ static int golden(void)
     size = encode(input, bytes);
     CHECK(size == 60);
     CHECK(same_bytes(bytes, size,
-        "50424e54000b09000000000900000000000000000000"
+        "50424e54000c09000000000900000000000000000000"
         "00c8001c000000000000"
         "00000007020000000000000000000064" // Life, count, latest snapshot tick.
         "7f81000000ff" // Steering +1, throttle -1.
@@ -207,7 +207,7 @@ static int golden(void)
     CHECK(bytes[32 + 40 + 29] == 0xc0); // -64 as a two's-complement byte.
     uint64_t digest = boat_net_bytes_digest(bytes, size);
     printf("golden: snapshot digest %016" PRIx64 "\n", digest);
-    CHECK(digest == UINT64_C(0xf2ec800e81b56e79)); // v11 header; snapshot payload unchanged.
+    CHECK(digest == UINT64_C(0x9e194ddbabc7ff9c)); // v12 header; snapshot payload unchanged.
     // Command quantization: keyboard values survive exactly.
     for (float value = -1; value <= 1; value += 1) {
         BoatInput back = boat_net_command_input(
@@ -240,7 +240,7 @@ static unsigned samples(Sample *out)
     m[0] = (BoatNetMessage) { .header = { .type = BOAT_NET_HELLO },
         .hello = { BOAT_PHYSICS_REVISION, 42, "name", "token", "build" } };
     m[1] = (BoatNetMessage) { .header = { .type = BOAT_NET_ACCEPT, .epoch = 3 },
-        .accept = { 2, true, BOAT_NET_MODE_DEATHMATCH, BOAT_LOCATION_RIVER, 4, 12, 2, 12, 24, 120,
+        .accept = { 2, true, BOAT_NET_MODE_DEATHMATCH, BOAT_LOCATION_OUTER, 4, 12, 2, 12, 24, 120,
             1920, 1.8f } };
     m[2] = (BoatNetMessage) { .header = { .type = BOAT_NET_REJECT },
         .reject = { BOAT_NET_REJECT_TOKEN, 1, 6, 42 } };
@@ -473,7 +473,7 @@ static int codec(void)
         .accept = { 0, false, BOAT_NET_MODE_RACE, BOAT_LOCATION_BASIN, 4, 12, 2, 12, 24, 120, 1920,
             1.8f } }; // The river sprint needs the river.
     CHECK(boat_net_encode(&bad, b) == 0);
-    bad.accept.location = BOAT_LOCATION_RIVER;
+    bad.accept.location = BOAT_LOCATION_OUTER;
     CHECK(boat_net_encode(&bad, b) > 0);
     printf("codec: %u non-finite floats and header/field/range faults rejected\n", nonfinite);
     return 0;
@@ -1133,7 +1133,7 @@ static int lan_discovery(void)
 {
     uint8_t query[BOAT_NET_DISCOVERY_BYTES], bytes[BOAT_NET_DISCOVERY_BYTES];
     CHECK(boat_net_lan_query_encode(query) == BOAT_NET_DISCOVERY_BYTES);
-    CHECK(same_bytes(query, 8, "50424c510001000b"));
+    CHECK(same_bytes(query, 8, "50424c510001000c"));
     CHECK(boat_net_lan_query_decode(query, sizeof(query)));
     CHECK(!boat_net_lan_query_decode(query, sizeof(query) - 1));
     query[51] = 1;
@@ -1389,7 +1389,7 @@ static int race_room(void)
 {
     static Room room;
     CHECK(room_open_mode(&room, 71,
-        (BoatNetServerConfig) { .resources = test_world(BOAT_LOCATION_RIVER) }, BOAT_ROOM_MODE_RACE,
+        (BoatNetServerConfig) { .resources = test_world(BOAT_LOCATION_OUTER) }, BOAT_ROOM_MODE_RACE,
         NULL));
     BoatNetServer *s = &room.server;
     room.predict = room.race = true;
@@ -1478,7 +1478,7 @@ static int prediction_release(void)
 {
     static BoatFleet authority, before;
     static BoatPrediction p, stuck;
-    const BoatWorldResources *river = test_world(BOAT_LOCATION_RIVER);
+    const BoatWorldResources *river = test_world(BOAT_LOCATION_OUTER);
     CHECK(boat_fleet_init(&authority, river,
         boat_world_test_water(river->definition, false, false, false), BOAT_OBJECT_LIFE_TICKS,
         BOAT_OBJECT_DEFAULT_HEIGHT));
@@ -1531,7 +1531,7 @@ static int prediction_release(void)
 // authority and prediction) mid-run leaves the surviving prediction replaying bit-identically.
 static int prediction_owners(void)
 {
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_OUTER);
     static BoatWorldResources kept, released;
     static BoatFleet authority[2], before;
     static BoatPrediction p[2];
@@ -1819,7 +1819,7 @@ static int impaired(void)
 static int mapped_rooms(void)
 {
     static Room room;
-    const int id = BOAT_LOCATION_RIVER;
+    const int id = BOAT_LOCATION_OUTER;
     BoatMatchRules rules = boat_fixture_match_default_rules;
     CHECK(room_open_mode(&room, 63, (BoatNetServerConfig) { .resources = test_world(id) },
         BOAT_ROOM_MODE_DEATHMATCH, &rules));
@@ -2719,7 +2719,7 @@ static int room_definition_codec(void)
     CHECK(boat_room_definition_decode(bytes, size, &back, &rd)); // The original still decodes.
     // A non-finite start gate value is refused.
     BoatRoomDefinition race = {
-        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_RACE, .location = BOAT_LOCATION_RIVER
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_RACE, .location = BOAT_LOCATION_OUTER
     };
     snprintf(race.id, sizeof(race.id), "%s", "validator.race");
     snprintf(race.name, sizeof(race.name), "%s", "Validator race");

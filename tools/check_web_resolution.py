@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Optional Playwright check of G5a's high resolution and HDR fallback against a served build.
 
-Single player on the river with PICTURE set to HIGH RES must render a 1280x800 scene, a
+Single player on the outer river with PICTURE set to HIGH RES must render a 1280x800 scene, a
 640x480 reflection and (with float render targets) the 640x400 bloom level; it must survive a
 mobile rotation and return to the title. With EXT_color_buffer_float hidden, the same session
 presents 8-bit (no bloom viewports) without errors. The saved settings keep resolution=high.
@@ -61,14 +61,14 @@ def session(browser, name, float_targets, mobile):
         page.keyboard.press(k, delay=90)
         page.wait_for_timeout(200)
 
-    key('Enter')  # SINGLE PLAYER, on START with the river selected
+    key('Enter')  # SINGLE PLAYER, on START with the outer river selected
     key('ArrowUp')  # PICTURE
     key('ArrowRight')  # SMOOTH -> HIGH RES
     page.screenshot(path=str(args.output / f'{name}-setup.png'))
     key('ArrowDown')
     key('Enter')  # START
     page.wait_for_timeout(5000)
-    page.screenshot(path=str(args.output / f'{name}-river.png'))
+    page.screenshot(path=str(args.output / f'{name}-outer.png'))
     sizes = page.evaluate('window.renderSizes')
     if mobile:
         page.set_viewport_size({'width': 390, 'height': 844})  # Rotate to portrait.

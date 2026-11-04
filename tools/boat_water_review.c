@@ -43,7 +43,7 @@ typedef struct {
     size_t count;
 } Route;
 static const Route river_route
-    = { "river-review", BOAT_LOCATION_RIVER, stops, sizeof(stops) / sizeof(*stops) };
+    = { "river-review", TEST_RIVER, stops, sizeof(stops) / sizeof(*stops) };
 static const Route outer_route = { "outer-review", BOAT_LOCATION_OUTER, outer_stops,
     sizeof(outer_stops) / sizeof(*outer_stops) };
 #define MAX_TICKS (240 * 120)
@@ -185,7 +185,7 @@ static int check_gpu_water(void)
         goto cleanup;
     // In the real waterfront, the authored field must vary the surface even with
     // reflections/shadows disabled, and cross the mouth without an abrupt colour step.
-    session.world.resources = test_world(BOAT_LOCATION_RIVER);
+    session.world.resources = test_world(TEST_RIVER);
     session.world.definition = session.world.resources->definition;
     boat->position.x = -12;
     Color first = { 0 }, previous = { 0 }, last = { 0 };
@@ -307,8 +307,7 @@ static int check_gpu_views(void)
     InitWindow(320, 200, "View binding probe");
     if (!IsWindowReady())
         return 1;
-    const BoatWorldDefinition definition
-        = test_harbor_definition(boat_location(BOAT_LOCATION_RIVER));
+    const BoatWorldDefinition definition = test_harbor_definition(test_location(TEST_RIVER));
     BoatWorldResources harbor = { 0 };
     BoatGpu a = { 0 }, b = { 0 };
     Image first = { 0 }, frame = { 0 }, harbor_frame = { 0 };
@@ -318,7 +317,7 @@ static int check_gpu_views(void)
     if (!boat_world_resources_init(&harbor, &definition) || !boat_gpu_init(&a, false)
         || !boat_gpu_init(&b, false))
         goto cleanup;
-    boat_session_init(&river, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    boat_session_init(&river, test_world(TEST_RIVER), (BoatWater) { 0 });
     boat_session_init(&other, &harbor, (BoatWater) { 0 });
     sessions = true;
 #define EXPECT(test)                                                                               \
@@ -504,7 +503,7 @@ static int check_detail(void)
         return 1;
     BoatGpu gpu = { 0 };
     BoatSession session;
-    boat_session_init(&session, test_world(BOAT_LOCATION_RIVER), boat_water_gentle());
+    boat_session_init(&session, test_world(TEST_RIVER), boat_water_gentle());
     int result = 1, cells = 0;
     unsigned char *previous = NULL, *start = NULL, *switched = NULL;
     if (!boat_gpu_init(&gpu, false))
@@ -611,8 +610,8 @@ static int check_culling(void)
     const BoatCamera cameras[] = { BOAT_CAMERA_DEFAULT, { .distance = 12, .height = 6 },
         { .distance = 1100, .height = 300 } };
     BoatSession session, flat;
-    boat_session_init(&session, test_world(BOAT_LOCATION_RIVER), boat_water_gentle());
-    boat_session_init(&flat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    boat_session_init(&session, test_world(TEST_RIVER), boat_water_gentle());
+    boat_session_init(&flat, test_world(TEST_RIVER), (BoatWater) { 0 });
     int result = 1, poses = 0;
     unsigned int culled[WATERFRONT_GPU_PASS_COUNT] = { 0 };
     size_t cpu_culled = 0;
@@ -744,7 +743,7 @@ static int check_presentation(void)
         }                                                                                          \
     } while (0)
 #define RELEASE(image) (UnloadImage(image), (image) = (Image) { 0 })
-    EXPECT(boat_world_resources_init(&owner, boat_location(BOAT_LOCATION_RIVER)));
+    EXPECT(boat_world_resources_init(&owner, test_location(TEST_RIVER)));
     boat_session_init(&session, &owner, boat_water_gentle());
     ready = true;
     for (int t = 0; t < 480; ++t)
@@ -919,7 +918,7 @@ static int check_light_clusters(void)
         }                                                                                          \
     } while (0)
 #define RELEASE(image) (UnloadImage(image), (image) = (Image) { 0 })
-    EXPECT(boat_world_resources_init(&owner, boat_location(BOAT_LOCATION_RIVER)));
+    EXPECT(boat_world_resources_init(&owner, test_location(TEST_RIVER)));
     boat_session_init(&session, &owner, boat_water_gentle());
     ready = true;
     for (int t = 0; t < 480; ++t)
@@ -1007,10 +1006,10 @@ static int check_gpu_lifecycle(void)
     if (!IsWindowReady())
         return 1;
     enum { VIEWS = 4, CYCLES = 3 };
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = test_location(TEST_RIVER);
     const BoatWorldDefinition harbor = test_harbor_definition(river);
     const BoatWorldDefinition *definitions[VIEWS]
-        = { river, river, &harbor, boat_location(BOAT_LOCATION_BASIN) };
+        = { river, river, &harbor, test_location(BOAT_LOCATION_BASIN) };
     static BoatWorldResources owners[VIEWS];
     static BoatSession sessions[VIEWS];
     static BoatWakeObjects arcade;
@@ -1178,7 +1177,7 @@ static BoatInput stress_input(const Boat *boat, unsigned slot, uint64_t tick)
 static bool stress_init(StressFixture *fixture, bool waves)
 {
     *fixture = (StressFixture) { 0 };
-    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    const BoatWorldDefinition *basin = test_location(BOAT_LOCATION_BASIN);
     if (!boat_fleet_init(&fixture->fleet, test_world(BOAT_LOCATION_BASIN),
             boat_world_test_water(basin, waves, false, false), BOAT_OBJECT_LIFE_TICKS,
             BOAT_OBJECT_DEFAULT_HEIGHT))
@@ -1446,12 +1445,12 @@ static bool prepare_location_tiles(
     WaterfrontScenery *scenery, BoatLocationId location, float tile_size)
 {
     return !(tile_size > 0)
-        || waterfront_scenery_init_tiled(scenery, boat_location(location)->map, tile_size);
+        || waterfront_scenery_init_tiled(scenery, test_location(location)->map, tile_size);
 }
 
 static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size)
 {
-    return prepare_location_tiles(scenery, BOAT_LOCATION_RIVER, tile_size);
+    return prepare_location_tiles(scenery, TEST_RIVER, tile_size);
 }
 
 static int benchmark(const char *prefix, bool waves, bool aa, bool visible, const char *pacing,
@@ -1474,7 +1473,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     BenchFrame *frames = calloc(BENCH_FRAMES, sizeof(*frames));
     float *scratch = calloc(BENCH_FRAMES, sizeof(*scratch));
     const BoatWorldDefinition *location
-        = boat_location(stress ? BOAT_LOCATION_BASIN : route->location);
+        = test_location(stress ? BOAT_LOCATION_BASIN : route->location);
     BoatSession session;
     StressFixture stress_fixture;
     if (!stress)
@@ -1840,25 +1839,23 @@ typedef struct {
 static const ReviewPose review_poses[] = {
     { "basin-hull", "static", BOAT_LOCATION_BASIN, { 0, 10 }, 0, 0, 8, 4, 360, 1, 0, { 0 }, 0 },
     { "basin-wake", "static", BOAT_LOCATION_BASIN, { 0, -20 }, 0, 0, 16, 9, 1080, 1, 0, { 0 }, 0 },
-    { "river-quay", "static", BOAT_LOCATION_RIVER, { -24, -70 }, -.3f, -.3f, 12, 6, 600, 1, 0,
+    { "river-quay", "static", TEST_RIVER, { -24, -70 }, -.3f, -.3f, 12, 6, 600, 1, 0, { 0 }, 0 },
+    { "river-bridge", "static", TEST_RIVER, { 250, -500 }, .85f, .85f, 14, 6, 900, 1, 0, { 0 }, 0 },
+    { "river-skyline", "static", TEST_RIVER, { 650, -850 }, 1.0f, 1.0f + PI, 44, 22, 1200, 1, 0,
         { 0 }, 0 },
-    { "river-bridge", "static", BOAT_LOCATION_RIVER, { 250, -500 }, .85f, .85f, 14, 6, 900, 1, 0,
-        { 0 }, 0 },
-    { "river-skyline", "static", BOAT_LOCATION_RIVER, { 650, -850 }, 1.0f, 1.0f + PI, 44, 22, 1200,
-        1, 0, { 0 }, 0 },
     { "outer-dock", "static", BOAT_LOCATION_OUTER, { -12, 60 }, 0, 0, 12, 6, 600, 1, 0, { 0 }, 0 },
     { "outer-coast", "static", BOAT_LOCATION_OUTER, { -24, -70 }, -.4f, -.4f, 36, 18, 1200, 1, 0,
         { 0 }, 0 },
-    { "river-tile-boundary", "tile-boundary", BOAT_LOCATION_RIVER, { 1100, -950 }, -1.79f, -1.79f,
-        30, 14, 1500, 4, 30, { -40, 9 }, 0 },
-    { "river-fast-turn", "fast-turn", BOAT_LOCATION_RIVER, { 250, -500 }, -.4f, -.4f, 22, 10, 300,
-        4, 30, { 3, 2 }, .45f },
-    { "river-stop", "stop-restart", BOAT_LOCATION_RIVER, { -15, -180 }, 2.2f, 2.2f, 16, 8, 180, 4,
-        360, { 0 }, 0 },
-    { "river-camera-turn", "camera-turn", BOAT_LOCATION_RIVER, { -15, -180 }, 2.2f, 2.2f, 20, 10,
-        180, 4, 30, { 0 }, 0 },
-    { "river-map-reload", "map-reload", BOAT_LOCATION_RIVER, { -12, 60 }, 0, 0, 20, 10, 2100, 4,
-        120, { 0 }, 0 },
+    { "river-tile-boundary", "tile-boundary", TEST_RIVER, { 1100, -950 }, -1.79f, -1.79f, 30, 14,
+        1500, 4, 30, { -40, 9 }, 0 },
+    { "river-fast-turn", "fast-turn", TEST_RIVER, { 250, -500 }, -.4f, -.4f, 22, 10, 300, 4, 30,
+        { 3, 2 }, .45f },
+    { "river-stop", "stop-restart", TEST_RIVER, { -15, -180 }, 2.2f, 2.2f, 16, 8, 180, 4, 360,
+        { 0 }, 0 },
+    { "river-camera-turn", "camera-turn", TEST_RIVER, { -15, -180 }, 2.2f, 2.2f, 20, 10, 180, 4, 30,
+        { 0 }, 0 },
+    { "river-map-reload", "map-reload", TEST_RIVER, { -12, 60 }, 0, 0, 20, 10, 2100, 4, 120, { 0 },
+        0 },
     { "outer-map-reload", "map-reload", BOAT_LOCATION_OUTER, { -12, 60 }, 0, 0, 20, 10, 2100, 4,
         120, { 0 }, 0 },
 };
@@ -2909,8 +2906,7 @@ static int report_geometry(void)
     InitWindow(320, 200, "Geometry report");
     BoatGpu gpu = { 0 };
     int result = !IsWindowReady() || !boat_gpu_init(&gpu, false);
-    const BoatLocationId locations[]
-        = { BOAT_LOCATION_BASIN, BOAT_LOCATION_RIVER, BOAT_LOCATION_OUTER };
+    const BoatLocationId locations[] = { BOAT_LOCATION_BASIN, TEST_RIVER, BOAT_LOCATION_OUTER };
     for (size_t i = 0; !result && i < sizeof(locations) / sizeof(*locations); ++i) {
         const BoatWorldResources *resources = test_world(locations[i]);
         BoatSession session;
@@ -3413,7 +3409,7 @@ int main(int argc, char **argv)
     if (review_dir)
         return review(review_dir, use_gpu);
     const Route *route = scenario && strcmp(scenario, "outer") == 0 ? &outer_route : &river_route;
-    const BoatWorldDefinition *location = boat_location(route->location);
+    const BoatWorldDefinition *location = test_location(route->location);
     BoatSession session;
     boat_session_init(
         &session, test_world(route->location), waves ? boat_water_gentle() : (BoatWater) { 0 });
@@ -3517,7 +3513,7 @@ int main(int argc, char **argv)
                         shown.flag.initialized = false;
                         Vector2 delta = Vector2Subtract(targets[bank], inspection.position);
                         shown.camera_heading = inspection.heading = atan2f(delta.x, -delta.y);
-                        if (!hull_clear(&inspection, BOAT_LOCATION_RIVER))
+                        if (!hull_clear(&inspection, TEST_RIVER))
                             goto cleanup;
                         snprintf(path, sizeof(path), "%s/%s.png", output, landfalls[bank].name);
                         if (!capture(&gpu, &cpu, &cpu_view, &inspection,

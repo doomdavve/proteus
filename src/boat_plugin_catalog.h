@@ -21,16 +21,15 @@ extern const unsigned boat_plugin_catalog_count;
 
 // Bundled defaults. A missing default is a build failure, never a launch-time fallback.
 #define BOAT_PLUGIN_DEFAULT_BASIN_FREE "proteus.basin-free"
-#define BOAT_PLUGIN_DEFAULT_RIVER_FREE "proteus.river-free"
 #define BOAT_PLUGIN_DEFAULT_OUTER_VOYAGE "proteus.langedrag"
-#define BOAT_PLUGIN_DEFAULT_RIVER_RACE "proteus.river-sprint"
+#define BOAT_PLUGIN_DEFAULT_RACE "proteus.river-sprint"
 #define BOAT_PLUGIN_DEFAULT_BASIN_COURSE "proteus.time-trial"
 #define BOAT_PLUGIN_DEFAULT_MATCH "proteus.deathmatch"
 
 const BoatPluginCatalogEntry *boat_plugin_catalog_at(unsigned index);
 const BoatPluginCatalogEntry *boat_plugin_catalog_find(const char *id);
-// KIND's default for LOCATION, or NULL. FREE uses the basin or river package; VOYAGE the outer
-// voyage; COURSE the basin time trial; RACE the river sprint.
+// KIND's default for LOCATION, or NULL. FREE uses the basin or outer package; VOYAGE the outer
+// voyage; COURSE the basin time trial; RACE the river sprint on the outer map.
 const BoatPluginCatalogEntry *boat_plugin_catalog_default(
     BoatPluginKind kind, const char *location);
 // Decode ENTRY into a typed revision with no Lua and no map sweep. The catalog generator already

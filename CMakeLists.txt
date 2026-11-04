@@ -159,12 +159,12 @@ target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_s
 # generator as a Node program for the browser and lets CMake run it through the cross-compiling
 # emulator; only solo entries are linked into the game.
 set(BOAT_PLUGIN_PACKAGES
-  plugins/basin-free plugins/river-free plugins/outer-free plugins/time-trial
+  plugins/basin-free plugins/outer-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
   plugins/harbor-room plugins/harbor-race)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
-    plugins/basin-free plugins/river-free plugins/time-trial plugins/langedrag
+    plugins/basin-free plugins/time-trial plugins/langedrag
     plugins/harbor-life)
 else()
   set(BOAT_PLUGIN_CATALOG_PACKAGES ${BOAT_PLUGIN_PACKAGES})
@@ -613,7 +613,7 @@ if(PROTEUS_GPU_TESTS)
     LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 180)
 endif()
 add_test(NAME wake_candidate_course_rejected COMMAND wake_velocity --wake-field --course)
-add_test(NAME wake_candidate_map_rejected COMMAND wake_velocity --wake-field --location river)
+add_test(NAME wake_candidate_map_rejected COMMAND wake_velocity --wake-field --location outer)
 add_test(NAME wake_candidate_current_rejected COMMAND wake_velocity --wake-field --current)
 set_tests_properties(wake_candidate_course_rejected wake_candidate_map_rejected
   wake_candidate_current_rejected PROPERTIES WILL_FAIL TRUE)
@@ -977,7 +977,7 @@ add_test(NAME boat_server_scripted_until_empty_rejected
   COMMAND boat_server --scripted --until-empty)
 # Every PLACE the title offers opens its package through the title's own arguments.
 foreach(place_package
-    "basin=proteus.basin-free" "river=proteus.river-free" "outer-standard=proteus.langedrag"
+    "basin=proteus.basin-free" "outer-standard=proteus.langedrag"
     "outer-harbor-life=proteus.harbor-life" "basin-trial=proteus.time-trial")
   string(REPLACE "=" ";" place_package "${place_package}")
   list(GET place_package 0 place)
@@ -1011,7 +1011,7 @@ set_tests_properties(boat_host PROPERTIES PASS_REGULAR_EXPRESSION "boat_host=ok"
 if(PROTEUS_GPU_TESTS)
   # A windowed host session on a private port: start the room, join it, leave, close it.
   add_test(NAME wake_velocity_host_gpu
-    COMMAND wake_velocity --host deathmatch --location river --port 24779 --frames 120)
+    COMMAND wake_velocity --host deathmatch --location outer --port 24779 --frames 120)
   set_tests_properties(wake_velocity_host_gpu PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu TIMEOUT 60
     PASS_REGULAR_EXPRESSION "standard input closed; closing the room")
 endif()
@@ -1094,7 +1094,7 @@ proteus_add_case_tests(boat_world_isolation validate_boat_world LABELS cpu)
 add_test(NAME wake_velocity_plugin_screenshot COMMAND wake_velocity --renderer cpu
   --plugin plugins/langedrag --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-plugin.png)
 add_test(NAME wake_velocity_plugin_location_rejected COMMAND wake_velocity
-  --plugin plugins/langedrag --location river)
+  --plugin plugins/langedrag --location basin)
 add_test(NAME wake_velocity_plugin_course_rejected COMMAND wake_velocity
   --plugin plugins/langedrag --course)
 add_test(NAME wake_velocity_plugin_room_rejected COMMAND wake_velocity
@@ -1117,9 +1117,9 @@ add_test(NAME boat_crossing_wake_screenshot COMMAND wake_velocity --renderer cpu
 add_test(NAME boat_environment_screenshot COMMAND wake_velocity --renderer cpu --current --crossing-wake
   --waves --time 9 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-environment.png)
 add_test(NAME boat_environment_course_rejected COMMAND wake_velocity --current --course)
-add_test(NAME boat_environment_river_screenshot COMMAND wake_velocity --renderer cpu
-  --location river --current --crossing-wake --time 3
-  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-river-environment.png)
+add_test(NAME boat_environment_outer_screenshot COMMAND wake_velocity --renderer cpu
+  --location outer --current --crossing-wake --time 3
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-outer-environment.png)
 set_tests_properties(boat_environment_course_rejected PROPERTIES WILL_FAIL TRUE)
 add_test(NAME boat_default_player_wake_screenshot COMMAND wake_velocity --renderer cpu --time 9
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-default-player-wake.png)
@@ -1170,8 +1170,13 @@ add_test(NAME boat_cpu_aa_option COMMAND wake_velocity --renderer cpu --gpu-aa -
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option.png)
 add_test(NAME boat_cpu_aa_option_reversed COMMAND wake_velocity --gpu-aa --renderer cpu --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option-reversed.png)
-add_test(NAME boat_river_screenshot COMMAND wake_velocity --renderer cpu --location river --time 0
-  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-river.png)
+add_test(NAME boat_outer_screenshot COMMAND wake_velocity --renderer cpu --location outer --time 0
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-outer.png)
+# The retired river location names its replacement instead of printing the usage.
+add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)
+add_test(NAME boat_server_river_location_retired COMMAND boat_server --location river)
+set_tests_properties(boat_river_location_retired boat_server_river_location_retired PROPERTIES
+  PASS_REGULAR_EXPRESSION "location is retired; --location outer")
 
 add_executable(dance_study tools/dance_study.c src/dance.c src/choreography.c src/xm_audio.c)
 target_link_libraries(dance_study PRIVATE proteus_render)
@@ -1362,11 +1367,11 @@ if(PROTEUS_GPU_TESTS)
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-replay-gpu.png)
   set_tests_properties(boat_ghost_gpu_screenshot boat_replay_gpu_screenshot
     PROPERTIES FIXTURES_REQUIRED boat_recording LABELS "gpu" RESOURCE_LOCK gpu)
-  add_test(NAME boat_gpu_screenshot COMMAND wake_velocity --location river --gpu --time 3
+  add_test(NAME boat_gpu_screenshot COMMAND wake_velocity --location outer --gpu --time 3
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-gpu.png)
-  add_test(NAME boat_gpu_aa_screenshot COMMAND wake_velocity --location river --gpu --gpu-aa --time 3
+  add_test(NAME boat_gpu_aa_screenshot COMMAND wake_velocity --location outer --gpu --gpu-aa --time 3
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-gpu-aa.png)
-  add_test(NAME boat_wave_gpu_screenshot COMMAND wake_velocity --location river --gpu-aa --waves
+  add_test(NAME boat_wave_gpu_screenshot COMMAND wake_velocity --location outer --gpu-aa --waves
     --camera-distance 12 --camera-height 6 --time 2.9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-wave-gpu.png)
   add_test(NAME boat_basin_gpu_screenshot COMMAND wake_velocity --time 0
@@ -1433,9 +1438,9 @@ set(PROTEUS_SLOW_TESTS
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors scene_site harbor_life_qualification
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
-  boat_environment_river_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
-  boat_river_screenshot
-  wake_velocity_title_start.basin wake_velocity_title_start.river
+  boat_environment_outer_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
+  boat_outer_screenshot
+  wake_velocity_title_start.basin
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
   wake_velocity_title_start.basin-trial)
 

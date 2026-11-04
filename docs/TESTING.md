@@ -285,7 +285,10 @@ quick budget are listed in `PROTEUS_SLOW_TESTS`; configure warns about a name th
   (`tools/boat_test_session.h`), which turn presentation off. The flag cloth was about 75–90% of
   a session tick. `boat_world_isolation.presentation_toggle` proves that physics stay
   bit-identical without presentation.
-- `test_world(id)` prepares a location on first use, so a basin-only case never builds the river.
+- `test_world(id)` prepares a location on first use, so a basin-only case never builds a mapped
+  world. `TEST_RIVER` (`tools/boat_test_location.h`) selects the Eriksberg river crop, which is no
+  longer a location (retired 2026-11-04) but remains the small mapped fixture for map, physics,
+  scenery, harbor, traffic and water-review checks; race, room and network checks use `outer`.
 - A sweep can stop once its asserted end state holds. It keeps a hard cap and a fixed length
   wherever the length is the contract.
 - A large sweep gets a sampled quick case and full slow cases, for example
@@ -427,7 +430,7 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   field at each tick. The `wake_velocity_plugin_*` tests render a CPU frame with the plugin and
   check that `--plugin` is refused with a room, the course, another location or a missing package.
 - `boat_plugin_catalog` (PD1/PD5) decodes every generated entry and proves it equals evaluating
-  its embedded source, that the basin-free, river-free, outer-voyage and time-trial defaults equal
+  its embedded source, that the basin-free, outer-voyage and time-trial defaults equal
   the shipped `proteus_boat_fixtures` values, and that catalog decoding creates no Lua state (the
   `boat_plugin_lua_states` counter is unchanged). `boat_plugin_session.catalog_runtime` opens the
   outer voyage and Harbor life entries and checks that no Lua state, watch, staging worker or
@@ -483,13 +486,14 @@ captures and checksums) or `gpu` (graphics context). Skin geometry carries both 
   checks the scenery packs under `assets/geometry/`: nothing is drawn before a load; cut packs,
   wrong magic or version, wrong counts, a moved bridge range and the river pack offered as
   `outer` are all refused; a good pack loads once with water identical to the compiled
-  `water.h`; `outer` needs the river pack for its kit ground; and unload clears them all. The
+  `water.h`; `outer` needs the river pack for its kit ground, and loading the outer location loads
+  that pack (without the crop's sidecars); and unload clears them all. The
   map validators and review tools load the packs from the source tree
   (`tools/boat_test_scenery.h`).
 - `map_pack` runs `tools/map_pack.py --self-test` (quick): float32 rounding, the leading-water
   count and a pack round trip.
-- `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `river` and
-  `outer` and none for the basin, checks that both frames fit the 320×200 scene (the chart
+- `boat_minimap` runs `validate_boat_minimap` (quick). It requires a chart for `outer`
+  and none for the basin, checks that both frames fit the 320×200 scene (the chart
   above the instruments), that the spawn, every voyage shelter and the destination are water
   pixels and inland Hisingen is not, that composition marks the boat and destination without
   touching the trim, and the N cycle. With arguments it writes review captures
@@ -655,7 +659,7 @@ python3 tools/boat_net_process.py --server build/boat_server --bot build/boat_bo
 on free ports and one `boat_bot --snapshots 3` session. It then closes the room's standard input,
 as the hosting game does when it leaves or dies. The room must report it, keep
 `accepted=1 left=1` and exit 0 within a 2 s deadline. With GPU tests enabled,
-`wake_velocity_host_gpu` hosts a windowed river deathmatch with `--host` on port 24779 for 120
+`wake_velocity_host_gpu` hosts a windowed outer deathmatch with `--host` on port 24779 for 120
 frames and requires the room to close after the session. It is the one listed exception to
 [the no-wall-time rule](#no-wall-time): windowed frames follow the display.
 
@@ -674,7 +678,7 @@ impairment. The 30-minute, one-hour and two-hour M5 gates still require recorded
 resource measurements. `boat_bot --predict`, `--reset-every S`, `--inactive-every S`, `--hunt`
 and `boat_server --mode deathmatch|race --round-seconds S` remain available for manual runs.
 
-`boat_net` also runs four predicted clients in the mapped river: shoreline-safe spawns,
+`boat_net` also runs four predicted clients on the outer map: shoreline-safe spawns,
 a deathmatch round, starts >200 m from the dock and >50 m apart with 35 m shoreline clearance,
 a snapshot outside the former basin coordinate envelope, a local loading pause, reset and exact
 mirrors at a birth-batch snapshot. The protocol-v8 codec rejects invalid map IDs and reserved

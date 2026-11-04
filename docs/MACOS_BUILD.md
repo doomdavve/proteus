@@ -51,13 +51,14 @@ the ZIP; it checks archive integrity, not publisher identity. Artifacts expire a
 checkout had uncommitted changes when packaged.
 
 Double-clicking the app opens the Wake Velocity title (2026-10-24), as does `wake_velocity`
-without options. Its SINGLE PLAYER starts the preferred river setup: current, crossing
+without options. Its SINGLE PLAYER starts the preferred outer river setup (the river location before its
+2026-11-04 [retirement](RIVER_RETIREMENT_PLAN.md)): current, crossing
 wake, gentle waves, GPU antialiasing, camera distance 12, and camera height 6, in the
 chosen BOAT livery. MULTIPLAYER hosts a room (HOST A ROOM), lists rooms found on the local
 network and joins one, or a typed HOST:PORT, with the chosen NAME. The single-player setup is equivalent to:
 
 ```sh
-./build/wake_velocity --current --crossing-wake --location river --waves --gpu-aa --camera-distance 12 --camera-height 6
+./build/wake_velocity --current --crossing-wake --location outer --waves --gpu-aa --camera-distance 12 --camera-height 6
 ```
 
 See the [controls and replay guide](PLAYING.md). Supplying any
@@ -66,7 +67,7 @@ without current/crossing wake/waves/antialiasing), then applies those arguments.
 For example:
 
 ```sh
-"/Applications/Wake Velocity.app/Contents/MacOS/wake_velocity" --location river --gpu-aa
+"/Applications/Wake Velocity.app/Contents/MacOS/wake_velocity" --location outer --gpu-aa
 ```
 
 Music, shaders, textures, the title river backdrop, bitmap menu fonts and their attribution,

@@ -110,7 +110,7 @@ jobs:
           $exe = (Resolve-Path "build-win/package/wake_velocity-$env:PACKAGE_VERSION-windows-x64/wake_velocity.exe").Path
           Push-Location $env:RUNNER_TEMP
           try {
-            & $exe --renderer cpu --location river --time 3 --screenshot boat-portable.png
+            & $exe --renderer cpu --location outer --time 3 --screenshot boat-portable.png
             if ($LASTEXITCODE -ne 0) { throw "Relocated Wake Velocity failed: $LASTEXITCODE" }
             $plugin = Join-Path (Split-Path $exe) assets/plugins/langedrag
             & $exe --renderer cpu --plugin $plugin --time 3 --screenshot boat-plugin.png

@@ -27,7 +27,8 @@ bool boat_scenery_path(
     const BoatWorldDefinition *location, const char *assets, char *path, size_t capacity);
 // Load a mapped LOCATION's pack from boat_scenery_path, then its optional water atlas
 // (boat_water_atlas.h) and ambient occlusion (boat_ambient.h) sidecars; true for an unmapped
-// location.
+// location. A map with a river kit ground (the outer map) also loads the Eriksberg river crop's
+// pack (ASSETS "geometry/river/scenery.bin"), which lays the kit out.
 bool boat_scenery_load_location(const BoatWorldDefinition *location, const char *assets);
 // Every mapped location's pack; stops at the first failure.
 bool boat_scenery_load_all(const char *assets);

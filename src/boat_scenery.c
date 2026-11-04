@@ -1,6 +1,8 @@
 #include "boat_scenery.h"
 #include "boat_ambient.h"
 #include "boat_water_atlas.h"
+#include "waterfront_city.h"
+#include "waterfront_outer.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -21,11 +23,13 @@ typedef struct {
     size_t bytes;
 } Scenery;
 
-static Scenery loaded[BOAT_LOCATION_COUNT];
+// Every location, plus the Eriksberg river crop (the river kit's layout source).
+enum { SLOTS = BOAT_LOCATION_COUNT + 1 };
+static Scenery loaded[SLOTS];
 
 static Scenery *find(const BoatMapDescription *map)
 {
-    for (size_t i = 0; map && i < BOAT_LOCATION_COUNT; ++i)
+    for (size_t i = 0; map && i < SLOTS; ++i)
         if (loaded[i].map == map)
             return &loaded[i];
     return NULL;
@@ -76,7 +80,7 @@ bool boat_scenery_load_bytes(const BoatMapDescription *map, const void *bytes, s
     if (!map || !bytes || size < PACK_HEADER || *(const unsigned char *)&one != 1)
         return false; // The payload is read in place, so the host must be little-endian.
     Scenery *slot = NULL;
-    for (size_t i = 0; !slot && i < BOAT_LOCATION_COUNT; ++i)
+    for (size_t i = 0; !slot && i < SLOTS; ++i)
         slot = loaded[i].map ? NULL : &loaded[i];
     if (!slot)
         return false;
@@ -150,6 +154,13 @@ bool boat_scenery_load_location(const BoatWorldDefinition *location, const char 
     if (!boat_scenery_path(location, assets, path, sizeof(path))
         || !boat_scenery_load(location->map, path))
         return false;
+    // A map with a kit ground lays the river kit out from the Eriksberg crop's pack.
+    if (waterfront_kit_ground(location->map)) {
+        int n = snprintf(path, sizeof(path), "%sgeometry/river/scenery.bin", assets);
+        if (n <= 0 || (size_t)n >= sizeof(path)
+            || !boat_scenery_load(&waterfront_city_river_map, path))
+            return false;
+    }
     // The water atlas and ambient occlusion are optional: without valid sidecars the shaders
     // keep their fallback and scenery draws unoccluded.
     boat_water_atlas_load_location(location, assets);
@@ -175,7 +186,7 @@ void boat_scenery_unload(void)
 {
     boat_ambient_unload();
     boat_water_atlas_unload();
-    for (size_t i = 0; i < BOAT_LOCATION_COUNT; ++i) {
+    for (size_t i = 0; i < SLOTS; ++i) {
         free(loaded[i].payload);
         loaded[i] = (Scenery) { 0 };
     }

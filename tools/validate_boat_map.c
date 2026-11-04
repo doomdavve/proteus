@@ -92,7 +92,7 @@ static bool zeroed(const BoatMap *map)
 static int definitions(void)
 {
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = test_location(TEST_RIVER);
     CHECK(!basin->mapped && !basin->map);
     CHECK(river->mapped && river->map == &waterfront_city_river_map);
     // The compiled map is the water alone; its scenery pack holds the same water, then the land
@@ -151,7 +151,7 @@ static int synthetic(const BoatMap *map)
 
 static int owners(void)
 {
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = test_location(TEST_RIVER);
     BoatMap a, b, s;
     CHECK(boat_map_init(&a, river->map));
     CHECK(boat_map_init(&s, &square));
@@ -193,7 +193,7 @@ static bool zeroed_resources(const BoatWorldResources *r)
 static int resources(void)
 {
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = test_location(TEST_RIVER);
     BoatWorldResources r = { 0 };
     boat_world_resources_destroy(&r);
     CHECK(zeroed_resources(&r) && !boat_world_resources_ready(&r));
@@ -266,7 +266,7 @@ static uint64_t boat_digest(const Boat *boat)
 static int worlds(void)
 {
     enum { TICKS = 3600 };
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = test_location(TEST_RIVER);
     BoatWorldDefinition pond_definition = *river;
     pond_definition.map = &square;
     pond_definition.spawn = (Vector2) { -5, 5 };

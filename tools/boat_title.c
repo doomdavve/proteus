@@ -127,10 +127,10 @@ const char *boat_title_host_mode(unsigned mode)
     return host_modes[mode < BOAT_TITLE_HOST_MODES ? mode : 0];
 }
 
-// Race rooms are always on the river.
+// Race rooms are always on the outer map.
 static unsigned host_location(const BoatTitleSettings *s)
 {
-    return s->host_mode == BOAT_TITLE_HOST_RACE ? BOAT_LOCATION_RIVER : s->host_location;
+    return s->host_mode == BOAT_TITLE_HOST_RACE ? BOAT_LOCATION_OUTER : s->host_location;
 }
 
 typedef struct {
@@ -310,7 +310,6 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             snprintf(value, size, "< %s >",
                 s->location == BOAT_LOCATION_COUNT       ? "BASIN TRIAL"
                     : s->location == BOAT_LOCATION_OUTER ? "OUTER RIVER"
-                    : s->location == BOAT_LOCATION_RIVER ? "RIVER"
                                                          : "BASIN");
         else if (logical == ROW_SOLO_CONTENT)
             snprintf(value, size, "< %s >", s->outer_content ? "HARBOR LIFE" : "STANDARD");
@@ -545,7 +544,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         if (t->selected == ROW_MODE)
             hint = modes[s->host_mode];
         else if (t->selected == ROW_PLACE && s->host_mode == BOAT_TITLE_HOST_RACE)
-            hint = "RIVER RACES ALWAYS RUN ON THE RIVER";
+            hint = "RIVER RACES ALWAYS RUN ON THE OUTER RIVER";
         else if (t->selected == ROW_START) {
             snprintf(
                 lan, sizeof(lan), "OPEN TO YOUR LAN ON UDP %d; LEAVING CLOSES IT", BOAT_NET_PORT);
@@ -1093,8 +1092,8 @@ void boat_title_defaults(BoatTitleSettings *s)
 {
     *s = (BoatTitleSettings) { .name = "player",
         .skin = BOAT_SKIN_SWEDEN,
-        .host_location = BOAT_LOCATION_RIVER,
-        .location = BOAT_LOCATION_RIVER,
+        .host_location = BOAT_LOCATION_OUTER,
+        .location = BOAT_LOCATION_OUTER,
         .waves = true,
         .smooth_edges = true };
 #if defined(__EMSCRIPTEN__)

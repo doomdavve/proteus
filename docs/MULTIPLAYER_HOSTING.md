@@ -29,6 +29,11 @@ the v0.0.18 connection limitation described in the historical notes no longer ap
 
 ## Routine deployments (davve-srv)
 
+**Owed with the first protocol-v12 release:** the room's `--location river` is
+[retired](RIVER_RETIREMENT_PLAN.md) and a v12 `boat_server` refuses it. In the same cutover set
+`wake_velocity_location: outer` in `ansible/roles/wake_velocity/defaults/main.yml` (and rename the
+service description's "river room"); the room becomes an outer deathmatch.
+
 Every release must include this hosted cutover after native publication and Pages succeed.
 The [release command](RELEASES.md#release-command) automates the version-pin commit, pushes
 the private hosting baseline and executes/verifies this routine role. Its preflight mode

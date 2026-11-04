@@ -382,7 +382,7 @@ static int failures(void)
     CHECK(!boat_map_init_cell(&map, &waterfront_city_river_map, 0) && !map.shore);
     CHECK(!boat_map_init_cell(&map, &waterfront_city_river_map, -1) && !map.grid.water_start);
     CHECK(!boat_map_init_cell(&map, &waterfront_city_river_map, NAN) && !map.grid.shore);
-    CHECK(boat_location(BOAT_LOCATION_RIVER)->map == &waterfront_city_river_map);
+    CHECK(test_location(TEST_RIVER)->map == &waterfront_city_river_map);
     return 0;
 }
 

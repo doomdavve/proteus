@@ -50,10 +50,8 @@ with sync_playwright() as p:
     key('ArrowUp')
     key('Enter')
     shot('solo-setup')
-    key('ArrowUp')
-    key('ArrowUp')
-    key('ArrowUp')
-    key('ArrowLeft')
+    key('ArrowUp', 4)  # START -> PLACE past the outer river's CONTENT row
+    key('ArrowLeft')  # OUTER RIVER -> BASIN
     key('ArrowDown')
     key('ArrowDown')
     key('ArrowLeft')
@@ -114,7 +112,7 @@ with sync_playwright() as p:
     key('Enter')          # SINGLE
     page.wait_for_timeout(400)
     key('ArrowUp', 3)     # PLACE
-    key('ArrowRight', 2)  # BASIN -> RIVER -> OUTER
+    key('ArrowRight')     # BASIN -> OUTER
     key('ArrowDown')      # CONTENT
     key('ArrowRight')     # HARBOR LIFE
     key('ArrowDown', 3)   # START

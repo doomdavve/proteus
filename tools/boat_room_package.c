@@ -21,14 +21,12 @@ static bool path_like(const char *spec)
 const char *boat_room_package_default(bool deathmatch, bool race, BoatLocationId location)
 {
     if (race)
-        return BOAT_PLUGIN_DEFAULT_RIVER_RACE;
+        return BOAT_PLUGIN_DEFAULT_RACE;
     if (deathmatch)
         return BOAT_PLUGIN_DEFAULT_MATCH;
     switch (location) {
     case BOAT_LOCATION_BASIN:
         return BOAT_PLUGIN_DEFAULT_BASIN_FREE;
-    case BOAT_LOCATION_RIVER:
-        return BOAT_PLUGIN_DEFAULT_RIVER_FREE;
     case BOAT_LOCATION_OUTER:
         return "proteus.outer-free";
     default:
@@ -251,8 +249,8 @@ bool boat_room_package_load(const char *spec, bool deathmatch, bool race, BoatLo
         reason(error, size, "the room's map is not ready");
         return false;
     }
-    if (race && location != BOAT_LOCATION_RIVER) {
-        reason(error, size, "a race room runs on the river");
+    if (race && location != BOAT_LOCATION_OUTER) {
+        reason(error, size, "a race room runs on the outer map");
         return false;
     }
     if (!spec)

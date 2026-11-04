@@ -63,7 +63,8 @@ def main():
         shutil.copytree(build / "assets" / directory, assets / directory)
     (assets / "music").mkdir()
     shutil.copy2(build / "assets/music/a-little-boat.xm", assets / "music")
-    # The mapped locations' scenery packs, which the game loads at start (A3.5i).
+    # The outer location's scenery pack, which the game loads at start (A3.5i), and the
+    # Eriksberg river crop's, which lays out the river kit on it.
     for name in ("river", "outer"):
         (assets / "geometry" / name).mkdir(parents=True)
         for file in ("manifest.json", "scenery.bin"):

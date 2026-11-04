@@ -89,7 +89,7 @@ static bool rejected(const unsigned char *copy, size_t size)
 int main(void)
 {
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
-    const BoatWorldDefinition *river = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *river = test_location(TEST_RIVER); // The crop fixture.
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
 
     // Nothing is loaded at start: compiled maps draw nothing until their pack is in.
@@ -173,9 +173,15 @@ int main(void)
     CHECK(waterfront_scenery_init(&scenery, &waterfront_outer_map) && scenery.ready
         && scenery.full == full && scenery.map == &waterfront_outer_map && scenery.river);
     waterfront_scenery_destroy(&scenery);
+    // Loading the outer location loads the river crop's pack it lays the kit out from, but not
+    // the crop's sidecars: the river is not a location.
+    boat_scenery_unload();
     CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/"));
+    CHECK(boat_scenery_of(river->map) && !boat_water_atlas_of(river->map)
+        && !boat_ambient_of(river->map));
+    CHECK(boat_scenery_load_location(river, PROTEUS_SOURCE_DIR "/assets/"));
 
-    // G4 water atlases: each location's sidecar loads with its pack, sized and keyed to it.
+    // G4 water atlases: each map's sidecar loads with its pack, sized and keyed to it.
     const BoatWaterAtlas *river_atlas = boat_water_atlas_of(river->map);
     const BoatWaterAtlas *outer_atlas = boat_water_atlas_of(outer->map);
     CHECK(river_atlas && outer_atlas && !boat_water_atlas_of(basin->map));
@@ -220,9 +226,10 @@ int main(void)
     free(bad);
     free(atlas);
 
-    // G5c ambient occlusion: each location's sidecar loads with its pack, keyed to its scenery.
+    // G5c ambient occlusion: each map's sidecar loads with its pack, keyed to its scenery.
     // Water corners are open; land has both open and closed-off corners.
-    CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/"));
+    CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/")
+        && boat_scenery_load_location(river, PROTEUS_SOURCE_DIR "/assets/"));
     const unsigned char *river_ambient = boat_ambient_of(river->map);
     CHECK(river_ambient && boat_ambient_of(outer->map) && !boat_ambient_of(basin->map));
     const Mesh3D *river_mesh = boat_scenery_of(river->map)->mesh;

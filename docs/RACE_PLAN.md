@@ -31,6 +31,14 @@ then assess pacing, missed-gate recovery and turn/wave overlap before extending 
 downtown coverage remains outside the current map. See the [R2 implementation](#r2-network-race--2026-10-24),
 the [R1 core](#r1-race-core--2026-10-24) and the [R0 evidence](#r0-prototype--2026-10-24).
 
+## Course on the outer map — 2026-11-04
+
+The `river` location was [retired](RIVER_RETIREMENT_PLAN.md) into the outer map, which holds the
+same water in the same frame. The course, grid, ferry, storm and rules are unchanged; race
+manifests, rooms, the server and protocol v12 now require `outer`, and the race shares that map's
+upstream traffic and harbour. Automated race, plugin-race, room and network checks pass there;
+no human has raced on outer yet.
+
 ## Local Lua course authoring — 2026-10-29
 
 [Plugin P2](PLUGIN_PLAN.md#p2-result-2026-10-29) adds the river sprint's gates, grid, ferry,

@@ -3,7 +3,7 @@
  * frame while the inland ground does not; composing marks the own ship and destination without
  * touching the neat line; and the N cycle runs corner, chart, hidden.
  *
- * Review: --screenshot FILE [--mode corner|chart] [--location river|outer]
+ * Review: --screenshot FILE [--mode corner|chart] [--location outer]
  * [--background SCENE.png] [--at X,Z,HEADING] [--shelter N] [--scale N] writes one composition,
  * over a 320x200 scene capture when given and nearest-scaled N times, without opening a window. */
 #include "boat_fixtures.h"
@@ -127,8 +127,8 @@ int main(int argc, char **argv)
     CHECK(boat_minimap_next(BOAT_MINIMAP_CORNER) == BOAT_MINIMAP_CHART);
     CHECK(boat_minimap_next(BOAT_MINIMAP_CHART) == BOAT_MINIMAP_HIDDEN);
 
-    const BoatLocationId mapped[] = { BOAT_LOCATION_RIVER, BOAT_LOCATION_OUTER };
-    for (int m = 0; m < 2; ++m) {
+    const BoatLocationId mapped[] = { BOAT_LOCATION_OUTER };
+    for (size_t m = 0; m < sizeof(mapped) / sizeof(*mapped); ++m) {
         const BoatWorldDefinition *location = boat_location(mapped[m]);
         CHECK(boat_minimap_init(&minimap, location));
         CHECK(boat_minimap_ready(&minimap));

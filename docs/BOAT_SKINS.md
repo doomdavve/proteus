@@ -35,7 +35,7 @@ the four countries.
 From the worktree root:
 
 ```sh
-./build/wake_velocity --skin finland --location river --waves --gpu-aa
+./build/wake_velocity --skin finland --location outer --waves --gpu-aa
 ./build/wake_velocity --skin denmark --renderer cpu --screenshot build/skin-follow.png --time 5
 ./build/boat_flag_review --skin sweden --angle front --screenshot build/skin-front.png
 ./build/boat_flag_review --skin norway --angle side --low-resolution --screenshot build/skin-side.png

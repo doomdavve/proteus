@@ -32,7 +32,7 @@
 
 static BoatWorldResources WORLDS[BOAT_LOCATION_COUNT];
 
-static const BoatWorldResources *world(void) { return &WORLDS[BOAT_LOCATION_RIVER]; }
+static const BoatWorldResources *world(void) { return &WORLDS[BOAT_LOCATION_OUTER]; }
 
 // The compiled river course with one gate moved and widened, a later ferry and a shorter round.
 static const char *const RACE_SOURCE
@@ -62,7 +62,7 @@ static const char *const RACE_SOURCE
 static const char *const RACE_MANIFEST
     = "{\"id\":\"test.race-edit\",\"name\":\"Edited race\","
       "\"api\":1,\"kind\":\"race\",\"entry\":\"main.lua\","
-      "\"location\":\"river\",\"capabilities\":[\"race.define\"],"
+      "\"location\":\"outer\",\"capabilities\":[\"race.define\"],"
       "\"state_version\":1}";
 
 // Non-default combat values: more health, weaker packets, a faster cannon cadence.
@@ -107,7 +107,7 @@ static size_t room_definition_size(const BoatRoomDefinition *definition)
 static BoatRoomDefinition from_race(const BoatPluginRace *race)
 {
     BoatRoomDefinition d = {
-        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_RACE, .location = BOAT_LOCATION_RIVER
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_RACE, .location = BOAT_LOCATION_OUTER
     };
     snprintf(d.id, sizeof(d.id), "%s", race->manifest.id);
     snprintf(d.name, sizeof(d.name), "%s", race->manifest.name);
@@ -122,7 +122,7 @@ static BoatRoomDefinition from_match(const BoatPluginMatch *match)
 {
     BoatRoomDefinition d = { .version = BOAT_ROOM_VERSION,
         .mode = BOAT_ROOM_MODE_DEATHMATCH,
-        .location = BOAT_LOCATION_RIVER };
+        .location = BOAT_LOCATION_OUTER };
     snprintf(d.id, sizeof(d.id), "%s", match->manifest.id);
     snprintf(d.name, sizeof(d.name), "%s", match->manifest.name);
     d.match_rules = match->rules;
@@ -324,7 +324,7 @@ static int definition_size(void)
     // A maximum definition: the river course plus a full authored scene. It must fit the 16 KiB
     // bootstrap cap with pages to spare.
     BoatRoomDefinition d = {
-        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_RACE, .location = BOAT_LOCATION_RIVER
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_RACE, .location = BOAT_LOCATION_OUTER
     };
     snprintf(d.id, sizeof(d.id), "maximum");
     snprintf(d.name, sizeof(d.name), "Maximum definition");
@@ -452,7 +452,7 @@ static int catalog_rooms(void)
             && kind != BOAT_PLUGIN_KIND_MATCH)
             continue;
         BoatLocationId location = !strcmp(entry->location, "any")
-            ? BOAT_LOCATION_RIVER
+            ? BOAT_LOCATION_OUTER
             : boat_location_find(entry->location)->id;
         BoatRoomDefinition definition;
         char error[220];
@@ -468,7 +468,7 @@ static int catalog_rooms(void)
         printf("room_package catalog %s: %zu bytes\n", entry->id, size);
         ++rooms;
     }
-    CHECK(rooms >= 7); // Three free locations, the race defaults and the two harbor rooms.
+    CHECK(rooms >= 6); // Two free locations, the race defaults and the two harbor rooms.
     return 0;
 }
 
@@ -492,7 +492,7 @@ static unsigned track_samples(Vector2 *points, unsigned capacity)
 {
     static Room room;
     BoatRoomDefinition d = {
-        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_OUTER
     };
     snprintf(d.id, sizeof(d.id), "scene.track");
     snprintf(d.name, sizeof(d.name), "Track samples");
@@ -549,7 +549,7 @@ static int scene_contact_room(void)
 {
     static Room room;
     BoatRoomDefinition d = {
-        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_OUTER
     };
     snprintf(d.id, sizeof(d.id), "scene.contact");
     snprintf(d.name, sizeof(d.name), "Scene contact");
@@ -657,7 +657,7 @@ static int scene_moving_contact_room(void)
     unsigned samples = track_samples(points, 8);
     CHECK(samples == 8);
     BoatRoomDefinition d = {
-        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_OUTER
     };
     snprintf(d.id, sizeof(d.id), "scene.moving");
     snprintf(d.name, sizeof(d.name), "Moving contact");
@@ -695,7 +695,7 @@ static int scene_resync_contact_room(void)
     unsigned samples = track_samples(points, 4);
     CHECK(samples == 4);
     BoatRoomDefinition d = {
-        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_RIVER
+        .version = BOAT_ROOM_VERSION, .mode = BOAT_ROOM_MODE_FREE, .location = BOAT_LOCATION_OUTER
     };
     snprintf(d.id, sizeof(d.id), "scene.resync");
     snprintf(d.name, sizeof(d.name), "Resync contact");
