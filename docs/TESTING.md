@@ -357,8 +357,9 @@ counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, 
 route completion and exact final-state parity with `--check --waves`. Since A2.1 (schema 2)
 it also checks that the per-pass and per-group submission/triangle columns partition the
 totals, apart from the two sky quads. Since A2.3 (schema 3) it also checks the default
-`tile_size` (1,024 m then, 2,048 m since the outer follow-up), the per-pass `*_tiles_culled` columns and that the shadow pass culls
-tiles on every row. Since G0 (schema 4) it also checks the `stress` scenario: the display-free
+`tile_size` (1,024 m then, 2,048 m since the outer follow-up), the per-pass `*_tiles_culled`
+columns and that the shadow pass culls tiles on every row (on more than three quarters of rows
+since the 512 m detail cells). Since G0 (schema 4) it also checks the `stress` scenario: the display-free
 `--stress-state` fixture must match the benchmark's exact `final_state`, and both wake pools
 must stay at capacity with reported emitter/piece counts. It asserts no timing thresholds.
 The `outer` scenario (2026-11-04) drives the river route on the outer map and continues across

@@ -937,7 +937,7 @@ invalidate caches. A failed human LOD review pauses dependent visual expansion u
 successful automated checks do not approve popping.
 
 **Checkpoint result (2026-11-01, M1 Max):** machine gates met; Batch A accepted on Mac 2026-11-02.
-Implementation: distant windows and street furniture draw at a far level per 256 m cell, chosen
+Implementation: distant windows and street furniture draw at a far level per 256 m cell (512 m since the outer follow-up), chosen
 per view with an 8% hysteresis band; shadow maps stay uncached. See
 [distance detail](3D.md#distance-detail) and
 [the numbers](evidence/graphics/g2b/summary.json).
@@ -1687,7 +1687,7 @@ trails from Batches A and B? The default stays low resolution whatever the verdi
 #### Outer performance follow-up
 
 Branch `perf/outer-geometry`, stacked on `feat/graphics-presentation` (PR #140); it opens after
-the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no user play yet.
+the user's 60 Hz decision above. Status 2026-11-04: render tiles and detail cells changed and played by the user.
 
 - **Step 1, done (machine-verified 2026-11-04):** `boat_water_review --benchmark --scenario outer`
   (the river route on the outer map, continued across the estuary) with a display-free
@@ -1703,25 +1703,23 @@ the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no 
 - **120 Hz on this Mac is a presentation limit, not scene cost:** vsync-paced runs miss 10 ms on
   about 40% of outer frames before and after, and on 45% of a light river run; vsync without the
   pacer is no steadier. Unpaced, the outer high-resolution frame now fits in about 4 ms p95.
-- **Candidate, needs the user in motion:** 512 m detail cells with 2,048 m tiles reach outer
-  high 1.90 / 2.34 ms at 145 submissions. G2b kept 256 m because a 512 m cell switches larger
-  pieces of windows and street furniture at once; whether that pops is the user's call.
-- **512 m cell trial (stacked branch `perf/detail-cell-512`), 2026-11-04:** the cell constant
+- **Step 2, 512 m detail cells (stacked branch `perf/detail-cell-512`), 2026-11-04:** G2b kept
+  256 m because a 512 m cell switches larger pieces of windows and street furniture at once; the
+  user played the trial build and noticed no difference, so 512 m is adopted. The cell constant
   only. Release, M1 Max, hidden, unpaced, two interleaved repeats against the parent (this
   session's runs read slower overall than the step 1 table): outer high GPU p50/p95
   2.22–2.24 / 3.66–3.67 → 2.09–2.10 / 3.49 ms, submissions p50 199 → 145; river 4x4
   1.71–1.77 / 2.44–2.57 → 1.65 / 2.49–2.50 ms, submissions p95 241 → 186. River scene
-  triangles p95 rise 553 k → 718 k, above the G2b gate of 650 k. That gate was set when triangles
-  were assumed to cost; on this Mac they do not, but Windows and the browser are unmeasured.
-  Outer and river `--check` routes still finish. Full CTest (Debug, GPU tests on): one
-  failure, `boat_river_benchmark_contract`, whose assertion that the 96 m shadow box always
-  culls some river tile or cell fails on 690 of 6,038 frames: with 512 m cells the box can
-  touch every occupied cell of the small river crop. River shadow triangles p95 rise
-  267 k → 306 k. Left failing on purpose. Awaiting the user's in-motion popping check; if
-  accepted, the triangle gate and that assertion need revisiting rather than silently loosening.
-- **Next:** the user has played this branch full-screen and windowed (below); the 512 m cell
-  size is the open candidate. Further candidates: fewer reflection submissions (it repeats the
-  main pass's classes), and the macOS windowed vsync behaviour if 120 Hz in a window matters. The user suggested macOS Game Mode (2026-11-04). Apple's
+  triangles p95 rise 553 k → 718 k, above the G2b gate of 650 k; the gate is retired for this
+  Mac, where GPU time follows submissions, and replaced by the measured times above. Windows and
+  the browser are unmeasured, and triangles may cost more there. River shadow triangles p95 rise
+  267 k → 306 k: the 96 m shadow box can now touch every occupied cell of the small river crop
+  (690 of 6,038 frames cull nothing), so `boat_river_benchmark_contract` now requires culling on
+  more than three quarters of rows instead of all. Outer and river `--check` routes still finish.
+  Full CTest (Debug, GPU tests on, 2026-11-04): 394 enabled tests passed, 15 disabled.
+- **Next:** no further outer work is planned. Remaining candidates: fewer reflection submissions
+  (it repeats the main pass's classes), and the macOS windowed vsync behaviour if 120 Hz in a
+  window matters. The user suggested macOS Game Mode (2026-11-04). Apple's
   [Game Mode page](https://support.apple.com/en-us/105118) says it turns on only when a game enters
   macOS full-screen mode, and gives it the highest CPU and GPU priority. Every run above was
   windowed. F11 is raylib's borderless window, not that mode; the resizable window's green

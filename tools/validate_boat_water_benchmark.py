@@ -179,8 +179,9 @@ with tempfile.TemporaryDirectory() as directory:
         assert int(row['map_triangles']) > 0 and int(row['water_triangles']) > 0, i
         for p in PASSES:
             assert int(row[f'{p}_tiles_culled']) >= 0, (i, p)
-    # The 96 m shadow box never needs the whole map.
-    assert all(int(row['shadow_tiles_culled']) > 0 for row in rows)
+    # The 96 m shadow box rarely needs the whole map: with 512 m detail cells it can touch
+    # every occupied cell of the small river crop, as on about a ninth of the route in 2026-11.
+    assert sum(int(row['shadow_tiles_culled']) > 0 for row in rows) > .75 * len(rows)
     assert previous_end == report['total_ticks'] == int(expected_state.split()[0][5:])
     assert report['warmup_end_tick'] == int(rows[WARMUP - 1]['end_tick'])
 

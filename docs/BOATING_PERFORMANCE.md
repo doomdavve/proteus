@@ -667,7 +667,15 @@ outside it can be inconsistent. Not tested: Game Mode, another display, Windows,
 (the window's green button) the user found the game very smooth with no stutter; in a window it
 still stutters. Game Mode was not active: no notice appeared and the menu bar showed no Game
 Mode icon in full screen. So the smoothness comes from full-screen presentation itself. F11's
-borderless window is smooth too; only a normal window stutters. Not tested: another display, Windows, or the browser.
+borderless window is smooth too; only a normal window stutters. Not tested: another display,
+Windows, or the browser.
+
+**512 m detail cells, 2026-11-04.** Same machine and method, two interleaved repeats against the
+2,048 m tile build (both read slower this session than the table above): outer high GPU p50/p95
+2.22–2.24 / 3.66–3.67 → 2.09–2.10 / 3.49 ms at submissions p50 199 → 145; river 4x4
+1.71–1.77 / 2.44–2.57 → 1.65 / 2.49–2.50 ms at submissions p95 241 → 186. River triangles p95
+553 k → 718 k, past G2b's 650 k gate, which is retired on this Mac. The user played the build
+and noticed no popping or other difference.
 
 ## Graphics G5a presentation presets — 2026-11-03
 
