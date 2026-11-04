@@ -1,7 +1,7 @@
-# Gothenburg Harbour and Kanalturen
+# Gothenburg Harbour and Grodan
 
 Proposed 2026-11-04 on branch `docs/gothenburg-harbour-plan`. This document owns the renaming of
-the `outer` location to Gothenburg Harbour, the Kanalturen canal tour, its canal boat, the canal
+the `outer` location to Gothenburg Harbour, the Grodan canal tour, its canal boat, the canal
 bridges and the sights along the route. [All plans](README.md).
 
 ## Why
@@ -11,7 +11,7 @@ The title still calls it OUTER RIVER, but it runs from Långedrag to Gullbergsva
 canals. The user wants the name to say where the player is, and as much life as possible in it.
 
 The Paddan sightseeing tour, which has run in the canals since 1939, passes the sights the map
-already holds and some it lacks. A virtual version, Kanalturen, gives the location a route that
+already holds and some it lacks. A virtual version, Grodan, gives the location a route that
 shows off the city. The bridges are its most visible gap: the boat passes under about twenty low
 bridges, and the bake draws only Hisingsbron and the river kit's deck.
 
@@ -21,9 +21,8 @@ bridges, and the bake draws only Hisingsbron and the river kit's deck.
   id stays `outer` in the wire protocol, plugin manifests (`"location": "outer"`), saved title
   files, command lines and Winterfell's room config. Renaming the id would need a protocol bump and
   a davve-srv change, and players would gain nothing.
-- **Kanalturen is the working name** of the tour (user, 2026-11-04), until something cleverer is
-  found. As with VINGA LINE for the Stena-style ferry, the game uses a made-up name rather than
-  Strömma's Paddan brand. [Naming](#naming) keeps the candidates.
+- **The tour and its boats are called GRODAN** (user, 2026-11-04), a made-up name in place of
+  Strömma's Paddan brand, as VINGA LINE stands in for Stena Line. See [naming](#naming).
 - **The player drives a canal boat on the tour** (user: "A paddan boat would be awesome!"). It is a
   new boat with its own look and handling, not a skin on the explorer.
 - **Bridge decks are scenery first.** They are drawn and cast shadows, but boats do not collide with
@@ -35,24 +34,23 @@ bridges, and the bake draws only Hisingsbron and the river kit's deck.
 
 ## Naming
 
-The working name is Kanalturen. Candidate names for the boat (and maybe the tour) that play on
-the original the way VINGA LINE plays on Stena Line. Not decided:
+**GRODAN** (the frog) names both the boats and the tour (user, 2026-11-04: "Grodan is
+perfect"). Paddan means the toad, so Grodan is a near relative, the way VINGA LINE plays on
+Stena Line. It is plain ASCII and needs no new font glyphs. Kanalturen was the working name
+until then.
 
-- **SKÖLDPADDAN / THE TURTLE** (the user's suggestion, 2026-11-04). Paddan is short for
-  *sköldpadda* (tortoise or turtle): Gundel Matsson described the first rebuilt boat (1939) as a
-  tortoise lying upside down. Using the whole word turns the nickname back into the animal it
-  came from.
-- **SKÖLDEN.** Paddan took the back half of *sköldpadda*; Skölden takes the front.
-- **VITSEN.** The name of the producer-gas boat put in service in 1940. It also means "the joke".
-- **ANKAN.** On the lowest bridge everyone has to *buka* (duck), and the canals are full of ducks.
-- **GRODAN.** A frog rather than a toad.
+Candidates considered on 2026-11-04:
 
-All but GRODAN and THE TURTLE need Å, Ä and Ö in the fonts ([GH4](#gh4-tour-format)).
+- SKÖLDPADDAN / THE TURTLE, the user's first suggestion. Paddan is short for *sköldpadda*:
+  Gundel Matsson described the first rebuilt boat (1939) as a tortoise lying upside down.
+- SKÖLDEN, the front half of *sköldpadda*.
+- VITSEN, the producer-gas boat of 1940; the word also means "the joke".
+- ANKAN, for the low bridge where everyone has to *buka* (duck).
 
 ## Route
 
 Traced by eye from the operator's map, to be fixed with the anchors and capture tools in
-[GH5](#gh5-the-kanalturen-package):
+[GH5](#gh5-the-grodan-package):
 
 1. Start at the Kungsportsplatsen pier on Vallgraven (Kungsportsbron).
 2. Along Vallgraven past Trädgårdsföreningen, then west through Fattighusån and Stora Hamnkanalen
@@ -99,7 +97,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Proposed |
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Proposed |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start, up to 32 named waypoints with captions, and canal speed limits; Å/Ä/Ö in the fonts | Proposed |
-| [GH5](#gh5-the-kanalturen-package) | GH3, GH4 | The bundled Kanalturen voyage, offered on the title | Proposed |
+| [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Proposed |
 | [GH6](#gh6-sights-along-the-route) | — | The Opera, Feskekörka, Börsen, Kronhuset, Stora Teatern, Skansen Kronan/Lejonet, Palmhuset and Maritiman | Proposed |
 | [GH7](#gh7-canal-boats-in-traffic) | GH3, [Marina M3](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion) | Canal boats running the loop in free play | Proposed |
 | [GH8](#gh8-low-bridge-contact-later) | GH2, GH5 | Low-bridge contact and the duck moment | Later |
@@ -162,7 +160,7 @@ Read `src/boat_skin.[ch]`, `src/boat_model.[ch]` and the
   inboard drive. Dimensions come from photographs of the current boats; record the reference used.
 - Its own handling profile: slow, heavy, little heel, a wide turning circle. Solo only at first;
   rooms keep their current boats.
-- A made-up livery and hull name ([naming](#naming)). No Strömma marks.
+- A made-up livery with GRODAN on the hull ([naming](#naming)). No Strömma marks.
 
 Acceptance: CPU/GPU captures from the chase camera; a user drive in the canals and on the open
 river.
@@ -188,16 +186,17 @@ at Kungsportsplatsen.
   Objectives can use waypoint events, so a tour can score keeping to the route, the speed limit
   and no contact.
 - The HUD shows the next sight's name and caption as the boat passes. Add Å, Ä, Ö (and É) to the
-  menu and HUD fonts (`tools/generate_menu_fonts.py`), and allow them in names and captions.
+  menu and HUD fonts (`tools/generate_menu_fonts.py`) so captions can spell Feskekörka and
+  Trädgårdsföreningen, and allow them in names and captions.
 - Staging checks gates and the route between them against the water, as the race does.
 - Browser parity: the browser catalog and import accept the new kind.
 
 Acceptance: schema and staging tests (valid tour, gate on land, broken order, too many
 waypoints); a reference tour decodes identically native and in the browser worker.
 
-## GH5: the Kanalturen package
+## GH5: the Grodan package
 
-- `plugins/kanalturen`: the [route](#route) as GH4 waypoints, one at each bridge and sight, with
+- `plugins/grodan`: the [route](#route) as GH4 waypoints, one at each bridge and sight, with
   captions. Starts the player in the GH3 boat at Kungsportsplatsen.
 - Trace the route with `plugin_author.py capture`/`anchors` and fix it against the map.
 - A title entry next to the Långedrag voyage.
