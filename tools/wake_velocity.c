@@ -2476,7 +2476,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
         arguments[count++] = "high";
     } else if (settings->smooth_edges)
         arguments[count++] = "--gpu-aa";
-    // The canal tour is always the Grodan's, whatever livery the player keeps for other places.
+    // GRODAN TOUR is the Grodan's, whatever livery the player keeps; CANAL TOUR keeps the livery.
     arguments[count++] = "--skin";
     arguments[count++] = (char *)boat_skin_name(grodan ? BOAT_SKIN_GRODAN : settings->skin);
     arguments[count++] = "--soundtrack";

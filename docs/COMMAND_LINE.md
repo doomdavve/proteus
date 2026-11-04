@@ -57,11 +57,11 @@ Launching a package starts no Lua VM, polls no files and shows no authoring pane
 compiled-content switch: every solo session takes this path. Browser solo sessions use the same
 catalog, built into the game Wasm; rooms receive their definition as data. An unknown ID, or a
 package for another location, fails with an explicit message. The title's single-player
-panel selects Standard, Harbor life or the Grodan tour for `outer` on native and web builds; the
-tour always uses the Grodan, as `--package proteus.grodan --skin grodan` does from the command
-line. `--title-start PLACE` takes the title's START path with default settings, without the menu,
+panel selects Standard, Harbor life, the Grodan tour or the canal tour for `outer` on native and
+web builds. Both tours are `proteus.grodan`: the Grodan tour always uses the Grodan, as
+`--package proteus.grodan --skin grodan` does, and the canal tour keeps your livery. `--title-start PLACE` takes the title's START path with default settings, without the menu,
 so tests can prove each PLACE opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`,
-`outer-grodan`, `basin-trial`); further options follow it.
+`outer-grodan`, `outer-canal-tour`, `basin-trial`); further options follow it.
 
 ### Live Lua authoring
 

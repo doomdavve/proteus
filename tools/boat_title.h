@@ -26,15 +26,17 @@ typedef enum {
     BOAT_TITLE_JOIN,
     BOAT_TITLE_HOST
 } BoatTitleChoice;
-// The CONTENT row on GOTHENBURG HARBOUR: the Långedrag voyage, Harbor life, or the Grodan canal
-// tour, which always starts in the Grodan.
+// The CONTENT row on GOTHENBURG HARBOUR: the Långedrag voyage, Harbor life, the Grodan canal tour
+// in the Grodan with its passengers, or the same tour in the player's own boat.
 typedef enum {
     BOAT_TITLE_OUTER_STANDARD,
     BOAT_TITLE_OUTER_HARBOR_LIFE,
     BOAT_TITLE_OUTER_GRODAN,
+    BOAT_TITLE_OUTER_CANAL_TOUR,
     BOAT_TITLE_OUTER_CONTENTS
 } BoatTitleOuterContent;
-// The saved spelling of a content, also the --title-start suffix: standard, harbor-life, grodan.
+// The saved spelling of a content, also the --title-start suffix: standard, harbor-life, grodan,
+// canal-tour.
 const char *boat_title_outer_content(unsigned content);
 // The bundled package for a content.
 const char *boat_title_outer_package(unsigned content);

@@ -980,6 +980,7 @@ add_test(NAME boat_server_scripted_until_empty_rejected
 foreach(place_package
     "basin=proteus.basin-free" "outer-standard=proteus.langedrag"
     "outer-harbor-life=proteus.harbor-life" "outer-grodan=proteus.grodan"
+    "outer-canal-tour=proteus.grodan"
     "basin-trial=proteus.time-trial")
   string(REPLACE "=" ";" place_package "${place_package}")
   list(GET place_package 0 place)
@@ -1444,7 +1445,8 @@ set(PROTEUS_SLOW_TESTS
   boat_outer_screenshot
   wake_velocity_title_start.basin
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
-  wake_velocity_title_start.outer-grodan wake_velocity_title_start.basin-trial)
+  wake_velocity_title_start.outer-grodan wake_velocity_title_start.outer-canal-tour
+  wake_velocity_title_start.basin-trial)
 
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)

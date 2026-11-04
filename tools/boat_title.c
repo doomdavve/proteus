@@ -126,7 +126,8 @@ static const struct {
 } outer_contents[BOAT_TITLE_OUTER_CONTENTS] = {
     { "standard", "proteus.langedrag", "STANDARD", "THE STANDARD HARBOUR" },
     { "harbor-life", "proteus.harbor-life", "HARBOR LIFE", "AUTHORED MARINA, TRAFFIC AND GULLS" },
-    { "grodan", "proteus.grodan", "GRODAN TOUR", "CANAL TOUR FROM KUNGSPORTSPLATSEN" },
+    { "grodan", "proteus.grodan", "GRODAN TOUR", "IN THE GRODAN, WITH ITS PASSENGERS" },
+    { "canal-tour", "proteus.grodan", "CANAL TOUR", "THE GRODAN'S ROUTE IN YOUR OWN BOAT" },
 };
 
 const char *boat_title_outer_content(unsigned content)

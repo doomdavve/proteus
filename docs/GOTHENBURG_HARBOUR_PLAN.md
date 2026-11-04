@@ -106,7 +106,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Implemented 2026-11-04; [result](#gh3-result-2026-11-04) |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start and up to 32 ordered stops with captions | Implemented 2026-11-04; [result](#gh4-result-2026-11-04). Speed-limit zones and Å/Ä/Ö moved to GH4b |
 | GH4b | GH4 | Å, Ä, Ö and É in the menu and HUD fonts and in stop names and captions; canal speed-limit zones | Proposed |
-| [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Implemented 2026-11-04; [result](#gh5-result-2026-11-04). User run 2026-11-04: not fun yet |
+| [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Implemented 2026-11-04; [result](#gh5-result-2026-11-04). User run 2026-11-04: not fun yet; [revised](#gh5-revision-after-the-users-run-2026-11-04) |
 | [GH6](#gh6-sights-along-the-route) | — | The Opera, Feskekörka, Börsen, Kronhuset, Stora Teatern, Skansen Kronan/Lejonet, Palmhuset and Maritiman | Proposed |
 | [GH7](#gh7-canal-boats-in-traffic) | GH3, [Marina M3](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion) | Canal boats running the loop in free play | Proposed |
 | [GH8](#gh8-low-bridge-contact-later) | GH2, GH5 | Low-bridge contact and the duck moment | Later |
@@ -372,6 +372,23 @@ Verification, 2026-11-04, Apple Silicon/macOS, Debug:
   inertia (30, against the speedboat's 2.2) works against the speedboat's yaw damping, so a turn
   overshoots by about 0.5 rad unless steering is eased off early. Players will feel this in the
   12 m channels; GH3's handling may need more yaw damping after the user's run.
+
+### GH5 revision after the user's run, 2026-11-04
+
+The user agreed to three follow-ups, in this order: bridges with estimated heights, a shorter
+loop, and the low-bridge duck and scrape score. They also asked to drive the same tour in their own
+boat ("Same tour just for me, not the tourists").
+
+- **Shorter loop.** The river legs to Hisingsbron and Masthugget are gone. From Stora Bommen the
+  tour runs a short way down the river to Rosenlundskanalen. The loop is now 3.7 km, down from
+  6.6 km, with 26 stops, planned the same way. It takes about 15 minutes in the Grodan at full
+  speed, more than the 10–12 minutes proposed to the user.
+- **Own boat.** CONTENT gains < CANAL TOUR > (saved as `canal-tour`): the same package in the
+  livery and handling chosen in SETTINGS. < GRODAN TOUR >'s hint now says "IN THE GRODAN, WITH ITS
+  PASSENGERS".
+- **Drive check.** The drive case runs the loop twice, in the Grodan and in the speedboat. Each run
+  scales its throttle to the Grodan's push and slows on legs into the narrowest stops. Neither
+  footprint left the water: 21.9 and 19.9 simulated minutes.
 
 ## GH6: sights along the route
 
