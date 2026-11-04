@@ -81,7 +81,31 @@ This branch does not deploy either public client. Physical Safari long holds, re
 permission, steering feel and audio listening remain unverified; emulation is not user acceptance.
 Mobile weapons, replay/camera controls and text entry remain outside this change.
 
-Verification will be recorded here after the final checks.
+Verification, 2026-11-04, Apple Silicon/macOS: Debug build and `ctest --preset full`
+passed all 358 enabled tests on the merged branch (`PROTEUS_GPU_TESTS=OFF`; 13 retired
+wake-field tests disabled). The full run needed unrestricted localhost sockets. The Node
+virtual-clock checks cover simultaneous contacts, long holds, opposing pedals, sliding off
+and back, cancellation/lost capture, inactive menu taps, blur/visibility/resize and sensor
+permission/fallbacks. Mouse and console bridge tests also pass. Emscripten MinSizeRel `web`
+build/packaging passed using the installed compiler cache.
+
+Chrome/SwiftShader phone (844×390 / 390×844) and Android (915×412 / 412×915) emulation
+passed canvas-only control/minimum-target checks, touch-only setup, 45 rendered frames of
+simultaneous steering/throttle with unchanged zoom and retained focus/running audio context,
+release, simulated tilt, menu/reset, portrait resizing and return to title. Android also
+passed fullscreen entry/exit and cancellation of a held pedal, and was repeated after merging
+main's console changes. Landscape, held-input, portrait and fullscreen-return captures were
+inspected. A native windowed GPU river demo (`--demo --frames 120`) exited 0 after the merge;
+this is an agent-run smoke check, not human input/audio acceptance.
+
+The existing desktop `check_web_title.py` passed navigation, settings persistence and repeated
+sessions, then stopped at its console query: 30 ms-per-character typing submitted the truncated
+`= def.voyage.arri` under software rendering and returned `nil`. This happened before and after
+merging main's console work; the complete title/authoring suite is not claimed as passing.
+A focused desktop probe passed solo startup, absence of touch controls, F11 fullscreen
+entry/exit, console opening and a pasted `= 2+4` query returning `6`, with no page errors.
+Firefox/WebKit, local WebRTC rooms, physical devices and human audio review were not run in
+this step. Changed local documentation links and JavaScript/Python syntax checks pass.
 
 ## Minimal landing page, 2026-11-01
 
@@ -89,8 +113,8 @@ Completed: the public launcher contains the river screenshot and one full-width 
 WAKE VELOCITY moved to the footer above the version, GitHub repository link and map attribution.
 The HTML Settings menu and its saved fullscreen preference were removed. PLAY starts in the
 browser tab; F11 toggles fullscreen on desktop. The mobile fullscreen button moved from
-the HTML overlay into the canvas on 2026-11-04. The browser F11 handler now matches the native shortcut and runs directly in the key
-gesture so the browser can grant fullscreen. Loading/storage errors and the
+the HTML overlay into the canvas on 2026-11-04. The browser F11 handler matches the native
+shortcut and runs directly in the key gesture so the browser can grant fullscreen. Loading/storage errors and the
 conditional iPhone Home Screen hint remain available. Plugin authoring is explicitly enabled
 with `?author`; normal visitors do not see its panel. Browser qualification scripts use this
 entry point where needed and no longer depend on the removed fullscreen checkbox.
