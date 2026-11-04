@@ -167,7 +167,7 @@ def main():
     parser.add_argument("--seconds", type=int, default=30)
     parser.add_argument("--peer-timeout", type=int, default=5, choices=range(1, 61),
                         metavar="1-60")
-    parser.add_argument("--location", choices=("basin", "river"), default="basin")
+    parser.add_argument("--location", choices=("basin", "outer"), default="basin")
     parser.add_argument("--mode", choices=("free", "deathmatch"), default="free")
     args = parser.parse_args()
     shortest = cycle_seconds(args.peer_timeout) + 1

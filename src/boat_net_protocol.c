@@ -683,8 +683,8 @@ static void decode_payload(Reader *r, BoatNetMessage *m)
         expect(r, a->tick_hz == BOAT_TICK_HZ);
         a->location = get8(r);
         expect(r, a->location < BOAT_LOCATION_COUNT);
-        // The river sprint is the only race course.
-        expect(r, a->mode != BOAT_NET_MODE_RACE || a->location == BOAT_LOCATION_RIVER);
+        // Race rooms run on the outer map.
+        expect(r, a->mode != BOAT_NET_MODE_RACE || a->location == BOAT_LOCATION_OUTER);
         reserved(r, 1);
         a->wake_life_ticks = get32(r);
         expect(r, a->wake_life_ticks >= 240 && a->wake_life_ticks <= BOAT_OBJECT_LIFE_TICKS);

@@ -260,7 +260,7 @@ static int timer_capabilities(void)
         snprintf(json, sizeof(json),
             "{\"id\":\"test.timers\",\"name\":\"Timers\",\"api\":1,\"kind\":\"%s\","
             "\"entry\":\"main.lua\",\"location\":\"%s\",\"capabilities\":[%s],\"state_version\":1}",
-            i == 4 ? "race" : "voyage", i == 4 ? "river" : "outer", caps[i]);
+            i == 4 ? "race" : "voyage", "outer", caps[i]);
         BoatPluginManifest manifest = { 0 };
         BoatPluginStatus status
             = boat_plugin_parse_manifest(json, strlen(json), NULL, &manifest, &diagnostic);

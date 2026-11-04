@@ -9,7 +9,8 @@
 #include "boat_world.h"
 
 // The package ID a room mode uses when --package is absent. Deathmatch uses `proteus.deathmatch`
-// at every location; race uses `proteus.river-sprint`; free uses the location's free package.
+// at every location; race uses `proteus.river-sprint` on the outer map; free uses the location's
+// free package.
 const char *boat_room_package_default(bool deathmatch, bool race, BoatLocationId location);
 
 // Resolve SPEC (a catalog ID, or a directory path) into DEFINITION. SPEC NULL selects the

@@ -41,6 +41,16 @@ suspension, measure memory/runtime budgets, and complete internet-play acceptanc
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
 
+## River location retired, 2026-11-04
+
+The title's PLACE ring is now OUTER RIVER (default), BASIN and BASIN TRIAL; the
+[retirement plan](RIVER_RETIREMENT_PLAN.md) owns the decision. The page still preloads
+`geometry/river/scenery.bin`, now only because the outer map lays out its river kit from it; the
+crop's water atlas and ambient sidecars left the bundle. A default START therefore fetches the
+outer pack (5.3 MB) before the first session. `tools/check_web_scenery.py` passed against a local
+build on 2026-11-04; the other browser checks were updated for the new PLACE order but not run.
+Older notes below that describe preloading the river's sidecars or a River PLACE are history.
+
 ## Minimal landing page, 2026-11-01
 
 Completed: the public launcher contains the river screenshot and one full-width PLAY button.
@@ -59,7 +69,7 @@ composition. Capture recipe in `tools/wake_velocity.c`: temporarily insert
 `if (screenshot && !boat_gpu_resize(&gpu, 1920, 1200)) goto cleanup;` immediately before
 `texture = gpu.target.texture;`, and replace `live_view.skin = skin;` with
 `live_view.skin = screenshot ? BOAT_SKIN_SWEDEN : skin;`. Build `wake_velocity`, then run
-`./build/wake_velocity --gpu --gpu-aa --location river --skin cabin --time 3 --screenshot web/river.png`
+`./build/wake_velocity --gpu --gpu-aa --location outer --skin cabin --time 3 --screenshot web/river.png`
 from the repository root. Simulating the cabin run and changing only the rendered boat preserves
 the previous capture's exact pose and camera. Restore both temporary C edits and rebuild
 afterward. These capture-only overrides add no resolution option or gameplay change.
@@ -590,7 +600,7 @@ and its pinned submodules. No new dependency enters default native or Wasm build
 ```sh
 cmake -S . -B build-rtc -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_WEBRTC=ON
 cmake --build build-rtc --target boat_server boat_bot boat_rtc_echo --parallel
-./build-rtc/boat_server --bind 127.0.0.1 --port 24680 --rtc-port 24682 --location river
+./build-rtc/boat_server --bind 127.0.0.1 --port 24680 --rtc-port 24682 --location outer
 ```
 
 Serve the browser build over local HTTP with the normal `web-serve` command. In its title,

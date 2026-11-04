@@ -13,6 +13,7 @@
 #include "boat_location.h"
 #include "boat_map.h"
 #include "boat_scenery.h"
+#include "boat_test_location.h"
 #include "raylib.h"
 #include "waterfront_corner.h"
 
@@ -289,7 +290,7 @@ int main(int argc, char **argv)
     }
     const BoatWorldDefinition *location = NULL;
     if (name && strcmp(name, "river") == 0)
-        location = boat_location(BOAT_LOCATION_RIVER);
+        location = test_location(TEST_RIVER);
     else if (name && strcmp(name, "outer") == 0)
         location = boat_location(BOAT_LOCATION_OUTER);
     if (!location || (out && check) || (!out && !check && !stats)) {

@@ -20,8 +20,7 @@ int main(int argc, char **argv)
     BoatWorldResources resources = { 0 };
     Image image = { 0 };
     int result = 1;
-    if (!IsWindowReady()
-        || !boat_world_resources_init(&resources, boat_location(BOAT_LOCATION_RIVER))
+    if (!IsWindowReady() || !boat_world_resources_init(&resources, test_location(TEST_RIVER))
         || !boat_gpu_init(&gpu, true)
         || !waterfront_scenery_bind(&gpu.scenery, resources.definition->map)
         || !waterfront_gpu_scene_bind(&gpu.scene, &gpu.scenery))

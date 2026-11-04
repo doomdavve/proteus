@@ -107,7 +107,7 @@ static int validate_core(void)
     physics_session(&boat, BOAT_LOCATION_BASIN);
     CHECK(boat.boat.turn_roll_load == 0 && boat.boat.roll == 0 && boat.boat.roll_velocity == 0);
     boat.boat.turn_roll_load = 3;
-    physics_session(&boat, BOAT_LOCATION_RIVER);
+    physics_session(&boat, TEST_RIVER);
     CHECK(boat.boat.turn_roll_load == 0);
     boat.boat.turn_roll_load = 3;
     physics_session(&boat, BOAT_LOCATION_BASIN);
@@ -757,7 +757,7 @@ static int validate_contacts(void)
 {
     for (int trial = 0; trial < 8; ++trial) {
         BoatSession boat;
-        physics_session(&boat, trial >= 2 ? BOAT_LOCATION_RIVER : BOAT_LOCATION_BASIN);
+        physics_session(&boat, trial >= 2 ? TEST_RIVER : BOAT_LOCATION_BASIN);
         if (trial < 2) {
             boat.boat.position = (Vector2) { 116, trial == 0 ? 0 : 76 };
             boat.boat.velocity = (Vector2) { 8, trial == 0 ? 0 : 8 };

@@ -333,16 +333,16 @@ current commands and verification limits; the preceding platform-check record is
 From the worktree root, build normally, then run the boating view:
 
 ```sh
-./build/wake_velocity --location river --gpu-aa
-./build/wake_velocity --location river --gpu-aa --mouse-steering
-./build/wake_velocity --location river --gpu-aa --demo --frames 180
+./build/wake_velocity --location outer --gpu-aa
+./build/wake_velocity --location outer --gpu-aa --mouse-steering
+./build/wake_velocity --location outer --gpu-aa --demo --frames 180
 ```
 
 `wake_velocity --screenshot` remains scene-only. The review tool composites deterministic
 telemetry onto a background at 320x200, then nearest-scales the combined frame:
 
 ```sh
-./build/wake_velocity --renderer cpu --location river --time 3 --screenshot build/hud-river-background.png
+./build/wake_velocity --renderer cpu --location outer --time 3 --screenshot build/hud-river-background.png
 ./build/boat_hud_review --background build/hud-river-background.png --case cruise --screenshot build/hud-cruise.png
 ./build/boat_hud_review --background build/hud-river-background.png --case neutral --compact --screenshot build/hud-neutral-compact.png
 ./build/boat_hud_review --background build/hud-river-background.png --case reverse --screenshot build/hud-reverse.png
@@ -363,7 +363,7 @@ X/Z, radians), `--shelter N` picks the current recovery shelter and `--scale N` 
 ./build/wake_velocity --renderer cpu --location outer --time 3 --screenshot build/minimap-outer.png
 ./build/validate_boat_minimap --mode corner --background build/minimap-outer.png --scale 3 --screenshot build/minimap-corner.png
 ./build/validate_boat_minimap --mode chart --at 3300,-2100,2.4 --shelter 2 --scale 3 --screenshot build/minimap-chart.png
-./build/validate_boat_minimap --location river --mode corner --scale 3 --screenshot build/minimap-river.png
+./build/validate_boat_minimap --location outer --mode corner --scale 3 --screenshot build/minimap-river.png
 ```
 
 The review tool requires a graphics context. Default output is 960x600 (3x), compact

@@ -117,13 +117,14 @@ static int defaults_match_compiled(void)
 {
     const BoatPluginCatalogEntry *basin
         = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "basin");
-    const BoatPluginCatalogEntry *river
-        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "river");
     const BoatPluginCatalogEntry *outer
         = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_VOYAGE, "outer");
     const BoatPluginCatalogEntry *course
         = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_COURSE, "basin");
-    CHECK(basin && river && outer && course);
+    CHECK(basin && outer && course);
+    // The retired river location has no packages.
+    CHECK(!boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "river"));
+    CHECK(!boat_plugin_catalog_default(BOAT_PLUGIN_KIND_RACE, "river"));
     BoatPluginRevision r;
     BoatPluginDiagnostic d = { 0 };
     CHECK(boat_plugin_catalog_decode(outer, &r, &d));

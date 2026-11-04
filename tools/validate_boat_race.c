@@ -52,7 +52,7 @@ static Vector2 along(const BoatRaceGate *g, float forward, float side)
 
 static bool fresh(BoatRaceRules rules)
 {
-    return boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 },
+    return boat_fleet_init(&fleet, test_world(BOAT_LOCATION_OUTER), (BoatWater) { 0 },
                BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT)
         && boat_race_init(&race, &rules, fixture_course());
 }
@@ -93,19 +93,19 @@ static int geometry(void)
     for (unsigned i = 0; i < c->gate_count; ++i) {
         const BoatRaceGate *g = gate(i);
         for (int side = -1; side <= 1; side += 2) {
-            CHECK(test_river_water(along(g, 0, side * g->half_width), 0));
+            CHECK(test_outer_water(along(g, 0, side * g->half_width), 0));
             if (i + 1 == c->gate_count)
-                CHECK(!test_river_water(along(g, 0, side * (g->half_width + 12)), 0));
+                CHECK(!test_outer_water(along(g, 0, side * (g->half_width + 12)), 0));
             else
-                CHECK(test_river_water(along(g, 0, side * g->half_width), 8));
+                CHECK(test_outer_water(along(g, 0, side * g->half_width), 8));
         }
         // Straight lines between anchors keep 12 m of mapped clearance.
         const BoatRaceGate *from = i ? gate(i - 1) : &c->start;
         for (int k = 0; k <= 100; ++k) {
-            CHECK(test_river_water(Vector2Lerp(from->centre, g->centre, k / 100.0f), 12));
+            CHECK(test_outer_water(Vector2Lerp(from->centre, g->centre, k / 100.0f), 12));
             // Include the outer racing lanes, not just the centre line.
             for (int side = -1; side <= 1; side += 2)
-                CHECK(test_river_water(
+                CHECK(test_outer_water(
                     Vector2Lerp(along(from, 0, (float)side * fminf(21, from->half_width - 4)),
                         along(g, 0, (float)side * fminf(21, g->half_width - 4)), k / 100.0f),
                     12));
@@ -611,7 +611,7 @@ static int hold(void)
 {
     BoatRaceRules rules = boat_fixture_race_default_rules;
     BoatWater water = { 0 };
-    CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), water, BOAT_OBJECT_LIFE_TICKS,
+    CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_OUTER), water, BOAT_OBJECT_LIFE_TICKS,
         BOAT_OBJECT_DEFAULT_HEIGHT));
     CHECK(boat_race_init(&race, &rules, fixture_course()));
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
@@ -651,7 +651,7 @@ static int hold(void)
 static int full_race(void)
 {
     BoatRaceRules rules = boat_fixture_race_default_rules;
-    CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 },
+    CHECK(boat_fleet_init(&fleet, test_world(BOAT_LOCATION_OUTER), (BoatWater) { 0 },
         BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     CHECK(boat_race_init(&race, &rules, fixture_course()));
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
@@ -675,7 +675,7 @@ static int full_race(void)
         if (race.round == 1 && race.phase == BOAT_RACE_RACING && !saved
             && fleet.state.tick == race.go_tick + 20 * BOAT_TICK_HZ) {
             // Checkpoint inside the ferry encounter: a fresh fleet resumes identically.
-            CHECK(boat_fleet_init(&copy, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 },
+            CHECK(boat_fleet_init(&copy, test_world(BOAT_LOCATION_OUTER), (BoatWater) { 0 },
                 BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
             BoatFleetState state;
             boat_fleet_save(&fleet, &state);
@@ -739,7 +739,7 @@ int main(int argc, char **argv)
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     if (boat_plugin_load_race(&bundle, NULL, &plugin_race, &d) != BOAT_PLUGIN_OK
         || boat_plugin_race_check_location(&plugin_race,
-               test_world(BOAT_LOCATION_RIVER)->definition, &test_world(BOAT_LOCATION_RIVER)->map,
+               test_world(BOAT_LOCATION_OUTER)->definition, &test_world(BOAT_LOCATION_OUTER)->map,
                &d)
             != BOAT_PLUGIN_OK) {
         fprintf(stderr, "%s: %s\n", d.field, d.message);

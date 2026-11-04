@@ -6,11 +6,11 @@
 
 #include <stdbool.h>
 
-// Compiled river map crop: its water triangles alone, which collision, the server and the
-// multiplayer content digest use. Immutable process-lifetime data, borrowed by the river
-// location's definition. Its land, buildings and bridge are presentation data in the river's
-// scenery pack (boat_scenery_of), whose leading water is exactly this; the authored
-// bridge/approach triangles there use flat materials and have no facade windows.
+// Compiled Eriksberg river crop: its water triangles alone. Immutable process-lifetime data. It is
+// not a location (the outer map holds this water in the same frame): its scenery pack
+// (boat_scenery_of), whose leading water is exactly this, lays out the river kit on the outer
+// map, and validators drive it as a small mapped fixture. The authored bridge/approach
+// triangles there use flat materials and have no facade windows.
 extern const BoatMapDescription waterfront_city_river_map;
 
 #endif

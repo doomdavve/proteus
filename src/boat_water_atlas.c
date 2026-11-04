@@ -14,11 +14,13 @@ typedef struct {
     unsigned char *texels;
 } Atlas;
 
-static Atlas loaded[BOAT_LOCATION_COUNT];
+// Every location, plus a validator's Eriksberg river crop fixture.
+enum { SLOTS = BOAT_LOCATION_COUNT + 1 };
+static Atlas loaded[SLOTS];
 
 static Atlas *find(const BoatMapDescription *map)
 {
-    for (size_t i = 0; map && i < BOAT_LOCATION_COUNT; ++i)
+    for (size_t i = 0; map && i < SLOTS; ++i)
         if (loaded[i].map == map)
             return &loaded[i];
     return NULL;
@@ -106,7 +108,7 @@ bool boat_water_atlas_load_bytes(const BoatMapDescription *map, const void *byte
     if (!map || !map->mesh || !bytes || size < BOAT_WATER_ATLAS_HEADER)
         return false;
     Atlas *slot = NULL;
-    for (size_t i = 0; !slot && i < BOAT_LOCATION_COUNT; ++i)
+    for (size_t i = 0; !slot && i < SLOTS; ++i)
         slot = loaded[i].map ? NULL : &loaded[i];
     if (!slot)
         return false;
@@ -182,7 +184,7 @@ bool boat_water_atlas_load_location(const BoatWorldDefinition *location, const c
 
 void boat_water_atlas_unload(void)
 {
-    for (size_t i = 0; i < BOAT_LOCATION_COUNT; ++i) {
+    for (size_t i = 0; i < SLOTS; ++i) {
         free(loaded[i].texels);
         loaded[i] = (Atlas) { 0 };
     }

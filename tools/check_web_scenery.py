@@ -43,9 +43,8 @@ with sync_playwright() as p:
     shot('title')
     assert not scenery and not atlases, f'outer files requested before any session: {scenery} {atlases}'
     key('Enter')  # SINGLE PLAYER
-    for _ in range(3):
-        key('ArrowUp')  # START -> PLACE
-    key('ArrowRight')  # River -> Outer river
+    for _ in range(4):
+        key('ArrowUp')  # START -> PLACE, the default Outer river
     shot('solo-outer')
     if args.throttle_kbps:
         cdp = page.context.new_cdp_session(page)

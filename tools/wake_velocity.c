@@ -137,8 +137,7 @@ static void usage(void)
     cli_usage_line(stdout, "--serve", "Run only a room; see --serve --help");
 
     cli_usage_section(stdout, "WORLD");
-    cli_usage_line(
-        stdout, "--location basin|river|outer", "Water map (default basin; title uses river)");
+    cli_usage_line(stdout, "--location basin|outer", "Water map (default basin; title uses outer)");
     cli_usage_line(
         stdout, "--start X,Z[,DEGREES]", "Place the boat on mapped water (heading 0 faces -Z)");
     cli_usage_line(stdout, "--skin NAME", "sweden|finland|denmark|norway|explorer|cabin");
@@ -165,8 +164,8 @@ static void usage(void)
     cli_usage_line(stdout, "--wake-field", "Coherent CPU field, native basin only (research)");
 
     cli_usage_section(stdout, "CAMERA AND DISPLAY");
-    cli_usage_line(stdout, "--camera-distance N", "8..48 (default 20; river 12)");
-    cli_usage_line(stdout, "--camera-height N", "4..36 (default 14; river 6)");
+    cli_usage_line(stdout, "--camera-distance N", "8..48 (default 20; outer 12)");
+    cli_usage_line(stdout, "--camera-height N", "4..36 (default 14; outer 6)");
     cli_usage_line(stdout, "--fixed-fov", "Hold the 55-degree view instead of widening with speed");
     cli_usage_line(stdout, "--renderer gpu|cpu", "Renderer (default gpu)");
     cli_usage_line(stdout, "--gpu", "Alias for --renderer gpu");
@@ -237,12 +236,14 @@ static void usage(void)
     puts("\nSee docs/COMMAND_LINE.md for examples, restrictions and defaults.");
 }
 
-// Native builds load every mapped location's scenery pack at start. The browser loads only the
-// river's, bundled with the page; the outer pack is fetched when a session there needs it.
+// Native builds load every mapped location's scenery pack at start. The browser fetches the
+// outer pack when a session there needs it (scenery_ready); the river kit's layout pack is
+// bundled with the page.
 static bool load_scenery(const char *assets)
 {
 #if defined(__EMSCRIPTEN__)
-    return boat_scenery_load_location(boat_location(BOAT_LOCATION_RIVER), assets);
+    (void)assets;
+    return true;
 #else
     return boat_scenery_load_all(assets);
 #endif
@@ -584,6 +585,11 @@ static int study(int argc, char **argv)
             skin_set = true;
         } else if (strcmp(argv[i], "--location") == 0 && i + 1 < argc) {
             location = boat_location_find(argv[++i]);
+            if (!location && !strcmp(argv[i], "river")) {
+                fprintf(
+                    stderr, "The river location is retired; --location outer holds its water.\n");
+                return 1;
+            }
             if (!location)
                 goto invalid;
             location_set = true;
@@ -756,8 +762,8 @@ static int study(int argc, char **argv)
             fprintf(stderr, "--host joins its own room; it cannot take --connect or --token.\n");
             goto invalid;
         }
-        if (!strcmp(host_mode, "race") && location_set && location->id != BOAT_LOCATION_RIVER) {
-            fprintf(stderr, "--host race runs on the river location.\n");
+        if (!strcmp(host_mode, "race") && location_set && location->id != BOAT_LOCATION_OUTER) {
+            fprintf(stderr, "--host race runs on the outer location.\n");
             goto invalid;
         }
         // The room's water: what follows joins it like --connect.
@@ -1131,7 +1137,7 @@ static int study(int argc, char **argv)
     }
     if (location->mapped
         && !boat_map_water(&session.world.resources->map, session.boat.position, 2.5f)) {
-        fprintf(stderr, "River spawn is not navigable.\n");
+        fprintf(stderr, "Map spawn is not navigable.\n");
         goto cleanup;
     }
     // A replay is viewed in its own recorded water, never by writing into the live session.
@@ -2399,7 +2405,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 }
 
 // --title-start PLACE [OPTIONS]: the title's START with default settings and no menu, so a test
-// proves that every PLACE the panel offers opens. PLACE is basin, river, outer, outer-standard,
+// proves that every PLACE the panel offers opens. PLACE is basin, outer, outer-standard,
 // outer-harbor-life or basin-trial.
 static int title_start(int argc, char **argv)
 {

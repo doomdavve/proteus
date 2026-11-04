@@ -650,8 +650,8 @@ bool boat_room_definition_validate(const BoatRoomDefinition *r, BoatRoomDiagnost
         return false;
     }
     if (r->mode == BOAT_ROOM_MODE_RACE) {
-        if (r->location != BOAT_LOCATION_RIVER) {
-            fail(diagnostic, "location", "a race room requires the river location");
+        if (r->location != BOAT_LOCATION_OUTER) {
+            fail(diagnostic, "location", "a race room requires the outer location");
             return false;
         }
         if (!boat_race_course_validate(&r->course, &r->race_rules, diagnostic))

@@ -951,7 +951,7 @@ static int validate_gentle_encounters(void)
     // Wave forces cannot bypass the existing hull/shore containment.
     for (int angle = 0; angle < 4; ++angle) {
         BoatSession boat;
-        boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(TEST_RIVER), (BoatWater) { 0 });
         boat.world.water = boat_water_gentle();
         boat.boat.heading = angle * PI / 2;
         boat.boat.throttle = 1;
@@ -1068,7 +1068,8 @@ static int shared_water(void)
     }
     BoatWaterMeshCache cache = { 0 };
     for (int location = 0; location < 2; ++location) {
-        const Mesh3D *mesh = boat_water_surface(&cache, boat_location(location)->map, water, .7f);
+        const Mesh3D *mesh = boat_water_surface(
+            &cache, test_location(location ? TEST_RIVER : BOAT_LOCATION_BASIN)->map, water, .7f);
         CHECK(mesh && mesh->triangle_count > 100);
         for (size_t i = 0; i < mesh->triangle_count; ++i) {
             Vector3 centre = { 0 };
@@ -1155,7 +1156,8 @@ static int validate_water_patch(void)
                 if (!location && k > 1)
                     break;
                 Vector2 center = location ? centers[k] : (Vector2) { k ? 100 : 0, 0 };
-                const BoatMapDescription *map = boat_location(location)->map;
+                const BoatMapDescription *map = location ? test_location(TEST_RIVER)->map
+                                                         : boat_location(BOAT_LOCATION_BASIN)->map;
                 const Mesh3D *mesh = detail ? boat_water_patch_arcade(&cache, map, center)
                                             : boat_water_patch(&cache, map, center);
                 CHECK(mesh && mesh->triangle_count > 0
@@ -1193,7 +1195,7 @@ static int validate_water_patch(void)
                         CHECK(patch_contains(mesh, p) == expected);
                     }
             }
-    const BoatMapDescription *river = boat_location(BOAT_LOCATION_RIVER)->map;
+    const BoatMapDescription *river = test_location(TEST_RIVER)->map;
     const Mesh3D *mesh = boat_water_patch(&cache, river, (Vector2) { 5.99f, -250 });
     CHECK(mesh);
     uint64_t before = patch_overlap(mesh);
@@ -1240,7 +1242,7 @@ static uint64_t patch_alone(const BoatMapDescription *map, Vector2 center, bool 
 
 static int validate_water_mesh_caches(void)
 {
-    const BoatMapDescription *river = boat_location(BOAT_LOCATION_RIVER)->map;
+    const BoatMapDescription *river = test_location(TEST_RIVER)->map;
     const Vector2 a_center = { 12, -125 }, b_center = { 170, -250 }, basin_center = { 100, 0 };
     uint64_t a_ref = patch_alone(river, a_center, false);
     uint64_t b_ref = patch_alone(river, b_center, true);
@@ -1346,7 +1348,7 @@ static bool water_window(void *context, Vector3 min, Vector3 max)
 // surface is the full surface minus whole triangles outside the window.
 static int validate_water_index(void)
 {
-    const BoatMapDescription *river = boat_location(BOAT_LOCATION_RIVER)->map;
+    const BoatMapDescription *river = test_location(TEST_RIVER)->map;
     BoatWaterMeshCache indexed = { 0 }, full = { 0 };
     full.full_scan = true;
     const float offsets[] = { -3, 0, 3 }; // Around and on a seam.
@@ -1724,13 +1726,13 @@ static int scene_frame(void)
 static int river_quays(void)
 {
     BoatSession mapped;
-    physics_session(&mapped, BOAT_LOCATION_RIVER);
+    physics_session(&mapped, TEST_RIVER);
     CHECK(mapped.world.definition->mapped && test_river_water(mapped.boat.position, .3f));
     CHECK(!test_river_water((Vector2) { 10000, 0 }, 0));
     CHECK(!test_river_water((Vector2) { -100, 60 }, 0));
     // Drive into both dock quays. Hull clearance must remain in water and impacts rebound.
     for (int side = -1; side <= 1; side += 2) {
-        physics_session(&mapped, BOAT_LOCATION_RIVER);
+        physics_session(&mapped, TEST_RIVER);
         mapped.boat.heading = side * 1.5707963f;
         mapped.boat.throttle = 1;
         bool bumped = false;
@@ -1748,7 +1750,7 @@ static int river_quays(void)
     const float heading_offsets[] = { 0, -.00001f, .00001f };
     for (size_t i = 0; i < sizeof(heading_offsets) / sizeof(*heading_offsets); ++i)
         for (int side = -1; side <= 1; side += 2) {
-            physics_session(&mapped, BOAT_LOCATION_RIVER);
+            physics_session(&mapped, TEST_RIVER);
             mapped.boat.heading = side * PI / 2 + heading_offsets[i];
             mapped.boat.throttle = 1;
             for (int tick = 0; tick < 900; ++tick) {
@@ -1771,7 +1773,7 @@ static int river_quays(void)
             CHECK(reverse_travel > 3);
         }
     // The channel remains navigable through the crane towards the river.
-    physics_session(&mapped, BOAT_LOCATION_RIVER);
+    physics_session(&mapped, TEST_RIVER);
     mapped.boat.throttle = 1;
     for (int tick = 0; tick < 1200; ++tick) {
         boat_session_step(&mapped, (BoatInput) { 0 });

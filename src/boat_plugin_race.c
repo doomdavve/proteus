@@ -229,8 +229,8 @@ BoatPluginStatus boat_plugin_race_check_location(const BoatPluginRace *r,
     BoatPluginDiagnostic scratch = { 0 };
     BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
     const char *file = r->manifest.entry;
-    if (!location || strcmp(location->name, "river") || !map)
-        return fail(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location", "requires the river map");
+    if (!location || strcmp(location->name, "outer") || !map)
+        return fail(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location", "requires the outer map");
     // Use normalized native gates for the same crossing/recovery geometry as the race engine.
     BoatRace native;
     if (!boat_race_init(&native, &r->rules, &r->course))

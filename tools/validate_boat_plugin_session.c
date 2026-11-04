@@ -1747,15 +1747,14 @@ static int catalog_runtime(void)
 // resulting voyage, course, rules and scene equal the shipped fixtures.
 static int default_sessions(void)
 {
-    static BoatWorldResources basin, river;
+    static BoatWorldResources basin;
     CHECK(boat_world_resources_init(&basin, boat_location(BOAT_LOCATION_BASIN)));
-    CHECK(boat_world_resources_init(&river, boat_location(BOAT_LOCATION_RIVER)));
     static WakePlugin p;
     BoatSession s;
 
     // Free packages select only their location: no voyage, course or scene is installed.
-    for (int id = BOAT_LOCATION_BASIN; id <= BOAT_LOCATION_RIVER; ++id) {
-        const BoatWorldResources *world = id == BOAT_LOCATION_BASIN ? &basin : &river;
+    for (int id = BOAT_LOCATION_BASIN; id <= BOAT_LOCATION_OUTER; ++id) {
+        const BoatWorldResources *world = id == BOAT_LOCATION_BASIN ? &basin : outer();
         const BoatPluginCatalogEntry *entry
             = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, world->definition->name);
         CHECK(entry);
@@ -1807,13 +1806,12 @@ static int default_sessions(void)
         == boat_plugin_match_digest(
             &boat_fixture_match_default_rules, &boat_fixture_combat_default_rules));
     const BoatPluginCatalogEntry *race
-        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_RACE, "river");
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_RACE, "outer");
     CHECK(race && boat_plugin_catalog_decode(race, &revision, &diagnostic));
     CHECK(boat_plugin_race_digest(&revision.race.course, &revision.race.rules)
         == boat_plugin_race_digest(&boat_fixture_river_course, &boat_fixture_race_default_rules));
 
     boat_world_resources_destroy(&basin);
-    boat_world_resources_destroy(&river);
     return 0;
 }
 

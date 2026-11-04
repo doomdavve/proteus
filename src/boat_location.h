@@ -7,16 +7,12 @@
 #define BOAT_BASIN_HALF_X 120.0f
 #define BOAT_BASIN_HALF_Z 80.0f
 
-typedef enum {
-    BOAT_LOCATION_BASIN,
-    BOAT_LOCATION_RIVER,
-    BOAT_LOCATION_OUTER,
-    BOAT_LOCATION_COUNT
-} BoatLocationId;
+typedef enum { BOAT_LOCATION_BASIN, BOAT_LOCATION_OUTER, BOAT_LOCATION_COUNT } BoatLocationId;
 
 // Immutable, process-lifetime location record. Worlds borrow it; nothing stores an active one.
-// The mapped record binds the compiled river crop's description; collision caches are
-// prepared from it by their owners (boat_map_init).
+// The mapped record binds the compiled outer map's description; collision caches are prepared
+// from it by their owners (boat_map_init). The Eriksberg river crop (waterfront_city.h) is not a
+// location: it is the river kit's layout source inside the outer map and a validator fixture.
 typedef struct {
     BoatLocationId id;
     const char *name; // Command-line spelling.
@@ -24,11 +20,11 @@ typedef struct {
     const BoatMapDescription *map; // Non-NULL exactly when mapped; NULL for the basin.
     Vector2 half_extent; // Basin wall half-sizes in simulation X/Z; zero for mapped records.
     Vector2 spawn; // Free-boating start position in simulation X/Z.
-    Vector2 fleet_spawn; // Multiplayer start area; mapped fleets use open river water.
+    Vector2 fleet_spawn; // Multiplayer start area; the outer fleet starts in open river water.
     // Authored current/crossing-source placement for opt-in water tests.
     float current_center;
     Vector2 wake_offset;
-    // A3.5j: river life upstream of the river crop (ferries, a schooner, Hisingsbron's lift),
+    // A3.5j: river life upstream of the Eriksberg crop (ferries, a schooner, Hisingsbron's lift),
     // which the player collides with; copied into the world's water (BoatWater.upstream).
     bool upstream;
     // Presentation companion values; physics never reads these.

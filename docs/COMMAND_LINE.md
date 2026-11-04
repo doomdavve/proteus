@@ -14,21 +14,22 @@ For controls and rules, see [Playing Wake Velocity](PLAYING.md).
 Each `--help` prints a grouped summary of modes, options and controls; this page
 carries the details, restrictions and examples. Launching without options opens the title. Explicit gameplay options start a session
 directly; `--title` selects the title explicitly. The direct-launch default location is
-`basin`, while the title's default outing is the river.
+`basin`, while the title's default outing is the outer river.
 
 ## Locations and voyages
 
 ```sh
-./build/wake_velocity --location river
+./build/wake_velocity --location outer
 ./build/wake_velocity --location basin --waves
 ./build/wake_velocity --location outer --skin explorer
 ./build/wake_velocity --location outer --start 1980,-1196,75
 ```
 
-`river` covers the Eriksberg waterfront towards Älvsborgsbron. `outer` adds the larger
-upstream and outer-fjord map and the solo voyage to Långedrag. `--start X,Z[,DEGREES]`
-places a boat on mapped water using simulation coordinates; heading zero faces −Z. It
-is for solo mapped free boating, not courses or rooms. Rooms on `outer` have no voyage
+`outer` covers the Eriksberg waterfront towards Älvsborgsbron, upstream past Hisingsbron and out
+along the fjord, with the solo voyage to Långedrag. The former `river` location, a crop of the same
+water, was retired on 2026-11-04; `--location river` now names `outer` and exits.
+`--start X,Z[,DEGREES]` places a boat on mapped water using simulation coordinates; heading zero
+faces −Z. It is for solo mapped free boating, not courses or rooms. Rooms on `outer` have no voyage
 or solo squall.
 
 `--skin sweden|finland|denmark|norway|explorer|cabin` selects a solo boat. Explorer has a stronger
@@ -40,13 +41,13 @@ starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSI
 ### Bundled packages
 
 ```sh
-./build/wake_velocity --location river
+./build/wake_velocity --location outer
 ./build/wake_velocity --location outer --package proteus.harbor-life
 ./build/wake_velocity --course
 ```
 
 Every native solo session starts from a package compiled into the executable at build time; the
-default for the basin and river is free boating, for `outer` the Långedrag voyage, and for
+default for the basin is free boating, for `outer` the Långedrag voyage, and for
 `--course` the basin time trial. `--package ID` selects another bundled package, which must
 belong to the session's location and mode (for example `proteus.harbor-life` on `outer`).
 Launching a package starts no Lua VM, polls no files and shows no authoring panel. There is no
@@ -55,7 +56,7 @@ catalog, built into the game Wasm; rooms receive their definition as data. An un
 package for another location, fails with an explicit message. The title's single-player
 panel selects Standard or Harbor life for `outer` on native and web builds. `--title-start PLACE`
 takes the title's START path with default settings, without the menu, so tests can prove each PLACE
-opens (`basin`, `river`, `outer`, `outer-standard`, `outer-harbor-life`, `basin-trial`); further
+opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`, `basin-trial`); further
 options follow it.
 
 ### Live Lua authoring
@@ -152,7 +153,7 @@ compatibility.
 
 Current and scripted crossing-wake options reject courses/replays/ghosts. Courses and
 recordings preserve their water settings and reject explicit player-wake modes. A deliberate
-reset clears player wakes and restarts scripted passages. The title's standard river outing
+reset clears player wakes and restarts scripted passages. The title's outer river outing
 includes current, crossing wake and gentle waves; explicit launches use their supplied options.
 
 Legacy `--player-wake` and native basin-only `--wake-field` remain research options.
@@ -169,8 +170,8 @@ or renderer. GPU captures need a graphics context; CPU captures need no window.
 
 ```sh
 ./build/wake_velocity --renderer cpu --location basin --screenshot build/basin.png --time 3
-./build/wake_velocity --renderer cpu --location river --screenshot build/river.png --time 3
-./build/wake_velocity --location river --gpu-aa --screenshot build/river-gpu.png --time 3
+./build/wake_velocity --renderer cpu --location outer --screenshot build/outer.png --time 3
+./build/wake_velocity --location outer --gpu-aa --screenshot build/outer-gpu.png --time 3
 ./build/wake_velocity --title --screenshot build/title.png
 ./build/wake_velocity --renderer cpu --replay build/my-run.run --screenshot build/replay.png --time 5
 ```
@@ -180,12 +181,12 @@ selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to it
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.
 
 ```sh
-./build/wake_velocity --location river --demo --frames 720
-./build/wake_velocity --location river --profiler
+./build/wake_velocity --location outer --demo --frames 720
+./build/wake_velocity --location outer --profiler
 ./build/wake_velocity --camera-distance 24 --camera-height 18 --fixed-fov
 ```
 
-Camera distance accepts 8–48 units, height 4–36. Defaults are 20/14, or 12/6 on `river`.
+Camera distance accepts 8–48 units, height 4–36. Defaults are 20/14, or 12/6 on `outer`.
 `--fixed-fov` holds 55° instead of widening with speed. `--no-vsync` paces gameplay at
 60 Hz; the title uses vsync. `--verbose` reports graphics/window and resource startup.
 F3 or `--profiler` shows rolling frame timings; GPU scene time measures CPU submission,
@@ -195,8 +196,8 @@ not GPU execution. See [performance tools](BOATING_PERFORMANCE.md),
 On macOS with full Xcode selected, record a windowed drive in Instruments:
 
 ```sh
-xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
-  --launch -- ./build/wake_velocity --location river --demo --frames 3600
+xcrun xctrace record --template 'Time Profiler' --output build/outer.trace \
+  --launch -- ./build/wake_velocity --location outer --demo --frames 3600
 ```
 
 ## Rooms and scripted clients
@@ -204,9 +205,9 @@ xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
 Host and join from a native game process:
 
 ```sh
-./build/wake_velocity --host free --location river --name me
-./build/wake_velocity --host deathmatch --location river --name me
-./build/wake_velocity --host race --location river --name me
+./build/wake_velocity --host free --location outer --name me
+./build/wake_velocity --host deathmatch --location outer --name me
+./build/wake_velocity --host race --name me
 ```
 
 `--host free|deathmatch|race` starts a background authority open to the LAN and joins it;
@@ -214,8 +215,8 @@ leaving closes the room. `--location`, `--waves` and `--port N` configure the ro
 For a separate authority, use the packaged game's `--serve`, or the development server:
 
 ```sh
-./build/wake_velocity --serve --bind 0.0.0.0 --mode deathmatch --location river
-./build/boat_server --bind 0.0.0.0 --mode race --location river
+./build/wake_velocity --serve --bind 0.0.0.0 --mode deathmatch --location outer
+./build/boat_server --bind 0.0.0.0 --mode race
 ./build/wake_velocity --connect 127.0.0.1:24680 --name me
 ./build/boat_bot --connect 127.0.0.1:24680 --seconds 60 --hunt
 ./build/boat_bot --discover
@@ -230,8 +231,8 @@ extra arguments. On macOS, a packaged headless room can run as:
 
 The room runs from a package. With no `--package`, `--mode free` uses the location's free
 package, `--mode deathmatch` uses `proteus.deathmatch` at any location, and `--mode race` uses
-`proteus.river-sprint` on the river. `--package ID|DIR` selects another bundled package by ID or
-evaluates a package directory once at start-up. The authority validates the package, sends the
+`proteus.river-sprint` on `outer`, where every race room runs. `--package ID|DIR` selects another
+bundled package by ID or evaluates a package directory once at start-up. The authority validates the package, sends the
 resulting definition to clients as data, and refuses to start with a diagnostic if it is
 invalid; rule overrides such as `--round-seconds` then apply to the loaded definition.
 

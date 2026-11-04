@@ -7,7 +7,7 @@ this package's own wake_velocity; plugin_tools.json records where it and the hel
 
 Copy an example somewhere writable before editing it. The examples are in the package's
 assets/plugins directory: langedrag and shelter-tour are voyages you can play with --plugin;
-river-sprint is a river race description that these tools can validate and preview only.
+river-sprint is a river race description on the outer map that these tools can validate and preview only.
 
 Replace AUTHORING below with this directory and EXAMPLES with assets/plugins.
 On Windows use "py" or "python" instead of python3, and wake_velocity.exe.

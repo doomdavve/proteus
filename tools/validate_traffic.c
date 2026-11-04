@@ -300,7 +300,7 @@ static int check_gulls(void)
     waterfront_boating_gulls(3, stimulus, (Vector3) { 8, 0, 0 }, &sought);
     CHECK(sought.gulls[0][0].position.y > idle_height + 1);
     BoatSession boat;
-    boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+    boat_session_init(&boat, test_world(TEST_RIVER), (BoatWater) { 0 });
     boat_scene_frame(
         SESSION_VIEW(&boat), &boat.presentation, &boat.world, BOAT_CAMERA_DEFAULT, &frame);
     waterfront_boating_gulls(boat_session_time(&boat), frame.player.hull.position,
@@ -830,7 +830,7 @@ int main(void)
         WaterfrontVesselMotion ship = waterfront_traffic_motion(i, 60);
         BoatModelSpec spec = waterfront_traffic_spec(i);
         BoatSession boat;
-        boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(TEST_RIVER), (BoatWater) { 0 });
         boat_session_set_tick(&boat, 7200);
         boat.boat.heading = boat.presentation.camera_heading = ship.heading;
         Vector3 p = Vector3Add(
@@ -851,7 +851,7 @@ int main(void)
         // A deliberate beam-on crossing checks the full SAT hull and moving contact torque.
         ship = waterfront_traffic_motion(i, 40);
         Vector2 right = { cosf(ship.heading), sinf(ship.heading) };
-        boat_session_init(&boat, test_world(BOAT_LOCATION_RIVER), (BoatWater) { 0 });
+        boat_session_init(&boat, test_world(TEST_RIVER), (BoatWater) { 0 });
         boat_session_set_tick(&boat, 4800);
         boat.boat.position = Vector2Add((Vector2) { -ship.position.x, ship.position.z },
             Vector2Scale(right, spec.beam * .5f + 3));

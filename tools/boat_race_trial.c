@@ -78,7 +78,7 @@ static void start(BoatSession *session, ObjectStudy *objects, bool source, doubl
     BoatWater water = { 0 };
     if (source)
         water.vessel = ferry();
-    boat_session_init(session, test_world(BOAT_LOCATION_RIVER), water);
+    boat_session_init(session, test_world(BOAT_LOCATION_OUTER), water);
     session->boat.position = route[0];
     session->boat.heading = heading_to(route[0], route[1]);
     boat_session_set_tick(session, (uint64_t)llround(delay * BOAT_TICK_HZ));
@@ -185,7 +185,7 @@ static void contracts(void)
     CHECK(nonzero > 100);
     // Restore the real fleet across the encounter, including all four ordinary player wakes.
     BoatFleet a, b;
-    CHECK(boat_fleet_init(&a, test_world(BOAT_LOCATION_RIVER), (BoatWater) { .vessel = w },
+    CHECK(boat_fleet_init(&a, test_world(BOAT_LOCATION_OUTER), (BoatWater) { .vessel = w },
         BOAT_OBJECT_LIFE_TICKS, BOAT_OBJECT_DEFAULT_HEIGHT));
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i) {
         Boat boat;
@@ -421,7 +421,7 @@ static void approaches(void)
                 }
                 if (overlap)
                     water.objects = &objects;
-                boat_session_init(&session, test_world(BOAT_LOCATION_RIVER), water);
+                boat_session_init(&session, test_world(BOAT_LOCATION_OUTER), water);
                 session.presentation_enabled = false;
                 boat_session_set_tick(&session, 600);
                 Vector2 direction = Vector2Rotate(forward, angle * DEG2RAD);
@@ -473,12 +473,12 @@ static void source_bounds(void)
                 Vector2 p = Vector2Add(centre,
                     Vector2Add(Vector2Scale(w.direction, end * BOAT_VESSEL_LENGTH * .5f),
                         Vector2Scale(side, edge * BOAT_VESSEL_BEAM * .5f)));
-                CHECK(test_river_water(p, 1));
+                CHECK(test_outer_water(p, 1));
             }
         float lo = 0, hi = 200;
         for (int i = 0; i < 12; ++i) {
             float mid = (lo + hi) * .5f;
-            if (test_river_water(centre, mid))
+            if (test_outer_water(centre, mid))
                 lo = mid;
             else
                 hi = mid;
@@ -506,7 +506,7 @@ static void checks(void)
         length += Vector2Distance(route[i - 1], route[i]);
         for (int j = 0; j <= 100; ++j) {
             Vector2 p = Vector2Lerp(route[i - 1], route[i], j / 100.0f);
-            CHECK(test_river_water(p, 12));
+            CHECK(test_outer_water(p, 12));
         }
     }
     printf("prototype_polyline_m=%.2f required_average_55s=%.2f\n", length, length / 55);
@@ -630,7 +630,7 @@ int main(int argc, char **argv)
         return 2;
     }
     if (plugin_path
-        && !race_plugin_open(&plugin, plugin_path, test_world(BOAT_LOCATION_RIVER), GetTime())) {
+        && !race_plugin_open(&plugin, plugin_path, test_world(BOAT_LOCATION_OUTER), GetTime())) {
         test_worlds_close();
         return 1;
     }

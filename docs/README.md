@@ -3,11 +3,18 @@
 Current status reconciled on 2026-11-03. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
-Acid Wake techno or Off. It provides free boating in the basin and on the river, a basin time
-trial and multiplayer rooms. It defaults to GPU rendering; the CPU reference supports
+Acid Wake techno or Off. It provides free boating in the basin and on Gothenburg's outer river, a
+basin time trial, the Långedrag voyage and multiplayer rooms. It defaults to GPU rendering; the CPU reference supports
 display-free captures. The four-minute Eriksberg demo (`proteus`), its soundtrack, the separate
 Eriksberg boating location and their plans were removed on 2026-10-25; they remain in the git
 history.
+
+## River location retired — 2026-11-04
+
+The `river` location, a crop of the outer map, is [retired](RIVER_RETIREMENT_PLAN.md): the
+title defaults to OUTER RIVER, the river sprint and Harbor race run on `outer`, and protocol v12
+renumbers the locations. The crop stays as the river kit's layout data and a validator fixture.
+Automated checks pass; human play and the Winterfell location change at the next release remain.
 
 ## Marina authoring M1 + M2 — 2026-11-03
 
@@ -85,7 +92,8 @@ and broader network/platform qualification remain open.
 | [Boat physics](BOAT_PHYSICS_PLAN.md) | Accepted H3 grip and turn banking retained; [arcade stability study](ARCADE_STABILITY.md) adds recovery and steering air roll (revision 7), integrated into main | User requested heavier, more satisfying landings (2026-10-24); [landing candidate L1](BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24) (landing speed scrub, revision 8; splash, hull slap) played 2026-10-25: the user liked the impact feel after the camera dip was removed; stability candidate needs play feedback; combined multiplayer feel and platform qualification pending |
 | [Wake rewrite](WAKE_REWRITE_PLAN.md) | Bounded arcade objects remain default; [stability study](ARCADE_STABILITY.md) lowers default crests to 1.2 m while retaining signed overlap and jumps | Play the stability/roll candidate; tight-turn readability and platform/fleet costs remain open |
 | [Living city](LIVING_CITY_PLAN.md) | 01–05: city dressing, materials, berths, shared actors; travelling boats and a compact ferry brought forward; 32 reactive boating gulls; blended near/far gameplay shadows | 06 people/cyclists; varied road traffic, building activity, ferry polish, perched gulls, and final review remain |
-| [River / Älvsborgsbron](river/README.md) | Separate source/crop, navigable bridge blockout, blocking tower legs, and grounded road approaches | Bridge/shoreline/building refinement; human handling and camera review |
+| [River location retirement](RIVER_RETIREMENT_PLAN.md) | `river` retired into `outer` (2026-11-04): title default, races and rooms on outer, protocol v12; crop kept as kit layout data and validator fixture | Set Winterfell's room to `outer` with the next release; play solo, deathmatch and a race on outer |
+| [River / Älvsborgsbron](river/README.md) | Separate source/crop, navigable bridge blockout, blocking tower legs, and grounded road approaches; retired as a location 2026-11-04 | History; the crop lives on inside the outer map |
 | [macOS app builds](MACOS_BUILD.md) | Apple Silicon action, relocatable app bundle, preferred river launch, ad-hoc signing, ZIP/checksum; title backdrop packaging fix added | Verify macOS packaging CI and launch the downloaded app from Finder; macOS 13 execution pending |
 | [Windows builds](WINDOWS_BUILD.md) | Portable x64 action; reversal and basin impact-bound corrections, bundled music, relocated CPU check; ENet/`boat_server` MSVC build and packaged server passed CI (run 40083439355, 2026-10-24); title backdrop packaging fix added, pending CI | Verify the current Windows workflow and launch the downloaded app; then physical mouse/scroll, GPU/audio and connected controls |
 | [Linux builds](LINUX_BUILD.md) | Native Wayland enabled with X11 compatibility; Weston/Xvfb CI checks configured; bundled GLFW no-seat startup crash backport implemented | Rerun Linux CI to verify the Weston crash fix and X11 startup, review CPU screenshots; GNOME/KDE physical input, display scaling, audio and connected play pending |
@@ -98,7 +106,7 @@ does not authorize advancing every plan. Use the requested track's scope and acc
 ## Guides and evidence
 
 - [Boating performance](BOATING_PERFORMANCE.md): headless arcade benchmark contract, P2a verification, P3a baseline and C1 clock comparison.
-- [Multiplayer protocol](MULTIPLAYER_PROTOCOL.md): protocol v9 byte layout, channels, validation
+- [Multiplayer protocol](MULTIPLAYER_PROTOCOL.md): protocol v12 byte layout, channels, validation
   envelope, authority rules carried on the wire, version policy and fixtures.
 - [Architecture review](ARCHITECTURE_REVIEW.md): 2026-10-19 assessment of ownership, performance,
   iteration, and growth risks; the [foundations plan](BOATING_FOUNDATIONS_PLAN.md) owns the

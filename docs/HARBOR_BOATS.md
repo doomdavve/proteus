@@ -126,7 +126,7 @@ See the [Harbor life review commands](../plugins/harbor-life/README.md#boat-appe
 Run from the repository root after building:
 
 ```sh
-./build/wake_velocity --location river --gpu-aa --waves
+./build/wake_velocity --location outer --gpu-aa --waves
 ./build/harbor_review --view marina --waves
 ./build/harbor_review --view workboat --waves
 ./build/harbor_review --view overview

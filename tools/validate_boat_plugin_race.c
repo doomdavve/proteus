@@ -20,7 +20,7 @@
 
 static BoatPluginFiles files, edit_files;
 static BoatPluginRace reference_race;
-static const BoatWorldResources *river(void) { return test_world(BOAT_LOCATION_RIVER); }
+static const BoatWorldResources *outer(void) { return test_world(BOAT_LOCATION_OUTER); }
 
 static BoatPluginBundle original(void) { return boat_plugin_bundle(&files); }
 
@@ -48,7 +48,7 @@ static int reference_matches_compiled(void)
     uint64_t compiled = boat_plugin_race_digest((&boat_fixture_river_course), &rules);
     CHECK(reference_race.digest == compiled);
     BoatPluginDiagnostic d = { 0 };
-    CHECK(boat_plugin_race_check_location(&reference_race, river()->definition, &river()->map, &d)
+    CHECK(boat_plugin_race_check_location(&reference_race, outer()->definition, &outer()->map, &d)
         == BOAT_PLUGIN_OK);
     printf("race digest=%016llx compiled=%016llx\n", (unsigned long long)reference_race.digest,
         (unsigned long long)compiled);
@@ -81,7 +81,7 @@ static int rejects(void)
         { "height = 1.6", "height = -1", "race.storm.height", false },
         { "speed = 12", "speed = 'fast'", "race.source.speed", false },
         { "race.define", "voyage.define", "capabilities[1]", true },
-        { "\"river\"", "\"outer\"", "location", true },
+        { "\"outer\"", "\"basin\"", "location", true },
     };
     for (unsigned i = 0; i < sizeof(bad) / sizeof(*bad); ++i) {
         BoatPluginBundle b = edit(bad[i].from, bad[i].to, bad[i].manifest);
@@ -89,7 +89,7 @@ static int rejects(void)
         BoatPluginRace r = reference_race;
         BoatPluginStatus status = boat_plugin_load_race(&b, NULL, &r, &d);
         if (status == BOAT_PLUGIN_OK)
-            status = boat_plugin_race_check_location(&r, river()->definition, &river()->map, &d);
+            status = boat_plugin_race_check_location(&r, outer()->definition, &outer()->map, &d);
         printf("reject %u: %s [%s] %s\n", i, boat_plugin_status_name(status), d.field, d.message);
         CHECK(status != BOAT_PLUGIN_OK && !strcmp(d.field, bad[i].field));
         CHECK(d.cost.leaked_bytes == 0);
@@ -123,7 +123,7 @@ static int reload_and_undo(void)
 {
     static BoatPluginHost host;
     BoatPluginBundle b = original();
-    CHECK(boat_plugin_host_start(&host, river()->definition, &river()->map, &b)
+    CHECK(boat_plugin_host_start(&host, outer()->definition, &outer()->map, &b)
         && host.kind == BOAT_PLUGIN_KIND_RACE);
     const BoatPluginRevision *active = boat_plugin_host_active(&host);
     b = edit("River sprint", "Evening sprint", true);
@@ -176,7 +176,7 @@ static int trial_controls(void)
 {
     static RacePlugin plugin;
     CHECK(save_bundle(original()));
-    CHECK(race_plugin_open(&plugin, BOAT_RACE_PLUGIN_TEST_DIR, river(), 0));
+    CHECK(race_plugin_open(&plugin, BOAT_RACE_PLUGIN_TEST_DIR, outer(), 0));
     CHECK(save_bundle(edit("River sprint", "Evening sprint", true)));
     CHECK(!race_plugin_frame(&plugin, true, false, false, 1));
     CHECK(plugin.staged && boat_plugin_host_active(&plugin.host)->number == 2);
@@ -227,7 +227,7 @@ static int physical_parity(void)
     CHECK(boat_race_init(&races[0], &rules, (&boat_fixture_river_course)));
     CHECK(boat_race_init(&races[1], &reference_race.rules, &reference_race.course));
     for (unsigned n = 0; n < 2; ++n) {
-        CHECK(boat_fleet_init(&fleets[n], river(), (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS,
+        CHECK(boat_fleet_init(&fleets[n], outer(), (BoatWater) { 0 }, BOAT_OBJECT_LIFE_TICKS,
             BOAT_OBJECT_DEFAULT_HEIGHT));
         for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
             CHECK(boat_race_join(&races[n], &fleets[n], i));

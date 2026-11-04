@@ -26,7 +26,7 @@ typedef struct {
 
 typedef struct {
     const char *mode; // "free", "deathmatch" or "race".
-    const char *location; // A boat_location name; race rooms are always on the river.
+    const char *location; // A boat_location name; race rooms are always on the outer map.
     bool waves;
     uint16_t port;
 } NetHostOptions;

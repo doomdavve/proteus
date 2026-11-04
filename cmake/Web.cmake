@@ -50,22 +50,18 @@ configure_file(assets/title/wake-velocity.png "${WEB_ASSETS}/title/wake-velocity
 configure_file(assets/title/river-backdrop.png "${WEB_ASSETS}/title/river-backdrop.png" COPYONLY)
 configure_file(assets/music/a-little-boat.xm "${WEB_ASSETS}/music/a-little-boat.xm" COPYONLY)
 configure_file(assets/music/acid-wake.xm "${WEB_ASSETS}/music/acid-wake.xm" COPYONLY)
-# The river's scenery pack is preloaded with the page. The outer pack is served next to it and
-# fetched only when a session needs it (web/scenery_loader.js), so river and basin players never
-# download it.
+# The Eriksberg river crop's scenery pack, which lays out the river kit on the outer map, is
+# preloaded with the page. The outer pack is served next to it and fetched only when a session
+# needs it (web/scenery_loader.js), so basin players never download it.
 configure_file(assets/geometry/river/scenery.bin "${WEB_ASSETS}/geometry/river/scenery.bin"
   COPYONLY)
 configure_file(assets/geometry/outer/scenery.bin
   "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/outer/scenery.bin" COPYONLY)
-# Water atlases (graphics G4) travel with their packs: preloaded for the river, fetched with the
-# outer pack. A missing atlas only loses the atlas shading.
-configure_file(assets/geometry/river/water_atlas.bin
-  "${WEB_ASSETS}/geometry/river/water_atlas.bin" COPYONLY)
+# The water atlas (graphics G4) is fetched with the outer pack. A missing atlas only loses the
+# atlas shading.
 configure_file(assets/geometry/outer/water_atlas.bin
   "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/outer/water_atlas.bin" COPYONLY)
 # Ambient occlusion (graphics G5c) travels the same way; without it scenery draws unoccluded.
-configure_file(assets/geometry/river/ambient.bin "${WEB_ASSETS}/geometry/river/ambient.bin"
-  COPYONLY)
 configure_file(assets/geometry/outer/ambient.bin
   "${CMAKE_CURRENT_BINARY_DIR}/web-lazy/geometry/outer/ambient.bin" COPYONLY)
 
@@ -99,8 +95,6 @@ set_property(TARGET wake_velocity APPEND PROPERTY LINK_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/a-little-boat.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/acid-wake.xm"
   "${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/river/scenery.bin"
-  "${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/river/water_atlas.bin"
-  "${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/river/ambient.bin"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/scenery_loader.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/rtc_transport.js"
   "${CMAKE_CURRENT_SOURCE_DIR}/web/server_directory.js"

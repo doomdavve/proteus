@@ -29,8 +29,9 @@ playground for iterating on effects, timing, audio, and presentation.
 - `src/boat_model.[ch]`: parameterized visual boat recipes and caller-owned generated meshes.
 - `src/waterfront_harbor.[ch]`: moored fleet, berth geometry, shared wave poses, and contact envelopes.
 - `src/waterfront_traffic.[ch]`: travelling craft, ferry routes, visual wakes, and moving contacts.
-- `src/waterfront_city.[ch]`: the compiled river map crop's water, shared by shoreline queries and
-  renderers.
+- `src/waterfront_city.[ch]`: the compiled Eriksberg river crop's water. It is not a location (the
+  outer map holds the same water): its scenery pack lays out the river kit on the outer map, and
+  validators use it as a small mapped fixture (`tools/boat_test_location.h`).
 - `src/boat_scenery.[ch]`: loads each map's land, buildings and bridge from
   `assets/geometry/<map>/scenery.bin` (written by `tools/map_pack.py`) and checks it against the
   compiled water in `water.h`. Collision and the server need the compiled water and maps; room
@@ -97,16 +98,16 @@ screenshot drive.
 
 ```sh
 ./build/wake_velocity --renderer cpu --screenshot build/basin.png --time 3
-./build/wake_velocity --renderer cpu --location river --screenshot build/river.png --time 3
+./build/wake_velocity --renderer cpu --location outer --screenshot build/outer.png --time 3
 ```
 
 On macOS, deeper CPU profiling can use Xcode's Instruments command-line tools when full Xcode is the
 active developer directory. For example, record a Time Profiler trace against a windowed scripted
-river drive:
+outer river drive:
 
 ```sh
-xcrun xctrace record --template 'Time Profiler' --output build/river.trace \
-  --launch -- ./build/wake_velocity --location river --demo --frames 3600
+xcrun xctrace record --template 'Time Profiler' --output build/outer.trace \
+  --launch -- ./build/wake_velocity --location outer --demo --frames 3600
 ```
 
 ## Conventions

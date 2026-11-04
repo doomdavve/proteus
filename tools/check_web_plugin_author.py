@@ -294,7 +294,7 @@ def main():
 
             # PD4: free and course packages launch through the same import path. Each needs its own
             # session because a running host keeps its kind.
-            for example in ('river-free', 'time-trial'):
+            for example in ('basin-free', 'time-trial'):
                 kind_context = browser.new_context(viewport={'width': 1100, 'height': 900})
                 page = kind_context.new_page()
                 watch(page)
