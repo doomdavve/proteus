@@ -45,6 +45,9 @@ Implemented and automatically verified; not yet played by a human, reviewed or r
 - Build warning-clean; `ctest --preset full` passed all 366 enabled tests (13 retired
   wake-field tests disabled, GPU tests off). New tests `boat_river_location_retired` and
   `boat_server_river_location_retired` check the refusal message.
+- With `PROTEUS_GPU_TESTS=ON`, all 34 enabled `gpu` tests passed, including the outer GPU
+  screenshots, the windowed outer `--host deathmatch` session and the GPU water reviews on the
+  crop fixture.
 - Race checks pass on outer with the unchanged course: `validate_boat_race` gate/approach water
   checks, `validate_boat_plugin_race`, `boat_race_trial` (bot and ferry runs) and the race rooms in
   `validate_boat_net` and `validate_boat_room_package`.
