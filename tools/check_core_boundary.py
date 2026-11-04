@@ -39,7 +39,7 @@ MATH_SYMBOL = re.compile(
     r"fmod|remainder|floor|ceil|round|trunc|l?lround|l?lrint|rint|nearbyint|fabs|fmin|fmax|copysign|fma|"
     r"ldexp|frexp|modf)[fl]?")
 RUNTIME_SYMBOL = re.compile(
-    r"malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|bzero|strcmp|strncmp|"
+    r"malloc|calloc|realloc|free|memcpy|memmove|memset|memset_pattern\d+|memcmp|memchr|strchr|bzero|strcmp|strncmp|"
     r"strlen|qsort|clock|_?_assert\w*|__\w*chk\w*|__stack_chk_\w+|__chkstk\w*|"
     r"__sincosf?_stret|vDSP_\w+|abort")
 
@@ -162,7 +162,8 @@ def self_test():
             print(f"self-test: clean source reported: {p}")
         return False
     if not symbol_allowed("Vector3Add", set()) or symbol_allowed("DrawCube", set()) \
-            or symbol_allowed("fopen", set()) or not symbol_allowed("atan2f", set()):
+            or symbol_allowed("fopen", set()) or not symbol_allowed("atan2f", set()) \
+            or not symbol_allowed("memchr", set()) or not symbol_allowed("strchr", set()):
         print("self-test: symbol allowlist is wrong")
         return False
     print(f"self-test: {len(violations)} violations rejected; clean source accepted")

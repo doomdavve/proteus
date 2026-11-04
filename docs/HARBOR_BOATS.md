@@ -65,7 +65,7 @@ Generate/upload when a recipe changes, not on every frame.
 ## Shared berth evaluation
 
 `src/waterfront_harbor.[ch]` owns placements, cached meshes, pontoon/quay equipment, and
-`WaterfrontHarborFrame`. Static models upload once. Each snapshot evaluates the moored
+`WaterfrontHarborFrame`. Default models upload once; M2 customized hulls rebuild/upload only when their resolved appearance changes. Each snapshot evaluates the moored
 hull poses, floating pontoon, sloping gangway and handrails, and two sagging lines per boat.
 CPU, GPU color, reflection, and shadow passes consume the same transforms.
 
@@ -80,7 +80,7 @@ fully displaced patch. Reflections remain planar.
 L2.1 (2026-10-30) added caller-owned berth inputs without changing the compiled default.
 `WaterfrontBerth` now carries a stable ID, a registered recipe, and a mooring rule;
 `waterfront_harbor_evaluate_scene`, `..._contact_height_scene` and `..._camera_clear_scene`
-select either the compiled seven or an authored list. Mesh generation is per recipe, so a
+select either the compiled seven or an authored list. At that step mesh generation was per recipe, so a
 moved/removed authored berth cannot leave its compiled hull visible, contacted or
 camera-blocking. The existing NULL-scene wrappers and frame fields are unchanged for current
 callers. Authored rope anchors still use the compiled pontoon's cleat region until L2.3 adds
@@ -112,6 +112,16 @@ routes remain open. Camera-route clearance includes conservative berth envelopes
 player follow-camera occlusion near shore remains unresolved.
 
 ## Inspect and verify
+
+M2 (2026-11-03) adds optional berth appearance. The
+[scene v3 contract](PLUGIN_API.md#scene-schema-v3) owns recipe-relative dimensions, mast
+applicability, opaque RGB colors and 1–16-character painted names. One resolved spec drives
+geometry, mooring attachments, pose, site/traffic checks, contacts and camera bounds. Each CPU/
+GPU view owns bounded customized meshes; changes build/upload before replacing the complete
+set, and removal/destruction releases it. Default recipes still borrow immutable meshes.
+The CPU renderer's existing mirrored view basis is compensated in glyph layout alone; GPU
+uses the ordinary outward-readable geometry. Both use the same hull surface and boat pose.
+See the [Harbor life review commands](../plugins/harbor-life/README.md#boat-appearance-m2).
 
 Run from the repository root after building:
 

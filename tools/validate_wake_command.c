@@ -451,6 +451,21 @@ static void test_live_scene(const char *executable)
     CHECK(pump(&edited, &a, query_now + 2, 20000000), "queued edit staged");
     wake_command_frame(&edit_command, &edited, &a, query_now + 2);
 
+    uint64_t appearance_tick = a.tick;
+    Vector2 appearance_position = a.boat.position;
+    CHECK(!wake_command_submit(&edit_command, &edited, &a,
+              "def.scene.marina.berths[8].appearance.name = 'TIDE'", query_now + 3),
+        "appearance edit submitted");
+    CHECK(pump(&edited, &a, query_now + 3, 200000000), "appearance edit staged");
+    wake_command_frame(&edit_command, &edited, &a, query_now + 3);
+    CHECK(!strcmp(a.world.scene->berths[7].appearance.name, "TIDE"),
+        "console name reached the native scene");
+    CHECK(a.tick == appearance_tick && a.boat.position.x == appearance_position.x
+            && a.boat.position.y == appearance_position.y,
+        "appearance kept boat and clock");
+    wake_plugin_frame(&edited, &a, false, true, false, query_now + 4);
+    CHECK(!strcmp(a.world.scene->berths[7].appearance.name, "MIRA"), "console appearance Undo");
+
     // Every edit and query above ran in the isolated worker: this process never opened a Lua VM.
     CHECK(boat_plugin_lua_states() == 0, "plain play and the console create no game-thread Lua");
 

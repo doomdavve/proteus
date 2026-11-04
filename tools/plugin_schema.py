@@ -106,11 +106,17 @@ def schema():
         {"if": {"properties": {"capabilities": {"const": ["voyage.define", "scene.define"]}}},
          "then": {"properties": {"state_version": {"const": 1}}}}]
     # M1: dimensioned marina pieces, with shape-specific required fields.
-    berth = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
+    appearance = object_schema({"length": number(3, 40, "metres; 0.75..1.25 times recipe length"),
+        "beam": number(1, 10, "metres; 0.75..1.25 times recipe beam"),
+        "mast_height": number(2.35, 12, "metres above calm water; sailboats only, >= freeboard + 2"),
+        **{key: sequence(number(0, 255, integer=True), 3, 3) for key in ("hull", "deck", "trim")},
+        "name": {**text(16, r"^[A-Z0-9.\-' ]+$"), "allOf": [{"pattern": "[A-Z0-9]"}]}}, required=())
+    berth = object_schema({"id": text(23, r"^[a-z][a-z0-9_]*$"),
                     "recipe": {"enum": ["skiff", "runabout", "sailboat", "cruiser", "speedboat",
                                         "sailboat_7m", "workboat"]},
                     **point, "heading": number(-math.tau, math.tau, "radians"),
-                    "mooring": {"enum": ["pontoon", "none"]}})
+                    "mooring": {"enum": ["pontoon", "none"]}, "appearance": appearance},
+                    required=("id", "recipe", "x", "z", "heading", "mooring"))
     module_common = {"id": text(23, r"^[a-z][a-z0-9_]*$"),
                      "length": number(.5, 60, "metres"), "width": number(.5, 20, "metres")}
     floating = {**module_common, "kind": {"enum": ["walkway", "platform", "finger_pier"]},
@@ -153,7 +159,7 @@ def schema():
                     "radius": number(.5, 200, "metres"), "height": number(.5, 200, "metres"),
                     "rate": number(-5, 5, "turns/second"), "cues": sequence(cue, 0, 16)})
     gulls = object_schema({"flocks": sequence(flock, 0, 4)}, required=("flocks",))
-    scene = object_schema({"version": {"const": 2}, "marina": marina, "traffic": traffic,
+    scene = object_schema({"version": {"const": 3}, "marina": marina, "traffic": traffic,
                            "gulls": gulls}, required=("version",))
     match_rules = record({"round_ticks": number(1, 432000, "120 Hz ticks", True),
                           "intermission_ticks": number(0, 432000, "120 Hz ticks", True),
@@ -217,6 +223,9 @@ def schema():
                     "No shelter in exposed water; first shelter equals selected location spawn",
                     "Shelters have 8m water clearance; arrival 20m"],
                 "scene": ["marina.berths is 0..32; missing berths keeps the compiled collection",
+                    "Optional berth appearance inherits recipe defaults; dimensions are 0.75..1.25 times recipe",
+                    "Mast height is sailboat-only, freeboard + 2 through 12 metres; RGB triples are opaque integers",
+                    "Painted names use 1..16 A-Z/0-9/space/period/hyphen/apostrophe, including a letter or digit",
                     "marina.modules is 0..64; missing modules keeps the compiled dock furniture",
                     "Berth/module IDs are unique scene-wide; recipes are registered native hulls",
                     "Hull plus mooring excursion must clear compiled water, other berths, the",

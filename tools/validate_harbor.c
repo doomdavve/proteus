@@ -71,8 +71,102 @@ static bool player_clear(const Boat *boat)
     return true;
 }
 
+static int appearance_checks(void)
+{
+    static BoatSceneDefinition scene, equivalent;
+    static BoatModel a, b;
+    scene = (BoatSceneDefinition) { .version = BOAT_SCENE_VERSION,
+        .berths_present = true,
+        .entrance_present = true,
+        .entrance_width = 8,
+        .berth_count = 1 };
+    strcpy(scene.berths[0].id, "custom");
+    BoatSceneBerth *berth = &scene.berths[0];
+    BoatSceneDiagnostic diagnostic;
+    size_t maximum = 0;
+    const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-'";
+    for (unsigned recipe = 0; recipe < BOAT_SCENE_BERTH_RECIPES; ++recipe) {
+        berth->recipe = (unsigned char)recipe;
+        berth->appearance = (BoatSceneAppearance) { 0 };
+        BoatModelSpec base = boat_scene_berth_resolve(berth);
+        CHECK(boat_scene_validate(&scene, &diagnostic));
+        CHECK(boat_model_generate(&a, base));
+        size_t plain = a.mesh.triangle_count;
+        CHECK(plain <= 1024); // Existing native recipes plus at most 640 glyph triangles.
+        equivalent = scene;
+        equivalent.berths[0].appearance = (BoatSceneAppearance) { .length = base.length,
+            .beam = base.beam,
+            .mast_height = base.mast_height,
+            .hull = base.hull,
+            .deck = base.deck,
+            .trim = base.trim };
+        CHECK(boat_scene_digest(&scene) == boat_scene_digest(&equivalent));
+        boat_scene_berth_canonicalize(&equivalent.berths[0]);
+        CHECK(equivalent.berths[0].appearance.length == 0);
+        CHECK(equivalent.berths[0].appearance.hull.a == 0);
+        for (unsigned boundary = 0; boundary < 2; ++boundary) {
+            float ratio = boundary ? 1.25f : .75f;
+            berth->appearance.length = base.length * ratio;
+            berth->appearance.beam = base.beam * ratio;
+            if (base.mast_height > 0)
+                berth->appearance.mast_height = boundary ? 12 : base.freeboard + 2;
+            CHECK(boat_scene_validate(&scene, &diagnostic));
+            BoatModelSpec spec = boat_scene_berth_resolve(berth);
+            CHECK(spec.length == base.length * ratio && spec.beam == base.beam * ratio);
+            CHECK(boat_model_generate(&a, spec) && valid_mesh(&a.mesh));
+            for (size_t c = 0; c < sizeof(alphabet) - 1; ++c) {
+                memset(spec.name, alphabet[c], BOAT_MODEL_NAME_BYTES - 1);
+                spec.name[BOAT_MODEL_NAME_BYTES - 1] = 0;
+                if (c >= 36)
+                    spec.name[0] = 'A'; // punctuation-only names intentionally reject.
+                CHECK(boat_model_generate(&b, spec) && valid_mesh(&b.mesh));
+                CHECK(b.mesh.triangle_count <= plain + 640);
+                CHECK(b.mesh.triangle_count <= 1024);
+                if (b.mesh.triangle_count > maximum)
+                    maximum = b.mesh.triangle_count;
+                for (size_t t = plain; t < b.mesh.triangle_count; ++t) {
+                    Vector3 p = b.vertices[t * 3], q = b.vertices[t * 3 + 1],
+                            r = b.vertices[t * 3 + 2];
+                    CHECK(Vector3CrossProduct(Vector3Subtract(q, p), Vector3Subtract(r, p)).x * p.x
+                        > 0);
+                    CHECK(p.y > 0 && p.y < spec.freeboard * .7f);
+                    CHECK(fabsf(p.z) < spec.length * .25f);
+                }
+            }
+        }
+        berth->appearance = (BoatSceneAppearance) { .length = base.length * 1.251f };
+        CHECK(!boat_scene_validate(&scene, &diagnostic) && strstr(diagnostic.field, "length"));
+        berth->appearance = (BoatSceneAppearance) { .beam = base.beam * .749f };
+        CHECK(!boat_scene_validate(&scene, &diagnostic) && strstr(diagnostic.field, "beam"));
+    }
+    berth->recipe = BOAT_SCENE_BERTH_RUNABOUT;
+    berth->appearance = (BoatSceneAppearance) { .mast_height = 4 };
+    CHECK(!boat_scene_validate(&scene, &diagnostic) && strstr(diagnostic.field, "mast_height"));
+    berth->appearance = (BoatSceneAppearance) { .length = NAN };
+    CHECK(!boat_scene_validate(&scene, &diagnostic));
+    berth->appearance = (BoatSceneAppearance) { .hull = { 1, 2, 3, 1 } };
+    CHECK(!boat_scene_validate(&scene, &diagnostic) && strstr(diagnostic.field, "hull"));
+    berth->appearance = (BoatSceneAppearance) { .hull = { 0, 0, 0, 255 }, .name = "SEA-1" };
+    CHECK(boat_scene_validate(&scene, &diagnostic));
+    CHECK(boat_model_generate(&a, boat_scene_berth_resolve(berth)));
+    equivalent = scene;
+    equivalent.berths[0].appearance.hull.r = 255;
+    CHECK(boat_scene_digest(&scene) != boat_scene_digest(&equivalent));
+    CHECK(boat_model_generate(&b, boat_scene_berth_resolve(&equivalent.berths[0])));
+    CHECK(a.mesh.vertices == a.vertices && b.mesh.vertices == b.vertices
+        && a.mesh.vertices != b.mesh.vertices);
+    strcpy(berth->appearance.name, "sea");
+    CHECK(!boat_scene_validate(&scene, &diagnostic) && strstr(diagnostic.field, "name"));
+    memset(berth->appearance.name, 'A', sizeof(berth->appearance.name));
+    CHECK(!boat_scene_validate(&scene, &diagnostic));
+    printf("harbor_appearance maximum_triangles=%zu model_bytes=%zu scene_bytes=%zu\n", maximum,
+        sizeof(BoatModel), sizeof(BoatSceneDefinition));
+    return 0;
+}
+
 int main(void)
 {
+    CHECK(appearance_checks() == 0);
     static BoatModel a, b;
     size_t triangles = 0;
     for (int kind = 0; kind < BOAT_MODEL_KIND_COUNT; ++kind) {

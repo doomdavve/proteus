@@ -3,6 +3,7 @@
 
 #include "renderer3d.h"
 #include "waterfront_corner.h"
+#include "waterfront_harbor_view.h"
 #include "waterfront_scene.h"
 
 // Static geographic scenery of SCENERY's map under a sky with SQUALL, in LIGHTING, which stays
@@ -13,6 +14,7 @@ bool waterfront_draw_boating(Renderer3D *renderer, const WaterfrontScenery *scen
     const WaterfrontLighting *lighting);
 
 void waterfront_draw_traffic(Renderer3D *renderer, const WaterfrontTrafficFrame *frame);
-void waterfront_draw_harbor(Renderer3D *renderer, const WaterfrontHarborFrame *frame);
+bool waterfront_draw_harbor(
+    Renderer3D *renderer, WaterfrontHarborModels *models, const WaterfrontHarborFrame *frame);
 
 #endif
