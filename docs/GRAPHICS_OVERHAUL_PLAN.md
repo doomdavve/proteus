@@ -1716,8 +1716,9 @@ the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no 
   button is. Whether an unbundled executable counts as a game is not established (the game has
   no app bundle or Info.plist).
 - **User play, 2026-11-04:** in macOS full-screen mode (green button) the game ran very smoothly
-  with no stutter; windowed it still stutters. No Game Mode notice appeared, so Game Mode's part
-  is unknown. F11's borderless window was not compared. Candidate next step: on macOS, have F11
+  with no stutter; windowed it still stutters. Game Mode was off (no notice, no menu-bar icon),
+  so full-screen presentation alone removes the stutter; the unbundled executable is likely not
+  recognised as a game. F11's borderless window was not compared. Candidate next step: on macOS, have F11
   and the menu's fullscreen entry enter macOS full-screen mode instead of the borderless window,
   then have the user compare. Windowed stutter is treated as a macOS presentation limit.
 - **Limits:** M1 Max only; no Windows, browser or second-display runs; GPU time measured paced is

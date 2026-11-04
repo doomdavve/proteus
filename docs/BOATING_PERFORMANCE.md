@@ -665,8 +665,8 @@ outside it can be inconsistent. Not tested: Game Mode, another display, Windows,
 
 **User play, 2026-11-04 (M1 Max, 120 Hz display, this branch).** In macOS full-screen mode
 (the window's green button) the user found the game very smooth with no stutter; in a window it
-still stutters. They saw no Game Mode notice, so whether Game Mode was active is not known; the
-smoothness may come from full-screen presentation itself. F11 (borderless window) was not
+still stutters. Game Mode was not active: no notice appeared and the menu bar showed no Game
+Mode icon in full screen. So the smoothness comes from full-screen presentation itself. F11 (borderless window) was not
 compared. Not tested: another display, Windows, or the browser.
 
 ## Graphics G5a presentation presets — 2026-11-03
