@@ -16,8 +16,9 @@ single-player setup: PIXEL is the plain 320×200 scene, SMOOTH (the default) sup
 and HIGH RES draws the scene at up to 1280×800 behind the same 320×200 HUD; it needs a GPU
 and looks sharpest in a window of 1280×800 or a whole multiple of it. Choose A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The
-cabin boat reaches about 25 knots on calm water, and the explorer has a stronger engine during
-solo free boating; timed courses use the standard engine and multiplayer assigns Nordic liveries by player slot.
+cabin boat reaches about 25 knots on calm water, the explorer has a stronger engine during
+solo free boating, and the GRODAN is a slow 15 m open canal tour boat (about 8 knots, with
+its own long hull and a camera pulled back to see it); timed courses use the standard engine and multiplayer assigns Nordic liveries by player slot.
 
 ## Controls
 
@@ -101,6 +102,17 @@ The same map holds the solo voyage (`--location outer` from the command line; se
 Lindholmen, Lilla Bommen and Hisingsbron, and out towards Långedrag. Follow the destination
 arrow and arrive in Långedrag's old harbour at 6 m/s or less. Passing a shelter sets your
 recovery point. Recovery returns you there while voyage time and water keep running.
+
+On GOTHENBURG HARBOUR, CONTENT < GRODAN TOUR > puts you in the GRODAN at the Kungsportsplatsen
+pier for a canal sightseeing tour in the spirit of Gothenburg's Paddan boats; < CANAL TOUR > runs
+the same tour in your own boat. Follow the arrow from stop to stop: up Vallgraven past
+Trädgårdsföreningen, hard to port at Slussen into Stora Hamnkanalen, under the bridges to Stora
+Bommen, a short way down the river, and home through Rosenlundskanalen past Feskekörka. Each stop
+shows its name and a short caption as you pass, and the tour ends when you come alongside the
+pier at 2 m/s or less. The loop is 3.7 km, about 15 minutes in the Grodan at full speed; the canals
+are narrow and the Grodan is long, so slow down before the corners. The tour passes under 16
+bridges, the lowest Stora Bommens Bro; their heights are estimates. Under a bridge the camera drops
+below the deck to keep the boat in view.
 
 A squall builds offshore as you approach the outer fjord. The eastern shore offers
 calmer water. The chart shows shelters, the destination and the exposed area; its blue

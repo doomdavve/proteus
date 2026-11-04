@@ -13,7 +13,8 @@ scattered tree cover (tools/outer_dressing.py); no roads. Inside the crop (A3.3)
 bake's buildings, roads, gardens, trees and bridge are imported from
 assets/geometry/river/scenery.bin. The terrain covers the crop too: roads and garden beds are
 painted onto it and the other solids are moved onto it (drape_objects); the bridge is kept as
-it is. Water is the A0.3 assembly (land polygons plus OSM inland water, bridge legs removed).
+it is. The canal bridges (outer_bridges.py, GH2) join the dressing over unchanged water.
+Water is the A0.3 assembly (land polygons plus OSM inland water, bridge legs removed).
 Where the region cuts open water, the water ends at an edge that collision treats as shore: a
 playable boundary, not a coastline. The manifest reports its length. The bake is written as a
 scenery pack plus the compiled water and kit ground (tools/map_pack.py).
@@ -34,6 +35,7 @@ from shapely.geometry.polygon import orient  # noqa: E402
 from shapely.ops import unary_union  # noqa: E402
 
 import map_pack  # noqa: E402
+import outer_bridges  # noqa: E402
 import outer_dressing  # noqa: E402
 import outer_landmarks  # noqa: E402
 import outer_terrain  # noqa: E402
@@ -457,7 +459,7 @@ def check(geo, region, water):
     return route
 
 
-def write(output, vertices, triangles, stats, region, water, route, terrain=None):
+def write(output, vertices, triangles, stats, region, water, route, terrain=None, bridges=()):
     ground = stats["ground"]
     lines = ["// The land surface over the river kit's streets and harbour, in centimetres, rows",
              "// from south to north (tools/prepare_outer_map.py ground_grid).",
@@ -470,7 +472,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
     cm = ground["cm"]
     lines += ["    " + ", ".join(str(v) for v in cm[i:i + 16]) + ","
               for i in range(0, len(cm), 16)]
-    lines += ["};", ""]
+    lines += ["};", "", *bridges]
     pack = map_pack.write(output, "outer", "tools/prepare_outer_map.py", vertices, triangles,
                           stats["bridge_first"], "\n".join(lines))
     land = stats["land"]
@@ -530,6 +532,7 @@ def write(output, vertices, triangles, stats, region, water, route, terrain=None
 
 
 def self_test():
+    outer_bridges.self_test()
     outer_dressing.self_test()
     outer_landmarks.self_test()
     outer_terrain.self_test()
@@ -604,6 +607,8 @@ def main():
         osm, frame, survey.multipolygon, water, model)
     water = water.difference(obstacles)
     route = check(geo, region, water)
+    # GH2: the canal bridges are scenery over continuous water.
+    canal_bridges, bridge_stats, bridge_table = outer_bridges.bridges(osm, frame, water, model)
     terrain = {
         "source": header["source"], "licence": header["licence"], "survey": header["survey"],
         "source_file": "docs/adventure/sources/terrain-hojdmodell.bin.gz",
@@ -626,8 +631,8 @@ def main():
                                              geo_land(region, water), model, fort,
                                              survey.multipolygon, outer_landmarks.SKIP)
     dressed.update(marks_in_water=carved, assumptions=outer_dressing.ASSUMPTIONS,
-                   landmarks=landmark_stats)
-    dressing = dressing + landmarks
+                   landmarks=landmark_stats, canal_bridges=bridge_stats)
+    dressing = dressing + landmarks + canal_bridges
     vertices, triangles, stats = bake(water, region, model, (objects + buildings, bridge, paint),
                                       dressing)
     stats["dressing"] = dressed
@@ -641,7 +646,7 @@ def main():
                    height_min_m=round(stats["height_min"], 2),
                    height_max_m=round(stats["height_max"], 2))
     write(args.output or ROOT / "assets/geometry/outer", vertices, triangles, stats, region,
-          water, route, terrain)
+          water, route, terrain, bridge_table)
 
 
 if __name__ == "__main__":

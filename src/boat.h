@@ -44,15 +44,26 @@ typedef struct {
     Vector2 physical_wake_start;
 } Boat;
 
-// Engine class: the forward thrust behind the hull's top speed. Everything else is shared.
-// Courses, rooms, recordings and bests use the speedboat; the explorer is the solo free-riding
-// boat, faster for long outings (about 30 m/s flat out against the speedboat's 23 m/s).
+// A hull's contact footprint: metres from the boat's position to the bow and the stern, and half
+// its beam, plus its yaw inertia. Sides longer than the speedboat's are sampled every 2 m so a
+// quay corner cannot slip between the ends.
+typedef struct {
+    float bow, stern, half_beam;
+    float yaw_inertia;
+} BoatHull;
+
+// Engine class: the forward thrust behind the hull's top speed, and optionally a larger hull.
+// Everything else is shared. Courses, rooms, recordings and bests use the speedboat; the explorer
+// is the solo free-riding boat, faster for long outings (about 30 m/s flat out against the
+// speedboat's 23 m/s). The Grodan (GH3) is the solo canal tour boat: 15 m long and slow.
 typedef struct {
     float thrust;
+    const BoatHull *hull; // NULL: the speedboat's 3.6 x 1.5 m footprint.
 } BoatHandling;
 extern const BoatHandling boat_handling_speedboat;
 extern const BoatHandling boat_handling_explorer;
 extern const BoatHandling boat_handling_cabin;
+extern const BoatHandling boat_handling_grodan;
 
 // Basin spawn at time zero; boat_reset_location() uses a definition's spawn instead.
 void boat_reset(Boat *boat);

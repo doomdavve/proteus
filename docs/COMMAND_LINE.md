@@ -32,8 +32,10 @@ water, was retired on 2026-11-04; `--location river` now names `outer` and exits
 faces −Z. It is for solo mapped free boating, not courses or rooms. Rooms on `outer` have no voyage
 or solo squall.
 
-`--skin sweden|finland|denmark|norway|explorer|cabin` selects a solo boat. Explorer has a stronger
-engine in free boating; the cabin boat reaches about 25 knots on calm water. Courses retain
+`--skin sweden|finland|denmark|norway|explorer|cabin|grodan` selects a solo boat. Explorer has a stronger
+engine in free boating; the cabin boat reaches about 25 knots on calm water; the Grodan is a
+15 m canal tour boat, about 8 knots, whose default camera sits 12 m farther back and 4 m higher.
+Courses retain
 the standard engine. Multiplayer assigns liveries
 by slot. `--soundtrack a-little-boat|acid-wake|off` selects local music. `--mouse-steering`
 starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSIC.md).
@@ -43,6 +45,7 @@ starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSI
 ```sh
 ./build/wake_velocity --location outer
 ./build/wake_velocity --location outer --package proteus.harbor-life
+./build/wake_velocity --location outer --package proteus.grodan --skin grodan
 ./build/wake_velocity --course
 ```
 
@@ -54,10 +57,11 @@ Launching a package starts no Lua VM, polls no files and shows no authoring pane
 compiled-content switch: every solo session takes this path. Browser solo sessions use the same
 catalog, built into the game Wasm; rooms receive their definition as data. An unknown ID, or a
 package for another location, fails with an explicit message. The title's single-player
-panel selects Standard or Harbor life for `outer` on native and web builds. `--title-start PLACE`
-takes the title's START path with default settings, without the menu, so tests can prove each PLACE
-opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`, `basin-trial`); further
-options follow it.
+panel selects Standard, Harbor life, the Grodan tour or the canal tour for `outer` on native and
+web builds. Both tours are `proteus.grodan`: the Grodan tour always uses the Grodan, as
+`--package proteus.grodan --skin grodan` does, and the canal tour keeps your livery. `--title-start PLACE` takes the title's START path with default settings, without the menu,
+so tests can prove each PLACE opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`,
+`outer-grodan`, `outer-canal-tour`, `basin-trial`); further options follow it.
 
 ### Live Lua authoring
 
