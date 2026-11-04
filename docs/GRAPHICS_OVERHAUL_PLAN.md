@@ -1708,8 +1708,13 @@ the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no 
   pieces of windows and street furniture at once; whether that pops is the user's call.
 - **Next:** the user plays outer at high resolution on this branch (any change in feel at 120 Hz
   and 60 Hz, and any seams) before the cell size is tried. Further candidates: fewer reflection
-  submissions (it repeats the main pass's classes), and the macOS vsync behaviour (fullscreen,
-  another display) if 120 Hz on the Mac matters.
+  submissions (it repeats the main pass's classes), and the macOS vsync behaviour if 120 Hz on
+  the Mac matters. The user suggested macOS Game Mode (2026-11-04). Apple's
+  [Game Mode page](https://support.apple.com/en-us/105118) says it turns on only when a game enters
+  macOS full-screen mode, and gives it the highest CPU and GPU priority. Every run above was
+  windowed. F11 is raylib's borderless window, not that mode; the resizable window's green
+  button is. Whether an unbundled executable counts as a game is not established (the game has
+  no app bundle or Info.plist). Untested so far.
 - **Limits:** M1 Max only; no Windows, browser or second-display runs; GPU time measured paced is
   inflated by clock-down (the game's paced demo shows 6.6 ms for the 2.4 ms unpaced load).
 
