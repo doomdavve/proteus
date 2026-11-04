@@ -126,6 +126,16 @@ scales; its landscape/portrait HUD captures were inspected. A windowed native
 GPU high-resolution river demo (`--resolution high --demo --frames 120`) exited 0. The earlier
 iPhone user acceptance refers to the pre-rebase build; no new physical-device review is claimed.
 
+Follow-up rebase, 2026-11-04: rebased onto `origin/main` at `9596f46`, preserving both
+this result and the river-retirement section above. The mobile check now taps START on the
+six-row default Outer River setup, including its CONTENT row. Native Debug and Emscripten
+MinSizeRel builds passed; `ctest --preset full` passed all 366 enabled tests (GPU tests off,
+13 retired checks disabled). Chrome/SwiftShader Android emulation passed the default Outer
+River setup, simultaneous holds, tilt, fullscreen cancellation, portrait resizing and return
+to title. The portrait capture was inspected: the voyage cue overlaps part of the upper
+Recenter/Fullscreen bar; that layout issue remains open. Changed local documentation links
+and Python syntax checks pass.
+
 ## Minimal landing page, 2026-11-01
 
 Completed: the public launcher contains the river screenshot and one full-width PLAY button.
