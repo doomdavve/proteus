@@ -42,26 +42,11 @@
     body.playing #stage { display: flex; }
     [hidden] { display: none !important; }
     #stage { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-    #mobile-controls { position: absolute; inset: 0; pointer-events: none; }
-    #mobile-controls button { pointer-events: auto; min-width: 52px; min-height: 48px;
-      border: 1px solid #afc2c4; border-radius: 8px; background: #14262fcc; color: #edf2eb; }
-    #mobile-controls button:active { background: #426779; }
-    #mobile-controls button:disabled { opacity: .35; }
-    .mobile-top { position: absolute; top: max(8px, env(safe-area-inset-top));
-      left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right));
-      display: flex; gap: 8px; align-items: start; flex-wrap: wrap; }
-    #tilt-status { flex-basis: 100%; font-size: 11px; text-shadow: 0 1px 3px #000; }
-    .mobile-bottom { position: absolute; bottom: max(8px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
-    .mobile-left { left: max(8px, env(safe-area-inset-left)); }
-    .mobile-right { flex-direction: column-reverse; right: max(8px, env(safe-area-inset-right)); }
-    #mobile-controls, #canvas { touch-action: none; user-select: none; -webkit-user-select: none; }
+    #stage, #canvas { touch-action: none; user-select: none; -webkit-user-select: none;
+      -webkit-touch-callout: none; }
     #iphone-tip { max-width: 52ch; margin: 12px auto 0; color: #afc2c4; }
     canvas { display: block; image-rendering: pixelated; }
     #canvas:focus { outline: none; }
-    @media (pointer: coarse) {
-      #stage { padding: 0; }
-      #mobile-controls { z-index: 1; }
-    }
     @media (max-width: 540px) {
       #launcher { padding: 20px; }
       .preview { aspect-ratio: 4 / 3; }
@@ -118,21 +103,7 @@
     </div>
   </details>
   <div id="stage">
-    <canvas id="canvas" width="960" height="600" tabindex="0" aria-label="Boating game. Press question mark for controls. Escape opens the menu; return to the title to change settings."></canvas>
-    <div id="mobile-controls" hidden aria-label="Mobile boating controls">
-      <div class="mobile-top">
-        <button id="mobile-menu">Menu</button><button id="tilt">Enable tilt</button>
-        <button id="recenter" hidden>Recenter</button><button id="screen-button" hidden>Fullscreen</button>
-        <span id="tilt-status" role="status">Touch steering</span>
-      </div>
-      <div class="mobile-bottom mobile-left">
-        <button data-hold="left" aria-label="Steer left">◀</button>
-        <button data-hold="right" aria-label="Steer right">▶</button>
-      </div>
-      <div class="mobile-bottom mobile-right">
-        <button data-hold="reverse">Reverse</button><button data-hold="forward">Forward</button>
-      </div>
-    </div>
+    <canvas id="canvas" width="960" height="600" tabindex="0" aria-label="Boating game. Press question mark for controls. Touch controls appear during play: hold left/right to steer and Forward/Reverse to move. Menu pauses; return to the title to change settings."></canvas>
   </div>
   <script>
     // Authoring is an explicit workspace, separate from the public launcher.

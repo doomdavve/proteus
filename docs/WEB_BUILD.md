@@ -35,7 +35,7 @@ packaging and `v*` Pages deployment workflow remain in use. Both music tracks an
 title backdrop are bundled. One browser audio device starts during PLAY and remains alive
 across title/session transitions; Off disables the soundtrack, retaining engine/water sound.
 
-Basic mobile controls and iPhone setup are described [below](#mobile-controls-and-iphone-presentation-2026-10-28).
+Mobile controls are drawn inside the game canvas; [the current touch-control result](#canvas-touch-controls-2026-11-04) and [iPhone setup](#mobile-controls-and-iphone-presentation-2026-10-28) are described below.
 Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/latency and tab
 suspension, measure memory/runtime budgets, and complete internet-play acceptance of the
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
@@ -51,14 +51,99 @@ outer pack (5.3 MB) before the first session. `tools/check_web_scenery.py` passe
 build on 2026-11-04; the other browser checks were updated for the new PLACE order but not run.
 Older notes below that describe preloading the river's sidecars or a River PLACE are history.
 
+## Canvas touch controls, 2026-11-04
+
+Current status: implemented in `feat/canvas-touch-controls`; the user accepted the local
+canvas controls on iPhone 17 Pro (2026-11-04). The HTML gameplay overlay is
+removed. C draws Menu, Tilt/Use touch, Recenter, Fullscreen, left/right and Forward/Reverse
+into the same low-resolution frame as the game, with held-pedal feedback. It publishes its
+exact rectangles to the browser as normalized canvas coordinates; JavaScript captures each
+touch pointer and maps it to those rectangles. Buttons retain at least 48 CSS pixels in each
+dimension in the qualified phone layouts. Portrait instruments leave room for the controls.
+The canvas stays within the viewport's safe-area padding.
+
+Holding steering and a pedal together works without focusing HTML buttons. Sliding off a
+pedal releases it; sliding back onto the original pedal resumes it. Release, pointer
+cancellation, lost capture, blur, hidden tabs, resize, rotation, menus and fullscreen changes
+clear held driving input. A control touch never doubles as a menu selection. Menus still
+consume completed scene taps, including taps between rendered frames. Keyboard/mouse steering
+and the existing neutral/opposing-pedal mapping are retained.
+
+The stage/canvas opt out of browser panning, pinch/double-tap zoom, selection and long-press
+callouts while playing; the launcher retains its normal browser behavior. Tilt permission and
+fullscreen requests execute directly in the canvas pointer-up gesture, preserving browser
+activation requirements. See [Pointer Events](https://www.w3.org/TR/pointerevents/) and
+[orientation permission](https://www.w3.org/TR/orientation-event/#dom-deviceorientationevent-requestpermission).
+
+Completed: canvas drawing/hit-region bridge, multi-touch routing, browser gesture suppression,
+phone target sizing, safe-area sizing, updated virtual-clock/browser checks, and user acceptance
+on a physical iPhone 17 Pro. Next: review/merge and ship through the release/hosting workflow;
+physical Android and HTTPS motion-permission qualification remain open. This branch does not
+deploy either public client. Specific long-hold duration, portrait/landscape coverage and audio
+listening were not reported in the user's check; emulation alone is not user acceptance.
+Mobile weapons, replay/camera controls and text entry remain outside this change.
+
+Verification, 2026-11-04, Apple Silicon/macOS: Debug build and `ctest --preset full`
+passed all 358 enabled tests on the merged branch (`PROTEUS_GPU_TESTS=OFF`; 13 retired
+wake-field tests disabled). The full run needed unrestricted localhost sockets. The Node
+virtual-clock checks cover simultaneous contacts, long holds, opposing pedals, sliding off
+and back, cancellation/lost capture, inactive menu taps, blur/visibility/resize and sensor
+permission/fallbacks. Mouse and console bridge tests also pass. Emscripten MinSizeRel `web`
+build/packaging passed using the installed compiler cache.
+
+Chrome/SwiftShader phone (844×390 / 390×844) and Android (915×412 / 412×915) emulation
+passed canvas-only control/minimum-target checks, touch-only setup, 45 rendered frames of
+simultaneous steering/throttle with unchanged zoom and retained focus/running audio context,
+release, simulated tilt, menu/reset, portrait resizing and return to title. Android also
+passed fullscreen entry/exit and cancellation of a held pedal, and was repeated after merging
+main's console changes. Landscape, held-input, portrait and fullscreen-return captures were
+inspected. A native windowed GPU river demo (`--demo --frames 120`) exited 0 after the merge;
+this is an agent-run smoke check, not human input/audio acceptance.
+
+The existing desktop `check_web_title.py` passed navigation, settings persistence and repeated
+sessions, then stopped at its console query: 30 ms-per-character typing submitted the truncated
+`= def.voyage.arri` under software rendering and returned `nil`. This happened before and after
+merging main's console work; the complete title/authoring suite is not claimed as passing.
+A focused desktop probe passed solo startup, absence of touch controls, F11 fullscreen
+entry/exit, console opening and a pasted `= 2+4` query returning `6`, with no page errors.
+Firefox/WebKit automation, local WebRTC rooms, agent-run physical-device checks and human
+audio review were not run in this step. Changed local documentation links and JavaScript/Python
+syntax checks pass.
+
+User acceptance, 2026-11-04: after opening the worktree's build over local HTTP on the
+iPhone, the user reported: "Works well on my iPhone 17 pro." This accepts
+the canvas touch controls on that device. The browser/iOS version, orientation coverage and
+individual gestures were not specified. The HTTP preview does not verify HTTPS-only tilt
+permission, Home Screen behavior or other devices.
+
+Rebase verification, 2026-11-04: rebased onto `origin/main` at `1c30168`, retaining the
+canvas controls inside the logical HUD before its high-resolution overlay blend ends.
+Native Debug and Emscripten MinSizeRel builds passed; the full CTest preset passed all 365
+enabled tests (`PROTEUS_GPU_TESTS=OFF`, 13 retired checks disabled). Chrome/SwiftShader Android
+emulation passed the touch/tilt/menu/portrait/fullscreen suite again. A focused high-resolution
+browser probe passed simultaneous steering/throttle and portrait resizing at 4×/2× canvas
+scales; its landscape/portrait HUD captures were inspected. A windowed native
+GPU high-resolution river demo (`--resolution high --demo --frames 120`) exited 0. The earlier
+iPhone user acceptance refers to the pre-rebase build; no new physical-device review is claimed.
+
+Follow-up rebase, 2026-11-04: rebased onto `origin/main` at `9596f46`, preserving both
+this result and the river-retirement section above. The mobile check now taps START on the
+six-row default Outer River setup, including its CONTENT row. Native Debug and Emscripten
+MinSizeRel builds passed; `ctest --preset full` passed all 366 enabled tests (GPU tests off,
+13 retired checks disabled). Chrome/SwiftShader Android emulation passed the default Outer
+River setup, simultaneous holds, tilt, fullscreen cancellation, portrait resizing and return
+to title. The portrait capture was inspected: the voyage cue overlaps part of the upper
+Recenter/Fullscreen bar; that layout issue remains open. Changed local documentation links
+and Python syntax checks pass.
+
 ## Minimal landing page, 2026-11-01
 
 Completed: the public launcher contains the river screenshot and one full-width PLAY button.
 WAKE VELOCITY moved to the footer above the version, GitHub repository link and map attribution.
 The HTML Settings menu and its saved fullscreen preference were removed. PLAY starts in the
-browser tab; F11 toggles fullscreen on desktop, and the mobile overlay retains its fullscreen
-button. The browser F11 handler now matches the native shortcut and runs directly in the key
-gesture so the browser can grant fullscreen. Loading/storage errors and the
+browser tab; F11 toggles fullscreen on desktop. The mobile fullscreen button moved from
+the HTML overlay into the canvas on 2026-11-04. The browser F11 handler matches the native
+shortcut and runs directly in the key gesture so the browser can grant fullscreen. Loading/storage errors and the
 conditional iPhone Home Screen hint remain available. Plugin authoring is explicitly enabled
 with `?author`; normal visitors do not see its panel. Browser qualification scripts use this
 entry point where needed and no longer depend on the removed fullscreen checkbox.
@@ -142,23 +227,24 @@ error (reloading retries); there is no offline cache beyond the browser's own HT
 
 ## Mobile controls and iPhone presentation, 2026-10-28
 
-Basic mobile boating is implemented on `mobile-web-controls`. Touch devices with a coarse
-primary pointer show left/right steering, hold-to-go Forward/Reverse, and Menu during a
+Basic mobile boating originated on `mobile-web-controls`; since 2026-11-04 its controls
+are drawn in the game canvas (see the [current result](#canvas-touch-controls-2026-11-04)).
+Touch devices with a coarse primary pointer show left/right steering, hold-to-go Forward/Reverse, and Menu during a
 session. Releasing the pedals selects neutral; pressing both also selects neutral. Menu
 provides reset/recovery and return to title. Title choices and gameplay menus accept completed
 touch taps, including taps shorter than a rendered frame. Keyboard and mouse remain available
 on desktop. Mobile weapon, camera, replay and text-editing controls are deferred; the existing
 player name is usable for joining a listed room.
 
-Tap **Enable tilt**, allow orientation access, and hold the phone comfortably to calibrate.
-Tilt left/right to steer; **Recenter** resets the holding position and **Use touch** disables
+Tap **TILT**, allow orientation access, and hold the phone comfortably to calibrate.
+Tilt left/right to steer; **RECENTER** resets the holding position and **USE TOUCH** disables
 sensors. Both landscape directions and portrait are supported. Rotation neutralizes steering
 until Recenter. Touch steering overrides tilt, and keyboard steering overrides mobile steering.
 The initial tuning uses a 3-degree dead zone, full lock at 25 degrees and 100 ms smoothing.
 Flat-on-a-table positions do not provide a useful gravity-based screen roll; raise the phone
 slightly. Touch steering remains available when permission is denied, readings stop or sensors
 are unavailable. Tilt requires HTTPS (localhost is suitable for desktop automation); permission
-is requested from its own button, separately from PLAY and audio initialization.
+is requested from its own canvas control, separately from PLAY and audio initialization.
 
 On mobile the game fills the visible viewport, with translucent controls over the scene and
 inside safe areas. The GPU scene adapts to the viewport aspect ratio, keeping geometry, instruments
@@ -167,7 +253,7 @@ viewport of at least 320×200, bounded to a 3:1 aspect range, and retains neares
 filtering. Browser-bar changes settle for 150 ms before target reallocation, retaining shaders
 and scenery caches. Desktop retains its original 320×200 scene and integer scaling. Forward
 is stacked above Reverse on the right; portrait instruments sit above the bottom steering buttons. Fullscreen is feature-detected; supported
-mobile browsers have a Fullscreen/Exit fullscreen button. Fullscreen requests prefer hidden
+mobile browsers have a FULLSCREEN/EXIT FULL canvas button. Fullscreen requests prefer hidden
 navigation UI and clear held touch input on entry/exit. iPhone Safari does not reliably offer element fullscreen:
 use **Share → Add to Home Screen → Open as Web App**, then launch from its icon for more screen
 space. Relative manifest/icon URLs support repository subpaths. This adds no service worker or
@@ -194,7 +280,8 @@ See [orientation access](https://developer.mozilla.org/en-US/docs/Web/API/Device
 [manifest guidance](https://web.dev/articles/add-manifest).
 
 The Node contract test is also registered in native CTest when Node is available. The optional
-Chrome/SwiftShader check drives touch-only setup, simultaneous steering/throttle, simulated
+Chrome/SwiftShader check drives touch-only setup, simultaneous steering/throttle long holds
+with focus/zoom/audio checks, canvas-only controls and minimum phone target sizes, simulated
 tilt, menu/reset, portrait resizing and return to title against the actual Wasm build. Add
 `--room-url ws://127.0.0.1:24443` for a matching local WebRTC room; this also checks emitted
 steering/throttle commands and leaving the room.
@@ -438,8 +525,8 @@ latency is accepted. See [candidate limits](WAKE_CANDIDATE_RESULTS.md).
   whole scene-pixel presentation scales. Mobile gameplay adapts the logical scene and drawing
   buffer to the visible viewport's aspect ratio; CSS scales it uniformly with nearest-neighbour
   filtering. The title retains its centred 320×200 layout. Page code owns CSS sizing rather
-  than raylib's web resize handler. Fullscreen can be selected before launch or toggled during
-  mobile play. P/Escape or the mobile Menu button opens the shared in-game menu
+  than raylib's web resize handler. F11 toggles desktop fullscreen; a canvas control toggles
+  fullscreen during mobile play. P/Escape or the mobile Menu button opens the shared in-game menu
   (P preserves fullscreen); title and sessions share the window.
 - **Assets:** preload both game XM tracks, the title backdrop, bitmap menu fonts and
   their attribution, textures and used shaders into `/assets`.
