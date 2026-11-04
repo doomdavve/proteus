@@ -103,6 +103,17 @@ Lindholmen, Lilla Bommen and Hisingsbron, and out towards Långedrag. Follow the
 arrow and arrive in Långedrag's old harbour at 6 m/s or less. Passing a shelter sets your
 recovery point. Recovery returns you there while voyage time and water keep running.
 
+On GOTHENBURG HARBOUR, CONTENT < GRODAN TOUR > puts you in the GRODAN at the Kungsportsplatsen
+pier for a canal sightseeing tour in the spirit of Gothenburg's Paddan boats; < CANAL TOUR > runs
+the same tour in your own boat. Follow the arrow from stop to stop: up Vallgraven past
+Trädgårdsföreningen, hard to port at Slussen into Stora Hamnkanalen, under the bridges to Stora
+Bommen, a short way down the river, and home through Rosenlundskanalen past Feskekörka. Each stop
+shows its name and a short caption as you pass, and the tour ends when you come alongside the
+pier at 2 m/s or less. The loop is 3.7 km, about 15 minutes in the Grodan at full speed; the canals
+are narrow and the Grodan is long, so slow down before the corners. The tour passes under 16
+bridges, the lowest Stora Bommens Bro; their heights are estimates. Under a bridge the camera drops
+below the deck to keep the boat in view.
+
 A squall builds offshore as you approach the outer fjord. The eastern shore offers
 calmer water. The chart shows shelters, the destination and the exposed area; its blue
 shore tints show distance from land, not depth. This is a game map, not a navigation aid.

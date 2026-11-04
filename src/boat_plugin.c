@@ -913,13 +913,15 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
         return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "voyage.shelters[1]",
             "must be the location's start, x = %g, z = %g", location->spawn.x, location->spawn.y);
     // Room for the hull at a shelter, and more for arriving and turning in the harbour. A tour
-    // arrives at a canal pier, so it needs only the shelter's room.
+    // stop may lie in a canal, where the boat recovers facing along it, so it needs room for the
+    // beam (GH5: the Rosenlund narrows are 11 m wide); a tour's pier arrival needs a shelter's.
+    float stop_clear = route->ordered ? 4 : 8;
     for (unsigned i = 0; i < route->shelter_count; ++i)
-        if (!boat_map_water(map, route->shelters[i].position, 8)) {
+        if (!boat_map_water(map, route->shelters[i].position, stop_clear)) {
             char at[32];
             snprintf(at, sizeof(at), "%s[%u]", list, i + 1);
             return diagnose(d, BOAT_PLUGIN_SCHEMA, file, at,
-                "is not open water of the %s map with 8 m clear", location->name);
+                "is not open water of the %s map with %.0f m clear", location->name, stop_clear);
         }
     float arrival_clear = route->ordered ? 8 : 20;
     if (!boat_map_water(map, route->arrival_centre, arrival_clear))

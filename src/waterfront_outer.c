@@ -34,3 +34,25 @@ WaterfrontGround waterfront_kit_ground(const BoatMapDescription *map)
 {
     return map == &waterfront_outer_map ? waterfront_outer_ground : NULL;
 }
+
+float waterfront_outer_overhead(float x, float z)
+{
+    float lowest = INFINITY;
+    for (size_t i = 0; i < sizeof(outer_bridges) / sizeof(outer_bridges[0]); ++i) {
+        const WaterfrontBridge *b = &outer_bridges[i];
+        float dx = x - b->x, dz = z - b->z;
+        float s = dx * b->ux + dz * b->uz, w = dz * b->ux - dx * b->uz;
+        if (s < b->s0 || s > b->s1 || fabsf(w) > b->half_width)
+            continue;
+        // Matches outer_bridges.underside: a parabola from the middle of the water to the quays.
+        float mid = (b->wet0 + b->wet1) * .5f, half = fmaxf((b->wet1 - b->wet0) * .5f, 1);
+        float t = fminf(fabsf(s - mid) / half, 1);
+        lowest = fminf(lowest, b->under - (b->under - b->spring) * t * t);
+    }
+    return lowest;
+}
+
+WaterfrontOverhead waterfront_overhead(const BoatMapDescription *map)
+{
+    return map == &waterfront_outer_map ? waterfront_outer_overhead : NULL;
+}
