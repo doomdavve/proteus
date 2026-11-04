@@ -650,10 +650,27 @@ while a restart begins at shelter 0.
 
 ## Live console and command layer (PC)
 
-Native solo free boating and voyages, release builds included. `F2`, `` ` `` or GLFW's world-1 key
+Native solo free boating and voyages, and desktop browsers with a physical keyboard, release builds
+included. `F2`, `` ` `` or GLFW's world-1 key
 (161, which some macOS ISO keyboards report as `§`) opens a drop-down console at the top of the
 low-resolution frame. The simulation keeps running with a neutral helm; driving input resumes when
 the console closes. Replays, `--demo`, screenshots and rooms do not offer it.
+
+The first opening shows an ASCII boat, the same build version as the title, and quick help.
+The smallest bundled pixel face, m3x6, uses natural letter spacing and word-wrapped output.
+Only the ASCII boat uses fixed cells. A translucent panel reveals the running world; GPU rendering
+adds a nine-tap background blur using the existing scene texture. CPU rendering or shader refusal
+keeps the translucent panel. The box cursor fits the next character and stays visible as input
+scrolls horizontally. Left/Right, Home/End and Delete edit at the cursor; Up/Down preserves the fresh draft.
+Tab completes slash commands, first extending a shared prefix and then cycling full names;
+Shift+Tab cycles backward. Lua and arguments are not completed.
+Escape or an opening key closes the panel without clearing input. PageUp/PageDown and the wheel
+scroll output. Ctrl/Cmd+C copies the latest submitted command and its output; add Shift to copy
+all retained scrollback. Copy preserves logical lines. Ctrl/Cmd+V inserts one printable ASCII line
+without executing it. Multiline, unsupported-character and oversized pastes leave input untouched.
+Browser writes happen in the key gesture; paste uses the native paste event without requesting
+clipboard read access. Browser refusal is shown in the footer. Mouse selection is not implemented.
+See [playing controls](PLAYING.md#controls) for the full keyboard list.
 
 A plain line is a **Lua edit** of `def`, the table the package's entry returns. `=` starts a
 read-only **query**; `/` starts a **command**.
@@ -675,7 +692,7 @@ SAVED ~/drafts/my-harbor
 
 | Command | Effect |
 | --- | --- |
-| `/help` | The command list |
+| `/help [COMMAND]` | Descriptions, editing/query examples and keyboard controls; optionally explain one command |
 | `/status` | Active revision, package, chunks, tick, boat position and pending work |
 | `/capabilities` | The session manifest's grants |
 | `/recipes`, `/anchors` | Registered berth recipes; voyage shelters and coordinates |

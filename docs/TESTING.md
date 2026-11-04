@@ -204,7 +204,10 @@ checks. Relative mouse mapping covers accumulated movement and lock reversal; sc
 covers fractional/multiple-step input, neutral crossing and overscroll reversal; held-key thrust
 covers the 0.5 s repeat, re-press and limits. See [the HUD guide](BOAT_HUD.md) for power
 settings, visual fixtures and the remaining manual checks. When Node.js is installed,
-`web_mouse_controls` runs the browser event-contract tests without a browser. Real Wasm
+`web_mouse_controls` runs the browser event-contract tests without a browser.
+`web_console_controls` (`cpu;quick`) checks console clipboard writes, paste events, focus and
+queued Tab/Shift+Tab input; run it directly with `node tools/test_web_console_controls.cjs`.
+`wake_command` covers the headless editor, completion and command semantics. Real Wasm
 checks use the opt-in [Playwright command](WEB_BUILD.md#mouse-and-scroll-qualification-2026-10-24).
 `web_rtc_transport` checks browser network bounds and reconnect callbacks; `boat_net_mux`
 checks colliding peer IDs, routing and disconnect isolation across two transports. Browser

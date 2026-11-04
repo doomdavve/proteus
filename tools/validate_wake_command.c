@@ -33,14 +33,14 @@ static unsigned failures;
     } while (0)
 
 typedef struct {
-    char lines[32][192];
+    char lines[64][192];
     unsigned count;
 } Output;
 
 static void collect(void *context, const char *line)
 {
     Output *output = context;
-    if (output->count < 32)
+    if (output->count < 64)
         snprintf(output->lines[output->count++], sizeof(output->lines[0]), "%s", line);
 }
 
@@ -91,6 +91,141 @@ static void test_console(void)
     CHECK(wake_console_open_key(KEY_GRAVE) && wake_console_open_key(KEY_F2)
             && wake_console_open_key(161),
         "opening keys");
+}
+
+static void test_console_comfort(void)
+{
+    WakeConsole console;
+    wake_console_init(&console);
+    wake_console_open(&console, "v-test");
+    CHECK(console.open && console.scroll_count == 12, "welcome includes logo and quick help");
+    char transcript[WAKE_CONSOLE_TRANSCRIPT];
+    wake_console_transcript(&console, true, transcript, sizeof(transcript));
+    CHECK(strstr(transcript, "Wake Velocity v-test"), "welcome has build version");
+    console.open = false;
+    wake_console_open(&console, "v-test");
+    CHECK(console.scroll_count == 12, "reopening does not repeat the welcome");
+    char line[WAKE_CONSOLE_INPUT];
+    CHECK(wake_console_paste(&console, "first"), "paste input");
+    wake_console_input(&console, KEY_ENTER, 0, line, sizeof(line));
+    wake_console_paste(&console, "draft");
+    wake_console_input(&console, KEY_UP, 0, line, sizeof(line));
+    CHECK(!strcmp(console.input, "first"), "history recalled");
+    wake_console_input(&console, KEY_DOWN, 0, line, sizeof(line));
+    CHECK(!strcmp(console.input, "draft"), "history restores unfinished draft");
+    wake_console_input(&console, KEY_HOME, 0, line, sizeof(line));
+    wake_console_input(&console, KEY_DELETE, 0, line, sizeof(line));
+    CHECK(!strcmp(console.input, "raft") && console.cursor == 0, "delete at start");
+    wake_console_input(&console, 0, 'c', line, sizeof(line));
+    CHECK(!strcmp(console.input, "craft") && console.cursor == 1, "insert at cursor");
+    wake_console_input(&console, KEY_RIGHT, 0, line, sizeof(line));
+    wake_console_input(&console, KEY_BACKSPACE, 0, line, sizeof(line));
+    CHECK(!strcmp(console.input, "caft"), "backspace inside line");
+    wake_console_input(&console, KEY_END, 0, line, sizeof(line));
+    CHECK(console.cursor == console.length, "End moves to end");
+    CHECK(!wake_console_paste(&console, "bad\n/restart") && !strcmp(console.input, "caft"),
+        "multiline paste rejected atomically");
+    CHECK(!wake_console_paste(&console, "bad\ttext"), "control character paste rejected");
+    CHECK(!wake_console_paste(&console, "\xc3\xa5"), "unsupported UTF-8 rejected atomically");
+    wake_console_input(&console, KEY_ENTER, 0, line, sizeof(line));
+    char full[WAKE_CONSOLE_INPUT];
+    memset(full, 'W', sizeof(full) - 1);
+    full[sizeof(full) - 1] = 0;
+    CHECK(wake_console_paste(&console, full), "maximum-length paste fits");
+    CHECK(!wake_console_paste(&console, "x") && console.length == sizeof(full) - 1,
+        "overflow paste changes nothing");
+    for (int width = 64; width <= 640; width += 16) {
+        WakeConsoleView view = wake_console_view(&console, width, 200);
+        CHECK(view.input_first > 0 && view.cursor_x + view.cursor_width <= width - 4,
+            "end cursor fits width %d", width);
+        CHECK(view.panel <= 200 && view.rows > 0, "panel fits");
+    }
+    wake_console_input(&console, KEY_HOME, 0, line, sizeof(line));
+    WakeConsoleView view = wake_console_view(&console, 320, 200);
+    CHECK(view.input_first == 0 && view.cursor_x == 11, "Home shows start of long input");
+    CHECK(
+        !wake_console_input(&console, KEY_ENTER, 0, line, 2) && console.length == sizeof(full) - 1,
+        "small submit buffer never truncates an edit");
+    wake_console_clear(&console);
+    wake_console_print(&console, "older output");
+    wake_console_begin_command(&console, "/status");
+    wake_console_print(&console, "R1 package");
+    wake_console_print(&console, "TICK 1 BOAT 2, 3");
+    wake_console_transcript(&console, false, transcript, sizeof(transcript));
+    CHECK(!strcmp(transcript, "> /status\nR1 package\nTICK 1 BOAT 2, 3\n"),
+        "Copy contains the command and its complete output, without old output");
+    wake_console_transcript(&console, true, transcript, sizeof(transcript));
+    CHECK(strstr(transcript, "older output"), "copy all retains earlier output");
+    char tiny[4] = "xxx";
+    CHECK(!wake_console_transcript(&console, true, tiny, sizeof(tiny)) && !tiny[0],
+        "undersize copy returns no partial line");
+    for (unsigned i = 0; i < WAKE_CONSOLE_SCROLL + 5; ++i) {
+        char text[64];
+        snprintf(text, sizeof(text), "line %u", i);
+        wake_console_print(&console, text);
+    }
+    CHECK(console.scroll_count == WAKE_CONSOLE_SCROLL, "scrollback bounded");
+    wake_console_transcript(&console, false, transcript, sizeof(transcript));
+    CHECK(strstr(transcript, "line 5\n") == transcript && !strstr(transcript, "older output"),
+        "copy markers follow scrollback eviction");
+    for (unsigned i = 0; i < 100; ++i)
+        wake_console_input(&console, KEY_PAGE_UP, 0, line, sizeof(line));
+    CHECK(console.scroll_back == console.scroll_count - console.visible_rows,
+        "PgUp stops at first full page, never a blank page");
+    wake_console_input(&console, KEY_PAGE_DOWN, 0, line, sizeof(line));
+    unsigned back = console.scroll_back;
+    wake_console_print(&console, "new line");
+    CHECK(console.scroll_back == back + 1, "new output preserves viewport when oldest line evicts");
+    wake_console_clear(&console);
+    CHECK(!wake_console_transcript(&console, true, transcript, sizeof(transcript)),
+        "clear also clears copy data");
+    CHECK(!wake_console_view(&console, 10, 10).text_width, "tiny viewport safely hidden");
+}
+
+static void test_console_completion(void)
+{
+    WakeConsole console;
+    wake_console_init(&console);
+    console.open = true;
+    char out[WAKE_CONSOLE_INPUT];
+    wake_console_paste(&console, "/st");
+    wake_console_input(&console, KEY_TAB, 0, out, sizeof(out));
+    CHECK(!strcmp(console.input, "/status"), "unique Tab match");
+    wake_console_complete(&console, false);
+    CHECK(!strcmp(console.input, "/status"), "unique completion stays stable");
+    wake_console_input(&console, KEY_ENTER, 0, out, sizeof(out));
+    wake_console_paste(&console, "/s");
+    wake_console_complete(&console, false);
+    CHECK(!strcmp(console.input, "/status"), "first ambiguous match");
+    wake_console_complete(&console, false);
+    CHECK(!strcmp(console.input, "/save"), "Tab cycles matches");
+    wake_console_complete(&console, true);
+    CHECK(!strcmp(console.input, "/status"), "Shift+Tab cycles back");
+    wake_console_paste(&console, "x");
+    CHECK(!wake_console_complete(&console, false) && !strcmp(console.input, "/statusx"),
+        "typing resets the original prefix; no match leaves input intact");
+    wake_console_input(&console, KEY_ENTER, 0, out, sizeof(out));
+    wake_console_paste(&console, "/cap");
+    wake_console_complete(&console, false);
+    CHECK(!strcmp(console.input, "/capabilit"), "Tab first extends the common prefix");
+    wake_console_complete(&console, false);
+    CHECK(!strcmp(console.input, "/capabilities"), "next Tab starts full matches");
+    wake_console_complete(&console, false);
+    CHECK(!strcmp(console.input, "/capability"), "then next common-prefix match");
+    wake_console_input(&console, KEY_ENTER, 0, out, sizeof(out));
+    wake_console_paste(&console, "  /st tail");
+    console.cursor = 5;
+    wake_console_complete(&console, false);
+    CHECK(!strcmp(console.input, "  /status tail") && console.cursor == 9,
+        "completion preserves leading whitespace, arguments and cursor position");
+    wake_console_input(&console, KEY_END, 0, out, sizeof(out));
+    CHECK(!wake_console_complete(&console, false), "arguments are not completed");
+    wake_console_input(&console, KEY_ENTER, 0, out, sizeof(out));
+    wake_console_paste(&console, "def.scene");
+    CHECK(!wake_console_complete(&console, false) && !strcmp(console.input, "def.scene"),
+        "Lua is untouched");
+    const char *matches[16];
+    CHECK(wake_command_completions("", matches, 16) == 12, "completion covers every help command");
 }
 
 static void test_source(void)
@@ -356,6 +491,18 @@ static void test_commands(const char *executable)
     Output output = { 0 };
     static WakeCommand command;
     wake_command_init(&command, collect, clear_output, saved, &output);
+    wake_command_submit(&command, &plugin, &session, "/help", 0);
+    CHECK(
+        has_line(&output, "read") || has_line(&output, "Read"), "help explains read-only queries");
+    CHECK(has_line(&output, "copies the latest"), "help explains Copy");
+    CHECK(has_line(&output, "/save DIR"), "help includes every command");
+    output.count = 0;
+    wake_command_submit(&command, &plugin, &session, "/help /status", 0);
+    CHECK(output.count == 2 && has_line(&output, "boat state"), "focused command help");
+    output.count = 0;
+    wake_command_submit(&command, &plugin, &session, "/help missing", 0);
+    CHECK(has_line(&output, "No help"), "unknown help topic explained");
+    output.count = 0;
     CHECK(wake_command_submit(&command, &plugin, &session, "/capabilities", 0) == false,
         "capabilities");
     CHECK(has_line(&output, "voyage.define"), "capabilities lists the voyage grant");
@@ -477,6 +624,8 @@ int main(int argc, char **argv)
     if (argc == 2 && !strcmp(argv[1], "--plugin-query-worker"))
         return boat_plugin_query_worker();
     test_console();
+    test_console_comfort();
+    test_console_completion();
     test_source();
     test_commands(argv[0]);
     test_live_scene(argv[0]);

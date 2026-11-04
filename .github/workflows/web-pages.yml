@@ -44,6 +44,7 @@ jobs:
       - name: Check browser input and network event contracts
         run: |
           node tools/test_web_mouse_controls.cjs
+          node tools/test_web_console_controls.cjs
           node tools/test_web_rtc_transport.cjs
           node tools/test_web_server_directory.cjs
 
