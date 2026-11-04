@@ -82,8 +82,8 @@ def main():
     shutil.copyfile(args.lua_license or args.build_dir / "lua-LICENSE.txt", site / "lua-LICENSE.txt")
     # Remove outputs from earlier builds only, never unrelated files.
     for pattern in ("wake_velocity-*.js", "wake_velocity-*.wasm", "wake_velocity-*.data",
-                    "scenery-*.bin", "water-atlas-*.bin", "plugin_stage-*.js", "plugin_stage-*.wasm",
-                    "plugin_worker-*.js", "plugin_example-*.json"):
+                    "scenery-*.bin", "water-atlas-*.bin", "ambient-*.bin", "plugin_stage-*.js",
+                    "plugin_stage-*.wasm", "plugin_worker-*.js", "plugin_example-*.json"):
         for path in site.glob(pattern):
             if path.name not in files.values():
                 path.unlink()

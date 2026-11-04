@@ -3,6 +3,7 @@
 
 #include "waterfront_corner.h"
 #include "waterfront_harbor_view.h"
+#include "waterfront_lights.h"
 #include "waterfront_scene.h"
 #include "waterfront_wake_stamp.h"
 #include "waterfront_water_history.h"
@@ -16,6 +17,8 @@
 #define WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE 512
 #define WATERFRONT_GPU_REFLECTION_WIDTH 160
 #define WATERFRONT_GPU_REFLECTION_HEIGHT 120
+// How much of the ambient term a fully closed baked corner (boat_ambient.h) removes.
+#define WATERFRONT_GPU_AMBIENT_OCCLUSION .6f
 
 // Ground batch stores one constant material ID per triangle in texcoord.x.
 // Keep these values in sync with waterfront_city.fs.
@@ -84,6 +87,7 @@ typedef struct {
     size_t far_triangles, far_vertex_bytes, far_index_bytes; // Distance detail, also GPU memory.
     size_t retained_cpu_bytes; // Zero unless the review-only retain_map_sources is set.
     float normal_error; // Worst decoded normal component error of packing.
+    size_t occluded_vertices; // Uploaded map vertices with a baked occlusion above zero.
 } WaterfrontGpuGeometry;
 
 // Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one GL
@@ -187,6 +191,22 @@ typedef struct {
     Material shadow_material;
     Material water_material;
     Texture2D roof_texture;
+    // G5b clustered local lights (waterfront_lights.h), uploaded as an RGBA32F texture. Without
+    // the clusters or their texture, the capped uniform list below is the fallback: the closest
+    // lights to the shot, by class, and no lamplight on the water.
+    WaterfrontLightClusters *light_clusters;
+    float *light_texels;
+    Texture2D light_texture;
+    bool light_clusters_active; // This frame shades from the clusters.
+    bool light_clusters_disabled; // Review: the capped uniform fallback.
+    bool light_reference; // Review: shade every clustered light, ignoring the slot lists.
+    bool ambient_occlusion_disabled; // Review: draw the baked occlusion at zero strength.
+    bool particles_disabled; // Review: draw no boat foam or spray cubes (their cost).
+    int stress_lights; // Review: extra synthetic lights around the shot.
+    WaterfrontLightStats light_stats; // This frame's submissions, drops and overflow.
+    int light_rows; // Texture rows uploaded this frame.
+    int fallback_dropped; // Lights the capped fallback left out this frame (or behind the eye).
+    bool emissive_hdr; // The target keeps light above 1: dusk lenses and windows exceed it.
     WaterfrontGpuLight local_lights[WATERFRONT_GPU_MAX_LOCAL_LIGHTS];
     int local_light_ids[WATERFRONT_GPU_MAX_LOCAL_LIGHTS];
     int local_light_count;
@@ -218,6 +238,11 @@ void waterfront_gpu_scene_set_shadows_enabled(WaterfrontGpuScene *scene, bool en
 void waterfront_gpu_scene_set_atmosphere_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_reflections_enabled(WaterfrontGpuScene *scene, bool enabled);
 bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int size);
+// Whether float render targets accept blending (the wake stamp's probe).
+bool waterfront_gpu_scene_float_blending(const WaterfrontGpuScene *scene);
+// Reallocate the water reflection target (initially 160x120, nearest-filtered). Failure keeps the
+// existing target. Dimensions are bounded to 1..2048.
+bool waterfront_gpu_scene_set_reflection_size(WaterfrontGpuScene *scene, int width, int height);
 // Review only: drawing every tile isolates culling from the per-tile draw order.
 void waterfront_gpu_scene_set_culling_enabled(WaterfrontGpuScene *scene, bool enabled);
 void waterfront_gpu_scene_set_instancing_enabled(WaterfrontGpuScene *scene, bool enabled);

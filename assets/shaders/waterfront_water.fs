@@ -43,6 +43,7 @@ uniform int waterPatchPass;
 uniform vec4 wavePatch;
 uniform int waterfrontWater; // Only playable mapped water; leave basin materials alone.
 uniform float surfacePixelScale;
+uniform float presentedPixelScale; // Presented pixels per 320-wide frame pixel.
 
 out vec4 finalColor;
 
@@ -501,9 +502,15 @@ vec3 shoreShade(vec3 color)
         * (1.0 - smoothstep(250.0, 400.0, distance));
     float lap = 0.5 + 0.5 * sin(fragWorldPosition.x * 1.9 + fragWorldPosition.z * 1.3
         + 1.5 * sin(fragWorldPosition.z * 0.7 - fragWorldPosition.x * 0.4) + detailRipplePhase.x);
+    float light = band * smoothstep(0.25, 0.7, lap);
+    // A high-resolution frame would draw the band as soft blots; hold both to hard steps so it
+    // stays pixel art. Supersampled low-resolution frames keep the smooth band they average.
+    if (presentedPixelScale > 1.0) {
+        band = floor(band * 3.0 + 0.5) / 3.0;
+        light = floor(light * 3.0 + 0.5) / 3.0;
+    }
     color *= 1.0 + 0.10 * band;
-    return mix(color, vec3(0.70, 0.82, 0.84) * waterLight,
-        0.55 * band * smoothstep(0.25, 0.7, lap));
+    return mix(color, vec3(0.70, 0.82, 0.84) * waterLight, 0.55 * light);
 }
 // G4 far-water life, presentation only. gustWaves and glitterWaves hold X/Z wavenumbers and a
 // CPU-reduced phase; squallWater the sky squall's centre X/Z, radius and growth.
@@ -584,6 +591,99 @@ float sunSheen(vec3 normal, vec3 viewDirection, float exposed)
     road *= mix(0.6, 1.0, exposed) * smoothstep(10.0, 35.0, distance) * (1.0 - 0.9 * squallWater.w);
     return glintSheen * floor(road * 3.0 + 0.35) / 3.0;
 }
+// G5b: the city's clustered lights (waterfront_lights.h) and warm reflections at dusk. Zero window
+// light, as by day, leaves the water as it was.
+uniform float windowLight;
+uniform vec2 reflectionTexel; // 1 / reflection target size.
+uniform int lightClusterMode; // 0 none (the capped fallback lights only the city), 1 slots, 2 all.
+uniform highp sampler2D lightClusters; // Float records: keep full precision on the web.
+uniform int lightClusterCount;
+uniform vec4 lightClusterLayout; // Cell metres, grid slots per axis, slot base, index base.
+
+vec4 lightTexel(int index)
+{
+    return texelFetch(lightClusters, ivec2(index % 256, index / 256), 0);
+}
+
+// The lights listed for this point: the slot's (offset, count), or every light in mode 2.
+ivec2 lightList()
+{
+    if (lightClusterMode == 2) return ivec2(0, lightClusterCount);
+    vec2 cell = mod(floor(fragWorldPosition.xz / lightClusterLayout.x), lightClusterLayout.y);
+    int slot = int(cell.y) * int(lightClusterLayout.y) + int(cell.x);
+    vec4 header = lightTexel(int(lightClusterLayout.z) + slot);
+    return ivec2(int(header.x), int(header.y));
+}
+
+int listedLight(ivec2 list, int k)
+{
+    if (lightClusterMode == 2) return k;
+    int at = list.x + k;
+    vec4 slots = lightTexel(int(lightClusterLayout.w) + at / 4);
+    return int(slots[at % 4]);
+}
+
+// Lamplight on the water: a faint pool under each light and a glint where the rippled surface
+// throws it toward the eye, from the same lights that shade the quays.
+vec3 waterLocalLight(vec3 normal, vec3 viewDirection)
+{
+    if (lightClusterMode == 0 || windowLight <= 0.0) return vec3(0.0);
+    vec3 sum = vec3(0.0);
+    ivec2 list = lightList();
+    vec3 mirrored = reflect(-viewDirection, normal);
+    for (int k = 0; k < list.y; ++k) {
+        int base = listedLight(list, k) * 4;
+        vec4 positionRadius = lightTexel(base);
+        vec3 delta = positionRadius.xyz - fragWorldPosition;
+        float distance = length(delta);
+        if (distance >= positionRadius.w) continue;
+        vec3 towardLight = delta / max(distance, 0.001);
+        vec4 colorIntensity = lightTexel(base + 1);
+        vec4 cone = lightTexel(base + 3);
+        float spot = 1.0;
+        if (cone.y >= 0.0)
+            spot = smoothstep(cone.y, cone.x, dot(normalize(lightTexel(base + 2).xyz), -towardLight));
+        float attenuation = 1.0 - distance / positionRadius.w;
+        float glint = pow(max(dot(mirrored, towardLight), 0.0), 48.0);
+        sum += colorIntensity.rgb * (colorIntensity.a * attenuation * attenuation * spot
+            * (0.16 * max(towardLight.y, 0.0) + 1.2 * glint));
+    }
+    return sum * windowLight;
+}
+
+// Warm emitters in the dusk reflection: lit windows, lamps and lenses. The dusk sky and scenery
+// are blue, and the afterglow is too dim in green to pass.
+float emitterKey(vec3 c)
+{
+    return smoothstep(0.20, 0.36, c.r - c.b) * smoothstep(0.52, 0.70, c.g);
+}
+
+// Long stepped streaks: each emitter seen in rippled water smears along the reflection's
+// vertical axis, longest toward the viewer, broken into dashes by the ripples and held to three
+// steps of brightness so it reads as pixels.
+vec4 duskStreak(vec2 uv, float exposed)
+{
+    // Only after sunset: a warm sunset sky passes the key too and would streak its clouds.
+    float dusk = smoothstep(0.5, 1.0, windowLight);
+    if (dusk <= 0.0) return vec4(0.0);
+    vec3 color = vec3(0.0);
+    float reach = 0.0;
+    for (int i = -4; i <= 10; ++i) {
+        float v = uv.y + float(i) * 2.0 * reflectionTexel.y;
+        if (v < 0.0 || v > 1.0) continue;
+        vec3 c = texture(reflectionTexture, vec2(uv.x, v)).rgb;
+        float weight = emitterKey(c) * (1.0 - abs(float(i)) / (i < 0 ? 6.0 : 12.0));
+        if (weight > reach) {
+            reach = weight;
+            color = c;
+        }
+    }
+    vec2 w = fragWorldPosition.xz;
+    float swell = sin(w.y * 1.9 + 1.4 * sin(w.x * 0.55) + detailRipplePhase.x)
+        + 0.6 * sin(w.x * 2.7 - w.y * 0.8 + detailRipplePhase.y);
+    reach *= mix(0.25, 1.0, step(-0.35, swell)) * mix(1.0, 0.75, exposed);
+    return vec4(color, floor(reach * 3.0 + 0.3) / 3.0 * dusk);
+}
 float waveCrestFoam(vec3 wave, float k)
 {
     float kh = k * wave.x;
@@ -655,9 +755,11 @@ void main()
             normal.z - ripples.y * normal.y));
         base *= 1.0 + 0.35 * dot(ripples, vec2(0.7));
     }
+    vec3 viewDirection = normalize(cameraPosition - fragWorldPosition);
+    vec3 lamplight = waterLocalLight(normal, viewDirection);
     if (reflectionsEnabled == 0) {
         base = shoreShade(mix(base, vec3(0.65, 0.78, 0.80) * waterLight, 0.55 * historyFoam));
-        finalColor = vec4(base * waterShadow(), 1.0);
+        finalColor = vec4(base * waterShadow() + lamplight, 1.0);
         return;
     }
 
@@ -676,7 +778,6 @@ void main()
     if (reflectedPosition.w <= 0.0) coverage = 0.0;
     reflectionUv = clamp(reflectionUv, vec2(0.004), vec2(0.996));
     vec3 reflection = texture(reflectionTexture, reflectionUv).rgb;
-    vec3 viewDirection = normalize(cameraPosition - fragWorldPosition);
     float viewDot = max(0.0, dot(normal, viewDirection));
     float reflectionAmount = mix(0.10, physicalWaves != 0 ? 0.30 : 0.42,
         (1.0 - viewDot) * (1.0 - viewDot));
@@ -713,5 +814,7 @@ void main()
         if (glintSheen > 0.0) glint = max(glint, sunSheen(normal, viewDirection, exposed));
         color = mix(color, glintColor, glint);
     }
-    finalColor = vec4(color * waterShadow(), 1.0);
+    vec4 streak = duskStreak(reflectionUv, exposed);
+    color = mix(color, streak.rgb, streak.a * coverage);
+    finalColor = vec4(color * waterShadow() + lamplight, 1.0);
 }

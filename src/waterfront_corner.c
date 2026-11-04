@@ -29,6 +29,15 @@ bool waterfront_building_wall(Color color)
     return false;
 }
 
+bool waterfront_facade_triangle(Vector3 a, Vector3 b, Vector3 c, Color color)
+{
+    Vector3 normal
+        = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
+    float top = fmaxf(a.y, fmaxf(b.y, c.y));
+    float bottom = fminf(a.y, fminf(b.y, c.y));
+    return fabsf(normal.y) < .15f && waterfront_building_wall(color) && top - bottom >= 5.5f;
+}
+
 bool waterfront_building_roof(Color color)
 {
     for (size_t i = 0; i < sizeof(building_tints) / sizeof(building_tints[0]); ++i) {

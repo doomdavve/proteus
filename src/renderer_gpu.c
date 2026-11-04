@@ -1,5 +1,7 @@
 #include "renderer_gpu.h"
+#include "boat_ambient.h"
 #include "boat_clock.h"
+#include "boat_scenery.h"
 #include "boat_water_atlas.h"
 #include "boat_water_mesh.h"
 #include "waterfront_city.h"
@@ -20,11 +22,14 @@ typedef struct {
     float *normals;
     float *texcoords;
     unsigned char *colors;
+    unsigned char *occlusion; // Baked ambient occlusion per vertex, 0 (open) to 255.
     int count;
     int capacity;
 } MeshBuilder;
 
 static const Color LAMP_LENS_COLOR = { 255, 218, 132, 255 };
+// The far shadow map's square coverage in metres (1.5 m texels at 512).
+static const float FAR_SHADOW_COVERAGE = 768;
 static const Color HEADLIGHT_LENS_COLOR = { 255, 246, 202, 255 };
 // The generated map uses this colour as its water material identifier.
 static const Color WATER_COLOR = { 45, 79, 104, 255 };
@@ -32,7 +37,7 @@ static const Color WATER_COLOR = { 45, 79, 104, 255 };
 // Distance detail: the fine grid of windows and street furniture, the window spacing whose
 // projected size picks the level, the hysteresis around that distance, and what the far level of
 // street furniture keeps.
-#define WATERFRONT_GPU_DETAIL_CELL 256.0f
+#define WATERFRONT_GPU_DETAIL_CELL 512.0f
 #define DETAIL_WINDOW_SPACING 4.0f
 #define DETAIL_BAND .08f
 #define DETAIL_SMALLEST_BOX 2.0f
@@ -43,6 +48,7 @@ static void builder_destroy(MeshBuilder *builder)
     free(builder->normals);
     free(builder->texcoords);
     free(builder->colors);
+    free(builder->occlusion);
     *builder = (MeshBuilder) { 0 };
 }
 
@@ -57,25 +63,31 @@ static bool builder_reserve(MeshBuilder *builder, int additional)
     float *normals = malloc((size_t)capacity * 3 * sizeof(*normals));
     float *texcoords = malloc((size_t)capacity * 2 * sizeof(*texcoords));
     unsigned char *colors = malloc((size_t)capacity * 4 * sizeof(*colors));
-    if (positions == NULL || normals == NULL || texcoords == NULL || colors == NULL) {
+    unsigned char *occlusion = malloc((size_t)capacity);
+    if (positions == NULL || normals == NULL || texcoords == NULL || colors == NULL
+        || occlusion == NULL) {
         free(positions);
         free(normals);
         free(texcoords);
         free(colors);
+        free(occlusion);
         return false;
     }
     memcpy(positions, builder->positions, (size_t)builder->count * 3 * sizeof(*positions));
     memcpy(normals, builder->normals, (size_t)builder->count * 3 * sizeof(*normals));
     memcpy(texcoords, builder->texcoords, (size_t)builder->count * 2 * sizeof(*texcoords));
     memcpy(colors, builder->colors, (size_t)builder->count * 4 * sizeof(*colors));
+    memcpy(occlusion, builder->occlusion, (size_t)builder->count);
     free(builder->positions);
     free(builder->normals);
     free(builder->texcoords);
     free(builder->colors);
+    free(builder->occlusion);
     builder->positions = positions;
     builder->normals = normals;
     builder->texcoords = texcoords;
     builder->colors = colors;
+    builder->occlusion = occlusion;
     builder->capacity = capacity;
     return true;
 }
@@ -114,8 +126,16 @@ static bool builder_triangle(MeshBuilder *builder, Vector3 a, Vector3 b, Vector3
         builder->colors[vertex * 4 + 1] = color.g;
         builder->colors[vertex * 4 + 2] = color.b;
         builder->colors[vertex * 4 + 3] = color.a;
+        builder->occlusion[vertex] = 0;
     }
     return true;
+}
+
+// The baked corners of the last triangle added, in its a, b, c order; none when CORNERS is NULL.
+static void builder_occlusion(MeshBuilder *builder, const unsigned char *corners)
+{
+    if (corners)
+        memcpy(&builder->occlusion[builder->count - 3], corners, 3);
 }
 
 static bool builder_quad(
@@ -162,6 +182,7 @@ static Mesh builder_finish(MeshBuilder *builder)
     builder->normals = NULL;
     builder->texcoords = NULL;
     builder->colors = NULL;
+    free(builder->occlusion);
     UploadMesh(&mesh, false);
     *builder = (MeshBuilder) { 0 };
     return mesh;
@@ -177,6 +198,7 @@ typedef struct {
     float texcoord[2];
     float normal[3];
     unsigned char color[4];
+    unsigned char occlusion;
 } StaticVertex;
 
 // What a map surface's shader reads, which decides how its vertices are stored.
@@ -221,6 +243,7 @@ static StaticVertex static_vertex(const MeshBuilder *builder, int source)
     memcpy(vertex.texcoord, &builder->texcoords[source * 2], sizeof(vertex.texcoord));
     memcpy(vertex.normal, &builder->normals[source * 3], sizeof(vertex.normal));
     memcpy(vertex.color, &builder->colors[source * 4], sizeof(vertex.color));
+    vertex.occlusion = builder->occlusion[source];
     return vertex;
 }
 
@@ -235,7 +258,9 @@ static unsigned int static_vertex_hash(const StaticVertex *vertex)
 
 // Normals are three GL_SHORT integers in an eight-byte slot, read unnormalized: the map shaders
 // renormalize them, and normalized integers decode differently before GL 4.2. *ERROR grows to the
-// worst component error as the shader reads it.
+// worst component error as the shader reads it. The fourth short is 1 + the baked occlusion
+// (0..255), so the shaders read occlusion as w - 1 and an ordinary three-float normal, whose w
+// defaults to 1, as unoccluded.
 #define STATIC_NORMAL_TYPE 0x1402
 #define STATIC_NORMAL_BYTES 8
 
@@ -276,6 +301,9 @@ static int static_vertices_pack(
             short normal[3];
             static_normal_pack(vertices[i].normal, normal, &binding_scene->geometry.normal_error);
             memcpy(p, normal, sizeof(normal));
+            short occlusion = (short)(1 + vertices[i].occlusion);
+            memcpy(p + sizeof(normal), &occlusion, sizeof(occlusion));
+            binding_scene->geometry.occluded_vertices += vertices[i].occlusion > 0;
             p += STATIC_NORMAL_BYTES;
         }
         if (surface == STATIC_GROUND)
@@ -318,7 +346,7 @@ static Mesh static_mesh_upload(const StaticVertex *vertices, int vertex_count,
     offset += (int)sizeof(vertices->color);
     if (surface != STATIC_UNLIT) {
         rlSetVertexAttribute(
-            RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 3, STATIC_NORMAL_TYPE, false, stride, offset);
+            RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 4, STATIC_NORMAL_TYPE, false, stride, offset);
         rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL);
         offset += STATIC_NORMAL_BYTES;
     }
@@ -397,8 +425,10 @@ static Mesh builder_static_chunk(
             vertex.texcoord[1] = 0;
         if (surface == STATIC_UNLIT || surface == STATIC_FLAT)
             vertex.texcoord[0] = 0;
-        if (surface == STATIC_UNLIT)
+        if (surface == STATIC_UNLIT) {
             memset(vertex.normal, 0, sizeof(vertex.normal));
+            vertex.occlusion = 0;
+        }
         unsigned int slot = static_vertex_hash(&vertex) & (unsigned int)(slots - 1);
         while (table[slot] >= 0 && memcmp(&vertices[table[slot]], &vertex, sizeof(vertex)) != 0)
             slot = (slot + 1) & (unsigned int)(slots - 1);
@@ -503,23 +533,25 @@ static int cached_location(Shader shader, const char *name)
 
 static const char *const known_uniforms[] = { "objectColor", "emissive", "instanced",
     "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
-    "directionalColor", "directionalDirection", "directionalIntensity", "shadowsEnabled",
-    "lightViewProjection", "shadowMap", "farShadowsEnabled", "farLightViewProjection",
-    "farShadowMap", "localLightCount", "localLightPositionRadius[0]", "localLightColorIntensity[0]",
-    "localLightDirection[0]", "localLightCone[0]", "cameraPosition", "fogColor", "fogStart",
-    "fogEnd", "fogOpacity", "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife",
-    "wakeFieldEnabled", "wakeGrid", "wakeField", "physicalWaves", "radialOrigin", "radialMotion",
-    "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape",
-    "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
-    "objectWakeData", "playerWakeCount", "playerWakeOrigins[0]", "playerWakeParameters[0]",
-    "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
-    "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
-    "reflectionTexture", "surfacePixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
+    "ambientOcclusion", "directionalColor", "directionalDirection", "directionalIntensity",
+    "shadowsEnabled", "lightViewProjection", "shadowMap", "farShadowsEnabled",
+    "farLightViewProjection", "farShadowMap", "farShadowTexel", "localLightCount",
+    "localLightPositionRadius[0]", "localLightColorIntensity[0]", "localLightDirection[0]",
+    "localLightCone[0]", "cameraPosition", "fogColor", "fogStart", "fogEnd", "fogOpacity",
+    "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife", "wakeFieldEnabled", "wakeGrid",
+    "wakeField", "physicalWaves", "radialOrigin", "radialMotion", "stormArea", "stormPhase",
+    "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape", "wakeAmplitude", "wakeOffset",
+    "objectWakePlayerCount", "objectWakeTrafficLife", "objectWakeData", "playerWakeCount",
+    "playerWakeOrigins[0]", "playerWakeParameters[0]", "waterfrontWater", "wavePatch",
+    "waveParameters[0]", "sunDirection", "reflectionViewProjection", "crossingWakeTime",
+    "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled", "reflectionTexture",
+    "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
     "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
     "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
     "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
     "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
-    "glintSparkle", NULL };
+    "glintSparkle", "lightClusterMode", "lightClusters", "lightClusterCount", "lightClusterLayout",
+    "emissiveGain", "reflectionTexel", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -948,11 +980,10 @@ static CitySurface city_surface(Vector3 a, Vector3 b, Vector3 c, Color color)
     Vector3 normal
         = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
     float top = fmaxf(a.y, fmaxf(b.y, c.y));
-    float bottom = fminf(a.y, fminf(b.y, c.y));
     if (normal.y > .95f)
         return top > 4.0f && waterfront_building_roof(color) ? CITY_SURFACE_ROOF
                                                              : CITY_SURFACE_FLAT;
-    if (fabsf(normal.y) < .15f && waterfront_building_wall(color) && top - bottom >= 5.5f)
+    if (waterfront_facade_triangle(a, b, c, color))
         return CITY_SURFACE_FACADE;
     return CITY_SURFACE_FLAT;
 }
@@ -1002,6 +1033,9 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_far, WaterfrontGpuTiled *corner_emissive)
 {
     const Mesh3D *city = scenery->full->mesh;
+    // Baked corners exist only for a loaded pack, in its own triangle order.
+    const unsigned char *occlusion
+        = boat_scenery_of(scenery->map) == scenery->full ? boat_ambient_of(scenery->map) : NULL;
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
     TiledBuilder builders[4] = { 0 };
     MeshBuilder water_builder = { 0 };
@@ -1014,6 +1048,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         Vector3 a = city->vertices[triangle->vertices[0]];
         Vector3 b = city->vertices[triangle->vertices[1]];
         Vector3 c = city->vertices[triangle->vertices[2]];
+        const unsigned char *corners = occlusion ? &occlusion[i * 3] : NULL;
         if (is_water_triangle(triangle)) {
             if (!builder_triangle(&water_builder, a, b, c, (Color) { 67, 151, 180, 255 }))
                 goto failed;
@@ -1038,9 +1073,10 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
             int finish = planting ? WATERFRONT_GROUND_PLANTING : WATERFRONT_GROUND_CONCRETE;
             if (road)
                 finish = WATERFRONT_GROUND_ASPHALT;
-            if (!builder_ground_triangle(
-                    &builders[CITY_SURFACE_QUAY].tiles[tile], a, b, c, triangle->color, finish))
+            MeshBuilder *ground = &builders[CITY_SURFACE_QUAY].tiles[tile];
+            if (!builder_ground_triangle(ground, a, b, c, triangle->color, finish))
                 goto failed;
+            builder_occlusion(ground, corners);
             continue;
         }
         if (surface == CITY_SURFACE_FACADE) {
@@ -1054,6 +1090,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
             : builder_triangle(builder, a, b, c, triangle->color);
         if (!ok)
             goto failed;
+        builder_occlusion(builder, corners);
     }
     // The compiled river has every surface class; another map needs only its water.
     if (water_builder.count == 0
@@ -1510,6 +1547,9 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
         || !IsShaderValid(scene->water_shader) || scene->water_shader.id == rlGetShaderIdDefault()
         || !IsShaderValid(scene->sky_shader) || scene->sky_shader.id == rlGetShaderIdDefault())
         goto failed;
+    float unit_gain = 1;
+    SetShaderValue(scene->shader, cached_location(scene->shader, "emissiveGain"), &unit_gain,
+        SHADER_UNIFORM_FLOAT);
     scene->sky_lighting = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
     scene->sky_texture = LoadTextureFromImage(waterfront_sky_image(&scene->sky_lighting));
     if (!IsTextureValid(scene->sky_texture))
@@ -1945,68 +1985,56 @@ typedef struct {
     LightKind kind;
 } LightCandidate;
 
-static bool light_was_selected(const WaterfrontGpuScene *scene, int id)
+enum {
+    QUAY_LIGHT_ID = 2000, // Dusk fixtures: 2000 + fixture index.
+    STRESS_LIGHT_ID = 10000, // Review stress lights: 10000 + index.
+    LIGHT_CANDIDATES = WATERFRONT_LIGHTS_MAX + 128,
+};
+
+static const Color QUAY_LIGHT_COLOR = { 255, 206, 128, 255 };
+
+// The fixtures the dusk light adds: deck lights along both sides of the docked ferry and lamps
+// on the dock, placed on the evaluated harbour poses so they ride the water with them. Their
+// lenses and light scale with the window light, so daytime has none.
+static int dusk_fixtures(const WaterfrontSceneFrame *frame, Vector3 *lenses, int capacity)
 {
-    for (int i = 0; i < scene->local_light_count; ++i) {
-        if (scene->local_light_ids[i] == id)
-            return true;
+    if (frame->boating_basin || frame->lighting.window_light <= 0)
+        return 0;
+    const WaterfrontHarborFrame *harbor = &frame->harbor;
+    const WaterfrontFerry *ferry = waterfront_harbor_ferry();
+    int count = 0;
+    for (int side = -1; side <= 1; side += 2)
+        for (int i = 0; i < 5 && count < capacity; ++i)
+            lenses[count++] = waterfront_harbor_attachment(
+                harbor->ferry, (Vector3) { side * (ferry->beam * .5f - .6f), 12, -56 + i * 28.0f });
+    if (!harbor->modules_authored) {
+        for (int i = 0; i < 3 && count < capacity; ++i)
+            lenses[count++] = waterfront_harbor_attachment(
+                harbor->pontoon, (Vector3) { .6f, 3.4f, -15 + i * 15.0f });
+    } else {
+        for (int i = 0; i < harbor->module_count && count < capacity; ++i) {
+            const WaterfrontModuleFrame *m = &harbor->modules[i];
+            if (m->kind == BOAT_SCENE_MODULE_GANGWAY)
+                continue;
+            lenses[count++] = waterfront_harbor_attachment(m->pose, (Vector3) { 0, 2.6f, 0 });
+        }
     }
-    return false;
+    return count;
 }
 
 static void add_light_candidate(
     LightCandidate *candidates, int *count, int id, WaterfrontGpuLight light, LightKind kind)
 {
-    if (*count >= 72)
+    if (*count >= LIGHT_CANDIDATES)
         return;
     candidates[*count] = (LightCandidate) { .id = id, .light = light, .kind = kind };
     ++*count;
 }
 
-static int select_light_class(const WaterfrontGpuScene *scene, const LightCandidate *candidates,
-    int candidate_count, const WaterfrontSceneFrame *frame, LightKind kind,
-    LightCandidate *selected, int capacity)
+// Every local light the frame offers, with its stable ID.
+static int gather_lights(
+    const WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, LightCandidate *candidates)
 {
-    Vector3 view_direction
-        = Vector3Normalize(Vector3Subtract(frame->camera.target, frame->camera.position));
-    int selected_count = 0;
-    for (int candidate = 0; candidate < candidate_count; ++candidate) {
-        LightCandidate current = candidates[candidate];
-        if (current.kind != kind)
-            continue;
-        Vector3 from_camera = Vector3Subtract(current.light.position, frame->camera.position);
-        float view_depth = Vector3DotProduct(from_camera, view_direction);
-        if (view_depth < -current.light.radius)
-            continue;
-        // The target is the authored shot focus, unlike the eye position which may sit far away
-        // or above the street. It keeps the selected lights relevant to the visible composition.
-        current.score = Vector3DistanceSqr(current.light.position, frame->camera.target);
-        if (light_was_selected(scene, current.id))
-            current.score *= .35f;
-        int slot = selected_count;
-        while (slot > 0 && current.score < selected[slot - 1].score) {
-            if (slot < capacity)
-                selected[slot] = selected[slot - 1];
-            --slot;
-        }
-        if (slot < capacity) {
-            selected[slot] = current;
-            if (selected_count < capacity)
-                ++selected_count;
-        }
-    }
-    return selected_count;
-}
-
-// Every authored lamp stays in the forward-light list, so its pool cannot pop off while the camera
-// approaches. Reserve the cafe light, three crane lights, and nearby moving headlights.
-static void select_local_lights(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
-{
-    if (frame->boating_basin) {
-        scene->local_light_count = 0;
-        return;
-    }
-    LightCandidate candidates[72];
     int candidate_count = 0;
     // The cafe and crane fixtures are authored for the river crop.
     if (scene->river) {
@@ -2080,7 +2108,92 @@ static void select_local_lights(WaterfrontGpuScene *scene, const WaterfrontScene
             }
         }
     }
+    Vector3 lenses[32];
+    int fixtures = dusk_fixtures(frame, lenses, 32);
+    for (int i = 0; i < fixtures; ++i)
+        add_light_candidate(candidates, &candidate_count, QUAY_LIGHT_ID + i,
+            (WaterfrontGpuLight) { .position = lenses[i],
+                .direction = { 0, -1, 0 },
+                .color = QUAY_LIGHT_COLOR,
+                .radius = 16,
+                .intensity = 1.2f * frame->lighting.window_light,
+                .inner_cone_cos = -1,
+                .outer_cone_cos = -1 },
+            LIGHT_LAMP);
+    // Review stress: a square lattice of coloured lamps just above the water, snapped to 64 m
+    // around the shot so a fixed pose keeps them still. Lamps over land shade it.
+    if (scene->stress_lights > 0) {
+        int side = (int)ceilf(sqrtf((float)scene->stress_lights));
+        float spacing = 12; // With radii up to 12 m, no slot exceeds its capacity.
+        Vector3 focus = frame->player_active ? frame->player.hull.position : frame->camera.target;
+        float x0 = 64 * floorf(focus.x / 64) - spacing * (side - 1) * .5f;
+        float z0 = 64 * floorf(focus.z / 64) - spacing * (side - 1) * .5f;
+        static const Color hues[] = { { 255, 196, 112, 255 }, { 120, 170, 255, 255 },
+            { 255, 120, 90, 255 }, { 150, 255, 160, 255 } };
+        for (int i = 0; i < scene->stress_lights; ++i)
+            add_light_candidate(candidates, &candidate_count, STRESS_LIGHT_ID + i,
+                (WaterfrontGpuLight) {
+                    .position = { x0 + spacing * (i % side), 2.5f, z0 + spacing * (i / side) },
+                    .direction = { 0, -1, 0 },
+                    .color = hues[i % 4],
+                    .radius = 8 + (float)(i % 5),
+                    .intensity = 1,
+                    .inner_cone_cos = -1,
+                    .outer_cone_cos = -1 },
+                LIGHT_LAMP);
+    }
+    return candidate_count;
+}
 
+static bool light_was_selected(const WaterfrontGpuScene *scene, int id)
+{
+    for (int i = 0; i < scene->local_light_count; ++i) {
+        if (scene->local_light_ids[i] == id)
+            return true;
+    }
+    return false;
+}
+
+static int select_light_class(const WaterfrontGpuScene *scene, const LightCandidate *candidates,
+    int candidate_count, const WaterfrontSceneFrame *frame, LightKind kind,
+    LightCandidate *selected, int capacity)
+{
+    Vector3 view_direction
+        = Vector3Normalize(Vector3Subtract(frame->camera.target, frame->camera.position));
+    int selected_count = 0;
+    for (int candidate = 0; candidate < candidate_count; ++candidate) {
+        LightCandidate current = candidates[candidate];
+        if (current.kind != kind)
+            continue;
+        Vector3 from_camera = Vector3Subtract(current.light.position, frame->camera.position);
+        float view_depth = Vector3DotProduct(from_camera, view_direction);
+        if (view_depth < -current.light.radius)
+            continue;
+        // The target is the authored shot focus, unlike the eye position which may sit far away
+        // or above the street. It keeps the selected lights relevant to the visible composition.
+        current.score = Vector3DistanceSqr(current.light.position, frame->camera.target);
+        if (light_was_selected(scene, current.id))
+            current.score *= .35f;
+        int slot = selected_count;
+        while (slot > 0 && current.score < selected[slot - 1].score) {
+            if (slot < capacity)
+                selected[slot] = selected[slot - 1];
+            --slot;
+        }
+        if (slot < capacity) {
+            selected[slot] = current;
+            if (selected_count < capacity)
+                ++selected_count;
+        }
+    }
+    return selected_count;
+}
+
+// The capped fallback: the closest lights to the shot by class within the uniform list. It
+// reserves the cafe light, three crane lights and nearby moving headlights.
+static void select_fallback_lights(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame,
+    const LightCandidate *candidates, int candidate_count)
+{
     LightCandidate selected[WATERFRONT_GPU_MAX_LOCAL_LIGHTS];
     int selected_count
         = select_light_class(scene, candidates, candidate_count, frame, LIGHT_CRANE, selected, 3);
@@ -2095,6 +2208,92 @@ static void select_local_lights(WaterfrontGpuScene *scene, const WaterfrontScene
         scene->local_light_ids[i] = selected[i].id;
         scene->local_lights[i] = selected[i].light;
     }
+    scene->fallback_dropped = candidate_count - selected_count;
+}
+
+// Allocates the cluster storage and texture on first use; any failure keeps the fallback.
+static bool light_clusters_ready(WaterfrontGpuScene *scene)
+{
+    if (scene->light_texture.id)
+        return true;
+    if (!scene->light_clusters)
+        scene->light_clusters = calloc(1, sizeof(*scene->light_clusters));
+    if (!scene->light_texels)
+        scene->light_texels = calloc((size_t)WATERFRONT_LIGHT_TEXELS * 4, sizeof(float));
+    if (!scene->light_clusters || !scene->light_texels)
+        return false;
+    Image image = { scene->light_texels, WATERFRONT_LIGHT_TEXTURE_WIDTH,
+        WATERFRONT_LIGHT_TEXTURE_HEIGHT, 1, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 };
+    scene->light_texture = LoadTextureFromImage(image);
+    if (!IsTextureValid(scene->light_texture)) {
+        scene->light_texture = (Texture2D) { 0 };
+        return false;
+    }
+    SetTextureFilter(scene->light_texture, TEXTURE_FILTER_POINT);
+    return true;
+}
+
+// Every frame's lights go to the clusters, which the city, its reflection and the water all read.
+// Without them, the capped uniform list.
+static void prepare_lights(WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame)
+{
+    static LightCandidate candidates[LIGHT_CANDIDATES]; // Drawing is single-threaded.
+    int candidate_count = frame->boating_basin ? 0 : gather_lights(scene, frame, candidates);
+    scene->light_clusters_active = false;
+    scene->light_stats = (WaterfrontLightStats) { 0 };
+    scene->light_rows = 0;
+    scene->fallback_dropped = 0;
+    if (scene->light_clusters_disabled || !light_clusters_ready(scene)) {
+        select_fallback_lights(scene, frame, candidates, candidate_count);
+        scene->light_stats.submitted = candidate_count;
+        return;
+    }
+    WaterfrontLightClusters *clusters = scene->light_clusters;
+    waterfront_lights_begin(clusters);
+    for (int i = 0; i < candidate_count; ++i) {
+        const WaterfrontGpuLight *l = &candidates[i].light;
+        waterfront_lights_add(clusters,
+            (WaterfrontLight) { .id = candidates[i].id,
+                .position = l->position,
+                .direction = l->direction,
+                .color = l->color,
+                .radius = l->radius,
+                .intensity = l->intensity,
+                .inner_cone_cos = l->inner_cone_cos,
+                .outer_cone_cos = l->outer_cone_cos });
+    }
+    waterfront_lights_build(clusters);
+    scene->light_stats = clusters->stats;
+    scene->light_rows = waterfront_lights_pack(clusters, scene->light_texels);
+    rlUpdateTexture(scene->light_texture.id, 0, 0, WATERFRONT_LIGHT_TEXTURE_WIDTH,
+        scene->light_rows, PIXELFORMAT_UNCOMPRESSED_R32G32B32A32, scene->light_texels);
+    scene->light_clusters_active = true;
+    scene->local_light_count = 0;
+}
+
+// Unit 5 is free in both the city and water materials.
+static void set_light_cluster_uniforms(const WaterfrontGpuScene *scene, Shader shader)
+{
+    int mode = !scene->lighting_enabled ? 0
+        : !scene->light_clusters_active ? 0
+        : scene->light_reference        ? 2
+                                        : 1;
+    SetShaderValue(shader, cached_location(shader, "lightClusterMode"), &mode, SHADER_UNIFORM_INT);
+    int slot = 5;
+    rlEnableShader(shader.id);
+    rlActiveTextureSlot(slot);
+    rlEnableTexture(scene->light_texture.id ? scene->light_texture.id : rlGetTextureIdDefault());
+    rlSetUniform(cached_location(shader, "lightClusters"), &slot, SHADER_UNIFORM_INT, 1);
+    rlActiveTextureSlot(0);
+    if (mode == 0)
+        return;
+    int count = scene->light_clusters->light_count;
+    SetShaderValue(
+        shader, cached_location(shader, "lightClusterCount"), &count, SHADER_UNIFORM_INT);
+    float layout[] = { WATERFRONT_LIGHT_CELL, WATERFRONT_LIGHT_GRID, WATERFRONT_LIGHT_SLOT_BASE,
+        WATERFRONT_LIGHT_INDEX_BASE };
+    SetShaderValue(
+        shader, cached_location(shader, "lightClusterLayout"), layout, SHADER_UNIFORM_VEC4);
 }
 
 // Slot 15 is free in both city and water materials (WebGL2 guarantees 16 fragment slots).
@@ -2107,6 +2306,8 @@ static void set_far_shadow_uniforms(const WaterfrontGpuScene *scene, Shader shad
         return;
     SetShaderValueMatrix(shader, cached_location(shader, "farLightViewProjection"),
         scene->far_light_view_projection);
+    float texel = FAR_SHADOW_COVERAGE / WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE;
+    SetShaderValue(shader, cached_location(shader, "farShadowTexel"), &texel, SHADER_UNIFORM_FLOAT);
     int slot = 15;
     rlEnableShader(shader.id);
     rlActiveTextureSlot(slot);
@@ -2130,6 +2331,10 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene, const WaterfrontLig
     location = cached_location(scene->shader, "directionalDirection");
     if (location >= 0)
         SetShaderValue(scene->shader, location, directional_direction, SHADER_UNIFORM_VEC3);
+    // Baked map corners darken only the ambient term: direct sun and lamps keep their contact.
+    float occlusion = scene->ambient_occlusion_disabled ? 0 : WATERFRONT_GPU_AMBIENT_OCCLUSION;
+    SetShaderValue(scene->shader, cached_location(scene->shader, "ambientOcclusion"), &occlusion,
+        SHADER_UNIFORM_FLOAT);
     location = cached_location(scene->shader, "directionalIntensity");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &lighting->direct_intensity, SHADER_UNIFORM_FLOAT);
@@ -2162,6 +2367,11 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene, const WaterfrontLig
         }
     }
     set_far_shadow_uniforms(scene, scene->shader);
+    set_light_cluster_uniforms(scene, scene->shader);
+    // Lamps, lenses and lit windows above 1 feed the HDR bloom at dusk; daytime keeps 1.
+    float emissive_gain = scene->emissive_hdr ? 1 + .35f * lighting->window_light : 1;
+    SetShaderValue(scene->shader, cached_location(scene->shader, "emissiveGain"), &emissive_gain,
+        SHADER_UNIFORM_FLOAT);
     int light_count = scene->lighting_enabled ? scene->local_light_count : 0;
     location = cached_location(scene->shader, "localLightCount");
     if (location >= 0)
@@ -2423,6 +2633,14 @@ static void set_water_uniforms(WaterfrontGpuScene *scene, const WaterfrontSceneF
         &lighting->glint_sheen, SHADER_UNIFORM_FLOAT);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "glintSparkle"),
         &lighting->glint_sparkle, SHADER_UNIFORM_FLOAT);
+    // Zero window light (daytime) leaves the water without local light or streaks.
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "windowLight"),
+        &lighting->window_light, SHADER_UNIFORM_FLOAT);
+    float reflection_texel[] = { 1.0f / fmaxf(1, (float)scene->reflection.texture.width),
+        1.0f / fmaxf(1, (float)scene->reflection.texture.height) };
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "reflectionTexel"),
+        reflection_texel, SHADER_UNIFORM_VEC2);
+    set_light_cluster_uniforms(scene, scene->water_shader);
     int shadow_location = cached_location(scene->water_shader, "shadowsEnabled");
     SetShaderValue(scene->water_shader, shadow_location, &shadows, SHADER_UNIFORM_INT);
     SetShaderValueMatrix(scene->water_shader,
@@ -2533,9 +2751,15 @@ static void draw_ghost(const WaterfrontGpuScene *scene, Material material,
     SetShaderValue(material.shader, opacity, &zero, SHADER_UNIFORM_FLOAT);
 }
 
-static void draw_harbor(
-    const WaterfrontGpuScene *scene, Material material, const WaterfrontSceneFrame *frame)
+static void draw_harbor(const WaterfrontGpuScene *scene, Material material,
+    const WaterfrontSceneFrame *frame, bool emissive)
 {
+    Vector3 lenses[32];
+    int fixtures = emissive ? dusk_fixtures(frame, lenses, 32) : 0;
+    for (int i = 0; i < fixtures; ++i)
+        draw_colored_mesh(scene->cube, material,
+            (Transform3D) { .position = lenses[i], .scale = { .7f, .32f, .7f } }, QUAY_LIGHT_COLOR,
+            true);
     const WaterfrontHarborFrame *harbor = &frame->harbor;
     if (harbor->modules_authored) {
         for (int i = 0; i < harbor->module_count; ++i) {
@@ -2605,7 +2829,7 @@ static void draw_boat(
     int particle_count = b.particle_count;
     if (flag.vaoId)
         draw_colored_mesh(flag, material, (Transform3D) { .scale = { 1, 1, 1 } }, WHITE, false);
-    for (int i = 0; i < particle_count; ++i) {
+    for (int i = 0; !scene->particles_disabled && i < particle_count; ++i) {
         // Surface foam receives shadows/depth but does not cast a solid slab shadow.
         // Airborne spray participates in both the reflection and shadow passes.
         if (!emissive && !particles[i].spray)
@@ -2635,7 +2859,7 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
 {
     if (!frame->boating_basin) {
         add_scenery(scene, frame, material);
-        draw_harbor(scene, material, frame);
+        draw_harbor(scene, material, frame, emissive);
         draw_traffic(scene, material, frame, emissive);
     }
     // By part, so each part's flock forms one instanced run. Gulls are self-coloured.
@@ -3109,6 +3333,9 @@ static void draw_water(
     float pixel_scale = fmaxf(1, width / 320.0f);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
+    float presented_scale = fmaxf(1, pixel_scale / fmaxf(1, scene->detail_scale));
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "presentedPixelScale"),
+        &presented_scale, SHADER_UNIFORM_FLOAT);
     int pass = scene->near_water.vaoId ? 1 : 0;
     int location = cached_location(scene->water_shader, "waterPatchPass");
     SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);
@@ -3228,10 +3455,11 @@ static void draw_scene(
         scene->light_view_projection = render_shadow_map(scene, frame, scene->shadow_map,
             frame->player_active ? 96.0f : 500.0f, scene->shadow_map_size, 600, false);
         if (scene->far_shadows_active)
-            scene->far_light_view_projection = render_shadow_map(scene, frame,
-                scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000, true);
+            scene->far_light_view_projection
+                = render_shadow_map(scene, frame, scene->far_shadow_map, FAR_SHADOW_COVERAGE,
+                    WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000, true);
     }
-    select_local_lights(scene, frame);
+    prepare_lights(scene, frame);
     set_lighting_uniforms(scene, &frame->lighting);
     counting_pass = WATERFRONT_GPU_PASS_REFLECTION;
     if (scene->reflections_enabled) {
@@ -3372,6 +3600,30 @@ bool waterfront_gpu_scene_set_shadow_map_size(WaterfrontGpuScene *scene, int siz
     return true;
 }
 
+bool waterfront_gpu_scene_float_blending(const WaterfrontGpuScene *scene)
+{
+    return scene->wake_stamp.blending;
+}
+
+bool waterfront_gpu_scene_set_reflection_size(WaterfrontGpuScene *scene, int width, int height)
+{
+    if (width < 1 || height < 1 || width > 2048 || height > 2048)
+        return false;
+    if (scene->reflection.texture.width == width && scene->reflection.texture.height == height)
+        return true;
+    RenderTexture2D replacement = LoadRenderTexture(width, height);
+    if (!IsRenderTextureValid(replacement)) {
+        if (replacement.id != 0)
+            UnloadRenderTexture(replacement);
+        return false;
+    }
+    SetTextureFilter(replacement.texture, TEXTURE_FILTER_POINT);
+    if (scene->reflection.id != 0)
+        UnloadRenderTexture(scene->reflection);
+    scene->reflection = replacement;
+    return true;
+}
+
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene)
 {
     return scene->shadow_map.depth;
@@ -3455,6 +3707,10 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         UnloadTexture(scene->sky_texture);
     if (scene->object_wakes.id != 0)
         UnloadTexture(scene->object_wakes);
+    if (scene->light_texture.id != 0)
+        UnloadTexture(scene->light_texture);
+    free(scene->light_clusters);
+    free(scene->light_texels);
     MemFree(scene->object_records);
     waterfront_wake_stamp_destroy(&scene->wake_stamp);
     waterfront_water_history_destroy(&scene->water_history);

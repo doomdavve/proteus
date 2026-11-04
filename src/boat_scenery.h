@@ -25,14 +25,15 @@ bool boat_scenery_load_bytes(const BoatMapDescription *map, const void *bytes, s
 // "assets/"): ASSETS "geometry/<name>/scenery.bin". False if it does not fit.
 bool boat_scenery_path(
     const BoatWorldDefinition *location, const char *assets, char *path, size_t capacity);
-// Load a mapped LOCATION's pack from boat_scenery_path, then its optional water atlas sidecar
-// (boat_water_atlas.h); true for an unmapped location.
+// Load a mapped LOCATION's pack from boat_scenery_path, then its optional water atlas
+// (boat_water_atlas.h) and ambient occlusion (boat_ambient.h) sidecars; true for an unmapped
+// location.
 bool boat_scenery_load_location(const BoatWorldDefinition *location, const char *assets);
 // Every mapped location's pack; stops at the first failure.
 bool boat_scenery_load_all(const char *assets);
 // Bytes MAP's loaded scenery holds (0 when not loaded).
 size_t boat_scenery_bytes(const BoatMapDescription *map);
-// Release every loaded pack and water atlas.
+// Release every loaded pack and its sidecars.
 void boat_scenery_unload(void);
 
 #endif

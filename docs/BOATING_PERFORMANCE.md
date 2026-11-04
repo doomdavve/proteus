@@ -174,7 +174,7 @@ reported all three as `null`. Since
 [A2.3](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a23-result-2026-10-25) (`schema_revision` 3) the
 JSON records `tile_size` and the CSV adds `shadow_tiles_culled`, `reflection_tiles_culled` and
 `main_tiles_culled`, the tile meshes each pass skipped. `--tile-size M` (64–65,536 m, default
-1,024) sets the render tile edge for the benchmark and for `--output` captures, and
+2,048 since the outer follow-up; 1,024 before) sets the render tile edge for the benchmark and for `--output` captures, and
 `--no-cull` (captures only) draws every tile in the same order, for isolating culling
 from draw order; `--no-detail` draws every detail cell near. Schema 6 (graphics G3a) adds
 `wake_shading` (`stamped` or `analytic`, field size, spacing, bytes and builds) and the
@@ -603,6 +603,171 @@ pairs (four applied passes plus the residual check). The bots capsize often, so 
 frequent. These are same-machine engineering measurements with no networking, encoding or
 snapshots. Artifacts: `build/bench/m2/{out-head,out-new,server-release.txt}`. The hour soaks
 were not rerun; the C3 soak hashes no longer apply because the soak drives crossing mode.
+
+## Outer benchmark and render tiles — 2026-11-04
+
+The follow-up to P3's [outer 120 Hz finding](GRAPHICS_OVERHAUL_PLAN.md#outer-performance-follow-up).
+`--scenario outer` drives the river route on the outer map and continues across the estuary to
+`fjord` (2700, −1500): 12,141 frames, 24,280 ticks, the same `final_state` as
+`--check --scenario outer --waves`. `--no-shadows` and `--no-reflections` skip a pass, for
+measuring it.
+
+```sh
+./build-release/boat_water_review --benchmark OUT/outer-high --aa off --waves --scenario outer \
+  --resolution high
+```
+
+Release, Apple M1 Max, macOS, `--waves`, `--aa off`. GPU is `GL_TIME_ELAPSED` around the scene
+draw; ms, p50 / p95, one value per run.
+
+**Where outer time goes** (hidden, unpaced, high resolution with HDR, 1,024 m tiles, two
+interleaved rounds): baseline 2.39–2.59 / 3.20–3.79; `--no-reflections` 1.49–1.64 / 1.84–2.03
+(and CPU submit −0.6 ms); `--no-shadows` 2.59–2.88 / 3.39–3.60; `--no-detail` 2.33–2.54 /
+3.11–3.67; `--no-far-water` 2.31–2.43 / 3.03–3.50. Only the reflection is a measurable share. At
+low resolution its 160×120 target costs the same 1.2 ms (2.39 → 1.23), so it is not pixels;
+culling its mirrored front faces instead of drawing both sides saved under 0.1 ms. Render tile
+size decides it: GPU p50 2.39 at 1,024 m, 4.22 at 512 m and 7.16 at 256 m though triangles fall
+(598 k → 470 k p50), 2.09 at 2,048 m and 2.00 at 4,096 m though they rise (795 k, 974 k).
+Submissions (270, 437, 856, 199, 185 p50) track GPU time here, and CPU submit tracks it as well,
+so the driver's per-draw work dominates; the timer cannot separate it from shading. Combined with
+512 m detail cells, 2,048 m tiles reach 1.90 / 2.34 at 145 submissions (not adopted; see the
+plan). The game's scripted outer demo, vsync-paced, reports 6.6 ms GPU p50 for the same
+triangle load: the GPU clocks down when paced, so paced and unpaced GPU times do not compare.
+
+**2,048 m default tiles** (`WATERFRONT_TILE_SIZE`; previous build against this one, interleaved,
+hidden and unpaced unless stated):
+
+| Run | Submissions p50 | Triangles p50 / p95 | GPU p50 / p95 | CPU submit p50 | Frame p95 |
+| --- | --- | --- | --- | --- | --- |
+| outer high, 1,024 m | 270 | 598 k / 1.11 M | 2.38–2.59 / 3.15–3.84 | 2.07–2.22 | 4.11–4.65 |
+| outer high, 2,048 m | 199 | 795 k / 1.50 M | 1.99–2.00 / 2.43–2.49 | 1.79–1.81 | 3.77–3.99 |
+| outer low, 1,024 m | 270 | 580 k / 1.04 M | 2.05–2.12 / 3.21–3.25 | 1.75–1.76 | 3.66–3.73 |
+| outer low, 2,048 m | 199 | 773 k / 1.39 M | 1.55 / 1.91–1.94 | 1.44–1.45 | 3.11–3.14 |
+| river 4x4, 1,024 m | 128 | 203 k / 512 k | 1.63 / 2.01–2.06 | 1.27–1.30 | 2.84–2.85 |
+| river 4x4, 2,048 m | 97 | 250 k / 553 k | 1.58 / 1.92 | 1.19–1.20 | 2.60–2.68 |
+| outer high vsync, 1,024 m | 270 | | 4.26 / 5.98 | 2.33 | 16.71 |
+| outer high vsync, 2,048 m | 199 | | 3.89 / 5.74 | 2.15 | 16.75 |
+
+Every run of a scenario ended in the same `final_state` in both builds. River 4x4 triangles p95
+553 k stay inside G2b's 650 k gate. Review captures against the previous build: low resolution
+worst 2/255 (inside the 2/255 bound), high resolution worst 19/255 at fewer than 51 pixels a
+frame in seven captures (mean below 0.0001/255), from coplanar depth ties that now fall in one
+tile instead of two.
+
+**120 Hz pacing on this Mac.** With vsync on the 120 Hz display, about 40% of outer frame
+intervals exceed 10 ms in both builds, evenly along the route, and so do 45% on the light river
+at low resolution (GPU 1.56, CPU submit 1.35 ms). Without the pacer's backstop (an uncommitted
+experiment) vsync alone gives river intervals p50 11.0 / p95 14.5 ms. Unpaced, outer high now
+fits in 3.8–4.0 ms frame p95. So in a window on this Mac, OpenGL vsync does not hold 120 Hz at
+any load, and scene work is not the cause of those misses. Every run was windowed, so outside
+macOS Game Mode, which applies only in macOS full-screen mode; as the user noted, frame rates
+outside it can be inconsistent. Not tested: Game Mode, another display, Windows, or the browser.
+
+**User play, 2026-11-04 (M1 Max, 120 Hz display, this branch).** In macOS full-screen mode
+(the window's green button) the user found the game very smooth with no stutter; in a window it
+still stutters. Game Mode was not active: no notice appeared and the menu bar showed no Game
+Mode icon in full screen. So the smoothness comes from full-screen presentation itself. F11's
+borderless window is smooth too; only a normal window stutters. Not tested: another display,
+Windows, or the browser.
+
+**512 m detail cells, 2026-11-04.** Same machine and method, two interleaved repeats against the
+2,048 m tile build (both read slower this session than the table above): outer high GPU p50/p95
+2.22–2.24 / 3.66–3.67 → 2.09–2.10 / 3.49 ms at submissions p50 199 → 145; river 4x4
+1.71–1.77 / 2.44–2.57 → 1.65 / 2.49–2.50 ms at submissions p95 241 → 186. River triangles p95
+553 k → 718 k, past G2b's 650 k gate, which is retired on this Mac. The user played the build
+and noticed no popping or other difference.
+
+## Graphics G5a presentation presets — 2026-11-03
+
+Release, Apple M1 Max, macOS, hidden 960×600 window, `--waves`, two interleaved repetitions
+against a control build of `main` (`6e78e5c`); GPU is `GL_TIME_ELAPSED` around the scene draw,
+which includes the HDR bloom and composite. Ranges are the two runs (ms):
+
+| Preset (`boat_water_review --benchmark`) | Scene | River GPU p50 / p95 | Stress GPU p50 / p95 |
+| --- | --- | --- | --- |
+| control `--aa off` | 320×200 | 1.12–1.16 / 1.53–1.87 | 2.81–2.88 / 3.43–3.66 |
+| `--aa off` | 320×200 | 1.20–1.21 / 1.58–2.28 | 2.80–2.86 / 3.40–3.58 |
+| control `--aa 4x4` | 1280×800 → 320×200 | 1.69–1.76 / 2.38–2.53 | 3.38–3.41 / 4.16–4.17 |
+| `--aa 4x4` | 1280×800 → 320×200 | 1.69–1.83 / 2.38–2.82 | 3.34–3.41 / 4.11–4.20 |
+| `--aa off --resolution high --hdr off` | 1280×800 | 1.63–1.69 / 2.22–2.58 | 3.36 / 4.06–4.11 |
+| `--aa off --resolution high` (HDR) | 1280×800 | 1.60–1.88 / 2.14–3.03 | 3.64–3.65 / 5.27–5.39 |
+
+Low resolution and 4×4 match the control within run-to-run noise, and every run of a scenario
+ends in the same `final_state`. High resolution without HDR costs about the same as today's 4×4
+supersampling, which renders as many scene pixels. HDR adds about 0.3 ms p50 and 1.2 ms p95 in
+the four-boat stress scene (16-bit scene, depth copy and the bloom chain); river differences are
+within noise. The HDR targets hold 14,976,000 bytes at 1280×800 (`hdr_bytes`). Everything stays
+far below G0's stress 4×4 reference of 20.01 ms GPU p95. No Windows, browser-timing or visible
+paced run was made for this checkpoint.
+
+## Graphics G5b clustered lights — 2026-11-03
+
+Release, Apple M1 Max, macOS, hidden 960×600 window, `--waves --aa off`, two interleaved runs
+against a control build of the G5a commit (`477251a`). GPU is `GL_TIME_ELAPSED` around the scene
+draw; `light_build_us` is one CPU cluster build and pack, timed over 50 repeats of the final
+frame's lights. Ranges are the two runs (ms):
+
+| Run | River GPU p50 / p95 | Stress GPU p50 / p95 | River lights / upload rows / build |
+| --- | --- | --- | --- |
+| control low, day | 1.18–1.20 / 1.57–1.58 | 2.75 / 3.14–3.15 | — |
+| low, day | 1.28–1.34 / 1.68–1.69 | 2.77–2.78 / 3.17–3.19 | 29 / 33 / 8 µs |
+| low, dusk | 1.31–1.34 / 1.74–1.77 | 2.89–2.90 / 3.35–3.36 | 42 / 34 / 9 µs |
+| low, dusk, 600 stress lights | 1.51 / 1.97–2.04 | 2.89–2.90 / 3.34–3.35 | 642 / 40 / 42 µs |
+| control high (HDR), day | 1.65–1.76 / 2.15–2.38 | 3.54 / 4.00–4.05 | — |
+| high, day | 1.72–1.76 / 2.26–2.36 | 3.62 / 4.08 | 29 / 33 / 8 µs |
+| high, dusk | 2.17–2.19 / 2.58–2.59 | 4.01–4.02 / 4.55–4.57 | 42 / 34 / 9 µs |
+| high, dusk, 600 stress lights | 2.81 / 3.17–3.19 | 4.01–4.02 / 4.53–4.58 | 642 / 40 / 43 µs |
+| high, dusk, 600, `--light-fallback` | 2.07–2.09 / 2.56–2.57 | 3.94–3.95 / 4.48 | 29 of 642 kept |
+
+The stress scenario is the basin, which has no local lights; its dusk cost is the water's streak
+taps (+0.1 ms low, +0.45 ms high p50). By day the clusters cost about 0.1 ms on the river at low
+resolution and are within noise at high. 600 extra lights add about 0.6 ms p50 at high dusk, with
+no slot overflow; the fallback is cheaper because it shades 29 lights and gives the water none.
+Every run of a scenario ended in the same `final_state`. All runs stay far below G0's stress 4×4
+reference of 20.01 ms GPU p95. No Windows, browser-timing or visible paced run was made.
+
+## Graphics G5c final matrix and particles — 2026-11-04
+
+Release, Apple M1 Max, macOS, hidden 960×600 window, unpaced, `--waves`, at `673f1d2` plus the
+F9 review toggle (uncommitted at measurement; it touches only input). Three interleaved
+repetitions against a control build of `main` (`6e78e5c`: P2 and the sunset frame, the package
+before P3). Values are medians of the per-run statistics (ms); GPU is `GL_TIME_ELAPSED` around
+the scene draw.
+
+| Run | GPU p50 / p95 | CPU submit p50 / p95 | Frame p50 / p95 |
+| --- | --- | --- | --- |
+| G0 reference (`d0b1970`), river 4x4 | 3.45 / 3.85 | 3.87 / 4.30 | 4.62 / 6.09 |
+| G0 reference, stress 4x4 | 17.78 / 20.01 | 9.84 / 11.13 | 11.61 / 13.48 |
+| `main` river 4x4 | 1.51 / 1.86 | 1.26 / 1.67 | 1.77 / 2.94 |
+| P3 river 4x4 | 1.63 / 2.05 | 1.33 / 1.78 | 1.84 / 2.90 |
+| `main` river off | 1.21 / 1.59 | 1.19 / 1.62 | 1.75 / 2.83 |
+| P3 river off | 1.26 / 1.67 | 1.24 / 1.68 | 1.78 / 2.85 |
+| `main` stress 4x4 | 3.39 / 3.83 | 2.37 / 3.00 | 3.80 / 5.41 |
+| P3 stress 4x4 | 3.47 / 3.89 | 2.46 / 3.11 | 3.89 / 5.54 |
+| `main` stress off | 2.74 / 3.13 | 1.89 / 2.36 | 3.20 / 4.57 |
+| P3 stress off | 2.77 / 3.18 | 1.92 / 2.41 | 3.26 / 4.68 |
+| P3 river low dusk | 1.33 / 1.76 | 1.27 / 1.75 | 1.80 / 2.86 |
+| P3 river high (HDR) day / dusk | 1.70 / 2.25, 2.18 / 2.57 | 1.63 / 2.10, 1.74 / 2.17 | 2.17 / 3.46, 2.26 / 3.42 |
+| P3 stress low dusk | 2.89 / 3.34 | 2.03 / 2.55 | 3.36 / 4.54 |
+| P3 stress high (HDR) day / dusk | 3.58 / 4.05, 4.00 / 4.53 | 2.63 / 3.30, 3.04 / 3.71 | 4.08 / 5.55, 4.45 / 6.01 |
+
+P3 at the default low preset costs at most about 0.1 ms GPU and CPU over `main` (clusters, AO
+and the G5b far-shadow lookup), with submissions and triangles unchanged (river p50 128 and
+203 k). Every run of a scenario ended in the same `final_state` in both builds. Against G0 all
+runs are far inside the budgets: river 4x4 GPU p95 2.05 ms (gate ≤ 4.05), stress 4x4 3.89 ms
+(G3 target ≤ 16.5), river CPU submit p95 1.78 ms (≤ 3.2) and river 4x4 frame p95 2.90 ms (≤ 8.0).
+The worst preset, stress at high resolution with HDR at dusk, is 4.53 ms GPU p95. Memory added
+by P3: HDR targets 14,976,000 bytes at 1280×800, the light texture (256 × 96 RGBA32F, 393 KB),
+the ambient sidecars held in memory (236 KB river, 1.84 MB outer) and their vertex splits (map
+vertex bytes 15.49 → 16.19 MB river, 70.14 → 71.96 MB outer).
+
+**Particles.** In the stress scene (four boats, `--waves`) the cube foam and spray draw 287 p50 /
+463 p95 instances. `--no-particles` over two interleaved runs: GPU −0.12 ms low and −0.2 ms high
+p50, CPU submit −0.17 ms. Posing them (instrumented once, not committed) costs about 59 µs per
+boat per frame with waves, most of it the water normal under each foam cube. A portable GPU
+path could at most save about 0.4 ms CPU in this worst case, so they stay CPU-evaluated.
+
+No Windows, browser-timing or visible paced run was made for this checkpoint.
 
 ## Windows active GPU check — 2026-11-03
 

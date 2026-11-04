@@ -281,6 +281,21 @@ static const char *fit(Font font, const char *text, int width)
     return text;
 }
 
+// PICTURE: plain low resolution, its 4x supersampling, or high resolution.
+static const char *const pictures[] = { "PIXEL", "SMOOTH", "HIGH RES" };
+
+static int picture(const BoatTitleSettings *s)
+{
+    return s->high_resolution ? 2 : s->smooth_edges ? 1 : 0;
+}
+
+static void turn_picture(BoatTitleSettings *s, int turn)
+{
+    int next = (picture(s) + 3 + turn) % 3;
+    s->smooth_edges = next == 1;
+    s->high_resolution = next == 2;
+}
+
 static void row_text(const Title *t, const BoatTitleSettings *s, int row, const char **label,
     char *value, size_t size)
 {
@@ -288,7 +303,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     value[0] = 0;
     if (t->panel == PANEL_SINGLE) {
         static const char *labels[SOLO_ROWS]
-            = { "PLACE", "CONTENT", "WAVES", "SMOOTHING", "START", "BACK" };
+            = { "PLACE", "CONTENT", "WAVES", "PICTURE", "START", "BACK" };
         int logical = solo_row(t, row);
         *label = labels[logical];
         if (logical == ROW_SOLO_PLACE)
@@ -302,12 +317,12 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         else if (logical == ROW_SOLO_WATER)
             snprintf(value, size, "< %s >", s->waves ? "ON" : "OFF");
         else if (logical == ROW_SOLO_EDGES)
-            snprintf(value, size, "< %s >", s->smooth_edges ? "ON" : "OFF");
+            snprintf(value, size, "< %s >", pictures[picture(s)]);
         return;
     }
     if (t->panel == PANEL_SETTINGS) {
         static const char *labels[SETTINGS_ROWS]
-            = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "SMOOTHING", "BACK" };
+            = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "PICTURE", "BACK" };
         *label = labels[row];
         if (row == ROW_NAME)
             snprintf(value, size, "%s", s->name);
@@ -320,7 +335,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         else if (row == ROW_MUSIC)
             snprintf(value, size, "%s", boat_music(s->soundtrack)->label);
         else if (row == ROW_EDGES)
-            snprintf(value, size, "< %s >", s->smooth_edges ? "ON" : "OFF");
+            snprintf(value, size, "< %s >", pictures[picture(s)]);
         return;
     }
     if (t->panel == PANEL_HOST) {
@@ -918,7 +933,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 else if (sel == ROW_SOLO_WATER && turn)
                     s->waves = !s->waves;
                 else if (sel == ROW_SOLO_EDGES && turn)
-                    s->smooth_edges = !s->smooth_edges;
+                    turn_picture(s, turn);
                 activate = false;
             }
         }
@@ -946,7 +961,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             else if (t.selected == ROW_MUSIC)
                 s->soundtrack = (s->soundtrack + BOAT_MUSIC_COUNT + turn) % BOAT_MUSIC_COUNT;
             else if (t.selected == ROW_EDGES && turn)
-                s->smooth_edges = !s->smooth_edges;
+                turn_picture(s, turn);
             else if (t.selected == ROW_MOUSE && turn)
                 s->mouse_steering = !s->mouse_steering;
             activate = false;
@@ -1122,6 +1137,8 @@ void boat_title_load(BoatTitleSettings *s)
             s->waves = !strcmp(value, "on");
         else if (!strcmp(line, "smooth_edges"))
             s->smooth_edges = !strcmp(value, "on");
+        else if (!strcmp(line, "resolution"))
+            s->high_resolution = !strcmp(value, "high");
         else if (!strcmp(line, "outer_content"))
             s->outer_content = !strcmp(value, "harbor-life");
         else if (!strcmp(line, "host_mode")) {
@@ -1154,6 +1171,7 @@ void boat_title_save(const BoatTitleSettings *s)
         s->location == BOAT_LOCATION_COUNT ? "course" : boat_location(s->location)->name,
         s->waves ? "on" : "off", s->smooth_edges ? "on" : "off",
         s->outer_content ? "harbor-life" : "standard");
+    fprintf(file, "resolution=%s\n", s->high_resolution ? "high" : "low");
     fprintf(file, "host_mode=%s\nhost_location=%s\nhost_waves=%s\n",
         boat_title_host_mode(s->host_mode), boat_location(s->host_location)->name,
         s->host_waves ? "on" : "off");

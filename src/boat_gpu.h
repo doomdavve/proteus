@@ -4,6 +4,8 @@
 #include "boat_water_mesh.h"
 #include "renderer_gpu.h"
 
+#define BOAT_GPU_BLOOM_LEVELS 3 // Half, quarter and eighth size.
+
 typedef struct {
     WaterfrontGpuScene scene;
     RenderTexture2D target, supersampled;
@@ -21,6 +23,14 @@ typedef struct {
     double wake_upload_seconds;
     size_t wake_uploads;
     float daylight; // Presentation phase, 0 (day; init resets it) .. 1 (dusk).
+    // HDR presentation, off unless requested: the colour pass renders into hdr_target (RGBA16F,
+    // with depth) and the post shader blooms, grades and clamps it into target. The rear-view
+    // mirror and supersampling keep drawing 8-bit directly.
+    RenderTexture2D hdr_target, bloom[BOAT_GPU_BLOOM_LEVELS];
+    Shader post;
+    int post_locations[7];
+    bool hdr_requested;
+    int hdr_allocation_failures; // Tests: fail this many upcoming HDR allocations.
     bool failed;
 
 } BoatGpu;
@@ -33,6 +43,16 @@ bool boat_gpu_resize(BoatGpu *gpu, int width, int height);
 void boat_gpu_draw(BoatGpu *gpu, const BoatViewState *view, const BoatPresentation *presentation,
     const BoatWorld *world, BoatCamera camera);
 void boat_gpu_destroy(BoatGpu *gpu);
+// Request (or release) HDR presentation at the target's size and return whether it is active.
+// It needs float render targets with blending; otherwise the 8-bit presentation remains, as it
+// does after a failed allocation here or in a later resize.
+bool boat_gpu_set_hdr(BoatGpu *gpu, bool enabled);
+bool boat_gpu_hdr_active(const BoatGpu *gpu);
+// Bloom, grade (for daylight PHASE) and clamp hdr_target into target. boat_gpu_draw_scene calls
+// this after its colour pass; tests call it on a hand-filled hdr_target.
+void boat_gpu_present_hdr(BoatGpu *gpu, float phase);
+// Bytes held by the HDR scene, its depth and the bloom chain.
+size_t boat_gpu_hdr_bytes(const BoatGpu *gpu);
 void boat_gpu_draw_with_ghost(BoatGpu *gpu, const BoatViewState *view,
     const BoatPresentation *presentation, const BoatWorld *world, BoatCamera camera,
     const BoatViewState *ghost, const BoatFlag *ghost_flag, float opacity);

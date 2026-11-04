@@ -13,7 +13,8 @@ Module['boatScenery'] = (() => {
       if (loads[name] && loads[name].state !== -1)
         return;
       const load = (loads[name] = { state: 1, received: 0, total: 0 });
-      // The pack, then its optional water atlas (graphics G4) next to it in the file system.
+      // The pack, then its optional water atlas (graphics G4) and ambient occlusion (G5c) next to
+      // it in the file system.
       const fetchInto = async (file, target, counted) => {
         const url = Module['locateFile'](`geometry/${name}/${file}`, '');
         const response = await fetch(url);
@@ -42,10 +43,12 @@ Module['boatScenery'] = (() => {
         FS.mkdirTree(target.slice(0, target.lastIndexOf('/')));
         FS.writeFile(target, bytes);
       };
-      const atlas = path.slice(0, path.lastIndexOf('/') + 1) + 'water_atlas.bin';
+      const directory = path.slice(0, path.lastIndexOf('/') + 1);
       fetchInto('scenery.bin', path, true)
-        .then(() => fetchInto('water_atlas.bin', atlas, false).catch(error =>
-          console.warn('Water atlas', name, error)))
+        .then(() => fetchInto('water_atlas.bin', directory + 'water_atlas.bin', false).catch(
+          error => console.warn('Water atlas', name, error)))
+        .then(() => fetchInto('ambient.bin', directory + 'ambient.bin', false).catch(error =>
+          console.warn('Ambient occlusion', name, error)))
         .then(() => {
           load.state = 2;
         })

@@ -9,6 +9,7 @@ typedef struct {
     char address[64]; // HOST:PORT for MULTIPLAYER.
     unsigned location; // Single-player location; BOAT_LOCATION_COUNT selects the basin trial.
     bool waves, smooth_edges;
+    bool high_resolution; // PICTURE HIGH RES: --resolution high, which replaces smooth_edges.
     unsigned skin; // Single-player livery; rooms colour boats by slot.
     bool mouse_steering; // Sessions start with captured mouse steering; in-game changes return.
     unsigned soundtrack; // Local music choice, including off; shared by single player and rooms.

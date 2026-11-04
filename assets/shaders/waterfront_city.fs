@@ -4,6 +4,7 @@ in vec2 fragTexCoord;
 in vec4 fragColor;
 in vec3 fragWorldPosition;
 in vec3 fragWorldNormal;
+in float fragOcclusion;
 flat in vec4 fragObjectColor;
 flat in int fragEmissive;
 
@@ -14,6 +15,7 @@ uniform int groundPass;
 uniform int facadePass;
 uniform int reflectionPass;
 uniform vec3 ambientColor;
+uniform float ambientOcclusion; // Share of ambient a fully closed baked corner removes.
 uniform vec3 directionalColor;
 uniform vec3 directionalDirection;
 uniform float directionalIntensity;
@@ -23,6 +25,7 @@ uniform int shadowsEnabled;
 uniform int farShadowsEnabled;
 uniform sampler2D farShadowMap;
 uniform mat4 farLightViewProjection;
+uniform float farShadowTexel; // Metres per far shadow-map texel.
 uniform vec3 cameraPosition;
 uniform vec3 fogColor;
 uniform float fogStart;
@@ -39,6 +42,13 @@ uniform vec4 localLightPositionRadius[32];
 uniform vec4 localLightColorIntensity[32];
 uniform vec4 localLightDirection[32];
 uniform vec4 localLightCone[32];
+// G5b clusters (waterfront_lights.h): 0 the capped uniform list above, 1 the slot list of each
+// point, 2 every clustered light (the reference the slot lists must match exactly).
+uniform int lightClusterMode;
+uniform highp sampler2D lightClusters; // Float records: keep full precision on the web.
+uniform int lightClusterCount;
+uniform vec4 lightClusterLayout; // Cell metres, grid slots per axis, slot base, index base.
+uniform float emissiveGain; // Above 1 only for an HDR target at dusk.
 
 out vec4 finalColor;
 
@@ -161,7 +171,7 @@ vec3 apply_atmosphere(vec3 color)
 }
 
 // Square light-space coverage; blend before the detailed map ends, then fade the far map.
-float shadow_visibility(float bias)
+float shadow_visibility(float bias, vec3 farOffset)
 {
     vec4 nearLight = lightViewProjection * vec4(fragWorldPosition, 1.0);
     vec3 p = nearLight.xyz / nearLight.w * 0.5 + 0.5;
@@ -175,7 +185,7 @@ float shadow_visibility(float bias)
     float nearWeight = 1.0 - smoothstep(0.70, 0.95, edge);
     if (nearWeight >= 1.0)
         return nearVisibility;
-    vec4 farLight = farLightViewProjection * vec4(fragWorldPosition, 1.0);
+    vec4 farLight = farLightViewProjection * vec4(fragWorldPosition + farOffset, 1.0);
     vec3 q = farLight.xyz / farLight.w * 0.5 + 0.5;
     float farVisibility = 1.0;
     if (all(greaterThan(q, vec3(0.0))) && all(lessThan(q, vec3(1.0)))) {
@@ -194,8 +204,65 @@ float directional_shadow(vec3 normal)
         return 1.0;
     float incidence = max(0.0, dot(normal, normalize(directionalDirection)));
     float bias = max(0.0012 * (1.0 - incidence), 0.00018);
+    // A depth bias cannot cover a far texel's 1.5 m: a low sun striped sunlit walls with their
+    // own shadow. Look the far map up a texel out along the normal, more as the light grazes.
+    vec3 farOffset = normal * (farShadowTexel * sqrt(1.0 - incidence * incidence));
     // Remove direct fill in shadow; ambient and local/emissive light remain visible.
-    return shadow_visibility(bias);
+    return shadow_visibility(bias, farOffset);
+}
+
+vec3 localLight(vec4 positionRadius, vec4 colorIntensity, vec4 direction, vec4 cone,
+    vec3 normal)
+{
+    vec3 delta = positionRadius.xyz - fragWorldPosition;
+    float radius = positionRadius.w;
+    float distance = length(delta);
+    if (distance >= radius)
+        return vec3(0.0);
+    vec3 towardLight = delta / max(distance, 0.001);
+    float incidence = max(0.0, dot(normal, towardLight));
+    float attenuation = 1.0 - distance / radius;
+    float spot = 1.0;
+    if (cone.y >= 0.0)
+        spot = smoothstep(cone.y, cone.x, dot(normalize(direction.xyz), -towardLight));
+    return colorIntensity.rgb * (colorIntensity.a * incidence * attenuation * attenuation * spot);
+}
+
+vec4 lightTexel(int index)
+{
+    return texelFetch(lightClusters, ivec2(index % 256, index / 256), 0);
+}
+
+vec3 clusterLight(int light, vec3 normal)
+{
+    int base = light * 4;
+    return localLight(lightTexel(base), lightTexel(base + 1), lightTexel(base + 2),
+        lightTexel(base + 3), normal);
+}
+
+void addLocalLights(inout vec3 illumination, vec3 normal)
+{
+    if (lightClusterMode == 0) {
+        for (int index = 0; index < localLightCount; ++index)
+            illumination += localLight(localLightPositionRadius[index],
+                localLightColorIntensity[index], localLightDirection[index],
+                localLightCone[index], normal);
+        return;
+    }
+    if (lightClusterMode == 2) {
+        for (int light = 0; light < lightClusterCount; ++light)
+            illumination += clusterLight(light, normal);
+        return;
+    }
+    vec2 cell = mod(floor(fragWorldPosition.xz / lightClusterLayout.x), lightClusterLayout.y);
+    int slot = int(cell.y) * int(lightClusterLayout.y) + int(cell.x);
+    vec4 header = lightTexel(int(lightClusterLayout.z) + slot);
+    int offset = int(header.x), count = int(header.y);
+    for (int k = 0; k < count; ++k) {
+        int at = offset + k;
+        vec4 slots = lightTexel(int(lightClusterLayout.w) + at / 4);
+        illumination += clusterLight(int(slots[at % 4]), normal);
+    }
 }
 
 void main()
@@ -223,33 +290,22 @@ void main()
                     mix(albedo.rgb * windowDark, windowLit, fragColor.a), windowLight);
             albedo.a = 1.0;
         }
-        finalColor = vec4(apply_atmosphere(albedo.rgb), albedo.a);
+        // The 8-bit reflection keeps unit gain; its streaks come from the water.
+        float gain = reflectionPass != 0 ? 1.0 : emissiveGain;
+        finalColor = vec4(apply_atmosphere(albedo.rgb * gain), albedo.a);
         return;
     }
 
     vec3 normal = normalize(fragWorldNormal);
     float directional = max(0.0, dot(normal, normalize(directionalDirection)));
-    vec3 illumination = ambientColor
+    // A facade is one tall triangle per wall, so its base corners' occlusion would shade the
+    // whole height: keep it to the bottom metres, as contact with the street.
+    float occlusion = fragOcclusion;
+    if (facadePass != 0)
+        occlusion *= 1.0 - smoothstep(0.0, 4.0, fragTexCoord.y);
+    vec3 illumination = ambientColor * (1.0 - ambientOcclusion * occlusion)
         + directionalColor * directionalIntensity * directional * directional_shadow(normal);
-    for (int index = 0; index < localLightCount; ++index) {
-        vec3 delta = localLightPositionRadius[index].xyz - fragWorldPosition;
-        float radius = localLightPositionRadius[index].w;
-        float distance = length(delta);
-        if (distance >= radius)
-            continue;
-        vec3 towardLight = delta / max(distance, 0.001);
-        float incidence = max(0.0, dot(normal, towardLight));
-        float attenuation = 1.0 - distance / radius;
-        float spot = 1.0;
-        float outerCone = localLightCone[index].y;
-        if (outerCone >= 0.0) {
-            float cone = dot(normalize(localLightDirection[index].xyz), -towardLight);
-            float innerCone = localLightCone[index].x;
-            spot = smoothstep(outerCone, innerCone, cone);
-        }
-        illumination += localLightColorIntensity[index].rgb
-            * (localLightColorIntensity[index].a * incidence * attenuation * attenuation * spot);
-    }
+    addLocalLights(illumination, normal);
 
     // Preserve the full output palette while retaining the low-resolution framebuffer. Clamp
     // illumination before multiplying albedo, rather than adding white, so nearby lamps do not

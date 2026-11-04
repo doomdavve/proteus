@@ -2,14 +2,215 @@
 #include "boat_assets.h"
 #include "raymath.h"
 #include "rlgl.h"
+#include "waterfront_grade.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
+enum { POST_MODE, POST_TEXEL, POST_BLOOM, POST_GRADE, POST_LIFT, POST_GAIN, POST_BLOOM_TEXTURE };
+enum { POST_BLOOM_SLOT = 1 };
+
+static RenderTexture2D load_float_target(int width, int height, bool depth)
+{
+    RenderTexture2D target = { .id = rlLoadFramebuffer() };
+    if (target.id == 0)
+        return target;
+    int format = PIXELFORMAT_UNCOMPRESSED_R16G16B16A16;
+    target.texture
+        = (Texture2D) { .width = width, .height = height, .mipmaps = 1, .format = format };
+    target.texture.id = rlLoadTexture(NULL, width, height, format, 1);
+    if (target.texture.id != 0) {
+        rlFramebufferAttach(
+            target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0, RL_ATTACHMENT_TEXTURE2D, 0);
+        // A renderbuffer like LoadRenderTexture's, so the water's depth copy can blit it.
+        if (depth) {
+            target.depth = (Texture2D) { .id = rlLoadTextureDepth(width, height, true),
+                .width = width,
+                .height = height,
+                .format = 19 }; // raylib's DEPTH_COMPONENT_24BIT marker.
+            if (target.depth.id != 0)
+                rlFramebufferAttach(
+                    target.id, target.depth.id, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_RENDERBUFFER, 0);
+        }
+        if ((!depth || target.depth.id != 0) && rlFramebufferComplete(target.id)) {
+            SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
+            SetTextureWrap(target.texture, TEXTURE_WRAP_CLAMP);
+            return target;
+        }
+    }
+    UnloadRenderTexture(target);
+    return (RenderTexture2D) { 0 };
+}
+
+static void unload_hdr_targets(RenderTexture2D *hdr, RenderTexture2D *bloom)
+{
+    if (hdr->id)
+        UnloadRenderTexture(*hdr);
+    *hdr = (RenderTexture2D) { 0 };
+    for (int i = 0; i < BOAT_GPU_BLOOM_LEVELS; ++i) {
+        if (bloom[i].id)
+            UnloadRenderTexture(bloom[i]);
+        bloom[i] = (RenderTexture2D) { 0 };
+    }
+}
+
+// Replace the HDR targets with WIDTH x HEIGHT ones, or release them all on failure.
+static bool allocate_hdr(BoatGpu *gpu, int width, int height)
+{
+    RenderTexture2D hdr = { 0 }, bloom[BOAT_GPU_BLOOM_LEVELS] = { 0 };
+    bool ok = gpu->hdr_allocation_failures <= 0;
+    if (!ok)
+        --gpu->hdr_allocation_failures;
+    if (ok) {
+        hdr = load_float_target(width, height, true);
+        ok = hdr.id != 0;
+        // A point-sampled scene composites exactly at 1:1 and feeds the bright pass texels.
+        if (ok)
+            SetTextureFilter(hdr.texture, TEXTURE_FILTER_POINT);
+    }
+    for (int i = 0; ok && i < BOAT_GPU_BLOOM_LEVELS; ++i) {
+        int w = width >> (i + 1), h = height >> (i + 1);
+        bloom[i] = load_float_target(w > 0 ? w : 1, h > 0 ? h : 1, false);
+        ok = bloom[i].id != 0;
+    }
+    unload_hdr_targets(&gpu->hdr_target, gpu->bloom);
+    if (!ok) {
+        unload_hdr_targets(&hdr, bloom);
+        TraceLog(LOG_WARNING, "HDR targets of %dx%d unavailable; presenting 8-bit", width, height);
+        return false;
+    }
+    gpu->hdr_target = hdr;
+    memcpy(gpu->bloom, bloom, sizeof(bloom));
+    return true;
+}
+
+bool boat_gpu_hdr_active(const BoatGpu *gpu) { return gpu->hdr_target.id != 0; }
+
+size_t boat_gpu_hdr_bytes(const BoatGpu *gpu)
+{
+    if (!gpu->hdr_target.id)
+        return 0;
+    size_t pixels = (size_t)gpu->hdr_target.texture.width * (size_t)gpu->hdr_target.texture.height;
+    size_t bytes = pixels * (8 + 4); // RGBA16F colour and a 24/8 depth-stencil buffer.
+    for (int i = 0; i < BOAT_GPU_BLOOM_LEVELS; ++i)
+        bytes += (size_t)gpu->bloom[i].texture.width * (size_t)gpu->bloom[i].texture.height * 8;
+    return bytes;
+}
+
+bool boat_gpu_set_hdr(BoatGpu *gpu, bool enabled)
+{
+    gpu->hdr_requested = enabled;
+    if (!enabled) {
+        unload_hdr_targets(&gpu->hdr_target, gpu->bloom);
+        return false;
+    }
+    if (!gpu->post.id) {
+        char path[1024];
+        if (!boat_asset_path(path, sizeof(path), "shaders/gpu_post.fs"))
+            return false;
+        Shader post = LoadShader(NULL, path);
+        if (!IsShaderValid(post) || post.id == rlGetShaderIdDefault()) {
+            TraceLog(LOG_WARNING, "HDR post shader unavailable; presenting 8-bit");
+            return false;
+        }
+        gpu->post = post;
+        const char *names[] = { "postMode", "sourceTexel", "bloomParameters", "gradeParameters",
+            "gradeLift", "gradeGain", "bloomTexture" };
+        for (int i = 0; i < (int)(sizeof(names) / sizeof(names[0])); ++i)
+            gpu->post_locations[i] = GetShaderLocation(post, names[i]);
+        int slot = POST_BLOOM_SLOT;
+        SetShaderValue(post, gpu->post_locations[POST_BLOOM_TEXTURE], &slot, SHADER_UNIFORM_INT);
+    }
+    if (!waterfront_gpu_scene_float_blending(&gpu->scene)) {
+        TraceLog(LOG_INFO, "HDR: float blending unavailable; presenting 8-bit");
+        return false;
+    }
+    if (gpu->hdr_target.id && gpu->hdr_target.texture.width == gpu->target.texture.width
+        && gpu->hdr_target.texture.height == gpu->target.texture.height)
+        return true;
+    if (!allocate_hdr(gpu, gpu->target.texture.width, gpu->target.texture.height))
+        return false;
+    TraceLog(LOG_INFO, "HDR: %dx%d RGBA16F scene, %d bloom levels", gpu->target.texture.width,
+        gpu->target.texture.height, BOAT_GPU_BLOOM_LEVELS);
+    return true;
+}
+
+// Draw SOURCE over all of DESTINATION with the post shader in MODE. Texture coordinates follow
+// the targets' own (bottom-up) rows, so no pass flips the image.
+static void post_pass(BoatGpu *gpu, RenderTexture2D destination, Texture2D source, int mode,
+    unsigned int bloom, bool add)
+{
+    int width = destination.texture.width, height = destination.texture.height;
+    BeginTextureMode(destination);
+    rlSetMatrixProjection(MatrixOrtho(0, width, 0, height, -1, 1));
+    rlSetMatrixModelview(MatrixIdentity());
+    if (add) {
+        rlSetBlendFactors(RL_ONE, RL_ONE, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM);
+    } else {
+        rlDisableColorBlend();
+    }
+    BeginShaderMode(gpu->post);
+    SetShaderValue(gpu->post, gpu->post_locations[POST_MODE], &mode, SHADER_UNIFORM_INT);
+    Vector2 texel = { 1.0f / (float)source.width, 1.0f / (float)source.height };
+    SetShaderValue(gpu->post, gpu->post_locations[POST_TEXEL], &texel, SHADER_UNIFORM_VEC2);
+    // Every declared sampler gets a texture, even in modes that do not read it.
+    rlActiveTextureSlot(POST_BLOOM_SLOT);
+    rlEnableTexture(bloom ? bloom : rlGetTextureIdDefault());
+    rlActiveTextureSlot(0);
+    rlSetTexture(source.id);
+    rlBegin(RL_QUADS);
+    rlColor4ub(255, 255, 255, 255);
+    rlTexCoord2f(0, 0);
+    rlVertex2f(0, 0);
+    rlTexCoord2f(1, 0);
+    rlVertex2f((float)width, 0);
+    rlTexCoord2f(1, 1);
+    rlVertex2f((float)width, (float)height);
+    rlTexCoord2f(0, 1);
+    rlVertex2f(0, (float)height);
+    rlEnd();
+    rlDrawRenderBatchActive();
+    rlSetTexture(0);
+    EndShaderMode();
+    rlActiveTextureSlot(POST_BLOOM_SLOT);
+    rlDisableTexture();
+    rlActiveTextureSlot(0);
+    if (add)
+        EndBlendMode();
+    else
+        rlEnableColorBlend();
+    EndTextureMode();
+}
+
+void boat_gpu_present_hdr(BoatGpu *gpu, float phase)
+{
+    WaterfrontGrade grade = waterfront_grade(phase);
+    Vector3 bloom = { grade.bloom_threshold, grade.bloom_knee, grade.bloom_strength };
+    Vector3 look = { grade.exposure, grade.contrast, grade.saturation };
+    SetShaderValue(gpu->post, gpu->post_locations[POST_BLOOM], &bloom, SHADER_UNIFORM_VEC3);
+    SetShaderValue(gpu->post, gpu->post_locations[POST_GRADE], &look, SHADER_UNIFORM_VEC3);
+    SetShaderValue(gpu->post, gpu->post_locations[POST_LIFT], &grade.lift, SHADER_UNIFORM_VEC3);
+    SetShaderValue(gpu->post, gpu->post_locations[POST_GAIN], &grade.gain, SHADER_UNIFORM_VEC3);
+    unsigned int blurred = 0;
+    if (grade.bloom_strength > 0) {
+        post_pass(gpu, gpu->bloom[0], gpu->hdr_target.texture, 0, 0, false);
+        for (int i = 1; i < BOAT_GPU_BLOOM_LEVELS; ++i)
+            post_pass(gpu, gpu->bloom[i], gpu->bloom[i - 1].texture, 1, 0, false);
+        for (int i = BOAT_GPU_BLOOM_LEVELS - 1; i > 0; --i)
+            post_pass(gpu, gpu->bloom[i - 1], gpu->bloom[i].texture, 2, 0, true);
+        blurred = gpu->bloom[0].texture.id;
+    }
+    post_pass(gpu, gpu->target, gpu->hdr_target.texture, 3, blurred, false);
+}
+
 void boat_gpu_destroy(BoatGpu *gpu)
 {
+    unload_hdr_targets(&gpu->hdr_target, gpu->bloom);
+    if (gpu->post.id)
+        UnloadShader(gpu->post);
     if (gpu->wake_texture.id)
         UnloadTexture(gpu->wake_texture);
     MemFree(gpu->wake_upload);
@@ -61,6 +262,9 @@ bool boat_gpu_resize(BoatGpu *gpu, int width, int height)
         UnloadRenderTexture(gpu->supersampled);
     gpu->target = target;
     gpu->supersampled = supersampled;
+    // The HDR chain follows the target; failing that, presentation stays 8-bit.
+    if (gpu->hdr_requested && gpu->hdr_target.id)
+        allocate_hdr(gpu, width, height);
     return true;
 }
 
@@ -163,8 +367,15 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
         frame.ghost_engine = pose.engine;
         frame.ghost_flag = pose.flag;
     }
-    RenderTexture2D target = gpu->supersampled.id ? gpu->supersampled : gpu->target;
+    // HDR applies to the target it was allocated for; the mirror swaps in a smaller one.
+    bool hdr = gpu->hdr_target.id && !gpu->supersampled.id
+        && gpu->hdr_target.texture.width == gpu->target.texture.width
+        && gpu->hdr_target.texture.height == gpu->target.texture.height;
+    RenderTexture2D target = hdr ? gpu->hdr_target
+        : gpu->supersampled.id   ? gpu->supersampled
+                                 : gpu->target;
     gpu->scene.detail_scale = gpu->supersampled.id ? 4 : 1;
+    gpu->scene.emissive_hdr = hdr;
     Mesh original_water = gpu->scene.water;
     if (!mapped) {
         if (!gpu->basin_water.vaoId)
@@ -270,6 +481,8 @@ restore_water:
     gpu->scene.water = original_water;
     gpu->scene.near_water = (Mesh) { 0 };
     gpu->scene.near_water_extra = (Mesh) { 0 };
+    if (hdr)
+        boat_gpu_present_hdr(gpu, frame.lighting.phase);
     if (gpu->supersampled.id) {
         BeginTextureMode(gpu->target);
         ClearBackground(BLACK);

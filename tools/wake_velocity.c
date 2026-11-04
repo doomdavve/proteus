@@ -41,6 +41,7 @@
 #endif
 #include "wake_velocity_net.h"
 #endif
+#include "boat_screen.h"
 #include "boat_title.h"
 #include "boat_web_touch.h"
 #include "frame_pacer.h"
@@ -56,6 +57,16 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
+// The canvas buffer's multiple of the logical frame: 3, or the high scene's own scale, which
+// shrinks for tall mobile frames so the buffer holds no more pixels than the scene.
+static int web_window_scale(BoatResolution resolution, int width, int height)
+{
+    int scale = boat_resolution_window_scale(resolution);
+    return resolution == BOAT_RESOLUTION_LOW
+        ? scale
+        : boat_screen_layout(resolution, width, height, width * scale, height * scale).scene_scale;
+}
+
 EM_JS(void, browser_plugin_controls, (bool pending, bool menu_open), {
     Module.boatPluginResetPending = !!pending;
     Module.boatPluginMenuOpen = !!menu_open;
@@ -160,6 +171,10 @@ static void usage(void)
     cli_usage_line(stdout, "--renderer gpu|cpu", "Renderer (default gpu)");
     cli_usage_line(stdout, "--gpu", "Alias for --renderer gpu");
     cli_usage_line(stdout, "--gpu-aa", "4x supersampling");
+    cli_usage_line(stdout, "--resolution low|high",
+        "Scene pixels: 320x200 (default) or up to 1280x800; high is GPU only, without --gpu-aa");
+    cli_usage_line(stdout, "--hdr on|off",
+        "HDR scene with restrained bloom and grade (default: on at high resolution)");
     cli_usage_line(stdout, "--daylight day|sunset|dusk", "Fixed light for review (default day)");
     cli_usage_line(
         stdout, "--no-far-detail", "Draw distant scenery at full detail, for comparison");
@@ -176,6 +191,8 @@ static void usage(void)
     cli_usage_line(stdout, "--title --screenshot FILE", "Capture the title screen");
     cli_usage_line(stdout, "--time SECONDS", "Screenshot only: 0..60, or 0..600 with --replay");
     cli_usage_line(stdout, "--frames COUNT", "Stop a smoke run after COUNT frames");
+    cli_usage_line(
+        stdout, "--frame-capture FILE", "Save the window, HUD included, at the last of --frames");
     cli_usage_line(stdout, "--demo", "Run the scripted screenshot drive in a window");
 
     cli_usage_section(stdout, "RECORDINGS");
@@ -491,6 +508,25 @@ static void apply_water_layer(BoatGpu *gpu, int layer)
     waterfront_gpu_scene_set_wake_stamp_enabled(&gpu->scene, layer < 4);
 }
 
+// The performance capture's preset: default, gpu-aa, high (with HDR), high-ldr or hdr.
+static const char *presentation_preset(bool aa, BoatResolution resolution, const BoatGpu *gpu)
+{
+    bool hdr = boat_gpu_hdr_active(gpu);
+    return aa               ? "gpu-aa"
+        : resolution && hdr ? "high"
+        : resolution        ? "high-ldr"
+        : hdr               ? "hdr"
+                            : "default";
+}
+
+// Size the GPU scene and its reflection for LAYOUT; failure keeps the previous targets.
+static bool apply_screen_layout(BoatGpu *gpu, BoatScreenLayout layout)
+{
+    return boat_gpu_resize(gpu, layout.scene_width, layout.scene_height)
+        && waterfront_gpu_scene_set_reflection_size(
+            &gpu->scene, layout.reflection_width, layout.reflection_height);
+}
+
 static int study(int argc, char **argv)
 {
     const char *screenshot = NULL;
@@ -510,6 +546,8 @@ static int study(int argc, char **argv)
     unsigned object_life = BOAT_OBJECT_LIFE_TICKS;
     float object_height = BOAT_OBJECT_DEFAULT_HEIGHT;
     bool gpu_enabled = true, gpu_aa = false, far_detail = true;
+    BoatResolution resolution = BOAT_RESOLUTION_LOW;
+    int hdr_option = -1; // --hdr; unset follows the resolution.
     float daylight_phase = WATERFRONT_DAYLIGHT_DAY;
     bool profiler_visible = false;
     const char *performance_report = NULL;
@@ -517,6 +555,7 @@ static int study(int argc, char **argv)
     bool vsync = true;
     bool verbose = false;
     int frame_limit = 0;
+    const char *frame_capture = NULL; // Saved from the window at the last of --frames.
     const char *connect_to = NULL, *net_name = "player", *net_token = "";
     bool networked = false; // Joined a room with --connect (native builds only).
     const char *host_mode = NULL; // --host: the room this session starts and joins.
@@ -560,6 +599,14 @@ static int study(int argc, char **argv)
             gpu_enabled = true;
         } else if (strcmp(argv[i], "--gpu-aa") == 0) {
             gpu_aa = true;
+        } else if (strcmp(argv[i], "--resolution") == 0 && i + 1 < argc) {
+            if (!boat_resolution_parse(argv[++i], &resolution))
+                goto invalid;
+        } else if (strcmp(argv[i], "--hdr") == 0 && i + 1 < argc) {
+            const char *value = argv[++i];
+            if (strcmp(value, "on") && strcmp(value, "off"))
+                goto invalid;
+            hdr_option = !strcmp(value, "on");
         } else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
             if (!waterfront_daylight_parse(argv[++i], &daylight_phase))
                 goto invalid;
@@ -684,6 +731,8 @@ static int study(int argc, char **argv)
             net_name = argv[++i];
         } else if (strcmp(argv[i], "--token") == 0 && i + 1 < argc) {
             net_token = argv[++i];
+        } else if (strcmp(argv[i], "--frame-capture") == 0 && i + 1 < argc) {
+            frame_capture = argv[++i];
         } else if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
             char *end;
             const char *value = argv[++i];
@@ -833,6 +882,19 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--start places the boat in a mapped location's free boating.\n");
         goto invalid;
     }
+    if (frame_capture && (!frame_limit || screenshot)) {
+        fprintf(stderr, "--frame-capture needs --frames and no --screenshot.\n");
+        goto invalid;
+    }
+    if (resolution == BOAT_RESOLUTION_HIGH && (!gpu_enabled || gpu_aa)) {
+        fprintf(stderr, "--resolution high needs the GPU renderer and replaces --gpu-aa.\n");
+        goto invalid;
+    }
+    bool hdr = hdr_option < 0 ? resolution == BOAT_RESOLUTION_HIGH : hdr_option;
+    if (hdr && (!gpu_enabled || gpu_aa)) {
+        fprintf(stderr, "--hdr on needs the GPU renderer without --gpu-aa.\n");
+        goto invalid;
+    }
     if (course && (location->mapped || demo)) {
         fprintf(stderr, "--course requires the basin and cannot be combined with --demo.\n");
         goto invalid;
@@ -932,7 +994,8 @@ static int study(int argc, char **argv)
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     cpu_view.daylight = daylight_phase;
     BoatGpu gpu = { 0 };
-    int water_layer = 0, water_layer_label = 0; // F8; label frames left.
+    int water_layer = 0, review_label_frames = 0; // F8 and F9; label frames left.
+    const char *review_label = NULL;
     BoatRearview mirror = { 0 };
     // Every mapped location, solo or room; hidden until N.
     BoatMinimap minimap = { 0 };
@@ -1140,13 +1203,25 @@ static int study(int argc, char **argv)
         SetConfigFlags(screenshot || performance_report ? FLAG_WINDOW_HIDDEN
                                                         : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
 #endif
-        InitWindow(width * 3, height * 3, "Wake Velocity");
+        int window_scale = boat_resolution_window_scale(resolution);
+        InitWindow(width * window_scale, height * window_scale, "Wake Velocity");
         if (!IsWindowReady())
             goto cleanup;
         window_owned = true;
         SetWindowMinSize(width, height);
     }
     window_ready = true;
+#if defined(__EMSCRIPTEN__)
+    // The canvas keeps the size the title or a previous session left; high resolution draws
+    // into a buffer of its own scale (CSS still fits the page).
+    {
+        int window_scale = web_window_scale(resolution, width, height);
+        if (GetScreenWidth() < width * window_scale) {
+            SetWindowSize(width * window_scale, height * window_scale);
+            boat_web_fit_canvas();
+        }
+    }
+#endif
     if (!boat_ui_load())
         goto cleanup;
 #if defined(__EMSCRIPTEN__)
@@ -1168,6 +1243,15 @@ static int study(int argc, char **argv)
         }
         waterfront_gpu_scene_set_detail_enabled(&gpu.scene, far_detail);
         gpu.daylight = daylight_phase;
+        if (!apply_screen_layout(&gpu,
+                boat_screen_layout(
+                    resolution, width, height, GetScreenWidth(), GetScreenHeight()))) {
+            fprintf(stderr, "Could not allocate the %s-resolution scene.\n",
+                boat_resolution_name(resolution));
+            goto cleanup;
+        }
+        if (hdr && !boat_gpu_set_hdr(&gpu, true))
+            fprintf(stderr, "HDR is unavailable here; presenting the 8-bit scene.\n");
         texture = gpu.target.texture;
         if (screenshot) {
             boat_gpu_draw_with_ghost(&gpu, view, view_presentation, view_world, camera_settings,
@@ -1275,8 +1359,10 @@ static int study(int argc, char **argv)
         int next_height = boat_web_viewport_size(1);
         if (gpu_enabled && (next_width != width || next_height != height)) {
             RenderTexture2D next_frame = LoadRenderTexture(next_width, next_height);
-            if (!IsRenderTextureValid(next_frame)
-                || !boat_gpu_resize(&gpu, next_width, next_height)) {
+            int window_scale = web_window_scale(resolution, next_width, next_height);
+            BoatScreenLayout next_layout = boat_screen_layout(resolution, next_width, next_height,
+                next_width * window_scale, next_height * window_scale);
+            if (!IsRenderTextureValid(next_frame) || !apply_screen_layout(&gpu, next_layout)) {
                 if (next_frame.id)
                     UnloadRenderTexture(next_frame);
                 result = 1;
@@ -1289,7 +1375,7 @@ static int study(int argc, char **argv)
             height = next_height;
             texture = gpu.target.texture;
             size = (VirtualSize) { width, height };
-            SetWindowSize(width * 3, height * 3);
+            SetWindowSize(width * window_scale, height * window_scale);
             boat_web_fit_canvas();
         }
 #endif
@@ -1373,13 +1459,14 @@ static int study(int argc, char **argv)
             else
                 boat_menu_open(&menu);
         }
-        int scale = GetScreenWidth() / width < GetScreenHeight() / height
-            ? GetScreenWidth() / width
-            : GetScreenHeight() / height;
-        if (scale < 1)
-            scale = 1;
-        Rectangle destination = { (GetScreenWidth() - width * scale) / 2,
-            (GetScreenHeight() - height * scale) / 2, width * scale, height * scale };
+        BoatScreenLayout layout
+            = boat_screen_layout(resolution, width, height, GetScreenWidth(), GetScreenHeight());
+        int scale = layout.scale;
+        Rectangle destination = layout.destination;
+        // A failed high-resolution reallocation keeps drawing at the previous size.
+        if (gpu_enabled && (resolution != BOAT_RESOLUTION_LOW || hdr)
+            && apply_screen_layout(&gpu, layout))
+            texture = gpu.target.texture;
         Camera2D menu_camera = { .offset = { destination.x + (width - 320) * scale / 2,
                                      destination.y + (height - 200) * scale / 2 },
             .zoom = scale };
@@ -1494,7 +1581,15 @@ static int study(int argc, char **argv)
         if (active && gpu_enabled && IsKeyPressed(KEY_F8)) {
             water_layer = (water_layer + 1) % WATER_LAYERS;
             apply_water_layer(&gpu, water_layer);
-            water_layer_label = 180;
+            review_label = water_layer_names[water_layer];
+            review_label_frames = 180;
+        }
+        if (active && gpu_enabled && IsKeyPressed(KEY_F9)) {
+            // Graphics review (Batch C): the map's baked ambient occlusion on or off.
+            gpu.scene.ambient_occlusion_disabled = !gpu.scene.ambient_occlusion_disabled;
+            review_label = gpu.scene.ambient_occlusion_disabled ? "AMBIENT OCCLUSION: OFF"
+                                                                : "AMBIENT OCCLUSION: ON";
+            review_label_frames = 180;
         }
         bool performance_request = active && IsKeyPressed(KEY_F4);
         if (active && boat_minimap_ready(&minimap) && IsKeyPressed(KEY_N))
@@ -1864,7 +1959,11 @@ static int study(int argc, char **argv)
             snapshot = profiler_snapshot(&profiler, (float)live_view.time, size, destination);
             boat_snapshot = boat_profile_snapshot(&boat_profile);
             snapshot.scene_label = location->name;
-            snapshot.renderer_label = gpu_enabled ? (gpu_aa ? "GPU 4x SSAA" : "GPU") : "CPU";
+            snapshot.renderer_label = !gpu_enabled ? "CPU"
+                : gpu_aa                           ? "GPU 4x SSAA"
+                : boat_gpu_hdr_active(&gpu)        ? (resolution ? "GPU high HDR" : "GPU HDR")
+                : resolution                       ? "GPU high"
+                                                   : "GPU";
             snapshot.texture_upload_kib = gpu_enabled ? (wake ? 384
                                                                 : objects ? 4
                                                                           : 0)
@@ -1872,11 +1971,18 @@ static int study(int argc, char **argv)
             next_snapshot_time = current_frame_started_at + 0.25;
         }
         double present_started_at = boat_profile_time(true);
+        // High resolution draws the HUD over a transparent frame, accumulating premultiplied
+        // alpha, and composites it over the full-size scene; low draws the scene into the frame.
+        bool hud_overlay = gpu_enabled && resolution != BOAT_RESOLUTION_LOW;
         BeginTextureMode(frame_target);
-        ClearBackground((Color) { 14, 23, 32, 255 });
-        DrawTexturePro(texture,
-            (Rectangle) { 0, 0, gpu_enabled ? -width : width, gpu_enabled ? -height : height },
-            (Rectangle) { 0, 0, width, height }, (Vector2) { 0 }, 0, WHITE);
+        if (hud_overlay) {
+            boat_screen_begin_overlay();
+        } else {
+            ClearBackground((Color) { 14, 23, 32, 255 });
+            DrawTexturePro(texture,
+                (Rectangle) { 0, 0, gpu_enabled ? -width : width, gpu_enabled ? -height : height },
+                (Rectangle) { 0, 0, width, height }, (Vector2) { 0 }, 0, WHITE);
+        }
         boat_hud_draw(
             (BoatHudTelemetry) { .speed_mps = hypotf(view->boat.velocity.x, view->boat.velocity.y),
                 .thrust = view->boat.throttle,
@@ -1910,10 +2016,9 @@ static int study(int argc, char **argv)
             boat_ui_text("MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10,
                 (Color) { 218, 223, 202, 255 });
 #endif
-        if (water_layer_label > 0) {
-            --water_layer_label;
-            boat_ui_text(
-                water_layer_names[water_layer], 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
+        if (review_label_frames > 0 && review_label) {
+            --review_label_frames;
+            boat_ui_text(review_label, 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
         }
         if (!networked && !session.runs.playing
             && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {
@@ -1921,11 +2026,16 @@ static int study(int argc, char **argv)
                 session.runs.practice ? " / PRACTICE" : "");
             boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
         }
+        if (hud_overlay)
+            boat_screen_end_overlay();
         EndTextureMode();
         BeginDrawing();
         ClearBackground((Color) { 14, 23, 32, 255 });
-        DrawTexturePro(frame_target.texture, (Rectangle) { 0, 0, width, -height }, destination,
-            (Vector2) { 0 }, 0, WHITE);
+        if (hud_overlay)
+            boat_screen_present_overlay(&layout, texture, frame_target.texture);
+        else
+            DrawTexturePro(frame_target.texture, (Rectangle) { 0, 0, width, -height }, destination,
+                (Vector2) { 0 }, 0, WHITE);
         const char *notice = NULL;
 #ifdef PROTEUS_BOAT_NET
         if (networked) {
@@ -1993,10 +2103,20 @@ static int study(int argc, char **argv)
         }
         if (console.open) {
             // Console stays above the HUD, in the same integer-scaled pixel grid as the frame.
+            // High resolution's frame holds only the HUD, so there is no low-resolution scene
+            // to blur beneath the panel.
             Camera2D console_camera = { .offset = { destination.x, destination.y }, .zoom = scale };
             BeginMode2D(console_camera);
-            wake_console_draw(&console, width, height, gpu_enabled ? &frame_target.texture : NULL);
+            wake_console_draw(&console, width, height,
+                gpu_enabled && !hud_overlay ? &frame_target.texture : NULL);
             EndMode2D();
+        }
+        if (frame_capture && frames + 1 == frame_limit) {
+            rlDrawRenderBatchActive(); // Draw what is batched before reading it back.
+            Image window = LoadImageFromScreen(); // The presented window, HUD included.
+            if (!ExportImage(window, frame_capture))
+                result = 1;
+            UnloadImage(window);
         }
         frame_pacer_wait(&pacer);
         EndDrawing();
@@ -2024,7 +2144,9 @@ static int study(int argc, char **argv)
                 .discarded_ms = metrics.discarded_active_ms,
                 .ticks = metrics.ticks,
                 .map = view_world->definition->id,
-                .preset = gpu_aa ? 1 : 0,
+                .preset = gpu_aa                         ? 1
+                    : resolution == BOAT_RESOLUTION_HIGH ? 2
+                                                         : 0,
                 .segment = capture.segment,
                 .x = session.boat.position.x,
                 .z = session.boat.position.y,
@@ -2071,7 +2193,7 @@ static int study(int argc, char **argv)
                 WakePerformanceInfo info = {
                     .capture_kind = demo || screenshot || frame_limit ? "scripted" : "live",
                     .map_name = view_world->definition->name,
-                    .preset_name = gpu_aa ? "gpu-aa" : "default",
+                    .preset_name = presentation_preset(gpu_aa, resolution, &gpu),
                     .vsync = vsync,
                     .aa = gpu_aa,
                     .fullscreen = IsWindowFullscreen(),
@@ -2123,7 +2245,7 @@ static int study(int argc, char **argv)
             WakePerformanceInfo info = {
                 .capture_kind = demo || frame_limit ? "scripted" : "live",
                 .map_name = view_world->definition->name,
-                .preset_name = gpu_aa ? "gpu-aa" : "default",
+                .preset_name = presentation_preset(gpu_aa, resolution, &gpu),
                 .vsync = vsync,
                 .aa = gpu_aa,
                 .fullscreen = IsWindowFullscreen(),
@@ -2258,7 +2380,10 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
     }
     if (settings->waves)
         arguments[count++] = "--waves";
-    if (settings->smooth_edges)
+    if (settings->high_resolution) {
+        arguments[count++] = "--resolution";
+        arguments[count++] = "high";
+    } else if (settings->smooth_edges)
         arguments[count++] = "--gpu-aa";
     arguments[count++] = "--skin";
     arguments[count++] = (char *)boat_skin_name(settings->skin);
@@ -2318,7 +2443,10 @@ static int title_join(BoatTitleSettings *settings, bool host)
     }
     if (settings->mouse_steering)
         arguments[count++] = "--mouse-steering";
-    if (settings->smooth_edges)
+    if (settings->high_resolution) {
+        arguments[count++] = "--resolution";
+        arguments[count++] = "high";
+    } else if (settings->smooth_edges)
         arguments[count++] = "--gpu-aa";
     net_study.failure[0] = 0;
     study_mouse_steering = settings->mouse_steering;

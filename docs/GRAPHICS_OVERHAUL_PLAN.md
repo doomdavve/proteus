@@ -1,12 +1,15 @@
 # Graphics overhaul plan
 
-Status, 2026-11-03: **P1 and P2 are merged**, with Batch A accepted on Mac and Batch B
+Status, 2026-11-04: **P1 and P2 are merged**, with Batch A accepted on Mac and Batch B
 accepted on Mac (outer and basin) 2026-11-03. The first Windows hardware AMD and verified RTX 4070 SUPER full matrices are saved;
 a recurring GeForce river hitch is open, with investigation deferred by the user on 2026-11-03.
 Each package has one human playtest and, by default, one implementation PR. The detailed G0–G5c
 briefs are internal checkpoints with focused commits and resumable agent handoffs. G6 remains a
-conditional study. **Next: P3/G5a**; its sunset prerequisites (the shared lighting frame and
-approved fixed sunset/dusk presets) are on `main`. See the
+conditional study. **P3 is in progress** on `feat/graphics-presentation`: G5a (optional high
+resolution and HDR), G5b (clustered lights and dusk water) and G5c (baked ambient occlusion,
+particle profiling and the final matrix) are machine-verified. **Next: Batch C**, the user's
+final review, with a returned Windows report. Stacked on it, the
+[outer performance follow-up](#outer-performance-follow-up) has step 1 machine-verified. See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -113,10 +116,10 @@ Everything before G6 is designed to work on both. Watch points for that work:
 
 ## Package execution process
 
-Status, 2026-11-03: **P1 merged, Batch A accepted on Mac; P2 machine-verified, Batch B accepted on Mac**. Each package owns one
+Status, 2026-11-03: **P1 and P2 merged (Batches A and B accepted on Mac); P3 in progress**. Each package owns one
 human playtest and, by default, one implementation PR. The G0–G5c sections below are ordered
 internal checkpoints, not separate work packages or PR assignments. G6 is a dormant contingency,
-outside the three-package count. **Next: P2 merge, then P3.**
+outside the three-package count. **Next: Batch C for P3.**
 
 Keep package definitions, prompts and process updates together in one planning PR. The original
 twelve-PR planning stack was an interpretation error and is merged; it does not prescribe future
@@ -292,7 +295,7 @@ or test pass supplies a missing verdict. A pending user session does not prevent
 | --- | --- | --- | --- |
 | A — engine and geometry (accepted on Mac 2026-11-02) | P1 complete (through G2b) | Windows report when available plus G1/G2a/G2b: river long views, bridge/quay, basin and outer; forward/backward LOD crossings, camera turns, reflected/animated actors and both shadow ranges. Any popping, missing actors, shadow trails or changed facets? | P2 |
 | B — all living water (accepted on Mac, outer and basin, 2026-11-03) | P2 complete (through G4) | Windows report when available plus G3a/G3b/G4: river and outer sheltered/open water, four-boat wake overlap, fast turns/stops, quays, rain/gull fixtures, gust/squall approach, scroll/reset and both resolutions. Is water alive/cozy, stable moving, shore-aware, with distinct cube foam? Compare stamp-only, history and place layers. | P3 |
-| C — final presentation | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
+| C — final presentation (Mac look approved apart from performance, 2026-11-04; Windows and browser open) | P3 complete (through G5c) | G5a/G5b/G5c: native Mac/Windows and hardware browser at low/high presets, returned Windows report analyzed on Mac, HUD/resize, calm/storm/day/dusk, lamps/windows/streaks, AO and cube spray; revisit A/B interactions. Is navigation clear and does the integrated look retain its identity? | Final G0–G5 acceptance; never automatically changes the default |
 
 Batch B deliberately combines G3 and G4 rather than asking for a separate water session between
 them: atlas boundaries/depth/shore foam are easier to judge with persistence in place. Keep a
@@ -313,7 +316,7 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 | --- | --- | --- | --- | --- |
 | [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows AMD/GeForce matrices saved; river hitch deferred |
 | [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Merged (#134); Batch B accepted on Mac (outer, basin) 2026-11-03; Windows report pending |
-| [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; P2 merged and sunset prerequisites met |
+| [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | G5a, G5b and G5c machine-verified on M1 Max; next Batch C |
 
 G6 is a conditional backend decision, not a fourth scheduled package. The delivery-boundary rule
 above handles a proven need for an additional prerequisite PR without creating extra playtests.
@@ -424,11 +427,21 @@ on Mac. Prepare one Batch C covering presets/UI, mood, particles and P1/P2 integ
 Mark the overhaul accepted only after the recorded user verdict and blocking fixes, with platform
 limitations explicit. G6 is opened only if its separate measured trigger is satisfied.
 
-**Result:** unstarted. Completed: package instructions only. Sunset readiness (2026-11-03): the
-shared lighting frame (`WaterfrontLighting` on the scene frame) and fixed sunset/dusk presets
-merged to `main` in #138 and the user approved the presets; see
-[SUNSET_PLAN](SUNSET_PLAN.md#current-status). Next: G5a task 1. No implementation verification, playback or user acceptance. Known
-risks: external sunset dependency, multiple target/light lifetimes and integrated preset behavior.
+**Result:** in progress. Sunset readiness (2026-11-03): the shared lighting frame
+(`WaterfrontLighting` on the scene frame) and fixed sunset/dusk presets merged to `main` in #138
+and the user approved the presets; see [SUNSET_PLAN](SUNSET_PLAN.md#current-status). Completed:
+[G5a](#g5a--optional-high-resolution-and-restrained-hdr), machine-verified on the M1 Max (high
+resolution, HDR with an 8-bit fallback, low resolution byte-identical to `main`) and
+[G5b](#g5b--clustered-cozy-lighting-and-dusk-water) (clustered lights, dusk lamplight and
+streaks, harbour lamps; daytime byte-identical until the 2026-11-04 far-shadow fix, which
+deliberately changes distant facades) and [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification)
+(baked ambient occlusion, particles kept on the CPU after profiling, final Release matrix within
+every G0 budget). Batch C on Mac: look approved apart from performance (2026-11-04); Windows
+report and hardware browser open. Next: the outer performance follow-up, stacked on this PR.
+Agent playback: captures,
+window captures, windowed demos and a WebGL2 smoke; no human review until Batch C. Known risks:
+the dusk streaks key on warm colour rather than an emission mask, and multiple target/light
+lifetimes and integrated preset behavior.
 
 **Kickoff prompt:**
 
@@ -457,9 +470,9 @@ Mac; G3a is machine-verified, with human review in Batch B.
 | [G3a](#g3a--stamped-wake-shading) | P2 | P1/Batch A | Machine-verified on M1 Max; stress GPU p95 at 4x4 9.7 → 3.3 ms; Batch B accepted on Mac (outer, basin) |
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Machine-verified on M1 Max; stress GPU p95 +0.1 ms, 5 MB; Batch B accepted on Mac (outer, basin) |
 | [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Machine-verified on M1 Max; river GPU p95 within noise, basin +0.3 ms for the depth copy; Batch B accepted on Mac (outer, basin) |
-| [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Unstarted |
-| [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Unstarted |
-| [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | P3 | G5b | Unstarted |
+| [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Machine-verified on M1 Max; low byte-identical to `main`; high + HDR stress GPU p95 5.3 ms; WebGL2 smoke with fallback |
+| [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Machine-verified on M1 Max; daytime byte-identical before the far-shadow fix; clusters equal the every-light reference with 642 lights; river high dusk + 600 lights GPU p95 3.2 ms |
+| [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | P3 | G5b | Machine-verified on M1 Max; AO off equals G5b within 1/255 on ≤ 1 pixel per frame; particles stay CPU-evaluated; final matrix within G0 budgets; Batch C prepared |
 
 ## Detailed implementation checkpoints
 
@@ -924,7 +937,7 @@ invalidate caches. A failed human LOD review pauses dependent visual expansion u
 successful automated checks do not approve popping.
 
 **Checkpoint result (2026-11-01, M1 Max):** machine gates met; Batch A accepted on Mac 2026-11-02.
-Implementation: distant windows and street furniture draw at a far level per 256 m cell, chosen
+Implementation: distant windows and street furniture draw at a far level per 256 m cell (512 m since the outer follow-up), chosen
 per view with an 8% hysteresis band; shadow maps stay uncached. See
 [distance detail](3D.md#distance-detail) and
 [the numbers](evidence/graphics/g2b/summary.json).
@@ -1397,10 +1410,44 @@ pass; no default-change acceptance is inferred.
 look that the user likes in the old spike does not approve the shipped HDR preset. Sunset
 implementation stays with SUNSET_PLAN.md.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P3. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G5b. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P3's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result (2026-11-03):**
+
+- State: machine-verified on the M1 Max; human review is Batch C.
+- Commits: `1091192` (high-resolution preset, logical HUD overlay, title PICTURE,
+  `--frame-capture`), `4ac26d3` (HDR targets, bloom, grade, fallback, `--check-presentation`),
+  `5e3035f` (review/benchmark options, browser canvas sizing, `check_web_resolution.py`).
+- Interfaces/owners and decisions to preserve: `boat_screen` owns sizes from the logical frame and
+  window (`BoatScreenLayout`; low unchanged, high = the window's integer scale up to 4, no side
+  above 2,048, reflection grown by the same factor) and the premultiplied HUD overlay. `BoatGpu`
+  owns the HDR target, depth and bloom chain (`boat_gpu_set_hdr`, `boat_gpu_present_hdr`) and
+  reallocates them with the target; the scene owns its reflection
+  (`waterfront_gpu_scene_set_reflection_size`). `waterfront_grade` evaluates a neutral grade per
+  daylight phase from the lighting frame's phase; no second clock. The user option is the title's
+  PICTURE row (PIXEL, SMOOTH, HIGH RES, saved as `smooth_edges` and `resolution`) and the CLI's
+  `--resolution low|high` and `--hdr on|off`; high replaces `--gpu-aa`. The scene renders at the
+  window's own scale, so a 960×600 window gets a 960×600 scene. The mirror and supersampling
+  stay 8-bit.
+- Decision for review: no current light exceeds 1 (measured: day/sunset/dusk peaks 0.96–1.00 in
+  river, outer and basin), because the city shader's `min(…, 1)` is an authored palette clamp
+  against bleaching, glitter mixes toward a colour and the sky is an 8-bit panorama. G5a keeps
+  those, so bloom is inert until G5b authors brighter lamps/windows; removing the clamp would bloom
+  every sunlit white hull. Grades stay neutral so the approved sunset and dusk do not shift.
+- Verification: Debug full suite with `PROTEUS_GPU_TESTS=ON`, 388 of 388 enabled tests (one
+  earlier full run under concurrent Release builds failed `instancing_parity` once; it passed
+  eight direct runs on both trees and the full rerun). `presentation` (bloom 3.5 spot: +28/255
+  beside it, gone by 16 px; daytime HDR within 1/255; preset cycles, second view, mirror and
+  failed allocations exact; HUD overlay within 1/255), `boat_screen`, `waterfront_grade`.
+  Low-resolution parity: 40 captures (`--screenshot` CPU/GPU/`--gpu-aa` for basin, river, outer
+  and `--review`) byte-identical to `main` at `6e78e5c`. High review poses in day/sunset/dusk and
+  windowed `--demo --frames 240 --frame-capture` at both presets inspected. WebGL2:
+  `check_web_resolution.py` (SwiftShader) passes HDR, hidden-float fallback and mobile rotation;
+  see [web](WEB_BUILD.md#high-resolution-and-hdr-2026-11-03). Release timings and memory are in
+  [Boating performance](BOATING_PERFORMANCE.md#graphics-g5a-presentation-presets--2026-11-03).
+- Unresolved / pending: human look (Batch C), whether bloom should ever show at day; HiDPI
+  (Retina) framebuffers are not enabled, so macOS upscales a 1280×800 window; no Windows,
+  hardware-GPU browser, Firefox/Safari or physical device check; the GPU-allocation failure is
+  injected (`hdr_allocation_failures`), not a real driver failure.
+- Next (done): G5b; see its checkpoint result.
 
 ### G5b — Clustered cozy lighting and dusk water
 
@@ -1440,14 +1487,66 @@ windows/streaks are readable and stable moving. Full suite, WebGL2 build/smoke a
 ceilings pass; Batch C is prepared, not accepted.
 
 **Limits and stop conditions:** External sunset work is a real readiness gate; the frame and the
-approved fixed presets were delivered in #138 (2026-11-03). No new gameplay clock, Lua capability, room protocol or dynamic global
+approved fixed presets were delivered in #138 (2026-11-03). G5a's HDR blooms only light above 1,
+and none is authored yet; lamps and windows brighter than 1 belong here and need review. No new gameplay clock, Lua capability, room protocol or dynamic global
 illumination. If the prerequisite remains unavailable, report G5b/G5c unready; final dusk acceptance
 stays open.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P3. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: G5c. Record commits/contracts/evidence and a resume handoff here; keep
-internal checkpoint work on P3's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result (2026-11-03):**
+
+- State: machine-verified on the M1 Max; human review is Batch C.
+- Task 1: the sunset frame and fixed presets merged in #138 and the user approved them on
+  2026-11-03; G5b reads `WaterfrontLighting.window_light` and adds no clock, phase or setting.
+- Interfaces/owners and decisions to preserve: `src/waterfront_lights.[ch]` owns the clusters
+  (8 m world X/Z cells wrapped onto 64 × 64 slots, 16 lights per slot, 1,024 lights, rank order
+  intensity × radius then lower ID, stats for drops/clipping/overflow) and the RGBA32F upload
+  layout. Slots depend on no camera, so the view, reflection and water read the same lists. Stable
+  IDs: cafe 40, cranes 10–12, lamps 100 + street × 100 + index, headlights 1000 + …, dusk fixtures
+  2000 + index, review stress 10000 + index. `WaterfrontGpuScene` gathers lights, builds and
+  uploads them (unit 5) and keeps the earlier capped uniform list as the fallback when storage or
+  the float texture is unavailable; the fallback records what it leaves out and gives the water no
+  lamplight. Water lamplight and streaks are gated by window light, the streaks by its upper half
+  (none at sunset, where the warm sky passes the colour key). Self-lit surfaces gain
+  `1 + 0.35 × window_light` only into an HDR target's main pass, and the composite scales light
+  above 1 back to the clamp with its hue. Dusk fixtures (ferry deck lights, pontoon or dock-module
+  lamps) sit on evaluated harbour poses and draw only on the GPU. See
+  [3D](3D.md#clustered-lights-and-dusk-water).
+- Decision for review: streaks key on warm, bright reflected colour, not an explicit emission
+  mask; the reflection target's alpha is not free while geometry blends through it. A warm
+  non-emitter in the dusk reflection could streak. The CPU renderer is unchanged.
+- Verification: Debug full suite with `PROTEUS_GPU_TESTS=ON`, 390 of 390 enabled tests, including
+  the new `waterfront_lights` (quick) and `light_clusters` (gpu: clustered frames equal the
+  every-light reference byte for byte at dusk and with 642 lights, at low and high, also after a
+  mirror pass; no overflow; daytime fallback distance 0). Daytime parity against the G5a commit
+  `477251a`: all 31 `--review` poses at low and at high, 18 Release `--screenshot` captures
+  (basin/river/outer × CPU/GPU/`--gpu-aa` × 3 s/8 s) and `gpu_fixture --city` at 0/7/20 s are
+  byte-identical; `--light-fallback` reviews are also identical by day and within 3/255 of the
+  clusters at dusk. Sunset changes about 1% of pixels (the new lenses, faint lamplight, HDR gain).
+  Agent-inspected: dusk high reviews (river stop/quay, outer dock), 600 stress lights, and
+  windowed 600-frame `--demo --resolution high --daylight dusk` on river and outer (exit 0). WebGL2:
+  `check_web_resolution.py` (SwiftShader) passes HDR, fallback and mobile rotation through the
+  cluster path. Release timings are in
+  [Boating performance](BOATING_PERFORMANCE.md#graphics-g5b-clustered-lights--2026-11-03).
+- User's first look (2026-11-03, Mac, informal): "dusk looks amazing now." This is not Batch C
+  acceptance.
+- High-resolution fixes after the user's sunset look (2026-11-04). The user reported dark stripes
+  on distant sunlit facades and soft, bright blobs along the quay band; they also saw the stripes
+  on `main` (`6e78e5c`) at low resolution by day. Causes: far shadow-map self-shadowing (1.5 m
+  texels against a ~0.25 m bias), and the quay band's smooth gradient at 4× pixels. Fixes: a
+  normal-offset far-map lookup, and the band held to thirds when the presented frame is high
+  resolution ([3D](3D.md#gameplay-shadow-coverage)). Agent-checked at the user's spot (`--location
+  outer --start -112.5,-61.5,-176`): sunset/high stripes and day/low speckle are gone. Frame impact
+  against `0c23708`, all 31 `--review` poses: low day 0.3–10.3% of pixels changed (shadow fix
+  only; the band leaves supersampled low unchanged), high day 0.1–3.9%, high sunset 0.1–3.5%.
+  The largest changes, on the river stop/camera-turn poses, were inspected and remove speckled
+  self-shadow from facades and quays. Earlier daytime byte-parity claims no longer hold from this
+  change on. Debug full suite: 390 of 390. The user reviewed both fixes and approved them on
+  2026-11-04 ("I've reviewed the latest fixes and approves"); this is not Batch C acceptance.
+- Unresolved / pending: Batch C review of dusk windows, streaks, lamplight and the new fixtures,
+  including in motion; no browser dusk (the web build has no daylight option), Windows,
+  hardware-GPU browser or device check; the fallback is forced by option, not a real driver
+  failure; storm/course/weapon readability at dusk not reviewed.
+- Next: G5c task 1.
 
 ### G5c — Ambient detail, cube spray and final qualification
 
@@ -1491,10 +1590,148 @@ platform checks remain explicitly open.
 requirement. No browser/desktop acceptance from stills alone, no release/deploy, and no
 default-resolution change without a later explicit user decision.
 
-**Checkpoint result:** unstarted; instructions only. Owner: P3. Implementation verification,
-agent playback and human acceptance: none. Next within this checkpoint: task 1, after dependencies.
-After its machine gates: Batch C / final acceptance. Record commits/contracts/evidence and a resume
-handoff here; keep internal checkpoint work on P3's PR unless the delivery-boundary rule explicitly changes it.
+**Checkpoint result (2026-11-04):**
+
+- State: machine-verified on the M1 Max; Batch C prepared, not played. Commits `af641fa` (baked
+  ambient occlusion), `673f1d2` (particle reference and cost switch), then the F9 toggle and
+  these docs.
+- Task 1, ambient occlusion: `tools/ambient_bake.c` writes `assets/geometry/<map>/ambient.bin`
+  (`src/boat_ambient.[ch]`: one byte per scenery triangle corner, 24 fixed rays within 6 m,
+  nearness-weighted; facade corners are point samples, other corners the mean of four points in
+  their third of the triangle; water open; keyed to the pack). It loads after the water atlas in
+  `boat_scenery_load_location`, optional like G4's sidecar; legacy packs, flat facets and authored
+  colours are unchanged. The GPU packs the value into the normal's spare fourth short and the
+  city shader removes up to 0.6 of ambient only, facades only over their bottom 4 m. Decisions
+  to preserve: a corner-point bake spread one crease over long quay walls and whole facades
+  (rejected after debug renders); the CPU renderer stays unoccluded. See
+  [3D](3D.md#baked-ambient-occlusion).
+- Task 2, particles: already instanced since G1. Measured in the four-boat stress scene: 287 p50
+  / 463 p95 cubes cost about 0.17 ms CPU submit and 0.12–0.2 ms GPU, posing about 59 µs per boat
+  with waves. A portable GPU path could save at most about 0.4 ms CPU here, so simulation and
+  posing stay on the CPU and shape, timing and lifetimes are untouched
+  ([performance](BOATING_PERFORMANCE.md#graphics-g5c-final-matrix-and-particles--2026-11-04)).
+- Task 3, references: `boat_handling.particle_lifecycle` records emission (foam by tick 8),
+  peak foam 209, spray over the straight and the turn, a 40-particle landing burst, cubes to
+  1.04 m living to 3.48 s, and the last expiring 2.54 s after a dead stop; it bounds each with
+  margin for other platforms, requires exact repeats, pure posing and the same boat whatever the
+  presentation holds. Physical `final_state` hashes are identical between P3 and `main` in every
+  benchmark run.
+- Task 4, final matrix: three interleaved Release repetitions against `main` (`6e78e5c`). P3 at
+  the default preset costs at most about 0.1 ms; every preset stays inside every G0 budget (worst:
+  stress high HDR dusk, 4.53 ms GPU p95; G0 stress 4x4 was 20.01 ms). Memory and vertex bytes
+  are in the performance record. **Windows: no new report.** The saved AMD/GeForce matrices are
+  from the G0w build; Batch C asks for a report from this PR's Windows CI artifact.
+- Verification (2026-11-04, Mac): Debug full suite with `PROTEUS_GPU_TESTS=ON`, 393 of 393, with
+  the new `ambient_river`/`ambient_outer` rebake checks, AO sidecar rejection cases in
+  `boat_scenery`, occluded vertices in `gpu_view_lifecycle`, and `particle_lifecycle`. With
+  `--no-ambient-occlusion` all 31 `--review` poses at low/high × day/dusk match `237b30f` within
+  1/255 on at most one pixel per frame (identical control runs differ by nothing). WebGL2:
+  `check_web_resolution.py` (SwiftShader) passes; `check_web_scenery.py` passes and the server
+  log shows the outer `ambient-outer-<hash>.bin` fetched after its atlas. Windowed 600-frame
+  `--demo` on outer (high, sunset) and river exit 0. Agent-inspected: high-resolution day and
+  sunset reviews and occlusion-only debug renders of river stop/quay and outer dock.
+- Limits: the AO is static and covers pack geometry only (the run-time kit, cranes, boats and
+  actors get none); the bake takes about 20 s for outer; the Emscripten build's
+  `validate_boat_capture` target does not compile (`gmtime_r`, a file this checkpoint does not
+  touch); no hardware-GPU browser, Firefox/Safari, Windows or device check.
+- Outer at 120 Hz (2026-11-04, after the user's profiler screenshot on the outer river at high
+  resolution with HDR: frame p95 13.5 ms, present/wait spikes to 21.5 ms on a 120 Hz display).
+  The final matrix covered only river and stress; windowed 1,200-frame outer `--demo` reports
+  (`--performance-report`), interleaved: `main` low GPU p50/p95 3.82–3.85 / 5.62–8.81 ms, P3 low
+  3.84–3.94 / 5.73–5.88, P3 high HDR 6.40–6.41 / 7.85–8.65 (p99 8.70–9.22). So P3 does not
+  regress low resolution on outer, but high resolution adds about 2.5 ms p50 there and its tail
+  exceeds a 120 Hz frame (8.33 ms); it stays inside the plan's 60 Hz budgets. GPU spikes follow
+  the view (main and reflection triangles 470k/450k against about 375k typical; the outer frame
+  draws 1.15–1.33 M triangles, about 410k of them into the shadow map each frame), not a period.
+  Decision (user, 2026-11-04): 60 Hz is acceptable for high resolution now, with follow-up
+  work after P3 to bring outer down; the method decides how far. Candidates, unmeasured: the
+  outer shadow pass, distance detail for outer terrain and buildings, and the reflection's
+  triangle load. Add an outer scenario to the benchmark first.
+- Next: the [outer performance follow-up](#outer-performance-follow-up), on a branch stacked on
+  this PR; Batch C's Windows report.
+
+#### Batch C request
+
+Verdict so far, 2026-11-04: on Mac, the user played `feat/graphics-presentation` (draft PR #140,
+at `5d08497` or later) and reported "Outside of performance, everything looks like expected on
+the branch". The performance part is the outer high-resolution finding above, accepted at 60 Hz
+with follow-up work. Still open for final acceptance: the returned Windows report and a
+hardware-browser look; which routes, presets and toggles were played was not stated.
+
+Request as prepared: build `feat/graphics-presentation` (draft PR #140) and run from the repository
+root; outer and basin matter most, the river is optional:
+
+```sh
+./build/wake_velocity --location outer
+./build/wake_velocity --location basin
+./build/wake_velocity --location outer --daylight dusk
+```
+
+Route: leave the dock at speed, turn hard, jump a wake if you can, and stop beside a quay; cross
+open water toward the sun; on the outer river let the Långedrag voyage grow its squall. Try the
+title's PICTURE row (PIXEL, SMOOTH, HIGH RES) in each. Compare as you go: F9 turns the baked
+ambient occlusion off and on; F8 steps the water back through its layers as in Batch B. Also open
+the web build once at low and high resolution in a hardware browser.
+
+Windows: download `wake_velocity-dev-45089c7…-windows-x64` from the Windows Wake Velocity run
+for `4738413` (PR #140's merge build, run 41797790879) or a later run, extract it, run **Collect
+performance** and return the ZIP; the agent compares it on the Mac with the saved AMD/GeForce
+baselines.
+
+Questions: Is navigation clear (boat, course, gates and weapons) at dusk and in the squall? Does
+the integrated look keep its identity at both resolutions? Is the ambient occlusion subtle and
+grounding rather than dirty, and stable while moving? Are dusk windows, lamps and streaks cozy?
+Are the cube foam and spray, and their lifetimes, intact? Any LOD popping, water seams or shadow
+trails from Batches A and B? The default stays low resolution whatever the verdict.
+
+#### Outer performance follow-up
+
+Branch `perf/outer-geometry`, stacked on `feat/graphics-presentation` (PR #140); it opens after
+the user's 60 Hz decision above. Status 2026-11-04: render tiles and detail cells changed and played by the user.
+
+- **Step 1, done (machine-verified 2026-11-04):** `boat_water_review --benchmark --scenario outer`
+  (the river route on the outer map, continued across the estuary) with a display-free
+  `--check --scenario outer` route test, `--no-shadows` and `--no-reflections` for pass costs,
+  and 2,048 m default render tiles. Findings and numbers in
+  [the performance record](BOATING_PERFORMANCE.md#outer-benchmark-and-render-tiles--2026-11-04):
+  outer GPU time follows draw submissions, not triangles or pixels. The reflection is the one
+  large pass (about 1.2 ms of 2.4 at either resolution); shadows, distance detail and far water
+  are within noise. 2,048 m tiles cut outer high-resolution GPU p50/p95 from 2.38–2.59 /
+  3.15–3.84 to 2.00 / 2.43–2.49 ms (hidden, unpaced), outer low from 2.05–2.12 to 1.55 and the
+  river at 4x4 slightly, with the same trajectories and images apart from isolated depth-tie
+  pixels.
+- **120 Hz on this Mac is a presentation limit, not scene cost:** vsync-paced runs miss 10 ms on
+  about 40% of outer frames before and after, and on 45% of a light river run; vsync without the
+  pacer is no steadier. Unpaced, the outer high-resolution frame now fits in about 4 ms p95.
+- **Step 2, 512 m detail cells (stacked branch `perf/detail-cell-512`), 2026-11-04:** G2b kept
+  256 m because a 512 m cell switches larger pieces of windows and street furniture at once; the
+  user played the trial build and noticed no difference, so 512 m is adopted. The cell constant
+  only. Release, M1 Max, hidden, unpaced, two interleaved repeats against the parent (this
+  session's runs read slower overall than the step 1 table): outer high GPU p50/p95
+  2.22–2.24 / 3.66–3.67 → 2.09–2.10 / 3.49 ms, submissions p50 199 → 145; river 4x4
+  1.71–1.77 / 2.44–2.57 → 1.65 / 2.49–2.50 ms, submissions p95 241 → 186. River scene
+  triangles p95 rise 553 k → 718 k, above the G2b gate of 650 k; the gate is retired for this
+  Mac, where GPU time follows submissions, and replaced by the measured times above. Windows and
+  the browser are unmeasured, and triangles may cost more there. River shadow triangles p95 rise
+  267 k → 306 k: the 96 m shadow box can now touch every occupied cell of the small river crop
+  (690 of 6,038 frames cull nothing), so `boat_river_benchmark_contract` now requires culling on
+  more than three quarters of rows instead of all. Outer and river `--check` routes still finish.
+  Full CTest (Debug, GPU tests on, 2026-11-04): 394 enabled tests passed, 15 disabled.
+- **Next:** no further outer work is planned. Remaining candidates: fewer reflection submissions
+  (it repeats the main pass's classes), and the macOS windowed vsync behaviour if 120 Hz in a
+  window matters. The user suggested macOS Game Mode (2026-11-04). Apple's
+  [Game Mode page](https://support.apple.com/en-us/105118) says it turns on only when a game enters
+  macOS full-screen mode, and gives it the highest CPU and GPU priority. Every run above was
+  windowed. F11 is raylib's borderless window, not that mode; the resizable window's green
+  button is. Whether an unbundled executable counts as a game is not established (the game has
+  no app bundle or Info.plist).
+- **User play, 2026-11-04:** in macOS full-screen mode (green button) the game ran very smoothly
+  with no stutter; windowed it still stutters. Game Mode was off (no notice, no menu-bar icon),
+  so full-screen presentation alone removes the stutter; the unbundled executable is likely not
+  recognised as a game. F11's borderless window is smooth too, so the fullscreen toggle needs
+  no change; only a normal window stutters, treated as a macOS presentation limit.
+- **Limits:** M1 Max only; no Windows, browser or second-display runs; GPU time measured paced is
+  inflated by clock-down (the game's paced demo shows 6.6 ms for the 2.4 ms unpaced load).
 
 ### G6 — Conditional backend decision spike
 
@@ -1674,7 +1911,7 @@ For the implementer, decided here unless reversed:
 
 1. **Bring the high-resolution option forward?** It was simple to run in the spike and the user
    liked it, so it may not need to wait for G5. It does need real HUD scaling, and it shows off the
-   plainer nearby buildings. Current choice: keep it in G5.
+   plainer nearby buildings. Resolved: kept in G5; G5a implemented it on 2026-11-03.
 2. **Browser floor:** the hardware floor above was stated for machines generally. Whether browsers
    must hold 60 Hz on the same machine, or may fall back to fewer effects, is not decided. Current
    choice: fallbacks are allowed, and G0's browser measurement informs this.

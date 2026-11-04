@@ -640,8 +640,8 @@ static int validate_course(void)
     boat_session_set_course_definition(&boat, &boat_fixture_course_default);
     boat_session_start_course(&boat);
     CHECK(boat.course.enabled && boat.course.next_gate == 0);
-    CHECK(boat.boat.position.x == 0
-        && boat.boat.position.y > boat_fixture_course_gates[0].centre.y);
+    CHECK(
+        boat.boat.position.x == 0 && boat.boat.position.y > boat_fixture_course_gates[0].centre.y);
     for (int i = 0; i < 120; ++i)
         boat_session_step(&boat, (BoatInput) { 0 });
     CHECK(boat.course.elapsed == 0);
@@ -1583,6 +1583,113 @@ static int validate_mouse_steering(void)
 }
 
 // Presentation reaches the shared scene frame in mirrored world coordinates.
+// Graphics G5c reference: the cube foam and spray signature through emission, a fast turn, a
+// jump and expiry. The particles stay CPU-evaluated (BOATING_PERFORMANCE.md, G5c), so this pins
+// what the renderers draw: lifetimes, sizes, colours and the landing burst, posed from explicit
+// state and time, and never feeding back into the boat.
+typedef struct {
+    int first_foam_tick, peak_foam, straight_spray, turn_spray, landing_burst, expiry_tick;
+    float largest, oldest;
+} ParticleSignature;
+
+static int particle_lifecycle_run(bool reset_presentation, ParticleSignature *out, Boat *final)
+{
+    static WaterfrontSceneFrame frame, again;
+    BoatSession boat;
+    boat_session_init(&boat, test_world(BOAT_LOCATION_BASIN), (BoatWater) { 0 });
+    ParticleSignature s = { .first_foam_tick = -1, .expiry_tick = -1 };
+    float ages[BOAT_WATER_PARTICLES] = { 0 };
+    unsigned landings = 0;
+    int landed_tick = -1;
+    for (int tick = 0; tick < 1800; ++tick) {
+        // 0-4 s full throttle straight, 4-6 s hard turn, 6 s a 2 m drop, 7.5 s stopped dead.
+        boat.boat.throttle = tick < 900 ? 1 : 0;
+        if (tick == 720)
+            boat.boat.height = 2;
+        if (tick == 900) {
+            boat.boat.velocity = (Vector2) { 0 };
+            boat.boat.yaw_velocity = boat.boat.engine_response = 0;
+        }
+        float steering = tick >= 480 && tick < 720 ? 1 : 0;
+        if (reset_presentation)
+            boat_presentation_reset(&boat.presentation);
+        boat_session_step(&boat, (BoatInput) { .steering_rate = steering });
+        if (reset_presentation)
+            continue;
+        const BoatPresentation *p = &boat.presentation;
+        int foam = particles(p, false), spray = particles(p, true), young = 0;
+        for (int i = 0; i < BOAT_WATER_PARTICLES; ++i) {
+            const BoatWaterParticle *q = &p->water[i];
+            if (q->lifetime <= 0) {
+                ages[i] = 0;
+                continue;
+            }
+            // A live particle ages by exactly one step, or is a new birth in a free slot.
+            CHECK(q->age <= q->lifetime && q->size > 0);
+            CHECK(q->age == ages[i] + BOAT_STEP || q->age <= BOAT_STEP);
+            ages[i] = q->age;
+            young += q->age <= .1f;
+            s.oldest = fmaxf(s.oldest, q->age);
+        }
+        if (s.first_foam_tick < 0 && foam)
+            s.first_foam_tick = tick;
+        s.peak_foam = foam > s.peak_foam ? foam : s.peak_foam;
+        // Live spray summed over the last straight second and the turn's last second.
+        s.straight_spray += tick >= 360 && tick < 480 ? spray : 0;
+        s.turn_spray += tick >= 600 && tick < 720 ? spray : 0;
+        if (p->landing_serial != landings) {
+            landings = p->landing_serial;
+            landed_tick = tick;
+        }
+        if (landed_tick >= 0 && tick < landed_tick + 12)
+            s.landing_burst = young > s.landing_burst ? young : s.landing_burst;
+        if (tick > 900 && s.expiry_tick < 0 && foam + spray == 0)
+            s.expiry_tick = tick;
+        if (tick % 60 == 0) {
+            // Posing reads state and explicit time only: twice gives the same frame.
+            boat_scene_frame(SESSION_VIEW(&boat), p, &boat.world, BOAT_CAMERA_DEFAULT, &frame);
+            boat_scene_frame(SESSION_VIEW(&boat), p, &boat.world, BOAT_CAMERA_DEFAULT, &again);
+            CHECK(frame.player.particle_count == foam + spray);
+            CHECK(memcmp(frame.player.particles, again.player.particles,
+                      (size_t)frame.player.particle_count * sizeof(frame.player.particles[0]))
+                == 0);
+            for (int i = 0; i < frame.player.particle_count; ++i)
+                s.largest = fmaxf(s.largest, frame.player.particles[i].transform.scale.x);
+        }
+    }
+    CHECK(reset_presentation || landings == 1);
+    *out = s;
+    *final = boat.boat;
+    return 0;
+}
+
+static int particle_lifecycle(void)
+{
+    ParticleSignature a, b, none;
+    Boat boat_a, boat_b, boat_none;
+    CHECK(particle_lifecycle_run(false, &a, &boat_a) == 0);
+    CHECK(particle_lifecycle_run(false, &b, &boat_b) == 0);
+    CHECK(particle_lifecycle_run(true, &none, &boat_none) == 0);
+    printf("particle_lifecycle first_foam_tick=%d peak_foam=%d straight_spray=%d turn_spray=%d "
+           "landing_burst=%d expiry_tick=%d largest=%.3f oldest=%.3f\n",
+        a.first_foam_tick, a.peak_foam, a.straight_spray, a.turn_spray, a.landing_burst,
+        a.expiry_tick, a.largest, a.oldest);
+    // The accepted signature (2026-11-04), with room for other platforms' libm: foam within
+    // 0.1 s of throttle, a landing burst, cubes up to about a metre that linger past 3 s, and
+    // the last one gone within the longest lifetime of the boat stopping at 7.5 s.
+    CHECK(a.first_foam_tick >= 0 && a.first_foam_tick <= 12);
+    CHECK(a.peak_foam >= 160 && a.peak_foam <= 260);
+    CHECK(a.straight_spray >= 3000 && a.straight_spray <= 5000);
+    CHECK(a.turn_spray >= 1800 && a.turn_spray <= 3300);
+    CHECK(a.landing_burst >= 25);
+    CHECK(a.largest >= .8f && a.largest <= 1.3f && a.oldest >= 3 && a.oldest <= 4);
+    CHECK(a.expiry_tick >= 900 + 180 && a.expiry_tick <= 900 + 480);
+    // Repeatable, and the boat is the same whatever the presentation holds.
+    CHECK(memcmp(&a, &b, sizeof(a)) == 0 && memcmp(&boat_a, &boat_b, sizeof(Boat)) == 0);
+    CHECK(memcmp(&boat_a, &boat_none, sizeof(Boat)) == 0);
+    return 0;
+}
+
 static int scene_frame(void)
 {
     // The GPU consumes the same held engine angle and mirrored world coordinates as CPU.
@@ -1847,6 +1954,7 @@ static const TestCase cases[] = {
     SLOW_CASE(validate_gentle_encounters),
     TEST_CASE(validate_calm_reference),
     TEST_CASE(scene_frame),
+    SLOW_CASE(particle_lifecycle),
     TEST_CASE(river_quays),
     TEST_CASE(validate_course),
     TEST_CASE(validate_coasting),

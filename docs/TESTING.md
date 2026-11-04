@@ -187,9 +187,32 @@ the outer dock with and without the opaque depth copy. The copy must be taken in
 texture and skipped when disabled or drawing to the default framebuffer; the outer map must bind
 its water atlas. The quay band must change between 100 pixels and 5% of the frame, and almost
 only lighten.
+`presentation` (`boat_water_review --check-presentation`, `gpu`, about 3 s; graphics G5a) draws
+the river at low and high resolution with and without HDR. Daytime HDR stays within one 8-bit step
+of the 8-bit scene; repeated preset and window-size changes, a second view and the rear-view
+mirror reproduce their frames; failed HDR allocations present the 8-bit frame exactly; a
+synthetic 3.5 spot blooms only a few pixels and clamps; and the HUD overlay composites like
+drawing over the scene. `boat_screen` and `waterfront_grade` (quick) check the layout sizes and
+the grades.
+`light_clusters` (`boat_water_review --check-light-clusters`, `gpu`, about 1 s; graphics G5b)
+draws the river at dusk, without and with 600 review lights, at low and high resolution. Each
+clustered frame must equal `--light-reference` (every light tested at every pixel) byte for byte,
+also after a rear-view mirror pass, with no dropped, clipped or overflowing lights; the daytime
+fallback frame stays within one 8-bit step of the clustered one; and the capped fallback must
+account for every light it leaves out. `waterfront_lights` (quick) checks the cluster slots, rank
+order, submission-order independence, overflow, capacity, packing and, at 20,000 points, that
+each slot list finds exactly the lights reaching the point.
 `water_atlas_river` and `water_atlas_outer` (`water_atlas_bake --check`; graphics G4) rebake each
 map's water atlas and require the committed sidecar byte for byte. `validate_boat_scenery`
 also rejects malformed, truncated, foreign-map and out-of-range atlases.
+`ambient_river` and `ambient_outer` (`ambient_bake --check`; graphics G5c, slow: about 1.5 s and
+20 s) rebake each map's ambient occlusion and require the committed sidecar byte for byte;
+`validate_boat_scenery` rejects malformed, truncated, stale-key, foreign-map and wet-corner
+sidecars and one loaded without its scenery, and `gpu_view_lifecycle` requires the river's
+occlusion to reach its uploaded vertices. `boat_handling.particle_lifecycle` (slow) pins the
+cube foam and spray signature through emission, a fast turn, a 2 m drop and expiry within
+declared ranges, checks that posing is pure and that the boat is identical whatever the
+presentation holds.
 `boat_water_review --geometry` prints each map's static GPU bytes (graphics G2a) and
 `--compare A B` checks two `--review` directories against the G0 image bounds. Neither is a CTest:
 review captures compare only within one platform and build.
@@ -349,11 +372,17 @@ about 32 s in Debug on an M1 Max) runs a hidden `--waves --aa off` voyage. It ch
 counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, finite values,
 route completion and exact final-state parity with `--check --waves`. Since A2.1 (schema 2)
 it also checks that the per-pass and per-group submission/triangle columns partition the
-totals, apart from the two sky quads. Since A2.3 (schema 3) it also checks the 1,024 m
-default `tile_size`, the per-pass `*_tiles_culled` columns and that the shadow pass culls
-tiles on every row. Since G0 (schema 4) it also checks the `stress` scenario: the display-free
+totals, apart from the two sky quads. Since A2.3 (schema 3) it also checks the default
+`tile_size` (1,024 m then, 2,048 m since the outer follow-up), the per-pass `*_tiles_culled`
+columns and that the shadow pass culls tiles on every row (on more than three quarters of rows
+since the 512 m detail cells). Since G0 (schema 4) it also checks the `stress` scenario: the display-free
 `--stress-state` fixture must match the benchmark's exact `final_state`, and both wake pools
 must stay at capacity with reported emitter/piece counts. It asserts no timing thresholds.
+The `outer` scenario (2026-11-04) drives the river route on the outer map and continues across
+the estuary; its GPU run is not in this contract (about 12,000 frames), but `boat_outer_route`
+(`cpu`, about 1.7 s in Release) drives it display-free with `--check --scenario outer --waves`,
+checking shore clearance on every tick. The benchmark's `final_state` matched it on the run
+that introduced the scenario.
 See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25) and the
 [G0 budgets](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
 

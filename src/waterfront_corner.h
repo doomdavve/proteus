@@ -38,8 +38,9 @@ typedef struct {
     BoatMapTiles tiles;
 } WaterfrontScenery;
 
-// Default render tile edge, in metres: chosen over 512 m by the A2.3 matrix.
-#define WATERFRONT_TILE_SIZE 1024.0f
+// Default render tile edge, in metres: 1024 m in the A2.3 matrix, 2048 m since the outer
+// follow-up to P3, where GPU time followed submissions more than triangles.
+#define WATERFRONT_TILE_SIZE 2048.0f
 
 // Fails, leaving the scenery zeroed, for a missing or empty mesh, a compiled map whose scenery is
 // not loaded (on the outer map, the river's too, which lays out the kit), allocation failure or
@@ -64,6 +65,9 @@ Vector3 waterfront_corner_position(float u, float height, float v);
 // terrain at any height (the outer map) as well as on the river's 3.5 m ground.
 bool waterfront_building_wall(Color color);
 bool waterfront_building_roof(Color color);
+// A wall triangle of an imported building the renderers draw as a facade: upright and at least
+// 5.5 m tall. The GPU renderer measures its windows, finish and ambient occlusion from its base.
+bool waterfront_facade_triangle(Vector3 a, Vector3 b, Vector3 c, Color color);
 // A generated wall triangle a,c,b (base corners a and b, c above b) of an imported building,
 // tall enough for windows. Window rows start 1.5 m above a.
 bool waterfront_window_wall(Color color, Vector3 a, Vector3 c, Vector3 b);
