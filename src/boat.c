@@ -71,7 +71,9 @@ static const float HULL_BOW = 2.0f;
 static const float HULL_STERN = 1.6f;
 static const float HULL_HALF_BEAM = .75f;
 static const float HULL_SHORE_CLEARANCE = .35f;
-static const BoatHull SPEEDBOAT_HULL = { HULL_BOW, HULL_STERN, HULL_HALF_BEAM, YAW_INERTIA };
+// HULL_BOW, HULL_STERN, HULL_HALF_BEAM and YAW_INERTIA, spelled out: MSVC's C rejects const
+// variables in a static initializer.
+static const BoatHull SPEEDBOAT_HULL = { 2.0f, 1.6f, .75f, 2.2f };
 #define HULL_SAMPLES_MAX 32
 #define HULL_SIDE_SPACING 2.0f
 
