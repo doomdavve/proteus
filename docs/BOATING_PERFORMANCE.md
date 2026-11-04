@@ -658,9 +658,10 @@ tile instead of two.
 intervals exceed 10 ms in both builds, evenly along the route, and so do 45% on the light river
 at low resolution (GPU 1.56, CPU submit 1.35 ms). Without the pacer's backstop (an uncommitted
 experiment) vsync alone gives river intervals p50 11.0 / p95 14.5 ms. Unpaced, outer high now
-fits in 3.8–4.0 ms frame p95. So on this Mac, OpenGL vsync does not hold 120 Hz at any load, and
-scene work is not the cause of those misses. Not tested: another display, fullscreen, Windows,
-or the browser.
+fits in 3.8–4.0 ms frame p95. So in a window on this Mac, OpenGL vsync does not hold 120 Hz at
+any load, and scene work is not the cause of those misses. Every run was windowed, so outside
+macOS Game Mode, which applies only in macOS full-screen mode; as the user noted, frame rates
+outside it can be inconsistent. Not tested: Game Mode, another display, Windows, or the browser.
 
 ## Graphics G5a presentation presets — 2026-11-03
 
