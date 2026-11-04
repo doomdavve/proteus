@@ -1,5 +1,7 @@
 #include "renderer_gpu.h"
+#include "boat_ambient.h"
 #include "boat_clock.h"
+#include "boat_scenery.h"
 #include "boat_water_atlas.h"
 #include "boat_water_mesh.h"
 #include "waterfront_city.h"
@@ -20,6 +22,7 @@ typedef struct {
     float *normals;
     float *texcoords;
     unsigned char *colors;
+    unsigned char *occlusion; // Baked ambient occlusion per vertex, 0 (open) to 255.
     int count;
     int capacity;
 } MeshBuilder;
@@ -45,6 +48,7 @@ static void builder_destroy(MeshBuilder *builder)
     free(builder->normals);
     free(builder->texcoords);
     free(builder->colors);
+    free(builder->occlusion);
     *builder = (MeshBuilder) { 0 };
 }
 
@@ -59,25 +63,31 @@ static bool builder_reserve(MeshBuilder *builder, int additional)
     float *normals = malloc((size_t)capacity * 3 * sizeof(*normals));
     float *texcoords = malloc((size_t)capacity * 2 * sizeof(*texcoords));
     unsigned char *colors = malloc((size_t)capacity * 4 * sizeof(*colors));
-    if (positions == NULL || normals == NULL || texcoords == NULL || colors == NULL) {
+    unsigned char *occlusion = malloc((size_t)capacity);
+    if (positions == NULL || normals == NULL || texcoords == NULL || colors == NULL
+        || occlusion == NULL) {
         free(positions);
         free(normals);
         free(texcoords);
         free(colors);
+        free(occlusion);
         return false;
     }
     memcpy(positions, builder->positions, (size_t)builder->count * 3 * sizeof(*positions));
     memcpy(normals, builder->normals, (size_t)builder->count * 3 * sizeof(*normals));
     memcpy(texcoords, builder->texcoords, (size_t)builder->count * 2 * sizeof(*texcoords));
     memcpy(colors, builder->colors, (size_t)builder->count * 4 * sizeof(*colors));
+    memcpy(occlusion, builder->occlusion, (size_t)builder->count);
     free(builder->positions);
     free(builder->normals);
     free(builder->texcoords);
     free(builder->colors);
+    free(builder->occlusion);
     builder->positions = positions;
     builder->normals = normals;
     builder->texcoords = texcoords;
     builder->colors = colors;
+    builder->occlusion = occlusion;
     builder->capacity = capacity;
     return true;
 }
@@ -116,8 +126,16 @@ static bool builder_triangle(MeshBuilder *builder, Vector3 a, Vector3 b, Vector3
         builder->colors[vertex * 4 + 1] = color.g;
         builder->colors[vertex * 4 + 2] = color.b;
         builder->colors[vertex * 4 + 3] = color.a;
+        builder->occlusion[vertex] = 0;
     }
     return true;
+}
+
+// The baked corners of the last triangle added, in its a, b, c order; none when CORNERS is NULL.
+static void builder_occlusion(MeshBuilder *builder, const unsigned char *corners)
+{
+    if (corners)
+        memcpy(&builder->occlusion[builder->count - 3], corners, 3);
 }
 
 static bool builder_quad(
@@ -164,6 +182,7 @@ static Mesh builder_finish(MeshBuilder *builder)
     builder->normals = NULL;
     builder->texcoords = NULL;
     builder->colors = NULL;
+    free(builder->occlusion);
     UploadMesh(&mesh, false);
     *builder = (MeshBuilder) { 0 };
     return mesh;
@@ -179,6 +198,7 @@ typedef struct {
     float texcoord[2];
     float normal[3];
     unsigned char color[4];
+    unsigned char occlusion;
 } StaticVertex;
 
 // What a map surface's shader reads, which decides how its vertices are stored.
@@ -223,6 +243,7 @@ static StaticVertex static_vertex(const MeshBuilder *builder, int source)
     memcpy(vertex.texcoord, &builder->texcoords[source * 2], sizeof(vertex.texcoord));
     memcpy(vertex.normal, &builder->normals[source * 3], sizeof(vertex.normal));
     memcpy(vertex.color, &builder->colors[source * 4], sizeof(vertex.color));
+    vertex.occlusion = builder->occlusion[source];
     return vertex;
 }
 
@@ -237,7 +258,9 @@ static unsigned int static_vertex_hash(const StaticVertex *vertex)
 
 // Normals are three GL_SHORT integers in an eight-byte slot, read unnormalized: the map shaders
 // renormalize them, and normalized integers decode differently before GL 4.2. *ERROR grows to the
-// worst component error as the shader reads it.
+// worst component error as the shader reads it. The fourth short is 1 + the baked occlusion
+// (0..255), so the shaders read occlusion as w - 1 and an ordinary three-float normal, whose w
+// defaults to 1, as unoccluded.
 #define STATIC_NORMAL_TYPE 0x1402
 #define STATIC_NORMAL_BYTES 8
 
@@ -278,6 +301,9 @@ static int static_vertices_pack(
             short normal[3];
             static_normal_pack(vertices[i].normal, normal, &binding_scene->geometry.normal_error);
             memcpy(p, normal, sizeof(normal));
+            short occlusion = (short)(1 + vertices[i].occlusion);
+            memcpy(p + sizeof(normal), &occlusion, sizeof(occlusion));
+            binding_scene->geometry.occluded_vertices += vertices[i].occlusion > 0;
             p += STATIC_NORMAL_BYTES;
         }
         if (surface == STATIC_GROUND)
@@ -320,7 +346,7 @@ static Mesh static_mesh_upload(const StaticVertex *vertices, int vertex_count,
     offset += (int)sizeof(vertices->color);
     if (surface != STATIC_UNLIT) {
         rlSetVertexAttribute(
-            RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 3, STATIC_NORMAL_TYPE, false, stride, offset);
+            RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL, 4, STATIC_NORMAL_TYPE, false, stride, offset);
         rlEnableVertexAttribute(RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL);
         offset += STATIC_NORMAL_BYTES;
     }
@@ -399,8 +425,10 @@ static Mesh builder_static_chunk(
             vertex.texcoord[1] = 0;
         if (surface == STATIC_UNLIT || surface == STATIC_FLAT)
             vertex.texcoord[0] = 0;
-        if (surface == STATIC_UNLIT)
+        if (surface == STATIC_UNLIT) {
             memset(vertex.normal, 0, sizeof(vertex.normal));
+            vertex.occlusion = 0;
+        }
         unsigned int slot = static_vertex_hash(&vertex) & (unsigned int)(slots - 1);
         while (table[slot] >= 0 && memcmp(&vertices[table[slot]], &vertex, sizeof(vertex)) != 0)
             slot = (slot + 1) & (unsigned int)(slots - 1);
@@ -505,24 +533,25 @@ static int cached_location(Shader shader, const char *name)
 
 static const char *const known_uniforms[] = { "objectColor", "emissive", "instanced",
     "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
-    "directionalColor", "directionalDirection", "directionalIntensity", "shadowsEnabled",
-    "lightViewProjection", "shadowMap", "farShadowsEnabled", "farLightViewProjection",
-    "farShadowMap", "farShadowTexel", "localLightCount", "localLightPositionRadius[0]",
-    "localLightColorIntensity[0]", "localLightDirection[0]", "localLightCone[0]", "cameraPosition",
-    "fogColor", "fogStart", "fogEnd", "fogOpacity", "atmosphereEnabled", "objectWakeEnabled",
-    "objectWakeLife", "wakeFieldEnabled", "wakeGrid", "wakeField", "physicalWaves", "radialOrigin",
-    "radialMotion", "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion",
-    "vesselShape", "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
-    "objectWakeData", "playerWakeCount", "playerWakeOrigins[0]", "playerWakeParameters[0]",
-    "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
-    "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
-    "reflectionTexture", "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward",
-    "skyRight", "skyUp", "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled",
-    "stampField", "stampRect", "stampOutsideCount", "historyEnabled", "historyField", "historyRect",
-    "historySlopeGain", "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass",
-    "windowLight", "windowLit", "windowDark", "waterLight", "waterShadowFloor", "glintColor",
-    "highlightTint", "glintSheen", "glintSparkle", "lightClusterMode", "lightClusters",
-    "lightClusterCount", "lightClusterLayout", "emissiveGain", "reflectionTexel", NULL };
+    "ambientOcclusion", "directionalColor", "directionalDirection", "directionalIntensity",
+    "shadowsEnabled", "lightViewProjection", "shadowMap", "farShadowsEnabled",
+    "farLightViewProjection", "farShadowMap", "farShadowTexel", "localLightCount",
+    "localLightPositionRadius[0]", "localLightColorIntensity[0]", "localLightDirection[0]",
+    "localLightCone[0]", "cameraPosition", "fogColor", "fogStart", "fogEnd", "fogOpacity",
+    "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife", "wakeFieldEnabled", "wakeGrid",
+    "wakeField", "physicalWaves", "radialOrigin", "radialMotion", "stormArea", "stormPhase",
+    "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape", "wakeAmplitude", "wakeOffset",
+    "objectWakePlayerCount", "objectWakeTrafficLife", "objectWakeData", "playerWakeCount",
+    "playerWakeOrigins[0]", "playerWakeParameters[0]", "waterfrontWater", "wavePatch",
+    "waveParameters[0]", "sunDirection", "reflectionViewProjection", "crossingWakeTime",
+    "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled", "reflectionTexture",
+    "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
+    "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
+    "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
+    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
+    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
+    "glintSparkle", "lightClusterMode", "lightClusters", "lightClusterCount", "lightClusterLayout",
+    "emissiveGain", "reflectionTexel", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -951,11 +980,10 @@ static CitySurface city_surface(Vector3 a, Vector3 b, Vector3 c, Color color)
     Vector3 normal
         = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
     float top = fmaxf(a.y, fmaxf(b.y, c.y));
-    float bottom = fminf(a.y, fminf(b.y, c.y));
     if (normal.y > .95f)
         return top > 4.0f && waterfront_building_roof(color) ? CITY_SURFACE_ROOF
                                                              : CITY_SURFACE_FLAT;
-    if (fabsf(normal.y) < .15f && waterfront_building_wall(color) && top - bottom >= 5.5f)
+    if (waterfront_facade_triangle(a, b, c, color))
         return CITY_SURFACE_FACADE;
     return CITY_SURFACE_FLAT;
 }
@@ -1005,6 +1033,9 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
     WaterfrontGpuTiled *corner, WaterfrontGpuTiled *corner_far, WaterfrontGpuTiled *corner_emissive)
 {
     const Mesh3D *city = scenery->full->mesh;
+    // Baked corners exist only for a loaded pack, in its own triangle order.
+    const unsigned char *occlusion
+        = boat_scenery_of(scenery->map) == scenery->full ? boat_ambient_of(scenery->map) : NULL;
     size_t tiles = boat_map_tiles_count(&scenery->tiles);
     TiledBuilder builders[4] = { 0 };
     MeshBuilder water_builder = { 0 };
@@ -1017,6 +1048,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
         Vector3 a = city->vertices[triangle->vertices[0]];
         Vector3 b = city->vertices[triangle->vertices[1]];
         Vector3 c = city->vertices[triangle->vertices[2]];
+        const unsigned char *corners = occlusion ? &occlusion[i * 3] : NULL;
         if (is_water_triangle(triangle)) {
             if (!builder_triangle(&water_builder, a, b, c, (Color) { 67, 151, 180, 255 }))
                 goto failed;
@@ -1041,9 +1073,10 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
             int finish = planting ? WATERFRONT_GROUND_PLANTING : WATERFRONT_GROUND_CONCRETE;
             if (road)
                 finish = WATERFRONT_GROUND_ASPHALT;
-            if (!builder_ground_triangle(
-                    &builders[CITY_SURFACE_QUAY].tiles[tile], a, b, c, triangle->color, finish))
+            MeshBuilder *ground = &builders[CITY_SURFACE_QUAY].tiles[tile];
+            if (!builder_ground_triangle(ground, a, b, c, triangle->color, finish))
                 goto failed;
+            builder_occlusion(ground, corners);
             continue;
         }
         if (surface == CITY_SURFACE_FACADE) {
@@ -1057,6 +1090,7 @@ static bool build_city(const WaterfrontScenery *scenery, WaterfrontGpuTiled *cit
             : builder_triangle(builder, a, b, c, triangle->color);
         if (!ok)
             goto failed;
+        builder_occlusion(builder, corners);
     }
     // The compiled river has every surface class; another map needs only its water.
     if (water_builder.count == 0
@@ -2297,6 +2331,10 @@ static void set_lighting_uniforms(WaterfrontGpuScene *scene, const WaterfrontLig
     location = cached_location(scene->shader, "directionalDirection");
     if (location >= 0)
         SetShaderValue(scene->shader, location, directional_direction, SHADER_UNIFORM_VEC3);
+    // Baked map corners darken only the ambient term: direct sun and lamps keep their contact.
+    float occlusion = scene->ambient_occlusion_disabled ? 0 : WATERFRONT_GPU_AMBIENT_OCCLUSION;
+    SetShaderValue(scene->shader, cached_location(scene->shader, "ambientOcclusion"), &occlusion,
+        SHADER_UNIFORM_FLOAT);
     location = cached_location(scene->shader, "directionalIntensity");
     if (location >= 0)
         SetShaderValue(scene->shader, location, &lighting->direct_intensity, SHADER_UNIFORM_FLOAT);

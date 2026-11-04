@@ -2,7 +2,8 @@
 
 in vec3 vertexPosition;
 in vec2 vertexTexCoord;
-in vec3 vertexNormal;
+// w is 1 + the baked ambient occlusion (0..255) of map meshes; three-float normals read 1.
+in vec4 vertexNormal;
 in vec4 vertexColor;
 
 // Locations are fixed because one mesh VAO serves this program and the shadow program.
@@ -28,6 +29,7 @@ out vec3 fragWorldNormal;
 // Flat: interpolating a constant across a triangle does not reproduce it exactly.
 flat out vec4 fragObjectColor;
 flat out int fragEmissive;
+out float fragOcclusion;
 
 void main()
 {
@@ -50,6 +52,7 @@ void main()
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
     fragWorldPosition = worldPosition.xyz;
-    fragWorldNormal = normalize((objectNormal * vec4(vertexNormal, 0.0)).xyz);
+    fragWorldNormal = normalize((objectNormal * vec4(vertexNormal.xyz, 0.0)).xyz);
+    fragOcclusion = clamp((vertexNormal.w - 1.0) / 255.0, 0.0, 1.0);
     gl_Position = objectMvp * vec4(vertexPosition, 1.0);
 }

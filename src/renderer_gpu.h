@@ -16,6 +16,8 @@
 #define WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE 512
 #define WATERFRONT_GPU_REFLECTION_WIDTH 160
 #define WATERFRONT_GPU_REFLECTION_HEIGHT 120
+// How much of the ambient term a fully closed baked corner (boat_ambient.h) removes.
+#define WATERFRONT_GPU_AMBIENT_OCCLUSION .6f
 
 // Ground batch stores one constant material ID per triangle in texcoord.x.
 // Keep these values in sync with waterfront_city.fs.
@@ -84,6 +86,7 @@ typedef struct {
     size_t far_triangles, far_vertex_bytes, far_index_bytes; // Distance detail, also GPU memory.
     size_t retained_cpu_bytes; // Zero unless the review-only retain_map_sources is set.
     float normal_error; // Worst decoded normal component error of packing.
+    size_t occluded_vertices; // Uploaded map vertices with a baked occlusion above zero.
 } WaterfrontGpuGeometry;
 
 // Application submissions of the last waterfront_gpu_scene_draw. Each mesh submission is one GL
@@ -192,6 +195,7 @@ typedef struct {
     bool light_clusters_active; // This frame shades from the clusters.
     bool light_clusters_disabled; // Review: the capped uniform fallback.
     bool light_reference; // Review: shade every clustered light, ignoring the slot lists.
+    bool ambient_occlusion_disabled; // Review: draw the baked occlusion at zero strength.
     int stress_lights; // Review: extra synthetic lights around the shot.
     WaterfrontLightStats light_stats; // This frame's submissions, drops and overflow.
     int light_rows; // Texture rows uploaded this frame.

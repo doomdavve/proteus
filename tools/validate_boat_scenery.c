@@ -1,6 +1,7 @@
 /* Scenery packs (A3.5i): each mapped location's pack loads once, holds exactly its compiled
  * water before the land, and is what the renderers draw; a missing, malformed or mismatched pack
  * loads nothing, and a compiled map without its pack draws nothing rather than bare water. */
+#include "boat_ambient.h"
 #include "boat_test_scenery.h"
 #include "boat_water_atlas.h"
 #include "waterfront_city.h"
@@ -23,6 +24,7 @@
 #define OUTER_PACK PROTEUS_SOURCE_DIR "/assets/geometry/outer/scenery.bin"
 #define RIVER_PACK PROTEUS_SOURCE_DIR "/assets/geometry/river/scenery.bin"
 #define RIVER_ATLAS PROTEUS_SOURCE_DIR "/assets/geometry/river/water_atlas.bin"
+#define RIVER_AMBIENT PROTEUS_SOURCE_DIR "/assets/geometry/river/ambient.bin"
 
 static unsigned char *read_file(const char *path, size_t *size)
 {
@@ -53,6 +55,28 @@ static bool atlas_rejected(const unsigned char *copy, size_t size)
 {
     return !boat_water_atlas_load_bytes(&waterfront_city_river_map, copy, size)
         && !boat_water_atlas_of(&waterfront_city_river_map);
+}
+
+// Loading COPY (SIZE bytes) as the river's ambient occlusion fails and leaves it unloaded.
+static bool ambient_rejected(const unsigned char *copy, size_t size)
+{
+    return !boat_ambient_load_bytes(&waterfront_city_river_map, copy, size)
+        && !boat_ambient_of(&waterfront_city_river_map);
+}
+
+// A sidecar file of CORNERS (three per triangle of MESH), or NULL.
+static unsigned char *ambient_file(const Mesh3D *mesh, const unsigned char *corners, size_t *size)
+{
+    int packed = 0;
+    unsigned char *stream = CompressData(corners, (int)(mesh->triangle_count * 3), &packed);
+    unsigned char *file = stream ? malloc(BOAT_AMBIENT_HEADER + (size_t)packed) : NULL;
+    if (file) {
+        boat_ambient_header(file, mesh->triangle_count, boat_ambient_key(mesh), (size_t)packed);
+        memcpy(file + BOAT_AMBIENT_HEADER, stream, (size_t)packed);
+        *size = BOAT_AMBIENT_HEADER + (size_t)packed;
+    }
+    MemFree(stream);
+    return file;
 }
 
 // Loading COPY (SIZE bytes) as the outer map's scenery fails and leaves it unloaded.
@@ -195,6 +219,66 @@ int main(void)
     boat_water_atlas_unload();
     free(bad);
     free(atlas);
+
+    // G5c ambient occlusion: each location's sidecar loads with its pack, keyed to its scenery.
+    // Water corners are open; land has both open and closed-off corners.
+    CHECK(boat_scenery_load_all(PROTEUS_SOURCE_DIR "/assets/"));
+    const unsigned char *river_ambient = boat_ambient_of(river->map);
+    CHECK(river_ambient && boat_ambient_of(outer->map) && !boat_ambient_of(basin->map));
+    const Mesh3D *river_mesh = boat_scenery_of(river->map)->mesh;
+    CHECK(boat_ambient_key(river_mesh) != boat_ambient_key(boat_scenery_of(outer->map)->mesh));
+    size_t wet_corners = boat_map_leading_water(river_mesh) * 3, open = 0, closed = 0;
+    for (size_t i = 0; i < river_mesh->triangle_count * 3; ++i) {
+        CHECK(i >= wet_corners || river_ambient[i] == 0);
+        open += i >= wet_corners && river_ambient[i] == 0;
+        closed += river_ambient[i] > 0;
+    }
+    CHECK(open > 0 && closed > 0);
+    // Malformed, stale and mismatched sidecars load nothing; nor does any without its scenery.
+    size_t ambient_size = 0;
+    unsigned char *ambient = read_file(RIVER_AMBIENT, &ambient_size);
+    CHECK(ambient && ambient_size > BOAT_AMBIENT_HEADER);
+    boat_ambient_unload();
+    CHECK(!boat_ambient_of(river->map));
+    bad = malloc(ambient_size + 1);
+    CHECK(bad);
+    CHECK(ambient_rejected(ambient, BOAT_AMBIENT_HEADER - 1)
+        && ambient_rejected(ambient, ambient_size - 1));
+    memcpy(bad, ambient, ambient_size);
+    bad[ambient_size] = 0;
+    CHECK(ambient_rejected(bad, ambient_size + 1)); // Trailing bytes.
+    // Magic, version, triangle count, key, payload, compressed bytes and the zero word.
+    const size_t ambient_fields[] = { 0, 4, 8, 12, 20, 24, 28 };
+    const uint32_t ambient_values[] = { 0, 2, 1, 1, 3, 1, 1 };
+    for (size_t f = 0; f < sizeof(ambient_fields) / sizeof(ambient_fields[0]); ++f) {
+        memcpy(bad, ambient, ambient_size);
+        put32(bad + ambient_fields[f], ambient_values[f]);
+        CHECK(ambient_rejected(bad, ambient_size));
+    }
+    // A value on a water corner means another bake.
+    unsigned char *corners = malloc(river_mesh->triangle_count * 3);
+    CHECK(corners);
+    CHECK(boat_ambient_load_bytes(river->map, ambient, ambient_size));
+    memcpy(corners, boat_ambient_of(river->map), river_mesh->triangle_count * 3);
+    boat_ambient_unload();
+    size_t edited_size = 0;
+    corners[0] = 1;
+    unsigned char *edited = ambient_file(river_mesh, corners, &edited_size);
+    CHECK(edited && ambient_rejected(edited, edited_size));
+    free(edited);
+    corners[0] = 0; // Rewritten with open water, it loads.
+    edited = ambient_file(river_mesh, corners, &edited_size);
+    CHECK(edited && boat_ambient_load_bytes(river->map, edited, edited_size));
+    boat_ambient_unload();
+    free(edited);
+    free(corners);
+    CHECK(!boat_ambient_load_bytes(outer->map, ambient, ambient_size)); // Another map's scenery.
+    boat_scenery_unload();
+    CHECK(!boat_ambient_of(river->map)
+        && !boat_ambient_load_bytes(river->map, ambient, ambient_size));
+    CHECK(!boat_ambient_load_location(basin, PROTEUS_SOURCE_DIR "/assets/"));
+    free(bad);
+    free(ambient);
 
     boat_scenery_unload();
     CHECK(!boat_scenery_of(&waterfront_outer_map) && !boat_scenery_of(&waterfront_city_river_map));

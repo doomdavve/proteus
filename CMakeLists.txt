@@ -95,7 +95,7 @@ target_compile_options(proteus_boat_fixtures PRIVATE ${PROTEUS_WARNINGS})
 # Scenery packs: each mapped location's whole bake (assets/geometry/<location>/scenery.bin), loaded
 # at run time for presentation. The core keeps only the compiled water, so it never reads them.
 add_library(proteus_boat_scenery STATIC src/boat_scenery.c src/boat_scenery.h
-  src/boat_water_atlas.c src/boat_water_atlas.h)
+  src/boat_water_atlas.c src/boat_water_atlas.h src/boat_ambient.c src/boat_ambient.h)
 target_link_libraries(proteus_boat_scenery PUBLIC proteus_boat_core)
 # Validators and review tools load the packs from the source tree (tools/boat_test_scenery.h).
 target_compile_definitions(proteus_boat_scenery INTERFACE PROTEUS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
@@ -862,6 +862,16 @@ foreach(map river outer)
   set_tests_properties(water_atlas_${map} PROPERTIES PASS_REGULAR_EXPRESSION "water_atlas=ok")
 endforeach()
 
+# Graphics G5c: each map's ambient occlusion sidecar rebakes byte for byte from its scenery pack.
+add_executable(ambient_bake tools/ambient_bake.c)
+target_link_libraries(ambient_bake PRIVATE proteus_render)
+target_compile_options(ambient_bake PRIVATE ${PROTEUS_WARNINGS})
+foreach(map river outer)
+  add_test(NAME ambient_${map} COMMAND ambient_bake --map ${map}
+    --check ${CMAKE_CURRENT_SOURCE_DIR}/assets/geometry/${map}/ambient.bin)
+  set_tests_properties(ambient_${map} PROPERTIES PASS_REGULAR_EXPRESSION "ambient=ok")
+endforeach()
+
 add_executable(validate_boat_minimap tools/validate_boat_minimap.c)
 target_link_libraries(validate_boat_minimap PRIVATE proteus_render)
 target_compile_options(validate_boat_minimap PRIVATE ${PROTEUS_WARNINGS})
@@ -1406,7 +1416,7 @@ set(PROTEUS_SLOW_TESTS
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
-  boat_scenery
+  boat_scenery ambient_river ambient_outer
   boat_river_benchmark_options boat_river_route boat_river_wave_route boat_voyage
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors scene_site harbor_life_qualification
@@ -1458,6 +1468,7 @@ if(PROTEUS_OPTIMIZE_TESTS)
       validate_boat_environment validate_boat_replay boat_water_review wake_objects_review
       validate_boat_clock validate_boat_world validate_boat_core validate_boat_map
       validate_boat_map_index validate_boat_outer_map validate_boat_voyage validate_boat_fleet
+      ambient_bake
       boat_server
       proteus_boat_net validate_boat_net validate_boat_net_enet)
     target_compile_options(${target} PRIVATE

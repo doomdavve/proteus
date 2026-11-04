@@ -324,6 +324,8 @@ static bool no_far_water;
 // --stress-lights N: N extra review lights around the shot.
 static bool light_fallback, light_reference;
 static int stress_lights;
+// --no-ambient-occlusion: the map's baked G5c occlusion at zero strength.
+static bool no_ambient_occlusion;
 // --daylight: review poses at a fixed presentation phase (default day).
 static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
 // --resolution and --hdr: the presentation preset of review and benchmark GPU views, sized for
@@ -359,6 +361,7 @@ static bool apply_scene_options(WaterfrontGpuScene *scene)
     waterfront_gpu_scene_set_far_water_enabled(scene, !no_far_water);
     scene->light_clusters_disabled = light_fallback;
     scene->light_reference = light_reference;
+    scene->ambient_occlusion_disabled = no_ambient_occlusion;
     scene->stress_lights = stress_lights;
     if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
         return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
@@ -1005,6 +1008,8 @@ static int check_gpu_lifecycle(void)
     a.scene.map_upload_limit = 0;
     EXPECT(MATCHES(&a, 1));
     EXPECT(a.scene.geometry.normal_error > 0 && a.scene.geometry.normal_error <= 2.0f / 255.0f);
+    // G5c: the river's baked ambient occlusion reaches its uploaded vertices.
+    EXPECT(a.scene.geometry.occluded_vertices > 0);
     boat_gpu_destroy(&a);
 #undef MATCHES
 #undef EXPECT
@@ -2827,13 +2832,13 @@ static int report_geometry(void)
         printf("geometry location=%s meshes=%d triangles=%zu vertices=%zu source_vertices=%zu "
                "vertex_bytes=%zu index_bytes=%zu far_triangles=%zu far_vertex_bytes=%zu "
                "far_index_bytes=%zu retained_cpu_bytes=%zu normal_error=%.5f "
-               "before_gpu_bytes=%zu "
+               "occluded_vertices=%zu before_gpu_bytes=%zu "
                "before_cpu_bytes=%zu vertex_change=%.1f%% total_change=%.1f%%\n",
             resources->definition->name, geometry.meshes, geometry.triangles, geometry.vertices,
             geometry.source_vertices, geometry.vertex_bytes, geometry.index_bytes,
             geometry.far_triangles, geometry.far_vertex_bytes, geometry.far_index_bytes,
-            geometry.retained_cpu_bytes, geometry.normal_error, before, before,
-            before ? 100.0 * ((double)geometry.vertex_bytes / (double)before - 1) : 0,
+            geometry.retained_cpu_bytes, geometry.normal_error, geometry.occluded_vertices, before,
+            before, before ? 100.0 * ((double)geometry.vertex_bytes / (double)before - 1) : 0,
             before ? 100.0 * ((double)after / (double)before - 1) : 0);
         const struct {
             const char *name;
@@ -3105,6 +3110,8 @@ int main(int argc, char **argv)
             light_fallback = true;
         else if (strcmp(argv[i], "--light-reference") == 0)
             light_reference = true;
+        else if (strcmp(argv[i], "--no-ambient-occlusion") == 0)
+            no_ambient_occlusion = true;
         else if (strcmp(argv[i], "--stress-lights") == 0 && i + 1 < argc) {
             stress_lights = atoi(argv[++i]);
             if (stress_lights < 0 || stress_lights > WATERFRONT_LIGHTS_MAX) {
@@ -3170,7 +3177,7 @@ int main(int argc, char **argv)
                  "       Any GPU run: [--analytic-wakes] [--stamp-size N] [--stamp-spacing M]\n"
                  "                    [--no-water-history] [--no-scene-depth] [--no-water-atlas]\n"
                  "                    [--no-far-water] [--light-fallback] [--light-reference]\n"
-                 "                    [--stress-lights N]\n"
+                 "                    [--stress-lights N] [--no-ambient-occlusion]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
@@ -3196,6 +3203,7 @@ int main(int argc, char **argv)
                  "--light-fallback draws the capped uniform light list instead of the clustered\n"
                  "  lights; --light-reference shades every clustered light at every pixel;\n"
                  "  --stress-lights adds N (0..1024) review lights on a 12 m lattice.\n"
+                 "--no-ambient-occlusion draws the map without its baked ambient occlusion.\n"
                  "--history-clip writes FRAMES (1..3600) 60 Hz stress frames to DIR, history\n"
                  "  left and stamp-only right, plus the final history field as history.png.\n"
                  "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"

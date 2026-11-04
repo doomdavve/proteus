@@ -4,6 +4,7 @@ in vec2 fragTexCoord;
 in vec4 fragColor;
 in vec3 fragWorldPosition;
 in vec3 fragWorldNormal;
+in float fragOcclusion;
 flat in vec4 fragObjectColor;
 flat in int fragEmissive;
 
@@ -14,6 +15,7 @@ uniform int groundPass;
 uniform int facadePass;
 uniform int reflectionPass;
 uniform vec3 ambientColor;
+uniform float ambientOcclusion; // Share of ambient a fully closed baked corner removes.
 uniform vec3 directionalColor;
 uniform vec3 directionalDirection;
 uniform float directionalIntensity;
@@ -296,7 +298,12 @@ void main()
 
     vec3 normal = normalize(fragWorldNormal);
     float directional = max(0.0, dot(normal, normalize(directionalDirection)));
-    vec3 illumination = ambientColor
+    // A facade is one tall triangle per wall, so its base corners' occlusion would shade the
+    // whole height: keep it to the bottom metres, as contact with the street.
+    float occlusion = fragOcclusion;
+    if (facadePass != 0)
+        occlusion *= 1.0 - smoothstep(0.0, 4.0, fragTexCoord.y);
+    vec3 illumination = ambientColor * (1.0 - ambientOcclusion * occlusion)
         + directionalColor * directionalIntensity * directional * directional_shadow(normal);
     addLocalLights(illumination, normal);
 
