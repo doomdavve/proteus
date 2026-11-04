@@ -53,7 +53,8 @@ Older notes below that describe preloading the river's sidecars or a River PLACE
 
 ## Canvas touch controls, 2026-11-04
 
-Current status: implemented in `feat/canvas-touch-controls`. The HTML gameplay overlay is
+Current status: implemented in `feat/canvas-touch-controls`; the user accepted the local
+canvas controls on iPhone 17 Pro (2026-11-04). The HTML gameplay overlay is
 removed. C draws Menu, Tilt/Use touch, Recenter, Fullscreen, left/right and Forward/Reverse
 into the same low-resolution frame as the game, with held-pedal feedback. It publishes its
 exact rectangles to the browser as normalized canvas coordinates; JavaScript captures each
@@ -75,10 +76,11 @@ activation requirements. See [Pointer Events](https://www.w3.org/TR/pointerevent
 [orientation permission](https://www.w3.org/TR/orientation-event/#dom-deviceorientationevent-requestpermission).
 
 Completed: canvas drawing/hit-region bridge, multi-touch routing, browser gesture suppression,
-phone target sizing, safe-area sizing, and updated virtual-clock/browser checks. Next: review
-on physical iPhone/Android devices, then ship through the reviewed release/hosting workflow.
-This branch does not deploy either public client. Physical Safari long holds, real motion
-permission, steering feel and audio listening remain unverified; emulation is not user acceptance.
+phone target sizing, safe-area sizing, updated virtual-clock/browser checks, and user acceptance
+on a physical iPhone 17 Pro. Next: review/merge and ship through the release/hosting workflow;
+physical Android and HTTPS motion-permission qualification remain open. This branch does not
+deploy either public client. Specific long-hold duration, portrait/landscape coverage and audio
+listening were not reported in the user's check; emulation alone is not user acceptance.
 Mobile weapons, replay/camera controls and text entry remain outside this change.
 
 Verification, 2026-11-04, Apple Silicon/macOS: Debug build and `ctest --preset full`
@@ -104,8 +106,15 @@ sessions, then stopped at its console query: 30 ms-per-character typing submitte
 merging main's console work; the complete title/authoring suite is not claimed as passing.
 A focused desktop probe passed solo startup, absence of touch controls, F11 fullscreen
 entry/exit, console opening and a pasted `= 2+4` query returning `6`, with no page errors.
-Firefox/WebKit, local WebRTC rooms, physical devices and human audio review were not run in
-this step. Changed local documentation links and JavaScript/Python syntax checks pass.
+Firefox/WebKit automation, local WebRTC rooms, agent-run physical-device checks and human
+audio review were not run in this step. Changed local documentation links and JavaScript/Python
+syntax checks pass.
+
+User acceptance, 2026-11-04: after opening the worktree's build over local HTTP on the
+iPhone, the user reported: "Works well on my iPhone 17 pro." This accepts
+the canvas touch controls on that device. The browser/iOS version, orientation coverage and
+individual gestures were not specified. The HTTP preview does not verify HTTPS-only tilt
+permission, Home Screen behavior or other devices.
 
 ## Minimal landing page, 2026-11-01
 
