@@ -26,7 +26,7 @@ owns that.
 | Step | Outcome | Depends on | Status |
 | --- | --- | --- | --- |
 | [PD1](#pd1--bundled-runtime-and-complete-solo-coverage) | Every native solo session runs from a bundled package; authoring is separate | — | Implemented 2026-10-31; merged in [#96](https://github.com/doomdavve/proteus/pull/96) |
-| [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31; merged in [#98](https://github.com/doomdavve/proteus/pull/98) without PD4 |
+| [PC](#pc--live-console-and-edits-without-reset) | In-game Lua console; edits apply without resetting the session, on the path a later agent uses | PD1 | Implemented 2026-10-31; merged in [#98](https://github.com/doomdavve/proteus/pull/98) without PD4; [console comfort](#pc-console-comfort-2026-11-04) implemented 2026-11-04 |
 | [PD2](#pd2--package-defined-rooms) | Rooms run from a package; clients receive data, protocol v9 | PD1 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100) |
 | [PD3](#pd3--authored-scenes-and-revisions-in-rooms) | Authored scenes with contacts in rooms; revisions between rounds | PD2 | Implemented 2026-10-31 in [#100](https://github.com/doomdavve/proteus/pull/100); round-boundary revisions deferred to v10; [follow-ups](#rooms-follow-ups) open |
 | [PD4](#pd4--browser-parity) | Browser solo play runs from bundled packages, scenes included | PD1, PC | Implemented 2026-10-31; merged in [#106](https://github.com/doomdavve/proteus/pull/106) |
@@ -569,6 +569,48 @@ the game thread; the child worker performs every evaluation.
 judge whether live edits read as continuous and held edits are understandable. Play Harbor life
 with a berth edit near the boat and check that the boat is never nudged. Decide whether the
 native-only console is acceptable until PD4.
+
+### PC console comfort, 2026-11-04
+
+**Status:** implemented on `feat/comfy-console`, including the latest marina M2 changes from
+`main`. Final user review of the small font, spacing, completion and translucent backdrop remains.
+
+**Completed:** a first-open ASCII boat, shared build version and quick help; descriptive `/help`
+and `/help COMMAND`; the smallest bundled m3x6 face with natural advances, word wrapping and a
+character-sized block cursor; horizontal input scrolling, cursor editing and key repeat;
+draft-preserving history; Tab command completion with common-prefix expansion and forward/backward
+cycling. Only the logo uses fixed-width cells. The panel renders above HUD text, with 195/255
+opacity and an optional nine-tap GPU blur of the existing frame texture. CPU and shader failure
+retain the translucent panel.
+
+Ctrl/Cmd+C copies the latest submitted command and its output; adding Shift copies the retained
+transcript. Display wrapping does not enter the clipboard. Ctrl/Cmd+V inserts one ASCII line at the
+cursor without submitting it; multiline, unsupported-character and oversize pastes are rejected
+atomically. Browser writes begin in the key gesture and paste uses the native paste event, with
+refusal visible in the footer. Scrollback is bounded and output arriving while reading older lines
+preserves that viewport.
+
+**Verification, 2026-11-04, Apple Silicon/macOS:** Debug build and `ctest --preset full` pass
+all 358 enabled tests (13 retired tests disabled, GPU CTests off). `wake_command` covers cursor
+editing, draft history, paste bounds, transcript eviction, long-input viewport bounds, focused help
+and completion/cycling. The Node browser control test covers clipboard refusal/fallback, focus,
+page-key ownership and queued Tab events with per-event Shift state. The Emscripten `web` target
+builds and its no-Lua-in-game-Wasm check passes. A 90-frame windowed CPU demo completed. Native
+OpenGL review captures verified shader compilation, GPU blur and the unblurred CPU overlay. These
+captures use a temporary review harness with a deterministic CPU river image as its backdrop.
+The pre-existing raylib `stb_vorbis.c` warning was the only warning during the full rebuild.
+
+Chrome 156.0.8078.80/SwiftShader passed real clipboard latest/all Copy and macOS paste,
+unique completion, rapid Tab/Shift+Tab cycling, submitted full/topic help, scrollback, long input,
+Home and closing/reopening with its draft intact; no page or shader errors were reported. Press
+queues preserve rapid Enter/editing keys; browser Tab queues retain each event's Shift state.
+[Inspected captures and their scope](evidence/console/2026-11-04/README.md) retain the final browser
+welcome/completion and native CPU fallback.
+
+**Next:** review the final presentation and platform CI before merging. Windows, Linux and other
+browser engines have not been qualified locally; shader refusal was not forced.
+**Known limits:** no mouse text selection, Lua/argument completion, multiline input or Unicode
+input. The existing 200-line scrollback, 16-command history and solo-only availability remain.
 
 ## PD2 — package-defined rooms
 

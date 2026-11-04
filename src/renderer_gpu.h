@@ -2,6 +2,7 @@
 #define PROTEUS_RENDERER_GPU_H
 
 #include "waterfront_corner.h"
+#include "waterfront_harbor_view.h"
 #include "waterfront_lights.h"
 #include "waterfront_scene.h"
 #include "waterfront_wake_stamp.h"
@@ -154,6 +155,10 @@ typedef struct {
     Mesh rival_flags[WATERFRONT_RIVALS];
     Mesh traffic_boats[WATERFRONT_TRAFFIC_MESH_SLOTS], lift_span;
     Mesh harbor_boats[BOAT_SCENE_BERTH_RECIPES], harbor_pontoon, harbor_quay, harbor_ferry;
+    Mesh harbor_custom[BOAT_SCENE_BERTHS];
+    WaterfrontHarborModels harbor_models;
+    unsigned harbor_uploads;
+    int harbor_upload_limit; // Review: fail after this many uploads per bind (0: no limit).
     Mesh plane;
     Mesh gull[WATERFRONT_GULL_PARTS];
     Shader shader;
@@ -255,7 +260,10 @@ void waterfront_gpu_scene_set_scene_depth_enabled(WaterfrontGpuScene *scene, boo
 // Review: turn the foam history and ripples off (stamp-only shading) or back on.
 void waterfront_gpu_scene_set_water_history_enabled(WaterfrontGpuScene *scene, bool enabled);
 Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene);
-void waterfront_gpu_scene_draw(
+// Transactional appearance refresh; failure retains every old CPU/GPU hull resource.
+bool waterfront_gpu_scene_bind_harbor(
+    WaterfrontGpuScene *scene, const WaterfrontHarborFrame *frame);
+bool waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);
 void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene);
 WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats);

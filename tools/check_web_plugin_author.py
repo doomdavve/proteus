@@ -309,6 +309,38 @@ def main():
                 page.close(); kind_context.close()
             checks.append('free and course imports launch')
 
+            # M2: launch the real marina, live-edit painted names and dimensions, then Undo.
+            marina_context = browser.new_context(viewport={'width': 1100, 'height': 900})
+            page = marina_context.new_page(); watch(page)
+            page.goto(args.url + ('&' if '?' in args.url else '?') + 'author'); ready()
+            marina_source = (root / 'plugins/harbor-life/main.lua').read_text()
+            page.fill('#plugin-manifest', (root / 'plugins/harbor-life/plugin.json').read_text())
+            page.fill('#plugin-source', marina_source)
+            assert 'Voyage staged' in stage()
+            page.click('#plugin-play'); owner(1)
+            page.wait_for_function('Module.boatPluginCheckpoint?.nativeTick[0] > 0')
+            page.locator('#plugin-tools').evaluate('(e) => e.open = true')
+            page.fill('#plugin-source', marina_source.replace('name = "MIRA"', 'name = "TIDE"'))
+            stage(); owner(2)
+            with page.expect_download() as download:
+                page.click('#plugin-export')
+            appearance_export = args.output / 'marina-appearance.wake-plugin.json'
+            download.value.save_as(appearance_export)
+            assert 'name = "TIDE"' in json.loads(appearance_export.read_text())['source']
+            shot('marina-name-edit')
+            page.click('#plugin-undo'); owner(1)
+            page.fill('#plugin-source', marina_source.replace('length = 5.2', 'length = 5.4'))
+            stage(); owner(3)
+            page.click('#plugin-undo'); owner(1)
+            # Complete source retained in a large reply must pass both worker and host limits.
+            long_source = marina_source.replace('name = "MIRA"', 'name = "LONG"')
+            padded = long_source + '\n--' + 'x' * (64000 - len(long_source.encode()) - 3)
+            page.fill('#plugin-source', padded)
+            stage(); owner(4)
+            drained('marina appearance edits')
+            checks.append('M2 marina name/dimensions Apply/Undo/export and full-source worker reply')
+            page.close(); marina_context.close()
+
             evidence['objectives'] = check_objectives(browser, args, root, errors, logs)
             checks.append('isolated objective init/update/timers, gated ticks, migration/Undo/restart, quarantine, timeout and session cleanup')
 

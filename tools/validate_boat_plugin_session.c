@@ -275,6 +275,77 @@ static bool same_storm(BoatStorm a, BoatStorm b)
 
 static Vector2 sim(Vector2 east_north) { return (Vector2) { -east_north.x, east_north.y }; }
 
+// Color/name edits keep the clock and progress; a dimension edit waits for a clear envelope.
+static int harbor_appearance_edits(void)
+{
+    static WakePlugin p;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    s.presentation_enabled = false;
+    CHECK(wake_plugin_open(&p, "plugins/harbor-life", &s, 0));
+    for (unsigned tick = 0; tick < 120; ++tick)
+        boat_session_step(&s, (BoatInput) { 0 });
+    uint64_t tick = s.tick;
+    Boat boat = s.boat;
+    BoatVoyage progress = s.voyage;
+    struct {
+        const char *from, *to;
+        BoatPluginChange change;
+    } edits[] = { { "name = \"MIRA\"", "name = \"TIDE\"", BOAT_PLUGIN_RENAMED },
+        { "35, 70, 125", "45, 80, 135", BOAT_PLUGIN_RENAMED },
+        { "length = 5.2", "length = 5.4", BOAT_PLUGIN_LIVE } };
+    for (unsigned i = 0; i < sizeof(edits) / sizeof(edits[0]); ++i) {
+        BoatPluginBundle candidate = harbor_edit(edits[i].from, edits[i].to);
+        CHECK(boat_plugin_host_stage(&p.host, &candidate));
+        CHECK(p.host.change == edits[i].change);
+        CHECK(!wake_plugin_frame(
+            &p, &s, false, false, edits[i].change == BOAT_PLUGIN_RENAMED, 2 + i * 2));
+        CHECK(boat_plugin_host_active(&p.host)->number != 1 && s.tick == tick);
+        CHECK(same_boat(&boat, &s.boat) && same_progress(progress, s.voyage));
+        CHECK(!wake_plugin_frame(&p, &s, false, true, false, 3 + i * 2));
+        CHECK(boat_plugin_host_active(&p.host)->number == 1 && s.tick == tick);
+        CHECK(same_boat(&boat, &s.boat) && same_progress(progress, s.voyage));
+        CHECK(!strcmp(s.world.scene->berths[7].appearance.name, "MIRA"));
+    }
+    // A dimension edit waits while the player overlaps the candidate; neither attempt moves it.
+    s.boat.position = (Vector2) { -15, 146 };
+    BoatPluginBundle wider = harbor_edit("length = 5.2", "length = 5.4");
+    CHECK(boat_plugin_host_stage(&p.host, &wider));
+    CHECK(!wake_plugin_frame(&p, &s, false, false, false, 9));
+    CHECK(boat_plugin_host_active(&p.host)->number == 1 && boat_plugin_host_held(&p.host));
+    CHECK(s.boat.position.x == -15 && s.boat.position.y == 146 && s.tick == tick);
+    s.boat = boat;
+    CHECK(!wake_plugin_frame(&p, &s, false, false, false, 10));
+    CHECK(s.world.scene->berths[7].appearance.length == 5.4f && s.tick == tick);
+    CHECK(same_boat(&boat, &s.boat) && same_progress(progress, s.voyage));
+    wake_plugin_close(&p, &s);
+    boat_session_destroy(&s);
+    // A cosmetic descriptor edit cannot disguise changed objective callback source.
+    static BoatPluginHost objective_host;
+    static char objective_source[BOAT_PLUGIN_SOURCE_MAX];
+    const char manifest[] = "{\"id\":\"test.appearance\",\"name\":\"Appearance\",\"api\":1,"
+                            "\"kind\":\"voyage\",\"entry\":\"main.lua\",\"location\":\"outer\","
+                            "\"capabilities\":[\"voyage.define\",\"scene.define\",\"objective."
+                            "hud\"],\"state_version\":1}";
+    int length = snprintf(objective_source, sizeof(objective_source),
+        "local d=(function()\n%.*s\nend)()\nd.init=function(c) return {},{} end\n"
+        "d.update=function(c,s) return s,{} end\nreturn d\n",
+        (int)harbor_files.source_size, harbor_files.source);
+    CHECK(length > 0 && (size_t)length < sizeof(objective_source));
+    BoatPluginBundle objective_bundle = { .manifest = manifest,
+        .manifest_size = strlen(manifest),
+        .source = objective_source,
+        .source_size = (size_t)length };
+    CHECK(boat_plugin_host_start(
+        &objective_host, outer()->definition, &outer()->map, &objective_bundle));
+    char *name = strstr(objective_source, "MIRA");
+    CHECK(name);
+    memcpy(name, "TIDE", 4);
+    CHECK(boat_plugin_host_stage(&objective_host, &objective_bundle));
+    CHECK(objective_host.change == BOAT_PLUGIN_RESTART_VOYAGE);
+    return 0;
+}
+
 // The P0 reference is the compiled route, so a session on it must play the compiled outing. Both
 // sessions take the same inputs from the fjord turn along the direct line through the exposed
 // flank to Långedrag, with a forced recovery on the way; every tick compares the boat, the water
@@ -1747,6 +1818,7 @@ static int default_sessions(void)
 }
 
 static const TestCase cases[] = {
+    TEST_CASE(harbor_appearance_edits),
     TEST_CASE(memory_accounting),
     TEST_CASE(live_migration),
     TEST_CASE(resource_composition),

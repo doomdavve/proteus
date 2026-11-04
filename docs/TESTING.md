@@ -1,5 +1,18 @@
 # Test workflow and timing
 
+Marina M2: `harbor_geometry` checks appearance boundaries, canonical defaults, supported text,
+glyph geometry and the unchanged triangle budget. `harbor_view` checks independent CPU mesh
+owners, no-rebuild repeats, aborted candidates, 96 edit/remove cycles and customized contact/
+camera bounds. `gpu_view_binding` also checks independent customized uploads, no-reupload
+repeats, 32-slot capacity, removal and rollback after a forced second-upload failure.
+`boat_plugin.scene_appearance` covers strict Lua decoding and PST9 round trips/rejection;
+`boat_plugin_session.harbor_appearance_edits`, `boat_plugin_stage` and `wake_command` exercise
+the actual session, isolated worker and console Apply/Undo paths. Room definition-size and
+contact/prediction checks carry customized hulls; source/catalog equality covers bundled data.
+The optional browser authoring checker now includes M2 name/dimension edits, Undo/export and
+a large source reply. See [the owning result](MARINA_AUTHORING_PLAN.md#m2-implementation-status--2026-11-03)
+for actual verification and remaining human/platform limits.
+
 P4.9 `boat_plugin_eval` checks the bounded objective worker protocol against the native
 transaction engine: canonical state, lossless wide integers, exact framing, capacities,
 protected fields and stale/malformed replies. `web_plugin_author` includes virtual-time
@@ -214,7 +227,10 @@ checks. Relative mouse mapping covers accumulated movement and lock reversal; sc
 covers fractional/multiple-step input, neutral crossing and overscroll reversal; held-key thrust
 covers the 0.5 s repeat, re-press and limits. See [the HUD guide](BOAT_HUD.md) for power
 settings, visual fixtures and the remaining manual checks. When Node.js is installed,
-`web_mouse_controls` runs the browser event-contract tests without a browser. Real Wasm
+`web_mouse_controls` runs the browser event-contract tests without a browser.
+`web_console_controls` (`cpu;quick`) checks console clipboard writes, paste events, focus and
+queued Tab/Shift+Tab input; run it directly with `node tools/test_web_console_controls.cjs`.
+`wake_command` covers the headless editor, completion and command semantics. Real Wasm
 checks use the opt-in [Playwright command](WEB_BUILD.md#mouse-and-scroll-qualification-2026-10-24).
 `web_rtc_transport` checks browser network bounds and reconnect callbacks; `boat_net_mux`
 checks colliding peer IDs, routing and disconnect isolation across two transports. Browser

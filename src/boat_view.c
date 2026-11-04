@@ -678,6 +678,7 @@ void boat_cpu_view_destroy(BoatCpuView *cpu)
 {
     boat_water_mesh_cache_destroy(&cpu->water_mesh);
     waterfront_scenery_destroy(&cpu->scenery);
+    waterfront_harbor_models_destroy(&cpu->harbor);
 }
 
 bool boat_draw(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int width, int height,
@@ -772,7 +773,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         WaterfrontHarborFrame harbor;
         waterfront_harbor_evaluate_scene(view->scene, world->water, time,
             waterfront_kit_ground(world->definition->map), &harbor);
-        waterfront_draw_harbor(renderer, &harbor);
+        if (!waterfront_draw_harbor(renderer, &cpu->harbor, &harbor))
+            return false;
         WaterfrontSceneFrame birds = { 0 };
         waterfront_boating_gulls_scene(view->scene, time,
             (Vector3) { -boat->position.x, boat->height, boat->position.y },

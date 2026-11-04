@@ -39,6 +39,8 @@ typedef struct {
     bool base_ready;
 } WakeCommand;
 
+// Match slash-command names (PREFIX excludes the slash), using the same list as /help.
+unsigned wake_command_completions(const char *prefix, const char **matches, unsigned capacity);
 void wake_command_init(WakeCommand *command, WakeCommandPrint print, WakeCommandClear clear,
     WakeCommandSave save, void *context);
 // Also send each result line to TEE while it is set; NULL clears it.

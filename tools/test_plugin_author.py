@@ -526,7 +526,7 @@ class Worker(unittest.TestCase):
         payload = author.snapshot(ROOT / "plugins/harbor-life")
         code, result = self.run_worker(payload)
         self.assertEqual(code, 0, result)
-        self.assertEqual(result["scene"], {"present": True, "version": 2,
+        self.assertEqual(result["scene"], {"present": True, "version": 3,
             "digest": result["scene"]["digest"], "content": True,
             "subsystems": ["marina.berths", "marina.modules", "traffic.vessels", "gulls.flocks"], "berths": 12,
             "modules": 13, "vessels": 4, "flocks": 1})

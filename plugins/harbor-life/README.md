@@ -21,10 +21,10 @@ the second walkway at `(-22, 175)`. Eight fingers attach along the two walkways.
 `quay_deck` stands wholly on land at `(38, 173)`. The gangway runs from land at `(34.1, 161.5)`
 to the first walkway's shore-side midpoint. The rows leave the central approach lane clear.
 
-Scene v2 supports 32 berths and 64 structures. Each structure specifies finite `length`,
+Scene v3 supports 32 berths and 64 structures. Each structure specifies finite `length`,
 `width` and `deck_height` in metres. Floating `attaches` references an earlier floating parent,
 with an orthogonal edge join and equal deck height; connected pieces share heave. See the
-[API contract](../../docs/PLUGIN_API.md#scene-schema-v2) for ranges and placement rules.
+[API contract](../../docs/PLUGIN_API.md#scene-schema-v3) for ranges and placement rules.
 
 The declared entrance is `(4, 140)`, width 8 m. The approach lane runs north along `x = 4`
 from open water into the marina. The pinned camera bookmark `outer.marina` is `(2, 161)` at
@@ -48,7 +48,7 @@ camera, use the `outer.marina-pass` anchor at `(0, 205)` facing the loop.
 
 ## Edit
 
-Change a berth's `recipe`, `x`, `z`, `heading`, `mooring`, the entrance, or remove a berth. The
+Change a berth's `recipe`, `x`, `z`, `heading`, `mooring`, optional `appearance`, the entrance, or remove a berth. The
 game checks the hull and wave/mooring envelope against the compiled water, other berths, the
 entrance and the spawn/recovery shelters. Depth is not available in the compiled map, so no
 depth claim is made. Live staging holds an obstructing edit rather than moving a hull under the boat.
@@ -84,6 +84,45 @@ gulls = { flocks = {
 Editing only cue timing/fade/amplitude keeps the session clock. Moving or resizing a flock is a
 layout edit and follows F7 restart/Undo.
 
+## Boat appearance (M2)
+
+The second-row runabouts MIRA and SALT share a recipe but have distinct dimensions, palettes
+and painted names. The first sailboat overrides its mast to 8.5 m. `harbor-room` mirrors these
+values. Each optional `appearance` field inherits its recipe when omitted:
+
+```lua
+appearance = { length = 5.2, beam = 1.9, hull = { 35, 70, 125 },
+  deck = { 180, 145, 100 }, trim = { 235, 225, 195 }, name = "MIRA" }
+```
+
+Length/beam must be 0.75–1.25 times the recipe's metre dimensions; they drive the mesh, ropes,
+water pose, site/traffic checks, player contacts and camera exclusion together. `mast_height`
+is accepted only on the two sailboat recipes, from freeboard + 2 through 12 m above calm water.
+Colors are dense RGB triples of integers 0–255. Names are 1–16 ASCII A–Z/0–9/space/period/hyphen/
+apostrophe characters and must contain a letter/digit. Empty, unsupported or overlong names
+reject without truncation; omit `name` for no lettering. No lowercase/accented glyphs yet.
+
+Names fit a forward hull-side region on both sides, follow wave motion and depth/occlusion,
+and become unreadable at distance rather than turning into floating labels. Color/name edits
+keep progress and apply without a reset; dimension/mast edits follow the safe live-layout
+policy and wait when obstructed. F6 Undo restores the previous appearance under the same policy.
+An enlarged hull must still fit its slip and clear the map, entrance, other hulls and traffic.
+
+For reproducible close typography review (the same two recipes/palettes, placed in the river
+review fixture), run from the repository root:
+
+```sh
+./build/harbor_review --renderer cpu --view names-port --screenshot build/names-port-cpu.png
+./build/harbor_review --renderer gpu --view names-starboard --waves --time 7 --screenshot build/names-starboard-gpu.png
+./build/harbor_review --renderer gpu --view names-far --screenshot build/names-far-gpu.png
+./build/harbor_review --renderer gpu --view names-port --waves --frames 300
+```
+
+Use both renderers and both near views for review. These fixture images are separate from
+actual package overview captures at `outer.marina`/`outer.eriksberg`, and neither establishes
+human visual/gameplay acceptance. The CPU view compensates glyph layout for its existing
+mirrored camera basis; the hull shape, contact spec and scene orientation are preserved.
+
 ## What the scene API cannot express yet
 
 The current marina is assembled from the registered native recipes and the existing scene
@@ -96,9 +135,6 @@ native work before Lua can author them:
   compiled from the map. There is no building, window-group, sign or street-furniture grant.
 - **Sculptures and arbitrary meshes.** Dimensioned fixed decks and floating platforms are
   available, but packages cannot import concrete sculpture or custom mesh geometry.
-- **Per-boat appearance and names.** A berth selects one of seven fixed native hull recipes.
-  Lua cannot set length, beam, mast height, hull/deck/trim colours, lettering or a boat name, so
-  the fleet cannot match the photograph's individual white sailboats closely.
 - **Moored occupancy.** Authored berths are static. There is no slip assignment, arrival,
   departure, fuel stop or owner schedule.
 - **Freeform traffic routes and departures.** Travelling craft select registered route presets

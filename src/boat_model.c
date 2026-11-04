@@ -3,6 +3,7 @@
 #include "raymath.h"
 
 #include <math.h>
+#include <string.h>
 
 static const Color glass = { 47, 110, 132, 255 };
 static const Color rubber = { 39, 48, 53, 255 };
@@ -186,11 +187,23 @@ static bool between(float value, float low, float high)
     return isfinite(value) && value >= low && value <= high;
 }
 
-bool boat_model_generate(BoatModel *m, BoatModelSpec s)
+bool boat_model_name_valid(const char name[BOAT_MODEL_NAME_BYTES])
 {
-    if (!m)
-        return false;
-    boat_model_begin(m);
+    bool visible = false;
+    for (unsigned i = 0; i < BOAT_MODEL_NAME_BYTES; ++i) {
+        unsigned char c = (unsigned char)name[i];
+        if (!c)
+            return i == 0 || visible;
+        bool letter = (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+        if (!letter && c != ' ' && c != '.' && c != '-' && c != '\'')
+            return false;
+        visible |= letter;
+    }
+    return false;
+}
+
+bool boat_model_spec_valid(BoatModelSpec s)
+{
     if (!between(s.length, 3, 40) || !between(s.beam, 1, 10) || !between(s.draft, .15f, 1.5f)
         || !between(s.freeboard, .35f, 3) || !between(s.bow_width, .02f, .45f)
         || !between(s.stern_width, .5f, 1) || !between(s.cabin_length, 0, s.length * .55f)
@@ -201,7 +214,109 @@ bool boat_model_generate(BoatModel *m, BoatModelSpec s)
         || (s.cabin_height > 0
             && (s.cabin_length < .5f
                 || s.cabin_length <= s.cabin_height * s.windshield_rake + .15f))
-        || (s.mast_height > 0 && s.mast_height < s.freeboard + 2))
+        || (s.mast_height > 0 && s.mast_height < s.freeboard + 2) || !boat_model_name_valid(s.name))
+        return false;
+    return true;
+}
+
+bool boat_model_spec_equal(const BoatModelSpec *a, const BoatModelSpec *b)
+{
+    return a->length == b->length && a->beam == b->beam && a->draft == b->draft
+        && a->freeboard == b->freeboard && a->bow_width == b->bow_width
+        && a->stern_width == b->stern_width && a->cabin_length == b->cabin_length
+        && a->cabin_height == b->cabin_height && a->cabin_offset == b->cabin_offset
+        && a->windshield_rake == b->windshield_rake && a->mast_height == b->mast_height
+        && a->engines == b->engines && a->work_deck == b->work_deck && a->fenders == b->fenders
+        && a->passenger_deck == b->passenger_deck && !memcmp(&a->hull, &b->hull, sizeof(Color))
+        && !memcmp(&a->deck, &b->deck, sizeof(Color)) && !memcmp(&a->trim, &b->trim, sizeof(Color))
+        && !strcmp(a->name, b->name);
+}
+
+// Bundled 3x5 pixel capitals/digits. Every row has at most two runs, so 16 characters
+// contribute at most 16 * 5 * 2 * 2 sides * 2 triangles = 640 triangles.
+static const char *name_glyph(char c)
+{
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .-'";
+    static const char *const rows[]
+        = { "010101111101101", "110101110101110", "011100100100011", "110101101101110",
+              "111100110100111", "111100110100100", "011100101101011", "101101111101101",
+              "111010010010111", "001001001101010", "101101110101101", "100100100100111",
+              "101111111101101", "101111111111101", "010101101101010", "110101110100100",
+              "010101101111011", "110101110101101", "011100010001110", "111010010010010",
+              "101101101101111", "101101101101010", "101101111111101", "101101010101101",
+              "101101010010010", "111001010100111", "111101101101111", "010110010010111",
+              "110001010100111", "110001010001110", "101101111001001", "111100110001110",
+              "011100110101010", "111001010010010", "010101010101010", "010101011001110",
+              "000000000000000", "000000000000010", "000000111000000", "010010000000000" };
+    const char *found = strchr(alphabet, c);
+    return found ? rows[found - alphabet] : rows[36];
+}
+
+// Intersection with the forward hull-side plane between the chine and trim rings.
+// The generator scales X AND Z at the chine; applying only a constant beam offset would
+// float letters away from the tapered hull. Four millimetres avoid coplanar depth fighting.
+static Vector3 name_point(BoatModelSpec s, int side, float y, float z)
+{
+    float scale = .66f + .34f * (y + s.draft) / (.70f * s.freeboard + s.draft);
+    float slope = s.beam * .10f / (s.length * .35f);
+    return (Vector3) {
+        side * (slope * z + (s.beam * .5f - slope * s.length * .05f) * scale + .004f), y, z
+    };
+}
+
+static void name_panels(BoatModel *m, BoatModelSpec s, bool mirror)
+{
+    size_t length = strlen(s.name);
+    if (!length)
+        return;
+    float columns = (float)(length * 4 - 1);
+    float cell = fminf(s.length * .25f / columns, s.freeboard * .09f);
+    float width = columns * cell, top = s.freeboard * .35f + cell * 2.5f;
+    Color ink = 299u * s.hull.r + 587u * s.hull.g + 114u * s.hull.b > 140000u
+        ? (Color) { 25, 31, 37, 255 }
+        : (Color) { 244, 240, 222, 255 };
+    for (int side = -1; side <= 1; side += 2)
+        for (size_t c = 0; c < length; ++c)
+            for (int row = 0; row < 5; ++row) {
+                const char *glyph = name_glyph(s.name[c]) + row * 3;
+                for (int column = 0; column < 3;) {
+                    if (glyph[column] != '1') {
+                        ++column;
+                        continue;
+                    }
+                    int start = column++;
+                    while (column < 3 && glyph[column] == '1')
+                        ++column;
+                    float za
+                        = -s.length * .09f + side * (width * .5f - ((float)c * 4 + start) * cell);
+                    float zb
+                        = -s.length * .09f + side * (width * .5f - ((float)c * 4 + column) * cell);
+                    if (mirror) {
+                        za = -s.length * .18f - za;
+                        zb = -s.length * .18f - zb;
+                    }
+                    float ya = top - (row + 1) * cell, yb = top - row * cell;
+                    Vector3 p0 = name_point(s, side, ya, za), p1 = name_point(s, side, ya, zb);
+                    Vector3 p2 = name_point(s, side, yb, zb), p3 = name_point(s, side, yb, za);
+                    if (mirror)
+                        quad(m, p0, p3, p2, p1, ink);
+                    else
+                        quad(m, p0, p1, p2, p3, ink);
+                }
+            }
+}
+
+bool boat_model_generate(BoatModel *m, BoatModelSpec s)
+{
+    return boat_model_generate_oriented(m, s, false);
+}
+
+bool boat_model_generate_oriented(BoatModel *m, BoatModelSpec s, bool mirror_lettering)
+{
+    if (!m)
+        return false;
+    boat_model_begin(m);
+    if (!boat_model_spec_valid(s))
         return false;
     float l = s.length, b = s.beam;
     Vector2 outline[] = { { -b * s.stern_width * .5f, l * .5f },
@@ -335,6 +450,7 @@ bool boat_model_generate(BoatModel *m, BoatModelSpec s)
             boat_model_box(m, (Vector3) { side * b * .39f, s.freeboard + .05f, z },
                 (Vector3) { .23f, .10f, .12f }, steel);
         }
+    name_panels(m, s, mirror_lettering);
     if (m->overflow)
         m->mesh.triangle_count = 0;
     return !m->overflow;

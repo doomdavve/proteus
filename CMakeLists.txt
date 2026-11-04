@@ -210,6 +210,7 @@ add_library(proteus_render STATIC
   src/boat_voyage_view.c src/boat_voyage_view.h src/boat_minimap.c src/boat_minimap.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
+  src/waterfront_harbor_view.c src/waterfront_harbor_view.h
   src/waterfront_lighting.c src/waterfront_lighting.h src/waterfront_scene.c
   src/boat_screen.c src/boat_screen.h src/waterfront_grade.c src/waterfront_grade.h
   src/waterfront_lights.c src/waterfront_lights.h)
@@ -661,6 +662,10 @@ if(PROTEUS_NODE_EXECUTABLE)
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mobile_controls.cjs)
   set_tests_properties(web_mobile_controls PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_mobile_controls=ok")
+  add_test(NAME web_console_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_console_controls.cjs)
+  set_tests_properties(web_console_controls PROPERTIES LABELS "cpu;quick"
+    PASS_REGULAR_EXPRESSION "web_console_controls=ok")
   add_test(NAME web_mouse_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mouse_controls.cjs)
   set_tests_properties(web_mouse_controls PROPERTIES LABELS "cpu"
@@ -1216,6 +1221,11 @@ target_link_libraries(validate_harbor PRIVATE proteus_boat_session)
 target_compile_options(validate_harbor PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME harbor_geometry COMMAND validate_harbor)
+add_executable(validate_harbor_view tools/validate_harbor_view.c)
+target_link_libraries(validate_harbor_view PRIVATE proteus_render)
+target_compile_options(validate_harbor_view PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME harbor_view COMMAND validate_harbor_view)
+set_tests_properties(harbor_view PROPERTIES LABELS "cpu;quick")
 
 # M1 marina site: shipped layout, dimension/attachment rejection and maximum-capacity checks.
 add_executable(validate_scene_site tools/validate_scene_site.c)

@@ -10,19 +10,19 @@
 // The central basin axis and the existing launch's X=12 route remain open.
 static const WaterfrontBerth berths[WATERFRONT_HARBOR_BOATS] = {
     { "skiff", BOAT_MODEL_SKIFF, BOAT_SCENE_BERTH_SKIFF, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 167 }, -PI / 2 },
+        { -13, 0, 167 }, -PI / 2, { 0 } },
     { "runabout", BOAT_MODEL_RUNABOUT, BOAT_SCENE_BERTH_RUNABOUT, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 173 }, -PI / 2 },
+        { -13, 0, 173 }, -PI / 2, { 0 } },
     { "sailboat", BOAT_MODEL_SAILBOAT, BOAT_SCENE_BERTH_SAILBOAT, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 179 }, -PI / 2 },
+        { -13, 0, 179 }, -PI / 2, { 0 } },
     { "cruiser", BOAT_MODEL_CRUISER, BOAT_SCENE_BERTH_CRUISER, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 185 }, -PI / 2 },
+        { -13, 0, 185 }, -PI / 2, { 0 } },
     { "speedboat", BOAT_MODEL_SPEEDBOAT, BOAT_SCENE_BERTH_SPEEDBOAT, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 191 }, -PI / 2 },
+        { -13, 0, 191 }, -PI / 2, { 0 } },
     { "sailboat_7m", BOAT_MODEL_SAILBOAT, BOAT_SCENE_BERTH_SAILBOAT_7M, BOAT_SCENE_MOORING_PONTOON,
-        { -13, 0, 197 }, -PI / 2 },
+        { -13, 0, 197 }, -PI / 2, { 0 } },
     { "workboat", BOAT_MODEL_WORKBOAT, BOAT_SCENE_BERTH_WORKBOAT, BOAT_SCENE_MOORING_QUAY,
-        { 44, 0, 35 }, -.10f },
+        { 44, 0, 35 }, -.10f, { 0 } },
 };
 static const Vector3 dock_center = { -20, 0, 182 };
 // The user asked for a Stena Line ferry "docked right across the Eriksbergs crane" (A3.5e): an
@@ -60,6 +60,7 @@ WaterfrontBerth waterfront_harbor_berth_at(const BoatSceneDefinition *scene, uns
             .mooring = source->mooring,
             .position = { -source->x, 0, source->z },
             .heading = source->heading };
+        out.appearance = source->appearance;
         memcpy(out.id, source->id, sizeof(out.id));
         return out;
     }
@@ -68,8 +69,10 @@ WaterfrontBerth waterfront_harbor_berth_at(const BoatSceneDefinition *scene, uns
 
 BoatModelSpec waterfront_harbor_berth_spec(const WaterfrontBerth *berth)
 {
-    return berth ? boat_scene_berth_spec((BoatSceneBerthRecipe)berth->recipe)
-                 : (BoatModelSpec) { 0 };
+    if (!berth)
+        return (BoatModelSpec) { 0 };
+    BoatSceneBerth source = { .recipe = berth->recipe, .appearance = berth->appearance };
+    return boat_scene_berth_resolve(&source);
 }
 
 BoatModelSpec waterfront_harbor_spec(int index)
@@ -458,6 +461,7 @@ void waterfront_harbor_evaluate_scene(const BoatSceneDefinition *scene, BoatWate
         WaterfrontBerth berth = waterfront_harbor_berth_at(scene, i);
         BoatModelSpec spec = waterfront_harbor_berth_spec(&berth);
         frame->recipes[i] = berth.recipe;
+        frame->specs[i] = spec;
         frame->boats[i]
             = boat_water_pose(water, time, berth.position, berth.heading, spec.length, spec.beam);
         for (int end = -1; end <= 1; end += 2) {

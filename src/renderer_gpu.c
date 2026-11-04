@@ -2774,8 +2774,9 @@ static void draw_harbor(const WaterfrontGpuScene *scene, Material material,
     }
     draw_colored_mesh(scene->harbor_ferry, material, harbor->ferry, WHITE, false);
     for (int i = 0; i < harbor->berth_count; ++i)
-        draw_colored_mesh(
-            scene->harbor_boats[harbor->recipes[i]], material, harbor->boats[i], WHITE, false);
+        draw_colored_mesh(scene->harbor_custom[i].vaoId ? scene->harbor_custom[i]
+                                                        : scene->harbor_boats[harbor->recipes[i]],
+            material, harbor->boats[i], WHITE, false);
     for (int i = 0; i < harbor->line_count; ++i)
         draw_colored_mesh(
             scene->cube, material, harbor->lines[i], (Color) { 169, 153, 113, 255 }, false);
@@ -3355,19 +3356,63 @@ static void draw_water(
 static void draw_scene(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height);
 
-void waterfront_gpu_scene_draw(
+bool waterfront_gpu_scene_bind_harbor(WaterfrontGpuScene *scene, const WaterfrontHarborFrame *frame)
+{
+    WaterfrontHarborModels candidate;
+    if (!waterfront_harbor_models_prepare(&candidate, &scene->harbor_models, frame))
+        return false;
+    Mesh replacement[BOAT_SCENE_BERTHS];
+    memcpy(replacement, scene->harbor_custom, sizeof(replacement));
+    unsigned uploaded = 0;
+    bool touched[BOAT_SCENE_BERTHS] = { false };
+    bool changed = false;
+    for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i) {
+        if (candidate.boats[i] == scene->harbor_models.boats[i])
+            continue;
+        changed = true;
+        touched[i] = true;
+        replacement[i] = (Mesh) { 0 };
+        if (candidate.boats[i]) {
+            if ((scene->harbor_upload_limit > 0 && uploaded >= (unsigned)scene->harbor_upload_limit)
+                || !build_source_mesh(&replacement[i], &candidate.boats[i]->mesh))
+                goto failed;
+            ++uploaded;
+        }
+    }
+    // No draw has consumed any replacement yet; commit the complete set together.
+    for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i)
+        if (candidate.boats[i] != scene->harbor_models.boats[i] && scene->harbor_custom[i].vaoId)
+            UnloadMesh(scene->harbor_custom[i]);
+    waterfront_harbor_models_commit(&scene->harbor_models, &candidate);
+    memcpy(scene->harbor_custom, replacement, sizeof(replacement));
+    scene->harbor_uploads += uploaded;
+    if (changed && scene->bounds_cache)
+        ((ObjectBoundsCache *)scene->bounds_cache)->count = 0; // VAO IDs may be reused.
+    return true;
+failed:
+    for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i)
+        if (touched[i] && (replacement[i].vaoId || replacement[i].vertices))
+            UnloadMesh(replacement[i]);
+    waterfront_harbor_models_discard(&candidate, &scene->harbor_models);
+    return false;
+}
+
+bool waterfront_gpu_scene_draw(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
 {
     scene->stats = (WaterfrontGpuStats) { 0 };
     if (!frame->boating_basin && !scene->map) {
         TraceLog(LOG_WARNING, "GPU waterfront frame drawn without a bound map");
-        return;
+        return false;
     }
+    if (!waterfront_gpu_scene_bind_harbor(scene, &frame->harbor))
+        return false;
     counting = &scene->stats;
     drawing_scene = scene;
     draw_scene(scene, frame, width, height);
     drawing_scene = NULL;
     counting = NULL;
+    return true;
 }
 
 WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats)
@@ -3587,6 +3632,10 @@ Texture2D waterfront_gpu_scene_shadow_map(const WaterfrontGpuScene *scene)
 void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
 {
     unbind_map(scene);
+    for (unsigned i = 0; i < BOAT_SCENE_BERTHS; ++i)
+        if (scene->harbor_custom[i].vaoId)
+            UnloadMesh(scene->harbor_custom[i]);
+    waterfront_harbor_models_destroy(&scene->harbor_models);
     if (scene->bridge.vaoId != 0)
         UnloadMesh(scene->bridge);
     for (int part = 0; part < WATERFRONT_GULL_PARTS; ++part)
