@@ -23,6 +23,7 @@ uniform int shadowsEnabled;
 uniform int farShadowsEnabled;
 uniform sampler2D farShadowMap;
 uniform mat4 farLightViewProjection;
+uniform float farShadowTexel; // Metres per far shadow-map texel.
 uniform vec3 cameraPosition;
 uniform vec3 fogColor;
 uniform float fogStart;
@@ -168,7 +169,7 @@ vec3 apply_atmosphere(vec3 color)
 }
 
 // Square light-space coverage; blend before the detailed map ends, then fade the far map.
-float shadow_visibility(float bias)
+float shadow_visibility(float bias, vec3 farOffset)
 {
     vec4 nearLight = lightViewProjection * vec4(fragWorldPosition, 1.0);
     vec3 p = nearLight.xyz / nearLight.w * 0.5 + 0.5;
@@ -182,7 +183,7 @@ float shadow_visibility(float bias)
     float nearWeight = 1.0 - smoothstep(0.70, 0.95, edge);
     if (nearWeight >= 1.0)
         return nearVisibility;
-    vec4 farLight = farLightViewProjection * vec4(fragWorldPosition, 1.0);
+    vec4 farLight = farLightViewProjection * vec4(fragWorldPosition + farOffset, 1.0);
     vec3 q = farLight.xyz / farLight.w * 0.5 + 0.5;
     float farVisibility = 1.0;
     if (all(greaterThan(q, vec3(0.0))) && all(lessThan(q, vec3(1.0)))) {
@@ -201,8 +202,11 @@ float directional_shadow(vec3 normal)
         return 1.0;
     float incidence = max(0.0, dot(normal, normalize(directionalDirection)));
     float bias = max(0.0012 * (1.0 - incidence), 0.00018);
+    // A depth bias cannot cover a far texel's 1.5 m: a low sun striped sunlit walls with their
+    // own shadow. Look the far map up a texel out along the normal, more as the light grazes.
+    vec3 farOffset = normal * (farShadowTexel * sqrt(1.0 - incidence * incidence));
     // Remove direct fill in shadow; ambient and local/emissive light remain visible.
-    return shadow_visibility(bias);
+    return shadow_visibility(bias, farOffset);
 }
 
 vec3 localLight(vec4 positionRadius, vec4 colorIntensity, vec4 direction, vec4 cone,

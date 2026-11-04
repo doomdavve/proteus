@@ -25,6 +25,8 @@ typedef struct {
 } MeshBuilder;
 
 static const Color LAMP_LENS_COLOR = { 255, 218, 132, 255 };
+// The far shadow map's square coverage in metres (1.5 m texels at 512).
+static const float FAR_SHADOW_COVERAGE = 768;
 static const Color HEADLIGHT_LENS_COLOR = { 255, 246, 202, 255 };
 // The generated map uses this colour as its water material identifier.
 static const Color WATER_COLOR = { 45, 79, 104, 255 };
@@ -505,22 +507,22 @@ static const char *const known_uniforms[] = { "objectColor", "emissive", "instan
     "ghostOpacity", "ghostPixelScale", "groundPass", "facadePass", "reflectionPass", "ambientColor",
     "directionalColor", "directionalDirection", "directionalIntensity", "shadowsEnabled",
     "lightViewProjection", "shadowMap", "farShadowsEnabled", "farLightViewProjection",
-    "farShadowMap", "localLightCount", "localLightPositionRadius[0]", "localLightColorIntensity[0]",
-    "localLightDirection[0]", "localLightCone[0]", "cameraPosition", "fogColor", "fogStart",
-    "fogEnd", "fogOpacity", "atmosphereEnabled", "objectWakeEnabled", "objectWakeLife",
-    "wakeFieldEnabled", "wakeGrid", "wakeField", "physicalWaves", "radialOrigin", "radialMotion",
-    "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion", "vesselShape",
-    "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
+    "farShadowMap", "farShadowTexel", "localLightCount", "localLightPositionRadius[0]",
+    "localLightColorIntensity[0]", "localLightDirection[0]", "localLightCone[0]", "cameraPosition",
+    "fogColor", "fogStart", "fogEnd", "fogOpacity", "atmosphereEnabled", "objectWakeEnabled",
+    "objectWakeLife", "wakeFieldEnabled", "wakeGrid", "wakeField", "physicalWaves", "radialOrigin",
+    "radialMotion", "stormArea", "stormPhase", "stormMotion", "vesselOrigin", "vesselMotion",
+    "vesselShape", "wakeAmplitude", "wakeOffset", "objectWakePlayerCount", "objectWakeTrafficLife",
     "objectWakeData", "playerWakeCount", "playerWakeOrigins[0]", "playerWakeParameters[0]",
     "waterfrontWater", "wavePatch", "waveParameters[0]", "sunDirection", "reflectionViewProjection",
     "crossingWakeTime", "detailRipplePhase", "reflectionRipplePhase", "reflectionsEnabled",
-    "reflectionTexture", "surfacePixelScale", "waterPatchPass", "skyForward", "skyRight", "skyUp",
-    "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled", "stampField", "stampRect",
-    "stampOutsideCount", "historyEnabled", "historyField", "historyRect", "historySlopeGain",
-    "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass", "windowLight", "windowLit",
-    "windowDark", "waterLight", "waterShadowFloor", "glintColor", "highlightTint", "glintSheen",
-    "glintSparkle", "lightClusterMode", "lightClusters", "lightClusterCount", "lightClusterLayout",
-    "emissiveGain", "reflectionTexel", NULL };
+    "reflectionTexture", "surfacePixelScale", "presentedPixelScale", "waterPatchPass", "skyForward",
+    "skyRight", "skyUp", "skyScale", "skyEye", "squallArea", "squallHeight", "stampEnabled",
+    "stampField", "stampRect", "stampOutsideCount", "historyEnabled", "historyField", "historyRect",
+    "historySlopeGain", "sceneDepthEnabled", "sceneDepth", "sceneDepthParams", "windowPass",
+    "windowLight", "windowLit", "windowDark", "waterLight", "waterShadowFloor", "glintColor",
+    "highlightTint", "glintSheen", "glintSparkle", "lightClusterMode", "lightClusters",
+    "lightClusterCount", "lightClusterLayout", "emissiveGain", "reflectionTexel", NULL };
 
 // Resolve every name the renderer uses for each shader once, while the program is valid.
 static void prewarm_locations(Shader shader)
@@ -2270,6 +2272,8 @@ static void set_far_shadow_uniforms(const WaterfrontGpuScene *scene, Shader shad
         return;
     SetShaderValueMatrix(shader, cached_location(shader, "farLightViewProjection"),
         scene->far_light_view_projection);
+    float texel = FAR_SHADOW_COVERAGE / WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE;
+    SetShaderValue(shader, cached_location(shader, "farShadowTexel"), &texel, SHADER_UNIFORM_FLOAT);
     int slot = 15;
     rlEnableShader(shader.id);
     rlActiveTextureSlot(slot);
@@ -3290,6 +3294,9 @@ static void draw_water(
     float pixel_scale = fmaxf(1, width / 320.0f);
     SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "surfacePixelScale"),
         &pixel_scale, SHADER_UNIFORM_FLOAT);
+    float presented_scale = fmaxf(1, pixel_scale / fmaxf(1, scene->detail_scale));
+    SetShaderValue(scene->water_shader, cached_location(scene->water_shader, "presentedPixelScale"),
+        &presented_scale, SHADER_UNIFORM_FLOAT);
     int pass = scene->near_water.vaoId ? 1 : 0;
     int location = cached_location(scene->water_shader, "waterPatchPass");
     SetShaderValue(scene->water_shader, location, &pass, SHADER_UNIFORM_INT);
@@ -3365,8 +3372,9 @@ static void draw_scene(
         scene->light_view_projection = render_shadow_map(scene, frame, scene->shadow_map,
             frame->player_active ? 96.0f : 500.0f, scene->shadow_map_size, 600, false);
         if (scene->far_shadows_active)
-            scene->far_light_view_projection = render_shadow_map(scene, frame,
-                scene->far_shadow_map, 768.0f, WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000, true);
+            scene->far_light_view_projection
+                = render_shadow_map(scene, frame, scene->far_shadow_map, FAR_SHADOW_COVERAGE,
+                    WATERFRONT_GPU_FAR_SHADOW_MAP_SIZE, 1000, true);
     }
     prepare_lights(scene, frame);
     set_lighting_uniforms(scene, &frame->lighting);

@@ -43,6 +43,7 @@ uniform int waterPatchPass;
 uniform vec4 wavePatch;
 uniform int waterfrontWater; // Only playable mapped water; leave basin materials alone.
 uniform float surfacePixelScale;
+uniform float presentedPixelScale; // Presented pixels per 320-wide frame pixel.
 
 out vec4 finalColor;
 
@@ -501,9 +502,15 @@ vec3 shoreShade(vec3 color)
         * (1.0 - smoothstep(250.0, 400.0, distance));
     float lap = 0.5 + 0.5 * sin(fragWorldPosition.x * 1.9 + fragWorldPosition.z * 1.3
         + 1.5 * sin(fragWorldPosition.z * 0.7 - fragWorldPosition.x * 0.4) + detailRipplePhase.x);
+    float light = band * smoothstep(0.25, 0.7, lap);
+    // A high-resolution frame would draw the band as soft blots; hold both to hard steps so it
+    // stays pixel art. Supersampled low-resolution frames keep the smooth band they average.
+    if (presentedPixelScale > 1.0) {
+        band = floor(band * 3.0 + 0.5) / 3.0;
+        light = floor(light * 3.0 + 0.5) / 3.0;
+    }
     color *= 1.0 + 0.10 * band;
-    return mix(color, vec3(0.70, 0.82, 0.84) * waterLight,
-        0.55 * band * smoothstep(0.25, 0.7, lap));
+    return mix(color, vec3(0.70, 0.82, 0.84) * waterLight, 0.55 * light);
 }
 // G4 far-water life, presentation only. gustWaves and glitterWaves hold X/Z wavenumbers and a
 // CPU-reduced phase; squallWater the sky squall's centre X/Z, radius and growth.

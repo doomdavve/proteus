@@ -431,7 +431,8 @@ and the user approved the presets; see [SUNSET_PLAN](SUNSET_PLAN.md#current-stat
 [G5a](#g5a--optional-high-resolution-and-restrained-hdr), machine-verified on the M1 Max (high
 resolution, HDR with an 8-bit fallback, low resolution byte-identical to `main`) and
 [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) (clustered lights, dusk lamplight and
-streaks, harbour lamps; daytime byte-identical). Next: G5c task 1. Agent playback: captures,
+streaks, harbour lamps; daytime byte-identical until the 2026-11-04 far-shadow fix, which
+deliberately changes distant facades). Next: G5c task 1. Agent playback: captures,
 window captures, windowed demos and a WebGL2 smoke; no human review until Batch C. Known risks:
 the dusk streaks key on warm colour rather than an emission mask, and multiple target/light
 lifetimes and integrated preset behavior.
@@ -464,7 +465,7 @@ Mac; G3a is machine-verified, with human review in Batch B.
 | [G3b](#g3b--foam-history-and-cosmetic-ripples) | P2 | G3a | Machine-verified on M1 Max; stress GPU p95 +0.1 ms, 5 MB; Batch B accepted on Mac (outer, basin) |
 | [G4](#g4--shore-aware-and-far-water-character) | P2 | G3b | Machine-verified on M1 Max; river GPU p95 within noise, basin +0.3 ms for the depth copy; Batch B accepted on Mac (outer, basin) |
 | [G5a](#g5a--optional-high-resolution-and-restrained-hdr) | P3 | P2/Batch B and sunset readiness | Machine-verified on M1 Max; low byte-identical to `main`; high + HDR stress GPU p95 5.3 ms; WebGL2 smoke with fallback |
-| [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Machine-verified on M1 Max; daytime byte-identical; clusters equal the every-light reference with 642 lights; river high dusk + 600 lights GPU p95 3.2 ms |
+| [G5b](#g5b--clustered-cozy-lighting-and-dusk-water) | P3 | G5a and sunset prerequisites | Machine-verified on M1 Max; daytime byte-identical before the far-shadow fix; clusters equal the every-light reference with 642 lights; river high dusk + 600 lights GPU p95 3.2 ms |
 | [G5c](#g5c--ambient-detail-cube-spray-and-final-qualification) | P3 | G5b | Unstarted |
 
 ## Detailed implementation checkpoints
@@ -1522,6 +1523,18 @@ stays open.
   [Boating performance](BOATING_PERFORMANCE.md#graphics-g5b-clustered-lights--2026-11-03).
 - User's first look (2026-11-03, Mac, informal): "dusk looks amazing now." This is not Batch C
   acceptance.
+- High-resolution fixes after the user's sunset look (2026-11-04). The user reported dark stripes
+  on distant sunlit facades and soft, bright blobs along the quay band; they also saw the stripes
+  on `main` (`6e78e5c`) at low resolution by day. Causes: far shadow-map self-shadowing (1.5 m
+  texels against a ~0.25 m bias), and the quay band's smooth gradient at 4× pixels. Fixes: a
+  normal-offset far-map lookup, and the band held to thirds when the presented frame is high
+  resolution ([3D](3D.md#gameplay-shadow-coverage)). Agent-checked at the user's spot (`--location
+  outer --start -112.5,-61.5,-176`): sunset/high stripes and day/low speckle are gone. Frame impact
+  against `0c23708`, all 31 `--review` poses: low day 0.3–10.3% of pixels changed (shadow fix
+  only; the band leaves supersampled low unchanged), high day 0.1–3.9%, high sunset 0.1–3.5%.
+  The largest changes, on the river stop/camera-turn poses, were inspected and remove speckled
+  self-shadow from facades and quays. Earlier daytime byte-parity claims no longer hold from this
+  change on. Debug full suite: 390 of 390. The user has not yet rechecked either fix in play.
 - Unresolved / pending: Batch C review of dusk windows, streaks, lamplight and the new fixtures,
   including in motion; no browser dusk (the web build has no daylight option), Windows,
   hardware-GPU browser or device check; the fallback is forced by option, not a real driver
