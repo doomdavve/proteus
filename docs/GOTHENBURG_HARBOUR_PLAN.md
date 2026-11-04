@@ -132,10 +132,28 @@ takes over the bridge-outline part of A3.5d.
   - an arched underside for `bridge:structure=arch`, a flat beam soffit otherwise.
 
   Bridges that have only `bridge=*` ways get a deck from the way's width and the water it crosses.
-- **Clearance.** OSM has none, and Höjdmodell is a ground model. Find a source for each bridge on
-  the route (municipal or operator data, or photographs measured against the quay height), and
-  record source and value per bridge in a table here. If a bridge has no source, use a
-  conservative default and say so.
+- **Heights.** OSM has none, and Höjdmodell is a ground model with bridges removed. Proposed
+  sources, in order (2026-11-04; none downloaded or checked over the canals yet):
+  1. **Deck tops from an aerial point cloud.** Lantmäteriet's *Laserdata Nedladdning, skog* is
+     open data (CC0), 1–2 points/m², and its classification level 3 marks bridge points
+     (class 17). Bridge points minus nearby water points give each deck's top above the water.
+     Check first that the tiles over central Gothenburg have level 3, and that download works
+     with a free Geotorget account. Göteborgs Stad's own 2017 point cloud (10 points/m² in its
+     2022 scan) would be denser but is not confirmed open.
+  2. **Clearance from the deck top.** Aerial scans do not see the underside. Subtract a deck
+     depth for each structure (beam or arch crown), and use the arch's span and rise for its
+     curve.
+  3. **Calibrate with photographs** of tour boats passing under, scaled by the boat's known
+     height or the quay's Höjdmodell height. The low bridge where passengers duck sets the
+     minimum.
+
+  Record each bridge's source and value in a table here. A bridge with no source gets a
+  conservative default, marked as such.
+- **Look.** Make a reference sheet per bridge: Wikimedia Commons photos (record their
+  licences), Swedish Wikipedia's bridge articles, and photos or a phone video from a tour boat
+  taken by the user. The sheet covers material (granite arch, iron or concrete beam),
+  railing type, lamps and colours. Geometry comes from OSM and the heights above; photos are
+  only references, and no photo textures are copied into the game.
 - Keep the water continuous under every deck. The bake's bridge-leg carving must not close a canal.
   Add a check that the tour route's corridor stays connected water.
 - **Camera.** At its distance of 12 m and height of 6 m, the camera sits inside a canal deck while
@@ -249,5 +267,6 @@ any user play. Captures alone do not count as acceptance for motion, camera or h
 ## Known limitations
 
 - The route is traced by eye from a screenshot of the operator's map.
-- Bridge clearances have no source yet.
+- Bridge heights have proposed sources ([GH2](#gh2-canal-bridges)), but none has been checked
+  over the canals.
 - No sight has had its look checked against photographs yet.
