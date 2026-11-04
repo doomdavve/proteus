@@ -210,6 +210,7 @@ add_library(proteus_render STATIC
   src/boat_voyage_view.c src/boat_voyage_view.h src/boat_minimap.c src/boat_minimap.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
+  src/waterfront_harbor_view.c src/waterfront_harbor_view.h
   src/waterfront_lighting.c src/waterfront_lighting.h src/waterfront_scene.c)
 target_link_libraries(proteus_render PUBLIC proteus_boat_core proteus_boat_scenery)
 target_compile_definitions(proteus_render PUBLIC PROTEUS_WARM_MENU=$<BOOL:${PROTEUS_WARM_MENU}>)
@@ -1204,6 +1205,11 @@ target_link_libraries(validate_harbor PRIVATE proteus_boat_session)
 target_compile_options(validate_harbor PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME harbor_geometry COMMAND validate_harbor)
+add_executable(validate_harbor_view tools/validate_harbor_view.c)
+target_link_libraries(validate_harbor_view PRIVATE proteus_render)
+target_compile_options(validate_harbor_view PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME harbor_view COMMAND validate_harbor_view)
+set_tests_properties(harbor_view PROPERTIES LABELS "cpu;quick")
 
 # M1 marina site: shipped layout, dimension/attachment rejection and maximum-capacity checks.
 add_executable(validate_scene_site tools/validate_scene_site.c)

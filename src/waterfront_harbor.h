@@ -18,6 +18,7 @@ typedef struct {
     unsigned char mooring; // BoatSceneMooring.
     Vector3 position; // Renderer coordinates; fixed mooring centre, Y=0.
     float heading;
+    BoatSceneAppearance appearance;
 } WaterfrontBerth;
 
 // The docked Gothenburg-Frederikshavn ro-pax ferry across the river from the Eriksberg crane:
@@ -39,6 +40,7 @@ typedef struct {
 typedef struct {
     Transform3D boats[BOAT_SCENE_BERTHS];
     unsigned char recipes[BOAT_SCENE_BERTHS]; // Mesh recipe per drawn boat.
+    BoatModelSpec specs[BOAT_SCENE_BERTHS]; // Same resolved appearance as contacts and ropes.
     int berth_count;
     Transform3D ferry;
     // Compiled dock furniture (NULL/length-zero authored-module scenes use modules instead).

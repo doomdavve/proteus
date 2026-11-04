@@ -1,16 +1,15 @@
 # Marina authoring expansion
 
 Status, 2026-11-03: **M1 implemented and merged in
-[PR #133](https://github.com/doomdavve/proteus/pull/133); M2 appearance is prepared for
-implementation.** This plan records the
+[PR #133](https://github.com/doomdavve/proteus/pull/133); M2 boat appearance is implemented and
+under review.** This plan records the
 user's decisions after reviewing the gaps in [PR #131](https://github.com/doomdavve/proteus/pull/131).
 It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
 and [the API](PLUGIN_API.md) describes only implemented capabilities.
 
-Completed implementation: **M1 structures and capacity**. Completed preparation: the
-[M2 execution package](#m2-execution-package--2026-11-03). Next task: **implement M2 boat appearance**.
-Verification evidence and limitations are recorded below; agreeing to features is not visual
-or gameplay acceptance of an implementation.
+Completed implementation: **M1 structures and capacity** and **M2 boat appearance**. Next task:
+**M3 authored routes and docking motion**. Verification evidence and limitations are recorded
+below; agreeing to features is not visual or gameplay acceptance of an implementation.
 
 ## Agreed result
 
@@ -37,7 +36,7 @@ fuel-stop berth without simulating fuel or customers. Traffic wakes remain visua
 | Step | Result | Depends on | Status |
 | --- | --- | --- | --- |
 | M1 | Configurable marina structures and tested larger capacities | Merged #131 | Implemented; verification below |
-| M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Prepared; implementation next |
+| M2 | Boat dimensions, colors, mast height and painted hull names | M1 | Implemented; verification below |
 | M3 | Authored routes, stops and docking maneuvers | M2 | Planned |
 | M4 | Separate berths/vessels and resident/visitor schedules | M3 | Planned |
 | M5 | Package-local Lua modules and integrated marina example | M4 | Planned |
@@ -178,7 +177,7 @@ failure behavior, before selecting a larger fixed capacity or separate lettering
 
 #### Implementation sequence and completion gates
 
-All rows below are **pending**. Use focused commits in one PR; do not mark M2 complete after
+The implementation status below tracks these rows. Use focused commits in one PR; do not mark M2 complete after
 only the native generator or codec works.
 
 | Commit | Work and evidence required before moving on |
@@ -243,6 +242,78 @@ review was needed for this documentation-only preparation; Windows/Linux, GPU an
 browser/device checks were not rerun. No M2 code, appearance data, serialization, lettering,
 performance or visual acceptance is implemented by this preparation. The proposed API and
 budgets above remain subject to the implementation's validation and geometry proof.
+
+### M2 implementation status — 2026-11-03
+
+Implemented on `feat/marina-m2-appearance`, based on merged preparation `807bfb3`.
+Completed: row 1's native appearance definition, shared resolver, canonical defaults, explicit
+digest fields and hull-surface lettering; row 2's Lua/schema/discovery, PST9 worker/catalog,
+scene/room v3 and multiplayer v11 data paths; row 3's runtime consumers/view-owned meshes; and
+row 4's mirrored CPU example and integrated native/browser qualification.
+
+The complete bundled 3×5 alphabet/digit/punctuation set, repeated through the 16-character
+limit on every registered berth recipe at both dimension/mast boundaries, produces at most
+894 triangles. The existing 1,024-triangle cap therefore stays unchanged. A `BoatModel` remains
+53,280 bytes; `BoatSceneDefinition` grows to 15,440 bytes. Lettering follows the forward hull
+side plane, reads correctly from each side and uses native opaque geometry. The CPU renderer's
+existing mirrored camera basis is compensated in glyph layout alone; the hull shape, contact
+spec and scene orientation are preserved, and both renderers share the same hull surface.
+
+Row 1 verification on Apple Silicon/macOS: Debug build and `validate_harbor` pass, including
+geometry bounds, winding, palette/mast/name rejection, canonical digests and independent model
+storage. The initial sandboxed quick run failed socket-only ENet checks; the socket-enabled
+rerun is the authoritative quick-lane result. Full-suite, GPU/browser and human acceptance
+remain pending for the integrated implementation.
+
+Row 2 verification: Debug build, `scene_appearance`, room maximum-size/round-trip and Node
+browser transport checks pass. The maximum room definition is 10,152 / 16,384 bytes (10 pages);
+the maximum scene with a full 64 KiB source occupies 80,124 staging bytes. This exposed the
+browser worker/transport's former 16 KiB reply limit; stage replies now use the Wasm host's
+163,840-byte read cap, with at/above-boundary Node checks. Query replies retain their 16 KiB
+worker limit. The browser decodes scene bodies in the shared C/Wasm codec; JavaScript checks
+the transport magic/framing rather than implementing another scene decoder. Protocol golden
+fixtures pin the new v11 header and unchanged payload. The updated quick lane passes 249
+enabled tests with local sockets. Interactive browser/resource lifetime checks remain pending.
+
+Row 3: the shared resolved spec now supplies berth/site/traffic/spawn checks, water pose,
+ropes, contacts, camera bounds and CPU/GPU draw resources. Customized meshes belong to each
+view; unchanged frames borrow their current mesh, while default boats borrow immutable recipe
+meshes. Replacement first builds the complete CPU set, then uploads the complete GPU set and
+commits together. A failed build/upload retains the old resource set and reports draw failure;
+it does not roll back a previously accepted gameplay revision. Undo can still restore that
+revision. GPU bounds cached by VAO are invalidated after replacement because IDs can be reused.
+Shrinking/removing berths releases obsolete models/uploads, and view destruction releases all.
+
+Row 3 verification on macOS: Debug build, all 250 enabled quick tests and `gpu_view_binding`
+pass with socket/desktop access. The new `harbor_view` drives 96 change/remove/restore cycles,
+independent owners, failure after partial candidate construction, no-rebuild repeats and custom
+contact/camera bounds. The GPU binding check drives 32 cycles, 32 customized slots, independent
+views, no-reupload repeats and a forced second-upload failure after the first succeeds; the
+old views remain intact.
+
+Row 4 (mirrored example + integrated qualification): `harbor-life` and `harbor-room` now carry
+the second-row `MIRA`/`SALT` runabouts and the 8.5 m `sailboat_aft` mast; both packages share the
+same source, and `harbor-race` migrates. The CPU view sets `mirror_lettering` before its first
+prepare so its existing mirrored camera basis renders outward-readable glyphs from either side;
+the GPU view uses ordinary geometry. Color/name edits classify cosmetic (progress kept, no
+reset); dimension/mast edits stay live (boat kept) and hold while the hull overlaps; Undo
+reapplies under the same policy. A NUL byte in a Lua field name rejects rather than truncating.
+
+Row 4 verification, 2026-11-03, Apple Silicon/macOS, Debug with `PROTEUS_GPU_TESTS=ON`: the full
+`ctest --preset full` passed **388/388 enabled tests** (117.09 s), including 33 GPU checks and
+261 quick-lane tests, with 15 retired wake-field experiments disabled. `validate_harbor_life`
+measures recipe-default versus populated frames, and `harbor_appearance_edits`/
+`boat_plugin_stage`/`wake_command` exercise the session, isolated worker and PC console
+Apply/Undo paths; `validate_boat_room_package` carries customized hulls through room definition,
+contact and prediction. The optional browser authoring checker passed on **Chromium, Firefox and
+WebKit**, including the M2 name/dimension Apply/Undo/export sequence and a full 64 KiB source
+reply; Chromium also exercised tab freeze/resume and the deadline across a freeze. CPU and GPU
+`names-port`/`names-starboard`/`names-far` lettering captures were generated and inspected;
+`git diff --check` and the changed documents' local links resolve. Rerun on 2026-11-04 after
+formatting: `ctest --preset full -j8` passed 387/388. The GPU `instancing_parity` check missed
+its `ok` line under parallel load, then passed when run alone. The GPU `names-port` and
+`names-far` captures were regenerated and inspected: names read up close and blur out at 32 m.
+Human visual/gameplay acceptance, Windows/Linux builds and fresh interactive browser/device runs remain separate.
 
 ## M3: authored routes and docking motion
 

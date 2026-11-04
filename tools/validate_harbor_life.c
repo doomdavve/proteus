@@ -112,6 +112,9 @@ static int measure_render(const BoatSceneDefinition *scene, const BoatSession *s
     *p50 = percentile(samples, FRAMES, .50);
     *p95 = percentile(samples, FRAMES, .95);
     boat_scene_frame(&view, &presentation, &world, BOAT_CAMERA_DEFAULT, snapshot);
+    printf("render %s hull_cpu_bytes=%zu hull_builds=%u frame_bytes=%zu host_bytes=%zu\n", label,
+        waterfront_harbor_models_bytes(&cpu.harbor), cpu.harbor.builds, sizeof(*snapshot),
+        sizeof(BoatPluginHost));
     boat_cpu_view_destroy(&cpu);
     printf("render %s p50_ms=%.3f p95_ms=%.3f frames=%d\n", label, *p50, *p95, FRAMES);
     return 0;
@@ -185,6 +188,13 @@ int main(void)
         == 0);
     CHECK(measure_render(scene, &session, "populated", &populated50, &populated95, &populated_frame)
         == 0);
+    BoatSceneDefinition unstyled = *scene;
+    for (unsigned i = 0; i < unstyled.berth_count; ++i)
+        unstyled.berths[i].appearance = (BoatSceneAppearance) { 0 };
+    double unstyled50, unstyled95;
+    CHECK(measure_render(
+              &unstyled, &session, "recipe-default", &unstyled50, &unstyled95, &populated_frame)
+        == 0);
     // The same camera/input at the supported maxima exercises the bounded worst case without
     // changing the installed package: 7 berths, 4 modules, 8 craft and 4 x 8 birds.
     BoatSceneDefinition maximum = *scene;
@@ -195,6 +205,14 @@ int main(void)
         maximum.berth_count = next + 1;
     }
     maximum.modules_present = true;
+    for (unsigned i = 0; i < maximum.berth_count; ++i) {
+        BoatModelSpec base = boat_scene_berth_spec((BoatSceneBerthRecipe)maximum.berths[i].recipe);
+        maximum.berths[i].appearance = (BoatSceneAppearance) { .length = base.length * 1.25f,
+            .beam = base.beam * 1.25f,
+            .mast_height = base.mast_height > 0 ? 12 : 0,
+            .hull = { (unsigned char)(20 + i), 80, 140, 255 },
+            .name = "MAXIMUM-NAME-123" };
+    }
     maximum.module_count = BOAT_SCENE_MODULES;
     for (unsigned i = 0; i < BOAT_SCENE_MODULES; ++i) {
         maximum.modules[i] = scene->modules[i % scene->module_count];

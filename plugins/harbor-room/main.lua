@@ -1,12 +1,13 @@
 -- Shared marina scene copied from harbor-life until M5 package modules.
 return { free = { version = 1,
 scene = {
-    version = 2,
+    version = 3,
     marina = {
       entrance = { x = 4, z = 140, width = 8 },
       berths = {
         { id = "sailboat_aft", recipe = "sailboat_7m", x = 13, z = 146,
-          heading = -1.5707964, mooring = "pontoon" },
+          heading = -1.5707964, mooring = "pontoon",
+          appearance = { mast_height = 8.5 } },
         { id = "runabout", recipe = "runabout", x = 13, z = 151,
           heading = -1.5707964, mooring = "pontoon" },
         { id = "sailboat", recipe = "sailboat", x = 13, z = 156,
@@ -20,9 +21,13 @@ scene = {
         { id = "sailboat_fore", recipe = "sailboat_7m", x = 13, z = 176,
           heading = -1.5707964, mooring = "pontoon" },
         { id = "row_two_0", recipe = "runabout", x = -15, z = 146,
-          heading = 1.5707964, mooring = "pontoon" },
+          heading = 1.5707964, mooring = "pontoon",
+          appearance = { length = 5.2, beam = 1.9, hull = { 35, 70, 125 },
+            deck = { 180, 145, 100 }, trim = { 235, 225, 195 }, name = "MIRA" } },
         { id = "row_two_1", recipe = "runabout", x = -15, z = 151,
-          heading = 1.5707964, mooring = "pontoon" },
+          heading = 1.5707964, mooring = "pontoon",
+          appearance = { length = 6.6, beam = 2.3, hull = { 220, 150, 45 },
+            deck = { 150, 110, 75 }, trim = { 35, 60, 85 }, name = "SALT" } },
         { id = "row_two_2", recipe = "runabout", x = -15, z = 156,
           heading = 1.5707964, mooring = "pontoon" },
         { id = "row_two_3", recipe = "runabout", x = -15, z = 161,

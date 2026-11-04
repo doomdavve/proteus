@@ -1,4 +1,4 @@
-# Multiplayer protocol v10
+# Multiplayer protocol v11
 
 Written 2026-10-23 with multiplayer M3 (v1); v2, 2026-10-24, adds the
 [deathmatch](DEATHMATCH_PLAN.md) room mode in Accept and the MatchState and MatchEvent messages. This document owns the byte layout, delivery classes,
@@ -56,6 +56,16 @@ request, slot blocks gain that request, checkpoints optionally append the comple
 combat state, and CombatPage (type 21) carries bounded periodic correction pages. MatchEvent
 uses a formerly reserved byte for the defeat reason. Rules are fingerprinted in content
 compatibility. Rebuild native and browser peers together; v1–v5 are incompatible.
+
+v11 (2026-11-03, M2) adds per-berth appearance in room definition v3 / scene v3. Each berth
+appends `f32` length, beam and mast height, three four-byte RGBA colors (hull, deck, trim),
+and a `u8` length plus 0–16 ASCII name bytes after heading. Zero dimensions and all-zero
+colors mean recipe inheritance; nonzero colors must have alpha 255. Names use A–Z, 0–9,
+space, period, hyphen and apostrophe and include a letter/digit when nonempty. Structural
+validation checks recipe-relative dimensions and mast applicability; authority site checks
+use the resolved geometry. Definition/page limits and message layouts are unchanged.
+Rebuild all peers: v1–v10 and room/scene v2 are incompatible. This adds no deployment or
+mid-round room revision support.
 
 v10 (2026-11-01) versions the dimensioned marina contract: room definition v2 contains scene
 v2 with up to 32 berths and 64 modules. Each module adds `f32` length, width and deck height
@@ -233,7 +243,7 @@ instead of entering the world. The definition is a fieldwise, pointer-free encod
 
 | Field | Type |
 | --- | --- |
-| version (2) | u8 |
+| version (3) | u8 |
 | mode (0 free, 1 deathmatch, 2 race) | u8 |
 | location (0 basin, 1 river, 2 outer) | u8 |
 | flags: bit 0 has rules, bit 1 has a scene | u8 |
@@ -571,7 +581,7 @@ must not exceed their capacities, and expired ≤ emitted.
 ## Version rules
 
 - Any change to a byte layout, a message type, a channel or a rule above increments the
-  protocol version. v10 rejects every other version, v1–v9 included; there is no negotiation or
+  protocol version. v11 rejects every other version, v1–v10 included; there is no negotiation or
   migration.
 - A handling change increments `BOAT_PHYSICS_REVISION`; a change to any compiled location/shore geometry, the
   cannon constants, the fleet/wake contract or a weather recipe changes the content digest.

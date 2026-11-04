@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BOAT_SCENE_VERSION 2
+#define BOAT_SCENE_VERSION 3
 #define BOAT_SCENE_TEXT 24 // ID and attachment capacity, including the terminator.
 #define BOAT_SCENE_BERTHS 32
 #define BOAT_SCENE_MODULES 64
@@ -49,11 +49,20 @@ typedef enum {
 } BoatSceneMooring;
 
 typedef struct {
+    // Zero dimensions or all-zero colors inherit the recipe. Lua rejects explicit zero
+    // dimensions; its decoder canonicalizes explicit recipe defaults back to these sentinels.
+    float length, beam, mast_height;
+    Color hull, deck, trim;
+    char name[BOAT_MODEL_NAME_BYTES];
+} BoatSceneAppearance;
+
+typedef struct {
     char id[BOAT_SCENE_TEXT];
     unsigned char recipe; // BoatSceneBerthRecipe
     unsigned char mooring; // BoatSceneMooring
     float x, z; // Simulation metres.
     float heading; // Renderer radians; forward is (sin, -cos).
+    BoatSceneAppearance appearance;
 } BoatSceneBerth;
 
 typedef struct {
@@ -93,9 +102,11 @@ typedef struct {
 bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *diagnostic);
 // True when any subsystem is authored. An envelope-only scene changes no runtime content.
 bool boat_scene_has_content(const BoatSceneDefinition *scene);
-// True when two scenes differ only in gull cue intervals: a compatible cosmetic change that
-// keeps the session clock, unlike a flock count/centre/layout edit.
-bool boat_scene_same_except_gull_cues(const BoatSceneDefinition *a, const BoatSceneDefinition *b);
+// True when two scenes differ only in gull cues or berth colors/names: a compatible cosmetic
+// change that keeps the session clock, unlike dimensions, a flock count/centre or layout edit.
+// With BERTH_APPEARANCE false, ignore only gull cues (the existing callback source fence).
+bool boat_scene_same_except_cosmetics(
+    const BoatSceneDefinition *a, const BoatSceneDefinition *b, bool berth_appearance);
 // FNV-1a over explicit fields only: presence, counts, IDs, recipes, positions and attachments.
 // Padding and the diagnostic are excluded.
 uint64_t boat_scene_digest(const BoatSceneDefinition *scene);
@@ -109,6 +120,9 @@ const char *boat_scene_mooring_name(BoatSceneMooring mooring);
 bool boat_scene_mooring_from_name(const char *name, BoatSceneMooring *mooring);
 // Registered native hull recipe. No authored dimensions or vertices.
 BoatModelSpec boat_scene_berth_spec(BoatSceneBerthRecipe recipe);
+// One resolved spec for geometry, clearance, ropes, contacts and every renderer.
+BoatModelSpec boat_scene_berth_resolve(const BoatSceneBerth *berth);
+void boat_scene_berth_canonicalize(BoatSceneBerth *berth);
 BoatModelKind boat_scene_berth_kind(BoatSceneBerthRecipe recipe);
 
 // Distance in simulation metres to a non-gangway module footprint.

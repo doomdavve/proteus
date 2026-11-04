@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-11-01: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; its README lists the native scene capabilities still missing (crane/building restyling, per-boat appearance, occupancy and lighting).
+Status, 2026-11-03: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; its README lists the native scene capabilities still missing (crane/building restyling, occupancy and lighting).
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages, free boating and the basin time trial, with optional objectives/timers and authored scenes.
@@ -272,6 +272,11 @@ packages, so no scene package can enter a room, replay or `--course` recording p
 
 ### Scene schema v2
 
+Historical anchor: M1 scene v2 was replaced by [scene v3](#scene-schema-v3) for M2.
+Old definitions are rejected; this is not a compatibility API.
+
+### Scene schema v3
+
 Coordinates follow the voyage API: simulation metres, **x = −east, z = north**, headings in
 radians with forward `(sin(heading), −cos(heading))`. Native scene storage converts to renderer
 X/Z once at the decode boundary (`renderer x = −source x`). Field paths in diagnostics use the
@@ -281,7 +286,7 @@ source spelling.
 return {
   voyage = { --[[ the current, complete voyage descriptor ]] },
   scene = {
-    version = 2,
+    version = 3,
     marina = {
       entrance = { x = 4, z = 140, width = 8 },
       berths = {
@@ -323,15 +328,20 @@ return {
 
 | Field | Bound | Meaning |
 | --- | --- | --- |
-| `scene.version` | integer `2` | M1 dimensioned structures. A different version is rejected, not migrated. |
+| `scene.version` | integer `3` | M2 per-berth appearance. A different version is rejected, not migrated. |
 | `marina` | table; absent means compiled marina | `entrance`, `berths` and `modules` are supported. Each present list replaces only its subsystem. |
 | `marina.entrance` | `{ x, z, width }`, finite, \|x/z\| ≤ 20 000 m, width 4–40 m | Required when `berths` is non-empty. Validation requires open water with half the width clear and no hull overlap. |
 | `marina.berths` | dense list of 0–32 records | A present list replaces the entire compiled moored collection. Empty means no authored moored hulls. |
 | `berths[i].id` | 1–23 of `a-z 0-9 _`, starting with a letter; unique in the scene | Stable authored identity; diagnostics and later occupancy. Reordering does not change identity. |
-| `berths[i].recipe` | `skiff`, `runabout`, `sailboat`, `cruiser`, `speedboat`, `sailboat_7m`, `workboat` | Registered native hull recipe. Lua cannot supply dimensions, vertices or renderer transforms. |
+| `berths[i].recipe` | `skiff`, `runabout`, `sailboat`, `cruiser`, `speedboat`, `sailboat_7m`, `workboat` | Registered native hull recipe; optional `appearance` overrides supported dimensions/colors/name. No custom vertices or renderer transforms. |
 | `berths[i].x`, `.z` | finite, \|v\| ≤ 20 000 m | Berth centre in simulation metres. |
 | `berths[i].heading` | finite, \|h\| ≤ 2π | Renderer heading; the boat's forward is `(sin, −cos)`. |
 | `berths[i].mooring` | `pontoon` or `none` | Native attachment rule. `pontoon` attaches two lines to the nearest authored floating footprint/default pontoon cleat region; `none` leaves the hull unmoored. |
+| `berths[i].appearance` | optional strict record; all its fields are optional | Missing values inherit the recipe; explicit recipe defaults canonicalize to inheritance. |
+| `appearance.length`, `appearance.beam` | finite positive metres, 0.75–1.25 × recipe values | Cabin length/offset follow length; recipe draft/freeboard/cabin height remain fixed. Site validation uses the resulting hull and excursion. |
+| `appearance.mast_height` | finite `freeboard + 2` through 12 m above calm water | Only `sailboat` and `sailboat_7m`; zero, removal and fields on mastless recipes reject. |
+| `appearance.hull`, `appearance.deck`, `appearance.trim` | dense triples of Lua integers 0–255 | Opaque RGB; alpha, extra/missing channels, fractions and coercion reject. |
+| `appearance.name` | optional 1–16 ASCII characters: A–Z, 0–9, space, period, hyphen, apostrophe; include a letter/digit | Painted on both hull sides. Empty, unsupported or overlong text rejects without truncation. No lowercase/accented glyphs. |
 | `marina.modules` | dense list of 0–64 records | A present list replaces the entire compiled dock furniture. Empty disables it. The ferry and bridge stay independent. |
 | `modules[i].id` | 1–23, same spelling; unique across the scene including berths | Stable attachment identity. |
 | `modules[i].kind` | `walkway`, `finger_pier`, `platform`, `gangway`, `quay_deck` | Native dimensioned pieces; removed recipe names reject. |
@@ -389,8 +399,8 @@ Floating assemblies stay level and share the root piece's sampled wave heave. Th
 in X/Z; they do not independently pitch or roll at joins. A gangway's shore endpoint stays on
 the map's ground while its far endpoint follows the assembly. CPU/GPU boxes, player contacts
 and camera exclusion use the authored dimensions; camera checks conservatively include wave
-excursion. The compiled fallback furniture remains independent. PST8 staging, room definition
-v2 and multiplayer v10 reject older content/pairs; there is no compatibility shim.
+excursion. The compiled fallback furniture remains independent. PST9 staging, room definition
+v3 and multiplayer v11 reject older content/pairs; there is no compatibility shim.
 
 ### Replacement, restart and owner lifetime
 
@@ -434,11 +444,11 @@ plugin bytes -> candidate BoatSceneDefinition (copied, no Lua pointers)
 | `boat.c` `hull_contact` | Static hull and pontoon contact envelopes | Pass `BoatWorld.scene`; no pointers or Lua in core |
 | `boat_combat.c` `blocked` | The same contact envelopes for projectiles | Pass the same scene; combat remains unavailable with plugins where already rejected |
 | `waterfront_harbor_camera_clear` | Berth/module height and footprint exclusion | Query the same accepted layout |
-| `waterfront_draw_harbor` (CPU) | Per-recipe meshes and module transforms | Draw only accepted berths/modules; no invisible compiled hull |
-| `renderer_gpu.c` harbor pass | Prebuilt recipe meshes and module transforms | Same frame data as CPU; no GPU changes to Lua |
+| `waterfront_draw_harbor` (CPU) | View-owned customized hull meshes and module transforms | Transactional rebuilds; default hulls borrow recipe meshes; no invisible compiled hull |
+| `renderer_gpu.c` harbor pass | View-owned customized hull uploads and module transforms | Same resolved specs/poses as CPU, all-or-nothing upload replacement; no GPU changes to Lua |
 | `waterfront_scene.c` shared frame | Evaluated harbor snapshot for stills/actors | Fill from the accepted scene, preserving explicit time |
 | `boat_view.c` direct harbor pass | Live view's scene | Add a frame-borrowed scene pointer; NULL is compiled |
-| `boat_net_protocol.c` content digest | Compiled harbor content | Authored content travels in room v2; protocol v10 rejects incompatible peers |
+| `boat_net_protocol.c` content digest | Compiled harbor content | Authored content travels in room v3; protocol v11 rejects incompatible peers |
 | Gull avoidance | Authored berthed hulls, if a later task chooses to avoid them | **No current consumer.** Gulls avoid the player and travelling traffic; L1–L2 does not add berth avoidance |
 | Wakes | Moored hulls are static; no wake source | **No current consumer.** Authored berths add no physical wake emitter |
 | Minimap | Only the docked ferry is charted today | No berth drawing in L1–L2; the ferry remains compiled |
@@ -509,9 +519,10 @@ under every driving line, depth, or human acceptance.
 
 ### Scene authoring not exposed yet
 
-Crane/building restyling, sculptures, arbitrary meshes, per-boat appearance/names, occupancy
-schedules, freeform routes and lighting remain outside this contract. M1 supplies larger
-marinas and fixed/floating deck geometry; [M2–M5](MARINA_AUTHORING_PLAN.md) own the next work.
+Crane/building restyling, sculptures, arbitrary meshes, occupancy schedules, freeform routes
+and lighting remain outside this contract. M1 supplies larger marinas and fixed/floating deck
+geometry; M2 supplies bounded hull appearance. [M3–M5](MARINA_AUTHORING_PLAN.md) own routes,
+occupancy and local modules.
 
 
 ## River race authoring (P2)
@@ -1414,8 +1425,8 @@ UI staging is in flight cancels that request first. **Export draft** downloads t
 source, including invalid drafts; exporting is not validation or permission to apply.
 
 The editor caps a bundle manifest at 4096 bytes and its source at 65536 bytes. A stage result may
-be up to 16384 bytes, which covers Harbor life's 5,505-byte scene revision and leaves room for
-larger authored scenes. All imported Lua evaluation happens in Web Workers; the game rechecks
+be up to 163,840 bytes, matching the Wasm host read buffer and covering a full source plus
+the maximum scene and diagnostics (80,124 bytes before diagnostics in the M2 fixture). All imported Lua evaluation happens in Web Workers; the game rechecks
 decoded data and never evaluates that source at startup, staging completion, Apply, Undo or a tick.
 Normal bundled sessions create no worker at all. Native trusted objectives retain their existing
 execution contract. Desktop browsers with a physical keyboard also get the live console; its
