@@ -1,8 +1,8 @@
 # Marina authoring expansion
 
-Status, 2026-11-03: **M1 implemented and merged in
+Status, 2026-11-04: **M1 implemented and merged in
 [PR #133](https://github.com/doomdavve/proteus/pull/133); M2 boat appearance is implemented and
-under review.** This plan records the
+merged in [PR #142](https://github.com/doomdavve/proteus/pull/142).** This plan records the
 user's decisions after reviewing the gaps in [PR #131](https://github.com/doomdavve/proteus/pull/131).
 It owns the next marina work; [the plugin plan](PLUGIN_PLAN.md) retains the broader roadmap
 and [the API](PLUGIN_API.md) describes only implemented capabilities.

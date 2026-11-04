@@ -53,7 +53,7 @@ Older notes below that describe preloading the river's sidecars or a River PLACE
 
 ## Canvas touch controls, 2026-11-04
 
-Current status: implemented in `feat/canvas-touch-controls`; the user accepted the local
+Current status: merged in [PR #147](https://github.com/doomdavve/proteus/pull/147); the user accepted the local
 canvas controls on iPhone 17 Pro (2026-11-04). The HTML gameplay overlay is
 removed. C draws Menu, Tilt/Use touch, Recenter, Fullscreen, left/right and Forward/Reverse
 into the same low-resolution frame as the game, with held-pedal feedback. It publishes its
@@ -77,7 +77,7 @@ activation requirements. See [Pointer Events](https://www.w3.org/TR/pointerevent
 
 Completed: canvas drawing/hit-region bridge, multi-touch routing, browser gesture suppression,
 phone target sizing, safe-area sizing, updated virtual-clock/browser checks, and user acceptance
-on a physical iPhone 17 Pro. Next: review/merge and ship through the release/hosting workflow;
+on a physical iPhone 17 Pro. Next: ship through the release/hosting workflow;
 physical Android and HTTPS motion-permission qualification remain open. This branch does not
 deploy either public client. Specific long-hold duration, portrait/landscape coverage and audio
 listening were not reported in the user's check; emulation alone is not user acceptance.
