@@ -207,8 +207,9 @@ and the [hosting guide](MULTIPLAYER_HOSTING.md) for operator setup.
 
 ## Phones and tablets
 
-The browser provides Forward/Reverse and left/right touch controls, plus optional tilt
-steering. Use Menu to recover or return to the title. Tilt requires HTTPS and permission;
+The browser draws Forward/Reverse and left/right touch controls inside the game. Hold a
+pedal and a steering control together; release the pedal for neutral. Optional TILT steering
+and MENU are also in the game. Use MENU to recover or return to the title. Tilt requires HTTPS and permission;
 recenter after rotating. On iPhone, Safari's Share → Add to Home Screen → Open as Web App
 provides more screen space. Mobile weapons, replay controls and text editing remain
 limited; see [mobile controls and qualification](WEB_BUILD.md#mobile-controls-and-iphone-presentation-2026-10-28).

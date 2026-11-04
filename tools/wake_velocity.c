@@ -91,6 +91,20 @@ EM_JS(void, boat_web_mobile_session, (int enabled), { Module['boatMobile']['sess
 EM_JS(int, boat_web_mobile_menu, (void), { return Module['boatMobile']['menu'](); })
 EM_JS(int, boat_web_mobile_sample, (int active), { return Module['boatMobile']['sample'](active); })
 EM_JS(float, boat_web_mobile_target, (void), { return Module['boatMobile']['target'](); })
+EM_JS(int, boat_web_mobile_state, (void), { return Module['boatMobile']['state'](); })
+EM_JS(int, boat_web_mobile_size, (int width), {
+    return Math.max(26, Math.ceil(48 * width / Module['canvas'].getBoundingClientRect().width));
+})
+EM_JS(void, boat_web_mobile_status, (char *text, int capacity),
+    { stringToUTF8(Module['boatMobile']['status'](), text, capacity); })
+EM_JS(void, boat_web_mobile_layout, (const float *rects), {
+    const regions = [];
+    for (let i = 0; i < 8; ++i) {
+        const offset = (rects >> 2) + i * 4;
+        regions.push(Array.from(HEAPF32.subarray(offset, offset + 4)));
+    }
+    Module['boatMobile']['layout'](regions);
+})
 EM_JS(int, boat_web_mouse_state, (int wanted, int available),
     { return Module['boatMouse']['state'](wanted, available); })
 EM_JS(int, boat_web_mouse_toggle, (void), { return Module['boatMouse']['toggle'](); })
@@ -114,6 +128,61 @@ EM_JS(int, boat_web_scenery_state, (const char *name),
     { return Module['boatScenery'].state(UTF8ToString(name)); })
 EM_JS(float, boat_web_scenery_progress, (const char *name),
     { return Module['boatScenery'].progress(UTF8ToString(name)); })
+#endif
+
+#if defined(__EMSCRIPTEN__)
+// Draw into the game's low-resolution frame. Publish these exact hit rectangles to the
+// browser, which captures each finger and delivers ordinary pedal/steering inputs to C.
+static void draw_touch_controls(
+    int width, int height, Rectangle destination, bool enabled, int buttons, int button_height)
+{
+    int state = boat_web_mobile_state();
+    if (!(state & 1))
+        return;
+    int steering_width = button_height > 30 ? button_height : 30;
+    int menu_width = button_height > 36 ? button_height : 36;
+    Rectangle bounds[8] = {
+        { width - 56, height - 2 * button_height - 8, 52, button_height },
+        { width - 56, height - button_height - 4, 52, button_height },
+        { 4, height - button_height - 4, steering_width, button_height },
+        { steering_width + 8, height - button_height - 4, steering_width, button_height },
+        { 4, 4, menu_width, button_height }, // Menu, tilt, recenter, fullscreen.
+        { menu_width + 8, 4, 56, button_height },
+        { menu_width + 68, 4, 50, button_height },
+        { menu_width + (state & 2 ? 122 : 68), 4, 66, button_height },
+    };
+    const char *labels[8] = { "FORWARD", "REVERSE", "LEFT", "RIGHT", "MENU",
+        state & 4       ? "WAIT..."
+            : state & 2 ? "USE TOUCH"
+                        : "TILT",
+        "RECENTER", state & 16 ? "EXIT FULL" : "FULLSCREEN" };
+    if (!(state & 2))
+        bounds[6].width = 0;
+    if (!(state & 8))
+        bounds[7].width = 0;
+    float regions[8][4];
+    BoatUiPalette palette = boat_ui_palette();
+    for (int i = 0; i < 8; ++i) {
+        Rectangle box = bounds[i];
+        regions[i][0] = (destination.x + box.x * destination.width / width) / GetScreenWidth();
+        regions[i][1] = (destination.y + box.y * destination.height / height) / GetScreenHeight();
+        regions[i][2] = box.width * destination.width / width / GetScreenWidth();
+        regions[i][3] = box.height * destination.height / height / GetScreenHeight();
+        if (!box.width)
+            continue;
+        bool held = i < 4 && (buttons & (1 << i));
+        Color fill = held ? (Color) { 66, 103, 121, 235 } : (Color) { 20, 38, 47, 210 };
+        DrawRectangleRec(box, fill);
+        DrawRectangleLinesEx(box, 1, palette.edge);
+        Color text = i < 4 && !enabled ? palette.hint : palette.text;
+        boat_ui_text(labels[i], (int)(box.x + (box.width - boat_ui_width(labels[i], 10)) / 2),
+            (int)box.y + (button_height - 10) / 2, 10, text);
+    }
+    boat_web_mobile_layout(&regions[0][0]);
+    char status[128];
+    boat_web_mobile_status(status, sizeof(status));
+    boat_ui_text(status, 4, button_height + 7, 10, palette.text);
+}
 #endif
 
 static void usage(void)
@@ -1520,9 +1589,11 @@ static int study(int argc, char **argv)
         }
         float mobile_target = NAN;
         int mobile_buttons = 0;
+        int mobile_button_height = 26;
 #if defined(__EMSCRIPTEN__)
         mobile_buttons = boat_web_mobile_sample(active && !demo && !session.runs.playing);
         mobile_target = boat_web_mobile_target();
+        mobile_button_height = boat_web_mobile_size(width);
 #endif
         bool keyboard_steering
             = IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A);
@@ -1995,7 +2066,9 @@ static int study(int argc, char **argv)
                 .steering = view->boat.wheel,
                 .precision = precision,
                 .reset_progress = reset_hold.seconds / BOAT_RESET_HOLD_SECONDS },
-            width, height > width ? height - 80 : height);
+            width,
+            height > width ? height - ((mobile_buttons & 16) ? 2 * mobile_button_height + 24 : 80)
+                           : height);
         const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
             networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
         Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, width, height);
@@ -2012,10 +2085,10 @@ static int study(int argc, char **argv)
         if (mirror_visible)
             boat_rearview_draw(&mirror, width);
         int hint_top = mirror_visible ? BOAT_REARVIEW_BOTTOM + 12 : 4;
-        if (mouse_driving && !menu.open)
+        if (!(mobile_buttons & 16) && mouse_driving && !menu.open)
             boat_ui_text(mouse_captured ? "MOUSE / P: MENU" : "MOUSE / CLICK TO CAPTURE", 4,
                 hint_top, 10, (Color) { 218, 223, 202, 255 });
-        else if (!menu.open)
+        else if (!(mobile_buttons & 16) && !menu.open)
             boat_ui_text("P: MENU", 4, hint_top, 10, (Color) { 218, 223, 202, 255 });
 #if defined(__EMSCRIPTEN__)
         if (mouse_unavailable)
@@ -2032,6 +2105,10 @@ static int study(int argc, char **argv)
                 session.runs.practice ? " / PRACTICE" : "");
             boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
         }
+#if defined(__EMSCRIPTEN__)
+        draw_touch_controls(width, height, destination, active && !demo && !session.runs.playing,
+            mobile_buttons, mobile_button_height);
+#endif
         if (hud_overlay)
             boat_screen_end_overlay();
         EndTextureMode();

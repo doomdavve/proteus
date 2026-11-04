@@ -11,8 +11,7 @@ installBoatMobileControls(Module, canvas, document, window);
 installBoatRtcTransport(Module);
 installBoatServerDirectory(Module).refresh();
 const canFullscreen = !!stage.requestFullscreen && document.fullscreenEnabled !== false;
-const screenButton = document.getElementById('screen-button');
-screenButton.hidden = !canFullscreen;
+Module['boatCanFullscreen'] = canFullscreen;
 function enterFullscreen() {
   if (canFullscreen) {
     try {
@@ -23,7 +22,7 @@ function enterFullscreen() {
   }
   canvas.focus();
 }
-screenButton.addEventListener('click', enterFullscreen);
+Module['boatFullscreen'] = enterFullscreen;
 document.getElementById('iphone-tip').hidden = !(/iPhone|iPod/.test(navigator.userAgent))
   || window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
@@ -70,8 +69,8 @@ function fitCanvas() {
     - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   const scale = Math.max(1, Math.floor(Math.min(availableWidth / 320, availableHeight / 200)));
   const mobile = window.matchMedia('(pointer: coarse)').matches;
-  const viewportWidth = viewport ? viewport.width : innerWidth;
-  const viewportHeight = viewport ? viewport.height : innerHeight;
+  const viewportWidth = availableWidth;
+  const viewportHeight = availableHeight;
   // Keep at least 320x200 logical pixels so menus and instruments fit naturally.
   // Cap the long side to bound memory and supersampling cost on mobile GPUs.
   const aspect = Math.max(1 / 3, Math.min(3, viewportWidth / viewportHeight));
@@ -126,7 +125,6 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('scroll', fitCanvas);
 }
 document.addEventListener('fullscreenchange', () => {
-  screenButton.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
   Module['boatMobile']['cancel']();
   fitCanvas();
 });

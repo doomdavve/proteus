@@ -55,19 +55,19 @@ with sync_playwright() as p:
     tap_scene(120, 115)  # SINGLE PLAYER
     page.screenshot(path=str(args.output / 'solo-setup.png'))
     tap_scene(160, 140)  # START
-    page.wait_for_function("!document.getElementById('mobile-controls').hidden", timeout=30000)
+    page.wait_for_function('Module.boatMobile.state() & 1', timeout=30000)
     page.wait_for_timeout(1500)
     page.evaluate('''() => {
-      window.mobileAudit = {buttons: 0, target: null, frames: 0};
+      window.mobileAudit = {buttons: 0, target: null, frames: 0, active: false};
       const original = Module.boatMobile.sample;
       Module.boatMobile.sample = active => {
         const result = original(active);
-        mobileAudit = {buttons: result, target: Module.boatMobile.target(), frames: mobileAudit.frames + 1};
+        mobileAudit = {buttons: result, target: Module.boatMobile.target(), frames: mobileAudit.frames + 1, active};
         return result;
       };
     }''')
     page.wait_for_function('mobileAudit.frames > 2')
-    def assert_overlay_layout():
+    def assert_canvas_layout():
         page.wait_for_function("""() => {
           const box = document.getElementById('canvas').getBoundingClientRect();
           const viewport = window.visualViewport;
@@ -77,48 +77,64 @@ with sync_playwright() as p:
         canvas_box = page.locator('#canvas').bounding_box()
         buffer = page.locator('#canvas').evaluate('(c) => ({width: c.width, height: c.height})')
         assert abs(canvas_box['width'] / buffer['width'] - canvas_box['height'] / buffer['height']) < .001
-        forward = page.locator('[data-hold=forward]').bounding_box()
-        reverse = page.locator('[data-hold=reverse]').bounding_box()
-        assert forward['y'] + forward['height'] <= reverse['y']
-        assert abs(forward['x'] - reverse['x']) < 1
-        for selector in ['#mobile-menu', '[data-hold=left]', '[data-hold=forward]']:
-            button = page.locator(selector).bounding_box()
-            assert button['x'] >= canvas_box['x'] - 1
-            assert button['y'] >= canvas_box['y'] - 1
-            assert button['x'] + button['width'] <= canvas_box['x'] + canvas_box['width'] + 1
-            assert button['y'] + button['height'] <= canvas_box['y'] + canvas_box['height'] + 1
+        assert page.locator('#mobile-controls, [data-hold], #mobile-menu, #tilt, #screen-button').count() == 0
+        regions = page.evaluate('Module.boatMobile.regions()')
+        assert len(regions) == 8
+        forward, reverse = regions[:2]
+        assert forward[1] + forward[3] <= reverse[1]
+        assert forward[0] == reverse[0]
+        for x, y, w, h in regions:
+            if w > 0:
+                assert w * canvas_box['width'] >= 47 and h * canvas_box['height'] >= 47
+            assert 0 <= x <= 1 and 0 <= y <= 1
+            assert x + w <= 1.001 and y + h <= 1.001
+        assert page.locator('#canvas').evaluate('(c) => getComputedStyle(c).touchAction') == 'none'
 
-    assert_overlay_layout()
+    assert_canvas_layout()
     page.screenshot(path=str(args.output / 'landscape.png'))
     # CDP sends real simultaneous touch contacts through browser pointer dispatch.
     cdp = page.context.new_cdp_session(page)
-    def point(selector, identifier):
-        box = page.locator(selector).bounding_box()
-        return {'x': box['x'] + box['width'] / 2,
-                'y': box['y'] + box['height'] / 2, 'id': identifier}
-    forward = point('[data-hold=forward]', 1)
-    left = point('[data-hold=left]', 2)
+    controls = {'forward': 0, 'reverse': 1, 'left': 2, 'right': 3,
+                'menu': 4, 'tilt': 5, 'recenter': 6, 'fullscreen': 7}
+    def point(name, identifier):
+        return page.evaluate("""([index, id]) => {
+          const [x,y,w,h] = Module.boatMobile.regions()[index];
+          const box = Module.canvas.getBoundingClientRect();
+          return {x: box.left + (x+w/2)*box.width, y: box.top + (y+h/2)*box.height, id};
+        }""", [controls[name], identifier])
+    def tap_control(name):
+        contact = point(name, 1)
+        page.touchscreen.tap(contact['x'], contact['y'])
+    forward = point('forward', 1)
+    left = point('left', 2)
     cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [forward]})
     cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [forward, left]})
     page.wait_for_function('(mobileAudit.buttons & 15) === 5')
+    held_frame = page.evaluate('mobileAudit.frames')
+    page.wait_for_function('start => mobileAudit.frames >= start + 45', arg=held_frame)
+    assert page.evaluate('(mobileAudit.buttons & 15) === 5 && mobileAudit.active')
+    assert page.evaluate('document.activeElement === Module.canvas && document.visibilityState === "visible"')
+    assert page.evaluate('visualViewport.scale') == 1
+    assert page.evaluate('testAudioContexts.some(c => c.state === "running")')
+    page.screenshot(path=str(args.output / 'held-controls.png'))
     cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
     page.wait_for_function('(mobileAudit.buttons & 15) === 0')
     if args.android:
         # Android normally exposes sensors without the iPhone permission method.
         assert page.evaluate('typeof DeviceOrientationEvent.requestPermission') == 'undefined'
-        page.locator('#screen-button').tap()
+        tap_control('fullscreen')
         page.wait_for_function('document.fullscreenElement !== null')
-        assert_overlay_layout()
+        assert_canvas_layout()
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart',
-                                             'touchPoints': [point('[data-hold=forward]', 1)]})
+                                             'touchPoints': [point('forward', 1)]})
         page.wait_for_function('(mobileAudit.buttons & 1) !== 0')
         page.evaluate('document.exitFullscreen()')  # System Back/escape releases held controls.
         page.wait_for_function('document.fullscreenElement === null && (mobileAudit.buttons & 15) === 0')
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchCancel', 'touchPoints': []})
-        assert_overlay_layout()
+        assert_canvas_layout()
         page.screenshot(path=str(args.output / 'fullscreen-return.png'))
-    page.locator('#tilt').tap()
-    page.wait_for_function("document.getElementById('tilt').textContent === 'Use touch'")
+    tap_control('tilt')
+    page.wait_for_function('Module.boatMobile.state() & 2')
     def orientation(beta, gamma):
         page.evaluate('''([beta, gamma]) => {
           const event = new Event('deviceorientation');
@@ -129,20 +145,20 @@ with sync_playwright() as p:
     page.wait_for_timeout(150)
     orientation(45, 35)
     page.wait_for_function('Number.isFinite(mobileAudit.target) && Math.abs(mobileAudit.target) > .3')
-    page.locator('#mobile-menu').tap()
-    page.wait_for_function("document.querySelector('[data-hold=forward]').disabled")
+    tap_control('menu')
+    page.wait_for_function('!mobileAudit.active')
     page.screenshot(path=str(args.output / 'menu.png'))
     tap_scene(160, 115)  # RESET BOAT, row 3
-    page.wait_for_function("!document.querySelector('[data-hold=forward]').disabled")
+    page.wait_for_function('mobileAudit.active')
     page.set_viewport_size({'width': phone['height'], 'height': phone['width']})
     page.wait_for_timeout(500)
-    assert_overlay_layout()
+    assert_canvas_layout()
     page.screenshot(path=str(args.output / 'portrait.png'))
-    assert page.locator('[data-hold=forward]').bounding_box()['x'] >= 0
-    page.locator('#mobile-menu').tap()
-    page.wait_for_function("document.querySelector('[data-hold=forward]').disabled")
+    assert point('forward', 1)['x'] >= 0
+    tap_control('menu')
+    page.wait_for_function('!mobileAudit.active')
     tap_scene(160, 132)  # BACK TO TITLE
-    page.wait_for_function("document.getElementById('mobile-controls').hidden")
+    page.wait_for_function('!(Module.boatMobile.state() & 1)')
     page.screenshot(path=str(args.output / 'returned-title.png'))
     if args.room_url:
         page.set_viewport_size({'width': 844, 'height': 390})
@@ -167,21 +183,21 @@ with sync_playwright() as p:
         }""", args.room_url)
         tap_scene(120, 129)  # MULTIPLAYER
         tap_scene(160, 100)  # Named room
-        page.wait_for_function("!document.getElementById('mobile-controls').hidden", timeout=30000)
+        page.wait_for_function('Module.boatMobile.state() & 1', timeout=30000)
         page.wait_for_timeout(1500)
-        page.locator('#recenter').tap()
+        tap_control('recenter')
         orientation(45, 0)
         page.wait_for_timeout(150)
         orientation(45, 35)
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart',
-                                             'touchPoints': [point('[data-hold=forward]', 1)]})
+                                             'touchPoints': [point('forward', 1)]})
         page.wait_for_function('wireAudit.forward && wireAudit.steering', timeout=10000)
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
         page.screenshot(path=str(args.output / 'multiplayer.png'))
-        page.locator('#mobile-menu').tap()
-        page.wait_for_function("document.querySelector('[data-hold=forward]').disabled")
+        tap_control('menu')
+        page.wait_for_function('!mobileAudit.active')
         tap_scene(160, 132)  # LEAVE ROOM
-        page.wait_for_function("document.getElementById('mobile-controls').hidden")
+        page.wait_for_function('!(Module.boatMobile.state() & 1)')
     assert not errors, errors
     (args.output / 'result.json').write_text(json.dumps({'result': 'ok', 'errors': errors}))
     print('web_mobile=ok')
