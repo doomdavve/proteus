@@ -330,6 +330,21 @@ int main(void)
     CHECK(Vector2Distance(cabin_session.boat.position, course_standard.boat.position) < .00001f);
     boat_session_destroy(&course_standard);
     boat_session_destroy(&cabin_session);
+
+    // GH4: a tour starts the boat at its first stop, on a restart and on a voyage restart.
+    BoatVoyageRoute tour = *route;
+    tour.ordered = true;
+    tour.shelters[0] = route->shelters[1];
+    BoatSession touring;
+    boat_session_init(&touring, &world, flat);
+    touring.voyage_route = &tour;
+    boat_session_restart(&touring, flat);
+    CHECK(Vector2Equals(touring.boat.position, tour.shelters[0].position));
+    CHECK(touring.boat.heading == tour.shelters[0].heading);
+    touring.boat.position = outer->spawn;
+    boat_session_restart_voyage(&touring, &tour);
+    CHECK(Vector2Equals(touring.boat.position, tour.shelters[0].position));
+    boat_session_destroy(&touring);
     boat_world_resources_destroy(&world);
     printf("cabin calm top speed %.2f m/s (%.1f knots)\n", cabin, cabin / .514444f);
     printf("boat_voyage=ok reach direct=%.2f coastal=%.2f; centre swell %.2f m; coastal %.1f s; "

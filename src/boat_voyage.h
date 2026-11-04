@@ -7,19 +7,26 @@
 // sheltered recovery points and a patch of exposed rough water, authored in a mapped location's
 // simulation X/Z. Free boating continues whether or not the destination is pursued. Observing a
 // voyage never changes the boat; only a recovery places it.
-#define BOAT_VOYAGE_SHELTERS 4
+// A tour (docs/GOTHENBURG_HARBOUR_PLAN.md, GH4) is an ordered route: its stops are passed in
+// order, each with a caption, the boat starts at the first, and it arrives only after the rest.
+#define BOAT_VOYAGE_SHELTERS 32 // Capacity; a destination voyage lists at most four.
+#define BOAT_VOYAGE_DESTINATION_SHELTERS 4
 
 typedef struct {
     const char *name; // HUD spelling, upper-case ASCII.
     Vector2 position; // Recovery position in open, navigable water.
     float heading; // Recovery heading in radians; forward is (sin, -cos).
     float radius; // Passing within this distance reaches the shelter.
+    const char *caption; // A tour stop's HUD line on passing; NULL for voyages.
 } BoatVoyageShelter;
 
 typedef struct BoatVoyageRoute {
     // Shelter 0 is the start. The last is the destination's, reached only by arriving.
     BoatVoyageShelter shelters[BOAT_VOYAGE_SHELTERS];
     unsigned shelter_count;
+    // A tour: shelters are reached only in order, the session starts the boat at shelter 0's
+    // pose, and arrival needs every shelter before the destination's.
+    bool ordered;
     Vector2 arrival_centre;
     float arrival_radius;
     float arrival_speed; // Arrive inside the area at or below this ground speed (m/s).
@@ -89,7 +96,11 @@ void boat_voyage_step(BoatVoyage *voyage, Vector2 position, Vector2 velocity, do
 BoatStorm boat_voyage_weather(const BoatVoyage *voyage);
 // Put a reset BOAT at the most recently reached shelter.
 void boat_voyage_recover(BoatVoyage *voyage, Boat *boat, double time);
-// Metres to the arrival area's centre and the bearing to it relative to HEADING, in radians,
+// Where the boat is heading: a tour's next stop, else the arrival area's centre.
+Vector2 boat_voyage_target(const BoatVoyage *voyage);
+// The tour's next stop, or the destination's shelter once every other stop is passed.
+unsigned boat_voyage_next(const BoatVoyage *voyage);
+// Metres to boat_voyage_target and the bearing to it relative to HEADING, in radians,
 // positive toward the boat's right (the direction its heading turns with right steering).
 float boat_voyage_bearing(
     const BoatVoyage *voyage, Vector2 position, float heading, float *distance);

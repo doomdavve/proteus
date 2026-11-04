@@ -7,11 +7,13 @@
 
 typedef struct {
     char id[BOAT_PLUGIN_TEXT], name[BOAT_PLUGIN_TEXT];
+    char caption[BOAT_PLUGIN_CAPTION]; // Tour stops only.
     double x, z, heading, radius;
 } BoatPluginShelterData;
 
 typedef struct {
     bool callbacks, migrates, has_scene;
+    bool tour; // The entry returned `tour` (stops and arrival) instead of `voyage`.
     BoatSceneDefinition scene; // Copied native/worker data; no Lua pointers.
     unsigned shelter_count;
     BoatPluginShelterData shelters[BOAT_VOYAGE_SHELTERS];

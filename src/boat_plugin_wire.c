@@ -256,15 +256,18 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
 
 static void voyage_payload(Wire *w, BoatPluginVoyageData *v)
 {
-    unsigned flags = (unsigned)integer(
-        w, (v->callbacks ? 1u : 0u) | (v->migrates ? 2u : 0u) | (v->has_scene ? 4u : 0u), 1);
-    if (flags > 7) {
+    unsigned flags = (unsigned)integer(w,
+        (v->callbacks ? 1u : 0u) | (v->migrates ? 2u : 0u) | (v->has_scene ? 4u : 0u)
+            | (v->tour ? 8u : 0u),
+        1);
+    if (flags > 15) {
         w->ok = false;
         return;
     }
     v->callbacks = flags & 1u;
     v->migrates = flags & 2u;
     v->has_scene = flags & 4u;
+    v->tour = flags & 8u;
     if (v->has_scene)
         scene_wire(w, &v->scene);
     v->shelter_count = (unsigned)integer(w, v->shelter_count, 4);
@@ -276,6 +279,8 @@ static void voyage_payload(Wire *w, BoatPluginVoyageData *v)
         BoatPluginShelterData *s = &v->shelters[i];
         string(w, s->id, sizeof(s->id));
         string(w, s->name, sizeof(s->name));
+        if (v->tour)
+            string(w, s->caption, sizeof(s->caption));
         s->x = number(w, s->x);
         s->z = number(w, s->z);
         s->heading = number(w, s->heading);

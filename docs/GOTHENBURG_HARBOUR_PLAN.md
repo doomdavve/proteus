@@ -96,7 +96,8 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | [GH1](#gh1-rename-to-gothenburg-harbour) | — | GOTHENBURG HARBOUR in the title, hints, package names and guides | Implemented 2026-11-04; [result](#gh1-result-2026-11-04) |
 | [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Proposed |
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Proposed |
-| [GH4](#gh4-tour-format) | — | A plugin route format with a free start, up to 32 named waypoints with captions, and canal speed limits; Å/Ä/Ö in the fonts | Proposed |
+| [GH4](#gh4-tour-format) | — | A plugin route format with a free start and up to 32 ordered stops with captions | Implemented 2026-11-04; [result](#gh4-result-2026-11-04). Speed-limit zones and Å/Ä/Ö moved to GH4b |
+| GH4b | GH4 | Å, Ä, Ö and É in the menu and HUD fonts and in stop names and captions; canal speed-limit zones | Proposed |
 | [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Proposed |
 | [GH6](#gh6-sights-along-the-route) | — | The Opera, Feskekörka, Börsen, Kronhuset, Stora Teatern, Skansen Kronan/Lejonet, Palmhuset and Maritiman | Proposed |
 | [GH7](#gh7-canal-boats-in-traffic) | GH3, [Marina M3](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion) | Canal boats running the loop in free play | Proposed |
@@ -232,6 +233,37 @@ at Kungsportsplatsen.
 Acceptance: schema and staging tests (valid tour, gate on land, broken order, too many
 waypoints); a reference tour decodes identically native and in the browser worker.
 
+### GH4 result, 2026-11-04
+
+Implemented differently from the proposal above, to reuse the voyage runtime, HUD, recovery,
+objectives, reload policies and browser path instead of adding a plugin kind:
+
+- A `voyage` package returns `tour = { stops, arrival }` instead of `voyage`
+  ([tour schema](PLUGIN_API.md#tour-schema)). Stops are reach circles like shelters, not
+  directional gates, with a required caption. `BoatVoyageRoute.ordered` marks a tour; capacity is
+  32 stops, while destination voyages keep their limit of four.
+- Ordered progress, arrival only after every stop, and `boat_voyage_next`/`boat_voyage_target`
+  for the cue. A session restart or voyage restart puts the boat at the first stop's pose; the
+  spawn rule applies only to destination voyages, and a tour's arrival needs 8 m of water, not 20.
+- The HUD names the next stop, shows each caption for 8 s on passing (else STOP N OF M), and the
+  panel widens to fit long text; the minimap marks the next stop and draws no exposure for calm
+  routes.
+- Destination voyage digests are unchanged; a tour's digest also covers its captions, and a
+  caption edit classifies as a rename. Browser wire version `PSTA` carries the tour flag and
+  captions.
+- Not done: speed-limit zones and Å/Ä/Ö (GH4b), directional gates, and a check that the water
+  between stops is connected.
+
+Verification, 2026-11-04, Apple Silicon/macOS, Debug: build warning-clean (only the upstream
+`stb_vorbis.c` warning); `ctest --preset full` passed all 367 enabled tests (13 retired wake-field
+tests disabled, GPU tests off). New checks: `boat_plugin.tours` (decode, captions, copy binding,
+rename classification, outer staging off the spawn and on land, ordered progress and arrival,
+recovery, wire round trip, invalid fields, 32/33 stops) and tour start placement in
+`boat_voyage`. `boat_hud_review --voyage tour|tour-caption|shelter` captures were inspected: the
+tour headline and a 46-character caption fit the widened panel, and the Långedrag panel is
+unchanged. No browser build or browser checks, no game run with a tour package (none exists
+until GH5), no human play.
+
 ## GH5: the Grodan package
 
 - `plugins/grodan`: the [route](#route) as GH4 waypoints, one at each bridge and sight, with
@@ -277,9 +309,10 @@ design before work starts.
 
 ## Status
 
-GH1 implemented 2026-11-04 on branch `feat/gothenburg-harbour-name` ([result](#gh1-result-2026-11-04)).
-The user asked to continue with the steps that need no new data from them: GH4 (tour format)
-next, then GH3, GH5 and GH6. GH2 waits for bridge height data.
+GH1 implemented 2026-11-04 on branch `feat/gothenburg-harbour-name` ([result](#gh1-result-2026-11-04)),
+and GH4 on `feat/grodan-tour-format` ([result](#gh4-result-2026-11-04)). The user asked to continue
+with the steps that need no new data from them: GH3 (the canal boat) next, then GH5 and GH6. GH2
+waits for bridge height data.
 
 ## Verification and handoff
 

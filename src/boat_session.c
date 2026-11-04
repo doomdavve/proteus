@@ -2,9 +2,19 @@
 
 #include <assert.h>
 
+// A tour starts at its first stop, wherever on the map that is.
+static void place_at_tour_start(BoatSession *session, const BoatVoyageRoute *route)
+{
+    boat_reset(&session->boat);
+    session->boat.position = route->shelters[0].position;
+    session->boat.heading = route->shelters[0].heading;
+}
+
 static void reset(BoatSession *session)
 {
     boat_reset_location(&session->boat, session->world.definition);
+    if (session->voyage_route && session->voyage_route->ordered)
+        place_at_tour_start(session, session->voyage_route);
     boat_presentation_reset(&session->presentation);
     session->presentation_enabled = true;
     session->tick = 0;
@@ -118,6 +128,10 @@ void boat_session_restart_voyage(BoatSession *session, const BoatVoyageRoute *ro
     boat_voyage_restart(&session->voyage, route, boat_session_time(session));
     if (route)
         session->world.water.storm = boat_voyage_weather(&session->voyage);
+    if (route && route->ordered) {
+        place_at_tour_start(session, route);
+        boat_presentation_reset(&session->presentation);
+    }
 }
 
 bool boat_session_step(BoatSession *session, BoatInput input)

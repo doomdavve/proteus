@@ -257,14 +257,28 @@ static bool shelter_name(const char *name)
     return true;
 }
 
+// A tour caption: the HUD font's printable ASCII without quotes or backslashes.
+static bool caption_text(const char *text)
+{
+    size_t n = strlen(text);
+    if (text[0] == ' ' || text[n - 1] == ' ')
+        return false;
+    for (; *text; ++text)
+        if (*text < ' ' || *text > '~' || strchr("\"\\`", *text))
+            return false;
+    return true;
+}
+
 static bool validate(Check *c, const BoatPluginVoyageData *v)
 {
     char at[64];
     unsigned last = v->shelter_count - 1;
+    const char *list = v->tour ? "tour.stops" : "voyage.shelters";
+    const char *root = v->tour ? "tour" : "voyage";
     for (unsigned i = 0; i < v->shelter_count; ++i) {
         const BoatPluginShelterData *s = &v->shelters[i];
         char path[48];
-        snprintf(path, sizeof(path), "voyage.shelters[%u]", i + 1);
+        snprintf(path, sizeof(path), "%s[%u]", list, i + 1);
         snprintf(at, sizeof(at), "%s.id", path);
         if (!identifier(s->id) || strchr(s->id, '.') || strchr(s->id, '-')) {
             diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
@@ -273,14 +287,20 @@ static bool validate(Check *c, const BoatPluginVoyageData *v)
         }
         for (unsigned j = 0; j < i; ++j)
             if (!strcmp(s->id, v->shelters[j].id)) {
-                diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
-                    "repeats voyage.shelters[%u].id \"%s\"", j + 1, s->id);
+                diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at, "repeats %s[%u].id \"%s\"",
+                    list, j + 1, s->id);
                 return false;
             }
         snprintf(at, sizeof(at), "%s.name", path);
         if (!shelter_name(s->name)) {
             diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
                 "must be upper-case A-Z, 0-9, space, '.', '-' or ''' for the HUD font");
+            return false;
+        }
+        snprintf(at, sizeof(at), "%s.caption", path);
+        if (v->tour && !caption_text(s->caption)) {
+            diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
+                "must be printable ASCII without quotes or backslashes, trimmed");
             return false;
         }
         if (!coordinates(c, path, s->x, s->z))
@@ -291,25 +311,33 @@ static bool validate(Check *c, const BoatPluginVoyageData *v)
         snprintf(at, sizeof(at), "%s.radius", path);
         if (i == last ? s->radius != 0 : !(s->radius > 0)) {
             diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
-                i == last ? "must be 0: the destination's shelter is reached only by arriving"
+                i == last ? (v->tour ? "must be 0: the last stop is reached only by arriving"
+                                     : "must be 0: the destination's shelter is reached only by "
+                                       "arriving")
                           : "must be greater than 0");
             return false;
         }
         if (!finite_in(c, at, s->radius, 0, SHELTER_RADIUS_MAX, "m"))
             return false;
     }
-    if (!coordinates(c, "voyage.arrival", v->arrival.x, v->arrival.z)
-        || !finite_in(c, "voyage.arrival.radius", v->arrival.radius, 1, SHELTER_RADIUS_MAX, "m")
-        || !finite_in(
-            c, "voyage.arrival.max_speed", v->arrival.max_speed, 0.5, ARRIVAL_SPEED_MAX, "m/s"))
+    char arrival[32], part[48];
+    snprintf(arrival, sizeof(arrival), "%s.arrival", root);
+    snprintf(part, sizeof(part), "%s.radius", arrival);
+    if (!coordinates(c, arrival, v->arrival.x, v->arrival.z)
+        || !finite_in(c, part, v->arrival.radius, 1, SHELTER_RADIUS_MAX, "m"))
+        return false;
+    snprintf(part, sizeof(part), "%s.max_speed", arrival);
+    if (!finite_in(c, part, v->arrival.max_speed, 0.5, ARRIVAL_SPEED_MAX, "m/s"))
         return false;
     const BoatPluginShelterData *end = &v->shelters[last];
     if (hypot(end->x - v->arrival.x, end->z - v->arrival.z) > v->arrival.radius) {
-        snprintf(at, sizeof(at), "voyage.shelters[%u]", last + 1);
+        snprintf(at, sizeof(at), "%s[%u]", list, last + 1);
         diagnose(c->diagnostic, BOAT_PLUGIN_SCHEMA, c->file, at,
-            "is the destination's shelter and must lie inside voyage.arrival");
+            "is the destination's and must lie inside %s", arrival);
         return false;
     }
+    if (v->tour)
+        return true; // Calm water: the decoder supplies no exposure.
     if (!coordinates(c, "voyage.exposure", v->exposure.x, v->exposure.z)
         || !finite_in(c, "voyage.exposure.radius", v->exposure.radius, 0, EXPOSURE_RADIUS_MAX, "m")
         || !finite_in(c, "voyage.exposure.height", v->exposure.height, 0, EXPOSURE_HEIGHT_MAX, "m")
@@ -331,9 +359,12 @@ static bool validate(Check *c, const BoatPluginVoyageData *v)
 
 static void bind(BoatPluginVoyage *voyage)
 {
-    for (unsigned i = 0; i < BOAT_VOYAGE_SHELTERS; ++i)
-        voyage->route.shelters[i].name
-            = i < voyage->route.shelter_count ? voyage->shelter_names[i] : NULL;
+    for (unsigned i = 0; i < BOAT_VOYAGE_SHELTERS; ++i) {
+        bool used = i < voyage->route.shelter_count;
+        voyage->route.shelters[i].name = used ? voyage->shelter_names[i] : NULL;
+        voyage->route.shelters[i].caption
+            = used && voyage->route.ordered ? voyage->shelter_captions[i] : NULL;
+    }
 }
 
 void boat_plugin_voyage_copy(BoatPluginVoyage *destination, const BoatPluginVoyage *source)
@@ -392,6 +423,12 @@ uint64_t boat_plugin_route_digest(const BoatVoyageRoute *route)
     value(&hash, "exposure.build", route->exposure.build);
     value(&hash, "exposed_fraction", route->exposed_fraction);
     value(&hash, "weather_range", route->weather_range);
+    if (route->ordered) {
+        // Tours only, so destination voyages keep their digests.
+        fold(&hash, "tour", 4);
+        for (unsigned i = 0; i < route->shelter_count; ++i)
+            fold(&hash, route->shelters[i].caption, strlen(route->shelters[i].caption) + 1);
+    }
     return hash;
 }
 
@@ -424,9 +461,13 @@ BoatPluginStatus boat_plugin_load_voyage(const BoatPluginBundle *bundle,
 BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     const BoatPluginVoyageData *data, BoatPluginVoyage *out, BoatPluginDiagnostic *d)
 {
-    if (data->shelter_count < 2 || data->shelter_count > BOAT_VOYAGE_SHELTERS)
-        return diagnose(
-            d, BOAT_PLUGIN_SCHEMA, manifest->entry, "voyage.shelters", "requires 2..4 shelters");
+    if (data->tour
+            ? data->shelter_count < 3 || data->shelter_count > BOAT_VOYAGE_SHELTERS
+            : data->shelter_count < 2 || data->shelter_count > BOAT_VOYAGE_DESTINATION_SHELTERS)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry,
+            data->tour ? "tour.stops" : "voyage.shelters",
+            data->tour ? "requires 3..%d stops" : "requires 2..%d shelters",
+            data->tour ? BOAT_VOYAGE_SHELTERS : BOAT_VOYAGE_DESTINATION_SHELTERS);
     if (data->callbacks != manifest->objective)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
             "callbacks require objective.hud and that capability requires both callbacks");
@@ -452,10 +493,13 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     }
     BoatVoyageRoute *route = &candidate.route;
     route->shelter_count = data->shelter_count;
+    route->ordered = data->tour;
     for (unsigned i = 0; i < data->shelter_count; ++i) {
         const BoatPluginShelterData *s = &data->shelters[i];
         memcpy(candidate.shelter_ids[i], s->id, sizeof(s->id));
         memcpy(candidate.shelter_names[i], s->name, sizeof(s->name));
+        if (data->tour)
+            memcpy(candidate.shelter_captions[i], s->caption, sizeof(s->caption));
         route->shelters[i].position = (Vector2) { (float)s->x, (float)s->z };
         route->shelters[i].heading = (float)s->heading;
         route->shelters[i].radius = (float)s->radius;
@@ -863,20 +907,25 @@ BoatPluginStatus boat_plugin_check_location(const BoatPluginVoyage *voyage,
         return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
             "is \"%s\"; this session is at \"%s\"", voyage->manifest.location, location->name);
     const BoatVoyageRoute *route = &voyage->route;
-    if (!same_point(route->shelters[0].position, location->spawn))
+    const char *list = route->ordered ? "tour.stops" : "voyage.shelters";
+    // A tour starts at its first stop; a destination voyage at the location's start.
+    if (!route->ordered && !same_point(route->shelters[0].position, location->spawn))
         return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "voyage.shelters[1]",
             "must be the location's start, x = %g, z = %g", location->spawn.x, location->spawn.y);
-    // Room for the hull at a shelter, and more for arriving and turning in the harbour.
+    // Room for the hull at a shelter, and more for arriving and turning in the harbour. A tour
+    // arrives at a canal pier, so it needs only the shelter's room.
     for (unsigned i = 0; i < route->shelter_count; ++i)
         if (!boat_map_water(map, route->shelters[i].position, 8)) {
             char at[32];
-            snprintf(at, sizeof(at), "voyage.shelters[%u]", i + 1);
+            snprintf(at, sizeof(at), "%s[%u]", list, i + 1);
             return diagnose(d, BOAT_PLUGIN_SCHEMA, file, at,
                 "is not open water of the %s map with 8 m clear", location->name);
         }
-    if (!boat_map_water(map, route->arrival_centre, 20))
-        return diagnose(d, BOAT_PLUGIN_SCHEMA, file, "voyage.arrival",
-            "is not open water of the %s map with 20 m clear", location->name);
+    float arrival_clear = route->ordered ? 8 : 20;
+    if (!boat_map_water(map, route->arrival_centre, arrival_clear))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, file,
+            route->ordered ? "tour.arrival" : "voyage.arrival",
+            "is not open water of the %s map with %.0f m clear", location->name, arrival_clear);
     if (check_scene_location(voyage, location, map, d) != BOAT_PLUGIN_OK)
         return d->status;
     BoatPluginCost cost = d->cost;
@@ -924,7 +973,7 @@ BoatPluginChange boat_plugin_classify(
                 live = true;
         }
     }
-    bool same = a->shelter_count == b->shelter_count
+    bool same = a->shelter_count == b->shelter_count && a->ordered == b->ordered
         && same_point(a->arrival_centre, b->arrival_centre)
         && a->arrival_radius == b->arrival_radius && a->arrival_speed == b->arrival_speed
         && a->exposed_fraction == b->exposed_fraction;
@@ -939,7 +988,8 @@ BoatPluginChange boat_plugin_classify(
     bool renamed = strcmp(m->name, n->name) != 0;
     unsigned common = a->shelter_count < b->shelter_count ? a->shelter_count : b->shelter_count;
     for (unsigned i = 0; i < common; ++i)
-        renamed |= strcmp(active->shelter_names[i], candidate->shelter_names[i]) != 0;
+        renamed |= strcmp(active->shelter_names[i], candidate->shelter_names[i]) != 0
+            || strcmp(active->shelter_captions[i], candidate->shelter_captions[i]) != 0;
     return live                     ? BOAT_PLUGIN_LIVE
         : renamed || cosmetic_scene ? BOAT_PLUGIN_RENAMED
                                     : BOAT_PLUGIN_UNCHANGED;
