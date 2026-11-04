@@ -1,6 +1,6 @@
 # Documentation and current plans
 
-Current status reconciled on 2026-11-03. The main program is the boating game `wake_velocity`
+Current status reconciled on 2026-11-04. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
 Acid Wake techno or Off. It provides free boating in the basin and on Gothenburg's outer river, a
@@ -66,7 +66,9 @@ PR; the native CI workflows skip Markdown-only changes.
 
 Released internet hosting: [v0.0.24](RELEASES.md#status-and-verification) is published and
 Winterfell's matching native/browser room is deployed (2026-11-01), with protocol 9 / physics 9.
-The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-01) owns deployment,
+The [v0.0.25 release preparation](RELEASES.md#v0025-preparation--2026-11-04) records local
+verification, the queued CI/Pages incident and pending hosting-baseline approval; no new version
+is published or deployed. The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-01) owns deployment,
 client-check evidence and limits. Every release includes this hosted cutover through
 `../davve-srv/ansible`; package publication and Pages alone do not complete it. The public
 `wake.davve.net` endpoint and shared known-server directory remain in use. Human gameplay/audio

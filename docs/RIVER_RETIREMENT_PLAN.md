@@ -38,7 +38,8 @@ the crop's edge, hit it, and never saw the Gothenburg content. The user asked to
 
 ## Status
 
-Implemented and automatically verified; not yet played by a human, reviewed or released.
+Merged in [PR #148](https://github.com/doomdavve/proteus/pull/148) and automatically verified.
+Release and hosted cutover are being prepared as v0.0.25; human play remains open.
 
 ### Verification, 2026-11-04 (Apple Silicon/macOS, Debug)
 

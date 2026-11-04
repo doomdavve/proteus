@@ -217,6 +217,47 @@ and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover
 
 ## Status and verification
 
+### v0.0.25 preparation — 2026-11-04
+
+The next release is being prepared from reviewed `origin/main` commit
+`8f4f496844ee165be19a6dae3455bf4b24e4aa32` in
+`/private/tmp/proteus-release-v0.0.25`. It includes the graphics/water improvements,
+optional high resolution/HDR, fixed sunset/dusk review presets, marina structures and boat
+appearance, live-console improvements, the browser landing page and canvas touch controls.
+The `river` location is retired; native clients and rooms must upgrade together to protocol 12 /
+physics 9, with Winterfell selecting `outer`.
+
+Hosting compatibility commit `9209fcd` in the separate `davve-srv` worktree switches the role's
+location to `outer` and makes its service description follow that location. Ansible syntax
+validation passed. It is pushed on `release/wake-v0.0.25`; promotion to the private hosting
+baseline awaits explicit approval after automatic review rejected the direct default-branch push.
+The v0.0.24 pin and running room remain unchanged.
+
+GitHub reports an [Actions and Pages incident](https://stspg.io/pjgptg3cfc6n); the source's
+[macOS](https://github.com/doomdavve/proteus/actions/runs/41864167394),
+[Windows](https://github.com/doomdavve/proteus/actions/runs/41864167119),
+[Linux](https://github.com/doomdavve/proteus/actions/runs/41864167349) and on-demand
+[browser qualification](https://github.com/doomdavve/proteus/actions/runs/41864476555) checks
+are queued. No v0.0.25 tag has been created or pushed, package publication has not started,
+and neither public browser client nor Winterfell has been upgraded.
+
+Local Debug build passed on Apple Silicon/macOS with GPU tests off. The Lua download endpoint
+was unreachable, so the cached archive was reused after confirming the pinned SHA-256. The build
+reported raylib's existing bundled stb_vorbis warning. CPU basin/outer and GPU outer HIGH RES/HDR
+and dusk captures, plus CPU/GPU authored-marina views, were inspected; a 240-frame windowed outer GPU demo exited 0 and its frame was
+inspected. `ctest --preset full` passed all **366 enabled CPU tests** (13 retired wake-field
+cases disabled). After enabling GPU tests, all **34 enabled GPU-labeled checks** passed
+(two retired GPU cases disabled). These checks do not establish human input/audio review,
+Windows package execution or physical-device acceptance of the released build.
+
+Next: promote the hosting compatibility commit with approval, then
+rerun `tools/cut_release.py v0.0.25 --check` and the full release command after CI recovers.
+Record download, deployment and matching native/browser joining evidence after completion.
+Evidence: `/private/tmp/proteus-release-v0.0.25/build/releases/v0.0.25/` and
+`/private/tmp/proteus-release-v0.0.25-build.log`.
+
+### v0.0.24 — 2026-11-01
+
 Current release, 2026-11-01: **[v0.0.24](https://github.com/doomdavve/proteus/releases/tag/v0.0.24)**
 is published at `24760a63788f2267a5547e41b00b3e570adbe52f`. The
 [native release](https://github.com/doomdavve/proteus/actions/runs/41293803685) and
