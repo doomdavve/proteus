@@ -32,8 +32,10 @@ water, was retired on 2026-11-04; `--location river` now names `outer` and exits
 faces −Z. It is for solo mapped free boating, not courses or rooms. Rooms on `outer` have no voyage
 or solo squall.
 
-`--skin sweden|finland|denmark|norway|explorer|cabin` selects a solo boat. Explorer has a stronger
-engine in free boating; the cabin boat reaches about 25 knots on calm water. Courses retain
+`--skin sweden|finland|denmark|norway|explorer|cabin|grodan` selects a solo boat. Explorer has a stronger
+engine in free boating; the cabin boat reaches about 25 knots on calm water; the Grodan is a
+15 m canal tour boat, about 8 knots, whose default camera sits 12 m farther back and 4 m higher.
+Courses retain
 the standard engine. Multiplayer assigns liveries
 by slot. `--soundtrack a-little-boat|acid-wake|off` selects local music. `--mouse-steering`
 starts with captured mouse steering. See [skins](BOAT_SKINS.md) and [music](MUSIC.md).

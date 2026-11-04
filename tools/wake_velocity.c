@@ -209,7 +209,7 @@ static void usage(void)
     cli_usage_line(stdout, "--location basin|outer", "Water map (default basin; title uses outer)");
     cli_usage_line(
         stdout, "--start X,Z[,DEGREES]", "Place the boat on mapped water (heading 0 faces -Z)");
-    cli_usage_line(stdout, "--skin NAME", "sweden|finland|denmark|norway|explorer|cabin");
+    cli_usage_line(stdout, "--skin NAME", "sweden|finland|denmark|norway|explorer|cabin|grodan");
     cli_usage_line(stdout, "", "default sweden; explorer and cabin have their own engines");
     cli_usage_line(
         stdout, "--soundtrack NAME", "a-little-boat|acid-wake|off (default a-little-boat)");
@@ -1031,6 +1031,11 @@ static int study(int argc, char **argv)
         player_wake = false; // Existing course/replay comparisons retain their original water.
     BoatCamera camera_default
         = { .distance = location->camera_distance, .height = location->camera_height };
+    if (skin == BOAT_SKIN_GRODAN && !connect_to) {
+        // The 15 m Grodan needs the camera clear of its stern and high enough to see over it.
+        camera_default.distance += 12;
+        camera_default.height += 4;
+    }
     camera_default.fixed_fov = camera_settings.fixed_fov;
     if (!camera_distance_set)
         camera_settings.distance = camera_default.distance;
@@ -1139,6 +1144,8 @@ static int study(int argc, char **argv)
         session.handling = &boat_handling_explorer;
     else if (!connect_to && skin == BOAT_SKIN_CABIN)
         session.handling = &boat_handling_cabin;
+    else if (!connect_to && skin == BOAT_SKIN_GRODAN)
+        session.handling = &boat_handling_grodan;
     if (objects)
         object_study_reset(objects, &session, object_crossing, object_life, object_height);
     // A replay or ghost is recorded against one exact course; only the standard course

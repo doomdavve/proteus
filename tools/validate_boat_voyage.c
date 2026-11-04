@@ -131,6 +131,58 @@ static float top_speed(const BoatWorldResources *world, BoatWater water, const B
     return speed;
 }
 
+// GH3: the Grodan's turning circle at full lock and full throttle in open fjord water, and how
+// close its hull gets to a quay it is driven straight at.
+static float grodan_turn_diameter(const BoatWorldResources *world, BoatWater water)
+{
+    BoatSession session;
+    boat_session_init(&session, world, water);
+    boat_session_restart_voyage(&session, &boat_fixture_voyage_outer);
+    session.presentation_enabled = false;
+    session.handling = &boat_handling_grodan;
+    session.boat.position = sim((Vector2) { -3850, -2700 });
+    float min_x = INFINITY, max_x = -INFINITY;
+    for (int tick = 0; tick < (int)(120 / BOAT_TICK_SECONDS); ++tick) {
+        BoatInput input = { .throttle_rate = boat_throttle_rate(session.boat.throttle, 1),
+            .steering_rate = tick * BOAT_TICK_SECONDS > 30 ? 1 : 0 };
+        boat_session_step(&session, input);
+        if (tick * BOAT_TICK_SECONDS > 60) {
+            min_x = fminf(min_x, session.boat.position.x);
+            max_x = fmaxf(max_x, session.boat.position.x);
+        }
+    }
+    boat_session_destroy(&session);
+    return max_x - min_x;
+}
+
+// GH3: the Grodan driven full ahead from the dock for a minute. Every point of its 15 x 4.2 m
+// footprint must still be water: the speedboat's six samples alone would let the hull's long
+// sides and bow overrun the quays. Returns the number of footprint points on land.
+static int grodan_aground(const BoatWorldResources *world, BoatWater water, float heading)
+{
+    BoatSession session;
+    boat_session_init(&session, world, water);
+    session.presentation_enabled = false;
+    session.handling = &boat_handling_grodan;
+    boat_session_restart(&session, water);
+    session.boat.heading = heading;
+    int aground = 0;
+    for (int tick = 0; tick < (int)(60 / BOAT_TICK_SECONDS); ++tick) {
+        boat_session_step(&session,
+            (BoatInput) { .throttle_rate = boat_throttle_rate(session.boat.throttle, 1) });
+        Vector2 forward = { sinf(session.boat.heading), -cosf(session.boat.heading) };
+        Vector2 right = { cosf(session.boat.heading), sinf(session.boat.heading) };
+        for (int along = -7; along <= 7; ++along)
+            for (int side = -1; side <= 1; side += 2) {
+                Vector2 p = Vector2Add(session.boat.position,
+                    Vector2Add(Vector2Scale(forward, along), Vector2Scale(right, side * 2.0f)));
+                aground += !boat_map_water(&world->map, p, 0);
+            }
+    }
+    boat_session_destroy(&session);
+    return aground;
+}
+
 int main(void)
 {
     const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
@@ -300,6 +352,18 @@ int main(void)
     float stock = top_speed(&world, flat, &boat_handling_speedboat);
     float explorer = top_speed(&world, flat, &boat_handling_explorer);
     float cabin = top_speed(&world, flat, &boat_handling_cabin);
+    float grodan = top_speed(&world, flat, &boat_handling_grodan);
+    float grodan_turn = grodan_turn_diameter(&world, flat);
+    printf("grodan calm top speed %.2f m/s (%.1f knots), turning circle %.0f m\n", grodan,
+        grodan / .514444f, grodan_turn);
+    CHECK(grodan > 3.9f && grodan < 4.4f); // About 8 knots flat out.
+    CHECK(grodan_turn > 15 && grodan_turn < 35);
+    for (int i = 0; i < 8; ++i) {
+        int aground = grodan_aground(&world, flat, i * PI / 4);
+        if (aground)
+            fprintf(stderr, "grodan heading %d: %d footprint points on land\n", i, aground);
+        CHECK(aground == 0);
+    }
     CHECK(cabin > 12.75f && cabin < 12.97f); // 25 knots = 12.861 m/s, calm water.
     CHECK(stock > 21 && stock < 25);
     CHECK(explorer > 29 && explorer < 31);

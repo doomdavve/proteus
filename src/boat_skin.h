@@ -4,8 +4,8 @@
 #include "boat_model.h"
 
 // Appearance IDs are local presentation choices,
-// not protocol values. The four countries colour room slots. The explorer and cabin choices
-// select their own handling profiles in solo free boating.
+// not protocol values. The four countries colour room slots. The explorer, cabin and
+// Grodan choices select their own handling profiles in solo free boating.
 typedef enum {
     BOAT_SKIN_SWEDEN,
     BOAT_SKIN_FINLAND,
@@ -14,6 +14,7 @@ typedef enum {
     BOAT_SKIN_COUNTRIES,
     BOAT_SKIN_EXPLORER = BOAT_SKIN_COUNTRIES,
     BOAT_SKIN_CABIN,
+    BOAT_SKIN_GRODAN, // GH3: the 15 m canal tour boat, solo free boating and tours only.
     BOAT_SKIN_COUNT
 } BoatSkinId;
 
@@ -25,6 +26,8 @@ typedef struct {
 } BoatSkinPalette;
 
 unsigned int boat_skin_index(unsigned int skin);
+// The speedboat-shaped choices carry twin outboards; the cabin boat and the Grodan do not.
+bool boat_skin_outboards(unsigned int skin);
 const char *boat_skin_name(unsigned int skin);
 bool boat_skin_parse(const char *name, unsigned int *skin);
 BoatSkinPalette boat_skin_palette(unsigned int skin);

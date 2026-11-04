@@ -16,8 +16,9 @@ single-player setup: PIXEL is the plain 320×200 scene, SMOOTH (the default) sup
 and HIGH RES draws the scene at up to 1280×800 behind the same 320×200 HUD; it needs a GPU
 and looks sharpest in a window of 1280×800 or a whole multiple of it. Choose A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The
-cabin boat reaches about 25 knots on calm water, and the explorer has a stronger engine during
-solo free boating; timed courses use the standard engine and multiplayer assigns Nordic liveries by player slot.
+cabin boat reaches about 25 knots on calm water, the explorer has a stronger engine during
+solo free boating, and the GRODAN is a slow 15 m open canal tour boat (about 8 knots, with
+its own long hull and a camera pulled back to see it); timed courses use the standard engine and multiplayer assigns Nordic liveries by player slot.
 
 ## Controls
 

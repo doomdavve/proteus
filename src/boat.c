@@ -71,6 +71,37 @@ static const float HULL_BOW = 2.0f;
 static const float HULL_STERN = 1.6f;
 static const float HULL_HALF_BEAM = .75f;
 static const float HULL_SHORE_CLEARANCE = .35f;
+static const BoatHull SPEEDBOAT_HULL = { HULL_BOW, HULL_STERN, HULL_HALF_BEAM, YAW_INERTIA };
+#define HULL_SAMPLES_MAX 32
+#define HULL_SIDE_SPACING 2.0f
+
+static const BoatHull *hull_of(const BoatHandling *handling)
+{
+    return handling && handling->hull ? handling->hull : &SPEEDBOAT_HULL;
+}
+
+// Contact samples in hull coordinates (x right, y forward). The speedboat keeps its six: bow and
+// stern centres and corners. A longer hull adds side samples at most HULL_SIDE_SPACING apart.
+static size_t hull_samples(const BoatHull *hull, float margin, Vector2 *out)
+{
+    float bow = hull->bow + margin, stern = hull->stern + margin, beam = hull->half_beam + margin;
+    size_t n = 0;
+    out[n++] = (Vector2) { 0, bow };
+    out[n++] = (Vector2) { -beam, bow };
+    out[n++] = (Vector2) { beam, bow };
+    out[n++] = (Vector2) { 0, -stern };
+    out[n++] = (Vector2) { -beam, -stern };
+    out[n++] = (Vector2) { beam, -stern };
+    if (hull == &SPEEDBOAT_HULL)
+        return n;
+    int sections = (int)ceilf((bow + stern) / HULL_SIDE_SPACING);
+    for (int i = 1; i < sections && n + 2 <= HULL_SAMPLES_MAX; ++i) {
+        float y = -stern + (bow + stern) * (float)i / (float)sections;
+        out[n++] = (Vector2) { -beam, y };
+        out[n++] = (Vector2) { beam, y };
+    }
+    return n;
+}
 static const float CONTACT_FRICTION = .15f;
 
 void boat_reset(Boat *boat) { *boat = (Boat) { .position = { 0, 10 } }; }
@@ -91,28 +122,32 @@ static Vector2 hull_point(Vector2 forward, Vector2 right, Vector2 position, Vect
         position, Vector2Add(Vector2Scale(forward, local.y), Vector2Scale(right, local.x)));
 }
 
-static void hull_vertical_bounds(const Boat *boat, float *bottom, float *top)
+static void hull_vertical_bounds(const Boat *boat, const BoatHull *hull, float *bottom, float *top)
 {
     // Physical hull plus cabin. Transform all corners so sideways/inverted jumps count.
-    BoatModelSpec spec
-        = { .length = 3.6f, .beam = 1.5f, .draft = .35f, .freeboard = .35f, .cabin_height = .8f };
+    // The speedboat keeps its literal 3.6 x 1.5 m so its trace stays bit for bit.
+    bool speedboat = hull == &SPEEDBOAT_HULL;
+    BoatModelSpec spec = { .length = speedboat ? 3.6f : hull->bow + hull->stern,
+        .beam = speedboat ? 1.5f : 2 * hull->half_beam,
+        .draft = .35f,
+        .freeboard = .35f,
+        .cabin_height = .8f };
     Transform3D pose = { .position = { 0, boat->height, 0 },
         .rotation = boat_model_rotation(boat_pose_rotation(boat)),
         .scale = { 1, 1, 1 } };
     boat_model_vertical_bounds(spec, pose, bottom, top);
 }
 
-static bool hull_contact(
-    const Boat *boat, const BoatWorld *world, double time, HullContact *contact)
+static bool hull_contact(const Boat *boat, const BoatHull *hull, const BoatWorld *world,
+    double time, HullContact *contact)
 {
     float bottom, top;
-    hull_vertical_bounds(boat, &bottom, &top);
-    const Vector2 samples[] = { { 0, HULL_BOW }, { -HULL_HALF_BEAM, HULL_BOW },
-        { HULL_HALF_BEAM, HULL_BOW }, { 0, -HULL_STERN }, { -HULL_HALF_BEAM, -HULL_STERN },
-        { HULL_HALF_BEAM, -HULL_STERN } };
+    hull_vertical_bounds(boat, hull, &bottom, &top);
+    Vector2 samples[HULL_SAMPLES_MAX];
+    size_t count = hull_samples(hull, 0, samples);
     Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
     Vector2 right = { cosf(boat->heading), sinf(boat->heading) };
-    for (size_t i = 0; i < sizeof(samples) / sizeof(*samples); ++i) {
+    for (size_t i = 0; i < count; ++i) {
         Vector2 point = hull_point(forward, right, boat->position, samples[i]);
         Vector2 normal = { 0 };
         bool water;
@@ -143,8 +178,10 @@ static bool hull_contact(
     return false;
 }
 
-static void resolve_hull_contact(Boat *boat, Vector2 safe_position, HullContact contact)
+static void resolve_hull_contact(
+    Boat *boat, const BoatHull *hull, Vector2 safe_position, HullContact contact)
 {
+    const float inertia = hull->yaw_inertia;
     boat->position = safe_position;
     Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
     Vector2 right = { cosf(boat->heading), sinf(boat->heading) };
@@ -157,9 +194,9 @@ static void resolve_hull_contact(Boat *boat, Vector2 safe_position, HullContact 
     if (normal_speed < 0) {
         float arm_cross_normal = arm.x * contact.normal.y - arm.y * contact.normal.x;
         float impulse = -(1 + BOAT_CONTACT_RESTITUTION) * normal_speed
-            / (1 + arm_cross_normal * arm_cross_normal / YAW_INERTIA);
+            / (1 + arm_cross_normal * arm_cross_normal / inertia);
         boat->velocity = Vector2Add(boat->velocity, Vector2Scale(contact.normal, impulse));
-        boat->yaw_velocity += arm_cross_normal * impulse / YAW_INERTIA;
+        boat->yaw_velocity += arm_cross_normal * impulse / inertia;
         // Limit tangential friction by impact strength so shallow scrapes retain momentum.
         float tangent_speed = Vector2DotProduct(Vector2Subtract(boat->velocity, contact.velocity),
             (Vector2) { -contact.normal.y, contact.normal.x });
@@ -170,28 +207,28 @@ static void resolve_hull_contact(Boat *boat, Vector2 safe_position, HullContact 
     }
 }
 
-static void resolve_traffic(Boat *boat, const BoatWorld *world, double time)
+static void resolve_traffic(Boat *boat, const BoatHull *hull, const BoatWorld *world, double time)
 {
     if (!world->definition->mapped)
         return;
     float bottom, top;
-    hull_vertical_bounds(boat, &bottom, &top);
+    hull_vertical_bounds(boat, hull, &bottom, &top);
     // Separate the full hull footprints, then match contact velocity against the moving hull.
     // Multiple passes cover a rare simultaneous contact without advancing traffic time.
     for (int pass = 0; pass < 4; ++pass) {
         WaterfrontTrafficContact traffic;
         if (!waterfront_traffic_contact_height_scene(world->scene, boat->position, boat->heading,
-                HULL_BOW, HULL_STERN, HULL_HALF_BEAM, bottom, top, world->water, time, &traffic))
+                hull->bow, hull->stern, hull->half_beam, bottom, top, world->water, time, &traffic))
             break;
         Vector2 previous = boat->position;
         Vector2 shifted
             = Vector2Add(previous, Vector2Scale(traffic.normal, traffic.penetration + .002f));
-        resolve_hull_contact(boat, shifted,
+        resolve_hull_contact(boat, hull, shifted,
             (HullContact) {
                 .local = traffic.local, .normal = traffic.normal, .velocity = traffic.velocity });
         HullContact shore;
-        if (hull_contact(boat, world, time, &shore))
-            resolve_hull_contact(boat, previous, shore);
+        if (hull_contact(boat, hull, world, time, &shore))
+            resolve_hull_contact(boat, hull, previous, shore);
     }
 }
 
@@ -203,7 +240,7 @@ bool boat_scene_clear(const Boat *boat, const BoatWorld *world, const BoatSceneD
     if (!world->definition->mapped)
         return !boat_scene_has_content(scene);
     float bottom, top;
-    hull_vertical_bounds(boat, &bottom, &top);
+    hull_vertical_bounds(boat, &SPEEDBOAT_HULL, &bottom, &top);
     Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
     Vector2 right = { cosf(boat->heading), sinf(boat->heading) };
     const float clearance = HULL_SHORE_CLEARANCE + (margin > 0 ? margin : 0);
@@ -226,8 +263,8 @@ bool boat_scene_clear(const Boat *boat, const BoatWorld *world, const BoatSceneD
 bool boat_pair_contact(const Boat *a, const Boat *b, BoatPairContact *contact)
 {
     float low_a, high_a, low_b, high_b;
-    hull_vertical_bounds(a, &low_a, &high_a);
-    hull_vertical_bounds(b, &low_b, &high_b);
+    hull_vertical_bounds(a, &SPEEDBOAT_HULL, &low_a, &high_a);
+    hull_vertical_bounds(b, &SPEEDBOAT_HULL, &low_b, &high_b);
     if (low_a > high_b || low_b > high_a)
         return false;
     Vector2 forward[2]
@@ -325,7 +362,7 @@ bool boat_collide_pair(Boat *a, float mass_a, Boat *b, float mass_b)
 bool boat_hull_clear(const Boat *boat, const BoatWorld *world, double time)
 {
     HullContact contact;
-    return !hull_contact(boat, world, time, &contact);
+    return !hull_contact(boat, &SPEEDBOAT_HULL, world, time, &contact);
 }
 
 BoatWakeStern boat_wake_stern(const Boat *boat, const BoatWorld *world, double time)
@@ -515,6 +552,10 @@ static void buoyancy_step(Boat *boat, const BoatWorld *world, double time, float
 const BoatHandling boat_handling_speedboat = { .thrust = 11.0f };
 const BoatHandling boat_handling_explorer = { .thrust = 18.0f };
 const BoatHandling boat_handling_cabin = { .thrust = 4.45f };
+// GH3: a 15 x 4.2 m open canal boat (dimensions estimated from its 73-92 seats; no published
+// figures). Low thrust for about 4 m/s (8 knots) flat out, and a long hull's yaw inertia.
+static const BoatHull GRODAN_HULL = { 7.6f, 7.4f, 2.1f, 30 };
+const BoatHandling boat_handling_grodan = { .thrust = 1.45f, .hull = &GRODAN_HULL };
 
 void boat_step(Boat *boat, BoatWorld *world, double now, BoatInput input)
 {
@@ -527,6 +568,7 @@ void boat_step_handling(
     float wheel_change = input.steering_rate;
     float throttle_change = input.throttle_rate;
     double time = now;
+    const BoatHull *hull = hull_of(handling);
     float wet = hull_wet(boat, world, time) > 0 ? 1 : 0;
     motion_step(boat, wet);
     if (boat->motion_state == BOAT_CAPSIZED)
@@ -631,23 +673,23 @@ void boat_step_handling(
     // Modest air yaw, .3 rad/s² at full wheel, without air thrust or hydrodynamic forces.
     // Object-wake flight also has the separate attitude controller in buoyancy_step().
     if (boat->motion_state != BOAT_CAPSIZED)
-        torque += YAW_INERTIA * .3f * boat->wheel * (1 - wet);
+        torque += hull->yaw_inertia * .3f * boat->wheel * (1 - wet);
     boat->velocity = Vector2Add(boat->velocity, Vector2Scale(force, BOAT_STEP));
-    boat->yaw_velocity += torque / YAW_INERTIA * BOAT_STEP;
+    boat->yaw_velocity += torque / hull->yaw_inertia * BOAT_STEP;
     // Accept translation and rotation separately. A rejected rotation must not leave a hull
     // sample on land, otherwise even an outward move can be rejected on the next tick.
     Vector2 previous = boat->position;
     boat->position = Vector2Add(previous, Vector2Scale(boat->velocity, BOAT_STEP));
     HullContact contact;
-    if (hull_contact(boat, world, time, &contact))
-        resolve_hull_contact(boat, previous, contact);
+    if (hull_contact(boat, hull, world, time, &contact))
+        resolve_hull_contact(boat, hull, previous, contact);
     float previous_heading = boat->heading;
     boat->heading = remainderf(boat->heading + boat->yaw_velocity * BOAT_STEP, 2 * PI);
-    if (hull_contact(boat, world, time, &contact)) {
-        resolve_hull_contact(boat, boat->position, contact);
+    if (hull_contact(boat, hull, world, time, &contact)) {
+        resolve_hull_contact(boat, hull, boat->position, contact);
         boat->heading = previous_heading;
     }
-    resolve_traffic(boat, world, time);
+    resolve_traffic(boat, hull, world, time);
     buoyancy_step(boat, world, time, turn_moment);
     if (world->water.player_wake_enabled) {
         if (boat->physical_wake_time == 0)

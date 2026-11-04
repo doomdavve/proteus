@@ -95,7 +95,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | --- | --- | --- | --- |
 | [GH1](#gh1-rename-to-gothenburg-harbour) | — | GOTHENBURG HARBOUR in the title, hints, package names and guides | Implemented 2026-11-04; [result](#gh1-result-2026-11-04) |
 | [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Proposed |
-| [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Proposed |
+| [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Implemented 2026-11-04; [result](#gh3-result-2026-11-04) |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start and up to 32 ordered stops with captions | Implemented 2026-11-04; [result](#gh4-result-2026-11-04). Speed-limit zones and Å/Ä/Ö moved to GH4b |
 | GH4b | GH4 | Å, Ä, Ö and É in the menu and HUD fonts and in stop names and captions; canal speed-limit zones | Proposed |
 | [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Proposed |
@@ -204,6 +204,38 @@ Read `src/boat_skin.[ch]`, `src/boat_model.[ch]` and the
 Acceptance: CPU/GPU captures from the chase camera; a user drive in the canals and on the open
 river.
 
+### GH3 result, 2026-11-04
+
+The user chose real scale over a visual-only or toy-sized boat (2026-11-04).
+
+- **Size.** No dimensions are published: Swedish Wikipedia gives 73–92 passengers per boat, the
+  fleet's builders and years, but no length or beam. The Grodan is 15 × 4.2 m, an estimate from
+  the seating; replace it if measured figures turn up.
+- **Physics.** `BoatHandling` can carry a `BoatHull` (bow, stern, half beam, yaw inertia). Shore,
+  quay, harbour-scene and traffic contacts use it, with side samples at most 2 m apart, so a
+  quay corner cannot pass between the ends. The speedboat-sized boats keep their six exact
+  samples and literal bounds, so their traces are unchanged. Room pair contacts, scene-clear
+  checks and `boat_hull_clear` still use the speedboat footprint; the Grodan is solo only.
+  Buoyancy, pitch, roll and wake emission are still the speedboat's: the long hull bobs like a
+  small one in waves.
+- **Handling.** Thrust 1.45 gives 4.15 m/s (8.1 knots) flat out in calm water, and a yaw inertia
+  of 30 gives a turning circle of about 21 m at full lock.
+- **Look.** The shared parametric hull recipe (frog green, dark green stripe, GRODAN painted on
+  both sides, fenders), plus 8 rows of yellow benches, about 20 passengers, a raked bow
+  windscreen, the guide's stand, the helm with its skipper, grab rails, and a stern ensign
+  staff. A boat choice in SETTINGS and `--skin grodan`; rooms keep their Nordic liveries. The
+  default camera sits 12 m farther back and 4 m higher for this boat.
+
+Verification, 2026-11-04, Apple Silicon/macOS, Debug: build warning-clean (only the upstream
+`stb_vorbis.c` warning); `ctest --preset full` passed all 367 enabled tests (13 retired wake-field
+tests disabled, GPU tests off). `boat_voyage` now checks the Grodan's top speed (3.9–4.4 m/s), its
+turning circle (15–35 m), and that a minute full ahead from the dock on 8 headings leaves no point
+of its 15 × 4.2 m footprint on land. With the speedboat's footprint the last check fails (55,263
+points on land), so the side samples matter. `boat_skin` covers the parse, meshes, outboards and
+ensign. CPU and GPU captures at `--location outer --time 3/8`, including a low camera, were
+inspected. Not checked: a human drive, canal manoeuvring, the flag cloth at the new staff (too
+small to judge at 320×200), browser builds.
+
 ## GH4: tour format
 
 Read the [voyage schema](PLUGIN_API.md#voyage-schema), `src/boat_plugin*.[ch]` and the
@@ -310,9 +342,9 @@ design before work starts.
 ## Status
 
 GH1 implemented 2026-11-04 on branch `feat/gothenburg-harbour-name` ([result](#gh1-result-2026-11-04)),
-and GH4 on `feat/grodan-tour-format` ([result](#gh4-result-2026-11-04)). The user asked to continue
-with the steps that need no new data from them: GH3 (the canal boat) next, then GH5 and GH6. GH2
-waits for bridge height data.
+GH4 on `feat/grodan-tour-format` ([result](#gh4-result-2026-11-04)) and GH3 on `feat/grodan-boat`
+([result](#gh3-result-2026-11-04)). The user asked to continue with the steps that need no new data
+from them: GH5 (the Grodan tour package) next, then GH6. GH2 waits for bridge height data.
 
 ## Verification and handoff
 
