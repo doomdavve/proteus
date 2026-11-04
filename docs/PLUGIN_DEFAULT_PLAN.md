@@ -570,6 +570,31 @@ judge whether live edits read as continuous and held edits are understandable. P
 with a berth edit near the boat and check that the boat is never nudged. Decide whether the
 native-only console is acceptable until PD4.
 
+### PC console comfort, 2026-11-04
+
+**Status:** implemented on `feat/comfy-console`; final integration verification and user review
+of the small font, spacing and translucent backdrop are pending.
+
+**Completed:** a first-open ASCII boat, shared build version and quick help; descriptive `/help`
+and `/help COMMAND`; the smallest bundled m3x6 face with natural advances, word wrapping and a
+character-sized block cursor; horizontal input scrolling, cursor editing and key repeat;
+draft-preserving history; Tab command completion with common-prefix expansion and forward/backward
+cycling. Only the logo uses fixed-width cells. The panel renders above HUD text, with 195/255
+opacity and an optional nine-tap GPU blur of the existing frame texture. CPU and shader failure
+retain the translucent panel.
+
+Ctrl/Cmd+C copies the latest submitted command and its output; adding Shift copies the retained
+transcript. Display wrapping does not enter the clipboard. Ctrl/Cmd+V inserts one ASCII line at the
+cursor without submitting it; multiline, unsupported-character and oversize pastes are rejected
+atomically. Browser writes begin in the key gesture and paste uses the native paste event, with
+refusal visible in the footer. Scrollback is bounded and output arriving while reading older lines
+preserves that viewport.
+
+**Next:** finish integration checks, then review the final font/backdrop and qualify platform CI.
+**Known limits:** no mouse text selection, Lua/argument completion, multiline input or Unicode
+input. The existing 200-line scrollback, 16-command history and solo-only availability remain.
+
+
 ## PD2 — package-defined rooms
 
 **Outcome.** A room's race course, race rules, match rules and combat rules come from a package

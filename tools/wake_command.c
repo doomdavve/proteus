@@ -205,13 +205,68 @@ void wake_command_status(
         held ? boat_plugin_change_name(plugin->host.change) : "");
 }
 
+static const struct {
+    const char *name, *usage, *description;
+} help[] = {
+    { "help", "/help [COMMAND]", "List commands or explain one." },
+    { "status", "/status", "Show package, revision and boat state." },
+    { "capabilities", "/capabilities", "List this package's granted features." },
+    { "recipes", "/recipes", "List available berth boat recipes." },
+    { "anchors", "/anchors", "List voyage shelters and coordinates." },
+    { "undo", "/undo", "Discard pending work, or undo a revision." },
+    { "discard", "/discard", "Cancel the staging or held edit." },
+    { "apply", "/apply", "Apply a held edit; may restart play." },
+    { "restart", "/restart", "Restart play with the active revision." },
+    { "clear", "/clear", "Clear output; keep input and history." },
+    { "save", "/save DIR", "Save a package; browser: download it." },
+    { "capability", "/capability scene.define", "Grant scene editing to this voyage." },
+};
+
+unsigned wake_command_completions(const char *prefix, const char **matches, unsigned capacity)
+{
+    unsigned count = 0;
+    size_t length = strlen(prefix);
+    for (unsigned i = 0; i < sizeof(help) / sizeof(help[0]) && count < capacity; ++i)
+        if (!strncmp(prefix, help[i].name, length))
+            matches[count++] = help[i].name;
+    return count;
+}
+
+static void print_help(WakeCommand *command, const char *topic)
+{
+    topic = trim(topic);
+    if (*topic == '/')
+        ++topic;
+    if (!*topic) {
+        emit(command, "Enter runs a line. Esc closes.");
+        emit(command, "The world runs with a neutral helm.");
+        emit(command, "Lua edits def: the package's table.");
+        emit(command, "= def.scene   Read without changing it.");
+        emit(command, "Edits stage safely; /undo reverses them.");
+        emit(command, "Up/Down history; Left/Right Home/End edit.");
+        emit(command, "Tab completes commands; Shift+Tab goes back.");
+        emit(command, "PgUp/PgDn or wheel scrolls output.");
+        emit(command, "Ctrl/Cmd+C copies the latest command + output.");
+        emit(command, "Ctrl/Cmd+Shift+C copies all retained output.");
+        emit(command, "Ctrl/Cmd+V pastes one line; Enter runs it.");
+        emit(command, "Commands (/help status explains one):");
+    }
+    bool found = false;
+    for (unsigned i = 0; i < sizeof(help) / sizeof(help[0]); ++i)
+        if (!*topic || !strcmp(topic, help[i].name)) {
+            emit(command, "%s", help[i].usage);
+            emit(command, "  %s", help[i].description);
+            found = true;
+        }
+    if (!found)
+        emit(command, "No help for '%s'. Try /help.", topic);
+}
+
 static bool run_command(
     WakeCommand *command, WakePlugin *plugin, BoatSession *session, const char *line, double now)
 {
-    if (!strcmp(line, "/help")) {
-        emit(command, "EDIT: def.path = value    = EXPR: READ-ONLY QUERY");
-        emit(command, "/status /capabilities /recipes /anchors /undo /discard");
-        emit(command, "/apply /restart /clear /save DIR /capability scene.define");
+    if (!strncmp(line, "/help", 5) && (!line[5] || line[5] == ' ')) {
+        print_help(command, line + 5);
         return false;
     }
     if (!strcmp(line, "/clear")) {

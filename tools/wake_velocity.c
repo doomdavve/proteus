@@ -22,6 +22,7 @@
 #include "boat_throttle.h"
 #include "boat_time_control.h"
 #include "boat_ui.h"
+#include "boat_version.h"
 #include "boat_voyage_view.h"
 #include "cli_usage.h"
 #include "wake_command.h"
@@ -1321,7 +1322,7 @@ static int study(int argc, char **argv)
         bool console_open_key
             = IsKeyPressed(KEY_GRAVE) || IsKeyPressed(KEY_F2) || IsKeyPressed(161);
         if (console_available && !console.open && console_open_key && IsWindowFocused()) {
-            console.open = true;
+            wake_console_open(&console, PROTEUS_VERSION);
             console_was_open = true; // Consume the opening key's own character this frame.
             console_just_opened = true;
             plugin_restart |= wake_command_frame(&command, &plugin, &session, plugin_time());
@@ -1329,47 +1330,21 @@ static int study(int argc, char **argv)
 #if defined(__EMSCRIPTEN__)
         boat_web_console_state(console.open, console_available, IsWindowFocused());
 #endif
+        if (console.open && !console_just_opened
+            && wake_console_update(&console, width, height, console_line, sizeof(console_line))) {
+            wake_console_begin_command(&console, console_line);
+            if (course)
+                session.runs.practice = true;
+            plugin_restart
+                |= wake_command_submit(&command, &plugin, &session, console_line, plugin_time());
+        }
         while ((character = GetCharPressed()) != 0) {
-            if (console.open) {
-                if (!console_just_opened
-                    && wake_console_input(
-                        &console, 0, character, console_line, sizeof(console_line))) {
-                    if (course)
-                        session.runs.practice = true;
-                    plugin_restart |= wake_command_submit(
-                        &command, &plugin, &session, console_line, plugin_time());
-                }
+            if (console.open || console_was_open)
                 continue;
-            }
             help_pressed |= character == '?';
             time_direction
                 += (character == ']' || character == '.') - (character == '[' || character == ',');
             time_normal |= character == '\\' || character == '0';
-        }
-        if (console.open) {
-            int console_key = 0;
-            if (IsKeyPressed(KEY_ESCAPE))
-                console_key = KEY_ESCAPE;
-            else if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))
-                console_key = KEY_ENTER;
-            else if (IsKeyPressed(KEY_BACKSPACE))
-                console_key = KEY_BACKSPACE;
-            else if (IsKeyPressed(KEY_UP))
-                console_key = KEY_UP;
-            else if (IsKeyPressed(KEY_DOWN))
-                console_key = KEY_DOWN;
-            else if (IsKeyPressed(KEY_PAGE_UP))
-                console_key = KEY_PAGE_UP;
-            else if (IsKeyPressed(KEY_PAGE_DOWN))
-                console_key = KEY_PAGE_DOWN;
-            if (console_key
-                && wake_console_input(
-                    &console, console_key, 0, console_line, sizeof(console_line))) {
-                if (course)
-                    session.runs.practice = true;
-                plugin_restart |= wake_command_submit(
-                    &command, &plugin, &session, console_line, plugin_time());
-            }
         }
         if (!console.open) {
             time_direction += IsKeyPressed(KEY_RIGHT_BRACKET) - IsKeyPressed(KEY_LEFT_BRACKET);
@@ -1946,7 +1921,6 @@ static int study(int argc, char **argv)
                 session.runs.practice ? " / PRACTICE" : "");
             boat_ui_text(time_label, 4, height - 64, 10, (Color) { 233, 180, 104, 255 });
         }
-        wake_console_draw(&console, width, height);
         EndTextureMode();
         BeginDrawing();
         ClearBackground((Color) { 14, 23, 32, 255 });
@@ -2016,6 +1990,13 @@ static int study(int argc, char **argv)
 #endif
             draw_help(course, !networked && session.voyage.route, boat_minimap_ready(&minimap),
                 deathmatch, race, networked, plugin_active && plugin.authoring);
+        }
+        if (console.open) {
+            // Console stays above the HUD, in the same integer-scaled pixel grid as the frame.
+            Camera2D console_camera = { .offset = { destination.x, destination.y }, .zoom = scale };
+            BeginMode2D(console_camera);
+            wake_console_draw(&console, width, height, gpu_enabled ? &frame_target.texture : NULL);
+            EndMode2D();
         }
         frame_pacer_wait(&pacer);
         EndDrawing();
@@ -2222,6 +2203,7 @@ cleanup:
     if (performance_timer.supported)
         boat_gpu_timer_destroy(&performance_timer);
     if (window_ready) {
+        wake_console_unload();
         boat_ui_unload();
 #if defined(__EMSCRIPTEN__)
         boat_web_mouse_state(0, 0);

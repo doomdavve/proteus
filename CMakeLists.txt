@@ -659,6 +659,10 @@ if(PROTEUS_NODE_EXECUTABLE)
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mobile_controls.cjs)
   set_tests_properties(web_mobile_controls PROPERTIES LABELS "cpu"
     PASS_REGULAR_EXPRESSION "web_mobile_controls=ok")
+  add_test(NAME web_console_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_console_controls.cjs)
+  set_tests_properties(web_console_controls PROPERTIES LABELS "cpu;quick"
+    PASS_REGULAR_EXPRESSION "web_console_controls=ok")
   add_test(NAME web_mouse_controls COMMAND ${PROTEUS_NODE_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_web_mouse_controls.cjs)
   set_tests_properties(web_mouse_controls PROPERTIES LABELS "cpu"

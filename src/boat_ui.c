@@ -1,6 +1,7 @@
 #include "boat_ui.h"
 #include "boat_assets.h"
 #include <math.h>
+#include <string.h>
 
 static Font ui, small;
 
@@ -73,13 +74,21 @@ void boat_ui_text(const char *text, int x, int y, int size, Color color)
     DrawTextEx(ui, text, (Vector2) { (float)x, (float)(y - top * scale) }, 16 * scale, 0, color);
 }
 
+int boat_ui_compact_width(const char *text)
+{
+    // Headless callers can lay out console input without loading a font or opening a window.
+    if (!small.glyphs)
+        return (int)strlen(text) * 4;
+    return (int)roundf(MeasureTextEx(small, text, 16, 0).x);
+}
+
 // Instruments use the title's compact face. Standalone primitive review tools can
 // retain their built-in lettering without loading any file-backed UI resources.
 bool boat_ui_compact(const char *text, int center, int y, Color color)
 {
     if (!small.glyphs)
         return false;
-    int width = (int)roundf(MeasureTextEx(small, text, 16, 0).x);
+    int width = boat_ui_compact_width(text);
     int top = small.glyphs[GetGlyphIndex(small, 'A')].offsetY;
     DrawTextEx(
         small, text, (Vector2) { (float)(center - width / 2), (float)(y - top) }, 16, 0, color);

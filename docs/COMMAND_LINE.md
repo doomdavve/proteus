@@ -94,6 +94,10 @@ In native solo free boating and voyages, including release builds, press `` ` ``
 world-1 key (`§` on some macOS ISO keyboards). Desktop browsers with a physical keyboard also
 offer it; touch-only phones do not. A plain line edits the package's `def` table; `=`
 starts a read-only query; `/` starts a command. The simulation keeps running with a neutral helm.
+The first opening shows the build version and quick help. `/help` explains commands and
+`/help status` explains one. Ctrl/Cmd+C copies the latest command and output; add Shift for all
+scrollback. Ctrl/Cmd+V pastes a single line without executing it. See [console controls](PLAYING.md#controls)
+for editing, Tab command completion, history and scrolling.
 
 ```text
 def.scene.marina.berths[1].x = 15
