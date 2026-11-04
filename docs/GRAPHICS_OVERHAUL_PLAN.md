@@ -1640,7 +1640,10 @@ default-resolution change without a later explicit user decision.
   exceeds a 120 Hz frame (8.33 ms); it stays inside the plan's 60 Hz budgets. GPU spikes follow
   the view (main and reflection triangles 470k/450k against about 375k typical; the outer frame
   draws 1.15–1.33 M triangles, about 410k of them into the shadow map each frame), not a period.
-  Open: whether 120 Hz at high resolution on outer is a target; no outer budget exists yet.
+  Decision (user, 2026-11-04): 60 Hz is acceptable for high resolution now, with follow-up
+  work after P3 to bring outer down; the method decides how far. Candidates, unmeasured: the
+  outer shadow pass, distance detail for outer terrain and buildings, and the reflection's
+  triangle load. Add an outer scenario to the benchmark first.
 - Next: Batch C.
 
 #### Batch C request
