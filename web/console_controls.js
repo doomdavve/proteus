@@ -21,6 +21,14 @@ function installBoatConsoleControls(module, canvas, document, navigator) {
   });
   canvas.addEventListener('keydown', event => {
     if (!active()) return;
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      if (!event.repeat) {
+        const tabs = module.boatConsoleTabs ||= [];
+        if (tabs.length < 16) tabs.push(event.shiftKey ? -1 : 1);
+      }
+      return;
+    }
     const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey;
     if (shortcut && event.key.toLowerCase() === 'c') {
       event.preventDefault();

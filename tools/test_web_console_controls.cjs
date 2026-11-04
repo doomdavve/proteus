@@ -37,6 +37,11 @@ const writes = [];
   assert.equal(f.module.boatConsolePaste, '/status\n/restart', 'C rejects multiline paste atomically');
   for (const key of ['ArrowLeft', 'Home', 'End', 'Backspace', 'PageDown', 'F2', 'Tab'])
     assert.ok(f.emit('keydown', {key}).prevented);
+  assert.deepEqual(Array.from(f.module.boatConsoleTabs), [1]);
+  f.emit('keydown', {key: 'Tab', shiftKey: true});
+  f.emit('keydown', {key: 'Tab', repeat: true});
+  assert.deepEqual(Array.from(f.module.boatConsoleTabs), [1, -1],
+    'rapid Tab presses retain order and each event modifier; repeats do not flood the queue');
   for (const key of [' ', 'a', '/', '=']) assert.ok(!f.emit('keydown', {key}).prevented);
   f.document.activeElement = null;
   assert.ok(!f.emit('paste', {clipboardData: {getData() { throw Error('unfocused'); }}}).prevented);

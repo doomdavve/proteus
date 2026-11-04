@@ -25,6 +25,14 @@ EM_JS(int, browser_console_paste, (char *text, int capacity), {
     stringToUTF8(paste, text, capacity);
     return 1;
 })
+EM_JS(void, browser_console_reset_input, (void), {
+    Module.boatConsoleTabs = [];
+    delete Module.boatConsolePaste;
+})
+EM_JS(int, browser_console_tab, (void), {
+    return Module.boatConsoleTabs && Module.boatConsoleTabs.length ? Module.boatConsoleTabs.shift()
+                                                                   : 0;
+})
 EM_JS(void, browser_console_notice, (char *text, int capacity), {
     if (!Module.boatConsoleClipboardNotice)
         return;
@@ -433,8 +441,6 @@ WakeConsoleView wake_console_view(const WakeConsole *console, int width, int hei
     return view;
 }
 
-static bool pressed(int key) { return IsKeyPressed(key) || IsKeyPressedRepeat(key); }
-
 bool wake_console_update(WakeConsole *console, int width, int height, char *out, size_t capacity)
 {
     WakeConsoleView view = wake_console_view(console, width, height);
@@ -450,6 +456,9 @@ bool wake_console_update(WakeConsole *console, int width, int height, char *out,
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_F2)
         || (!shift && (IsKeyPressed(KEY_GRAVE) || IsKeyPressed(161)))) {
         console->open = false;
+#ifdef __EMSCRIPTEN__
+        browser_console_reset_input();
+#endif
         while (GetCharPressed()) { }
         return false;
     }
@@ -479,15 +488,31 @@ bool wake_console_update(WakeConsole *console, int width, int height, char *out,
     while ((character = GetCharPressed()))
         if (!shortcut)
             wake_console_input(console, 0, character, out, capacity);
-    if (IsKeyPressed(KEY_TAB))
-        wake_console_complete(console, shift);
+#ifdef __EMSCRIPTEN__
+    int tab;
+    while ((tab = browser_console_tab()))
+        wake_console_complete(console, tab < 0);
+#endif
     const int keys[] = { KEY_ENTER, KEY_KP_ENTER, KEY_BACKSPACE, KEY_DELETE, KEY_LEFT, KEY_RIGHT,
         KEY_HOME, KEY_END, KEY_UP, KEY_DOWN, KEY_PAGE_UP, KEY_PAGE_DOWN };
-    for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
-        if ((keys[i] == KEY_ENTER || keys[i] == KEY_KP_ENTER) ? IsKeyPressed(keys[i])
-                                                              : pressed(keys[i]))
-            if (wake_console_input(console, keys[i], 0, out, capacity))
-                return true;
+    // Queued press events preserve quick release/re-presses between frames. Repeats are a
+    // separate raylib signal, so a held editing key repeats without submitting Enter again.
+    int queued_key;
+    while ((queued_key = GetKeyPressed())) {
+#ifndef __EMSCRIPTEN__
+        if (queued_key == KEY_TAB)
+            wake_console_complete(console, shift);
+#endif
+        for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
+            if (queued_key == keys[i]) {
+                if (wake_console_input(console, queued_key, 0, out, capacity))
+                    return true;
+                break;
+            }
+    }
+    for (unsigned i = 2; i < sizeof(keys) / sizeof(keys[0]); ++i)
+        if (IsKeyPressedRepeat(keys[i]))
+            wake_console_input(console, keys[i], 0, out, capacity);
     float wheel = GetMouseWheelMove();
     if (wheel != 0)
         wake_console_input(console, wheel > 0 ? KEY_PAGE_UP : KEY_PAGE_DOWN, 0, out, capacity);

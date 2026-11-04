@@ -10,7 +10,7 @@ build_dir=${WAKE_WEB_BUILD_DIR:-"$repo_root/build/winterfell-web"}
 mkdir -p "$source_dir"
 git archive "$release_commit" | tar -x -C "$source_dir"
 for path in tools/boat_title.c web/index.html web/runtime.js web/server_directory.js \
-    web/servers.json cmake/Web.cmake tools/package_web.py; do
+    web/console_controls.js web/servers.json cmake/Web.cmake tools/package_web.py; do
     cp "$repo_root/$path" "$source_dir/$path"
 done
 # v0.0.17 predates the outer location; keep this UI backport on its two-location core.
