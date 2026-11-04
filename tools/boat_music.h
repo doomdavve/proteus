@@ -4,7 +4,13 @@
 #include <stdbool.h>
 #include <string.h>
 
-enum { BOAT_MUSIC_LITTLE_BOAT, BOAT_MUSIC_ACID_WAKE, BOAT_MUSIC_OFF, BOAT_MUSIC_COUNT };
+enum {
+    BOAT_MUSIC_LITTLE_BOAT,
+    BOAT_MUSIC_ACID_WAKE,
+    BOAT_MUSIC_COZY,
+    BOAT_MUSIC_OFF,
+    BOAT_MUSIC_COUNT
+};
 
 typedef struct {
     const char *id, *label, *asset;
@@ -16,6 +22,7 @@ static inline const BoatMusic *boat_music(unsigned choice)
     static const BoatMusic tracks[BOAT_MUSIC_COUNT] = {
         { "a-little-boat", "A LITTLE BOAT", "music/a-little-boat.xm", .35f },
         { "acid-wake", "ACID WAKE", "music/acid-wake.xm", .35f },
+        { "a-little-boat-cozy", "LITTLE BOAT: COZY", "music/a-little-boat-cozy.xm", .35f },
         { "off", "OFF", NULL, 0 },
     };
     return &tracks[choice < BOAT_MUSIC_COUNT ? choice : BOAT_MUSIC_LITTLE_BOAT];

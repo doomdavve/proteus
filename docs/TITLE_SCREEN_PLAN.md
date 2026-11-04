@@ -435,7 +435,7 @@ the menu table above remains a later proposal.
   PLAYER, MULTIPLAYER, SETTINGS, EXIT. SETTINGS opens NAME / BOAT / STEERING / SOUNDTRACK / BACK
   (2026-10-24; NAME and BOAT were main rows before). STEERING picks KEYBOARD or MOUSE for the
   start of each session, passed as `--mouse-steering`. SOUNDTRACK cycles A LITTLE BOAT /
-  ACID WAKE / OFF with Left/Right, Enter or a click, passed as `--soundtrack` to single
+  ACID WAKE / LITTLE BOAT: COZY / OFF (Cozy added 2026-11-01) with Left/Right, Enter or a click, passed as `--soundtrack` to single
   player and joined rooms. MULTIPLAYER opens LAN / ADDRESS / CONNECT / BACK.
   LAN (added 2026-10-24) lists rooms found by
   [LAN discovery](MULTIPLAYER_PROTOCOL.md#lan-discovery). The search runs while the panel is
@@ -445,7 +445,7 @@ the menu table above remains a later proposal.
   Enter on a text row starts typing (printable ASCII; Enter keeps, Esc cancels, empty
   restores). Mouse hover/click works. Settings persist as `title.txt` in the
   personal-best data directory (`name=`, `address=`, `skin=`, `mouse_steering=on|off`,
-  `soundtrack=a-little-boat|acid-wake|off`), saved
+  `soundtrack=a-little-boat|a-little-boat-cozy|acid-wake|off`), saved
   when leaving SETTINGS, choosing a session or exiting. The default address is
   `127.0.0.1:24680` and the default name `player`.
 - `tools/wake_velocity.c`: the former `main` is `study(argc, argv)`; it reuses an open window and

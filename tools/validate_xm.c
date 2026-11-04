@@ -47,9 +47,10 @@ int main(int argc, char **argv)
 {
     bool background = argc == 3 && strcmp(argv[2], "--background") == 0;
     bool acid = argc == 3 && strcmp(argv[2], "--acid") == 0;
-    bool looping = background || acid;
+    bool cozy = argc == 3 && strcmp(argv[2], "--cozy") == 0;
+    bool looping = background || acid || cozy;
     if (argc != 2 && !looping) {
-        fprintf(stderr, "usage: %s module.xm [--background|--acid]\n", argv[0]);
+        fprintf(stderr, "usage: %s module.xm [--background|--acid|--cozy]\n", argv[0]);
         return 2;
     }
     if (looping && !check_loaded_start(argv[1]))
@@ -78,7 +79,7 @@ int main(int argc, char **argv)
     uint64_t generated_frames = 0;
     jar_xm_get_position(xm, &pattern_index, NULL, NULL, &generated_frames);
     uint64_t expected_frames = (uint64_t)((double)seek_time * music.stream.sampleRate);
-    if (pattern_index != (background ? 4 : 6) || generated_frames != expected_frames) {
+    if (pattern_index != (cozy ? 3 : background ? 4 : 6) || generated_frames != expected_frames) {
         fprintf(stderr,
             "XM seek mismatch: pattern %u, frames %llu (expected timed pattern, frames %llu)\n",
             pattern_index, (unsigned long long)generated_frames,
@@ -98,7 +99,7 @@ int main(int argc, char **argv)
     float frames[48000 * 2];
     double energy = 0, loop_energy = 0;
     float peak = 0;
-    for (int second = 0; second < (acid ? 235 : background ? 185 : 1); ++second) {
+    for (int second = 0; second < (cozy ? 205 : acid ? 235 : background ? 185 : 1); ++second) {
         jar_xm_generate_samples(xm, frames, 48000);
         for (size_t i = 0; i < sizeof(frames) / sizeof(frames[0]); ++i) {
             if (!isfinite(frames[i]) || fabsf(frames[i]) > 1) {
@@ -107,7 +108,7 @@ int main(int argc, char **argv)
                 return 1;
             }
             energy += (double)frames[i] * frames[i];
-            if (looping && second >= (acid ? 117 : 92))
+            if (looping && second >= (cozy ? 102 : acid ? 117 : 92))
                 loop_energy += (double)frames[i] * frames[i];
             peak = fmaxf(peak, fabsf(frames[i]));
         }
