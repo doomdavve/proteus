@@ -138,8 +138,8 @@ takes over the bridge-outline part of A3.5d.
      open data (CC0), 1–2 points/m², and its classification level 3 marks bridge points
      (class 17). Bridge points minus nearby water points give each deck's top above the water.
      Check first that the tiles over central Gothenburg have level 3, and that download works
-     with a free Geotorget account. Göteborgs Stad's own 2017 point cloud (10 points/m² in its
-     2022 scan) would be denser but is not confirmed open.
+     with a free Geotorget account. Göteborgs Stad's own scans would be denser (the 2022 survey
+     behind Höjdmodell had 10 points/m²), but only the derived ground model is confirmed open.
   2. **Clearance from the deck top.** Aerial scans do not see the underside. Subtract a deck
      depth for each structure (beam or arch crown), and use the arch's span and rise for its
      curve.
