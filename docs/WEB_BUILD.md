@@ -116,6 +116,16 @@ the canvas touch controls on that device. The browser/iOS version, orientation c
 individual gestures were not specified. The HTTP preview does not verify HTTPS-only tilt
 permission, Home Screen behavior or other devices.
 
+Rebase verification, 2026-11-04: rebased onto `origin/main` at `1c30168`, retaining the
+canvas controls inside the logical HUD before its high-resolution overlay blend ends.
+Native Debug and Emscripten MinSizeRel builds passed; the full CTest preset passed all 365
+enabled tests (`PROTEUS_GPU_TESTS=OFF`, 13 retired checks disabled). Chrome/SwiftShader Android
+emulation passed the touch/tilt/menu/portrait/fullscreen suite again. A focused high-resolution
+browser probe passed simultaneous steering/throttle and portrait resizing at 4×/2× canvas
+scales; its landscape/portrait HUD captures were inspected. A windowed native
+GPU high-resolution river demo (`--resolution high --demo --frames 120`) exited 0. The earlier
+iPhone user acceptance refers to the pre-rebase build; no new physical-device review is claimed.
+
 ## Minimal landing page, 2026-11-01
 
 Completed: the public launcher contains the river screenshot and one full-width PLAY button.
