@@ -1,0 +1,66 @@
+-- GH5: Grodan, a canal sightseeing tour from Kungsportsplatsen in the style of Gothenburg's
+-- Paddan boats: Vallgraven, Stora Hamnkanalen, a short stretch of the river from Stora Bommen,
+-- then Rosenlundskanalen and Vallgraven home. Simulation metres: x = -east, z = north; headings are
+-- radians, forward (sin, -cos). Stops sit at the sights and at the canal bends, so the straight
+-- line from each stop to the next stays clear of the quays (docs/GOTHENBURG_HARBOUR_PLAN.md).
+-- Names and captions are ASCII until the fonts gain the Swedish letters (GH4b).
+return {
+  tour = {
+    stops = {
+      { id = "pier", name = "KUNGSPORTSPLATSEN", caption = "ALL ABOARD THE GRODAN",
+        x = -3700.5, z = 714.5, heading = -1.79, radius = 23 },
+      { id = "vallgraven", name = "VALLGRAVEN", caption = "THE MOAT OF THE OLD FORTRESS TOWN",
+        x = -3804.4, z = 731.0, heading = -2.79, radius = 15 },
+      { id = "garden", name = "TRADGARDSFORENINGEN", caption = "PALMHUSET IN THE PARK, 1878",
+        x = -3818.5, z = 911.3, heading = -2.68, radius = 14 },
+      { id = "bend", name = "VALLGRAVEN", caption = "KEEP RIGHT FOR THE TURN",
+        x = -3930.0, z = 1026.5, heading = -2.98, radius = 12 },
+      { id = "slussen", name = "SLUSSBRON", caption = "HARD TO PORT INTO STORA HAMNKANALEN",
+        x = -3913.0, z = 1054.1, heading = 2.57, radius = 20 },
+      { id = "station", name = "DROTTNINGTORGET", caption = "CENTRALSTATIONEN, 1858",
+        x = -3892.4, z = 1115.8, heading = 1.63, radius = 12 },
+      { id = "kvarnbron", name = "KVARNBRON", caption = "UNDER THE TRAM BRIDGE",
+        x = -3742.6, z = 1112.0, heading = 1.39, radius = 12 },
+      { id = "brunnsparken", name = "BRUNNSPARKEN", caption = "FREDSBRON AND THE TRAMS",
+        x = -3587.1, z = 1067.1, heading = 1.30, radius = 12 },
+      { id = "torget", name = "GUSTAF ADOLFS TORG", caption = "THE KING POINTS WHERE THE CITY SHOULD BE",
+        x = -3493.1, z = 1037.3, heading = 0.61, radius = 12 },
+      { id = "christinae", name = "TYSKA BRON", caption = "CHRISTINAE KYRKA, THE GERMAN CHURCH",
+        x = -3333.3, z = 977.1, heading = 1.29, radius = 24 },
+      { id = "kampebron", name = "KAMPEBRON", caption = "NORDSTADEN TO STARBOARD",
+        x = -3183.2, z = 948.1, heading = 1.85, radius = 21 },
+      { id = "bommen", name = "STORA BOMMEN", caption = "OSTHYVELN, THE CHEESE SLICER: HEADS DOWN",
+        x = -2976.1, z = 1006.0, heading = 1.85, radius = 21 },
+      { id = "stenpiren", name = "STENPIREN", caption = "OUT ON THE RIVER: TURN DOWNSTREAM",
+        x = -2716.5, z = 1050.0, heading = 1.02, radius = 60 },
+      { id = "river", name = "GOTA ALV", caption = "LAPPSTIFTET AND THE OPERA UPSTREAM",
+        x = -2639.2, z = 948.5, heading = 0.53, radius = 60 },
+      { id = "rosenlund", name = "ROSENLUNDSKANALEN", caption = "BACK INTO THE CANALS",
+        x = -2542.8, z = 750.7, heading = 0.01, radius = 40 },
+      { id = "pustervik", name = "PUSTERVIKSBRON", caption = "SKANSEN KRONAN ABOVE HAGA",
+        x = -2743.1, z = 497.2, heading = -1.03, radius = 19 },
+      { id = "haga", name = "ROSENLUND", caption = "HAGA TO STARBOARD",
+        x = -2843.6, z = 382.5, heading = -1.16, radius = 19 },
+      { id = "feskekorka", name = "FESKEKORKA", caption = "THE FISH CHURCH, 1874",
+        x = -2930.1, z = 358.1, heading = -1.30, radius = 25 },
+      { id = "rosenlundsplatsen", name = "ROSENLUNDSPLATSEN", caption = "NARROWS AHEAD: KEEP TO THE MIDDLE",
+        x = -3056.5, z = 319.6, heading = -1.52, radius = 12 },
+      { id = "narrows", name = "THE NARROWS", caption = "STEADY AS SHE GOES",
+        x = -3111.7, z = 332.8, heading = -1.98, radius = 12 },
+      { id = "viktoriabron", name = "VIKTORIABRON", caption = "KUNGSPARKEN ON THE OLD RAMPARTS",
+        x = -3293.4, z = 395.2, heading = -1.86, radius = 18 },
+      { id = "allen", name = "NYA ALLEN", caption = "THE AVENUE ALONG THE MOAT",
+        x = -3350.1, z = 414.6, heading = -2.16, radius = 17 },
+      { id = "vasabron", name = "VASABRON", caption = "UNDER THE TRAMS AT VASAPLATSEN",
+        x = -3426.7, z = 551.2, heading = -2.09, radius = 16 },
+      { id = "bazarbron", name = "BAZARBRON", caption = "NEARLY HOME",
+        x = -3467.9, z = 553.3, heading = -1.43, radius = 15 },
+      { id = "teatern", name = "STORA TEATERN", caption = "THE GRAND THEATRE, 1859",
+        x = -3598.4, z = 549.4, heading = -1.89, radius = 16 },
+      { id = "home", name = "KUNGSPORTSPLATSEN", caption = "THANK YOU FOR RIDING THE GRODAN",
+        x = -3626.2, z = 639.5, heading = -2.82, radius = 0 },
+    },
+    -- Back alongside the pier, slowly.
+    arrival = { x = -3626.2, z = 639.5, radius = 15, max_speed = 2 }
+  }
+}

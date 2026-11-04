@@ -161,11 +161,11 @@ target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_s
 set(BOAT_PLUGIN_PACKAGES
   plugins/basin-free plugins/outer-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
-  plugins/harbor-room plugins/harbor-race)
+  plugins/harbor-room plugins/harbor-race plugins/grodan)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
     plugins/basin-free plugins/time-trial plugins/langedrag
-    plugins/harbor-life)
+    plugins/harbor-life plugins/grodan)
 else()
   set(BOAT_PLUGIN_CATALOG_PACKAGES ${BOAT_PLUGIN_PACKAGES})
 endif()
@@ -206,7 +206,8 @@ target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
   src/boat_ui.c src/boat_ui.h
-  src/boat_hud.c src/boat_hud.h src/boat_cabin.c src/boat_cabin.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
+  src/boat_hud.c src/boat_hud.h src/boat_cabin.c src/boat_cabin.h src/boat_grodan.c
+  src/boat_grodan.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
   src/boat_voyage_view.c src/boat_voyage_view.h src/boat_minimap.c src/boat_minimap.h
   src/boat_flag.c src/boat_presentation.c src/boat_view.c
   src/boat_water_mesh.c src/renderer3d.c src/waterfront.c src/waterfront_corner.c
@@ -978,7 +979,9 @@ add_test(NAME boat_server_scripted_until_empty_rejected
 # Every PLACE the title offers opens its package through the title's own arguments.
 foreach(place_package
     "basin=proteus.basin-free" "outer-standard=proteus.langedrag"
-    "outer-harbor-life=proteus.harbor-life" "basin-trial=proteus.time-trial")
+    "outer-harbor-life=proteus.harbor-life" "outer-grodan=proteus.grodan"
+    "outer-canal-tour=proteus.grodan"
+    "basin-trial=proteus.time-trial")
   string(REPLACE "=" ";" place_package "${place_package}")
   list(GET place_package 0 place)
   list(GET place_package 1 package)
@@ -1442,6 +1445,7 @@ set(PROTEUS_SLOW_TESTS
   boat_outer_screenshot
   wake_velocity_title_start.basin
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
+  wake_velocity_title_start.outer-grodan wake_velocity_title_start.outer-canal-tour
   wake_velocity_title_start.basin-trial)
 
 if(TEST boat_plugin_author)

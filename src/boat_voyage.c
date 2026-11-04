@@ -57,7 +57,7 @@ void boat_voyage_step_events(
         return;
     unsigned destination = route->shelter_count - 1;
     for (unsigned i = 0; i < destination; ++i)
-        if (i != voyage->shelter
+        if (i != voyage->shelter && (!route->ordered || i == voyage->shelter + 1)
             && Vector2Distance(position, route->shelters[i].position)
                 <= route->shelters[i].radius) {
             voyage->shelter = i;
@@ -84,7 +84,8 @@ void boat_voyage_step_events(
         notify(voyage, exposed ? BOAT_VOYAGE_EXPOSED : BOAT_VOYAGE_SHELTERED, voyage->shelter, time,
             events);
     }
-    bool inside = Vector2Distance(position, route->arrival_centre) <= route->arrival_radius;
+    bool inside = Vector2Distance(position, route->arrival_centre) <= route->arrival_radius
+        && (!route->ordered || voyage->arrived || voyage->shelter + 1 >= destination);
     bool slow = Vector2Length(velocity) <= route->arrival_speed;
     voyage->too_fast = inside && !slow && !voyage->arrived;
     if (inside && slow && !voyage->arrived) {
@@ -132,11 +133,28 @@ float boat_voyage_bearing(
         *distance = 0;
         return 0;
     }
-    Vector2 to = Vector2Subtract(voyage->route->arrival_centre, position);
+    Vector2 to = Vector2Subtract(boat_voyage_target(voyage), position);
     *distance = Vector2Length(to);
     Vector2 forward = { sinf(heading), -cosf(heading) };
     Vector2 right = { cosf(heading), sinf(heading) };
     return atan2f(Vector2DotProduct(to, right), Vector2DotProduct(to, forward));
+}
+
+unsigned boat_voyage_next(const BoatVoyage *voyage)
+{
+    const BoatVoyageRoute *route = voyage->route;
+    unsigned destination = route->shelter_count - 1;
+    if (!route->ordered || voyage->arrived || voyage->shelter + 1 >= destination)
+        return destination;
+    return voyage->shelter + 1;
+}
+
+Vector2 boat_voyage_target(const BoatVoyage *voyage)
+{
+    const BoatVoyageRoute *route = voyage->route;
+    unsigned next = boat_voyage_next(voyage);
+    return next == route->shelter_count - 1 ? route->arrival_centre
+                                            : route->shelters[next].position;
 }
 
 const char *boat_voyage_destination(const BoatVoyageRoute *route)

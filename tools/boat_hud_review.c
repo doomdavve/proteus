@@ -89,6 +89,25 @@ int main(int argc, char **argv)
                 voyage.event = BOAT_VOYAGE_RECOVERED;
                 voyage.event_shelter = 2;
                 voyage.event_time = voyage_time - 1;
+            } else if (!strcmp(name, "tour") || !strcmp(name, "tour-caption")) {
+                // GH4: a tour between its second and third stops, and just past the second.
+                static BoatVoyageRoute tour;
+                tour = *route;
+                tour.ordered = true;
+                static const char *const captions[]
+                    = { "THE EAST SHORE", "ALVSBORGSBRON, ONCE SWEDEN'S LONGEST SPAN, 1966",
+                          "THE OUTER FJORD", "JOURNEY'S END" };
+                for (unsigned s = 0; s < tour.shelter_count; ++s)
+                    tour.shelters[s].caption = captions[s];
+                boat_voyage_start(&voyage, &tour, 0);
+                voyage.shelter = 1;
+                boat.position = (Vector2) { 2300, -1600 };
+                boat.heading = 1.08f;
+                if (!strcmp(name, "tour-caption")) {
+                    voyage.event = BOAT_VOYAGE_SHELTER;
+                    voyage.event_shelter = 1;
+                    voyage.event_time = voyage_time - 1;
+                }
             } else if (strcmp(name, "shelter")) {
                 fprintf(stderr, "Unknown voyage case: %s\n", name);
                 return 1;
@@ -97,7 +116,8 @@ int main(int argc, char **argv)
             fprintf(stderr,
                 "Usage: boat_hud_review [--background PNG] [--screenshot PNG] "
                 "[--case neutral|docking|reverse-docking|cruise|reverse|full|reset] "
-                "[--compact|--large] [--voyage shelter|exposed|slow|arrived|recovered|weather] "
+                "[--compact|--large] "
+                "[--voyage shelter|exposed|slow|arrived|recovered|weather|tour|tour-caption] "
                 "[--frames N]\n");
             return 1;
         }

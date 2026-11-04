@@ -3,9 +3,10 @@
 // The outer location's first-slice outing, copied from src/boat_voyage.c before compiled
 // selection was removed.
 const BoatVoyageRoute boat_fixture_voyage_outer = {
-    .shelters = { { "DOCK", { -12, 60 }, 0, 60 }, { "BRIDGE", { 650, -850 }, 1.33f, 150 },
-        { "EAST SHORE", { 3250, -2000 }, .86f, 200 },
-        { "LANGEDRAG", { 3600, -3370 }, 1.57f, 0 } },
+    .shelters
+    = { { "DOCK", { -12, 60 }, 0, 60, NULL }, { "BRIDGE", { 650, -850 }, 1.33f, 150, NULL },
+        { "EAST SHORE", { 3250, -2000 }, .86f, 200, NULL },
+        { "LANGEDRAG", { 3600, -3370 }, 1.57f, 0, NULL } },
     .shelter_count = 4,
     .arrival_centre = { 3595, -3370 },
     .arrival_radius = 75,

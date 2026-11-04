@@ -5,7 +5,8 @@
 
 // Screen-space destination cue centred at the top of a WIDTH-pixel window: a bearing arrow,
 // the distance or arrival time, and the latest voyage notice, the exposure or the shelter that
-// recovery returns to. Draws nothing without a route.
+// recovery returns to. A tour shows its next stop and each passed stop's caption. Draws nothing
+// without a route.
 void boat_voyage_hud(const BoatVoyage *voyage, const Boat *boat, double time, int width);
 
 #endif

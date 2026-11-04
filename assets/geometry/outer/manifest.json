@@ -100,8 +100,8 @@
   "playable_boundary_m": 5165.3,
   "route_length_m": 6016.9,
   "route_min_shore_clearance_m": 27.6,
-  "vertices": 357048,
-  "triangles": 612173,
+  "vertices": 361664,
+  "triangles": 619497,
   "water_triangles": 3731,
   "contents": "water, land surface and quay walls; inside the river crop also the river bake's buildings, roads, gardens, trees and bridge (A3.3); outside it buildings (A3.5a; since A3.5f before the authored range, with windows), container cranes, port masts, channel marks and trees (A3.5a)",
   "dressing": {
@@ -151,6 +151,203 @@
         "lift_span": "runtime waterfront_upstream.c; omitted from scenery"
       },
       "assumptions": "Footprints, the bridge line and the towers' heights are OSM (Karlatornet 246 m, Lilla Bommen 86 m) or Swedish Wikipedia (Hisingsbron: 12 m clearance, 13 m deck, 28 m lifted). Authored by eye: Karlatornet's pale facade with dark glass bands, a 24 degree turn of its upper floors above 70 m, and a brown 15-floor hotel wing on its north-east side; Lilla Bommen's red and white floor bands, dark observation deck and red cap, with no low-rise wing; Hisingsbron's 40 m deck, 90 m lift span on the channel, four 44 m white lift towers, piers every 50 m (carved out of the water) and lamp posts. Colours are authored."
+    },
+    "canal_bridges": {
+      "count": 19,
+      "triangles": 7324,
+      "bridges": [
+        {
+          "name": "Font\u00e4nbron",
+          "osm": "w/124540192",
+          "structure": "arch",
+          "over_water_m": 12.0,
+          "width_m": 41.9,
+          "top_m": 2.52,
+          "clearance_m": 2.02,
+          "triangles": 300
+        },
+        {
+          "name": "Kvarnbron",
+          "osm": "w/141880824",
+          "structure": "beam",
+          "over_water_m": 13.5,
+          "width_m": 43.3,
+          "top_m": 2.78,
+          "clearance_m": 2.23,
+          "triangles": 236
+        },
+        {
+          "name": "Drottningtorgsbron",
+          "osm": "w/160949096",
+          "structure": "beam",
+          "over_water_m": 11.5,
+          "width_m": 12.2,
+          "top_m": 2.85,
+          "clearance_m": 2.3,
+          "triangles": 212
+        },
+        {
+          "name": "Kungsportsbron",
+          "osm": "w/207291269",
+          "structure": "beam",
+          "over_water_m": 23.5,
+          "width_m": 25.0,
+          "top_m": 2.4,
+          "clearance_m": 1.85,
+          "triangles": 356
+        },
+        {
+          "name": "Residensbron",
+          "osm": "w/210492777",
+          "structure": "beam",
+          "over_water_m": 33.0,
+          "width_m": 28.9,
+          "top_m": 2.77,
+          "clearance_m": 2.22,
+          "triangles": 468
+        },
+        {
+          "name": "Stora Bommens Bro",
+          "osm": "w/210492782",
+          "structure": "beam",
+          "over_water_m": 38.0,
+          "width_m": 13.1,
+          "top_m": 2.4,
+          "clearance_m": 1.75,
+          "triangles": 532
+        },
+        {
+          "name": "Pusterviksbron",
+          "osm": "w/222926564",
+          "structure": "beam",
+          "over_water_m": 35.5,
+          "width_m": 29.8,
+          "top_m": 3.16,
+          "clearance_m": 2.61,
+          "triangles": 500
+        },
+        {
+          "name": "Fredsbron",
+          "osm": "w/313303719",
+          "structure": "arch",
+          "over_water_m": 11.5,
+          "width_m": 9.7,
+          "top_m": 2.4,
+          "clearance_m": 1.9,
+          "triangles": 300
+        },
+        {
+          "name": "Tyska Bron",
+          "osm": "w/313303720",
+          "structure": "beam",
+          "over_water_m": 41.5,
+          "width_m": 11.4,
+          "top_m": 2.4,
+          "clearance_m": 1.85,
+          "triangles": 564
+        },
+        {
+          "name": "Vasabron",
+          "osm": "w/376302344",
+          "structure": "beam",
+          "over_water_m": 31.0,
+          "width_m": 19.7,
+          "top_m": 3.0,
+          "clearance_m": 2.45,
+          "triangles": 452
+        },
+        {
+          "name": "K\u00e4mpebron",
+          "osm": "w/376304419",
+          "structure": "beam",
+          "over_water_m": 30.0,
+          "width_m": 39.1,
+          "top_m": 2.4,
+          "clearance_m": 1.85,
+          "triangles": 428
+        },
+        {
+          "name": "Slussbron",
+          "osm": "w/397779695",
+          "structure": "arch",
+          "over_water_m": 30.0,
+          "width_m": 15.3,
+          "top_m": 2.79,
+          "clearance_m": 2.29,
+          "triangles": 612
+        },
+        {
+          "name": "V\u00e4stra Stampbron",
+          "osm": "w/397779697",
+          "structure": "arch",
+          "over_water_m": 14.5,
+          "width_m": 23.3,
+          "top_m": 3.21,
+          "clearance_m": 2.71,
+          "triangles": 348
+        },
+        {
+          "name": "Brunnsparksbron",
+          "osm": "w/1202725437",
+          "structure": "beam",
+          "over_water_m": 11.5,
+          "width_m": 4.1,
+          "top_m": 2.4,
+          "clearance_m": 1.85,
+          "triangles": 212
+        },
+        {
+          "name": "Viktoriabron",
+          "osm": "w/4770181",
+          "structure": "beam",
+          "over_water_m": 27.5,
+          "width_m": 9.0,
+          "top_m": 2.66,
+          "clearance_m": 2.11,
+          "triangles": 388
+        },
+        {
+          "name": "Palacehusets personalbro",
+          "osm": "w/44500668",
+          "structure": "beam",
+          "over_water_m": 11.5,
+          "width_m": 3.0,
+          "top_m": 2.4,
+          "clearance_m": 1.85,
+          "triangles": 212
+        },
+        {
+          "name": "?",
+          "osm": "w/166612428",
+          "structure": "beam",
+          "over_water_m": 19.0,
+          "width_m": 3.0,
+          "top_m": 3.2,
+          "clearance_m": 2.65,
+          "triangles": 300
+        },
+        {
+          "name": "Bazarbron",
+          "osm": "w/246629421",
+          "structure": "beam",
+          "over_water_m": 35.5,
+          "width_m": 3.0,
+          "top_m": 2.4,
+          "clearance_m": 1.85,
+          "triangles": 516
+        },
+        {
+          "name": "?",
+          "osm": "w/246629447",
+          "structure": "beam",
+          "over_water_m": 27.0,
+          "width_m": 3.0,
+          "top_m": 2.42,
+          "clearance_m": 1.87,
+          "triangles": 388
+        }
+      ],
+      "assumptions": "Canal bridges (GH2): outlines and ways are OSM; heights are estimates: deck top at the street level 4 m past the water at both ends (H\u00f6jdmodell, clamped to 2.4-3.6 m), beam underside .55 m below it, arches from a .5 m crown down to 1.3 m at the quays, and Stora Bommens Bro (Swedish Wikipedia: the lowest) by hand at 1.75 m. Colours, railings and default widths are authored."
     }
   },
   "river_overlay": {
@@ -179,6 +376,6 @@
     "rows": 601,
     "use": "waterfront_outer_ground: the river kit (crane, bridge deck, cafe, street furniture, frontages, quay fittings, cars, lamps and harbour) stands on the baked land surface"
   },
-  "scenery_sha256": "0821ac3940a27de8630c06c3194cf48d5774f99b7ddd147464ff99c52a221325",
-  "water_sha256": "633e1beabec9938b3eeb6bb20297c19cadbbd8caab96691b0153726577d71cef"
+  "scenery_sha256": "238de574394a035aa4bae32015c0ac9a8d82e59d008903ccf0c34dffb6e6529a",
+  "water_sha256": "a721eb87ca72f679c9a6bfe9e5628e1e3a146de9f018fbb2daa505b9299a114c"
 }

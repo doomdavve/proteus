@@ -1082,6 +1082,169 @@ static int navigable_water(void)
     return 0;
 }
 
+// GH4: a voyage package may return a tour: ordered stops with captions, a start anywhere and
+// arrival only after every stop. Positions are open river water on the outer map.
+#define TOUR_STOPS                                                                                 \
+    "{ id = 'bridge', name = 'BRIDGE', caption = 'ALVSBORGSBRON, 1966', x = 650, z = -850,"        \
+    "  heading = 1.33, radius = 150 },"                                                            \
+    "{ id = 'shore', name = 'EAST SHORE', caption = 'THE OUTER FJORD', x = 3250, z = -2000,"       \
+    "  heading = 0.86, radius = 200 },"                                                            \
+    "{ id = 'end', name = 'LANGEDRAG', caption = 'JOURNEY\\'S END', x = 3600, z = -3370,"          \
+    "  heading = 1.57, radius = 0 }"
+#define TOUR_ARRIVAL "arrival = { x = 3595, z = -3370, radius = 75, max_speed = 6 }"
+
+static const char TOUR[] = "return { tour = { stops = {" TOUR_STOPS "}, " TOUR_ARRIVAL " } }";
+
+static int tours(void)
+{
+    BoatPluginVoyage tour;
+    BoatPluginDiagnostic d;
+    CHECK(load_source(TOUR, &tour, &d) == BOAT_PLUGIN_OK);
+    const BoatVoyageRoute *route = &tour.route;
+    CHECK(route->ordered && route->shelter_count == 3);
+    CHECK(route->exposure.radius == 0 && route->weather_range == 0);
+    CHECK(!strcmp(route->shelters[0].caption, "ALVSBORGSBRON, 1966"));
+    CHECK(!strcmp(route->shelters[2].caption, "JOURNEY'S END"));
+    BoatPluginVoyage copy;
+    boat_plugin_voyage_copy(&copy, &tour);
+    CHECK(copy.route.shelters[1].caption == copy.shelter_captions[1]);
+    CHECK(copy.route.shelters[1].name == copy.shelter_names[1]);
+    // Captions are display text: a caption edit is a rename, and it changes the digest.
+    char edited[sizeof(TOUR)];
+    snprintf(edited, sizeof(edited), "%s", TOUR);
+    memcpy(strstr(edited, "THE OUTER FJORD"), "THE INNER FJORD", 15);
+    BoatPluginVoyage renamed;
+    CHECK(load_source(edited, &renamed, &d) == BOAT_PLUGIN_OK);
+    CHECK(renamed.digest != tour.digest);
+    CHECK(boat_plugin_classify(&tour, &renamed) == BOAT_PLUGIN_RENAMED);
+    // A destination voyage's reference still decodes without captions.
+    BoatPluginBundle bundle = boat_plugin_bundle(reference());
+    BoatPluginVoyage voyage;
+    CHECK(boat_plugin_load_voyage(&bundle, NULL, &voyage, &d) == BOAT_PLUGIN_OK);
+    CHECK(!voyage.route.ordered && voyage.route.shelters[0].caption == NULL);
+
+    // Staging: open water, and the start need not be the location's spawn.
+    const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
+    BoatWorldResources world;
+    CHECK(boat_world_resources_init(&world, outer));
+    BoatPluginStatus staged = boat_plugin_check_location(&tour, outer, &world.map, &d);
+    show("tour staging", &d);
+    char aground[sizeof(TOUR) + 16];
+    snprintf(aground, sizeof(aground), "%s", TOUR);
+    char *x = strstr(aground, "x = 3250");
+    memcpy(x, "x = 9250", 8);
+    BoatPluginVoyage land;
+    BoatPluginStatus loaded = load_source(aground, &land, &d);
+    BoatPluginStatus land_staged = loaded == BOAT_PLUGIN_OK
+        ? boat_plugin_check_location(&land, outer, &world.map, &d)
+        : loaded;
+    bool land_field = !strcmp(d.field, "tour.stops[2]");
+    boat_world_resources_destroy(&world);
+    CHECK(staged == BOAT_PLUGIN_OK);
+    CHECK(land_staged == BOAT_PLUGIN_SCHEMA && land_field);
+
+    // Ordered progress: a later stop does not count before the earlier one, and arrival needs
+    // every stop before the last.
+    BoatVoyage v;
+    BoatVoyageEvents events;
+    boat_voyage_start(&v, route, 0);
+    CHECK(boat_voyage_next(&v) == 1);
+    CHECK(boat_voyage_target(&v).x == 3250);
+    boat_voyage_step_events(&v, (Vector2) { 3595, -3370 }, (Vector2) { 0 }, 1, &events);
+    CHECK(!v.arrived && v.shelter == 0 && events.count == 0);
+    boat_voyage_step_events(&v, (Vector2) { 3250, -2000 }, (Vector2) { 0 }, 2, &events);
+    CHECK(v.shelter == 1 && events.count == 1 && events.items[0].kind == BOAT_VOYAGE_SHELTER);
+    CHECK(boat_voyage_next(&v) == 2);
+    CHECK(boat_voyage_target(&v).x == 3595);
+    boat_voyage_step_events(&v, (Vector2) { 3595, -3370 }, (Vector2) { 10, 0 }, 3, &events);
+    CHECK(!v.arrived && v.too_fast);
+    boat_voyage_step_events(&v, (Vector2) { 3595, -3370 }, (Vector2) { 1, 0 }, 4, &events);
+    CHECK(
+        v.arrived && v.shelter == 2 && events.items[events.count - 1].kind == BOAT_VOYAGE_ARRIVED);
+    // A recovery returns to the last stop passed.
+    boat_voyage_start(&v, route, 0);
+    boat_voyage_step(&v, (Vector2) { 650, -850 }, (Vector2) { 0 }, 1);
+    Boat boat = { 0 };
+    boat_voyage_recover(&v, &boat, 2);
+    CHECK(v.shelter == 0 && boat.position.x == 650 && boat.heading == 1.33f);
+
+    // The browser worker's wire carries the tour and its captions.
+    static BoatPluginDecoded decoded, back;
+    static unsigned char wire[sizeof(BoatPluginDecoded)];
+    memset(&decoded, 0, sizeof(decoded));
+    decoded.kind = BOAT_PLUGIN_KIND_VOYAGE;
+    memcpy(decoded.manifest, MANIFEST, sizeof(MANIFEST) - 1);
+    decoded.manifest_size = sizeof(MANIFEST) - 1;
+    memcpy(decoded.source, TOUR, sizeof(TOUR) - 1);
+    decoded.source_size = sizeof(TOUR) - 1;
+    CHECK(boat_plugin_lua_voyage(
+              TOUR, sizeof(TOUR) - 1, "@main.lua", &boat_plugin_default_limits, &decoded.voyage, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_parse_manifest(MANIFEST, sizeof(MANIFEST) - 1, NULL, &decoded.parsed, &d)
+        == BOAT_PLUGIN_OK);
+    size_t encoded;
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
+    static BoatPluginRevision revision;
+    CHECK(boat_plugin_decoded_revision(&back, &revision, &d));
+    CHECK(revision.voyage.digest == tour.digest && revision.voyage.route.ordered);
+    CHECK(!strcmp(revision.voyage.route.shelters[1].caption, "THE OUTER FJORD"));
+
+    static const struct {
+        const char *source, *field;
+    } invalid[] = {
+        { "return { voyage = {}, tour = { stops = {" TOUR_STOPS "}, " TOUR_ARRIVAL " } }", "tour" },
+        { "return { tour = { stops = {" TOUR_STOPS "}, " TOUR_ARRIVAL ", weather_range = 0 } }",
+            "tour.weather_range" },
+        { "return { tour = { stops = { { id = 'a', name = 'A', caption = 'A', x = 650, z = -850,"
+          " heading = 0, radius = 9 }, { id = 'b', name = 'B', caption = 'B', x = 3600,"
+          " z = -3370, heading = 0, radius = 0 } }, " TOUR_ARRIVAL " } }",
+            "tour.stops" },
+    };
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i)
+        if (expect(
+                invalid[i].field, NULL, invalid[i].source, BOAT_PLUGIN_SCHEMA, invalid[i].field, 0))
+            return 1;
+    static const struct {
+        const char *from, *to, *field;
+    } edits[] = {
+        { "caption = 'THE OUTER FJORD', ", "", "tour.stops[2].caption" },
+        { "'THE OUTER FJORD'", "'SAY \"HI\"'", "tour.stops[2].caption" },
+        { "'THE OUTER FJORD'", "' PADDED'", "tour.stops[2].caption" },
+        { "'THE OUTER FJORD'", "'0123456789012345678901234567890123456789012345678'",
+            "tour.stops[2].caption" },
+        { "heading = 1.57, radius = 0", "heading = 1.57, radius = 5", "tour.stops[3].radius" },
+        { "x = 3595", "x = 3000", "tour.stops[3]" },
+    };
+    for (size_t i = 0; i < sizeof(edits) / sizeof(edits[0]); ++i) {
+        char source[sizeof(TOUR) + 64];
+        const char *at = strstr(TOUR, edits[i].from);
+        CHECK(at);
+        snprintf(source, sizeof(source), "%.*s%s%s", (int)(at - TOUR), TOUR, edits[i].to,
+            at + strlen(edits[i].from));
+        if (expect(edits[i].field, NULL, source, BOAT_PLUGIN_SCHEMA, edits[i].field, 0))
+            return 1;
+    }
+    // Up to 32 stops; 33 is too many.
+    static char many[BOAT_PLUGIN_SOURCE_MAX];
+    for (unsigned count = 32; count <= 33; ++count) {
+        int n = snprintf(many, sizeof(many), "return { tour = { stops = {");
+        for (unsigned i = 0; i < count; ++i)
+            n += snprintf(many + n, sizeof(many) - (size_t)n,
+                "{ id = 's%u', name = 'S%u', caption = 'STOP %u', x = %s, heading = 0,"
+                " radius = %s },",
+                i, i, i, i + 1 < count ? "650, z = -850" : "3600, z = -3370",
+                i + 1 < count ? "9" : "0");
+        snprintf(many + n, sizeof(many) - (size_t)n, "}, " TOUR_ARRIVAL " } }");
+        BoatPluginVoyage out;
+        BoatPluginStatus status = load_source(many, &out, &d);
+        show("many stops", &d);
+        CHECK(count == 32 ? status == BOAT_PLUGIN_OK && out.route.shelter_count == 32
+                          : status == BOAT_PLUGIN_SCHEMA && !strcmp(d.field, "tour.stops"));
+    }
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(reference_matches_compiled),
     TEST_CASE(computed_definition),
@@ -1101,6 +1264,7 @@ static const TestCase cases[] = {
     TEST_CASE(package_files),
 #endif
     TEST_CASE(navigable_water),
+    TEST_CASE(tours),
 };
 
 int main(int argc, char **argv)

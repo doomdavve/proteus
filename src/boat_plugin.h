@@ -27,6 +27,7 @@
 #define BOAT_PLUGIN_QUERY_MAX 2048
 #define BOAT_PLUGIN_QUERY_REPLY_MAX 4096
 #define BOAT_PLUGIN_TEXT 24 // Shelter id and name capacity, including the terminator.
+#define BOAT_PLUGIN_CAPTION 48 // A tour stop's caption capacity, including the terminator.
 
 typedef enum {
     BOAT_PLUGIN_KIND_NONE,
@@ -96,8 +97,9 @@ typedef struct {
     bool timers; // objective.timers additionally grants bounded tick timers.
 } BoatPluginManifest;
 
-// Owns its strings: ROUTE's shelter names point into SHELTER_NAMES, so copy it only with
-// boat_plugin_voyage_copy.
+// Owns its strings: ROUTE's shelter names and captions point into SHELTER_NAMES and
+// SHELTER_CAPTIONS, so copy it only with boat_plugin_voyage_copy. A voyage package returns either
+// a destination voyage or a tour (ROUTE.ordered; docs/PLUGIN_API.md, tour schema).
 typedef struct BoatPluginVoyage {
     BoatPluginManifest manifest;
     bool migrates; // Optional explicit migrate callback.
@@ -109,6 +111,7 @@ typedef struct BoatPluginVoyage {
     uint64_t scene_digest; // boat_scene_digest(&scene); zero when absent.
     char shelter_ids[BOAT_VOYAGE_SHELTERS][BOAT_PLUGIN_TEXT];
     char shelter_names[BOAT_VOYAGE_SHELTERS][BOAT_PLUGIN_TEXT];
+    char shelter_captions[BOAT_VOYAGE_SHELTERS][BOAT_PLUGIN_CAPTION]; // Tours only.
     uint64_t digest; // boat_plugin_route_digest(&route).
 } BoatPluginVoyage;
 
