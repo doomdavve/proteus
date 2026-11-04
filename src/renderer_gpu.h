@@ -196,6 +196,7 @@ typedef struct {
     bool light_clusters_disabled; // Review: the capped uniform fallback.
     bool light_reference; // Review: shade every clustered light, ignoring the slot lists.
     bool ambient_occlusion_disabled; // Review: draw the baked occlusion at zero strength.
+    bool particles_disabled; // Review: draw no boat foam or spray cubes (their cost).
     int stress_lights; // Review: extra synthetic lights around the shot.
     WaterfrontLightStats light_stats; // This frame's submissions, drops and overflow.
     int light_rows; // Texture rows uploaded this frame.

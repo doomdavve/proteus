@@ -325,7 +325,8 @@ static bool no_far_water;
 static bool light_fallback, light_reference;
 static int stress_lights;
 // --no-ambient-occlusion: the map's baked G5c occlusion at zero strength.
-static bool no_ambient_occlusion;
+// --no-particles: no boat foam or spray cubes, to measure what they cost.
+static bool no_ambient_occlusion, no_particles;
 // --daylight: review poses at a fixed presentation phase (default day).
 static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
 // --resolution and --hdr: the presentation preset of review and benchmark GPU views, sized for
@@ -362,6 +363,7 @@ static bool apply_scene_options(WaterfrontGpuScene *scene)
     scene->light_clusters_disabled = light_fallback;
     scene->light_reference = light_reference;
     scene->ambient_occlusion_disabled = no_ambient_occlusion;
+    scene->particles_disabled = no_particles;
     scene->stress_lights = stress_lights;
     if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
         return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
@@ -3112,6 +3114,8 @@ int main(int argc, char **argv)
             light_reference = true;
         else if (strcmp(argv[i], "--no-ambient-occlusion") == 0)
             no_ambient_occlusion = true;
+        else if (strcmp(argv[i], "--no-particles") == 0)
+            no_particles = true;
         else if (strcmp(argv[i], "--stress-lights") == 0 && i + 1 < argc) {
             stress_lights = atoi(argv[++i]);
             if (stress_lights < 0 || stress_lights > WATERFRONT_LIGHTS_MAX) {
@@ -3178,6 +3182,7 @@ int main(int argc, char **argv)
                  "                    [--no-water-history] [--no-scene-depth] [--no-water-atlas]\n"
                  "                    [--no-far-water] [--light-fallback] [--light-reference]\n"
                  "                    [--stress-lights N] [--no-ambient-occlusion]\n"
+                 "                    [--no-particles]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
@@ -3204,6 +3209,7 @@ int main(int argc, char **argv)
                  "  lights; --light-reference shades every clustered light at every pixel;\n"
                  "  --stress-lights adds N (0..1024) review lights on a 12 m lattice.\n"
                  "--no-ambient-occlusion draws the map without its baked ambient occlusion.\n"
+                 "--no-particles draws no boat foam or spray cubes (to measure their cost).\n"
                  "--history-clip writes FRAMES (1..3600) 60 Hz stress frames to DIR, history\n"
                  "  left and stamp-only right, plus the final history field as history.png.\n"
                  "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"

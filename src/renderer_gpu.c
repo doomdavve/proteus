@@ -2828,7 +2828,7 @@ static void draw_boat(
     int particle_count = b.particle_count;
     if (flag.vaoId)
         draw_colored_mesh(flag, material, (Transform3D) { .scale = { 1, 1, 1 } }, WHITE, false);
-    for (int i = 0; i < particle_count; ++i) {
+    for (int i = 0; !scene->particles_disabled && i < particle_count; ++i) {
         // Surface foam receives shadows/depth but does not cast a solid slab shadow.
         // Airborne spray participates in both the reflection and shadow passes.
         if (!emissive && !particles[i].spray)
