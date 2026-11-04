@@ -1129,6 +1129,7 @@ add_test(NAME boat_default_wake_matches_explicit COMMAND ${CMAKE_COMMAND} -E com
 set_tests_properties(boat_default_wake_matches_explicit PROPERTIES FIXTURES_REQUIRED player_wake_defaults)
 add_test(NAME boat_river_route COMMAND boat_water_review --check)
 add_test(NAME boat_river_wave_route COMMAND boat_water_review --check --waves)
+add_test(NAME boat_outer_route COMMAND boat_water_review --check --scenario outer --waves)
 add_test(NAME boat_river_benchmark_options COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_water_benchmark.py
   $<TARGET_FILE:boat_water_review> --options)
@@ -1417,7 +1418,8 @@ set(PROTEUS_SLOW_TESTS
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
   boat_scenery ambient_river ambient_outer
-  boat_river_benchmark_options boat_river_route boat_river_wave_route boat_voyage
+  boat_river_benchmark_options boat_river_route boat_river_wave_route boat_outer_route
+  boat_voyage
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
   waterfront_actors scene_site harbor_life_qualification
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot

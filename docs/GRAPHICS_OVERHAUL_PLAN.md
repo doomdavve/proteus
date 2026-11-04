@@ -8,7 +8,8 @@ briefs are internal checkpoints with focused commits and resumable agent handoff
 conditional study. **P3 is in progress** on `feat/graphics-presentation`: G5a (optional high
 resolution and HDR), G5b (clustered lights and dusk water) and G5c (baked ambient occlusion,
 particle profiling and the final matrix) are machine-verified. **Next: Batch C**, the user's
-final review, with a returned Windows report. See the
+final review, with a returned Windows report. Stacked on it, the
+[outer performance follow-up](#outer-performance-follow-up) has step 1 machine-verified. See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -1646,8 +1647,8 @@ default-resolution change without a later explicit user decision.
   work after P3 to bring outer down; the method decides how far. Candidates, unmeasured: the
   outer shadow pass, distance detail for outer terrain and buildings, and the reflection's
   triangle load. Add an outer scenario to the benchmark first.
-- Next: the outer performance follow-up, on a branch stacked on this PR; Batch C's Windows
-  report.
+- Next: the [outer performance follow-up](#outer-performance-follow-up), on a branch stacked on
+  this PR; Batch C's Windows report.
 
 #### Batch C request
 
@@ -1682,6 +1683,35 @@ the integrated look keep its identity at both resolutions? Is the ambient occlus
 grounding rather than dirty, and stable while moving? Are dusk windows, lamps and streaks cozy?
 Are the cube foam and spray, and their lifetimes, intact? Any LOD popping, water seams or shadow
 trails from Batches A and B? The default stays low resolution whatever the verdict.
+
+#### Outer performance follow-up
+
+Branch `perf/outer-geometry`, stacked on `feat/graphics-presentation` (PR #140); it opens after
+the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no user play yet.
+
+- **Step 1, done (machine-verified 2026-11-04):** `boat_water_review --benchmark --scenario outer`
+  (the river route on the outer map, continued across the estuary) with a display-free
+  `--check --scenario outer` route test, `--no-shadows` and `--no-reflections` for pass costs,
+  and 2,048 m default render tiles. Findings and numbers in
+  [the performance record](BOATING_PERFORMANCE.md#outer-benchmark-and-render-tiles--2026-11-04):
+  outer GPU time follows draw submissions, not triangles or pixels. The reflection is the one
+  large pass (about 1.2 ms of 2.4 at either resolution); shadows, distance detail and far water
+  are within noise. 2,048 m tiles cut outer high-resolution GPU p50/p95 from 2.38–2.59 /
+  3.15–3.84 to 2.00 / 2.43–2.49 ms (hidden, unpaced), outer low from 2.05–2.12 to 1.55 and the
+  river at 4x4 slightly, with the same trajectories and images apart from isolated depth-tie
+  pixels.
+- **120 Hz on this Mac is a presentation limit, not scene cost:** vsync-paced runs miss 10 ms on
+  about 40% of outer frames before and after, and on 45% of a light river run; vsync without the
+  pacer is no steadier. Unpaced, the outer high-resolution frame now fits in about 4 ms p95.
+- **Candidate, needs the user in motion:** 512 m detail cells with 2,048 m tiles reach outer
+  high 1.90 / 2.34 ms at 145 submissions. G2b kept 256 m because a 512 m cell switches larger
+  pieces of windows and street furniture at once; whether that pops is the user's call.
+- **Next:** the user plays outer at high resolution on this branch (any change in feel at 120 Hz
+  and 60 Hz, and any seams) before the cell size is tried. Further candidates: fewer reflection
+  submissions (it repeats the main pass's classes), and the macOS vsync behaviour (fullscreen,
+  another display) if 120 Hz on the Mac matters.
+- **Limits:** M1 Max only; no Windows, browser or second-display runs; GPU time measured paced is
+  inflated by clock-down (the game's paced demo shows 6.6 ms for the 2.4 ms unpaced load).
 
 ### G6 — Conditional backend decision spike
 

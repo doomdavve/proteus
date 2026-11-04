@@ -30,6 +30,22 @@ static const Stop stops[] = { { "mouth", { -24, -70 } }, { "river", { -15, -180 
     { "bridge-approach", { 250, -500 } }, { "under-bridge", { 454, -678 } },
     { "past-bridge", { 650, -850 } }, { "beyond", { 1100, -950 } } };
 static const size_t stop_count = sizeof(stops) / sizeof(*stops);
+// The outer map shares the river's frame: the river route, then out across the estuary, where the
+// whole outer crop's terrain and buildings are in view.
+static const Stop outer_stops[] = { { "mouth", { -24, -70 } }, { "river", { -15, -180 } },
+    { "bridge-approach", { 250, -500 } }, { "under-bridge", { 454, -678 } },
+    { "past-bridge", { 650, -850 } }, { "beyond", { 1100, -950 } }, { "estuary", { 1800, -1150 } },
+    { "fjord", { 2700, -1500 } } };
+typedef struct {
+    const char *name; // Scenario and route name in benchmark reports.
+    BoatLocationId location;
+    const Stop *stops;
+    size_t count;
+} Route;
+static const Route river_route
+    = { "river-review", BOAT_LOCATION_RIVER, stops, sizeof(stops) / sizeof(*stops) };
+static const Route outer_route = { "outer-review", BOAT_LOCATION_OUTER, outer_stops,
+    sizeof(outer_stops) / sizeof(*outer_stops) };
 #define MAX_TICKS (240 * 120)
 #define SAMPLE_TICKS 12 // 10 Hz capture sequence; simulation remains 120 Hz.
 
@@ -40,13 +56,13 @@ static double now(void)
     return (double)t.tv_sec + t.tv_nsec * 1e-9;
 }
 
-static void drive(BoatSession *session, size_t *destination)
+static void drive(BoatSession *session, const Route *route, size_t *destination)
 {
     const Boat *boat = &session->boat;
-    Vector2 delta = Vector2Subtract(stops[*destination].position, boat->position);
-    if (Vector2Length(delta) < 12 && *destination + 1 < stop_count) {
+    Vector2 delta = Vector2Subtract(route->stops[*destination].position, boat->position);
+    if (Vector2Length(delta) < 12 && *destination + 1 < route->count) {
         ++*destination;
-        delta = Vector2Subtract(stops[*destination].position, boat->position);
+        delta = Vector2Subtract(route->stops[*destination].position, boat->position);
     }
     float target = atan2f(delta.x, -delta.y);
     float error = remainderf(target - boat->heading, 2 * PI);
@@ -58,7 +74,7 @@ static void drive(BoatSession *session, size_t *destination)
             = Clamp((thrust - boat->throttle) / (BOAT_THROTTLE_COMMAND_RATE * BOAT_STEP), -1, 1) });
 }
 
-static bool hull_clear(const Boat *boat)
+static bool hull_clear(const Boat *boat, BoatLocationId location)
 {
     Vector2 forward = { sinf(boat->heading), -cosf(boat->heading) };
     Vector2 right = { cosf(boat->heading), sinf(boat->heading) };
@@ -67,7 +83,7 @@ static bool hull_clear(const Boat *boat)
         for (int side = -1; side <= 1; side += 2) {
             Vector2 p = Vector2Add(boat->position,
                 Vector2Add(Vector2Scale(forward, end * 2.5f), Vector2Scale(right, side * 1.2f)));
-            if (!test_river_water(p, .5f))
+            if (!boat_map_water(&test_world(location)->map, p, .5f))
                 return false;
         }
     return true;
@@ -326,7 +342,9 @@ static bool light_fallback, light_reference;
 static int stress_lights;
 // --no-ambient-occlusion: the map's baked G5c occlusion at zero strength.
 // --no-particles: no boat foam or spray cubes, to measure what they cost.
-static bool no_ambient_occlusion, no_particles;
+// --no-shadows, --no-reflections: skip the shadow-map or reflection pass, to measure what they
+// cost.
+static bool no_ambient_occlusion, no_particles, no_shadows, no_reflections;
 // --daylight: review poses at a fixed presentation phase (default day).
 static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
 // --resolution and --hdr: the presentation preset of review and benchmark GPU views, sized for
@@ -364,6 +382,10 @@ static bool apply_scene_options(WaterfrontGpuScene *scene)
     scene->light_reference = light_reference;
     scene->ambient_occlusion_disabled = no_ambient_occlusion;
     scene->particles_disabled = no_particles;
+    if (no_shadows)
+        waterfront_gpu_scene_set_shadows_enabled(scene, false);
+    if (no_reflections)
+        waterfront_gpu_scene_set_reflections_enabled(scene, false);
     scene->stress_lights = stress_lights;
     if (stamp_size != WATERFRONT_WAKE_STAMP_SIZE || stamp_spacing != WATERFRONT_WAKE_STAMP_SPACING)
         return waterfront_gpu_scene_set_wake_stamp_size(scene, stamp_size, stamp_spacing);
@@ -1037,10 +1059,10 @@ cleanup:
     return result;
 }
 
-static bool route_finished(const Boat *boat, size_t destination)
+static bool route_finished(const Boat *boat, const Route *route, size_t destination)
 {
-    return destination == stop_count - 1
-        && Vector2Distance(boat->position, stops[destination].position) < 12;
+    return destination == route->count - 1
+        && Vector2Distance(boat->position, route->stops[destination].position) < 12;
 }
 
 // Exact physical state shared by --check and --benchmark for same-build parity.
@@ -1360,16 +1382,23 @@ static int bench_fail(const char *message)
 // 60 Hz pacer without vsync and "vsync" the game default (vsync with the pacer as a backstop).
 // Prepares a view's scenery at TILE_SIZE before its first draw; drawing keeps a ready scenery
 // of the same map. Zero keeps the default size.
-static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size)
+static bool prepare_location_tiles(
+    WaterfrontScenery *scenery, BoatLocationId location, float tile_size)
 {
     return !(tile_size > 0)
-        || waterfront_scenery_init_tiled(
-            scenery, boat_location(BOAT_LOCATION_RIVER)->map, tile_size);
+        || waterfront_scenery_init_tiled(scenery, boat_location(location)->map, tile_size);
+}
+
+static bool prepare_tiles(WaterfrontScenery *scenery, float tile_size)
+{
+    return prepare_location_tiles(scenery, BOAT_LOCATION_RIVER, tile_size);
 }
 
 static int benchmark(const char *prefix, bool waves, bool aa, bool visible, const char *pacing,
-    float tile_size, bool stress)
+    float tile_size, const Route *route)
 {
+    // No route: the four-boat stress fixture.
+    bool stress = !route;
     char csv_path[4096], json_path[4096], state[1024];
     snprintf(csv_path, sizeof(csv_path), "%s.csv", prefix);
     snprintf(json_path, sizeof(json_path), "%s.json", prefix);
@@ -1384,12 +1413,13 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     }
     BenchFrame *frames = calloc(BENCH_FRAMES, sizeof(*frames));
     float *scratch = calloc(BENCH_FRAMES, sizeof(*scratch));
-    const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
+    const BoatWorldDefinition *location
+        = boat_location(stress ? BOAT_LOCATION_BASIN : route->location);
     BoatSession session;
     StressFixture stress_fixture;
     if (!stress)
-        boat_session_init(&session, test_world(BOAT_LOCATION_RIVER),
-            waves ? boat_water_gentle() : (BoatWater) { 0 });
+        boat_session_init(
+            &session, test_world(route->location), waves ? boat_water_gentle() : (BoatWater) { 0 });
     const Boat *boat = stress ? &stress_fixture.fleet.state.slots[0].boat : &session.boat;
     const BoatCamera camera = stress
         ? (BoatCamera) { .distance = 26, .height = 16 }
@@ -1411,7 +1441,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     SetConfigFlags(!visible ? FLAG_WINDOW_HIDDEN : vsync ? FLAG_VSYNC_HINT : 0);
     InitWindow(960, 600, "Proteus / boat water benchmark");
     if (!IsWindowReady() || !boat_gpu_init(&gpu, aa)
-        || (!stress && !prepare_tiles(&gpu.scenery, tile_size))) {
+        || (!stress && !prepare_location_tiles(&gpu.scenery, route->location, tile_size))) {
         error = "graphics initialization failed";
         goto cleanup;
     }
@@ -1460,9 +1490,9 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
             finished = count + 1 >= STRESS_FRAMES;
         } else if (count > 0) {
             do {
-                drive(&session, &destination);
+                drive(&session, route, &destination);
                 ++tick;
-                finished = route_finished(boat, destination);
+                finished = route_finished(boat, route, destination);
             } while (tick % 2 && !finished);
         }
         double simulated = boat_profile_time(false);
@@ -1523,7 +1553,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         } else {
             // Frame poses only; --check covers every tick and the report's final state proves
             // that this run followed the same trajectory.
-            if (!hull_clear(boat)) {
+            if (!hull_clear(boat, route->location)) {
                 error = "route too close to shore";
                 goto cleanup;
             }
@@ -1613,7 +1643,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         "{\n  \"schema_revision\":7,\"tool\":\"boat_water_review\",\"mode\":\"benchmark\",\n"
         "  \"scenario\":\"%s\",\"route\":\"%s\",\"route_revision\":1,\"physics_revision\":%d,\n"
         "  \"build\":\"%s\",\"platform\":\"%s\",\n  \"gl_renderer\":",
-        stress ? "stress-basin" : "river-review", stress ? "stress-basin" : "river-review",
+        stress ? "stress-basin" : route->name, stress ? "stress-basin" : route->name,
         BOAT_PHYSICS_REVISION, BOAT_BENCH_BUILD, BOAT_BENCH_PLATFORM);
     json_string(json, renderer_name);
     fputs(",\"gl_version\":", json);
@@ -1709,7 +1739,7 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     ok = !ferror(csv) && !ferror(json);
     printf("benchmark scenario=%s aa=%s preset=%s resolution=%s hdr=%s window=%s frames=%d "
            "warmup=%d ticks=%d gpu_samples=%d\n",
-        stress ? "stress-basin" : "river-review", aa ? "4x4" : "off", waves ? "waves" : "flat",
+        stress ? "stress-basin" : route->name, aa ? "4x4" : "off", waves ? "waves" : "flat",
         boat_resolution_name(review_resolution), boat_gpu_hdr_active(&gpu) ? "on" : "off",
         visible ? "visible" : "hidden", count, BENCH_WARMUP, tick, gpu_samples);
     printf("final_state %s\n", state);
@@ -3116,6 +3146,10 @@ int main(int argc, char **argv)
             no_ambient_occlusion = true;
         else if (strcmp(argv[i], "--no-particles") == 0)
             no_particles = true;
+        else if (strcmp(argv[i], "--no-shadows") == 0)
+            no_shadows = true;
+        else if (strcmp(argv[i], "--no-reflections") == 0)
+            no_reflections = true;
         else if (strcmp(argv[i], "--stress-lights") == 0 && i + 1 < argc) {
             stress_lights = atoi(argv[++i]);
             if (stress_lights < 0 || stress_lights > WATERFRONT_LIGHTS_MAX) {
@@ -3182,7 +3216,7 @@ int main(int argc, char **argv)
                  "                    [--no-water-history] [--no-scene-depth] [--no-water-atlas]\n"
                  "                    [--no-far-water] [--light-fallback] [--light-reference]\n"
                  "                    [--stress-lights N] [--no-ambient-occlusion]\n"
-                 "                    [--no-particles]\n"
+                 "                    [--no-particles] [--no-shadows] [--no-reflections]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
@@ -3194,10 +3228,10 @@ int main(int argc, char **argv)
                  "       boat_water_review --benchmark PREFIX [--renderer gpu] --aa off|4x4\n"
                  "                         [--resolution low|high] [--hdr on|off] (with --aa off)\n"
                  "                         [--daylight day|sunset|dusk|0..1]\n"
-                 "                         [--scenario river|stress] [--waves]\n"
+                 "                         [--scenario river|outer|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"
                  "                         [--tile-size M]\n"
-                 "--tile-size: render tile edge, 64..65536 m (default 1024).\n"
+                 "--tile-size: render tile edge, 64..65536 m (default 2048).\n"
                  "--analytic-wakes shades object wakes with the reference per-piece loop; by\n"
                  "  default they sample the stamped field (1024 texels of 0.25 m).\n"
                  "--no-water-history shades stamp-only water, without foam history and ripples.\n"
@@ -3210,12 +3244,14 @@ int main(int argc, char **argv)
                  "  --stress-lights adds N (0..1024) review lights on a 12 m lattice.\n"
                  "--no-ambient-occlusion draws the map without its baked ambient occlusion.\n"
                  "--no-particles draws no boat foam or spray cubes (to measure their cost).\n"
+                 "--no-shadows and --no-reflections skip that pass (to measure its cost).\n"
                  "--history-clip writes FRAMES (1..3600) 60 Hz stress frames to DIR, history\n"
                  "  left and stamp-only right, plus the final history field as history.png.\n"
                  "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"
                  "  G4 water left and G3b water right; squall brings a weather squall in.\n"
                  "  --clip-aa off draws it without supersampling; --daylight sets the light.\n"
-                 "--scenario river: the existing river route; stress: four basin boats with\n"
+                 "--scenario river: the existing river route; outer: the same route on the outer\n"
+                 "  map, continued across the estuary; stress: four basin boats with\n"
                  "  saturated boat and traffic wake pools (deterministic pre-roll).\n"
                  "--stress-state prints the stress fixture's final physical state without a\n"
                  "  window; --benchmark --scenario stress must report the same state.\n"
@@ -3234,12 +3270,17 @@ int main(int argc, char **argv)
     }
     if (stress_state_only)
         return argc > 2 ? 2 : stress_state();
-    if (bench || aa_name || pacing || scenario) {
-        const char *problem = !bench ? "--aa, --pacing and --scenario require --benchmark"
-            : !aa_name               ? "--benchmark requires --aa off|4x4"
+    // --check drives the river or outer route display-free; captures follow only the river.
+    bool route_check = check && !bench && !aa_name && !pacing && scenario
+        && (strcmp(scenario, "river") == 0 || strcmp(scenario, "outer") == 0);
+    if (bench || aa_name || pacing || (scenario && !route_check)) {
+        const char *problem = !bench
+            ? "--aa, --pacing and --scenario require --benchmark (--check: river or outer)"
+            : !aa_name                                         ? "--benchmark requires --aa off|4x4"
             : strcmp(aa_name, "off") && strcmp(aa_name, "4x4") ? "--aa must be off or 4x4"
-            : scenario && strcmp(scenario, "river") && strcmp(scenario, "stress")
-            ? "--scenario must be river or stress"
+            : scenario && strcmp(scenario, "river") && strcmp(scenario, "outer")
+                && strcmp(scenario, "stress")
+            ? "--scenario must be river, outer or stress"
             : check || gpu_check || gpu_views || gpu_lifecycle || output || sequence || review_dir
             ? "--benchmark excludes --check, --check-gpu*, --output, --review and --sequence"
             : !use_gpu ? "--benchmark supports only --renderer gpu"
@@ -3305,13 +3346,17 @@ int main(int argc, char **argv)
     }
     if (bench)
         return benchmark(bench, waves, strcmp(aa_name, "4x4") == 0, visible,
-            pacing ? pacing : "cap", tile_size, scenario && strcmp(scenario, "stress") == 0);
+            pacing ? pacing : "cap", tile_size,
+            !scenario || strcmp(scenario, "river") == 0 ? &river_route
+                : strcmp(scenario, "outer") == 0        ? &outer_route
+                                                        : NULL);
     if (review_dir)
         return review(review_dir, use_gpu);
-    const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_RIVER);
+    const Route *route = scenario && strcmp(scenario, "outer") == 0 ? &outer_route : &river_route;
+    const BoatWorldDefinition *location = boat_location(route->location);
     BoatSession session;
     boat_session_init(
-        &session, test_world(BOAT_LOCATION_RIVER), waves ? boat_water_gentle() : (BoatWater) { 0 });
+        &session, test_world(route->location), waves ? boat_water_gentle() : (BoatWater) { 0 });
     const BoatWorld *world = &session.world;
     Boat *boat = &session.boat;
     const BoatPresentation *presentation = &session.presentation;
@@ -3370,16 +3415,16 @@ int main(int argc, char **argv)
     // rasterized triangles.
     size_t work_total[3] = { 0 }, work_max[3] = { 0 };
     for (ticks = 0; ticks <= MAX_TICKS; ++ticks) {
-        if (!hull_clear(boat)) {
+        if (!hull_clear(boat, route->location)) {
             fprintf(stderr, "Route too close to shore at tick %d: %.3f %.3f\n", ticks,
                 boat->position.x, boat->position.y);
             goto cleanup;
         }
         bool arrival = destination != captured_destination;
-        bool finished = route_finished(boat, destination);
+        bool finished = route_finished(boat, route, destination);
         const char *name = ticks == 0 ? "dock"
-            : finished                ? "beyond"
-            : arrival                 ? stops[destination - 1].name
+            : finished                ? route->stops[route->count - 1].name
+            : arrival                 ? route->stops[destination - 1].name
                                       : NULL;
         if (name) {
             printf("%s tick=%d time=%.3f x=%.3f z=%.3f heading=%.3f\n", name, ticks,
@@ -3412,7 +3457,7 @@ int main(int argc, char **argv)
                         shown.flag.initialized = false;
                         Vector2 delta = Vector2Subtract(targets[bank], inspection.position);
                         shown.camera_heading = inspection.heading = atan2f(delta.x, -delta.y);
-                        if (!hull_clear(&inspection))
+                        if (!hull_clear(&inspection, BOAT_LOCATION_RIVER))
                             goto cleanup;
                         snprintf(path, sizeof(path), "%s/%s.png", output, landfalls[bank].name);
                         if (!capture(&gpu, &cpu, &cpu_view, &inspection,
@@ -3484,7 +3529,7 @@ int main(int argc, char **argv)
         }
         if (finished)
             break;
-        drive(&session, &destination);
+        drive(&session, route, &destination);
     }
     if (ticks > MAX_TICKS) {
         fprintf(stderr, "Route did not finish; destination=%zu position=%.3f %.3f\n", destination,

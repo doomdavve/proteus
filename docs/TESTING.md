@@ -356,11 +356,16 @@ about 32 s in Debug on an M1 Max) runs a hidden `--waves --aa off` voyage. It ch
 counts, warmup flags, tick continuity, recomputed percentiles, deadline counts, finite values,
 route completion and exact final-state parity with `--check --waves`. Since A2.1 (schema 2)
 it also checks that the per-pass and per-group submission/triangle columns partition the
-totals, apart from the two sky quads. Since A2.3 (schema 3) it also checks the 1,024 m
-default `tile_size`, the per-pass `*_tiles_culled` columns and that the shadow pass culls
+totals, apart from the two sky quads. Since A2.3 (schema 3) it also checks the default
+`tile_size` (1,024 m then, 2,048 m since the outer follow-up), the per-pass `*_tiles_culled` columns and that the shadow pass culls
 tiles on every row. Since G0 (schema 4) it also checks the `stress` scenario: the display-free
 `--stress-state` fixture must match the benchmark's exact `final_state`, and both wake pools
 must stay at capacity with reported emitter/piece counts. It asserts no timing thresholds.
+The `outer` scenario (2026-11-04) drives the river route on the outer map and continues across
+the estuary; its GPU run is not in this contract (about 12,000 frames), but `boat_outer_route`
+(`cpu`, about 1.7 s in Release) drives it display-free with `--check --scenario outer --waves`,
+checking shore clearance on every tick. The benchmark's `final_state` matched it on the run
+that introduced the scenario.
 See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25) and the
 [G0 budgets](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
 

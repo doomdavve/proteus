@@ -174,7 +174,7 @@ reported all three as `null`. Since
 [A2.3](FREE_RIDING_ADVENTURE_FIRST_STEPS.md#a23-result-2026-10-25) (`schema_revision` 3) the
 JSON records `tile_size` and the CSV adds `shadow_tiles_culled`, `reflection_tiles_culled` and
 `main_tiles_culled`, the tile meshes each pass skipped. `--tile-size M` (64–65,536 m, default
-1,024) sets the render tile edge for the benchmark and for `--output` captures, and
+2,048 since the outer follow-up; 1,024 before) sets the render tile edge for the benchmark and for `--output` captures, and
 `--no-cull` (captures only) draws every tile in the same order, for isolating culling
 from draw order; `--no-detail` draws every detail cell near. Schema 6 (graphics G3a) adds
 `wake_shading` (`stamped` or `analytic`, field size, spacing, bytes and builds) and the
@@ -603,6 +603,64 @@ pairs (four applied passes plus the residual check). The bots capsize often, so 
 frequent. These are same-machine engineering measurements with no networking, encoding or
 snapshots. Artifacts: `build/bench/m2/{out-head,out-new,server-release.txt}`. The hour soaks
 were not rerun; the C3 soak hashes no longer apply because the soak drives crossing mode.
+
+## Outer benchmark and render tiles — 2026-11-04
+
+The follow-up to P3's [outer 120 Hz finding](GRAPHICS_OVERHAUL_PLAN.md#outer-performance-follow-up).
+`--scenario outer` drives the river route on the outer map and continues across the estuary to
+`fjord` (2700, −1500): 12,141 frames, 24,280 ticks, the same `final_state` as
+`--check --scenario outer --waves`. `--no-shadows` and `--no-reflections` skip a pass, for
+measuring it.
+
+```sh
+./build-release/boat_water_review --benchmark OUT/outer-high --aa off --waves --scenario outer \
+  --resolution high
+```
+
+Release, Apple M1 Max, macOS, `--waves`, `--aa off`. GPU is `GL_TIME_ELAPSED` around the scene
+draw; ms, p50 / p95, one value per run.
+
+**Where outer time goes** (hidden, unpaced, high resolution with HDR, 1,024 m tiles, two
+interleaved rounds): baseline 2.39–2.59 / 3.20–3.79; `--no-reflections` 1.49–1.64 / 1.84–2.03
+(and CPU submit −0.6 ms); `--no-shadows` 2.59–2.88 / 3.39–3.60; `--no-detail` 2.33–2.54 /
+3.11–3.67; `--no-far-water` 2.31–2.43 / 3.03–3.50. Only the reflection is a measurable share. At
+low resolution its 160×120 target costs the same 1.2 ms (2.39 → 1.23), so it is not pixels;
+culling its mirrored front faces instead of drawing both sides saved under 0.1 ms. Render tile
+size decides it: GPU p50 2.39 at 1,024 m, 4.22 at 512 m and 7.16 at 256 m though triangles fall
+(598 k → 470 k p50), 2.09 at 2,048 m and 2.00 at 4,096 m though they rise (795 k, 974 k).
+Submissions (270, 437, 856, 199, 185 p50) track GPU time here, and CPU submit tracks it as well,
+so the driver's per-draw work dominates; the timer cannot separate it from shading. Combined with
+512 m detail cells, 2,048 m tiles reach 1.90 / 2.34 at 145 submissions (not adopted; see the
+plan). The game's scripted outer demo, vsync-paced, reports 6.6 ms GPU p50 for the same
+triangle load: the GPU clocks down when paced, so paced and unpaced GPU times do not compare.
+
+**2,048 m default tiles** (`WATERFRONT_TILE_SIZE`; previous build against this one, interleaved,
+hidden and unpaced unless stated):
+
+| Run | Submissions p50 | Triangles p50 / p95 | GPU p50 / p95 | CPU submit p50 | Frame p95 |
+| --- | --- | --- | --- | --- | --- |
+| outer high, 1,024 m | 270 | 598 k / 1.11 M | 2.38–2.59 / 3.15–3.84 | 2.07–2.22 | 4.11–4.65 |
+| outer high, 2,048 m | 199 | 795 k / 1.50 M | 1.99–2.00 / 2.43–2.49 | 1.79–1.81 | 3.77–3.99 |
+| outer low, 1,024 m | 270 | 580 k / 1.04 M | 2.05–2.12 / 3.21–3.25 | 1.75–1.76 | 3.66–3.73 |
+| outer low, 2,048 m | 199 | 773 k / 1.39 M | 1.55 / 1.91–1.94 | 1.44–1.45 | 3.11–3.14 |
+| river 4x4, 1,024 m | 128 | 203 k / 512 k | 1.63 / 2.01–2.06 | 1.27–1.30 | 2.84–2.85 |
+| river 4x4, 2,048 m | 97 | 250 k / 553 k | 1.58 / 1.92 | 1.19–1.20 | 2.60–2.68 |
+| outer high vsync, 1,024 m | 270 | | 4.26 / 5.98 | 2.33 | 16.71 |
+| outer high vsync, 2,048 m | 199 | | 3.89 / 5.74 | 2.15 | 16.75 |
+
+Every run of a scenario ended in the same `final_state` in both builds. River 4x4 triangles p95
+553 k stay inside G2b's 650 k gate. Review captures against the previous build: low resolution
+worst 2/255 (inside the 2/255 bound), high resolution worst 19/255 at fewer than 51 pixels a
+frame in seven captures (mean below 0.0001/255), from coplanar depth ties that now fall in one
+tile instead of two.
+
+**120 Hz pacing on this Mac.** With vsync on the 120 Hz display, about 40% of outer frame
+intervals exceed 10 ms in both builds, evenly along the route, and so do 45% on the light river
+at low resolution (GPU 1.56, CPU submit 1.35 ms). Without the pacer's backstop (an uncommitted
+experiment) vsync alone gives river intervals p50 11.0 / p95 14.5 ms. Unpaced, outer high now
+fits in 3.8–4.0 ms frame p95. So on this Mac, OpenGL vsync does not hold 120 Hz at any load, and
+scene work is not the cause of those misses. Not tested: another display, fullscreen, Windows,
+or the browser.
 
 ## Graphics G5a presentation presets — 2026-11-03
 

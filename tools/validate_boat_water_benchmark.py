@@ -69,6 +69,9 @@ with tempfile.TemporaryDirectory() as directory:
         ['--benchmark', root / 'x', '--aa', 'off', '--sequence'],
         ['--benchmark', root / 'x', '--aa', 'off', '--renderer', 'cpu'],
         ['--benchmark', root / 'x', '--aa', 'off', '--scenario', 'none'],
+        ['--scenario', 'outer'],
+        ['--check', '--scenario', 'stress'],
+        ['--check', '--scenario', 'outer', '--aa', 'off'],
         ['--benchmark', '', '--aa', 'off'],
         ['--benchmark', f'{root}/', '--aa', 'off'],
         ['--benchmark', 'x' * 4001, '--aa', 'off'],
@@ -109,7 +112,7 @@ with tempfile.TemporaryDirectory() as directory:
 
     assert report['schema_revision'] == 7 and report['mode'] == 'benchmark'
     assert report['scenario'] == 'river-review' and report['route'] == 'river-review'
-    assert report['tile_size'] == 1024
+    assert report['tile_size'] == 2048
     assert report['renderer'] == 'gpu' and report['aa'] == 'off'
     assert report['preset'] == 'waves' and report['window'] == 'hidden'
     assert report['pacing'] == 'unpaced' and report['vsync_hint'] is False

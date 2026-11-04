@@ -38,8 +38,9 @@ typedef struct {
     BoatMapTiles tiles;
 } WaterfrontScenery;
 
-// Default render tile edge, in metres: chosen over 512 m by the A2.3 matrix.
-#define WATERFRONT_TILE_SIZE 1024.0f
+// Default render tile edge, in metres: 1024 m in the A2.3 matrix, 2048 m since the outer
+// follow-up to P3, where GPU time followed submissions more than triangles.
+#define WATERFRONT_TILE_SIZE 2048.0f
 
 // Fails, leaving the scenery zeroed, for a missing or empty mesh, a compiled map whose scenery is
 // not loaded (on the outer map, the river's too, which lays out the kit), allocation failure or
