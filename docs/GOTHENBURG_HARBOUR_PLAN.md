@@ -102,7 +102,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | Step | After | Result | Status |
 | --- | --- | --- | --- |
 | [GH1](#gh1-rename-to-gothenburg-harbour) | — | GOTHENBURG HARBOUR in the title, hints, package names and guides | Implemented 2026-11-04; [result](#gh1-result-2026-11-04) |
-| [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Implemented 2026-11-04 with estimated heights; [result](#gh2-result-2026-11-04). Unplayed |
+| [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Implemented 2026-11-04 with estimated heights; [result](#gh2-result-2026-11-04). User drive: descent good, snap back up fixed (unplayed) |
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Implemented 2026-11-04; [result](#gh3-result-2026-11-04) |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start and up to 32 ordered stops with captions | Implemented 2026-11-04; [result](#gh4-result-2026-11-04). Speed-limit zones and Å/Ä/Ö moved to GH4b |
 | GH4b | GH4 | Å, Ä, Ö and É in the menu and HUD fonts and in stop names and captions; canal speed-limit zones | Proposed |
@@ -244,6 +244,13 @@ they cannot source measured heights or looks. Branch `feat/canal-bridges`, stack
   0.3 m below the underside. The limit comes from the deck between the boat and the eye, so it
   tightens smoothly as the boat goes under and eases as the eye comes out. It keeps no history, so
   replays seek as before. The eye goes no lower than 1 m.
+- **User drive, 2026-11-04.** The user found the descent good, but the camera snapped back up once
+  the eye left the deck. Now a deck behind the eye still holds it down, rising 0.5 m for each metre
+  the eye has travelled clear. A straight line from Kämpebron through Residensbron and Stora Bommen,
+  traced with the same deck table and formula, showed the climb. Leaving Residensbron, the eye goes
+  from 1.9 m back to 10 m over about 16 m, about 5 s in the Grodan, with no step over 0.3 m. Coming
+  in, it drops to about 2.5 m within the first 6–7 m under the deck. `ctest --preset full` passed
+  all 370 enabled tests again. The change is not played yet.
 - **Checks.** `boat_outer_map` checks the overhead query: open sky over the river spawn, 1.75 m at
   Stora Bommen, nothing in the basin. The `grodan_tour` drive now counts the bridges the boat passes
   under: 16 in both boats, the lowest 1.75 m. That drive is also the route's connectivity check,
@@ -253,7 +260,7 @@ they cannot source measured heights or looks. Branch `feat/canal-bridges`, stack
   Vallgraven and Vasabron, and a GPU set through Residensbron and Stora Bommen. Before the camera
   change, the deck hid the boat completely. After it, the camera comes in under the railings, the
   underside fills the top of the frame, and the boat stays in view.
-- **Not done.** No user drive, so the camera change is unaccepted. Frame times were not measured,
+- **Not done.** The camera's gradual climb is unplayed. Frame times were not measured,
   only the triangle count. There is no photo reference sheet, so looks are uniform grey decks with
   black railings. The Grodan's ensign staff passes through the decks, and its skipper's head
   (1.73 m) just clears Stora Bommen.

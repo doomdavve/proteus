@@ -21,6 +21,8 @@ static const float CAMERA_SPEED_FULL = 18.0f;
 // GH2: under a bridge the eye keeps its line to a point this high over the boat this far below
 // the deck, and never drops below the last height.
 static const float CAMERA_BOAT_SIGHT = .9f, CAMERA_DECK_MARGIN = .3f, CAMERA_LOWEST = 1.0f;
+// Metres the eye climbs per metre it travels clear of a deck (GH2, after the user's drive).
+static const float CAMERA_RISE = .5f;
 
 void boat_player_pose(
     const BoatViewState *view, const BoatFlag *flag, WaterfrontPlayerState *player)
@@ -93,14 +95,20 @@ static View3D boat_camera(const Boat *boat, const BoatPresentation *presentation
     eye.y = camera_settings.height;
     // GH2: under a canal bridge the eye drops until its line to the boat passes below the deck.
     // Each covered point B metres aft bounds the eye's height; the bound loosens smoothly to
-    // nothing as the deck reaches the boat, so the view needs no history.
+    // nothing as the deck reaches the boat. Behind the eye, a deck the eye has left still holds
+    // it down, rising CAMERA_RISE per metre, so it climbs back gradually rather than snapping up.
+    // The bounds come from the pose alone, so the view needs no history.
     WaterfrontOverhead overhead = waterfront_overhead(definition->map);
-    for (float b = .5f; overhead && b <= camera_settings.distance; b += .5f) {
+    float reach = camera_settings.distance + camera_settings.height / CAMERA_RISE;
+    for (float b = .5f; overhead && b <= reach; b += .5f) {
         Vector3 p = Vector3Subtract(boat_position, Vector3Scale(follow, b));
         float under = overhead(p.x, p.z) - CAMERA_DECK_MARGIN;
-        if (isfinite(under))
-            eye.y = fminf(eye.y,
-                CAMERA_BOAT_SIGHT + (under - CAMERA_BOAT_SIGHT) * camera_settings.distance / b);
+        if (!isfinite(under))
+            continue;
+        eye.y = fminf(eye.y,
+            b <= camera_settings.distance
+                ? CAMERA_BOAT_SIGHT + (under - CAMERA_BOAT_SIGHT) * camera_settings.distance / b
+                : under + (b - camera_settings.distance) * CAMERA_RISE);
     }
     eye.y = fmaxf(eye.y, CAMERA_LOWEST);
     Vector3 look_at = Vector3Add(boat_position, Vector3Scale(follow, 5));
