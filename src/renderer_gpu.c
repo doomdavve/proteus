@@ -37,7 +37,7 @@ static const Color WATER_COLOR = { 45, 79, 104, 255 };
 // Distance detail: the fine grid of windows and street furniture, the window spacing whose
 // projected size picks the level, the hysteresis around that distance, and what the far level of
 // street furniture keeps.
-#define WATERFRONT_GPU_DETAIL_CELL 256.0f
+#define WATERFRONT_GPU_DETAIL_CELL 512.0f
 #define DETAIL_WINDOW_SPACING 4.0f
 #define DETAIL_BAND .08f
 #define DETAIL_SMALLEST_BOX 2.0f

@@ -1706,6 +1706,15 @@ the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no 
 - **Candidate, needs the user in motion:** 512 m detail cells with 2,048 m tiles reach outer
   high 1.90 / 2.34 ms at 145 submissions. G2b kept 256 m because a 512 m cell switches larger
   pieces of windows and street furniture at once; whether that pops is the user's call.
+- **512 m cell trial (stacked branch `perf/detail-cell-512`), 2026-11-04:** the cell constant
+  only. Release, M1 Max, hidden, unpaced, two interleaved repeats against the parent (this
+  session's runs read slower overall than the step 1 table): outer high GPU p50/p95
+  2.22–2.24 / 3.66–3.67 → 2.09–2.10 / 3.49 ms, submissions p50 199 → 145; river 4x4
+  1.71–1.77 / 2.44–2.57 → 1.65 / 2.49–2.50 ms, submissions p95 241 → 186. River scene
+  triangles p95 rise 553 k → 718 k, above the G2b gate of 650 k. That gate was set when triangles
+  were assumed to cost; on this Mac they do not, but Windows and the browser are unmeasured.
+  Outer and river `--check` routes still finish. Awaiting the user's in-motion popping check;
+  if accepted, the G2b triangle gate needs revisiting rather than silently exceeding it.
 - **Next:** the user has played this branch full-screen and windowed (below); the 512 m cell
   size is the open candidate. Further candidates: fewer reflection submissions (it repeats the
   main pass's classes), and the macOS windowed vsync behaviour if 120 Hz in a window matters. The user suggested macOS Game Mode (2026-11-04). Apple's
