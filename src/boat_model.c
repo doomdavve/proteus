@@ -264,7 +264,7 @@ static Vector3 name_point(BoatModelSpec s, int side, float y, float z)
     };
 }
 
-static void name_panels(BoatModel *m, BoatModelSpec s)
+static void name_panels(BoatModel *m, BoatModelSpec s, bool mirror)
 {
     size_t length = strlen(s.name);
     if (!length)
@@ -291,14 +291,27 @@ static void name_panels(BoatModel *m, BoatModelSpec s)
                         = -s.length * .09f + side * (width * .5f - ((float)c * 4 + start) * cell);
                     float zb
                         = -s.length * .09f + side * (width * .5f - ((float)c * 4 + column) * cell);
+                    if (mirror) {
+                        za = -s.length * .18f - za;
+                        zb = -s.length * .18f - zb;
+                    }
                     float ya = top - (row + 1) * cell, yb = top - row * cell;
-                    quad(m, name_point(s, side, ya, za), name_point(s, side, ya, zb),
-                        name_point(s, side, yb, zb), name_point(s, side, yb, za), ink);
+                    Vector3 p0 = name_point(s, side, ya, za), p1 = name_point(s, side, ya, zb);
+                    Vector3 p2 = name_point(s, side, yb, zb), p3 = name_point(s, side, yb, za);
+                    if (mirror)
+                        quad(m, p0, p3, p2, p1, ink);
+                    else
+                        quad(m, p0, p1, p2, p3, ink);
                 }
             }
 }
 
 bool boat_model_generate(BoatModel *m, BoatModelSpec s)
+{
+    return boat_model_generate_oriented(m, s, false);
+}
+
+bool boat_model_generate_oriented(BoatModel *m, BoatModelSpec s, bool mirror_lettering)
 {
     if (!m)
         return false;
@@ -437,7 +450,7 @@ bool boat_model_generate(BoatModel *m, BoatModelSpec s)
             boat_model_box(m, (Vector3) { side * b * .39f, s.freeboard + .05f, z },
                 (Vector3) { .23f, .10f, .12f }, steel);
         }
-    name_panels(m, s);
+    name_panels(m, s, mirror_lettering);
     if (m->overflow)
         m->mesh.triangle_count = 0;
     return !m->overflow;

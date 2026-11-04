@@ -207,6 +207,11 @@ int main(void)
             .x = positions[BOAT_SCENE_MODULES + i].x,
             .z = positions[BOAT_SCENE_MODULES + i].y };
         snprintf(v.scene.berths[i].id, BOAT_SCENE_TEXT, "berth_%u", i);
+        BoatModelSpec base = boat_scene_berth_spec(BOAT_SCENE_BERTH_RUNABOUT);
+        v.scene.berths[i].appearance = (BoatSceneAppearance) { .length = base.length * 1.25f,
+            .beam = base.beam * 1.25f,
+            .hull = { 20, 80, 140, 255 },
+            .name = "MAXIMUM-NAME-123" };
     }
     if (!accepted(&v, &resources)) {
         boat_plugin_check_location(&v, resources.definition, &resources.map, &d);

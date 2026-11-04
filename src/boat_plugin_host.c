@@ -126,11 +126,12 @@ static BoatPluginChange classify(
         break;
     }
     bool voyage = host->kind == BOAT_PLUGIN_KIND_VOYAGE;
-    // A gull-cue-only scene edit keeps the session clock even though the source bytes changed.
-    bool cosmetic_gulls = voyage && change == BOAT_PLUGIN_RENAMED && a->voyage.has_scene
+    // Preserve the existing gull-cue exemption. Appearance data must not exempt changed
+    // callback source from the established migration/restart policy.
+    bool cosmetic_scene = voyage && change == BOAT_PLUGIN_RENAMED && a->voyage.has_scene
         && b->voyage.has_scene
-        && boat_scene_same_except_gull_cues(&a->voyage.scene, &b->voyage.scene);
-    if (voyage && change < BOAT_PLUGIN_RESTART_VOYAGE && !cosmetic_gulls
+        && boat_scene_same_except_cosmetics(&a->voyage.scene, &b->voyage.scene, false);
+    if (voyage && change < BOAT_PLUGIN_RESTART_VOYAGE && !cosmetic_scene
         && (a->voyage.manifest.objective || b->voyage.manifest.objective)
         && (a->voyage.manifest.objective != b->voyage.manifest.objective
             || a->voyage.manifest.timers != b->voyage.manifest.timers

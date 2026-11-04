@@ -22,15 +22,16 @@ return {
   -- Eriksberg marina: two rows, twelve hulls and separately dimensioned finger piers.
   -- The entrance stays clear west of the hulls and the approach lane runs north along x = 4.
   -- The passing craft's registered loop stays north of the pontoon, so no berth occupies it.
-  -- The compiled crane/buildings and the missing per-boat detail are documented in
-  -- README.md; they are not expressible through this scene schema yet.
+  -- The compiled crane/buildings and remaining occupancy/route gaps are documented in
+  -- README.md. M2 appearance is authored below; native code owns its geometry and contacts.
   scene = {
     version = 3,
     marina = {
       entrance = { x = 4, z = 140, width = 8 },
       berths = {
         { id = "sailboat_aft", recipe = "sailboat_7m", x = 13, z = 146,
-          heading = -1.5707964, mooring = "pontoon" },
+          heading = -1.5707964, mooring = "pontoon",
+          appearance = { mast_height = 8.5 } },
         { id = "runabout", recipe = "runabout", x = 13, z = 151,
           heading = -1.5707964, mooring = "pontoon" },
         { id = "sailboat", recipe = "sailboat", x = 13, z = 156,
@@ -44,9 +45,13 @@ return {
         { id = "sailboat_fore", recipe = "sailboat_7m", x = 13, z = 176,
           heading = -1.5707964, mooring = "pontoon" },
         { id = "row_two_0", recipe = "runabout", x = -15, z = 146,
-          heading = 1.5707964, mooring = "pontoon" },
+          heading = 1.5707964, mooring = "pontoon",
+          appearance = { length = 5.2, beam = 1.9, hull = { 35, 70, 125 },
+            deck = { 180, 145, 100 }, trim = { 235, 225, 195 }, name = "MIRA" } },
         { id = "row_two_1", recipe = "runabout", x = -15, z = 151,
-          heading = 1.5707964, mooring = "pontoon" },
+          heading = 1.5707964, mooring = "pontoon",
+          appearance = { length = 6.6, beam = 2.3, hull = { 220, 150, 45 },
+            deck = { 150, 110, 75 }, trim = { 35, 60, 85 }, name = "SALT" } },
         { id = "row_two_2", recipe = "runabout", x = -15, z = 156,
           heading = 1.5707964, mooring = "pontoon" },
         { id = "row_two_3", recipe = "runabout", x = -15, z = 161,

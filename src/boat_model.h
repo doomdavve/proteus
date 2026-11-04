@@ -51,6 +51,8 @@ bool boat_model_name_valid(const char name[BOAT_MODEL_NAME_BYTES]);
 bool boat_model_spec_valid(BoatModelSpec spec);
 bool boat_model_spec_equal(const BoatModelSpec *a, const BoatModelSpec *b);
 bool boat_model_generate(BoatModel *model, BoatModelSpec spec);
+// The CPU view's existing mirrored camera basis needs mirrored glyph layout (hull unchanged).
+bool boat_model_generate_oriented(BoatModel *model, BoatModelSpec spec, bool mirror_lettering);
 // Small shared geometry helpers, also used to build the pontoon and quay equipment.
 void boat_model_begin(BoatModel *model);
 void boat_model_box(BoatModel *model, Vector3 position, Vector3 size, Color color);

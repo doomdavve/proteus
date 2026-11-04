@@ -186,6 +186,18 @@ int main(int argc, char **argv)
     CHECK(held_scene->scene_digest == scene_digest
         && boat_scene_digest(&held_scene->scene) == scene_digest);
     boat_plugin_stage_close(job);
+    CHECK(!strcmp(held_scene->scene.berths[7].appearance.name, "MIRA")
+        && held_scene->scene.berths[7].appearance.length == 5.2f
+        && held_scene->scene.berths[8].appearance.length == 6.6f);
+    CHECK(replace_once(scene_files->source, &scene_files->source_size, sizeof(scene_files->source),
+        "name = \"MIRA\"", "name = \"TIDE\""));
+    job = boat_plugin_stage_start(argv[0], &scene_host, scene_files, 0);
+    CHECK(job && completed(job, &scene_host) == 1);
+    CHECK(scene_host.change == BOAT_PLUGIN_RENAMED);
+    CHECK(!strcmp(
+        boat_plugin_host_held(&scene_host)->voyage.scene.berths[7].appearance.name, "TIDE"));
+    CHECK(boat_plugin_host_active(&scene_host)->voyage.scene_digest == scene_digest);
+    boat_plugin_stage_close(job);
     free(scene_files);
 
     // Drive the actual live F5/async completion path through a relocated executable/package.

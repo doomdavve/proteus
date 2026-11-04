@@ -102,9 +102,11 @@ typedef struct {
 bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *diagnostic);
 // True when any subsystem is authored. An envelope-only scene changes no runtime content.
 bool boat_scene_has_content(const BoatSceneDefinition *scene);
-// True when two scenes differ only in gull cue intervals: a compatible cosmetic change that
-// keeps the session clock, unlike a flock count/centre/layout edit.
-bool boat_scene_same_except_gull_cues(const BoatSceneDefinition *a, const BoatSceneDefinition *b);
+// True when two scenes differ only in gull cues or berth colors/names: a compatible cosmetic
+// change that keeps the session clock, unlike dimensions, a flock count/centre or layout edit.
+// With BERTH_APPEARANCE false, ignore only gull cues (the existing callback source fence).
+bool boat_scene_same_except_cosmetics(
+    const BoatSceneDefinition *a, const BoatSceneDefinition *b, bool berth_appearance);
 // FNV-1a over explicit fields only: presence, counts, IDs, recipes, positions and attachments.
 // Padding and the diagnostic are excluded.
 uint64_t boat_scene_digest(const BoatSceneDefinition *scene);

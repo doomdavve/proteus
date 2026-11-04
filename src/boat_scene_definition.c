@@ -372,11 +372,19 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
     return hash;
 }
 
-bool boat_scene_same_except_gull_cues(const BoatSceneDefinition *a, const BoatSceneDefinition *b)
+bool boat_scene_same_except_cosmetics(
+    const BoatSceneDefinition *a, const BoatSceneDefinition *b, bool berth_appearance)
 {
     if (!a || !b || a->gulls_present != b->gulls_present)
         return false;
     BoatSceneDefinition ca = *a, cb = *b;
+    for (unsigned i = 0; berth_appearance && i < BOAT_SCENE_BERTHS; ++i) {
+        ca.berths[i].appearance.hull = cb.berths[i].appearance.hull = (Color) { 0 };
+        ca.berths[i].appearance.deck = cb.berths[i].appearance.deck = (Color) { 0 };
+        ca.berths[i].appearance.trim = cb.berths[i].appearance.trim = (Color) { 0 };
+        memset(ca.berths[i].appearance.name, 0, BOAT_MODEL_NAME_BYTES);
+        memset(cb.berths[i].appearance.name, 0, BOAT_MODEL_NAME_BYTES);
+    }
     for (unsigned i = 0; i < WATERFRONT_FLOCKS; ++i) {
         ca.gulls.flocks[i].cue_count = 0;
         cb.gulls.flocks[i].cue_count = 0;

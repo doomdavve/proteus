@@ -190,6 +190,7 @@ bool waterfront_draw_harbor(
     Renderer3D *r, WaterfrontHarborModels *models, const WaterfrontHarborFrame *frame)
 {
     WaterfrontHarborModels candidate;
+    models->mirror_lettering = true;
     if (!waterfront_harbor_models_prepare(&candidate, models, frame))
         return false;
     waterfront_harbor_models_commit(models, &candidate);

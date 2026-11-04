@@ -571,6 +571,12 @@ static int scene_contact_room(void)
         b->recipe = BOAT_SCENE_BERTH_CRUISER;
         b->x = own->boat.position.x;
         b->z = own->boat.position.y;
+        BoatModelSpec base = boat_scene_berth_spec(BOAT_SCENE_BERTH_CRUISER);
+        float ratio = i % 2 ? 1.2f : .8f;
+        b->appearance = (BoatSceneAppearance) { .length = base.length * ratio,
+            .beam = base.beam * ratio,
+            .hull = { (unsigned char)(20 + i), 80, 140, 255 },
+            .name = "ROOM-BOAT" };
     }
     boat_net_memory_destroy(room.network);
     BoatRoomDiagnostic rd;

@@ -909,7 +909,7 @@ BoatPluginChange boat_plugin_classify(
     const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
         return BOAT_PLUGIN_RESTART_SESSION;
-    // PC: scene layout edits install live between ticks. A gull-cue-only edit stays cosmetic.
+    // Scene layout edits install live between ticks; gull cues and berth colors/names are cosmetic.
     // Flock layout, berth, module, entrance and travelling-craft changes all take the live path;
     // the application waits for the hull to clear the candidate envelopes before installing.
     bool cosmetic_scene = false, live = false;
@@ -919,7 +919,7 @@ BoatPluginChange boat_plugin_classify(
         if (!scene_a || !scene_b) {
             live = true;
         } else if (active->scene_digest != candidate->scene_digest) {
-            if (boat_scene_same_except_gull_cues(&active->scene, &candidate->scene))
+            if (boat_scene_same_except_cosmetics(&active->scene, &candidate->scene, true))
                 cosmetic_scene = true;
             else
                 live = true;

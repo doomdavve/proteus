@@ -1,6 +1,6 @@
 # Lua plugin API (voyage/race authoring and optional voyage objectives)
 
-Status, 2026-11-01: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; its README lists the native scene capabilities still missing (crane/building restyling, per-boat appearance, occupancy and lighting).
+Status, 2026-11-03: **P0–P3 native descriptors/objectives, P4.1–P4.9 authoring tools/browser objective isolation, the full L1.1–L1.4 + L2.1–L2.3 marina path, PD1 bundled runtime, the PC live console and PD4 browser parity implemented**. The bundled `harbor-life` example now uses a twelve-berth, two-row Eriksberg marina layout; M2 adds bounded per-boat dimensions/colors/masts and painted hull names; its README lists the native scene capabilities still missing (crane/building restyling, occupancy and lighting).
 Native tooling includes schema discovery, isolated validation/preview, live descriptor staging,
 draft workspace access, pinned frame capture and a [live tool bridge](#live-tool-bridge-p46) to a
 running game; the browser supports source bundles for solo voyages, free boating and the basin time trial, with optional objectives/timers and authored scenes.
@@ -444,8 +444,8 @@ plugin bytes -> candidate BoatSceneDefinition (copied, no Lua pointers)
 | `boat.c` `hull_contact` | Static hull and pontoon contact envelopes | Pass `BoatWorld.scene`; no pointers or Lua in core |
 | `boat_combat.c` `blocked` | The same contact envelopes for projectiles | Pass the same scene; combat remains unavailable with plugins where already rejected |
 | `waterfront_harbor_camera_clear` | Berth/module height and footprint exclusion | Query the same accepted layout |
-| `waterfront_draw_harbor` (CPU) | Per-recipe meshes and module transforms | Draw only accepted berths/modules; no invisible compiled hull |
-| `renderer_gpu.c` harbor pass | Prebuilt recipe meshes and module transforms | Same frame data as CPU; no GPU changes to Lua |
+| `waterfront_draw_harbor` (CPU) | View-owned customized hull meshes and module transforms | Transactional rebuilds; default hulls borrow recipe meshes; no invisible compiled hull |
+| `renderer_gpu.c` harbor pass | View-owned customized hull uploads and module transforms | Same resolved specs/poses as CPU, all-or-nothing upload replacement; no GPU changes to Lua |
 | `waterfront_scene.c` shared frame | Evaluated harbor snapshot for stills/actors | Fill from the accepted scene, preserving explicit time |
 | `boat_view.c` direct harbor pass | Live view's scene | Add a frame-borrowed scene pointer; NULL is compiled |
 | `boat_net_protocol.c` content digest | Compiled harbor content | Authored content travels in room v3; protocol v11 rejects incompatible peers |
@@ -519,9 +519,10 @@ under every driving line, depth, or human acceptance.
 
 ### Scene authoring not exposed yet
 
-Crane/building restyling, sculptures, arbitrary meshes, per-boat appearance/names, occupancy
-schedules, freeform routes and lighting remain outside this contract. M1 supplies larger
-marinas and fixed/floating deck geometry; [M2–M5](MARINA_AUTHORING_PLAN.md) own the next work.
+Crane/building restyling, sculptures, arbitrary meshes, occupancy schedules, freeform routes
+and lighting remain outside this contract. M1 supplies larger marinas and fixed/floating deck
+geometry; M2 supplies bounded hull appearance. [M3–M5](MARINA_AUTHORING_PLAN.md) own routes,
+occupancy and local modules.
 
 
 ## River race authoring (P2)
@@ -1424,8 +1425,8 @@ UI staging is in flight cancels that request first. **Export draft** downloads t
 source, including invalid drafts; exporting is not validation or permission to apply.
 
 The editor caps a bundle manifest at 4096 bytes and its source at 65536 bytes. A stage result may
-be up to 16384 bytes, which covers Harbor life's 5,505-byte scene revision and leaves room for
-larger authored scenes. All imported Lua evaluation happens in Web Workers; the game rechecks
+be up to 163,840 bytes, matching the Wasm host read buffer and covering a full source plus
+the maximum scene and diagnostics (80,124 bytes before diagnostics in the M2 fixture). All imported Lua evaluation happens in Web Workers; the game rechecks
 decoded data and never evaluates that source at startup, staging completion, Apply, Undo or a tick.
 Normal bundled sessions create no worker at all. Native trusted objectives retain their existing
 execution contract. Desktop browsers with a physical keyboard also get the live console; its

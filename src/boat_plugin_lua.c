@@ -173,6 +173,8 @@ static bool only(lua_State *L, Vm *vm, int table, const char *path, const char *
         lua_pop(L, 1);
         if (lua_type(L, -1) != LUA_TSTRING)
             return reject(vm, path, "has a %s key; fields are named", luaL_typename(L, -1));
+        if (strlen(lua_tostring(L, -1)) != lua_rawlen(L, -1))
+            return reject(vm, path, "has a field name containing a NUL character");
         if (!listed(keys, lua_tostring(L, -1))) {
             char field[64];
             join(field, sizeof(field), path, lua_tostring(L, -1));

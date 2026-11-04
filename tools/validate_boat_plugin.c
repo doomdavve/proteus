@@ -459,6 +459,7 @@ static int scene_appearance(void)
         { "{ length = math.huge }", "length" }, { "{ length = 9 }", "length" },
         { "{ beam = 0 }", "beam" }, { "{ beam = '2' }", "beam" },
         { "{ mast_height = 4 }", "mast_height" }, { "{ unknown = 1 }", "unknown" },
+        { "{ ['length' .. string.char(0) .. 'x'] = 5 }", "appearance" },
         { "{ hull = { 1, 2 } }", "hull" }, { "{ hull = { 1, 2, 3, 4 } }", "hull" },
         { "{ hull = { 1, 2, 256 } }", "hull" }, { "{ hull = { 1, 2, -1 } }", "hull" },
         { "{ hull = { 1, 2, 2.5 } }", "hull" }, { "{ hull = { 1, 2, '3' } }", "hull" },

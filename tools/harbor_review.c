@@ -22,6 +22,8 @@ static void usage(void)
          "       [--resolution 320x180|320x200|320x240]\n"
          "Default: GPU, marina, interactive. Screenshots render once; --frames bounds playback.\n"
          "GPU uses 4x4 supersampling. CPU screenshots need no graphics context. Esc exits.");
+    puts("M2 hull lettering: --view names-port|names-starboard|names-far (two customized "
+         "runabouts).");
 }
 
 // Double world seconds up to 30 days, for long-session water and traffic probes.
@@ -83,7 +85,8 @@ int main(int argc, char **argv)
             view = argv[++i];
             if (strcmp(view, "marina") && strcmp(view, "workboat") && strcmp(view, "overview")
                 && strcmp(view, "ferry") && strcmp(view, "launch") && strcmp(view, "traffic")
-                && strcmp(view, "bridge"))
+                && strcmp(view, "bridge") && strcmp(view, "names-port")
+                && strcmp(view, "names-starboard") && strcmp(view, "names-far"))
                 goto invalid;
         } else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
             const char *name = argv[++i];
@@ -139,7 +142,38 @@ int main(int argc, char **argv)
         camera.position = (Vector3) { 3524, 24, 2032 };
         camera.target = (Vector3) { 3504, 16, 1962 };
     }
+    bool names = !strncmp(view, "names-", 6);
+    static const BoatSceneDefinition named_scene = { .version = BOAT_SCENE_VERSION,
+        .berths_present = true,
+        .modules_present = true,
+        .berth_count = 2,
+        .berths = { { .id = "mira",
+                        .recipe = BOAT_SCENE_BERTH_RUNABOUT,
+                        .x = 13,
+                        .z = 167,
+                        .appearance = { .length = 5.2f,
+                            .beam = 1.9f,
+                            .hull = { 35, 70, 125, 255 },
+                            .deck = { 180, 145, 100, 255 },
+                            .trim = { 235, 225, 195, 255 },
+                            .name = "MIRA" } },
+            { .id = "salt",
+                .recipe = BOAT_SCENE_BERTH_RUNABOUT,
+                .x = 13,
+                .z = 173,
+                .appearance = { .length = 6.6f,
+                    .beam = 2.3f,
+                    .hull = { 220, 150, 45, 255 },
+                    .deck = { 150, 110, 75, 255 },
+                    .trim = { 35, 60, 85, 255 },
+                    .name = "SALT" } } } };
     camera = follow_vessel(camera, view, time);
+    if (names) {
+        float side = !strcmp(view, "names-starboard") ? -1 : 1;
+        float distance = !strcmp(view, "names-far") ? 32 : 12;
+        camera.position = (Vector3) { -13 + side * distance, 1.6f, 170 };
+        camera.target = (Vector3) { -13, .35f, 170 };
+    }
     Vector3 patch_center = camera.target;
     bool window = gpu || !screenshot;
     if (window) {
@@ -212,6 +246,8 @@ int main(int argc, char **argv)
         WaterfrontSceneFrame frame;
         double local_time = time + count / 60.0;
         waterfront_scene_evaluate(local_time, water, &frame);
+        if (names)
+            waterfront_harbor_evaluate_scene(&named_scene, water, local_time, NULL, &frame.harbor);
         frame.camera = follow_vessel(camera, view, local_time);
         frame.player_active = true;
         frame.player_water = water;
@@ -232,7 +268,8 @@ int main(int argc, char **argv)
                 patch_center = frame.camera.target;
             }
             BeginTextureMode(target);
-            waterfront_gpu_scene_draw(&scene, &frame, 1280, height * 4);
+            if (!waterfront_gpu_scene_draw(&scene, &frame, 1280, height * 4))
+                result = 1;
             EndTextureMode();
             BeginTextureMode(resolved);
             ClearBackground(BLACK);

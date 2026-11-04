@@ -19,6 +19,7 @@ bool waterfront_harbor_models_prepare(WaterfrontHarborModels *candidate,
     if (frame->berth_count < 0 || frame->berth_count > BOAT_SCENE_BERTHS)
         return false;
     candidate->count = (unsigned)frame->berth_count;
+    candidate->mirror_lettering = active->mirror_lettering;
     candidate->builds = active->builds;
     for (unsigned i = 0; i < candidate->count; ++i) {
         BoatModelSpec spec = frame->specs[i];
@@ -34,7 +35,8 @@ bool waterfront_harbor_models_prepare(WaterfrontHarborModels *candidate,
         if (boat_model_spec_equal(&spec, &base))
             continue;
         candidate->boats[i] = malloc(sizeof(BoatModel));
-        if (!candidate->boats[i] || !boat_model_generate(candidate->boats[i], spec))
+        if (!candidate->boats[i]
+            || !boat_model_generate_oriented(candidate->boats[i], spec, active->mirror_lettering))
             goto failed;
         ++candidate->builds;
     }

@@ -11,6 +11,7 @@ typedef struct {
     BoatModelSpec specs[BOAT_SCENE_BERTHS];
     unsigned char recipes[BOAT_SCENE_BERTHS];
     unsigned count, builds;
+    bool mirror_lettering; // Fixed per owner before first prepare; CPU camera compensation.
 } WaterfrontHarborModels;
 
 // Prepare a complete replacement without changing ACTIVE. On failure no allocation survives.
