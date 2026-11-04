@@ -389,6 +389,9 @@ boat ("Same tour just for me, not the tourists").
 - **Drive check.** The drive case runs the loop twice, in the Grodan and in the speedboat. Each run
   scales its throttle to the Grodan's push and slows on legs into the narrowest stops. Neither
   footprint left the water: 21.9 and 19.9 simulated minutes.
+- **Verification**, 2026-11-04, macOS Debug: `ctest --preset full` passed all 370 enabled tests,
+  with `wake_velocity_title_start.outer-canal-tour` new. A CPU capture of the canal tour shows the
+  speedboat at the pier. No human play of the revision.
 
 ## GH6: sights along the route
 
