@@ -466,8 +466,8 @@ the game thread. `race` and `match` imports are rejected with a message pointing
 imported Lua executes on the game thread. A completed descriptor receipt is bound to exact bytes
 and the current revision/commit epoch before native schema/map checks.
 
-A stage result may be 16384 bytes; Harbor life's scene revision measures 5,505 bytes, above the
-old 4 KiB cap. The browser worker deadline is 15 seconds. The bundled catalog is generated for
+M2 stage replies may be 163,840 bytes, matching the Wasm host read buffer. A maximum scene
+with a full 64 KiB source measures 80,124 bytes; the native body cap remains source + 32 KiB. The browser worker deadline is 15 seconds. The bundled catalog is generated for
 Wasm by the same Node generator the native build runs through CMake's cross-compiling emulator;
 only the solo entries (basin and river free, time trial, Långedrag and Harbor life) are linked.
 The game Wasm links `proteus_plugins` for runtime package data, so `tools/check_web_wasm.py` tests
@@ -487,7 +487,7 @@ state transactions. See [browser objectives](PLUGIN_API.md#browser-objective-tra
 
 Source persistence uses localStorage, separately from existing IndexedDB game settings/bests;
 time-trial bests keep the same digest-derived file name as native, so existing bests remain valid.
-Import and stage results are bounded by the manifest/source limits above and the 16 KiB result cap.
+Import and stage results are bounded by the manifest/source limits above and the 160 KiB stage result cap (query worker output remains 16 KiB).
 Denied/corrupt storage leaves import, validation, play and export usable and reports the loss
 of persistence. Saved source always requires revalidation after reload. No world progress,
 callback state or Undo history is persisted. Example/worker JS/Wasm URLs are content-addressed

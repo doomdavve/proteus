@@ -146,7 +146,7 @@ static bool convert(const BoatPluginRevision *revision, BoatPluginKind kind,
     if (room.has_scene) {
         for (unsigned i = 0; i < room.scene.berth_count; ++i) {
             const BoatSceneBerth *b = &room.scene.berths[i];
-            BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+            BoatModelSpec spec = boat_scene_berth_resolve(b);
             if (!boat_map_water(&world->map, (Vector2) { b->x, b->z }, (int)ceilf(spec.length))) {
                 reason(error, size, "a scene berth is not on open water");
                 return false;

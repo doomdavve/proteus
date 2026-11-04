@@ -6,6 +6,7 @@ const canvas = Module['canvas'];
 const stage = document.getElementById('stage');
 let started = false;
 installBoatMouseControls(Module, canvas, document, window);
+installBoatConsoleControls(Module, canvas, document, navigator);
 installBoatMobileControls(Module, canvas, document, window);
 installBoatRtcTransport(Module);
 installBoatServerDirectory(Module).refresh();

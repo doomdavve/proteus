@@ -11,6 +11,7 @@ BoatUiPalette boat_ui_palette(void);
 bool boat_ui_load(void);
 void boat_ui_unload(void);
 void boat_ui_text(const char *text, int x, int y, int size, Color color);
+int boat_ui_compact_width(const char *text);
 bool boat_ui_compact(const char *text, int center, int y, Color color);
 int boat_ui_width(const char *text, int size);
 #endif

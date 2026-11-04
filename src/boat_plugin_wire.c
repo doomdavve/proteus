@@ -217,6 +217,20 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
         b->x = (float)number(w, b->x);
         b->z = (float)number(w, b->z);
         b->heading = (float)number(w, b->heading);
+        BoatSceneAppearance *a = &b->appearance;
+        a->length = (float)number(w, a->length);
+        a->beam = (float)number(w, a->beam);
+        a->mast_height = (float)number(w, a->mast_height);
+        Color *colors[] = { &a->hull, &a->deck, &a->trim };
+        for (unsigned c = 0; c < 3; ++c) {
+            colors[c]->r = (unsigned char)integer(w, colors[c]->r, 1);
+            colors[c]->g = (unsigned char)integer(w, colors[c]->g, 1);
+            colors[c]->b = (unsigned char)integer(w, colors[c]->b, 1);
+            colors[c]->a = (unsigned char)integer(w, colors[c]->a, 1);
+        }
+        string(w, a->name, sizeof(a->name));
+        if (w->reading)
+            boat_scene_berth_canonicalize(b);
     }
     for (unsigned i = 0; i < s->module_count; ++i) {
         BoatSceneModule *m = &s->modules[i];
