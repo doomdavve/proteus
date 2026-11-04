@@ -114,7 +114,9 @@ since A3.5f extended it upstream past Hisingsbron; the pack is already DEFLATE-c
 Since graphics G4 each map also has a water atlas sidecar (`water_atlas.bin`, about 0.2 MB river
 and 0.4 MB outer). The river's is preloaded; the outer one is packaged as
 `water-atlas-outer-<hash>.bin` and fetched after its scenery pack, best effort: without it the
-water keeps its hand-written shading.
+water keeps its hand-written shading. The G5c ambient occlusion sidecar (`ambient.bin`, about 0.08 MB river and
+0.74 MB outer) travels the same way: preloaded for the river, `ambient-outer-<hash>.bin` fetched
+after the outer atlas, best effort; without it scenery draws unoccluded.
 
 Check it against a served build (Playwright and Chrome; the script is optional and not in CTest):
 

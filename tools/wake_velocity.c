@@ -993,7 +993,8 @@ static int study(int argc, char **argv)
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     cpu_view.daylight = daylight_phase;
     BoatGpu gpu = { 0 };
-    int water_layer = 0, water_layer_label = 0; // F8; label frames left.
+    int water_layer = 0, review_label_frames = 0; // F8 and F9; label frames left.
+    const char *review_label = NULL;
     BoatRearview mirror = { 0 };
     // Every mapped location, solo or room; hidden until N.
     BoatMinimap minimap = { 0 };
@@ -1605,7 +1606,15 @@ static int study(int argc, char **argv)
         if (active && gpu_enabled && IsKeyPressed(KEY_F8)) {
             water_layer = (water_layer + 1) % WATER_LAYERS;
             apply_water_layer(&gpu, water_layer);
-            water_layer_label = 180;
+            review_label = water_layer_names[water_layer];
+            review_label_frames = 180;
+        }
+        if (active && gpu_enabled && IsKeyPressed(KEY_F9)) {
+            // Graphics review (Batch C): the map's baked ambient occlusion on or off.
+            gpu.scene.ambient_occlusion_disabled = !gpu.scene.ambient_occlusion_disabled;
+            review_label = gpu.scene.ambient_occlusion_disabled ? "AMBIENT OCCLUSION: OFF"
+                                                                : "AMBIENT OCCLUSION: ON";
+            review_label_frames = 180;
         }
         bool performance_request = active && IsKeyPressed(KEY_F4);
         if (active && boat_minimap_ready(&minimap) && IsKeyPressed(KEY_N))
@@ -2032,10 +2041,9 @@ static int study(int argc, char **argv)
             boat_ui_text("MOUSE UNAVAILABLE / A/D / P: MENU", 4, hint_top, 10,
                 (Color) { 218, 223, 202, 255 });
 #endif
-        if (water_layer_label > 0) {
-            --water_layer_label;
-            boat_ui_text(
-                water_layer_names[water_layer], 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
+        if (review_label_frames > 0 && review_label) {
+            --review_label_frames;
+            boat_ui_text(review_label, 4, height - 76, 10, (Color) { 233, 180, 104, 255 });
         }
         if (!networked && !session.runs.playing
             && (time_speed_index != BOAT_TIME_NORMAL || session.runs.practice)) {

@@ -192,6 +192,14 @@ each slot list finds exactly the lights reaching the point.
 `water_atlas_river` and `water_atlas_outer` (`water_atlas_bake --check`; graphics G4) rebake each
 map's water atlas and require the committed sidecar byte for byte. `validate_boat_scenery`
 also rejects malformed, truncated, foreign-map and out-of-range atlases.
+`ambient_river` and `ambient_outer` (`ambient_bake --check`; graphics G5c, slow: about 1.5 s and
+20 s) rebake each map's ambient occlusion and require the committed sidecar byte for byte;
+`validate_boat_scenery` rejects malformed, truncated, stale-key, foreign-map and wet-corner
+sidecars and one loaded without its scenery, and `gpu_view_lifecycle` requires the river's
+occlusion to reach its uploaded vertices. `boat_handling.particle_lifecycle` (slow) pins the
+cube foam and spray signature through emission, a fast turn, a 2 m drop and expiry within
+declared ranges, checks that posing is pure and that the boat is identical whatever the
+presentation holds.
 `boat_water_review --geometry` prints each map's static GPU bytes (graphics G2a) and
 `--compare A B` checks two `--review` directories against the G0 image bounds. Neither is a CTest:
 review captures compare only within one platform and build.

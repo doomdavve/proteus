@@ -653,6 +653,49 @@ no slot overflow; the fallback is cheaper because it shades 29 lights and gives 
 Every run of a scenario ended in the same `final_state`. All runs stay far below G0's stress 4×4
 reference of 20.01 ms GPU p95. No Windows, browser-timing or visible paced run was made.
 
+## Graphics G5c final matrix and particles — 2026-11-04
+
+Release, Apple M1 Max, macOS, hidden 960×600 window, unpaced, `--waves`, at `673f1d2` plus the
+F9 review toggle (uncommitted at measurement; it touches only input). Three interleaved
+repetitions against a control build of `main` (`6e78e5c`: P2 and the sunset frame, the package
+before P3). Values are medians of the per-run statistics (ms); GPU is `GL_TIME_ELAPSED` around
+the scene draw.
+
+| Run | GPU p50 / p95 | CPU submit p50 / p95 | Frame p50 / p95 |
+| --- | --- | --- | --- |
+| G0 reference (`d0b1970`), river 4x4 | 3.45 / 3.85 | 3.87 / 4.30 | 4.62 / 6.09 |
+| G0 reference, stress 4x4 | 17.78 / 20.01 | 9.84 / 11.13 | 11.61 / 13.48 |
+| `main` river 4x4 | 1.51 / 1.86 | 1.26 / 1.67 | 1.77 / 2.94 |
+| P3 river 4x4 | 1.63 / 2.05 | 1.33 / 1.78 | 1.84 / 2.90 |
+| `main` river off | 1.21 / 1.59 | 1.19 / 1.62 | 1.75 / 2.83 |
+| P3 river off | 1.26 / 1.67 | 1.24 / 1.68 | 1.78 / 2.85 |
+| `main` stress 4x4 | 3.39 / 3.83 | 2.37 / 3.00 | 3.80 / 5.41 |
+| P3 stress 4x4 | 3.47 / 3.89 | 2.46 / 3.11 | 3.89 / 5.54 |
+| `main` stress off | 2.74 / 3.13 | 1.89 / 2.36 | 3.20 / 4.57 |
+| P3 stress off | 2.77 / 3.18 | 1.92 / 2.41 | 3.26 / 4.68 |
+| P3 river low dusk | 1.33 / 1.76 | 1.27 / 1.75 | 1.80 / 2.86 |
+| P3 river high (HDR) day / dusk | 1.70 / 2.25, 2.18 / 2.57 | 1.63 / 2.10, 1.74 / 2.17 | 2.17 / 3.46, 2.26 / 3.42 |
+| P3 stress low dusk | 2.89 / 3.34 | 2.03 / 2.55 | 3.36 / 4.54 |
+| P3 stress high (HDR) day / dusk | 3.58 / 4.05, 4.00 / 4.53 | 2.63 / 3.30, 3.04 / 3.71 | 4.08 / 5.55, 4.45 / 6.01 |
+
+P3 at the default low preset costs at most about 0.1 ms GPU and CPU over `main` (clusters, AO
+and the G5b far-shadow lookup), with submissions and triangles unchanged (river p50 128 and
+203 k). Every run of a scenario ended in the same `final_state` in both builds. Against G0 all
+runs are far inside the budgets: river 4x4 GPU p95 2.05 ms (gate ≤ 4.05), stress 4x4 3.89 ms
+(G3 target ≤ 16.5), river CPU submit p95 1.78 ms (≤ 3.2) and river 4x4 frame p95 2.90 ms (≤ 8.0).
+The worst preset, stress at high resolution with HDR at dusk, is 4.53 ms GPU p95. Memory added
+by P3: HDR targets 14,976,000 bytes at 1280×800, the light texture (256 × 96 RGBA32F, 393 KB),
+the ambient sidecars held in memory (236 KB river, 1.84 MB outer) and their vertex splits (map
+vertex bytes 15.49 → 16.19 MB river, 70.14 → 71.96 MB outer).
+
+**Particles.** In the stress scene (four boats, `--waves`) the cube foam and spray draw 287 p50 /
+463 p95 instances. `--no-particles` over two interleaved runs: GPU −0.12 ms low and −0.2 ms high
+p50, CPU submit −0.17 ms. Posing them (instrumented once, not committed) costs about 59 µs per
+boat per frame with waves, most of it the water normal under each foam cube. A portable GPU
+path could at most save about 0.4 ms CPU in this worst case, so they stay CPU-evaluated.
+
+No Windows, browser-timing or visible paced run was made for this checkpoint.
+
 ## Windows active GPU check — 2026-11-03
 
 Before collecting, follow [Windows GPU selection](WINDOWS_BUILD.md#select-and-verify-the-active-gpu)
