@@ -39,7 +39,8 @@ the crop's edge, hit it, and never saw the Gothenburg content. The user asked to
 ## Status
 
 Merged in [PR #148](https://github.com/doomdavve/proteus/pull/148) and automatically verified.
-Release and hosted cutover are being prepared as v0.0.25; human play remains open.
+Released in [v0.0.25](RELEASES.md#status-and-verification) and deployed to Winterfell on `outer`
+(2026-11-04); matching browser/native joins passed. Human play remains open.
 
 ### Verification, 2026-11-04 (Apple Silicon/macOS, Debug)
 
@@ -75,11 +76,10 @@ Release and hosted cutover are being prepared as v0.0.25; human play remains ope
 
 ## Next tasks
 
-1. **Release (owed with the first v12 release).** The hosted Winterfell room runs
-   `--mode deathmatch --location river` (`wake_velocity_location: river` in
-   `davve-srv/ansible/roles/wake_velocity/defaults/main.yml`). The v12 server refuses that, so
-   set it to `outer` in the same release cutover; also rename the service description's "river
-   room". See [hosting](MULTIPLAYER_HOSTING.md#routine-deployments-davve-srv).
+1. **Release complete, 2026-11-04.** v0.0.25 is published and Winterfell runs `outer` with
+   protocol 12 / physics 9. Hosting preparation `9209fcd` and version pin `09a8cf2` changed the
+   location and service description; the ordinary role and native/browser checks passed.
+   [Deployment evidence](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-04).
 2. **Play it.** A solo outer outing from the title, a hosted outer deathmatch and a two-player
    race on outer.
 3. **Optional.** Move the remaining validators from the crop fixture to outer and drop the crop's
