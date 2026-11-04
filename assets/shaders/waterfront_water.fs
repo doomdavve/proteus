@@ -619,8 +619,8 @@ int listedLight(ivec2 list, int k)
 {
     if (lightClusterMode == 2) return k;
     int at = list.x + k;
-    vec4 packed = lightTexel(int(lightClusterLayout.w) + at / 4);
-    return int(packed[at % 4]);
+    vec4 slots = lightTexel(int(lightClusterLayout.w) + at / 4);
+    return int(slots[at % 4]);
 }
 
 // Lamplight on the water: a faint pool under each light and a glint where the rippled surface

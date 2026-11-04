@@ -260,8 +260,8 @@ void addLocalLights(inout vec3 illumination, vec3 normal)
     int offset = int(header.x), count = int(header.y);
     for (int k = 0; k < count; ++k) {
         int at = offset + k;
-        vec4 packed = lightTexel(int(lightClusterLayout.w) + at / 4);
-        illumination += clusterLight(int(packed[at % 4]), normal);
+        vec4 slots = lightTexel(int(lightClusterLayout.w) + at / 4);
+        illumination += clusterLight(int(slots[at % 4]), normal);
     }
 }
 
