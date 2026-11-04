@@ -102,7 +102,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | Step | After | Result | Status |
 | --- | --- | --- | --- |
 | [GH1](#gh1-rename-to-gothenburg-harbour) | — | GOTHENBURG HARBOUR in the title, hints, package names and guides | Implemented 2026-11-04; [result](#gh1-result-2026-11-04) |
-| [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Proposed |
+| [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Implemented 2026-11-04 with estimated heights; [result](#gh2-result-2026-11-04). User drive: descent good, snap back up fixed (unplayed) |
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Implemented 2026-11-04; [result](#gh3-result-2026-11-04) |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start and up to 32 ordered stops with captions | Implemented 2026-11-04; [result](#gh4-result-2026-11-04). Speed-limit zones and Å/Ä/Ö moved to GH4b |
 | GH4b | GH4 | Å, Ä, Ö and É in the menu and HUD fonts and in stop names and captions; canal speed-limit zones | Proposed |
@@ -197,6 +197,73 @@ Acceptance:
   lowest bridge.
 - The water connectivity check passes.
 - A user drive through Vallgraven with the camera change.
+
+### GH2 result, 2026-11-04
+
+The user agreed to bridges with estimated heights first ("Yes, do so. We start there."), because
+they cannot source measured heights or looks. Branch `feat/canal-bridges`, stacked on
+`feat/grodan-tour`.
+
+- **Bake.** `tools/outer_bridges.py` builds 19 decks over the canals (7,324 triangles; the outer
+  pack is now 619,497 triangles, 1.2% more) from `man_made=bridge` outlines, and from `bridge=*`
+  ways where no outline covers the water. Each deck spans the water it crosses plus 1.5 m onto
+  each quay, with a top, an underside, fascias and railings. Abutments, lamps and materials are
+  not modelled. Decks are scenery only: the water and collision are unchanged.
+- **Filters.** A deck must be a crossing. The bake skips outlines whose span does not land at both
+  ends: the two gangways out to the Lilla Bommen pontoons, which first drew a long railing along
+  the river. It also skips ways that end in the water and sidewalk stubs that cross only a corner
+  of the water. It drops any deck that spans more water than runs on under it.
+- **Heights (estimates).** OSM has no heights, and no measured source was used. The deck top is the
+  street level 4 m past the water at both ends (Höjdmodell), clamped to 2.4–3.6 m. The underside
+  sits 0.55 m below the top for a beam. An arch's underside falls from 0.5 m below the top at the
+  middle to 1.3 m at the quays. Stora Bommens Bro is set by hand at 1.75 m, as the lowest
+  (Swedish Wikipedia). The manifest's `dressing.canal_bridges` records every deck and these
+  assumptions.
+
+  | Bridge | Structure | Over water (m) | Underside (m) |
+  | --- | --- | --- | --- |
+  | Stora Bommens Bro | beam | 38.0 | 1.75 (by hand) |
+  | Kungsportsbron, Tyska Bron, Kämpebron, Brunnsparksbron, Bazarbron, Palacehusets personalbro | beam | 11.5–41.5 | 1.85 |
+  | Fredsbron | arch | 11.5 | 1.90 at the middle |
+  | Fontänbron | arch | 12.0 | 2.02 at the middle |
+  | Viktoriabron | beam | 27.5 | 2.11 |
+  | Residensbron | beam | 33.0 | 2.22 |
+  | Kvarnbron | beam | 13.5 | 2.23 |
+  | Slussbron | arch | 30.0 | 2.29 at the middle |
+  | Drottningtorgsbron | beam | 11.5 | 2.30 |
+  | Vasabron | beam | 31.0 | 2.45 |
+  | Pusterviksbron | beam | 35.5 | 2.61 |
+  | Västra Stampbron | arch | 14.5 | 2.71 at the middle |
+  | Two unnamed footbridges (w/166612428, w/246629447) | beam | 19.0, 27.0 | 2.65, 1.87 |
+
+- **Data for the game.** The bake also writes the decks into the compiled `water.h` as
+  `WaterfrontBridge` records. `waterfront_outer_overhead(x, z)` returns the lowest underside over a
+  point, and `waterfront_overhead(map)` returns that function for the outer map and NULL for the
+  others. The tour's duck rules will use it next.
+- **Camera.** Under a deck the chase camera drops just enough that its line to the boat passes
+  0.3 m below the underside. The limit comes from the deck between the boat and the eye, so it
+  tightens smoothly as the boat goes under and eases as the eye comes out. It keeps no history, so
+  replays seek as before. The eye goes no lower than 1 m.
+- **User drive, 2026-11-04.** The user found the descent good, but the camera snapped back up once
+  the eye left the deck. Now a deck behind the eye still holds it down, rising 0.5 m for each metre
+  the eye has travelled clear. A straight line from Kämpebron through Residensbron and Stora Bommen,
+  traced with the same deck table and formula, showed the climb. Leaving Residensbron, the eye goes
+  from 1.9 m back to 10 m over about 16 m, about 5 s in the Grodan, with no step over 0.3 m. Coming
+  in, it drops to about 2.5 m within the first 6–7 m under the deck. `ctest --preset full` passed
+  all 370 enabled tests again. The change is not played yet.
+- **Checks.** `boat_outer_map` checks the overhead query: open sky over the river spawn, 1.75 m at
+  Stora Bommen, nothing in the basin. The `grodan_tour` drive now counts the bridges the boat passes
+  under: 16 in both boats, the lowest 1.75 m. That drive is also the route's connectivity check,
+  because decks never change the water. `ambient_outer`'s sidecar was rebaked.
+- **Verification**, 2026-11-04, macOS Debug: `ctest --preset full` passed all 370 enabled tests. I
+  inspected CPU captures at 5/10/15/20 s on legs through Residensbron and Stora Bommen, Fontänbron,
+  Vallgraven and Vasabron, and a GPU set through Residensbron and Stora Bommen. Before the camera
+  change, the deck hid the boat completely. After it, the camera comes in under the railings, the
+  underside fills the top of the frame, and the boat stays in view.
+- **Not done.** The camera's gradual climb is unplayed. Frame times were not measured,
+  only the triangle count. There is no photo reference sheet, so looks are uniform grey decks with
+  black railings. The Grodan's ensign staff passes through the decks, and its skipper's head
+  (1.73 m) just clears Stora Bommen.
 
 ## GH3: the canal boat
 
@@ -431,8 +498,11 @@ GH1 implemented 2026-11-04 on branch `feat/gothenburg-harbour-name` ([result](#g
 GH4 on `feat/grodan-tour-format` ([result](#gh4-result-2026-11-04)), GH3 on `feat/grodan-boat`
 ([result](#gh3-result-2026-11-04)) and GH5 on `feat/grodan-tour` ([result](#gh5-result-2026-11-04)).
 The user asked to continue with the steps that need no new data from them: GH6 (sights along the
-route) next. GH2 waits for bridge height data. The user ran the Grodan tour on 2026-11-04: no
-bridges, nothing new to see, too slow, not fun yet.
+route) next. The user ran the Grodan tour on 2026-11-04: no bridges, nothing new to see, too slow,
+not fun yet. They then agreed to a revised order, recorded in
+[the GH5 revision](#gh5-revision-after-the-users-run-2026-11-04): GH2 with estimated heights,
+implemented 2026-11-04 on `feat/canal-bridges` ([result](#gh2-result-2026-11-04)). Next comes the
+duck and scrape score in the tour rules (GH8, reworked so that physics stays unchanged), then GH6.
 
 ## Verification and handoff
 
@@ -444,6 +514,8 @@ any user play. Captures alone do not count as acceptance for motion, camera or h
 - The tour follows the operator's map only roughly: Stora Hamnkanalen replaces Fattighusån, which
   leaves the map ([GH5](#gh5-result-2026-11-04)).
 - The Grodan overshoots turns in the narrow canals (GH5); its handling has not been played.
-- Bridge heights have proposed sources ([GH2](#gh2-canal-bridges)), but none has been checked
-  over the canals.
+- Bridge heights are estimates ([GH2 result](#gh2-result-2026-11-04)); the proposed measured
+  sources have not been checked over the canals.
+- The bridges' looks are uniform and unchecked against photographs, and the Grodan's ensign staff
+  passes through the low decks.
 - No sight has had its look checked against photographs yet.
