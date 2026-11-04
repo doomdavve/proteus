@@ -1650,8 +1650,10 @@ title's PICTURE row (PIXEL, SMOOTH, HIGH RES) in each. Compare as you go: F9 tur
 ambient occlusion off and on; F8 steps the water back through its layers as in Batch B. Also open
 the web build once at low and high resolution in a hardware browser.
 
-Windows: download the Windows artifact of PR #140's latest CI run, run **Collect performance**,
-and return the ZIP; the agent compares it on the Mac with the saved AMD/GeForce baselines.
+Windows: download `wake_velocity-dev-45089c7…-windows-x64` from the Windows Wake Velocity run
+for `4738413` (PR #140's merge build, run 41797790879) or a later run, extract it, run **Collect
+performance** and return the ZIP; the agent compares it on the Mac with the saved AMD/GeForce
+baselines.
 
 Questions: Is navigation clear (boat, course, gates and weapons) at dusk and in the squall? Does
 the integrated look keep its identity at both resolutions? Is the ambient occlusion subtle and
