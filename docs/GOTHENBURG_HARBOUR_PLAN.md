@@ -93,7 +93,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 
 | Step | After | Result | Status |
 | --- | --- | --- | --- |
-| [GH1](#gh1-rename-to-gothenburg-harbour) | — | GOTHENBURG HARBOUR in the title, hints, package names and guides | Proposed |
+| [GH1](#gh1-rename-to-gothenburg-harbour) | — | GOTHENBURG HARBOUR in the title, hints, package names and guides | Implemented 2026-11-04; [result](#gh1-result-2026-11-04) |
 | [GH2](#gh2-canal-bridges) | — | The canal bridges baked from their OSM outlines, and a camera that stays readable under a deck | Proposed |
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Proposed |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start, up to 32 named waypoints with captions, and canal speed limits; Å/Ä/Ö in the fonts | Proposed |
@@ -119,6 +119,26 @@ Read `tools/boat_title.c`, `tools/wake_velocity.c` and `plugins/outer-free/plugi
 
 Acceptance: title captures (CPU, plus the browser title check) show the new name; `ctest --preset
 full` passes; `--location outer` and the hosted room's command are unchanged.
+
+### GH1 result, 2026-11-04
+
+- `BoatWorldDefinition.title` holds the player-facing name (BASIN, GOTHENBURG HARBOUR). The
+  title's solo and host PLACE rows and the browser's LOADING line use it; `name` stays the
+  command-line and wire spelling `outer`.
+- Hints now read THE STANDARD HARBOUR and RIVER RACES ALWAYS RUN IN THE HARBOUR. The
+  `proteus.outer-free` package is named "Gothenburg Harbour free boating"; package ids are
+  unchanged.
+- Updated the live guides (PLAYING, COMMAND_LINE, WEB_BUILD, MACOS_BUILD, the index intro,
+  AGENTS.md), the Windows README and the browser check scripts' comments. Dated history keeps
+  OUTER RIVER.
+- The content option is still spelled HARBOR LIFE (American); unchanged here.
+
+Verification, 2026-11-04, Apple Silicon/macOS, Debug: build warning-clean (only the upstream
+`stb_vorbis.c` warning); `ctest --preset full` passed all 366 enabled tests (13 retired wake-field
+tests disabled, GPU tests off). `< GOTHENBURG HARBOUR >` measures 125 px in the m5x7 font
+against the 126 px value column. CPU title captures of the solo and host panels (made with a
+temporary local patch, not committed) show the full name. The browser title scripts and a
+browser build were not run; no human play.
 
 ## GH2: canal bridges
 
@@ -257,7 +277,9 @@ design before work starts.
 
 ## Status
 
-Plan only (2026-11-04). Nothing is implemented. Next task: GH2, or GH1 as a quick first step.
+GH1 implemented 2026-11-04 on branch `feat/gothenburg-harbour-name` ([result](#gh1-result-2026-11-04)).
+The user asked to continue with the steps that need no new data from them: GH4 (tour format)
+next, then GH3, GH5 and GH6. GH2 waits for bridge height data.
 
 ## Verification and handoff
 

@@ -44,7 +44,7 @@ with sync_playwright() as p:
     assert not scenery and not atlases, f'outer files requested before any session: {scenery} {atlases}'
     key('Enter')  # SINGLE PLAYER
     for _ in range(4):
-        key('ArrowUp')  # START -> PLACE, the default Outer river
+        key('ArrowUp')  # START -> PLACE, the default Gothenburg Harbour
     shot('solo-outer')
     if args.throttle_kbps:
         cdp = page.context.new_cdp_session(page)
@@ -71,7 +71,7 @@ with sync_playwright() as p:
         key('ArrowDown')
     key('Enter')  # BACK TO TITLE
     page.wait_for_timeout(700)
-    key('Enter')  # SINGLE PLAYER, remembered Outer river
+    key('Enter')  # SINGLE PLAYER, remembered Gothenburg Harbour
     key('Enter')  # START
     page.wait_for_timeout(3000)
     shot('outer-again')

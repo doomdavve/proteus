@@ -50,8 +50,8 @@ with sync_playwright() as p:
     key('ArrowUp')
     key('Enter')
     shot('solo-setup')
-    key('ArrowUp', 4)  # START -> PLACE past the outer river's CONTENT row
-    key('ArrowLeft')  # OUTER RIVER -> BASIN
+    key('ArrowUp', 4)  # START -> PLACE past Gothenburg Harbour's CONTENT row
+    key('ArrowLeft')  # GOTHENBURG HARBOUR -> BASIN
     key('ArrowDown')
     key('ArrowDown')
     key('ArrowLeft')

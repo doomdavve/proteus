@@ -16,6 +16,7 @@ typedef enum { BOAT_LOCATION_BASIN, BOAT_LOCATION_OUTER, BOAT_LOCATION_COUNT } B
 typedef struct {
     BoatLocationId id;
     const char *name; // Command-line spelling.
+    const char *title; // Player-facing spelling, upper-case ASCII.
     bool mapped; // Shoreline, harbor, traffic and gulls come from the compiled map crop.
     const BoatMapDescription *map; // Non-NULL exactly when mapped; NULL for the basin.
     Vector2 half_extent; // Basin wall half-sizes in simulation X/Z; zero for mapped records.

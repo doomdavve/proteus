@@ -3,7 +3,7 @@
 Current status reconciled on 2026-11-04. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
-Acid Wake techno or Off. It provides free boating in the basin and on Gothenburg's outer river, a
+Acid Wake techno or Off. It provides free boating in the basin and in Gothenburg Harbour (`outer`), a
 basin time trial, the Långedrag voyage and multiplayer rooms. It defaults to GPU rendering; the CPU reference supports
 display-free captures. The four-minute Eriksberg demo (`proteus`), its soundtrack, the separate
 Eriksberg boating location and their plans were removed on 2026-10-25; they remain in the git

@@ -54,7 +54,7 @@ with sync_playwright() as p:
 
     tap_scene(120, 115)  # SINGLE PLAYER
     page.screenshot(path=str(args.output / 'solo-setup.png'))
-    tap_scene(160, 150)  # START (default Outer River includes a CONTENT row)
+    tap_scene(160, 150)  # START (default Gothenburg Harbour includes a CONTENT row)
     page.wait_for_function('Module.boatMobile.state() & 1', timeout=30000)
     page.wait_for_timeout(1500)
     page.evaluate('''() => {

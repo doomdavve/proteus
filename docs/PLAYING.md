@@ -90,7 +90,7 @@ reset/recovery action to get moving again.
 
 ## Explore
 
-The outer river (the title's default PLACE) starts in the Eriksberg dock, with moored craft,
+Gothenburg Harbour (the title's default PLACE; `--location outer`) starts in the Eriksberg dock, with moored craft,
 moving traffic and gulls. Leave the dock and follow the river southwest towards Älvsborgsbron.
 The basin provides an open practice area. Player wakes are rideable; crossing your own trail or another
 boat's wake can launch you into the air. Steering still provides modest yaw in flight,

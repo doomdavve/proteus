@@ -14,7 +14,7 @@ For controls and rules, see [Playing Wake Velocity](PLAYING.md).
 Each `--help` prints a grouped summary of modes, options and controls; this page
 carries the details, restrictions and examples. Launching without options opens the title. Explicit gameplay options start a session
 directly; `--title` selects the title explicitly. The direct-launch default location is
-`basin`, while the title's default outing is the outer river.
+`basin`, while the title's default outing is Gothenburg Harbour (`outer`).
 
 ## Locations and voyages
 
@@ -153,7 +153,7 @@ compatibility.
 
 Current and scripted crossing-wake options reject courses/replays/ghosts. Courses and
 recordings preserve their water settings and reject explicit player-wake modes. A deliberate
-reset clears player wakes and restarts scripted passages. The title's outer river outing
+reset clears player wakes and restarts scripted passages. The title's Gothenburg Harbour outing
 includes current, crossing wake and gentle waves; explicit launches use their supplied options.
 
 Legacy `--player-wake` and native basin-only `--wake-field` remain research options.

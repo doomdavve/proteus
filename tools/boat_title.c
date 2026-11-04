@@ -308,9 +308,8 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         *label = labels[logical];
         if (logical == ROW_SOLO_PLACE)
             snprintf(value, size, "< %s >",
-                s->location == BOAT_LOCATION_COUNT       ? "BASIN TRIAL"
-                    : s->location == BOAT_LOCATION_OUTER ? "OUTER RIVER"
-                                                         : "BASIN");
+                s->location == BOAT_LOCATION_COUNT ? "BASIN TRIAL"
+                                                   : boat_location(s->location)->title);
         else if (logical == ROW_SOLO_CONTENT)
             snprintf(value, size, "< %s >", s->outer_content ? "HARBOR LIFE" : "STANDARD");
         else if (logical == ROW_SOLO_WATER)
@@ -342,8 +341,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         static const char *modes[BOAT_TITLE_HOST_MODES]
             = { "FREE BOATING", "DEATHMATCH", "RIVER RACE" };
         *label = labels[row];
-        char place[32];
-        upper(place, sizeof(place), boat_location(host_location(s))->name);
+        const char *place = boat_location(host_location(s))->title;
         if (row == ROW_MODE)
             snprintf(value, size, "< %s >", modes[s->host_mode]);
         else if (row == ROW_PLACE)
@@ -514,7 +512,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
     if (!hint && t->panel == PANEL_SINGLE && solo_row(t, t->selected) == ROW_SOLO_CONTENT)
-        hint = s->outer_content ? "AUTHORED MARINA, TRAFFIC AND GULLS" : "THE STANDARD OUTER RIVER";
+        hint = s->outer_content ? "AUTHORED MARINA, TRAFFIC AND GULLS" : "THE STANDARD HARBOUR";
     char public_hint[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_PUBLIC_SERVER) {
         if (!public_server_count())
@@ -544,7 +542,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         if (t->selected == ROW_MODE)
             hint = modes[s->host_mode];
         else if (t->selected == ROW_PLACE && s->host_mode == BOAT_TITLE_HOST_RACE)
-            hint = "RIVER RACES ALWAYS RUN ON THE OUTER RIVER";
+            hint = "RIVER RACES ALWAYS RUN IN THE HARBOUR";
         else if (t->selected == ROW_START) {
             snprintf(
                 lan, sizeof(lan), "OPEN TO YOUR LAN ON UDP %d; LEAVING CLOSES IT", BOAT_NET_PORT);

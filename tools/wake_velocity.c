@@ -331,8 +331,7 @@ static bool scenery_ready(const BoatWorldDefinition *location, const char *asset
     boat_web_scenery_start(location->name, path);
     while (boat_web_scenery_state(location->name) == 1 && !WindowShouldClose()) {
         char text[64];
-        snprintf(text, sizeof(text), "LOADING %s %d%%",
-            location->id == BOAT_LOCATION_OUTER ? "OUTER RIVER" : "MAP",
+        snprintf(text, sizeof(text), "LOADING %s %d%%", location->title,
             (int)(100 * boat_web_scenery_progress(location->name)));
         int scale = GetScreenHeight() / 200 > 1 ? GetScreenHeight() / 200 : 1;
         BoatUiPalette palette = boat_ui_palette();
