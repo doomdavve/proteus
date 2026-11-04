@@ -1631,6 +1631,16 @@ default-resolution change without a later explicit user decision.
   actors get none); the bake takes about 20 s for outer; the Emscripten build's
   `validate_boat_capture` target does not compile (`gmtime_r`, a file this checkpoint does not
   touch); no hardware-GPU browser, Firefox/Safari, Windows or device check.
+- Outer at 120 Hz (2026-11-04, after the user's profiler screenshot on the outer river at high
+  resolution with HDR: frame p95 13.5 ms, present/wait spikes to 21.5 ms on a 120 Hz display).
+  The final matrix covered only river and stress; windowed 1,200-frame outer `--demo` reports
+  (`--performance-report`), interleaved: `main` low GPU p50/p95 3.82–3.85 / 5.62–8.81 ms, P3 low
+  3.84–3.94 / 5.73–5.88, P3 high HDR 6.40–6.41 / 7.85–8.65 (p99 8.70–9.22). So P3 does not
+  regress low resolution on outer, but high resolution adds about 2.5 ms p50 there and its tail
+  exceeds a 120 Hz frame (8.33 ms); it stays inside the plan's 60 Hz budgets. GPU spikes follow
+  the view (main and reflection triangles 470k/450k against about 375k typical; the outer frame
+  draws 1.15–1.33 M triangles, about 410k of them into the shadow map each frame), not a period.
+  Open: whether 120 Hz at high resolution on outer is a target; no outer budget exists yet.
 - Next: Batch C.
 
 #### Batch C request
