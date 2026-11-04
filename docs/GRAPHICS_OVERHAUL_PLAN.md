@@ -1646,8 +1646,8 @@ default-resolution change without a later explicit user decision.
   work after P3 to bring outer down; the method decides how far. Candidates, unmeasured: the
   outer shadow pass, distance detail for outer terrain and buildings, and the reflection's
   triangle load. Add an outer scenario to the benchmark first.
-- Next: the outer performance follow-up (see
-  [Outer performance follow-up](#outer-performance-follow-up)); Batch C's Windows report.
+- Next: the outer performance follow-up, on a branch stacked on this PR; Batch C's Windows
+  report.
 
 #### Batch C request
 
