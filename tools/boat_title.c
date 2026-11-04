@@ -121,6 +121,24 @@ typedef enum {
 } Panel;
 
 static const char *const host_modes[BOAT_TITLE_HOST_MODES] = { "free", "deathmatch", "race" };
+static const struct {
+    const char *name, *package, *label, *hint;
+} outer_contents[BOAT_TITLE_OUTER_CONTENTS] = {
+    { "standard", "proteus.langedrag", "STANDARD", "THE STANDARD HARBOUR" },
+    { "harbor-life", "proteus.harbor-life", "HARBOR LIFE", "AUTHORED MARINA, TRAFFIC AND GULLS" },
+    { "grodan", "proteus.grodan", "GRODAN TOUR", "IN THE GRODAN, WITH ITS PASSENGERS" },
+    { "canal-tour", "proteus.grodan", "CANAL TOUR", "THE GRODAN'S ROUTE IN YOUR OWN BOAT" },
+};
+
+const char *boat_title_outer_content(unsigned content)
+{
+    return outer_contents[content < BOAT_TITLE_OUTER_CONTENTS ? content : 0].name;
+}
+
+const char *boat_title_outer_package(unsigned content)
+{
+    return outer_contents[content < BOAT_TITLE_OUTER_CONTENTS ? content : 0].package;
+}
 
 const char *boat_title_host_mode(unsigned mode)
 {
@@ -308,11 +326,10 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         *label = labels[logical];
         if (logical == ROW_SOLO_PLACE)
             snprintf(value, size, "< %s >",
-                s->location == BOAT_LOCATION_COUNT       ? "BASIN TRIAL"
-                    : s->location == BOAT_LOCATION_OUTER ? "OUTER RIVER"
-                                                         : "BASIN");
+                s->location == BOAT_LOCATION_COUNT ? "BASIN TRIAL"
+                                                   : boat_location(s->location)->title);
         else if (logical == ROW_SOLO_CONTENT)
-            snprintf(value, size, "< %s >", s->outer_content ? "HARBOR LIFE" : "STANDARD");
+            snprintf(value, size, "< %s >", outer_contents[s->outer_content].label);
         else if (logical == ROW_SOLO_WATER)
             snprintf(value, size, "< %s >", s->waves ? "ON" : "OFF");
         else if (logical == ROW_SOLO_EDGES)
@@ -342,8 +359,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         static const char *modes[BOAT_TITLE_HOST_MODES]
             = { "FREE BOATING", "DEATHMATCH", "RIVER RACE" };
         *label = labels[row];
-        char place[32];
-        upper(place, sizeof(place), boat_location(host_location(s))->name);
+        const char *place = boat_location(host_location(s))->title;
         if (row == ROW_MODE)
             snprintf(value, size, "< %s >", modes[s->host_mode]);
         else if (row == ROW_PLACE)
@@ -508,13 +524,14 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_BOAT)
         hint = s->skin == BOAT_SKIN_EXPLORER ? "FASTER ENGINE WHEN FREE RIDING SOLO"
             : s->skin == BOAT_SKIN_CABIN     ? "25 KNOTS WHEN FREE RIDING SOLO"
+            : s->skin == BOAT_SKIN_GRODAN    ? "15 M CANAL TOUR BOAT, SOLO ONLY"
                                              : "SINGLE PLAYER; ROOMS COLOUR BOATS BY SLOT";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MOUSE)
         hint = "REMEMBERED; ESC MENU OR M SWITCHES IN GAME";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
     if (!hint && t->panel == PANEL_SINGLE && solo_row(t, t->selected) == ROW_SOLO_CONTENT)
-        hint = s->outer_content ? "AUTHORED MARINA, TRAFFIC AND GULLS" : "THE STANDARD OUTER RIVER";
+        hint = outer_contents[s->outer_content].hint;
     char public_hint[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_PUBLIC_SERVER) {
         if (!public_server_count())
@@ -544,7 +561,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         if (t->selected == ROW_MODE)
             hint = modes[s->host_mode];
         else if (t->selected == ROW_PLACE && s->host_mode == BOAT_TITLE_HOST_RACE)
-            hint = "RIVER RACES ALWAYS RUN ON THE OUTER RIVER";
+            hint = "RIVER RACES ALWAYS RUN IN THE HARBOUR";
         else if (t->selected == ROW_START) {
             snprintf(
                 lan, sizeof(lan), "OPEN TO YOUR LAN ON UDP %d; LEAVING CLOSES IT", BOAT_NET_PORT);
@@ -928,7 +945,8 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     if (t.selected >= row_count(&t))
                         t.selected = row_count(&t) - 1;
                 } else if (sel == ROW_SOLO_CONTENT && turn)
-                    s->outer_content = !s->outer_content;
+                    s->outer_content = (s->outer_content + BOAT_TITLE_OUTER_CONTENTS + turn)
+                        % BOAT_TITLE_OUTER_CONTENTS;
                 else if (sel == ROW_SOLO_WATER && turn)
                     s->waves = !s->waves;
                 else if (sel == ROW_SOLO_EDGES && turn)
@@ -1138,9 +1156,11 @@ void boat_title_load(BoatTitleSettings *s)
             s->smooth_edges = !strcmp(value, "on");
         else if (!strcmp(line, "resolution"))
             s->high_resolution = !strcmp(value, "high");
-        else if (!strcmp(line, "outer_content"))
-            s->outer_content = !strcmp(value, "harbor-life");
-        else if (!strcmp(line, "host_mode")) {
+        else if (!strcmp(line, "outer_content")) {
+            for (unsigned i = 0; i < BOAT_TITLE_OUTER_CONTENTS; ++i)
+                if (!strcmp(value, outer_contents[i].name))
+                    s->outer_content = i;
+        } else if (!strcmp(line, "host_mode")) {
             for (unsigned i = 0; i < BOAT_TITLE_HOST_MODES; ++i)
                 if (!strcmp(value, host_modes[i]))
                     s->host_mode = i;
@@ -1169,7 +1189,7 @@ void boat_title_save(const BoatTitleSettings *s)
     fprintf(file, "location=%s\nwaves=%s\nsmooth_edges=%s\nouter_content=%s\n",
         s->location == BOAT_LOCATION_COUNT ? "course" : boat_location(s->location)->name,
         s->waves ? "on" : "off", s->smooth_edges ? "on" : "off",
-        s->outer_content ? "harbor-life" : "standard");
+        boat_title_outer_content(s->outer_content));
     fprintf(file, "resolution=%s\n", s->high_resolution ? "high" : "low");
     fprintf(file, "host_mode=%s\nhost_location=%s\nhost_waves=%s\n",
         boat_title_host_mode(s->host_mode), boat_location(s->host_location)->name,

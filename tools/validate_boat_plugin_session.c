@@ -12,6 +12,7 @@
 #include "boat_throttle.h"
 #include "raymath.h"
 #include "wake_velocity_plugin.h"
+#include "waterfront_outer.h"
 #include "waterfront_traffic.h"
 
 #include <math.h>
@@ -1815,6 +1816,131 @@ static int default_sessions(void)
     return 0;
 }
 
+// GH5: the bundled Grodan tour starts the boat at Kungsportsplatsen, and an autopilot that only
+// follows the straight lines between stop centres passes every stop in order and arrives at the
+// pier without its footprint leaving the water. Pure pursuit with a short look-ahead keeps it on
+// those lines, so a quay touch would mean a leg the planner should not have allowed. The tour is
+// driven in the Grodan and in the player's own speedboat, on the same push either way.
+static int drive_tour(const BoatHandling *handling, BoatHull footprint, double *minutes_out)
+{
+    const BoatPluginCatalogEntry *entry = boat_plugin_catalog_find("proteus.grodan");
+    CHECK(entry && !strcmp(entry->location, "outer") && !strcmp(entry->kind, "voyage"));
+    static WakePlugin p;
+    BoatSession s;
+    boat_session_init(&s, outer(), calm());
+    CHECK(wake_plugin_open_catalog(&p, entry, &s));
+    const BoatVoyageRoute *route = s.voyage_route;
+    CHECK(route && route->ordered && route->shelter_count >= 20);
+    CHECK(Vector2Equals(s.boat.position, route->shelters[0].position));
+    s.presentation_enabled = false;
+    s.handling = handling;
+    // Throttle settings give the Grodan's push whatever the engine.
+    float scale = boat_handling_grodan.thrust / handling->thrust;
+
+    unsigned leg = 0, last = route->shelter_count - 1, order = 0;
+    int touching = 0, bridges = 0;
+    bool in_order = true, covered = false;
+    float lowest = INFINITY;
+    uint64_t limit = (uint64_t)(3600 / BOAT_TICK_SECONDS);
+    while (!s.voyage.arrived && s.tick < limit) {
+        // Advance past legs whose end the boat's projection has passed.
+        Vector2 at = s.boat.position, to = route->shelters[leg + 1].position;
+        for (;;) {
+            Vector2 from = route->shelters[leg].position;
+            to = route->shelters[leg + 1].position;
+            Vector2 along = Vector2Subtract(to, from);
+            float t = Vector2DotProduct(Vector2Subtract(at, from), along)
+                / Vector2DotProduct(along, along);
+            if (t < 1 || leg + 1 == last)
+                break;
+            ++leg;
+        }
+        // Look 12 m ahead along the polyline from the projection.
+        Vector2 from = route->shelters[leg].position;
+        Vector2 along = Vector2Subtract(to, from);
+        float length = Vector2Length(along);
+        float t
+            = Clamp(Vector2DotProduct(Vector2Subtract(at, from), along) / (length * length), 0, 1);
+        float ahead = t * length + 12;
+        unsigned k = leg;
+        while (ahead > Vector2Distance(route->shelters[k].position, route->shelters[k + 1].position)
+            && k + 1 < last) {
+            ahead -= Vector2Distance(route->shelters[k].position, route->shelters[k + 1].position);
+            ++k;
+        }
+        Vector2 a = route->shelters[k].position, b = route->shelters[k + 1].position;
+        Vector2 aim = Vector2Add(a,
+            Vector2Scale(
+                Vector2Normalize(Vector2Subtract(b, a)), fminf(ahead, Vector2Distance(a, b))));
+        Vector2 offset = Vector2Subtract(aim, at);
+        Vector2 forward = { sinf(s.boat.heading), -cosf(s.boat.heading) };
+        Vector2 right = { cosf(s.boat.heading), sinf(s.boat.heading) };
+        float bearing
+            = atan2f(Vector2DotProduct(offset, right), Vector2DotProduct(offset, forward));
+        // Yaw damping stops the long hull swinging past the new course after a turn.
+        float wheel = Clamp(bearing * 2.5f - s.boat.yaw_velocity * 8.0f, -1, 1);
+        // Most of the way along the canals, slow through turns and the narrowest channels (the
+        // smallest stop radius), full on the river, dead slow at the pier.
+        float remaining = Vector2Distance(at, route->arrival_centre);
+        float throttle = scale
+            * (leg + 1 == last && remaining < 60            ? .12f
+                    : fabsf(bearing) > .35f                 ? .3f
+                    : route->shelters[leg + 1].radius >= 30 ? 1.0f
+                    : route->shelters[leg + 1].radius <= 12 ? .4f
+                                                            : .8f);
+        boat_session_step(&s,
+            (BoatInput) { .steering_rate = boat_steering_rate(s.boat.wheel, wheel),
+                .throttle_rate = boat_throttle_rate(s.boat.throttle, throttle) });
+        if (s.voyage.shelter != order) {
+            in_order &= s.voyage.shelter == order + 1;
+            order = s.voyage.shelter;
+        }
+        // The hull's footprint, every metre along each side.
+        forward = (Vector2) { sinf(s.boat.heading), -cosf(s.boat.heading) };
+        right = (Vector2) { cosf(s.boat.heading), sinf(s.boat.heading) };
+        bool touch = false;
+        for (float along_m = -footprint.stern; along_m <= footprint.bow && !touch; along_m += 1)
+            for (int side = -1; side <= 1 && !touch; side += 2)
+                touch = !boat_map_water(&outer()->map,
+                    Vector2Add(s.boat.position,
+                        Vector2Add(Vector2Scale(forward, along_m),
+                            Vector2Scale(right, side * footprint.half_beam))),
+                    0);
+        touching += touch;
+        // GH2: the bridges the tour passes under and the lowest underside over the boat.
+        float overhead = waterfront_outer_overhead(-s.boat.position.x, s.boat.position.y);
+        bridges += isfinite(overhead) && !covered;
+        covered = isfinite(overhead);
+        lowest = fminf(lowest, overhead);
+    }
+    double minutes = s.tick * BOAT_TICK_SECONDS / 60;
+    printf("tour=%s stops=%u/%u minutes=%.1f touching_ticks=%d at=(%.0f, %.0f) leg=%u "
+           "bridges=%d lowest=%.2f\n",
+        s.voyage.arrived ? "arrived" : "unfinished", s.voyage.shelter, last, minutes, touching,
+        -s.boat.position.x, s.boat.position.y, leg, bridges, lowest);
+    bool arrived = s.voyage.arrived && s.voyage.shelter == last;
+    wake_plugin_close(&p, &s);
+    boat_session_destroy(&s);
+    *minutes_out = minutes;
+    CHECK(arrived && in_order);
+    CHECK(touching == 0);
+    // Every canal bridge on the route; Stora Bommens Bro is the lowest.
+    CHECK(bridges >= 10 && lowest >= 1.7f);
+    return 0;
+}
+
+static int grodan_tour(void)
+{
+    double grodan, own;
+    CHECK(!drive_tour(&boat_handling_grodan, *boat_handling_grodan.hull, &grodan));
+    // The speedboat's hull: src/boat.c HULL_BOW, HULL_STERN and HULL_HALF_BEAM.
+    CHECK(!drive_tour(&boat_handling_speedboat, (BoatHull) { 2.0f, 1.6f, .75f, 0 }, &own));
+    // The short canal loop: about a quarter of an hour at the autopilot's canal speed.
+    CHECK(grodan > 8 && grodan < 25);
+    CHECK(own > 8 && own < 25);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(harbor_appearance_edits),
     TEST_CASE(memory_accounting),
@@ -1841,6 +1967,7 @@ static const TestCase cases[] = {
     TEST_CASE(catalog_runtime),
     TEST_CASE(default_sessions),
     TEST_CASE(harbor_life_scene),
+    SLOW_CASE(grodan_tour),
     SLOW_CASE(compiled_parity),
 };
 

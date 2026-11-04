@@ -40,9 +40,9 @@ static void flags(void)
     Mesh3D sweden = boat_flag_skin_mesh(&surface, BOAT_SKIN_SWEDEN, &sweden_storage);
     BoatFlagMesh retained = sweden_storage;
     const Color fields[] = { { 0, 106, 167, 255 }, { 250, 246, 237, 255 }, { 198, 12, 48, 255 },
-        { 186, 12, 47, 255 }, { 242, 118, 28, 255 }, { 0, 106, 167, 255 } };
+        { 186, 12, 47, 255 }, { 242, 118, 28, 255 }, { 0, 106, 167, 255 }, { 0, 106, 167, 255 } };
     const Color crosses[] = { { 255, 205, 0, 255 }, { 0, 53, 128, 255 }, { 250, 246, 237, 255 },
-        { 0, 32, 91, 255 }, { 58, 64, 70, 255 }, { 255, 205, 0, 255 } };
+        { 0, 32, 91, 255 }, { 58, 64, 70, 255 }, { 255, 205, 0, 255 }, { 255, 205, 0, 255 } };
     for (unsigned int skin = 0; skin < BOAT_SKIN_COUNT; ++skin) {
         Mesh3D mesh = boat_flag_skin_mesh(&surface, skin, &other_storage);
         assert(mesh.triangle_count == BOAT_FLAG_MESH_TRIANGLES);
@@ -164,6 +164,15 @@ int main(void)
             assert(skin == 0 || different);
         }
     }
+    // GH3: the Grodan has its own hull and deck, no outboards, and flies a Swedish ensign from
+    // its stern.
+    unsigned int grodan = 99;
+    assert(boat_skin_parse("grodan", &grodan) && grodan == BOAT_SKIN_GRODAN);
+    assert(!boat_skin_outboards(grodan) && !boat_skin_outboards(BOAT_SKIN_CABIN));
+    for (unsigned int skin = 0; skin < BOAT_SKIN_CABIN; ++skin)
+        assert(boat_skin_outboards(skin));
+    assert(boat_skin_mesh(grodan, BOAT_SKIN_HULL)->triangle_count > 0);
+    assert(boat_skin_mesh(grodan, BOAT_SKIN_COCKPIT)->triangle_count > 0);
     unsigned int cabin = 99;
     assert(boat_skin_parse("cabin", &cabin) && cabin == BOAT_SKIN_CABIN);
     assert(boat_skin_mesh(cabin, BOAT_SKIN_HULL)->triangle_count > 0);

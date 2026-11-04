@@ -3,7 +3,7 @@
 Current status reconciled on 2026-11-04. The main program is the boating game `wake_velocity`
 (formerly `boat_study`; [rename record](MULTIPLAYER_PLAN.md#host-from-the-game--2026-10-25))
 (Wake Velocity), with quiet engine/water audio and a choice of the gentle A little boat loop,
-Acid Wake techno or Off. It provides free boating in the basin and on Gothenburg's outer river, a
+Acid Wake techno or Off. It provides free boating in the basin and in Gothenburg Harbour (`outer`), a
 basin time trial, the Långedrag voyage and multiplayer rooms. It defaults to GPU rendering; the CPU reference supports
 display-free captures. The four-minute Eriksberg demo (`proteus`), its soundtrack, the separate
 Eriksberg boating location and their plans were removed on 2026-10-25; they remain in the git
@@ -95,6 +95,7 @@ and broader network/platform qualification remain open.
 | [Boat physics](BOAT_PHYSICS_PLAN.md) | Accepted H3 grip and turn banking retained; [arcade stability study](ARCADE_STABILITY.md) adds recovery and steering air roll (revision 7), integrated into main | User requested heavier, more satisfying landings (2026-10-24); [landing candidate L1](BOAT_PHYSICS_PLAN.md#l1-candidate--2026-10-24) (landing speed scrub, revision 8; splash, hull slap) played 2026-10-25: the user liked the impact feel after the camera dip was removed; stability candidate needs play feedback; combined multiplayer feel and platform qualification pending |
 | [Wake rewrite](WAKE_REWRITE_PLAN.md) | Bounded arcade objects remain default; [stability study](ARCADE_STABILITY.md) lowers default crests to 1.2 m while retaining signed overlap and jumps | Play the stability/roll candidate; tight-turn readability and platform/fleet costs remain open |
 | [Living city](LIVING_CITY_PLAN.md) | 01–05: city dressing, materials, berths, shared actors; travelling boats and a compact ferry brought forward; 32 reactive boating gulls; blended near/far gameplay shadows | 06 people/cyclists; varied road traffic, building activity, ferry polish, perched gulls, and final review remain |
+| [Gothenburg Harbour and Grodan](GOTHENBURG_HARBOUR_PLAN.md) | 2026-11-04: `outer` shown as GOTHENBURG HARBOUR; the Grodan canal boat, tour format and Grodan canal tour (also in your own boat); canal bridges with estimated heights and a camera that drops under them. All on stacked branches, unplayed since the user's first tour run ("not fun yet") | Low-bridge duck and scrape score in the tour, then sights along the route |
 | [River location retirement](RIVER_RETIREMENT_PLAN.md) | `river` retired into `outer` (2026-11-04): title default, races and rooms on outer, protocol v12; crop kept as kit layout data and validator fixture | Set Winterfell's room to `outer` with the next release; play solo, deathmatch and a race on outer |
 | [River / Älvsborgsbron](river/README.md) | Separate source/crop, navigable bridge blockout, blocking tower legs, and grounded road approaches; retired as a location 2026-11-04 | History; the crop lives on inside the outer map |
 | [macOS app builds](MACOS_BUILD.md) | Apple Silicon action, relocatable app bundle, preferred river launch, ad-hoc signing, ZIP/checksum; title backdrop packaging fix added | Verify macOS packaging CI and launch the downloaded app from Finder; macOS 13 execution pending |

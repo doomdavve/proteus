@@ -518,6 +518,45 @@ The same poses are the pinned anchors `outer.marina` and `outer.eriksberg` in
 This fixture proves water/shore geometry and hull separation; it does not prove player clearance
 under every driving line, depth, or human acceptance.
 
+## Tour schema
+
+Since 2026-11-04 ([GH4](GOTHENBURG_HARBOUR_PLAN.md#gh4-tour-format)), a `voyage` package may return
+`tour` instead of `voyage`: ordered stops with captions, such as a canal sightseeing route. The
+manifest is unchanged (`"kind": "voyage"`, `voyage.define`, optional objective capabilities);
+returning both tables is an error.
+
+```lua
+return { -- Illustrative coordinates.
+  tour = {
+    stops = {            -- 3 to 32, a list numbered from 1
+      { id = "pier", name = "KUNGSPORTSPLATSEN", caption = "ALL ABOARD",
+        x = -3614, z = 790, heading = 0, radius = 15 },
+      -- ...
+      { id = "home", name = "KUNGSPORTSPLATSEN", caption = "BACK AT THE PIER",
+        x = -3614, z = 790, heading = 0, radius = 0 }
+    },
+    arrival = { x = -3614, z = 790, radius = 20, max_speed = 2 }
+  }
+}
+```
+
+Stops take the shelter fields and rules above (`id`, `name`, `x`, `z`, `heading`, `radius`, the last
+radius 0 and inside `arrival`) plus a required `caption`: 1–47 printable ASCII characters other
+than `"`, `\` and `` ` ``, without leading or trailing spaces. A tour has no `exposure`,
+`exposed_fraction` or `weather_range`: its water is calm.
+
+| Behaviour | Tour | Destination voyage |
+| --- | --- | --- |
+| Start | The boat starts (and restarts) at stop 1's pose, anywhere on open water | Shelter 1 must be the location's spawn |
+| Progress | Only the next stop counts; passing a later one first does nothing | Any shelter within its radius |
+| Arrival | Only after every stop before the last | Whenever inside the area at speed |
+| HUD | The next stop's name and distance; each stop's caption for 8 s on passing, else STOP N OF M | The destination and the latest notice |
+| Staging | Stops need 4 m of open water (room for the beam in a canal), the arrival 8 m | Shelters 8 m, arrival 20 m |
+
+Recovery returns to the last stop passed, facing along the stop's heading. Objectives see the same
+`voyage.shelter_reached` and `voyage.arrived` events, with stop ids. A caption edit reloads like a rename. The browser
+worker's wire (`PSTA`) carries tours and captions.
+
 ### Scene authoring not exposed yet
 
 Crane/building restyling, sculptures, arbitrary meshes, occupancy schedules, freeform routes

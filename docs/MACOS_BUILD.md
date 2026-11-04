@@ -51,7 +51,7 @@ the ZIP; it checks archive integrity, not publisher identity. Artifacts expire a
 checkout had uncommitted changes when packaged.
 
 Double-clicking the app opens the Wake Velocity title (2026-10-24), as does `wake_velocity`
-without options. Its SINGLE PLAYER starts the preferred outer river setup (the river location before its
+without options. Its SINGLE PLAYER starts the preferred Gothenburg Harbour (`outer`) setup (the river location before its
 2026-11-04 [retirement](RIVER_RETIREMENT_PLAN.md)): current, crossing
 wake, gentle waves, GPU antialiasing, camera distance 12, and camera height 6, in the
 chosen BOAT livery. MULTIPLAYER hosts a room (HOST A ROOM), lists rooms found on the local

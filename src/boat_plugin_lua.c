@@ -241,7 +241,7 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
     return only(L, vm, index, at, keys) ? index : 0;
 }
 
-static const char *const ROOT[] = { "voyage", "scene", "init", "update", "migrate", NULL };
+static const char *const ROOT[] = { "voyage", "tour", "scene", "init", "update", "migrate", NULL };
 static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
@@ -265,14 +265,19 @@ static const char *const ANCHOR[] = { "x", "z", NULL };
 static const char *const VOYAGE[]
     = { "shelters", "arrival", "exposure", "exposed_fraction", "weather_range", NULL };
 static const char *const SHELTER[] = { "id", "name", "x", "z", "heading", "radius", NULL };
+static const char *const TOUR[] = { "stops", "arrival", NULL };
+static const char *const TOUR_STOP[]
+    = { "id", "name", "caption", "x", "z", "heading", "radius", NULL };
 static const char *const ARRIVAL[] = { "x", "z", "radius", "max_speed", NULL };
 static const char *const EXPOSURE[] = { "x", "z", "radius", "height", "build", NULL };
 
-// The shelters are a sequence: integer keys exactly 1..n.
+// The shelters (a tour's stops) are a sequence: integer keys exactly 1..n.
 static bool shelters(lua_State *L, Vm *vm, int voyage)
 {
+    bool tour = vm->data->tour;
+    unsigned capacity = tour ? BOAT_VOYAGE_SHELTERS : BOAT_VOYAGE_DESTINATION_SHELTERS;
     char at[64];
-    int type = field(L, voyage, "shelters", "voyage", at);
+    int type = field(L, voyage, tour ? "stops" : "shelters", tour ? "tour" : "voyage", at);
     if (type != LUA_TTABLE)
         return reject(vm, at, type == LUA_TNIL ? "is missing" : "must be a table, not a %s",
             lua_typename(L, type));
@@ -288,9 +293,9 @@ static bool shelters(lua_State *L, Vm *vm, int voyage)
     }
     if (entries != length)
         return reject(vm, at, "must be a list numbered from 1 without gaps");
-    if (length < 2 || length > BOAT_VOYAGE_SHELTERS)
-        return reject(vm, at, "must list 2 to %d shelters, not %llu", BOAT_VOYAGE_SHELTERS,
-            (unsigned long long)length);
+    if (length < (tour ? 3u : 2u) || length > capacity)
+        return reject(vm, at, "must list %u to %u %s, not %llu", tour ? 3u : 2u, capacity,
+            tour ? "stops" : "shelters", (unsigned long long)length);
     vm->data->shelter_count = (unsigned)length;
     for (unsigned i = 0; i < length; ++i) {
         BoatPluginShelterData *s = &vm->data->shelters[i];
@@ -300,9 +305,10 @@ static bool shelters(lua_State *L, Vm *vm, int voyage)
         if (lua_type(L, -1) != LUA_TTABLE)
             return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
         int shelter = lua_absindex(L, -1);
-        if (!only(L, vm, shelter, path, SHELTER)
+        if (!only(L, vm, shelter, path, tour ? TOUR_STOP : SHELTER)
             || !string(L, vm, shelter, path, "id", s->id, sizeof(s->id))
             || !string(L, vm, shelter, path, "name", s->name, sizeof(s->name))
+            || (tour && !string(L, vm, shelter, path, "caption", s->caption, sizeof(s->caption)))
             || !number(L, vm, shelter, path, "x", &s->x)
             || !number(L, vm, shelter, path, "z", &s->z)
             || !number(L, vm, shelter, path, "heading", &s->heading)
@@ -965,7 +971,18 @@ static int decode(lua_State *L)
     // validate them with the same copied-data rules.
     if (!read_scene(L, vm, 2, &d->scene, &d->has_scene))
         return 0;
-    int voyage = record(L, vm, 2, "", "voyage", VOYAGE, at);
+    // Exactly one of a destination voyage and a tour.
+    lua_getfield(L, 2, "tour");
+    lua_getfield(L, 2, "voyage");
+    d->tour = !lua_isnil(L, -2);
+    bool both = d->tour && !lua_isnil(L, -1);
+    lua_pop(L, 2);
+    if (both) {
+        reject(vm, "tour", "a package returns either voyage or tour, not both");
+        return 0;
+    }
+    int voyage = d->tour ? record(L, vm, 2, "", "tour", TOUR, at)
+                         : record(L, vm, 2, "", "voyage", VOYAGE, at);
     if (!voyage || !shelters(L, vm, voyage))
         return 0;
     int arrival = record(L, vm, voyage, at, "arrival", ARRIVAL, part);
@@ -974,6 +991,11 @@ static int decode(lua_State *L)
         || !number(L, vm, arrival, part, "radius", &d->arrival.radius)
         || !number(L, vm, arrival, part, "max_speed", &d->arrival.max_speed))
         return 0;
+    if (d->tour) {
+        // Calm water: no exposure or weather.
+        d->exposed_fraction = 1;
+        return 0;
+    }
     int exposure = record(L, vm, voyage, at, "exposure", EXPOSURE, part);
     if (!exposure || !number(L, vm, exposure, part, "x", &d->exposure.x)
         || !number(L, vm, exposure, part, "z", &d->exposure.z)

@@ -3,7 +3,7 @@
 ## Current status
 
 The browser enters the shared Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER
-opens PLACE (OUTER RIVER by default, BASIN, BASIN TRIAL), WAVES, PICTURE (SMOOTHING before
+opens PLACE (GOTHENBURG HARBOUR by default, BASIN, BASIN TRIAL), WAVES, PICTURE (SMOOTHING before
 graphics G5a) and START. (From 2026-10-25 until its 2026-11-01 fix, Basin trial could not
 start from the title: the title passed free-boating options the course rejects.) SETTINGS
 remembers name, single-player boat livery,
@@ -15,7 +15,7 @@ attribution sit in its footer. PLAY starts in the browser tab; fullscreen is con
 Gameplay/title settings
 use the native `title.txt` format through the existing IndexedDB mount; older saves get the new
 outer-river/waves/picture defaults; saves naming the retired `river` location fall back to
-OUTER RIVER. IndexedDB denial still permits play without durable settings.
+GOTHENBURG HARBOUR. IndexedDB denial still permits play without durable settings.
 
 Browser multiplayer now uses a JavaScript WebRTC transport and the existing C protocol,
 client prediction, wake reconciliation and remote rendering. The optional native endpoint accepts

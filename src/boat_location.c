@@ -6,6 +6,7 @@
 static const BoatWorldDefinition locations[BOAT_LOCATION_COUNT] = {
     [BOAT_LOCATION_BASIN] = { .id = BOAT_LOCATION_BASIN,
         .name = "basin",
+        .title = "BASIN",
         .half_extent = { BOAT_BASIN_HALF_X, BOAT_BASIN_HALF_Z },
         .spawn = { 0, 10 },
         .camera_distance = 20,
@@ -14,6 +15,7 @@ static const BoatWorldDefinition locations[BOAT_LOCATION_COUNT] = {
         .particle_water = { 36, 107, 125, 255 } },
     [BOAT_LOCATION_OUTER] = { .id = BOAT_LOCATION_OUTER,
         .name = "outer",
+        .title = "GOTHENBURG HARBOUR",
         .mapped = true,
         .map = &waterfront_outer_map,
         .spawn = { -12, 60 },

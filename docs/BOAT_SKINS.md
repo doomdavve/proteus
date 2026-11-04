@@ -14,6 +14,11 @@ Nearest-neighbour presentation remains unchanged.
 
 The owning status and acceptance record is in [the boating plan](BOATING_PLAN.md#speedboat-skins--2026-10-24).
 The original cabin craft has returned as a separate solo option, following the 2026-10-30 model review.
+Since 2026-11-04 the solo choices also include the GRODAN, a 15 m open canal tour boat
+(`src/boat_grodan.[ch]`, [GH3](GOTHENBURG_HARBOUR_PLAN.md#gh3-the-canal-boat)). Unlike the
+other choices it is not presentation only: its handling carries a 15 × 4.2 m contact hull
+(`BoatHull` in `src/boat.h`). It has no outboards (`boat_skin_outboards`) and flies its ensign
+6 m farther aft.
 
 ## Try the liveries
 

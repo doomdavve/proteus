@@ -34,7 +34,7 @@ def main():
         page.wait_for_function("!document.getElementById('play').disabled", timeout=60000)
         page.click('#play')
         page.wait_for_function("Module['boatMouse'] && document.activeElement === Module.canvas")
-        # Shared title -> single-player setup -> start (default outer river).
+        # Shared title -> single-player setup -> start (default Gothenburg Harbour).
         page.wait_for_timeout(500)
         page.keyboard.press('Enter', delay=100)
         page.wait_for_timeout(200)

@@ -2741,7 +2741,7 @@ static void draw_ghost(const WaterfrontGpuScene *scene, Material material,
         frame->ghost_hull, WHITE, true);
     draw_colored_mesh(scene->player_cabin[boat_skin_index(frame->ghost_skin)], material,
         frame->ghost_cabin, WHITE, true);
-    for (int side = -1; frame->ghost_skin != BOAT_SKIN_CABIN && side <= 1; side += 2)
+    for (int side = -1; boat_skin_outboards(frame->ghost_skin) && side <= 1; side += 2)
         draw_colored_mesh(scene->player_engine[boat_skin_index(frame->ghost_skin)], material,
             boat_skin_outboard_pose(frame->ghost_hull, frame->ghost_engine, side), WHITE, true);
     if (scene->ghost_flag.vaoId)
@@ -2821,7 +2821,7 @@ static void draw_boat(
     unsigned int index = boat_skin_index(b.skin);
     draw_colored_mesh(scene->player_hull[index], material, b.hull, WHITE, false);
     draw_colored_mesh(scene->player_cabin[index], material, b.cabin, WHITE, false);
-    for (int side = -1; index != BOAT_SKIN_CABIN && side <= 1; side += 2)
+    for (int side = -1; boat_skin_outboards(index) && side <= 1; side += 2)
         draw_colored_mesh(scene->player_engine[index], material,
             boat_skin_outboard_pose(b.hull, b.engine, side), WHITE, false);
     Mesh flag = b.flag;

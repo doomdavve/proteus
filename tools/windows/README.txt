@@ -31,7 +31,7 @@ F3: toggle profiler overlay
 Esc: menu (resume, steering, controls, back to title); single player pauses, rooms
   keep running with your boat idle. Esc on the title quits.
 
-Explicit options skip the title. The outer river with 4x4 supersampling, from PowerShell:
+Explicit options skip the title. Gothenburg Harbour (`outer`) with 4x4 supersampling, from PowerShell:
   .\wake_velocity.exe --location outer --gpu --gpu-aa
 
 If GPU startup fails, launch from PowerShell to read the diagnostic output.
