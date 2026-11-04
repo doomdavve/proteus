@@ -2,10 +2,11 @@
 
 ## Current status
 
-Implemented in the isolated `web-parity` worktree, 2026-10-25: the browser enters the shared
-Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER opens PLACE (River, Basin,
-Basin trial), WAVES, PICTURE (SMOOTHING before graphics G5a) and START. (Basin trial could not start from the title in any build
-from this date until its 2026-11-01 fix: the title passed free-boating options the course rejects.) SETTINGS remembers name, single-player boat livery,
+The browser enters the shared Wake Velocity title after the page's PLAY gesture. SINGLE PLAYER
+opens PLACE (OUTER RIVER by default, BASIN, BASIN TRIAL), WAVES, PICTURE (SMOOTHING before
+graphics G5a) and START. (From 2026-10-25 until its 2026-11-01 fix, Basin trial could not
+start from the title: the title passed free-boating options the course rejects.) SETTINGS
+remembers name, single-player boat livery,
 steering, soundtrack and PICTURE. The saved PICTURE (PIXEL, SMOOTH or HIGH RES) applies to
 single-player and multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
 but the browser may leave fullscreen. BACK TO TITLE returns to setup
@@ -13,7 +14,8 @@ without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The HTML
 attribution sit in its footer. PLAY starts in the browser tab; fullscreen is controlled in-game.
 Gameplay/title settings
 use the native `title.txt` format through the existing IndexedDB mount; older saves get the new
-river/waves/smoothing defaults. IndexedDB denial still permits play without durable settings.
+outer-river/waves/picture defaults; saves naming the retired `river` location fall back to
+OUTER RIVER. IndexedDB denial still permits play without durable settings.
 
 Browser multiplayer now uses a JavaScript WebRTC transport and the existing C protocol,
 client prediction, wake reconciliation and remote rendering. The optional native endpoint accepts
@@ -77,10 +79,10 @@ activation requirements. See [Pointer Events](https://www.w3.org/TR/pointerevent
 
 Completed: canvas drawing/hit-region bridge, multi-touch routing, browser gesture suppression,
 phone target sizing, safe-area sizing, updated virtual-clock/browser checks, and user acceptance
-on a physical iPhone 17 Pro. Next: ship through the release/hosting workflow;
-physical Android and HTTPS motion-permission qualification remain open. This branch does not
-deploy either public client. Specific long-hold duration, portrait/landscape coverage and audio
-listening were not reported in the user's check; emulation alone is not user acceptance.
+on a physical iPhone 17 Pro. Shipped in [v0.0.25](RELEASES.md#status-and-verification) to Pages
+and Winterfell on 2026-11-04, with matching browser/native joins verified. Next: physical Android
+and HTTPS motion-permission qualification. Specific long-hold duration, portrait/landscape
+coverage and audio listening were not reported in the user's check; emulation alone is not user acceptance.
 Mobile weapons, replay/camera controls and text entry remain outside this change.
 
 Verification, 2026-11-04, Apple Silicon/macOS: Debug build and `ctest --preset full`

@@ -14,7 +14,8 @@ history.
 The `river` location, a crop of the outer map, is [retired](RIVER_RETIREMENT_PLAN.md): the
 title defaults to OUTER RIVER, the river sprint and Harbor race run on `outer`, and protocol v12
 renumbers the locations. The crop stays as the river kit's layout data and a validator fixture.
-Automated checks pass; human play and the Winterfell location change at the next release remain.
+Automated checks pass and [v0.0.25](RELEASES.md#status-and-verification) deployed Winterfell on
+outer. Human play remains open.
 
 ## Marina authoring M1 + M2 — 2026-11-03
 
@@ -64,13 +65,13 @@ PR; the native CI workflows skip Markdown-only changes.
 
 ## Current work
 
-Released internet hosting: [v0.0.24](RELEASES.md#status-and-verification) is published and
-Winterfell's matching native/browser room is deployed (2026-11-01), with protocol 9 / physics 9.
-The [v0.0.25 release preparation](RELEASES.md#v0025-preparation--2026-11-04) records local
-verification, the queued CI/Pages incident and pending hosting-baseline approval; no new version
-is published or deployed. The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-01) owns deployment,
-client-check evidence and limits. Every release includes this hosted cutover through
-`../davve-srv/ansible`; package publication and Pages alone do not complete it. The public
+Released internet hosting: [v0.0.25](RELEASES.md#status-and-verification) is published and
+Winterfell's matching native/browser outer room is deployed (2026-11-04), with protocol 12 /
+physics 9. The [hosting guide](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-04) owns
+deployment/client evidence and limits. Native downloads, the Mac package demo and local full
+CPU/GPU checks pass. Firefox/WebKit CI and full local Chrome plugin qualification pass; CI
+Chromium reload/objective timeouts remain open. Every release includes this hosted cutover
+through `../davve-srv/ansible`; package publication and Pages alone do not complete it. The public
 `wake.davve.net` endpoint and shared known-server directory remain in use. Human gameplay/audio
 and broader network/platform qualification remain open.
 

@@ -38,7 +38,7 @@ controller vault file in place and pass its path rather than copying it.
 For the next version (replace the tag and paths as appropriate), check prerequisites first:
 
 ```sh
-python3 tools/cut_release.py v0.0.25 \
+python3 tools/cut_release.py v0.0.26 \
   --hosting-repo /path/to/clean-davve-srv-worktree \
   --vault-password-file /path/to/davve-srv/ansible/.vault_pass.txt \
   --browser-python /path/to/playwright-venv/bin/python \
@@ -217,48 +217,67 @@ and map the hosted hostname away. Protocol and physics remain v9 / 9, so Cutover
 
 ## Status and verification
 
-### v0.0.25 preparation — 2026-11-04
+### v0.0.25 — 2026-11-04
 
-The next release is being prepared from reviewed `origin/main` commit
-`8f4f496844ee165be19a6dae3455bf4b24e4aa32` in
-`/private/tmp/proteus-release-v0.0.25`. It includes the graphics/water improvements,
-optional high resolution/HDR, fixed sunset/dusk review presets, marina structures and boat
-appearance, live-console improvements, the browser landing page and canvas touch controls.
-The `river` location is retired; native clients and rooms must upgrade together to protocol 12 /
-physics 9, with Winterfell selecting `outer`.
+Current release: **[v0.0.25](https://github.com/doomdavve/proteus/releases/tag/v0.0.25)**
+is published at `f6152ba3eb655772dc2fcea1de177bb8c79b86be`. The
+[native release](https://github.com/doomdavve/proteus/actions/runs/41867615283) and
+[Pages](https://github.com/doomdavve/proteus/actions/runs/41867615336) workflows passed after
+GitHub's Actions/Pages incident delayed scheduling and completion updates.
 
-Hosting compatibility commit `9209fcd` in the separate `davve-srv` worktree switches the role's
-location to `outer` and makes its service description follow that location. Ansible syntax
-validation passed. It is pushed on `release/wake-v0.0.25`; promotion to the private hosting
-baseline awaits explicit approval after automatic review rejected the direct default-branch push.
-The v0.0.24 pin and running room remain unchanged.
+This release includes the graphics/water improvements, optional high resolution/HDR, fixed
+sunset/dusk review presets, expanded marina structures and boat appearance, live-console
+improvements, the browser landing page and canvas touch controls. The `river` location is retired;
+clients and rooms must upgrade together to **protocol 12 / physics 9**, with Winterfell on `outer`.
+Sunset/dusk remain review options; daytime and low resolution stay the defaults.
 
-GitHub reports an [Actions and Pages incident](https://stspg.io/pjgptg3cfc6n); the source's
-[macOS](https://github.com/doomdavve/proteus/actions/runs/41864167394),
-[Windows](https://github.com/doomdavve/proteus/actions/runs/41864167119),
-[Linux](https://github.com/doomdavve/proteus/actions/runs/41864167349) and on-demand
-[browser qualification](https://github.com/doomdavve/proteus/actions/runs/41864476555) checks
-are queued. No v0.0.25 tag has been created or pushed, package publication has not started,
-and neither public browser client nor Winterfell has been upgraded.
+The tagged source passed Debug configure/build and all **366 enabled CPU CTests** on Apple
+Silicon/macOS (`ctest --preset full`, GPU tests off, 13 retired wake-field cases disabled).
+Before the six-file documentation-only preparation merge, all **34 enabled GPU-labeled checks**
+passed (two retired GPU cases disabled). CPU basin/outer and authored-marina frames, GPU outer
+HIGH RES/HDR, dusk and authored-marina frames were inspected; a 240-frame windowed outer GPU demo
+completed. Both native downloads passed SHA-256, ZIP integrity and embedded version/commit
+checks. The downloaded Mac app reports `Uncommitted changes: False`, passes strict signature
+verification and completed a 240-frame outer GPU demo from outside the repository; its frame was
+inspected. The build retains raylib's bundled stb_vorbis warning. Windows package execution,
+human input/audio and physical-device acceptance of the released build were not performed.
 
-Local Debug build passed on Apple Silicon/macOS with GPU tests off. The Lua download endpoint
-was unreachable, so the cached archive was reused after confirming the pinned SHA-256. The build
-reported raylib's existing bundled stb_vorbis warning. CPU basin/outer and GPU outer HIGH RES/HDR
-and dusk captures, plus CPU/GPU authored-marina views, were inspected; a 240-frame windowed outer GPU demo exited 0 and its frame was
-inspected. `ctest --preset full` passed all **366 enabled CPU tests** (13 retired wake-field
-cases disabled). After enabling GPU tests, all **34 enabled GPU-labeled checks** passed
-(two retired GPU cases disabled). These checks do not establish human input/audio review,
-Windows package execution or physical-device acceptance of the released build.
+Hosting preparation `9209fcd` and version pin `09a8cf2` are pushed to the private baseline.
+The first deployment stalled fetching Lua for the hosted browser after its native build passed.
+The download was terminated and its evidence retained; the browser cache was seeded from the
+native build's archive after checking the pinned SHA-256, then the same immutable release command
+was retried. No source or tag was changed. The retry completed with `ok=44 changed=7 unreachable=0
+failed=0`; a further full repeat was not run. Room and relay are active on the exact tagged source.
+Both browser sites report v0.0.25 and passed named joining/driving without page errors in
+Chrome/SwiftShader and hardware Metal follow-up checks. The native
+bot shared a two-player room, received 114 snapshots, repaired seven mismatches and finished
+consistent with zero decode errors and zero resyncs (`received_ratio=0.893`, RTT 5.19 ms).
+[Hosting verification](MULTIPLAYER_HOSTING.md#status-and-verification--2026-11-04) owns the
+measurements and capture limitations.
 
-Next: promote the hosting compatibility commit with approval, then
-rerun `tools/cut_release.py v0.0.25 --check` and the full release command after CI recovers.
-Record download, deployment and matching native/browser joining evidence after completion.
-Evidence: `/private/tmp/proteus-release-v0.0.25/build/releases/v0.0.25/` and
-`/private/tmp/proteus-release-v0.0.25-build.log`.
+Both [preparation qualification](https://github.com/doomdavve/proteus/actions/runs/41864476555)
+at `8f4f496` (the same product code) and
+[exact-tag qualification](https://github.com/doomdavve/proteus/actions/runs/41867789408) passed
+Firefox and WebKit but failed Chromium. The first Chromium run logged an objective migration
+deadline, then timed out taking the failure screenshot, obscuring its original exception. The
+second timed out on `Page.reload` after the validation freeze/resume checks. The unchanged full
+Chromium qualification passed locally against the published Pages client in Chrome 156.0.8078.80
+with SwiftShader, including freeze/resume, repeated navigation, marina Apply/Undo/export and
+objective migration/Undo/restart/quarantine/timeout/session cleanup. No page errors were recorded.
+This does not resolve CI Chromium reliability or the earlier Firefox deadline sensitivity.
+
+Evidence: `/private/tmp/proteus-release-v0.0.25/build/releases/v0.0.25/`, including
+`verification.json`, build/test/deployment logs, package checks, browser captures and
+`browser-qualification/` and
+`chromium-local/`. The interrupted first deployment is retained in `deployment-attempt-1.log`,
+`release-attempt-1.log` and `verification-attempt-1.json`. Current orchestration log:
+`/private/tmp/proteus-release-v0.0.25.log`.
+Next: investigate CI browser qualification and continue human package/input/audio and wider
+platform/network review. Publication and the required hosted cutover are complete.
 
 ### v0.0.24 — 2026-11-01
 
-Current release, 2026-11-01: **[v0.0.24](https://github.com/doomdavve/proteus/releases/tag/v0.0.24)**
+Earlier release, 2026-11-01: **[v0.0.24](https://github.com/doomdavve/proteus/releases/tag/v0.0.24)**
 is published at `24760a63788f2267a5547e41b00b3e570adbe52f`. The
 [native release](https://github.com/doomdavve/proteus/actions/runs/41293803685) and
 [Pages](https://github.com/doomdavve/proteus/actions/runs/41293803664) workflows passed.

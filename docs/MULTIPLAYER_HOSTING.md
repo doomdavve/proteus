@@ -1,18 +1,18 @@
 # Winterfell internet room
 
-The Winterfell deployment runs released **v0.0.24**, commit
-`24760a63788f2267a5547e41b00b3e570adbe52f`, with the optional WebRTC transport enabled.
-The native room, hosted browser and Pages client use protocol v9 / physics 9. The room runs the
+The Winterfell deployment runs released **v0.0.25**, commit
+`f6152ba3eb655772dc2fcea1de177bb8c79b86be`, with the optional WebRTC transport enabled.
+The native room, hosted browser and Pages client use protocol v12 / physics 9. The room runs the
 `proteus.deathmatch` package and sends clients its definition as data, so the browser needs no Lua.
 Upgrade native clients to this matching release.
-It hosts one shared four-player river deathmatch room for native and browser players.
+It hosts one shared four-player outer-river deathmatch room for native and browser players.
 The [arsenal](DEATHMATCH_PLAN.md#arsenal-milestone--2026-10-27) provides the water cannon
 (hold Space), stern wave grenade (E), torpedo (Q) and optional rearview mirror (V).
 A round starts when two players join. There is no room token or player account requirement.
 
 ## Join
 
-- Native: use v0.0.24, choose MULTIPLAYER and select WINTERFELL, or enter
+- Native: use v0.0.25, choose MULTIPLAYER and select WINTERFELL, or enter
   `wake.davve.net:24680`.
 - Browser: open [Wake Velocity on Winterfell](https://wake.davve.net/) or
   [GitHub Pages](https://doomdavve.github.io/proteus/), press PLAY, choose MULTIPLAYER,
@@ -20,22 +20,19 @@ A round starts when two players join. There is no room token or player account r
   URL / CONNECT remain available for manual joining.
 - On the home LAN, the native address `10.0.21.3:24680` bypasses router hairpin NAT.
 
-The native server and hosted browser client are built from the same v0.0.24 tag by the
-`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.24 and uses
-the same public directory and signaling endpoint. The directory reports protocol 9 / physics 9.
+The native server and hosted browser client are built from the same v0.0.25 tag by the
+`wake_velocity` role in `davve-srv`. The published Pages client is also v0.0.25 and uses
+the same public directory and signaling endpoint. The directory reports protocol 12 / physics 9.
 Both launchers include public STUN. The public `wake.davve.net` hostname avoids the VPN's
 private `*.winterfell.davve.net` DNS override. Native v0.0.20 includes the connection fix;
 the v0.0.18 connection limitation described in the historical notes no longer applies.
 
 ## Routine deployments (davve-srv)
 
-**Owed with v0.0.25, the first protocol-v12 release:** the room's `--location river` is
-[retired](RIVER_RETIREMENT_PLAN.md) and a v12 `boat_server` refuses it. In the same cutover set
-`wake_velocity_location: outer` in `ansible/roles/wake_velocity/defaults/main.yml` (and rename the
-service description's "river room"); the room becomes an outer deathmatch. Prepared and
-syntax-validated in `davve-srv` commit `9209fcd` on `release/wake-v0.0.25`; baseline promotion
-awaits approval. The [release status](RELEASES.md#v0025-preparation--2026-11-04) owns blockers
-and verification. No v0.0.25 deployment is claimed.
+The v0.0.25 protocol-v12 cutover retired the room's `--location river`. Hosting preparation
+`9209fcd` selects `wake_velocity_location: outer` and makes the service description name the
+configured location; version pin `09a8cf2` and the ordinary role deployed the outer deathmatch.
+[Current verification](#status-and-verification--2026-11-04) records deployment and client evidence.
 
 Every release must include this hosted cutover after native publication and Pages succeed.
 The [release command](RELEASES.md#release-command) automates the version-pin commit, pushes
@@ -58,8 +55,8 @@ The controller needs no Proteus checkout, local Emscripten, release artifacts or
 Both builds finish before service/nginx configuration is switched. Upgrades briefly disconnect
 players; repeat deployments reuse the builds and leave a healthy room running.
 
-The v0.0.24 cutover passed through that exact wrapper on 2026-11-01.
-`davve-srv/docs/wake-velocity.md` owns operator commands and deployment evidence; [current verification](#status-and-verification--2026-11-01) records the client checks
+The v0.0.25 cutover passed through that exact wrapper on 2026-11-04.
+`davve-srv/docs/wake-velocity.md` owns operator commands and deployment evidence; [current verification](#status-and-verification--2026-11-04) records the client checks
 and their limits. Do not alternate the baseline role with the standalone Proteus playbook:
 they manage the same service names and ports. The standalone commands below are historical
 reference, not the routine workflow.
@@ -262,6 +259,45 @@ Use `10.0.21.3:24680` for the LAN check. A development build with newer handling
 be rejected; use the release checkout's bot instead. Browser testing must reach the room,
 receive snapshots and play alongside a native client, then leave and rejoin. Inspect the
 selected ICE candidate pair to distinguish direct connectivity from relay verification.
+
+## Status and verification — 2026-11-04
+
+The [release command](RELEASES.md#release-command) deployed **v0.0.25** through committed/pushed
+hosting preparation `9209fcd` and version pin `09a8cf2`. The role now selects `outer` because
+protocol 12 retires `river`. Both room and browser builds finished before switching the service
+and nginx. The first attempt was interrupted while the browser configure stalled downloading
+Lua; its native build had passed. Reusing that native build's archive after verifying the pinned
+SHA-256 allowed the unchanged routine command to complete with `ok=44 changed=7 unreachable=0
+failed=0`. No source or tag changed; a further full repeat deployment was not run.
+
+Room and relay are active; the service description is `Wake Velocity v0.0.25 outer room`, and
+the service-account checkout matches tagged commit `f6152ba3eb655772dc2fcea1de177bb8c79b86be`.
+Both Winterfell and Pages report v0.0.25. Public directory compatibility is protocol 12 /
+physics 9. Both Chrome/SwiftShader clients joined the named room and drove without page errors;
+their captures were inspected. The matching native bot shared a two-player room, received
+114 snapshots, repaired seven mismatches and finished consistent with zero decode errors and
+zero resyncs, `received_ratio=0.893`, RTT 5.19 ms and 55.3 m travelled.
+
+The software-rendered captures show `STALE`. Follow-up used a temporary copy of the directory
+checker with `--use-angle=metal`; both sites passed again and reported the Apple M1 Max Metal
+renderer. Their inspected driving frames have no `STALE` marker; the Winterfell frame shows
+`WAKES REPAIRING`, while the Pages frame has neither marker. This is observed capture evidence,
+not a continuous browser freshness/repair measurement or proof of the software-rendered delay's
+cause. Human input, audio, Windows package execution, released-build physical phones,
+independent external-network/
+TURN selection, restrictive networks and long sessions remain unverified. The separate browser
+plugin qualification passed Firefox/WebKit CI and full local Chrome, while CI Chromium reload
+and objective-deadline failures remain open; [release status](RELEASES.md#status-and-verification)
+owns that evidence and the remaining review limits.
+
+Evidence: `/private/tmp/proteus-release-v0.0.25/build/releases/v0.0.25/verification.json`,
+`deployment.log`, `native.log`, `hosted/`, `pages/`, `hosted-metal/`, `pages-metal/`,
+`browser-qualification/` and `chromium-local/`. The temporary checker is
+`/private/tmp/proteus-v0.0.25-directory-metal.py`.
+The interrupted deployment is preserved in `deployment-attempt-1.log`, `release-attempt-1.log`
+and `verification-attempt-1.json`; orchestration log `/private/tmp/proteus-release-v0.0.25.log`.
+Next: investigate CI Chromium reliability and continue
+human package/multiplayer and wider platform/network review.
 
 ## Status and verification — 2026-11-01
 
