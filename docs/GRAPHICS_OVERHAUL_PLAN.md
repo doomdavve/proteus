@@ -1,13 +1,12 @@
 # Graphics overhaul plan
 
-Status, 2026-11-03: **P1 is merged and Batch A accepted on Mac; P2 is machine-verified**: G3a,
-G3b and G4 are on `feat/graphics-water`, and Batch B was accepted on Mac (outer and basin)
-2026-11-03. The first Windows hardware AMD and verified RTX 4070 SUPER full matrices are saved;
+Status, 2026-11-03: **P1 and P2 are merged**, with Batch A accepted on Mac and Batch B
+accepted on Mac (outer and basin) 2026-11-03. The first Windows hardware AMD and verified RTX 4070 SUPER full matrices are saved;
 a recurring GeForce river hitch is open, with investigation deferred by the user on 2026-11-03.
 Each package has one human playtest and, by default, one implementation PR. The detailed G0–G5c
 briefs are internal checkpoints with focused commits and resumable agent handoffs. G6 remains a
-conditional study. **Next: merge P2 (the user's call), then P3/G5a once sunset readiness
-allows.** See the
+conditional study. **Next: P3/G5a**; its sunset prerequisites (the shared lighting frame and
+approved fixed sunset/dusk presets) are on `main`. See the
 [work packages](#work-package-register) and [execution
 process](#package-execution-process) for scope, review and boundary-change rules.
 
@@ -313,8 +312,8 @@ checkpoints retained so a simpler model can execute one coherent task at a time.
 | Work package | Ordered checkpoints | Branch | Human gate / next package | Status |
 | --- | --- | --- | --- | --- |
 | [P1 — Performance foundations](#p1--performance-foundations) | G0 → G0w → G1 → G2a → G2b | `feat/graphics-foundations` | Batch A before P2 | All checkpoints machine-verified on M1 Max; Batch A accepted on Mac 2026-11-02; Windows AMD/GeForce matrices saved; river hitch deferred |
-| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | All checkpoints machine-verified on M1 Max; Batch B accepted on Mac (outer, basin) 2026-11-03; Windows report pending |
-| [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; depends on P2 and sunset prerequisites |
+| [P2 — Living water](#p2--living-water) | G3a → G3b → G4 | `feat/graphics-water` | Batch B before P3 | Merged (#134); Batch B accepted on Mac (outer, basin) 2026-11-03; Windows report pending |
+| [P3 — Presentation](#p3--presentation) | G5a → G5b → G5c | `feat/graphics-presentation` | Batch C before final acceptance | Unstarted; P2 merged and sunset prerequisites met |
 
 G6 is a conditional backend decision, not a fourth scheduled package. The delivery-boundary rule
 above handles a proven need for an additional prerequisite PR without creating extra playtests.
@@ -380,7 +379,7 @@ state, browser fallback and full suite pass. Record cumulative costs against P1/
 Batch B for river/outer, with stamp/history/place effects distinguishable. Fix blocking water
 feedback before P3 starts; actual human acceptance stays pending until the user plays it.
 
-**Result:** in progress. P1 merged (`dd02c47`) with Batch A resolved 2026-11-02. Completed:
+**Result:** merged as #134 (`90b3e92`) 2026-11-03. P1 merged (`dd02c47`) with Batch A resolved 2026-11-02. Completed:
 [G3a](#g3a--stamped-wake-shading), stamped wake shading, machine-verified on the M1 Max: four-boat
 stress GPU p95 9.6–9.7 → 3.3 ms at 4x4 and 4.66 → 2.77 ms at 320x200, physical state unchanged,
 float-blend probe and analytic fallback checked in WebGL2. [G3b](#g3b--foam-history-and-cosmetic-ripples),
@@ -391,7 +390,7 @@ depth contact and far-water life, machine-verified: river GPU p95 within noise, 
 stress +0.3 ms (the depth copy), atlases 0.23 and 0.38 MB on disk, physical state unchanged,
 WebGL2 depth blit and outer atlas lazy load checked. Cumulative stress GPU p95 at 4x4 against P1:
 9.6–9.7 → 3.76–3.81 ms. Batch B ([request](#batch-b-request)) accepted on Mac 2026-11-03 for outer
-and basin. Next: P2 merge, the user's call. Agent playback: captures,
+and basin. Next: P3. Agent playback: captures,
 clips, windowed native demos and WebGL2 smokes; no human acceptance until Batch B. Known risks:
 glitter and gust strength judged only from stills and clips, the basin's open mask, and no
 Windows report.
@@ -426,9 +425,9 @@ Mark the overhaul accepted only after the recorded user verdict and blocking fix
 limitations explicit. G6 is opened only if its separate measured trigger is satisfied.
 
 **Result:** unstarted. Completed: package instructions only. Sunset readiness (2026-11-03): the
-shared lighting frame (`WaterfrontLighting` on the scene frame, byte-identical daytime) and fixed
-sunset/dusk presets are implemented on `feat/sunset-lighting` but not merged or user-reviewed;
-see [SUNSET_PLAN](SUNSET_PLAN.md#current-status). Next: that merge and review, then G5a task 1. No implementation verification, playback or user acceptance. Known
+shared lighting frame (`WaterfrontLighting` on the scene frame) and fixed sunset/dusk presets
+merged to `main` in #138 and the user approved the presets; see
+[SUNSET_PLAN](SUNSET_PLAN.md#current-status). Next: G5a task 1. No implementation verification, playback or user acceptance. Known
 risks: external sunset dependency, multiple target/light lifetimes and integrated preset behavior.
 
 **Kickoff prompt:**
@@ -1330,8 +1329,10 @@ and basin the same day. Owner: P2.
   "basically static noise" without `--gpu-aa` and allowed calmer daytime glitter too. On
   `feat/sunset-lighting`, daytime keeps about half the sparkles at half speed and fades them
   where a pixel covers several facets, so G4's accepted glitter changed; see
-  [SUNSET_PLAN](SUNSET_PLAN.md#current-status) for the measurements. Not yet played.
-- **Next:** P2 merge.
+  [SUNSET_PLAN](SUNSET_PLAN.md#current-status) for the measurements. The user then approved
+  the sunset and dusk presets with that glitter (2026-11-03); the calmer daytime glitter has no
+  separate verdict.
+- **Merged:** P2 as #134 (`90b3e92`), 2026-11-03.
 
 #### Batch B request
 
@@ -1438,8 +1439,8 @@ and reflected-light captures. Daytime/reference fallback parity remains within d
 windows/streaks are readable and stable moving. Full suite, WebGL2 build/smoke and G0 CPU/GPU/memory
 ceilings pass; Batch C is prepared, not accepted.
 
-**Limits and stop conditions:** External sunset work is a real readiness gate; it is currently
-proposed, not delivered. No new gameplay clock, Lua capability, room protocol or dynamic global
+**Limits and stop conditions:** External sunset work is a real readiness gate; the frame and the
+approved fixed presets were delivered in #138 (2026-11-03). No new gameplay clock, Lua capability, room protocol or dynamic global
 illumination. If the prerequisite remains unavailable, report G5b/G5c unready; final dusk acceptance
 stays open.
 
