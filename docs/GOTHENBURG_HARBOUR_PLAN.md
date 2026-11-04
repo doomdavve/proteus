@@ -49,8 +49,10 @@ Candidates considered on 2026-11-04:
 
 ## Route
 
-Traced by eye from the operator's map, to be fixed with the anchors and capture tools in
-[GH5](#gh5-the-grodan-package):
+Proposed 2026-11-04, traced by eye from the operator's map. [GH5](#gh5-result-2026-11-04)
+fixed it against the compiled water and changed step 2: Fattighusån leaves the map at its
+eastern edge (east 4200 m) and is too narrow to turn in, so the tour turns west at Slussen into
+Stora Hamnkanalen and leaves it at Stora Bommen.
 
 1. Start at the Kungsportsplatsen pier on Vallgraven (Kungsportsbron).
 2. Along Vallgraven past Trädgårdsföreningen, then west through Fattighusån and Stora Hamnkanalen
@@ -64,7 +66,13 @@ Traced by eye from the operator's map, to be fixed with the anchors and capture 
 **Water (checked 2026-11-04).** The user confirmed the canals are in the outer map's water.
 Point tests against the compiled water (`assets/geometry/outer/water.h`) found water at
 Brunnsparken, Kungsportsplatsen, Vallgraven by Trädgårdsföreningen and Rosenlundskanalen by
-Feskekörka. Nobody has driven the full loop or checked its width against hull clearance yet.
+Feskekörka. GH5 measured the widths and drove the loop: see its [result](#gh5-result-2026-11-04).
+
+**Facts from the [Swedish Wikipedia article](https://sv.wikipedia.org/wiki/Paddan)** (read
+2026-11-04). The lowest bridge is at Stora Bommen. It is nicknamed *Osthyveln* (the cheese
+slicer) because even at low water it often makes passengers bend down. It was raised in a 2011
+renovation and given a cheese slicer as decoration underneath. The article gives no clearances in
+metres.
 
 ## Inventory (pinned OSM corridor, checked 2026-11-04)
 
@@ -98,7 +106,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Implemented 2026-11-04; [result](#gh3-result-2026-11-04) |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start and up to 32 ordered stops with captions | Implemented 2026-11-04; [result](#gh4-result-2026-11-04). Speed-limit zones and Å/Ä/Ö moved to GH4b |
 | GH4b | GH4 | Å, Ä, Ö and É in the menu and HUD fonts and in stop names and captions; canal speed-limit zones | Proposed |
-| [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Proposed |
+| [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Implemented 2026-11-04; [result](#gh5-result-2026-11-04). User run owed |
 | [GH6](#gh6-sights-along-the-route) | — | The Opera, Feskekörka, Börsen, Kronhuset, Stora Teatern, Skansen Kronan/Lejonet, Palmhuset and Maritiman | Proposed |
 | [GH7](#gh7-canal-boats-in-traffic) | GH3, [Marina M3](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion) | Canal boats running the loop in free play | Proposed |
 | [GH8](#gh8-low-bridge-contact-later) | GH2, GH5 | Low-bridge contact and the duck moment | Later |
@@ -307,6 +315,61 @@ until GH5), no human play.
 Acceptance: the bundled catalog builds it; a scripted drive finishes the loop; CPU/GPU captures at
 three sights; a user run of the whole tour.
 
+### GH5 result, 2026-11-04
+
+- **Package.** `plugins/grodan` (`proteus.grodan`, kind `voyage`) returns a 31-stop tour. Stop
+  1 is the Kungsportsplatsen pier on the Vallgraven side north-east of Kungsportsbron. The tour
+  arrives south-west of the bridge at 2 m/s or less. Native and browser catalogs both list it.
+- **Stops.** 22 stops are at sights and bridges, including "OSTHYVELN, THE CHEESE SLICER: HEADS
+  DOWN" at Stora Bommen. Nine more are at canal bends, named after the nearest bridge or place.
+  Every stop has an ASCII caption. Apart from Osthyveln, the facts in the captions come from
+  general knowledge and are not checked against sources: Palmhuset 1878, Centralstationen 1858,
+  Barken Viking 1906, the Opera 1994, Hisingsbron 2021, Masthuggskyrkan 1914, Feskekörka 1874,
+  Stora Teatern 1859, and the Gustav II Adolf statue's pointing legend.
+- **Placement.** A scratch planner placed the stops from the compiled water and the OSM canal
+  centrelines, re-centred on the water. It is not checked in.
+  - Each sight may move 40 m along the route.
+  - The planner adds the fewest bend stops for which every straight leg between stop centres keeps
+    0.6 times the canal's centreline clearance, at most 6 m.
+  - Slussen got a hand-placed turning arc.
+- **Format change: tour stops need 4 m of water, not 8.** The 8 m GH4 rule fits no stop in Stora
+  Hamnkanalen east of Fontänbron (12 m wide in the map for 400 m) or the Rosenlund narrows (9–11 m).
+  A tour stop's recovery pose faces along the canal, so it needs room for the beam (2.1 m). The
+  arrival keeps 8 m, and destination voyages are unchanged.
+- **Title.** CONTENT on GOTHENBURG HARBOUR cycles STANDARD, HARBOR LIFE and GRODAN TOUR, with the
+  hint "CANAL TOUR FROM KUNGSPORTSPLATSEN". It is saved as `outer_content=grodan`. GRODAN TOUR
+  always launches `--package proteus.grodan --skin grodan`, whatever livery is chosen.
+  `--title-start outer-grodan` exists for tests.
+- **Not done.** The objective HUD (sights passed, time) and canal speed-limit warnings
+  ([GH4b](#delivery-and-dependencies)). Directional gates. The tour package is not in
+  `plugin_author.py`'s or `package_plugin_tools.py`'s example lists.
+
+Verification, 2026-11-04, Apple Silicon/macOS, Debug:
+
+- **Suite.** Warning-clean build (only the upstream `stb_vorbis.c` warning). `ctest --preset full`
+  passed all 369 enabled tests (13 retired wake-field tests disabled, GPU tests off), among them
+  `wake_velocity_title_start.outer-grodan`.
+- **Scripted drive.** The new case `boat_plugin_session.grodan_tour` (slow lane, about 5 s) opens
+  the bundled entry and drives the Grodan by pure pursuit along the lines between stop centres:
+  half throttle in the canals, full on the river, damped steering. Its 15 × 4.2 m footprint never
+  left the water. It passed all 30 stops after the start in order and arrived in 35.9 simulated
+  minutes.
+- **Track plots** at Slussen and the narrows were inspected (scratch tooling).
+- **Captures inspected.**
+  - CPU and GPU from tour copies starting at Stora Bommen and Göteborgsoperan, CPU only at Slussen
+    and Feskekörka: the boat sits in the canal or river facing along the route, with Karlatornet
+    or Läppstiftet and Hisingsbron ahead where expected.
+  - The title's single-player panel with CONTENT < GRODAN TOUR > and its hint, through a
+    temporary capture patch that was reverted.
+  - `--title-start outer-grodan` opens the package; `outer-bogus` and `nowhere` are rejected.
+- **Not checked.** No browser build or browser checks. The in-game tour HUD was not captured
+  (GH4's `boat_hud_review` captures cover its layout). No human play: the user's run of the
+  whole tour is still owed.
+- **Handling.** The autopilot first jammed against Vallgraven's west quay. The Grodan's yaw
+  inertia (30, against the speedboat's 2.2) works against the speedboat's yaw damping, so a turn
+  overshoots by about 0.5 rad unless steering is eased off early. Players will feel this in the
+  12 m channels; GH3's handling may need more yaw damping after the user's run.
+
 ## GH6: sights along the route
 
 Read `tools/outer_landmarks.py` (Karlatornet, Lilla Bommen, Hisingsbron in
@@ -342,9 +405,10 @@ design before work starts.
 ## Status
 
 GH1 implemented 2026-11-04 on branch `feat/gothenburg-harbour-name` ([result](#gh1-result-2026-11-04)),
-GH4 on `feat/grodan-tour-format` ([result](#gh4-result-2026-11-04)) and GH3 on `feat/grodan-boat`
-([result](#gh3-result-2026-11-04)). The user asked to continue with the steps that need no new data
-from them: GH5 (the Grodan tour package) next, then GH6. GH2 waits for bridge height data.
+GH4 on `feat/grodan-tour-format` ([result](#gh4-result-2026-11-04)), GH3 on `feat/grodan-boat`
+([result](#gh3-result-2026-11-04)) and GH5 on `feat/grodan-tour` ([result](#gh5-result-2026-11-04)).
+The user asked to continue with the steps that need no new data from them: GH6 (sights along the
+route) next. GH2 waits for bridge height data. The user's run of the Grodan tour is owed.
 
 ## Verification and handoff
 
@@ -353,7 +417,9 @@ any user play. Captures alone do not count as acceptance for motion, camera or h
 
 ## Known limitations
 
-- The route is traced by eye from a screenshot of the operator's map.
+- The tour follows the operator's map only roughly: Stora Hamnkanalen replaces Fattighusån, which
+  leaves the map ([GH5](#gh5-result-2026-11-04)).
+- The Grodan overshoots turns in the narrow canals (GH5); its handling has not been played.
 - Bridge heights have proposed sources ([GH2](#gh2-canal-bridges)), but none has been checked
   over the canals.
 - No sight has had its look checked against photographs yet.

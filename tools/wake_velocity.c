@@ -2463,9 +2463,11 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
         arguments[count++] = "--location";
         arguments[count++] = (char *)boat_location(settings->location)->name;
     }
+    bool grodan = false;
     if (settings->location == BOAT_LOCATION_OUTER && settings->outer_content) {
         arguments[count++] = "--package";
-        arguments[count++] = (char *)"proteus.harbor-life";
+        arguments[count++] = (char *)boat_title_outer_package(settings->outer_content);
+        grodan = settings->outer_content == BOAT_TITLE_OUTER_GRODAN;
     }
     if (settings->waves)
         arguments[count++] = "--waves";
@@ -2474,8 +2476,9 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
         arguments[count++] = "high";
     } else if (settings->smooth_edges)
         arguments[count++] = "--gpu-aa";
+    // The canal tour is always the Grodan's, whatever livery the player keeps for other places.
     arguments[count++] = "--skin";
-    arguments[count++] = (char *)boat_skin_name(settings->skin);
+    arguments[count++] = (char *)boat_skin_name(grodan ? BOAT_SKIN_GRODAN : settings->skin);
     arguments[count++] = "--soundtrack";
     arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
     if (settings->mouse_steering)
@@ -2489,21 +2492,27 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 
 // --title-start PLACE [OPTIONS]: the title's START with default settings and no menu, so a test
 // proves that every PLACE the panel offers opens. PLACE is basin, outer, outer-standard,
-// outer-harbor-life or basin-trial.
+// outer-harbor-life, outer-grodan or basin-trial.
 static int title_start(int argc, char **argv)
 {
     BoatTitleSettings settings;
     boat_title_defaults(&settings);
     const char *place = argv[2];
     const BoatWorldDefinition *location = boat_location_find(place);
+    bool known = location != NULL;
     if (location)
         settings.location = location->id;
-    else if (!strcmp(place, "basin-trial"))
+    else if (!strcmp(place, "basin-trial")) {
         settings.location = BOAT_LOCATION_COUNT;
-    else if (!strcmp(place, "outer-standard") || !strcmp(place, "outer-harbor-life")) {
-        settings.location = BOAT_LOCATION_OUTER;
-        settings.outer_content = !strcmp(place, "outer-harbor-life");
-    } else {
+        known = true;
+    } else if (!strncmp(place, "outer-", 6))
+        for (unsigned i = 0; i < BOAT_TITLE_OUTER_CONTENTS; ++i)
+            if (!strcmp(place + 6, boat_title_outer_content(i))) {
+                settings.location = BOAT_LOCATION_OUTER;
+                settings.outer_content = i;
+                known = true;
+            }
+    if (!known) {
         fprintf(stderr, "--title-start: unknown place %s.\n", place);
         return 1;
     }

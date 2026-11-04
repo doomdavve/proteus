@@ -1,0 +1,10 @@
+{
+  "id": "proteus.grodan",
+  "name": "Grodan canal tour",
+  "api": 1,
+  "kind": "voyage",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["voyage.define"],
+  "state_version": 1
+}

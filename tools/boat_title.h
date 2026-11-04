@@ -16,7 +16,7 @@ typedef struct {
     unsigned host_mode; // HOST A ROOM: a BoatTitleHostMode, a boat_location id and the water.
     unsigned host_location;
     bool host_waves;
-    unsigned outer_content; // OUTER content: 0 standard voyage, 1 Harbor life.
+    unsigned outer_content; // A BoatTitleOuterContent: the harbour's single-player package.
     char message[160]; // Shown under the menu, e.g. why the last connection ended.
 } BoatTitleSettings;
 
@@ -26,6 +26,18 @@ typedef enum {
     BOAT_TITLE_JOIN,
     BOAT_TITLE_HOST
 } BoatTitleChoice;
+// The CONTENT row on GOTHENBURG HARBOUR: the Långedrag voyage, Harbor life, or the Grodan canal
+// tour, which always starts in the Grodan.
+typedef enum {
+    BOAT_TITLE_OUTER_STANDARD,
+    BOAT_TITLE_OUTER_HARBOR_LIFE,
+    BOAT_TITLE_OUTER_GRODAN,
+    BOAT_TITLE_OUTER_CONTENTS
+} BoatTitleOuterContent;
+// The saved spelling of a content, also the --title-start suffix: standard, harbor-life, grodan.
+const char *boat_title_outer_content(unsigned content);
+// The bundled package for a content.
+const char *boat_title_outer_package(unsigned content);
 typedef enum {
     BOAT_TITLE_HOST_FREE,
     BOAT_TITLE_HOST_DEATHMATCH,

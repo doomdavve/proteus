@@ -551,10 +551,10 @@ than `"`, `\` and `` ` ``, without leading or trailing spaces. A tour has no `ex
 | Progress | Only the next stop counts; passing a later one first does nothing | Any shelter within its radius |
 | Arrival | Only after every stop before the last | Whenever inside the area at speed |
 | HUD | The next stop's name and distance; each stop's caption for 8 s on passing, else STOP N OF M | The destination and the latest notice |
-| Staging | Stops and arrival need 8 m of open water | Shelters 8 m, arrival 20 m |
+| Staging | Stops need 4 m of open water (room for the beam in a canal), the arrival 8 m | Shelters 8 m, arrival 20 m |
 
-Recovery returns to the last stop passed. Objectives see the same `voyage.shelter_reached` and
-`voyage.arrived` events, with stop ids. A caption edit reloads like a rename. The browser
+Recovery returns to the last stop passed, facing along the stop's heading. Objectives see the same
+`voyage.shelter_reached` and `voyage.arrived` events, with stop ids. A caption edit reloads like a rename. The browser
 worker's wire (`PSTA`) carries tours and captions.
 
 ### Scene authoring not exposed yet
