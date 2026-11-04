@@ -1,11 +1,13 @@
 #include "boat_skin.h"
 #include "boat_cabin.h"
 #include "boat_flag.h"
+#include "boat_grodan.h"
 #include "raymath.h"
 
 #include <string.h>
 
-static const char *names[] = { "sweden", "finland", "denmark", "norway", "explorer", "cabin" };
+static const char *names[]
+    = { "sweden", "finland", "denmark", "norway", "explorer", "cabin", "grodan" };
 #define WHITE_HULL { 239, 243, 245, 255 } // A macro: MSVC rejects const objects in initializers.
 static const BoatSkinPalette palettes[] = {
     // Hull, deck, stripe/seat accent, upholstery. One shape for all; the explorer has a
@@ -15,12 +17,19 @@ static const BoatSkinPalette palettes[] = {
     { WHITE_HULL, { 198, 12, 48, 255 }, { 250, 246, 237, 255 }, { 63, 36, 43, 255 } },
     { WHITE_HULL, { 186, 12, 47, 255 }, { 0, 32, 91, 255 }, { 29, 40, 62, 255 } },
     { { 58, 64, 70, 255 }, { 214, 196, 158, 255 }, { 242, 118, 28, 255 }, { 70, 56, 44, 255 } },
-    { { 235, 238, 235, 255 }, { 244, 245, 239, 255 }, { 173, 129, 80, 255 }, { 71, 111, 127, 255 } }
+    { { 235, 238, 235, 255 }, { 244, 245, 239, 255 }, { 173, 129, 80, 255 },
+        { 71, 111, 127, 255 } },
+    { { 58, 140, 72, 255 }, { 173, 129, 80, 255 }, { 30, 84, 52, 255 }, { 240, 196, 64, 255 } }
 };
 static const Color rubber = { 27, 39, 47, 255 };
 static const Color glass = { 43, 85, 106, 255 };
 
 unsigned int boat_skin_index(unsigned int skin) { return skin < BOAT_SKIN_COUNT ? skin : 0; }
+bool boat_skin_outboards(unsigned int skin)
+{
+    skin = boat_skin_index(skin);
+    return skin != BOAT_SKIN_CABIN && skin != BOAT_SKIN_GRODAN;
+}
 const char *boat_skin_name(unsigned int skin) { return names[boat_skin_index(skin)]; }
 BoatSkinPalette boat_skin_palette(unsigned int skin) { return palettes[boat_skin_index(skin)]; }
 
@@ -233,6 +242,8 @@ const Mesh3D *boat_skin_mesh(unsigned int skin, BoatSkinPart part)
     if (!m->mesh.triangle_count) {
         if (skin == BOAT_SKIN_CABIN && part != BOAT_SKIN_ENGINE)
             boat_cabin_generate(m, part == BOAT_SKIN_HULL);
+        else if (skin == BOAT_SKIN_GRODAN && part != BOAT_SKIN_ENGINE)
+            boat_grodan_generate(m, part == BOAT_SKIN_HULL);
         else
             boat_skin_generate(m, boat_skin_palette(skin), part);
     }

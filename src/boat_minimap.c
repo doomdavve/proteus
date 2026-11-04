@@ -653,18 +653,22 @@ const Image *boat_minimap_compose(BoatMinimap *minimap, BoatMinimapMode mode,
     }
     const BoatVoyageRoute *route = voyage ? voyage->route : NULL;
     if (route) {
-        Vector2 centre = project_map(layer, to_map(route->exposure.centre));
-        float radius = route->exposure.radius * route->exposed_fraction * layer->scale;
-        dashed_circle(layer, centre, radius, magenta);
-        if (chart)
-            text(layer, "EXPOSED", (int)centre.x, (int)(centre.y - radius) - 7, magenta);
-        // Anchorages: the recovery shelter in full magenta, the others pale.
+        if (route->exposure.radius > 0) {
+            Vector2 centre = project_map(layer, to_map(route->exposure.centre));
+            float radius = route->exposure.radius * route->exposed_fraction * layer->scale;
+            dashed_circle(layer, centre, radius, magenta);
+            if (chart)
+                text(layer, "EXPOSED", (int)centre.x, (int)(centre.y - radius) - 7, magenta);
+        }
+        // Anchorages: the recovery shelter in full magenta, the others pale. A tour marks its
+        // next stop instead.
         static const unsigned char anchor[5] = { 0x04, 0x0e, 0x04, 0x15, 0x0e };
         unsigned destination = route->shelter_count - 1;
+        unsigned marked = route->ordered ? boat_voyage_next(voyage) : voyage->shelter;
         for (unsigned i = 0; i < destination; ++i) {
             Vector2 p = project_map(layer, to_map(route->shelters[i].position));
             int x = (int)floorf(p.x), y = (int)floorf(p.y);
-            symbol(layer, anchor, x, y, i == voyage->shelter ? magenta : pale_magenta);
+            symbol(layer, anchor, x, y, i == marked ? magenta : pale_magenta);
         }
         // The destination as a route waypoint: a magenta ring, filled once arrived.
         Vector2 p = project_map(layer, to_map(route->arrival_centre));

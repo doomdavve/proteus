@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Optional Playwright check of G5a's high resolution and HDR fallback against a served build.
 
-Single player on the outer river with PICTURE set to HIGH RES must render a 1280x800 scene, a
+Single player in Gothenburg Harbour with PICTURE set to HIGH RES must render a 1280x800 scene, a
 640x480 reflection and (with float render targets) the 640x400 bloom level; it must survive a
 mobile rotation and return to the title. With EXT_color_buffer_float hidden, the same session
 presents 8-bit (no bloom viewports) without errors. The saved settings keep resolution=high.
@@ -61,7 +61,7 @@ def session(browser, name, float_targets, mobile):
         page.keyboard.press(k, delay=90)
         page.wait_for_timeout(200)
 
-    key('Enter')  # SINGLE PLAYER, on START with the outer river selected
+    key('Enter')  # SINGLE PLAYER, on START with Gothenburg Harbour selected
     key('ArrowUp')  # PICTURE
     key('ArrowRight')  # SMOOTH -> HIGH RES
     page.screenshot(path=str(args.output / f'{name}-setup.png'))

@@ -48,8 +48,8 @@ void boat_session_start_course(BoatSession *session);
 void boat_session_set_course_definition(
     BoatSession *session, const BoatCourseDefinition *definition);
 // A new attempt in the same location: flush, reinitialize clock, WATER, boat and presentation
-// (at the course start when the course is enabled) and pin the course opponent. Runs and the
-// borrowed resources survive.
+// (at the course start when the course is enabled, a tour route's first stop when one is set) and
+// pin the course opponent. Runs and the borrowed resources survive.
 void boat_session_restart(BoatSession *session, BoatWater water);
 // Write a pending course finish. Never called from a tick.
 void boat_session_flush(BoatSession *session);
@@ -73,7 +73,8 @@ void boat_session_rebind_voyage_live(BoatSession *session, const BoatVoyageRoute
     const char *old_id, const char *const *new_ids, unsigned new_count);
 // Begin ROUTE's voyage at the start shelter now: progress, timing and recoveries reset while the
 // boat, clock, water and weather continue, so ROUTE's exposure must be the current one's. A
-// boat already inside an area is observed on the next step. Later restarts begin ROUTE.
+// boat already inside an area is observed on the next step. Later restarts begin ROUTE. A tour
+// (an ordered ROUTE) also puts a reset boat and presentation at its first stop.
 void boat_session_restart_voyage(BoatSession *session, const BoatVoyageRoute *route);
 // Advance the clock once, step the boat at the new tick, sweep the course gates from its
 // previous position, observe the voyage, step its presentation when enabled and record course

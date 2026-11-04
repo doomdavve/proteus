@@ -8,7 +8,7 @@
 #include "boat_plugin_host.h"
 #include "boat_plugin_lua.h"
 
-#define BOAT_PLUGIN_WIRE_VERSION 0x50535439u // PST9: berth appearance (scene v3).
+#define BOAT_PLUGIN_WIRE_VERSION 0x50535441u // PSTA: tours (ordered stops with captions).
 
 typedef struct {
     BoatPluginKind kind;

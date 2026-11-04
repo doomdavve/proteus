@@ -1,6 +1,7 @@
 #include "boat_view.h"
 #include "boat_combat.h"
 #include "boat_course_view.h"
+#include "boat_grodan.h"
 #include "boat_map.h"
 #include "boat_pose.h"
 #include "boat_race.h"
@@ -17,6 +18,11 @@ static const float CAMERA_BASE_FOV = 55 * DEG2RAD;
 static const float CAMERA_SPEED_FOV = 7 * DEG2RAD;
 static const float CAMERA_SPEED_START = 4.0f;
 static const float CAMERA_SPEED_FULL = 18.0f;
+// GH2: under a bridge the eye keeps its line to a point this high over the boat this far below
+// the deck, and never drops below the last height.
+static const float CAMERA_BOAT_SIGHT = .9f, CAMERA_DECK_MARGIN = .3f, CAMERA_LOWEST = 1.0f;
+// Metres the eye climbs per metre it travels clear of a deck (GH2, after the user's drive).
+static const float CAMERA_RISE = .5f;
 
 void boat_player_pose(
     const BoatViewState *view, const BoatFlag *flag, WaterfrontPlayerState *player)
@@ -41,6 +47,12 @@ void boat_player_pose(
         Vector3 offset = Vector3Transform((Vector3) { 0, -.40f, 0 }, boat_pose_rotation(boat));
         player->hull.position = Vector3Add(player->hull.position, offset);
         player->cabin.position = Vector3Add(player->cabin.position, offset);
+        for (int i = 0; i < BOAT_FLAG_POINTS; ++i)
+            player->flag.points[i] = Vector3Add(player->flag.points[i], offset);
+    } else if (player->skin == BOAT_SKIN_GRODAN) {
+        // The ensign flies from the long hull's stern staff, 6 m aft of the speedboat's.
+        Vector3 offset
+            = Vector3Transform((Vector3) { 0, 0, BOAT_GRODAN_FLAG_AFT }, boat_pose_rotation(boat));
         for (int i = 0; i < BOAT_FLAG_POINTS; ++i)
             player->flag.points[i] = Vector3Add(player->flag.points[i], offset);
     }
@@ -81,6 +93,24 @@ static View3D boat_camera(const Boat *boat, const BoatPresentation *presentation
         = { -sinf(presentation->camera_heading), 0, -cosf(presentation->camera_heading) };
     Vector3 eye = Vector3Subtract(boat_position, Vector3Scale(follow, camera_settings.distance));
     eye.y = camera_settings.height;
+    // GH2: under a canal bridge the eye drops until its line to the boat passes below the deck.
+    // Each covered point B metres aft bounds the eye's height; the bound loosens smoothly to
+    // nothing as the deck reaches the boat. Behind the eye, a deck the eye has left still holds
+    // it down, rising CAMERA_RISE per metre, so it climbs back gradually rather than snapping up.
+    // The bounds come from the pose alone, so the view needs no history.
+    WaterfrontOverhead overhead = waterfront_overhead(definition->map);
+    float reach = camera_settings.distance + camera_settings.height / CAMERA_RISE;
+    for (float b = .5f; overhead && b <= reach; b += .5f) {
+        Vector3 p = Vector3Subtract(boat_position, Vector3Scale(follow, b));
+        float under = overhead(p.x, p.z) - CAMERA_DECK_MARGIN;
+        if (!isfinite(under))
+            continue;
+        eye.y = fminf(eye.y,
+            b <= camera_settings.distance
+                ? CAMERA_BOAT_SIGHT + (under - CAMERA_BOAT_SIGHT) * camera_settings.distance / b
+                : under + (b - camera_settings.distance) * CAMERA_RISE);
+    }
+    eye.y = fmaxf(eye.y, CAMERA_LOWEST);
     Vector3 look_at = Vector3Add(boat_position, Vector3Scale(follow, 5));
     look_at.y = 0.6f;
     return (View3D) { .position = eye,
@@ -608,7 +638,7 @@ static void draw_skinned_boat(Renderer3D *renderer, const WaterfrontPlayerState 
 {
     renderer3d_draw_mesh(renderer, boat_skin_mesh(boat->skin, BOAT_SKIN_HULL), boat->hull);
     renderer3d_draw_mesh(renderer, boat_skin_mesh(boat->skin, BOAT_SKIN_COCKPIT), boat->cabin);
-    for (int side = -1; boat->skin != BOAT_SKIN_CABIN && side <= 1; side += 2)
+    for (int side = -1; boat_skin_outboards(boat->skin) && side <= 1; side += 2)
         renderer3d_draw_mesh(renderer, boat_skin_mesh(boat->skin, BOAT_SKIN_ENGINE),
             boat_skin_outboard_pose(boat->hull, boat->engine, side));
     BoatFlagMesh flag_storage;

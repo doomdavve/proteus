@@ -103,7 +103,7 @@ screenshot drive.
 
 On macOS, deeper CPU profiling can use Xcode's Instruments command-line tools when full Xcode is the
 active developer directory. For example, record a Time Profiler trace against a windowed scripted
-outer river drive:
+Gothenburg Harbour (`outer`) drive:
 
 ```sh
 xcrun xctrace record --template 'Time Profiler' --output build/outer.trace \
