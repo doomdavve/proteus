@@ -106,7 +106,7 @@ Each step is its own worktree and pull request. Dependent steps stack on their p
 | [GH3](#gh3-the-canal-boat) | — | A low, wide, open canal boat with its own handling | Implemented 2026-11-04; [result](#gh3-result-2026-11-04) |
 | [GH4](#gh4-tour-format) | — | A plugin route format with a free start and up to 32 ordered stops with captions | Implemented 2026-11-04; [result](#gh4-result-2026-11-04). Speed-limit zones and Å/Ä/Ö moved to GH4b |
 | GH4b | GH4 | Å, Ä, Ö and É in the menu and HUD fonts and in stop names and captions; canal speed-limit zones | Proposed |
-| [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Implemented 2026-11-04; [result](#gh5-result-2026-11-04). User run owed |
+| [GH5](#gh5-the-grodan-package) | GH3, GH4 | The bundled Grodan tour, offered on the title | Implemented 2026-11-04; [result](#gh5-result-2026-11-04). User run 2026-11-04: not fun yet |
 | [GH6](#gh6-sights-along-the-route) | — | The Opera, Feskekörka, Börsen, Kronhuset, Stora Teatern, Skansen Kronan/Lejonet, Palmhuset and Maritiman | Proposed |
 | [GH7](#gh7-canal-boats-in-traffic) | GH3, [Marina M3](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion) | Canal boats running the loop in free play | Proposed |
 | [GH8](#gh8-low-bridge-contact-later) | GH2, GH5 | Low-bridge contact and the duck moment | Later |
@@ -365,6 +365,9 @@ Verification, 2026-11-04, Apple Silicon/macOS, Debug:
 - **Not checked.** No browser build or browser checks. The in-game tour HUD was not captured
   (GH4's `boat_hud_review` captures cover its layout). No human play: the user's run of the
   whole tour is still owed.
+- **User run, 2026-11-04.** The user played the whole tour at 8× speed. They saw no bridges, and
+  the canals looked as on earlier visits, only slower. Their verdict: "It's not fun yet." Not
+  accepted.
 - **Handling.** The autopilot first jammed against Vallgraven's west quay. The Grodan's yaw
   inertia (30, against the speedboat's 2.2) works against the speedboat's yaw damping, so a turn
   overshoots by about 0.5 rad unless steering is eased off early. Players will feel this in the
@@ -408,7 +411,8 @@ GH1 implemented 2026-11-04 on branch `feat/gothenburg-harbour-name` ([result](#g
 GH4 on `feat/grodan-tour-format` ([result](#gh4-result-2026-11-04)), GH3 on `feat/grodan-boat`
 ([result](#gh3-result-2026-11-04)) and GH5 on `feat/grodan-tour` ([result](#gh5-result-2026-11-04)).
 The user asked to continue with the steps that need no new data from them: GH6 (sights along the
-route) next. GH2 waits for bridge height data. The user's run of the Grodan tour is owed.
+route) next. GH2 waits for bridge height data. The user ran the Grodan tour on 2026-11-04: no
+bridges, nothing new to see, too slow, not fun yet.
 
 ## Verification and handoff
 
