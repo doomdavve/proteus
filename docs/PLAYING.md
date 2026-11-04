@@ -38,16 +38,41 @@ solo free boating; timed courses use the standard engine and multiplayer assigns
 | F3 | Toggle profiler |
 | F8 (GPU) | Step through water layers for graphics review: all, no far-water life, G3 only, stamp only, analytic wakes |
 | F9 (GPU) | Turn the map's baked ambient occlusion off or on, for graphics review |
-| `` ` `` or F2 (native solo) | Live Lua console; `/help` lists commands and `/save DIR` writes a package |
+| `` ` ``, F2 or § (solo, physical keyboard) | Live Lua console; `/help` explains commands |
 
 Holding both thrust directions selects neutral. Reverse power is weaker than forward;
-Shift selects 5% power in either direction. Scrolling is unassigned and R does nothing.
+Shift selects 5% power in either direction. Outside the console, scrolling is unassigned and R does nothing.
 
-The live console is available in native solo free boating and voyages, including release builds.
-It takes typed input while the world keeps running with a neutral helm, so a test edit never
-stops the boat. A plain line edits the package, `=` queries the current candidate and `/` runs a
-command; see [the console contract](PLUGIN_API.md#live-console-and-command-layer-pc). It is
-unavailable in replays, demos, screenshots and rooms.
+The live console is available in native solo free boating and voyages and desktop browsers with a
+physical keyboard, including release builds. Its first opening shows a boat logo, build version and
+quick help. The panel uses the smallest bundled m3x6 pixel face, natural letter spacing and
+crisp integer scaling. Only the boat drawing uses fixed-width cells. The translucent panel shows
+the world beneath it; GPU rendering adds a light background blur while the text stays sharp. It takes typed input while the world keeps running with a neutral helm. A plain line
+edits the package's `def` table, `= expression` inspects it without changing it, and `/` runs a command.
+Try `/status`, `/help` or `/help status`; see [the console contract](PLUGIN_API.md#live-console-and-command-layer-pc).
+Replays, demos, screenshots and rooms do not offer it.
+
+While the console is open:
+
+| Input | Action |
+| --- | --- |
+| Enter | Run the line |
+| Escape, F2, `` ` `` or § | Close; keep the unfinished line |
+| Left/Right, Home/End | Move the block cursor; long input scrolls horizontally |
+| Backspace / Delete | Delete before / under the cursor; holding repeats |
+| Up / Down | Browse history, then return to your unfinished draft |
+| Tab / Shift+Tab | Complete a slash command, then cycle matches forward / backward |
+| PageUp / PageDown or mouse wheel | Scroll wrapped output; new output preserves your reading position |
+| Ctrl+C / Cmd+C | Copy the latest submitted command and its output, useful after `/status` |
+| Ctrl+Shift+C / Cmd+Shift+C | Copy all retained scrollback |
+| Ctrl+V / Cmd+V | Paste one printable ASCII line at the cursor; Enter runs it |
+
+Completion first expands a shared prefix, then cycles command names; Lua and arguments stay
+untouched. Copy keeps the original output lines, without display wrapping. These shortcuts copy output even
+while a command is being edited; mouse text selection is not available. Multiline, unsupported
+character and oversized pastes are rejected without changing the input. Clipboard refusal in a
+browser is shown in the console footer. `/clear` clears output and the copy buffer, preserving
+command history. Scrollback retains 200 logical lines and history retains 16 commands.
 
 Mouse steering captures the pointer. Move horizontally to turn the wheel, then stop
 moving to hold its setting; move back to straighten it. The wheel needle shows the actual

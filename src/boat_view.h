@@ -6,6 +6,7 @@
 #include "boat_water_mesh.h"
 #include "renderer3d.h"
 #include "waterfront_corner.h"
+#include "waterfront_harbor_view.h"
 #include "waterfront_scene.h"
 
 #define BOAT_CAMERA_DEFAULT ((BoatCamera) { .distance = 20, .height = 14 })
@@ -54,6 +55,7 @@ typedef struct {
 typedef struct {
     BoatWaterMeshCache water_mesh;
     WaterfrontScenery scenery;
+    WaterfrontHarborModels harbor;
     float daylight; // Presentation phase, 0 (day, the zero default) .. 1 (dusk).
 } BoatCpuView;
 

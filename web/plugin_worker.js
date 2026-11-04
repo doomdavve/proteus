@@ -57,7 +57,7 @@ self.onmessage = async ({data}) => {
     const runtime = await create({
       locateFile: () => data.wasm,
       stdin: () => offset < data.bytes.length ? data.bytes[offset++] : null,
-      stdout: byte => { if (output.length >= 16384) throw Error('Worker output exceeds limit'); output.push(byte); },
+      stdout: byte => { if (output.length >= 163840) throw Error('Worker output exceeds limit'); output.push(byte); },
       stderr: () => {},
       print: () => {}, printErr: () => {}
     });

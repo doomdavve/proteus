@@ -8,7 +8,7 @@
 #include "boat_plugin_host.h"
 #include "boat_plugin_lua.h"
 
-#define BOAT_PLUGIN_WIRE_VERSION 0x50535438u // PST8: dimensioned marina structures (scene v2).
+#define BOAT_PLUGIN_WIRE_VERSION 0x50535439u // PST9: berth appearance (scene v3).
 
 typedef struct {
     BoatPluginKind kind;

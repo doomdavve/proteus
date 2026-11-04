@@ -4,6 +4,7 @@
 #include "lua.h"
 #include "lualib.h"
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -172,6 +173,8 @@ static bool only(lua_State *L, Vm *vm, int table, const char *path, const char *
         lua_pop(L, 1);
         if (lua_type(L, -1) != LUA_TSTRING)
             return reject(vm, path, "has a %s key; fields are named", luaL_typename(L, -1));
+        if (strlen(lua_tostring(L, -1)) != lua_rawlen(L, -1))
+            return reject(vm, path, "has a field name containing a NUL character");
         if (!listed(keys, lua_tostring(L, -1))) {
             char field[64];
             join(field, sizeof(field), path, lua_tostring(L, -1));
@@ -250,7 +253,10 @@ static const char *const VESSEL[]
     = { "id", "retain", "recipe", "route", "speed", "phase", "period", "stops", NULL };
 static const char *const STOP[] = { "id", "dwell", NULL };
 static const char *const ENTRANCE[] = { "x", "z", "width", NULL };
-static const char *const BERTH[] = { "id", "recipe", "x", "z", "heading", "mooring", NULL };
+static const char *const BERTH[]
+    = { "id", "recipe", "x", "z", "heading", "mooring", "appearance", NULL };
+static const char *const APPEARANCE[]
+    = { "length", "beam", "mast_height", "hull", "deck", "trim", "name", NULL };
 static const char *const MODULE[]
     = { "id", "kind", "x", "z", "heading", "length", "width", "deck_height", "attaches", NULL };
 static const char *const GANGWAY[]
@@ -308,7 +314,75 @@ static bool shelters(lua_State *L, Vm *vm, int voyage)
     return true;
 }
 
-// L2.2 marina berths. The list is dense 0..7; every field is copied, and names are resolved
+static bool scene_appearance(lua_State *L, Vm *vm, int entry, const char *path, BoatSceneBerth *b)
+{
+    char at[64], key[64];
+    int type = field(L, entry, "appearance", path, at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table");
+    int appearance = lua_absindex(L, -1);
+    if (!only(L, vm, appearance, at, APPEARANCE))
+        return false;
+    float *dimensions[]
+        = { &b->appearance.length, &b->appearance.beam, &b->appearance.mast_height };
+    for (unsigned i = 0; i < 3; ++i) {
+        type = field(L, appearance, APPEARANCE[i], at, key);
+        if (type != LUA_TNIL) {
+            if (type != LUA_TNUMBER || !isfinite(lua_tonumber(L, -1))
+                || !((float)lua_tonumber(L, -1) > 0))
+                return reject(vm, key, "must be a positive finite number of metres");
+            if (i == 2 && b->recipe != BOAT_SCENE_BERTH_SAILBOAT
+                && b->recipe != BOAT_SCENE_BERTH_SAILBOAT_7M)
+                return reject(vm, key, "this recipe has no mast");
+            *dimensions[i] = (float)lua_tonumber(L, -1);
+        }
+        lua_pop(L, 1);
+    }
+    Color *colors[] = { &b->appearance.hull, &b->appearance.deck, &b->appearance.trim };
+    for (unsigned i = 0; i < 3; ++i) {
+        type = field(L, appearance, APPEARANCE[i + 3], at, key);
+        if (type != LUA_TNIL) {
+            if (type != LUA_TTABLE || lua_rawlen(L, -1) != 3)
+                return reject(vm, key, "must be a dense RGB triple of integers 0..255");
+            int color = lua_absindex(L, -1);
+            unsigned entries = 0;
+            lua_pushnil(L);
+            while (lua_next(L, color)) {
+                if (!lua_isinteger(L, -2) || lua_tointeger(L, -2) < 1 || lua_tointeger(L, -2) > 3
+                    || !lua_isinteger(L, -1) || lua_tointeger(L, -1) < 0
+                    || lua_tointeger(L, -1) > 255)
+                    return reject(vm, key, "must be a dense RGB triple of integers 0..255");
+                ++entries;
+                lua_pop(L, 1);
+            }
+            if (entries != 3)
+                return reject(vm, key, "must have exactly three RGB channels");
+            unsigned char rgb[3];
+            for (unsigned c = 0; c < 3; ++c) {
+                lua_rawgeti(L, color, c + 1);
+                rgb[c] = (unsigned char)lua_tointeger(L, -1);
+                lua_pop(L, 1);
+            }
+            *colors[i] = (Color) { rgb[0], rgb[1], rgb[2], 255 };
+        }
+        lua_pop(L, 1);
+    }
+    type = field(L, appearance, "name", at, key);
+    lua_pop(L, 1);
+    if (type != LUA_TNIL
+        && !string(L, vm, appearance, at, "name", b->appearance.name, sizeof(b->appearance.name)))
+        return false;
+    // Validate before canonicalizing, so explicit unsupported mast fields cannot disappear.
+    boat_scene_berth_canonicalize(b);
+    lua_pop(L, 1);
+    return true;
+}
+
+// L2.2 marina berths. The list is dense 0..32; every field is copied, and names are resolved
 // against the native registry before the Lua state closes.
 static bool scene_berths(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *s)
 {
@@ -370,6 +444,8 @@ static bool scene_berths(lua_State *L, Vm *vm, int marina, BoatSceneDefinition *
         }
         b->recipe = (unsigned char)r;
         b->mooring = (unsigned char)m;
+        if (!scene_appearance(L, vm, entry, path, b))
+            return false;
         lua_pop(L, 1);
     }
     lua_pop(L, 1);

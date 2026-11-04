@@ -650,7 +650,7 @@ static BoatPluginStatus check_scene_modules(const BoatPluginVoyage *voyage,
         }
         for (unsigned b = 0; b < scene->berth_count; ++b) {
             const BoatSceneBerth *berth = &scene->berths[b];
-            BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)berth->recipe);
+            BoatModelSpec spec = boat_scene_berth_resolve(berth);
             Vector2 bc, bl, bb;
             float bhl, bhb;
             berth_box(berth, spec, &bl, &bb, &bc, &bhl, &bhb);
@@ -742,7 +742,7 @@ static BoatPluginStatus check_scene_traffic(
                     "crosses the declared marina entrance");
             for (unsigned b = 0; b < scene->berth_count; ++b) {
                 const BoatSceneBerth *berth = &scene->berths[b];
-                BoatModelSpec bs = boat_scene_berth_spec((BoatSceneBerthRecipe)berth->recipe);
+                BoatModelSpec bs = boat_scene_berth_resolve(berth);
                 Vector2 bc, bl, bb;
                 float bhl, bhb;
                 berth_box(berth, bs, &bl, &bb, &bc, &bhl, &bhb);
@@ -815,7 +815,7 @@ static BoatPluginStatus check_scene_location(const BoatPluginVoyage *voyage,
     float half_length[BOAT_SCENE_BERTHS], half_beam[BOAT_SCENE_BERTHS];
     for (unsigned i = 0; i < scene->berth_count; ++i) {
         const BoatSceneBerth *b = &scene->berths[i];
-        BoatModelSpec spec = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+        BoatModelSpec spec = boat_scene_berth_resolve(b);
         berth_box(b, spec, &length[i], &beam[i], &centre[i], &half_length[i], &half_beam[i]);
         char path[32];
         snprintf(path, sizeof(path), "scene.marina.berths[%u]", i + 1);
@@ -909,7 +909,7 @@ BoatPluginChange boat_plugin_classify(
     const BoatVoyageRoute *a = &active->route, *b = &candidate->route;
     if (!same_storm(a->exposure, b->exposure) || a->weather_range != b->weather_range)
         return BOAT_PLUGIN_RESTART_SESSION;
-    // PC: scene layout edits install live between ticks. A gull-cue-only edit stays cosmetic.
+    // Scene layout edits install live between ticks; gull cues and berth colors/names are cosmetic.
     // Flock layout, berth, module, entrance and travelling-craft changes all take the live path;
     // the application waits for the hull to clear the candidate envelopes before installing.
     bool cosmetic_scene = false, live = false;
@@ -919,7 +919,7 @@ BoatPluginChange boat_plugin_classify(
         if (!scene_a || !scene_b) {
             live = true;
         } else if (active->scene_digest != candidate->scene_digest) {
-            if (boat_scene_same_except_gull_cues(&active->scene, &candidate->scene))
+            if (boat_scene_same_except_cosmetics(&active->scene, &candidate->scene, true))
                 cosmetic_scene = true;
             else
                 live = true;
@@ -1333,8 +1333,8 @@ BoatPluginStatus boat_plugin_match_check_location(const BoatPluginMatch *match,
             const BoatSceneBerth *b = &match->scene.berths[i];
             char path[64];
             snprintf(path, sizeof(path), "scene.marina.berths[%u]", i + 1);
-            if (!boat_map_water(map, (Vector2) { b->x, b->z },
-                    (int)ceilf(boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe).length)))
+            if (!boat_map_water(
+                    map, (Vector2) { b->x, b->z }, (int)ceilf(boat_scene_berth_resolve(b).length)))
                 return diagnose(d, BOAT_PLUGIN_SCHEMA, match->manifest.entry, path,
                     "is not open water of the %s map", location->name);
         }

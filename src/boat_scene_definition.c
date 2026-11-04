@@ -117,7 +117,7 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
     if (!scene)
         return fail(diagnostic, "", "is missing");
     if (scene->version != BOAT_SCENE_VERSION)
-        return fail(diagnostic, "scene.version", "must be 2");
+        return fail(diagnostic, "scene.version", "must be 3");
     if (scene->berth_count > BOAT_SCENE_BERTHS)
         return fail(diagnostic, "scene.marina.berths", "exceeds the 32-berth capacity");
     if (scene->module_count > BOAT_SCENE_MODULES)
@@ -148,6 +148,35 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".recipe");
         if (b->recipe >= BOAT_SCENE_BERTH_RECIPES)
             return fail(diagnostic, at, "is not a registered berth recipe");
+        BoatModelSpec base = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+        const BoatSceneAppearance *a = &b->appearance;
+        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.length");
+        if (a->length != 0 && !finite_in(a->length, base.length * .75f, base.length * 1.25f))
+            return fail(diagnostic, at, "must be finite, 0.75..1.25 times recipe length in metres");
+        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.beam");
+        if (a->beam != 0 && !finite_in(a->beam, base.beam * .75f, base.beam * 1.25f))
+            return fail(diagnostic, at, "must be finite, 0.75..1.25 times recipe beam in metres");
+        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.mast_height");
+        if (a->mast_height != 0
+            && (base.mast_height == 0 || !finite_in(a->mast_height, base.freeboard + 2, 12)))
+            return fail(
+                diagnostic, at, "requires a sailboat mast, freeboard + 2 through 12 metres");
+        const Color colors[] = { a->hull, a->deck, a->trim };
+        const char *const suffix[] = { ".appearance.hull", ".appearance.deck", ".appearance.trim" };
+        for (unsigned c = 0; c < 3; ++c) {
+            indexed(at, sizeof(at), "scene.marina.berths", i + 1, suffix[c]);
+            if (colors[c].a != 255
+                && (colors[c].a != 0 || colors[c].r || colors[c].g || colors[c].b))
+                return fail(diagnostic, at, "must be opaque RGB or the all-zero inherited color");
+        }
+        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance.name");
+        if (!boat_model_name_valid(a->name))
+            return fail(diagnostic, at,
+                "must be 1..16 A-Z, 0-9, space, period, hyphen or apostrophe; include a "
+                "letter/digit");
+        indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".appearance");
+        if (!boat_model_spec_valid(boat_scene_berth_resolve(b)))
+            return fail(diagnostic, at, "resolved recipe violates native geometry limits");
         indexed(at, sizeof(at), "scene.marina.berths", i + 1, ".mooring");
         if (b->mooring > BOAT_SCENE_MOORING_PONTOON)
             return fail(diagnostic, at, "must be pontoon or none");
@@ -298,6 +327,16 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
         value(&hash, "berth.x", b->x);
         value(&hash, "berth.z", b->z);
         value(&hash, "berth.heading", b->heading);
+        BoatModelSpec spec = boat_scene_berth_resolve(b);
+        value(&hash, "berth.length", spec.length);
+        value(&hash, "berth.beam", spec.beam);
+        value(&hash, "berth.mast_height", spec.mast_height);
+        const unsigned char colors[] = { spec.hull.r, spec.hull.g, spec.hull.b, spec.deck.r,
+            spec.deck.g, spec.deck.b, spec.trim.r, spec.trim.g, spec.trim.b };
+        fold(&hash, "berth.colors", 13);
+        fold(&hash, colors, sizeof(colors));
+        fold(&hash, "berth.name", 11);
+        fold(&hash, spec.name, strlen(spec.name) + 1);
     }
     count(&hash, "modules", scene->module_count);
     for (unsigned i = 0; i < scene->module_count; ++i) {
@@ -333,11 +372,19 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
     return hash;
 }
 
-bool boat_scene_same_except_gull_cues(const BoatSceneDefinition *a, const BoatSceneDefinition *b)
+bool boat_scene_same_except_cosmetics(
+    const BoatSceneDefinition *a, const BoatSceneDefinition *b, bool berth_appearance)
 {
     if (!a || !b || a->gulls_present != b->gulls_present)
         return false;
     BoatSceneDefinition ca = *a, cb = *b;
+    for (unsigned i = 0; berth_appearance && i < BOAT_SCENE_BERTHS; ++i) {
+        ca.berths[i].appearance.hull = cb.berths[i].appearance.hull = (Color) { 0 };
+        ca.berths[i].appearance.deck = cb.berths[i].appearance.deck = (Color) { 0 };
+        ca.berths[i].appearance.trim = cb.berths[i].appearance.trim = (Color) { 0 };
+        memset(ca.berths[i].appearance.name, 0, BOAT_MODEL_NAME_BYTES);
+        memset(cb.berths[i].appearance.name, 0, BOAT_MODEL_NAME_BYTES);
+    }
     for (unsigned i = 0; i < WATERFRONT_FLOCKS; ++i) {
         ca.gulls.flocks[i].cue_count = 0;
         cb.gulls.flocks[i].cue_count = 0;
@@ -418,6 +465,48 @@ BoatModelSpec boat_scene_berth_spec(BoatSceneBerthRecipe recipe)
         spec.trim = (Color) { 75, 117, 108, 255 };
     }
     return spec;
+}
+
+BoatModelSpec boat_scene_berth_resolve(const BoatSceneBerth *b)
+{
+    BoatModelSpec s = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+    const BoatSceneAppearance *a = &b->appearance;
+    if (a->length != 0) {
+        float ratio = a->length / s.length;
+        s.cabin_length *= ratio;
+        s.cabin_offset *= ratio;
+        s.length = a->length;
+    }
+    if (a->beam != 0)
+        s.beam = a->beam;
+    if (a->mast_height != 0)
+        s.mast_height = a->mast_height;
+    if (a->hull.a)
+        s.hull = a->hull;
+    if (a->deck.a)
+        s.deck = a->deck;
+    if (a->trim.a)
+        s.trim = a->trim;
+    memcpy(s.name, a->name, sizeof(s.name));
+    return s;
+}
+
+void boat_scene_berth_canonicalize(BoatSceneBerth *b)
+{
+    BoatModelSpec base = boat_scene_berth_spec((BoatSceneBerthRecipe)b->recipe);
+    BoatSceneAppearance *a = &b->appearance;
+    if (a->length == base.length)
+        a->length = 0;
+    if (a->beam == base.beam)
+        a->beam = 0;
+    if (a->mast_height == base.mast_height)
+        a->mast_height = 0;
+    if (!memcmp(&a->hull, &base.hull, sizeof(Color)))
+        a->hull = (Color) { 0 };
+    if (!memcmp(&a->deck, &base.deck, sizeof(Color)))
+        a->deck = (Color) { 0 };
+    if (!memcmp(&a->trim, &base.trim, sizeof(Color)))
+        a->trim = (Color) { 0 };
 }
 
 float boat_scene_module_distance(const BoatSceneModule *m, float x, float z)
