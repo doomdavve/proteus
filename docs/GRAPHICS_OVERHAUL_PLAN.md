@@ -1707,9 +1707,8 @@ the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no 
   high 1.90 / 2.34 ms at 145 submissions. G2b kept 256 m because a 512 m cell switches larger
   pieces of windows and street furniture at once; whether that pops is the user's call.
 - **Next:** the user has played this branch full-screen and windowed (below); the 512 m cell
-  size and a macOS full-screen toggle are the open candidates. Further candidates: fewer reflection
-  submissions (it repeats the main pass's classes), and the macOS vsync behaviour if 120 Hz on
-  the Mac matters. The user suggested macOS Game Mode (2026-11-04). Apple's
+  size is the open candidate. Further candidates: fewer reflection submissions (it repeats the
+  main pass's classes), and the macOS windowed vsync behaviour if 120 Hz in a window matters. The user suggested macOS Game Mode (2026-11-04). Apple's
   [Game Mode page](https://support.apple.com/en-us/105118) says it turns on only when a game enters
   macOS full-screen mode, and gives it the highest CPU and GPU priority. Every run above was
   windowed. F11 is raylib's borderless window, not that mode; the resizable window's green
@@ -1718,9 +1717,8 @@ the user's 60 Hz decision above. Status 2026-11-04: step 1 machine-verified; no 
 - **User play, 2026-11-04:** in macOS full-screen mode (green button) the game ran very smoothly
   with no stutter; windowed it still stutters. Game Mode was off (no notice, no menu-bar icon),
   so full-screen presentation alone removes the stutter; the unbundled executable is likely not
-  recognised as a game. F11's borderless window was not compared. Candidate next step: on macOS, have F11
-  and the menu's fullscreen entry enter macOS full-screen mode instead of the borderless window,
-  then have the user compare. Windowed stutter is treated as a macOS presentation limit.
+  recognised as a game. F11's borderless window is smooth too, so the fullscreen toggle needs
+  no change; only a normal window stutters, treated as a macOS presentation limit.
 - **Limits:** M1 Max only; no Windows, browser or second-display runs; GPU time measured paced is
   inflated by clock-down (the game's paced demo shows 6.6 ms for the 2.4 ms unpaced load).
 
