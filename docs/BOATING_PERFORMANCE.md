@@ -663,6 +663,12 @@ any load, and scene work is not the cause of those misses. Every run was windowe
 macOS Game Mode, which applies only in macOS full-screen mode; as the user noted, frame rates
 outside it can be inconsistent. Not tested: Game Mode, another display, Windows, or the browser.
 
+**User play, 2026-11-04 (M1 Max, 120 Hz display, this branch).** In macOS full-screen mode
+(the window's green button) the user found the game very smooth with no stutter; in a window it
+still stutters. They saw no Game Mode notice, so whether Game Mode was active is not known; the
+smoothness may come from full-screen presentation itself. F11 (borderless window) was not
+compared. Not tested: another display, Windows, or the browser.
+
 ## Graphics G5a presentation presets — 2026-11-03
 
 Release, Apple M1 Max, macOS, hidden 960×600 window, `--waves`, two interleaved repetitions
