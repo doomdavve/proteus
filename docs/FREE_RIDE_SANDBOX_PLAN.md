@@ -1,6 +1,6 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-06: **S0b wave-phase shadow correction implemented locally; hands-on review and PR approval pending.**
+Status, 2026-11-06: **S0b wave-phase shadow correction user-tested and accepted; approved for publication in existing PR #162.**
 The standalone `cargo_sandbox` now defaults to a temporary service platform in the real
 Eriksberg inlet on `outer`; `--location basin` retains the controlled reference. This is
 still a handling experiment, without deliveries or an addition to the normal free ride menu.
@@ -15,16 +15,18 @@ Completed: design and requested Astra review; S0a's one-crate crane, pad, wave-p
 explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view.
 Also completed: clearer helm/crane control switching, S0b's first mapped work site,
 receiver-projected landing footprints and assisted return mooring. A later wave-phase
-regression now has a local correction using the actual receiver triangles and exact GPU
-draw counts.
-Next: **retest bow-edge and water footprints locally, and the assisted return**, then author a
-second receiving site and the useful crossing (S1), with S0c qualification still open.
+regression is corrected using the actual receiver triangles and exact GPU draw counts.
+The user tested the correction, reported “Now it works well!” and approved publication
+on 2026-11-06.
+Next: **a second receiving site and the useful crossing (S1)**, with S0c qualification
+still open. Publish the approved correction through existing PR #162; future PRs still
+require separate approval.
 The user reached loaded, lashed and unmoored state and accepted this as a solid base;
 the original “Tab View” label obscured that Tab also switches input controls. No earnings
 or progression is implemented. The user reports that harbour loading works as well as
-the basin but found the shadow unclear and returning very hard. The revised depth cues,
-throttle/brake display and mooring assist need hands-on review; automated checks do not
-establish acceptance of those fixes.
+the basin but found the shadow unclear and returning very hard. The latest wave-phase
+correction has since been tried and accepted by the user. This
+acceptance does not close the independent qualification limits listed below.
 
 ## S0a: try the cargo toy
 
@@ -106,7 +108,7 @@ and water meshes (including the GPU near-water patch). The custom boat/crane/car
 simple lighting and does not yet participate in GPU reflections or cast directional sunlight
 shadows. A shared vertical landing footprint is projected onto the deck, pad and water
 before contact to provide a depth cue; it is not a sunlight shadow-map implementation.
-The current local correction clips to the renderer's actual triangles, including the bow,
+The correction clips to the renderer's actual triangles, including the bow,
 and uses exactly the current GPU vertex count; see the wave-phase result below. The CPU
 reference limits draw distance to 240 m to bound displaced-water work; the GPU uses 4500 m. CPU
 display-free captures contain the 3D view; windowed CPU and GPU captures include the HUD.
@@ -217,14 +219,14 @@ Next: review these depth and return controls by hand, then continue with the rec
 and first useful crossing. No new boats, rewards, persistence or physical ferry wakes are
 part of this correction.
 
-## S0b: wave-phase shadow correction (local)
+## S0b: wave-phase shadow correction
 
 User feedback, 2026-11-06: footprints still disappear on the boat and sometimes on water,
 correlated with waves. The prior centre-deck snapshots did not cover the bow/receiver-edge
 case. A new virtual-clock render probe reproduces the failure and counts the footprint's
 actual visible pixels over eight poses and 32 water phases per pose.
 
-Confirmed causes and local corrections:
+Confirmed causes and corrections:
 
 - The projected rectangle was clipped to the loading deck's ±1.9 m fore/aft bounds, while
   the rendered hull extends to ±2.3 m. Pitching moved a bow-edge projection outside the
@@ -262,10 +264,10 @@ failure; it writes no image on success. GPU review also draws a nonempty mesh fo
 an empty one and checks that no old pixels remain. `shadow-bow` and `shadow-water` are
 normal-colour review fixtures at simulated 3.5 s, including a formerly failing bow phase.
 
-**Workflow:** the user requires approval before any further PR is opened. This correction
-stays in its separate local worktree, without a push or PR update. The local AGENTS.md now
-records that approval requirement. Next: hands-on wave/depth review, then publication only
-after approval; the receiving-site work remains after this usability correction.
+**Workflow:** the user requires approval before any further PR is opened. They tested this
+correction and approved publication on 2026-11-06. Fold it into existing PR #162 rather than
+opening another PR. AGENTS.md records the approval requirement; this approval covers the
+current correction, not future PRs. The receiving site/useful crossing is next.
 
 ## The experience
 
@@ -733,21 +735,44 @@ or performance qualification. [Captured output](evidence/sandbox/2026-11-06/shad
 Inspected normal-colour GPU bow, water, high/low load and matching CPU bow/water captures.
 A GPU 240-frame crane demo and a CPU 12-frame bow-view windowed smoke run exited 0.
 The new GPU review command directly passed with the real mapped water and includes the
-stream regression; the optional full GPU CTest matrix was not configured. No new sound,
-hands-on acceptance, Windows/Linux/browser build or CI result is claimed for this local
-correction. Existing CPU speed and lighting/reflection limitations remain unchanged.
+stream regression; the optional full GPU CTest matrix was not configured. At this automated
+verification checkpoint, no new sound, hands-on acceptance, Windows/Linux/browser build or
+CI result was claimed for the local correction. Existing CPU speed and lighting/reflection
+limitations remain unchanged.
 
 ![Bow footprint projected onto the actual hull receiver](evidence/sandbox/2026-11-06/wave-bow.png)
 
 ![Water footprint follows the rendered wave triangles](evidence/sandbox/2026-11-06/wave-water.png)
 
 The previous static snapshots missed this regression; wave-phase pixel checks now cover
-it alongside geometry clipping tests. Next: hands-on local review of bow/water footprints,
-then publish or update PRs only after user approval. No branch has been pushed and no PR
-has been opened or updated for this correction.
+it alongside geometry clipping tests. At the local handoff, hands-on review and publication
+approval were pending; no branch had been pushed and no PR had been opened or updated.
+The acceptance entry below supersedes that pending status.
 
 Local handoff checks: all 88 local links/anchors across the four changed Markdown files
 resolve, the documented review commands match `--help`, and `git diff --check` passes.
 Build/profiling/counterfactual binaries remain untracked under `build/`; the two normal
-captures and compact before/after diagnostic log are intentional evidence. This work is
-held on local branch `fix/cargo-shadow-wave-depth` for user testing and approval.
+captures and compact before/after diagnostic log are intentional evidence. At that handoff
+it was held on local branch `fix/cargo-shadow-wave-depth` for user testing and approval.
+
+### User acceptance and approved publication, 2026-11-06
+
+After trying the local correction, the user reported **“Now it works well! Approved.”**
+This records hands-on acceptance of the wave-stable shadow correction and approval to
+publish it. Fold the tested change into existing [PR #162](https://github.com/doomdavve/proteus/pull/162),
+which already owns the landing-depth/mooring work; do not open another PR for this feedback
+iteration. Keep its parent/base at the harbour-site branch so the existing stack merges in
+order. This approval does not authorize merging the stack or future PRs automatically.
+
+Completed: corrected receiver geometry and GPU draw counts, automated wave/stream
+regressions, native local verification, and user review. Next: existing-PR CI/review, then
+the receiving site and first useful crossing. The slow CPU reference, approximate
+workboat/load model, broader platform/touch qualification, lighting/reflections and
+multiple-body budget remain open; the accepted correction does not establish those gates.
+
+Approved-publication preflight, 2026-11-06, M1 Max/macOS arm64: rebuild passed and the full
+local CTest preset passed all 381 enabled tests in 36.03 s (13 retired tests disabled;
+GPU CTest matrix off, local sockets enabled). No runtime code changed after the accepted
+wave-phase correction. All 280 local links/anchors across the four updated guides resolve;
+`git diff --check` passes. No additional audiovisual acceptance is inferred from this
+preflight; the user's explicit report above owns acceptance.

@@ -25,8 +25,8 @@ empty results. `cargo_shadow_wave_cpu` drives 256 fixed virtual poses/phases and
 that a visible footprint remains in the rendered image. Optional `cargo_shadow_wave_gpu`
 (`PROTEUS_GPU_TESTS=ON`) repeats the checks on the real mapped GPU view and checks a
 populated-to-empty dynamic mesh for stale vertices. These are visibility/state checks,
-not performance targets. See the [wave-phase correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction-local)
-for baseline failures, local evidence and the approval-before-PR workflow.
+not performance targets. See the [wave-phase correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction)
+for baseline failures, verification evidence and the approval-before-PR workflow.
 
 Marina M2: `harbor_geometry` checks appearance boundaries, canonical defaults, supported text,
 glyph geometry and the unchanged triangle budget. `harbor_view` checks independent CPU mesh
