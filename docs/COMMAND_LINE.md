@@ -167,6 +167,11 @@ and [arcade object results](WAKE_OBJECT_RESULTS.md). Field mode is unavailable i
 
 ## Rendering, captures and profiling
 
+`--daylight day|sunset|dusk` selects a fixed lighting preset (default day); a numeric
+phase 0..1 blends between them. In the title, SETTINGS → LIGHTING remembers DAY,
+SUNSET or DUSK for your new solo and multiplayer sessions. Explicit CLI launches use
+their own options rather than the saved title choice.
+
 GPU is the default. `--renderer cpu` selects the software reference; `--gpu` is an alias
 for `--renderer gpu`. `--gpu-aa` enables 4×4 supersampling while preserving the logical
 320×200 pixel grid and integer-scaled desktop presentation. It does not select a location
