@@ -54,6 +54,11 @@ void boat_model_quad(BoatModel *m, Vector3 a, Vector3 b, Vector3 c, Vector3 d, C
     quad(m, a, b, c, d, color);
 }
 
+void boat_model_triangle(BoatModel *m, Vector3 a, Vector3 b, Vector3 c, Color color)
+{
+    triangle(m, a, b, c, color);
+}
+
 static void box_vertices(BoatModel *m, const Vector3 *v, Color color)
 {
     const int faces[][4] = { { 0, 3, 2, 1 }, { 4, 5, 6, 7 }, { 0, 1, 5, 4 }, { 3, 7, 6, 2 },

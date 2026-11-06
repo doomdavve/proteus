@@ -206,6 +206,7 @@ target_compile_options(proteus_plugin_catalog PRIVATE ${PROTEUS_WARNINGS})
 # Presentation: cosmetic simulation, CPU renderer, boat/course views, water meshes and scenes.
 option(PROTEUS_WARM_MENU "Warm daylight menus (OFF selects the cyan dusk menus)" ON)
 add_library(proteus_render STATIC
+  src/boat_cargo_view.c src/boat_cargo_view.h
   src/boat_ui.c src/boat_ui.h
   src/boat_hud.c src/boat_hud.h src/boat_cabin.c src/boat_cabin.h src/boat_grodan.c
   src/boat_grodan.h src/boat_skin.c src/boat_skin.h src/boat_course_view.c
@@ -513,6 +514,10 @@ add_executable(validate_boat_cargo tools/validate_boat_cargo.c)
 target_link_libraries(validate_boat_cargo PRIVATE proteus_boat_core)
 target_compile_options(validate_boat_cargo PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_cargo COMMAND validate_boat_cargo)
+add_executable(validate_cargo_decal tools/validate_cargo_decal.c)
+target_link_libraries(validate_cargo_decal PRIVATE proteus_render)
+target_compile_options(validate_cargo_decal PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME cargo_shadow_geometry COMMAND validate_cargo_decal)
 set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
@@ -529,6 +534,16 @@ if(NOT EMSCRIPTEN)
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-outer-${side}-test.png)
   endforeach()
   add_test(NAME cargo_sandbox_site COMMAND cargo_sandbox --survey)
+  add_test(NAME cargo_shadow_wave_cpu COMMAND cargo_sandbox --location basin --renderer cpu --shadow-review)
+  if(PROTEUS_GPU_TESTS)
+    add_test(NAME cargo_shadow_wave_gpu COMMAND cargo_sandbox --renderer gpu --shadow-review)
+    set_tests_properties(cargo_shadow_wave_gpu PROPERTIES LABELS "gpu" TIMEOUT 30)
+  endif()
+  foreach(scenario shadow-high shadow-low remoor)
+    add_test(NAME cargo_sandbox_${scenario}_screenshot COMMAND cargo_sandbox --renderer cpu
+      --scenario ${scenario}
+      --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${scenario}-test.png)
+  endforeach()
 endif()
 add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -1452,6 +1467,8 @@ endforeach()
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
 # in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
+  cargo_shadow_wave_cpu
+  cargo_sandbox_shadow-high_screenshot cargo_sandbox_shadow-low_screenshot cargo_sandbox_remoor_screenshot
   cargo_sandbox_site cargo_sandbox_outer_left_screenshot cargo_sandbox_outer_right_screenshot
   release_command
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid

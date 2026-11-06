@@ -1,6 +1,6 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-06: **S0a basic toy accepted; S0b first harbour work site implemented, review pending.**
+Status, 2026-11-06: **S0b wave-phase shadow correction user-tested and accepted; approved for publication in existing PR #162.**
 The standalone `cargo_sandbox` now defaults to a temporary service platform in the real
 Eriksberg inlet on `outer`; `--location basin` retains the controlled reference. This is
 still a handling experiment, without deliveries or an addition to the normal free ride menu.
@@ -13,13 +13,20 @@ scheduled harbour life; [plugins](PLUGIN_PLAN.md) own authoring/runtime contract
 
 Completed: design and requested Astra review; S0a's one-crate crane, pad, wave-posed deck,
 explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view.
-Also completed: clearer helm/crane control switching and S0b's first mapped work site.
-Next: **try loading, driving out of the inlet and returning to the source**, then author a
-second receiving site and the useful crossing (S1), with S0c qualification still open.
+Also completed: clearer helm/crane control switching, S0b's first mapped work site,
+receiver-projected landing footprints and assisted return mooring. A later wave-phase
+regression is corrected using the actual receiver triangles and exact GPU draw counts.
+The user tested the correction, reported “Now it works well!” and approved publication
+on 2026-11-06.
+Next: **a second receiving site and the useful crossing (S1)**, with S0c qualification
+still open. Publish the approved correction through existing PR #162; future PRs still
+require separate approval.
 The user reached loaded, lashed and unmoored state and accepted this as a solid base;
 the original “Tab View” label obscured that Tab also switches input controls. No earnings
-or progression is implemented. The harbour extension still needs hands-on feedback;
-automated checks do not establish enjoyable handling or user acceptance of that extension.
+or progression is implemented. The user reports that harbour loading works as well as
+the basin but found the shadow unclear and returning very hard. The latest wave-phase
+correction has since been tried and accepted by the user. This
+acceptance does not close the independent qualification limits listed below.
 
 ## S0a: try the cargo toy
 
@@ -44,11 +51,12 @@ First lift:
 1. Press **F** to catch the crate. Press **2** or **3** for the left/right deck target.
    The optional aim assist raises and slews the crane using its ordinary limited motors;
    it does not teleport the load. Wait for the hook to stop above the deck.
-2. Hold **E** to lower. The prompt changes when the crate rests on the moving deck.
+2. Hold **E** to lower. A dark footprint follows the receiving deck before contact,
+   and **DECK GAP** reports the remaining height. The prompt changes at touchdown.
    Press **F** to release the hook, wait briefly for settling, then **L** to lash it.
    A green crate and two straps confirm it is secured.
 3. Press **G** to unmoor and **Tab** to activate helm controls (and change camera). Use **Up/Down** to adjust throttle,
-   **Left/Right** to steer and **Space** to idle. Try a short turn through the yellow
+   **Left/Right** to steer and hold **Space** to idle the throttle and brake. Try a short turn through the yellow
    markers. Reset and compare the other deck position, or leave the crate on the pad
    and take the boat out empty.
 
@@ -58,8 +66,10 @@ the crane motors and actions; driving currently uses the keyboard. The Tab butto
 destination, **Helm** or **Crane**, and the header names the active controls. Tab switches
 controls as well as camera, returning to the helm
 while a load hangs, stopping the motors while physics continues. Departure rejects a
-connected hook or loose deck cargo. Re-moor near the original berth, facing the green
-approach marks, at less than 0.5 m/s; R is the quick recovery if docking gets in the way.
+connected hook or loose deck cargo. To return, use the berth distance/turn cue and approach
+the boat-shaped outline at low speed. Hold Space to stop; when **BERTH READY** appears,
+press **G** to stop and align automatically. Press G again to cancel the assist. R remains
+the immediate recovery if docking gets in the way.
 Unlash only at low speed; a floating/dropped crate remains simulated and can be caught again
 if in reach. Reset is always available when it is out of reach.
 
@@ -72,7 +82,7 @@ different enough to explore? No reward loop is needed to answer these questions.
 | Step | Status | Next gate |
 | --- | --- | --- |
 | S0a controlled handling toy | Implemented as native `cargo_sandbox`; basic toy accepted by the user; control labels clarified | Review the updated labels in the harbour experiment |
-| S0b harbour placement | First Eriksberg work site implemented, with native CPU/GPU scenery and boat/shore/camera contacts | Try loaded departure/return; author the second receiving site before S1 |
+| S0b harbour placement | First Eriksberg work site implemented, with native CPU/GPU scenery and boat/shore/camera contacts | Review projected landing footprints and assisted return; author the second receiving site before S1 |
 | S0c broader qualification | Not started | Multiple loads and measured 16-body stress ceiling, browser/touch, audio feedback and harbour traffic/wake performance |
 
 The original S0a test basin preceded harbour site selection; it remains an explicit
@@ -95,7 +105,11 @@ Both renderers consume the same evaluated box/beam meshes, including the hook, c
 crate, straps and deck markers, at 480 × 300 with nearest-neighbour integer presentation.
 The basin retains its simple test view; `outer` uses the production scenery, harbour actors
 and water meshes (including the GPU near-water patch). The custom boat/crane/cargo pass has
-simple lighting and does not yet participate in GPU reflections or cast shadows. The CPU
+simple lighting and does not yet participate in GPU reflections or cast directional sunlight
+shadows. A shared vertical landing footprint is projected onto the deck, pad and water
+before contact to provide a depth cue; it is not a sunlight shadow-map implementation.
+The correction clips to the renderer's actual triangles, including the bow,
+and uses exactly the current GPU vertex count; see the wave-phase result below. The CPU
 reference limits draw distance to 240 m to bound displaced-water work; the GPU uses 4500 m. CPU
 display-free captures contain the 3D view; windowed CPU and GPU captures include the HUD.
 There are no new sounds. Browser/touch, normal-game integration, persistence, multiple cargo
@@ -144,9 +158,10 @@ The launch runs the same check. Initial and live cameras check loaded scenery, b
 traffic, and the temporary platform/tower/boom along the viewing segment.
 
 Try the same lift, then drive out towards the marina at low speed, steer around the
-moored boats and return. The green approach marks are behind the original berth; face
-heading 0 and stop within 0.6 m at less than 0.5 m/s to use G again. R remains the quick
-reset. This tests whether loading still reads clearly against a real waterfront and whether
+moored boats and return. The boat outline now marks the actual final berth position,
+with a bow arrow for heading 0. Enter the larger assisted capture zone, roughly facing
+the arrow, at no more than 1.5 m/s; **BERTH READY** signals that G can take over alignment.
+Hold Space to slow down, and use G again to cancel an active capture. R remains the quick reset. This tests whether loading still reads clearly against a real waterfront and whether
 a loaded boat is interesting to take out and dock again. The broader map retains its
 ordinary visual traffic wakes; no physical ferry wakes were added.
 
@@ -154,6 +169,105 @@ Two other candidate footprints, **(-105, 0)** and **(-200, -150)**, passed the p
 water/berth/traffic survey but have not been camera-reviewed, authored or connected as
 receiving sites. They are candidates only. Next: select a receiver, qualify its support and
 approaches, and implement the first useful crossing before adding earnings.
+
+## S0b: depth cues and returning to the berth
+
+User feedback, 2026-11-06: harbour loading works as well as the basin, but the shadow did
+not communicate depth and returning was very difficult. Confirmed causes: the old landing
+marker stayed at water height until physical deck contact, hiding it beneath the boat; the
+green lines were behind the actual berth, and the G gate required an unmarked point within
+0.6 m, speed below 0.5 m/s and heading within about 9 degrees. Throttle was not displayed.
+This feedback establishes a working harbour loading path, not acceptance of the return UX.
+
+The shared CPU/GPU landing footprint now projects onto actual visible hull, deck, helm,
+platform and water triangles **before** contact, clips at their edges and darkens their
+albedo close to touchdown. It retains the receiver's triangle planes rather than bridging
+them with a separate four-corner quad. The DECK GAP readout measures crate-bottom
+clearance from the actual deck plane. These are explicit vertical depth cues; the custom
+boat/crane/cargo pass still has no directional sunlight shadows. The whole temporary
+platform's supported crate-centre area now agrees with its drawn length.
+
+The return outline marks the final hull pose, with a bow arrow and water-following lines
+raised above the waves. The HUD reports distance and a turn cue: toward the berth when
+away, then toward the bow-arrow heading in the capture area. It also shows throttle
+FWD/REV/IDLE, a signed bar, speed and engine response. Up/Down sets persistent throttle;
+releasing the arrow does not idle it. Holding Space cuts the command and adds a bounded
+2 m/s² stopping aid, only in this experimental tool. Ordinary game handling is unchanged.
+
+G becomes available when the boat centre is in local renderer X = -0.6..2.4 m and
+Z = -3.5..5 m, speed is at most 1.5 m/s, heading is within 45 degrees of the bow arrow,
+and the hull is upright. The asymmetric zone stays on the open-water side of the platform
+and inside the surveyed work envelope. The outline is the **final** boat pose; BERTH READY
+appears before exact alignment is needed. G starts an explicit alignment assist (at most
+1.5 m/s translation and 0.6 rad/s yaw), idles/centres controls and retains wave heave, pitch
+and roll. It ends at the original berth; G cancels without an additional snap and ordinary movement
+resumes. Departure
+still rejects a connected hook or loose deck cargo, and a capsize cancels capture.
+
+Review commands (`berth-approach` is an explicit return pose; `mooring`/`remoor` then use
+a crate obtained by a real lift/lash and real G/capture ticks, not a seeded moored state):
+
+```sh
+./build/cargo_sandbox --scenario shadow-high --screenshot build/shadow-high.png
+./build/cargo_sandbox --scenario shadow-low --screenshot build/shadow-low.png
+./build/cargo_sandbox --scenario berth-approach --screenshot build/berth-approach.png
+./build/cargo_sandbox --scenario mooring --frames 180
+./build/cargo_sandbox --renderer cpu --scenario remoor --screenshot build/remoor-cpu.png
+```
+
+Next: review these depth and return controls by hand, then continue with the receiving site
+and first useful crossing. No new boats, rewards, persistence or physical ferry wakes are
+part of this correction.
+
+## S0b: wave-phase shadow correction
+
+User feedback, 2026-11-06: footprints still disappear on the boat and sometimes on water,
+correlated with waves. The prior centre-deck snapshots did not cover the bow/receiver-edge
+case. A new virtual-clock render probe reproduces the failure and counts the footprint's
+actual visible pixels over eight poses and 32 water phases per pose.
+
+Confirmed causes and corrections:
+
+- The projected rectangle was clipped to the loading deck's ±1.9 m fore/aft bounds, while
+  the rendered hull extends to ±2.3 m. Pitching moved a bow-edge projection outside the
+  smaller rectangle. The decal now clips to actual upward-facing receiver triangles,
+  covering the visible bow and raised helm as well as the deck and pad.
+- Four independently sampled water corners formed a different plane from the rendered
+  water triangles. The decal now retains those triangles' planes. CPU uses the already
+  displaced mesh; GPU evaluates only intersecting near-patch triangles with the same
+  vertex water samples and patch fade as its water shader. The small drawing separation
+  is 12 mm above that exact receiver, rather than a wave-height approximation.
+- The custom GPU upload changed `triangleCount` but left `vertexCount` at allocated
+  capacity. Raylib's non-indexed draw uses `vertexCount`, allowing stale trailing geometry
+  to be drawn when the current mesh shrinks. Each draw now uses exactly its current
+  vertex count, including zero for an empty mesh.
+
+This changes the visual receivers; the physical loading deck and lashing rules remain as
+before. The footprint can be occluded by the crate or by nearer geometry, as expected.
+No directional sunlight shadows, reflection integration or new cargo physics is claimed.
+
+Developer checks:
+
+```sh
+./build/validate_cargo_decal
+./build/cargo_sandbox --location basin --renderer cpu --shadow-review
+./build/cargo_sandbox --renderer gpu --shadow-review
+./build/cargo_sandbox --scenario shadow-bow --screenshot build/shadow-bow.png
+./build/cargo_sandbox --scenario shadow-water --screenshot build/shadow-water.png
+```
+
+The review uses eight explicit poses (centre deck, bow edge, water and pad, with high/low
+load variants) over 256 virtual-clock frames, with diagnostic colours used only to count
+rendered footprint pixels. It has no wall-clock wait or performance assertion. An optional
+`--screenshot FILE` with `--shadow-review` writes the first missing-footprint frame on
+failure; it writes no image on success. GPU review also draws a nonempty mesh followed by
+an empty one and checks that no old pixels remain. `shadow-bow` and `shadow-water` are
+normal-colour review fixtures at simulated 3.5 s, including a formerly failing bow phase.
+
+**Workflow:** the user requires approval before any further PR is opened. They tested this
+correction and approved publication on 2026-11-06. Fold it into existing PR #162 rather than
+opening another PR. AGENTS.md records the approval requirement; this approval covers the
+current correction, not future PRs. The receiving site/useful crossing is next.
 
 ## The experience
 
@@ -558,3 +672,107 @@ Documentation handoff: all 402 local links/anchors across the seven changed guid
 `git diff --check` passes. The overview records the first mapped site; detailed remaining
 steps stay in this plan. No generated build caches, profiling trace bundle or save data are
 committed; the stack-sample excerpt and two review screenshots are intentional evidence.
+
+### S0b depth/return verification, 2026-11-06
+
+User report: harbour loading works as well as in the basin; landing depth is unclear and
+returning is very hard. Confirmed and corrected the below-deck pre-contact marker, the
+unmarked exact mooring point, missing throttle feedback and lack of a stopping aid. This
+records the reported loading path and usability problems, not acceptance of the fixes.
+
+Apple M1 Max/macOS arm64, Debug, pinned local dependencies, `PROTEUS_GPU_TESTS=OFF`:
+complete build and `ctest --preset full` passed **379 enabled tests** in 41.02 s (13 retired
+tests disabled; local sockets enabled). The initial clean build emitted the existing
+upstream `stb_vorbis.c` warning; the added C code is warning-clean. Release cargo checks
+and the high/low hanging-load and loaded-remoor CPU review scenarios also passed; no
+Release full-suite claim is made.
+
+`boat_cargo` now checks a landing footprint before contact on a pitched/rolled deck,
+receiver-edge clipping, pad and moving-water heights, capture rejection reasons, bounded
+translation/yaw, preserved wave pose, secured cargo following the assist, cancellation,
+capsize cancellation, blocking unlash during capture and braking without reversal. The
+three new application checks stop real lifts at about 1.2 m / 0.2 m deck clearance and
+complete the real G/capture path with cargo obtained through an actual lift/lash. The
+return pose is an explicit fixture; it does not establish a human-driven round trip.
+
+Inspected CPU and GPU high/low landing footprints, ready-to-moor, mid-capture and completed
+loaded-return frames. GPU windowed smoke runs completed for mid-capture (180 frames) and
+the crane demo (240 frames); a 12-frame CPU mid-capture windowed run also exited 0. These
+are scripted motion/input-path checks, not hands-on keyboard/mouse or user acceptance.
+No sound changed. Native Windows/Linux/browser checks and a GPU CTest matrix were not run
+locally for this follow-up; its own PR CI remains separate from parent #161's successful CI.
+
+![Landing footprint before deck contact, with gap readout](evidence/sandbox/2026-11-06/landing-shadow.png)
+
+![Loaded boat inside the assisted capture zone](evidence/sandbox/2026-11-06/berth-assist.png)
+
+Known limits remain the slow CPU reference, approximate workboat/load handling, vertical
+landing cues rather than directional sunlight shadows, no custom-object reflections,
+keyboard helm input, a single source site and no delivery or save. Next: hands-on depth
+and return review, then the receiving site/useful crossing. The area overview remains at
+its first-harbour-site milestone; these per-step details stay in this owning plan.
+
+Documentation check for this follow-up: all 97 local links/anchors across the four changed
+guides resolve, command examples match `cargo_sandbox --help`, and `git diff --check` passes.
+
+### Local wave-phase correction verification, 2026-11-06
+
+Apple M1 Max/macOS arm64, Debug, pinned local dependencies, `PROTEUS_GPU_TESTS=OFF`:
+complete build and `ctest --preset full` passed **381 enabled tests** in 51.27 s (13 retired
+tests disabled; local sockets enabled). Targeted Release geometry and CPU wave-cycle
+checks also pass. The clean dependency build emitted the existing upstream `stb_vorbis.c`
+warning; changed project code builds warning-clean. No Release full suite is claimed.
+
+The same 256-frame probe with the old projection restored loses **33 CPU basin frames**
+and **14 GPU harbour frames**. With the receiver-triangle correction, both report
+**0/256 missing** (minimum 13 visible CPU pixels / 4 GPU pixels at the narrow bow edge).
+The counterfactual old projection keeps the corrected draw count to isolate that failure.
+The independent populated-to-empty GPU test reports **10,368 → 0 pixels** after the fix;
+a local counterfactual with the old vertex count reports **10,368 → 10,368** and correctly
+fails. These checks establish the selected wave/edge regression, not unrestricted shadow
+or performance qualification. [Captured output](evidence/sandbox/2026-11-06/shadow-wave-regression.txt).
+
+Inspected normal-colour GPU bow, water, high/low load and matching CPU bow/water captures.
+A GPU 240-frame crane demo and a CPU 12-frame bow-view windowed smoke run exited 0.
+The new GPU review command directly passed with the real mapped water and includes the
+stream regression; the optional full GPU CTest matrix was not configured. At this automated
+verification checkpoint, no new sound, hands-on acceptance, Windows/Linux/browser build or
+CI result was claimed for the local correction. Existing CPU speed and lighting/reflection
+limitations remain unchanged.
+
+![Bow footprint projected onto the actual hull receiver](evidence/sandbox/2026-11-06/wave-bow.png)
+
+![Water footprint follows the rendered wave triangles](evidence/sandbox/2026-11-06/wave-water.png)
+
+The previous static snapshots missed this regression; wave-phase pixel checks now cover
+it alongside geometry clipping tests. At the local handoff, hands-on review and publication
+approval were pending; no branch had been pushed and no PR had been opened or updated.
+The acceptance entry below supersedes that pending status.
+
+Local handoff checks: all 88 local links/anchors across the four changed Markdown files
+resolve, the documented review commands match `--help`, and `git diff --check` passes.
+Build/profiling/counterfactual binaries remain untracked under `build/`; the two normal
+captures and compact before/after diagnostic log are intentional evidence. At that handoff
+it was held on local branch `fix/cargo-shadow-wave-depth` for user testing and approval.
+
+### User acceptance and approved publication, 2026-11-06
+
+After trying the local correction, the user reported **“Now it works well! Approved.”**
+This records hands-on acceptance of the wave-stable shadow correction and approval to
+publish it. Fold the tested change into existing [PR #162](https://github.com/doomdavve/proteus/pull/162),
+which already owns the landing-depth/mooring work; do not open another PR for this feedback
+iteration. Keep its parent/base at the harbour-site branch so the existing stack merges in
+order. This approval does not authorize merging the stack or future PRs automatically.
+
+Completed: corrected receiver geometry and GPU draw counts, automated wave/stream
+regressions, native local verification, and user review. Next: existing-PR CI/review, then
+the receiving site and first useful crossing. The slow CPU reference, approximate
+workboat/load model, broader platform/touch qualification, lighting/reflections and
+multiple-body budget remain open; the accepted correction does not establish those gates.
+
+Approved-publication preflight, 2026-11-06, M1 Max/macOS arm64: rebuild passed and the full
+local CTest preset passed all 381 enabled tests in 36.03 s (13 retired tests disabled;
+GPU CTest matrix off, local sockets enabled). No runtime code changed after the accepted
+wave-phase correction. All 280 local links/anchors across the four updated guides resolve;
+`git diff --check` passes. No additional audiovisual acceptance is inferred from this
+preflight; the user's explicit report above owns acceptance.

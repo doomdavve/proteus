@@ -4,16 +4,29 @@ S0a/S0b `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane moto
 actual lifts onto both deck positions, release/settle/lash, moving deck attachment,
 rotational point velocity on unlash, departure guards, dropped/floating recovery, capsize,
 reset, translated-origin sway/mooring, floating cargo stopping at a mapped bank and unchanged
-empty-load effects. Checks remain active in Release builds.
+empty-load effects. It also checks pre-contact receiver footprints on a pitched/rolled deck,
+clipping at deck edges, pad/wave height, assisted capture gates and bounded alignment,
+cancellation, preserved wave pose and braking without reversal. Checks remain active in Release builds.
 `./build/validate_boat_cargo --benchmark` additionally reports one hanging body's tick cost;
 measurements are not pass/fail timing limits. `cargo_sandbox_left_screenshot` and
 `cargo_sandbox_right_screenshot` additionally drive the application's assisted lifts onto a
 wave-posed boat, lashing, departure and turn before a display-free basin CPU capture.
 The two `cargo_sandbox_outer_*_screenshot` checks
 repeat real transfers on `outer`; `cargo_sandbox_site` qualifies the footprint, sampled
-traffic envelope and initial camera against the loaded map.
+traffic envelope and initial camera against the loaded map. The `shadow-high`/`shadow-low`
+capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,
+requests capture and advances the real application until moored, checking the terminal state.
 CPU/GPU toy captures, windowed motion and
 hands-on controls are separate checks; see the [owning sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy).
+
+`cargo_shadow_geometry` checks receiver-triangle clipping at a pitched/rolled bow,
+footprint bounds, actual nonplanar water receiver planes, above-projector rejection and
+empty results. `cargo_shadow_wave_cpu` drives 256 fixed virtual poses/phases and checks
+that a visible footprint remains in the rendered image. Optional `cargo_shadow_wave_gpu`
+(`PROTEUS_GPU_TESTS=ON`) repeats the checks on the real mapped GPU view and checks a
+populated-to-empty dynamic mesh for stale vertices. These are visibility/state checks,
+not performance targets. See the [wave-phase correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction)
+for baseline failures, verification evidence and the approval-before-PR workflow.
 
 Marina M2: `harbor_geometry` checks appearance boundaries, canonical defaults, supported text,
 glyph geometry and the unchanged triangle budget. `harbor_view` checks independent CPU mesh

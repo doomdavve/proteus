@@ -29,12 +29,126 @@ static void step(BoatCargoSandbox *s, Boat *b, BoatWorld *w, int tick)
     CHECK(isfinite(s->cargo.position.z) && Vector3Length(s->cargo.velocity) < 12.01f);
 }
 
+static void check_mooring_and_shadow(BoatWorld *world)
+{
+    BoatCargoSandbox s;
+    Vector2 berth = { 10, 245 };
+    boat_cargo_reset_at(&s, berth);
+    s.moored = false;
+    Boat b = { .position = { 8.2f, 249.3f },
+        .heading = .5f,
+        .velocity = { .2f, -.8f },
+        .height = .15f,
+        .pitch = .06f,
+        .roll = -.08f,
+        .throttle = .3f,
+        .engine_response = .2f };
+    CHECK(boat_cargo_moor_status(&s, &b).reason == BOAT_CARGO_MOOR_READY);
+    Boat rejected = b;
+    rejected.velocity.x = 2;
+    CHECK(boat_cargo_moor_status(&s, &rejected).reason == BOAT_CARGO_MOOR_FAST);
+    BoatCargoSandbox unchanged = s;
+    CHECK(!boat_cargo_moor_toggle(&s, &rejected));
+    CHECK(memcmp(&s, &unchanged, sizeof(s)) == 0);
+    rejected = b;
+    rejected.heading = PI;
+    CHECK(boat_cargo_moor_status(&s, &rejected).reason == BOAT_CARGO_MOOR_HEADING);
+    rejected = b;
+    rejected.position.x = berth.x + .7f; // Quay side, outside the qualified capture zone.
+    CHECK(boat_cargo_moor_status(&s, &rejected).reason == BOAT_CARGO_MOOR_DISTANCE);
+    rejected = b;
+    rejected.roll = PI;
+    CHECK(boat_cargo_moor_status(&s, &rejected).reason == BOAT_CARGO_MOOR_UPRIGHT);
+    CHECK(boat_cargo_moor_toggle(&s, &b));
+    CHECK(!s.moored && s.mooring);
+    s.cargo.state = BOAT_CARGO_SECURED;
+    s.cargo.deck_local = (Vector3) { .4f, BOAT_CARGO_DECK_Y + BOAT_CARGO_HALF, .5f };
+    CHECK(!boat_cargo_lash_toggle(&s, &b));
+    for (int i = 0; i < 900 && !s.moored; ++i) {
+        Boat previous = b;
+        boat_cargo_moor_step(&s, &b);
+        boat_cargo_step(&s, &b, world, boat_tick_seconds((uint64_t)i));
+        CHECK(s.cargo.state == BOAT_CARGO_SECURED);
+        CHECK(Vector3Distance(s.cargo.position, boat_pose_attachment(&b, s.cargo.deck_local))
+            < .0001f);
+        CHECK(Vector2Distance(previous.position, b.position) <= 1.5f * BOAT_STEP + .0001f);
+        CHECK(fabsf(previous.heading - b.heading) <= .6f * BOAT_STEP + .0001f);
+        CHECK(Vector2Distance(b.position, berth) <= Vector2Distance(previous.position, berth));
+        CHECK(b.height == previous.height && b.pitch == previous.pitch && b.roll == previous.roll);
+        CHECK(b.throttle == 0 && b.engine_response == 0);
+        CHECK(b.wheel == 0 && b.engine_angle == 0);
+    }
+    CHECK(s.moored && !s.mooring && Vector2Distance(b.position, berth) == 0);
+    CHECK(boat_cargo_moor_toggle(&s, &b));
+    CHECK(boat_cargo_moor_toggle(&s, &b));
+    CHECK(s.mooring);
+    CHECK(boat_cargo_moor_toggle(&s, &b)); // Cancel before the next tick without moving anything.
+    CHECK(!s.moored && !s.mooring && Vector2Distance(b.position, berth) == 0);
+    CHECK(boat_cargo_moor_toggle(&s, &b));
+    Vector2 before_capsize = b.position;
+    b.roll = PI;
+    boat_cargo_moor_step(&s, &b);
+    CHECK(!s.mooring && !s.moored && Vector2Distance(b.position, before_capsize) == 0);
+    b.roll = 0;
+    b.velocity = (Vector2) { 1, -1 };
+    b.throttle = 1;
+    for (int i = 0; i < 180; ++i) {
+        float speed = Vector2Length(b.velocity);
+        boat_cargo_brake(&b);
+        CHECK(Vector2Length(b.velocity) <= speed && b.velocity.x >= 0 && b.velocity.y <= 0);
+    }
+    CHECK(Vector2Length(b.velocity) == 0 && b.throttle == 0);
+    b = (Boat) { .position = berth, .heading = .7f, .roll = .12f, .pitch = -.08f, .height = .2f };
+    Vector3 receiver = boat_pose_attachment(&b, (Vector3) { .4f, BOAT_CARGO_DECK_Y, .4f });
+    s.cargo.state = BOAT_CARGO_HANGING;
+    s.cargo.deck_contact = false; // The reported regression: shadow must exist before touchdown.
+    s.cargo.position = Vector3Add(receiver, (Vector3) { 0, BOAT_CARGO_HALF + 1.2f, 0 });
+    BoatCargoShadow shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_DECK);
+    CHECK(shadow.count == 4 && fabsf(shadow.clearance - 1.2f) < .0001f);
+    for (int i = 0; i < 4; ++i) {
+        Vector3 local
+            = Vector3Transform(Vector3Subtract(shadow.points[i], boat_pose_hull(&b).position),
+                MatrixTranspose(boat_pose_rotation(&b)));
+        CHECK(fabsf(local.y - (BOAT_CARGO_DECK_Y + .04f)) < .0001f);
+        CHECK(fabsf(local.x) <= BOAT_CARGO_DECK_X + .0001f);
+        CHECK(fabsf(local.z) <= BOAT_CARGO_DECK_Z + .0001f);
+    }
+    b = (Boat) { .position = berth };
+    s.cargo.position = boat_pose_attachment(&b, (Vector3) { 1.5f, 2, 0 });
+    shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_DECK);
+    CHECK(shadow.count == 4); // Partial footprint is clipped at the deck edge.
+    for (int i = 0; i < 4; ++i)
+        CHECK(shadow.points[i].x <= s.crane.origin.x + BOAT_CARGO_DECK_X + .0001f);
+    s.cargo.position.x += 2;
+    CHECK(!boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_DECK).count);
+    s.cargo.position = Vector3Add(s.crane.origin, (Vector3) { -5, 3, 0 });
+    shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_PAD);
+    CHECK(shadow.count == 4 && fabsf(shadow.clearance - 1.6f) < .0001f);
+    for (int i = 0; i < 4; ++i)
+        CHECK(shadow.points[i].y == 1.04f);
+    s.cargo.position = Vector3Add(s.crane.origin, (Vector3) { 5, 3, 0 });
+    shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_WATER);
+    CHECK(shadow.count == 4);
+    for (int i = 0; i < 4; ++i) {
+        Vector3 p = shadow.points[i];
+        float expected
+            = boat_water_query_borrowed(&world->water, (Vector2) { -p.x, p.z }, 3).height + .04f;
+        CHECK(fabsf(p.y - expected) < .0001f);
+    }
+    s.cargo.position = Vector3Add(s.crane.origin, (Vector3) { -5, 1.5f, 2.8f });
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    for (int i = 0; i < 120; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_PAD && fabsf(s.cargo.position.y - 1.4f) < .0001f);
+}
+
 int main(int argc, char **argv)
 {
     BoatWorldResources resources = { 0 };
     CHECK(boat_world_resources_init(&resources, boat_location(BOAT_LOCATION_BASIN)));
     BoatWorld world;
     boat_world_init(&world, &resources, boat_water_gentle());
+    check_mooring_and_shadow(&world);
     Boat boat = { 0 };
     BoatCargoSandbox s, repeat;
     boat_cargo_reset(&s);

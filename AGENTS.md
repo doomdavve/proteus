@@ -10,7 +10,9 @@ playground for iterating on effects, timing, audio, and presentation.
 ## Development workflow
 
 - Implement all changes, including features and bug fixes, in a separate Git worktree.
-- Push the worktree branch and open a pull request for CI checks.
+- Keep implementation work local until the user explicitly approves opening a pull request.
+  After approval, push the worktree branch and open the pull request for CI checks. Do not
+  automatically create a pull request for each experimental iteration.
 - Stack dependent work explicitly: branch each follow-up from its parent branch, open its pull
   request against that parent rather than `main`, and merge the stack in order. When a parent
   gains `main` merges or conflict resolutions, merge the updated parent into every open child

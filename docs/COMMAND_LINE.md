@@ -29,8 +29,16 @@ directly; `--title` selects the title explicitly. The direct-launch default loca
 This separate native S0 experiment defaults to the Eriksberg inlet on `outer`, with a small
 service crane, one crate and a borrowed deck boat. `--location basin` retains the isolated
 reference (CPU draw distance is 240 m; the GPU view uses 4500 m). `--survey` checks the mapped work site without a window. Reset is immediate and
-there is no saved progress. It is not a `wake_velocity` mode. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
+there is no saved progress. It is not a `wake_velocity` mode. Holding Space brakes; G
+starts/cancels assisted mooring when BERTH READY appears. The HUD shows persistent throttle
+and the landing footprint/deck gap before contact. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
 for the first lift, controls, capture/measurement commands and current limitations.
+
+`--shadow-review` is a developer-only, virtual-clock footprint visibility check (use
+`--location basin --renderer cpu` for display-free checks, or `--renderer gpu` with a
+desktop context). With `--screenshot FILE` it saves only the first failing frame; no image
+is written on success. `--scenario shadow-bow` and `shadow-water` show normal-colour
+wave-phase regression fixtures. See the [shadow correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction).
 
 ## Locations and voyages
 
