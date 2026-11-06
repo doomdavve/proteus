@@ -1,6 +1,6 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-06: **S0a basic toy accepted; S0b harbour loading exercised; depth/mooring fixes await review.**
+Status, 2026-11-06: **S0b wave-phase shadow correction implemented locally; hands-on review and PR approval pending.**
 The standalone `cargo_sandbox` now defaults to a temporary service platform in the real
 Eriksberg inlet on `outer`; `--location basin` retains the controlled reference. This is
 still a handling experiment, without deliveries or an addition to the normal free ride menu.
@@ -14,8 +14,10 @@ scheduled harbour life; [plugins](PLUGIN_PLAN.md) own authoring/runtime contract
 Completed: design and requested Astra review; S0a's one-crate crane, pad, wave-posed deck,
 explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view.
 Also completed: clearer helm/crane control switching, S0b's first mapped work site,
-receiver-projected landing footprints and assisted return mooring.
-Next: **retest hanging-load depth and the assisted return**, then author a
+receiver-projected landing footprints and assisted return mooring. A later wave-phase
+regression now has a local correction using the actual receiver triangles and exact GPU
+draw counts.
+Next: **retest bow-edge and water footprints locally, and the assisted return**, then author a
 second receiving site and the useful crossing (S1), with S0c qualification still open.
 The user reached loaded, lashed and unmoored state and accepted this as a solid base;
 the original “Tab View” label obscured that Tab also switches input controls. No earnings
@@ -103,7 +105,9 @@ The basin retains its simple test view; `outer` uses the production scenery, har
 and water meshes (including the GPU near-water patch). The custom boat/crane/cargo pass has
 simple lighting and does not yet participate in GPU reflections or cast directional sunlight
 shadows. A shared vertical landing footprint is projected onto the deck, pad and water
-before contact to provide a depth cue; it is not a sunlight shadow-map implementation. The CPU
+before contact to provide a depth cue; it is not a sunlight shadow-map implementation.
+The current local correction clips to the renderer's actual triangles, including the bow,
+and uses exactly the current GPU vertex count; see the wave-phase result below. The CPU
 reference limits draw distance to 240 m to bound displaced-water work; the GPU uses 4500 m. CPU
 display-free captures contain the 3D view; windowed CPU and GPU captures include the HUD.
 There are no new sounds. Browser/touch, normal-game integration, persistence, multiple cargo
@@ -173,9 +177,10 @@ green lines were behind the actual berth, and the G gate required an unmarked po
 0.6 m, speed below 0.5 m/s and heading within about 9 degrees. Throttle was not displayed.
 This feedback establishes a working harbour loading path, not acceptance of the return UX.
 
-The shared CPU/GPU landing footprint now projects onto the wave-posed deck **before**
-contact, clips at the receiver edges, and darkens close to touchdown. The static pad and
-water have their own projected footprints. The DECK GAP readout measures crate-bottom
+The shared CPU/GPU landing footprint now projects onto actual visible hull, deck, helm,
+platform and water triangles **before** contact, clips at their edges and darkens their
+albedo close to touchdown. It retains the receiver's triangle planes rather than bridging
+them with a separate four-corner quad. The DECK GAP readout measures crate-bottom
 clearance from the actual deck plane. These are explicit vertical depth cues; the custom
 boat/crane/cargo pass still has no directional sunlight shadows. The whole temporary
 platform's supported crate-centre area now agrees with its drawn length.
@@ -211,6 +216,56 @@ a crate obtained by a real lift/lash and real G/capture ticks, not a seeded moor
 Next: review these depth and return controls by hand, then continue with the receiving site
 and first useful crossing. No new boats, rewards, persistence or physical ferry wakes are
 part of this correction.
+
+## S0b: wave-phase shadow correction (local)
+
+User feedback, 2026-11-06: footprints still disappear on the boat and sometimes on water,
+correlated with waves. The prior centre-deck snapshots did not cover the bow/receiver-edge
+case. A new virtual-clock render probe reproduces the failure and counts the footprint's
+actual visible pixels over eight poses and 32 water phases per pose.
+
+Confirmed causes and local corrections:
+
+- The projected rectangle was clipped to the loading deck's ±1.9 m fore/aft bounds, while
+  the rendered hull extends to ±2.3 m. Pitching moved a bow-edge projection outside the
+  smaller rectangle. The decal now clips to actual upward-facing receiver triangles,
+  covering the visible bow and raised helm as well as the deck and pad.
+- Four independently sampled water corners formed a different plane from the rendered
+  water triangles. The decal now retains those triangles' planes. CPU uses the already
+  displaced mesh; GPU evaluates only intersecting near-patch triangles with the same
+  vertex water samples and patch fade as its water shader. The small drawing separation
+  is 12 mm above that exact receiver, rather than a wave-height approximation.
+- The custom GPU upload changed `triangleCount` but left `vertexCount` at allocated
+  capacity. Raylib's non-indexed draw uses `vertexCount`, allowing stale trailing geometry
+  to be drawn when the current mesh shrinks. Each draw now uses exactly its current
+  vertex count, including zero for an empty mesh.
+
+This changes the visual receivers; the physical loading deck and lashing rules remain as
+before. The footprint can be occluded by the crate or by nearer geometry, as expected.
+No directional sunlight shadows, reflection integration or new cargo physics is claimed.
+
+Developer checks:
+
+```sh
+./build/validate_cargo_decal
+./build/cargo_sandbox --location basin --renderer cpu --shadow-review
+./build/cargo_sandbox --renderer gpu --shadow-review
+./build/cargo_sandbox --scenario shadow-bow --screenshot build/shadow-bow.png
+./build/cargo_sandbox --scenario shadow-water --screenshot build/shadow-water.png
+```
+
+The review uses eight explicit poses (centre deck, bow edge, water and pad, with high/low
+load variants) over 256 virtual-clock frames, with diagnostic colours used only to count
+rendered footprint pixels. It has no wall-clock wait or performance assertion. An optional
+`--screenshot FILE` with `--shadow-review` writes the first missing-footprint frame on
+failure; it writes no image on success. GPU review also draws a nonempty mesh followed by
+an empty one and checks that no old pixels remain. `shadow-bow` and `shadow-water` are
+normal-colour review fixtures at simulated 3.5 s, including a formerly failing bow phase.
+
+**Workflow:** the user requires approval before any further PR is opened. This correction
+stays in its separate local worktree, without a push or PR update. The local AGENTS.md now
+records that approval requirement. Next: hands-on wave/depth review, then publication only
+after approval; the receiving-site work remains after this usability correction.
 
 ## The experience
 
@@ -657,3 +712,42 @@ its first-harbour-site milestone; these per-step details stay in this owning pla
 
 Documentation check for this follow-up: all 97 local links/anchors across the four changed
 guides resolve, command examples match `cargo_sandbox --help`, and `git diff --check` passes.
+
+### Local wave-phase correction verification, 2026-11-06
+
+Apple M1 Max/macOS arm64, Debug, pinned local dependencies, `PROTEUS_GPU_TESTS=OFF`:
+complete build and `ctest --preset full` passed **381 enabled tests** in 51.27 s (13 retired
+tests disabled; local sockets enabled). Targeted Release geometry and CPU wave-cycle
+checks also pass. The clean dependency build emitted the existing upstream `stb_vorbis.c`
+warning; changed project code builds warning-clean. No Release full suite is claimed.
+
+The same 256-frame probe with the old projection restored loses **33 CPU basin frames**
+and **14 GPU harbour frames**. With the receiver-triangle correction, both report
+**0/256 missing** (minimum 13 visible CPU pixels / 4 GPU pixels at the narrow bow edge).
+The counterfactual old projection keeps the corrected draw count to isolate that failure.
+The independent populated-to-empty GPU test reports **10,368 → 0 pixels** after the fix;
+a local counterfactual with the old vertex count reports **10,368 → 10,368** and correctly
+fails. These checks establish the selected wave/edge regression, not unrestricted shadow
+or performance qualification. [Captured output](evidence/sandbox/2026-11-06/shadow-wave-regression.txt).
+
+Inspected normal-colour GPU bow, water, high/low load and matching CPU bow/water captures.
+A GPU 240-frame crane demo and a CPU 12-frame bow-view windowed smoke run exited 0.
+The new GPU review command directly passed with the real mapped water and includes the
+stream regression; the optional full GPU CTest matrix was not configured. No new sound,
+hands-on acceptance, Windows/Linux/browser build or CI result is claimed for this local
+correction. Existing CPU speed and lighting/reflection limitations remain unchanged.
+
+![Bow footprint projected onto the actual hull receiver](evidence/sandbox/2026-11-06/wave-bow.png)
+
+![Water footprint follows the rendered wave triangles](evidence/sandbox/2026-11-06/wave-water.png)
+
+The previous static snapshots missed this regression; wave-phase pixel checks now cover
+it alongside geometry clipping tests. Next: hands-on local review of bow/water footprints,
+then publish or update PRs only after user approval. No branch has been pushed and no PR
+has been opened or updated for this correction.
+
+Local handoff checks: all 88 local links/anchors across the four changed Markdown files
+resolve, the documented review commands match `--help`, and `git diff --check` passes.
+Build/profiling/counterfactual binaries remain untracked under `build/`; the two normal
+captures and compact before/after diagnostic log are intentional evidence. This work is
+held on local branch `fix/cargo-shadow-wave-depth` for user testing and approval.

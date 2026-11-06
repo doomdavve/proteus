@@ -19,6 +19,15 @@ requests capture and advances the real application until moored, checking the te
 CPU/GPU toy captures, windowed motion and
 hands-on controls are separate checks; see the [owning sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy).
 
+`cargo_shadow_geometry` checks receiver-triangle clipping at a pitched/rolled bow,
+footprint bounds, actual nonplanar water receiver planes, above-projector rejection and
+empty results. `cargo_shadow_wave_cpu` drives 256 fixed virtual poses/phases and checks
+that a visible footprint remains in the rendered image. Optional `cargo_shadow_wave_gpu`
+(`PROTEUS_GPU_TESTS=ON`) repeats the checks on the real mapped GPU view and checks a
+populated-to-empty dynamic mesh for stale vertices. These are visibility/state checks,
+not performance targets. See the [wave-phase correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction-local)
+for baseline failures, local evidence and the approval-before-PR workflow.
+
 Marina M2: `harbor_geometry` checks appearance boundaries, canonical defaults, supported text,
 glyph geometry and the unchanged triangle budget. `harbor_view` checks independent CPU mesh
 owners, no-rebuild repeats, aborted candidates, 96 edit/remove cycles and customized contact/

@@ -1,6 +1,7 @@
 // Native S0 handling toy. No packages, progression, files or network state in the simulation.
 #include "boat_assets.h"
 #include "boat_cargo.h"
+#include "boat_cargo_view.h"
 #include "boat_model.h"
 #include "boat_scenery.h"
 #include "boat_water_mesh.h"
@@ -21,6 +22,23 @@ static const BoatHull hull = { 2.3f, 2.3f, 1.3f, 5 };
 static const BoatHandling handling = { .thrust = 3.1f, .hull = &hull };
 static const Color yellow = { 241, 183, 57, 255 }, teal = { 45, 116, 127, 255 };
 static const Color ink = { 20, 31, 42, 255 }, green = { 99, 216, 156, 255 };
+static bool shadow_review;
+static const Vector3 shadow_review_positions[]
+    = { { .65f, 2.7f, .65f }, { .65f, 2.7f, -2.35f }, { 2.8f, 2.7f, .65f }, { -5, 2.7f, 0 },
+          { .65f, 1.4f, .65f }, { .65f, 1.4f, -2.35f }, { 2.8f, 2.7f, -2.2f }, { 3.5f, 2.7f, 1 } };
+static const int shadow_review_surfaces[] = { 0, 0, 1, 0, 0, 0, 1, 1 };
+enum { SHADOW_REVIEW_FRAMES = 256 };
+static int shadow_pixel_count(const Color *pixels, int frame)
+{
+    int count = 0, surface = shadow_review_surfaces[frame / 32];
+    for (int i = 0; i < WIDTH * HEIGHT; ++i) {
+        Color p = pixels[i];
+        count += surface == 0 ? p.r > 120 && p.g < 8 && p.b < 8
+            : surface == 1    ? p.r > 120 && p.g < 8 && p.b > 120
+                              : p.r < 8 && p.g < 8 && p.b > 120;
+    }
+    return count;
+}
 
 typedef struct {
     BoatWorldResources resources;
@@ -215,7 +233,7 @@ static void berth_line(
 }
 
 // One evaluated mesh for both renderers, including rope, cargo and support markers.
-static void scene(const Experiment *e, BoatModel *m)
+static size_t scene(const Experiment *e, BoatModel *m)
 {
     const BoatCargoSandbox *s = &e->sandbox;
     Vector3 origin = s->crane.origin;
@@ -256,7 +274,8 @@ static void scene(const Experiment *e, BoatModel *m)
         boat_model_beam(m, (Vector3) { -3.4f, 1, 1.5f },
             boat_pose_attachment(b, (Vector3) { -1.25f, .8f, 1.5f }), .04f, yellow);
     }
-    size_t start = m->mesh.triangle_count * 3;
+    size_t receivers = m->mesh.triangle_count;
+    size_t start = receivers * 3;
     box(m, (Vector3) { 0 }, (Vector3) { .8f, .8f, .8f },
         c->state == BOAT_CARGO_SECURED ? green : (Color) { 196, 111, 59, 255 });
     box(m, (Vector3) { 0, -.32f, 0 }, (Vector3) { .92f, .12f, .92f }, (Color) { 116, 78, 50, 255 });
@@ -268,24 +287,6 @@ static void scene(const Experiment *e, BoatModel *m)
         for (int side = -1; side <= 1; side += 2)
             boat_model_beam(m, boat_pose_attachment(b, (Vector3) { side * 1.2f, .78f, .65f }),
                 Vector3Add(c->position, (Vector3) { 0, .43f, 0 }), .04f, ink);
-    }
-    // A vertical landing shadow on every visible receiver, before physical contact.
-    // The GPU toy draws custom objects outside the sunlight shadow map; this shared cue
-    // deliberately works identically in both renderers and clips at receiver edges.
-    for (int surface = BOAT_CARGO_SHADOW_WATER; surface <= BOAT_CARGO_SHADOW_DECK; ++surface) {
-        BoatCargoShadow shadow = boat_cargo_shadow(
-            s, &e->boat, &e->world, boat_tick_seconds(e->tick), (BoatCargoSurface)surface);
-        if (!shadow.count)
-            continue;
-        float fade = Clamp(shadow.clearance / 4, 0, 1);
-        Color color = surface == BOAT_CARGO_SHADOW_WATER
-            ? (Color) { 24, 51, 61, 255 }
-            : (Color) { (unsigned char)Lerp(57, 105, fade), (unsigned char)Lerp(46, 85, fade),
-                  (unsigned char)Lerp(33, 61, fade), 255 };
-        Vector3 p[4];
-        for (int i = 0; i < 4; ++i)
-            p[i] = Vector3Subtract(shadow.points[i], origin);
-        boat_model_quad(m, p[0], p[1], p[2], p[3], color);
     }
     BoatCargoMoorStatus berth = boat_cargo_moor_status(s, &e->boat);
     Color berth_color
@@ -304,6 +305,7 @@ static void scene(const Experiment *e, BoatModel *m)
     }
     for (size_t i = 0; i < m->mesh.triangle_count * 3; ++i)
         m->vertices[i] = Vector3Add(m->vertices[i], origin);
+    return receivers;
 }
 
 static bool site_camera_clear(const Experiment *e, Vector3 p)
@@ -403,9 +405,39 @@ static void gpu_draw(GpuMesh *g, const BoatModel *m, bool lit)
         }
     }
     g->mesh.triangleCount = (int)m->mesh.triangle_count;
+    g->mesh.vertexCount = g->mesh.triangleCount * 3;
     UpdateMeshBuffer(g->mesh, 0, g->mesh.vertices, g->mesh.triangleCount * 9 * sizeof(float), 0);
     UpdateMeshBuffer(g->mesh, 3, g->mesh.colors, g->mesh.triangleCount * 12, 0);
     DrawMesh(g->mesh, g->material, MatrixIdentity());
+}
+
+static bool shadow_stream_check(GpuMesh *gpu, RenderTexture2D target)
+{
+    static BoatModel triangle;
+    boat_model_begin(&triangle);
+    boat_model_triangle(
+        &triangle, (Vector3) { -1, -1, 0 }, (Vector3) { 1, -1, 0 }, (Vector3) { 0, 1, 0 }, RED);
+    Camera3D camera = { { 0, 0, 4 }, { 0 }, { 0, 1, 0 }, 55, CAMERA_PERSPECTIVE };
+    int counts[2];
+    for (int pass = 0; pass < 2; ++pass) {
+        if (pass)
+            boat_model_begin(&triangle);
+        BeginTextureMode(target);
+        ClearBackground(BLACK);
+        BeginMode3D(camera);
+        gpu_draw(gpu, &triangle, false);
+        EndMode3D();
+        EndTextureMode();
+        Image capture = LoadImageFromTexture(target.texture);
+        Color *pixels = LoadImageColors(capture);
+        counts[pass] = 0;
+        for (int i = 0; i < WIDTH * HEIGHT; ++i)
+            counts[pass] += pixels[i].r > 120 && pixels[i].g < 80 && pixels[i].b < 80;
+        UnloadImageColors(pixels);
+        UnloadImage(capture);
+    }
+    printf("shadow stream: populated=%d pixels; empty=%d pixels\n", counts[0], counts[1]);
+    return counts[0] > 20 && counts[1] == 0;
 }
 
 static bool button(Rectangle r, const char *label, Vector2 mouse, bool enabled, bool held)
@@ -580,6 +612,18 @@ static bool stage(Experiment *e, const char *name)
         boat_cargo_hook_toggle(&e->sandbox);
         for (int i = 0; i < 360; ++i)
             tick(e, .7f, .5f, 1, (BoatInput) { 0 });
+    } else if (!strcmp(name, "shadow-bow") || !strcmp(name, "shadow-water")) {
+        for (int i = 0; i < 420; ++i)
+            tick(e, 0, 0, 0, (BoatInput) { 0 });
+        Vector3 p
+            = !strcmp(name, "shadow-bow") ? shadow_review_positions[5] : shadow_review_positions[6];
+        e->sandbox.cargo.position = Vector3Add(e->sandbox.crane.origin, p);
+        e->sandbox.cargo.state = BOAT_CARGO_HANGING;
+        e->sandbox.cargo.rotation = (Vector3) { 0 };
+        e->sandbox.cargo.deck_contact = false;
+        e->sandbox.crane.angle = atan2f(p.x + 4, p.z - 3);
+        e->sandbox.crane.reach = hypotf(p.x + 4, p.z - 3);
+        e->sandbox.crane.rope = 5.5f - p.y - BOAT_CARGO_HALF;
     } else if (!strcmp(name, "shadow-high") || !strcmp(name, "shadow-low")) {
         if (!boat_cargo_hook_toggle(&e->sandbox))
             return false;
@@ -663,6 +707,8 @@ int main(int argc, char **argv)
                 return 2;
         } else if (!strcmp(argv[i], "--survey"))
             survey = true;
+        else if (!strcmp(argv[i], "--shadow-review"))
+            shadow_review = true;
         else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
             const char *renderer = argv[++i];
             if (strcmp(renderer, "cpu") && strcmp(renderer, "gpu"))
@@ -684,8 +730,10 @@ int main(int argc, char **argv)
             fprintf(stderr,
                 "Usage: cargo_sandbox [--location outer|basin] [--survey]\n"
                 "  [--renderer cpu|gpu] [--demo] [--frames N]\n"
+                "  [--shadow-review] (virtual wave-cycle pixel/stream checks)\n"
                 "  [--screenshot FILE] [--scenario "
-                "origin|swing|departure|loaded-left|loaded-right|shadow-high|shadow-low|"
+                "origin|swing|departure|loaded-left|loaded-right|shadow-high|shadow-low|shadow-bow|"
+                "shadow-water|"
                 "berth-approach|mooring|remoor]\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
                 "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, P pause, R "
@@ -696,9 +744,14 @@ int main(int argc, char **argv)
     if (strcmp(scenario, "origin") && strcmp(scenario, "swing") && strcmp(scenario, "departure")
         && strcmp(scenario, "loaded-left") && strcmp(scenario, "loaded-right")
         && strcmp(scenario, "shadow-high") && strcmp(scenario, "shadow-low")
+        && strcmp(scenario, "shadow-bow") && strcmp(scenario, "shadow-water")
         && strcmp(scenario, "berth-approach") && strcmp(scenario, "mooring")
         && strcmp(scenario, "remoor"))
         return 2;
+    if (shadow_review && (frames || demo || survey || strcmp(scenario, "origin"))) {
+        fprintf(stderr, "--shadow-review uses its own fixed virtual poses; omit other modes.\n");
+        return 2;
+    }
     if (screenshot && (frames || demo)) {
         fprintf(stderr, "Use --scenario for a capture; --demo/--frames need a live window.\n");
         return 2;
@@ -736,17 +789,18 @@ int main(int argc, char **argv)
         boat_world_resources_destroy(&e.resources);
         return 1;
     }
-    static BoatModel solids, water;
+    static BoatModel solids, water, body_decal, water_decal;
     static Color pixels[WIDTH * HEIGHT];
     Renderer3D cpu = { 0 };
     Image image = { pixels, WIDTH, HEIGHT, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
     SetTraceLogLevel(LOG_WARNING);
-    bool headless = screenshot && !gpu;
+    bool headless = (screenshot || shadow_review) && !gpu;
     RenderTexture2D target = { 0 }, world_target = { 0 };
     Texture2D texture = { 0 };
     GpuMesh mesh = { 0 };
     if (!headless) {
-        SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+        SetConfigFlags(screenshot || shadow_review ? FLAG_WINDOW_HIDDEN
+                                                   : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
         InitWindow(WIDTH * 2, HEIGHT * 2, "Wake Velocity - cargo handling experiment");
         if (!IsWindowReady())
             return 1;
@@ -767,11 +821,25 @@ int main(int argc, char **argv)
         if (!gpu)
             texture = LoadTextureFromImage(image);
     }
+    if (shadow_review && gpu && !shadow_stream_check(&mesh, target))
+        return 1;
     int result = 0, frame = 0;
     double accumulator = 0;
     float mouse_slew = 0, mouse_reach = 0, mouse_hoist = 0;
+    int review_missing = 0, review_min = WIDTH * HEIGHT;
     while (headless || !WindowShouldClose()) {
-        if (!headless && !screenshot) {
+        if (shadow_review) {
+            int sample = frame % 32, surface = frame / 32;
+            if (!sample)
+                reset(&e);
+            for (int i = 0; i < 30; ++i)
+                tick(&e, 0, 0, 0, (BoatInput) { 0 });
+            e.sandbox.cargo.state = BOAT_CARGO_HANGING;
+            e.sandbox.cargo.deck_contact = false;
+            Vector3 p = shadow_review_positions[surface];
+            e.sandbox.cargo.position = Vector3Add(e.sandbox.crane.origin, p);
+            e.sandbox.cargo.rotation = (Vector3) { 0 };
+        } else if (!headless && !screenshot) {
             if (IsKeyPressed(KEY_R))
                 reset(&e);
             if (IsKeyPressed(KEY_P))
@@ -827,7 +895,15 @@ int main(int argc, char **argv)
                 accumulator -= BOAT_TICK_SECONDS;
             }
         }
-        scene(&e, &solids);
+        size_t receiver_count = scene(&e, &solids);
+        Mesh3D receivers = solids.mesh;
+        receivers.triangle_count = receiver_count;
+        boat_model_begin(&body_decal);
+        if (!boat_cargo_decal(&body_decal, &receivers, e.sandbox.cargo.position, NULL, 0,
+                (Vector2) { 0 }, shadow_review ? (Color) { 255, 0, 0, 255 } : (Color) { 0 })) {
+            result = 1;
+            break;
+        }
         if (!location->mapped)
             water_mesh(&e, &water);
         View3D view = camera(&e, &harbour.scenery);
@@ -858,11 +934,41 @@ int main(int argc, char **argv)
                 renderer3d_draw_emissive_mesh(&cpu, &water.mesh, identity);
             cpu.light_direction = Vector3Normalize((Vector3) { -1, 3, 2 });
             renderer3d_draw_mesh(&cpu, &solids.mesh, identity);
-            if (headless) {
-                result = ExportImage(image, screenshot) ? 0 : 1;
+            boat_model_begin(&water_decal);
+            const Mesh3D *water_receiver
+                = location->mapped ? &harbour.water.surface.mesh : &water.mesh;
+            if (!boat_cargo_decal(&water_decal, water_receiver, e.sandbox.cargo.position, NULL, 0,
+                    (Vector2) { 0 },
+                    shadow_review ? (Color) { 255, 0, 255, 255 } : (Color) { 0 })) {
+                result = 1;
                 break;
             }
-            UpdateTexture(texture, pixels);
+            renderer3d_draw_emissive_mesh(&cpu, &water_decal.mesh, identity);
+            renderer3d_draw_mesh(&cpu, &body_decal.mesh, identity);
+            if (headless) {
+                if (!shadow_review) {
+                    result = ExportImage(image, screenshot) ? 0 : 1;
+                    break;
+                }
+            } else {
+                UpdateTexture(texture, pixels);
+            }
+        }
+        if (shadow_review && headless) {
+            int surface = frame / 32;
+            int count = shadow_pixel_count(pixels, frame);
+            if (count < review_min)
+                review_min = count;
+            if (!count) {
+                printf("shadow missing: case=%d sample=%d time=%.2f\n", surface, frame % 32,
+                    boat_tick_seconds(e.tick));
+                if (!review_missing && screenshot)
+                    ExportImage(image, screenshot);
+                ++review_missing;
+            }
+            if (++frame == SHADOW_REVIEW_FRAMES)
+                break;
+            continue;
         }
         int scale = (int)fminf(GetScreenWidth() / (float)WIDTH, GetScreenHeight() / (float)HEIGHT);
         if (scale < 1)
@@ -894,6 +1000,32 @@ int main(int argc, char **argv)
             if (!location->mapped)
                 gpu_draw(&mesh, &water, false);
             gpu_draw(&mesh, &solids, true);
+            boat_model_begin(&water_decal);
+            Vector2 focus = { -e.boat.position.x, e.boat.position.y };
+            const Mesh3D *water_receiver = &water.mesh;
+            const BoatWater *displace = NULL;
+            Mesh3D far_water;
+            if (location->mapped) {
+                Vector2 cargo = { e.sandbox.cargo.position.x, e.sandbox.cargo.position.z };
+                if (Vector2Distance(cargo, focus) < BOAT_WATER_PATCH_RADIUS) {
+                    water_receiver = &harbour.water.patches[0].mesh;
+                    displace = &e.world.water;
+                } else {
+                    far_water = *location->map->mesh;
+                    far_water.triangle_count = boat_map_leading_water(location->map->mesh);
+                    water_receiver = &far_water;
+                }
+            }
+            if (!boat_cargo_decal(&water_decal, water_receiver, e.sandbox.cargo.position, displace,
+                    boat_tick_seconds(e.tick), focus,
+                    shadow_review ? (Color) { 255, 0, 255, 255 } : (Color) { 0 })) {
+                EndMode3D();
+                EndTextureMode();
+                result = 1;
+                break;
+            }
+            gpu_draw(&mesh, &water_decal, false);
+            gpu_draw(&mesh, &body_decal, true);
             rlEnableBackfaceCulling();
             EndMode3D();
         } else
@@ -908,7 +1040,27 @@ int main(int argc, char **argv)
         mouse_slew = mouse_reach = mouse_hoist = 0;
         ui(&e, screenshot ? (Vector2) { -1, -1 } : mouse, &mouse_slew, &mouse_reach, &mouse_hoist);
         EndTextureMode();
-        if (screenshot) {
+        if (shadow_review) {
+            Image capture = LoadImageFromTexture(target.texture);
+            ImageFlipVertical(&capture);
+            Color *review_pixels = LoadImageColors(capture);
+            int surface = frame / 32;
+            int count = shadow_pixel_count(review_pixels, frame);
+            if (count < review_min)
+                review_min = count;
+            if (!count) {
+                printf("shadow missing: case=%d sample=%d time=%.2f\n", surface, frame % 32,
+                    boat_tick_seconds(e.tick));
+                if (!review_missing && screenshot)
+                    ExportImage(capture, screenshot);
+                ++review_missing;
+            }
+            UnloadImageColors(review_pixels);
+            UnloadImage(capture);
+            if (++frame == SHADOW_REVIEW_FRAMES)
+                break;
+            continue;
+        } else if (screenshot) {
             Image capture = LoadImageFromTexture(target.texture);
             ImageFlipVertical(&capture);
             result = ExportImage(capture, screenshot) ? 0 : 1;
@@ -923,6 +1075,11 @@ int main(int argc, char **argv)
         EndDrawing();
         if (frames && ++frame >= frames)
             break;
+    }
+    if (shadow_review) {
+        printf("shadow review: %s, %d/256 missing, minimum %d visible pixels\n",
+            gpu ? "GPU" : "CPU", review_missing, review_min);
+        result = review_missing ? 1 : 0;
     }
     renderer3d_destroy(&cpu);
     waterfront_scenery_destroy(&harbour.scenery);

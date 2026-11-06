@@ -34,6 +34,12 @@ starts/cancels assisted mooring when BERTH READY appears. The HUD shows persiste
 and the landing footprint/deck gap before contact. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
 for the first lift, controls, capture/measurement commands and current limitations.
 
+`--shadow-review` is a developer-only, virtual-clock footprint visibility check (use
+`--location basin --renderer cpu` for display-free checks, or `--renderer gpu` with a
+desktop context). With `--screenshot FILE` it saves only the first failing frame; no image
+is written on success. `--scenario shadow-bow` and `shadow-water` show normal-colour
+wave-phase regression fixtures. See the [local shadow correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction-local).
+
 ## Locations and voyages
 
 ```sh

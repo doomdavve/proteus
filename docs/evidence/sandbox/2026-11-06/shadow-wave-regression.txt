@@ -1,0 +1,67 @@
+2026-11-06, Apple M1 Max / macOS arm64, Debug.
+256 virtual frames: eight poses, 32 phase samples each. Diagnostic colours count visible footprint pixels.
+Old projection comparisons retain the corrected vertex count to isolate projection failures.
+
+Old projection / CPU basin
+shadow missing: case=1 sample=0 time=0.25
+shadow missing: case=1 sample=1 time=0.50
+shadow missing: case=1 sample=10 time=2.75
+shadow missing: case=1 sample=11 time=3.00
+shadow missing: case=1 sample=12 time=3.25
+shadow missing: case=1 sample=25 time=6.50
+shadow missing: case=1 sample=26 time=6.75
+shadow missing: case=1 sample=27 time=7.00
+shadow missing: case=2 sample=12 time=3.25
+shadow missing: case=2 sample=13 time=3.50
+shadow missing: case=2 sample=14 time=3.75
+shadow missing: case=5 sample=0 time=0.25
+shadow missing: case=5 sample=1 time=0.50
+shadow missing: case=5 sample=10 time=2.75
+shadow missing: case=5 sample=11 time=3.00
+shadow missing: case=5 sample=12 time=3.25
+shadow missing: case=5 sample=25 time=6.50
+shadow missing: case=5 sample=26 time=6.75
+shadow missing: case=5 sample=27 time=7.00
+shadow missing: case=6 sample=2 time=0.75
+shadow missing: case=6 sample=3 time=1.00
+shadow missing: case=6 sample=4 time=1.25
+shadow missing: case=6 sample=5 time=1.50
+shadow missing: case=6 sample=14 time=3.75
+shadow missing: case=6 sample=15 time=4.00
+shadow missing: case=6 sample=16 time=4.25
+shadow missing: case=6 sample=26 time=6.75
+shadow missing: case=6 sample=27 time=7.00
+shadow missing: case=6 sample=28 time=7.25
+shadow missing: case=7 sample=11 time=3.00
+shadow missing: case=7 sample=12 time=3.25
+shadow missing: case=7 sample=13 time=3.50
+shadow missing: case=7 sample=14 time=3.75
+shadow review: CPU, 33/256 missing, minimum 0 visible pixels
+
+Old projection / GPU outer
+shadow stream: populated=10368 pixels; empty=0 pixels
+shadow missing: case=1 sample=13 time=3.50
+shadow missing: case=1 sample=14 time=3.75
+shadow missing: case=1 sample=15 time=4.00
+shadow missing: case=1 sample=25 time=6.50
+shadow missing: case=1 sample=26 time=6.75
+shadow missing: case=1 sample=27 time=7.00
+shadow missing: case=1 sample=28 time=7.25
+shadow missing: case=5 sample=13 time=3.50
+shadow missing: case=5 sample=14 time=3.75
+shadow missing: case=5 sample=15 time=4.00
+shadow missing: case=5 sample=25 time=6.50
+shadow missing: case=5 sample=26 time=6.75
+shadow missing: case=5 sample=27 time=7.00
+shadow missing: case=5 sample=28 time=7.25
+shadow review: GPU, 14/256 missing, minimum 0 visible pixels
+
+Fixed projection / GPU outer
+shadow stream: populated=10368 pixels; empty=0 pixels
+shadow review: GPU, 0/256 missing, minimum 4 visible pixels
+
+Old stale vertex count deliberately restored
+shadow stream: populated=10368 pixels; empty=10368 pixels
+
+Fixed projection / CPU basin
+shadow review: CPU, 0/256 missing, minimum 13 visible pixels
