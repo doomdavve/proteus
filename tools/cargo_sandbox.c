@@ -272,7 +272,8 @@ static void lash_action(Experiment *e)
 static void moor_action(Experiment *e)
 {
     e->notice = boat_cargo_moor_toggle(&e->sandbox, &e->boat)
-        ? (e->sandbox.moored ? "Moored. TAB: crane view." : "Free to drive. TAB: helm.")
+        ? (e->sandbox.moored ? "Moored. TAB: crane controls."
+                             : "Ready to drive. TAB: helm controls.")
         : (e->sandbox.moored ? "Release hook and lash loose deck cargo before departure."
                              : "Moor near start: speed <0.5 m/s, face the approach marks.");
     e->aim = 0;
@@ -284,6 +285,8 @@ static void view_action(Experiment *e)
         e->crane_view = !e->crane_view;
         e->aim = 0;
         e->boat.throttle = 0;
+        e->notice = e->crane_view ? "Crane controls active: A/D slew, W/S reach, Q/E hoist."
+                                  : "Helm controls active: arrows drive, SPACE idles.";
     } else
         e->notice = "Moor at the starting berth to operate the crane.";
 }
@@ -294,13 +297,18 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
     const char *states[] = { "ON PAD", "ON HOOK", "LOOSE ON DECK", "LASHED", "FREE / FLOATING" };
     DrawRectangle(0, 0, WIDTH, 43, ink);
     DrawText("WORKING HARBOUR / CARGO TOY", 9, 6, 10, yellow);
-    DrawText(TextFormat("%s  |  %s  |  %s  |  %.1f m/s", e->crane_view ? "CRANE" : "HELM",
-                 e->sandbox.moored ? "MOORED" : "UNDER WAY", states[c->state],
+    DrawText(TextFormat("%s  |  %s  |  %s  |  %.1f m/s",
+                 e->crane_view ? "CRANE CONTROLS" : "HELM CONTROLS",
+                 e->sandbox.moored ? "MOORED" : "UNMOORED", states[c->state],
                  Vector2Length(e->boat.velocity)),
         9, 21, 10, RAYWHITE);
     DrawRectangle(0, 218, WIDTH, 82, ink);
     const char *prompt = e->notice;
-    if (c->state == BOAT_CARGO_HANGING && c->deck_contact)
+    if (e->crane_view && !e->sandbox.moored)
+        prompt = "Ready to drive. TAB switches to HELM CONTROLS; arrows drive.";
+    else if (c->state == BOAT_CARGO_SECURED && e->sandbox.moored)
+        prompt = "Cargo secured. G: unmoor, TAB: helm controls, arrows: drive.";
+    else if (c->state == BOAT_CARGO_HANGING && c->deck_contact)
         prompt = "Resting on deck. F: release hook, wait briefly, L: lash.";
     else if (c->state == BOAT_CARGO_LOOSE && c->settled >= .5f)
         prompt = "Settled. L: lash, G: unmoor, TAB: helm. Arrows to drive.";
@@ -313,7 +321,8 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
         lash_action(e);
     if (button((Rectangle) { 156, 236, 70, 22 }, "G Moor", mouse, !e->paused, false))
         moor_action(e);
-    if (button((Rectangle) { 230, 236, 85, 22 }, "TAB View", mouse, !e->paused, false))
+    if (button((Rectangle) { 230, 236, 85, 22 }, e->crane_view ? "TAB Helm" : "TAB Crane", mouse,
+            !e->paused && (e->crane_view || e->sandbox.moored), false))
         view_action(e);
     if (button((Rectangle) { 319, 236, 72, 22 }, "R Reset", mouse, true, false))
         reset(e);
@@ -350,11 +359,12 @@ static bool stage(Experiment *e, const char *name)
         boat_cargo_hook_toggle(&e->sandbox);
         for (int i = 0; i < 360; ++i)
             tick(e, .7f, .5f, 1, (BoatInput) { 0 });
-    } else if (!strcmp(name, "loaded-left") || !strcmp(name, "loaded-right")) {
+    } else if (!strcmp(name, "loaded-left") || !strcmp(name, "loaded-right")
+        || !strcmp(name, "departure")) {
         // Exercise the real application assist, wave-posed deck, release and departure.
         if (!boat_cargo_hook_toggle(&e->sandbox))
             return false;
-        e->aim = !strcmp(name, "loaded-left") ? 2 : 3;
+        e->aim = !strcmp(name, "loaded-right") ? 3 : 2;
         for (int i = 0; i < 2000; ++i)
             tick(e, 0, 0, 0, (BoatInput) { 0 });
         e->aim = 0;
@@ -367,6 +377,8 @@ static bool stage(Experiment *e, const char *name)
         if (!boat_cargo_lash_toggle(&e->sandbox, &e->boat)
             || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
             return false;
+        if (!strcmp(name, "departure"))
+            return true; // The user's handoff: unmoored, still operating crane controls.
         e->crane_view = false;
         e->notice = "Loaded review fixture. R: restart the hands-on lifting trial.";
         for (int i = 0; i < 600; ++i)
@@ -403,14 +415,15 @@ int main(int argc, char **argv)
         else {
             fprintf(stderr,
                 "Usage: cargo_sandbox [--renderer cpu|gpu] [--demo] [--frames N]\n"
-                "  [--screenshot FILE] [--scenario origin|swing|loaded-left|loaded-right]\n"
+                "  [--screenshot FILE] [--scenario "
+                "origin|swing|departure|loaded-left|loaded-right]\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
                 "G moor, TAB crane/helm, arrows drive, SPACE idle, P pause, R reset.\n");
             return !strcmp(argv[i], "--help") ? 0 : 2;
         }
     }
-    if (strcmp(scenario, "origin") && strcmp(scenario, "swing") && strcmp(scenario, "loaded-left")
-        && strcmp(scenario, "loaded-right"))
+    if (strcmp(scenario, "origin") && strcmp(scenario, "swing") && strcmp(scenario, "departure")
+        && strcmp(scenario, "loaded-left") && strcmp(scenario, "loaded-right"))
         return 2;
     if (screenshot && (frames || demo)) {
         fprintf(stderr, "Use --scenario for a capture; --demo/--frames need a live window.\n");
