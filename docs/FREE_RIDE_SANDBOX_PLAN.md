@@ -1,6 +1,6 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-06: **S0a native cargo/crane experiment implemented; hands-on review pending.**
+Status, 2026-11-06: **S0a native cargo/crane experiment implemented; basic toy accepted; control clarity follow-up.**
 The standalone `cargo_sandbox` test basin is the first controlled S0 step, not a completed
 harbour outing or an addition to the normal free ride menu. This plan owns free ride's
 interactive cargo, player changes to places, Creative/Working Harbour rules, boat ownership and
@@ -11,8 +11,9 @@ scheduled harbour life; [plugins](PLUGIN_PLAN.md) own authoring/runtime contract
 
 Completed: design and requested Astra review; S0a's one-crate crane, pad, wave-posed deck,
 explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view.
-Next: **try S0a's lift, drop and loaded turn**, then refine controls/camera/handling from that
-feedback before surveying `outer` work sites (S0b). No earnings or progression is implemented;
+Next: **clarify helm/crane control switching**, then survey `outer` work sites (S0b).
+The user reached loaded, lashed and unmoored state and accepted this as a solid base;
+the original “Tab View” label obscured that Tab also switches input controls. No earnings or progression is implemented;
 the design and automated checks do not establish enjoyable handling or user acceptance.
 
 ## S0a: try the cargo toy
@@ -40,14 +41,16 @@ First lift:
 2. Hold **E** to lower. The prompt changes when the crate rests on the moving deck.
    Press **F** to release the hook, wait briefly for settling, then **L** to lash it.
    A green crate and two straps confirm it is secured.
-3. Press **G** to unmoor and **Tab** for the helm. Use **Up/Down** to adjust throttle,
+3. Press **G** to unmoor and **Tab** to activate helm controls (and change camera). Use **Up/Down** to adjust throttle,
    **Left/Right** to steer and **Space** to idle. Try a short turn through the yellow
    markers. Reset and compare the other deck position, or leave the crate on the pad
    and take the boat out empty.
 
 For manual crane experiments, **A/D** slew, **W/S** extend/retract and **Q/E** raise/lower.
 Manual motor input cancels aim assist; **1** aims at the source pad. Mouse buttons expose
-the crane motors and actions; driving currently uses the keyboard. Tab returns to the helm
+the crane motors and actions; driving currently uses the keyboard. The Tab button names its
+destination, **Helm** or **Crane**, and the header names the active controls. Tab switches
+controls as well as camera, returning to the helm
 while a load hangs, stopping the motors while physics continues. Departure rejects a
 connected hook or loose deck cargo. Re-moor near the original berth, facing the green
 approach marks, at less than 0.5 m/s; R is the quick recovery if docking gets in the way.
@@ -62,7 +65,7 @@ different enough to explore? No reward loop is needed to answer these questions.
 
 | Step | Status | Next gate |
 | --- | --- | --- |
-| S0a controlled handling toy | Implemented as native `cargo_sandbox`; automated verification below; hands-on review pending | Try the lift/drop/turn and refine controls, camera and balance |
+| S0a controlled handling toy | Implemented as native `cargo_sandbox`; basic toy accepted by the user; control clarity follow-up | Clarify Tab control switching, then survey the harbour site |
 | S0b harbour placement | Not started | Survey clear `outer` work sites; integrate support/contact/camera with production scenery |
 | S0c broader qualification | Not started | Multiple loads and measured 16-body stress ceiling, browser/touch, audio feedback and harbour traffic/wake performance |
 
@@ -436,3 +439,24 @@ At that planning checkpoint, unresolved design details were exact working sites,
 boat dimensions/deck capacity, control bindings, prices and cooperative ownership. S0a now
 provides experimental solver/deck/control choices; their qualification and harbour sites
 remain open as described above.
+
+### S0a control clarity follow-up, 2026-11-06
+
+The user successfully loaded, lashed and unmoored, and called this a solid base to build on.
+They understood “Tab View” as a camera-only change, so the button now names the destination
+controls (Helm/Crane), the header names the active controls, and the unmoored crane prompt
+explicitly explains how to start driving. Secured/unmoored state guidance takes precedence
+over an old hook message. This records acceptance of the basic toy, not broader S0
+qualification or acceptance of the updated UI. Next: S0b harbour site survey/integration.
+
+Parent CI: macOS and browser authoring passed; Linux's existing `boat_plugin_stage` timed out
+and Windows could not download Lua. The cargo checks passed on Linux. These failures were
+inspected and are not attributed to cargo portability; they remain unverified until rerun.
+
+Control follow-up verification, 2026-11-06, M1 Max/macOS arm64: Debug configure/full build
+and `ctest --preset full` passed all 373 enabled tests (13 retired tests disabled; GPU CTest
+matrix off, local sockets enabled). GPU departure/helm captures were inspected and a 120-frame
+windowed scripted demo exited 0. `--scenario departure` reproduces the user's unmoored crane
+handoff after a real lift/release/lash. No hands-on acceptance of these revised labels is
+claimed. Next: harbour site survey. The [departure capture](evidence/sandbox/2026-11-06/departure-controls.png)
+records the new prompt and destination button.
