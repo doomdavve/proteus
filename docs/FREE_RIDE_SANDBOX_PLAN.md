@@ -1,8 +1,10 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-06: **S0a native cargo/crane experiment implemented; basic toy accepted; control clarity follow-up.**
-The standalone `cargo_sandbox` test basin is the first controlled S0 step, not a completed
-harbour outing or an addition to the normal free ride menu. This plan owns free ride's
+Status, 2026-11-06: **S0a basic toy accepted; S0b first harbour work site implemented, review pending.**
+The standalone `cargo_sandbox` now defaults to a temporary service platform in the real
+Eriksberg inlet on `outer`; `--location basin` retains the controlled reference. This is
+still a handling experiment, without deliveries or an addition to the normal free ride menu.
+This plan owns free ride's
 interactive cargo, player changes to places, Creative/Working Harbour rules, boat ownership and
 economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography, weather and the
 journey toward Vinga. [Marina authoring](MARINA_AUTHORING_PLAN.md) owns static scene recipes and
@@ -11,10 +13,13 @@ scheduled harbour life; [plugins](PLUGIN_PLAN.md) own authoring/runtime contract
 
 Completed: design and requested Astra review; S0a's one-crate crane, pad, wave-posed deck,
 explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view.
-Next: **clarify helm/crane control switching**, then survey `outer` work sites (S0b).
+Also completed: clearer helm/crane control switching and S0b's first mapped work site.
+Next: **try loading, driving out of the inlet and returning to the source**, then author a
+second receiving site and the useful crossing (S1), with S0c qualification still open.
 The user reached loaded, lashed and unmoored state and accepted this as a solid base;
-the original “Tab View” label obscured that Tab also switches input controls. No earnings or progression is implemented;
-the design and automated checks do not establish enjoyable handling or user acceptance.
+the original “Tab View” label obscured that Tab also switches input controls. No earnings
+or progression is implemented. The harbour extension still needs hands-on feedback;
+automated checks do not establish enjoyable handling or user acceptance of that extension.
 
 ## S0a: try the cargo toy
 
@@ -26,12 +31,13 @@ cmake --build build -j
 ./build/cargo_sandbox
 ```
 
-This native experiment defaults to GPU; `--renderer cpu` uses the reference rasterizer.
-It starts with a borrowed deck boat moored beside one crate and a small service crane.
+This native experiment defaults to `outer` and GPU; `--renderer cpu` uses the reference
+rasterizer. `--location basin` selects the original isolated fixture. It starts with a
+borrowed deck boat moored beside one crate and a small service crane in the Eriksberg inlet.
 There is no save, money, job or timer. **R resets both boat and crate immediately**;
 **P pauses the simulation**, including a suspended load. Escape closes the experiment.
 
-![S0a crane, source crate and moored deck boat](evidence/sandbox/2026-11-06/crane.png)
+![S0b Eriksberg service crane and moored deck boat](evidence/sandbox/2026-11-06/harbour-crane.png)
 
 First lift:
 
@@ -65,11 +71,12 @@ different enough to explore? No reward loop is needed to answer these questions.
 
 | Step | Status | Next gate |
 | --- | --- | --- |
-| S0a controlled handling toy | Implemented as native `cargo_sandbox`; basic toy accepted by the user; control clarity follow-up | Clarify Tab control switching, then survey the harbour site |
-| S0b harbour placement | Not started | Survey clear `outer` work sites; integrate support/contact/camera with production scenery |
+| S0a controlled handling toy | Implemented as native `cargo_sandbox`; basic toy accepted by the user; control labels clarified | Review the updated labels in the harbour experiment |
+| S0b harbour placement | First Eriksberg work site implemented, with native CPU/GPU scenery and boat/shore/camera contacts | Try loaded departure/return; author the second receiving site before S1 |
 | S0c broader qualification | Not started | Multiple loads and measured 16-body stress ceiling, browser/touch, audio feedback and harbour traffic/wake performance |
 
-The test basin intentionally precedes harbour site selection. One upright 0.8 m crate is the
+The original S0a test basin preceded harbour site selection; it remains an explicit
+reference mode. One upright 0.8 m crate is the
 entire active-body budget in this step. Four bounded cable projections, one support contact
 and fixed 120 Hz stepping provide pendulum motion, deck sliding and water recovery; there
 is no cargo/cargo contact, stacking, free angular rigid-body solver or dependency addition.
@@ -78,19 +85,28 @@ surface recovery rather than multi-sample buoyancy. No solver stability claim ex
 these fixtures. The boat has a 4.6 × 2.6 m contact/visual recipe but still uses the existing
 speedboat's six buoyancy supports. Secured cargo reduces speed changes and adds bounded
 trim/heel; loose/hanging cargo exerts no reaction forces. This is an authored workboat
-approximation. The quay uses a conservative circular boat exclusion in this fixture.
+approximation. The temporary work platform uses a conservative circular boat exclusion;
+the `outer` boat
+also uses the existing mapped shoreline, berth and moving-traffic contacts. Dropped floating
+cargo stops at the compiled bank. The platform is a new temporary native prop, not an
+existing decorative quay assumed to be a load-bearing surface.
 
 Both renderers consume the same evaluated box/beam meshes, including the hook, cable,
 crate, straps and deck markers, at 480 × 300 with nearest-neighbour integer presentation.
-This is a simple test view, not the production harbour lighting/water renderer. CPU
+The basin retains its simple test view; `outer` uses the production scenery, harbour actors
+and water meshes (including the GPU near-water patch). The custom boat/crane/cargo pass has
+simple lighting and does not yet participate in GPU reflections or cast shadows. The CPU
+reference limits draw distance to 240 m to bound displaced-water work; the GPU uses 4500 m. CPU
 display-free captures contain the 3D view; windowed CPU and GPU captures include the HUD.
 There are no new sounds. Browser/touch, normal-game integration, persistence, multiple cargo
-IDs, progression and multiplayer remain outside S0a.
+IDs, progression and multiplayer remain outside these S0 steps.
 
 Review and measurement commands:
 
 ```sh
 ./build/validate_boat_cargo --benchmark
+./build/cargo_sandbox --survey
+./build/cargo_sandbox --location basin --renderer cpu --screenshot build/cargo-basin-cpu.png
 ./build/cargo_sandbox --renderer cpu --screenshot build/cargo-origin-cpu.png
 ./build/cargo_sandbox --renderer gpu --scenario swing --screenshot build/cargo-swing-gpu.png
 ./build/cargo_sandbox --renderer gpu --scenario loaded-left --screenshot build/cargo-left-gpu.png
@@ -101,10 +117,43 @@ Review and measurement commands:
 `swing` advances actual crane physics; the two loaded review fixtures use the application's
 aim assist to lift onto the wave-posed deck, release, settle, lash, depart and drive a short
 turn. They fail if a transfer cannot complete. The display-free CTests
-`cargo_sandbox_left_screenshot` and `cargo_sandbox_right_screenshot` exercise these paths;
+`cargo_sandbox_left_screenshot` and `cargo_sandbox_right_screenshot` exercise the basin paths;
+`cargo_sandbox_outer_left_screenshot` and `cargo_sandbox_outer_right_screenshot` repeat them
+in the harbour;
 `boat_cargo` separately checks the core state/constraint transitions. Automated fixtures do
 not establish a successful human lift or enjoyable controls. `--benchmark` measures a single
 hanging cargo tick with timer overhead; it does not establish the harbour/16-body budget.
+
+## S0b: first Eriksberg work site
+
+The experiment's default mooring is simulation **(10, 245), heading 0** at the north end
+of the Eriksberg inlet, outside the marina entrance and registered traffic paths. The
+3 × 6 m temporary fixed work platform sits five metres toward simulation +X from the
+boat, with its original 1 m pad surface and 5.5 m crane tip height. It is an explicit test
+prop, not a claim about existing quay strength, seabed depth or real crane engineering.
+One cargo/crane state is translated to this origin; the normal game's map and packages are
+unchanged. This step does not yet author a second work site, unload at a destination or
+complete a persistent landing.
+
+`--survey` loads the actual scenery pack and checks the site's water and berth clearance
+on a 1 m grid over local X = -3..11, Z = -5..12, with a 1 m shoreline margin. It checks a
+larger conservative traffic rectangle (centre +2,+2, half beam 10 m, bow/stern 12 m) at
+0.25 s intervals through the longest retained actor period. This covers each compiled
+actor's cycle; it is sampled clearance evidence, not a proof about future authored routes.
+The launch runs the same check. Initial and live cameras check loaded scenery, berths,
+traffic, and the temporary platform/tower/boom along the viewing segment.
+
+Try the same lift, then drive out towards the marina at low speed, steer around the
+moored boats and return. The green approach marks are behind the original berth; face
+heading 0 and stop within 0.6 m at less than 0.5 m/s to use G again. R remains the quick
+reset. This tests whether loading still reads clearly against a real waterfront and whether
+a loaded boat is interesting to take out and dock again. The broader map retains its
+ordinary visual traffic wakes; no physical ferry wakes were added.
+
+Two other candidate footprints, **(-105, 0)** and **(-200, -150)**, passed the preliminary
+water/berth/traffic survey but have not been camera-reviewed, authored or connected as
+receiving sites. They are candidates only. Next: select a receiver, qualify its support and
+approaches, and implement the first useful crossing before adding earnings.
 
 ## The experience
 
@@ -354,7 +403,7 @@ the remaining gates below are still open.
 
 | Slice | Depends on | Playable result and completion gate | Status |
 | --- | --- | --- | --- |
-| S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a test-basin toy implemented; hands-on feedback next, then S0b harbour placement and S0c qualification |
+| S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a basic toy accepted; S0b first harbour site implemented; receiving site and S0c qualification remain |
 | S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. | Proposed |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
@@ -460,3 +509,52 @@ windowed scripted demo exited 0. `--scenario departure` reproduces the user's un
 handoff after a real lift/release/lash. No hands-on acceptance of these revised labels is
 claimed. Next: harbour site survey. The [departure capture](evidence/sandbox/2026-11-06/departure-controls.png)
 records the new prompt and destination button.
+
+### S0b first-site verification, 2026-11-06
+
+Apple M1 Max/macOS arm64, Debug, pinned local raylib/Lua/ENet sources,
+`PROTEUS_GPU_TESTS=OFF`, retired wake tests off: configure/full build passed, followed by
+**376 enabled CTests passing** in 36.07 s with local sockets enabled (13 retired tests
+disabled). The clean build emitted the existing upstream `stb_vorbis.c` warning; added code
+built without warnings. Targeted Release builds, core cargo checks, the site survey and
+both real harbour lift/departure CPU captures passed. No Release full suite is claimed.
+
+The validator now checks translated-origin sway/mooring and floating cargo stopping at a
+real mapped bank. Translation initially exposed sway drift from reconstructing velocity
+using global float position differences; applying constraint corrections directly to velocity
+fixed the regression. Basin and mapped actual lift/release/settle/lash/departure tests pass.
+The surveyed site and initial camera are clear; nearby shore, compiled marina and retained
+traffic remain enabled. These checks do not prove seabed support or future route clearance.
+
+Inspected CPU/GPU harbour origin, swing, departure and left/right loaded-turn captures, plus
+a normal-game GPU capture confirming the ordinary player remains visible. The shared scene
+can retain its water/focus anchor while hiding the built-in boat for this custom workboat
+pass; normal scenes retain the default behaviour. Windowed GPU scripted runs completed,
+including a final 240-frame run in 5.61 s end to end (startup included). This is not a frame
+p95/p99 measurement. The final 120-frame CPU demo completed in 19.85 s, exit 0.
+
+CPU limitation: the first 4500 m CPU water view was unexpectedly expensive; two long CPU
+demo runs were stopped after diagnosis rather than counted as passing. A 3 s Xcode
+Instruments Time Profiler trace was recorded at `build/cargo-cpu.trace`; a simultaneous
+[stack sample excerpt](evidence/sandbox/2026-11-06/cpu-water-sample.txt) places the sampled
+main-thread work in displaced-water evaluation (1.4 GB footprint, 1.8 GB peak in that
+pre-limit process). The CPU reference now caps its draw distance at 240 m, but remains
+about six frames/s in the recorded scripted run. **Use the default GPU renderer for play.**
+Far-water/CPU optimisation and maximum-load/traffic frame budgets remain open S0c work;
+this result does not establish a CPU performance target or a 16-body budget.
+
+![S0b actual harbour lift and loaded turn](evidence/sandbox/2026-11-06/harbour-loaded-turn.png)
+
+No human acceptance of the harbour site, revised control labels or numerical sway fix is
+claimed. Windows/Linux/browser builds were not run locally; the GPU CTest matrix, touch,
+new audio, custom-object reflections/shadows, a receiving site and persistent delivery
+remain open. Original S0a PR CI passed native macOS/Linux/Windows and browser authoring
+(after retrying unrelated Linux stage and Windows dependency-download timeouts); the
+control follow-up's macOS/Windows checks passed, with its Linux stage timeout retried.
+The new harbour branch requires its own CI. Next: try a loaded outing and return, then
+qualify/author a receiver for the useful crossing, without adding money yet.
+
+Documentation handoff: all 402 local links/anchors across the seven changed guides resolve;
+`git diff --check` passes. The overview records the first mapped site; detailed remaining
+steps stay in this plan. No generated build caches, profiling trace bundle or save data are
+committed; the stack-sample excerpt and two review screenshots are intentional evidence.

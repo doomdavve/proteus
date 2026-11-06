@@ -79,6 +79,7 @@ typedef struct {
 typedef struct {
     View3D camera;
     bool player_active;
+    bool hide_player; // Keep the water/focus anchor while a caller draws a custom boat.
     bool boating_basin;
     int scenery_count;
     struct {

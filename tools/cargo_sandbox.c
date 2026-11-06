@@ -1,10 +1,15 @@
 // Native S0 handling toy. No packages, progression, files or network state in the simulation.
+#include "boat_assets.h"
 #include "boat_cargo.h"
 #include "boat_model.h"
+#include "boat_scenery.h"
 #include "boat_water_mesh.h"
+#include "cargo_sandbox_site.h"
 #include "raymath.h"
 #include "renderer3d.h"
+#include "renderer_gpu.h"
 #include "rlgl.h"
+#include "waterfront.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -21,6 +26,7 @@ typedef struct {
     BoatWorldResources resources;
     BoatWorld world;
     Boat boat;
+    Vector2 mooring;
     BoatCargoSandbox sandbox;
     uint64_t tick;
     bool crane_view, paused;
@@ -33,12 +39,79 @@ typedef struct {
     Material material;
 } GpuMesh;
 
+typedef struct {
+    WaterfrontScenery scenery;
+    BoatWaterMeshCache water;
+    WaterfrontHarborModels harbor;
+    WaterfrontGpuScene gpu;
+    WaterfrontSceneFrame frame;
+    Mesh patch;
+    Vector2 patch_centre;
+    int patch_capacity;
+} HarbourView;
+
+static bool water_visible(void *context, Vector3 lo, Vector3 hi)
+{
+    return renderer3d_box_visible(context, lo, hi);
+}
+
+static bool harbour_cpu(
+    HarbourView *h, Renderer3D *cpu, Color *pixels, View3D camera, const Experiment *e)
+{
+    WaterfrontLighting light = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
+    if (!waterfront_draw_boating(cpu, &h->scenery, pixels, WIDTH, HEIGHT, camera, true,
+            (WaterfrontSquall) { 0 }, &light))
+        return false;
+    const Mesh3D *water = boat_water_surface_visible(&h->water, e->world.definition->map,
+        e->world.water, boat_tick_seconds(e->tick), water_visible, cpu);
+    if (!water)
+        return false;
+    renderer3d_draw_emissive_mesh(cpu, water, (Transform3D) { .scale = { 1, 1, 1 } });
+    waterfront_draw_traffic(cpu, &h->frame.traffic);
+    return waterfront_draw_harbor(cpu, &h->harbor, &h->frame.harbor);
+}
+
+static bool harbour_gpu_water(HarbourView *h, const Experiment *e)
+{
+    Vector2 centre
+        = { roundf(-e->boat.position.x / 12) * 12, roundf(e->boat.position.y / 12) * 12 };
+    if (h->patch.vaoId && Vector2Equals(centre, h->patch_centre))
+        return true;
+    const Mesh3D *source = boat_water_patch(
+        &h->water, e->world.definition->map, (Vector2) { -e->boat.position.x, e->boat.position.y });
+    if (!source)
+        return false;
+    int count = (int)source->triangle_count * 3;
+    if (!h->patch.vaoId || count > h->patch_capacity) {
+        if (h->patch.vaoId)
+            UnloadMesh(h->patch);
+        h->patch_capacity = count;
+        h->patch = (Mesh) { .vertexCount = count, .triangleCount = count / 3 };
+        h->patch.vertices = MemAlloc((unsigned int)count * 3 * sizeof(float));
+        if (!h->patch.vertices)
+            return false;
+        memset(h->patch.vertices, 0, (size_t)count * 3 * sizeof(float));
+        UploadMesh(&h->patch, true);
+    }
+    for (int i = 0; i < count; ++i) {
+        Vector3 v = source->vertices[source->triangles[i / 3].vertices[i % 3]];
+        memcpy(h->patch.vertices + 3 * i, &v, sizeof(v));
+    }
+    h->patch.vertexCount = count;
+    h->patch.triangleCount = count / 3;
+    UpdateMeshBuffer(h->patch, 0, h->patch.vertices, count * 3 * sizeof(float), 0);
+    h->patch_centre = centre;
+    h->gpu.near_water = h->patch; // Borrowed by the scene, exactly as in BoatGpu.
+    return h->patch.vaoId != 0;
+}
+
 static void reset(Experiment *e)
 {
     boat_world_init(&e->world, &e->resources, boat_water_gentle());
+    e->world.water.upstream = e->resources.definition->upstream;
     e->world.water.player_wake_enabled = true;
-    e->boat = (Boat) { 0 };
-    boat_cargo_reset(&e->sandbox);
+    e->boat = (Boat) { .position = e->mooring };
+    boat_cargo_reset_at(&e->sandbox, e->mooring);
     e->tick = 0;
     e->crane_view = true;
     e->aim = 0;
@@ -58,10 +131,12 @@ static void tick(Experiment *e, float slew, float reach, float hoist, BoatInput 
         if (slew || reach || hoist)
             e->aim = 0;
         if (e->aim) {
-            Vector3 target = e->aim == 1 ? (Vector3) { -5, 1, 0 }
+            Vector3 target = e->aim == 1 ? Vector3Add(s->crane.origin, (Vector3) { -5, 1, 0 })
                                          : boat_pose_attachment(&e->boat, local_target(e->aim));
-            float angle = atan2f(target.x + 4, target.z - 3);
-            float radius = hypotf(target.x + 4, target.z - 3);
+            float dx = target.x - s->crane.origin.x + 4;
+            float dz = target.z - s->crane.origin.z - 3;
+            float angle = atan2f(dx, dz);
+            float radius = hypotf(dx, dz);
             // Lift clear before slewing; the final lowering is the player's action.
             if (s->crane.rope > .9f)
                 hoist = 1;
@@ -78,13 +153,14 @@ static void tick(Experiment *e, float slew, float reach, float hoist, BoatInput 
     boat_cargo_load_effect(s, &before, &e->boat);
     if (s->moored) {
         // Assisted berth constrains only horizontal movement; wave heave/roll remain live.
-        e->boat.position = (Vector2) { 0 };
+        e->boat.position = e->mooring;
         e->boat.velocity = (Vector2) { 0 };
         e->boat.heading = e->boat.yaw_velocity = 0;
         e->boat.throttle = e->boat.engine_response = 0;
     } else {
         // Conservative circle against the solid test quay; this fixture is not scene editing.
-        float x = -e->boat.position.x, z = e->boat.position.y;
+        float x = -e->boat.position.x - s->crane.origin.x;
+        float z = e->boat.position.y - s->crane.origin.z;
         float nearest_x = Clamp(x, -6.5f, -3.5f), nearest_z = Clamp(z, -2, 4);
         Vector2 away = { x - nearest_x, z - nearest_z };
         float distance = Vector2Length(away);
@@ -113,7 +189,10 @@ static void boat_box(BoatModel *m, const Boat *boat, Vector3 p, Vector3 size, Co
 static void scene(const Experiment *e, BoatModel *m)
 {
     const BoatCargoSandbox *s = &e->sandbox;
-    const BoatCargo *c = &s->cargo;
+    Vector3 origin = s->crane.origin;
+    BoatCargo cargo = s->cargo;
+    cargo.position = Vector3Subtract(cargo.position, origin);
+    const BoatCargo *c = &cargo;
     boat_model_begin(m);
     box(m, (Vector3) { -5, 0, 1 }, (Vector3) { 3, 2, 6 }, (Color) { 126, 134, 132, 255 });
     box(m, (Vector3) { -5, 1.01f, 0 }, (Vector3) { 2, .03f, 2.8f }, teal);
@@ -121,13 +200,16 @@ static void scene(const Experiment *e, BoatModel *m)
         box(m, (Vector3) { -3.48f, .85f, -1.5f + i * 1.5f }, (Vector3) { .07f, .25f, .6f }, yellow);
     box(m, (Vector3) { -4, 1.3f, 3 }, (Vector3) { .9f, .6f, .9f }, ink);
     box(m, (Vector3) { -4, 3.3f, 3 }, (Vector3) { .35f, 4.4f, .35f }, yellow);
-    Vector3 tip = boat_cargo_tip(&s->crane), hook = boat_cargo_hook(s);
+    Vector3 tip = Vector3Subtract(boat_cargo_tip(&s->crane), origin);
+    Vector3 hook = Vector3Subtract(boat_cargo_hook(s), origin);
     boat_model_beam(m, (Vector3) { -4, 5.5f, 3 }, tip, .22f, yellow);
     boat_model_beam(m, (Vector3) { -4, 4.6f, 3 }, tip, .07f, ink);
     boat_model_beam(m, tip, hook, .035f, ink);
     box(m, hook, (Vector3) { .16f, .23f, .16f }, yellow);
 
-    const Boat *b = &e->boat;
+    Boat local_boat = e->boat;
+    local_boat.position = Vector2Subtract(local_boat.position, e->mooring);
+    const Boat *b = &local_boat;
     boat_box(m, b, (Vector3) { 0, .18f, 0 }, (Vector3) { 2.6f, .85f, 4.6f }, teal);
     boat_box(m, b, (Vector3) { 0, .69f, 0 }, (Vector3) { 2.6f, .12f, 3.8f },
         (Color) { 176, 151, 106, 255 });
@@ -169,18 +251,48 @@ static void scene(const Experiment *e, BoatModel *m)
         box(m, (Vector3) { side * 11, .35f, -18 }, (Vector3) { .5f, .8f, .5f }, yellow);
         box(m, (Vector3) { side * 1.6f, -.03f, 8 }, (Vector3) { .12f, .1f, 4 }, green);
     }
+    for (size_t i = 0; i < m->mesh.triangle_count * 3; ++i)
+        m->vertices[i] = Vector3Add(m->vertices[i], origin);
 }
 
-static View3D camera(const Experiment *e)
+static bool site_camera_clear(const Experiment *e, Vector3 p)
 {
-    Vector3 centre = { -2, 2.2f, 1 };
-    Vector3 eye = { 8.5f, 9, 12 };
+    Vector3 q = Vector3Subtract(p, e->sandbox.crane.origin);
+    if (q.x > -7 && q.x < -3 && q.z > -2.5f && q.z < 4.5f && q.y < 1.5f)
+        return false;
+    if (q.x > -4.6f && q.x < -3.4f && q.z > 2.4f && q.z < 3.6f && q.y < 6)
+        return false;
+    Vector3 a = Vector3Add(e->sandbox.crane.origin, (Vector3) { -4, 5.5f, 3 });
+    Vector3 b = boat_cargo_tip(&e->sandbox.crane), axis = Vector3Subtract(b, a);
+    float t = Clamp(Vector3DotProduct(Vector3Subtract(p, a), axis) / Vector3LengthSqr(axis), 0, 1);
+    return Vector3Distance(p, Vector3Add(a, Vector3Scale(axis, t))) > .6f;
+}
+
+static View3D camera(const Experiment *e, const WaterfrontScenery *scenery)
+{
+    Vector3 centre = Vector3Add(e->sandbox.crane.origin, (Vector3) { -2, 2.2f, 1 });
+    Vector3 eye = Vector3Add(e->sandbox.crane.origin, (Vector3) { 8.5f, 9, 12 });
     if (!e->crane_view) {
         centre = boat_pose_attachment(&e->boat, (Vector3) { 0, 1, 0 });
         eye = Vector3Add(
             centre, (Vector3) { sinf(e->boat.heading) * 13, 9, cosf(e->boat.heading) * 13 });
     }
-    return (View3D) { eye, centre, { 0, 1, 0 }, 55 * DEG2RAD, .1f, 240 };
+    if (e->world.definition->mapped) {
+        Vector3 safe = centre;
+        for (int i = 1; i <= 80; ++i) {
+            Vector3 p = Vector3Lerp(centre, eye, i / 80.0f);
+            if (!site_camera_clear(e, p) || !waterfront_scenery_clear(scenery, p, .45f)
+                || !waterfront_harbor_camera_clear_scene(e->world.scene, p, .45f)
+                || !waterfront_traffic_camera_clear_scene(
+                    e->world.scene, p, boat_tick_seconds(e->tick), .45f))
+                break;
+            safe = p;
+        }
+        eye = Vector3Distance(safe, centre) > .05f ? safe
+                                                   : Vector3Add(centre, (Vector3) { 0, .6f, 0 });
+    }
+    return (View3D) { eye, centre, { 0, 1, 0 }, 55 * DEG2RAD, .1f,
+        e->world.definition->mapped ? 4500 : 240 };
 }
 
 static void water_mesh(const Experiment *e, BoatModel *m)
@@ -296,7 +408,8 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
     const BoatCargo *c = &e->sandbox.cargo;
     const char *states[] = { "ON PAD", "ON HOOK", "LOOSE ON DECK", "LASHED", "FREE / FLOATING" };
     DrawRectangle(0, 0, WIDTH, 43, ink);
-    DrawText("WORKING HARBOUR / CARGO TOY", 9, 6, 10, yellow);
+    DrawText(e->world.definition->mapped ? "ERIKSBERG / CARGO TOY" : "BASIN / CARGO TOY", 9, 6, 10,
+        yellow);
     DrawText(TextFormat("%s  |  %s  |  %s  |  %.1f m/s",
                  e->crane_view ? "CRANE CONTROLS" : "HELM CONTROLS",
                  e->sandbox.moored ? "MOORED" : "UNMOORED", states[c->state],
@@ -391,11 +504,18 @@ static bool stage(Experiment *e, const char *name)
 
 int main(int argc, char **argv)
 {
-    bool gpu = true, demo = false;
+    bool gpu = true, demo = false, survey = false;
+    const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_OUTER);
     int frames = 0;
     const char *screenshot = NULL, *scenario = "origin";
     for (int i = 1; i < argc; ++i) {
-        if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
+        if (!strcmp(argv[i], "--location") && i + 1 < argc) {
+            location = boat_location_find(argv[++i]);
+            if (!location)
+                return 2;
+        } else if (!strcmp(argv[i], "--survey"))
+            survey = true;
+        else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
             const char *renderer = argv[++i];
             if (strcmp(renderer, "cpu") && strcmp(renderer, "gpu"))
                 return 2;
@@ -414,7 +534,8 @@ int main(int argc, char **argv)
             demo = true;
         else {
             fprintf(stderr,
-                "Usage: cargo_sandbox [--renderer cpu|gpu] [--demo] [--frames N]\n"
+                "Usage: cargo_sandbox [--location outer|basin] [--survey]\n"
+                "  [--renderer cpu|gpu] [--demo] [--frames N]\n"
                 "  [--screenshot FILE] [--scenario "
                 "origin|swing|departure|loaded-left|loaded-right]\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
@@ -430,9 +551,33 @@ int main(int argc, char **argv)
         return 2;
     }
     Experiment e = { 0 };
-    if (!boat_world_resources_init(&e.resources, boat_location(BOAT_LOCATION_BASIN)))
+    SetTraceLogLevel(LOG_WARNING);
+    if (!boat_world_resources_init(&e.resources, location))
         return 1;
+    e.mooring = location->mapped ? CARGO_SITE_MOORING : (Vector2) { 0 };
     reset(&e);
+    static HarbourView harbour;
+    if (location->mapped) {
+        char assets[4096];
+        if (!boat_asset_path(assets, sizeof(assets), "")
+            || !boat_scenery_load_location(location, assets)
+            || !waterfront_scenery_bind(&harbour.scenery, location->map)
+            || !cargo_site_clear(&e.world)) {
+            fprintf(stderr, "Cargo work site needs its scenery pack and clear mapped water.\n");
+            return 1;
+        }
+    }
+    if (survey) {
+        View3D view = camera(&e, &harbour.scenery);
+        bool clear
+            = !location->mapped || waterfront_scenery_clear(&harbour.scenery, view.position, .45f);
+        printf("cargo site: %s at %.0f,%.0f; water/berth/traffic survey %s; camera %s\n",
+            location->name, e.mooring.x, e.mooring.y, "clear", clear ? "clear" : "blocked");
+        waterfront_scenery_destroy(&harbour.scenery);
+        boat_scenery_unload();
+        boat_world_resources_destroy(&e.resources);
+        return clear ? 0 : 1;
+    }
     if (!stage(&e, scenario)) {
         fprintf(stderr, "Cargo scenario failed to lift, settle, lash or depart: %s\n", scenario);
         boat_world_resources_destroy(&e.resources);
@@ -444,7 +589,7 @@ int main(int argc, char **argv)
     Image image = { pixels, WIDTH, HEIGHT, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
     SetTraceLogLevel(LOG_WARNING);
     bool headless = screenshot && !gpu;
-    RenderTexture2D target = { 0 };
+    RenderTexture2D target = { 0 }, world_target = { 0 };
     Texture2D texture = { 0 };
     GpuMesh mesh = { 0 };
     if (!headless) {
@@ -457,6 +602,15 @@ int main(int argc, char **argv)
         target = LoadRenderTexture(WIDTH, HEIGHT);
         if (gpu && !gpu_init(&mesh))
             return 1;
+        if (gpu && location->mapped) {
+            char shader[4096];
+            world_target = LoadRenderTexture(WIDTH, HEIGHT);
+            if (!world_target.id
+                || !boat_asset_path(shader, sizeof(shader), "shaders/waterfront_city.fs")
+                || !waterfront_gpu_scene_init(&harbour.gpu, shader)
+                || !waterfront_gpu_scene_bind(&harbour.gpu, &harbour.scenery))
+                return 1;
+        }
         if (!gpu)
             texture = LoadTextureFromImage(image);
     }
@@ -517,17 +671,35 @@ int main(int argc, char **argv)
             }
         }
         scene(&e, &solids);
-        water_mesh(&e, &water);
-        View3D view = camera(&e);
+        if (!location->mapped)
+            water_mesh(&e, &water);
+        View3D view = camera(&e, &harbour.scenery);
+        if (!gpu)
+            view.far_plane = 240; // Bound the reference rasterizer's displaced-water work.
+        if (location->mapped) {
+            waterfront_scene_evaluate_ground_scene(e.world.scene, boat_tick_seconds(e.tick),
+                e.world.water, waterfront_kit_ground(location->map), &harbour.frame);
+            harbour.frame.camera = view;
+            harbour.frame.time = boat_tick_seconds(e.tick);
+            harbour.frame.player_active = true;
+            harbour.frame.hide_player = true;
+            harbour.frame.player_water = e.world.water;
+            harbour.frame.player.hull = boat_pose_hull(&e.boat);
+        }
         if (!gpu) {
             for (int i = 0; i < WIDTH * HEIGHT; ++i)
                 pixels[i] = (Color) { 145, 173, 185, 255 };
-            if (!renderer3d_begin(&cpu, pixels, WIDTH, HEIGHT, view, (Vector3) { -1, 3, 2 })) {
+            bool ready = location->mapped
+                ? harbour_cpu(&harbour, &cpu, pixels, view, &e)
+                : renderer3d_begin(&cpu, pixels, WIDTH, HEIGHT, view, (Vector3) { -1, 3, 2 });
+            if (!ready) {
                 result = 1;
                 break;
             }
             Transform3D identity = { .scale = { 1, 1, 1 } };
-            renderer3d_draw_emissive_mesh(&cpu, &water.mesh, identity);
+            if (!location->mapped)
+                renderer3d_draw_emissive_mesh(&cpu, &water.mesh, identity);
+            cpu.light_direction = Vector3Normalize((Vector3) { -1, 3, 2 });
             renderer3d_draw_mesh(&cpu, &solids.mesh, identity);
             if (headless) {
                 result = ExportImage(image, screenshot) ? 0 : 1;
@@ -541,24 +713,41 @@ int main(int argc, char **argv)
         Vector2 offset = { (GetScreenWidth() - WIDTH * scale) / 2.0f,
             (GetScreenHeight() - HEIGHT * scale) / 2.0f };
         Vector2 mouse = Vector2Scale(Vector2Subtract(GetMousePosition(), offset), 1.0f / scale);
-        BeginTextureMode(target);
+        BeginTextureMode(world_target.id ? world_target : target);
         ClearBackground((Color) { 145, 173, 185, 255 });
         if (gpu) {
+            if (location->mapped
+                && (!harbour_gpu_water(&harbour, &e)
+                    || !waterfront_gpu_scene_draw(&harbour.gpu, &harbour.frame, WIDTH, HEIGHT))) {
+                EndTextureMode();
+                result = 1;
+                break;
+            }
             Camera3D ray = { view.position, view.target, view.up, view.vertical_fov * RAD2DEG,
                 CAMERA_PERSPECTIVE };
             BeginMode3D(ray);
             // Match the game's mirrored presentation basis, so starboard is screen-right
             // from behind the helm. The reflection reverses winding; depth still hides backs.
-            Matrix projection = rlGetMatrixProjection();
-            projection.m0 = -projection.m0;
+            Matrix projection = MatrixPerspective(
+                view.vertical_fov, WIDTH / (float)HEIGHT, view.near_plane, view.far_plane);
+            if (!location->mapped)
+                projection.m0 = -projection.m0;
             rlSetMatrixProjection(projection);
             rlDisableBackfaceCulling();
-            gpu_draw(&mesh, &water, false);
+            if (!location->mapped)
+                gpu_draw(&mesh, &water, false);
             gpu_draw(&mesh, &solids, true);
             rlEnableBackfaceCulling();
             EndMode3D();
         } else
             DrawTexture(texture, 0, 0, WHITE);
+        if (world_target.id) {
+            EndTextureMode();
+            BeginTextureMode(target);
+            ClearBackground(BLACK);
+            DrawTexturePro(world_target.texture, (Rectangle) { 0, 0, -WIDTH, -HEIGHT },
+                (Rectangle) { 0, 0, WIDTH, HEIGHT }, (Vector2) { 0 }, 0, WHITE);
+        }
         mouse_slew = mouse_reach = mouse_hoist = 0;
         ui(&e, screenshot ? (Vector2) { -1, -1 } : mouse, &mouse_slew, &mouse_reach, &mouse_hoist);
         EndTextureMode();
@@ -579,15 +768,25 @@ int main(int argc, char **argv)
             break;
     }
     renderer3d_destroy(&cpu);
+    waterfront_scenery_destroy(&harbour.scenery);
+    waterfront_harbor_models_destroy(&harbour.harbor);
+    boat_water_mesh_cache_destroy(&harbour.water);
     boat_world_resources_destroy(&e.resources);
     if (!headless) {
         if (gpu) {
+            if (location->mapped)
+                waterfront_gpu_scene_destroy(&harbour.gpu);
+            if (harbour.patch.vaoId)
+                UnloadMesh(harbour.patch);
             UnloadMesh(mesh.mesh);
             UnloadMaterial(mesh.material);
         } else
             UnloadTexture(texture);
         UnloadRenderTexture(target);
+        if (world_target.id)
+            UnloadRenderTexture(world_target);
         CloseWindow();
     }
+    boat_scenery_unload();
     return result;
 }

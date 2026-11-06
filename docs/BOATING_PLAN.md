@@ -719,9 +719,9 @@ one score mode. The archipelago is the direction for expansion, not a requiremen
 
 The [free-riding adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) adds a proposed optional
 destination/shelter objective and recovery checkpoints. The
-[sandbox proposal](FREE_RIDE_SANDBOX_PLAN.md) now owns cargo jobs, equipment unlocks, currency,
+[sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) now owns cargo jobs, equipment unlocks, currency,
 supported dock improvements and progression saves, superseding their blanket deferral here.
-They remain unimplemented and follow a playable cargo experiment. Procedural terrain, a general
+They remain unimplemented; a separate native cargo/crane experiment is playable on `outer`. Procedural terrain, a general
 level editor, full fluid simulation and a general mission scripting system remain deferred.
 Course personal bests and portable run files already persist. Incremental boat physics follows the
 separate physics plan rather than being a prerequisite for a complete game. Arcade wake jumps,

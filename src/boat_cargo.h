@@ -27,6 +27,7 @@ typedef struct {
 } BoatCargo;
 
 typedef struct {
+    Vector3 origin; // Work-site translation in renderer coordinates; Y remains zero.
     float angle, reach, rope;
 } BoatCargoCrane;
 
@@ -38,6 +39,7 @@ typedef struct {
 
 // Reset keeps no outside state. The application separately resets its boat and clock.
 void boat_cargo_reset(BoatCargoSandbox *sandbox);
+void boat_cargo_reset_at(BoatCargoSandbox *sandbox, Vector2 mooring);
 Vector3 boat_cargo_tip(const BoatCargoCrane *crane);
 Vector3 boat_cargo_hook(const BoatCargoSandbox *sandbox);
 // Bounded motors at the same 120 Hz as the cargo/boat. Inputs are signed unit rates.

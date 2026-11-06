@@ -2880,10 +2880,11 @@ static void add_life(const WaterfrontGpuScene *scene, Material material,
                     LAMP_LENS_COLOR, true);
         }
         const WaterfrontPlayerState *p = &frame->player;
-        draw_boat(scene, material,
-            (BoatDrawParts) { p->hull, p->cabin, p->engine, p->skin, scene->player_flag,
-                p->particles, p->particle_count },
-            emissive);
+        if (!frame->hide_player)
+            draw_boat(scene, material,
+                (BoatDrawParts) { p->hull, p->cabin, p->engine, p->skin, scene->player_flag,
+                    p->particles, p->particle_count },
+                emissive);
         for (int i = 0; i < frame->rival_count; ++i) {
             const WaterfrontRivalState *r = &frame->rivals[i];
             draw_boat(scene, material,
@@ -3434,7 +3435,7 @@ static void draw_scene(
         UpdateTexture(scene->sky_texture, waterfront_sky_image(&frame->lighting).data);
         scene->sky_lighting = frame->lighting;
     }
-    if (frame->player_active)
+    if (frame->player_active && !frame->hide_player)
         update_flag_mesh(&scene->player_flag, &frame->player.flag, frame->player.skin);
     if (frame->ghost_opacity > 0)
         update_flag_mesh(&scene->ghost_flag, &frame->ghost_flag, frame->ghost_skin);

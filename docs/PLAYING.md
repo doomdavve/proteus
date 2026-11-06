@@ -121,8 +121,10 @@ A squall builds offshore as you approach the outer fjord. The eastern shore offe
 calmer water. The chart shows shelters, the destination and the exposed area; its blue
 shore tints show distance from land, not depth. This is a game map, not a navigation aid.
 The longer adventure to Vinga remains [planned](FREE_RIDING_ADVENTURE_PLAN.md).
-Cargo handling, working cranes, Creative/progression worlds, boat trading and fuel costs are a
-separate [free ride sandbox proposal](FREE_RIDE_SANDBOX_PLAN.md); they are not playable yet.
+A separate native [cargo/crane experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
+is available as `./build/cargo_sandbox`, outside the normal free ride menu. It starts at a
+temporary Eriksberg service platform; Tab switches helm/crane controls and camera.
+Creative/progression worlds, boat trading, jobs and fuel costs remain planned.
 
 ## Basin time trial and replays
 

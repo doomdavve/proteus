@@ -21,11 +21,15 @@ directly; `--title` selects the title explicitly. The direct-launch default loca
 ```sh
 ./build/cargo_sandbox
 ./build/cargo_sandbox --renderer cpu
+./build/cargo_sandbox --location basin
+./build/cargo_sandbox --survey
 ./build/cargo_sandbox --help
 ```
 
-This separate S0 test basin has a small crane, one crate and a borrowed deck boat, with reset
-and no saved progress. It is not a `wake_velocity` mode. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
+This separate native S0 experiment defaults to the Eriksberg inlet on `outer`, with a small
+service crane, one crate and a borrowed deck boat. `--location basin` retains the isolated
+reference (CPU draw distance is 240 m; the GPU view uses 4500 m). `--survey` checks the mapped work site without a window. Reset is immediate and
+there is no saved progress. It is not a `wake_velocity` mode. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
 for the first lift, controls, capture/measurement commands and current limitations.
 
 ## Locations and voyages
