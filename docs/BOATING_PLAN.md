@@ -1,6 +1,13 @@
 # Gothenburg boating playground
 
-Status: updated 2026-10-25. `wake_velocity` implements free boating in the basin and river
+Direction update, 2026-11-06: the [free ride sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) proposes
+cargo/crane handling, useful changes to harbour places, Creative and Working Harbour rules,
+then boat ownership, earnings and fuel. No sandbox features are implemented. Next is a small
+handling experiment to establish whether loading and carrying cargo are fun before adding
+scarcity. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography and Vinga;
+the [documentation index](README.md) records current implementation across tracks.
+
+Historical baseline, 2026-10-25: `wake_velocity` implements free boating in the basin and river
 locations ([Eriksberg location removed](#eriksberg-location-removed--2026-10-25)), reverse/docking, planing, buoyancy, optional gentle waves, opt-in
 current/scripted-wake options in all locations, default bounded arcade wakes in free boating,
 and a timed S course with recordings, persistent personal bests, ghosts, and replay controls. The study
@@ -666,6 +673,10 @@ These stages describe the design sequence; current implementation is recorded ex
 4. **Free-riding adventure (planned 2026-10-25):** extend beyond the bridge, prove tiled world
    costs with a short sheltered/exposed outing, then expand through the approaches to Vinga.
    The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) owns data, technical stages and acceptance.
+5. **Free ride sandbox (proposed 2026-11-06):** prove crane/cargo handling and one useful
+   delivery on the current harbour map, then introduce Creative tools, saved progression,
+   boat trading and fuel. The [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) owns the playable slices
+   and fun/verification gates; larger geography is not a prerequisite.
 
 `wake_velocity` reuses the scene and rendering foundation. Its controls live in the
 [playing guide](PLAYING.md); launch options live in the [command-line reference](COMMAND_LINE.md).
@@ -707,10 +718,12 @@ The first complete game can be one arena, one craft, one course, one music track
 one score mode. The archipelago is the direction for expansion, not a requirement to build a vast map.
 
 The [free-riding adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) adds a proposed optional
-destination/shelter objective and recovery checkpoints. A general mission system remains deferred.
-Defer upgrades, unlocks, economy, building systems, procedural terrain,
-a level editor, full fluid simulation, and broader progression saves. Course personal bests
-and portable run files already persist. Incremental boat physics follows the
+destination/shelter objective and recovery checkpoints. The
+[sandbox proposal](FREE_RIDE_SANDBOX_PLAN.md) now owns cargo jobs, equipment unlocks, currency,
+supported dock improvements and progression saves, superseding their blanket deferral here.
+They remain unimplemented and follow a playable cargo experiment. Procedural terrain, a general
+level editor, full fluid simulation and a general mission scripting system remain deferred.
+Course personal bests and portable run files already persist. Incremental boat physics follows the
 separate physics plan rather than being a prerequisite for a complete game. Arcade wake jumps,
 landing and capsize now exist in free boating; boost remains deferred. Multiplayer is now a
 planning track for shared free boating, superseding its earlier deferral; elaborate networked

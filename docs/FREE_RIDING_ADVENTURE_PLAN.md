@@ -1,6 +1,13 @@
 # Free-riding adventure: Gothenburg to Vinga
 
-Status, 2026-10-25: [A0.1 original-river inventory and reference](adventure/baseline.md),
+Direction update, 2026-11-06: [Free ride sandbox](FREE_RIDE_SANDBOX_PLAN.md) now owns the
+proposed cargo/crane interactions, Creative/Working Harbour rules, economy and player changes
+to places. Its next task is a small handling experiment on the current `outer` map. This plan
+retains geographic expansion, weather and Vinga; a larger map is not a prerequisite for the
+sandbox loop. No sandbox implementation is claimed. The dated expansion history below remains
+history; current harbour-life implementation is indexed in [All plans](README.md).
+
+Expansion history, begun 2026-10-25: [A0.1 original-river inventory and reference](adventure/baseline.md),
 the [A0.2 pinned coastal sources](adventure/README.md#coastal-sources-a02-2026-10-25) and the
 [A0.3 route/coverage survey](adventure/README.md#route-and-coverage-survey-a03-2026-10-25)
 and the [A0.4 controlled river baseline](adventure/baseline.md#a04-controlled-river-baseline--2026-10-25)
@@ -100,8 +107,9 @@ extension beyond Älvsborgsbron with one sheltered destination and one exposed-w
 Vinga is the eventual destination, reached through independently playable expansions.
 [All plans](README.md) · [Gameplay direction](BOATING_PLAN.md).
 
-This document owns expansion scope, data preparation, bounded world costs and the free-riding
-adventure. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership)
+This document owns geographic expansion scope, data preparation, bounded world costs and the
+voyage toward Vinga. The [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) owns interactive work and
+progression. The [foundations plan](BOATING_FOUNDATIONS_PLAN.md#phase-w--explicit-world-ownership)
 owns the prerequisite mapped-world/cache ownership work; the [river record](river/README.md)
 owns existing coverage. Race, multiplayer and physics plans retain their existing work.
 This planning request does not start implementation or create additional approval gates.
@@ -118,7 +126,9 @@ Start with one optional destination and a return-to-shelter objective. Use a bea
 cue and a few discoverable stopping places; recovery returns to the last suitable sheltered
 checkpoint. An arrival requires entering a generously sized approach area at controlled speed.
 No docking precision challenge, mission framework, inventory, economy or progression system
-is needed for the first slice. A small explicit session state is sufficient.
+was needed for this original geographic slice. The later
+[sandbox proposal](FREE_RIDE_SANDBOX_PLAN.md) introduces those selected interactions separately,
+starting with cargo handling on existing geography.
 
 Proposed progression, subject to the A0 map survey:
 
