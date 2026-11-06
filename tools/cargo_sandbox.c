@@ -1,0 +1,580 @@
+// Native S0 handling toy. No packages, progression, files or network state in the simulation.
+#include "boat_cargo.h"
+#include "boat_model.h"
+#include "boat_water_mesh.h"
+#include "raymath.h"
+#include "renderer3d.h"
+#include "rlgl.h"
+
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+enum { WIDTH = 480, HEIGHT = 300, MAX_VERTICES = BOAT_MODEL_MAX_TRIANGLES * 3 };
+static const BoatHull hull = { 2.3f, 2.3f, 1.3f, 5 };
+static const BoatHandling handling = { .thrust = 3.1f, .hull = &hull };
+static const Color yellow = { 241, 183, 57, 255 }, teal = { 45, 116, 127, 255 };
+static const Color ink = { 20, 31, 42, 255 }, green = { 99, 216, 156, 255 };
+
+typedef struct {
+    BoatWorldResources resources;
+    BoatWorld world;
+    Boat boat;
+    BoatCargoSandbox sandbox;
+    uint64_t tick;
+    bool crane_view, paused;
+    int aim; // 1 pad, 2/3 port/starboard. Motors, never a pose teleport.
+    const char *notice;
+} Experiment;
+
+typedef struct {
+    Mesh mesh;
+    Material material;
+} GpuMesh;
+
+static void reset(Experiment *e)
+{
+    boat_world_init(&e->world, &e->resources, boat_water_gentle());
+    e->world.water.player_wake_enabled = true;
+    e->boat = (Boat) { 0 };
+    boat_cargo_reset(&e->sandbox);
+    e->tick = 0;
+    e->crane_view = true;
+    e->aim = 0;
+    e->paused = false;
+    e->notice = "F: catch crate. 2 / 3: lift and aim at deck.";
+}
+
+static Vector3 local_target(int aim)
+{
+    return (Vector3) { aim == 2 ? .65f : -.65f, BOAT_CARGO_DECK_Y, .65f };
+}
+
+static void tick(Experiment *e, float slew, float reach, float hoist, BoatInput input)
+{
+    BoatCargoSandbox *s = &e->sandbox;
+    if (e->crane_view && s->moored) {
+        if (slew || reach || hoist)
+            e->aim = 0;
+        if (e->aim) {
+            Vector3 target = e->aim == 1 ? (Vector3) { -5, 1, 0 }
+                                         : boat_pose_attachment(&e->boat, local_target(e->aim));
+            float angle = atan2f(target.x + 4, target.z - 3);
+            float radius = hypotf(target.x + 4, target.z - 3);
+            // Lift clear before slewing; the final lowering is the player's action.
+            if (s->crane.rope > .9f)
+                hoist = 1;
+            else {
+                slew = Clamp(remainderf(angle - s->crane.angle, 2 * PI) * 3, -1, 1);
+                reach = Clamp((radius - s->crane.reach) * 2, -1, 1);
+            }
+        }
+        boat_cargo_motor(&s->crane, slew, reach, hoist);
+    }
+    Boat before = e->boat;
+    boat_step_handling(&e->boat, &e->world, boat_tick_seconds(++e->tick),
+        s->moored ? (BoatInput) { 0 } : input, &handling);
+    boat_cargo_load_effect(s, &before, &e->boat);
+    if (s->moored) {
+        // Assisted berth constrains only horizontal movement; wave heave/roll remain live.
+        e->boat.position = (Vector2) { 0 };
+        e->boat.velocity = (Vector2) { 0 };
+        e->boat.heading = e->boat.yaw_velocity = 0;
+        e->boat.throttle = e->boat.engine_response = 0;
+    } else {
+        // Conservative circle against the solid test quay; this fixture is not scene editing.
+        float x = -e->boat.position.x, z = e->boat.position.y;
+        float nearest_x = Clamp(x, -6.5f, -3.5f), nearest_z = Clamp(z, -2, 4);
+        Vector2 away = { x - nearest_x, z - nearest_z };
+        float distance = Vector2Length(away);
+        if (distance < 2.65f) {
+            e->boat.position = before.position;
+            e->boat.velocity = Vector2Scale(before.velocity, -.12f);
+        }
+    }
+    boat_cargo_step(s, &e->boat, &e->world, boat_tick_seconds(e->tick));
+}
+
+static void box(BoatModel *m, Vector3 p, Vector3 size, Color color)
+{
+    boat_model_box(m, p, size, color);
+}
+
+static void boat_box(BoatModel *m, const Boat *boat, Vector3 p, Vector3 size, Color color)
+{
+    size_t first = m->mesh.triangle_count * 3;
+    boat_model_box(m, p, size, color);
+    for (size_t i = first; i < m->mesh.triangle_count * 3; ++i)
+        m->vertices[i] = boat_pose_attachment(boat, m->vertices[i]);
+}
+
+// One evaluated mesh for both renderers, including rope, cargo and support markers.
+static void scene(const Experiment *e, BoatModel *m)
+{
+    const BoatCargoSandbox *s = &e->sandbox;
+    const BoatCargo *c = &s->cargo;
+    boat_model_begin(m);
+    box(m, (Vector3) { -5, 0, 1 }, (Vector3) { 3, 2, 6 }, (Color) { 126, 134, 132, 255 });
+    box(m, (Vector3) { -5, 1.01f, 0 }, (Vector3) { 2, .03f, 2.8f }, teal);
+    for (int i = 0; i < 4; ++i)
+        box(m, (Vector3) { -3.48f, .85f, -1.5f + i * 1.5f }, (Vector3) { .07f, .25f, .6f }, yellow);
+    box(m, (Vector3) { -4, 1.3f, 3 }, (Vector3) { .9f, .6f, .9f }, ink);
+    box(m, (Vector3) { -4, 3.3f, 3 }, (Vector3) { .35f, 4.4f, .35f }, yellow);
+    Vector3 tip = boat_cargo_tip(&s->crane), hook = boat_cargo_hook(s);
+    boat_model_beam(m, (Vector3) { -4, 5.5f, 3 }, tip, .22f, yellow);
+    boat_model_beam(m, (Vector3) { -4, 4.6f, 3 }, tip, .07f, ink);
+    boat_model_beam(m, tip, hook, .035f, ink);
+    box(m, hook, (Vector3) { .16f, .23f, .16f }, yellow);
+
+    const Boat *b = &e->boat;
+    boat_box(m, b, (Vector3) { 0, .18f, 0 }, (Vector3) { 2.6f, .85f, 4.6f }, teal);
+    boat_box(m, b, (Vector3) { 0, .69f, 0 }, (Vector3) { 2.6f, .12f, 3.8f },
+        (Color) { 176, 151, 106, 255 });
+    boat_box(m, b, (Vector3) { 0, 1.05f, -1.95f }, (Vector3) { 1.1f, .8f, .45f }, ink);
+    boat_box(m, b, (Vector3) { 0, .45f, 2.4f }, (Vector3) { .5f, .7f, .5f }, ink);
+    for (int side = -1; side <= 1; side += 2) {
+        boat_box(m, b, (Vector3) { side * 1.32f, .35f, -.9f }, (Vector3) { .14f, .45f, .6f }, ink);
+        boat_box(m, b, (Vector3) { side * 1.32f, .35f, 1.1f }, (Vector3) { .14f, .45f, .6f }, ink);
+        boat_box(m, b, local_target(side < 0 ? 2 : 3), (Vector3) { .85f, .025f, .85f },
+            (Color) { 220, 207, 144, 255 });
+    }
+    if (s->moored) {
+        boat_model_beam(m, (Vector3) { -3.4f, 1, -1 },
+            boat_pose_attachment(b, (Vector3) { -1.25f, .8f, -1 }), .04f, yellow);
+        boat_model_beam(m, (Vector3) { -3.4f, 1, 1.5f },
+            boat_pose_attachment(b, (Vector3) { -1.25f, .8f, 1.5f }), .04f, yellow);
+    }
+    size_t start = m->mesh.triangle_count * 3;
+    box(m, (Vector3) { 0 }, (Vector3) { .8f, .8f, .8f },
+        c->state == BOAT_CARGO_SECURED ? green : (Color) { 196, 111, 59, 255 });
+    box(m, (Vector3) { 0, -.32f, 0 }, (Vector3) { .92f, .12f, .92f }, (Color) { 116, 78, 50, 255 });
+    box(m, (Vector3) { 0, .05f, -.405f }, (Vector3) { .18f, .45f, .025f }, yellow);
+    Matrix rotation = MatrixRotateXYZ(c->rotation);
+    for (size_t i = start; i < m->mesh.triangle_count * 3; ++i)
+        m->vertices[i] = Vector3Add(c->position, Vector3Transform(m->vertices[i], rotation));
+    if (c->state == BOAT_CARGO_SECURED) {
+        for (int side = -1; side <= 1; side += 2)
+            boat_model_beam(m, boat_pose_attachment(b, (Vector3) { side * 1.2f, .78f, .65f }),
+                Vector3Add(c->position, (Vector3) { 0, .43f, 0 }), .04f, ink);
+    } else {
+        // Landing footprint on the deck or water, separate from the suspended crate.
+        Vector3 p = c->deck_contact ? boat_pose_attachment(b, c->deck_local)
+                                    : (Vector3) { c->position.x, .03f, c->position.z };
+        p.y -= c->deck_contact ? .38f : 0;
+        box(m, p, (Vector3) { .95f, .025f, .95f }, (Color) { 34, 72, 76, 255 });
+    }
+    // Turning references and a berth approach, away from the work surface.
+    for (int side = -1; side <= 1; side += 2) {
+        box(m, (Vector3) { side * 11, .35f, -18 }, (Vector3) { .5f, .8f, .5f }, yellow);
+        box(m, (Vector3) { side * 1.6f, -.03f, 8 }, (Vector3) { .12f, .1f, 4 }, green);
+    }
+}
+
+static View3D camera(const Experiment *e)
+{
+    Vector3 centre = { -2, 2.2f, 1 };
+    Vector3 eye = { 8.5f, 9, 12 };
+    if (!e->crane_view) {
+        centre = boat_pose_attachment(&e->boat, (Vector3) { 0, 1, 0 });
+        eye = Vector3Add(
+            centre, (Vector3) { sinf(e->boat.heading) * 13, 9, cosf(e->boat.heading) * 13 });
+    }
+    return (View3D) { eye, centre, { 0, 1, 0 }, 55 * DEG2RAD, .1f, 240 };
+}
+
+static void water_mesh(const Experiment *e, BoatModel *m)
+{
+    // A small finite basin patch. Water queries share the physical ambient/player wakes.
+    boat_model_begin(m);
+    float cx = -e->boat.position.x, cz = e->boat.position.y;
+    for (int z = -10; z < 10; ++z)
+        for (int x = -10; x < 10; ++x) {
+            Vector3 p[4] = { { cx + x * 5, 0, cz + z * 5 }, { cx + x * 5, 0, cz + (z + 1) * 5 },
+                { cx + (x + 1) * 5, 0, cz + (z + 1) * 5 }, { cx + (x + 1) * 5, 0, cz + z * 5 } };
+            for (int i = 0; i < 4; ++i)
+                p[i].y = boat_water_query_borrowed(
+                    &e->world.water, (Vector2) { -p[i].x, p[i].z }, boat_tick_seconds(e->tick))
+                             .height;
+            boat_model_quad(m, p[0], p[1], p[2], p[3],
+                (x + z) % 2 ? (Color) { 45, 107, 122, 255 } : (Color) { 48, 113, 127, 255 });
+        }
+}
+
+static bool gpu_init(GpuMesh *g)
+{
+    g->mesh = (Mesh) { .vertexCount = MAX_VERTICES, .triangleCount = MAX_VERTICES / 3 };
+    g->mesh.vertices = MemAlloc(MAX_VERTICES * 3 * sizeof(float));
+    g->mesh.colors = MemAlloc(MAX_VERTICES * 4);
+    if (!g->mesh.vertices || !g->mesh.colors) {
+        MemFree(g->mesh.vertices);
+        MemFree(g->mesh.colors);
+        *g = (GpuMesh) { 0 };
+        return false;
+    }
+    memset(g->mesh.vertices, 0, MAX_VERTICES * 3 * sizeof(float));
+    memset(g->mesh.colors, 255, MAX_VERTICES * 4);
+    UploadMesh(&g->mesh, true);
+    g->material = LoadMaterialDefault();
+    return g->mesh.vaoId != 0;
+}
+
+static void gpu_draw(GpuMesh *g, const BoatModel *m, bool lit)
+{
+    Vector3 light = Vector3Normalize((Vector3) { -1, 3, 2 });
+    for (size_t t = 0; t < m->mesh.triangle_count; ++t) {
+        Triangle3D triangle = m->triangles[t];
+        Vector3 a = m->vertices[triangle.vertices[0]], b = m->vertices[triangle.vertices[1]],
+                c = m->vertices[triangle.vertices[2]];
+        Vector3 normal
+            = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
+        float shade = lit ? .3f + .7f * fmaxf(0, Vector3DotProduct(normal, light)) : 1;
+        for (int i = 0; i < 3; ++i) {
+            size_t v = t * 3 + i;
+            Vector3 p = m->vertices[triangle.vertices[i]];
+            memcpy(g->mesh.vertices + v * 3, &p, sizeof(p));
+            g->mesh.colors[v * 4] = (unsigned char)(triangle.color.r * shade);
+            g->mesh.colors[v * 4 + 1] = (unsigned char)(triangle.color.g * shade);
+            g->mesh.colors[v * 4 + 2] = (unsigned char)(triangle.color.b * shade);
+            g->mesh.colors[v * 4 + 3] = 255;
+        }
+    }
+    g->mesh.triangleCount = (int)m->mesh.triangle_count;
+    UpdateMeshBuffer(g->mesh, 0, g->mesh.vertices, g->mesh.triangleCount * 9 * sizeof(float), 0);
+    UpdateMeshBuffer(g->mesh, 3, g->mesh.colors, g->mesh.triangleCount * 12, 0);
+    DrawMesh(g->mesh, g->material, MatrixIdentity());
+}
+
+static bool button(Rectangle r, const char *label, Vector2 mouse, bool enabled, bool held)
+{
+    bool over = enabled && CheckCollisionPointRec(mouse, r);
+    DrawRectangleRec(r, over ? teal : (Color) { 42, 58, 69, 255 });
+    DrawText(label, (int)r.x + 5, (int)r.y + 6, 10, enabled ? RAYWHITE : GRAY);
+    return over
+        && (held ? IsMouseButtonDown(MOUSE_BUTTON_LEFT) : IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
+}
+
+static void hook_action(Experiment *e)
+{
+    e->notice = boat_cargo_hook_toggle(&e->sandbox)
+        ? "Hook changed. Lower to a surface before releasing."
+        : "Move hook near the crate's top. Unlash first; moor to operate.";
+    e->aim = 0;
+}
+
+static void lash_action(Experiment *e)
+{
+    e->notice = boat_cargo_lash_toggle(&e->sandbox, &e->boat)
+        ? "Lashing changed. Green crate + straps = secured."
+        : "Detach hook, settle fully inside deck, stop boat, then lash.";
+}
+
+static void moor_action(Experiment *e)
+{
+    e->notice = boat_cargo_moor_toggle(&e->sandbox, &e->boat)
+        ? (e->sandbox.moored ? "Moored. TAB: crane view." : "Free to drive. TAB: helm.")
+        : (e->sandbox.moored ? "Release hook and lash loose deck cargo before departure."
+                             : "Moor near start: speed <0.5 m/s, face the approach marks.");
+    e->aim = 0;
+}
+
+static void view_action(Experiment *e)
+{
+    if (e->crane_view || e->sandbox.moored) {
+        e->crane_view = !e->crane_view;
+        e->aim = 0;
+        e->boat.throttle = 0;
+    } else
+        e->notice = "Moor at the starting berth to operate the crane.";
+}
+
+static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *hoist)
+{
+    const BoatCargo *c = &e->sandbox.cargo;
+    const char *states[] = { "ON PAD", "ON HOOK", "LOOSE ON DECK", "LASHED", "FREE / FLOATING" };
+    DrawRectangle(0, 0, WIDTH, 43, ink);
+    DrawText("WORKING HARBOUR / CARGO TOY", 9, 6, 10, yellow);
+    DrawText(TextFormat("%s  |  %s  |  %s  |  %.1f m/s", e->crane_view ? "CRANE" : "HELM",
+                 e->sandbox.moored ? "MOORED" : "UNDER WAY", states[c->state],
+                 Vector2Length(e->boat.velocity)),
+        9, 21, 10, RAYWHITE);
+    DrawRectangle(0, 218, WIDTH, 82, ink);
+    const char *prompt = e->notice;
+    if (c->state == BOAT_CARGO_HANGING && c->deck_contact)
+        prompt = "Resting on deck. F: release hook, wait briefly, L: lash.";
+    else if (c->state == BOAT_CARGO_LOOSE && c->settled >= .5f)
+        prompt = "Settled. L: lash, G: unmoor, TAB: helm. Arrows to drive.";
+    else if (e->aim)
+        prompt = "Aim assist lifting / slewing. E: lower slowly onto the deck.";
+    DrawText(prompt, 8, 221, 10, RAYWHITE);
+    if (button((Rectangle) { 8, 236, 70, 22 }, "F Hook", mouse, !e->paused, false))
+        hook_action(e);
+    if (button((Rectangle) { 82, 236, 70, 22 }, "L Lash", mouse, !e->paused, false))
+        lash_action(e);
+    if (button((Rectangle) { 156, 236, 70, 22 }, "G Moor", mouse, !e->paused, false))
+        moor_action(e);
+    if (button((Rectangle) { 230, 236, 85, 22 }, "TAB View", mouse, !e->paused, false))
+        view_action(e);
+    if (button((Rectangle) { 319, 236, 72, 22 }, "R Reset", mouse, true, false))
+        reset(e);
+    if (button((Rectangle) { 395, 236, 77, 22 }, e->paused ? "P Resume" : "P Pause", mouse, true,
+            false))
+        e->paused = !e->paused;
+    if (e->crane_view) {
+        bool enabled = !e->paused && e->sandbox.moored;
+        const char *labels[] = { "A <", "D >", "W Out", "S In", "Q Up", "E Down" };
+        float *rates[] = { slew, slew, reach, reach, hoist, hoist };
+        const float signs[] = { -1, 1, 1, -1, 1, -1 };
+        for (int i = 0; i < 6; ++i)
+            if (button((Rectangle) { 8 + i * 52, 263, 48, 22 }, labels[i], mouse, enabled, true))
+                *rates[i] = signs[i];
+        for (int i = 1; i <= 3; ++i)
+            if (button((Rectangle) { 324 + (i - 1) * 50, 263, 46, 22 },
+                    i == 1       ? "1 Pad"
+                        : i == 2 ? "2 Left"
+                                 : "3 Rgt",
+                    mouse, enabled, false))
+                e->aim = i;
+    } else
+        DrawText("ARROWS: throttle / steer  SPACE: idle  G: moor at start", 8, 269, 10, RAYWHITE);
+    if (e->paused)
+        DrawText("PAUSED", 205, 100, 20, yellow);
+}
+
+static bool stage(Experiment *e, const char *name)
+{
+    if (!strcmp(name, "origin"))
+        return true;
+    if (!strcmp(name, "swing")) {
+        e->notice = "Swing fixture. F: release, R: recover crate and boat.";
+        boat_cargo_hook_toggle(&e->sandbox);
+        for (int i = 0; i < 360; ++i)
+            tick(e, .7f, .5f, 1, (BoatInput) { 0 });
+    } else if (!strcmp(name, "loaded-left") || !strcmp(name, "loaded-right")) {
+        // Exercise the real application assist, wave-posed deck, release and departure.
+        if (!boat_cargo_hook_toggle(&e->sandbox))
+            return false;
+        e->aim = !strcmp(name, "loaded-left") ? 2 : 3;
+        for (int i = 0; i < 2000; ++i)
+            tick(e, 0, 0, 0, (BoatInput) { 0 });
+        e->aim = 0;
+        for (int i = 0; i < 900 && !e->sandbox.cargo.deck_contact; ++i)
+            tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+        if (!e->sandbox.cargo.deck_contact || !boat_cargo_hook_toggle(&e->sandbox))
+            return false;
+        for (int i = 0; i < 600 && e->sandbox.cargo.settled < .5f; ++i)
+            tick(e, 0, 0, 0, (BoatInput) { 0 });
+        if (!boat_cargo_lash_toggle(&e->sandbox, &e->boat)
+            || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
+            return false;
+        e->crane_view = false;
+        e->notice = "Loaded review fixture. R: restart the hands-on lifting trial.";
+        for (int i = 0; i < 600; ++i)
+            tick(e, 0, 0, 0,
+                (BoatInput) {
+                    .throttle_rate = i < 30 ? .4f : 0, .steering_rate = i > 360 ? .35f : 0 });
+    }
+    return true;
+}
+
+int main(int argc, char **argv)
+{
+    bool gpu = true, demo = false;
+    int frames = 0;
+    const char *screenshot = NULL, *scenario = "origin";
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
+            const char *renderer = argv[++i];
+            if (strcmp(renderer, "cpu") && strcmp(renderer, "gpu"))
+                return 2;
+            gpu = !strcmp(renderer, "gpu");
+        } else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc)
+            screenshot = argv[++i];
+        else if (!strcmp(argv[i], "--scenario") && i + 1 < argc)
+            scenario = argv[++i];
+        else if (!strcmp(argv[i], "--frames") && i + 1 < argc) {
+            char *end;
+            long n = strtol(argv[++i], &end, 10);
+            if (*end || n < 1 || n > 100000)
+                return 2;
+            frames = (int)n;
+        } else if (!strcmp(argv[i], "--demo"))
+            demo = true;
+        else {
+            fprintf(stderr,
+                "Usage: cargo_sandbox [--renderer cpu|gpu] [--demo] [--frames N]\n"
+                "  [--screenshot FILE] [--scenario origin|swing|loaded-left|loaded-right]\n"
+                "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
+                "G moor, TAB crane/helm, arrows drive, SPACE idle, P pause, R reset.\n");
+            return !strcmp(argv[i], "--help") ? 0 : 2;
+        }
+    }
+    if (strcmp(scenario, "origin") && strcmp(scenario, "swing") && strcmp(scenario, "loaded-left")
+        && strcmp(scenario, "loaded-right"))
+        return 2;
+    if (screenshot && (frames || demo)) {
+        fprintf(stderr, "Use --scenario for a capture; --demo/--frames need a live window.\n");
+        return 2;
+    }
+    Experiment e = { 0 };
+    if (!boat_world_resources_init(&e.resources, boat_location(BOAT_LOCATION_BASIN)))
+        return 1;
+    reset(&e);
+    if (!stage(&e, scenario)) {
+        fprintf(stderr, "Cargo scenario failed to lift, settle, lash or depart: %s\n", scenario);
+        boat_world_resources_destroy(&e.resources);
+        return 1;
+    }
+    static BoatModel solids, water;
+    static Color pixels[WIDTH * HEIGHT];
+    Renderer3D cpu = { 0 };
+    Image image = { pixels, WIDTH, HEIGHT, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    SetTraceLogLevel(LOG_WARNING);
+    bool headless = screenshot && !gpu;
+    RenderTexture2D target = { 0 };
+    Texture2D texture = { 0 };
+    GpuMesh mesh = { 0 };
+    if (!headless) {
+        SetConfigFlags(screenshot ? FLAG_WINDOW_HIDDEN : FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+        InitWindow(WIDTH * 2, HEIGHT * 2, "Wake Velocity - cargo handling experiment");
+        if (!IsWindowReady())
+            return 1;
+        SetWindowMinSize(WIDTH, HEIGHT);
+        SetTargetFPS(60);
+        target = LoadRenderTexture(WIDTH, HEIGHT);
+        if (gpu && !gpu_init(&mesh))
+            return 1;
+        if (!gpu)
+            texture = LoadTextureFromImage(image);
+    }
+    int result = 0, frame = 0;
+    double accumulator = 0;
+    float mouse_slew = 0, mouse_reach = 0, mouse_hoist = 0;
+    while (headless || !WindowShouldClose()) {
+        if (!headless && !screenshot) {
+            if (IsKeyPressed(KEY_R))
+                reset(&e);
+            if (IsKeyPressed(KEY_P))
+                e.paused = !e.paused;
+            if (!e.paused) {
+                if (IsKeyPressed(KEY_F))
+                    hook_action(&e);
+                if (IsKeyPressed(KEY_L))
+                    lash_action(&e);
+                if (IsKeyPressed(KEY_G))
+                    moor_action(&e);
+                if (IsKeyPressed(KEY_TAB))
+                    view_action(&e);
+                if (e.crane_view && e.sandbox.moored)
+                    for (int i = 1; i <= 3; ++i)
+                        if (IsKeyPressed(KEY_ONE + i - 1))
+                            e.aim = i;
+                if (IsKeyDown(KEY_SPACE))
+                    e.boat.throttle = 0;
+            }
+            accumulator = e.paused ? 0 : accumulator + (demo ? 1.0 / 60 : fmin(GetFrameTime(), .1));
+            float slew = mouse_slew, reach = mouse_reach, hoist = mouse_hoist;
+            if (IsKeyDown(KEY_A))
+                slew -= 1;
+            if (IsKeyDown(KEY_D))
+                slew += 1;
+            if (IsKeyDown(KEY_W))
+                reach += 1;
+            if (IsKeyDown(KEY_S))
+                reach -= 1;
+            if (IsKeyDown(KEY_Q))
+                hoist += 1;
+            if (IsKeyDown(KEY_E))
+                hoist -= 1;
+            BoatInput input = { 0 };
+            if (!e.crane_view) {
+                input.throttle_rate = IsKeyDown(KEY_UP) - IsKeyDown(KEY_DOWN);
+                input.steering_rate = IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT);
+            }
+            if (demo && e.tick == 0)
+                boat_cargo_hook_toggle(&e.sandbox);
+            while (accumulator >= BOAT_TICK_SECONDS) {
+                if (demo) {
+                    slew = sinf((float)e.tick * .003f) * .6f;
+                    reach = sinf((float)e.tick * .002f) * .4f;
+                    hoist = e.tick < 240 ? 1 : 0;
+                }
+                tick(&e, slew, reach, hoist, input);
+                accumulator -= BOAT_TICK_SECONDS;
+            }
+        }
+        scene(&e, &solids);
+        water_mesh(&e, &water);
+        View3D view = camera(&e);
+        if (!gpu) {
+            for (int i = 0; i < WIDTH * HEIGHT; ++i)
+                pixels[i] = (Color) { 145, 173, 185, 255 };
+            if (!renderer3d_begin(&cpu, pixels, WIDTH, HEIGHT, view, (Vector3) { -1, 3, 2 })) {
+                result = 1;
+                break;
+            }
+            Transform3D identity = { .scale = { 1, 1, 1 } };
+            renderer3d_draw_emissive_mesh(&cpu, &water.mesh, identity);
+            renderer3d_draw_mesh(&cpu, &solids.mesh, identity);
+            if (headless) {
+                result = ExportImage(image, screenshot) ? 0 : 1;
+                break;
+            }
+            UpdateTexture(texture, pixels);
+        }
+        int scale = (int)fminf(GetScreenWidth() / (float)WIDTH, GetScreenHeight() / (float)HEIGHT);
+        if (scale < 1)
+            scale = 1;
+        Vector2 offset = { (GetScreenWidth() - WIDTH * scale) / 2.0f,
+            (GetScreenHeight() - HEIGHT * scale) / 2.0f };
+        Vector2 mouse = Vector2Scale(Vector2Subtract(GetMousePosition(), offset), 1.0f / scale);
+        BeginTextureMode(target);
+        ClearBackground((Color) { 145, 173, 185, 255 });
+        if (gpu) {
+            Camera3D ray = { view.position, view.target, view.up, view.vertical_fov * RAD2DEG,
+                CAMERA_PERSPECTIVE };
+            BeginMode3D(ray);
+            // Match the game's mirrored presentation basis, so starboard is screen-right
+            // from behind the helm. The reflection reverses winding; depth still hides backs.
+            Matrix projection = rlGetMatrixProjection();
+            projection.m0 = -projection.m0;
+            rlSetMatrixProjection(projection);
+            rlDisableBackfaceCulling();
+            gpu_draw(&mesh, &water, false);
+            gpu_draw(&mesh, &solids, true);
+            rlEnableBackfaceCulling();
+            EndMode3D();
+        } else
+            DrawTexture(texture, 0, 0, WHITE);
+        mouse_slew = mouse_reach = mouse_hoist = 0;
+        ui(&e, screenshot ? (Vector2) { -1, -1 } : mouse, &mouse_slew, &mouse_reach, &mouse_hoist);
+        EndTextureMode();
+        if (screenshot) {
+            Image capture = LoadImageFromTexture(target.texture);
+            ImageFlipVertical(&capture);
+            result = ExportImage(capture, screenshot) ? 0 : 1;
+            UnloadImage(capture);
+            break;
+        }
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawTexturePro(target.texture, (Rectangle) { 0, 0, WIDTH, -HEIGHT },
+            (Rectangle) { offset.x, offset.y, WIDTH * scale, HEIGHT * scale }, (Vector2) { 0 }, 0,
+            WHITE);
+        EndDrawing();
+        if (frames && ++frame >= frames)
+            break;
+    }
+    renderer3d_destroy(&cpu);
+    boat_world_resources_destroy(&e.resources);
+    if (!headless) {
+        if (gpu) {
+            UnloadMesh(mesh.mesh);
+            UnloadMaterial(mesh.material);
+        } else
+            UnloadTexture(texture);
+        UnloadRenderTexture(target);
+        CloseWindow();
+    }
+    return result;
+}

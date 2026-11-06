@@ -1,5 +1,16 @@
 # Test workflow and timing
 
+S0a `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane motors/cable,
+actual lifts onto both deck positions, release/settle/lash, moving deck attachment,
+rotational point velocity on unlash, departure guards, dropped/floating recovery, capsize,
+reset and unchanged empty-load effects. Checks remain active in Release builds.
+`./build/validate_boat_cargo --benchmark` additionally reports one hanging body's tick cost;
+measurements are not pass/fail timing limits. `cargo_sandbox_left_screenshot` and
+`cargo_sandbox_right_screenshot` additionally drive the application's assisted lifts onto a
+wave-posed boat, lashing, departure and turn before a display-free CPU capture.
+CPU/GPU toy captures, windowed motion and
+hands-on controls are separate checks; see the [owning sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy).
+
 Marina M2: `harbor_geometry` checks appearance boundaries, canonical defaults, supported text,
 glyph geometry and the unchanged triangle budget. `harbor_view` checks independent CPU mesh
 owners, no-rebuild repeats, aborted candidates, 96 edit/remove cycles and customized contact/

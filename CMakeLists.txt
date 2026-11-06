@@ -62,6 +62,7 @@ set(PROTEUS_WARNINGS $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wped
 # harbor/traffic contacts and boat/city geometry data. It must not draw, read input, open
 # windows or audio, or touch files; boat_core_boundary checks its sources and symbols.
 set(PROTEUS_BOAT_CORE_SOURCES
+  src/boat_cargo.c src/boat_cargo.h
   src/boat_vessel_wake.c src/boat_vessel_wake.h
   src/boat.c src/boat.h src/boat_clock.h src/boat_course.c src/boat_course.h
   src/boat_combat.c src/boat_combat.h src/boat_fleet.c src/boat_fleet.h src/boat_match.c src/boat_match.h src/boat_race.c src/boat_race.h src/boat_location.c src/boat_location.h src/boat_map.c
@@ -508,6 +509,22 @@ target_link_libraries(validate_boat_flag PRIVATE proteus_render)
 target_compile_options(validate_boat_flag PRIVATE
   $<$<C_COMPILER_ID:AppleClang,Clang,GNU>:-Wall;-Wextra;-Wpedantic>)
 add_test(NAME boat_flag_cloth COMMAND validate_boat_flag)
+add_executable(validate_boat_cargo tools/validate_boat_cargo.c)
+target_link_libraries(validate_boat_cargo PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_cargo PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_cargo COMMAND validate_boat_cargo)
+set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
+if(NOT EMSCRIPTEN)
+  add_executable(cargo_sandbox tools/cargo_sandbox.c)
+  target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
+  target_link_libraries(cargo_sandbox PRIVATE proteus_render)
+  target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
+  foreach(side left right)
+    add_test(NAME cargo_sandbox_${side}_screenshot COMMAND cargo_sandbox --renderer cpu
+      --scenario loaded-${side}
+      --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${side}-test.png)
+  endforeach()
+endif()
 add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(validate_boat_audio PRIVATE raylib)
