@@ -16,6 +16,18 @@ carries the details, restrictions and examples. Launching without options opens 
 directly; `--title` selects the title explicitly. The direct-launch default location is
 `basin`, while the title's default outing is Gothenburg Harbour (`outer`).
 
+## Experimental cargo toy (native)
+
+```sh
+./build/cargo_sandbox
+./build/cargo_sandbox --renderer cpu
+./build/cargo_sandbox --help
+```
+
+This separate S0 test basin has a small crane, one crate and a borrowed deck boat, with reset
+and no saved progress. It is not a `wake_velocity` mode. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
+for the first lift, controls, capture/measurement commands and current limitations.
+
 ## Locations and voyages
 
 ```sh

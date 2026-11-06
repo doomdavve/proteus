@@ -1,17 +1,107 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-06: **design proposal; no sandbox implementation.** This plan owns free ride's
+Status, 2026-11-06: **S0a native cargo/crane experiment implemented; hands-on review pending.**
+The standalone `cargo_sandbox` test basin is the first controlled S0 step, not a completed
+harbour outing or an addition to the normal free ride menu. This plan owns free ride's
 interactive cargo, player changes to places, Creative/Working Harbour rules, boat ownership and
 economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography, weather and the
 journey toward Vinga. [Marina authoring](MARINA_AUTHORING_PLAN.md) owns static scene recipes and
 scheduled harbour life; [plugins](PLUGIN_PLAN.md) own authoring/runtime contracts;
 [room content](ROOM_CONTENT_PLAN.md) owns loading and distribution.
 
-Completed: inspect the current free packages, scene/boat contracts and related plans; propose
-the experience, bounded physics and ordered playable slices; incorporate an Astra design review
-requested by the user. Next: **S0, a small cargo/crane
-handling experiment**, before implementing earnings or progression. These are proposed design
-choices, not user acceptance of a playable result. This request covers planning only.
+Completed: design and requested Astra review; S0a's one-crate crane, pad, wave-posed deck,
+explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view.
+Next: **try S0a's lift, drop and loaded turn**, then refine controls/camera/handling from that
+feedback before surveying `outer` work sites (S0b). No earnings or progression is implemented;
+the design and automated checks do not establish enjoyable handling or user acceptance.
+
+## S0a: try the cargo toy
+
+Build and run from the implementation worktree root:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+./build/cargo_sandbox
+```
+
+This native experiment defaults to GPU; `--renderer cpu` uses the reference rasterizer.
+It starts with a borrowed deck boat moored beside one crate and a small service crane.
+There is no save, money, job or timer. **R resets both boat and crate immediately**;
+**P pauses the simulation**, including a suspended load. Escape closes the experiment.
+
+![S0a crane, source crate and moored deck boat](evidence/sandbox/2026-11-06/crane.png)
+
+First lift:
+
+1. Press **F** to catch the crate. Press **2** or **3** for the left/right deck target.
+   The optional aim assist raises and slews the crane using its ordinary limited motors;
+   it does not teleport the load. Wait for the hook to stop above the deck.
+2. Hold **E** to lower. The prompt changes when the crate rests on the moving deck.
+   Press **F** to release the hook, wait briefly for settling, then **L** to lash it.
+   A green crate and two straps confirm it is secured.
+3. Press **G** to unmoor and **Tab** for the helm. Use **Up/Down** to adjust throttle,
+   **Left/Right** to steer and **Space** to idle. Try a short turn through the yellow
+   markers. Reset and compare the other deck position, or leave the crate on the pad
+   and take the boat out empty.
+
+For manual crane experiments, **A/D** slew, **W/S** extend/retract and **Q/E** raise/lower.
+Manual motor input cancels aim assist; **1** aims at the source pad. Mouse buttons expose
+the crane motors and actions; driving currently uses the keyboard. Tab returns to the helm
+while a load hangs, stopping the motors while physics continues. Departure rejects a
+connected hook or loose deck cargo. Re-moor near the original berth, facing the green
+approach marks, at less than 0.5 m/s; R is the quick recovery if docking gets in the way.
+Unlash only at low speed; a floating/dropped crate remains simulated and can be caught again
+if in reach. Reset is always available when it is out of reach.
+
+Useful feedback: does catching, lowering and lashing read clearly; is the aim assist helpful;
+does sway invite another attempt; can you see the receiving deck; are empty/left/right turns
+different enough to explore? No reward loop is needed to answer these questions.
+
+### S0 steps and current limits
+
+| Step | Status | Next gate |
+| --- | --- | --- |
+| S0a controlled handling toy | Implemented as native `cargo_sandbox`; automated verification below; hands-on review pending | Try the lift/drop/turn and refine controls, camera and balance |
+| S0b harbour placement | Not started | Survey clear `outer` work sites; integrate support/contact/camera with production scenery |
+| S0c broader qualification | Not started | Multiple loads and measured 16-body stress ceiling, browser/touch, audio feedback and harbour traffic/wake performance |
+
+The test basin intentionally precedes harbour site selection. One upright 0.8 m crate is the
+entire active-body budget in this step. Four bounded cable projections, one support contact
+and fixed 120 Hz stepping provide pendulum motion, deck sliding and water recovery; there
+is no cargo/cargo contact, stacking, free angular rigid-body solver or dependency addition.
+The pad and deck catch contact use bounded support regions; a fallen crate has simple
+surface recovery rather than multi-sample buoyancy. No solver stability claim extends beyond
+these fixtures. The boat has a 4.6 × 2.6 m contact/visual recipe but still uses the existing
+speedboat's six buoyancy supports. Secured cargo reduces speed changes and adds bounded
+trim/heel; loose/hanging cargo exerts no reaction forces. This is an authored workboat
+approximation. The quay uses a conservative circular boat exclusion in this fixture.
+
+Both renderers consume the same evaluated box/beam meshes, including the hook, cable,
+crate, straps and deck markers, at 480 × 300 with nearest-neighbour integer presentation.
+This is a simple test view, not the production harbour lighting/water renderer. CPU
+display-free captures contain the 3D view; windowed CPU and GPU captures include the HUD.
+There are no new sounds. Browser/touch, normal-game integration, persistence, multiple cargo
+IDs, progression and multiplayer remain outside S0a.
+
+Review and measurement commands:
+
+```sh
+./build/validate_boat_cargo --benchmark
+./build/cargo_sandbox --renderer cpu --screenshot build/cargo-origin-cpu.png
+./build/cargo_sandbox --renderer gpu --scenario swing --screenshot build/cargo-swing-gpu.png
+./build/cargo_sandbox --renderer gpu --scenario loaded-left --screenshot build/cargo-left-gpu.png
+./build/cargo_sandbox --renderer gpu --scenario loaded-right --screenshot build/cargo-right-gpu.png
+./build/cargo_sandbox --demo --frames 360
+```
+
+`swing` advances actual crane physics; the two loaded review fixtures use the application's
+aim assist to lift onto the wave-posed deck, release, settle, lash, depart and drive a short
+turn. They fail if a transfer cannot complete. The display-free CTests
+`cargo_sandbox_left_screenshot` and `cargo_sandbox_right_screenshot` exercise these paths;
+`boat_cargo` separately checks the core state/constraint transitions. Automated fixtures do
+not establish a successful human lift or enjoyable controls. `--benchmark` measures a single
+hanging cargo tick with timer overhead; it does not establish the harbour/16-body budget.
 
 ## The experience
 
@@ -256,11 +346,12 @@ S0 and S1 begin as small playable experiments. Later rows are milestones, not si
 commitments: Creative manipulation, placement/undo, save storage and boat trading each need
 separate reviewable steps. Refine only the next milestone into implementation tasks. Each
 implementation step uses a separate worktree/PR; dependent branches target their parent until
-merged, following the repository stack workflow. No slice is implemented by this planning change.
+merged, following the repository stack workflow. S0a implements the first controlled test;
+the remaining gates below are still open.
 
 | Slice | Depends on | Playable result and completion gate | Status |
 | --- | --- | --- | --- |
-| S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | Proposed; next |
+| S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a test-basin toy implemented; hands-on feedback next, then S0b harbour placement and S0c qualification |
 | S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. | Proposed |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
@@ -298,6 +389,39 @@ Run the build and full CTest preset for each implementation handoff. Profile the
 cargo case beside harbour traffic and wakes; record tick p95/p99 and frame cost on named
 hardware before committing larger budgets. Qualify saves and controls on native and browser.
 
+### S0a implementation verification, 2026-11-06
+
+Apple M1 Max / macOS arm64, Debug, `PROTEUS_GPU_TESTS=OFF`, retired wake tests off:
+configure and complete build passed using the existing pinned dependency source trees.
+The clean build emitted the existing upstream `stb_vorbis.c` pointer-comparison warning;
+the added C code built without warnings. The final `ctest --preset full` with local socket
+access passed **373 enabled tests** (13 retired tests disabled); the earlier sandboxed run
+failed the existing socket tests. Core/net boundaries and the existing game checks pass.
+Targeted Release builds of `validate_boat_cargo` and `cargo_sandbox`, cargo checks and both
+actual lift/departure captures also pass; no Release full-suite run is claimed.
+
+Inspected CPU/GPU origin, suspended swing and left/right loaded-turn captures. Windowed
+GPU (360 frames) and CPU (180 frames) scripted crane demos exited 0. One initial sandboxed
+graphics launch could not access desktop services; a later attempt found the display asleep.
+The final desktop checks ran with desktop access and the display awake. No new sound was
+implemented or reviewed, no GPU CTest matrix was enabled, and no hands-on keyboard/mouse,
+touch, human motion/audio review or user acceptance is claimed.
+
+The single hanging-body measurement reported approximately **0.15 µs mean / 1 µs p95 /
+1 µs p99** in Debug and **0.08 / 1 / 1 µs** in Release, including timer/check overhead;
+the 1 µs timer quantization limits interpretation. This is cargo stepping alone, not frame
+cost, multiple-body capacity or harbour traffic/wake qualification. The real application
+lift/departure CPU capture checks each took about 0.05 s in the targeted CTest run.
+
+![Scripted real lift, lashing and loaded turn](evidence/sandbox/2026-11-06/loaded-turn.png)
+
+All 268 local links/anchors across the four changed guides resolved before adding these two
+evidence links (both image paths checked separately); `git diff --check` passed. Windows,
+Linux and browser builds were not run locally. Native CI and hands-on feedback remain
+separate gates. Next task and known limits are listed in the S0a section above.
+
+### Historical planning verification
+
 Planning verification, 2026-11-06, macOS arm64: Debug configure/build passed using the existing
 pinned raylib/Lua/ENet source trees; `PROTEUS_GPU_TESTS=OFF`, retired wake-field tests off.
 The build emitted one upstream `stb_vorbis.c` pointer-comparison warning. The first full CTest
@@ -308,5 +432,7 @@ Native GitHub build workflows skip Markdown-only changes; opening a PR does not 
 build checks ran. This is a documentation-only proposal; no new audiovisual review is needed.
 No cargo simulation, runtime performance, hands-on playback, balance or player acceptance is
 established. Windows/Linux/browser builds and GPU tests were not run for this change.
-Unresolved design details: exact working sites, cargo solver, boat dimensions/deck capacity,
-control bindings, prices and cooperative ownership.
+At that planning checkpoint, unresolved design details were exact working sites, cargo solver,
+boat dimensions/deck capacity, control bindings, prices and cooperative ownership. S0a now
+provides experimental solver/deck/control choices; their qualification and harbour sites
+remain open as described above.
