@@ -517,13 +517,18 @@ set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
-  target_link_libraries(cargo_sandbox PRIVATE proteus_render)
+  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu)
+  add_dependencies(cargo_sandbox proteus_assets)
   target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
   foreach(side left right)
-    add_test(NAME cargo_sandbox_${side}_screenshot COMMAND cargo_sandbox --renderer cpu
+    add_test(NAME cargo_sandbox_${side}_screenshot COMMAND cargo_sandbox --location basin --renderer cpu
       --scenario loaded-${side}
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${side}-test.png)
+    add_test(NAME cargo_sandbox_outer_${side}_screenshot COMMAND cargo_sandbox --renderer cpu
+      --scenario loaded-${side}
+      --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-outer-${side}-test.png)
   endforeach()
+  add_test(NAME cargo_sandbox_site COMMAND cargo_sandbox --survey)
 endif()
 add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -1447,6 +1452,7 @@ endforeach()
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
 # in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
+  cargo_sandbox_site cargo_sandbox_outer_left_screenshot cargo_sandbox_outer_right_screenshot
   release_command
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat

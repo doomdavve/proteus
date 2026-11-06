@@ -5,17 +5,21 @@
 
 static const Vector3 crane_base = { -4, 5.5f, 3 };
 
-void boat_cargo_reset(BoatCargoSandbox *s)
+void boat_cargo_reset(BoatCargoSandbox *s) { boat_cargo_reset_at(s, (Vector2) { 0 }); }
+
+void boat_cargo_reset_at(BoatCargoSandbox *s, Vector2 mooring)
 {
     *s = (BoatCargoSandbox) { .cargo = { .state = BOAT_CARGO_PAD, .position = { -5, 1.4f, 0 } },
         .crane = { .angle = -2.819842f, .reach = 3.162278f, .rope = 3.2f },
         .moored = true };
+    s->crane.origin = (Vector3) { -mooring.x, 0, mooring.y };
+    s->cargo.position = Vector3Add(s->cargo.position, s->crane.origin);
 }
 
 Vector3 boat_cargo_tip(const BoatCargoCrane *c)
 {
-    return Vector3Add(
-        crane_base, (Vector3) { sinf(c->angle) * c->reach, 0, cosf(c->angle) * c->reach });
+    return Vector3Add(Vector3Add(c->origin, crane_base),
+        (Vector3) { sinf(c->angle) * c->reach, 0, cosf(c->angle) * c->reach });
 }
 
 Vector3 boat_cargo_hook(const BoatCargoSandbox *s)
@@ -78,7 +82,8 @@ bool boat_cargo_moor_toggle(BoatCargoSandbox *s, const Boat *boat)
         s->moored = false;
         return true;
     }
-    if (Vector2Length(boat->position) > .6f || Vector2Length(boat->velocity) > .5f
+    Vector2 mooring = { -s->crane.origin.x, s->crane.origin.z };
+    if (Vector2Distance(boat->position, mooring) > .6f || Vector2Length(boat->velocity) > .5f
         || fabsf(remainderf(boat->heading, 2 * PI)) > .15f)
         return false;
     s->moored = true;
@@ -144,10 +149,14 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
         for (int iteration = 0; iteration < 4; ++iteration) {
             Vector3 delta = Vector3Subtract(c->position, anchor);
             float length = Vector3Length(delta);
-            if (length > s->crane.rope)
-                c->position = Vector3Add(anchor, Vector3Scale(delta, s->crane.rope / length));
+            if (length > s->crane.rope) {
+                Vector3 correction = Vector3Scale(delta, s->crane.rope / length - 1);
+                c->position = Vector3Add(c->position, correction);
+                c->velocity = Vector3Add(c->velocity, Vector3Scale(correction, 1 / BOAT_STEP));
+            }
         }
-        c->velocity = Vector3Scale(Vector3Subtract(c->position, old), 1 / BOAT_STEP);
+        // Apply only constraint corrections to velocity. Differencing global positions here
+        // amplifies float rounding by 120 and changes sway when the site is translated.
         // Damping keeps sway readable without an endless precision wait.
         c->velocity.x *= .997f;
         c->velocity.z *= .997f;
@@ -157,7 +166,8 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
         c->settled = 0;
         c->rotation = (Vector3) { 0 };
     }
-    bool pad = fabsf(c->position.x + 5) < 1.1f && fabsf(c->position.z) < 1.5f;
+    bool pad = fabsf(c->position.x - s->crane.origin.x + 5) < 1.1f
+        && fabsf(c->position.z - s->crane.origin.z) < 1.5f;
     float floor = pad
         ? 1.4f
         : boat_water_query_borrowed(&world->water, (Vector2) { -c->position.x, c->position.z }, now)
@@ -174,6 +184,15 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
     }
     // A single bounded body; falling/suspended simulation never depends on the camera.
     c->velocity = Vector3ClampValue(c->velocity, 0, 12);
+    if (c->state == BOAT_CARGO_FLOATING && world->definition->mapped
+        && !boat_map_water(&world->resources->map, (Vector2) { -c->position.x, c->position.z },
+            BOAT_CARGO_HALF + .1f)) {
+        // A dropped crate stops at the bank instead of drifting through rendered land.
+        // Suspended loads use the surveyed crane envelope, avoiding a second rope constraint.
+        c->position.x = old.x;
+        c->position.z = old.z;
+        c->velocity.x = c->velocity.z = 0;
+    }
 }
 
 void boat_cargo_load_effect(const BoatCargoSandbox *s, const Boat *before, Boat *boat)

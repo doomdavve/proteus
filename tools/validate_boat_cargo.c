@@ -150,7 +150,47 @@ int main(int argc, char **argv)
         CHECK(loaded.velocity.x < 3 && loaded.velocity.x > 2);
         CHECK(loaded.roll_velocity * side < 0);
     }
-    puts("cargo: deterministic lift, transfer, moving deck and recovery checks passed");
+    // Translation must preserve the fixed basin behaviour at a mapped work-site origin.
+    BoatCargoSandbox translated;
+    boat = (Boat) { 0 };
+    boat_cargo_reset(&s);
+    boat_cargo_reset_at(&translated, (Vector2) { 10, 245 });
+    CHECK(boat_cargo_hook_toggle(&s) && boat_cargo_hook_toggle(&translated));
+    Boat shifted = { .position = { 10, 245 } };
+    for (int i = 0; i < 2400; ++i) {
+        boat_cargo_motor(&s.crane, .1f, 0, i < 240 ? 1 : 0);
+        boat_cargo_motor(&translated.crane, .1f, 0, i < 240 ? 1 : 0);
+        step(&s, &boat, &world, i);
+        step(&translated, &shifted, &world, i);
+        CHECK(Vector3Distance(s.cargo.position,
+                  Vector3Subtract(translated.cargo.position, translated.crane.origin))
+            < .02f);
+    }
+    CHECK(boat_cargo_hook_toggle(&translated));
+    CHECK(boat_cargo_moor_toggle(&translated, &shifted));
+    CHECK(!boat_cargo_moor_toggle(&translated, &boat));
+    CHECK(boat_cargo_moor_toggle(&translated, &shifted));
+    // A floating crate stays on compiled water when it reaches an actual harbour bank.
+    BoatWorldResources outer = { 0 };
+    CHECK(boat_world_resources_init(&outer, boat_location(BOAT_LOCATION_OUTER)));
+    BoatWorld mapped;
+    boat_world_init(&mapped, &outer, (BoatWater) { 0 });
+    float edge = 10;
+    while (edge < 80 && boat_map_water(&outer.map, (Vector2) { edge + .1f, 245 }, .5f))
+        edge += .1f;
+    CHECK(edge > 10 && edge < 80);
+    boat_cargo_reset_at(&translated, shifted.position);
+    translated.cargo.state = BOAT_CARGO_FLOATING;
+    translated.cargo.position = (Vector3) { -edge, .12f, 245 };
+    translated.cargo.velocity.x = -12;
+    for (int i = 0; i < 240; ++i) {
+        step(&translated, &shifted, &mapped, i);
+        CHECK(boat_map_water(&outer.map,
+            (Vector2) { -translated.cargo.position.x, translated.cargo.position.z }, .5f));
+    }
+    boat_world_resources_destroy(&outer);
+    puts("cargo: deterministic lift, transfer, moving deck, translated site and recovery checks "
+         "passed");
     // Optional measurement only: virtual ticks, no timing assertion or wall-clock wait.
     if (argc == 2 && !strcmp(argv[1], "--benchmark")) {
         boat = (Boat) { 0 };

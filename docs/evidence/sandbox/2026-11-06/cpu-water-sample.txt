@@ -1,0 +1,255 @@
+Analysis of sampling cargo_sandbox (pid 57896) every 1 millisecond
+Process:         cargo_sandbox [57896]
+Path:            /private/tmp/*/cargo_sandbox
+Load Address:    0x100b90000
+Identifier:      cargo_sandbox
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  bash [57875]
+Target Type:     live task
+
+Date/Time:       2026-11-06 20:52:21.270 +0100
+Launch Time:     2026-11-06 20:48:50.495 +0100
+OS Version:      macOS 26.6.2 (25G83)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         1.4G
+Physical footprint (peak):  1.8G
+Idle exit:                  untracked
+----
+
+Call graph:
+    781 Thread_23939128   DispatchQueue_1: com.apple.main-thread  (serial)
+    + 781 start  (in dyld) + 6992  [0x189f244e4]
+    +   781 main  (in cargo_sandbox) + 4456  [0x100b94c88]
+    +     781 harbour_cpu  (in cargo_sandbox) + 348  [0x100b98510]
+    +       190 boat_water_surface_visible  (in cargo_sandbox) + 1456  [0x100bbb620]  boat_water_mesh.c:539
+    +       ! 57 query  (in cargo_sandbox) + 492  [0x100be3d5c]  boat_water.c:418
+    +       ! : 41 __sincosf_stret  (in libsystem_m.dylib) + 136,148,...  [0x19a0a634c,0x19a0a6358,...]
+    +       ! : 6 query  (in cargo_sandbox) + 740  [0x100be3e54]  boat_water.c:418
+    +       ! : 5 query  (in cargo_sandbox) + 592,728  [0x100be3dc0,0x100be3e48]  boat_water.c:0
+    +       ! : 2 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 1 query  (in cargo_sandbox) + 680  [0x100be3e18]  boat_water.c:417
+    +       ! : 1 query  (in cargo_sandbox) + 556  [0x100be3d9c]  boat_water.c:420
+    +       ! : 1 query  (in cargo_sandbox) + 572  [0x100be3dac]  boat_water.c:421
+    +       ! 52 query  (in cargo_sandbox) + 1000  [0x100be3f58]  boat_water.c:418
+    +       ! : 37 __sincosf_stret  (in libsystem_m.dylib) + 136,164,...  [0x19a0a634c,0x19a0a6368,...]
+    +       ! : 4 query  (in cargo_sandbox) + 1080  [0x100be3fa8]  boat_water.c:423
+    +       ! : 3 query  (in cargo_sandbox) + 3400  [0x100be48b8]  boat_water.c:446
+    +       ! : 3 query  (in cargo_sandbox) + 3608  [0x100be4988]  boat_water.c:462
+    +       ! : 2 query  (in cargo_sandbox) + 3364,3384  [0x100be4894,0x100be48a8]  boat_water.c:445
+    +       ! : 1 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 1 query  (in cargo_sandbox) + 2224  [0x100be4420]  boat_water.c:439
+    +       ! : 1 query  (in cargo_sandbox) + 3648  [0x100be49b0]  boat_water.c:465
+    +       ! 50 query  (in cargo_sandbox) + 756  [0x100be3e64]  boat_water.c:418
+    +       ! : 36 __sincosf_stret  (in libsystem_m.dylib) + 136,164,...  [0x19a0a634c,0x19a0a6368,...]
+    +       ! : 6 query  (in cargo_sandbox) + 848  [0x100be3ec0]  boat_water.c:0
+    +       ! : 2 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 2 query  (in cargo_sandbox) + 940,972  [0x100be3f1c,0x100be3f3c]  boat_water.c:417
+    +       ! : 2 query  (in cargo_sandbox) + 828  [0x100be3eac]  boat_water.c:421
+    +       ! : 1 query  (in cargo_sandbox) + 860  [0x100be3ecc]  boat_water.c:412
+    +       ! : 1 query  (in cargo_sandbox) + 996  [0x100be3f54]  boat_water.c:418
+    +       ! 23 boat_water_surface_visible  (in cargo_sandbox) + 1456  [0x100bbb620]  boat_water_mesh.c:539
+    +       ! : 5 query  (in cargo_sandbox) + 160  [0x100be3c10]  boat_water.c:404
+    +       ! : 5 query  (in cargo_sandbox) + 256,280,...  [0x100be3c70,0x100be3c88,...]  boat_water.c:408
+    +       ! : 4 query  (in cargo_sandbox) + 72,84  [0x100be3bb8,0x100be3bc4]  boat_water.c:400
+    +       ! : 4 query  (in cargo_sandbox) + 420,452  [0x100be3d14,0x100be3d34]  boat_water.c:417
+    +       ! : 3 query  (in cargo_sandbox) + 308  [0x100be3ca4]  boat_water.c:0
+    +       ! : 2 query  (in cargo_sandbox) + 480  [0x100be3d50]  boat_water.c:418
+    +       ! 5 query  (in cargo_sandbox) + 3684,3680  [0x100be49d4,0x100be49d0]  boat_water.c:465
+    +       ! 2 boat_water_surface_visible  (in cargo_sandbox) + 1496  [0x100bbb648]  boat_water_mesh.c:543
+    +       ! 1 query  (in cargo_sandbox) + 16  [0x100be3b80]  boat_water.c:399
+    +       164 boat_water_surface_visible  (in cargo_sandbox) + 1388  [0x100bbb5dc]  boat_water_mesh.c:539
+    +       ! 50 query  (in cargo_sandbox) + 756  [0x100be3e64]  boat_water.c:418
+    +       ! : 39 __sincosf_stret  (in libsystem_m.dylib) + 136,164,...  [0x19a0a634c,0x19a0a6368,...]
+    +       ! : 5 query  (in cargo_sandbox) + 940,892,...  [0x100be3f1c,0x100be3eec,...]  boat_water.c:417
+    +       ! : 3 query  (in cargo_sandbox) + 848  [0x100be3ec0]  boat_water.c:0
+    +       ! : 2 query  (in cargo_sandbox) + 996  [0x100be3f54]  boat_water.c:418
+    +       ! : 1 query  (in cargo_sandbox) + 776  [0x100be3e78]  boat_water.c:419
+    +       ! 46 query  (in cargo_sandbox) + 492  [0x100be3d5c]  boat_water.c:418
+    +       ! : 37 __sincosf_stret  (in libsystem_m.dylib) + 136,140,...  [0x19a0a634c,0x19a0a6350,...]
+    +       ! : 3 query  (in cargo_sandbox) + 728,592  [0x100be3e48,0x100be3dc0]  boat_water.c:0
+    +       ! : 2 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 1 query  (in cargo_sandbox) + 612  [0x100be3dd4]  boat_water.c:412
+    +       ! : 1 query  (in cargo_sandbox) + 680  [0x100be3e18]  boat_water.c:417
+    +       ! : 1 query  (in cargo_sandbox) + 740  [0x100be3e54]  boat_water.c:418
+    +       ! : 1 query  (in cargo_sandbox) + 568  [0x100be3da8]  boat_water.c:421
+    +       ! 45 query  (in cargo_sandbox) + 1000  [0x100be3f58]  boat_water.c:418
+    +       ! : 27 __sincosf_stret  (in libsystem_m.dylib) + 148,140,...  [0x19a0a6358,0x19a0a6350,...]
+    +       ! : 4 query  (in cargo_sandbox) + 2336,3384  [0x100be4490,0x100be48a8]  boat_water.c:445
+    +       ! : 3 query  (in cargo_sandbox) + 3608  [0x100be4988]  boat_water.c:462
+    +       ! : 2 query  (in cargo_sandbox) + 1080  [0x100be3fa8]  boat_water.c:423
+    +       ! : 2 query  (in cargo_sandbox) + 1648,1660  [0x100be41e0,0x100be41ec]  boat_water.c:438
+    +       ! : 2 query  (in cargo_sandbox) + 2224  [0x100be4420]  boat_water.c:439
+    +       ! : 2 query  (in cargo_sandbox) + 3400  [0x100be48b8]  boat_water.c:446
+    +       ! : 1 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 1 query  (in cargo_sandbox) + 1072  [0x100be3fa0]  boat_water.c:421
+    +       ! : 1 query  (in cargo_sandbox) + 3572  [0x100be4964]  boat_water.c:461
+    +       ! 16 boat_water_surface_visible  (in cargo_sandbox) + 1388  [0x100bbb5dc]  boat_water_mesh.c:539
+    +       ! : 5 query  (in cargo_sandbox) + 308,300  [0x100be3ca4,0x100be3c9c]  boat_water.c:0
+    +       ! : 3 query  (in cargo_sandbox) + 480  [0x100be3d50]  boat_water.c:418
+    +       ! : 2 query  (in cargo_sandbox) + 160  [0x100be3c10]  boat_water.c:404
+    +       ! : 2 query  (in cargo_sandbox) + 256,280  [0x100be3c70,0x100be3c88]  boat_water.c:408
+    +       ! : 2 query  (in cargo_sandbox) + 452  [0x100be3d34]  boat_water.c:417
+    +       ! : 1 query  (in cargo_sandbox) + 84  [0x100be3bc4]  boat_water.c:400
+    +       ! : 1 query  (in cargo_sandbox) + 340  [0x100be3cc4]  boat_water.c:407
+    +       ! 5 boat_water_surface_visible  (in cargo_sandbox) + 1436  [0x100bbb60c]  boat_water_mesh.c:539
+    +       ! 1 query  (in cargo_sandbox) + 8  [0x100be3b78]  boat_water.c:399
+    +       ! 1 query  (in cargo_sandbox) + 3664  [0x100be49c0]  boat_water.c:465
+    +       154 boat_water_surface_visible  (in cargo_sandbox) + 1316  [0x100bbb594]  boat_water_mesh.c:539
+    +       ! 53 query  (in cargo_sandbox) + 756  [0x100be3e64]  boat_water.c:418
+    +       ! : 47 __sincosf_stret  (in libsystem_m.dylib) + 164,148,...  [0x19a0a6368,0x19a0a6358,...]
+    +       ! : 3 query  (in cargo_sandbox) + 940,968  [0x100be3f1c,0x100be3f38]  boat_water.c:417
+    +       ! : 1 query  (in cargo_sandbox) + 848  [0x100be3ec0]  boat_water.c:0
+    +       ! : 1 query  (in cargo_sandbox) + 996  [0x100be3f54]  boat_water.c:418
+    +       ! : 1 query  (in cargo_sandbox) + 808  [0x100be3e98]  boat_water.c:420
+    +       ! 48 query  (in cargo_sandbox) + 492  [0x100be3d5c]  boat_water.c:418
+    +       ! : 45 __sincosf_stret  (in libsystem_m.dylib) + 136,140,...  [0x19a0a634c,0x19a0a6350,...]
+    +       ! : 2 query  (in cargo_sandbox) + 740  [0x100be3e54]  boat_water.c:418
+    +       ! : 1 query  (in cargo_sandbox) + 592  [0x100be3dc0]  boat_water.c:0
+    +       ! 35 query  (in cargo_sandbox) + 1000  [0x100be3f58]  boat_water.c:418
+    +       ! : 24 __sincosf_stret  (in libsystem_m.dylib) + 164,148,...  [0x19a0a6368,0x19a0a6358,...]
+    +       ! : 4 query  (in cargo_sandbox) + 3608,3600,...  [0x100be4988,0x100be4980,...]  boat_water.c:462
+    +       ! : 3 query  (in cargo_sandbox) + 2336,3336,...  [0x100be4490,0x100be4878,...]  boat_water.c:445
+    +       ! : 2 query  (in cargo_sandbox) + 1648  [0x100be41e0]  boat_water.c:438
+    +       ! : 1 query  (in cargo_sandbox) + 1072  [0x100be3fa0]  boat_water.c:421
+    +       ! : 1 query  (in cargo_sandbox) + 1080  [0x100be3fa8]  boat_water.c:423
+    +       ! 10 boat_water_surface_visible  (in cargo_sandbox) + 1316  [0x100bbb594]  boat_water_mesh.c:539
+    +       ! : 4 query  (in cargo_sandbox) + 308,292,...  [0x100be3ca4,0x100be3c94,...]  boat_water.c:0
+    +       ! : 4 query  (in cargo_sandbox) + 72,84  [0x100be3bb8,0x100be3bc4]  boat_water.c:400
+    +       ! : 1 query  (in cargo_sandbox) + 264  [0x100be3c78]  boat_water.c:408
+    +       ! : 1 query  (in cargo_sandbox) + 420  [0x100be3d14]  boat_water.c:417
+    +       ! 4 query  (in cargo_sandbox) + 3664,3684  [0x100be49c0,0x100be49d4]  boat_water.c:465
+    +       ! 3 boat_water_surface_visible  (in cargo_sandbox) + 1368  [0x100bbb5c8]  boat_water_mesh.c:539
+    +       ! 1 query  (in cargo_sandbox) + 16  [0x100be3b80]  boat_water.c:399
+    +       137 boat_water_surface_visible  (in cargo_sandbox) + 1516  [0x100bbb65c]  boat_water_mesh.c:543
+    +       ! 48 query  (in cargo_sandbox) + 756  [0x100be3e64]  boat_water.c:418
+    +       ! : 38 __sincosf_stret  (in libsystem_m.dylib) + 136,140,...  [0x19a0a634c,0x19a0a6350,...]
+    +       ! : 3 query  (in cargo_sandbox) + 996  [0x100be3f54]  boat_water.c:418
+    +       ! : 2 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 2 query  (in cargo_sandbox) + 896,912  [0x100be3ef0,0x100be3f00]  boat_water.c:417
+    +       ! : 1 query  (in cargo_sandbox) + 848  [0x100be3ec0]  boat_water.c:0
+    +       ! : 1 query  (in cargo_sandbox) + 860  [0x100be3ecc]  boat_water.c:412
+    +       ! : 1 query  (in cargo_sandbox) + 776  [0x100be3e78]  boat_water.c:419
+    +       ! 46 query  (in cargo_sandbox) + 492  [0x100be3d5c]  boat_water.c:418
+    +       ! : 37 __sincosf_stret  (in libsystem_m.dylib) + 148,164,...  [0x19a0a6358,0x19a0a6368,...]
+    +       ! : 3 query  (in cargo_sandbox) + 612  [0x100be3dd4]  boat_water.c:412
+    +       ! : 2 query  (in cargo_sandbox) + 704,708  [0x100be3e30,0x100be3e34]  boat_water.c:417
+    +       ! : 1 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 1 query  (in cargo_sandbox) + 592  [0x100be3dc0]  boat_water.c:0
+    +       ! : 1 query  (in cargo_sandbox) + 740  [0x100be3e54]  boat_water.c:418
+    +       ! : 1 query  (in cargo_sandbox) + 556  [0x100be3d9c]  boat_water.c:420
+    +       ! 32 query  (in cargo_sandbox) + 1000  [0x100be3f58]  boat_water.c:418
+    +       ! : 24 __sincosf_stret  (in libsystem_m.dylib) + 136,164,...  [0x19a0a634c,0x19a0a6368,...]
+    +       ! : 2 query  (in cargo_sandbox) + 3608  [0x100be4988]  boat_water.c:462
+    +       ! : 1 query  (in cargo_sandbox) + 1068  [0x100be3f9c]  boat_water.c:421
+    +       ! : 1 query  (in cargo_sandbox) + 1648  [0x100be41e0]  boat_water.c:438
+    +       ! : 1 query  (in cargo_sandbox) + 2336  [0x100be4490]  boat_water.c:445
+    +       ! : 1 query  (in cargo_sandbox) + 3400  [0x100be48b8]  boat_water.c:446
+    +       ! : 1 query  (in cargo_sandbox) + 3480  [0x100be4908]  boat_water.c:453
+    +       ! : 1 query  (in cargo_sandbox) + 3648  [0x100be49b0]  boat_water.c:465
+    +       ! 6 boat_water_surface_visible  (in cargo_sandbox) + 1516  [0x100bbb65c]  boat_water_mesh.c:543
+    +       ! : 3 query  (in cargo_sandbox) + 84,72  [0x100be3bc4,0x100be3bb8]  boat_water.c:400
+    +       ! : 2 query  (in cargo_sandbox) + 300,308  [0x100be3c9c,0x100be3ca4]  boat_water.c:0
+    +       ! : 1 query  (in cargo_sandbox) + 340  [0x100be3cc4]  boat_water.c:407
+    +       ! 4 query  (in cargo_sandbox) + 3664,3684,...  [0x100be49c0,0x100be49d4,...]  boat_water.c:465
+    +       ! 1 boat_water_surface_visible  (in cargo_sandbox) + 1580  [0x100bbb69c]  boat_water_mesh.c:548
+    +       119 boat_water_surface_visible  (in cargo_sandbox) + 2448  [0x100bbba00]  boat_water_mesh.c:558
+    +       ! 34 query  (in cargo_sandbox) + 1000  [0x100be3f58]  boat_water.c:418
+    +       ! : 16 __sincosf_stret  (in libsystem_m.dylib) + 136,140,...  [0x19a0a634c,0x19a0a6350,...]
+    +       ! : 6 query  (in cargo_sandbox) + 3572  [0x100be4964]  boat_water.c:461
+    +       ! : 4 query  (in cargo_sandbox) + 3608,3612  [0x100be4988,0x100be498c]  boat_water.c:462
+    +       ! : 3 query  (in cargo_sandbox) + 1648,1656  [0x100be41e0,0x100be41e8]  boat_water.c:438
+    +       ! : 1 query  (in cargo_sandbox) + 1072  [0x100be3fa0]  boat_water.c:421
+    +       ! : 1 query  (in cargo_sandbox) + 1080  [0x100be3fa8]  boat_water.c:423
+    +       ! : 1 query  (in cargo_sandbox) + 2224  [0x100be4420]  boat_water.c:439
+    +       ! : 1 query  (in cargo_sandbox) + 3400  [0x100be48b8]  boat_water.c:446
+    +       ! : 1 query  (in cargo_sandbox) + 3480  [0x100be4908]  boat_water.c:453
+    +       ! 28 query  (in cargo_sandbox) + 492  [0x100be3d5c]  boat_water.c:418
+    +       ! : 14 __sincosf_stret  (in libsystem_m.dylib) + 140,128,...  [0x19a0a6350,0x19a0a6344,...]
+    +       ! : 4 query  (in cargo_sandbox) + 680,668,...  [0x100be3e18,0x100be3e0c,...]  boat_water.c:417
+    +       ! : 3 query  (in cargo_sandbox) + 592,728  [0x100be3dc0,0x100be3e48]  boat_water.c:0
+    +       ! : 3 query  (in cargo_sandbox) + 740  [0x100be3e54]  boat_water.c:418
+    +       ! : 2 query  (in cargo_sandbox) + 552  [0x100be3d98]  boat_water.c:420
+    +       ! : 1 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 1 query  (in cargo_sandbox) + 520  [0x100be3d78]  boat_water.c:419
+    +       ! 17 query  (in cargo_sandbox) + 756  [0x100be3e64]  boat_water.c:418
+    +       ! : 12 __sincosf_stret  (in libsystem_m.dylib) + 140,136,...  [0x19a0a6350,0x19a0a634c,...]
+    +       ! : 3 query  (in cargo_sandbox) + 848  [0x100be3ec0]  boat_water.c:0
+    +       ! : 1 DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 4  [0x100d43b5c]
+    +       ! : 1 query  (in cargo_sandbox) + 996  [0x100be3f54]  boat_water.c:418
+    +       ! 14 boat_water_surface_visible  (in cargo_sandbox) + 2448  [0x100bbba00]  boat_water_mesh.c:558
+    +       ! : 4 query  (in cargo_sandbox) + 308,300  [0x100be3ca4,0x100be3c9c]  boat_water.c:0
+    +       ! : 2 query  (in cargo_sandbox) + 60,96  [0x100be3bac,0x100be3bd0]  boat_water.c:401
+    +       ! : 2 query  (in cargo_sandbox) + 160  [0x100be3c10]  boat_water.c:404
+    +       ! : 2 query  (in cargo_sandbox) + 256  [0x100be3c70]  boat_water.c:408
+    +       ! : 2 query  (in cargo_sandbox) + 420  [0x100be3d14]  boat_water.c:417
+    +       ! : 2 query  (in cargo_sandbox) + 480  [0x100be3d50]  boat_water.c:418
+    +       ! 12 boat_water_surface_visible  (in cargo_sandbox) + 1912,1848,...  [0x100bbb7e8,0x100bbb7a8,...]  boat_water_mesh.c:563
+    +       ! 3 boat_water_surface_visible  (in cargo_sandbox) + 1964,1968  [0x100bbb81c,0x100bbb820]  boat_water_mesh.c:564
+    +       ! 3 boat_water_surface_visible  (in cargo_sandbox) + 1136,1232  [0x100bbb4e0,0x100bbb540]  boat_water_mesh.c:574
+    +       ! 2 boat_water_surface_visible  (in cargo_sandbox) + 1296  [0x100bbb580]  boat_water_mesh.c:539
+    +       ! 2 boat_water_surface_visible  (in cargo_sandbox) + 1200  [0x100bbb520]  boat_water_mesh.c:575
+    +       ! 1 boat_water_surface_visible  (in cargo_sandbox) + 1260  [0x100bbb55c]  boat_water_mesh.c:535
+    +       ! 1 boat_water_surface_visible  (in cargo_sandbox) + 2196  [0x100bbb904]  boat_water_mesh.c:569
+    +       ! 1 boat_water_surface_visible  (in cargo_sandbox) + 1208  [0x100bbb528]  boat_water_mesh.c:576
+    +       ! 1 query  (in cargo_sandbox) + 3684  [0x100be49d4]  boat_water.c:465
+    +       13 boat_water_surface_visible  (in cargo_sandbox) + 1604  [0x100bbb6b4]  boat_water_mesh.c:548
+    +       ! 5 boat_water_storm_query  (in cargo_sandbox) + 252,260  [0x100be5888,0x100be5890]  boat_water.c:396
+    +       ! 4 boat_water_surface_visible  (in cargo_sandbox) + 1604  [0x100bbb6b4]  boat_water_mesh.c:548
+    +       ! : 4 boat_water_storm_query  (in cargo_sandbox) + 164  [0x100be5830]  boat_water.c:355
+    +       ! 3 boat_water_surface_visible  (in cargo_sandbox) + 1632,1640  [0x100bbb6d0,0x100bbb6d8]  boat_water_mesh.c:549
+    +       ! 1 boat_water_storm_query  (in cargo_sandbox) + 8  [0x100be5794]  boat_water.c:354
+    +       4 boat_water_surface_visible  (in cargo_sandbox) + 1664  [0x100bbb6f0]  boat_water_mesh.c:549
+    +         2 boat_water_surface_visible  (in cargo_sandbox) + 1676,1684  [0x100bbb6fc,0x100bbb704]  boat_water_mesh.c:552
+    +         2 boat_water_surface_visible  (in cargo_sandbox) + 2384,2396  [0x100bbb9c0,0x100bbb9cc]  boat_water_mesh.c:555
+    781 Thread_23939182
+    + 781 start_wqthread  (in libsystem_pthread.dylib) + 8  [0x18a2eac10]
+    +   781 _pthread_wqthread  (in libsystem_pthread.dylib) + 368  [0x18a2ebf0c]
+    +     781 __workq_kernreturn  (in libsystem_kernel.dylib) + 8  [0x18a2ad9f0]
+    781 Thread_23939186: com.apple.NSEventThread
+    + 781 thread_start  (in libsystem_pthread.dylib) + 8  [0x18a2eac1c]
+    +   781 _pthread_start  (in libsystem_pthread.dylib) + 136  [0x18a2efc58]
+    +     781 _NSEventThread  (in AppKit) + 184  [0x18e903cac]
+    +       781 _CFRunLoopRunSpecificWithOptions  (in CoreFoundation) + 532  [0x18a47e264]
+    +         781 __CFRunLoopRun  (in CoreFoundation) + 1188  [0x18a3ab9f4]
+    +           781 __CFRunLoopServiceMachPort  (in CoreFoundation) + 160  [0x18a3ad108]
+    +             781 mach_msg  (in libsystem_kernel.dylib) + 24  [0x18a2abfc0]
+    +               781 mach_msg_overwrite  (in libsystem_kernel.dylib) + 480  [0x18a2b49c0]
+    +                 781 mach_msg2_internal  (in libsystem_kernel.dylib) + 76  [0x18a2be5a4]
+    +                   781 mach_msg2_trap  (in libsystem_kernel.dylib) + 8  [0x18a2abc34]
+    781 Thread_23946158
+    + 781 start_wqthread  (in libsystem_pthread.dylib) + 8  [0x18a2eac10]
+    +   781 _pthread_wqthread  (in libsystem_pthread.dylib) + 368  [0x18a2ebf0c]
+    +     781 __workq_kernreturn  (in libsystem_kernel.dylib) + 8  [0x18a2ad9f0]
+    781 Thread_23947060
+      781 start_wqthread  (in libsystem_pthread.dylib) + 8  [0x18a2eac10]
+        781 _pthread_wqthread  (in libsystem_pthread.dylib) + 368  [0x18a2ebf0c]
+          781 __workq_kernreturn  (in libsystem_kernel.dylib) + 8  [0x18a2ad9f0]
+
+Total number in stack (recursive counted multiple, when >=5):
+        15       __sincosf_stret  (in libsystem_m.dylib) + 0  [0x19a0a62c4]
+        15       query  (in cargo_sandbox) + 0  [0x100be3b70]  boat_water.c:0
+        13       query  (in cargo_sandbox) + 0  [0x100be3b70]  boat_water.c:418
+        12       query  (in cargo_sandbox) + 0  [0x100be3b70]  boat_water.c:417
+        9       DYLD-STUB$$__sincosf_stret  (in cargo_sandbox) + 0  [0x100d43b58]
+        7       query  (in cargo_sandbox) + 0  [0x100be3b70]  boat_water.c:421
+        7       query  (in cargo_sandbox) + 0  [0x100be3b70]  boat_water.c:465
+        5       query  (in cargo_sandbox) + 0  [0x100be3b70]  boat_water.c:462
+        5       query  (in cargo_sandbox) + 1000  [0x100be3f58]  boat_water.c:418
+        5       query  (in cargo_sandbox) + 492  [0x100be3d5c]  boat_water.c:418
+        5       query  (in cargo_sandbox) + 756  [0x100be3e64]  boat_water.c:418
+
+Sort by top of stack, same collapsed (when >= 5):
+        __workq_kernreturn  (in libsystem_kernel.dylib)        2343
+        mach_msg2_trap  (in libsystem_kernel.dylib)        781
+        __sincosf_stret  (in libsystem_m.dylib)        474
+        query  (in cargo_sandbox)        241
+        boat_water_surface_visible  (in cargo_sandbox)        43
+        DYLD-STUB$$__sincosf_stret  (in cargo_sandbox)        13
+        boat_water_storm_query  (in cargo_sandbox)        10
+
+
+[Binary image inventory omitted; call graph retained.]

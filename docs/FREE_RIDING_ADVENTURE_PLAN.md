@@ -127,8 +127,9 @@ cue and a few discoverable stopping places; recovery returns to the last suitabl
 checkpoint. An arrival requires entering a generously sized approach area at controlled speed.
 No docking precision challenge, mission framework, inventory, economy or progression system
 was needed for this original geographic slice. The later
-[sandbox proposal](FREE_RIDE_SANDBOX_PLAN.md) introduces those selected interactions separately,
-starting with cargo handling on existing geography.
+[sandbox plan](FREE_RIDE_SANDBOX_PLAN.md) introduces those selected interactions separately.
+Its standalone native cargo/crane toy now has a first work site on the existing `outer` map;
+jobs, inventory, economy and progression remain future work.
 
 Proposed progression, subject to the A0 map survey:
 
