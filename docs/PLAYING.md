@@ -11,8 +11,11 @@ Native first-launch details: [macOS](MACOS_BUILD.md), [Windows](WINDOWS_BUILD.md
 For a source build, run `./build/wake_velocity` from the repository root so assets resolve.
 
 The title offers SINGLE PLAYER, MULTIPLAYER, SETTINGS and CREDITS. SETTINGS remembers your
-name, boat livery, steering mode, soundtrack and PICTURE. PICTURE also appears in the
-single-player setup: PIXEL is the plain 320×200 scene, SMOOTH (the default) supersamples it,
+name, boat livery, steering mode, soundtrack, PICTURE and LIGHTING. LIGHTING cycles DAY
+(the default), SUNSET and DUSK with Left/Right, Enter or a click. It sets your view in
+each new solo or multiplayer session; other players keep their own choice.
+PICTURE also appears in the single-player setup: PIXEL is the plain 320×200 scene,
+SMOOTH (the default) supersamples it,
 and HIGH RES draws the scene at up to 1280×800 behind the same 320×200 HUD; it needs a GPU
 and looks sharpest in a window of 1280×800 or a whole multiple of it. Choose A LITTLE BOAT, ACID WAKE or OFF;
 Off leaves engine and water sounds enabled. The Nordic liveries share handling. The

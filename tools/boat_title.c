@@ -99,6 +99,7 @@ typedef enum {
     ROW_MOUSE,
     ROW_MUSIC,
     ROW_EDGES,
+    ROW_LIGHTING,
     ROW_DONE,
     SETTINGS_ROWS
 } SettingsRow;
@@ -121,6 +122,13 @@ typedef enum {
 } Panel;
 
 static const char *const host_modes[BOAT_TITLE_HOST_MODES] = { "free", "deathmatch", "race" };
+static const char *const lighting_names[BOAT_TITLE_LIGHTING_COUNT] = { "day", "sunset", "dusk" };
+
+const char *boat_title_lighting(unsigned lighting)
+{
+    return lighting_names[lighting < BOAT_TITLE_LIGHTING_COUNT ? lighting
+                                                               : BOAT_TITLE_LIGHTING_DAY];
+}
 static const struct {
     const char *name, *package, *label, *hint;
 } outer_contents[BOAT_TITLE_OUTER_CONTENTS] = {
@@ -279,8 +287,9 @@ static Rectangle row_bounds(const Title *t, int row)
         return (Rectangle) { 127, 171, 66, 14 };
     if (t->panel == PANEL_MAIN)
         return (Rectangle) { 70, (float)(109 + row * 14), 118, 13 };
-    int top = 86 + (5 - row_count(t)) * ROW_HEIGHT / 2; // Centred on five rows' space.
-    return (Rectangle) { 45, (float)(top + row * ROW_HEIGHT), 230, ROW_HEIGHT - 2 };
+    int height = t->panel == PANEL_SETTINGS ? 14 : ROW_HEIGHT;
+    int top = 86 + (5 - row_count(t)) * height / 2; // Centred on five rows' space.
+    return (Rectangle) { 45, (float)(top + row * height), 230, height - 2 };
 }
 
 static void upper(char *out, size_t size, const char *text)
@@ -338,7 +347,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     }
     if (t->panel == PANEL_SETTINGS) {
         static const char *labels[SETTINGS_ROWS]
-            = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "PICTURE", "BACK" };
+            = { "NAME", "BOAT", "STEERING", "SOUNDTRACK", "PICTURE", "LIGHTING", "BACK" };
         *label = labels[row];
         if (row == ROW_NAME)
             snprintf(value, size, "%s", s->name);
@@ -352,6 +361,11 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
             snprintf(value, size, "%s", boat_music(s->soundtrack)->label);
         else if (row == ROW_EDGES)
             snprintf(value, size, "< %s >", pictures[picture(s)]);
+        else if (row == ROW_LIGHTING) {
+            char lighting[16];
+            upper(lighting, sizeof(lighting), boat_title_lighting(s->lighting));
+            snprintf(value, size, "< %s >", lighting);
+        }
         return;
     }
     if (t->panel == PANEL_HOST) {
@@ -530,6 +544,8 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         hint = "REMEMBERED; ESC MENU OR M SWITCHES IN GAME";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
+    if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_LIGHTING)
+        hint = "REMEMBERED FOR SINGLE PLAYER AND ROOMS";
     if (!hint && t->panel == PANEL_SINGLE && solo_row(t, t->selected) == ROW_SOLO_CONTENT)
         hint = outer_contents[s->outer_content].hint;
     char public_hint[96];
@@ -970,7 +986,7 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         bool settings = t.panel == PANEL_SETTINGS && !t.editing;
         if (settings
             && (t.selected == ROW_BOAT || t.selected == ROW_MOUSE || t.selected == ROW_MUSIC
-                || t.selected == ROW_EDGES)) {
+                || t.selected == ROW_EDGES || t.selected == ROW_LIGHTING)) {
             int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
                 - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
             if (t.selected == ROW_BOAT)
@@ -979,6 +995,9 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 s->soundtrack = (s->soundtrack + BOAT_MUSIC_COUNT + turn) % BOAT_MUSIC_COUNT;
             else if (t.selected == ROW_EDGES && turn)
                 turn_picture(s, turn);
+            else if (t.selected == ROW_LIGHTING)
+                s->lighting
+                    = (s->lighting + BOAT_TITLE_LIGHTING_COUNT + turn) % BOAT_TITLE_LIGHTING_COUNT;
             else if (t.selected == ROW_MOUSE && turn)
                 s->mouse_steering = !s->mouse_steering;
             activate = false;
@@ -1144,7 +1163,11 @@ void boat_title_load(BoatTitleSettings *s)
             s->mouse_steering = !strcmp(value, "on");
         else if (!strcmp(line, "soundtrack"))
             boat_music_parse(value, &s->soundtrack);
-        else if (!strcmp(line, "location")) {
+        else if (!strcmp(line, "lighting")) {
+            for (unsigned i = 0; i < BOAT_TITLE_LIGHTING_COUNT; ++i)
+                if (!strcmp(value, boat_title_lighting(i)))
+                    s->lighting = i;
+        } else if (!strcmp(line, "location")) {
             const BoatWorldDefinition *location = boat_location_find(value);
             if (!strcmp(value, "course"))
                 s->location = BOAT_LOCATION_COUNT;
@@ -1191,6 +1214,7 @@ void boat_title_save(const BoatTitleSettings *s)
         s->waves ? "on" : "off", s->smooth_edges ? "on" : "off",
         boat_title_outer_content(s->outer_content));
     fprintf(file, "resolution=%s\n", s->high_resolution ? "high" : "low");
+    fprintf(file, "lighting=%s\n", boat_title_lighting(s->lighting));
     fprintf(file, "host_mode=%s\nhost_location=%s\nhost_waves=%s\n",
         boat_title_host_mode(s->host_mode), boat_location(s->host_location)->name,
         s->host_waves ? "on" : "off");

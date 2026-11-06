@@ -7,7 +7,9 @@ opens PLACE (GOTHENBURG HARBOUR by default, BASIN, BASIN TRIAL), WAVES, PICTURE 
 graphics G5a) and START. (From 2026-10-25 until its 2026-11-01 fix, Basin trial could not
 start from the title: the title passed free-boating options the course rejects.) SETTINGS
 remembers name, single-player boat livery,
-steering, soundtrack and PICTURE. The saved PICTURE (PIXEL, SMOOTH or HIGH RES) applies to
+steering, soundtrack, PICTURE and LIGHTING. LIGHTING selects DAY (default), SUNSET or DUSK
+for your own view in new solo and multiplayer sessions and persists through IndexedDB.
+The saved PICTURE (PIXEL, SMOOTH or HIGH RES) applies to
 single-player and multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
 but the browser may leave fullscreen. BACK TO TITLE returns to setup
 without reloading. BACK TO LAUNCHER flushes saves and reloads the page. The HTML launcher shows the screenshot and PLAY; the title, version, repository link and map

@@ -13,6 +13,7 @@ typedef struct {
     unsigned skin; // Single-player livery; rooms colour boats by slot.
     bool mouse_steering; // Sessions start with captured mouse steering; in-game changes return.
     unsigned soundtrack; // Local music choice, including off; shared by single player and rooms.
+    unsigned lighting; // Fixed local lighting preset, shared by single player and rooms.
     unsigned host_mode; // HOST A ROOM: a BoatTitleHostMode, a boat_location id and the water.
     unsigned host_location;
     bool host_waves;
@@ -46,9 +47,17 @@ typedef enum {
     BOAT_TITLE_HOST_RACE,
     BOAT_TITLE_HOST_MODES
 } BoatTitleHostMode;
+typedef enum {
+    BOAT_TITLE_LIGHTING_DAY,
+    BOAT_TITLE_LIGHTING_SUNSET,
+    BOAT_TITLE_LIGHTING_DUSK,
+    BOAT_TITLE_LIGHTING_COUNT
+} BoatTitleLighting;
 
 // The command-line spelling of a host mode: free, deathmatch or race.
 const char *boat_title_host_mode(unsigned mode);
+// The command-line spelling of a fixed lighting preset: day, sunset or dusk.
+const char *boat_title_lighting(unsigned lighting);
 
 void boat_title_defaults(BoatTitleSettings *settings);
 // Remembered between launches in the per-user data directory; defaults when absent.

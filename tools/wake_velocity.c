@@ -243,7 +243,7 @@ static void usage(void)
         "Scene pixels: 320x200 (default) or up to 1280x800; high is GPU only, without --gpu-aa");
     cli_usage_line(stdout, "--hdr on|off",
         "HDR scene with restrained bloom and grade (default: on at high resolution)");
-    cli_usage_line(stdout, "--daylight day|sunset|dusk", "Fixed light for review (default day)");
+    cli_usage_line(stdout, "--daylight day|sunset|dusk", "Fixed lighting (default day)");
     cli_usage_line(
         stdout, "--no-far-detail", "Draw distant scenery at full detail, for comparison");
     cli_usage_line(stdout, "--no-vsync", "Pace at exactly 60 Hz");
@@ -2481,6 +2481,8 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
     arguments[count++] = (char *)boat_skin_name(grodan ? BOAT_SKIN_GRODAN : settings->skin);
     arguments[count++] = "--soundtrack";
     arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
+    arguments[count++] = "--daylight";
+    arguments[count++] = (char *)boat_title_lighting(settings->lighting);
     if (settings->mouse_steering)
         arguments[count++] = "--mouse-steering";
     for (int i = 0; i < extra_count && count < 31; ++i)
@@ -2524,8 +2526,9 @@ static int title_start(int argc, char **argv)
 static int title_join(BoatTitleSettings *settings, bool host)
 {
     char *arguments[16] = { "wake_velocity", "--name", settings->name, "--soundtrack",
-        (char *)boat_music(settings->soundtrack)->id };
-    int count = 5;
+        (char *)boat_music(settings->soundtrack)->id, "--daylight",
+        (char *)boat_title_lighting(settings->lighting) };
+    int count = 7;
     if (host) {
         arguments[count++] = "--host";
         arguments[count++] = (char *)boat_title_host_mode(settings->host_mode);

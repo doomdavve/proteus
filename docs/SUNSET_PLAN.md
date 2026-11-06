@@ -1,10 +1,12 @@
 # Sunset and dusk in gameplay
 
-Status, 2026-11-03: steps 1 and 2 merged to `main` (#138) and the fixed sunset and dusk
-presets approved by the user; step 3 awaits their decisions. The user liked
-the dusk river in title mock-up B and asked for sunset in the game; this document owns that
-work. Gameplay stays daytime by default. Sunset and dusk are reachable only through the
-review option `--daylight`; there is no game setting, transition or day/night cycle.
+Status, 2026-11-06: steps 1 and 2 merged to `main` (#138) and the fixed sunset and dusk
+presets approved by the user; the fixed menu setting from step 3 is implemented in this
+branch. The user liked the dusk river in title mock-up B and asked for sunset in the game;
+this document owns that work. Gameplay stays daytime by default. SETTINGS → LIGHTING
+remembers DAY, SUNSET or DUSK for the local player's new solo and multiplayer sessions.
+Explicit CLI launches still use `--daylight` independently. Transitions and a day/night cycle remain deferred;
+Auto is not a committed follow-up.
 
 The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
 will expose approved daylight/dusk presets, phase transitions and building/street lighting
@@ -35,9 +37,11 @@ whether a session transitions automatically after visual review.
    keep blue dusk's sky/cloud contrast and warm occupied windows. Do not fake gameplay
    sunset with the title's screen-space palette or authored window coordinates.
    Review fixed river/bridge, basin and outer-coast views before exposing a setting.
-3. **Transition and controls.** Interpolate approved presets continuously with an
-   explicit presentation time/phase input. Decide solo setting names/defaults and the
-   title's fixed phase with the user. Keep visual time separate from 120 Hz physics,
+3. **Controls (fixed selector implemented 2026-11-06); transitions deferred.** The
+   remembered selector is a local presentation preference in solo and rooms. Automatic
+   transitions are not part of this step. If separately requested, interpolate approved
+   presets with an explicit presentation time/phase input and decide the title's phase.
+   Keep visual time separate from 120 Hz physics,
    water simulation time and course clocks; scripted captures must be repeatable.
    Define replay phase persistence and room-wide phase ownership before enabling
    automatic changes there. A room setting may need protocol/content-version work;
@@ -59,14 +63,46 @@ outside this first slice.
 
 ## Current status
 
-**Completed (2026-11-03, steps 1–2):** `src/waterfront_lighting.[ch]` evaluates one
+### Menu setting, 2026-11-06
+
+**Completed:** SETTINGS → LIGHTING selects DAY, SUNSET or DUSK with Left/Right, Enter
+or a click. `BoatTitleSettings.lighting` persists named presets in native `title.txt`
+and the existing browser save mount. Missing or invalid names leave the default Day.
+New solo, joined and hosted sessions receive the choice through `--daylight`; each player
+owns their local view. Settings rows use 14-pixel spacing to retain room for all seven
+rows, hints and footer. The title backdrop and the three approved lighting recipes are
+unchanged. The user requested this selector and expressed uncertainty about whether Auto
+would be fun; Auto, astronomy, transitions and new presets are not scheduled by this change.
+
+**Verification (2026-11-06, Apple Silicon/macOS):** native Debug and Emscripten MinSizeRel
+builds passed. `ctest --preset full` passed all 370 enabled tests with
+`PROTEUS_GPU_TESTS=OFF` (13 retired checks disabled); local socket access was required for
+the network tests. A focused Chrome/SwiftShader check passed the initial Day default,
+Left/Right wrap, Enter and pointer activation, IndexedDB saves and reload persistence,
+and three solo session/return cycles. Captured GPU sun-direction uniforms agreed with
+Day, Sunset and Dusk. Settings and all three browser gameplay captures were inspected.
+A native windowed GPU sunset demo (`--location outer --daylight sunset --demo --frames 120`)
+and a CPU dusk capture through `--title-start outer-standard --daylight dusk` passed;
+their captures were inspected. Local evidence is in ignored `build/lighting-review/`.
+Changed documentation links and `git diff --check` passed. These are agent checks, not
+human acceptance. Windows, Safari, physical input/audio, native title save/reload and
+non-default lighting in a joined/hosted room were not exercised in this step.
+
+**Next task:** review the fixed selector in play. Any later transition or room-wide
+lighting ownership needs a separate decision. This change does not add in-session lighting
+controls or change replay persistence; the existing renderer/readability limits below remain.
+
+### Fixed preset result, 2026-11-03
+
+**Completed (steps 1–2):** `src/waterfront_lighting.[ch]` evaluates one
 caller-owned `WaterfrontLighting` from an explicit phase (0 day, 0.5 sunset, 1 dusk, linear
 between them). `WaterfrontSceneFrame.lighting` carries it to the GPU sky, city lighting, fog,
 shadow direction, water and reflections and the CPU sky, flat shading, displaced water and
 self-coloured actors; windows share an occupancy rule and light up as `window_light` rises.
 The sky panorama repaints when the light's sky changes, and each GPU scene re-uploads its
 texture. `BoatGpu.daylight`/`BoatCpuView.daylight` choose the phase; `wake_velocity --daylight`
-and `boat_water_review --review DIR --daylight` expose the three presets for review only.
+and `boat_water_review --review DIR --daylight` exposed the three presets for review at this step;
+the menu setting above now exposes them to players.
 Design and API notes are in [3D.md](3D.md#scene-lighting).
 
 - Sunset: sun 7° above the horizon on the daytime bearing; warm direct light, cool
@@ -107,7 +143,7 @@ only; the change needs the user's play in motion.
 ("I'm approving dusk and sunset"), after the calmer glitter that #138 merged. Which locations and platform they played was not stated.
 This approves the fixed presets only, not a transition, setting or default.
 
-**Known limitations:** storm/squall readability, course and
+**Known limitations at the 2026-11-03 baseline:** storm/squall readability, course and
 weapon visibility at sunset/dusk not reviewed; the squall's own cloud and rain colours and
 the overcast overlay are unchanged; the CPU basin has no sky and keeps its own light
 direction; the CPU textured-box material path is unlit by the frame; the shadow maps still
@@ -115,7 +151,8 @@ render at dusk; a panorama repaint costs about 25 ms (Debug), which a transition
 paying every frame; no frame-cost measurement, browser or Windows check yet; intermediate
 phases are untested visually. The title keeps its own grade.
 
-**Next task:** step 3 (transition, controls and ownership), which needs the user's
+**Next task at the 2026-11-03 baseline (superseded by the menu setting above):** step 3
+(transition, controls and ownership), which needed the user's
 decisions on names, defaults and the title phase; don't start it unasked. The graphics
 overhaul's G5b builds its dusk lamplight, streaks and harbour lamps on the frame's window
 light (machine-verified 2026-11-03 on `feat/graphics-presentation`; see
