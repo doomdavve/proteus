@@ -30,6 +30,7 @@ typedef struct {
     BoatCargoSandbox sandbox;
     uint64_t tick;
     bool crane_view, paused;
+    bool braking;
     int aim; // 1 pad, 2/3 port/starboard. Motors, never a pose teleport.
     const char *notice;
 } Experiment;
@@ -116,6 +117,7 @@ static void reset(Experiment *e)
     e->crane_view = true;
     e->aim = 0;
     e->paused = false;
+    e->braking = false;
     e->notice = "F: catch crate. 2 / 3: lift and aim at deck.";
 }
 
@@ -148,9 +150,20 @@ static void tick(Experiment *e, float slew, float reach, float hoist, BoatInput 
         boat_cargo_motor(&s->crane, slew, reach, hoist);
     }
     Boat before = e->boat;
+    bool assisting = s->mooring;
     boat_step_handling(&e->boat, &e->world, boat_tick_seconds(++e->tick),
-        s->moored ? (BoatInput) { 0 } : input, &handling);
+        s->moored || s->mooring ? (BoatInput) { 0 } : input, &handling);
+    if (assisting) {
+        // Keep dynamic wave pose, then let the surveyed assist own planar motion exactly once.
+        e->boat.position = before.position;
+        e->boat.heading = before.heading;
+        e->boat.velocity = before.velocity;
+        e->boat.yaw_velocity = before.yaw_velocity;
+    }
     boat_cargo_load_effect(s, &before, &e->boat);
+    if (e->braking && !s->moored)
+        boat_cargo_brake(&e->boat);
+    boat_cargo_moor_step(s, &e->boat);
     if (s->moored) {
         // Assisted berth constrains only horizontal movement; wave heave/roll remain live.
         e->boat.position = e->mooring;
@@ -183,6 +196,22 @@ static void boat_box(BoatModel *m, const Boat *boat, Vector3 p, Vector3 size, Co
     boat_model_box(m, p, size, color);
     for (size_t i = first; i < m->mesh.triangle_count * 3; ++i)
         m->vertices[i] = boat_pose_attachment(boat, m->vertices[i]);
+}
+
+static Vector3 berth_point(const Experiment *e, float x, float z)
+{
+    Vector3 p = Vector3Add(e->sandbox.crane.origin, (Vector3) { x, 0, z });
+    p.y = boat_water_query_borrowed(
+              &e->world.water, (Vector2) { -p.x, p.z }, boat_tick_seconds(e->tick))
+              .height
+        + .1f;
+    return Vector3Subtract(p, e->sandbox.crane.origin);
+}
+
+static void berth_line(
+    const Experiment *e, BoatModel *m, float ax, float az, float bx, float bz, Color color)
+{
+    boat_model_beam(m, berth_point(e, ax, az), berth_point(e, bx, bz), .065f, color);
 }
 
 // One evaluated mesh for both renderers, including rope, cargo and support markers.
@@ -239,17 +268,39 @@ static void scene(const Experiment *e, BoatModel *m)
         for (int side = -1; side <= 1; side += 2)
             boat_model_beam(m, boat_pose_attachment(b, (Vector3) { side * 1.2f, .78f, .65f }),
                 Vector3Add(c->position, (Vector3) { 0, .43f, 0 }), .04f, ink);
-    } else {
-        // Landing footprint on the deck or water, separate from the suspended crate.
-        Vector3 p = c->deck_contact ? boat_pose_attachment(b, c->deck_local)
-                                    : (Vector3) { c->position.x, .03f, c->position.z };
-        p.y -= c->deck_contact ? .38f : 0;
-        box(m, p, (Vector3) { .95f, .025f, .95f }, (Color) { 34, 72, 76, 255 });
     }
+    // A vertical landing shadow on every visible receiver, before physical contact.
+    // The GPU toy draws custom objects outside the sunlight shadow map; this shared cue
+    // deliberately works identically in both renderers and clips at receiver edges.
+    for (int surface = BOAT_CARGO_SHADOW_WATER; surface <= BOAT_CARGO_SHADOW_DECK; ++surface) {
+        BoatCargoShadow shadow = boat_cargo_shadow(
+            s, &e->boat, &e->world, boat_tick_seconds(e->tick), (BoatCargoSurface)surface);
+        if (!shadow.count)
+            continue;
+        float fade = Clamp(shadow.clearance / 4, 0, 1);
+        Color color = surface == BOAT_CARGO_SHADOW_WATER
+            ? (Color) { 24, 51, 61, 255 }
+            : (Color) { (unsigned char)Lerp(57, 105, fade), (unsigned char)Lerp(46, 85, fade),
+                  (unsigned char)Lerp(33, 61, fade), 255 };
+        Vector3 p[4];
+        for (int i = 0; i < 4; ++i)
+            p[i] = Vector3Subtract(shadow.points[i], origin);
+        boat_model_quad(m, p[0], p[1], p[2], p[3], color);
+    }
+    BoatCargoMoorStatus berth = boat_cargo_moor_status(s, &e->boat);
+    Color berth_color
+        = berth.reason == BOAT_CARGO_MOOR_READY ? green : (Color) { 178, 220, 220, 255 };
+    // The outline marks the actual final hull pose; the bow arrow faces heading zero.
+    berth_line(e, m, -1.45f, -2.45f, 1.45f, -2.45f, berth_color);
+    berth_line(e, m, -1.45f, 2.45f, 1.45f, 2.45f, berth_color);
+    berth_line(e, m, -1.45f, -2.45f, -1.45f, 2.45f, berth_color);
+    berth_line(e, m, 1.45f, -2.45f, 1.45f, 2.45f, berth_color);
+    berth_line(e, m, 0, -3.2f, -.5f, -2.6f, berth_color);
+    berth_line(e, m, 0, -3.2f, .5f, -2.6f, berth_color);
+    berth_line(e, m, 0, -3.2f, 0, -2.2f, berth_color);
     // Turning references and a berth approach, away from the work surface.
     for (int side = -1; side <= 1; side += 2) {
         box(m, (Vector3) { side * 11, .35f, -18 }, (Vector3) { .5f, .8f, .5f }, yellow);
-        box(m, (Vector3) { side * 1.6f, -.03f, 8 }, (Vector3) { .12f, .1f, 4 }, green);
     }
     for (size_t i = 0; i < m->mesh.triangle_count * 3; ++i)
         m->vertices[i] = Vector3Add(m->vertices[i], origin);
@@ -376,6 +427,10 @@ static void hook_action(Experiment *e)
 
 static void lash_action(Experiment *e)
 {
+    if (e->sandbox.mooring) {
+        e->notice = "Wait for mooring to finish, or G to cancel, before unlashing.";
+        return;
+    }
     e->notice = boat_cargo_lash_toggle(&e->sandbox, &e->boat)
         ? "Lashing changed. Green crate + straps = secured."
         : "Detach hook, settle fully inside deck, stop boat, then lash.";
@@ -384,10 +439,12 @@ static void lash_action(Experiment *e)
 static void moor_action(Experiment *e)
 {
     e->notice = boat_cargo_moor_toggle(&e->sandbox, &e->boat)
-        ? (e->sandbox.moored ? "Moored. TAB: crane controls."
-                             : "Ready to drive. TAB: helm controls.")
-        : (e->sandbox.moored ? "Release hook and lash loose deck cargo before departure."
-                             : "Moor near start: speed <0.5 m/s, face the approach marks.");
+        ? (e->sandbox.moored           ? "Moored. TAB: crane controls."
+                  : e->sandbox.mooring ? "Mooring assist active. G cancels."
+                                       : "Ready to drive. TAB: helm controls.")
+        : (e->sandbox.moored
+                  ? "Release hook and lash loose deck cargo before departure."
+                  : "Approach the berth outline; SPACE brakes; G starts mooring assist.");
     e->aim = 0;
 }
 
@@ -398,7 +455,7 @@ static void view_action(Experiment *e)
         e->aim = 0;
         e->boat.throttle = 0;
         e->notice = e->crane_view ? "Crane controls active: A/D slew, W/S reach, Q/E hoist."
-                                  : "Helm controls active: arrows drive, SPACE idles.";
+                                  : "Helm controls active: arrows drive, hold SPACE to brake.";
     } else
         e->notice = "Moor at the starting berth to operate the crane.";
 }
@@ -406,19 +463,66 @@ static void view_action(Experiment *e)
 static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *hoist)
 {
     const BoatCargo *c = &e->sandbox.cargo;
+    BoatCargoMoorStatus berth = boat_cargo_moor_status(&e->sandbox, &e->boat);
     const char *states[] = { "ON PAD", "ON HOOK", "LOOSE ON DECK", "LASHED", "FREE / FLOATING" };
-    DrawRectangle(0, 0, WIDTH, 43, ink);
+    DrawRectangle(0, 0, WIDTH, 57, ink);
     DrawText(e->world.definition->mapped ? "ERIKSBERG / CARGO TOY" : "BASIN / CARGO TOY", 9, 6, 10,
         yellow);
+    const char *throttle = fabsf(e->boat.throttle) < .005f
+        ? "THROTTLE IDLE"
+        : TextFormat("THROTTLE %s %.0f%%", e->boat.throttle > 0 ? "FWD" : "REV",
+              fabsf(e->boat.throttle) * 100);
+    DrawText(throttle, 280, 6, 10, RAYWHITE);
+    DrawRectangle(394, 8, 78, 5, (Color) { 55, 70, 77, 255 });
+    float thrust = e->boat.throttle * 38;
+    DrawRectangle(
+        (int)(433 + fminf(thrust, 0)), 8, (int)fabsf(thrust), 5, thrust >= 0 ? green : yellow);
+    DrawLine(433, 6, 433, 15, RAYWHITE);
     DrawText(TextFormat("%s  |  %s  |  %s  |  %.1f m/s",
                  e->crane_view ? "CRANE CONTROLS" : "HELM CONTROLS",
-                 e->sandbox.moored ? "MOORED" : "UNMOORED", states[c->state],
-                 Vector2Length(e->boat.velocity)),
+                 e->sandbox.moored        ? "MOORED"
+                     : e->sandbox.mooring ? "MOORING"
+                                          : "UNMOORED",
+                 states[c->state], Vector2Length(e->boat.velocity)),
         9, 21, 10, RAYWHITE);
+    if (e->crane_view) {
+        BoatCargoShadow deck = boat_cargo_shadow(
+            &e->sandbox, &e->boat, &e->world, boat_tick_seconds(e->tick), BOAT_CARGO_SHADOW_DECK);
+        if (c->state == BOAT_CARGO_HANGING && deck.count)
+            DrawText(TextFormat("DECK GAP %.2f m / E LOWERS / Q RAISES", fmaxf(0, deck.clearance)),
+                9, 40, 10, yellow);
+        else
+            DrawText(
+                "DARK FOOTPRINT = LANDING SURFACE / TAB SWITCHES CONTROLS", 9, 40, 10, RAYWHITE);
+    } else {
+        Vector2 to = { -e->sandbox.crane.origin.x - e->boat.position.x,
+            e->sandbox.crane.origin.z - e->boat.position.y };
+        float turn = berth.reason == BOAT_CARGO_MOOR_DISTANCE
+            ? remainderf(atan2f(to.x, -to.y) - e->boat.heading, 2 * PI)
+            : berth.heading_error;
+        DrawText(
+            TextFormat("BERTH %.1f m / %s %.0f deg / ENGINE %+03.0f%%", berth.distance,
+                turn < 0 ? "LEFT" : "RIGHT", fabsf(turn) * RAD2DEG, e->boat.engine_response * 100),
+            9, 40, 10, berth.reason == BOAT_CARGO_MOOR_READY ? green : RAYWHITE);
+    }
     DrawRectangle(0, 218, WIDTH, 82, ink);
     const char *prompt = e->notice;
-    if (e->crane_view && !e->sandbox.moored)
+    if (e->sandbox.mooring)
+        prompt = "MOORING ASSIST: stopping and aligning. G: cancel.";
+    else if (!e->crane_view && e->sandbox.moored)
+        prompt = "MOORED. TAB: crane controls. G: unmoor and drive.";
+    else if (e->braking)
+        prompt = "BRAKING: throttle idle, slowing to a stop. G when BERTH READY.";
+    else if (e->crane_view && !e->sandbox.moored)
         prompt = "Ready to drive. TAB switches to HELM CONTROLS; arrows drive.";
+    else if (!e->crane_view && !e->sandbox.moored && berth.reason == BOAT_CARGO_MOOR_READY)
+        prompt = "BERTH READY. G: assisted mooring. SPACE: brake.";
+    else if (!e->crane_view && !e->sandbox.moored && berth.distance < 12)
+        prompt = berth.reason == BOAT_CARGO_MOOR_FAST
+            ? "Hold SPACE to brake below 1.5 m/s, then G: assisted mooring."
+            : berth.reason == BOAT_CARGO_MOOR_HEADING
+            ? "Turn toward the berth's bow arrow; G when BERTH READY."
+            : "Approach the boat outline slowly; SPACE brakes; G when ready.";
     else if (c->state == BOAT_CARGO_SECURED && e->sandbox.moored)
         prompt = "Cargo secured. G: unmoor, TAB: helm controls, arrows: drive.";
     else if (c->state == BOAT_CARGO_HANGING && c->deck_contact)
@@ -432,7 +536,11 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
         hook_action(e);
     if (button((Rectangle) { 82, 236, 70, 22 }, "L Lash", mouse, !e->paused, false))
         lash_action(e);
-    if (button((Rectangle) { 156, 236, 70, 22 }, "G Moor", mouse, !e->paused, false))
+    if (button((Rectangle) { 156, 236, 70, 22 },
+            e->sandbox.mooring      ? "G Cancel"
+                : e->sandbox.moored ? "G Unmoor"
+                                    : "G Moor",
+            mouse, !e->paused, false))
         moor_action(e);
     if (button((Rectangle) { 230, 236, 85, 22 }, e->crane_view ? "TAB Helm" : "TAB Crane", mouse,
             !e->paused && (e->crane_view || e->sandbox.moored), false))
@@ -458,7 +566,7 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
                     mouse, enabled, false))
                 e->aim = i;
     } else
-        DrawText("ARROWS: throttle / steer  SPACE: idle  G: moor at start", 8, 269, 10, RAYWHITE);
+        DrawText("UP/DOWN: set throttle  LEFT/RIGHT: steer  SPACE: brake", 8, 269, 10, RAYWHITE);
     if (e->paused)
         DrawText("PAUSED", 205, 100, 20, yellow);
 }
@@ -472,6 +580,46 @@ static bool stage(Experiment *e, const char *name)
         boat_cargo_hook_toggle(&e->sandbox);
         for (int i = 0; i < 360; ++i)
             tick(e, .7f, .5f, 1, (BoatInput) { 0 });
+    } else if (!strcmp(name, "shadow-high") || !strcmp(name, "shadow-low")) {
+        if (!boat_cargo_hook_toggle(&e->sandbox))
+            return false;
+        e->aim = 2;
+        for (int i = 0; i < 2000; ++i)
+            tick(e, 0, 0, 0, (BoatInput) { 0 });
+        e->aim = 0;
+        float gap = !strcmp(name, "shadow-high") ? 1.2f : .2f;
+        BoatCargoShadow shadow = { 0 };
+        for (int i = 0; i < 900; ++i) {
+            shadow = boat_cargo_shadow(&e->sandbox, &e->boat, &e->world, boat_tick_seconds(e->tick),
+                BOAT_CARGO_SHADOW_DECK);
+            if (shadow.count && shadow.clearance <= gap)
+                break;
+            tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+        }
+        return shadow.count && shadow.clearance > .05f && shadow.clearance <= gap;
+    } else if (!strcmp(name, "berth-approach") || !strcmp(name, "mooring")
+        || !strcmp(name, "remoor")) {
+        // Explicit returning-boat review pose; subsequent capture uses the real G/tick path.
+        if (!stage(e, "departure"))
+            return false; // Carry a crate obtained through the actual lift/lash path.
+        e->crane_view = false;
+        e->boat.position = Vector2Add(e->mooring, (Vector2) { -1.8f, 4.3f });
+        e->boat.heading = .5f;
+        e->boat.velocity = (Vector2) { .2f, -.8f };
+        e->boat.throttle = .25f;
+        e->boat.engine_response = .2f;
+        boat_cargo_step(&e->sandbox, &e->boat, &e->world, boat_tick_seconds(e->tick));
+        if (!strcmp(name, "berth-approach"))
+            return boat_cargo_moor_status(&e->sandbox, &e->boat).reason == BOAT_CARGO_MOOR_READY;
+        moor_action(e);
+        if (!e->sandbox.mooring)
+            return false;
+        int ticks = !strcmp(name, "mooring") ? 120 : 900;
+        for (int i = 0; i < ticks && !e->sandbox.moored; ++i)
+            tick(e, 0, 0, 0, (BoatInput) { 0 });
+        return !strcmp(name, "mooring") ? e->sandbox.mooring
+                                        : e->sandbox.moored && !e->sandbox.mooring
+                && e->sandbox.cargo.state == BOAT_CARGO_SECURED;
     } else if (!strcmp(name, "loaded-left") || !strcmp(name, "loaded-right")
         || !strcmp(name, "departure")) {
         // Exercise the real application assist, wave-posed deck, release and departure.
@@ -537,14 +685,19 @@ int main(int argc, char **argv)
                 "Usage: cargo_sandbox [--location outer|basin] [--survey]\n"
                 "  [--renderer cpu|gpu] [--demo] [--frames N]\n"
                 "  [--screenshot FILE] [--scenario "
-                "origin|swing|departure|loaded-left|loaded-right]\n"
+                "origin|swing|departure|loaded-left|loaded-right|shadow-high|shadow-low|"
+                "berth-approach|mooring|remoor]\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
-                "G moor, TAB crane/helm, arrows drive, SPACE idle, P pause, R reset.\n");
+                "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, P pause, R "
+                "reset.\n");
             return !strcmp(argv[i], "--help") ? 0 : 2;
         }
     }
     if (strcmp(scenario, "origin") && strcmp(scenario, "swing") && strcmp(scenario, "departure")
-        && strcmp(scenario, "loaded-left") && strcmp(scenario, "loaded-right"))
+        && strcmp(scenario, "loaded-left") && strcmp(scenario, "loaded-right")
+        && strcmp(scenario, "shadow-high") && strcmp(scenario, "shadow-low")
+        && strcmp(scenario, "berth-approach") && strcmp(scenario, "mooring")
+        && strcmp(scenario, "remoor"))
         return 2;
     if (screenshot && (frames || demo)) {
         fprintf(stderr, "Use --scenario for a capture; --demo/--frames need a live window.\n");
@@ -579,7 +732,7 @@ int main(int argc, char **argv)
         return clear ? 0 : 1;
     }
     if (!stage(&e, scenario)) {
-        fprintf(stderr, "Cargo scenario failed to lift, settle, lash or depart: %s\n", scenario);
+        fprintf(stderr, "Cargo review scenario failed: %s\n", scenario);
         boat_world_resources_destroy(&e.resources);
         return 1;
     }
@@ -639,6 +792,8 @@ int main(int argc, char **argv)
                 if (IsKeyDown(KEY_SPACE))
                     e.boat.throttle = 0;
             }
+            e.braking = !e.paused && !e.crane_view && !e.sandbox.moored && !e.sandbox.mooring
+                && IsKeyDown(KEY_SPACE);
             accumulator = e.paused ? 0 : accumulator + (demo ? 1.0 / 60 : fmin(GetFrameTime(), .1));
             float slew = mouse_slew, reach = mouse_reach, hoist = mouse_hoist;
             if (IsKeyDown(KEY_A))
@@ -657,6 +812,8 @@ int main(int argc, char **argv)
             if (!e.crane_view) {
                 input.throttle_rate = IsKeyDown(KEY_UP) - IsKeyDown(KEY_DOWN);
                 input.steering_rate = IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT);
+                if (e.braking)
+                    input.throttle_rate = 0;
             }
             if (demo && e.tick == 0)
                 boat_cargo_hook_toggle(&e.sandbox);

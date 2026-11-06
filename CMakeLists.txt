@@ -529,6 +529,11 @@ if(NOT EMSCRIPTEN)
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-outer-${side}-test.png)
   endforeach()
   add_test(NAME cargo_sandbox_site COMMAND cargo_sandbox --survey)
+  foreach(scenario shadow-high shadow-low remoor)
+    add_test(NAME cargo_sandbox_${scenario}_screenshot COMMAND cargo_sandbox --renderer cpu
+      --scenario ${scenario}
+      --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${scenario}-test.png)
+  endforeach()
 endif()
 add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -1452,6 +1457,7 @@ endforeach()
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
 # in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
+  cargo_sandbox_shadow-high_screenshot cargo_sandbox_shadow-low_screenshot cargo_sandbox_remoor_screenshot
   cargo_sandbox_site cargo_sandbox_outer_left_screenshot cargo_sandbox_outer_right_screenshot
   release_command
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid

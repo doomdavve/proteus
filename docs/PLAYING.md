@@ -124,6 +124,9 @@ The longer adventure to Vinga remains [planned](FREE_RIDING_ADVENTURE_PLAN.md).
 A separate native [cargo/crane experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
 is available as `./build/cargo_sandbox`, outside the normal free ride menu. It starts at a
 temporary Eriksberg service platform; Tab switches helm/crane controls and camera.
+In this toy, Up/Down sets throttle, holding Space brakes, and G starts/cancels assisted
+mooring when the HUD says BERTH READY. The berth outline marks the final boat pose; a
+projected landing footprint and DECK GAP readout help place the crate.
 Creative/progression worlds, boat trading, jobs and fuel costs remain planned.
 
 ## Basin time trial and replays

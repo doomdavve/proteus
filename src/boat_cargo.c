@@ -60,7 +60,7 @@ bool boat_cargo_hook_toggle(BoatCargoSandbox *s)
 bool boat_cargo_lash_toggle(BoatCargoSandbox *s, const Boat *boat)
 {
     BoatCargo *c = &s->cargo;
-    if (Vector2Length(boat->velocity) > .5f || boat_pose_up(boat) < .9f)
+    if (s->mooring || Vector2Length(boat->velocity) > .5f || boat_pose_up(boat) < .9f)
         return false;
     if (c->state == BOAT_CARGO_SECURED) {
         c->velocity = boat_pose_motion(boat, c->deck_local).velocity;
@@ -76,18 +76,127 @@ bool boat_cargo_lash_toggle(BoatCargoSandbox *s, const Boat *boat)
 
 bool boat_cargo_moor_toggle(BoatCargoSandbox *s, const Boat *boat)
 {
+    if (s->mooring) {
+        s->mooring = false;
+        return true;
+    }
     if (s->moored) {
         if (s->cargo.state == BOAT_CARGO_HANGING || s->cargo.state == BOAT_CARGO_LOOSE)
             return false;
         s->moored = false;
         return true;
     }
-    Vector2 mooring = { -s->crane.origin.x, s->crane.origin.z };
-    if (Vector2Distance(boat->position, mooring) > .6f || Vector2Length(boat->velocity) > .5f
-        || fabsf(remainderf(boat->heading, 2 * PI)) > .15f)
+    if (boat_cargo_moor_status(s, boat).reason != BOAT_CARGO_MOOR_READY)
         return false;
-    s->moored = true;
+    s->mooring = true;
     return true;
+}
+
+BoatCargoMoorStatus boat_cargo_moor_status(const BoatCargoSandbox *s, const Boat *boat)
+{
+    Vector2 offset
+        = { -boat->position.x - s->crane.origin.x, boat->position.y - s->crane.origin.z };
+    BoatCargoMoorStatus status = { .offset = offset,
+        .distance = Vector2Length(offset),
+        .speed = Vector2Length(boat->velocity),
+        .heading_error = -remainderf(boat->heading, 2 * PI) };
+    if (boat_pose_up(boat) < .75f || boat->motion_state == BOAT_CAPSIZED)
+        status.reason = BOAT_CARGO_MOOR_UPRIGHT;
+    else if (offset.x < BOAT_CARGO_BERTH_LEFT || offset.x > BOAT_CARGO_BERTH_RIGHT
+        || offset.y < BOAT_CARGO_BERTH_FRONT || offset.y > BOAT_CARGO_BERTH_BACK)
+        status.reason = BOAT_CARGO_MOOR_DISTANCE;
+    else if (fabsf(status.heading_error) > BOAT_CARGO_MOOR_ANGLE)
+        status.reason = BOAT_CARGO_MOOR_HEADING;
+    else if (status.speed > BOAT_CARGO_MOOR_SPEED)
+        status.reason = BOAT_CARGO_MOOR_FAST;
+    return status;
+}
+
+void boat_cargo_brake(Boat *boat)
+{
+    boat->throttle = 0;
+    boat->velocity = Vector2MoveTowards(boat->velocity, (Vector2) { 0 }, 2 * BOAT_STEP);
+}
+
+void boat_cargo_moor_step(BoatCargoSandbox *s, Boat *boat)
+{
+    if (!s->mooring)
+        return;
+    if (boat_pose_up(boat) < .75f || boat->motion_state == BOAT_CAPSIZED) {
+        s->mooring = false;
+        return;
+    }
+    Vector2 berth = { -s->crane.origin.x, s->crane.origin.z };
+    Vector2 previous = boat->position;
+    float previous_heading = boat->heading;
+    boat->position = Vector2MoveTowards(boat->position, berth, 1.5f * BOAT_STEP);
+    boat->heading += Clamp(-remainderf(boat->heading, 2 * PI), -.6f * BOAT_STEP, .6f * BOAT_STEP);
+    boat->heading = remainderf(boat->heading, 2 * PI);
+    boat->velocity = Vector2Scale(Vector2Subtract(boat->position, previous), 1 / BOAT_STEP);
+    boat->yaw_velocity = remainderf(boat->heading - previous_heading, 2 * PI) / BOAT_STEP;
+    boat->throttle = boat->engine_response = 0;
+    boat->wheel = boat->engine_angle = 0;
+    if (Vector2Distance(boat->position, berth) < .0001f && fabsf(boat->heading) < .0001f) {
+        boat->position = berth;
+        boat->heading = 0;
+        boat->velocity = (Vector2) { 0 };
+        boat->yaw_velocity = 0;
+        s->mooring = false;
+        s->moored = true;
+    }
+}
+
+BoatCargoShadow boat_cargo_shadow(const BoatCargoSandbox *s, const Boat *boat,
+    const BoatWorld *world, double now, BoatCargoSurface surface)
+{
+    BoatCargoShadow result = { 0 };
+    Vector3 p = s->cargo.position;
+    float level = 0, min_x = p.x - .48f, max_x = p.x + .48f;
+    float min_z = p.z - .48f, max_z = p.z + .48f;
+    if (surface == BOAT_CARGO_SHADOW_DECK) {
+        Vector3 normal = Vector3Transform((Vector3) { 0, 1, 0 }, boat_pose_rotation(boat));
+        if (normal.y < .75f)
+            return result;
+        Vector3 deck = boat_pose_attachment(boat, (Vector3) { 0, BOAT_CARGO_DECK_Y, 0 });
+        p.y = deck.y - (normal.x * (p.x - deck.x) + normal.z * (p.z - deck.z)) / normal.y;
+        level = p.y;
+        p = Vector3Transform(Vector3Subtract(p, boat_pose_hull(boat).position),
+            MatrixTranspose(boat_pose_rotation(boat)));
+        min_x = fmaxf(p.x - .48f, -BOAT_CARGO_DECK_X);
+        max_x = fminf(p.x + .48f, BOAT_CARGO_DECK_X);
+        min_z = fmaxf(p.z - .48f, -BOAT_CARGO_DECK_Z);
+        max_z = fminf(p.z + .48f, BOAT_CARGO_DECK_Z);
+        p.y = BOAT_CARGO_DECK_Y + .04f;
+    } else if (surface == BOAT_CARGO_SHADOW_PAD) {
+        min_x = fmaxf(min_x, s->crane.origin.x - 6.5f);
+        max_x = fminf(max_x, s->crane.origin.x - 3.5f);
+        min_z = fmaxf(min_z, s->crane.origin.z - 2);
+        max_z = fminf(max_z, s->crane.origin.z + 4);
+        level = 1;
+        p.y = level + .04f;
+    }
+    if (max_x <= min_x || max_z <= min_z)
+        return result;
+    if (surface != BOAT_CARGO_SHADOW_WATER && s->cargo.position.y - BOAT_CARGO_HALF < level - .08f)
+        return result;
+    result.points[0] = (Vector3) { min_x, p.y, min_z };
+    result.points[1] = (Vector3) { min_x, p.y, max_z };
+    result.points[2] = (Vector3) { max_x, p.y, max_z };
+    result.points[3] = (Vector3) { max_x, p.y, min_z };
+    for (int i = 0; i < 4; ++i) {
+        if (surface == BOAT_CARGO_SHADOW_DECK)
+            result.points[i] = boat_pose_attachment(boat, result.points[i]);
+        else if (surface == BOAT_CARGO_SHADOW_WATER) {
+            result.points[i].y = boat_water_query_borrowed(&world->water,
+                                     (Vector2) { -result.points[i].x, result.points[i].z }, now)
+                                     .height
+                + .04f;
+            level += (result.points[i].y - .04f) * .25f;
+        }
+    }
+    result.count = 4;
+    result.clearance = s->cargo.position.y - BOAT_CARGO_HALF - level;
+    return result;
 }
 
 static bool deck_inside(Vector3 p)
@@ -167,7 +276,7 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
         c->rotation = (Vector3) { 0 };
     }
     bool pad = fabsf(c->position.x - s->crane.origin.x + 5) < 1.1f
-        && fabsf(c->position.z - s->crane.origin.z) < 1.5f;
+        && c->position.z - s->crane.origin.z > -1.6f && c->position.z - s->crane.origin.z < 3.6f;
     float floor = pad
         ? 1.4f
         : boat_water_query_borrowed(&world->water, (Vector2) { -c->position.x, c->position.z }, now)
