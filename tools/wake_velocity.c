@@ -357,8 +357,8 @@ static BoatWater study_water(
     return water; // A solo session's voyage adds its exposure; rooms keep calm water.
 }
 
-static void draw_help(
-    bool course, bool voyage, bool minimap, bool deathmatch, bool race, bool networked, bool plugin)
+static void draw_help(bool course, bool voyage, bool minimap, bool deathmatch, bool race,
+    bool networked, bool plugin, bool work)
 {
     int width = GetScreenWidth(), height = GetScreenHeight();
     const char *lines[] = {
@@ -372,7 +372,11 @@ static void draw_help(
         "Release keyboard steering: centre wheel",
         "Release thrust keys: neutral / coast",
         "Hold Shift: low-power maneuvering",
-        voyage ? "Hold Backspace 1 s: back to last shelter" : "Hold Backspace 1 s: reset / restart",
+        work         ? "Work: TAB crane/helm | F hook | L lash | G moor"
+            : voyage ? "Hold Backspace 1 s: back to last shelter"
+                     : "Hold Backspace 1 s: reset / restart",
+        work ? "Crane: A/D slew | W/S reach | Q/E hoist | 1/2/3 aim" : "",
+        work ? "J: next site | Space: brake | menu: return crate" : "",
         plugin ? "F5: reload plugin | F6: undo | F7: apply" : "",
         plugin ? "F2 or `: live console (/help, /save)" : "",
         deathmatch ? "Space: water | E: stern wave | Q: torpedo | Tab: scores"
@@ -638,6 +642,8 @@ static int study(int argc, char **argv)
     const char *package_id = NULL; // --package: a bundled catalog entry in runtime mode.
     const char *bridge_path = NULL; // --plugin-bridge: the live tool bridge's mailbox.
     bool work_mode = false; // --work: the location's working-harbour session (SV1f).
+    const char *save_path = NULL; // --save: the work session's file (default: the data directory).
+    bool fresh_work = false, save_now = false; // --new ignores a save; --save-now (tests).
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
 #endif
@@ -762,6 +768,12 @@ static int study(int argc, char **argv)
             bridge_path = argv[++i];
         } else if (strcmp(argv[i], "--work") == 0) {
             work_mode = true;
+        } else if (strcmp(argv[i], "--save") == 0 && i + 1 < argc) {
+            save_path = argv[++i];
+        } else if (strcmp(argv[i], "--new") == 0) {
+            fresh_work = true;
+        } else if (strcmp(argv[i], "--save-now") == 0) {
+            save_now = true;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -823,7 +835,8 @@ static int study(int argc, char **argv)
             goto invalid;
         }
     }
-    if ((time_set && !screenshot) || (screenshot && frame_limit) || (!replay_path && time > 60))
+    if ((time_set && !screenshot && !save_now) || (screenshot && frame_limit)
+        || (!replay_path && time > 60))
         goto invalid;
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     NetHostOptions host_options = { 0 };
@@ -892,7 +905,7 @@ static int study(int argc, char **argv)
         goto invalid;
 #endif
     }
-    if ((!course && (data_dir || export_path)) || (replay_path && ghost_path))
+    if ((!course && ((data_dir && !work_mode) || export_path)) || (replay_path && ghost_path))
         goto invalid;
 #if defined(__EMSCRIPTEN__)
     if (bridge_path) {
@@ -902,6 +915,14 @@ static int study(int argc, char **argv)
 #endif
     if (bridge_path && (!plugin_path || screenshot)) {
         fprintf(stderr, "--plugin-bridge needs --plugin and a window (no --screenshot).\n");
+        goto invalid;
+    }
+    if ((save_path || fresh_work || save_now) && !work_mode) {
+        fprintf(stderr, "--save, --new and --save-now belong to --work.\n");
+        goto invalid;
+    }
+    if (save_now && (!(save_path || data_dir) || screenshot || frame_limit || demo)) {
+        fprintf(stderr, "--save-now needs --save or --data-dir and no screenshot or demo.\n");
         goto invalid;
     }
     if (work_mode
@@ -1141,6 +1162,19 @@ static int study(int argc, char **argv)
         && !wake_work_open(
             &work, &session, &worlds[location->id], location, study_failure, sizeof(study_failure)))
         goto cleanup;
+    if (work_mode) {
+        // Only interactive play reads or writes the game's data directory unasked; scripted runs
+        // use a save only when told which one (--save or --data-dir).
+        bool plain = !screenshot && !demo && !frame_limit && !save_now;
+        wake_work_save_open(&work, &session, save_path, data_dir, plain, fresh_work);
+    }
+    if (save_now) {
+        // Test fixture: the scripted drive, then one save and exit.
+        bool ok = wake_work_script(&work, &session, (uint64_t)round(time / BOAT_TICK_SECONDS))
+            && wake_work_save_now(&work);
+        result = ok ? 0 : 1;
+        goto cleanup;
+    }
 #if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
@@ -1423,7 +1457,10 @@ static int study(int argc, char **argv)
     bool replay_dragging = false;
     bool help_visible = false;
     BoatMenu menu = { .can_leave = true,
-        .reset_label = networked   ? "REQUEST RESET"
+        .return_label = work_mode ? "RETURN CRATE" : NULL,
+        .reset_hint = work_mode ? "STARTS THE JOB OVER; THE SAVE FOLLOWS" : NULL,
+        .reset_label = work_mode   ? "RESTART JOB"
+            : networked            ? "REQUEST RESET"
             : course               ? "RESTART RUN"
             : session.voyage.route ? "RECOVER BOAT"
                                    : "RESET BOAT",
@@ -1460,6 +1497,8 @@ static int study(int argc, char **argv)
     if (performance_capture && gpu_enabled)
         boat_gpu_timer_init(&performance_timer);
     result = 0;
+    if (work_mode)
+        wake_work_autosave(&work, true);
     while (!WindowShouldClose() && (!frame_limit || frames < frame_limit)) {
 #if defined(__EMSCRIPTEN__)
         // The browser supplies a bounded low-resolution viewport after resizing settles.
@@ -1584,7 +1623,10 @@ static int study(int argc, char **argv)
                 menu.open = false;
             else if (choice == BOAT_MENU_CONTROLS)
                 help_visible = true;
-            else if (choice == BOAT_MENU_RESET) {
+            else if (choice == BOAT_MENU_RETURN) {
+                wake_work_return_crate(&work);
+                menu.open = false;
+            } else if (choice == BOAT_MENU_RESET) {
                 reset_requested = true;
                 menu.open = false;
             } else if (choice == BOAT_MENU_LEAVE)
@@ -1796,8 +1838,8 @@ static int study(int argc, char **argv)
         }
         metrics.course_replay_ms
             += (float)((boat_profile_time(true) - course_input_started_at) * 1000.0);
-        reset_requested |= boat_reset_hold_update(
-            &reset_hold, IsKeyDown(KEY_BACKSPACE), active && !session.runs.playing, GetFrameTime());
+        reset_requested |= boat_reset_hold_update(&reset_hold, IsKeyDown(KEY_BACKSPACE),
+            active && !session.runs.playing && !work_mode, GetFrameTime());
         // A plugin revision changes between this frame's ticks; a new exposure restarts below.
 #if !defined(__EMSCRIPTEN__)
         // Tool requests arrive whether or not the window has focus.
@@ -1825,6 +1867,10 @@ static int study(int argc, char **argv)
             steering_target = mouse_driving ? 0 : NAN;
         }
         double simulation_started_at = boat_profile_time(true);
+        // The work session's key actions run once per frame and its crane axes drive each tick.
+        WakeWorkDrive work_drive = { 0 };
+        if (work_mode)
+            work_drive = wake_work_frame_input(&work, active && !demo);
         if (networked) {
 #ifdef PROTEUS_BOAT_NET
             BoatInput input = { 0 };
@@ -1904,9 +1950,21 @@ static int study(int argc, char **argv)
             while (accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
-                if (work_mode)
-                    wake_work_tick(&work, &session, 0, 0, 0, (BoatInput) { 0 });
-                else if (demo)
+                if (work_mode) {
+                    // The helm is the game's own (throttle, wheel, mouse); the crane view and a
+                    // brake take it over.
+                    const BoatWorkSession *w = &work.session;
+                    BoatInput helm = { 0 };
+                    if (!w->crane_view && !demo) {
+                        helm.steering_rate = isfinite(steering_target)
+                            ? boat_steering_rate(w->boat.wheel, steering_target)
+                            : steering_rate;
+                        helm.throttle_rate
+                            = w->braking ? 0 : boat_throttle_rate(w->boat.throttle, thrust_target);
+                    }
+                    wake_work_tick(
+                        &work, &session, work_drive.slew, work_drive.reach, work_drive.hoist, helm);
+                } else if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
                 else {
                     if (isfinite(steering_target))
@@ -1931,8 +1989,10 @@ static int study(int argc, char **argv)
         metrics.simulation_ms = (float)((boat_profile_time(true) - simulation_started_at) * 1000.0);
         // Course saves wait until the frame's ticks are done.
         double flush_started_at = boat_profile_time(true);
-        if (work_mode)
+        if (work_mode) {
             wake_work_sync(&work, &session);
+            wake_work_save_frame(&work, menu.open || help_visible, IsWindowFocused());
+        }
         boat_session_flush(&session);
         metrics.course_replay_ms += (float)((boat_profile_time(true) - flush_started_at) * 1000.0);
         double audio_started_at = boat_profile_time(true);
@@ -2111,7 +2171,12 @@ static int study(int argc, char **argv)
             height > width ? height - ((mobile_buttons & 16) ? 2 * mobile_button_height + 24 : 80)
                            : height);
         if (work_mode)
-            wake_work_hud(&work, width, height);
+            wake_work_hud(&work,
+                &(WakeWorkProjection) { .view = view,
+                    .presentation = view_presentation,
+                    .world = view_world,
+                    .camera = camera_settings },
+                width, height);
         const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
             networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
         Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, width, height);
@@ -2225,7 +2290,7 @@ static int study(int argc, char **argv)
             race = networked && net_study_race(net);
 #endif
             draw_help(course, !networked && session.voyage.route, boat_minimap_ready(&minimap),
-                deathmatch, race, networked, plugin_active && plugin.authoring);
+                deathmatch, race, networked, plugin_active && plugin.authoring, work_mode);
         }
         if (console.open) {
             // Console stays above the HUD, in the same integer-scaled pixel grid as the frame.
@@ -2363,6 +2428,8 @@ static int study(int argc, char **argv)
         }
 #endif
     }
+    if (work_mode)
+        wake_work_save_leave(&work); // Quitting, closing the window or returning to the title.
     if (performance_report) {
         if (!performance_capture || !capture.count) {
             fprintf(stderr, "No performance samples were captured; the report was not written.\n");

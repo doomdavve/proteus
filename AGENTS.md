@@ -50,7 +50,8 @@ playground for iterating on effects, timing, audio, and presentation.
   ENet and sockets. `tools/boat_server.c` and `tools/boat_bot.c` are the server and scripted
   client; `docs/MULTIPLAYER_PROTOCOL.md` owns the byte layout.
 - `src/boat_work_session.[ch]`: the working-harbour session (boat, work sites, crate, job host, save
-  and resume, autosave watch) shared by `cargo_sandbox`; no drawing, input or files.
+  and resume, autosave watch) shared by `cargo_sandbox` and the game; no drawing, input or files.
+  `src/boat_work_save.[ch]` (`proteus_work_save`) adds its save file and automatic saving.
 - `tools/wake_velocity_work.[ch]`: the game's glue for the working-harbour session (`--work`); it
   copies the session into the game's `BoatSession` and hands renderers `BoatViewProps`.
 - `src/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors

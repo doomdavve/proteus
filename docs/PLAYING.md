@@ -131,7 +131,23 @@ and a yellow marker guide to the next site (N cycles). The job, shown top right,
 the crate to the landing and set it on the marked pad; that builds a quay beside the landing,
 whose pad holds the next crate. Carry that one east along the river to the new jetty. C returns
 a crate in the water to its latest starting pad, and R restarts everything.
-Creative/progression worlds, boat trading, paid jobs and fuel costs remain planned.
+The same working harbour also runs inside the game as `./build/wake_velocity --location outer --work`
+(experimental; the title does not offer it yet). It keeps the game's camera and keys, adds the
+crane controls, and saves itself automatically (no save key; the menu and quitting save too):
+
+| Key | Work action |
+| --- | --- |
+| W/S, Up/Down, A/D | Drive at the helm (the game's throttle and wheel; mouse steering with M) |
+| Tab | Switch between helm and crane (the crane needs a mooring) |
+| In crane view: A/D, W/S, Q/E | Slew, reach, hoist; 1/2/3 aim the hook at the pad or deck |
+| F, L, G | Hook the crate, lash it, moor or unmoor (when BERTH READY) |
+| Space | Brake at the helm |
+| J | Choose the next site to steer toward (a marker and distance show it) |
+| P or Escape | Menu, which pauses and saves: RETURN CRATE, RESTART JOB |
+| C, N | Reset the camera, cycle the minimap (as in the rest of the game) |
+
+Backspace-hold reset is off in the working harbour; the menu restarts the job. Creative/progression worlds, boat trading,
+paid jobs and fuel costs remain planned.
 
 ## Basin time trial and replays
 

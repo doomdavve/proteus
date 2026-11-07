@@ -11,7 +11,10 @@ resumes it from the record and from its encoded bytes, and requires equal behavi
 
 `wake_velocity_work_*` (SV1f) render `--work` through the CPU view (`render`, slow lane): the scripted berth
 at 3 s, the scripted landing delivery at 14 s, and a refusal of `--work --package`. `wake_velocity_work_gpu_screenshot` and
-`wake_velocity_work_delivered_gpu_screenshot` are their GPU-lane twins.
+`wake_velocity_work_delivered_gpu_screenshot` are their GPU-lane twins. `wake_velocity_work_save_write` then
+`wake_velocity_work_save_resume` (SV1g, slow lane) save a scripted delivery to `build/work-save-tests` and resume it
+with a far camera that shows the built quay; both run through `cmake/run_expect.cmake`, which requires exit code 0 and an output
+match. The windowed `--demo --frames` smoke run with `--data-dir` in the build tree is a developer command (windowed frames follow the wall clock, so it is not a CTest).
 
 S0a/S0b `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane motors/cable,
 actual lifts onto both deck positions, release/settle/lash, moving deck attachment,

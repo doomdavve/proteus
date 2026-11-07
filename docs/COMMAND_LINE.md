@@ -29,7 +29,7 @@ directly; `--title` selects the title explicitly. The direct-launch default loca
 This separate native S0 experiment defaults to the Eriksberg inlet on `outer`, with a small
 service crane, one crate and a borrowed deck boat. `--location basin` retains the isolated
 reference (CPU draw distance is 240 m; the GPU view uses 4500 m). `--survey` checks the mapped work site without a window. Reset is immediate and
-there is no saved progress. It is not a `wake_velocity` mode. Holding Space brakes; G
+it saves automatically (see below), and it stays the review harness; the game runs the same session as `wake_velocity --work`. Holding Space brakes; G
 starts/cancels assisted mooring when BERTH READY appears; N cycles the guided site (the job may
 choose it) and C returns an unhooked, unlashed crate to its source pad. The HUD shows persistent throttle, the landing
 footprint/deck gap before contact and the package's job row. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
@@ -41,19 +41,32 @@ desktop context). With `--screenshot FILE` it saves only the first failing frame
 is written on success. `--scenario shadow-bow` and `shadow-water` show normal-colour
 wave-phase regression fixtures. See the [shadow correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction).
 
-## Working harbour in the game (`--work`, native, in progress)
+## Working harbour in the game (`--work`, native)
 
 ```sh
 ./build/wake_velocity --location outer --work
+./build/wake_velocity --location outer --work --data-dir build/work-profile
 ./build/wake_velocity --renderer cpu --location outer --work --screenshot build/work.png --time 3
 ```
 
 `--work` runs the location's bundled working-harbour package (on `outer`, `outer-work`) in place
 of the free-ride boat step, with the game's camera, water and harbour, plus the work sites, crate,
-crane and the package's job rows. It is the SV1f step of the
-[save and resume plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume): there are no work
-controls yet and nothing is saved (both arrive with SV1g). It cannot be combined with `--plugin`,
-`--package`, rooms, `--course`, replays, wake, water, `--start`, `--skin` or `--plugin-bridge`.
+crane and the package's job rows. It is the SV1f/SV1g step of the
+[save and resume plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume). It cannot be combined
+with `--plugin`, `--package`, rooms, `--course`, replays, wake, water, `--start`, `--skin` or
+`--plugin-bridge`. The title does not offer it yet (SV1h).
+
+The session saves itself: there is no save key and F5 stays the plugin reload key. Plain
+interactive play reads and writes `cargo-<package id>.sav` in the game's data directory
+(`--data-dir DIR` replaces the directory) at every milestone, every 30 s of simulated play, and
+when the menu opens, the window loses focus, or you quit or close the window; the next `--work`
+run resumes it. A small `SAVED` mark appears after milestone and leave writes, and `SAVE FAILED`
+stays until a write succeeds. `--save FILE` uses an explicit file, `--new` ignores any save, and a
+save that cannot be used (damaged, a changed package or physics) is set aside as `NAME.rejected`,
+never deleted. Scripted runs (`--screenshot`, `--demo`, `--frames`) touch no save unless given
+`--save` or `--data-dir`. `--save-now` (a test fixture, with `--time` and `--save`) runs the
+scripted drive, writes one save and exits.
+
 `--time` drives a scripted capture: idle at the berth, and after 10 s of simulated time the landing
 delivery script (load, lash, depart, moor at the landing, unload), so `--time 3` shows the berth
 and `--time 14` the delivered crate. Screenshots draw no HUD.

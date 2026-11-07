@@ -208,6 +208,10 @@ add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_se
 target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_boat_core)
 target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
+add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h)
+target_link_libraries(proteus_work_save PUBLIC proteus_work_session proteus_file)
+target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
+
 add_library(proteus_plugin_catalog STATIC
   src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
 target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
@@ -297,7 +301,7 @@ add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c to
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
-  proteus_work_session)
+  proteus_work_session proteus_work_save)
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
 target_compile_definitions(wake_velocity PRIVATE
@@ -550,7 +554,7 @@ if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
   target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_work_session
-    proteus_sandbox_save proteus_file)
+    proteus_work_save proteus_sandbox_save proteus_file)
   add_dependencies(cargo_sandbox proteus_assets)
   target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
   foreach(side left right)
@@ -1291,6 +1295,20 @@ add_test(NAME wake_velocity_work_cpu_screenshot COMMAND wake_velocity --renderer
 add_test(NAME wake_velocity_work_delivered_cpu_screenshot COMMAND wake_velocity --renderer cpu
   --location outer --work --time 14
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered.png)
+# SV1g: a scripted delivery is saved to a build-tree file by one run and resumed by the next,
+# which must say so (and exit 0); nothing touches the user's data directory.
+set(WORK_SAVE_DIR ${CMAKE_CURRENT_BINARY_DIR}/work-save-tests)
+file(MAKE_DIRECTORY ${WORK_SAVE_DIR})
+add_test(NAME wake_velocity_work_save_write COMMAND ${CMAKE_COMMAND} "-DREGEX=Wrote save .*work.sav"
+  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_expect.cmake -- $<TARGET_FILE:wake_velocity>
+  --renderer cpu --location outer --work --time 14 --save ${WORK_SAVE_DIR}/work.sav --save-now)
+add_test(NAME wake_velocity_work_save_resume COMMAND ${CMAKE_COMMAND}
+  "-DREGEX=Resumed save .*work.sav at tick" -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_expect.cmake
+  -- $<TARGET_FILE:wake_velocity> --renderer cpu --location outer --work
+  --save ${WORK_SAVE_DIR}/work.sav --camera-distance 30 --camera-height 20
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-resumed.png)
+set_tests_properties(wake_velocity_work_save_write PROPERTIES FIXTURES_SETUP work_save)
+set_tests_properties(wake_velocity_work_save_resume PROPERTIES FIXTURES_REQUIRED work_save)
 add_test(NAME wake_velocity_work_refuses_package COMMAND wake_velocity --renderer cpu
   --location outer --work --package outer-work --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-refused.png)
@@ -1577,7 +1595,7 @@ set(PROTEUS_SLOW_TESTS
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_outer_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
   boat_outer_screenshot wake_velocity_work_cpu_screenshot wake_velocity_work_delivered_cpu_screenshot
-  wake_velocity_work_refuses_package
+  wake_velocity_work_refuses_package wake_velocity_work_save_write wake_velocity_work_save_resume
   wake_velocity_title_start.basin
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
   wake_velocity_title_start.outer-grodan wake_velocity_title_start.outer-canal-tour

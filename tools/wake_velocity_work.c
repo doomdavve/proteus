@@ -5,8 +5,12 @@
 #include "boat_presentation.h"
 #include "boat_ui.h"
 
+#include "raymath.h"
+
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 // Borrowed by the session for as long as the program runs.
 static BoatPluginRevision revision;
@@ -56,8 +60,10 @@ bool wake_work_script(WakeWork *work, BoatSession *game, uint64_t ticks)
 {
     BoatWorkSession *s = &work->session;
     bool ok = true;
+    // A resumed session continues idle: the delivery script belongs to a fresh start.
+    bool fresh = s->tick == 0;
     for (uint64_t i = 0; i < ticks; ++i) {
-        if (i == WAKE_WORK_DELIVERY_TICK)
+        if (fresh && i == WAKE_WORK_DELIVERY_TICK)
             ok = boat_work_script_landing_delivery(s);
         else
             boat_work_session_tick(s, 0, 0, 0, (BoatInput) { 0 });
@@ -94,6 +100,82 @@ const BoatViewProps *wake_work_props(WakeWork *work)
     return &work->props;
 }
 
+int wake_work_save_open(WakeWork *work, BoatSession *game, const char *explicit_path,
+    const char *data_dir, bool default_dir, bool fresh)
+{
+    BoatWorkSession *s = &work->session;
+    work->save = (BoatWorkSave) { 0 };
+    if (!s->revision || !(explicit_path || data_dir || default_dir))
+        return 0;
+    boat_work_save_path(&work->save, explicit_path, data_dir, s->revision->free.manifest.id);
+    int loaded = work->save.enabled && !fresh ? boat_work_save_load(s, &work->save) : 0;
+    work->watch = (BoatWorkFrameWatch) { .last = boat_work_watch(s), .was_focused = true };
+    wake_work_sync(work, game);
+    return loaded;
+}
+
+void wake_work_autosave(WakeWork *work, bool on)
+{
+    work->save.autosaving = on && work->save.enabled;
+}
+
+void wake_work_save_frame(WakeWork *work, bool paused, bool focused)
+{
+    if (work->save.autosaving)
+        boat_work_save_frame(
+            &work->session, &work->save, &work->watch, paused, focused, (int64_t)time(NULL));
+}
+
+bool wake_work_save_now(WakeWork *work)
+{
+    bool ok = work->save.enabled
+        && boat_work_save_write(&work->session, &work->save, (int64_t)time(NULL));
+    printf("%s %s at tick %llu\n", ok ? "Wrote save" : "Could not write save", work->save.path,
+        (unsigned long long)work->session.tick);
+    return ok;
+}
+
+bool wake_work_save_leave(WakeWork *work)
+{
+    return !work->save.autosaving
+        || boat_work_save_leave(&work->session, &work->save, (int64_t)time(NULL));
+}
+
+WakeWorkDrive wake_work_frame_input(WakeWork *work, bool active)
+{
+    BoatWorkSession *s = &work->session;
+    WakeWorkDrive drive = { 0 };
+    s->braking = false;
+    if (!active)
+        return drive;
+    if (IsKeyPressed(KEY_F))
+        boat_work_hook_action(s);
+    if (IsKeyPressed(KEY_L))
+        boat_work_lash_action(s);
+    if (IsKeyPressed(KEY_G))
+        boat_work_moor_action(s);
+    if (IsKeyPressed(KEY_TAB))
+        boat_work_view_action(s);
+    if (s->crane_view && s->sandbox.moored)
+        for (int i = 1; i <= 3; ++i)
+            if (IsKeyPressed(KEY_ONE + i - 1))
+                s->aim = i;
+    if (IsKeyPressed(KEY_J) && !s->sandbox.moored && !s->sandbox.mooring)
+        s->target = boat_work_next_site(s, s->target);
+    if (IsKeyDown(KEY_SPACE) && !s->crane_view) {
+        s->boat.throttle = 0;
+        s->braking = !s->sandbox.moored && !s->sandbox.mooring;
+    }
+    if (s->crane_view) {
+        drive.slew = (float)(IsKeyDown(KEY_D) - IsKeyDown(KEY_A));
+        drive.reach = (float)(IsKeyDown(KEY_W) - IsKeyDown(KEY_S));
+        drive.hoist = (float)(IsKeyDown(KEY_Q) - IsKeyDown(KEY_E));
+    }
+    return drive;
+}
+
+void wake_work_return_crate(WakeWork *work) { boat_work_recover_action(&work->session); }
+
 static void label(const char *text, int x, int y, Color color)
 {
     int width = boat_ui_width(text, 10);
@@ -101,20 +183,101 @@ static void label(const char *text, int x, int y, Color color)
     boat_ui_text(text, x, y, 10, color);
 }
 
-void wake_work_hud(const WakeWork *work, int width, int height)
+// A marker over the target berth, pinned to the view's edge when it is off screen, so a distant
+// site can be found from the helm.
+static void target_marker(const WakeWork *work, const WakeWorkProjection *p, int width, int height)
 {
     const BoatWorkSession *s = &work->session;
+    Vector3 berth = boat_cargo_site_point(&s->sandbox.cranes[s->target], (Vector3) { 0, 4, 0 });
+    Vector2 at = { 0 };
+    bool visible = boat_view_project(
+        p->view, p->presentation, p->world, p->camera, berth, width, height, &at);
+    bool above = !visible || at.y < 40;
+    at.x = visible ? Clamp(at.x, 12, (float)width - 12) : (float)width / 2;
+    at.y = visible ? Clamp(at.y, 40, (float)height - 70) : 40;
+    Color yellow = { 241, 183, 57, 255 };
+    if (above)
+        DrawTriangle((Vector2) { at.x, at.y - 10 }, (Vector2) { at.x - 6, at.y },
+            (Vector2) { at.x + 6, at.y }, yellow);
+    else
+        DrawTriangle((Vector2) { at.x - 5, at.y - 8 }, (Vector2) { at.x, at.y },
+            (Vector2) { at.x + 5, at.y - 8 }, yellow);
+    Vector2 to = Vector2Subtract(boat_cargo_berth(&s->sandbox.cranes[s->target]), s->boat.position);
+    const char *text
+        = TextFormat("%s %.0f M", TextToUpper(s->sites[s->target].id), Vector2Length(to));
+    int w = boat_ui_width(text, 10);
+    boat_ui_text(text, (int)Clamp(at.x - w / 2.0f, 4, (float)(width - 4 - w)),
+        above ? (int)at.y + 3 : (int)at.y - 20, 10, yellow);
+}
+
+void wake_work_hud(WakeWork *work, const WakeWorkProjection *projection, int width, int height)
+{
+    const BoatWorkSession *s = &work->session;
+    const BoatCargo *c = &s->sandbox.cargo;
+    Color yellow = { 241, 183, 57, 255 }, green = { 99, 216, 156, 255 },
+          text = { 218, 223, 202, 255 }, red = { 232, 106, 84, 255 };
     int y = 18;
     if (s->revision) {
         for (unsigned i = 0; i < s->objective.hud_count; ++i, y += 14)
             label(TextFormat(
                       "%s: %lld", s->objective.hud[i].label, (long long)s->objective.hud[i].value),
-                4, y, (Color) { 241, 183, 57, 255 });
+                4, y, yellow);
         const char *problem = s->objective.quarantined ? "JOB SUSPENDED" : s->waiting;
-        if (problem)
-            label(problem, 4, y, (Color) { 232, 106, 84, 255 });
+        if (problem) {
+            label(problem, 4, y, red);
+            y += 14;
+        }
     }
-    if (s->notice)
-        label(s->notice, (width - boat_ui_width(s->notice, 10)) / 2, height - 98,
-            (Color) { 218, 223, 202, 255 });
+    static const char *const states[]
+        = { "ON PAD", "ON HOOK", "LOOSE ON DECK", "LASHED", "FREE / FLOATING" };
+    BoatCargoMoorStatus berth = boat_cargo_moor_status(&s->sandbox, &s->boat);
+    label(TextFormat("%s / %s / %s", s->crane_view ? "CRANE" : "HELM",
+              s->sandbox.moored        ? "MOORED"
+                  : s->sandbox.mooring ? "MOORING"
+                                       : "UNMOORED",
+              states[c->state]),
+        4, y, text);
+    y += 14;
+    if (s->crane_view) {
+        label("TAB HELM  A/D SLEW  W/S REACH  Q/E HOIST  F HOOK  L LASH", 4, y, text);
+    } else {
+        label("W/S THROTTLE  A/D STEER  SPACE BRAKE  G MOOR  TAB CRANE", 4, y, text);
+        y += 14;
+        if (!s->sandbox.moored && !s->sandbox.mooring && berth.site != s->target) {
+            Vector2 to = Vector2Subtract(
+                boat_cargo_berth(&s->sandbox.cranes[s->target]), s->boat.position);
+            float turn = remainderf(atan2f(to.x, -to.y) - s->boat.heading, 2 * PI);
+            label(TextFormat("TO %s %.0f M / %s %.0f DEG / J NEXT SITE",
+                      TextToUpper(s->sites[s->target].id), Vector2Length(to),
+                      turn < 0 ? "LEFT" : "RIGHT", fabsf(turn) * RAD2DEG),
+                4, y, yellow);
+            if (projection)
+                target_marker(work, projection, width, height);
+        } else if (!s->sandbox.moored && !s->sandbox.mooring) {
+            label(TextFormat("BERTH %.1f M / ENGINE %+03.0f%%", berth.distance,
+                      s->boat.engine_response * 100),
+                4, y, berth.reason == BOAT_CARGO_MOOR_READY ? green : text);
+            if (projection && berth.distance > 12)
+                target_marker(work, projection, width, height);
+        }
+    }
+    const char *prompt = s->notice;
+    if (s->sandbox.mooring)
+        prompt = "MOORING ASSIST: STOPPING AND ALIGNING. G CANCELS.";
+    else if (s->braking)
+        prompt = "BRAKING. G WHEN BERTH READY.";
+    else if (!s->sandbox.moored && !s->crane_view && berth.reason == BOAT_CARGO_MOOR_READY)
+        prompt = "BERTH READY. G: ASSISTED MOORING. SPACE: BRAKE.";
+    if (prompt && prompt[0])
+        label(prompt,
+            (width - boat_ui_width(prompt, 10)) / 2 > 4 ? (width - boat_ui_width(prompt, 10)) / 2
+                                                        : 4,
+            height - 64, text);
+    if (work->save.failed || work->save.mark > 0) {
+        const char *mark = work->save.failed ? "SAVE FAILED" : "SAVED";
+        label(mark, width - boat_ui_width(mark, 10) - 6, height - 14,
+            work->save.failed ? red : green);
+        if (work->save.mark > 0)
+            --work->save.mark;
+    }
 }

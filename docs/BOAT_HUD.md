@@ -404,3 +404,14 @@ independent. A callback or event-queue failure replaces the row with `OBJECTIVE 
 and a diagnostic; native boating continues. The [plugin API](PLUGIN_API.md#live-optional-voyage-objective-p32)
 owns event timing and restart policy; [P3.2 evidence](PLUGIN_PLAN.md#p32-result-2026-10-29)
 distinguishes automated review from human playtesting.
+
+## Working-harbour rows, 2026-11-07 (SV1g)
+
+`wake_velocity --work` draws the package's job rows (`LABEL: value`, yellow) at the top left
+under the P: MENU hint, then `JOB SUSPENDED` or the waiting reason in red, a status line
+(`CRANE` or `HELM`, mooring state, crate state), the controls for that view, and at the helm the
+guidance to the target site with a yellow marker pinned to the view's edge (J cycles) or the berth
+readout near a berth. The current notice sits above the instrument panel; `SAVED` (milestone and
+leave writes, 1.5 s) and the persistent red `SAVE FAILED` sit at the bottom right. Layout,
+text widths and overlap with the minimap at 320x200 are unverified: headless CPU and GPU
+screenshots draw no HUD and no windowed run was possible when this was written.
