@@ -46,8 +46,8 @@ The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures a
 twelve-berth/two-row package, plus M2 boat appearance; M3 authored routes are next. The
 first playable L4.3 harbor gate is implemented and awaits human review. The proposed
 [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
-sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1c are
-implemented locally (not merged). The milestones below are this plan's
+sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1d are
+merged to main (2026-11-07); S1e is planned. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -2690,8 +2690,8 @@ passed. No new audiovisual verification was needed for this documentation-only r
 The [free ride sandbox](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-in-c) keeps
 cargo physics, lashing, assisted mooring, delivery detection and placement validation native,
 and moves work-site layout, loads, jobs and project outcomes into packages. That plan owns the
-gameplay steps and acceptance; this plan owns the contract each step adds. S1a–S1c are
-implemented on stacked branches, published as stacked PRs after the user approved S1d (2026-11-07); S3+ is not implemented.
+gameplay steps and acceptance; this plan owns the contract each step adds. S1a–S1d are
+merged to main (2026-11-07); S1e is planned; S3+ is not implemented.
 
 | Sandbox step | Contract addition | Rejected until qualified |
 | --- | --- | --- |
@@ -2699,6 +2699,7 @@ implemented on stacked branches, published as stacked PRs after the user approve
 | S1b (implemented locally and accepted 2026-11-07) | Two schema additions before the site: a required site `heading` and the `receiving_platform` preset (same layout, starts empty, marked pad); a work list needs a `service_platform`. The bundled package gains a turned `landing` receiver at (−105, 0). The survey, overlap and spawn checks turn with the site | Same as S1a |
 | S1c (implemented locally and played 2026-11-07) | [Work-site job](PLUGIN_API.md#work-site-job-s1c): `objective.hud` after `scene.define` for a `free` package with work sites (init/update; no timers or migration); native `cargo.secured`, `cargo.delivered` (once per session), `cargo.lost` and `cargo.reset` events whose `id` is a work-site id (one crate, so no cargo id yet); sites may be `hidden`, and `work.enable {id}` builds one. The sandbox checks the named sites before committing the batch and keeps the previous checkpoint while the boat or crate occupies the envelope. The catalog bundles this one kind of objective package and probes its init | Same as S1a; `wake_velocity --plugin` refuses a free package with a job; the browser evaluator rejects `work.enable` |
 | S1d (implemented and approved 2026-11-07) | [Quay pickup](FREE_RIDE_SANDBOX_PLAN.md#s1d-result-2026-11-07): `cargo.supply {id}` uses up a delivered crate and places the next load on a built service pad (checked with the whole batch, as `work.enable`; waits while the crate is busy); cargo events gain `load` and delivery becomes once per load at each receiver; `work.guide {id}` sets the helm guidance target. Each at most once per batch. Still one crate body. The bundled package gains a hidden `jetty` receiver, its fourth site | Same as S1c; the browser evaluator also rejects the two new commands (no work grant) |
+| S1e (planned 2026-11-07) | [Fixtures as package data](FREE_RIDE_SANDBOX_PLAN.md#s1e-remaining-fixtures-as-package-data): `scene.work` gains an optional workboat preset name (default `flat_deck`; unknown names rejected at staging); a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package; job notices from the objective (a bounded `objective.notice` or text in work commands, chosen and recorded in PLUGIN_API when implemented). Save/resume (SV1) will extend the P3 checkpoint contract to work-site state (cargo, receivers, hidden sites, supply, mooring) | Same as S1c; the browser evaluator rejects or ignores the notice |
 | S3+ | Currency, prices and saves as objective/native state with exactly-once rewards; payouts never decided outside a committed transaction | Rooms until P5 authority |
 
 Finding from S1a: `boat_plugin_free_check_location` runs no map checks on a free package's

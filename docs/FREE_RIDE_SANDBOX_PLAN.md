@@ -1,15 +1,12 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-07: **S1d implemented, played and approved by the user: the quay the job builds
-beside the landing is the next outing's nearer pickup.** The landing's delivered crate is
-used up, load 2 waits on the quay's pad, and the helm guidance leads to a new jetty 120 m east
-along the river ([S1d result](#s1d-result-2026-11-07)). S1c (the delivery job, played and
-accepted: “Landing works great now!”), S1b (the turned receiving site,
-whose whole tour the user accepted: “Works great! I did the whole tour. Mechanics work great.”)
-and S1a (the Eriksberg site from the package) sit beneath it; S0a and S0b are merged
-(#159–#162). The standalone `cargo_sandbox` loads its `outer` sites and job from that package's
-[`scene.work`](PLUGIN_API.md#work-sites-s1a); `--location basin` retains the controlled
-reference without a job. It is still an experiment, without payouts, saves or an addition to
+Status, 2026-11-07: **S1a-S1d and the deck-edge fix are merged to main (0f09479; PRs
+#163-#168).** The standalone `cargo_sandbox` loads its `outer` sites and job from the bundled
+package's [`scene.work`](PLUGIN_API.md#work-sites-s1a): the Eriksberg site, the turned landing
+(S1b, whole tour accepted), the delivery job (S1c, "Landing works great now!") and the quay
+pickup on a new jetty 120 m east (S1d, played and approved; [result](#s1d-result-2026-11-07)).
+S0a and S0b are merged (#159-#162). `--location basin` retains the controlled reference without
+a job. It is still an experiment, without payouts, saves or an addition to
 the normal free ride menu. This plan owns
 free ride's interactive cargo, player changes to places, Creative/Working Harbour rules, boat
 ownership and economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography,
@@ -31,19 +28,14 @@ Completed planning task, 2026-11-07: review against the merged code found that e
 value is compiled into C (core `#define`s, the site header, a custom platform mesh and the
 sandbox's hull), and the sandbox loads no package. The [content/mechanics split](#content-in-plugins-mechanics-in-c)
 now places site layout, loads, jobs and project outcomes in a plugin package and keeps
-physics and validation native. Completed S1a, 2026-11-07, on local branch
-`feat/sandbox-s1a-site-package` (stacked on the planning branch; not pushed): see the
-[S1a result](#s1a-result-2026-11-07). Completed S1b, 2026-11-07, on local branch
-`feat/sandbox-s1b-receiver` (stacked on S1a; not pushed): see the
-[S1b result](#s1b-result-2026-11-07). Completed S1c, 2026-11-07, on local branch
-`feat/sandbox-s1c-delivery-job` (stacked on S1b; not pushed): see the
-[S1c result](#s1c-result-2026-11-07); the user played the landing and reported it works.
-Completed S1d, 2026-11-07, on local branch `feat/sandbox-s1d-quay-pickup` (stacked on S1c; not
-pushed at first): see the [S1d result](#s1d-result-2026-11-07). The user played both outings and
-approved S1d; the planning, S1a, S1b, S1c and S1d branches are published as stacked PRs. They
-reported that cargo collision was sometimes off; that was S0a's deck contact, and its fix is a
-separate local follow-up, [`fix/cargo-deck-edge`](#deck-edge-collision-fix-2026-11-07). Next: the user's check of that fix, then S1's
-review of fun and broader S0 qualification. Future PRs still require the user's approval.
+physics and validation native. Completed S1a-S1d, 2026-11-07: see the [S1a](#s1a-result-2026-11-07),
+[S1b](#s1b-result-2026-11-07), [S1c](#s1c-result-2026-11-07) and
+[S1d](#s1d-result-2026-11-07) results; the user played the landing and both outings and
+approved them. They then reported that cargo collision was sometimes off; that was S0a's deck
+contact, fixed in the [deck-edge fix](#deck-edge-collision-fix-2026-11-07), merged with the
+rest. Still owed: the user's play check of that fix and S1's review of fun, then broader S0
+qualification. Next implementation task: [F1](#s1e-remaining-fixtures-as-package-data), the
+workboat preset (planned 2026-11-07). Future PRs still require the user's approval.
 
 ## S0a: try the cargo toy
 
@@ -580,7 +572,7 @@ the remaining gates below are still open.
 | Slice | Depends on | Playable result and completion gate | Status |
 | --- | --- | --- | --- |
 | S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a basic toy accepted; S0b first harbour site implemented; receiving site and S0c qualification remain |
-| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a–S1d implemented; S1b crossing, S1c landing and S1d both outings played and accepted |
+| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps); [S1e](#s1e-remaining-fixtures-as-package-data) moves the remaining fixtures into data. | S1a–S1d merged; S1b crossing, S1c landing and S1d both outings played and accepted |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
 | S3: saved Working Harbour | S1 + T0; reconcile S2 edits | Versioned native/browser save path, a few varied local jobs, currency and buy/rent/sell boats, delivered in separate steps. Persistent project changes; preview a purchase through borrowing. Save/reload cannot duplicate goods or payouts; player has a choice beyond repeating one delivery. | Proposed |
@@ -597,14 +589,14 @@ required chain of chores merely because later slices are listed.
 
 ### S1 steps
 
-Each step is its own worktree and PR (with the user's approval), stacked on its parent.
+Each of S1a-S1d was its own worktree and PR, stacked on its parent (all merged). S1e below replaces that wording for its series.
 
 | Step | Result | Completion gate | Status |
 | --- | --- | --- | --- |
-| S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Implemented locally 2026-11-07; [result](#s1a-result-2026-11-07) |
-| S1b: second receiving site | A receiver at a surveyed candidate, placed by editing the package | A native receiver preset and site heading first (S1a has one layout facing heading 0); then no further C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Implemented locally and accepted 2026-11-07; [result](#s1b-result-2026-11-07) |
-| S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Implemented locally and played 2026-11-07; [result](#s1c-result-2026-11-07) |
-| S1d: useful landing playtest | The built quay is the next outing's nearer pickup: its load goes on a short second crossing ([plan](#s1d-the-quay-becomes-the-next-pickup)) | The user completes both outings without developer help and tries another idea | Implemented, played and approved 2026-11-07; [result](#s1d-result-2026-11-07) |
+| S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Merged; [result](#s1a-result-2026-11-07) |
+| S1b: second receiving site | A receiver at a surveyed candidate, placed by editing the package | A native receiver preset and site heading first (S1a has one layout facing heading 0); then no further C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Merged, accepted 2026-11-07; [result](#s1b-result-2026-11-07) |
+| S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Merged, played 2026-11-07; [result](#s1c-result-2026-11-07) |
+| S1d: useful landing playtest | The built quay is the next outing's nearer pickup: its load goes on a short second crossing ([plan](#s1d-the-quay-becomes-the-next-pickup)) | The user completes both outings without developer help and tries another idea | Merged, played and approved 2026-11-07; [result](#s1d-result-2026-11-07) |
 
 #### S1a: the existing site as package data
 
@@ -934,6 +926,23 @@ water like the landing (its depth and seabed are not evidenced); four sites is t
 maximum, so no further outing can be added without a schema change or a repeatable job;
 `SUPPLY WAITING` was exercised only by the validator, not captured; Windows, Linux and the
 browser build were not run.
+
+#### S1e: remaining fixtures as package data
+
+Planned 2026-11-07 at the user's request: integrate this plan with the [plugin
+plan](PLUGIN_PLAN.md#working-harbour-contract-proposed-2026-11-07) so that the sandbox's
+remaining compiled fixtures become plugin data as far as possible; saving the player's state
+comes after, one step at a time. All of S1e and SV1 goes on one branch
+(`feat/sandbox-plugin-fixtures`) as many commits, with one PR opened only when the user
+approves. This replaces the "one worktree/PR per step" wording above for this series.
+
+| Step | Result | Completion gate | Status |
+| --- | --- | --- | --- |
+| F1: workboat preset | The workboat hull `{2.3, 2.3, 1.3, 5}` and thrust 3.1 (`tools/cargo_sandbox.c:24-25`), the deck dimensions and berth capture box (`src/boat_cargo.h:13-22`) become a named native workboat preset (e.g. `flat_deck`). An optional `scene.work` field selects it (default `flat_deck`; unknown names rejected at staging). Mooring speed/angle limits stay native mechanics | Behaviour unchanged; cargo CTests pass; the bundled package names the preset | Planned |
+| F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Planned |
+| F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Planned |
+| F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Planned |
+| SV1: save and resume (after F1-F4; design refined when it starts) | Versioned local native solo save/resume of the sandbox. Session state lives in RAM in `Experiment` (`tools/cargo_sandbox.c:46-73`): cargo state, pose, load, delivered, receivers bitmask and wet flag; active crane; supply source; mooring; hidden flags on cranes and sites; objective revision and state (`BoatPluginObjective`); queued events, generation and sequence; guide target; boat pose; tick. Follows [State, authoring and multiplayer](#state-authoring-and-multiplayer): content identity, stable ids, last stable support for a load mid-lift, atomic write outside the tick, and incompatible saves rejected with a recovery choice. Reuses the P3 objective checkpoint/migration contract. Browser storage is separate, later | Save at several points (mid-lift, mid-job, after a delivery) resumes to identical state; a changed package is refused with a recovery choice; no duplicated crate or delivery | Planned |
 
 #### Deck-edge collision fix, 2026-11-07
 
