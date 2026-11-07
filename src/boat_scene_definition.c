@@ -270,6 +270,8 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         return fail(diagnostic, "scene.work.sites", "must list at least one site");
     if (!scene->work_present && scene->work_count)
         return fail(diagnostic, "scene.work.sites", "is absent but has entries");
+    if (scene->work_boat >= BOAT_SCENE_WORKBOATS)
+        return fail(diagnostic, "scene.work.boat", "is not a registered workboat preset");
     for (unsigned i = 0; i < scene->work_count; ++i) {
         const BoatSceneWorkSite *w = &scene->work[i];
         indexed(path, sizeof(path), "scene.work.sites", i + 1, ".id");
@@ -422,6 +424,11 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
             value(&hash, "work.heading", w->heading);
             if (w->hidden) // Visible sites keep their S1b digests.
                 fold(&hash, "work.hidden", 12);
+        }
+        // The default workboat keeps every S1a/S1b/S1c digest unchanged.
+        if (scene->work_boat) {
+            fold(&hash, "work.boat", 10);
+            count(&hash, "work.boat", scene->work_boat);
         }
     }
     return hash;
@@ -604,6 +611,23 @@ bool boat_scene_work_preset_from_name(const char *name, BoatSceneWorkPreset *pre
     for (unsigned i = 0; i < BOAT_SCENE_WORK_PRESETS; ++i)
         if (!strcmp(name, work_presets[i])) {
             *preset = (BoatSceneWorkPreset)i;
+            return true;
+        }
+    return false;
+}
+
+static const char *const workboats[] = { "flat_deck" };
+
+const char *boat_scene_workboat_name(BoatSceneWorkboat b)
+{
+    return (unsigned)b < BOAT_SCENE_WORKBOATS ? workboats[b] : "unknown";
+}
+
+bool boat_scene_workboat_from_name(const char *name, BoatSceneWorkboat *b)
+{
+    for (unsigned i = 0; i < BOAT_SCENE_WORKBOATS; ++i)
+        if (!strcmp(name, workboats[i])) {
+            *b = (BoatSceneWorkboat)i;
             return true;
         }
     return false;

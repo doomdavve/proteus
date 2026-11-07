@@ -138,6 +138,12 @@ return {
 | `heading` | Required. The moored workboat's heading in radians, \|h\| ≤ 2π, with the voyage API's forward `(sin, −cos)`; the platform, crane, pad, capture zone and survey envelope turn with it. At 0 the bow faces south and the platform lies 5 m toward +x |
 | `hidden` | Optional boolean, default `false`. A hidden site has no platform, berth, pad or contact until its job builds it with `work.enable`; staging surveys it like any other site. The site the sandbox starts at must be a visible `service_platform`. Only `true` changes the scene digest |
 
+`work` may also carry an optional `boat` string naming the registered native workboat preset
+(`"flat_deck"`, the default, S1e/F1): the workboat's hull, thrust, deck rectangle and mooring
+capture box. One preset applies to every site; unknown names are rejected at staging
+(`scene.work.boat` "is not a registered workboat preset"). Mooring speed and angle limits stay
+native. Only a non-default preset changes the scene digest.
+
 `work` is an optional subsystem of scene v3; absent work leaves every earlier scene digest
 unchanged. Voyage, race and match packages reject it (`scene.work` "is only supported by free
 packages"). Staging, the catalog generator and `cargo_sandbox --survey` run the same site survey

@@ -86,6 +86,8 @@ typedef enum {
     BOAT_SCENE_WORK_PRESETS
 } BoatSceneWorkPreset;
 typedef enum { BOAT_SCENE_CARGO_CRATE, BOAT_SCENE_CARGO_PRESETS } BoatSceneCargoPreset;
+// The hull and deck a work site's assisted berth belongs to.
+typedef enum { BOAT_SCENE_WORKBOAT_FLAT_DECK, BOAT_SCENE_WORKBOATS } BoatSceneWorkboat;
 
 typedef struct {
     char id[BOAT_SCENE_TEXT];
@@ -116,6 +118,7 @@ typedef struct BoatSceneDefinition {
     // S1a: cargo work sites. Only free packages may author them; nothing is compiled by default.
     bool work_present;
     unsigned work_count;
+    unsigned char work_boat; // BoatSceneWorkboat; zero is flat_deck
     BoatSceneWorkSite work[BOAT_SCENE_WORK_SITES];
 } BoatSceneDefinition;
 
@@ -159,6 +162,8 @@ const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, co
 const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, const char *id);
 const char *boat_scene_work_preset_name(BoatSceneWorkPreset preset);
 bool boat_scene_work_preset_from_name(const char *name, BoatSceneWorkPreset *preset);
+const char *boat_scene_workboat_name(BoatSceneWorkboat b);
+bool boat_scene_workboat_from_name(const char *name, BoatSceneWorkboat *b);
 const char *boat_scene_cargo_preset_name(BoatSceneCargoPreset preset);
 bool boat_scene_cargo_preset_from_name(const char *name, BoatSceneCargoPreset *preset);
 

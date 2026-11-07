@@ -21,6 +21,16 @@
 #define BOAT_CARGO_MOOR_SPEED 1.5f
 #define BOAT_CARGO_MOOR_ANGLE .785398163f // 45 degrees.
 
+// A registered workboat preset: the assisted berth's hull, thrust, deck rectangle and capture
+// envelope. Reset picks one per sandbox; the macros above are the flat_deck values.
+typedef struct {
+    const char *name;
+    BoatHull hull;
+    float thrust;
+    float deck_x, deck_y, deck_z;
+    float berth_left, berth_right, berth_front, berth_back;
+} BoatCargoWorkboat;
+
 typedef enum {
     BOAT_CARGO_PAD,
     BOAT_CARGO_HANGING,
@@ -77,6 +87,7 @@ typedef struct {
     unsigned crane_count;
     unsigned active; // The berth moored at, or being moored at; its crane holds the hook.
     unsigned source; // The service platform the load starts on and recovers to.
+    const BoatCargoWorkboat *boat; // Hull, deck and berth of the assisted workboat.
     bool moored;
     bool mooring; // Requested assisted alignment; G cancels it before reaching the berth.
     BoatCargoEvent events[BOAT_CARGO_EVENTS];
@@ -117,6 +128,11 @@ void boat_cargo_reset_at(BoatCargoSandbox *sandbox, Vector2 mooring);
 // site is a service platform.
 bool boat_cargo_reset_sites(
     BoatCargoSandbox *sandbox, const BoatSceneWorkSite *sites, unsigned count);
+// As above with a BoatSceneWorkboat preset (out of range falls back to flat_deck).
+bool boat_cargo_reset_sites_with(
+    BoatCargoSandbox *sandbox, unsigned workboat, const BoatSceneWorkSite *sites, unsigned count);
+// Registered workboat preset; out-of-range returns the flat_deck entry.
+const BoatCargoWorkboat *boat_cargo_workboat(unsigned preset);
 // Staging survey for one site: the platform, workboat approach and complete crane sweep clear
 // the compiled water, SCENE's berths/modules (NULL: compiled) and every retained or authored
 // travelling craft over its longest period. Conservative envelopes include the sampling gap.

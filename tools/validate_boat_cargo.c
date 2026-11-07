@@ -438,6 +438,9 @@ int main(int argc, char **argv)
     CHECK(boat_world_resources_init(&resources, boat_location(BOAT_LOCATION_BASIN)));
     BoatWorld world;
     boat_world_init(&world, &resources, boat_water_gentle());
+    const BoatCargoWorkboat *flat = boat_cargo_workboat(0);
+    CHECK(flat->deck_x == BOAT_CARGO_DECK_X && flat->thrust == 3.1f);
+    CHECK(boat_cargo_workboat(99) == boat_cargo_workboat(0));
     check_mooring_and_shadow(&world);
     check_delivery_events(&world);
     check_supply(&world);

@@ -21,8 +21,6 @@
 #include <string.h>
 
 enum { WIDTH = 480, HEIGHT = 300, MAX_VERTICES = BOAT_MODEL_MAX_TRIANGLES * 3 };
-static const BoatHull hull = { 2.3f, 2.3f, 1.3f, 5 };
-static const BoatHandling handling = { .thrust = 3.1f, .hull = &hull };
 static const Color yellow = { 241, 183, 57, 255 }, teal = { 45, 116, 127, 255 };
 static const Color ink = { 20, 31, 42, 255 }, green = { 99, 216, 156, 255 };
 static bool shadow_review;
@@ -289,7 +287,8 @@ static void reset(Experiment *e)
     boat_world_init(&e->world, &e->resources, boat_water_gentle());
     e->world.water.upstream = e->resources.definition->upstream;
     e->world.water.player_wake_enabled = true;
-    boat_cargo_reset_sites(&e->sandbox, e->sites, e->site_count);
+    boat_cargo_reset_sites_with(
+        &e->sandbox, e->world.scene ? e->world.scene->work_boat : 0, e->sites, e->site_count);
     e->boat = (Boat) { .position = boat_cargo_berth(active(e)), .heading = active(e)->heading };
     e->target = next_site(e, e->sandbox.active);
     e->tick = 0;
@@ -333,6 +332,7 @@ static void tick(Experiment *e, float slew, float reach, float hoist, BoatInput 
     }
     Boat before = e->boat;
     bool assisting = s->mooring;
+    BoatHandling handling = { .thrust = s->boat->thrust, .hull = &s->boat->hull };
     boat_step_handling(&e->boat, &e->world, boat_tick_seconds(++e->tick),
         s->moored || s->mooring ? (BoatInput) { 0 } : input, &handling);
     if (assisting) {

@@ -243,7 +243,7 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 
 static const char *const ROOT[] = { "voyage", "tour", "scene", "init", "update", "migrate", NULL };
 static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", "work", NULL };
-static const char *const WORK[] = { "sites", NULL };
+static const char *const WORK[] = { "sites", "boat", NULL };
 static const char *const WORK_SITE[]
     = { "id", "preset", "cargo", "x", "z", "heading", "hidden", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
@@ -995,6 +995,18 @@ static bool scene_work(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
         w->cargo = (unsigned char)c;
         lua_pop(L, 1);
     }
+    s->work_boat = BOAT_SCENE_WORKBOAT_FLAT_DECK;
+    char boat_at[64];
+    int boat = field(L, work, "boat", "scene.work", boat_at);
+    if (boat != LUA_TNIL) {
+        if (boat != LUA_TSTRING)
+            return reject(vm, boat_at, "must be a string, not a %s", lua_typename(L, boat));
+        BoatSceneWorkboat wb;
+        if (!boat_scene_workboat_from_name(lua_tostring(L, -1), &wb))
+            return reject(vm, boat_at, "is not a registered workboat preset");
+        s->work_boat = (unsigned char)wb;
+    }
+    lua_pop(L, 1);
     lua_pop(L, 2);
     return true;
 }

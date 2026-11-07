@@ -163,7 +163,8 @@ def schema():
                         "preset": {"enum": ["service_platform", "receiving_platform"]},
                         "cargo": {"enum": ["crate"]}, **point,
                         "heading": number(-math.tau, math.tau, "radians")})
-    work = object_schema({"sites": sequence(work_site, 1, 4)}, required=("sites",))
+    work = object_schema({"sites": sequence(work_site, 1, 4),
+                          "boat": {"enum": ["flat_deck"]}}, required=("sites",))
     scene = object_schema({"version": {"const": 3}, "marina": marina, "traffic": traffic,
                            "gulls": gulls, "work": work}, required=("version",))
     match_rules = record({"round_ticks": number(1, 432000, "120 Hz ticks", True),

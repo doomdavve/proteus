@@ -1280,6 +1280,7 @@ static int work_sites(void)
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
     CHECK(free.has_scene && free.scene.work_present && free.scene.work_count == 4);
+    CHECK(free.scene.work_boat == BOAT_SCENE_WORKBOAT_FLAT_DECK);
     CHECK(free.manifest.objective && !free.manifest.timers);
     const BoatSceneWorkSite *site = &free.scene.work[0];
     CHECK(!strcmp(site->id, "eriksberg") && site->x == 10 && site->z == 245 && site->heading == 0);
@@ -1360,6 +1361,12 @@ static int work_sites(void)
         show("work", &d);
         CHECK(!strncmp(d.field, invalid[i].field, strlen(invalid[i].field)));
     }
+    // The optional workboat preset must name a registered native boat.
+    CHECK(load_work(WORK_MANIFEST("outer"),
+              "{ boat = 'nope', sites = {" WORK_SITE("a", 10, 245) "} }", &free, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    show("workboat", &d);
+    CHECK(!strcmp(d.field, "scene.work.boat") && strstr(d.message, "registered workboat preset"));
     // Voyages, races and matches cannot author work sites in S1a.
     const char *voyage = variant("return {",
         "return { scene = { version = 3, work = { sites = {" WORK_SITE("a", 10, 245) "} } },");

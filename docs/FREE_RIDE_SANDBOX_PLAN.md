@@ -938,11 +938,23 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 
 | Step | Result | Completion gate | Status |
 | --- | --- | --- | --- |
-| F1: workboat preset | The workboat hull `{2.3, 2.3, 1.3, 5}` and thrust 3.1 (`tools/cargo_sandbox.c:24-25`), the deck dimensions and berth capture box (`src/boat_cargo.h:13-22`) become a named native workboat preset (e.g. `flat_deck`). An optional `scene.work` field selects it (default `flat_deck`; unknown names rejected at staging). Mooring speed/angle limits stay native mechanics | Behaviour unchanged; cargo CTests pass; the bundled package names the preset | Planned |
+| F1: workboat preset | The workboat hull `{2.3, 2.3, 1.3, 5}` and thrust 3.1 (`tools/cargo_sandbox.c:24-25`), the deck dimensions and berth capture box (`src/boat_cargo.h:13-22`) become a named native workboat preset (e.g. `flat_deck`). An optional `scene.work` field selects it (default `flat_deck`; unknown names rejected at staging). Mooring speed/angle limits stay native mechanics | Behaviour unchanged; cargo CTests pass; the bundled package names the preset | Implemented 2026-11-07 (local) |
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Planned |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Planned |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Planned |
 | SV1: save and resume (after F1-F4; design refined when it starts) | Versioned local native solo save/resume of the sandbox. Session state lives in RAM in `Experiment` (`tools/cargo_sandbox.c:46-73`): cargo state, pose, load, delivered, receivers bitmask and wet flag; active crane; supply source; mooring; hidden flags on cranes and sites; objective revision and state (`BoatPluginObjective`); queued events, generation and sequence; guide target; boat pose; tick. Follows [State, authoring and multiplayer](#state-authoring-and-multiplayer): content identity, stable ids, last stable support for a load mid-lift, atomic write outside the tick, and incompatible saves rejected with a recovery choice. Reuses the P3 objective checkpoint/migration contract. Browser storage is separate, later | Save at several points (mid-lift, mid-job, after a delivery) resumes to identical state; a changed package is refused with a recovery choice; no duplicated crate or delivery | Planned |
+
+##### F1 result, 2026-11-07
+
+`scene.work.boat` (optional, default and only value `flat_deck`) selects a native workboat preset
+(`BoatCargoWorkboat`, `src/boat_cargo.c`): hull, thrust, deck rectangle and mooring capture
+box. The sandbox takes its handling and deck/berth numbers from the selected preset instead of
+file-scope constants in `tools/cargo_sandbox.c` and the `BOAT_CARGO_DECK_*`/`BERTH_*` macros
+(kept as the flat-deck values). Decisions: one preset per scene, not per site; mooring
+speed/angle stay macros; the default leaves scene digests unchanged. `proteus.outer-work`
+names `flat_deck`. Verified on macOS arm64, Debug: full build warning-clean, quick and cargo,
+plugin and catalog tests pass (`validate_boat_cargo` and `validate_boat_plugin` gained preset
+checks). No visual change was expected or captured for F1; F4 compares scenarios.
 
 #### Deck-edge collision fix, 2026-11-07
 

@@ -259,6 +259,11 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
             w->ok = false;
             return;
         }
+        s->work_boat = (unsigned char)integer(w, s->work_boat, 1);
+        if (s->work_boat >= BOAT_SCENE_WORKBOATS) {
+            w->ok = false;
+            return;
+        }
         for (unsigned i = 0; i < s->work_count; ++i) {
             BoatSceneWorkSite *site = &s->work[i];
             string(w, site->id, sizeof(site->id));
