@@ -38,7 +38,7 @@ owed: S1's review of fun, then broader S0 qualification. S1e's F1-F4 are impleme
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented too, so SV1a-SV1i are all implemented locally. Remaining checks: the user's look at the decluttered HUD (da52ff3). Then the single PR for the branch, with the user's approval. Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented too, so SV1a-SV1i are all implemented locally. All checks on the branch are done, including the user's look at the decluttered HUD (da52ff3), which they accepted on 2026-11-07. Next: open the single PR for the branch when the user approves. After that, a [structured HUD / information design](BOAT_HUD.md#structured-contextual-information-proposed-2026-11-07) (proposed, unscheduled). Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -1252,6 +1252,11 @@ not exercised, because the backup was usable. Feedback: "We need to get rid of a
 help text though. It takes up most part of the screen." (acted on in the next commit). `file`
 identifies the `.sav` as an RPF package, which is only libmagic matching our magic bytes; the
 format does not change for it.
+
+**Decluttered HUD (da52ff3), 2026-11-07, user, native macOS.** Accepted: "decluttered HUD is much
+better. Still a bit too much but let's accept it here. What I think we need is a structured way of
+showing this type of information and that's a bigger job than this." The follow-up is proposed in
+[BOAT_HUD](BOAT_HUD.md#structured-contextual-information-proposed-2026-11-07).
 
 S1 fun-review observation, in the user's words: "it's quite fun moving stuff around the harbour."
 This is an observation, not an approval of S1 or of any later slice.

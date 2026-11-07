@@ -416,3 +416,12 @@ A single `G MOOR` prompt appears when the berth is ready. The current notice sit
 leave writes, 1.5 s) and the persistent red `SAVE FAILED` sit at the bottom right. Layout,
 text widths and overlap with the minimap at 320x200 are unverified: headless CPU and GPU
 screenshots draw no HUD and no windowed run was possible when this was written.
+
+## Structured contextual information, proposed 2026-11-07
+
+Proposed, unscheduled. The user's request after accepting the decluttered working-harbour HUD
+([sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume)): "What I think we need is a
+structured way of showing this type of information and that's a bigger job than this." Contextual
+gameplay information (job state, prompts, notices, save state) is drawn as ad-hoc text lines, each
+placed by hand. A structured presentation would give it a common model and layout instead. This is
+larger than the sandbox branch and is not designed or scheduled; nothing here is implemented.
