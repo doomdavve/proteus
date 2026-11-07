@@ -1,29 +1,36 @@
-# Sunset and dusk in gameplay
+# Lighting through the day
 
-Status, 2026-11-06: steps 1 and 2 merged to `main` (#138) and the fixed sunset and dusk
-presets approved by the user; the fixed menu setting from step 3 is implemented in this
-branch. The user liked the dusk river in title mock-up B and asked for sunset in the game;
-this document owns that work. Gameplay stays daytime by default. SETTINGS → LIGHTING
-remembers DAY, SUNSET or DUSK for the local player's new solo and multiplayer sessions.
-Explicit CLI launches still use `--daylight` independently. Transitions and a day/night cycle remain deferred;
-Auto is not a committed follow-up.
+Status, 2026-11-07: the shared frame and user-approved sunset/dusk presets (#138) and the
+remembered fixed menu selector are on `main`. Gameplay stays daytime by default.
+SETTINGS → LIGHTING remembers DAY, SUNSET or DUSK for the local player's new solo and
+multiplayer sessions; explicit CLI launches use `--daylight` independently. The revised
+direction is to represent any hour of an authored 24-hour day, beginning with fixed-time
+evaluation and review. A later sandbox-specific step now targets a 15-real-minute
+day/night cycle (900 seconds = 24 game hours). General Auto controls, room-wide time and
+plugin schedules remain deferred. No new runtime behavior is implemented by this plan review.
 
 The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
-will expose approved daylight/dusk presets, phase transitions and building/street lighting
-schedules after the native prerequisites here are implemented and reviewed. No lighting
-capability exists in the current Lua API. This plan continues to own the shared lighting
-frame, renderer/cache agreement and visual acceptance.
+will expose approved fixed lighting choices, then separately scoped transitions and
+building/street lighting schedules after the native prerequisites here are implemented
+and reviewed. No lighting capability exists in the current Lua API. This plan continues
+to own the shared lighting frame, renderer/cache agreement and visual acceptance.
 
 ## Intended result
 
-Make the river and outer voyage playable from warm late afternoon through sunset into
-blue dusk. Sky, sun direction, ambient/direct light, distant haze, water/reflections and
-occupied windows should agree about the time of day. Keep navigation, shorelines and
-boats legible at 320×200. Preserve the integer-scaled aesthetic and the existing storm
-readability. Start with an explicit fixed sunset/dusk preset; decide the duration and
-whether a session transitions automatically after visual review.
+Make the basin and Gothenburg Harbour playable at any selected hour: night, dawn,
+morning, day, late afternoon, sunset and blue dusk. Sky, sun direction, ambient/direct
+light, distant haze, water/reflections, grading and occupied windows should agree about
+the selected time. Keep navigation, shorelines and boats legible at 320×200. Preserve the
+integer-scaled aesthetic, calm glitter and storm readability. The day is an artistic
+lighting recipe with a coherent sun path; it need not match Gothenburg's latitude,
+season or any particular date. Real-world astronomy and a running clock are unnecessary.
 
-## Implementation sequence
+A fixed hour is a complete useful result: selecting or seeking a time must work without
+waiting through a cycle. Smooth evaluation between hours supports later transitions
+and remains the foundation for the sandbox's separately planned 15-minute cycle. Other
+modes keep their fixed lighting choices and Day default.
+
+## Evening foundation and original qualification (2026-11-03–06)
 
 1. **Shared lighting frame (implemented 2026-11-03).** Introduce a small caller-owned presentation value
    for sun direction, direct/ambient color and strength, sky/horizon and haze colors,
@@ -46,22 +53,160 @@ whether a session transitions automatically after visual review.
    Define replay phase persistence and room-wide phase ownership before enabling
    automatic changes there. A room setting may need protocol/content-version work;
    this plan does not silently introduce one or infer host authority from local clocks.
-4. **Qualification.** Check CPU/GPU sky, water, scenery, material and fog agreement;
-   inspect captures at afternoon/sunset/dusk and transition midpoints. Run full CTest,
+4. **Original qualification scope (partly open; evidence below).** Check CPU/GPU sky,
+   water, scenery, material and fog agreement; inspect captures at afternoon/sunset/dusk
+   and transition midpoints. Run full CTest,
    meaningful lighting/cache checks and a windowed transition demo. Measure frame cost,
    review storm/course/weapon visibility, and qualify browser/native packaged behavior.
    Physical playback and user acceptance remain separate gates.
 
-## Acceptance and limits
+## Review and direction, 2026-11-07
 
-The user should be able to recognize sunset from the light on the scene and the water,
-then reach dusk without a sudden color jump. Window lights should belong to buildings
-and remain stable as the camera moves. The title should eventually use the approved
-shared dusk recipe, avoiding a second independent palette. Night sailing, a full
-24-hour clock, dates/astronomy, weather changes and new gameplay visibility rules are
-outside this first slice.
+**Finding:** the shared `WaterfrontLighting` is the right consumer boundary, but its input
+is currently a clamped evening blend, not a clock. `waterfront_lighting(phase)` maps
+0 → day, 0.5 → sunset and 1 → dusk; all three use the same sun bearing. Extending this
+scalar past 1 or reversing dusk back into day would not give a coherent full day. Dawn
+needs its own sky and opposite-side low sun, and night needs a readable recipe beyond
+the approved dusk. The shader/cache and presentation consumers must follow that model.
+
+### Fixed-time contract (planned)
+
+- Evaluate an explicit presentation hour in [0, 24), wrapping 24 to 0. Document finite
+  input normalization and invalid-input handling. A new full-day input must remain
+  distinct from the legacy evening phase; do not reinterpret `--daylight 0.5` as noon
+  or change the meaning of saved DAY/SUNSET/DUSK names. Keep the existing zero-initialized
+  day default and exact approved recipes available through a compatibility path.
+- Use a small native table of artistic lighting anchors and a coherent sun path. Give
+  dawn/sunrise, morning, day, late afternoon, sunset, dusk and night distinct treatment;
+  interpolate every hour, including the night-to-dawn and midnight seams. Choose and
+  document anchor hours during implementation; they are art decisions, not solar claims.
+  Keep the approved day, sunset and dusk recipes as regression references. Any intentional
+  change to those named looks, including sun bearing, needs explicit visual review.
+- Keep sun elevation and bearing continuous, with no zero-length direction or noon
+  singularity in sky/shadow calculations. Sunrise and sunset must occur on opposite
+  sides of the scene. Gate direct sunlight, disc, glitter and directional shadows around
+  the horizon together; no direct sunlight at night. A readable ambient night and harbour
+  lights are sufficient initially; moon phases, stars and a second shadow-casting light
+  are optional art work, not prerequisites.
+- Produce the same caller-owned lighting frame for sky, CPU/GPU materials, water,
+  reflections, haze, windows/lamps and HDR grading. Audit `WaterfrontLighting.phase`,
+  `waterfront_grade`, title grading and existing dusk-dependent effects so an hour never
+  accidentally passes through the old clamped evening evaluator. Keep window occupancy
+  stable; vary emission/intensity without re-rolling occupied rooms on each selection.
+- Keep visual time separate from physics, wave time, course clocks and weather. A fixed
+  hour stays fixed while boats and waves move. Evaluation and direct/backward seeks must
+  not depend on previously rendered hours, local wall time or accumulated frame deltas.
+  If later transitions vary sparkle speed, derive its phase from an explicit timeline
+  (or a deterministic integral), rather than multiplying wave time by the current speed.
+- Preserve the current local presentation preference in solo and multiplayer. A fixed-hour
+  renderer does not imply shared room time, a protocol change, replay persistence, Lua
+  access or an automatic schedule. Define ownership and persistence before adding those.
+
+### Next implementation slices (all planned)
+
+| Step | Scope | Completion evidence |
+| --- | --- | --- |
+| T1 — full-day evaluator and fixed-hour review input | Add the explicit hour contract, artistic anchors and sun path behind a developer review input. Preserve legacy preset/CLI/save behavior and default Day. Keep one shared frame; add no Auto. | Evaluator checks cover every hour, anchor boundaries, midnight continuity, horizon crossings, valid unit directions, normalization/invalid input and legacy exactness. Direct and backward seeks agree. Candidate anchor captures establish what still needs art review. |
+| T2 — renderer agreement and readable night/morning | Refine the new looks and wire every consumer, including grading, materials, lamps, water and reflections. Resolve the CPU basin's independent light/no-sky path and textured-box lighting gap, or document an explicitly reviewed fallback. Bound sky repaint/upload work before exposing continuous scrubbing; the present ~25 ms Debug repaint cannot happen every changing frame. | Inspect matched CPU/GPU basin, outer harbour/bridge/quay and outer-coast views at anchors, all integer hours and difficult midpoints. Review seam/horizon/azimuth boundaries, emissive vs illuminated surfaces, storm, course/weapon visibility and glitter in motion. Record measured frame/cache cost. |
+| T3 — fixed-hour player controls and qualification | Expose the reviewed hours through the local LIGHTING setting, keeping the existing named choices and Day default. Choose a simple hour control/names after the review; persist a versioned choice without repurposing the old numeric phase. Add documented CLI/review examples when implemented. | Verify native/browser save/load, invalid and old settings, explicit CLI precedence, new solo/join/host sessions and return to title. Run build/full CTest, inspect representative captures and a windowed manual demo; qualify platform/package limits. Fixed-selector and new-look user acceptance remain separate. |
+| T4 — sandbox 15-minute day/night cycle | After T1–T3 and their rendering/performance gates, drive the free ride sandbox's shared lighting from a session-owned presentation timeline: 900 active real seconds = 24 game hours. Wire the custom workboat/crane/cargo view into that frame. See the clock and upload contracts below and the [sandbox owner](FREE_RIDE_SANDBOX_PLAN.md#sandbox-daynight-cycle-t4). | Virtual-clock tests prove rate, pause/resume, seeks and repeated midnight wrap; matched CPU/GPU captures and a windowed cycle review prove smooth light and readable crane/cargo work at night. Measure sky work/upload and frame cost through a whole cycle. Planned, not implemented or visually accepted. |
+| Later — general Auto and script/room ownership | General Auto controls, title phase, replay persistence and room authority remain separate decisions. Coordinate plugin L5/L6 bounds and versioning before adding scripts or shared time. | Room/replay/Apply/Undo and synchronization evidence where those features are introduced. These remain deferred and are not dependencies of the solo sandbox cycle. |
+
+T1 is the next lighting implementation task when selected. T2 may need smaller renderer
+changes; keep each reviewable and record evidence here.
+
+### Sky rendering and GPU uploads (T2 prerequisite for T4)
+
+The current `draw_scene()` in `src/renderer_gpu.c` calls `waterfront_sky_image()` and
+`UpdateTexture()` whenever `waterfront_lighting_same_sky()` detects a change. That is a
+1024×512 RGBA8 image: **2 MiB per update**, about **120 MiB/s at 60 updates/s**, before
+driver overhead. The recorded ~25 ms Debug cost is CPU panorama painting, not a measured
+GPU transfer cost. A slowly moving clock would still invalidate this exact-value cache
+on every frame; a 15-minute cycle alone does not solve the problem.
+
+**Planned strategy:** separate fixed sky structure from changing light. Generate the
+existing cloud underside/rim mask once, retain it in caller-owned scene resources and
+upload a point-sampled texture once at scene creation or GPU context recreation. Extend
+`assets/shaders/waterfront_sky.fs` to compute the gradient, horizon glow, sun disc/halo,
+cloud colours and fixed grain from the shared frame's small set of uniforms. Preserve
+panorama texel-centre sampling/quantization so the new path retains the pixel aesthetic.
+The sun is evaluated at its current direction, avoiding doubled suns from cross-fading
+complete preset panoramas. Main, reflection and mirror passes use the same frame values;
+camera and squall inputs retain their existing pass-specific behavior.
+
+Time-of-day changes must cause **zero sky texture uploads or texture allocations** in
+steady state; only lighting uniforms change. This applies to sky uploads, not the
+existing light-list/wake textures used elsewhere. Keep the CPU sky as a reference and
+move continuous CPU rendering to the same mask/recipe evaluated at visible sky samples,
+avoiding a full panorama repaint for every new hour. Preserve a fixed-preset comparison
+path while qualifying the migration; do not introduce a second independently tuned sky.
+
+Qualification records texture-write/allocation counts, CPU sky preparation/upload time,
+GPU sky pass time and whole-frame p50/p95 against fixed-hour baselines at low/high
+resolution, including native and browser contexts. Test a full virtual cycle, direct
+seeks, two scene instances and context recreation, plus seam/horizon views and approved
+presets. Measure steady state separately from first-use costs. GPU fragment work may
+increase, so compare with the graphics plan's existing budgets before enabling T4;
+this upload strategy is planned, not yet benchmarked.
+
+### Sandbox clock contract (T4)
+
+The requested initial tuning is **15 real minutes per full day**, equivalent to one
+game hour every **37.5 real seconds** (96× game time). Use
+`hour = wrap24(start_hour + active_elapsed_seconds * 24 / 900)`, with an explicit input
+timeline so captures and tests can seek directly without waiting 15 minutes. Start a
+new sandbox in the reviewed Day look; choose its exact anchor hour in T1.
+
+Advance during active play, including crane mode. Proposed solo behavior: pause freezes
+the presentation clock with the world; suspended/background time causes no catch-up jump
+on resume. Keep this clock separate from physics/wave/course rates: it changes light,
+not boat or crane speed. Resetting a load or recovering the boat retains the hour;
+a new session restarts it. When sandbox saves arrive, store the current hour and cycle
+rate in versioned session state and resume without offline progression. Shared multiplayer
+time belongs to the later room-authority contract. Keep a fixed-hour developer override
+for comparisons, and review night-time handling before enabling the cycle by default
+in the sandbox. The 900-second target is initial tuning, not a measured fun result.
+
+### Acceptance and limits
+
+The user should recognize morning, day, sunset, dusk and night from the scene and water,
+and be able to select intermediate hours without discontinuities. Night retains readable
+shorelines, boats and navigation; it must not simply darken dusk until play becomes hard.
+Window lights belong to buildings and remain stable as the camera moves. The title should
+eventually use an approved shared recipe, avoiding a second independent palette; its
+phase is a separate decision. Dates/astronomy, seasonal daylight lengths, weather changes
+and new gameplay visibility rules remain outside this work. T4 adds cycling only to the
+sandbox; general Auto remains deferred.
 
 ## Current status
+
+### Plan review, 2026-11-07
+
+**Completed:** reviewed the current evaluator, sun path, scene/sky cache, renderer and
+grading consumers and the native/plugin plan boundaries. Expanded the goal from evening
+presets to any fixed hour of an artistic day, with T1–T3 above. Added the requested T4
+sandbox cycle (15 real minutes = 24 game hours) and a concrete static-mask/uniform sky
+upload strategy; general Auto remains deferred. Existing fixed recipes retain their
+approval; new hours, controls and transitions have no visual
+or user acceptance yet.
+
+**Verification (2026-11-07, Apple Silicon/macOS):** native Debug configure/build passed
+using the existing pinned dependency sources, with one upstream `stb_vorbis.c` warning.
+`ctest --preset full` ran 381 enabled tests (`PROTEUS_GPU_TESTS=OFF`, 13 retired checks
+disabled): 369 passed in the sandbox; all 12 socket-dependent failures passed with local
+socket access via `ctest --preset full --rerun-failed`. The initial review's 22 changed/owning-plan
+local link references and `git diff --check` passed. This is documentation-only work; no new
+captures, playback, GPU/browser/Windows checks or audiovisual acceptance were performed.
+
+**Cycle/upload follow-up verification (2026-11-07, same platform/options):** incremental
+Debug build and `ctest --preset full` with local sockets passed all 381 enabled tests.
+All 48 changed/owning-plan local link references and `git diff --check` passed. The
+sandbox cycle and upload strategy are documentation only; neither has runtime or
+performance evidence yet.
+
+**Next task:** T1, the separate full-day evaluator and developer fixed-hour review input.
+The current menu still needs the player's playback review. The historical verification
+and limits below apply to their dated changes, not to the proposed full-day work.
 
 ### Menu setting, 2026-11-06
 
@@ -88,8 +233,9 @@ Changed documentation links and `git diff --check` passed. These are agent check
 human acceptance. Windows, Safari, physical input/audio, native title save/reload and
 non-default lighting in a joined/hosted room were not exercised in this step.
 
-**Next task:** review the fixed selector in play. Any later transition or room-wide
-lighting ownership needs a separate decision. This change does not add in-session lighting
+**Next task at the 2026-11-06 baseline (superseded by the plan review above):** review the
+fixed selector in play. Any later transition or room-wide lighting ownership needs a
+separate decision. This change does not add in-session lighting
 controls or change replay persistence; the existing renderer/readability limits below remain.
 
 ### Fixed preset result, 2026-11-03
