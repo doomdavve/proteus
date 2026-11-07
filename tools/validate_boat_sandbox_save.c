@@ -355,6 +355,79 @@ static void check_work_digest(void)
     CHECK(boat_scene_work_digest(&edit) != base);
 }
 
+static void check_autosave(void)
+{
+    BoatAutosave a;
+
+    // A clean session never writes, even when leaving.
+    memset(&a, 0, sizeof(a));
+    CHECK(!boat_autosave_due(&a, 5000, false));
+    CHECK(!boat_autosave_due(&a, 5000, true));
+
+    // A milestone writes that frame; a successful write clears it.
+    memset(&a, 0, sizeof(a));
+    boat_autosave_note(&a, 100, true, true);
+    CHECK(boat_autosave_due(&a, 100, false));
+    boat_autosave_written(&a, 100, true);
+    CHECK(!a.dirty && !a.milestone);
+    CHECK(!boat_autosave_due(&a, 100, true));
+
+    // Several milestones in one frame still make one write.
+    memset(&a, 0, sizeof(a));
+    boat_autosave_note(&a, 200, true, true);
+    boat_autosave_note(&a, 200, true, true);
+    boat_autosave_note(&a, 200, true, true);
+    CHECK(boat_autosave_due(&a, 200, false));
+    boat_autosave_written(&a, 200, true);
+    CHECK(!boat_autosave_due(&a, 200, false));
+    CHECK(!boat_autosave_due(&a, 200, true));
+
+    // A plain change writes once the period has passed since the first change.
+    memset(&a, 0, sizeof(a));
+    boat_autosave_note(&a, 1000, true, false);
+    CHECK(!boat_autosave_due(&a, 1000, false));
+    CHECK(!boat_autosave_due(&a, 1000 + BOAT_AUTOSAVE_PERIOD - 1, false));
+    CHECK(boat_autosave_due(&a, 1000 + BOAT_AUTOSAVE_PERIOD, false));
+    boat_autosave_written(&a, 1000 + BOAT_AUTOSAVE_PERIOD, true);
+    CHECK(!boat_autosave_due(&a, 1000 + BOAT_AUTOSAVE_PERIOD, false));
+
+    // An idle gap does not count: the clock starts at the first change after a clean state.
+    memset(&a, 0, sizeof(a));
+    boat_autosave_note(&a, 0, true, true);
+    CHECK(boat_autosave_due(&a, 0, false));
+    boat_autosave_written(&a, 0, true);
+    boat_autosave_note(&a, 100000, true, false);
+    CHECK(!boat_autosave_due(&a, 100000, false));
+
+    // A paused session (tick does not advance) never becomes due until it leaves.
+    memset(&a, 0, sizeof(a));
+    boat_autosave_note(&a, 1500, true, false);
+    CHECK(!boat_autosave_due(&a, 1500, false));
+    CHECK(!boat_autosave_due(&a, 1500, false));
+    CHECK(boat_autosave_due(&a, 1500, true));
+
+    // Leaving writes only when dirty.
+    memset(&a, 0, sizeof(a));
+    CHECK(!boat_autosave_due(&a, 1, true));
+    boat_autosave_note(&a, 1, true, false);
+    CHECK(boat_autosave_due(&a, 1, true));
+
+    // A failed write keeps dirty, clears milestone, and restarts the periodic clock.
+    memset(&a, 0, sizeof(a));
+    boat_autosave_note(&a, 300, true, true);
+    CHECK(boat_autosave_due(&a, 300, false));
+    boat_autosave_written(&a, 300, false);
+    CHECK(a.dirty && !a.milestone);
+    CHECK(!boat_autosave_due(&a, 300, false));
+    CHECK(boat_autosave_due(&a, 300, true));
+    CHECK(boat_autosave_due(&a, 300 + BOAT_AUTOSAVE_PERIOD, false));
+    boat_autosave_note(&a, 400, true, true);
+    CHECK(boat_autosave_due(&a, 400, false));
+    boat_autosave_written(&a, 400, true);
+    CHECK(!a.dirty && !a.milestone);
+    CHECK(!boat_autosave_due(&a, 400, false));
+}
+
 int main(void)
 {
     check_round_trip();
@@ -363,6 +436,7 @@ int main(void)
     check_bounds();
     check_verdicts();
     check_work_digest();
+    check_autosave();
     puts("sandbox save ok");
     return 0;
 }

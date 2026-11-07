@@ -6,6 +6,7 @@
 #include "boat_model.h"
 #include "boat_plugin_catalog.h"
 #include "boat_plugin_state.h"
+#include "boat_sandbox_save.h"
 #include "boat_scenery.h"
 #include "boat_water_mesh.h"
 #include "raymath.h"
@@ -217,10 +218,9 @@ static void job_reset(Experiment *e)
         job_suspend(e, d.message);
 }
 
-// After each tick: queue the native cargo events, and at each 12-tick boundary run the update.
-// Its work.enable intents are checked against the live boat and crate before the batch commits;
-// a refusal keeps the previous checkpoint and its unacknowledged events for the next boundary.
-static void job_tick(Experiment *e)
+// Move the native cargo events into the job's unacknowledged queue (and raise the delivery
+// notice). Saving does the same first, so a key action's event is never left in the core.
+static void job_queue_events(Experiment *e)
 {
     static const char *const kinds[]
         = { "cargo.secured", "cargo.delivered", "cargo.lost", "cargo.reset" };
@@ -242,6 +242,14 @@ static void job_tick(Experiment *e)
         snprintf(event->kind, sizeof(event->kind), "%s", kinds[native[i].kind]);
         snprintf(event->id, sizeof(event->id), "%s", e->sites[native[i].site].id);
     }
+}
+
+// After each tick: queue the native cargo events, and at each 12-tick boundary run the update.
+// Its work.enable intents are checked against the live boat and crate before the batch commits;
+// a refusal keeps the previous checkpoint and its unacknowledged events for the next boundary.
+static void job_tick(Experiment *e)
+{
+    job_queue_events(e);
     if (!e->revision || e->objective.quarantined || e->tick % 12)
         return;
     BoatPluginObjective next = e->objective;
@@ -306,7 +314,8 @@ static void job_tick(Experiment *e)
     e->event_count = 0; // The update acknowledged every queued event.
 }
 
-static void reset(Experiment *e)
+// The world, cargo and controls of a fresh session, without the job.
+static void session_reset(Experiment *e)
 {
     boat_world_init(&e->world, &e->resources, boat_water_gentle());
     e->world.water.upstream = e->resources.definition->upstream;
@@ -321,7 +330,101 @@ static void reset(Experiment *e)
     e->paused = false;
     e->braking = false;
     e->notice = "F: catch crate. 2 / 3: lift and aim at deck.";
+}
+
+static void reset(Experiment *e)
+{
+    session_reset(e);
     job_reset(e);
+}
+
+// SV1c: the session as a save record. The package's identity compares the work digest of its
+// scene, the manifest state_version and the physics revision; the source hash and build string
+// are for messages only.
+static void experiment_identity(const Experiment *e, BoatSandboxIdentity *id)
+{
+    const BoatPluginManifest *m = &e->revision->free.manifest;
+    *id = (BoatSandboxIdentity) { .work_digest = boat_scene_work_digest(&e->revision->free.scene),
+        .source_hash = boat_sandbox_source_hash(e->revision->source, e->revision->source_size),
+        .state_version = m->state_version,
+        .physics_revision = BOAT_PHYSICS_REVISION,
+        .tick_hz = BOAT_TICK_HZ };
+    snprintf(id->package, sizeof(id->package), "%s", m->id);
+    snprintf(id->build, sizeof(id->build), "cargo_sandbox");
+}
+
+// Between ticks only. A key action's core events move into the job's queue first; nothing
+// else is re-derived. Jobless sessions (the basin reference) have nothing to save.
+static bool experiment_save(Experiment *e, int64_t saved_at, BoatSandboxSave *save)
+{
+    if (!e->revision)
+        return false;
+    job_queue_events(e);
+    memset(save, 0, sizeof(*save));
+    boat_cargo_snapshot(&e->sandbox, &e->boat, &save->cargo);
+    BoatSandboxSummary *sum = &save->summary;
+    experiment_identity(e, &sum->identity);
+    const BoatPluginManifest *m = &e->revision->free.manifest;
+    snprintf(sum->name, sizeof(sum->name), "%s", m->name);
+    snprintf(sum->location, sizeof(sum->location), "%s", m->location);
+    sum->saved_at = saved_at;
+    sum->tick = e->tick;
+    sum->load = e->sandbox.cargo.load;
+    sum->sites = e->site_count;
+    for (unsigned i = 0; i < e->site_count; ++i) {
+        snprintf(save->site_ids[i], sizeof(save->site_ids[i]), "%s", e->sites[i].id);
+        sum->built += !e->sandbox.cranes[i].hidden;
+    }
+    if (e->objective.hud_count) {
+        sum->has_progress = true;
+        snprintf(sum->progress_label, sizeof(sum->progress_label), "%s", e->objective.hud[0].label);
+        sum->progress_value = e->objective.hud[0].value;
+    }
+    save->guide = e->guide;
+    save->target = e->target;
+    save->has_objective = true;
+    save->objective = e->objective;
+    memset(save->objective.commands, 0, sizeof(save->objective.commands));
+    save->objective.command_count = 0; // Inspection only; not part of the checkpoint.
+    memcpy(save->events, e->events, e->event_count * sizeof(e->events[0]));
+    save->event_count = e->event_count;
+    save->generation = e->generation;
+    save->sequence = e->sequence;
+    return true;
+}
+
+// Replace the session with SAVE, or return false leaving it untouched when the record does not
+// belong to this package's sites or the core refuses it. Resume never queues events and never
+// re-runs the job's init. The boat resumes where the core puts it (at rest), the crane at rest.
+static bool experiment_resume(Experiment *e, const BoatSandboxSave *save)
+{
+    if (!e->revision || !save->has_objective || save->summary.sites != e->site_count
+        || save->guide > e->site_count || save->target >= e->site_count)
+        return false;
+    for (unsigned i = 0; i < e->site_count; ++i)
+        if (strcmp(save->site_ids[i], e->sites[i].id))
+            return false;
+    BoatCargoSandbox sandbox;
+    Boat boat;
+    if (!boat_cargo_restore(&sandbox, e->revision->free.scene.work_boat, e->sites, e->site_count,
+            &save->cargo, &boat))
+        return false;
+    session_reset(e);
+    e->sandbox = sandbox;
+    e->boat = boat;
+    e->tick = save->summary.tick;
+    e->crane_view = e->sandbox.moored;
+    e->guide = save->guide;
+    e->target = save->target;
+    e->notice = "Resumed the saved session.";
+    e->waiting = NULL;
+    e->objective = save->objective;
+    memset(e->events, 0, sizeof(e->events));
+    memcpy(e->events, save->events, save->event_count * sizeof(e->events[0]));
+    e->event_count = save->event_count;
+    e->sequence = save->sequence;
+    e->generation = save->objective.generation;
+    return true;
 }
 
 static Vector3 local_target(int aim)
@@ -979,6 +1082,10 @@ static bool moor_at(Experiment *e, unsigned site, bool approach_only)
     return true;
 }
 
+// SV1c fixture switch: stop unload_at on the tick the core delivery is queued but the job has
+// not yet counted it.
+static bool stop_at_pending_delivery;
+
 // Carry the lashed crate (lashed on the left target) to RECEIVER, moor and unload it onto that
 // site's pad with its crane, until the native delivery commits there. The job may use the
 // delivered crate up meanwhile, so the commit is watched tick by tick.
@@ -1016,6 +1123,8 @@ static bool unload_at(Experiment *e, unsigned receiver, bool approach_only)
         tick(e, 0, 0, i < 120 ? 1 : 0, (BoatInput) { 0 });
         delivered |= e->sandbox.cargo.load == load && e->sandbox.cargo.state == BOAT_CARGO_PAD
             && e->sandbox.cargo.pad == receiver && e->sandbox.cargo.receivers & 1u << receiver;
+        if (stop_at_pending_delivery && delivered && e->event_count)
+            return true;
     }
     return delivered;
 }
@@ -1146,6 +1255,23 @@ static bool stage(Experiment *e, const char *name)
             hidden &= !e->sites[i].hidden || e->sandbox.cranes[i].hidden;
         return once && hidden && !c->delivered && c->load == 1 && e->guide == e->site_count
             && e->objective.hud_count == 1 && hud_value(e, "CRATES TO LANDING / 1") == 0;
+    } else if (!strcmp(name, "delivery-pending")) {
+        // SV1c resume fixture: the core has delivered the crate but the job has not counted it
+        // yet, so the delivery event is still queued and unacknowledged.
+        unsigned landing = find_site(e, "landing");
+        if (!e->revision || landing == e->site_count || !stage(e, "departure"))
+            return false;
+        stop_at_pending_delivery = true;
+        bool ok = unload_at(e, landing, false);
+        stop_at_pending_delivery = false;
+        return ok && e->sandbox.cargo.delivered && e->event_count == 1
+            && hud_value(e, "LANDING BUILT") == -1;
+    } else if (!strcmp(name, "capsized")) {
+        // SV1c resume fixture: the crossing, then the boat capsizes with the crate lashed on.
+        if (!stage(e, "crossing"))
+            return false;
+        e->boat.motion_state = BOAT_CAPSIZED;
+        return e->sandbox.cargo.state == BOAT_CARGO_SECURED;
     } else if (!strcmp(name, "build-blocked")) {
         // S1c: a build the boat would sit inside waits, keeping the job's last checkpoint and
         // its delivery event, and happens at the first update after the boat moves clear. The
@@ -1280,9 +1406,155 @@ static bool stage(Experiment *e, const char *name)
     return true;
 }
 
+// SV1c resume check. The staged session is saved, then resumed twice, once from the record
+// itself and once from its encoded and decoded bytes. Each copy then runs the same scripted
+// 1200 ticks, and every tick's cargo, boat, events, objective and HUD must hash equal.
+enum { RESUME_TICKS = 1200 };
+
+static void hash_bytes(uint64_t *h, const void *bytes, size_t size)
+{
+    const unsigned char *p = bytes;
+    for (size_t i = 0; i < size; ++i)
+        *h = (*h ^ p[i]) * UINT64_C(1099511628211);
+}
+#define HASH(h, value) hash_bytes(h, &(value), sizeof(value))
+
+static uint64_t session_hash(const Experiment *e)
+{
+    uint64_t h = UINT64_C(14695981039346656037);
+    const BoatCargo *c = &e->sandbox.cargo;
+    HASH(&h, e->tick);
+    HASH(&h, c->state);
+    HASH(&h, c->load);
+    HASH(&h, c->delivered);
+    HASH(&h, c->receivers);
+    HASH(&h, c->pad);
+    HASH(&h, c->position);
+    HASH(&h, c->rotation);
+    HASH(&h, e->boat.position);
+    HASH(&h, e->boat.heading);
+    HASH(&h, e->sandbox.moored);
+    HASH(&h, e->sandbox.mooring);
+    HASH(&h, e->sandbox.active);
+    HASH(&h, e->sandbox.source);
+    for (unsigned i = 0; i < e->sandbox.crane_count; ++i)
+        HASH(&h, e->sandbox.cranes[i].hidden);
+    HASH(&h, e->guide);
+    HASH(&h, e->target);
+    HASH(&h, e->sequence);
+    HASH(&h, e->event_count);
+    for (unsigned i = 0; i < e->event_count; ++i) {
+        HASH(&h, e->events[i].tick);
+        HASH(&h, e->events[i].sequence);
+        HASH(&h, e->events[i].load);
+        hash_bytes(&h, e->events[i].kind, strlen(e->events[i].kind) + 1);
+        hash_bytes(&h, e->events[i].id, strlen(e->events[i].id) + 1);
+    }
+    uint64_t objective = boat_plugin_objective_digest(&e->objective);
+    HASH(&h, objective);
+    HASH(&h, e->objective.quarantined);
+    return h;
+}
+
+// The same scripted actions and inputs for every copy, a function of the tick count alone.
+static void resume_script(Experiment *e, unsigned i)
+{
+    if (i == 5 || i == 900)
+        hook_action(e);
+    if (i == 300)
+        lash_action(e);
+    if (i == 700)
+        moor_action(e);
+    float slew = ((int)(i / 150) % 3 - 1) * .5f, reach = (int)(i / 200) % 2 ? .4f : -.4f;
+    float hoist = (int)(i / 90) % 2 ? -.3f : .5f;
+    tick(e, slew, reach, hoist,
+        (BoatInput) { .throttle_rate = i < 30 ? .4f : 0, .steering_rate = i > 360 ? .1f : 0 });
+}
+
+#define RESUME_CHECK(condition)                                                                    \
+    do {                                                                                           \
+        if (!(condition)) {                                                                        \
+            fprintf(stderr, "Resume check failed at %d: %s\n", __LINE__, #condition);              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
+
+static bool resume_check(Experiment *e, const char *scenario)
+{
+    static BoatSandboxSave record, decoded;
+    static unsigned char bytes[BOAT_SANDBOX_SAVE_MAX], again[BOAT_SANDBOX_SAVE_MAX];
+    static uint64_t trace[2][RESUME_TICKS];
+    size_t size = 0, size_again = 0;
+    RESUME_CHECK(experiment_save(e, 0, &record));
+    RESUME_CHECK(boat_sandbox_save_encode(&record, bytes, sizeof(bytes), &size));
+    RESUME_CHECK(boat_sandbox_save_decode(bytes, size, &decoded) == BOAT_SANDBOX_SAVE_OK);
+    RESUME_CHECK(boat_sandbox_save_encode(&decoded, again, sizeof(again), &size_again)
+        && size == size_again && !memcmp(bytes, again, size));
+    BoatSandboxIdentity now;
+    experiment_identity(e, &now);
+    char reason[48];
+    RESUME_CHECK(
+        boat_sandbox_save_check(&decoded.summary.identity, &now, false, reason, sizeof(reason))
+        == BOAT_SANDBOX_RESUME);
+    bool is_swing = !strcmp(scenario, "swing"), is_capsized = !strcmp(scenario, "capsized");
+    bool lashed = !strcmp(scenario, "departure") || !strcmp(scenario, "crossing");
+    bool pending = !strcmp(scenario, "delivery-pending");
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        RESUME_CHECK(experiment_resume(e, pass ? &decoded : &record));
+        const BoatCargo *c = &e->sandbox.cargo;
+        const BoatCargoSnapshot *snap = &record.cargo;
+        RESUME_CHECK(e->tick == record.summary.tick && c->load == snap->loads[0].load);
+        RESUME_CHECK(
+            c->delivered == snap->loads[0].delivered && c->receivers == snap->loads[0].receivers);
+        RESUME_CHECK(c->state == BOAT_CARGO_PAD || c->state == BOAT_CARGO_SECURED);
+        RESUME_CHECK(e->sandbox.moored == snap->moored && !e->sandbox.mooring);
+        for (unsigned i = 0; i < e->site_count; ++i)
+            RESUME_CHECK(!e->sandbox.cranes[i].hidden == snap->built[i]);
+        RESUME_CHECK(boat_plugin_objective_digest(&e->objective)
+            == boat_plugin_objective_digest(&record.objective));
+        RESUME_CHECK(e->event_count == record.event_count && e->sequence == record.sequence);
+        RESUME_CHECK(e->generation == e->objective.generation);
+        if (is_swing)
+            RESUME_CHECK(c->state == BOAT_CARGO_PAD && e->sandbox.moored); // Hook released.
+        if (lashed)
+            RESUME_CHECK(c->state == BOAT_CARGO_SECURED);
+        if (!strcmp(scenario, "crossing"))
+            RESUME_CHECK(!e->sandbox.moored);
+        if (is_capsized)
+            RESUME_CHECK(e->sandbox.moored && c->state == BOAT_CARGO_PAD
+                && e->boat.motion_state != BOAT_CAPSIZED);
+        if (pending)
+            RESUME_CHECK(
+                e->event_count == 1 && c->delivered && hud_value(e, "LANDING BUILT") == -1);
+        for (unsigned i = 0; i < RESUME_TICKS; ++i) {
+            resume_script(e, i);
+            trace[pass][i] = session_hash(e);
+        }
+        RESUME_CHECK(!e->objective.quarantined);
+        // Exactly one counted delivery and one built quay, whichever side of the update the
+        // save fell on.
+        unsigned quay = find_site(e, "landing_quay");
+        if (pending || !strcmp(scenario, "delivered") || !strcmp(scenario, "landing-built")
+            || !strcmp(scenario, "quay-pickup") || !strcmp(scenario, "jetty-delivered")) {
+            RESUME_CHECK(quay < e->site_count && !e->sandbox.cranes[quay].hidden);
+            RESUME_CHECK(hud_value(e, "LANDING BUILT") == 1);
+        }
+        if (!strcmp(scenario, "jetty-delivered"))
+            RESUME_CHECK(hud_value(e, "JETTY SUPPLIED") == 1);
+    }
+    for (unsigned i = 0; i < RESUME_TICKS; ++i)
+        if (trace[0][i] != trace[1][i]) {
+            fprintf(stderr, "Resume check: the copies diverged at tick %u\n", i);
+            return false;
+        }
+    printf("resume check %s: saved %zu bytes at tick %llu; %d ticks equal\n", scenario, size,
+        (unsigned long long)record.summary.tick, RESUME_TICKS);
+    return true;
+}
+
 int main(int argc, char **argv)
 {
-    bool gpu = true, demo = false, survey = false;
+    bool gpu = true, demo = false, survey = false, resume = false;
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_OUTER);
     int frames = 0;
     const char *screenshot = NULL, *scenario = "origin", *package = NULL;
@@ -1295,6 +1567,8 @@ int main(int argc, char **argv)
             package = argv[++i];
         else if (!strcmp(argv[i], "--survey"))
             survey = true;
+        else if (!strcmp(argv[i], "--resume-check"))
+            resume = true;
         else if (!strcmp(argv[i], "--shadow-review"))
             shadow_review = true;
         else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
@@ -1326,7 +1600,9 @@ int main(int argc, char **argv)
                 "shadow-water|"
                 "berth-approach|mooring|remoor|crossing|receiver-approach|delivered|landing-built|"
                 "\n"
-                "redelivered|job-reset|build-blocked|quay-pickup|jetty-approach|jetty-delivered]\n"
+                "redelivered|job-reset|build-blocked|quay-pickup|jetty-approach|jetty-delivered|\n"
+                "delivery-pending|capsized]\n"
+                "  [--resume-check] (with --scenario: save, resume twice, compare 1200 ticks)\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
                 "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, N next site,\n"
                 "C return an unhooked, unlashed crate to its source pad, P pause, R reset.\n");
@@ -1343,7 +1619,10 @@ int main(int argc, char **argv)
         && strcmp(scenario, "landing-built") && strcmp(scenario, "redelivered")
         && strcmp(scenario, "job-reset") && strcmp(scenario, "build-blocked")
         && strcmp(scenario, "quay-pickup") && strcmp(scenario, "jetty-approach")
-        && strcmp(scenario, "jetty-delivered"))
+        && strcmp(scenario, "jetty-delivered") && strcmp(scenario, "delivery-pending")
+        && strcmp(scenario, "capsized"))
+        return 2;
+    if (resume && (screenshot || frames || demo || survey || shadow_review))
         return 2;
     if (shadow_review && (frames || demo || survey || strcmp(scenario, "origin"))) {
         fprintf(stderr, "--shadow-review uses its own fixed virtual poses; omit other modes.\n");
@@ -1419,6 +1698,13 @@ int main(int argc, char **argv)
         fprintf(stderr, "Cargo review scenario failed: %s\n", scenario);
         boat_world_resources_destroy(&e.resources);
         return 1;
+    }
+    if (resume) {
+        bool ok = resume_check(&e, scenario);
+        waterfront_scenery_destroy(&harbour.scenery);
+        boat_scenery_unload();
+        boat_world_resources_destroy(&e.resources);
+        return ok ? 0 : 1;
     }
     static BoatModel solids, water, body_decal, water_decal;
     static Color pixels[WIDTH * HEIGHT];

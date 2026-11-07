@@ -533,7 +533,7 @@ set_tests_properties(boat_sandbox_save PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
-  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog)
+  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_sandbox_save)
   add_dependencies(cargo_sandbox proteus_assets)
   target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
   foreach(side left right)
@@ -555,6 +555,14 @@ if(NOT EMSCRIPTEN)
     add_test(NAME cargo_sandbox_${scenario}_screenshot COMMAND cargo_sandbox --renderer cpu
       --scenario ${scenario}
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${scenario}-test.png)
+  endforeach()
+  # SV1c: save the staged session, resume it from the record and from its encoded bytes, and
+  # require equal behaviour over 1200 scripted ticks. No window and no files.
+  foreach(scenario swing departure crossing delivered landing-built build-blocked quay-pickup
+    jetty-delivered delivery-pending capsized)
+    add_test(NAME cargo_sandbox_resume_${scenario} COMMAND cargo_sandbox --resume-check
+      --scenario ${scenario})
+    list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_resume_${scenario})
   endforeach()
 endif()
 add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
@@ -1479,7 +1487,7 @@ endforeach()
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
 # in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
-  cargo_shadow_wave_cpu
+  cargo_shadow_wave_cpu ${PROTEUS_RESUME_TESTS}
   cargo_sandbox_shadow-high_screenshot cargo_sandbox_shadow-low_screenshot cargo_sandbox_remoor_screenshot
   cargo_sandbox_crossing_screenshot cargo_sandbox_receiver-approach_screenshot
   cargo_sandbox_delivered_screenshot cargo_sandbox_landing-built_screenshot

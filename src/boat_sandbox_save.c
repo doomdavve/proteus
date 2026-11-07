@@ -489,3 +489,32 @@ BoatSandboxVerdict boat_sandbox_save_check(const BoatSandboxIdentity *saved,
         snprintf(reason, capacity, "%s", why);
     return verdict;
 }
+
+void boat_autosave_note(BoatAutosave *autosave, uint64_t tick, bool changed, bool milestone)
+{
+    if (!autosave || (!changed && !milestone))
+        return;
+    if (!autosave->dirty)
+        autosave->last_write = tick;
+    autosave->dirty = true;
+    if (milestone)
+        autosave->milestone = true;
+}
+
+bool boat_autosave_due(const BoatAutosave *autosave, uint64_t tick, bool leaving)
+{
+    if (!autosave || !autosave->dirty)
+        return false;
+    if (leaving || autosave->milestone)
+        return true;
+    return tick >= autosave->last_write && tick - autosave->last_write >= BOAT_AUTOSAVE_PERIOD;
+}
+
+void boat_autosave_written(BoatAutosave *autosave, uint64_t tick, bool ok)
+{
+    if (!autosave)
+        return;
+    autosave->dirty = !ok;
+    autosave->milestone = false;
+    autosave->last_write = tick;
+}

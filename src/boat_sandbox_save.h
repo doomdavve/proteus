@@ -74,4 +74,22 @@ BoatSandboxVerdict boat_sandbox_save_check(const BoatSandboxIdentity *saved,
 // FNV-1a 64 over a package's entry source, for messages.
 uint64_t boat_sandbox_source_hash(const char *source, size_t size);
 
+#define BOAT_AUTOSAVE_PERIOD 3600 /* simulation ticks of dirty play between periodic writes */
+typedef struct {
+    bool dirty, milestone;
+    uint64_t last_write;
+} BoatAutosave;
+/* Record what one frame changed. CHANGED marks the session dirty; MILESTONE also requests a write
+this frame. The first change after a clean state starts the periodic clock at TICK. */
+void boat_autosave_note(BoatAutosave *autosave, uint64_t tick, bool changed, bool milestone);
+/* True when a write is due now. LEAVING (pause, focus loss, return to title, quit) writes whenever
+dirty. A clean session never writes; a milestone writes at once; otherwise write once
+BOAT_AUTOSAVE_PERIOD ticks have passed since last_write (use tick >= last_write guard against
+underflow). */
+bool boat_autosave_due(const BoatAutosave *autosave, uint64_t tick, bool leaving);
+/* After a write attempt at TICK. Success clears dirty and milestone. Failure keeps dirty, clears
+milestone, and restarts the periodic clock at TICK, so it retries at the next milestone, leave or
+period. Both set last_write = tick. */
+void boat_autosave_written(BoatAutosave *autosave, uint64_t tick, bool ok);
+
 #endif

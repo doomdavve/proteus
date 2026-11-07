@@ -37,8 +37,9 @@ rest. Still owed: the user's play check of that fix and S1's review of fun, then
 qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtures`, and
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
-discovered in the menu. SV1a (the core cargo snapshot and restore) and SV1b (the save format) are implemented locally; next
-implementation task: [SV1c](#sv1-steps), resume and the autosave policy in memory. Future PRs still
+discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format) and SV1c (resume and the autosave
+policy in memory) are implemented locally; next implementation task: [SV1d](#sv1-steps), files and
+automatic saving in the harness. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -951,7 +952,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a and SV1b implemented locally (2026-11-07); next SV1c |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1c implemented locally (2026-11-07); next SV1d |
 
 ##### F1 result, 2026-11-07
 
@@ -1033,13 +1034,40 @@ checksum-valid body with an unknown site id, the 64-event, 8-row, 16-timer and 1
 verdicts, and the work digest. No drawing path changed, so no captures were compared. The full
 CTest preset passed 397 tests (13 disabled wake experiments not run) with a warning-clean build.
 
+**SV1c result (2026-11-07, macOS arm64, Debug).** `cargo_sandbox` splits `job_tick` into
+`job_queue_events` and the update, and `reset` into `session_reset` and the job init. It gains
+`experiment_save` (between ticks: drains key-action core events into the queue, then the cargo
+snapshot, objective without `commands`, events, sequence, generation, guide, target, identity and
+summary) and `experiment_resume` (refuses, changing nothing, a record whose site ids differ from
+the package's or that the core refuses; otherwise it rebuilds the world with `session_reset`, installs
+the restored cargo and boat, the objective, the queued events and sequence, and never re-runs the
+job's init or queues events). `BoatAutosave` (`boat_autosave_note/due/written`, in
+`src/boat_sandbox_save.[ch]`) is pure tick logic. Deviation: `note` takes the tick, so the
+periodic clock starts at the first change after a clean state (30 s of dirty play) rather than at
+the last write; a failed write keeps dirty, clears the milestone and restarts the clock, so it
+retries at the next milestone, leave or period. `--resume-check` (`cargo_sandbox_resume_<scenario>`,
+slow lane, no window and no files) saves the staged session, resumes it from the record and from
+the encoded then decoded bytes, checks the per-scenario resume rules, and requires equal per-tick
+hashes (cargo, boat, events, objective, HUD) over 1200 scripted ticks (hook, lash and moor
+actions, crane and helm inputs) for `swing`, `departure`, `crossing`, `delivered`, `landing-built`,
+`build-blocked`, `quay-pickup`, `jetty-delivered`, and two new fixtures: `capsized` (the crossing,
+capsized, resumes moored with the crate back on its source pad) and `delivery-pending` (saved with
+the core delivery queued and not yet counted; afterwards exactly one counted delivery and one
+built quay). Limit: `build-blocked` is saved after its wait resolves, not during it. Found, not
+changed: `reset` calls `boat_world_init`, which drops the `world.scene` that `main` set, so the
+harness runs with a null scene (its notices and workboat are the native defaults, which equal the
+outer package's); resume reproduces the same behaviour. Verified: the 34 CPU captures (22 outer, 12
+basin) were rendered before and after and are byte-identical (`cmp`); the full CTest preset passed
+407 tests (13 disabled wake experiments not run) with a warning-clean build. No GPU frames,
+windowed run or hands-on play.
+
 #### SV1: local save and resume
 
 Designed 2026-11-07 at the user's request ("save the state of the player", one step at a time,
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a and SV1b implemented locally (2026-11-07); SV1c–SV1i planned.**
+will apply to all future state as well." Status: **SV1a-SV1c implemented locally (2026-11-07); SV1d–SV1i planned.**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or
