@@ -941,7 +941,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F1: workboat preset | The workboat hull `{2.3, 2.3, 1.3, 5}` and thrust 3.1 (`tools/cargo_sandbox.c:24-25`), the deck dimensions and berth capture box (`src/boat_cargo.h:13-22`) become a named native workboat preset (e.g. `flat_deck`). An optional `scene.work` field selects it (default `flat_deck`; unknown names rejected at staging). Mooring speed/angle limits stay native mechanics | Behaviour unchanged; cargo CTests pass; the bundled package names the preset | Implemented 2026-11-07 (local) |
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
-| F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Planned |
+| F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
 | SV1: save and resume (after F1-F4; design refined when it starts) | Versioned local native solo save/resume of the sandbox. Session state lives in RAM in `Experiment` (`tools/cargo_sandbox.c:46-73`): cargo state, pose, load, delivered, receivers bitmask and wet flag; active crane; supply source; mooring; hidden flags on cranes and sites; objective revision and state (`BoatPluginObjective`); queued events, generation and sequence; guide target; boat pose; tick. Follows [State, authoring and multiplayer](#state-authoring-and-multiplayer): content identity, stable ids, last stable support for a load mid-lift, atomic write outside the tick, and incompatible saves rejected with a recovery choice. Reuses the P3 objective checkpoint/migration contract. Browser storage is separate, later | Save at several points (mid-lift, mid-job, after a delivery) resumes to identical state; a changed package is refused with a recovery choice; no duplicated crate or delivery | Planned |
 
 ##### F1 result, 2026-11-07
@@ -981,6 +981,19 @@ a job (the basin fixture) can still word them. Absent keys keep the native defau
 prompts stay native. Verified on macOS arm64, Debug: warning-clean build, the full CTest preset
 passed 396 tests, `validate_boat_plugin` checks the decoded texts, four rejections and the digest,
 and all 34 CPU review captures are byte-identical to the baseline taken at F1.
+
+##### F4 result, 2026-11-07
+
+The review scenarios in `tools/cargo_sandbox.c` find their sites by the package's ids
+(`landing`, `landing_quay`, `jetty`) with `find_site`, instead of the first `RECEIVING_PLATFORM`
+or the first hidden site of a preset; the supply-notice check expands the package's own
+`supplied` template rather than comparing the literal "LANDING QUAY" text. A package without
+those ids refuses the scenario (as the basin does) instead of indexing past its sites. The
+scenarios stay fixtures of the bundled outer job, not a general mechanism. Verified on macOS
+arm64, Debug: all 34 CPU captures that exist (`--renderer cpu` default for screenshots; 22
+scenarios on `outer`, 12 on the basin) were rendered before F2 and after F2, F3 and F4 and are
+byte-identical (`cmp`). The full CTest preset passed 396 tests with a warning-clean build. No
+GPU frames, windowed run or hands-on play were done for S1e; saves (SV1) are not started.
 
 #### Deck-edge collision fix, 2026-11-07
 

@@ -158,7 +158,8 @@ static unsigned next_site(const Experiment *e, unsigned from)
 
 // KIND's template: the package's own notice, else the native default. Each {site} token becomes
 // the site's name as a sign: capitals with underscores as spaces. The notice owns its text.
-static void notice(Experiment *e, BoatSceneNotice kind, unsigned site)
+static void notice_text(
+    const Experiment *e, BoatSceneNotice kind, unsigned site, char *out, size_t capacity)
 {
     static const char *const defaults[BOAT_SCENE_NOTICES]
         = { "Crate delivered. It stays counted, even if moved again.", "{site} built.",
@@ -173,15 +174,20 @@ static void notice(Experiment *e, BoatSceneNotice kind, unsigned site)
     for (char *c = name; *c; ++c)
         *c = *c == '_' ? ' ' : (char)toupper((unsigned char)*c);
     size_t n = 0;
-    for (const char *p = format; *p && n + 1 < sizeof(e->notice_text);) {
+    for (const char *p = format; *p && n + 1 < capacity;) {
         if (!strncmp(p, "{site}", 6)) {
-            for (const char *q = name; *q && n + 1 < sizeof(e->notice_text); ++q)
-                e->notice_text[n++] = *q;
+            for (const char *q = name; *q && n + 1 < capacity; ++q)
+                out[n++] = *q;
             p += 6;
         } else
-            e->notice_text[n++] = *p++;
+            out[n++] = *p++;
     }
-    e->notice_text[n] = 0;
+    out[n] = 0;
+}
+
+static void notice(Experiment *e, BoatSceneNotice kind, unsigned site)
+{
+    notice_text(e, kind, site, e->notice_text, sizeof(e->notice_text));
     e->notice = e->notice_text;
 }
 
@@ -1023,11 +1029,13 @@ static int64_t hud_value(const Experiment *e, const char *label)
     return -1;
 }
 
-// The sites the S1d job builds: the hidden service platform (the quay) and hidden receiver.
-static unsigned hidden_site(const Experiment *e, BoatSceneWorkPreset preset)
+// The review fixtures follow the bundled outer job by the package's own site ids: the landing
+// receiver, the quay (a service platform the job builds) and the jetty receiver. SITE_COUNT
+// means the package has no such site.
+static unsigned find_site(const Experiment *e, const char *id)
 {
     for (unsigned i = 0; i < e->site_count; ++i)
-        if (e->sites[i].hidden && e->sites[i].preset == preset)
+        if (!strcmp(e->sites[i].id, id))
             return i;
     return e->site_count;
 }
@@ -1115,9 +1123,9 @@ static bool stage(Experiment *e, const char *name)
         // the landing once and wants load 2 at the jetty. R then restarts everything together.
         if (!stage(e, "delivered") || !e->revision)
             return false;
-        unsigned landing = 0;
-        while (e->sites[landing].preset != BOAT_SCENE_WORK_RECEIVING_PLATFORM)
-            ++landing;
+        unsigned landing = find_site(e, "landing");
+        if (landing == e->site_count)
+            return false;
         e->sandbox.cargo.state = BOAT_CARGO_FLOATING;
         e->sandbox.cargo.position
             = boat_cargo_site_point(&e->sandbox.cranes[landing], (Vector3) { -5, 1.6f, 0 });
@@ -1144,10 +1152,9 @@ static bool stage(Experiment *e, const char *name)
         // crate is posed onto the landing's pad; the delivery itself is the native commit.
         if (!e->revision)
             return false;
-        unsigned landing = 0, quay = hidden_site(e, BOAT_SCENE_WORK_SERVICE_PLATFORM);
-        while (e->sites[landing].preset != BOAT_SCENE_WORK_RECEIVING_PLATFORM)
-            ++landing;
-        if (quay == e->site_count || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
+        unsigned landing = find_site(e, "landing"), quay = find_site(e, "landing_quay");
+        if (landing == e->site_count || quay == e->site_count
+            || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
             return false;
         e->crane_view = false;
         e->boat.position = boat_cargo_berth(&e->sandbox.cranes[quay]);
@@ -1174,7 +1181,7 @@ static bool stage(Experiment *e, const char *name)
         // the job built beside it.
         if (!stage(e, "delivered") || !e->revision)
             return false;
-        unsigned built = hidden_site(e, BOAT_SCENE_WORK_SERVICE_PLATFORM);
+        unsigned built = find_site(e, "landing_quay");
         if (built == e->site_count || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
             return false;
         const BoatCargoCrane *landing = active(e), *quay = &e->sandbox.cranes[built];
@@ -1193,11 +1200,8 @@ static bool stage(Experiment *e, const char *name)
     } else if (!strcmp(name, "receiver-approach") || !strcmp(name, "delivered")) {
         // S1b review: carry the lashed crate to the first receiving site (an explicit pose in
         // place of the crossing), then moor and unload with that site's crane by the real path.
-        unsigned receiver = 0;
-        while (receiver < e->sandbox.crane_count
-            && e->sandbox.cranes[receiver].preset != BOAT_SCENE_WORK_RECEIVING_PLATFORM)
-            ++receiver;
-        if (receiver == e->sandbox.crane_count || !stage(e, "departure"))
+        unsigned receiver = find_site(e, "landing");
+        if (receiver == e->site_count || !stage(e, "departure"))
             return false;
         if (!unload_at(e, receiver, !strcmp(name, "receiver-approach")))
             return false;
@@ -1208,12 +1212,16 @@ static bool stage(Experiment *e, const char *name)
         // not a reused raylib TextFormat buffer.
         for (int i = 0; i < 8; ++i) // Cycle every TextFormat buffer, as one HUD frame does.
             TextFormat("%d", i);
-        unsigned quay = hidden_site(e, BOAT_SCENE_WORK_SERVICE_PLATFORM);
+        unsigned quay = find_site(e, "landing_quay");
+        if (e->revision && quay == e->site_count)
+            return false;
+        char supplied[64] = "";
+        if (quay < e->site_count)
+            notice_text(e, BOAT_SCENE_NOTICE_SUPPLIED, quay, supplied, sizeof(supplied));
         if (e->revision
-            && (strcmp(e->notice, "Supplies used. Next crate waits on the LANDING QUAY pad.")
-                || e->sandbox.cargo.load != 2 || e->sandbox.cargo.state != BOAT_CARGO_PAD
-                || e->sandbox.cargo.pad != quay || e->sandbox.source != quay
-                || e->guide != hidden_site(e, BOAT_SCENE_WORK_RECEIVING_PLATFORM)))
+            && (strcmp(e->notice, supplied) || e->sandbox.cargo.load != 2
+                || e->sandbox.cargo.state != BOAT_CARGO_PAD || e->sandbox.cargo.pad != quay
+                || e->sandbox.source != quay || e->guide != find_site(e, "jetty")))
             return false;
         e->notice = "Delivered review fixture. R: restart from the first site.";
         for (unsigned i = 0; e->revision && i < e->site_count; ++i)
@@ -1228,8 +1236,8 @@ static bool stage(Experiment *e, const char *name)
         // S1d's second outing: from the landing, moor at the built quay beside it by the real G
         // path, where load 2 waits; lift and lash it, depart toward the job's guided jetty, then
         // moor and unload there (explicit poses in place of the two short drives).
-        unsigned quay = hidden_site(e, BOAT_SCENE_WORK_SERVICE_PLATFORM);
-        unsigned jetty = hidden_site(e, BOAT_SCENE_WORK_RECEIVING_PLATFORM);
+        unsigned quay = find_site(e, "landing_quay");
+        unsigned jetty = find_site(e, "jetty");
         if (!e->revision || quay == e->site_count || jetty == e->site_count
             || !stage(e, "delivered") || !boat_cargo_moor_toggle(&e->sandbox, &e->boat)
             || !moor_at(e, quay, false))
