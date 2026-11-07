@@ -147,7 +147,8 @@ endif()
 # plus boat_plugin_io for reading a package directory. Core and net never link it.
 add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
   src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
-  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h)
+  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h
+  src/boat_plugin_objective_codec.c)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
@@ -297,12 +298,20 @@ else()
   set(PROTEUS_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
 endif()
 
-add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/wake_velocity_work.c
+add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c
   tools/wake_velocity_work.h tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
 target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
-  proteus_work_session proteus_work_save)
+  proteus_work_save)
+# WORKING HARBOUR steps the work package's Lua, so it is native-only: the browser game links stubs
+# (tools/check_web_wasm.py proves it carries no Lua).
+if(EMSCRIPTEN)
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c)
+else()
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c)
+  target_link_libraries(wake_velocity PRIVATE proteus_work_session)
+endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
 target_compile_definitions(wake_velocity PRIVATE

@@ -97,6 +97,8 @@ typedef struct {
 } BoatPluginHudRow;
 bool boat_plugin_hud_compose(const BoatPluginHudOwner *owners, unsigned owner_count,
     BoatPluginHudRow *rows, unsigned capacity, unsigned *count);
+// Timer table invariants shared by stepping, the digest and the byte codec.
+bool boat_plugin_objective_timers_valid(const BoatPluginObjective *objective);
 // Canonical hash of the complete committed checkpoint, excluding quarantine/struct padding.
 uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective);
 // Explicit little-endian checkpoint codec. Commands are inspection-only and never encoded.
