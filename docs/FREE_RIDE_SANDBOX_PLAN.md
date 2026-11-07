@@ -38,7 +38,7 @@ owed: S1's review of fun, then broader S0 qualification. S1e's F1-F4 are impleme
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented locally too; SV1a-SV1i are implemented. Remaining checks: the user's look at the decluttered HUD (da52ff3). Then the single PR for the branch, with the user's approval. Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented too, so SV1a-SV1i are all implemented locally. Remaining checks: the user's look at the decluttered HUD (da52ff3). Then the single PR for the branch, with the user's approval. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
