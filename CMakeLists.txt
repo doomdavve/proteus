@@ -208,7 +208,8 @@ add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_se
 target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_boat_core)
 target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
 
-add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h)
+add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
+  src/boat_work_menu.c src/boat_work_menu.h)
 target_link_libraries(proteus_work_save PUBLIC proteus_work_session proteus_file)
 target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
 
@@ -550,6 +551,12 @@ target_link_libraries(validate_boat_file PRIVATE proteus_file)
 target_compile_options(validate_boat_file PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_file COMMAND validate_boat_file ${CMAKE_CURRENT_BINARY_DIR}/file-tests)
 set_tests_properties(boat_file PROPERTIES LABELS "cpu;quick")
+# SV1h: discovery over build-tree directories and the SAVE row's confirmations.
+add_executable(validate_boat_work_menu tools/validate_boat_work_menu.c)
+target_link_libraries(validate_boat_work_menu PRIVATE proteus_work_save proteus_plugin_catalog)
+target_compile_options(validate_boat_work_menu PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_work_menu COMMAND validate_boat_work_menu ${CMAKE_CURRENT_BINARY_DIR}/work-menu-tests)
+set_tests_properties(boat_work_menu PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -1105,6 +1112,14 @@ foreach(place_package
   set_tests_properties(wake_velocity_title_start.${place} PROPERTIES TIMEOUT 60
     PASS_REGULAR_EXPRESSION "Plugin ${package}:")
 endforeach()
+# WORKING HARBOUR starts through --work instead of --package. Unlike --package, --work prints no
+# package banner, so the exit status and the screenshot are the check.
+add_test(NAME wake_velocity_title_start.outer-working-harbour
+  COMMAND wake_velocity --title-start outer-working-harbour --renderer cpu
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/title_start_outer-working-harbour.png --time 0.1
+    --data-dir ${CMAKE_CURRENT_BINARY_DIR}/work-save-tests-title
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(wake_velocity_title_start.outer-working-harbour PROPERTIES TIMEOUT 60)
 add_test(NAME wake_velocity_title_start_rejected COMMAND wake_velocity --title-start nowhere)
 set_tests_properties(wake_velocity_title_start_rejected PROPERTIES WILL_FAIL TRUE)
 add_test(NAME boat_net_study_mode_rejected COMMAND wake_velocity --connect 127.0.0.1:24680 --waves)
@@ -1599,7 +1614,7 @@ set(PROTEUS_SLOW_TESTS
   wake_velocity_title_start.basin
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
   wake_velocity_title_start.outer-grodan wake_velocity_title_start.outer-canal-tour
-  wake_velocity_title_start.basin-trial)
+  wake_velocity_title_start.outer-working-harbour wake_velocity_title_start.basin-trial)
 
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)

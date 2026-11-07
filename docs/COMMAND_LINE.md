@@ -54,7 +54,9 @@ of the free-ride boat step, with the game's camera, water and harbour, plus the 
 crane and the package's job rows. It is the SV1f/SV1g step of the
 [save and resume plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume). It cannot be combined
 with `--plugin`, `--package`, rooms, `--course`, replays, wake, water, `--start`, `--skin` or
-`--plugin-bridge`. The title does not offer it yet (SV1h).
+`--plugin-bridge`. The title offers it as GOTHENBURG HARBOUR, CONTENT `WORKING HARBOUR` (native
+builds), with a SAVE row (CONTINUE, NEW, DELETE; NEW and DELETE ask first). START passes
+`--location outer --work` (plus `--new` for NEW), so these options stay the scripted spelling.
 
 The session saves itself: there is no save key and F5 stays the plugin reload key. Plain
 interactive play reads and writes `cargo-<package id>.sav` in the game's data directory
@@ -116,7 +118,7 @@ panel selects Standard, Harbor life, the Grodan tour or the canal tour for `oute
 web builds. Both tours are `proteus.grodan`: the Grodan tour always uses the Grodan, as
 `--package proteus.grodan --skin grodan` does, and the canal tour keeps your livery. `--title-start PLACE` takes the title's START path with default settings, without the menu,
 so tests can prove each PLACE opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`,
-`outer-grodan`, `outer-canal-tour`, `basin-trial`); further options follow it.
+`outer-grodan`, `outer-canal-tour`, `outer-working-harbour`, `basin-trial`); further options follow it.
 
 ### Live Lua authoring
 
@@ -237,6 +239,7 @@ or renderer. GPU captures need a graphics context; CPU captures need no window.
 ./build/wake_velocity --renderer cpu --location outer --screenshot build/outer.png --time 3
 ./build/wake_velocity --location outer --gpu-aa --screenshot build/outer-gpu.png --time 3
 ./build/wake_velocity --title --screenshot build/title.png
+./build/wake_velocity --title --screenshot build/title-save.png --content working-harbour --data-dir build/work-profile --save-mode new --ask
 ./build/wake_velocity --renderer cpu --replay build/my-run.run --screenshot build/replay.png --time 5
 ```
 

@@ -131,9 +131,17 @@ and a yellow marker guide to the next site (N cycles). The job, shown top right,
 the crate to the landing and set it on the marked pad; that builds a quay beside the landing,
 whose pad holds the next crate. Carry that one east along the river to the new jetty. C returns
 a crate in the water to its latest starting pad, and R restarts everything.
-The same working harbour also runs inside the game as `./build/wake_velocity --location outer --work`
-(experimental; the title does not offer it yet). It keeps the game's camera and keys, adds the
-crane controls, and saves itself automatically (no save key; the menu and quitting save too):
+The same working harbour also runs inside the game (experimental). On the native build, choose
+SINGLE PLAYER, PLACE GOTHENBURG HARBOUR, CONTENT < WORKING HARBOUR > (or launch
+`./build/wake_velocity --location outer --work`). It keeps the game's camera and keys, adds the
+crane controls, and saves itself automatically: there is no save key, and the menu, losing focus and
+quitting save too. The SAVE row under CONTENT finds your save by itself: < CONTINUE > (the default)
+resumes it, < NEW > starts over after a `START OVER? YES / NO` question (the old save stays as a
+backup copy), and < DELETE > removes it after `DELETE SAVE? YES / NO`. The hint line shows the
+save's load, progress and time. A save the game cannot read (damaged, from a newer game or from a
+changed package) is shown as unavailable with the reason, is never deleted behind your back, and NEW
+sets it aside as `.rejected`. Saves live in the game's data directory (macOS: `~/Library/Application
+Support/Proteus`, file `cargo-proteus.outer-work.sav`).
 
 | Key | Work action |
 | --- | --- |

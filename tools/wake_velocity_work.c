@@ -4,7 +4,9 @@
 #include "boat_file.h"
 #include "boat_plugin_catalog.h"
 #include "boat_presentation.h"
+#include "boat_title.h"
 #include "boat_ui.h"
+#include "boat_work_menu.h"
 
 #include "raymath.h"
 
@@ -31,6 +33,7 @@ bool wake_work_open(WakeWork *work, BoatSession *game, const BoatWorldResources 
     *work = (WakeWork) { .open = true };
     BoatWorkSession *s = &work->session;
     s->resources = resources;
+    s->writer = "wake_velocity";
     s->world.scene = &revision.free.scene;
     s->revision = revision.free.manifest.objective ? &revision : NULL;
     s->site_count = revision.free.scene.work_count;
@@ -281,4 +284,63 @@ void wake_work_hud(WakeWork *work, const WakeWorkProjection *projection, int wid
         if (work->save.mark > 0)
             --work->save.mark;
     }
+}
+
+// SV1h: the title's view of the bundled package's save slot.
+
+// The display time zone: this machine's offset from UTC now (display only).
+static int local_utc_offset(void)
+{
+    time_t now = time(NULL);
+    struct tm utc = *gmtime(&now);
+    utc.tm_isdst = -1;
+    return (int)difftime(now, mktime(&utc));
+}
+
+// Decode the location's bundled work package. False when there is none.
+static bool bundled_identity(BoatSandboxIdentity *identity)
+{
+    static BoatPluginRevision scanned;
+    BoatPluginDiagnostic d = { 0 };
+    const BoatPluginCatalogEntry *entry = boat_plugin_catalog_work_default("outer");
+    if (!entry || !boat_plugin_catalog_decode(entry, &scanned, &d) || !scanned.free.has_scene)
+        return false;
+    boat_work_revision_identity(&scanned, "wake_velocity", identity);
+    return true;
+}
+
+void wake_work_title_scan(const char *data_dir, BoatTitleSave *save)
+{
+    static BoatWorkMenuSave found[BOAT_WORK_MENU_SAVES];
+    char directory[1000] = "";
+    BoatSandboxIdentity installed;
+    *save = (BoatTitleSave) { 0 };
+    if (!bundled_identity(&installed))
+        return;
+    if (data_dir)
+        snprintf(directory, sizeof(directory), "%s", data_dir);
+    else if (!boat_file_data_directory(directory, sizeof(directory)))
+        return;
+    unsigned count
+        = boat_work_menu_discover(directory, &installed, 1, local_utc_offset(), found, 16);
+    const BoatWorkMenuSave *slot = boat_work_menu_find(found, count, installed.package);
+    if (!slot)
+        return;
+    save->present = true;
+    save->available = slot->available;
+    snprintf(save->summary, sizeof(save->summary), "%s", slot->summary);
+    snprintf(save->reason, sizeof(save->reason), "%s", slot->reason);
+    snprintf(save->path, sizeof(save->path), "%s", slot->path);
+}
+
+bool wake_work_title_delete(const BoatTitleSave *save)
+{
+    return save->present && boat_file_remove_save(save->path);
+}
+
+bool wake_work_title_set_aside(const BoatTitleSave *save)
+{
+    bool ok = save->present && boat_work_menu_set_aside(save->path);
+    printf("%s %s as .rejected\n", ok ? "Set aside" : "Could not set aside", save->path);
+    return ok;
 }

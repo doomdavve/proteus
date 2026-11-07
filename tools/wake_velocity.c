@@ -258,7 +258,9 @@ static void usage(void)
     cli_usage_section(stdout, "CAPTURES AND AUTOMATION");
     cli_usage_line(stdout, "--screenshot FILE", "Save a deterministic scripted frame");
     cli_usage_line(stdout, "", "CPU screenshots need no window; GPU ones need a context");
-    cli_usage_line(stdout, "--title --screenshot FILE", "Capture the title screen");
+    cli_usage_line(stdout, "--title --screenshot FILE [OPTIONS]", "Capture the title screen");
+    cli_usage_line(stdout, "--solo --ask --content NAME --save-mode MODE --data-dir DIR",
+        "Title capture options; --save-mode is continue, new or delete");
     cli_usage_line(stdout, "--time SECONDS", "Screenshot only: 0..60, or 0..600 with --replay");
     cli_usage_line(stdout, "--frames COUNT", "Stop a smoke run after COUNT frames");
     cli_usage_line(
@@ -2559,7 +2561,27 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 {
     char *arguments[32] = { "wake_velocity" };
     int count = 1;
-    if (settings->location == BOAT_LOCATION_COUNT)
+    // WORKING HARBOUR runs its own --work session, which refuses the free-ride options.
+    bool working_harbour = settings->location == BOAT_LOCATION_OUTER
+        && settings->outer_content == BOAT_TITLE_OUTER_WORKING_HARBOUR;
+    if (working_harbour) {
+        // Starting New over an unavailable save sets it aside instead of overwriting it.
+        if (settings->work_new) {
+            BoatTitleSave slot;
+            wake_work_title_scan(settings->data_dir, &slot);
+            if (slot.present && !slot.available)
+                wake_work_title_set_aside(&slot);
+        }
+        arguments[count++] = "--location";
+        arguments[count++] = "outer";
+        arguments[count++] = "--work";
+        if (settings->work_new)
+            arguments[count++] = "--new";
+        if (settings->data_dir) {
+            arguments[count++] = "--data-dir";
+            arguments[count++] = (char *)settings->data_dir;
+        }
+    } else if (settings->location == BOAT_LOCATION_COUNT)
         arguments[count++] = "--course";
     else {
         arguments[count++] = "--current";
@@ -2568,21 +2590,23 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
         arguments[count++] = (char *)boat_location(settings->location)->name;
     }
     bool grodan = false;
-    if (settings->location == BOAT_LOCATION_OUTER && settings->outer_content) {
+    if (!working_harbour && settings->location == BOAT_LOCATION_OUTER && settings->outer_content) {
         arguments[count++] = "--package";
         arguments[count++] = (char *)boat_title_outer_package(settings->outer_content);
         grodan = settings->outer_content == BOAT_TITLE_OUTER_GRODAN;
     }
-    if (settings->waves)
+    if (!working_harbour && settings->waves)
         arguments[count++] = "--waves";
     if (settings->high_resolution) {
         arguments[count++] = "--resolution";
         arguments[count++] = "high";
     } else if (settings->smooth_edges)
         arguments[count++] = "--gpu-aa";
-    // GRODAN TOUR is the Grodan's, whatever livery the player keeps; CANAL TOUR keeps the livery.
-    arguments[count++] = "--skin";
-    arguments[count++] = (char *)boat_skin_name(grodan ? BOAT_SKIN_GRODAN : settings->skin);
+    if (!working_harbour) {
+        // GRODAN TOUR is the Grodan's, whatever livery the player keeps; CANAL TOUR keeps it.
+        arguments[count++] = "--skin";
+        arguments[count++] = (char *)boat_skin_name(grodan ? BOAT_SKIN_GRODAN : settings->skin);
+    }
     arguments[count++] = "--soundtrack";
     arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
     arguments[count++] = "--daylight";
@@ -2598,7 +2622,7 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
 
 // --title-start PLACE [OPTIONS]: the title's START with default settings and no menu, so a test
 // proves that every PLACE the panel offers opens. PLACE is basin, outer, outer-standard,
-// outer-harbor-life, outer-grodan or basin-trial.
+// outer-harbor-life, outer-grodan, outer-canal-tour, outer-working-harbour or basin-trial.
 static int title_start(int argc, char **argv)
 {
     BoatTitleSettings settings;
@@ -2681,11 +2705,54 @@ int main(int argc, char **argv)
 #endif
     if (argc > 2 && !strcmp(argv[1], "--title-start"))
         return title_start(argc, argv);
-    bool capture = argc == 4 && !strcmp(argv[1], "--title") && !strcmp(argv[2], "--screenshot");
+    bool capture = argc >= 4 && !strcmp(argv[1], "--title") && !strcmp(argv[2], "--screenshot");
     if (argc != 1 && !(argc == 2 && !strcmp(argv[1], "--title")) && !capture)
         return study(argc, argv);
     BoatTitleSettings settings;
     boat_title_load(&settings);
+    BoatTitleCapture capture_options = { false, false, 0 };
+    if (capture) {
+        for (int i = 4; i < argc; ++i) {
+            if (!strcmp(argv[i], "--solo"))
+                capture_options.solo = true;
+            else if (!strcmp(argv[i], "--ask")) {
+                capture_options.ask = true;
+                capture_options.solo = true;
+            } else if (!strcmp(argv[i], "--save-mode") && i + 1 < argc) {
+                const char *mode = argv[++i];
+                if (!strcmp(mode, "continue"))
+                    capture_options.save_mode = 0;
+                else if (!strcmp(mode, "new"))
+                    capture_options.save_mode = 1;
+                else if (!strcmp(mode, "delete"))
+                    capture_options.save_mode = 2;
+                else {
+                    fprintf(stderr, "--title --screenshot: unknown save mode %s.\n", mode);
+                    return 1;
+                }
+            } else if (!strcmp(argv[i], "--content") && i + 1 < argc) {
+                const char *name = argv[++i];
+                bool found = false;
+                for (unsigned content = 0; content < BOAT_TITLE_OUTER_CONTENTS; ++content)
+                    if (!strcmp(name, boat_title_outer_content(content))) {
+                        settings.location = BOAT_LOCATION_OUTER;
+                        settings.outer_content = content;
+                        found = true;
+                        break;
+                    }
+                if (!found) {
+                    fprintf(stderr, "--title --screenshot: unknown content %s.\n", name);
+                    return 1;
+                }
+                capture_options.solo = true;
+            } else if (!strcmp(argv[i], "--data-dir") && i + 1 < argc)
+                settings.data_dir = argv[++i];
+            else {
+                fprintf(stderr, "--title --screenshot: unknown option %s.\n", argv[i]);
+                return 1;
+            }
+        }
+    }
     SetTraceLogLevel(LOG_WARNING);
 #if defined(__EMSCRIPTEN__)
     SetConfigFlags(0);
@@ -2696,7 +2763,8 @@ int main(int argc, char **argv)
     if (!IsWindowReady())
         return 1;
     if (capture) {
-        bool ok = boat_title_screenshot(&settings, 2.5, argv[3]);
+        bool ok = argc > 4 ? boat_title_screenshot_panel(&settings, 2.5, argv[3], &capture_options)
+                           : boat_title_screenshot(&settings, 2.5, argv[3]);
         CloseWindow();
         return ok ? 0 : 1;
     }

@@ -38,8 +38,8 @@ qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtu
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) are implemented locally; next
-implementation task: [SV1h](#sv1-steps), the menu and discovery, which needs the user's hands-on play check. Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; next: the user's hands-on play check of SV1g+SV1h
+(script in the [SV1h result](#sv1-steps)), then [SV1i](#sv1-steps), objective migration at load. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -952,7 +952,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1g implemented locally (2026-11-07); next SV1h |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1h implemented locally (2026-11-07); next: the user's play check of SV1g+SV1h, then SV1i |
 
 ##### F1 result, 2026-11-07
 
@@ -1156,6 +1156,61 @@ hard to pick out from the default chase camera at the berth (an orange block bes
 with a warning-clean build. GPU frames, windowed runs and hands-on play were not possible: GLFW
 could not open a display under the command sandbox (`Failed to initialize platform`).
 
+**SV1h result (2026-11-07, macOS arm64, Debug; no window).** `WORKING HARBOUR`
+(`working-harbour`) is the fifth Gothenburg Harbour content in the normal title menu (native
+builds; the browser's menu stops at CANAL TOUR). With it selected the WATER row is hidden and a
+`SAVE` row follows CONTENT: `< CONTINUE >` (the default when a save is available), `< NEW >` and
+`< DELETE >`. With no save the row offers `< NEW >` alone and START begins at once. NEW over any
+file, and DELETE, ask `START OVER? < NO >` or `DELETE SAVE? < NO >` on the SAVE row (left/right
+switch, Enter answers, Escape or moving to another row withdraws; NO is the default). DELETE
+removes only that package's `cargo-<id>.sav` and its `.bak`. NEW over an available save lets the
+first write replace it, keeping `.bak`; NEW over an unavailable one first sets it and its backup
+aside as `.rejected`. START in DELETE mode does nothing and says so. The hint line (on CONTENT,
+SAVE and START) shows the entry: `OUTER - LOAD 2 - JETTY SUPPLIED: 1 - SAVED 2026-11-07 14:32`
+(machine-local time zone), or `SAVE UNAVAILABLE: <reason>; NEW SETS IT ASIDE`, or `NO SAVE YET;
+PROGRESS IS SAVED AUTOMATICALLY`; reasons are `DAMAGED`, `NEWER FORMAT`, `PACKAGE CHANGED`,
+`PROGRESS FORMAT CHANGED`, `PHYSICS CHANGED` and `PACKAGE NOT INSTALLED`. Code: new
+`src/boat_work_menu.[ch]` in `proteus_work_save` (raylib-free) holds the bounded discovery (reads
+only the first 512 bytes of each file, never writes or deletes), the time formatting and the
+SAVE row's state machine; `tools/boat_title.[ch]` draws and drives it; `tools/wake_velocity_work.c`
+supplies the title's scan, delete and set-aside; `title_single` launches `--location outer --work
+[--new]` (never `--waves`, `--skin` or `--package`, which `--work` refuses). `--title-start
+outer-working-harbour` opens it; `--title --screenshot FILE` takes `--content NAME`, `--solo`,
+`--save-mode continue|new|delete`, `--ask` and `--data-dir DIR`. Deviations from the plan above:
+discovery lives in the library rather than the game file, so its test is the new `boat_work_menu`
+(not an addition to `boat_sandbox_save`); the unavailable reason is in the hint, not the row value;
+the slot's own file is always read first, so more than 16 junk `cargo-*.sav` files cannot hide it;
+a lone `.bak` with no `.sav` is not offered (Continue only looks at the backup when `.sav` exists
+and fails). Also fixed: the save identity's build string said `cargo_sandbox` whatever wrote it;
+`BoatWorkSession.writer` now records `wake_velocity` or `cargo_sandbox` (display only, never
+compared). Verification: full CTest preset 422 passed (13 disabled wake experiments not run),
+build warning-clean; `boat_work_menu` (`cpu;quick`, build-tree directories, no clock) covers a missing and
+an empty directory, one good save with `.bak`, `.rejected`, `.tmp` and a text file ignored, a header-only
+prefix, corrupt, truncated and empty files, a newer format, changed digest, changed physics, an
+uninstalled package, 40 junk files (16 read, slot found, capacity honoured), the fixed-offset
+time (`2026-10-26 08:33` at +1 h, a leap day, a negative offset), set-aside of file and backup,
+delete of exactly one package's files, every SAVE row transition (default, cycling, both
+confirmations with NO the default, withdrawing, START in DELETE mode, unavailable saves) and the
+writer string. Not verified: the title itself, since no window can open here (GLFW `Failed to initialize
+platform`), so no title capture was taken or inspected, the drawn row and hint widths at 320x200,
+mouse and keyboard handling, and a real launch from the menu. `wake_velocity_title_start.outer-working-harbour`
+(CPU, no window) proves START's argument list opens the session. No hands-on play.
+
+Play-check script (SV1g and SV1h, macOS data directory `~/Library/Application Support/Proteus`):
+1. `./build/wake_velocity`; SINGLE PLAYER; PLACE `GOTHENBURG HARBOUR`; CONTENT `WORKING HARBOUR`.
+   Expect SAVE `< NEW >` and the hint `NO SAVE YET...` (delete `cargo-proteus.outer-work.sav*` first
+   if you have played). START; deliver a crate and begin the second outing; P then Quit mid-crossing.
+2. Reopen; SINGLE PLAYER; the SAVE row reads `< CONTINUE >` and the hint shows load, progress and
+   time. START: the boat is at rest where you left it with the same crate and count; finish both
+   outings, capsize once and resume; return to the title from the menu and CONTINUE again.
+3. SAVE `< NEW >`, START: answers `START OVER? < NO >`; Escape leaves it; try again, choose YES and the
+   job restarts (the old save stays as `cargo-proteus.outer-work.sav.bak`). SAVE `< DELETE >`, Enter:
+   `DELETE SAVE? < NO >`; YES removes `.sav` and `.bak` only.
+4. Corrupt safely: quit the game, then `printf 'junk' | dd of="$HOME/Library/Application
+   Support/Proteus/cargo-proteus.outer-work.sav" bs=1 seek=10 conv=notrunc`. Open the menu: the hint
+   reads `SAVE UNAVAILABLE: DAMAGED; NEW SETS IT ASIDE` and Continue is gone. NEW, then YES: the file
+   becomes `...sav.rejected` and a fresh job starts. Nothing was deleted.
+
 **SV1g result (2026-11-07, macOS arm64, Debug; no window).** `wake_velocity --work` is playable and
 saves itself. Controls (the game's keys win): the helm uses the game's own throttle, wheel and
 mouse steering; Tab switches helm and crane; in crane view A/D, W/S and Q/E slew, reach and
@@ -1192,7 +1247,7 @@ Designed 2026-11-07 at the user's request ("save the state of the player", one s
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a-SV1g implemented locally (2026-11-07); SV1h–SV1i planned.**
+will apply to all future state as well." Status: **SV1a-SV1h implemented locally (2026-11-07); SV1i planned.**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or
@@ -1616,9 +1671,10 @@ The coordinator settled the four earlier open questions on the user's behalf:
 
 None blocks SV1a; each has a default the steps assume.
 
-1. **The `WORKING HARBOUR` entry while it is an experiment.** Default: shown in the native
-   Single Player menu once SV1h lands, labelled as the work sandbox. Alternative: hidden behind
-   a command-line flag until S1's fun review.
+1. **The `WORKING HARBOUR` entry while it is an experiment.** Settled by the user's direction
+   (2026-11-07): the game is experimental, so nothing is hidden. SV1h shows it in the native
+   Single Player menu as a normal fifth content, with the hint `CARGO JOBS THAT SAVE THEMSELVES
+   (EXPERIMENT)`. The browser build omits it.
 
 Known limits of this design:
 
