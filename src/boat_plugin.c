@@ -1051,7 +1051,7 @@ BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
     if (data->callbacks != manifest->objective)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
             "callbacks require objective.hud and that capability requires both callbacks");
-    BoatPluginFree candidate = { .manifest = *manifest, .digest = 0 };
+    BoatPluginFree candidate = { .manifest = *manifest, .migrates = data->migrates, .digest = 0 };
     if (boat_plugin_take_scene(manifest, data->has_scene, &data->scene, &candidate.has_scene,
             &candidate.scene, &candidate.scene_digest, d)
         != BOAT_PLUGIN_OK)
@@ -1165,7 +1165,25 @@ static BoatPluginStatus check_work_sites(const BoatPluginFree *free,
 {
     const BoatSceneDefinition *scene = &free->scene;
     const char *file = free->manifest.entry;
-    if (!location->mapped || !map)
+    if (!location->mapped) {
+        // An unmapped basin has no map to survey: keep every registered envelope and its restart
+        // margin inside the walls and leave the spawn open.
+        for (unsigned i = 0; i < scene->work_count; ++i) {
+            const BoatSceneWorkSite *site = &scene->work[i];
+            char path[32];
+            snprintf(path, sizeof(path), "scene.work.sites[%u]", i + 1);
+            if (!(fabsf(site->x) + 16 < location->half_extent.x
+                    && fabsf(site->z) + 16 < location->half_extent.y))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                    "lies too close to the edge of the %s basin", location->name);
+            for (unsigned j = 0; j < i; ++j)
+                if (!boat_cargo_sites_apart(&scene->work[j], site))
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                        "overlaps the envelope of scene.work.sites[%u]", j + 1);
+        }
+        return BOAT_PLUGIN_OK;
+    }
+    if (!map)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
             "scene.work requires a mapped location");
     for (unsigned i = 0; i < scene->work_count; ++i) {

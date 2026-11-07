@@ -22,6 +22,7 @@
 #define BOAT_SCENE_GANGWAY_MIN_LENGTH 2.0f
 #define BOAT_SCENE_GANGWAY_MAX_LENGTH 20.0f
 #define BOAT_SCENE_WORK_SITES 4
+#define BOAT_SCENE_NOTICE_TEXT 64 // One notice template, including the terminator.
 
 typedef enum {
     BOAT_SCENE_BERTH_SKIFF,
@@ -86,6 +87,16 @@ typedef enum {
     BOAT_SCENE_WORK_PRESETS
 } BoatSceneWorkPreset;
 typedef enum { BOAT_SCENE_CARGO_CRATE, BOAT_SCENE_CARGO_PRESETS } BoatSceneCargoPreset;
+// The hull and deck a work site's assisted berth belongs to.
+typedef enum { BOAT_SCENE_WORKBOAT_FLAT_DECK, BOAT_SCENE_WORKBOATS } BoatSceneWorkboat;
+// F3: the job's feedback lines. Each key is an optional template; absent keeps the native text.
+typedef enum {
+    BOAT_SCENE_NOTICE_DELIVERED,
+    BOAT_SCENE_NOTICE_BUILT,
+    BOAT_SCENE_NOTICE_SUPPLIED,
+    BOAT_SCENE_NOTICE_RETURNED,
+    BOAT_SCENE_NOTICES
+} BoatSceneNotice;
 
 typedef struct {
     char id[BOAT_SCENE_TEXT];
@@ -116,7 +127,9 @@ typedef struct BoatSceneDefinition {
     // S1a: cargo work sites. Only free packages may author them; nothing is compiled by default.
     bool work_present;
     unsigned work_count;
+    unsigned char work_boat; // BoatSceneWorkboat; zero is flat_deck
     BoatSceneWorkSite work[BOAT_SCENE_WORK_SITES];
+    char work_notice[BOAT_SCENE_NOTICES][BOAT_SCENE_NOTICE_TEXT]; // empty: native default
 } BoatSceneDefinition;
 
 typedef struct {
@@ -137,6 +150,8 @@ bool boat_scene_same_except_cosmetics(
 // FNV-1a over explicit fields only: presence, counts, IDs, recipes, positions and attachments.
 // Padding and the diagnostic are excluded.
 uint64_t boat_scene_digest(const BoatSceneDefinition *scene);
+// FNV-1a over the work sites and workboat only, excluding work_notice display text.
+uint64_t boat_scene_work_digest(const BoatSceneDefinition *scene);
 
 bool boat_scene_identifier(const char *text);
 const char *boat_scene_berth_recipe_name(BoatSceneBerthRecipe recipe);
@@ -159,7 +174,13 @@ const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, co
 const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, const char *id);
 const char *boat_scene_work_preset_name(BoatSceneWorkPreset preset);
 bool boat_scene_work_preset_from_name(const char *name, BoatSceneWorkPreset *preset);
+const char *boat_scene_workboat_name(BoatSceneWorkboat b);
+bool boat_scene_workboat_from_name(const char *name, BoatSceneWorkboat *b);
 const char *boat_scene_cargo_preset_name(BoatSceneCargoPreset preset);
 bool boat_scene_cargo_preset_from_name(const char *name, BoatSceneCargoPreset *preset);
+// F3: the Lua key for a notice, and the template rule (non-empty is required; empty entries are
+// "absent" only in the stored definition, so callers check that first).
+const char *boat_scene_notice_key(BoatSceneNotice n);
+bool boat_scene_notice_valid(const char *text);
 
 #endif

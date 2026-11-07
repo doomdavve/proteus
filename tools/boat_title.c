@@ -9,6 +9,7 @@
 #include "boat_ui.h"
 #include "boat_version.h"
 #include "boat_web_touch.h"
+#include "boat_work_menu.h"
 #include "frame_pacer.h"
 #include "raylib.h"
 #include <stdio.h>
@@ -106,6 +107,7 @@ typedef enum {
 typedef enum {
     ROW_SOLO_PLACE,
     ROW_SOLO_CONTENT,
+    ROW_SOLO_SAVE,
     ROW_SOLO_WATER,
     ROW_SOLO_EDGES,
     ROW_SOLO_START,
@@ -136,7 +138,19 @@ static const struct {
     { "harbor-life", "proteus.harbor-life", "HARBOR LIFE", "AUTHORED MARINA, TRAFFIC AND GULLS" },
     { "grodan", "proteus.grodan", "GRODAN TOUR", "IN THE GRODAN, WITH ITS PASSENGERS" },
     { "canal-tour", "proteus.grodan", "CANAL TOUR", "THE GRODAN'S ROUTE IN YOUR OWN BOAT" },
+    { "working-harbour", "proteus.outer-work", "WORKING HARBOUR",
+        "CARGO JOBS THAT SAVE THEMSELVES (EXPERIMENT)" },
 };
+
+// The browser has no work package, so its menu stops before WORKING HARBOUR.
+static unsigned content_count(void)
+{
+#if defined(__EMSCRIPTEN__)
+    return BOAT_TITLE_OUTER_WORKING_HARBOUR;
+#else
+    return BOAT_TITLE_OUTER_CONTENTS;
+#endif
+}
 
 const char *boat_title_outer_content(unsigned content)
 {
@@ -178,6 +192,10 @@ typedef struct {
     unsigned public_shown;
     double queried;
     bool solo_content; // The outer content row is visible in this panel.
+    bool solo_save; // WORKING HARBOUR: the SAVE row replaces the WATER row.
+    BoatTitleSave slot; // The working-harbour save slot as last scanned.
+    BoatSaveRow save; // The SAVE row's mode and open question.
+    int confirm_row; // The row that was selected when the question opened.
     FramePacer pacer;
 } Title;
 
@@ -263,22 +281,79 @@ static void crosshair(int x, int y, Color ink)
     DrawPixel(x, y, (PROTEUS_WARM_MENU ? boat_ui_palette().text : rgb(188, 255, 243)));
 }
 
+// A SOLO row is shown unless it is the content row off the outer location, the SAVE row off
+// WORKING HARBOUR, or the water row on WORKING HARBOUR (its job uses the sandbox's calm water).
+static bool solo_visible(const Title *t, int logical)
+{
+    return logical == ROW_SOLO_CONTENT ? t->solo_content
+        : logical == ROW_SOLO_SAVE     ? t->solo_save
+        : logical == ROW_SOLO_WATER    ? !t->solo_save
+                                       : true;
+}
+
+static int solo_count(const Title *t)
+{
+    int count = 0;
+    for (int i = 0; i < SOLO_ROWS; ++i)
+        count += solo_visible(t, i);
+    return count;
+}
+
 static int row_count(const Title *t)
 {
     return t->panel == PANEL_CREDITS ? 1
-        : t->panel == PANEL_SINGLE   ? (t->solo_content ? SOLO_ROWS : SOLO_ROWS - 1)
+        : t->panel == PANEL_SINGLE   ? solo_count(t)
         : t->panel == PANEL_JOIN     ? JOIN_ROWS
         : t->panel == PANEL_HOST     ? HOST_ROWS
         : t->panel == PANEL_SETTINGS ? SETTINGS_ROWS
                                      : MAIN_ROWS;
 }
 
-// A visible SOLO row as its enum value: the content row is hidden except on the outer location.
+// A visible SOLO row as its enum value.
 static int solo_row(const Title *t, int visible)
 {
-    if (t->solo_content || visible < ROW_SOLO_CONTENT)
-        return visible;
-    return visible + 1;
+    for (int i = 0; i < SOLO_ROWS; ++i)
+        if (solo_visible(t, i) && visible-- == 0)
+            return i;
+    return ROW_SOLO_BACK;
+}
+
+// The visible index of a SOLO row, or -1 when it is hidden.
+static int solo_index(const Title *t, int logical)
+{
+    int index = 0;
+    for (int i = 0; i < logical; ++i)
+        index += solo_visible(t, i);
+    return solo_visible(t, logical) ? index : -1;
+}
+
+// After the place or content changed (or the panel opened): show the right rows and, for
+// WORKING HARBOUR, rescan its save slot. The row starts on Continue when one can be continued.
+static void solo_refresh(Title *t, const BoatTitleSettings *s)
+{
+    t->solo_content = s->location == BOAT_LOCATION_OUTER;
+    t->solo_save = t->solo_content && s->outer_content == BOAT_TITLE_OUTER_WORKING_HARBOUR;
+    t->slot = (BoatTitleSave) { 0 };
+    if (t->solo_save)
+        wake_work_title_scan(s->data_dir, &t->slot);
+    boat_save_row_set(&t->save, t->slot.present, t->slot.available);
+    if (t->selected >= row_count(t))
+        t->selected = row_count(t) - 1;
+}
+
+// What the hint line says about WORKING HARBOUR's save, or NULL.
+static const char *work_hint(const Title *t, char *out, size_t size)
+{
+    if (t->save.confirming)
+        return t->save.pending == BOAT_SAVE_DELETE_FILE ? "REMOVES THE SAVE AND ITS BACKUP COPY"
+            : t->slot.available                         ? "THE OLD SAVE STAYS AS A BACKUP COPY"
+                                                        : "THE OLD SAVE IS SET ASIDE, NOT DELETED";
+    if (!t->slot.present)
+        return "NO SAVE YET; PROGRESS IS SAVED AUTOMATICALLY";
+    if (t->slot.available)
+        return t->slot.summary;
+    snprintf(out, size, "SAVE UNAVAILABLE: %s; NEW SETS IT ASIDE", t->slot.reason);
+    return out;
 }
 
 static Rectangle row_bounds(const Title *t, int row)
@@ -330,7 +405,7 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
     value[0] = 0;
     if (t->panel == PANEL_SINGLE) {
         static const char *labels[SOLO_ROWS]
-            = { "PLACE", "CONTENT", "WAVES", "PICTURE", "START", "BACK" };
+            = { "PLACE", "CONTENT", "SAVE", "WAVES", "PICTURE", "START", "BACK" };
         int logical = solo_row(t, row);
         *label = labels[logical];
         if (logical == ROW_SOLO_PLACE)
@@ -339,6 +414,8 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
                                                    : boat_location(s->location)->title);
         else if (logical == ROW_SOLO_CONTENT)
             snprintf(value, size, "< %s >", outer_contents[s->outer_content].label);
+        else if (logical == ROW_SOLO_SAVE)
+            boat_save_row_text(&t->save, value, size);
         else if (logical == ROW_SOLO_WATER)
             snprintf(value, size, "< %s >", s->waves ? "ON" : "OFF");
         else if (logical == ROW_SOLO_EDGES)
@@ -546,7 +623,11 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_LIGHTING)
         hint = "REMEMBERED FOR SINGLE PLAYER AND ROOMS";
-    if (!hint && t->panel == PANEL_SINGLE && solo_row(t, t->selected) == ROW_SOLO_CONTENT)
+    char work_text[96];
+    int solo = t->panel == PANEL_SINGLE ? solo_row(t, t->selected) : -1;
+    if (!hint && t->solo_save && (solo == ROW_SOLO_SAVE || solo == ROW_SOLO_START))
+        hint = work_hint(t, work_text, sizeof(work_text));
+    if (!hint && solo == ROW_SOLO_CONTENT)
         hint = outer_contents[s->outer_content].hint;
     char public_hint[96];
     if (!hint && t->panel == PANEL_JOIN && t->selected == ROW_PUBLIC_SERVER) {
@@ -935,6 +1016,10 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             t.moved = true;
             s->message[0] = 0;
         }
+        // A question is answered on its own row: moving off it withdraws the question.
+        if (t.save.confirming && t.selected != t.confirm_row)
+            boat_save_row_cancel(&t.save);
+        BoatSaveAction work_action = BOAT_SAVE_NOTHING;
         if (t.panel == PANEL_JOIN && !t.editing)
             search(&t);
         if (t.panel == PANEL_JOIN && t.selected == ROW_PUBLIC_SERVER && !t.editing
@@ -952,18 +1037,22 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
         if (t.panel == PANEL_SINGLE) {
             int sel = solo_row(&t, t.selected);
             if (sel <= ROW_SOLO_EDGES) {
-                int turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || activate)
+                int step_turn = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
                     - (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A));
+                int turn = step_turn + activate > 1 ? 1 : step_turn + activate;
                 if (sel == ROW_SOLO_PLACE) {
                     s->location = (s->location + BOAT_LOCATION_COUNT + 1 + turn)
                         % (BOAT_LOCATION_COUNT + 1);
-                    t.solo_content = s->location == BOAT_LOCATION_OUTER;
-                    if (t.selected >= row_count(&t))
-                        t.selected = row_count(&t) - 1;
-                } else if (sel == ROW_SOLO_CONTENT && turn)
-                    s->outer_content = (s->outer_content + BOAT_TITLE_OUTER_CONTENTS + turn)
-                        % BOAT_TITLE_OUTER_CONTENTS;
-                else if (sel == ROW_SOLO_WATER && turn)
+                    solo_refresh(&t, s);
+                } else if (sel == ROW_SOLO_CONTENT && turn) {
+                    s->outer_content
+                        = (s->outer_content + content_count() + turn) % content_count();
+                    solo_refresh(&t, s);
+                } else if (sel == ROW_SOLO_SAVE) {
+                    boat_save_row_turn(&t.save, step_turn);
+                    if (activate)
+                        work_action = boat_save_row_press(&t.save);
+                } else if (sel == ROW_SOLO_WATER && turn)
                     s->waves = !s->waves;
                 else if (sel == ROW_SOLO_EDGES && turn)
                     turn_picture(s, turn);
@@ -1012,7 +1101,9 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                 else
                     back = true;
             } else if (t.panel == PANEL_SINGLE) {
-                if (solo_row(&t, t.selected) == ROW_SOLO_START) {
+                if (solo_row(&t, t.selected) == ROW_SOLO_START && t.solo_save)
+                    work_action = boat_save_row_start(&t.save);
+                else if (solo_row(&t, t.selected) == ROW_SOLO_START) {
                     choice = BOAT_TITLE_SINGLE;
                     chosen = true;
                 } else
@@ -1052,8 +1143,8 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
                     back = true;
             } else if (t.selected == ROW_SINGLE) {
                 t.panel = PANEL_SINGLE;
-                t.solo_content = s->location == BOAT_LOCATION_OUTER;
-                t.selected = t.solo_content ? ROW_SOLO_START : ROW_SOLO_START - 1;
+                solo_refresh(&t, s);
+                t.selected = solo_index(&t, ROW_SOLO_START);
             } else if (t.selected == ROW_MULTI) {
                 t.panel = PANEL_JOIN;
                 t.selected = ROW_PUBLIC_SERVER;
@@ -1068,6 +1159,26 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
             } else if (t.selected == ROW_EXIT)
                 chosen = true;
         }
+        if (t.panel == PANEL_SINGLE) {
+            // The question shows on the SAVE row, whichever row started it.
+            if (t.save.confirming && t.confirm_row != solo_index(&t, ROW_SOLO_SAVE))
+                t.selected = solo_index(&t, ROW_SOLO_SAVE);
+            t.confirm_row = t.selected;
+            if (work_action == BOAT_SAVE_START_CONTINUE || work_action == BOAT_SAVE_START_NEW) {
+                s->work_new = work_action == BOAT_SAVE_START_NEW;
+                choice = BOAT_TITLE_SINGLE;
+                chosen = true;
+            } else if (work_action == BOAT_SAVE_DELETE_FILE) {
+                bool ok = wake_work_title_delete(&t.slot);
+                solo_refresh(&t, s);
+                snprintf(s->message, sizeof(s->message), "%s",
+                    ok ? "SAVE DELETED" : "COULD NOT DELETE THE SAVE");
+            } else if (activate && t.solo_save && solo_row(&t, t.selected) == ROW_SOLO_START
+                && !t.save.confirming && t.save.mode == BOAT_SAVE_DELETE)
+                snprintf(s->message, sizeof(s->message), "CHOOSE CONTINUE OR NEW TO START");
+        }
+        if (back && t.panel == PANEL_SINGLE && boat_save_row_cancel(&t.save))
+            back = false; // Escape first withdraws an open question.
         if (back && t.panel == PANEL_SINGLE) {
             boat_title_save(s);
             t.panel = PANEL_MAIN;
@@ -1098,6 +1209,34 @@ BoatTitleChoice boat_title_run(BoatTitleSettings *s)
     }
     close_title(&t);
     return choice;
+}
+
+bool boat_title_screenshot_panel(
+    const BoatTitleSettings *settings, double time, const char *path, const BoatTitleCapture *cap)
+{
+    Title t;
+    bool ok = false;
+    if (open_title(&t)) {
+        t.time = time;
+        if (cap->solo || cap->ask) {
+            t.panel = PANEL_SINGLE;
+            solo_refresh(&t, settings);
+            t.selected = solo_index(&t, t.solo_save ? ROW_SOLO_SAVE : ROW_SOLO_START);
+            for (int i = 0; i < 3 && t.solo_save && (int)t.save.mode != cap->save_mode; ++i)
+                boat_save_row_turn(&t.save, 1);
+            if (cap->ask && t.save.mode == BOAT_SAVE_DELETE)
+                boat_save_row_press(&t.save);
+            else if (cap->ask)
+                boat_save_row_start(&t.save);
+        }
+        draw_screen(&t, settings, NULL);
+        Image image = LoadImageFromTexture(t.target.texture);
+        ImageFlipVertical(&image);
+        ok = ExportImage(image, path);
+        UnloadImage(image);
+    }
+    close_title(&t);
+    return ok;
 }
 
 bool boat_title_screenshot(const BoatTitleSettings *settings, double time, const char *path)
@@ -1180,7 +1319,7 @@ void boat_title_load(BoatTitleSettings *s)
         else if (!strcmp(line, "resolution"))
             s->high_resolution = !strcmp(value, "high");
         else if (!strcmp(line, "outer_content")) {
-            for (unsigned i = 0; i < BOAT_TITLE_OUTER_CONTENTS; ++i)
+            for (unsigned i = 0; i < content_count(); ++i)
                 if (!strcmp(value, outer_contents[i].name))
                     s->outer_content = i;
         } else if (!strcmp(line, "host_mode")) {

@@ -259,6 +259,16 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
             w->ok = false;
             return;
         }
+        s->work_boat = (unsigned char)integer(w, s->work_boat, 1);
+        if (s->work_boat >= BOAT_SCENE_WORKBOATS) {
+            w->ok = false;
+            return;
+        }
+        for (unsigned i = 0; i < BOAT_SCENE_NOTICES; ++i) {
+            string(w, s->work_notice[i], sizeof(s->work_notice[i]));
+            if (s->work_notice[i][0] && !boat_scene_notice_valid(s->work_notice[i]))
+                w->ok = false;
+        }
         for (unsigned i = 0; i < s->work_count; ++i) {
             BoatSceneWorkSite *site = &s->work[i];
             string(w, site->id, sizeof(site->id));
@@ -391,14 +401,17 @@ static void payload(Wire *w, BoatPluginDecoded *d)
         break;
     case BOAT_PLUGIN_KIND_FREE: {
         d->free.version = number(w, d->free.version);
-        unsigned flags = (unsigned)integer(
-            w, (d->free.has_scene ? 1u : 0u) | (d->free.callbacks ? 2u : 0u), 1);
-        if (flags > 3) {
+        unsigned flags = (unsigned)integer(w,
+            (d->free.has_scene ? 1u : 0u) | (d->free.callbacks ? 2u : 0u)
+                | (d->free.migrates ? 4u : 0u),
+            1);
+        if (flags > 7) {
             w->ok = false;
             break;
         }
         d->free.has_scene = flags & 1u;
         d->free.callbacks = flags & 2u;
+        d->free.migrates = flags & 4u;
         if (d->free.has_scene)
             scene_wire(w, &d->free.scene);
         break;

@@ -466,30 +466,6 @@ static int transition(lua_State *L)
     return 0;
 }
 
-static bool valid_timers(const BoatPluginObjective *o)
-{
-    if (o->timer_count > BOAT_PLUGIN_TIMERS || (!o->timers_enabled && o->timer_count))
-        return false;
-    for (unsigned i = 0; i < o->timer_count; ++i) {
-        const BoatPluginTimer *timer = &o->timers[i];
-        const char *end = memchr(timer->id, 0, sizeof(timer->id));
-        if (!end || end == timer->id || timer->tick <= 0)
-            return false;
-        for (const char *p = timer->id; p < end; ++p)
-            if ((unsigned char)*p < 32 || (unsigned char)*p > 126)
-                return false;
-        if (i
-            && (o->timers[i - 1].tick > timer->tick
-                || (o->timers[i - 1].tick == timer->tick
-                    && strcmp(o->timers[i - 1].id, timer->id) >= 0)))
-            return false;
-        for (unsigned j = 0; j < i; ++j)
-            if (!strcmp(o->timers[j].id, timer->id))
-                return false;
-    }
-    return true;
-}
-
 static BoatPluginStatus step(BoatPluginObjective *objective, const char *source, size_t size,
     BoatPluginTransition action, int64_t tick, const BoatPluginEvent *events, unsigned event_count,
     const BoatPluginLimits *limits, BoatPluginDiagnostic *diagnostic, unsigned previous_version)
@@ -510,7 +486,7 @@ static BoatPluginStatus step(BoatPluginObjective *objective, const char *source,
         error = "transition budgets cannot exceed host limits";
     else if (action < BOAT_PLUGIN_OBJECTIVE_INIT || action > BOAT_PLUGIN_OBJECTIVE_RESET || tick < 0
         || objective->state_version > 65535 || !objective->generation || !objective->rng
-        || objective->hud_count > BOAT_PLUGIN_HUD || !valid_timers(objective)
+        || objective->hud_count > BOAT_PLUGIN_HUD || !boat_plugin_objective_timers_valid(objective)
         || objective->state.size > BOAT_PLUGIN_STATE_BYTES || objective->acknowledged < 0
         || objective->tick < 0)
         error = "invalid checkpoint or transition";
@@ -627,7 +603,7 @@ static void hash_integer(uint64_t *hash, uint64_t value)
 uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
 {
     if (!objective || objective->state.size > BOAT_PLUGIN_STATE_BYTES
-        || objective->hud_count > BOAT_PLUGIN_HUD || !valid_timers(objective))
+        || objective->hud_count > BOAT_PLUGIN_HUD || !boat_plugin_objective_timers_valid(objective))
         return 0;
     for (unsigned i = 0; i < objective->hud_count; ++i)
         if (!memchr(objective->hud[i].id, 0, sizeof(objective->hud[i].id))

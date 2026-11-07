@@ -21,6 +21,16 @@
 #define BOAT_CARGO_MOOR_SPEED 1.5f
 #define BOAT_CARGO_MOOR_ANGLE .785398163f // 45 degrees.
 
+// A registered workboat preset: the assisted berth's hull, thrust, deck rectangle and capture
+// envelope. Reset picks one per sandbox; the macros above are the flat_deck values.
+typedef struct {
+    const char *name;
+    BoatHull hull;
+    float thrust;
+    float deck_x, deck_y, deck_z;
+    float berth_left, berth_right, berth_front, berth_back;
+} BoatCargoWorkboat;
+
 typedef enum {
     BOAT_CARGO_PAD,
     BOAT_CARGO_HANGING,
@@ -28,6 +38,13 @@ typedef enum {
     BOAT_CARGO_SECURED,
     BOAT_CARGO_FLOATING
 } BoatCargoState;
+
+typedef enum { BOAT_CARGO_SUPPORT_PAD, BOAT_CARGO_SUPPORT_DECK } BoatCargoSupportKind;
+typedef struct {
+    BoatCargoSupportKind kind;
+    unsigned char pad; // Site index for PAD.
+    Vector3 deck_local; // Lashed position for DECK.
+} BoatCargoSupport;
 
 typedef struct {
     BoatCargoState state;
@@ -41,6 +58,7 @@ typedef struct {
     // wrong one can still reach the right one.
     bool delivered;
     unsigned char receivers;
+    BoatCargoSupport support; // Last stable support: a pad, or the lashed deck.
     unsigned load; // S1d: which load this is, from 1; a supply starts the next.
     bool wet; // Resting in water since its last support; a LOST event marks the first touch.
     float rest; // Continuous seconds at rest on a receiving pad, toward delivery.
@@ -77,11 +95,36 @@ typedef struct {
     unsigned crane_count;
     unsigned active; // The berth moored at, or being moored at; its crane holds the hook.
     unsigned source; // The service platform the load starts on and recovers to.
+    const BoatCargoWorkboat *boat; // Hull, deck and berth of the assisted workboat.
     bool moored;
     bool mooring; // Requested assisted alignment; G cancels it before reaching the berth.
     BoatCargoEvent events[BOAT_CARGO_EVENTS];
     unsigned event_count;
 } BoatCargoSandbox;
+
+#define BOAT_CARGO_SNAPSHOT_LOADS 1
+typedef struct {
+    unsigned load, source;
+    bool delivered;
+    unsigned char receivers;
+    BoatCargoSupport support; // Where it rests on resume: PAD or a lashed DECK only.
+} BoatCargoLoadSnapshot;
+typedef struct {
+    unsigned crane_count, active;
+    bool built[BOAT_SCENE_WORK_SITES];
+    BoatCargoLoadSnapshot loads[BOAT_CARGO_SNAPSHOT_LOADS];
+    unsigned load_count;
+    bool moored; // Resume moored at ACTIVE's berth.
+    Vector2 position; // Simulation metres, when not moored.
+    float heading;
+} BoatCargoSnapshot;
+// Record the built sites, one stable load and the boat pose for resuming this session. A load
+// that is hooked, loose on the deck or floating records where it last rested.
+void boat_cargo_snapshot(const BoatCargoSandbox *sandbox, const Boat *boat, BoatCargoSnapshot *out);
+// Rebuild the sandbox and boat from SNAPSHOT and the work sites it was taken with. Refuses,
+// changing neither output, when the sites, load or pose cannot be restored.
+bool boat_cargo_restore(BoatCargoSandbox *sandbox, unsigned workboat,
+    const BoatSceneWorkSite *sites, unsigned count, const BoatCargoSnapshot *snapshot, Boat *boat);
 
 typedef enum {
     BOAT_CARGO_MOOR_READY,
@@ -117,6 +160,11 @@ void boat_cargo_reset_at(BoatCargoSandbox *sandbox, Vector2 mooring);
 // site is a service platform.
 bool boat_cargo_reset_sites(
     BoatCargoSandbox *sandbox, const BoatSceneWorkSite *sites, unsigned count);
+// As above with a BoatSceneWorkboat preset (out of range falls back to flat_deck).
+bool boat_cargo_reset_sites_with(
+    BoatCargoSandbox *sandbox, unsigned workboat, const BoatSceneWorkSite *sites, unsigned count);
+// Registered workboat preset; out-of-range returns the flat_deck entry.
+const BoatCargoWorkboat *boat_cargo_workboat(unsigned preset);
 // Staging survey for one site: the platform, workboat approach and complete crane sweep clear
 // the compiled water, SCENE's berths/modules (NULL: compiled) and every retained or authored
 // travelling craft over its longest period. Conservative envelopes include the sampling gap.
@@ -130,6 +178,8 @@ bool boat_cargo_site_near(const BoatSceneWorkSite *site, Vector2 point, float ma
 // Site frame <-> renderer coordinates; directions omit the origin.
 Vector3 boat_cargo_site_direction(const BoatCargoCrane *crane, Vector3 local);
 Vector3 boat_cargo_site_point(const BoatCargoCrane *crane, Vector3 local);
+// The boat-local deck spot an aim assist (2 port, 3 starboard) lowers the crate onto.
+Vector3 boat_cargo_deck_aim_point(int aim);
 Vector3 boat_cargo_site_local(const BoatCargoCrane *crane, Vector3 point);
 Vector2 boat_cargo_berth(const BoatCargoCrane *crane); // Simulation metres.
 Vector3 boat_cargo_tip(const BoatCargoCrane *crane);

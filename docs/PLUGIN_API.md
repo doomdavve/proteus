@@ -79,7 +79,9 @@ authored `outer` voyage), `proteus.time-trial` (`course`), `proteus.river-sprint
 the separate `river` location and `proteus.river-free` were retired on 2026-11-04.
 The native catalog also bundles `proteus.outer-work` (`free`, `outer`), the
 [work-site](#work-sites-s1a) package that `cargo_sandbox` loads; it is never a default and the
-browser catalog omits it.
+browser catalog omits it. `proteus.basin-work` (`free`, `basin`) is the basin's reference fixture
+for the sandbox: one `service_platform` at the origin, no job. `boat_plugin_catalog_work_default`
+maps a location to its work package (`boat_plugin_catalog_default` never returns either).
 `plugins/langedrag`, `plugins/river-sprint`, `plugins/basin-free`, `plugins/outer-free`,
 `plugins/time-trial`, `plugins/deathmatch`, `plugins/harbor-room` and `plugins/harbor-race` are
 complete package sources; the catalog does not duplicate them.
@@ -138,12 +140,29 @@ return {
 | `heading` | Required. The moored workboat's heading in radians, \|h\| ≤ 2π, with the voyage API's forward `(sin, −cos)`; the platform, crane, pad, capture zone and survey envelope turn with it. At 0 the bow faces south and the platform lies 5 m toward +x |
 | `hidden` | Optional boolean, default `false`. A hidden site has no platform, berth, pad or contact until its job builds it with `work.enable`; staging surveys it like any other site. The site the sandbox starts at must be a visible `service_platform`. Only `true` changes the scene digest |
 
+`work` may also carry an optional `boat` string naming the registered native workboat preset
+(`"flat_deck"`, the default, S1e/F1): the workboat's hull, thrust, deck rectangle and mooring
+capture box. One preset applies to every site; unknown names are rejected at staging
+(`scene.work.boat` "is not a registered workboat preset"). Mooring speed and angle limits stay
+native. Only a non-default preset changes the scene digest.
+
+`work.notices` (S1e/F3) is an optional table of the job's feedback lines, with the optional string
+keys `delivered`, `built`, `supplied` and `returned`. Each is 1-63 printable ASCII characters and
+may use the token `{site}` for the site's name as a sign (capitals, underscores as spaces); `%`
+and any other brace are rejected (`scene.work.notices.<key>`). An absent key keeps the sandbox's
+native text. The lines are scene data shown on the native event, not commands, so they need no
+grant and the browser evaluator never sees them; control and key-binding prompts stay native.
+`plugins/outer-work` states the four texts the sandbox used before this field. Only a present
+notice changes the scene digest.
+
 `work` is an optional subsystem of scene v3; absent work leaves every earlier scene digest
 unchanged. Voyage, race and match packages reject it (`scene.work` "is only supported by free
 packages"). Staging, the catalog generator and `cargo_sandbox --survey` run the same site survey
 on the location's compiled map, with the sandbox's gentle water:
 
-- the site needs a mapped location (the basin is rejected);
+- on a mapped location the checks below apply. The unmapped basin has no map: each site's berth
+  must lie at least 16 m inside the basin walls and clear the earlier sites' envelopes, and the
+  map, traffic and spawn checks are skipped (S1e F2);
 - the preset's envelope, berth −3..11 m in x and −5..12 m in z of the turned site frame, must be
   open water with 1 m clearance and clear of the scene's (or compiled) moored hulls and dock
   modules;
@@ -167,8 +186,13 @@ Status, 2026-11-07: **implemented locally for the native `cargo_sandbox` only; n
 free package with `scene.work` may request `["free.define", "scene.define", "objective.hud"]`
 and return `init` and `update` beside `free`, with the
 [voyage objective](#live-optional-voyage-objective-p32) transaction contract: state, HUD rows,
-the 12-tick update boundary, budgets and suspension are the same. `migrate`, `objective.timers`
-and live reload are not offered; a reset restarts the job at a new generation. The catalog
+the 12-tick update boundary, budgets and suspension are the same. `objective.timers`
+and live reload are not offered. A job may also return `migrate(context, state)` (SV1i,
+local): when a save was written at another `state_version`, the game runs it once at load
+(P3.3b contract, at the saved tick, with the fresh generation; queued events stay unacknowledged)
+and the job continues from the migrated state. A package without `migrate` leaves such a save
+unavailable (`PROGRESS FORMAT CHANGED`); a failing `migrate` does the same and touches no file. A
+non-function `migrate` is a schema error. Free packages have no live reload; a reset restarts the job at a new generation. The catalog
 generator probes `init` at build time. S1d (local, 2026-11-07) added `cargo.supply`,
 `work.guide` and the events' `load`. `plugins/outer-work` is the reference:
 
@@ -211,6 +235,20 @@ site whose surveyed envelope holds the boat (within 3 m) or the crate keeps the 
 checkpoint and its unacknowledged events, shows `BUILD WAITING: MOVE CLEAR`, and retries at the
 next boundary. Otherwise the site appears between ticks and the batch commits. Nothing is built
 that staging did not survey. A reset (R) hides built sites and restarts cargo and job together.
+
+Saves (SV1d, local, 2026-11-07): `cargo_sandbox` saves and resumes the session automatically; the
+package does nothing. It writes `cargo-<package id>.sav` (with `.bak`) in the data directory
+(`--data-dir DIR` overrides it, `--save FILE` names a file, `--new` starts fresh), at milestones
+(a committed change to the job's state, HUD or timers; a site built; a load number, delivery,
+lashing, set-down, mooring or departure), every 30 s of dirty play, and when pausing, losing focus
+or quitting. A save is compared by package id, a **work digest** (site ids, presets, cargo,
+positions, headings, hidden flags and the workboat; **not** `scene.work.notices` or HUD text),
+the manifest `state_version`, the physics revision and the tick rate. Equal values resume with the
+current source, so editing text or behaviour while keeping `state_version` keeps saves valid;
+changing what the state means needs a new `state_version`, and until SV1i a changed
+`state_version` (like any other mismatch) sets the file aside as `NAME.rejected` and starts fresh.
+Resume restores the committed checkpoint, its unacknowledged events and the generation, never
+re-runs `init`, and never queues events.
 
 `cargo.supply` and `work.guide` take the same exact fields under the same grant, each at most
 once per batch; each command kind has its own id namespace, so one batch may build, supply and

@@ -133,6 +133,7 @@ typedef struct {
 // PD3: an optional authored scene, which also fixes the location.
 typedef struct {
     BoatPluginManifest manifest;
+    bool migrates; // SV1i: an optional work-site job migrate callback.
     bool has_scene;
     BoatSceneDefinition scene;
     uint64_t scene_digest; // boat_scene_digest(&scene); zero when absent.

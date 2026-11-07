@@ -147,7 +147,8 @@ endif()
 # plus boat_plugin_io for reading a package directory. Core and net never link it.
 add_library(proteus_plugins STATIC src/boat_plugin.c src/boat_plugin.h src/boat_plugin_lua.c
   src/boat_plugin_lua.h src/boat_plugin_io.c src/boat_plugin_io.h src/boat_plugin_host.c
-  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h)
+  src/boat_plugin_host.h src/boat_plugin_race.c src/boat_plugin_state.c src/boat_plugin_state.h
+  src/boat_plugin_objective_codec.c)
 target_link_libraries(proteus_plugins PUBLIC proteus_boat_core PRIVATE proteus_json proteus_lua)
 target_compile_options(proteus_plugins PRIVATE ${PROTEUS_WARNINGS})
 target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_stage.h
@@ -162,7 +163,8 @@ target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_s
 set(BOAT_PLUGIN_PACKAGES
   plugins/basin-free plugins/outer-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
-  plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work)
+  plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work
+  plugins/basin-work)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
     plugins/basin-free plugins/time-trial plugins/langedrag
@@ -198,6 +200,20 @@ add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating the bundled plugin catalog"
   VERBATIM)
+# SV1b: the sandbox save's byte format. Buffers only: no files, no Lua beyond proteus_plugins.
+add_library(proteus_sandbox_save STATIC src/boat_sandbox_save.c src/boat_sandbox_save.h)
+target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)
+target_compile_options(proteus_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
+
+add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_session.h)
+target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_boat_core)
+target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
+
+add_library(proteus_work_save STATIC src/boat_work_save.c src/boat_work_save.h
+  src/boat_work_menu.c src/boat_work_menu.h)
+target_link_libraries(proteus_work_save PUBLIC proteus_work_session proteus_file)
+target_compile_options(proteus_work_save PRIVATE ${PROTEUS_WARNINGS})
+
 add_library(proteus_plugin_catalog STATIC
   src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
 target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
@@ -228,9 +244,14 @@ add_library(proteus_gpu STATIC src/boat_gpu.c src/renderer_gpu.c src/waterfront_
 target_link_libraries(proteus_gpu PUBLIC proteus_render)
 target_compile_options(proteus_gpu PRIVATE ${PROTEUS_WARNINGS})
 
+# SV1d: user-data file helpers (atomic save with backup, bounded listing). No raylib.
+add_library(proteus_file STATIC src/boat_file.c src/boat_file.h)
+target_include_directories(proteus_file PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(proteus_file PRIVATE ${PROTEUS_WARNINGS})
+
 # Single-player session orchestration and replay persistence.
 add_library(proteus_boat_session STATIC src/boat_replay.c src/boat_session.c)
-target_link_libraries(proteus_boat_session PUBLIC proteus_render)
+target_link_libraries(proteus_boat_session PUBLIC proteus_render proteus_file)
 target_compile_options(proteus_boat_session PRIVATE ${PROTEUS_WARNINGS})
 
 # Shared wake_velocity drive, state hashing and profile records for the study, benchmark and
@@ -277,10 +298,20 @@ else()
   set(PROTEUS_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
 endif()
 
-add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/boat_title.c
+add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c
+  tools/wake_velocity_work.h tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
-target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer)
+target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
+  proteus_work_save)
+# WORKING HARBOUR steps the work package's Lua, so it is native-only: the browser game links stubs
+# (tools/check_web_wasm.py proves it carries no Lua).
+if(EMSCRIPTEN)
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_work_web.c)
+else()
+  target_sources(wake_velocity PRIVATE tools/wake_velocity_work.c)
+  target_link_libraries(wake_velocity PRIVATE proteus_work_session)
+endif()
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
 target_compile_definitions(wake_velocity PRIVATE
@@ -519,10 +550,27 @@ target_link_libraries(validate_cargo_decal PRIVATE proteus_render)
 target_compile_options(validate_cargo_decal PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME cargo_shadow_geometry COMMAND validate_cargo_decal)
 set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
+add_executable(validate_boat_sandbox_save tools/validate_boat_sandbox_save.c)
+target_link_libraries(validate_boat_sandbox_save PRIVATE proteus_sandbox_save)
+target_compile_options(validate_boat_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_sandbox_save COMMAND validate_boat_sandbox_save)
+set_tests_properties(boat_sandbox_save PROPERTIES LABELS "cpu;quick")
+add_executable(validate_boat_file tools/validate_boat_file.c)
+target_link_libraries(validate_boat_file PRIVATE proteus_file)
+target_compile_options(validate_boat_file PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_file COMMAND validate_boat_file ${CMAKE_CURRENT_BINARY_DIR}/file-tests)
+set_tests_properties(boat_file PROPERTIES LABELS "cpu;quick")
+# SV1h: discovery over build-tree directories and the SAVE row's confirmations.
+add_executable(validate_boat_work_menu tools/validate_boat_work_menu.c)
+target_link_libraries(validate_boat_work_menu PRIVATE proteus_work_save proteus_plugin_catalog)
+target_compile_options(validate_boat_work_menu PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_work_menu COMMAND validate_boat_work_menu ${CMAKE_CURRENT_BINARY_DIR}/work-menu-tests)
+set_tests_properties(boat_work_menu PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
-  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog)
+  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_work_session
+    proteus_work_save proteus_sandbox_save proteus_file)
   add_dependencies(cargo_sandbox proteus_assets)
   target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
   foreach(side left right)
@@ -534,6 +582,7 @@ if(NOT EMSCRIPTEN)
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-outer-${side}-test.png)
   endforeach()
   add_test(NAME cargo_sandbox_site COMMAND cargo_sandbox --survey)
+  add_test(NAME cargo_sandbox_scene_survives_reset COMMAND cargo_sandbox --scene-check)
   add_test(NAME cargo_shadow_wave_cpu COMMAND cargo_sandbox --location basin --renderer cpu --shadow-review)
   if(PROTEUS_GPU_TESTS)
     add_test(NAME cargo_shadow_wave_gpu COMMAND cargo_sandbox --renderer gpu --shadow-review)
@@ -545,6 +594,48 @@ if(NOT EMSCRIPTEN)
       --scenario ${scenario}
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${scenario}-test.png)
   endforeach()
+  # SV1d: a staged session is saved to a build-tree file, resumed by a later run and captured
+  # (the same landing-built frame as its screenshot test), and a save written by a package with
+  # a different work digest is set aside and the run starts fresh. Nothing touches the user's data
+  # directory because every run names its file.
+  set(SANDBOX_SAVE_DIR ${CMAKE_CURRENT_BINARY_DIR}/sandbox-save-tests)
+  file(MAKE_DIRECTORY ${SANDBOX_SAVE_DIR})
+  add_test(NAME cargo_sandbox_save_write COMMAND cargo_sandbox --scenario landing-built
+    --save ${SANDBOX_SAVE_DIR}/resume.sav --save-now)
+  add_test(NAME cargo_sandbox_save_resume COMMAND cargo_sandbox --renderer cpu
+    --save ${SANDBOX_SAVE_DIR}/resume.sav --expect resumed
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-save-resume-test.png)
+  add_test(NAME cargo_sandbox_save_stale COMMAND cargo_sandbox --scenario landing-built
+    --save ${SANDBOX_SAVE_DIR}/stale.sav --save-now --stale-digest)
+  add_test(NAME cargo_sandbox_save_rejected COMMAND cargo_sandbox --renderer cpu
+    --save ${SANDBOX_SAVE_DIR}/stale.sav --expect rejected
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-save-rejected-test.png)
+  set_tests_properties(cargo_sandbox_save_write PROPERTIES FIXTURES_SETUP sandbox_save_resume)
+  set_tests_properties(cargo_sandbox_save_resume PROPERTIES FIXTURES_REQUIRED sandbox_save_resume)
+  set_tests_properties(cargo_sandbox_save_stale PROPERTIES FIXTURES_SETUP sandbox_save_rejected)
+  set_tests_properties(cargo_sandbox_save_rejected PROPERTIES FIXTURES_REQUIRED
+    sandbox_save_rejected)
+  # The window loop's automatic saving on a virtual clock (2 ticks per frame): a periodic
+  # write, a milestone, pausing and quitting, then a later run resumes the last write.
+  add_test(NAME cargo_sandbox_autosave COMMAND cargo_sandbox --autosave-check --scenario departure
+    --save ${SANDBOX_SAVE_DIR}/autosave.sav)
+  add_test(NAME cargo_sandbox_autosave_resume COMMAND cargo_sandbox --renderer cpu
+    --save ${SANDBOX_SAVE_DIR}/autosave.sav --expect resumed
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-autosave-resume-test.png)
+  set_tests_properties(cargo_sandbox_autosave PROPERTIES FIXTURES_SETUP sandbox_autosave)
+  set_tests_properties(cargo_sandbox_autosave_resume PROPERTIES FIXTURES_REQUIRED sandbox_autosave)
+  list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_autosave cargo_sandbox_autosave_resume)
+  list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_save_write cargo_sandbox_save_resume
+    cargo_sandbox_save_stale cargo_sandbox_save_rejected)
+  # SV1c: save the staged session, resume it from the record and from its encoded bytes, and
+  # require equal behaviour over 1200 scripted ticks. No window and no files.
+  foreach(scenario swing departure crossing delivered landing-built build-blocked quay-pickup
+    jetty-delivered delivery-pending capsized)
+    add_test(NAME cargo_sandbox_resume_${scenario} COMMAND cargo_sandbox --resume-check
+      --scenario ${scenario})
+    list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_resume_${scenario})
+  endforeach()
+  list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_scene_survives_reset)
 endif()
 add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -1030,6 +1121,14 @@ foreach(place_package
   set_tests_properties(wake_velocity_title_start.${place} PROPERTIES TIMEOUT 60
     PASS_REGULAR_EXPRESSION "Plugin ${package}:")
 endforeach()
+# WORKING HARBOUR starts through --work instead of --package. Unlike --package, --work prints no
+# package banner, so the exit status and the screenshot are the check.
+add_test(NAME wake_velocity_title_start.outer-working-harbour
+  COMMAND wake_velocity --title-start outer-working-harbour --renderer cpu
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/title_start_outer-working-harbour.png --time 0.1
+    --data-dir ${CMAKE_CURRENT_BINARY_DIR}/work-save-tests-title
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(wake_velocity_title_start.outer-working-harbour PROPERTIES TIMEOUT 60)
 add_test(NAME wake_velocity_title_start_rejected COMMAND wake_velocity --title-start nowhere)
 set_tests_properties(wake_velocity_title_start_rejected PROPERTIES WILL_FAIL TRUE)
 add_test(NAME boat_net_study_mode_rejected COMMAND wake_velocity --connect 127.0.0.1:24680 --waves)
@@ -1213,6 +1312,31 @@ add_test(NAME boat_cpu_aa_option_reversed COMMAND wake_velocity --gpu-aa --rende
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option-reversed.png)
 add_test(NAME boat_outer_screenshot COMMAND wake_velocity --renderer cpu --location outer --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-outer.png)
+# SV1f: the working-harbour session in the game, from the scripted drive: the berth, and the
+# landing delivery (idle for 10 s, then the delivery script). --work refuses incompatible options.
+add_test(NAME wake_velocity_work_cpu_screenshot COMMAND wake_velocity --renderer cpu
+  --location outer --work --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth.png)
+add_test(NAME wake_velocity_work_delivered_cpu_screenshot COMMAND wake_velocity --renderer cpu
+  --location outer --work --time 14
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered.png)
+# SV1g: a scripted delivery is saved to a build-tree file by one run and resumed by the next,
+# which must say so (and exit 0); nothing touches the user's data directory.
+set(WORK_SAVE_DIR ${CMAKE_CURRENT_BINARY_DIR}/work-save-tests)
+file(MAKE_DIRECTORY ${WORK_SAVE_DIR})
+add_test(NAME wake_velocity_work_save_write COMMAND ${CMAKE_COMMAND} "-DREGEX=Wrote save .*work.sav"
+  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_expect.cmake -- $<TARGET_FILE:wake_velocity>
+  --renderer cpu --location outer --work --time 14 --save ${WORK_SAVE_DIR}/work.sav --save-now)
+add_test(NAME wake_velocity_work_save_resume COMMAND ${CMAKE_COMMAND}
+  "-DREGEX=Resumed save .*work.sav at tick" -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_expect.cmake
+  -- $<TARGET_FILE:wake_velocity> --renderer cpu --location outer --work
+  --save ${WORK_SAVE_DIR}/work.sav --camera-distance 30 --camera-height 20
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-resumed.png)
+set_tests_properties(wake_velocity_work_save_write PROPERTIES FIXTURES_SETUP work_save)
+set_tests_properties(wake_velocity_work_save_resume PROPERTIES FIXTURES_REQUIRED work_save)
+add_test(NAME wake_velocity_work_refuses_package COMMAND wake_velocity --renderer cpu
+  --location outer --work --package outer-work --time 0
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-refused.png)
+set_tests_properties(wake_velocity_work_refuses_package PROPERTIES WILL_FAIL TRUE)
 # The retired river location names its replacement instead of printing the usage.
 add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)
 add_test(NAME boat_server_river_location_retired COMMAND boat_server --location river)
@@ -1415,6 +1539,12 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME boat_wave_gpu_screenshot COMMAND wake_velocity --location outer --gpu-aa --waves
     --camera-distance 12 --camera-height 6 --time 2.9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-wave-gpu.png)
+  add_test(NAME wake_velocity_work_gpu_screenshot COMMAND wake_velocity --location outer --work
+    --gpu --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth-gpu.png)
+  add_test(NAME wake_velocity_work_delivered_gpu_screenshot COMMAND wake_velocity --location outer
+    --work --gpu --time 14 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered-gpu.png)
+  set_tests_properties(wake_velocity_work_gpu_screenshot wake_velocity_work_delivered_gpu_screenshot
+    PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_basin_gpu_screenshot COMMAND wake_velocity --time 0
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-basin-gpu.png)
   add_test(NAME boat_basin_gpu_aa_screenshot COMMAND wake_velocity --gpu-aa --time 0
@@ -1468,7 +1598,7 @@ endforeach()
 # else, including GPU tests, is slow and runs in the full suite. Case tests declare their lane
 # in C (tools/boat_test_cases.h); the remaining tests heavier than that are listed here.
 set(PROTEUS_SLOW_TESTS
-  cargo_shadow_wave_cpu
+  cargo_shadow_wave_cpu ${PROTEUS_RESUME_TESTS}
   cargo_sandbox_shadow-high_screenshot cargo_sandbox_shadow-low_screenshot cargo_sandbox_remoor_screenshot
   cargo_sandbox_crossing_screenshot cargo_sandbox_receiver-approach_screenshot
   cargo_sandbox_delivered_screenshot cargo_sandbox_landing-built_screenshot
@@ -1488,11 +1618,12 @@ set(PROTEUS_SLOW_TESTS
   waterfront_actors scene_site harbor_life_qualification
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_outer_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
-  boat_outer_screenshot
+  boat_outer_screenshot wake_velocity_work_cpu_screenshot wake_velocity_work_delivered_cpu_screenshot
+  wake_velocity_work_refuses_package wake_velocity_work_save_write wake_velocity_work_save_resume
   wake_velocity_title_start.basin
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
   wake_velocity_title_start.outer-grodan wake_velocity_title_start.outer-canal-tour
-  wake_velocity_title_start.basin-trial)
+  wake_velocity_title_start.outer-working-harbour wake_velocity_title_start.basin-trial)
 
 if(TEST boat_plugin_author)
   list(APPEND PROTEUS_SLOW_TESTS boat_plugin_author boat_plugin_capture boat_plugin_stage)

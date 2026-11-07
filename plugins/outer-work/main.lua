@@ -5,6 +5,9 @@
 -- (sin, -cos)). "receiving_platform" is the same layout starting empty, its pad marked for
 -- delivery. A `hidden` site is absent until the job builds it. Staging surveys every site,
 -- hidden or not, against the map, marina, retained traffic, the spawn and the other sites.
+-- The optional `boat` key picks the assisted berth's registered workboat preset ("flat_deck"
+-- today); its hull, deck and capture envelope apply to every site. The optional `notices` table
+-- holds the job's feedback text; `{site}` becomes the site name.
 -- Crane, cargo, mooring and delivery physics stay native.
 local function job(c, s)
   if not s.built then
@@ -51,6 +54,13 @@ return {
     scene = {
       version = 3,
       work = {
+        boat = "flat_deck",
+        notices = {
+          delivered = "Crate delivered. It stays counted, even if moved again.",
+          built = "{site} built.",
+          supplied = "Supplies used. Next crate waits on the {site} pad.",
+          returned = "Crate returned to the {site} pad."
+        },
         sites = {
           -- North end of the Eriksberg inlet, outside the marina entrance and traffic paths.
           { id = "eriksberg", preset = "service_platform", cargo = "crate", x = 10, z = 245,

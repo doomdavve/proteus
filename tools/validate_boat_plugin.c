@@ -1280,6 +1280,15 @@ static int work_sites(void)
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
     CHECK(free.has_scene && free.scene.work_present && free.scene.work_count == 4);
+    CHECK(free.scene.work_boat == BOAT_SCENE_WORKBOAT_FLAT_DECK);
+    // F3: the bundled package states the same feedback texts the sandbox shows natively.
+    CHECK(!strcmp(free.scene.work_notice[BOAT_SCENE_NOTICE_DELIVERED],
+        "Crate delivered. It stays counted, even if moved again."));
+    CHECK(!strcmp(free.scene.work_notice[BOAT_SCENE_NOTICE_BUILT], "{site} built."));
+    CHECK(!strcmp(free.scene.work_notice[BOAT_SCENE_NOTICE_SUPPLIED],
+        "Supplies used. Next crate waits on the {site} pad."));
+    CHECK(!strcmp(
+        free.scene.work_notice[BOAT_SCENE_NOTICE_RETURNED], "Crate returned to the {site} pad."));
     CHECK(free.manifest.objective && !free.manifest.timers);
     const BoatSceneWorkSite *site = &free.scene.work[0];
     CHECK(!strcmp(site->id, "eriksberg") && site->x == 10 && site->z == 245 && site->heading == 0);
@@ -1313,6 +1322,8 @@ static int work_sites(void)
     CHECK(boat_plugin_decoded_revision(&back, &revision, &d));
     CHECK(revision.free.scene_digest == free.scene_digest);
     CHECK(!memcmp(revision.free.scene.work, free.scene.work, 4 * sizeof(*site)));
+    CHECK(!memcmp(
+        revision.free.scene.work_notice, free.scene.work_notice, sizeof(free.scene.work_notice)));
     CHECK(back.free.callbacks && revision.free.manifest.objective);
     // An explicit hidden = false keeps the S1b digest; hiding a site changes it.
     BoatSceneDefinition shown = free.scene;
@@ -1354,12 +1365,36 @@ static int work_sites(void)
             "scene.work.sites[2].id" },
         { "{ sites = {" WORK_SITE("a", 1, 1) "," WORK_SITE("b", 2, 2) "," WORK_SITE(
               "c", 3, 3) "," WORK_SITE("d", 4, 4) "," WORK_SITE("e", 5, 5) "} }",
-            "scene.work.sites" } };
+            "scene.work.sites" },
+        { "{ notices = { delivered = '100% done' }, sites = {" WORK_SITE("a", 10, 245) "} }",
+            "scene.work.notices" },
+        { "{ notices = { supplied = '{x}' }, sites = {" WORK_SITE("a", 10, 245) "} }",
+            "scene.work.notices" },
+        { "{ notices = { built = '' }, sites = {" WORK_SITE("a", 10, 245) "} }",
+            "scene.work.notices" },
+        { "{ notices = { nope = 'a' }, sites = {" WORK_SITE("a", 10, 245) "} }",
+            "scene.work.notices" } };
     for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
         CHECK(load_work(WORK_MANIFEST("outer"), invalid[i].sites, &free, &d) == BOAT_PLUGIN_SCHEMA);
         show("work", &d);
         CHECK(!strncmp(d.field, invalid[i].field, strlen(invalid[i].field)));
     }
+    // A valid token template loads and changes the digest; absent notices do not.
+    CHECK(load_work(WORK_MANIFEST("outer"),
+              "{ notices = { built = '{site} is up.' }, sites = {" WORK_SITE("a", 10, 245) "} }",
+              &free, &d)
+        == BOAT_PLUGIN_OK);
+    show("work notice", &d);
+    CHECK(!strcmp(free.scene.work_notice[BOAT_SCENE_NOTICE_BUILT], "{site} is up."));
+    BoatSceneDefinition plain = free.scene;
+    memset(plain.work_notice, 0, sizeof(plain.work_notice));
+    CHECK(boat_scene_digest(&free.scene) != boat_scene_digest(&plain));
+    // The optional workboat preset must name a registered native boat.
+    CHECK(load_work(WORK_MANIFEST("outer"),
+              "{ boat = 'nope', sites = {" WORK_SITE("a", 10, 245) "} }", &free, &d)
+        == BOAT_PLUGIN_SCHEMA);
+    show("workboat", &d);
+    CHECK(!strcmp(d.field, "scene.work.boat") && strstr(d.message, "registered workboat preset"));
     // Voyages, races and matches cannot author work sites in S1a.
     const char *voyage = variant("return {",
         "return { scene = { version = 3, work = { sites = {" WORK_SITE("a", 10, 245) "} } },");
@@ -1426,10 +1461,18 @@ static int work_sites(void)
 
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
     CHECK(boat_world_resources_init(&world, basin));
-    CHECK(load_work(WORK_MANIFEST("basin"), "{ sites = {" WORK_SITE("a", 0, 0) "} }", &free, &d)
-        == BOAT_PLUGIN_OK);
-    failed = boat_plugin_free_check_location(&free, basin, &world.map, &d) != BOAT_PLUGIN_MANIFEST;
-    show("basin site", &d);
+    // S1a: the basin has no map, so staging only checks the walls, not the map survey.
+    BoatPluginFiles basin_files;
+    CHECK(boat_plugin_read("plugins/basin-work", NULL, &basin_files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginBundle basin_bundle = boat_plugin_bundle(&basin_files);
+    CHECK(boat_plugin_load_free(&basin_bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
+    failed = boat_plugin_free_check_location(&free, basin, NULL, &d) != BOAT_PLUGIN_OK;
+    show("basin work", &d);
+    // A site outside the walls fails the bounds check with its own diagnostic.
+    free.scene.work[0].x = 5000;
+    failed |= boat_plugin_free_check_location(&free, basin, NULL, &d) != BOAT_PLUGIN_SCHEMA
+        || strncmp(d.field, "scene.work.sites[1]", strlen("scene.work.sites[1]"));
+    show("basin edge", &d);
     boat_world_resources_destroy(&world);
     CHECK(!failed);
     return 0;
@@ -1476,6 +1519,14 @@ static int free_objective(void)
         { JOB_MANIFEST(JOB_GRANT),
             "return { " JOB_CALLBACKS " migrate = function(c, s) return s, {} end, free = { "
             "version = 1, scene = { version = 3, " JOB_WORK " } } }",
+            BOAT_PLUGIN_OK, "" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { " JOB_CALLBACKS " migrate = 1, free = { version = 1, scene = { "
+            "version = 3, " JOB_WORK " } } }",
+            BOAT_PLUGIN_SCHEMA, "migrate" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { migrate = function(c, s) return s, {} end, free = { version = 1, scene = { "
+            "version = 3, " JOB_WORK " } } }",
             BOAT_PLUGIN_SCHEMA, "migrate" },
         { JOB_MANIFEST("\"free.define\", \"objective.hud\""), "return {}", BOAT_PLUGIN_MANIFEST,
             "capabilities[2]" },
@@ -1492,6 +1543,18 @@ static int free_objective(void)
         CHECK(status == cases[i].status);
         CHECK(status == BOAT_PLUGIN_OK || !strcmp(d.field, cases[i].field));
         CHECK(status != BOAT_PLUGIN_OK || free.manifest.objective);
+    }
+    // SV1i: the optional migrate callback is recorded, and absent otherwise.
+    for (unsigned migrates = 0; migrates < 2; ++migrates) {
+        char source[512];
+        snprintf(source, sizeof(source),
+            "return { " JOB_CALLBACKS " %s free = { version = 1, scene = { version = 3, " JOB_WORK
+            " } } }",
+            migrates ? "migrate = function(c, s) return s, {} end," : "");
+        const char *manifest = JOB_MANIFEST(JOB_GRANT);
+        BoatPluginBundle bundle = { manifest, strlen(manifest), source, strlen(source) };
+        CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
+        CHECK(free.migrates == (migrates != 0));
     }
     // Races and matches keep their single optional scene grant.
     BoatPluginManifest manifest;

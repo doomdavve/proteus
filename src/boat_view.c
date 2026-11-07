@@ -656,6 +656,7 @@ void boat_scene_frame(const BoatViewState *view, const BoatPresentation *present
         view->scene, time, world->water, waterfront_kit_ground(world->definition->map), frame);
     frame->camera = boat_camera(boat, presentation, world->definition, camera);
     frame->player_active = true;
+    frame->hide_player = view->props && view->props->hide_player;
     if (!world->definition->mapped)
         basin_scenery(view, world, frame);
     else
@@ -815,6 +816,14 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
                     renderer, waterfront_gull_mesh(part), birds.gulls[i][part]);
         renderer->emissive_tint = (Vector3) { 1, 1, 1 };
     }
+    if (view->props) {
+        // The working harbour's own geometry, in renderer coordinates (identity transform).
+        Transform3D identity = { .scale = { 1, 1, 1 } };
+        if (view->props->solids)
+            renderer3d_draw_mesh(renderer, view->props->solids, identity);
+        if (view->props->decal)
+            renderer3d_draw_mesh(renderer, view->props->decal, identity);
+    }
     for (int i = 0; i < BOAT_WATER_PARTICLES; ++i) {
         const BoatWaterParticle *p = &presentation->water[i];
         if (p->lifetime <= 0)
@@ -851,7 +860,8 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     static WaterfrontPlayerState player; // Large; drawing is single-threaded.
     player = (WaterfrontPlayerState) { 0 };
     boat_player_pose(view, &presentation->flag, &player);
-    draw_skinned_boat(renderer, &player);
+    if (!view->props || !view->props->hide_player)
+        draw_skinned_boat(renderer, &player);
     if (world->combat && world->combat->enabled)
         cannon_visit(&view->boat, environment_draw, renderer);
     for (int i = 0; i < other_count; ++i) {

@@ -9,6 +9,25 @@
 
 static const Vector3 crane_base = { -4, 5.5f, 3 };
 
+static const BoatCargoWorkboat workboats[] = {
+    { .name = "flat_deck",
+        .hull = { 2.3f, 2.3f, 1.3f, 5 },
+        .thrust = 3.1f,
+        .deck_x = BOAT_CARGO_DECK_X,
+        .deck_y = BOAT_CARGO_DECK_Y,
+        .deck_z = BOAT_CARGO_DECK_Z,
+        .berth_left = BOAT_CARGO_BERTH_LEFT,
+        .berth_right = BOAT_CARGO_BERTH_RIGHT,
+        .berth_front = BOAT_CARGO_BERTH_FRONT,
+        .berth_back = BOAT_CARGO_BERTH_BACK },
+};
+
+const BoatCargoWorkboat *boat_cargo_workboat(unsigned preset)
+{
+    unsigned count = (unsigned)(sizeof(workboats) / sizeof(workboats[0]));
+    return &workboats[preset < count ? preset : 0];
+}
+
 void boat_cargo_reset(BoatCargoSandbox *s) { boat_cargo_reset_at(s, (Vector2) { 0 }); }
 
 void boat_cargo_reset_at(BoatCargoSandbox *s, Vector2 mooring)
@@ -19,7 +38,15 @@ void boat_cargo_reset_at(BoatCargoSandbox *s, Vector2 mooring)
 
 bool boat_cargo_reset_sites(BoatCargoSandbox *s, const BoatSceneWorkSite *sites, unsigned count)
 {
-    *s = (BoatCargoSandbox) { .cargo = { .state = BOAT_CARGO_PAD, .load = 1 }, .moored = true };
+    return boat_cargo_reset_sites_with(s, 0, sites, count);
+}
+
+bool boat_cargo_reset_sites_with(
+    BoatCargoSandbox *s, unsigned workboat, const BoatSceneWorkSite *sites, unsigned count)
+{
+    *s = (BoatCargoSandbox) { .cargo = { .state = BOAT_CARGO_PAD, .load = 1 },
+        .moored = true,
+        .boat = boat_cargo_workboat(workboat) };
     if (!count || count > BOAT_SCENE_WORK_SITES)
         return false;
     s->crane_count = count;
@@ -42,6 +69,8 @@ bool boat_cargo_reset_sites(BoatCargoSandbox *s, const BoatSceneWorkSite *sites,
     }
     s->source = s->active;
     s->cargo.pad = (unsigned char)s->active;
+    s->cargo.support
+        = (BoatCargoSupport) { .kind = BOAT_CARGO_SUPPORT_PAD, .pad = (unsigned char)s->active };
     s->cargo.position = boat_cargo_site_point(&s->cranes[s->active], (Vector3) { -5, 1.4f, 0 });
     return true;
 }
@@ -71,6 +100,7 @@ bool boat_cargo_recover(BoatCargoSandbox *s)
         .pad = (unsigned char)s->source,
         .delivered = c->delivered,
         .receivers = c->receivers,
+        .support = { BOAT_CARGO_SUPPORT_PAD, (unsigned char)s->source, { 0 } },
         .load = c->load };
     event(s, BOAT_CARGO_EVENT_RESET, s->source);
     return true;
@@ -92,7 +122,116 @@ bool boat_cargo_supply(BoatCargoSandbox *s, unsigned site)
     s->cargo = (BoatCargo) { .state = BOAT_CARGO_PAD,
         .position = boat_cargo_site_point(&s->cranes[site], (Vector3) { -5, 1.4f, 0 }),
         .pad = (unsigned char)site,
+        .support = { BOAT_CARGO_SUPPORT_PAD, (unsigned char)site, { 0 } },
         .load = s->cargo.load + 1 };
+    return true;
+}
+
+void boat_cargo_snapshot(const BoatCargoSandbox *s, const Boat *boat, BoatCargoSnapshot *out)
+{
+    *out = (BoatCargoSnapshot) { 0 };
+    out->crane_count = s->crane_count;
+    out->active = s->active;
+    for (unsigned i = 0; i < s->crane_count && i < BOAT_SCENE_WORK_SITES; ++i)
+        out->built[i] = !s->cranes[i].hidden;
+    BoatCargoSupport support = s->cargo.support;
+    if (s->cargo.state == BOAT_CARGO_FLOATING)
+        support = (BoatCargoSupport) { BOAT_CARGO_SUPPORT_PAD, (unsigned char)s->source, { 0 } };
+    bool shed = boat->motion_state == BOAT_CAPSIZED || boat_pose_up(boat) < .5f;
+    if (shed && support.kind == BOAT_CARGO_SUPPORT_DECK)
+        support = (BoatCargoSupport) { BOAT_CARGO_SUPPORT_PAD, (unsigned char)s->source, { 0 } };
+    out->load_count = 1;
+    out->loads[0] = (BoatCargoLoadSnapshot) { .load = s->cargo.load,
+        .source = s->source,
+        .delivered = s->cargo.delivered,
+        .receivers = s->cargo.receivers,
+        .support = support };
+    bool resting = s->moored || s->mooring || boat->motion_state == BOAT_CAPSIZED
+        || boat_pose_up(boat) < .75f;
+    if (s->active < s->crane_count && resting) {
+        out->moored = true;
+        out->position = boat_cargo_berth(&s->cranes[s->active]);
+        out->heading = s->cranes[s->active].heading;
+    } else {
+        out->moored = false;
+        out->position = boat->position;
+        out->heading = boat->heading;
+    }
+}
+
+static bool finite3(Vector3 v) { return isfinite(v.x) && isfinite(v.y) && isfinite(v.z); }
+
+bool boat_cargo_restore(BoatCargoSandbox *s, unsigned workboat, const BoatSceneWorkSite *sites,
+    unsigned count, const BoatCargoSnapshot *snap, Boat *boat)
+{
+    if (!s || !sites || !snap || !boat || count < 1 || count > BOAT_SCENE_WORK_SITES
+        || snap->crane_count != count || snap->load_count != 1)
+        return false;
+    const BoatCargoLoadSnapshot *load = &snap->loads[0];
+    if (snap->active >= count || load->source >= count || !snap->built[snap->active]
+        || !snap->built[load->source])
+        return false;
+    for (unsigned i = 0; i < count; ++i)
+        if (!sites[i].hidden && !snap->built[i])
+            return false;
+    if (load->load < 1 || ((unsigned)load->receivers >> count))
+        return false;
+    for (unsigned i = 0; i < count; ++i)
+        if ((load->receivers & (1u << i))
+            && (!snap->built[i] || sites[i].preset != BOAT_SCENE_WORK_RECEIVING_PLATFORM))
+            return false;
+    if (load->delivered != (load->receivers != 0))
+        return false;
+    const BoatCargoWorkboat *wb = boat_cargo_workboat(workboat);
+    if (load->support.kind == BOAT_CARGO_SUPPORT_PAD) {
+        if (load->support.pad >= count || !snap->built[load->support.pad])
+            return false;
+    } else if (load->support.kind == BOAT_CARGO_SUPPORT_DECK) {
+        Vector3 p = load->support.deck_local;
+        if (!finite3(p) || fabsf(p.x) > wb->deck_x - BOAT_CARGO_HALF
+            || fabsf(p.z) > wb->deck_z - BOAT_CARGO_HALF)
+            return false;
+    } else
+        return false;
+    if (!isfinite(snap->heading)
+        || (!snap->moored && (!isfinite(snap->position.x) || !isfinite(snap->position.y))))
+        return false;
+    BoatSceneWorkSite local[BOAT_SCENE_WORK_SITES];
+    memcpy(local, sites, count * sizeof(local[0]));
+    BoatCargoSandbox tmp;
+    if (!boat_cargo_reset_sites_with(&tmp, workboat, local, count))
+        return false;
+    for (unsigned i = 0; i < count; ++i)
+        tmp.cranes[i].hidden = !snap->built[i];
+    tmp.active = snap->active;
+    tmp.source = load->source;
+    tmp.moored = snap->moored;
+    tmp.mooring = false;
+    Boat resumable = { 0 };
+    if (snap->moored) {
+        resumable.position = boat_cargo_berth(&tmp.cranes[snap->active]);
+        resumable.heading = tmp.cranes[snap->active].heading;
+    } else {
+        resumable.position = snap->position;
+        resumable.heading = snap->heading;
+    }
+    BoatCargo cargo = { .load = load->load,
+        .delivered = load->delivered,
+        .receivers = load->receivers,
+        .support = load->support };
+    if (load->support.kind == BOAT_CARGO_SUPPORT_PAD) {
+        cargo.state = BOAT_CARGO_PAD;
+        cargo.pad = load->support.pad;
+        cargo.position = boat_cargo_site_point(&tmp.cranes[cargo.pad], (Vector3) { -5, 1.4f, 0 });
+    } else {
+        cargo.state = BOAT_CARGO_SECURED;
+        cargo.deck_local = load->support.deck_local;
+        cargo.position = boat_pose_attachment(&resumable, cargo.deck_local);
+        cargo.rotation = boat_pose_hull(&resumable).rotation;
+    }
+    tmp.cargo = cargo;
+    *s = tmp;
+    *boat = resumable;
     return true;
 }
 
@@ -101,6 +240,11 @@ Vector3 boat_cargo_site_direction(const BoatCargoCrane *c, Vector3 v)
     // Boat heading's renderer rotation, MatrixRotateY(heading); heading zero is exact.
     float cs = cosf(c->heading), sn = sinf(c->heading);
     return (Vector3) { cs * v.x + sn * v.z, v.y, cs * v.z - sn * v.x };
+}
+
+Vector3 boat_cargo_deck_aim_point(int aim)
+{
+    return (Vector3) { aim == 2 ? .65f : -.65f, BOAT_CARGO_DECK_Y, .65f };
 }
 
 Vector3 boat_cargo_site_point(const BoatCargoCrane *c, Vector3 local)
@@ -267,10 +411,9 @@ bool boat_cargo_hook_toggle(BoatCargoSandbox *s)
     return true;
 }
 
-static bool deck_inside(Vector3 p)
+static bool deck_inside(const BoatCargoWorkboat *wb, Vector3 p)
 {
-    return fabsf(p.x) <= BOAT_CARGO_DECK_X - BOAT_CARGO_HALF
-        && fabsf(p.z) <= BOAT_CARGO_DECK_Z - BOAT_CARGO_HALF;
+    return fabsf(p.x) <= wb->deck_x - BOAT_CARGO_HALF && fabsf(p.z) <= wb->deck_z - BOAT_CARGO_HALF;
 }
 
 bool boat_cargo_lash_toggle(BoatCargoSandbox *s, const Boat *boat)
@@ -286,9 +429,10 @@ bool boat_cargo_lash_toggle(BoatCargoSandbox *s, const Boat *boat)
     }
     // A crate resting across the deck edge is supported but cannot be lashed.
     if (c->state != BOAT_CARGO_LOOSE || !c->deck_contact || c->settled < .5f
-        || !deck_inside(c->deck_local))
+        || !deck_inside(s->boat, c->deck_local))
         return false;
     c->state = BOAT_CARGO_SECURED;
+    c->support = (BoatCargoSupport) { BOAT_CARGO_SUPPORT_DECK, 0, c->deck_local };
     event(s, BOAT_CARGO_EVENT_SECURED, s->active);
     return true;
 }
@@ -334,8 +478,8 @@ BoatCargoMoorStatus boat_cargo_moor_status(const BoatCargoSandbox *s, const Boat
         .site = site };
     if (boat_pose_up(boat) < .75f || boat->motion_state == BOAT_CAPSIZED)
         status.reason = BOAT_CARGO_MOOR_UPRIGHT;
-    else if (offset.x < BOAT_CARGO_BERTH_LEFT || offset.x > BOAT_CARGO_BERTH_RIGHT
-        || offset.y < BOAT_CARGO_BERTH_FRONT || offset.y > BOAT_CARGO_BERTH_BACK)
+    else if (offset.x < s->boat->berth_left || offset.x > s->boat->berth_right
+        || offset.y < s->boat->berth_front || offset.y > s->boat->berth_back)
         status.reason = BOAT_CARGO_MOOR_DISTANCE;
     else if (fabsf(status.heading_error) > BOAT_CARGO_MOOR_ANGLE)
         status.reason = BOAT_CARGO_MOOR_HEADING;
@@ -392,16 +536,16 @@ BoatCargoShadow boat_cargo_shadow(const BoatCargoSandbox *s, const Boat *boat,
         Vector3 normal = Vector3Transform((Vector3) { 0, 1, 0 }, boat_pose_rotation(boat));
         if (normal.y < .75f)
             return result;
-        Vector3 deck = boat_pose_attachment(boat, (Vector3) { 0, BOAT_CARGO_DECK_Y, 0 });
+        Vector3 deck = boat_pose_attachment(boat, (Vector3) { 0, s->boat->deck_y, 0 });
         p.y = deck.y - (normal.x * (p.x - deck.x) + normal.z * (p.z - deck.z)) / normal.y;
         level = p.y;
         p = Vector3Transform(Vector3Subtract(p, boat_pose_hull(boat).position),
             MatrixTranspose(boat_pose_rotation(boat)));
-        min_x = fmaxf(p.x - .48f, -BOAT_CARGO_DECK_X);
-        max_x = fminf(p.x + .48f, BOAT_CARGO_DECK_X);
-        min_z = fmaxf(p.z - .48f, -BOAT_CARGO_DECK_Z);
-        max_z = fminf(p.z + .48f, BOAT_CARGO_DECK_Z);
-        p.y = BOAT_CARGO_DECK_Y + .04f;
+        min_x = fmaxf(p.x - .48f, -s->boat->deck_x);
+        max_x = fminf(p.x + .48f, s->boat->deck_x);
+        min_z = fmaxf(p.z - .48f, -s->boat->deck_z);
+        max_z = fminf(p.z + .48f, s->boat->deck_z);
+        p.y = s->boat->deck_y + .04f;
     } else if (surface == BOAT_CARGO_SHADOW_PAD) {
         // The active crane's pad; clip in its site frame.
         p = boat_cargo_site_local(&s->cranes[s->active], p);
@@ -438,21 +582,21 @@ BoatCargoShadow boat_cargo_shadow(const BoatCargoSandbox *s, const Boat *boat,
     return result;
 }
 
-static void contact(BoatCargo *c, const Boat *boat)
+static void contact(BoatCargo *c, const Boat *boat, const BoatCargoWorkboat *wb)
 {
     Matrix inverse = MatrixTranspose(boat_pose_rotation(boat));
     Vector3 centre = boat_pose_attachment(boat, (Vector3) { 0 });
     Vector3 local = Vector3Transform(Vector3Subtract(c->position, centre), inverse);
-    float level = BOAT_CARGO_DECK_Y + BOAT_CARGO_HALF;
+    float level = wb->deck_y + BOAT_CARGO_HALF;
     c->deck_contact = false;
     // The deck tops a solid hull box. Before this, a crate overlapping the deck edge found no
     // support and sank through the hull to the water.
-    float over_x = BOAT_CARGO_DECK_X + BOAT_CARGO_HALF - fabsf(local.x);
-    float over_z = BOAT_CARGO_DECK_Z + BOAT_CARGO_HALF - fabsf(local.z);
+    float over_x = wb->deck_x + BOAT_CARGO_HALF - fabsf(local.x);
+    float over_z = wb->deck_z + BOAT_CARGO_HALF - fabsf(local.z);
     if (boat_pose_up(boat) < .75f || over_x <= 0 || over_z <= 0 || local.y > level + .03f
         || local.y < level - 1.5f)
         return;
-    if (fabsf(local.x) > BOAT_CARGO_DECK_X || fabsf(local.z) > BOAT_CARGO_DECK_Z) {
+    if (fabsf(local.x) > wb->deck_x || fabsf(local.z) > wb->deck_z) {
         // Its centre is past the edge: below deck level, the hull's side pushes it out along
         // the shallower overlap and stops it moving inward; it then falls beside the boat.
         if (local.y >= level)
@@ -497,6 +641,7 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
         c->position = boat_pose_attachment(boat, c->deck_local);
         c->velocity = boat_pose_motion(boat, c->deck_local).velocity;
         c->rotation = boat_pose_hull(boat).rotation;
+        c->support = (BoatCargoSupport) { BOAT_CARGO_SUPPORT_DECK, 0, c->deck_local };
         // An inverted boat cannot keep its cargo; recovery always remains available.
         if (boat_pose_up(boat) < .5f) {
             c->state = BOAT_CARGO_FLOATING;
@@ -529,7 +674,7 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
         c->velocity.x *= .997f;
         c->velocity.z *= .997f;
     }
-    contact(c, boat);
+    contact(c, boat, s->boat);
     if (!c->deck_contact) {
         c->settled = 0;
         c->rotation = (Vector3) { 0 };
@@ -558,6 +703,8 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
     if (c->state != BOAT_CARGO_HANGING) {
         c->state = c->deck_contact ? BOAT_CARGO_LOOSE : pad ? BOAT_CARGO_PAD : BOAT_CARGO_FLOATING;
     }
+    if (c->state == BOAT_CARGO_PAD)
+        c->support = (BoatCargoSupport) { BOAT_CARGO_SUPPORT_PAD, c->pad, { 0 } };
     // A single bounded body; falling/suspended simulation never depends on the camera.
     c->velocity = Vector3ClampValue(c->velocity, 0, 12);
     // S1c events. A delivery commits once per load and receiver after the released load has

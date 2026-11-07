@@ -243,7 +243,8 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 
 static const char *const ROOT[] = { "voyage", "tour", "scene", "init", "update", "migrate", NULL };
 static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", "work", NULL };
-static const char *const WORK[] = { "sites", NULL };
+static const char *const WORK[] = { "sites", "boat", "notices", NULL };
+static const char *const NOTICES[] = { "delivered", "built", "supplied", "returned", NULL };
 static const char *const WORK_SITE[]
     = { "id", "preset", "cargo", "x", "z", "heading", "hidden", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
@@ -995,6 +996,44 @@ static bool scene_work(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
         w->cargo = (unsigned char)c;
         lua_pop(L, 1);
     }
+    s->work_boat = BOAT_SCENE_WORKBOAT_FLAT_DECK;
+    char boat_at[64];
+    int boat = field(L, work, "boat", "scene.work", boat_at);
+    if (boat != LUA_TNIL) {
+        if (boat != LUA_TSTRING)
+            return reject(vm, boat_at, "must be a string, not a %s", lua_typename(L, boat));
+        BoatSceneWorkboat wb;
+        if (!boat_scene_workboat_from_name(lua_tostring(L, -1), &wb))
+            return reject(vm, boat_at, "is not a registered workboat preset");
+        s->work_boat = (unsigned char)wb;
+    }
+    lua_pop(L, 1);
+    // F3: optional per-notice templates; an absent key keeps the native text.
+    char notices_at[64];
+    int notices_type = field(L, work, "notices", "scene.work", notices_at);
+    if (notices_type != LUA_TNIL) {
+        if (notices_type != LUA_TTABLE)
+            return reject(
+                vm, notices_at, "must be a table, not a %s", lua_typename(L, notices_type));
+        int notices = lua_absindex(L, -1);
+        if (!only(L, vm, notices, notices_at, NOTICES))
+            return false;
+        for (unsigned i = 0; i < BOAT_SCENE_NOTICES; ++i) {
+            const char *key = boat_scene_notice_key((BoatSceneNotice)i);
+            char at[64];
+            int type = field(L, notices, key, notices_at, at);
+            lua_pop(L, 1);
+            if (type == LUA_TNIL)
+                continue;
+            if (!string(
+                    L, vm, notices, notices_at, key, s->work_notice[i], sizeof(s->work_notice[i])))
+                return false;
+            if (!boat_scene_notice_valid(s->work_notice[i]))
+                return reject(vm, at,
+                    "must be 1-63 printable characters with at most the {site} token and no %");
+        }
+    }
+    lua_pop(L, 1);
     lua_pop(L, 2);
     return true;
 }
@@ -1233,7 +1272,7 @@ static int decode_match(lua_State *L)
     return 0;
 }
 
-static const char *const FREE_ROOT[] = { "free", "init", "update", NULL };
+static const char *const FREE_ROOT[] = { "free", "init", "update", "migrate", NULL };
 static const char *const FREE[] = { "version", "scene", NULL };
 static const char *const COURSE_ROOT[] = { "course", NULL };
 static const char *const COURSE[] = { "start", "gates", NULL };
@@ -1259,6 +1298,13 @@ static int decode_free(lua_State *L)
         return 0;
     }
     lua_pop(L, 2);
+    lua_getfield(L, 2, "migrate");
+    d->migrates = !lua_isnil(L, -1);
+    if (d->migrates && (!d->callbacks || !lua_isfunction(L, -1))) {
+        reject(vm, "migrate", "requires init/update and must be a function");
+        return 0;
+    }
+    lua_pop(L, 1);
     int free = record(L, vm, 2, "", "free", FREE, at);
     if (!free || !number(L, vm, free, at, "version", &d->version))
         return 0;
