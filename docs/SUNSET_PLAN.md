@@ -7,8 +7,10 @@ multiplayer sessions; explicit CLI launches use `--daylight` independently. The 
 direction is to represent any hour of an authored 24-hour day, beginning with fixed-time
 evaluation and review. A later sandbox-specific step now targets a 15-real-minute
 day/night cycle (900 seconds = 24 game hours). General Auto controls, room-wide time and
-plugin schedules remain deferred. T1 adds the fixed-hour evaluator, provisional anchors and
-a developer review input; the named presets and player settings are unchanged.
+plugin schedules remain deferred. T1 adds the fixed-hour evaluator, artistic anchors and
+a developer review input, approved by the user on 2026-11-07. The named presets and player
+settings are unchanged. Next is T2a, the GPU sky upload path; cloud/reflection attenuation
+is a documented deferred issue.
 
 The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
 will expose approved fixed lighting choices, then separately scoped transitions and
@@ -107,14 +109,24 @@ the approved dusk. The shader/cache and presentation consumers must follow that 
 
 | Step | Scope | Completion evidence |
 | --- | --- | --- |
-| T1 — full-day evaluator and fixed-hour review input (implemented locally) | Explicit hour contract, artistic anchors and sun path behind a developer review input. Legacy preset/CLI/save behavior and default Day remain. One shared frame, no Auto. | Evaluator, CLI and capture checks passed; new-hour looks remain provisional. Detailed evidence is in the [T1 result](#t1-implementation-2026-11-07). |
+| T1 — full-day evaluator and fixed-hour review input (implemented locally) | Explicit hour contract, artistic anchors and sun path behind a developer review input. Legacy preset/CLI/save behavior and default Day remain. One shared frame, no Auto. | Evaluator, CLI and capture checks passed; T1 preview approved by the user on 2026-11-07. Detailed evidence is in the [T1 result](#t1-implementation-2026-11-07). |
 | T2 — renderer agreement and readable night/morning | Refine the new looks and wire every consumer, including grading, materials, lamps, water and reflections. Resolve the CPU basin's independent light/no-sky path and textured-box lighting gap, or document an explicitly reviewed fallback. Bound sky repaint/upload work before exposing continuous scrubbing; the present ~25 ms Debug repaint cannot happen every changing frame. | Inspect matched CPU/GPU basin, outer harbour/bridge/quay and outer-coast views at anchors, all integer hours and difficult midpoints. Review seam/horizon/azimuth boundaries, emissive vs illuminated surfaces, storm, course/weapon visibility and glitter in motion. Record measured frame/cache cost. |
 | T3 — fixed-hour player controls and qualification | Expose the reviewed hours through the local LIGHTING setting, keeping the existing named choices and Day default. Choose a simple hour control/names after the review; persist a versioned choice without repurposing the old numeric phase. Add documented CLI/review examples when implemented. | Verify native/browser save/load, invalid and old settings, explicit CLI precedence, new solo/join/host sessions and return to title. Run build/full CTest, inspect representative captures and a windowed manual demo; qualify platform/package limits. Fixed-selector and new-look user acceptance remain separate. |
 | T4 — sandbox 15-minute day/night cycle | After T1–T3 and their rendering/performance gates, drive the free ride sandbox's shared lighting from a session-owned presentation timeline: 900 active real seconds = 24 game hours. Wire the custom workboat/crane/cargo view into that frame. See the clock and upload contracts below and the [sandbox owner](FREE_RIDE_SANDBOX_PLAN.md#sandbox-daynight-cycle-t4). | Virtual-clock tests prove rate, pause/resume, seeks and repeated midnight wrap; matched CPU/GPU captures and a windowed cycle review prove smooth light and readable crane/cargo work at night. Measure sky work/upload and frame cost through a whole cycle. Planned, not implemented or visually accepted. |
 | Later — general Auto and script/room ownership | General Auto controls, title phase, replay persistence and room authority remain separate decisions. Coordinate plugin L5/L6 bounds and versioning before adding scripts or shared time. | Room/replay/Apply/Undo and synchronization evidence where those features are introduced. These remain deferred and are not dependencies of the solo sandbox cycle. |
 
-T1 is implemented; T2 is the next lighting implementation task. T2 may need smaller
-renderer changes; keep each reviewable and record evidence here.
+T1 is implemented and user-approved. Split T2 into reviewable steps:
+
+- **T2a — GPU sky upload path (next).** Upload static cloud structure once per GPU scene,
+  shade changing sky light with uniforms, preserve accepted appearance and the existing
+  CPU panorama as the reference. Prove zero steady-state sky texture writes/allocations.
+- **T2b — CPU and material agreement.** Move changing-hour CPU sky work to visible samples
+  and resolve the basin/material gaps. Keep actor, water and grading inputs coherent.
+- **T2c — qualification.** Review readability and intermediate hours, native/browser
+  behavior and measured CPU/GPU/frame cost before T3/T4.
+
+The cloud/reflection mismatch below is deferred separately; T2a must preserve its current
+behavior rather than silently bundling an artistic fix into the upload migration.
 
 ### Sky rendering and GPU uploads (T2 prerequisite for T4)
 
@@ -149,6 +161,22 @@ seeks, two scene instances and context recreation, plus seam/horizon views and a
 presets. Measure steady state separately from first-use costs. GPU fragment work may
 increase, so compare with the graphics plan's existing budgets before enabling T4;
 this upload strategy is planned, not yet benchmarked.
+
+### Deferred: clouded sun and water reflection
+
+On 2026-11-07 the user observed that clouds can obscure the visible sun while the water
+still shows a strong, apparently unobstructed road of sunlight. They asked to document
+it and explicitly defer the fix. It may predate T1; its first introduction was not
+investigated. The supplied screenshot is retained as evidence:
+
+![User capture: cloud-obscured sun with a strong water reflection](evidence/lighting/2026-11-07/clouded-sun-reflection.png)
+
+A later change should make cloud visibility and the sun's water highlight/glitter agree,
+with restrained, stable attenuation as clouds cover the sun. Define the exact artistic
+recipe then, and review CPU/GPU, direct seeks, camera motion and clear/partially covered/
+fully covered cases. This is not a request for a general weather or astronomy simulation.
+**Status: documented, not scheduled or implemented.** Keep it outside T2a, and retain the
+mismatch in its regression references so a deliberate later correction remains reviewable.
 
 ### Sandbox clock contract (T4)
 
@@ -190,7 +218,7 @@ angles, sunrise/sunset use opposite bearings, and the maximum elevation stays be
 zenith. Direct light, disc, glitter, highlight and cast water shadow share a continuous
 horizon gate, so all are zero at or below the horizon. Night and dawn have their own recipes.
 Day, sunset and dusk reuse the approved palettes at their anchor hours with new bearings;
-those fixed-hour looks are provisional and not visually reviewed here. The legacy evaluator,
+the user approved the T1 preview on 2026-11-07 (see acceptance below). The legacy evaluator,
 `--daylight`, named saves and the zero-initialized Day default are unchanged.
 
 Finite hours wrap into `[0,24)`; negative values come back from the other side of
@@ -226,15 +254,21 @@ GPU HDR night demo (music Off, exit 0, final frame inspected) passed. Local arti
 in ignored `build/t1-review/`; the saved pre-change references are in `build/t1-baseline/`.
 Changed links, command examples and `git diff --check` were checked before handoff.
 
-**Limits:** new-hour looks have no human acceptance. Browser/Windows and the GPU CTest
+**Limits:** T1 preview acceptance does not qualify every hour, view or platform. Browser/Windows and the GPU CTest
 matrix were not run. CPU basin sky/light, textured-box lighting, night shadow-map cost
 and storm/course/weapon readability remain T2 work; no continuous-clock performance is
 claimed. An initial GLFW monitor-enumeration failure also affected the unchanged binary;
 macOS/GLFW display probes and subsequent baseline/new GPU runs succeeded without a source
 workaround. Its exact cause was not established.
 
-**Next task:** T2 renderer agreement and readable night/morning, including the planned
-static cloud mask and uniform sky upload path. T3 menu controls, T4 cycle, Lua access, room
+**User acceptance (2026-11-07):** after trying the fixed-hour preview, the user reported
+“Looks nice! Approved” and asked to continue the OpenCode/DeepSeek implementation-and-review
+workflow. Their screenshot records the cloud/reflection issue above. Exact hours, settings
+and platform coverage were not stated; this is T1 preview acceptance, not blanket
+qualification of every hour, T2 performance, player controls or the future cycle.
+
+**Next task:** T2a, the static cloud mask and uniform GPU sky upload path. T2b/T2c retain
+CPU/material agreement, readability and broader qualification. T3 menu controls, T4 cycle, Lua access, room
 time and replay persistence remain planned.
 
 ### Plan review, 2026-11-07
