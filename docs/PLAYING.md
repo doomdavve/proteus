@@ -143,6 +143,9 @@ changed package) is shown as unavailable with the reason, is never deleted behin
 sets it aside as `.rejected`. Saves live in the game's data directory (macOS: `~/Library/Application
 Support/Proteus`, file `cargo-proteus.outer-work.sav`).
 
+The screen shows only the job rows, one status line, notices and the saved mark; every key below
+is also listed under the pause menu's CONTROLS (or `?`).
+
 | Key | Work action |
 | --- | --- |
 | W/S, Up/Down, A/D | Drive at the helm (the game's throttle and wheel; mouse steering with M) |

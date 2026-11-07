@@ -205,7 +205,7 @@ void boat_work_session_reset_world(BoatWorkSession *e)
     e->aim = 0;
     e->paused = false;
     e->braking = false;
-    e->notice = "F: catch crate. 2 / 3: lift and aim at deck.";
+    e->notice = "F HOOK";
 }
 
 void boat_work_session_reset(BoatWorkSession *e)
@@ -434,8 +434,7 @@ void boat_work_view_action(BoatWorkSession *e)
         e->crane_view = !e->crane_view;
         e->aim = 0;
         e->boat.throttle = 0;
-        e->notice = e->crane_view ? "Crane controls active: A/D slew, W/S reach, Q/E hoist."
-                                  : "Helm controls active: arrows drive, hold SPACE to brake.";
+        e->notice = e->crane_view ? "CRANE VIEW" : "HELM VIEW";
     } else
         e->notice = "Moor at a work berth to operate its crane.";
 }

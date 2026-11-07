@@ -242,36 +242,15 @@ void wake_work_hud(WakeWork *work, const WakeWorkProjection *projection, int wid
               states[c->state]),
         4, y, text);
     y += 14;
-    if (s->crane_view) {
-        label("TAB HELM  A/D SLEW  W/S REACH  Q/E HOIST  F HOOK  L LASH", 4, y, text);
-    } else {
-        label("W/S THROTTLE  A/D STEER  SPACE BRAKE  G MOOR  TAB CRANE", 4, y, text);
-        y += 14;
-        if (!s->sandbox.moored && !s->sandbox.mooring && berth.site != s->target) {
-            Vector2 to = Vector2Subtract(
-                boat_cargo_berth(&s->sandbox.cranes[s->target]), s->boat.position);
-            float turn = remainderf(atan2f(to.x, -to.y) - s->boat.heading, 2 * PI);
-            label(TextFormat("TO %s %.0f M / %s %.0f DEG / J NEXT SITE",
-                      TextToUpper(s->sites[s->target].id), Vector2Length(to),
-                      turn < 0 ? "LEFT" : "RIGHT", fabsf(turn) * RAD2DEG),
-                4, y, yellow);
-            if (projection)
-                target_marker(work, projection, width, height);
-        } else if (!s->sandbox.moored && !s->sandbox.mooring) {
-            label(TextFormat("BERTH %.1f M / ENGINE %+03.0f%%", berth.distance,
-                      s->boat.engine_response * 100),
-                4, y, berth.reason == BOAT_CARGO_MOOR_READY ? green : text);
-            if (projection && berth.distance > 12)
-                target_marker(work, projection, width, height);
-        }
-    }
+    if (!s->crane_view && !s->sandbox.moored && !s->sandbox.mooring
+        && (berth.site != s->target || berth.distance > 12) && projection)
+        target_marker(work, projection, width, height);
     const char *prompt = s->notice;
-    if (s->sandbox.mooring)
-        prompt = "MOORING ASSIST: STOPPING AND ALIGNING. G CANCELS.";
-    else if (s->braking)
-        prompt = "BRAKING. G WHEN BERTH READY.";
-    else if (!s->sandbox.moored && !s->crane_view && berth.reason == BOAT_CARGO_MOOR_READY)
-        prompt = "BERTH READY. G: ASSISTED MOORING. SPACE: BRAKE.";
+    if (prompt && !prompt[0])
+        prompt = NULL;
+    if (!prompt && !s->sandbox.moored && !s->sandbox.mooring && !s->crane_view
+        && berth.reason == BOAT_CARGO_MOOR_READY)
+        prompt = "G MOOR";
     if (prompt && prompt[0])
         label(prompt,
             (width - boat_ui_width(prompt, 10)) / 2 > 4 ? (width - boat_ui_width(prompt, 10)) / 2

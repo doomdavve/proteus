@@ -1258,6 +1258,16 @@ tedious in-game." That is, crane or loading automation bought as an upgrade or p
 repeated deliveries do not become tedious. Nothing is designed or scheduled; S3 and S6 decide
 whether and how, after reviewing how repetition feels.
 
+**HUD declutter result (2026-11-07, macOS arm64, Debug; no window).** In reply to the play check,
+`wake_work_hud` no longer draws control lines, the target guidance line or the berth readout; the
+screen keeps the job rows, one status line, the target marker (site and distance), notices, one
+`G MOOR` prompt when the berth is ready, and the `SAVED` mark. The session's help-style notices
+became `F HOOK`, `CRANE VIEW` and `HELM VIEW`. The full key list is the pause menu's CONTROLS page
+(the game's `?` overlay already listed the work keys); `docs/PLAYING.md` and `docs/BOAT_HUD.md`
+updated. `cargo_sandbox` keeps its own control lines (a developer harness whose captures show them).
+Verification: warning-clean build, full CTest 422 passed. Not verified: the HUD itself (CPU
+captures draw no HUD and no window can open here). The user should look at the HUD in the next play.
+
 #### SV1: local save and resume
 
 Designed 2026-11-07 at the user's request ("save the state of the player", one step at a time,

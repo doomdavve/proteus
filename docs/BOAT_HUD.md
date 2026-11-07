@@ -408,10 +408,11 @@ distinguishes automated review from human playtesting.
 ## Working-harbour rows, 2026-11-07 (SV1g)
 
 `wake_velocity --work` draws the package's job rows (`LABEL: value`, yellow) at the top left
-under the P: MENU hint, then `JOB SUSPENDED` or the waiting reason in red, a status line
-(`CRANE` or `HELM`, mooring state, crate state), the controls for that view, and at the helm the
-guidance to the target site with a yellow marker pinned to the view's edge (J cycles) or the berth
-readout near a berth. The current notice sits above the instrument panel; `SAVED` (milestone and
+under the P: MENU hint, then `JOB SUSPENDED` or the waiting reason in red, and one status line
+(`CRANE` or `HELM`, mooring state, crate state). There are no control or help lines: the full
+key list is the pause menu's CONTROLS page (also `?`). At the helm a yellow marker (site and
+distance, pinned to the view's edge; J cycles the target) shows the way until the berth is within 12 m.
+A single `G MOOR` prompt appears when the berth is ready. The current notice sits above the instrument panel; `SAVED` (milestone and
 leave writes, 1.5 s) and the persistent red `SAVE FAILED` sit at the bottom right. Layout,
 text widths and overlap with the minimap at 320x200 are unverified: headless CPU and GPU
 screenshots draw no HUD and no windowed run was possible when this was written.
