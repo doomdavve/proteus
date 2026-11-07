@@ -55,6 +55,8 @@ typedef struct {
     int aim; // 1 pad, 2/3 port/starboard. Motors, never a pose teleport.
     unsigned target; // The site helm guidance points to: the next one after departure; N cycles.
     const char *notice;
+    // A formatted notice; raylib's TextFormat buffers are reused within the next frame.
+    char notice_text[64];
     // S1c: the package's job. Native cargo events queue here until an update commits them.
     const BoatPluginRevision *revision; // NULL: no job (the basin reference or no objective).
     BoatPluginObjective objective;
@@ -228,8 +230,13 @@ static void job_tick(Experiment *e)
         build[site] = true;
     }
     for (unsigned i = 0; i < e->site_count; ++i)
-        if (build[i] && boat_cargo_site_enable(&e->sandbox, i, &e->boat))
-            e->notice = TextFormat("%s built.", TextToUpper(e->sites[i].id));
+        if (build[i] && boat_cargo_site_enable(&e->sandbox, i, &e->boat)) {
+            snprintf(
+                e->notice_text, sizeof(e->notice_text), "%s built.", TextToUpper(e->sites[i].id));
+            for (char *c = e->notice_text; *c; ++c)
+                *c = *c == '_' ? ' ' : *c;
+            e->notice = e->notice_text;
+        }
     e->blocked = false;
     e->objective = next;
     e->event_count = 0; // The update acknowledged every queued event.
@@ -659,9 +666,12 @@ static void moor_action(Experiment *e)
 
 static void recover_action(Experiment *e)
 {
-    e->notice = boat_cargo_recover(&e->sandbox)
-        ? TextFormat("Crate returned to the %s pad.", TextToUpper(e->sites[e->sandbox.source].id))
-        : "Release the hook and unlash before returning the crate.";
+    if (boat_cargo_recover(&e->sandbox)) {
+        snprintf(e->notice_text, sizeof(e->notice_text), "Crate returned to the %s pad.",
+            TextToUpper(e->sites[e->sandbox.source].id));
+        e->notice = e->notice_text;
+    } else
+        e->notice = "Release the hook and unlash before returning the crate.";
     e->aim = 0;
 }
 
@@ -1074,11 +1084,16 @@ static bool stage(Experiment *e, const char *name)
             return false;
         for (int i = 0; i < 240; ++i)
             tick(e, 0, 0, i < 120 ? 1 : 0, (BoatInput) { 0 });
-        e->notice = "Delivered review fixture. R: restart from the first site.";
         if (e->sandbox.cargo.state != BOAT_CARGO_PAD || e->sandbox.cargo.pad != receiver
             || !e->sandbox.cargo.delivered)
             return false;
-        // S1c: the package's job counts the delivery once and builds its hidden quay.
+        // S1c: the package's job counts the delivery once and builds its hidden quay. The
+        // notice must be owned text, not a reused raylib TextFormat buffer.
+        for (int i = 0; i < 8; ++i) // Cycle every TextFormat buffer, as one HUD frame does.
+            TextFormat("%d", i);
+        if (e->revision && strcmp(e->notice, "LANDING QUAY built."))
+            return false;
+        e->notice = "Delivered review fixture. R: restart from the first site.";
         for (unsigned i = 0; e->revision && i < e->site_count; ++i)
             if (e->sites[i].hidden && e->sandbox.cranes[i].hidden)
                 return false;

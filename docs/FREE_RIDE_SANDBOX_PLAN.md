@@ -780,7 +780,15 @@ Review commands (`delivered` now also requires the counted delivery and the buil
 ./build/cargo_sandbox   # load, cross, unload at the landing; watch the quay appear
 ```
 
-Known limits: the user has not played S1c; the quay has no job of its own; one crate and one
+First play check, 2026-11-07 (macOS): right after the first landing, the bottom message flickered
+too fast to read. The "LANDING_QUAY built." notice, and the crate-recovery notice, pointed into
+raylib's reused `TextFormat` buffers, so each frame showed whatever HUD text last filled that
+buffer. Both notices are now copied into the sandbox's own buffer (the quay's reads "LANDING
+QUAY built."), and the `delivered` check cycles every `TextFormat` buffer before requiring that
+notice; it fails on the previous code. `ctest --preset full` passed all 391 enabled tests again
+(36.24 s). The fix has not been played yet.
+
+Known limits: the user has not completed an S1c play check; the quay has no job of its own; one crate and one
 delivery; no payout, save or browser/room support; `BUILD WAITING` was exercised by the
 `build-blocked` check but not captured on screen; Windows, Linux and the browser build were not
 run.
