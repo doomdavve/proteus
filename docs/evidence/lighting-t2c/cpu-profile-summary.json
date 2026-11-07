@@ -1,0 +1,172 @@
+{
+  "date": "2026-11-07",
+  "tool": "Xcode Instruments 16.0 Time Profiler",
+  "run": "10 s diagnostic CPU outer qualification, fixed hour 6.5, Release, waves; instrument time limit killed child by design",
+  "scope": "running target samples at trace time >=2 s; separate from uninstrumented timing; incomplete qualification output is excluded",
+  "samples": 8819,
+  "sampled_ms": 8819.0,
+  "self": [
+    {
+      "function": "__sincosf_stret",
+      "ms": 4408.0,
+      "percent": 49.98
+    },
+    {
+      "function": "draw_mesh_list",
+      "ms": 1843.0,
+      "percent": 20.9
+    },
+    {
+      "function": "query",
+      "ms": 1808.0,
+      "percent": 20.5
+    },
+    {
+      "function": "boat_water_surface_visible",
+      "ms": 479.0,
+      "percent": 5.43
+    },
+    {
+      "function": "DYLD-STUB$$__sincosf_stret",
+      "ms": 135.0,
+      "percent": 1.53
+    },
+    {
+      "function": "boat_water_storm_query",
+      "ms": 50.0,
+      "percent": 0.57
+    },
+    {
+      "function": "boat_vessel_wake_query",
+      "ms": 39.0,
+      "percent": 0.44
+    },
+    {
+      "function": "waterfront_draw_boating",
+      "ms": 16.0,
+      "percent": 0.18
+    },
+    {
+      "function": "waterfront_window_wall",
+      "ms": 10.0,
+      "percent": 0.11
+    },
+    {
+      "function": "ColorIsEqual",
+      "ms": 9.0,
+      "percent": 0.1
+    },
+    {
+      "function": "waterfront_sky_draw_squall",
+      "ms": 6.0,
+      "percent": 0.07
+    },
+    {
+      "function": "boat_water_query_borrowed",
+      "ms": 4.0,
+      "percent": 0.05
+    }
+  ],
+  "inclusive": [
+    {
+      "function": "main",
+      "ms": 8819.0,
+      "percent": 100.0
+    },
+    {
+      "function": "lighting_qualify",
+      "ms": 8819.0,
+      "percent": 100.0
+    },
+    {
+      "function": "start",
+      "ms": 8819.0,
+      "percent": 100.0
+    },
+    {
+      "function": "boat_draw",
+      "ms": 8816.0,
+      "percent": 99.97
+    },
+    {
+      "function": "boat_draw_scene",
+      "ms": 8816.0,
+      "percent": 99.97
+    },
+    {
+      "function": "boat_water_surface_visible",
+      "ms": 6885.0,
+      "percent": 78.07
+    },
+    {
+      "function": "query",
+      "ms": 6345.0,
+      "percent": 71.95
+    },
+    {
+      "function": "__sincosf_stret",
+      "ms": 4408.0,
+      "percent": 49.98
+    },
+    {
+      "function": "draw_mesh_list",
+      "ms": 1844.0,
+      "percent": 20.91
+    },
+    {
+      "function": "renderer3d_draw_emissive_mesh",
+      "ms": 1534.0,
+      "percent": 17.39
+    },
+    {
+      "function": "0x29",
+      "ms": 536.0,
+      "percent": 6.08
+    },
+    {
+      "function": "waterfront_draw_boating",
+      "ms": 357.0,
+      "percent": 4.05
+    },
+    {
+      "function": "renderer3d_draw_mesh_triangles",
+      "ms": 291.0,
+      "percent": 3.3
+    },
+    {
+      "function": "0x28",
+      "ms": 254.0,
+      "percent": 2.88
+    },
+    {
+      "function": "0x2a",
+      "ms": 207.0,
+      "percent": 2.35
+    },
+    {
+      "function": "DYLD-STUB$$__sincosf_stret",
+      "ms": 135.0,
+      "percent": 1.53
+    },
+    {
+      "function": "0x27",
+      "ms": 111.0,
+      "percent": 1.26
+    },
+    {
+      "function": "0x2b",
+      "ms": 87.0,
+      "percent": 0.99
+    },
+    {
+      "function": "0x2f",
+      "ms": 68.0,
+      "percent": 0.77
+    },
+    {
+      "function": "0x2c",
+      "ms": 65.0,
+      "percent": 0.74
+    }
+  ]
+}

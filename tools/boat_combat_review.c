@@ -1,6 +1,7 @@
 // Fixed combat presentation fixture. Offline captures and a visible animation use the
 // production CPU/GPU scene, water, HUD and audio; never joins or modifies a room.
 #include "boat_audio.h"
+#include "boat_fixtures.h"
 #include "boat_fleet.h"
 #include "boat_gpu.h"
 #include "boat_hud.h"
@@ -10,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "boat_fixtures.h"
 
 int main(int argc, char **argv)
 {
@@ -18,6 +18,8 @@ int main(int argc, char **argv)
          torpedo_view = false;
     const char *path = "build/combat.png";
     double at = 2.3;
+    float lighting_hour = 0;
+    bool lighting_hour_set = false;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--gpu"))
             gpu_enabled = true;
@@ -33,7 +35,11 @@ int main(int argc, char **argv)
             at = atof(argv[++i]);
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc)
             path = argv[++i];
-        else
+        else if (!strcmp(argv[i], "--lighting-hour") && i + 1 < argc) {
+            if (!waterfront_hour_parse(argv[++i], &lighting_hour))
+                return 2;
+            lighting_hour_set = true;
+        } else
             return 2;
     }
     if (gpu_enabled || play || mirror_enabled) {
@@ -65,6 +71,10 @@ int main(int argc, char **argv)
     BoatCpuView cpu_view = { 0 };
     if (gpu_enabled && !boat_gpu_init(&gpu, false))
         return 1;
+    cpu_view.hour = lighting_hour;
+    cpu_view.hour_set = lighting_hour_set;
+    gpu.hour = lighting_hour;
+    gpu.hour_set = lighting_hour_set;
     BoatPresentation presentation = { 0 };
     BoatAudio audio = { 0 };
     if (play)
@@ -171,10 +181,12 @@ int main(int argc, char **argv)
             }
             UpdateTexture(texture, pixels);
         }
-        if (show_mirror
-            && !boat_rearview_update(
-                &mirror, gpu_enabled ? &gpu : NULL, &view, &presentation, &world, &rivals))
-            return 1;
+        if (show_mirror) {
+            boat_rearview_set_lighting(&mirror, 0, lighting_hour, lighting_hour_set);
+            if (!boat_rearview_update(
+                    &mirror, gpu_enabled ? &gpu : NULL, &view, &presentation, &world, &rivals))
+                return 1;
+        }
         BeginTextureMode(target);
         DrawTexturePro(gpu_enabled ? gpu.target.texture : texture,
             (Rectangle) { 0, 0, gpu_enabled ? -320 : 320, gpu_enabled ? -200 : 200 },

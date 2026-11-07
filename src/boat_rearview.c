@@ -1,14 +1,27 @@
 #include "boat_rearview.h"
 
+void boat_rearview_set_lighting(BoatRearview *m, float daylight, float hour, bool hour_set)
+{
+    m->daylight = daylight;
+    m->hour = hour;
+    m->hour_set = hour_set;
+}
+
 bool boat_rearview_update(BoatRearview *m, BoatGpu *gpu, const BoatViewState *view,
     const BoatPresentation *presentation, const BoatWorld *world, const BoatRivals *rivals)
 {
-    if (m->sampled && m->location == world->definition && view->time >= m->sampled_time
+    bool gpu_mode = gpu != NULL;
+    float daylight = gpu_mode ? gpu->daylight : m->daylight;
+    float hour = gpu_mode ? gpu->hour : m->hour;
+    bool hour_set = gpu_mode ? gpu->hour_set : m->hour_set;
+    if (m->sampled && m->gpu == gpu_mode && m->location == world->definition
+        && m->sampled_daylight == daylight && m->sampled_hour == hour
+        && m->sampled_hour_set == hour_set && view->time >= m->sampled_time
         && view->time - m->sampled_time + 1e-9 < 1.0 / 30)
         return true;
     BoatCamera camera = { .rear_view = true };
-    m->gpu = gpu != NULL;
-    if (gpu) {
+    m->gpu = gpu_mode;
+    if (gpu_mode) {
         if (!m->target.id) {
             m->target = LoadRenderTexture(BOAT_REARVIEW_WIDTH, BOAT_REARVIEW_HEIGHT);
             if (!IsRenderTextureValid(m->target))
@@ -26,6 +39,9 @@ bool boat_rearview_update(BoatRearview *m, BoatGpu *gpu, const BoatViewState *vi
         if (gpu->failed)
             return false;
     } else {
+        m->cpu.daylight = m->daylight;
+        m->cpu.hour = m->hour;
+        m->cpu.hour_set = m->hour_set;
         if (!boat_draw_scene(&m->renderer, &m->cpu, m->pixels, BOAT_REARVIEW_WIDTH,
                 BOAT_REARVIEW_HEIGHT, view, presentation, world, camera, rivals, NULL, NULL, 0))
             return false;
@@ -40,6 +56,9 @@ bool boat_rearview_update(BoatRearview *m, BoatGpu *gpu, const BoatViewState *vi
     }
     m->sampled = true;
     m->sampled_time = view->time;
+    m->sampled_daylight = daylight;
+    m->sampled_hour = hour;
+    m->sampled_hour_set = hour_set;
     m->location = world->definition;
     return true;
 }

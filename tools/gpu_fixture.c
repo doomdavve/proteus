@@ -899,6 +899,16 @@ static bool verify_sky_resource_stability(WaterfrontGpuScene *scene)
         ok = capture_sky(scene, target, &frame, &scratch) && ok;
         UnloadImage(scratch);
     }
+    // A bounded sampled full virtual cycle crosses midnight and alternates the accepted
+    // above-city view with the azimuth seam view, still without any sky texture writes.
+    for (int i = 0; spied && i < 241; ++i) {
+        Image scratch = { 0 };
+        float hour = fmodf(6.5f + (float)i * .1f, 24.0f);
+        sky_fixture_frame(&frame, i % 2);
+        ok = waterfront_lighting_hour(hour, &frame.lighting) && ok;
+        ok = capture_sky(scene, target, &frame, &scratch) && ok;
+        UnloadImage(scratch);
+    }
     if (spied)
         restore_sky_spies();
     ok = ok && spied && scene->sky_mask.id == sky_id && spy_sky_tex_image_calls == 0

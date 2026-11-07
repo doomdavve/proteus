@@ -218,7 +218,8 @@ only lighten.
 `presentation` (`boat_water_review --check-presentation`, `gpu`, about 3 s; graphics G5a) draws
 the river at low and high resolution with and without HDR. Daytime HDR stays within one 8-bit step
 of the 8-bit scene; repeated preset and window-size changes, a second view and the rear-view
-mirror reproduce their frames; failed HDR allocations present the 8-bit frame exactly; a
+mirror reproduce their frames; a same-wave-time light seek refreshes actual CPU and GPU mirror
+pixels and returning restores them; failed HDR allocations present the 8-bit frame exactly; a
 synthetic 3.5 spot blooms only a few pixels and clamps; and the HUD overlay composites like
 drawing over the scene. `boat_screen` and `waterfront_grade` (quick) check the layout sizes and
 the grades.
@@ -416,6 +417,15 @@ checking shore clearance on every tick. The benchmark's `final_state` matched it
 that introduced the scenario.
 See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25) and the
 [G0 budgets](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
+
+`boat_lighting_qualification_contract` (`cpu;slow`, about 11 s in Debug on an M1 Max) runs the
+small deterministic `--lighting-qualify` stress audit in `tools/validate_boat_lighting_qualification.py`.
+It rejects out-of-bounds sample counts, CPU high/HDR, `--daylight`, `--aa`, review/check mixing
+and unusable prefixes before a window. The 25-sample run must exclude eight warmup rows, span a
+virtual 900 s cycle with every hour bin and midnight wrap, hold the fixed hour, match the two
+runs' final physical state, and produce a parseable JSON/CSV with recomputable finite rows. It
+asserts no frame-time threshold and does not replace supervisor fixed/cycle Release, GPU and
+visual measurements.
 
 `boat_capture` (`cpu`) owns the bounded live-capture contract: ring ordering/eviction, the
 retained window's span, segment separation, the percentile convention, missing GPU samples and
@@ -620,8 +630,10 @@ work/pixel checks, not timing budgets.
 clipping: above-water scenery remains visible, submerged scenery cannot change the reflection,
 and clipping is reset before the main pass. It also compares the uniform-shaded GPU sky with
 the CPU panorama at selected legacy/hour values and low/high sizes, checks direct/backward
-seeks and independent scene recreation, and observes native GL texture calls across 24 hours.
-A separate probe texture proves the upload spies work before the sky's zero-write measurement.
+seeks and independent scene recreation, and observes native GL texture calls across 24 hours
+plus a bounded 241-sample virtual cycle that crosses midnight and alternates the above-city and
+azimuth-seam views. A separate probe texture proves the upload spies work before the sky's
+zero-write measurement.
 The original target/overlay/squall/pass checks remain. This requires `PROTEUS_GPU_TESTS=ON`
 and a desktop graphics context; detailed evidence and limits live in the
 [lighting plan](SUNSET_PLAN.md#t2a-implementation-2026-11-07).

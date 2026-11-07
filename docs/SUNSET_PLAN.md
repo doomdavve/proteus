@@ -11,8 +11,12 @@ plugin schedules remain deferred. T1 adds the fixed-hour evaluator, artistic anc
 a developer review input, approved by the user on 2026-11-07. The named presets and player
 settings are unchanged. T2a implements the native GPU static-mask/uniform sky upload path.
 T2b is implemented locally: CPU sky drawing uses visible samples, the basin shares the frame
-light/sky, and textured materials follow the frame light/tint. Next is T2c qualification.
-Cloud/reflection attenuation is a documented deferred issue.
+light/sky, and textured materials follow the frame light/tint. T2c local Mac qualification is
+recorded: sampled-cycle native GPU costs fit the measured budget, while CPU reference rendering
+fails the interactive budget. Mirror lighting and performance-report target dimensions are fixed.
+Night course/weapon readability still needs playtest acceptance. Next is that review and T3
+fixed-hour controls; T4 also needs the glitter-phase contract and continuous-clock qualification.
+Cloud/reflection attenuation remains deferred.
 
 The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
 will expose approved fixed lighting choices, then separately scoped transitions and
@@ -129,8 +133,9 @@ T1 is implemented and user-approved. Split T2 into reviewable steps:
   to visible samples, make the basin share the frame sky/light and water tint, and make
   textured materials follow the frame light/tint. Keep actor, water and grading inputs
   coherent. See [the T2b result](#t2b-implementation-2026-11-07).
-- **T2c — qualification.** Review readability and intermediate hours, native/browser
-  behavior and measured CPU/GPU/frame cost before T3/T4.
+- **T2c — local qualification recorded; acceptance/platform limits open.** All-hour and
+  representative scene review, native fixed/cycle Release costs and hardware-browser fixed-hour
+  game costs are recorded. CPU performance and night playtest limits remain explicit before T3/T4. See [the T2c result](#t2c-implementation-2026-11-07).
 
 The cloud/reflection mismatch below is deferred separately; T2a must preserve its current
 behavior rather than silently bundling an artistic fix into the upload migration.
@@ -169,8 +174,8 @@ presets. Measure steady state separately from first-use costs. GPU fragment work
 increase, so compare with the graphics plan's existing budgets before enabling T4.
 T2a implements this upload strategy with native upload checks, a WebGL2 shader smoke check
 and one fixed-hour native cost comparison recorded below. T2b moves CPU sky drawing to visible
-samples with a bounded lazy cache; the full cycle, hardware browser and broader performance
-qualification remain T2c.
+samples with a bounded lazy cache. T2c records the sampled native cycle and hardware-browser
+fixed-hour costs below; a real continuous-clock/browser cycle and other platforms remain open.
 
 ### Deferred: clouded sun and water reflection
 
@@ -277,7 +282,7 @@ workflow. Their screenshot records the cloud/reflection issue above. Exact hours
 and platform coverage were not stated; this is T1 preview acceptance, not blanket
 qualification of every hour, T2 performance, player controls or the future cycle.
 
-**Next task:** T2c, readability and broader CPU/GPU qualification; T2b is implemented locally.
+**Next task at this baseline (superseded by T2c below):** broader CPU/GPU qualification.
 T3 menu controls, T4 cycle, Lua access, room time and replay persistence remain planned.
 
 ### T2a implementation, 2026-11-07
@@ -375,7 +380,7 @@ hardware performance are not qualified here. The cloud-obscured-sun/water-reflec
 remains deliberately unchanged and deferred. The user approved T1; no separate T2a user verdict
 is inferred.
 
-**Next task:** T2c, readability and broader CPU/GPU qualification; T2b is implemented locally.
+**Next task at this baseline (superseded by T2c below):** broader CPU/GPU qualification.
 
 ### T2b implementation, 2026-11-07
 
@@ -511,8 +516,168 @@ readability and whole-frame performance qualification, Windows, Safari and hardw
 physical input and audio listening remain open. No new player hour controls or sandbox cycle
 were added. T1 approval and the T2a evidence above remain as recorded.
 
-**Next task:** T2c, readability and broader CPU/GPU qualification (including changing/fixed-hour
-measurements and native/browser review).
+**Next task at the T2b baseline (superseded below):** T2c readability and whole-frame qualification.
+
+### T2c implementation, 2026-11-07
+
+**Completed locally:** `boat_water_review --lighting-qualify
+PREFIX` runs two finite production-draw workloads on the same independent physical trajectory:
+a fixed `--lighting-hour` baseline and a sampled virtual 900 s cycle. `--lighting-samples`
+accepts 25..3601 (default 241), eight warmup frames are stored separately and excluded, and the
+measured samples independently span virtual elapsed 0..900 s inclusive, so all 24 hour bins and
+the midnight wrap are visited without claiming 54,000 real 60 Hz frames. Route scenarios
+`river`/`outer` and the saturated `stress` basin use the existing sessions, fixtures, camera,
+scene and water paths. CPU drawing is the whole `boat_draw`/`boat_draw_scene` frame at 320x200;
+GPU drawing uses the production scene plus the benchmark's presentation path and actual
+asynchronous `GL_TIME_ELAPSED`, with query availability reported (`null`, not CPU time, when
+unavailable). JSON/CSV record build/platform/GL, resolution/HDR, hour/cadence, per-frame
+simulation/submission/presentation/frame/GPU times, p50/p95/p99/max, deadline misses, final
+state parity, CPU sky reference/visible/cache counters and scene submission counters. No
+timing threshold is embedded in CTest and no game clock or Auto behavior was added.
+
+```sh
+./build/boat_water_review --lighting-qualify build/lighting-qualify --renderer gpu \
+  --scenario outer --lighting-samples 241 --waves --lighting-hour 6.5 \
+  --resolution high --hdr on
+./build/boat_water_review --lighting-qualify build/lighting-cpu --renderer cpu \
+  --scenario stress --lighting-samples 25 --waves
+```
+
+**Cycle regression:** the existing native GL sky spies now also cover a bounded 241-sample
+virtual cycle that crosses midnight and alternates the accepted above-city and azimuth-seam
+views, retaining zero sky `TexImage2D`/`TexSubImage2D` observations and resource-ID stability
+alongside the original 24 integer-hour, target, overlay, pass and squall matrix.
+
+**Consumer audit and bounded corrections:** phase/hour grading, main/reflection passes, sky,
+water and emissive/navigation lamps consume the shared frame as recorded in T2b. Two concrete
+gaps were fixed. The CPU rear-view mirror kept its own zero-initialized Day lighting, so it did
+not follow a legacy sunset/dusk or full-hour main view; and its 30 Hz sample cache ignored a
+light change at the same wave time. `boat_rearview_set_lighting()` now supplies only
+daylight/hour/hour_set to the mirror's own `BoatCpuView`, while the GPU mirror reads the main
+`BoatGpu` selection, and the cache key includes renderer, light and location while retaining
+unchanged-light reuse. `wake_velocity` and `boat_combat_review` pass their selected light.
+`boat_combat_review` now accepts `--lighting-hour H`, rejecting invalid/missing values before a
+window, so existing cannon/grenade/torpedo/mirror captures can be reviewed at any hour. The
+presentation check now proves actual CPU and GPU mirror pixels refresh on a same-time light seek
+and return exactly to the first light. Fixed-hour direct/backward seeks remain history
+independent; this is fixed-light determinism, not qualification of a running T4 clock.
+
+The actual-game qualification also exposed stale report metadata: both F8 and
+`--performance-report` exported fixed low-resolution dimensions even at high/HDR. They now read
+the actual GPU scene/reflection targets, and CPU reports no reflection target. The hardware
+browser matrix and native high/HDR demo verify those exported dimensions.
+
+**Recorded T4 risk (not fixed here):** GPU water glitter derives its phase from the current
+`glint_speed` multiplied by frame time (`phase(rate * lighting->glint_speed, frame->time)`).
+A future continuous clock whose `glint_speed` changes with hour can therefore show a phase
+discontinuity at the change, even though fixed-hour samples and direct seeks are deterministic.
+T4 should use a seekable presentation-phase integral or an explicit sparkle timeline rather
+than multiplying total wave time by the instantaneous speed. No clock or workaround was added
+in T2c.
+
+**Readability review (2026-11-07, agent inspection):** 152 native low-resolution game captures
+cover 38 fixed hours (all integer hours plus dawn/dusk, horizon and midnight neighbours), both
+renderers and basin/outer. All four labelled sheets were inspected. The 22 saved outer T2b
+hour references remain byte-identical. The existing 31-pose review produced 310 captures over
+hours 0, 6.1, 12, 18 and 19.5 on both renderers; 60 representative hull, quay, bridge, skyline,
+coast and dock views were inspected. A further 24 cannon/grenade/torpedo views with mirrors,
+ten full-scene squall views and eight course views were inspected. Selected
+[combat/mirror](evidence/lighting-t2c/combat.png) and
+[course](evidence/lighting-t2c/course.png) sheets are retained in the repository.
+
+Night, dawn, daylight and dusk remain distinct; sky seams/horizons, harbour lamps, occupied
+windows, shore silhouettes and HUD agree with the selected hour in the reviewed views. Night
+course buoys and small cannon/torpedo details remain dark silhouettes, especially on the CPU
+flat-water course. Their visibility in actual play is an open acceptance gate; these stills
+do not establish competitive combat or safe course navigation. No palette retune or cloud/sun
+reflection change was bundled into qualification.
+
+**Repeated whole-scene cost (2026-11-07, Apple M1 Max, macOS 26.6.2, native Release):** three
+interleaved repeats per case, waves on, fixed start 6.5 versus the sampled virtual 900 s cycle,
+eight warmup draws per workload excluded. GPU uses 721 measured samples (1.25 virtual seconds
+per sample); CPU uses 241 (3.75 s). Within each pair the physical route is identical and its
+reported final state matches; physical motion remains two ticks per drawn frame, so these
+are about 12.13/4.13 s route probes, not a real-time 900 s gameplay soak. All 24 hour bins and
+the wrap are checked. Values below are medians of the three runs' percentiles, in milliseconds.
+[Raw reports and repeat ranges](evidence/lighting-t2c/native-qualification.json) preserve
+p50/p95/p99/max, first use, counters and GPU query coverage.
+
+| Scene / renderer / preset | Fixed frame p50 / p95 | Cycle frame p50 / p95 | Fixed / cycle GPU p95 |
+| --- | --- | --- | --- |
+| Outer / GPU low, LDR | 1.950 / 3.245 | 1.945 / 3.297 | 1.846 / 1.829 |
+| Outer / GPU high, HDR | 2.637 / 3.696 | 2.686 / 3.655 | 3.258 / 3.347 |
+| Four-boat stress / GPU low, LDR | 3.184 / 4.462 | 3.221 / 4.657 | 3.160 / 3.148 |
+| Outer / CPU low | 446.002 / 490.106 | 450.606 / 496.651 | unavailable |
+| Four-boat stress / CPU low | 93.666 / 95.040 | 95.724 / 97.204 | unavailable |
+
+Every GPU workload had zero measured 16.667 ms frame-deadline misses and 721/721 actual GPU
+queries. Cycle frame p95 ranges were 3.200–3.536 ms low outer, 3.618–4.041 ms high/HDR outer
+and 4.417–4.786 ms stress. The CPU reference renderer fails the interactive budget in both
+fixed and cycle workloads: all 241 measured frames miss in every repeat. Its cycle p95 ranges
+were 489.212–714.239 ms outer and 96.969–170.593 ms stress; this variation prevents attributing
+a precise full-frame increment to lighting. CPU full-reference sky samples remain zero.
+GPU frame includes simulation, scene submission and hidden-window presentation; GPU query
+covers the scene draw. CPU frame is simulation plus software rendering without presentation.
+Neither native workload includes the game's HUD, input or audio. These are useful local
+budgets, not a replacement for the older G0 river/4x4 matrix or Windows measurements.
+
+First-use cost is separate: fixed outer GPU first draw was 278–294 ms before warmup, versus
+26–29 ms stress; CPU outer was 564–570 ms and CPU stress 96–98 ms. Reused process resources
+make the subsequent cycle's first draw a warm start, not an independent cold-start comparison.
+
+**CPU diagnosis:** a separate ten-second Xcode Instruments 16.0 Time Profiler capture of the
+Release CPU outer workload found 78.07% inclusive time in `boat_water_surface_visible`, 71.95%
+in its `query` path, about 50% self time in wave trigonometry, and 20.91% inclusive in
+`draw_mesh_list`. Sky drawing was small (0.07% self). These overlap and must not be added.
+The [sample summary](evidence/lighting-t2c/cpu-profile-summary.json) excludes the first two
+trace seconds. The profiler's time limit intentionally killed its child; that partial
+qualification report is excluded from the timing matrix. Water-sampling performance is a
+separate CPU follow-up; T2c does not establish an interactive CPU cycle.
+
+**Hardware browser (2026-11-07):** Emscripten 6.0.12 MinSizeRel build/packaging passed.
+Chrome 156.0.8078.81 headless used actual ANGLE Metal on Apple M1 Max with software fallback
+disabled. Six inspected gameplay canvases cover CPU basin 0 / outer 21.5, GPU basin 0 / outer
+6.1, and GPU outer high/HDR at 0 and 18.5, without JavaScript exceptions, asset/shader failures
+or GL errors. These exercise production lazy map loading; the HTTP test response changes only
+startup arguments and leaves packaged files untouched. Solo V does not activate a deathmatch
+mirror; the browser mirror is not claimed as checked here.
+
+A separate actual-game performance export, with waves on and soundtrack off, records 240
+frames per GPU case and 48 for CPU. After discarding 24 GPU / 12 CPU startup frames, GPU
+frame p95 is 4.1 ms at night low, 4.5 ms dawn low, 4.4 ms noon high/HDR and 4.5 ms dusk high/HDR;
+frame-interval p95 is 17.5–17.6 ms. CPU outer night frame p50/p95 is 2074.3/6230.9 ms over
+36 retained frames, confirming its budget failure. First GPU game frames cost 529–534 ms and
+are reported separately. These game frames include HUD and loop work; browser intervals
+include animation scheduling. No GPU queries were available, so these are not GPU execution
+times or proof of a stable 60 Hz browser delivery. Each is one fixed-hour run, not a browser
+cycle. [Settings, backend and retained percentiles](evidence/lighting-t2c/browser-qualification.json)
+include the corrected actual scene/reflection dimensions (320x200/160x120 low,
+1280x800/640x480 high; CPU reflection 0x0).
+
+**Build/tests and native motion (2026-11-07):** final Debug and Release builds were warning-clean;
+final Web build/packaging passed. `ctest --preset full` with `PROTEUS_GPU_TESTS=ON`, native graphics
+and local sockets passed all 426 enabled tests, including 36 GPU cases (15 retired checks
+disabled; 96.70 s). The qualification contract rejects conflicting check modes before window
+creation, validates explicit CPU low/HDR-off, cadence, state parity and finite recomputable
+JSON/CSV. Final format, local documentation targets and `git diff --check` passed. Native
+windowed GPU combat with mirror at hour 0 completed 480 frames, and outer dawn 6.1 at high/HDR
+with waves completed 180 frames; final captures were inspected and the latter's exported target
+dimensions verified. These are agent-run scripted motion checks; physical input, audio listening
+and human acceptance were not performed.
+
+**Limits and next task:** local T2c qualification is recorded, including a failed CPU performance
+gate. Obtain the night course/weapon readability verdict and carry any bounded art correction
+into the owning plan before calling night gameplay accepted; then T3 exposes fixed-hour
+controls. Windows, Safari, browser deathmatch mirror and real continuous-clock/cycle motion
+remain unqualified. T4 must address the glitter-phase contract above and remeasure the actual
+900-active-second sandbox timeline, pause/resume and crane/cargo work; these sampled native
+inputs do not enable it. General Auto, Lua/network/replay ownership and the deferred
+cloud-obscured-sun/water-reflection issue are unchanged.
+
+Local ignored evidence is in `build/t2c-baseline/` and `build/t2c-review/`: all-hour and pose
+captures/manifests, weather probe and images, complete native CSV/JSON repeats, browser canvas
+checks and game exports, Instruments trace and windowed demo frames. The compact committed
+[evidence index](evidence/lighting-t2c/README.md) links selected sheets and measurement summaries.
 
 ### Plan review, 2026-11-07
 

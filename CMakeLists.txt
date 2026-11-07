@@ -395,6 +395,12 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
     proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
+  add_test(NAME boat_combat_lighting_hour_invalid
+    COMMAND boat_combat_review --lighting-hour nope)
+  add_test(NAME boat_combat_lighting_hour_missing
+    COMMAND boat_combat_review --lighting-hour)
+  set_tests_properties(boat_combat_lighting_hour_invalid boat_combat_lighting_hour_missing
+    PROPERTIES WILL_FAIL TRUE LABELS "cpu;quick")
 endif()
 
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
@@ -622,6 +628,11 @@ set_tests_properties(performance_analyzer PROPERTIES LABELS "cpu")
 set_tests_properties(web_endpoint_configuration PROPERTIES LABELS "cpu")
 add_test(NAME boat_benchmark_contract COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_benchmark.py $<TARGET_FILE:boat_benchmark>)
+add_test(NAME boat_lighting_qualification_contract COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_lighting_qualification.py
+  $<TARGET_FILE:boat_water_review>)
+set_tests_properties(boat_lighting_qualification_contract PROPERTIES LABELS "cpu;slow"
+  TIMEOUT 240)
 
 add_executable(wake_objects_review tools/wake_objects_review.c)
 target_include_directories(wake_objects_review PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -1500,6 +1511,7 @@ set(PROTEUS_SLOW_TESTS
   release_command
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
+  boat_lighting_qualification_contract
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
   boat_scenery ambient_river ambient_outer

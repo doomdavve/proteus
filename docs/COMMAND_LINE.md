@@ -207,6 +207,31 @@ wave time, not the light, so the same hour can be captured at different moments:
 ./build/boat_water_review --review build/lighting-review --renderer cpu --lighting-hour 6
 ```
 
+`boat_water_review --lighting-qualify PREFIX` is the bounded T2c developer audit. It draws the
+same full physical trajectory twice with production scene drawing: once holding
+`--lighting-hour` and once sampling the virtual 900 s cycle (`0..900` inclusive). It defaults to
+241 measured samples (`--lighting-samples` accepts 25..3601), excludes a separate eight-frame
+warmup, and writes `PREFIX.json` plus `PREFIX.csv` with per-frame hour, simulation, submission,
+presentation, frame and actual `GL_TIME_ELAPSED` where available, plus CPU sky/reference/cache
+counters and GPU counters. It never sleeps or advances the game clock; pose ticks are independent
+of the light. The CPU renderer supports only its existing 320x200 low, non-HDR path; use
+`--renderer gpu --resolution high --hdr on` for those presets. Reports contain no pass/fail
+timing threshold.
+
+```sh
+./build/boat_water_review --lighting-qualify build/lighting-qualify --renderer cpu \
+  --scenario stress --lighting-samples 25 --waves
+```
+
+The deathmatch capture fixture accepts the same developer hour for weapons and mirror review;
+invalid or missing values are rejected before a window opens:
+
+```sh
+./build/boat_combat_review --lighting-hour 21 --screenshot build/combat-night.png
+./build/boat_combat_review --gpu --mirror --play --lighting-hour 6.5 \
+  --screenshot build/combat-dawn.png
+```
+
 The named Day, Sunset and Dusk recipes keep their exact legacy behavior. The CPU basin now
 shares the selected hour's sky and light, and both CPU flat-water paths apply the frame's water
 multiplier once with ordinary flat shading, so basin captures from earlier daytime-only builds

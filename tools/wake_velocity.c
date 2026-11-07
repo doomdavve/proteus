@@ -2063,11 +2063,13 @@ static int study(int argc, char **argv)
         }
         if (!gpu_enabled)
             UpdateTexture(texture, pixels);
-        if (mirror_visible
-            && !boat_rearview_update(
-                &mirror, gpu_enabled ? &gpu : NULL, view, view_presentation, view_world, &rivals)) {
-            result = 1;
-            break;
+        if (mirror_visible) {
+            boat_rearview_set_lighting(&mirror, daylight_phase, lighting_hour, lighting_hour_set);
+            if (!boat_rearview_update(&mirror, gpu_enabled ? &gpu : NULL, view, view_presentation,
+                    view_world, &rivals)) {
+                result = 1;
+                break;
+            }
         }
         metrics.snapshot_render_ms = (float)((boat_profile_time(true) - scene_started_at) * 1000.0);
         if (profiler_visible && current_frame_started_at >= next_snapshot_time) {
@@ -2327,10 +2329,10 @@ static int study(int argc, char **argv)
                     .window_height = GetScreenHeight(),
                     .render_width = GetRenderWidth(),
                     .render_height = GetRenderHeight(),
-                    .scene_width = width,
-                    .scene_height = height,
-                    .reflection_width = WATERFRONT_GPU_REFLECTION_WIDTH,
-                    .reflection_height = WATERFRONT_GPU_REFLECTION_HEIGHT,
+                    .scene_width = gpu_enabled ? gpu.target.texture.width : width,
+                    .scene_height = gpu_enabled ? gpu.target.texture.height : height,
+                    .reflection_width = gpu_enabled ? gpu.scene.reflection.texture.width : 0,
+                    .reflection_height = gpu_enabled ? gpu.scene.reflection.texture.height : 0,
                     .monitor_refresh_hz = GetMonitorRefreshRate(GetCurrentMonitor()),
                 };
                 export_performance(
@@ -2379,10 +2381,10 @@ static int study(int argc, char **argv)
                 .window_height = GetScreenHeight(),
                 .render_width = GetRenderWidth(),
                 .render_height = GetRenderHeight(),
-                .scene_width = width,
-                .scene_height = height,
-                .reflection_width = WATERFRONT_GPU_REFLECTION_WIDTH,
-                .reflection_height = WATERFRONT_GPU_REFLECTION_HEIGHT,
+                .scene_width = gpu_enabled ? gpu.target.texture.width : width,
+                .scene_height = gpu_enabled ? gpu.target.texture.height : height,
+                .reflection_width = gpu_enabled ? gpu.scene.reflection.texture.width : 0,
+                .reflection_height = gpu_enabled ? gpu.scene.reflection.texture.height : 0,
                 .monitor_refresh_hz = GetMonitorRefreshRate(GetCurrentMonitor()),
             };
             char written[4096], error[512];
