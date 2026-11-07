@@ -44,7 +44,9 @@ scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3
 parameterization and the original seven-berth Eriksberg package are complete.
 The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
 twelve-berth/two-row package, plus M2 boat appearance; M3 authored routes are next. The
-first playable L4.3 harbor gate is implemented and awaits human review. The milestones below are this plan's
+first playable L4.3 harbor gate is implemented and awaits human review. The proposed
+[working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
+sites, cargo events and free-package objectives for the sandbox's S1 steps. The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -2682,13 +2684,45 @@ merged worktree, Debug build and full CTest passed (310 enabled tests, 13 disabl
 off, local socket access enabled); all 29 added local links/anchors and `git diff --check`
 passed. No new audiovisual verification was needed for this documentation-only resolution.
 
+## Working-harbour contract (proposed 2026-11-07)
+
+The [free ride sandbox](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-in-c) keeps
+cargo physics, lashing, assisted mooring, delivery detection and placement validation native,
+and moves work-site layout, loads, jobs and project outcomes into packages. That plan owns the
+gameplay steps and acceptance; this plan owns the contract each step adds. Nothing below is
+implemented.
+
+| Sandbox step | Contract addition | Rejected until qualified |
+| --- | --- | --- |
+| S1a | `scene.work` in the scene envelope (scene v4): work sites selecting registered crane, cargo and workboat presets with bounded placement; source pads, receiving areas, work berths and capture zones; platforms remain `marina.modules`. Decoded to a pointer-free core definition. Staging runs the generalised work-site survey; the catalog generator runs it for bundled packages. Bundled `proteus.outer-work` (`free`, `outer`). | Browser imports, rooms, replays and recordings |
+| S1b | No new contract; the second site is package data only | — |
+| S1c | `objective.hud` (and optionally `objective.timers`) granted to `free` packages; native cargo events (`cargo.secured`, `cargo.delivered`, `cargo.lost`, `cargo.reset`) with site/receiver/cargo IDs in the ordered event batch; a transactional scene-change command that enables an authored module/berth set, validated and committed between ticks | Same as S1a; plus any command that moves contacts under a player boat |
+| S3+ | Currency, prices and saves as objective/native state with exactly-once rewards; payouts never decided outside a committed transaction | Rooms until P5 authority |
+
+Rules carried over from P3 and the location-life track:
+
+- **Presets, not tuning.** Lua selects registered native presets; motor speeds, rope and mass
+  limits and contact margins are not package fields.
+- **Reload.** A changed work-site definition restarts the cargo session; display-only changes
+  may preserve it. A suspended load is never carried across an incompatible revision. Undo
+  restores the whole accepted definition through the same restart.
+- **Scene changes from objectives.** The S1c command selects among modules/berths already
+  present and validated in the accepted definition (initially hidden); it does not create
+  geometry at runtime. Enabling one checks that no boat or cargo body is inside its envelope,
+  and otherwise fails the transaction visibly. Undo/reset/migration retire it with the
+  objective state that enabled it.
+- **One owner.** The package that owns the work sites owns their jobs; a second claimant is
+  rejected, as for scene overrides.
+
 ## Longer-term creative roadmap
 
 Grow capabilities when a playable example needs them, preserving the existing owning plans:
 
 - **Voyage episodes:** optional deliveries, rescue encounters, visiting landmarks and choosing
   sheltered routes, built over the adventure's real map expansion and weather work. Cargo,
-  rescue actors and more destinations need native resource/rule support before Lua orchestration.
+  rescue actors and more destinations need native resource/rule support before Lua orchestration;
+  the [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) stages cargo sites,
+  events and jobs in that order.
 - **Living waterfront:** the [location-life track](#location-life-track-proposed-2026-10-30)
   now specifies marina layout/population, harbor traffic and ferry timetables, gulls, trams,
   seals and building/street lighting. Pedestrians/cyclists remain native city work before

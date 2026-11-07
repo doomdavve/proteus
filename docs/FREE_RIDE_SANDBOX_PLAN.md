@@ -1,32 +1,33 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-06: **S0b wave-phase shadow correction user-tested and accepted; approved for publication in existing PR #162.**
-The standalone `cargo_sandbox` now defaults to a temporary service platform in the real
-Eriksberg inlet on `outer`; `--location basin` retains the controlled reference. This is
-still a handling experiment, without deliveries or an addition to the normal free ride menu.
-This plan owns free ride's
-interactive cargo, player changes to places, Creative/Working Harbour rules, boat ownership and
-economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography, weather and the
-journey toward Vinga. [Marina authoring](MARINA_AUTHORING_PLAN.md) owns static scene recipes and
-scheduled harbour life; [plugins](PLUGIN_PLAN.md) own authoring/runtime contracts;
+Status, 2026-11-07: **S0a and S0b are merged (#159–#162); S1 is split so that work-site
+content moves into a plugin package before a second site is added.** The standalone
+`cargo_sandbox` defaults to a temporary service platform in the real Eriksberg inlet on
+`outer`; `--location basin` retains the controlled reference. It is still a handling
+experiment, without deliveries or an addition to the normal free ride menu. This plan owns
+free ride's interactive cargo, player changes to places, Creative/Working Harbour rules, boat
+ownership and economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography,
+weather and the journey toward Vinga. [Marina authoring](MARINA_AUTHORING_PLAN.md) owns static
+scene recipes and scheduled harbour life; [plugins](PLUGIN_PLAN.md) own authoring/runtime
+contracts, including the [working-harbour contract](PLUGIN_PLAN.md#working-harbour-contract-proposed-2026-11-07);
 [room content](ROOM_CONTENT_PLAN.md) owns loading and distribution.
 
 Completed: design and requested Astra review; S0a's one-crate crane, pad, wave-posed deck,
-explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view.
-Also completed: clearer helm/crane control switching, S0b's first mapped work site,
-receiver-projected landing footprints and assisted return mooring. A later wave-phase
-regression is corrected using the actual receiver triangles and exact GPU draw counts.
-The user tested the correction, reported “Now it works well!” and approved publication
-on 2026-11-06.
-Next: **a second receiving site and the useful crossing (S1)**, with S0c qualification
-still open. Publish the approved correction through existing PR #162; future PRs still
-require separate approval.
-The user reached loaded, lashed and unmoored state and accepted this as a solid base;
-the original “Tab View” label obscured that Tab also switches input controls. No earnings
-or progression is implemented. The user reports that harbour loading works as well as
-the basin but found the shadow unclear and returning very hard. The latest wave-phase
-correction has since been tried and accepted by the user. This
-acceptance does not close the independent qualification limits listed below.
+explicit catch/release/lashing, assisted berth, load balance, recovery and native CPU/GPU view;
+clearer helm/crane control switching; S0b's first mapped work site, receiver-projected landing
+footprints, assisted return mooring and the wave-phase footprint correction. The user accepted
+the basic toy, reported that harbour loading works as well as the basin, and accepted the
+wave-stable footprint (“Now it works well!”, 2026-11-06). The return UX after the depth/mooring
+changes has no separate acceptance beyond that report. No earnings or progression is
+implemented, and the S0c qualification limits below remain open.
+
+Completed planning task, 2026-11-07: review against the merged code found that every work-site
+value is compiled into C (core `#define`s, the site header, a custom platform mesh and the
+sandbox's hull), and the sandbox loads no package. The [content/mechanics split](#content-in-plugins-mechanics-in-c)
+now places site layout, loads, jobs and project outcomes in a plugin package and keeps
+physics and validation native. Next: **[S1a, move the existing site into a package with
+unchanged behaviour](#s1a-the-existing-site-as-package-data)**. Future PRs still require the
+user's approval.
 
 ## S0a: try the cargo toy
 
@@ -82,7 +83,7 @@ different enough to explore? No reward loop is needed to answer these questions.
 | Step | Status | Next gate |
 | --- | --- | --- |
 | S0a controlled handling toy | Implemented as native `cargo_sandbox`; basic toy accepted by the user; control labels clarified | Review the updated labels in the harbour experiment |
-| S0b harbour placement | First Eriksberg work site implemented, with native CPU/GPU scenery and boat/shore/camera contacts | Review projected landing footprints and assisted return; author the second receiving site before S1 |
+| S0b harbour placement | First Eriksberg work site merged, with native CPU/GPU scenery, boat/shore/camera contacts, landing footprints and assisted return; wave-stable footprint accepted | The second receiving site is authored as package data in [S1b](#s1-steps), after S1a |
 | S0c broader qualification | Not started | Multiple loads and measured 16-body stress ceiling, browser/touch, audio feedback and harbour traffic/wake performance |
 
 The original S0a test basin preceded harbour site selection; it remains an explicit
@@ -167,8 +168,8 @@ ordinary visual traffic wakes; no physical ferry wakes were added.
 
 Two other candidate footprints, **(-105, 0)** and **(-200, -150)**, passed the preliminary
 water/berth/traffic survey but have not been camera-reviewed, authored or connected as
-receiving sites. They are candidates only. Next: select a receiver, qualify its support and
-approaches, and implement the first useful crossing before adding earnings.
+receiving sites. They are candidates only. A receiver is selected and authored as package
+data in [S1b](#s1-steps), after S1a moves this site into a package; no earnings come first.
 
 ## S0b: depth cues and returning to the berth
 
@@ -264,10 +265,9 @@ failure; it writes no image on success. GPU review also draws a nonempty mesh fo
 an empty one and checks that no old pixels remain. `shadow-bow` and `shadow-water` are
 normal-colour review fixtures at simulated 3.5 s, including a formerly failing bow phase.
 
-**Workflow:** the user requires approval before any further PR is opened. They tested this
-correction and approved publication on 2026-11-06. Fold it into existing PR #162 rather than
-opening another PR. AGENTS.md records the approval requirement; this approval covers the
-current correction, not future PRs. The receiving site/useful crossing is next.
+**Workflow (history):** the user tested this correction and approved publication on
+2026-11-06; it was folded into PR #162, which has since merged with the rest of the S0 stack.
+Approval covered that correction only; future PRs still require the user's approval.
 
 ## The experience
 
@@ -469,14 +469,55 @@ offline fuel drain, mandatory maintenance timers or permanent loss of the player
 Display reserve warnings early enough to choose shelter. Judge whether fuel adds route and
 load choices; reduce or disable it if players just avoid exploring.
 
+## Content in plugins, mechanics in C
+
+Decision, 2026-11-07 (requested by the user): keep as much of the working harbour as possible
+in plugin packages, and keep only the gameplay mechanics in native code. S0 compiled every
+work-site value into C: the deck bounds, berth capture box and mooring limits are `#define`s
+in `src/boat_cargo.h`; the crane base and crate pad are constants in `src/boat_cargo.c`; the
+mooring position and survey are fixed in `tools/cargo_sandbox_site.h`; the platform is a custom
+box mesh; and the workboat hull/handling are fixed in `tools/cargo_sandbox.c`. The sandbox loads
+no package. Adding a second site that way would duplicate those constants, so S1 moves content
+into data first.
+
+| Native C (mechanics and safety) | Plugin package (content and rules) |
+| --- | --- |
+| Crane motors, rope constraint, cargo states and their atomic transitions | Work sites: crane placements, source pads, receiving areas, work berths and capture zones |
+| Deck/pad/water contact, lashing rules and secured-load effect on the boat | Which loads exist and where they start, chosen from registered cargo presets |
+| Assisted mooring motion and its bounds | Platforms and landings, as ordinary scene `marina.modules` |
+| Deciding a delivery happened (hook detached, load settled, inside a declared receiver) and emitting it as an event | Jobs: what to deliver where, project progress and HUD text; later payouts and prices |
+| Placement/clearance validation, generalised from the S0b survey | What changes when a project completes (modules or berths that appear) |
+| Input, cameras, rendering, save commits and file I/O | Which registered workboat recipe a site lends |
+
+Guardrails:
+
+- **Presets, not raw tuning.** A package selects registered crane, cargo and workboat presets
+  with bounded placement overrides (position, heading, chosen limits within a preset's range),
+  the same pattern as traffic routes. Motor speeds, rope limits, masses and contact margins
+  stay native so the solver's tested envelope remains meaningful.
+- **Invalid content fails at staging.** The S0b site survey becomes the staging validator for
+  every authored work site: mapped water, berth and module clearance, the traffic sweep, crane
+  reach to its pad and receivers, and the berth capture zone. The bundled catalog build runs
+  the same check, so an invalid bundled site fails the build.
+- **The core stays file- and Lua-free.** `proteus_boat_core` receives a copied, pointer-free
+  site definition, like `BoatSceneDefinition`; decoding lives with the other plugin decoders.
+- **Plugin reload policy.** Until a finer policy is specified, a changed work-site definition
+  restarts the cargo session (cargo, crane and mooring reset), while display-only edits may
+  preserve it. A load in mid-lift is never carried across an incompatible edit.
+- **Native solo first.** Rooms, replays, recordings and browser imports reject the new grant
+  and subsystem until each is qualified, as `scene.define` was introduced.
+
+The [plugin plan](PLUGIN_PLAN.md#working-harbour-contract-proposed-2026-11-07) owns the
+schema, grant, event and command contract; this plan owns the gameplay steps and acceptance.
+
 ## State, authoring and multiplayer
 
 Keep immutable map/scenery and authored service/cargo/site definitions separate from mutable
 world state: cargo poses/ownership, crane state, changed structures, jobs, boat inventory,
 fuel and currency. Use stable IDs and bounded caller-owned arrays. Native code validates and
-executes commands; Lua supplies supported data. Current `free` packages have no objective or
-callback grant, so jobs and interactions require an explicit descriptor/runtime extension.
-Existing voyage HUD objectives alone cannot implement cargo or money safely.
+executes commands; Lua supplies supported data. The [content/mechanics split](#content-in-plugins-mechanics-in-c)
+assigns each piece. Current `free` packages have no objective or callback grant, so S1c adds
+one explicitly. Existing voyage HUD objectives alone cannot implement cargo or money safely.
 
 Put physical cargo/constraint stepping behind the core boundary. A small data-only sandbox
 rules layer can own transactions; the application owns menus, input, file I/O and save commits.
@@ -518,7 +559,7 @@ the remaining gates below are still open.
 | Slice | Depends on | Playable result and completion gate | Status |
 | --- | --- | --- | --- |
 | S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a basic toy accepted; S0b first harbour site implemented; receiving site and S0c qualification remain |
-| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. | Proposed |
+| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a next |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
 | S3: saved Working Harbour | S1 + T0; reconcile S2 edits | Versioned native/browser save path, a few varied local jobs, currency and buy/rent/sell boats, delivered in separate steps. Persistent project changes; preview a purchase through borrowing. Save/reload cannot duplicate goods or payouts; player has a choice beyond repeating one delivery. | Proposed |
@@ -532,6 +573,43 @@ approvals or substitutes for automated checks. If S0 feels fiddly, simplify atta
 sway or improve the camera before adding more physics. If S1 is dull, shorten travel and make
 the destination change more useful before introducing money. Do not turn open play into a
 required chain of chores merely because later slices are listed.
+
+### S1 steps
+
+Each step is its own worktree and PR (with the user's approval), stacked on its parent.
+
+| Step | Result | Completion gate | Status |
+| --- | --- | --- | --- |
+| S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Next |
+| S1b: second receiving site | A receiver at a surveyed candidate, added by editing the package only | No C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Proposed |
+| S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Proposed |
+| S1d: useful landing playtest | The completed landing offers a nearer pickup or mooring on the next outing | The user completes the crossing without developer help and tries another idea | Proposed |
+
+#### S1a: the existing site as package data
+
+Move the S0b site out of C without changing how it plays:
+
+1. Replace the site and deck `#define`s in `src/boat_cargo.h` and the constants in
+   `src/boat_cargo.c` with a pointer-free work-site definition (crane preset and placement,
+   pad, work berth and capture zone, cargo start) passed to `boat_cargo_reset_at` and the
+   step functions. Keep the workboat deck bounds with the workboat preset. The current values
+   become the registered defaults, and `boat_cargo` keeps passing unchanged.
+2. Add a `scene.work` subsystem to the scene envelope (scene v4, keeping the v2→v3
+   no-compatibility precedent), decoded into that definition. Add the [plugin API](PLUGIN_API.md)
+   schema, discovery entry and diagnostics.
+3. Add a bundled `proteus.outer-work` package (`kind = "free"`, `location = "outer"`,
+   `["free.define", "scene.define"]`) that describes today's site, with its platform as a scene
+   `platform` module instead of the custom box mesh. Check the platform's contact, camera
+   exclusion and supported crate area against the module; a visible change in the platform's
+   look is expected and must be inspected, not assumed.
+4. Make `cargo_sandbox` open that package through the catalog (`--package ID`, defaulting to
+   it on `outer`); the basin reference stays an explicit fixture. Remove `CARGO_SITE_MOORING`.
+5. Generalise `cargo_site_clear` into the staging validator for authored work sites and run
+   it from staging, the catalog generator and `--survey`. Add rejection cases: dry or blocked
+   footprint, receiver out of crane reach, overlapping work berths, and traffic conflicts.
+
+Not in S1a: a second site, new presets, objectives, events, browser or room support, or any
+change to cargo physics. Reload policy is the restart rule above.
 
 ## Astra review, 2026-11-06
 
@@ -776,3 +854,16 @@ GPU CTest matrix off, local sockets enabled). No runtime code changed after the 
 wave-phase correction. All 280 local links/anchors across the four updated guides resolve;
 `git diff --check` passes. No additional audiovisual acceptance is inferred from this
 preflight; the user's explicit report above owns acceptance.
+
+### Content/mechanics split planning, 2026-11-07
+
+Documentation-only change at the user's request: S1 is split into S1a–S1d so work-site content,
+jobs and project outcomes live in plugin packages, with the matching
+[plugin contract](PLUGIN_PLAN.md#working-harbour-contract-proposed-2026-11-07). No runtime code
+changed. Apple M1 Max/macOS arm64, Debug, pinned local raylib/Lua/ENet sources,
+`PROTEUS_GPU_TESTS=OFF`: the build passed (only the existing upstream `stb_vorbis.c` warning)
+and `ctest --preset full` passed all **381 enabled tests** in 33.69 s (13 retired tests
+disabled; local sockets enabled). All 332 local links/anchors across the three changed guides
+resolve; `git diff --check` passes. No audiovisual review is needed. The proposed `scene.work`
+schema, preset ranges and S1c command are unimplemented; their exact fields are decided in
+S1a/S1c, and no receiver site has been selected.
