@@ -126,8 +126,12 @@ is available as `./build/cargo_sandbox`, outside the normal free ride menu. It s
 temporary Eriksberg service platform; Tab switches helm/crane controls and camera.
 In this toy, Up/Down sets throttle, holding Space brakes, and G starts/cancels assisted
 mooring when the HUD says BERTH READY. The berth outline marks the final boat pose; a
-projected landing footprint and DECK GAP readout help place the crate.
-Creative/progression worlds, boat trading, jobs and fuel costs remain planned.
+projected landing footprint and DECK GAP readout help place the crate. After departure the HUD
+and a yellow marker guide to the next site (N cycles). The job, shown top right, is to carry
+the crate to the landing and set it on the marked pad; that builds a quay beside the landing,
+whose pad holds the next crate. Carry that one east along the river to the new jetty. C returns
+a crate in the water to its latest starting pad, and R restarts everything.
+Creative/progression worlds, boat trading, paid jobs and fuel costs remain planned.
 
 ## Basin time trial and replays
 

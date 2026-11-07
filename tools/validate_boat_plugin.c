@@ -1252,7 +1252,11 @@ static int tours(void)
     "\"main.lua\", \"location\": \"" location "\", \"capabilities\": [\"free.define\", "           \
     "\"scene.define\"], \"state_version\": 1}"
 #define WORK_SITE(id, x, z)                                                                        \
-    "{ id = '" id "', preset = 'service_platform', cargo = 'crate', x = " #x ", z = " #z " }"
+    "{ id = '" id "', preset = 'service_platform', cargo = 'crate', x = " #x ", z = " #z           \
+    ", heading = 0 }"
+#define RECEIVING_SITE(id, x, z, heading)                                                          \
+    "{ id = '" id "', preset = 'receiving_platform', cargo = 'crate', x = " #x ", z = " #z         \
+    ", heading = " #heading " }"
 
 static BoatPluginStatus load_work(
     const char *manifest, const char *sites, BoatPluginFree *out, BoatPluginDiagnostic *d)
@@ -1275,11 +1279,21 @@ static int work_sites(void)
     CHECK(boat_plugin_read("plugins/outer-work", NULL, &files, &d) == BOAT_PLUGIN_OK);
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
-    CHECK(free.has_scene && free.scene.work_present && free.scene.work_count == 1);
+    CHECK(free.has_scene && free.scene.work_present && free.scene.work_count == 4);
+    CHECK(free.manifest.objective && !free.manifest.timers);
     const BoatSceneWorkSite *site = &free.scene.work[0];
-    CHECK(!strcmp(site->id, "eriksberg") && site->x == 10 && site->z == 245);
+    CHECK(!strcmp(site->id, "eriksberg") && site->x == 10 && site->z == 245 && site->heading == 0);
     CHECK(
         site->preset == BOAT_SCENE_WORK_SERVICE_PLATFORM && site->cargo == BOAT_SCENE_CARGO_CRATE);
+    const BoatSceneWorkSite *landing = &free.scene.work[1];
+    CHECK(!strcmp(landing->id, "landing") && landing->x == -105 && landing->z == 0);
+    CHECK(landing->heading == -.45f && landing->preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM);
+    CHECK(!site->hidden && !landing->hidden && free.scene.work[2].hidden);
+    CHECK(!strcmp(free.scene.work[2].id, "landing_quay"));
+    // S1d: the jetty, a hidden receiver 120 m east of the quay, built with it.
+    const BoatSceneWorkSite *jetty = &free.scene.work[3];
+    CHECK(!strcmp(jetty->id, "jetty") && jetty->x == -245 && jetty->z == 10 && jetty->hidden);
+    CHECK(jetty->heading == -1.57f && jetty->preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM);
     // Absent subsystems keep their compiled defaults; only work is authored.
     CHECK(!free.scene.berths_present && !free.scene.modules_present && !free.scene.traffic_present);
 
@@ -1298,7 +1312,12 @@ static int work_sites(void)
     CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
     CHECK(boat_plugin_decoded_revision(&back, &revision, &d));
     CHECK(revision.free.scene_digest == free.scene_digest);
-    CHECK(!memcmp(&revision.free.scene.work[0], site, sizeof(*site)));
+    CHECK(!memcmp(revision.free.scene.work, free.scene.work, 4 * sizeof(*site)));
+    CHECK(back.free.callbacks && revision.free.manifest.objective);
+    // An explicit hidden = false keeps the S1b digest; hiding a site changes it.
+    BoatSceneDefinition shown = free.scene;
+    shown.work[2].hidden = false;
+    CHECK(boat_scene_digest(&shown) != free.scene_digest);
     BoatSceneDefinition without = free.scene;
     without.work_present = false;
     without.work_count = 0;
@@ -1308,14 +1327,28 @@ static int work_sites(void)
         const char *sites, *field;
     } invalid[] = { { "{ sites = {} }", "scene.work.sites" }, { "{}", "scene.work.sites" },
         { "{ sites = {" WORK_SITE("a", 10, 245) "}, extra = 1 }", "scene.work" },
-        { "{ sites = { { id = 'a', preset = 'gantry', cargo = 'crate', x = 10, z = 245 } } }",
+        { "{ sites = { { id = 'a', preset = 'gantry', cargo = 'crate', x = 10, z = 245, "
+          "heading = 0 } } }",
             "scene.work.sites[1].preset" },
         { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'barrel', x = 10, "
-          "z = 245 } } }",
+          "z = 245, heading = 0 } } }",
             "scene.work.sites[1].cargo" },
         { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'crate', x = 10, "
-          "z = 245, heading = 1 } } }",
+          "z = 245, heading = 0, turn = 1 } } }",
             "scene.work.sites[1]" },
+        { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'crate', x = 10, "
+          "z = 245 } } }",
+            "scene.work.sites[1].heading" },
+        { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'crate', x = 10, "
+          "z = 245, heading = 7 } } }",
+            "scene.work.sites[1].heading" },
+        { "{ sites = {" RECEIVING_SITE("a", 10, 245, 0) "} }", "scene.work.sites" },
+        { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'crate', x = 10, "
+          "z = 245, heading = 0, hidden = 1 } } }",
+            "scene.work.sites[1].hidden" },
+        { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'crate', x = 10, "
+          "z = 245, heading = 0, hidden = true } } }",
+            "scene.work.sites" },
         { "{ sites = {" WORK_SITE("Bad", 10, 245) "} }", "scene.work.sites[1].id" },
         { "{ sites = {" WORK_SITE("a", 10, 245) "," WORK_SITE("a", -105, 0) "} }",
             "scene.work.sites[2].id" },
@@ -1344,11 +1377,21 @@ static int work_sites(void)
     CHECK(boat_world_resources_init(&world, outer));
     int failed = 0;
     CHECK(load_work(WORK_MANIFEST("outer"),
-              "{ sites = {" WORK_SITE("eriksberg", 10, 245) "," WORK_SITE("west", -105, 0) "} }",
+              "{ sites = {" WORK_SITE("eriksberg", 10, 245) "," RECEIVING_SITE(
+                  "west", -105, 0, 2.5) "} }",
               &free, &d)
         == BOAT_PLUGIN_OK);
     failed |= boat_plugin_free_check_location(&free, outer, &world.map, &d) != BOAT_PLUGIN_OK;
     show("two sites", &d);
+    // Beside the first site, separate facing the same way but overlapping once turned.
+    CHECK(load_work(WORK_MANIFEST("outer"),
+              "{ sites = {" WORK_SITE("eriksberg", 10, 245) "," RECEIVING_SITE(
+                  "turned", 24.5, 245, 1.5707964) "} }",
+              &free, &d)
+        == BOAT_PLUGIN_OK);
+    failed |= boat_plugin_free_check_location(&free, outer, &world.map, &d) != BOAT_PLUGIN_SCHEMA
+        || strcmp(d.field, "scene.work.sites[2]") || !strstr(d.message, "overlaps");
+    show("turned overlap", &d);
     CHECK(load_work(WORK_MANIFEST("outer"),
               "{ sites = {" WORK_SITE("eriksberg", 10, 245) "," WORK_SITE("near", 20, 250) "} }",
               &free, &d)
@@ -1363,7 +1406,7 @@ static int work_sites(void)
     char land[256];
     snprintf(land, sizeof(land),
         "{ sites = { { id = 'shore', preset = 'service_platform', "
-        "cargo = 'crate', x = 10, z = %.0f } } }",
+        "cargo = 'crate', x = 10, z = %.0f, heading = 0 } } }",
         shore - 2);
     CHECK(shore < 2000);
     CHECK(load_work(WORK_MANIFEST("outer"), land, &free, &d) == BOAT_PLUGIN_OK);
@@ -1372,7 +1415,7 @@ static int work_sites(void)
     show("shore site", &d);
     snprintf(land, sizeof(land),
         "{ sites = { { id = 'spawn', preset = 'service_platform', "
-        "cargo = 'crate', x = %.3f, z = %.3f } } }",
+        "cargo = 'crate', x = %.3f, z = %.3f, heading = 0 } } }",
         outer->spawn.x, outer->spawn.y);
     CHECK(load_work(WORK_MANIFEST("outer"), land, &free, &d) == BOAT_PLUGIN_OK);
     failed |= boat_plugin_free_check_location(&free, outer, &world.map, &d) != BOAT_PLUGIN_SCHEMA
@@ -1389,6 +1432,75 @@ static int work_sites(void)
     show("basin site", &d);
     boat_world_resources_destroy(&world);
     CHECK(!failed);
+    return 0;
+}
+
+// S1c: a free package's job. objective.hud follows scene.define, needs both callbacks and work
+// sites; the init probe runs at staging. Other free grants stay rejected.
+#define JOB_MANIFEST(capabilities)                                                                 \
+    "{\"id\": \"test.job\", \"name\": \"Job\", \"api\": 1, \"kind\": \"free\", \"entry\": "        \
+    "\"main.lua\", \"location\": \"outer\", \"capabilities\": [" capabilities                      \
+    "], \"state_version\": 1}"
+#define JOB_GRANT "\"free.define\", \"scene.define\", \"objective.hud\""
+#define JOB_CALLBACKS                                                                              \
+    "init = function(c) return {}, {} end, update = function(c, s) return s, {} end,"
+#define JOB_WORK "work = { sites = {" WORK_SITE("a", 10, 245) "} }"
+
+static int free_objective(void)
+{
+    static BoatPluginFree free;
+    BoatPluginDiagnostic d;
+    static const struct {
+        const char *manifest, *source;
+        BoatPluginStatus status;
+        const char *field;
+    } cases[] = {
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { " JOB_CALLBACKS " free = { version = 1, scene = { version = 3, " JOB_WORK
+            " } } }",
+            BOAT_PLUGIN_OK, "" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { free = { version = 1, scene = { version = 3, " JOB_WORK " } } }",
+            BOAT_PLUGIN_SCHEMA, "init/update" },
+        { JOB_MANIFEST("\"free.define\", \"scene.define\""),
+            "return { " JOB_CALLBACKS " free = { version = 1, scene = { version = 3, " JOB_WORK
+            " } } }",
+            BOAT_PLUGIN_SCHEMA, "init/update" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { init = function() end, update = 1, free = { version = 1, scene = { "
+            "version = 3, " JOB_WORK " } } }",
+            BOAT_PLUGIN_SCHEMA, "init/update" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { " JOB_CALLBACKS " free = { version = 1, scene = { version = 3 } } }",
+            BOAT_PLUGIN_SCHEMA, "init/update" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { " JOB_CALLBACKS " migrate = function(c, s) return s, {} end, free = { "
+            "version = 1, scene = { version = 3, " JOB_WORK " } } }",
+            BOAT_PLUGIN_SCHEMA, "migrate" },
+        { JOB_MANIFEST("\"free.define\", \"objective.hud\""), "return {}", BOAT_PLUGIN_MANIFEST,
+            "capabilities[2]" },
+        { JOB_MANIFEST("\"free.define\", \"objective.hud\", \"scene.define\""), "return {}",
+            BOAT_PLUGIN_MANIFEST, "capabilities[2]" },
+        { JOB_MANIFEST(JOB_GRANT ", \"objective.timers\""), "return {}", BOAT_PLUGIN_MANIFEST,
+            "capabilities" },
+    };
+    for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        BoatPluginBundle bundle = { cases[i].manifest, strlen(cases[i].manifest), cases[i].source,
+            strlen(cases[i].source) };
+        BoatPluginStatus status = boat_plugin_load_free(&bundle, NULL, &free, &d);
+        show("free objective", &d);
+        CHECK(status == cases[i].status);
+        CHECK(status == BOAT_PLUGIN_OK || !strcmp(d.field, cases[i].field));
+        CHECK(status != BOAT_PLUGIN_OK || free.manifest.objective);
+    }
+    // Races and matches keep their single optional scene grant.
+    BoatPluginManifest manifest;
+    const char *race = "{\"id\": \"test.race\", \"name\": \"R\", \"api\": 1, \"kind\": \"race\", "
+                       "\"entry\": \"main.lua\", \"location\": \"outer\", \"capabilities\": "
+                       "[\"race.define\", \"scene.define\", \"objective.hud\"], "
+                       "\"state_version\": 1}";
+    CHECK(boat_plugin_parse_manifest(race, strlen(race), NULL, &manifest, &d)
+        == BOAT_PLUGIN_MANIFEST);
     return 0;
 }
 
@@ -1413,6 +1525,7 @@ static const TestCase cases[] = {
     TEST_CASE(navigable_water),
     TEST_CASE(tours),
     TEST_CASE(work_sites),
+    TEST_CASE(free_objective),
 };
 
 int main(int argc, char **argv)

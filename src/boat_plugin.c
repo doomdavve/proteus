@@ -162,12 +162,13 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         : kind == BOAT_PLUGIN_KIND_RACE                 ? "race.define"
                                                         : "match.define";
     const jsmntok_t *capabilities = &tokens[at[6]];
-    unsigned maximum = kind == BOAT_PLUGIN_KIND_VOYAGE ? 4 : 2;
+    unsigned maximum = kind == BOAT_PLUGIN_KIND_VOYAGE ? 4 : kind == BOAT_PLUGIN_KIND_FREE ? 3 : 2;
     if (capabilities->type != JSMN_ARRAY || capabilities->size < 1
         || capabilities->size > (int)maximum)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
-            kind == BOAT_PLUGIN_KIND_VOYAGE
-                ? "must contain voyage.define and optional grants"
+            kind == BOAT_PLUGIN_KIND_VOYAGE ? "must contain voyage.define and optional grants"
+                : kind == BOAT_PLUGIN_KIND_FREE
+                ? "must contain free.define, optionally scene.define and objective.hud"
                 : "must contain one kind grant and optionally scene.define");
     char capability[32];
     if (!boat_json_text(json, &tokens[at[6] + 1], capability, sizeof(capability))
@@ -176,7 +177,8 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]", "is not granted for this kind");
     // Voyage grants are a canonical prefix: scene.define, objective.hud, objective.timers.
     // A package cannot reorder or repeat them, and timers require HUD. Other kinds may add only
-    // scene.define, immediately after their kind grant.
+    // scene.define, immediately after their kind grant; a free package may follow it with
+    // objective.hud (S1c, for its work sites' job).
     int order = 0;
     bool extra_scene = false;
     for (int i = 1; i < capabilities->size; ++i) {
@@ -188,9 +190,14 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             if (!strcmp(capability, "scene.define") && !extra_scene) {
                 m.scene = true;
                 extra_scene = true;
-            } else
+            } else if (kind == BOAT_PLUGIN_KIND_FREE && !strcmp(capability, "objective.hud")
+                && extra_scene && !m.objective)
+                m.objective = true;
+            else
                 return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
-                    "must be scene.define and may appear once");
+                    kind == BOAT_PLUGIN_KIND_FREE
+                        ? "must be scene.define, optionally followed by objective.hud"
+                        : "must be scene.define and may appear once");
             continue;
         }
         if (!strcmp(capability, "scene.define") && order == 0) {
@@ -1041,11 +1048,19 @@ BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
     if (!(data->version == 1))
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "free.version",
             "must be 1, the supported free schema");
+    if (data->callbacks != manifest->objective)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
+            "callbacks require objective.hud and that capability requires both callbacks");
     BoatPluginFree candidate = { .manifest = *manifest, .digest = 0 };
     if (boat_plugin_take_scene(manifest, data->has_scene, &data->scene, &candidate.has_scene,
             &candidate.scene, &candidate.scene_digest, d)
         != BOAT_PLUGIN_OK)
         return BOAT_PLUGIN_SCHEMA;
+    // S1c: a free objective is the job of its package's work sites; only the cargo sandbox
+    // hosts it.
+    if (manifest->objective && !candidate.scene.work_present)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
+            "free objectives require scene.work sites");
     candidate.digest = candidate.scene_digest;
     *out = candidate;
     BoatPluginCost cost = d->cost;
@@ -1157,9 +1172,8 @@ static BoatPluginStatus check_work_sites(const BoatPluginFree *free,
         const BoatSceneWorkSite *site = &scene->work[i];
         char path[32];
         snprintf(path, sizeof(path), "scene.work.sites[%u]", i + 1);
-        // The registered envelope (berth -3..11 m in x, -5..12 m in z) plus a 4 m restart margin.
-        if (location->spawn.x > site->x - 7 && location->spawn.x < site->x + 15
-            && location->spawn.y > site->z - 9 && location->spawn.y < site->z + 16)
+        // The registered envelope plus a 4 m restart margin.
+        if (boat_cargo_site_near(site, location->spawn, 4))
             return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path, "blocks the location's spawn");
         for (unsigned j = 0; j < i; ++j)
             if (!boat_cargo_sites_apart(&scene->work[j], site))

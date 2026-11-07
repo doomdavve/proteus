@@ -119,15 +119,15 @@ static void check_mooring_and_shadow(BoatWorld *world)
     shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_DECK);
     CHECK(shadow.count == 4); // Partial footprint is clipped at the deck edge.
     for (int i = 0; i < 4; ++i)
-        CHECK(shadow.points[i].x <= s.crane.origin.x + BOAT_CARGO_DECK_X + .0001f);
+        CHECK(shadow.points[i].x <= s.cranes[0].origin.x + BOAT_CARGO_DECK_X + .0001f);
     s.cargo.position.x += 2;
     CHECK(!boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_DECK).count);
-    s.cargo.position = Vector3Add(s.crane.origin, (Vector3) { -5, 3, 0 });
+    s.cargo.position = Vector3Add(s.cranes[0].origin, (Vector3) { -5, 3, 0 });
     shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_PAD);
     CHECK(shadow.count == 4 && fabsf(shadow.clearance - 1.6f) < .0001f);
     for (int i = 0; i < 4; ++i)
         CHECK(shadow.points[i].y == 1.04f);
-    s.cargo.position = Vector3Add(s.crane.origin, (Vector3) { 5, 3, 0 });
+    s.cargo.position = Vector3Add(s.cranes[0].origin, (Vector3) { 5, 3, 0 });
     shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_WATER);
     CHECK(shadow.count == 4);
     for (int i = 0; i < 4; ++i) {
@@ -136,11 +136,300 @@ static void check_mooring_and_shadow(BoatWorld *world)
             = boat_water_query_borrowed(&world->water, (Vector2) { -p.x, p.z }, 3).height + .04f;
         CHECK(fabsf(p.y - expected) < .0001f);
     }
-    s.cargo.position = Vector3Add(s.crane.origin, (Vector3) { -5, 1.5f, 2.8f });
+    s.cargo.position = Vector3Add(s.cranes[0].origin, (Vector3) { -5, 1.5f, 2.8f });
     s.cargo.state = BOAT_CARGO_FLOATING;
     for (int i = 0; i < 120; ++i)
         step(&s, &b, world, i);
     CHECK(s.cargo.state == BOAT_CARGO_PAD && fabsf(s.cargo.position.y - 1.4f) < .0001f);
+}
+
+// A turned receiving site behaves as the S0 site in its own frame: berth status and capture,
+// assisted alignment to its heading, and a load set down on its pad.
+static void check_turned_site(BoatWorld *world, const BoatSceneWorkSite *pair)
+{
+    BoatCargoSandbox s;
+    CHECK(boat_cargo_reset_sites(&s, pair, 2));
+    const BoatCargoCrane *receiver = &s.cranes[0];
+    CHECK(receiver->heading == 1 && receiver->preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM);
+    Vector3 bow = boat_cargo_site_direction(receiver, (Vector3) { 0, 0, -1 });
+    Boat probe = { .position = { -105, 0 }, .heading = 1 };
+    Vector3 hull_bow = Vector3Subtract(boat_pose_attachment(&probe, (Vector3) { 0, 0, -1 }),
+        boat_pose_attachment(&probe, (Vector3) { 0 }));
+    CHECK(Vector3Distance(bow, hull_bow) < .0001f);
+    Vector3 back
+        = boat_cargo_site_local(receiver, boat_cargo_site_point(receiver, (Vector3) { 3, 1, -2 }));
+    CHECK(Vector3Distance(back, (Vector3) { 3, 1, -2 }) < .0001f);
+    // Same local approach as check_mooring_and_shadow, turned into the receiver's frame.
+    CHECK(boat_cargo_moor_toggle(&s, &(Boat) { 0 }) && !s.moored);
+    Vector3 approach = boat_cargo_site_point(receiver, (Vector3) { 1.8f, 0, 4.3f });
+    Boat b
+        = { .position = { -approach.x, approach.z }, .heading = 1.5f, .velocity = { .2f, -.8f } };
+    BoatCargoMoorStatus status = boat_cargo_moor_status(&s, &b);
+    CHECK(status.site == 0 && status.reason == BOAT_CARGO_MOOR_READY);
+    CHECK(fabsf(status.heading_error + .5f) < .0001f);
+    b.heading = 1.5f - PI;
+    CHECK(boat_cargo_moor_status(&s, &b).reason == BOAT_CARGO_MOOR_HEADING);
+    b.heading = 1.5f;
+    CHECK(boat_cargo_moor_toggle(&s, &b) && s.active == 0 && s.mooring);
+    for (int i = 0; i < 900 && !s.moored; ++i)
+        boat_cargo_moor_step(&s, &b);
+    CHECK(s.moored && b.heading == 1);
+    CHECK(Vector2Distance(b.position, boat_cargo_berth(receiver)) == 0);
+    // The receiving pad supports a released load like the source pad.
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    s.cargo.position = boat_cargo_site_point(receiver, (Vector3) { -5, 1.5f, 2.8f });
+    for (int i = 0; i < 120; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_PAD && s.cargo.pad == 0);
+    CHECK(fabsf(s.cargo.position.y - 1.4f) < .0001f);
+    s.cargo.position = boat_cargo_site_point(receiver, (Vector3) { -5, 3, 0 });
+    BoatCargoShadow shadow = boat_cargo_shadow(&s, &b, world, 3, BOAT_CARGO_SHADOW_PAD);
+    CHECK(shadow.count == 4 && fabsf(shadow.clearance - 1.6f) < .0001f);
+    for (int i = 0; i < 4; ++i) {
+        Vector3 local = boat_cargo_site_local(receiver, shadow.points[i]);
+        CHECK(fabsf(local.x + 5) <= .4801f && fabsf(local.z) <= .4801f);
+    }
+    // The hook belongs to the active crane, which aims in its own frame.
+    Vector3 hook = Vector3Add(boat_cargo_tip(receiver), (Vector3) { 0, -receiver->rope, 0 });
+    CHECK(Vector3Distance(boat_cargo_hook(&s), hook) == 0);
+}
+
+static unsigned take(BoatCargoSandbox *s, BoatCargoEventKind kind, unsigned site)
+{
+    BoatCargoEvent events[BOAT_CARGO_EVENTS];
+    unsigned count = boat_cargo_take_events(s, events, BOAT_CARGO_EVENTS), matching = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        CHECK(events[i].kind == kind && events[i].site == site);
+        ++matching;
+    }
+    return matching;
+}
+
+// S1c: a delivery commits once per session; lifting it off again, losing and recovering the
+// load, or capsizing never repeat it. Hidden sites have no berth or pad until enabled, and an
+// occupied site refuses to build.
+static void check_delivery_events(BoatWorld *world)
+{
+    const BoatSceneWorkSite sites[] = {
+        { .id = "source", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM },
+        { .id = "receiver", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = 40 },
+        { .id = "quay", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM, .x = 80, .hidden = true },
+    };
+    BoatCargoSandbox s;
+    CHECK(boat_cargo_reset_sites(&s, sites, 3));
+    CHECK(s.active == 0 && s.source == 0 && s.cranes[2].hidden && !s.event_count);
+    BoatCargoSandbox only_hidden;
+    CHECK(!boat_cargo_reset_sites(&only_hidden, sites + 1, 2)); // No visible service platform.
+    Boat b = { 0 };
+    const BoatCargoCrane *receiver = &s.cranes[1], *quay = &s.cranes[2];
+
+    // A hidden site is not a berth, and its pad does not exist.
+    CHECK(boat_cargo_moor_toggle(&s, &b) && !s.moored);
+    Boat at_quay = { .position = boat_cargo_berth(quay) };
+    CHECK(boat_cargo_moor_status(&s, &at_quay).site != 2);
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    s.cargo.position = boat_cargo_site_point(quay, (Vector3) { -5, 1.5f, 0 });
+    for (int i = 0; i < 120; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_FLOATING && s.cargo.position.y < 1);
+    CHECK(take(&s, BOAT_CARGO_EVENT_LOST, 0) == 1);
+
+    // Delivery: one event once the released load rests on the receiving pad.
+    s.cargo.position = boat_cargo_site_point(receiver, (Vector3) { -5, 1.6f, 0 });
+    s.cargo.velocity = (Vector3) { 0 };
+    for (int i = 0; i < 30; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_PAD && !s.cargo.delivered && !s.event_count);
+    for (int i = 30; i < 600; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.delivered && take(&s, BOAT_CARGO_EVENT_DELIVERED, 1) == 1);
+    // Lifted off and set down again: still one delivery.
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    s.cargo.position.y += 1.5f;
+    for (int i = 0; i < 600; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_PAD && !s.event_count);
+
+    // Loss in open water is reported at the first contact only.
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    s.cargo.position = (Vector3) { -20, 2, 15 };
+    for (int i = 0; i < 600; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.wet && take(&s, BOAT_CARGO_EVENT_LOST, 0) == 1);
+
+    // Recovery returns the load to its source pad and keeps the committed delivery.
+    s.cargo.state = BOAT_CARGO_HANGING;
+    CHECK(!boat_cargo_recover(&s) && !s.event_count);
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    CHECK(boat_cargo_recover(&s) && take(&s, BOAT_CARGO_EVENT_RESET, 0) == 1);
+    CHECK(s.cargo.state == BOAT_CARGO_PAD && s.cargo.pad == 0 && s.cargo.delivered);
+    CHECK(Vector3Distance(
+              s.cargo.position, boat_cargo_site_point(&s.cranes[0], (Vector3) { -5, 1.4f, 0 }))
+        == 0);
+    for (int i = 0; i < 240; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_PAD && !s.event_count);
+
+    // Lashing reports SECURED; capsizing loses the load once and delivers nothing.
+    s.cargo = (BoatCargo) { .state = BOAT_CARGO_LOOSE,
+        .deck_contact = true,
+        .settled = 1,
+        .delivered = true,
+        .position = boat_pose_attachment(&b, (Vector3) { 0, BOAT_CARGO_DECK_Y + .4f, 0 }) };
+    CHECK(boat_cargo_lash_toggle(&s, &b) && take(&s, BOAT_CARGO_EVENT_SECURED, 0) == 1);
+    b.roll = PI;
+    for (int i = 0; i < 600; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_FLOATING && take(&s, BOAT_CARGO_EVENT_LOST, 0) == 1);
+    b.roll = 0;
+
+    // Building: refused while the boat or the load is inside, then idempotently refused.
+    BoatCargoSandbox before = s;
+    CHECK(boat_cargo_site_occupied(&s, 2, &at_quay));
+    CHECK(!boat_cargo_site_enable(&s, 2, &at_quay) && memcmp(&s, &before, sizeof(s)) == 0);
+    s.cargo.position = boat_cargo_site_point(quay, (Vector3) { -5, 0, 0 });
+    CHECK(!boat_cargo_site_enable(&s, 2, &b) && s.cranes[2].hidden);
+    CHECK(boat_cargo_recover(&s) && take(&s, BOAT_CARGO_EVENT_RESET, 0) == 1);
+    CHECK(!boat_cargo_site_enable(&s, 1, &b) && !boat_cargo_site_enable(&s, 3, &b));
+    CHECK(boat_cargo_site_enable(&s, 2, &b) && !s.cranes[2].hidden);
+    CHECK(!boat_cargo_site_enable(&s, 2, &b));
+    CHECK(boat_cargo_moor_status(&s, &at_quay).site == 2);
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    s.cargo.position = boat_cargo_site_point(quay, (Vector3) { -5, 1.6f, 0 });
+    for (int i = 0; i < 120; ++i)
+        step(&s, &b, world, i);
+    CHECK(s.cargo.state == BOAT_CARGO_PAD && s.cargo.pad == 2 && !s.event_count);
+
+    // A new session clears the delivery and hides the site again.
+    CHECK(boat_cargo_reset_sites(&s, sites, 3));
+    CHECK(!s.cargo.delivered && s.cranes[2].hidden && !s.event_count);
+}
+
+// The crate's position in the boat's deck frame.
+static Vector3 deck_frame(const Boat *b, Vector3 p)
+{
+    return Vector3Transform(Vector3Subtract(p, boat_pose_attachment(b, (Vector3) { 0 })),
+        MatrixTranspose(boat_pose_rotation(b)));
+}
+
+// The deck tops a solid hull: a crate overhanging the edge rests on it but cannot be lashed,
+// and one whose centre is past the edge is pushed out of the hull's side and falls beside the
+// boat. Before this, both sank through the hull to the water (user report, 2026-11-07).
+static void check_deck_edge(BoatWorld *world)
+{
+    const float level = BOAT_CARGO_DECK_Y + BOAT_CARGO_HALF;
+    const Vector3 starts[] = { { BOAT_CARGO_DECK_X - .2f, level + .3f, 0 },
+        { 0, level + .3f, -BOAT_CARGO_DECK_Z + .15f } };
+    for (unsigned i = 0; i < 2; ++i) {
+        BoatCargoSandbox s;
+        boat_cargo_reset(&s);
+        Boat b = { 0 };
+        s.cargo.state = BOAT_CARGO_FLOATING;
+        s.cargo.position = boat_pose_attachment(&b, starts[i]);
+        for (int t = 0; t < 240; ++t)
+            step(&s, &b, world, t);
+        Vector3 local = deck_frame(&b, s.cargo.position);
+        CHECK(s.cargo.state == BOAT_CARGO_LOOSE && s.cargo.deck_contact);
+        CHECK(fabsf(local.y - level) < .01f && s.cargo.settled >= .5f);
+        CHECK(!boat_cargo_lash_toggle(&s, &b) && s.cargo.state == BOAT_CARGO_LOOSE);
+    }
+    const Vector3 past[] = { { BOAT_CARGO_DECK_X + .2f, level + .3f, .3f },
+        { -BOAT_CARGO_DECK_X - .1f, level + .3f, -.5f },
+        { .2f, level + .3f, BOAT_CARGO_DECK_Z + .2f } };
+    for (unsigned i = 0; i < 3; ++i) {
+        BoatCargoSandbox s;
+        boat_cargo_reset(&s);
+        Boat b = { 0 };
+        s.cargo.state = BOAT_CARGO_FLOATING;
+        s.cargo.position = boat_pose_attachment(&b, past[i]);
+        for (int t = 0; t < 240; ++t) {
+            step(&s, &b, world, t);
+            Vector3 local = deck_frame(&b, s.cargo.position);
+            bool overlapping = fabsf(local.x) < BOAT_CARGO_DECK_X + BOAT_CARGO_HALF - .001f
+                && fabsf(local.z) < BOAT_CARGO_DECK_Z + BOAT_CARGO_HALF - .001f;
+            CHECK(!overlapping || local.y > level - .03f); // Never inside the hull.
+        }
+        CHECK(s.cargo.state == BOAT_CARGO_FLOATING && !s.cargo.deck_contact);
+        CHECK(deck_frame(&b, s.cargo.position).y < BOAT_CARGO_DECK_Y);
+    }
+}
+
+// The only queued event: KIND at SITE for LOAD.
+static void take_one(BoatCargoSandbox *s, BoatCargoEventKind kind, unsigned site, unsigned load)
+{
+    BoatCargoEvent events[BOAT_CARGO_EVENTS];
+    CHECK(boat_cargo_take_events(s, events, BOAT_CARGO_EVENTS) == 1);
+    CHECK(events[0].kind == kind && events[0].site == site && events[0].load == load);
+}
+
+// Set the released load onto SITE's pad and let it rest there.
+static void set_down(BoatCargoSandbox *s, Boat *b, BoatWorld *world, unsigned site)
+{
+    s->cargo.state = BOAT_CARGO_FLOATING;
+    s->cargo.velocity = (Vector3) { 0 };
+    s->cargo.position = boat_cargo_site_point(&s->cranes[site], (Vector3) { -5, 1.6f, 0 });
+    for (int i = 0; i < 600; ++i)
+        step(s, b, world, i);
+    CHECK(s->cargo.state == BOAT_CARGO_PAD && s->cargo.pad == site);
+}
+
+// S1d: a supply uses up the delivered load and starts the next on a built service pad, its new
+// source. A load delivers once at each receiver, so one set down at the wrong receiver can
+// still reach the right one; events carry the load number.
+static void check_supply(BoatWorld *world)
+{
+    const BoatSceneWorkSite sites[] = {
+        { .id = "source", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM },
+        { .id = "landing", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = 40 },
+        { .id = "quay", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM, .x = 80, .hidden = true },
+        { .id = "jetty", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = 120, .hidden = true },
+    };
+    BoatCargoSandbox s;
+    CHECK(boat_cargo_reset_sites(&s, sites, 4) && s.cargo.load == 1);
+    Boat b = { 0 };
+    CHECK(boat_cargo_moor_toggle(&s, &b) && !s.moored);
+    // Nothing to use up before a delivery.
+    CHECK(!boat_cargo_supply_ready(&s) && !boat_cargo_supply(&s, 0));
+    set_down(&s, &b, world, 1);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 1, 1);
+    // Only a built service platform takes a supply.
+    CHECK(boat_cargo_supply_ready(&s) && !boat_cargo_supply(&s, 2) && !boat_cargo_supply(&s, 1));
+    CHECK(boat_cargo_site_enable(&s, 2, &b) && boat_cargo_site_enable(&s, 3, &b));
+    CHECK(!boat_cargo_supply(&s, 3) && !boat_cargo_supply(&s, 4));
+    // Never while the load is hooked, loose on deck or lashed.
+    const BoatCargoState busy[] = { BOAT_CARGO_HANGING, BOAT_CARGO_LOOSE, BOAT_CARGO_SECURED };
+    BoatCargo resting = s.cargo;
+    for (unsigned i = 0; i < 3; ++i) {
+        s.cargo.state = busy[i];
+        BoatCargoSandbox before = s;
+        CHECK(!boat_cargo_supply_ready(&s) && !boat_cargo_supply(&s, 2));
+        CHECK(memcmp(&s, &before, sizeof(s)) == 0);
+    }
+    s.cargo = resting;
+    CHECK(boat_cargo_supply(&s, 2) && !s.event_count);
+    CHECK(s.cargo.load == 2 && s.cargo.state == BOAT_CARGO_PAD && s.cargo.pad == 2);
+    CHECK(s.source == 2 && !s.cargo.delivered && !s.cargo.receivers);
+    CHECK(Vector3Distance(
+              s.cargo.position, boat_cargo_site_point(&s.cranes[2], (Vector3) { -5, 1.4f, 0 }))
+        == 0);
+    CHECK(!boat_cargo_supply(&s, 2)); // Load 2 is not delivered yet.
+    // Recovery now returns load 2 to the quay.
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    CHECK(boat_cargo_recover(&s) && s.cargo.pad == 2 && s.cargo.load == 2);
+    take_one(&s, BOAT_CARGO_EVENT_RESET, 2, 2);
+    // Load 2 at the landing commits there once, then still commits at the jetty.
+    set_down(&s, &b, world, 1);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 1, 2);
+    set_down(&s, &b, world, 1);
+    CHECK(!s.event_count);
+    set_down(&s, &b, world, 3);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 3, 2);
+    set_down(&s, &b, world, 3);
+    set_down(&s, &b, world, 1);
+    CHECK(!s.event_count && s.cargo.receivers == (1u << 1 | 1u << 3));
+    // A new session starts at load 1 on the first source, with both sites hidden again.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    CHECK(s.cargo.load == 1 && s.source == 0 && s.cranes[2].hidden && s.cranes[3].hidden);
 }
 
 int main(int argc, char **argv)
@@ -150,6 +439,9 @@ int main(int argc, char **argv)
     BoatWorld world;
     boat_world_init(&world, &resources, boat_water_gentle());
     check_mooring_and_shadow(&world);
+    check_delivery_events(&world);
+    check_supply(&world);
+    check_deck_edge(&world);
     Boat boat = { 0 };
     BoatCargoSandbox s, repeat;
     boat_cargo_reset(&s);
@@ -160,16 +452,16 @@ int main(int argc, char **argv)
     repeat = s;
     for (int i = 0; i < 12000; ++i) {
         float slew = (i / 180) % 2 ? 1 : -1;
-        boat_cargo_motor(&s.crane, slew, sinf(i * .01f), cosf(i * .02f));
-        boat_cargo_motor(&repeat.crane, slew, sinf(i * .01f), cosf(i * .02f));
+        boat_cargo_motor(&s.cranes[0], slew, sinf(i * .01f), cosf(i * .02f));
+        boat_cargo_motor(&repeat.cranes[0], slew, sinf(i * .01f), cosf(i * .02f));
         step(&s, &boat, &world, i);
         step(&repeat, &boat, &world, i);
         CHECK(memcmp(&s, &repeat, sizeof(s)) == 0);
         Vector3 anchor
-            = Vector3Subtract(boat_cargo_tip(&s.crane), (Vector3) { 0, BOAT_CARGO_HALF, 0 });
-        CHECK(Vector3Distance(s.cargo.position, anchor) <= s.crane.rope + .02f);
-        CHECK(s.crane.reach >= 2 && s.crane.reach <= 7);
-        CHECK(s.crane.rope >= .7f && s.crane.rope <= 5.2f);
+            = Vector3Subtract(boat_cargo_tip(&s.cranes[0]), (Vector3) { 0, BOAT_CARGO_HALF, 0 });
+        CHECK(Vector3Distance(s.cargo.position, anchor) <= s.cranes[0].rope + .02f);
+        CHECK(s.cranes[0].reach >= 2 && s.cranes[0].reach <= 7);
+        CHECK(s.cranes[0].rope >= .7f && s.cranes[0].rope <= 5.2f);
     }
     // Detachment is atomic and cannot move or accelerate the load.
     Vector3 pos = s.cargo.position, velocity = s.cargo.velocity;
@@ -184,19 +476,20 @@ int main(int argc, char **argv)
         boat_cargo_reset(&s);
         CHECK(boat_cargo_hook_toggle(&s));
         for (int i = 0; i < 360; ++i) {
-            boat_cargo_motor(&s.crane, 0, 0, 1);
+            boat_cargo_motor(&s.cranes[0], 0, 0, 1);
             step(&s, &boat, &world, i);
         }
         Vector3 target = { side * .65f, 1.15f, .65f };
         float angle = atan2f(target.x + 4, target.z - 3);
         float radius = hypotf(target.x + 4, target.z - 3);
         for (int i = 0; i < 1800; ++i) {
-            boat_cargo_motor(&s.crane, Clamp(remainderf(angle - s.crane.angle, 2 * PI) * 3, -1, 1),
-                Clamp((radius - s.crane.reach) * 2, -1, 1), 0);
+            boat_cargo_motor(&s.cranes[0],
+                Clamp(remainderf(angle - s.cranes[0].angle, 2 * PI) * 3, -1, 1),
+                Clamp((radius - s.cranes[0].reach) * 2, -1, 1), 0);
             step(&s, &boat, &world, i);
         }
         for (int i = 0; i < 360; ++i) {
-            boat_cargo_motor(&s.crane, 0, 0, -1);
+            boat_cargo_motor(&s.cranes[0], 0, 0, -1);
             step(&s, &boat, &world, i);
         }
         CHECK(s.cargo.deck_contact && s.cargo.state == BOAT_CARGO_HANGING);
@@ -273,12 +566,12 @@ int main(int argc, char **argv)
     CHECK(boat_cargo_hook_toggle(&s) && boat_cargo_hook_toggle(&translated));
     Boat shifted = { .position = { 10, 245 } };
     for (int i = 0; i < 2400; ++i) {
-        boat_cargo_motor(&s.crane, .1f, 0, i < 240 ? 1 : 0);
-        boat_cargo_motor(&translated.crane, .1f, 0, i < 240 ? 1 : 0);
+        boat_cargo_motor(&s.cranes[0], .1f, 0, i < 240 ? 1 : 0);
+        boat_cargo_motor(&translated.cranes[0], .1f, 0, i < 240 ? 1 : 0);
         step(&s, &boat, &world, i);
         step(&translated, &shifted, &world, i);
         CHECK(Vector3Distance(s.cargo.position,
-                  Vector3Subtract(translated.cargo.position, translated.crane.origin))
+                  Vector3Subtract(translated.cargo.position, translated.cranes[0].origin))
             < .02f);
     }
     CHECK(boat_cargo_hook_toggle(&translated));
@@ -306,13 +599,32 @@ int main(int argc, char **argv)
     // S1a: a package site resets exactly like the S0 origin and passes its staging survey.
     BoatSceneWorkSite site = { .id = "eriksberg", .x = 10, .z = 245 };
     BoatCargoSandbox from_site, from_origin;
-    boat_cargo_reset_site(&from_site, &site);
+    CHECK(boat_cargo_reset_sites(&from_site, &site, 1));
     boat_cargo_reset_at(&from_origin, (Vector2) { 10, 245 });
     CHECK(!memcmp(&from_site, &from_origin, sizeof(from_site)));
     CHECK(boat_cargo_site_clear(&outer.map, NULL, boat_water_gentle(), &site));
     BoatSceneWorkSite near = { .id = "near", .x = 20, .z = 250 };
     BoatSceneWorkSite far = { .id = "far", .x = -105, .z = 0 };
     CHECK(!boat_cargo_sites_apart(&site, &near) && boat_cargo_sites_apart(&site, &far));
+    // Heading zero keeps S1a's axis-aligned separation; a quarter turn swaps the long axis.
+    BoatSceneWorkSite beside = { .id = "beside", .x = 10 + 14.5f, .z = 245 };
+    CHECK(boat_cargo_sites_apart(&site, &beside));
+    beside.heading = PI / 2;
+    CHECK(!boat_cargo_sites_apart(&site, &beside));
+    CHECK(boat_cargo_site_near(&site, (Vector2) { 10 + 11.5f, 245 }, 1));
+    CHECK(!boat_cargo_site_near(&site, (Vector2) { 10 - 4.5f, 245 }, 1));
+    CHECK(!boat_cargo_reset_sites(&from_site, &site, 0));
+    // S1b: a receiving platform needs a service platform to start from.
+    BoatSceneWorkSite pair[2] = {
+        { .id = "receiver", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = -105, .heading = 1 },
+        site
+    };
+    CHECK(!boat_cargo_reset_sites(&from_site, pair, 1));
+    CHECK(boat_cargo_reset_sites(&from_site, pair, 2));
+    CHECK(from_site.active == 1 && from_site.moored && from_site.cargo.pad == 1);
+    CHECK(!memcmp(&from_site.cranes[1], &from_origin.cranes[0], sizeof(from_origin.cranes[0])));
+    CHECK(Vector3Distance(from_site.cargo.position, from_origin.cargo.position) == 0);
+    check_turned_site(&mapped, pair);
     // Traffic alone blocks a site: a present empty vessel list clears the same water.
     static BoatSceneDefinition quiet = { .version = BOAT_SCENE_VERSION, .traffic_present = true };
     bool traffic_blocks = false;

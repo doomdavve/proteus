@@ -47,7 +47,7 @@ rejected. Strings are non-empty printable ASCII.
 | `kind` | `"voyage"`, `"free"`, `"course"`, `"race"` or `"match"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
 | `location` | `"outer"` for voyage; `"basin"` for course; `"outer"` for race; `"basin"` or `"outer"` for free; `"any"` or a compiled location for match |
-| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`. A course package uses exactly `["course.define"]`. |
+| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c). A course package uses exactly `["course.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -57,7 +57,8 @@ package's.
 
 `tools/boat_plugin_catalog_gen.c` links `proteus_plugins` and evaluates every bundled package
 during the native build. For each it runs the same checks as staging (manifest, schema, the
-location's map and the full traffic sweep), rejects objective callbacks, and embeds the decoded
+location's map and the full traffic sweep), rejects objective callbacks (except a free package's
+[work-site job](#work-site-job-s1c), whose init it probes), and embeds the decoded
 definition, manifest text and source as byte arrays in
 `build/generated/boat_plugin_catalog_data.c`. An invalid package fails the build with its normal
 diagnostic. The generated table and the lookup/decode helpers are `proteus_plugin_catalog`, which
@@ -93,15 +94,18 @@ return { free = { version = 1 } }
 ```
 
 Absent content means the engine's registered defaults, exactly as an absent subsystem does. The
-location must be `basin` or `outer`. A free package has no objective or callback grant;
+location must be `basin` or `outer`. A free package has no objective or callback grant unless
+it authors work sites, whose [job](#work-site-job-s1c) may request `objective.hud`;
 a scene is the same envelope described under [the scene contract](#location-life-scene-contract-l11l43).
 A free package with a scene fixes the room's location; without one it still names its location.
 
 ## Work sites (S1a)
 
 Status, 2026-11-07: **implemented for the native `cargo_sandbox` only.** A `free` package's scene
-may list cargo work sites. Each site places a registered native preset; the crane, rope, cargo,
-lashing and assisted mooring stay native and are not package fields. The
+may list cargo work sites. Each site places and turns a registered native preset; the crane,
+rope, cargo, lashing and assisted mooring stay native and are not package fields. S1b added the
+required `heading` and the `receiving_platform` preset, and S1c the optional `hidden` flag and
+the [job](#work-site-job-s1c) (both local; not yet merged). The
 [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-in-c) owns the gameplay
 steps; [`plugins/outer-work`](../plugins/outer-work/) is the reference.
 
@@ -113,7 +117,10 @@ return {
       version = 3,
       work = {
         sites = {
-          { id = "eriksberg", preset = "service_platform", cargo = "crate", x = 10, z = 245 }
+          { id = "eriksberg", preset = "service_platform", cargo = "crate", x = 10, z = 245,
+            heading = 0 },
+          { id = "landing", preset = "receiving_platform", cargo = "crate", x = -105, z = 0,
+            heading = -0.45 }
         }
       }
     }
@@ -125,9 +132,11 @@ return {
 | --- | --- |
 | `work.sites` | 1–4 sites, a list numbered from 1 |
 | `id` | 1–23 characters of `a-z 0-9 _`, starting with a letter; unique among sites |
-| `preset` | `"service_platform"`: the S0 temporary 3 × 6 m platform, service crane, 1 m pad and assisted workboat berth, fixed relative to the site |
-| `cargo` | `"crate"`: one upright 0.8 m crate starting on the pad |
-| `x`, `z` | The workboat's final berth in simulation metres (x = −east, z = north), within 20000 m. Sites face heading 0; there is no heading field yet |
+| `preset` | `"service_platform"`: the S0 temporary 3 × 6 m platform, service crane, 1 m pad and assisted workboat berth, fixed relative to the site; the load starts on its pad. `"receiving_platform"`: the same layout, starting empty, with its pad marked as the place to set the load down. A list needs at least one `service_platform`; the sandbox starts moored at the first |
+| `cargo` | `"crate"`: one upright 0.8 m crate; the load a service platform starts with, or the one a receiving platform takes |
+| `x`, `z` | The workboat's final berth in simulation metres (x = −east, z = north), within 20000 m |
+| `heading` | Required. The moored workboat's heading in radians, \|h\| ≤ 2π, with the voyage API's forward `(sin, −cos)`; the platform, crane, pad, capture zone and survey envelope turn with it. At 0 the bow faces south and the platform lies 5 m toward +x |
+| `hidden` | Optional boolean, default `false`. A hidden site has no platform, berth, pad or contact until its job builds it with `work.enable`; staging surveys it like any other site. The site the sandbox starts at must be a visible `service_platform`. Only `true` changes the scene digest |
 
 `work` is an optional subsystem of scene v3; absent work leaves every earlier scene digest
 unchanged. Voyage, race and match packages reject it (`scene.work` "is only supported by free
@@ -135,18 +144,86 @@ packages"). Staging, the catalog generator and `cargo_sandbox --survey` run the 
 on the location's compiled map, with the sandbox's gentle water:
 
 - the site needs a mapped location (the basin is rejected);
-- the preset's envelope, berth −3..11 m in x and −5..12 m in z, must be open water with 1 m
-  clearance and clear of the scene's (or compiled) moored hulls and dock modules;
-- a 12 × 10 m half-extent traffic rectangle around the platform must clear every retained or
-  authored travelling craft, sampled every 0.25 s over the longest route period;
-- envelopes of two sites must not overlap, and no envelope (plus 4 m) may contain the spawn.
+- the preset's envelope, berth −3..11 m in x and −5..12 m in z of the turned site frame, must be
+  open water with 1 m clearance and clear of the scene's (or compiled) moored hulls and dock
+  modules;
+- a 12 × 10 m half-extent traffic rectangle around the platform, turned with the site, must clear
+  every retained or authored travelling craft, sampled every 0.25 s over the longest route period;
+- turned envelopes of two sites must not overlap, and no envelope (plus 4 m) may contain the
+  spawn.
 
 These checks are sampled clearance evidence for the registered preset, not depth, seabed support
 or human navigation approval. A changed site changes the free digest, so a reload restarts the
 session; nothing is carried across. Rooms reject work sites (`scene.work: work sites are
 solo-only`), and the plugin/stage wires carry them only within one native build. `wake_velocity`
-free ride has no work runtime: it binds no solo free scene today, so a work package there plays
-as ordinary free ride. The browser catalog does not include the package.
+free ride has no work runtime: it binds no solo free scene today, so a work package without a
+job plays there as ordinary free ride, and `--plugin` refuses one with a job. The browser
+catalog does not include the package, and the browser's isolated objective evaluator does not
+accept `work.enable`.
+
+### Work-site job (S1c)
+
+Status, 2026-11-07: **implemented locally for the native `cargo_sandbox` only; not merged.** A
+free package with `scene.work` may request `["free.define", "scene.define", "objective.hud"]`
+and return `init` and `update` beside `free`, with the
+[voyage objective](#live-optional-voyage-objective-p32) transaction contract: state, HUD rows,
+the 12-tick update boundary, budgets and suspension are the same. `migrate`, `objective.timers`
+and live reload are not offered; a reset restarts the job at a new generation. The catalog
+generator probes `init` at build time. S1d (local, 2026-11-07) added `cargo.supply`,
+`work.guide` and the events' `load`. `plugins/outer-work` is the reference:
+
+```lua
+update = function(c, s)
+  for _,e in ipairs(c.events) do
+    if e.kind == "cargo.delivered" and e.id == "landing" and e.load == 1 then s.delivered = 1 end
+  end
+  local commands = {}
+  if s.delivered == 1 and not s.built then
+    s.built = true
+    commands = {
+      {kind="work.enable", generation=c.generation, id="landing_quay"},
+      {kind="work.enable", generation=c.generation, id="jetty"},
+      {kind="cargo.supply", generation=c.generation, id="landing_quay"},
+      {kind="work.guide", generation=c.generation, id="jetty"}
+    }
+  end
+  -- ... plus hud.set rows
+  return s, commands
+end
+```
+
+Native code decides every event; `id` is a work-site id. There is still one crate body, used
+for one load after another: every cargo event carries `load`, the crate's load number (1 until
+a `cargo.supply` starts load 2). Other objective events have no `load` field.
+
+| Event | When | `id` |
+| --- | --- | --- |
+| `cargo.secured` | The crate is lashed to the deck | The site moored at |
+| `cargo.delivered` | The released crate has rested 0.5 s on a receiving pad; **once per load at each receiver** (lifting it off, recovering it or setting it down there again never repeats it, but the same load still commits at another receiver) | The receiving site |
+| `cargo.lost` | The crate first touches water after a deck or pad supported it, including when a capsize sheds a lashed load | The last active site |
+| `cargo.reset` | The player returned an unhooked, unlashed crate to its source pad (C) | The source site |
+
+`work.enable` takes exactly `kind`, `generation` and `id`, at most once per id in a batch; the
+host grants it only to a free work-site job (a voyage objective gets "work.enable requires a
+free package with scene.work"). It records intent only. Before committing a batch, the sandbox
+checks every named site: an unknown id suspends the job; an already built site is a no-op; a
+site whose surveyed envelope holds the boat (within 3 m) or the crate keeps the **previous**
+checkpoint and its unacknowledged events, shows `BUILD WAITING: MOVE CLEAR`, and retries at the
+next boundary. Otherwise the site appears between ticks and the batch commits. Nothing is built
+that staging did not survey. A reset (R) hides built sites and restarts cargo and job together.
+
+`cargo.supply` and `work.guide` take the same exact fields under the same grant, each at most
+once per batch; each command kind has its own id namespace, so one batch may build, supply and
+guide to the same site. The sandbox checks the whole batch before applying any of it:
+
+- `cargo.supply {id}` uses up a **delivered** crate and places the next load, undelivered, on
+  the named site's pad; that site becomes its source, so C recovers there. The site must be a
+  `service_platform` that is built or built in the same batch, or the job is suspended. While
+  the crate is hooked, loose on deck or lashed, the batch waits with `SUPPLY WAITING: SET CRATE
+  DOWN` like a blocked build. The supply queues no event.
+- `work.guide {id}` points the helm guidance at a site that is built or built in the same
+  batch (otherwise the job is suspended). Departure guides there instead of to the next site in
+  list order, unless the boat is leaving that site; N still cycles by hand. A reset clears it.
 
 ## Match schema
 

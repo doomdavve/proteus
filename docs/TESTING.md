@@ -15,7 +15,24 @@ The two `cargo_sandbox_outer_*_screenshot` checks
 repeat real transfers on `outer`; `cargo_sandbox_site` loads the bundled `proteus.outer-work`
 site and qualifies its footprint, sampled traffic envelope and initial camera against the
 loaded map. `boat_plugin.work_sites` checks `scene.work` decoding, the staging wire and the
-staging survey's rejections; `boat_cargo` also checks that traffic alone can block a site. The `shadow-high`/`shadow-low`
+staging survey's rejections, including turned overlap; `boat_cargo` also checks that traffic
+alone can block a site and that a turned receiving site moors, aligns and supports a load in
+its own frame. `cargo_sandbox_crossing_screenshot` stages the helm part-way to the guided
+next site; `cargo_sandbox_receiver-approach_screenshot` carries a lashed crate to the
+package's receiving site, and `cargo_sandbox_delivered_screenshot` then moors and unloads it
+onto the receiving pad with that site's crane, and requires the package's job to count it once,
+build its hidden quay and jetty and supply load 2 on the quay's pad (`landing-built` captures
+the result from the helm). `redelivered` sets load 2 on the landing, a native delivery the job
+does not count, `job-reset` checks that R restarts cargo, job and the hidden sites together,
+and `build-blocked` holds the build (keeping the job's checkpoint and event) while the boat sits
+in the quay's envelope. S1d's second outing: `quay-pickup` moors at the quay beside load 2,
+`jetty-approach` lifts, lashes and departs by G toward the job's guided jetty, and
+`jetty-delivered` unloads there and requires `JETTY SUPPLIED: 1`. These job captures are in
+the slow lane. `boat_cargo` checks the native delivery (once per load and receiver), loss,
+recovery, hidden-site and supply rules, and that a crate at the deck's edge rests on it or is
+pushed out of the hull's side, `boat_plugin.free_objective` the free job grant, and
+`boat_plugin_state.work_commands`/`supply_commands` the `work.enable`, `cargo.supply` and
+`work.guide` commands and the events' `load`. The `shadow-high`/`shadow-low`
 capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,
 requests capture and advances the real application until moored, checking the terminal state.
 CPU/GPU toy captures, windowed motion and
