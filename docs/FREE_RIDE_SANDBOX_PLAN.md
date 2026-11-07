@@ -938,7 +938,7 @@ browser build were not run.
 #### Deck-edge collision fix, 2026-11-07
 
 Follow-up to the user's S1d report (“the collision detection is sometimes off”), on local
-branch `fix/cargo-deck-edge`, stacked on S1d and not pushed. Their screenshot showed a hanging
+branch `fix/cargo-deck-edge`, stacked on S1d (published as a PR at the user's request). Their screenshot showed a hanging
 crate lowered across the workboat's deck edge, half sunk into the hull. Deck contact only
 caught a crate whose whole footprint was inside the deck, and nothing else stopped it, so a
 crate overlapping the edge fell through the hull to the water level. This dates from S0a.
@@ -1313,5 +1313,5 @@ old `contact` restored, `boat_cargo` fails. CPU captures of all eleven pre-deliv
 scenarios listed under the S1d verification and of `delivered`, `landing-built`,
 `quay-pickup`, `jetty-approach` and `jetty-delivered` are byte-identical to S1d: their crates
 land fully inside the deck, so only edge contact changed. No new capture of an edge landing
-was made, and nobody has tried the fix by hand yet.
+was made, and nobody has tried the fix by hand yet; the user asked to publish it before trying it.
 
