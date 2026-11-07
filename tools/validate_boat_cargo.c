@@ -432,6 +432,265 @@ static void check_supply(BoatWorld *world)
     CHECK(s.cargo.load == 1 && s.source == 0 && s.cranes[2].hidden && s.cranes[3].hidden);
 }
 
+static bool snap_equal(const BoatCargoSnapshot *a, const BoatCargoSnapshot *b)
+{
+    if (a->crane_count != b->crane_count || a->active != b->active || a->load_count != b->load_count
+        || a->moored != b->moored)
+        return false;
+    if (a->position.x != b->position.x || a->position.y != b->position.y
+        || a->heading != b->heading)
+        return false;
+    for (unsigned i = 0; i < BOAT_SCENE_WORK_SITES; ++i)
+        if (a->built[i] != b->built[i])
+            return false;
+    for (unsigned i = 0; i < BOAT_CARGO_SNAPSHOT_LOADS; ++i) {
+        const BoatCargoLoadSnapshot *x = &a->loads[i], *y = &b->loads[i];
+        if (x->load != y->load || x->source != y->source || x->delivered != y->delivered
+            || x->receivers != y->receivers || x->support.kind != y->support.kind
+            || x->support.pad != y->support.pad
+            || x->support.deck_local.x != y->support.deck_local.x
+            || x->support.deck_local.y != y->support.deck_local.y
+            || x->support.deck_local.z != y->support.deck_local.z)
+            return false;
+    }
+    return true;
+}
+
+static bool restore_to(
+    const BoatSceneWorkSite *sites, BoatCargoSandbox *s, Boat *b, const BoatCargoSnapshot *snapshot)
+{
+    return boat_cargo_restore(s, 0, sites, 4, snapshot, b);
+}
+
+static void expect_refused(
+    const BoatSceneWorkSite *sites, BoatCargoSandbox *s, Boat *b, const BoatCargoSnapshot *snapshot)
+{
+    BoatCargoSandbox before_sandbox = *s;
+    Boat before_boat = *b;
+    CHECK(!restore_to(sites, s, b, snapshot));
+    CHECK(memcmp(s, &before_sandbox, sizeof(*s)) == 0);
+    CHECK(memcmp(b, &before_boat, sizeof(*b)) == 0);
+}
+
+// Snapshot/restore keeps the built sites, the stable load support and the boat pose, and refuses
+// snapshots that do not describe a resumable session.
+static void check_snapshot(BoatWorld *world)
+{
+    const BoatSceneWorkSite sites[] = {
+        { .id = "source", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM },
+        { .id = "landing", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = 40 },
+        { .id = "quay", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM, .x = 80, .hidden = true },
+        { .id = "jetty", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = 120, .hidden = true },
+    };
+    BoatCargoSandbox s;
+    BoatCargoSandbox fresh = { 0 };
+    Boat b = { 0 };
+    Boat restored = { 0 };
+
+    // 1. A fresh pad snapshot round-trips unchanged.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    BoatCargoSnapshot pad = { 0 }, again = { 0 };
+    boat_cargo_snapshot(&s, &b, &pad);
+    CHECK(pad.crane_count == 4 && pad.active == 0 && pad.load_count == 1);
+    CHECK(pad.loads[0].support.kind == BOAT_CARGO_SUPPORT_PAD && pad.loads[0].support.pad == 0);
+    CHECK(pad.moored && pad.loads[0].load == 1);
+    CHECK(pad.built[0] && pad.built[1] && !pad.built[2] && !pad.built[3]);
+    CHECK(boat_cargo_reset_sites(&fresh, sites, 4));
+    CHECK(restore_to(sites, &fresh, &restored, &pad));
+    boat_cargo_snapshot(&fresh, &restored, &again);
+    CHECK(snap_equal(&pad, &again));
+
+    // 2. A hanging load records the pad it last rested on and resumes released there.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4) && s.moored);
+    b = (Boat) { 0 };
+    CHECK(boat_cargo_hook_toggle(&s) && s.cargo.state == BOAT_CARGO_HANGING);
+    for (int i = 0; i < 12; ++i) {
+        boat_cargo_motor(&s.cranes[0], 0, 0, 1);
+        step(&s, &b, world, i);
+    }
+    CHECK(s.cargo.state == BOAT_CARGO_HANGING);
+    BoatCargoSnapshot hanging = { 0 };
+    boat_cargo_snapshot(&s, &b, &hanging);
+    CHECK(hanging.loads[0].support.kind == BOAT_CARGO_SUPPORT_PAD);
+    CHECK(hanging.loads[0].support.pad == hanging.loads[0].source);
+    CHECK(boat_cargo_reset_sites(&fresh, sites, 4));
+    restored = (Boat) { 0 };
+    CHECK(restore_to(sites, &fresh, &restored, &hanging));
+    CHECK(fresh.cargo.state == BOAT_CARGO_PAD);
+    CHECK(Vector3Distance(fresh.cargo.position,
+              boat_cargo_site_point(
+                  &fresh.cranes[hanging.loads[0].support.pad], (Vector3) { -5, 1.4f, 0 }))
+        == 0);
+    CHECK(fresh.cargo.state != BOAT_CARGO_HANGING);
+
+    // 3. A lashed load resumes secured, and unlashing keeps the deck as last support.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    b = (Boat) { 0 };
+    s.cargo = (BoatCargo) { .state = BOAT_CARGO_LOOSE,
+        .deck_contact = true,
+        .settled = 1,
+        .deck_local = { .2f, BOAT_CARGO_DECK_Y + BOAT_CARGO_HALF, .3f },
+        .load = 1 };
+    CHECK(boat_cargo_lash_toggle(&s, &b) && s.cargo.state == BOAT_CARGO_SECURED);
+    BoatCargoSnapshot secured = { 0 };
+    boat_cargo_snapshot(&s, &b, &secured);
+    CHECK(secured.loads[0].support.kind == BOAT_CARGO_SUPPORT_DECK);
+    CHECK(Vector3Distance(secured.loads[0].support.deck_local, s.cargo.deck_local) == 0);
+    CHECK(boat_cargo_reset_sites(&fresh, sites, 4));
+    restored = (Boat) { 0 };
+    CHECK(restore_to(sites, &fresh, &restored, &secured));
+    CHECK(fresh.cargo.state == BOAT_CARGO_SECURED);
+    CHECK(Vector3Distance(fresh.cargo.position,
+              boat_pose_attachment(&restored, secured.loads[0].support.deck_local))
+        < .0001f);
+    CHECK(boat_cargo_lash_toggle(&fresh, &restored));
+    CHECK(fresh.cargo.state == BOAT_CARGO_LOOSE);
+    BoatCargoSnapshot loose = { 0 };
+    boat_cargo_snapshot(&fresh, &restored, &loose);
+    CHECK(loose.loads[0].support.kind == BOAT_CARGO_SUPPORT_DECK);
+    CHECK(Vector3Distance(loose.loads[0].support.deck_local, secured.loads[0].support.deck_local)
+        == 0);
+
+    // 4. A floating load records its source pad and keeps the committed delivery.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    b = (Boat) { 0 };
+    set_down(&s, &b, world, 1);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 1, 1);
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    BoatCargoSnapshot floating = { 0 };
+    boat_cargo_snapshot(&s, &b, &floating);
+    CHECK(floating.loads[0].support.kind == BOAT_CARGO_SUPPORT_PAD);
+    CHECK(floating.loads[0].support.pad == 0);
+    CHECK(floating.loads[0].delivered && floating.loads[0].receivers == (1u << 1));
+    CHECK(boat_cargo_reset_sites(&fresh, sites, 4));
+    restored = (Boat) { 0 };
+    CHECK(restore_to(sites, &fresh, &restored, &floating));
+    CHECK(fresh.cargo.state == BOAT_CARGO_PAD && fresh.cargo.pad == 0);
+    CHECK(fresh.cargo.delivered && fresh.cargo.receivers == (1u << 1));
+
+    // 5. A capsized or mooring boat resumes at the active berth.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    s.moored = false;
+    Boat capsized = { .motion_state = BOAT_CAPSIZED };
+    BoatCargoSnapshot rest = { 0 };
+    boat_cargo_snapshot(&s, &capsized, &rest);
+    CHECK(rest.moored);
+    CHECK(Vector2Distance(rest.position, boat_cargo_berth(&s.cranes[s.active])) == 0);
+    s.moored = false;
+    s.mooring = true;
+    boat_cargo_snapshot(&s, &b, &rest);
+    CHECK(rest.moored);
+
+    // 6. A free boat keeps its pose and resumes still.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    s.moored = false;
+    Boat free_boat = { .position = { 12, 34 }, .heading = .5f };
+    BoatCargoSnapshot free_snap = { 0 };
+    boat_cargo_snapshot(&s, &free_boat, &free_snap);
+    CHECK(!free_snap.moored);
+    CHECK(Vector2Distance(free_snap.position, (Vector2) { 12, 34 }) == 0);
+    CHECK(free_snap.heading == .5f);
+    CHECK(boat_cargo_reset_sites(&fresh, sites, 4));
+    restored = (Boat) { .velocity = { 1, 2 } };
+    CHECK(restore_to(sites, &fresh, &restored, &free_snap));
+    CHECK(!fresh.moored);
+    CHECK(Vector2Distance(restored.position, (Vector2) { 12, 34 }) == 0);
+    CHECK(restored.heading == .5f && Vector2Length(restored.velocity) == 0);
+
+    // 7. Refused snapshots leave both populated outputs untouched.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    b = (Boat) { 0 };
+    BoatCargoSnapshot valid = { 0 }, bad = { 0 };
+    boat_cargo_snapshot(&s, &b, &valid);
+    bad = valid;
+    bad.crane_count = 3;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.active = 4;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.built[bad.active] = false;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.loads[0].source = 2; // Hidden site.
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.loads[0].support.pad = 2; // Hidden pad.
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.loads[0].receivers = 1u << 4; // Beyond CRANE_COUNT.
+    bad.loads[0].delivered = true;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.loads[0].receivers = 1u << 0; // A service platform.
+    bad.loads[0].delivered = true;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.loads[0].delivered = true; // No receiver to match.
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.moored = false;
+    bad.position.x = NAN;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.heading = NAN;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.loads[0].support.kind = BOAT_CARGO_SUPPORT_DECK;
+    bad.loads[0].support.deck_local = (Vector3) { 1, 1.15f, .3f }; // Outside the deck.
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.load_count = 0;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.loads[0].load = 0;
+    expect_refused(sites, &s, &b, &bad);
+    bad = valid;
+    bad.built[1] = false; // Visible in sites but not built.
+    expect_refused(sites, &s, &b, &bad);
+
+    // 8. Built flags survive; a new reset sandbox has the hidden sites absent again.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    b = (Boat) { 0 };
+    set_down(&s, &b, world, 1);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 1, 1);
+    CHECK(boat_cargo_site_enable(&s, 2, &b) && boat_cargo_site_enable(&s, 3, &b));
+    CHECK(boat_cargo_supply(&s, 2));
+    BoatCargoSnapshot built = { 0 };
+    boat_cargo_snapshot(&s, &b, &built);
+    CHECK(built.built[2] && built.built[3]);
+    CHECK(boat_cargo_reset_sites(&fresh, sites, 4));
+    CHECK(fresh.cranes[2].hidden && fresh.cranes[3].hidden);
+    restored = (Boat) { 0 };
+    CHECK(restore_to(sites, &fresh, &restored, &built));
+    CHECK(!fresh.cranes[2].hidden && !fresh.cranes[3].hidden);
+    CHECK(fresh.source == 2 && fresh.cargo.load == 2);
+    CHECK(Vector3Distance(fresh.cargo.position,
+              boat_cargo_site_point(&fresh.cranes[2], (Vector3) { -5, 1.4f, 0 }))
+        == 0);
+
+    // 9. Two restores stay identical and never re-deliver the committed load.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    b = (Boat) { 0 };
+    set_down(&s, &b, world, 1);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 1, 1);
+    BoatCargoSnapshot delivered = { 0 };
+    boat_cargo_snapshot(&s, &b, &delivered);
+    BoatCargoSandbox first = { 0 }, second = { 0 };
+    Boat first_boat = { 0 }, second_boat = { 0 };
+    CHECK(restore_to(sites, &first, &first_boat, &delivered));
+    CHECK(restore_to(sites, &second, &second_boat, &delivered));
+    for (int i = 0; i < 1200; ++i) {
+        float slew = (i / 180) % 2 ? 1 : -1;
+        boat_cargo_motor(&first.cranes[0], slew, sinf(i * .01f), cosf(i * .02f));
+        boat_cargo_motor(&second.cranes[0], slew, sinf(i * .01f), cosf(i * .02f));
+        step(&first, &first_boat, world, i);
+        step(&second, &second_boat, world, i);
+        CHECK(memcmp(&first, &second, sizeof(first)) == 0);
+        CHECK(first.event_count == 0 && first.cargo.receivers == (1u << 1));
+    }
+}
+
 int main(int argc, char **argv)
 {
     BoatWorldResources resources = { 0 };
@@ -444,6 +703,7 @@ int main(int argc, char **argv)
     check_mooring_and_shadow(&world);
     check_delivery_events(&world);
     check_supply(&world);
+    check_snapshot(&world);
     check_deck_edge(&world);
     Boat boat = { 0 };
     BoatCargoSandbox s, repeat;

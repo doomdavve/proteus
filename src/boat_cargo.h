@@ -39,6 +39,13 @@ typedef enum {
     BOAT_CARGO_FLOATING
 } BoatCargoState;
 
+typedef enum { BOAT_CARGO_SUPPORT_PAD, BOAT_CARGO_SUPPORT_DECK } BoatCargoSupportKind;
+typedef struct {
+    BoatCargoSupportKind kind;
+    unsigned char pad; // Site index for PAD.
+    Vector3 deck_local; // Lashed position for DECK.
+} BoatCargoSupport;
+
 typedef struct {
     BoatCargoState state;
     Vector3 position, velocity, deck_local;
@@ -51,6 +58,7 @@ typedef struct {
     // wrong one can still reach the right one.
     bool delivered;
     unsigned char receivers;
+    BoatCargoSupport support; // Last stable support: a pad, or the lashed deck.
     unsigned load; // S1d: which load this is, from 1; a supply starts the next.
     bool wet; // Resting in water since its last support; a LOST event marks the first touch.
     float rest; // Continuous seconds at rest on a receiving pad, toward delivery.
@@ -93,6 +101,30 @@ typedef struct {
     BoatCargoEvent events[BOAT_CARGO_EVENTS];
     unsigned event_count;
 } BoatCargoSandbox;
+
+#define BOAT_CARGO_SNAPSHOT_LOADS 1
+typedef struct {
+    unsigned load, source;
+    bool delivered;
+    unsigned char receivers;
+    BoatCargoSupport support; // Where it rests on resume: PAD or a lashed DECK only.
+} BoatCargoLoadSnapshot;
+typedef struct {
+    unsigned crane_count, active;
+    bool built[BOAT_SCENE_WORK_SITES];
+    BoatCargoLoadSnapshot loads[BOAT_CARGO_SNAPSHOT_LOADS];
+    unsigned load_count;
+    bool moored; // Resume moored at ACTIVE's berth.
+    Vector2 position; // Simulation metres, when not moored.
+    float heading;
+} BoatCargoSnapshot;
+// Record the built sites, one stable load and the boat pose for resuming this session. A load
+// that is hooked, loose on the deck or floating records where it last rested.
+void boat_cargo_snapshot(const BoatCargoSandbox *sandbox, const Boat *boat, BoatCargoSnapshot *out);
+// Rebuild the sandbox and boat from SNAPSHOT and the work sites it was taken with. Refuses,
+// changing neither output, when the sites, load or pose cannot be restored.
+bool boat_cargo_restore(BoatCargoSandbox *sandbox, unsigned workboat,
+    const BoatSceneWorkSite *sites, unsigned count, const BoatCargoSnapshot *snapshot, Boat *boat);
 
 typedef enum {
     BOAT_CARGO_MOOR_READY,

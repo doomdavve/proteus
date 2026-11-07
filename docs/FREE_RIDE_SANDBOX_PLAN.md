@@ -37,8 +37,8 @@ rest. Still owed: the user's play check of that fix and S1's review of fun, then
 qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtures`, and
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
-discovered in the menu. Next
-implementation task: [SV1a](#sv1-steps), the core cargo snapshot and restore. Future PRs still
+discovered in the menu. SV1a (the core cargo snapshot and restore) is implemented locally; next
+implementation task: [SV1b](#sv1-steps), the save format. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -951,7 +951,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | Planned; next SV1a |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a implemented locally (2026-11-07); next SV1b |
 
 ##### F1 result, 2026-11-07
 
@@ -1002,7 +1002,17 @@ scenarios stay fixtures of the bundled outer job, not a general mechanism. Verif
 arm64, Debug: all 34 CPU captures that exist (`--renderer cpu` default for screenshots; 22
 scenarios on `outer`, 12 on the basin) were rendered before F2 and after F2, F3 and F4 and are
 byte-identical (`cmp`). The full CTest preset passed 396 tests with a warning-clean build. No
-GPU frames, windowed run or hands-on play were done for S1e; saves (SV1) are not started.
+GPU frames, windowed run or hands-on play were done for S1e.
+
+**SV1a result (2026-11-07, macOS arm64, Debug).** `BoatCargo` records its last stable support
+(`BoatCargoSupport`: a pad or the lashed deck), kept by reset, recover, supply, lashing and
+`boat_cargo_step`. `boat_cargo_snapshot` and `boat_cargo_restore` (`src/boat_cargo.[ch]`, no file
+I/O) apply the resume rules: hanging and loose loads return to the last support with the hook
+released, floating loads to the source pad (keeping `delivered`/`receivers`), moored, mooring and
+capsized boats resume moored, and a free upright boat resumes at rest. Restore validates first
+and leaves both outputs untouched on refusal. `validate_boat_cargo` (`boat_cargo`) gained
+`check_snapshot`: each state, round trip, 14 refusals, built flags, and two restores run 1200
+ticks identically with no re-delivery. No drawing path changed, so no captures were compared. The full CTest preset passed 396 tests (13 disabled wake experiments not run) with a warning-clean build.
 
 #### SV1: local save and resume
 
@@ -1010,7 +1020,7 @@ Designed 2026-11-07 at the user's request ("save the state of the player", one s
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **Planned; nothing implemented.**
+will apply to all future state as well." Status: **SV1a implemented locally (2026-11-07); SV1b–SV1i planned.**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or
