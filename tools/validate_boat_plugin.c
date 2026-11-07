@@ -1245,6 +1245,153 @@ static int tours(void)
     return 0;
 }
 
+// S1a: scene.work sites decode only in free packages, survive the staging wire and run the
+// cargo site survey against the compiled map at staging.
+#define WORK_MANIFEST(location)                                                                    \
+    "{\"id\": \"test.work\", \"name\": \"Work\", \"api\": 1, \"kind\": \"free\", \"entry\": "      \
+    "\"main.lua\", \"location\": \"" location "\", \"capabilities\": [\"free.define\", "           \
+    "\"scene.define\"], \"state_version\": 1}"
+#define WORK_SITE(id, x, z)                                                                        \
+    "{ id = '" id "', preset = 'service_platform', cargo = 'crate', x = " #x ", z = " #z " }"
+
+static BoatPluginStatus load_work(
+    const char *manifest, const char *sites, BoatPluginFree *out, BoatPluginDiagnostic *d)
+{
+    static char source[2048];
+    snprintf(source, sizeof(source),
+        "return { free = { version = 1, scene = { version = 3, work = %s } } }", sites);
+    BoatPluginBundle bundle = { manifest, strlen(manifest), source, strlen(source) };
+    return boat_plugin_load_free(&bundle, NULL, out, d);
+}
+
+static int work_sites(void)
+{
+    static BoatPluginFree free;
+    static BoatPluginDecoded decoded, back;
+    static BoatPluginRevision revision;
+    static unsigned char wire[32768];
+    BoatPluginDiagnostic d;
+    BoatPluginFiles files;
+    CHECK(boat_plugin_read("plugins/outer-work", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
+    CHECK(free.has_scene && free.scene.work_present && free.scene.work_count == 1);
+    const BoatSceneWorkSite *site = &free.scene.work[0];
+    CHECK(!strcmp(site->id, "eriksberg") && site->x == 10 && site->z == 245);
+    CHECK(
+        site->preset == BOAT_SCENE_WORK_SERVICE_PLATFORM && site->cargo == BOAT_SCENE_CARGO_CRATE);
+    // Absent subsystems keep their compiled defaults; only work is authored.
+    CHECK(!free.scene.berths_present && !free.scene.modules_present && !free.scene.traffic_present);
+
+    decoded.kind = BOAT_PLUGIN_KIND_FREE;
+    memcpy(decoded.manifest, files.manifest, files.manifest_size);
+    decoded.manifest_size = files.manifest_size;
+    memcpy(decoded.source, files.source, files.source_size);
+    decoded.source_size = files.source_size;
+    CHECK(boat_plugin_lua_free(files.source, files.source_size, "@main.lua",
+              &boat_plugin_default_limits, &decoded.free, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_parse_manifest(files.manifest, files.manifest_size, NULL, &decoded.parsed, &d)
+        == BOAT_PLUGIN_OK);
+    size_t encoded;
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
+    CHECK(boat_plugin_decoded_revision(&back, &revision, &d));
+    CHECK(revision.free.scene_digest == free.scene_digest);
+    CHECK(!memcmp(&revision.free.scene.work[0], site, sizeof(*site)));
+    BoatSceneDefinition without = free.scene;
+    without.work_present = false;
+    without.work_count = 0;
+    CHECK(boat_scene_digest(&without) != free.scene_digest);
+
+    struct {
+        const char *sites, *field;
+    } invalid[] = { { "{ sites = {} }", "scene.work.sites" }, { "{}", "scene.work.sites" },
+        { "{ sites = {" WORK_SITE("a", 10, 245) "}, extra = 1 }", "scene.work" },
+        { "{ sites = { { id = 'a', preset = 'gantry', cargo = 'crate', x = 10, z = 245 } } }",
+            "scene.work.sites[1].preset" },
+        { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'barrel', x = 10, "
+          "z = 245 } } }",
+            "scene.work.sites[1].cargo" },
+        { "{ sites = { { id = 'a', preset = 'service_platform', cargo = 'crate', x = 10, "
+          "z = 245, heading = 1 } } }",
+            "scene.work.sites[1]" },
+        { "{ sites = {" WORK_SITE("Bad", 10, 245) "} }", "scene.work.sites[1].id" },
+        { "{ sites = {" WORK_SITE("a", 10, 245) "," WORK_SITE("a", -105, 0) "} }",
+            "scene.work.sites[2].id" },
+        { "{ sites = {" WORK_SITE("a", 1, 1) "," WORK_SITE("b", 2, 2) "," WORK_SITE(
+              "c", 3, 3) "," WORK_SITE("d", 4, 4) "," WORK_SITE("e", 5, 5) "} }",
+            "scene.work.sites" } };
+    for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        CHECK(load_work(WORK_MANIFEST("outer"), invalid[i].sites, &free, &d) == BOAT_PLUGIN_SCHEMA);
+        show("work", &d);
+        CHECK(!strncmp(d.field, invalid[i].field, strlen(invalid[i].field)));
+    }
+    // Voyages, races and matches cannot author work sites in S1a.
+    const char *voyage = variant("return {",
+        "return { scene = { version = 3, work = { sites = {" WORK_SITE("a", 10, 245) "} } },");
+    CHECK(expect("voyage work",
+              "{\"id\": \"test.voyage\", \"name\": \"Test\", \"api\": 1, "
+              "\"kind\": \"voyage\", \"entry\": \"main.lua\", \"location\": "
+              "\"outer\", \"capabilities\": [\"voyage.define\", "
+              "\"scene.define\"], \"state_version\": 1}",
+              voyage, BOAT_PLUGIN_SCHEMA, "scene.work", -1)
+        == 0);
+
+    // Staging runs the site survey on the compiled map.
+    const BoatWorldDefinition *outer = boat_location(BOAT_LOCATION_OUTER);
+    BoatWorldResources world;
+    CHECK(boat_world_resources_init(&world, outer));
+    int failed = 0;
+    CHECK(load_work(WORK_MANIFEST("outer"),
+              "{ sites = {" WORK_SITE("eriksberg", 10, 245) "," WORK_SITE("west", -105, 0) "} }",
+              &free, &d)
+        == BOAT_PLUGIN_OK);
+    failed |= boat_plugin_free_check_location(&free, outer, &world.map, &d) != BOAT_PLUGIN_OK;
+    show("two sites", &d);
+    CHECK(load_work(WORK_MANIFEST("outer"),
+              "{ sites = {" WORK_SITE("eriksberg", 10, 245) "," WORK_SITE("near", 20, 250) "} }",
+              &free, &d)
+        == BOAT_PLUGIN_OK);
+    failed |= boat_plugin_free_check_location(&free, outer, &world.map, &d) != BOAT_PLUGIN_SCHEMA
+        || strcmp(d.field, "scene.work.sites[2]") || !strstr(d.message, "overlaps");
+    show("overlapping sites", &d);
+    // The first map point north of the site that is not open water: the envelope reaches land.
+    float shore = 245;
+    while (shore < 2000 && boat_map_water(&world.map, (Vector2) { 10, shore }, 0))
+        shore += 1;
+    char land[256];
+    snprintf(land, sizeof(land),
+        "{ sites = { { id = 'shore', preset = 'service_platform', "
+        "cargo = 'crate', x = 10, z = %.0f } } }",
+        shore - 2);
+    CHECK(shore < 2000);
+    CHECK(load_work(WORK_MANIFEST("outer"), land, &free, &d) == BOAT_PLUGIN_OK);
+    failed |= boat_plugin_free_check_location(&free, outer, &world.map, &d) != BOAT_PLUGIN_SCHEMA
+        || strcmp(d.field, "scene.work.sites[1]") || !strstr(d.message, "not clear");
+    show("shore site", &d);
+    snprintf(land, sizeof(land),
+        "{ sites = { { id = 'spawn', preset = 'service_platform', "
+        "cargo = 'crate', x = %.3f, z = %.3f } } }",
+        outer->spawn.x, outer->spawn.y);
+    CHECK(load_work(WORK_MANIFEST("outer"), land, &free, &d) == BOAT_PLUGIN_OK);
+    failed |= boat_plugin_free_check_location(&free, outer, &world.map, &d) != BOAT_PLUGIN_SCHEMA
+        || !strstr(d.message, "spawn");
+    show("spawn site", &d);
+    boat_world_resources_destroy(&world);
+    CHECK(!failed);
+
+    const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
+    CHECK(boat_world_resources_init(&world, basin));
+    CHECK(load_work(WORK_MANIFEST("basin"), "{ sites = {" WORK_SITE("a", 0, 0) "} }", &free, &d)
+        == BOAT_PLUGIN_OK);
+    failed = boat_plugin_free_check_location(&free, basin, &world.map, &d) != BOAT_PLUGIN_MANIFEST;
+    show("basin site", &d);
+    boat_world_resources_destroy(&world);
+    CHECK(!failed);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(reference_matches_compiled),
     TEST_CASE(computed_definition),
@@ -1265,6 +1412,7 @@ static const TestCase cases[] = {
 #endif
     TEST_CASE(navigable_water),
     TEST_CASE(tours),
+    TEST_CASE(work_sites),
 };
 
 int main(int argc, char **argv)

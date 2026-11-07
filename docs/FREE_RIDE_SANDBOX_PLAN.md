@@ -1,9 +1,10 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-07: **S0a and S0b are merged (#159–#162); S1 is split so that work-site
-content moves into a plugin package before a second site is added.** The standalone
-`cargo_sandbox` defaults to a temporary service platform in the real Eriksberg inlet on
-`outer`; `--location basin` retains the controlled reference. It is still a handling
+Status, 2026-11-07: **S1a implemented locally: the Eriksberg work site now comes from the
+bundled `proteus.outer-work` package, with byte-identical captures.** S0a and S0b are merged
+(#159–#162). The standalone `cargo_sandbox` loads its `outer` site from that package's
+[`scene.work`](PLUGIN_API.md#work-sites-s1a); `--location basin` retains the controlled
+reference. It is still a handling
 experiment, without deliveries or an addition to the normal free ride menu. This plan owns
 free ride's interactive cargo, player changes to places, Creative/Working Harbour rules, boat
 ownership and economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography,
@@ -25,9 +26,11 @@ Completed planning task, 2026-11-07: review against the merged code found that e
 value is compiled into C (core `#define`s, the site header, a custom platform mesh and the
 sandbox's hull), and the sandbox loads no package. The [content/mechanics split](#content-in-plugins-mechanics-in-c)
 now places site layout, loads, jobs and project outcomes in a plugin package and keeps
-physics and validation native. Next: **[S1a, move the existing site into a package with
-unchanged behaviour](#s1a-the-existing-site-as-package-data)**. Future PRs still require the
-user's approval.
+physics and validation native. Completed S1a, 2026-11-07, on local branch
+`feat/sandbox-s1a-site-package` (stacked on the planning branch; not pushed): see the
+[S1a result](#s1a-result-2026-11-07). Next: **[S1b, a second receiving site as package
+data](#s1-steps)**, which first needs a receiver preset and a site heading. Future PRs still
+require the user's approval.
 
 ## S0a: try the cargo toy
 
@@ -40,7 +43,9 @@ cmake --build build -j
 ```
 
 This native experiment defaults to `outer` and GPU; `--renderer cpu` uses the reference
-rasterizer. `--location basin` selects the original isolated fixture. It starts with a
+rasterizer. `--location basin` selects the original isolated fixture. On `outer` the site comes
+from the bundled `proteus.outer-work` package (`--package ID` selects another bundled free
+package with work sites). It starts with a
 borrowed deck boat moored beside one crate and a small service crane in the Eriksberg inlet.
 There is no save, money, job or timer. **R resets both boat and crate immediately**;
 **P pauses the simulation**, including a suspended load. Escape closes the experiment.
@@ -484,7 +489,7 @@ into data first.
 | --- | --- |
 | Crane motors, rope constraint, cargo states and their atomic transitions | Work sites: crane placements, source pads, receiving areas, work berths and capture zones |
 | Deck/pad/water contact, lashing rules and secured-load effect on the boat | Which loads exist and where they start, chosen from registered cargo presets |
-| Assisted mooring motion and its bounds | Platforms and landings, as ordinary scene `marina.modules` |
+| Assisted mooring motion and its bounds | Platforms and landings, as scene `marina.modules` once a fixed in-water module kind exists (S1a keeps the platform in its preset; see the [S1a result](#s1a-result-2026-11-07)) |
 | Deciding a delivery happened (hook detached, load settled, inside a declared receiver) and emitting it as an event | Jobs: what to deliver where, project progress and HUD text; later payouts and prices |
 | Placement/clearance validation, generalised from the S0b survey | What changes when a project completes (modules or berths that appear) |
 | Input, cameras, rendering, save commits and file I/O | Which registered workboat recipe a site lends |
@@ -580,8 +585,8 @@ Each step is its own worktree and PR (with the user's approval), stacked on its 
 
 | Step | Result | Completion gate | Status |
 | --- | --- | --- | --- |
-| S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Next |
-| S1b: second receiving site | A receiver at a surveyed candidate, added by editing the package only | No C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Proposed |
+| S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Implemented locally 2026-11-07; [result](#s1a-result-2026-11-07) |
+| S1b: second receiving site | A receiver at a surveyed candidate, placed by editing the package | A native receiver preset and site heading first (S1a has one layout facing heading 0); then no further C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Next |
 | S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Proposed |
 | S1d: useful landing playtest | The completed landing offers a nearer pickup or mooring on the next outing | The user completes the crossing without developer help and tries another idea | Proposed |
 
@@ -610,6 +615,62 @@ Move the S0b site out of C without changing how it plays:
 
 Not in S1a: a second site, new presets, objectives, events, browser or room support, or any
 change to cargo physics. Reload policy is the restart rule above.
+
+#### S1a result, 2026-11-07
+
+Implemented:
+
+- `scene.work.sites` (1–4 sites: `id`, `preset`, `cargo`, `x`, `z`) in `BoatSceneDefinition`,
+  decoded from Lua, validated, digested, carried on the plugin/stage wire and described in
+  `tools/plugin_schema.py`. The [API](PLUGIN_API.md#work-sites-s1a) owns the contract. Only
+  `free` packages accept it; rooms reject it as solo-only.
+- The survey moved from `tools/cargo_sandbox_site.h` (deleted) into the core as
+  `boat_cargo_site_clear`, now including authored traffic periods, plus
+  `boat_cargo_sites_apart`. `boat_plugin_free_check_location` takes the map and runs it for
+  every site with spawn and site-overlap checks, so staging, the catalog generator and
+  `boat_room_package` share it.
+- Bundled native-only `plugins/outer-work`; `cargo_sandbox` opens it through the catalog
+  (`--package ID`, default `proteus.outer-work` on `outer`), binds its scene and resets from
+  its first site. `CARGO_SITE_MOORING` is gone.
+
+Deviations from the step list above, decided during implementation:
+
+- **No scene v4.** `work` is an optional scene v3 subsystem, like `traffic` and `gulls`.
+  Bumping the version would have changed every scene package and the room wire (which
+  validates version 3) for no gain; absent work keeps all existing digests.
+- **The platform stays part of the native preset, not a `marina.modules` piece.** No module
+  kind fits a fixed platform standing in water: `platform` heaves with the waves (it would move
+  the pad), `quay_deck` must stand on land at 3.8–8 m, and any present module list replaces the
+  whole compiled marina. Landings in S1c will need a fixed in-water module kind, or a way to
+  add modules without replacing the compiled set.
+- **The preset values stay where they are.** The berth/crane/pad constants in
+  `src/boat_cargo.[ch]` and the sandbox's drawing are documented as the registered
+  `service_platform` preset rather than moved into a struct. With one layout, a struct would
+  only add indirection; S1b's receiver preset is when a preset table earns its place.
+
+Verification, Apple M1 Max/macOS arm64, Debug, pinned local raylib/Lua/ENet sources,
+`PROTEUS_GPU_TESTS=OFF`: the build is warning-clean apart from the existing upstream
+`stb_vorbis.c` warning, and `ctest --preset full` passed all **382 enabled tests** in 42.49 s
+(13 retired tests disabled; local sockets enabled; 37.97 s on the post-format rerun). New checks: `boat_plugin.work_sites`
+(decoding, nine rejected forms, the voyage refusal, a wire round-trip with an unchanged digest,
+and staging accepting two separate sites while rejecting overlapping, shore, spawn and basin
+sites) and additions to `boat_cargo` (a site reset equals the S0 origin; a site on a compiled
+ferry path passes with traffic disabled and fails with it). `room_package.catalog_rooms` checks
+that the package is refused as a room.
+
+Behaviour parity: CPU captures of `origin`, `swing`, `loaded-left`, `loaded-right`,
+`shadow-high`, `shadow-bow`, `shadow-water`, `berth-approach` and `remoor` on `outer`, and basin
+`origin`/`loaded-left`, are **byte-identical** to the pre-change build (`b525f3a`); so are GPU
+`origin`, `loaded-left` and `shadow-bow`. The GPU shadow review reports 0/256 missing. The
+loaded-turn GPU capture was inspected. Nothing in motion, input, audio or presentation changed,
+so no new windowed or hands-on review was run; Windows, Linux and the browser build were not
+run locally.
+
+Known limits: one preset and one cargo type; sites face heading 0; the survey samples clearance
+with the sandbox's gentle water and is not depth or seabed evidence. Separately, the review found
+that `free` packages' marina/traffic scenes (such as `proteus.harbor-room`) get no map check in
+`boat_plugin_free_check_location`; only work sites are checked there. That gap predates S1a and
+is left for the plugin plan.
 
 ## Astra review, 2026-11-06
 

@@ -185,9 +185,9 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
     unsigned flags = (unsigned)integer(w,
         (s->entrance_present ? 1u : 0u) | (s->berths_present ? 2u : 0u)
             | (s->modules_present ? 4u : 0u) | (s->traffic_present ? 8u : 0u)
-            | (s->gulls_present ? 16u : 0u),
+            | (s->gulls_present ? 16u : 0u) | (s->work_present ? 32u : 0u),
         1);
-    if (flags > 31 || s->version > BOAT_SCENE_VERSION) {
+    if (flags > 63 || s->version > BOAT_SCENE_VERSION) {
         w->ok = false;
         return;
     }
@@ -196,6 +196,7 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
     s->modules_present = flags & 4u;
     s->traffic_present = flags & 8u;
     s->gulls_present = flags & 16u;
+    s->work_present = flags & 32u;
     if (s->entrance_present) {
         s->entrance_x = (float)number(w, s->entrance_x);
         s->entrance_z = (float)number(w, s->entrance_z);
@@ -252,6 +253,23 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
         traffic_wire(w, &s->traffic);
     if (s->gulls_present)
         flock_wire(w, &s->gulls);
+    if (s->work_present) {
+        s->work_count = (unsigned)integer(w, s->work_count, 1);
+        if (s->work_count > BOAT_SCENE_WORK_SITES) {
+            w->ok = false;
+            return;
+        }
+        for (unsigned i = 0; i < s->work_count; ++i) {
+            BoatSceneWorkSite *site = &s->work[i];
+            string(w, site->id, sizeof(site->id));
+            site->preset = (unsigned char)integer(w, site->preset, 1);
+            site->cargo = (unsigned char)integer(w, site->cargo, 1);
+            if (site->preset >= BOAT_SCENE_WORK_PRESETS || site->cargo >= BOAT_SCENE_CARGO_PRESETS)
+                w->ok = false;
+            site->x = (float)number(w, site->x);
+            site->z = (float)number(w, site->z);
+        }
+    }
 }
 
 static void voyage_payload(Wire *w, BoatPluginVoyageData *v)

@@ -1,5 +1,8 @@
 #include "boat_cargo.h"
+#include "boat_map.h"
 #include "raymath.h"
+#include "waterfront_harbor.h"
+#include "waterfront_traffic.h"
 
 #include <math.h>
 
@@ -14,6 +17,48 @@ void boat_cargo_reset_at(BoatCargoSandbox *s, Vector2 mooring)
         .moored = true };
     s->crane.origin = (Vector3) { -mooring.x, 0, mooring.y };
     s->cargo.position = Vector3Add(s->cargo.position, s->crane.origin);
+}
+
+void boat_cargo_reset_site(BoatCargoSandbox *s, const BoatSceneWorkSite *site)
+{
+    boat_cargo_reset_at(s, (Vector2) { site->x, site->z });
+}
+
+// The service-platform survey envelope in simulation metres relative to the berth.
+#define SITE_MIN_X -3
+#define SITE_MAX_X 11
+#define SITE_MIN_Z -5
+#define SITE_MAX_Z 12
+
+bool boat_cargo_site_clear(const BoatMap *map, const BoatSceneDefinition *scene, BoatWater water,
+    const BoatSceneWorkSite *site)
+{
+    Vector2 p = { site->x, site->z };
+    for (int z = SITE_MIN_Z; z <= SITE_MAX_Z; ++z)
+        for (int x = SITE_MIN_X; x <= SITE_MAX_X; ++x) {
+            Vector2 q = { p.x + x, p.y + z }, normal;
+            if (!boat_map_water(map, q, 1)
+                || waterfront_harbor_contact_height_scene(scene, q, 1, -1, 9, water, 0, &normal))
+                return false;
+        }
+    double period = 0;
+    for (int i = 0; i < WATERFRONT_TRAFFIC_ALL; ++i)
+        period = fmax(period, waterfront_traffic_period(i));
+    for (unsigned i = 0; scene && scene->traffic_present && i < scene->traffic.actor_count; ++i)
+        period = fmax(period, waterfront_traffic_period_routes(&scene->traffic, (int)i));
+    for (double now = 0; now <= period; now += .25) {
+        WaterfrontTrafficContact contact;
+        if (waterfront_traffic_contact_height_scene(
+                scene, (Vector2) { p.x + 2, p.y + 2 }, 0, 12, 12, 10, -1, 9, water, now, &contact))
+            return false;
+    }
+    return true;
+}
+
+bool boat_cargo_sites_apart(const BoatSceneWorkSite *a, const BoatSceneWorkSite *b)
+{
+    return fabsf(a->x - b->x) > SITE_MAX_X - SITE_MIN_X
+        || fabsf(a->z - b->z) > SITE_MAX_Z - SITE_MIN_Z;
 }
 
 Vector3 boat_cargo_tip(const BoatCargoCrane *c)

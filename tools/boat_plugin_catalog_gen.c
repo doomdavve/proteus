@@ -119,8 +119,8 @@ static bool evaluate(const char *directory, Entry *entry)
                 &entry->revision.race, resources.definition, &resources.map, &d);
             break;
         case BOAT_PLUGIN_KIND_FREE:
-            status
-                = boat_plugin_free_check_location(&entry->revision.free, resources.definition, &d);
+            status = boat_plugin_free_check_location(
+                &entry->revision.free, resources.definition, &resources.map, &d);
             break;
         case BOAT_PLUGIN_KIND_COURSE:
             status = boat_plugin_course_check_location(

@@ -2694,10 +2694,16 @@ implemented.
 
 | Sandbox step | Contract addition | Rejected until qualified |
 | --- | --- | --- |
-| S1a | `scene.work` in the scene envelope (scene v4): work sites selecting registered crane, cargo and workboat presets with bounded placement; source pads, receiving areas, work berths and capture zones; platforms remain `marina.modules`. Decoded to a pointer-free core definition. Staging runs the generalised work-site survey; the catalog generator runs it for bundled packages. Bundled `proteus.outer-work` (`free`, `outer`). | Browser imports, rooms, replays and recordings |
+| S1a (implemented locally 2026-11-07) | [`scene.work`](PLUGIN_API.md#work-sites-s1a) as an optional scene v3 subsystem (no v4 bump): 1–4 sites, each a registered `service_platform` preset and `crate` cargo placed at a berth position facing heading 0. Decoded to a pointer-free core definition; staging, the catalog generator and room packaging run the work-site survey. Bundled native-only `proteus.outer-work` (`free`, `outer`). The platform stays inside the preset: no module kind is a fixed in-water platform. | Rooms (rejected); browser catalog (omitted); voyage/race/match (rejected). Solo free scenes are not bound by `wake_velocity`, so the game ignores work sites |
 | S1b | No new contract; the second site is package data only | — |
 | S1c | `objective.hud` (and optionally `objective.timers`) granted to `free` packages; native cargo events (`cargo.secured`, `cargo.delivered`, `cargo.lost`, `cargo.reset`) with site/receiver/cargo IDs in the ordered event batch; a transactional scene-change command that enables an authored module/berth set, validated and committed between ticks | Same as S1a; plus any command that moves contacts under a player boat |
 | S3+ | Currency, prices and saves as objective/native state with exactly-once rewards; payouts never decided outside a committed transaction | Rooms until P5 authority |
+
+Finding from S1a: `boat_plugin_free_check_location` runs no map checks on a free package's
+marina or traffic scene (only S1a work sites are surveyed there). Free scenes reach players
+through rooms, whose package loader checks spawn/grid contacts and open water around each
+berth, but not the voyage path's module shore/support checks or authored-traffic sweep. This
+predates S1a and needs its own fix.
 
 Rules carried over from P3 and the location-life track:
 

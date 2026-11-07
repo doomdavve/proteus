@@ -40,7 +40,7 @@ static bool load_revision(
         status = boat_plugin_race_check_location(&revision->race, host->location, host->map, d);
         break;
     case BOAT_PLUGIN_KIND_FREE:
-        status = boat_plugin_free_check_location(&revision->free, host->location, d);
+        status = boat_plugin_free_check_location(&revision->free, host->location, host->map, d);
         break;
     case BOAT_PLUGIN_KIND_COURSE:
         status = boat_plugin_course_check_location(&revision->course, host->location, host->map, d);

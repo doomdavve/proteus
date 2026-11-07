@@ -1,5 +1,6 @@
 #include "boat_cargo.h"
 #include "raymath.h"
+#include "waterfront_traffic.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -302,6 +303,27 @@ int main(int argc, char **argv)
         CHECK(boat_map_water(&outer.map,
             (Vector2) { -translated.cargo.position.x, translated.cargo.position.z }, .5f));
     }
+    // S1a: a package site resets exactly like the S0 origin and passes its staging survey.
+    BoatSceneWorkSite site = { .id = "eriksberg", .x = 10, .z = 245 };
+    BoatCargoSandbox from_site, from_origin;
+    boat_cargo_reset_site(&from_site, &site);
+    boat_cargo_reset_at(&from_origin, (Vector2) { 10, 245 });
+    CHECK(!memcmp(&from_site, &from_origin, sizeof(from_site)));
+    CHECK(boat_cargo_site_clear(&outer.map, NULL, boat_water_gentle(), &site));
+    BoatSceneWorkSite near = { .id = "near", .x = 20, .z = 250 };
+    BoatSceneWorkSite far = { .id = "far", .x = -105, .z = 0 };
+    CHECK(!boat_cargo_sites_apart(&site, &near) && boat_cargo_sites_apart(&site, &far));
+    // Traffic alone blocks a site: a present empty vessel list clears the same water.
+    static BoatSceneDefinition quiet = { .version = BOAT_SCENE_VERSION, .traffic_present = true };
+    bool traffic_blocks = false;
+    for (int actor = 0; actor < WATERFRONT_TRAFFIC_ALL && !traffic_blocks; ++actor)
+        for (double t = 0; t < waterfront_traffic_period(actor) && !traffic_blocks; t += 20) {
+            Vector3 p = waterfront_traffic_motion(actor, t).position;
+            BoatSceneWorkSite lane = { .id = "lane", .x = -p.x - 2, .z = p.z - 2 };
+            traffic_blocks = boat_cargo_site_clear(&outer.map, &quiet, boat_water_gentle(), &lane)
+                && !boat_cargo_site_clear(&outer.map, NULL, boat_water_gentle(), &lane);
+        }
+    CHECK(traffic_blocks);
     boat_world_resources_destroy(&outer);
     puts("cargo: deterministic lift, transfer, moving deck, translated site and recovery checks "
          "passed");

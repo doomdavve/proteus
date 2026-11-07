@@ -219,8 +219,8 @@ static bool load_directory(const char *directory, BoatLocationId location,
     case BOAT_PLUGIN_KIND_FREE:
         status = boat_plugin_load_free(&bundle, NULL, &revision.free, &diagnostic);
         if (status == BOAT_PLUGIN_OK)
-            status
-                = boat_plugin_free_check_location(&revision.free, world->definition, &diagnostic);
+            status = boat_plugin_free_check_location(
+                &revision.free, world->definition, &world->map, &diagnostic);
         break;
     default:
         status = BOAT_PLUGIN_MANIFEST;

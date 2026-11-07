@@ -12,8 +12,10 @@ measurements are not pass/fail timing limits. `cargo_sandbox_left_screenshot` an
 `cargo_sandbox_right_screenshot` additionally drive the application's assisted lifts onto a
 wave-posed boat, lashing, departure and turn before a display-free basin CPU capture.
 The two `cargo_sandbox_outer_*_screenshot` checks
-repeat real transfers on `outer`; `cargo_sandbox_site` qualifies the footprint, sampled
-traffic envelope and initial camera against the loaded map. The `shadow-high`/`shadow-low`
+repeat real transfers on `outer`; `cargo_sandbox_site` loads the bundled `proteus.outer-work`
+site and qualifies its footprint, sampled traffic envelope and initial camera against the
+loaded map. `boat_plugin.work_sites` checks `scene.work` decoding, the staging wire and the
+staging survey's rejections; `boat_cargo` also checks that traffic alone can block a site. The `shadow-high`/`shadow-low`
 capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,
 requests capture and advances the real application until moored, checking the terminal state.
 CPU/GPU toy captures, windowed motion and

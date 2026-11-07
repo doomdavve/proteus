@@ -162,7 +162,7 @@ target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_s
 set(BOAT_PLUGIN_PACKAGES
   plugins/basin-free plugins/outer-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
-  plugins/harbor-room plugins/harbor-race plugins/grodan)
+  plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
     plugins/basin-free plugins/time-trial plugins/langedrag
@@ -522,7 +522,7 @@ set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
-  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu)
+  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog)
   add_dependencies(cargo_sandbox proteus_assets)
   target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
   foreach(side left right)

@@ -168,8 +168,9 @@ BoatPluginStatus boat_plugin_load_match(const BoatPluginBundle *bundle,
     const BoatPluginLimits *limits, BoatPluginMatch *out, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_race_check_location(const BoatPluginRace *race,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
+// S1a: MAP is LOCATION's compiled water; scene.work sites run the cargo site survey on it.
 BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
-    const BoatWorldDefinition *location, BoatPluginDiagnostic *diagnostic);
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_course_check_location(const BoatPluginCourse *course,
     const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic);
 BoatPluginStatus boat_plugin_match_check_location(const BoatPluginMatch *match,

@@ -159,8 +159,12 @@ def schema():
                     "radius": number(.5, 200, "metres"), "height": number(.5, 200, "metres"),
                     "rate": number(-5, 5, "turns/second"), "cues": sequence(cue, 0, 16)})
     gulls = object_schema({"flocks": sequence(flock, 0, 4)}, required=("flocks",))
+    work_site = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
+                        "preset": {"enum": ["service_platform"]}, "cargo": {"enum": ["crate"]},
+                        **point})
+    work = object_schema({"sites": sequence(work_site, 1, 4)}, required=("sites",))
     scene = object_schema({"version": {"const": 3}, "marina": marina, "traffic": traffic,
-                           "gulls": gulls}, required=("version",))
+                           "gulls": gulls, "work": work}, required=("version",))
     match_rules = record({"round_ticks": number(1, 432000, "120 Hz ticks", True),
                           "intermission_ticks": number(0, 432000, "120 Hz ticks", True),
                           "credit_ticks": number(1, 432000, "120 Hz ticks", True),
@@ -248,7 +252,10 @@ def schema():
                 "race": ["Gate directions have unit length within .01; source squared tolerance .0001",
                     "skip_ticks <= recovery_ticks; native course/rules validation",
                     "Grid, gate corridors and ferry path pass compiled-map clearance checks"],
-                "free": ["free.version must be 1; content stays the engine's registered defaults"],
+                "free": ["free.version must be 1; content stays the engine's registered defaults",
+                    "scene.work is free-only and solo-only: 1..4 unique sites from registered presets;",
+                    "each site's berth, platform and crane envelope must clear compiled water,",
+                    "berths, modules, retained traffic, the spawn and the other sites"],
                 "course": ["Exactly four gates south of the start and in strictly decreasing z",
                     "The gate centre and both edges must be open water; basin gates stay in bounds",
                     "The compiled course's digest keeps existing course-*.run bests valid"]},

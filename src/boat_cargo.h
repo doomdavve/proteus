@@ -2,9 +2,12 @@
 #define PROTEUS_BOAT_CARGO_H
 
 #include "boat_pose.h"
+#include "boat_scene_definition.h"
 
 // S0 fixture: one upright 0.8 m crate, one kinematic service crane and one deck.
 // All positions are renderer coordinates. No cargo/cargo or reaction-force coupling.
+// The berth, crane and pad offsets below are the registered "service_platform" work-site
+// preset; a package's scene.work site places it (S1a). The deck belongs to the workboat.
 #define BOAT_CARGO_HALF .4f
 #define BOAT_CARGO_DECK_Y .75f
 #define BOAT_CARGO_DECK_X 1.3f
@@ -72,6 +75,15 @@ typedef struct {
 // Reset keeps no outside state. The application separately resets its boat and clock.
 void boat_cargo_reset(BoatCargoSandbox *sandbox);
 void boat_cargo_reset_at(BoatCargoSandbox *sandbox, Vector2 mooring);
+void boat_cargo_reset_site(BoatCargoSandbox *sandbox, const BoatSceneWorkSite *site);
+// Staging survey for one service-platform site: the platform, workboat approach and complete
+// crane sweep clear the compiled water, SCENE's berths/modules (NULL: compiled) and every
+// retained or authored travelling craft over its longest period. Conservative envelopes include
+// the sampling gap. No depth, seabed support or human navigation approval is inferred.
+bool boat_cargo_site_clear(const BoatMap *map, const BoatSceneDefinition *scene, BoatWater water,
+    const BoatSceneWorkSite *site);
+// Surveyed envelopes of two sites, which must not overlap.
+bool boat_cargo_sites_apart(const BoatSceneWorkSite *a, const BoatSceneWorkSite *b);
 Vector3 boat_cargo_tip(const BoatCargoCrane *crane);
 Vector3 boat_cargo_hook(const BoatCargoSandbox *sandbox);
 // Bounded motors at the same 120 Hz as the cargo/boat. Inputs are signed unit rates.

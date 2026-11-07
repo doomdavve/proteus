@@ -1,5 +1,6 @@
 #include "boat_plugin.h"
 
+#include "boat_cargo.h"
 #include "boat_json.h"
 #include "boat_plugin_lua.h"
 #include "raymath.h"
@@ -477,6 +478,9 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     if (data->has_scene && data->scene.version != BOAT_SCENE_VERSION)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.version",
             "must be %d, the supported scene schema", BOAT_SCENE_VERSION);
+    if (data->has_scene && data->scene.work_present)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.work",
+            "is only supported by free packages");
     Check check = { d, manifest->entry };
     if (!validate(&check, data))
         return BOAT_PLUGIN_SCHEMA;
@@ -1018,6 +1022,10 @@ BoatPluginStatus boat_plugin_take_scene(const BoatPluginManifest *manifest, bool
     if (scene->version != BOAT_SCENE_VERSION)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.version",
             "must be %d, the supported scene schema", BOAT_SCENE_VERSION);
+    // S1a: work sites run only in the native cargo sandbox, from a free package.
+    if (scene->work_present && strcmp(manifest->kind, "free"))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.work",
+            "is only supported by free packages");
     BoatSceneDiagnostic check;
     if (!boat_scene_validate(scene, &check))
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, check.field, "%s", check.message);
@@ -1137,8 +1145,38 @@ BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
     return boat_plugin_decode_course(&manifest, &data, out, d);
 }
 
+static BoatPluginStatus check_work_sites(const BoatPluginFree *free,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
+{
+    const BoatSceneDefinition *scene = &free->scene;
+    const char *file = free->manifest.entry;
+    if (!location->mapped || !map)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "scene.work requires a mapped location");
+    for (unsigned i = 0; i < scene->work_count; ++i) {
+        const BoatSceneWorkSite *site = &scene->work[i];
+        char path[32];
+        snprintf(path, sizeof(path), "scene.work.sites[%u]", i + 1);
+        // The registered envelope (berth -3..11 m in x, -5..12 m in z) plus a 4 m restart margin.
+        if (location->spawn.x > site->x - 7 && location->spawn.x < site->x + 15
+            && location->spawn.y > site->z - 9 && location->spawn.y < site->z + 16)
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path, "blocks the location's spawn");
+        for (unsigned j = 0; j < i; ++j)
+            if (!boat_cargo_sites_apart(&scene->work[j], site))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                    "overlaps the envelope of scene.work.sites[%u]", j + 1);
+        // The sandbox's gentle water heaves moored hulls the same way during the survey.
+        if (!boat_cargo_site_clear(map, scene, boat_water_gentle(), site))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                "platform, approach or crane sweep is not clear of the %s map, berths, "
+                "modules or traffic",
+                location->name);
+    }
+    return BOAT_PLUGIN_OK;
+}
+
 BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
-    const BoatWorldDefinition *location, BoatPluginDiagnostic *diagnostic)
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic)
 {
     BoatPluginDiagnostic scratch;
     BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
@@ -1146,6 +1184,9 @@ BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
         return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
             "is \"%s\"; this session is at \"%s\"", free->manifest.location,
             location ? location->name : "none");
+    if (free->has_scene && free->scene.work_present
+        && check_work_sites(free, location, map, d) != BOAT_PLUGIN_OK)
+        return d->status;
     d->status = BOAT_PLUGIN_OK;
     return BOAT_PLUGIN_OK;
 }

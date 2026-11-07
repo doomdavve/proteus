@@ -1,11 +1,12 @@
-// Native S0 handling toy. No packages, progression, files or network state in the simulation.
+// Native cargo handling toy. On a mapped location its work site comes from a bundled package
+// (S1a); no progression, files or network state enter the simulation.
 #include "boat_assets.h"
 #include "boat_cargo.h"
 #include "boat_cargo_view.h"
 #include "boat_model.h"
+#include "boat_plugin_catalog.h"
 #include "boat_scenery.h"
 #include "boat_water_mesh.h"
-#include "cargo_sandbox_site.h"
 #include "raymath.h"
 #include "renderer3d.h"
 #include "renderer_gpu.h"
@@ -44,6 +45,7 @@ typedef struct {
     BoatWorldResources resources;
     BoatWorld world;
     Boat boat;
+    BoatSceneWorkSite site; // The package's first site, or the basin reference fixture.
     Vector2 mooring;
     BoatCargoSandbox sandbox;
     uint64_t tick;
@@ -130,7 +132,7 @@ static void reset(Experiment *e)
     e->world.water.upstream = e->resources.definition->upstream;
     e->world.water.player_wake_enabled = true;
     e->boat = (Boat) { .position = e->mooring };
-    boat_cargo_reset_at(&e->sandbox, e->mooring);
+    boat_cargo_reset_site(&e->sandbox, &e->site);
     e->tick = 0;
     e->crane_view = true;
     e->aim = 0;
@@ -699,13 +701,15 @@ int main(int argc, char **argv)
     bool gpu = true, demo = false, survey = false;
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_OUTER);
     int frames = 0;
-    const char *screenshot = NULL, *scenario = "origin";
+    const char *screenshot = NULL, *scenario = "origin", *package = NULL;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--location") && i + 1 < argc) {
             location = boat_location_find(argv[++i]);
             if (!location)
                 return 2;
-        } else if (!strcmp(argv[i], "--survey"))
+        } else if (!strcmp(argv[i], "--package") && i + 1 < argc)
+            package = argv[++i];
+        else if (!strcmp(argv[i], "--survey"))
             survey = true;
         else if (!strcmp(argv[i], "--shadow-review"))
             shadow_review = true;
@@ -728,7 +732,9 @@ int main(int argc, char **argv)
             demo = true;
         else {
             fprintf(stderr,
-                "Usage: cargo_sandbox [--location outer|basin] [--survey]\n"
+                "Usage: cargo_sandbox [--location outer|basin] [--package ID] [--survey]\n"
+                "  --package: bundled free package with scene.work sites (outer default "
+                "proteus.outer-work)\n"
                 "  [--renderer cpu|gpu] [--demo] [--frames N]\n"
                 "  [--shadow-review] (virtual wave-cycle pixel/stream checks)\n"
                 "  [--screenshot FILE] [--scenario "
@@ -760,7 +766,30 @@ int main(int argc, char **argv)
     SetTraceLogLevel(LOG_WARNING);
     if (!boat_world_resources_init(&e.resources, location))
         return 1;
-    e.mooring = location->mapped ? CARGO_SITE_MOORING : (Vector2) { 0 };
+    // The basin keeps its explicit reference fixture; a mapped location reads its package.
+    static BoatPluginRevision revision;
+    e.site = (BoatSceneWorkSite) { .id = "basin" };
+    if (location->mapped) {
+        const BoatPluginCatalogEntry *entry
+            = boat_plugin_catalog_find(package ? package : "proteus.outer-work");
+        BoatPluginDiagnostic d = { 0 };
+        if (!entry || boat_plugin_kind_parse(entry->kind) != BOAT_PLUGIN_KIND_FREE
+            || strcmp(entry->location, location->name)
+            || !boat_plugin_catalog_decode(entry, &revision, &d) || !revision.free.has_scene
+            || !revision.free.scene.work_present) {
+            fprintf(stderr, "No bundled free package with scene.work sites for %s: %s\n",
+                location->name, package ? package : "proteus.outer-work");
+            boat_world_resources_destroy(&e.resources);
+            return 1;
+        }
+        e.world.scene = &revision.free.scene;
+        e.site = revision.free.scene.work[0];
+    } else if (package) {
+        fprintf(stderr, "--package needs a mapped location; the basin is a fixed reference.\n");
+        boat_world_resources_destroy(&e.resources);
+        return 2;
+    }
+    e.mooring = (Vector2) { e.site.x, e.site.z };
     reset(&e);
     static HarbourView harbour;
     if (location->mapped) {
@@ -768,7 +797,7 @@ int main(int argc, char **argv)
         if (!boat_asset_path(assets, sizeof(assets), "")
             || !boat_scenery_load_location(location, assets)
             || !waterfront_scenery_bind(&harbour.scenery, location->map)
-            || !cargo_site_clear(&e.world)) {
+            || !boat_cargo_site_clear(&e.resources.map, e.world.scene, e.world.water, &e.site)) {
             fprintf(stderr, "Cargo work site needs its scenery pack and clear mapped water.\n");
             return 1;
         }
@@ -777,8 +806,9 @@ int main(int argc, char **argv)
         View3D view = camera(&e, &harbour.scenery);
         bool clear
             = !location->mapped || waterfront_scenery_clear(&harbour.scenery, view.position, .45f);
-        printf("cargo site: %s at %.0f,%.0f; water/berth/traffic survey %s; camera %s\n",
-            location->name, e.mooring.x, e.mooring.y, "clear", clear ? "clear" : "blocked");
+        printf("cargo site: %s %s at %.0f,%.0f; water/berth/traffic survey %s; camera %s\n",
+            location->name, e.site.id, e.mooring.x, e.mooring.y, "clear",
+            clear ? "clear" : "blocked");
         waterfront_scenery_destroy(&harbour.scenery);
         boat_scenery_unload();
         boat_world_resources_destroy(&e.resources);

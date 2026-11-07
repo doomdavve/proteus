@@ -76,6 +76,9 @@ authored `outer` voyage), `proteus.time-trial` (`course`), `proteus.river-sprint
 `proteus.harbor-room` (a free `outer` room with the Harbor life scene) and
 `proteus.harbor-race` (a river race with an authored obstacle berth). Both races run on `outer`;
 the separate `river` location and `proteus.river-free` were retired on 2026-11-04.
+The native catalog also bundles `proteus.outer-work` (`free`, `outer`), the
+[work-site](#work-sites-s1a) package that `cargo_sandbox` loads; it is never a default and the
+browser catalog omits it.
 `plugins/langedrag`, `plugins/river-sprint`, `plugins/basin-free`, `plugins/outer-free`,
 `plugins/time-trial`, `plugins/deathmatch`, `plugins/harbor-room` and `plugins/harbor-race` are
 complete package sources; the catalog does not duplicate them.
@@ -93,6 +96,57 @@ Absent content means the engine's registered defaults, exactly as an absent subs
 location must be `basin` or `outer`. A free package has no objective or callback grant;
 a scene is the same envelope described under [the scene contract](#location-life-scene-contract-l11l43).
 A free package with a scene fixes the room's location; without one it still names its location.
+
+## Work sites (S1a)
+
+Status, 2026-11-07: **implemented for the native `cargo_sandbox` only.** A `free` package's scene
+may list cargo work sites. Each site places a registered native preset; the crane, rope, cargo,
+lashing and assisted mooring stay native and are not package fields. The
+[sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-in-c) owns the gameplay
+steps; [`plugins/outer-work`](../plugins/outer-work/) is the reference.
+
+```lua
+return {
+  free = {
+    version = 1,
+    scene = {
+      version = 3,
+      work = {
+        sites = {
+          { id = "eriksberg", preset = "service_platform", cargo = "crate", x = 10, z = 245 }
+        }
+      }
+    }
+  }
+}
+```
+
+| Field | Accepted value |
+| --- | --- |
+| `work.sites` | 1–4 sites, a list numbered from 1 |
+| `id` | 1–23 characters of `a-z 0-9 _`, starting with a letter; unique among sites |
+| `preset` | `"service_platform"`: the S0 temporary 3 × 6 m platform, service crane, 1 m pad and assisted workboat berth, fixed relative to the site |
+| `cargo` | `"crate"`: one upright 0.8 m crate starting on the pad |
+| `x`, `z` | The workboat's final berth in simulation metres (x = −east, z = north), within 20000 m. Sites face heading 0; there is no heading field yet |
+
+`work` is an optional subsystem of scene v3; absent work leaves every earlier scene digest
+unchanged. Voyage, race and match packages reject it (`scene.work` "is only supported by free
+packages"). Staging, the catalog generator and `cargo_sandbox --survey` run the same site survey
+on the location's compiled map, with the sandbox's gentle water:
+
+- the site needs a mapped location (the basin is rejected);
+- the preset's envelope, berth −3..11 m in x and −5..12 m in z, must be open water with 1 m
+  clearance and clear of the scene's (or compiled) moored hulls and dock modules;
+- a 12 × 10 m half-extent traffic rectangle around the platform must clear every retained or
+  authored travelling craft, sampled every 0.25 s over the longest route period;
+- envelopes of two sites must not overlap, and no envelope (plus 4 m) may contain the spawn.
+
+These checks are sampled clearance evidence for the registered preset, not depth, seabed support
+or human navigation approval. A changed site changes the free digest, so a reload restarts the
+session; nothing is carried across. Rooms reject work sites (`scene.work: work sites are
+solo-only`), and the plugin/stage wires carry them only within one native build. `wake_velocity`
+free ride has no work runtime: it binds no solo free scene today, so a work package there plays
+as ordinary free ride. The browser catalog does not include the package.
 
 ## Match schema
 

@@ -242,7 +242,9 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 }
 
 static const char *const ROOT[] = { "voyage", "tour", "scene", "init", "update", "migrate", NULL };
-static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", NULL };
+static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", "work", NULL };
+static const char *const WORK[] = { "sites", NULL };
+static const char *const WORK_SITE[] = { "id", "preset", "cargo", "x", "z", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
 static const char *const GULLS[] = { "flocks", NULL };
@@ -917,6 +919,77 @@ static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s
     return true;
 }
 
+// S1a: optional work sites, chosen from registered native presets.
+static bool scene_work(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
+{
+    char at[64];
+    int type = field(L, scene, "work", "scene", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int work = lua_absindex(L, -1);
+    if (!only(L, vm, work, at, WORK))
+        return false;
+    type = field(L, work, "sites", "scene.work", at);
+    if (type != LUA_TTABLE)
+        return reject(vm, at, type == LUA_TNIL ? "is missing" : "must be a table, not a %s",
+            lua_typename(L, type));
+    int list = lua_absindex(L, -1);
+    lua_Unsigned length = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > length)
+            return reject(vm, at, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != length)
+        return reject(vm, at, "must be a list numbered from 1 without gaps");
+    if (length < 1 || length > BOAT_SCENE_WORK_SITES)
+        return reject(vm, at, "must list 1 to %d sites, not %llu", BOAT_SCENE_WORK_SITES,
+            (unsigned long long)length);
+    s->work_present = true;
+    s->work_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        BoatSceneWorkSite *w = &s->work[i];
+        char path[64], preset[24], cargo[24];
+        element(path, sizeof(path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int entry = lua_absindex(L, -1);
+        double x, z;
+        if (!only(L, vm, entry, path, WORK_SITE)
+            || !string(L, vm, entry, path, "id", w->id, sizeof(w->id))
+            || !string(L, vm, entry, path, "preset", preset, sizeof(preset))
+            || !string(L, vm, entry, path, "cargo", cargo, sizeof(cargo))
+            || !number(L, vm, entry, path, "x", &x) || !number(L, vm, entry, path, "z", &z))
+            return false;
+        w->x = (float)x;
+        w->z = (float)z;
+        BoatSceneWorkPreset p;
+        BoatSceneCargoPreset c;
+        char field_at[64];
+        if (!boat_scene_work_preset_from_name(preset, &p)) {
+            join(field_at, sizeof(field_at), path, "preset");
+            return reject(vm, field_at, "is not a registered work-site preset");
+        }
+        if (!boat_scene_cargo_preset_from_name(cargo, &c)) {
+            join(field_at, sizeof(field_at), path, "cargo");
+            return reject(vm, field_at, "is not a registered cargo preset");
+        }
+        w->preset = (unsigned char)p;
+        w->cargo = (unsigned char)c;
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 2);
+    return true;
+}
+
 // Read an optional scene table at SCENE_KEY of the table at ROOT. Absent means no scene.
 static bool read_scene(lua_State *L, Vm *vm, int root, BoatSceneDefinition *s, bool *has_scene)
 {
@@ -928,7 +1001,8 @@ static bool read_scene(lua_State *L, Vm *vm, int root, BoatSceneDefinition *s, b
         double version;
         if (!only(L, vm, scene, "scene", SCENE)
             || !number(L, vm, scene, "scene", "version", &version) || !scene_marina(L, vm, scene, s)
-            || !scene_traffic(L, vm, scene, s) || !scene_gulls(L, vm, scene, s))
+            || !scene_traffic(L, vm, scene, s) || !scene_gulls(L, vm, scene, s)
+            || !scene_work(L, vm, scene, s))
             return false;
         *has_scene = true;
         s->version = version == (double)BOAT_SCENE_VERSION ? BOAT_SCENE_VERSION : 0;
