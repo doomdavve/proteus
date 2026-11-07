@@ -31,9 +31,9 @@ Completed task: **P4.9 browser objective isolation**, following
 **M2 boat appearance is implemented; next marina task: [M3 authored routes and docking](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
-Authority callbacks, commands and session recordings remain P5 work after it; **P5 is held by
-user direction (2026-11-01), as are the round-boundary revisions (protocol v10)**, so neither is
-the next task. Physical-device and human qualification need the
+Authority callbacks, commands and session recordings remain P5 work after it; **P5 is the next plugin task, scheduled by the user 2026-11-07 (previously held 2026-11-01)**; the round-boundary
+revisions (protocol v10) are part of its scope. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
+are not scheduled. Physical-device and human qualification need the
 user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time
 init/migration still evaluate trusted Lua synchronously. Browser voyages evaluate all imported
@@ -1717,8 +1717,7 @@ three-engine browser qualification, including the cached INIT deadline regressio
 results remain historical evidence. GCC still reports pre-existing warnings outside the new
 plugin sources.
 
-**Next:** none queued in this plan's main line; P5 (authority/prediction/recording) is held by
-user direction (2026-11-01).
+**Next:** P5 (authority/prediction/recording, including v10 round-boundary revisions), scheduled by the user 2026-11-07 (previously held 2026-11-01).
 Browser races, interactive preview controls, durable full-session saves, native asynchronous
 objective execution and an in-game agent are not implemented. Physical Safari/mobile devices,
 real background-tab policies and P3 human migration/Undo/recovery acceptance remain open.
@@ -1729,7 +1728,7 @@ At the user's request, the full browser matrix no longer runs on every relevant 
 Node contracts and the packaged Wasm build; manual dispatch retains full three-engine runtime
 qualification and evidence. Superseded PR runs are canceled, and no `main` push trigger is
 added. The [browser guide](WEB_BUILD.md#browser-authoring-ci-lanes-2026-10-30) owns the command
-and coverage tradeoff. P5 was the next implementation task then; it has been held by user direction since 2026-11-01.
+and coverage tradeoff. P5 was the next implementation task then; it was held from 2026-11-01 and is again the next task (scheduled by the user 2026-11-07 (previously held 2026-11-01)).
 
 Verification, 2026-10-30, Apple Silicon/macOS: Debug configure/build passed using the pinned
 existing dependency sources (project sources warning-clean; bundled `stb_vorbis` warning).
