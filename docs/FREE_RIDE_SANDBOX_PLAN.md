@@ -33,12 +33,12 @@ physics and validation native. Completed S1a-S1d, 2026-11-07: see the [S1a](#s1a
 [S1d](#s1d-result-2026-11-07) results; the user played the landing and both outings and
 approved them. They then reported that cargo collision was sometimes off; that was S0a's deck
 contact, fixed in the [deck-edge fix](#deck-edge-collision-fix-2026-11-07), merged with the
-rest. Still owed: the user's play check of that fix and S1's review of fun, then broader S0
-qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtures`, and
+rest. The user played that fix natively on macOS on 2026-11-07 and reported "works". Still
+owed: S1's review of fun, then broader S0 qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtures`, and
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented locally too; next: the user's check of the decluttered HUD. Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented locally too; SV1a-SV1i are implemented. Remaining checks: the user's look at the decluttered HUD (da52ff3). Then the single PR for the branch, with the user's approval. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -1243,8 +1243,12 @@ that smoke run would write no file; the policy itself is covered by the harness'
 **SV1g+SV1h play check (2026-11-07, user, native macOS).** The user played the working harbour from
 the title menu and reported "seems to work"; the save file was written to
 `~/Library/Application Support/Proteus`. Checked: moving cargo by hand ("The actual work moving cargo
-worked great") and save/resume. Not reported (time pressure), so unchecked: the damaged-save case,
-the NEW and DELETE confirmations and capsize-then-resume. Feedback: "We need to get rid of all the
+worked great") and save/resume. Not reported (time pressure): the NEW and DELETE confirmations
+and capsize-then-resume. Damaged save, checked later the same day (native macOS): the user
+corrupted the `.sav` and the game reported "Save ~/Library/Application Support/Proteus/cargo-proteus.outer-work.sav
+was not usable (DAMAGED); resumed its backup"; the user said it "seems to work as well". That
+exercised the `.bak` fallback only. The menu's `DAMAGED` hint and the NEW to `.rejected` path were
+not exercised, because the backup was usable. Feedback: "We need to get rid of all the
 help text though. It takes up most part of the screen." (acted on in the next commit). `file`
 identifies the `.sav` as an RPF package, which is only libmagic matching our magic bytes; the
 format does not change for it.
@@ -1744,7 +1748,7 @@ The deck now tops a solid hull box (`src/boat_cargo.c`, `contact`):
 
 `boat_cargo` checks both cases (overhangs at the side and the stern rest at deck level and
 refuse lashing; three crates past the edge never enter the hull and end floating beside it);
-the check fails on the previous code. The user's check of the fix in play is owed.
+the check fails on the previous code. The user played the fix natively on macOS on 2026-11-07 and reported "works"; the check is done.
 
 ## Astra review, 2026-11-06
 
