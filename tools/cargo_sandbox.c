@@ -10,6 +10,7 @@
 #include "boat_sandbox_save.h"
 #include "boat_scenery.h"
 #include "boat_water_mesh.h"
+#include "boat_work_session.h"
 #include "raymath.h"
 #include "renderer3d.h"
 #include "renderer_gpu.h"
@@ -45,35 +46,6 @@ static int shadow_pixel_count(const Color *pixels, int frame)
 }
 
 typedef struct {
-    BoatWorldResources resources;
-    BoatWorld world;
-    Boat boat;
-    BoatSceneWorkSite sites[BOAT_SCENE_WORK_SITES]; // The package's, or the basin reference.
-    unsigned site_count;
-    BoatCargoSandbox sandbox;
-    uint64_t tick;
-    bool crane_view, paused;
-    bool braking;
-    int aim; // 1 pad, 2/3 port/starboard. Motors, never a pose teleport.
-    // The site helm guidance points to: after departure the job's guided site, else the next
-    // one; N cycles.
-    unsigned target;
-    unsigned guide; // S1d: the job's work.guide site, or site_count for none.
-    const char *notice;
-    // A formatted notice; raylib's TextFormat buffers are reused within the next frame.
-    char notice_text[64];
-    // S1c: the package's job. Native cargo events queue here until an update commits them.
-    const BoatPluginRevision *revision; // NULL: no job (the basin reference or no objective).
-    BoatPluginObjective objective;
-    BoatPluginEvent events[BOAT_PLUGIN_EVENTS];
-    unsigned event_count, generation;
-    int64_t sequence;
-    // Why the last update's batch waits: a build the boat or crate occupies, or a supply whose
-    // delivered crate is not set down yet. NULL when the job is not waiting.
-    const char *waiting;
-} Experiment;
-
-typedef struct {
     Mesh mesh;
     Material material;
 } GpuMesh;
@@ -89,13 +61,22 @@ typedef struct {
     int patch_capacity;
 } HarbourView;
 
+static BoatCargoView view_of(const BoatWorkSession *e)
+{
+    return (BoatCargoView) { .sandbox = &e->sandbox,
+        .boat = &e->boat,
+        .world = &e->world,
+        .tick = e->tick,
+        .crane_view = e->crane_view };
+}
+
 static bool water_visible(void *context, Vector3 lo, Vector3 hi)
 {
     return renderer3d_box_visible(context, lo, hi);
 }
 
 static bool harbour_cpu(
-    HarbourView *h, Renderer3D *cpu, Color *pixels, View3D camera, const Experiment *e)
+    HarbourView *h, Renderer3D *cpu, Color *pixels, View3D camera, const BoatWorkSession *e)
 {
     WaterfrontLighting light = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
     if (!waterfront_draw_boating(cpu, &h->scenery, pixels, WIDTH, HEIGHT, camera, true,
@@ -110,7 +91,7 @@ static bool harbour_cpu(
     return waterfront_draw_harbor(cpu, &h->harbor, &h->frame.harbor);
 }
 
-static bool harbour_gpu_water(HarbourView *h, const Experiment *e)
+static bool harbour_gpu_water(HarbourView *h, const BoatWorkSession *e)
 {
     Vector2 centre
         = { roundf(-e->boat.position.x / 12) * 12, roundf(e->boat.position.y / 12) * 12 };
@@ -142,580 +123,6 @@ static bool harbour_gpu_water(HarbourView *h, const Experiment *e)
     h->patch_centre = centre;
     h->gpu.near_water = h->patch; // Borrowed by the scene, exactly as in BoatGpu.
     return h->patch.vaoId != 0;
-}
-
-static const BoatCargoCrane *active(const Experiment *e)
-{
-    return &e->sandbox.cranes[e->sandbox.active];
-}
-
-// The next visible site after FROM, for helm guidance; hidden sites are not there yet.
-static unsigned next_site(const Experiment *e, unsigned from)
-{
-    unsigned n = e->sandbox.crane_count;
-    for (unsigned i = 1; i <= n; ++i)
-        if (!e->sandbox.cranes[(from + i) % n].hidden)
-            return (from + i) % n;
-    return from;
-}
-
-// KIND's template: the package's own notice, else the native default. Each {site} token becomes
-// the site's name as a sign: capitals with underscores as spaces. The notice owns its text.
-static void notice_text(
-    const Experiment *e, BoatSceneNotice kind, unsigned site, char *out, size_t capacity)
-{
-    static const char *const defaults[BOAT_SCENE_NOTICES]
-        = { "Crate delivered. It stays counted, even if moved again.", "{site} built.",
-              "Supplies used. Next crate waits on the {site} pad.",
-              "Crate returned to the {site} pad." };
-    const char *format
-        = e->world.scene && e->world.scene->work_present && e->world.scene->work_notice[kind][0]
-        ? e->world.scene->work_notice[kind]
-        : defaults[kind];
-    char name[sizeof(e->sites[site].id)];
-    snprintf(name, sizeof(name), "%s", e->sites[site].id);
-    for (char *c = name; *c; ++c)
-        *c = *c == '_' ? ' ' : (char)toupper((unsigned char)*c);
-    size_t n = 0;
-    for (const char *p = format; *p && n + 1 < capacity;) {
-        if (!strncmp(p, "{site}", 6)) {
-            for (const char *q = name; *q && n + 1 < capacity; ++q)
-                out[n++] = *q;
-            p += 6;
-        } else
-            out[n++] = *p++;
-    }
-    out[n] = 0;
-}
-
-static void notice(Experiment *e, BoatSceneNotice kind, unsigned site)
-{
-    notice_text(e, kind, site, e->notice_text, sizeof(e->notice_text));
-    e->notice = e->notice_text;
-}
-
-static void job_suspend(Experiment *e, const char *message)
-{
-    e->objective.quarantined = true;
-    fprintf(stderr, "Cargo job suspended: %s\n", message);
-}
-
-// A fresh job for a fresh session: new generation, no queued events, init at tick zero.
-static void job_reset(Experiment *e)
-{
-    e->event_count = 0;
-    e->sequence = 0;
-    e->waiting = NULL;
-    e->guide = e->site_count;
-    e->objective = (BoatPluginObjective) {
-        .generation = ++e->generation, .rng = 12345, .work_enabled = true
-    };
-    if (!e->revision)
-        return;
-    e->objective.state_version = e->revision->free.manifest.state_version;
-    BoatPluginDiagnostic d = { 0 };
-    if (boat_plugin_objective_step(&e->objective, e->revision->source, e->revision->source_size,
-            BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &d)
-        != BOAT_PLUGIN_OK)
-        job_suspend(e, d.message);
-}
-
-// Move the native cargo events into the job's unacknowledged queue (and raise the delivery
-// notice). Saving does the same first, so a key action's event is never left in the core.
-static void job_queue_events(Experiment *e)
-{
-    static const char *const kinds[]
-        = { "cargo.secured", "cargo.delivered", "cargo.lost", "cargo.reset" };
-    BoatCargoEvent native[BOAT_CARGO_EVENTS];
-    unsigned count = boat_cargo_take_events(&e->sandbox, native, BOAT_CARGO_EVENTS);
-    for (unsigned i = 0; i < count; ++i) {
-        if (native[i].kind == BOAT_CARGO_EVENT_DELIVERED)
-            notice(e, BOAT_SCENE_NOTICE_DELIVERED, native[i].site);
-        if (!e->revision || e->objective.quarantined)
-            continue;
-        if (e->event_count == BOAT_PLUGIN_EVENTS) {
-            job_suspend(e, "event queue full");
-            break;
-        }
-        BoatPluginEvent *event = &e->events[e->event_count++];
-        *event = (BoatPluginEvent) {
-            .tick = (int64_t)e->tick, .sequence = ++e->sequence, .load = native[i].load
-        };
-        snprintf(event->kind, sizeof(event->kind), "%s", kinds[native[i].kind]);
-        snprintf(event->id, sizeof(event->id), "%s", e->sites[native[i].site].id);
-    }
-}
-
-// After each tick: queue the native cargo events, and at each 12-tick boundary run the update.
-// Its work.enable intents are checked against the live boat and crate before the batch commits;
-// a refusal keeps the previous checkpoint and its unacknowledged events for the next boundary.
-static void job_tick(Experiment *e)
-{
-    job_queue_events(e);
-    if (!e->revision || e->objective.quarantined || e->tick % 12)
-        return;
-    BoatPluginObjective next = e->objective;
-    BoatPluginDiagnostic d = { 0 };
-    if (boat_plugin_objective_step(&next, e->revision->source, e->revision->source_size,
-            BOAT_PLUGIN_OBJECTIVE_UPDATE, (int64_t)e->tick, e->events, e->event_count, NULL, &d)
-        != BOAT_PLUGIN_OK) {
-        job_suspend(e, d.message);
-        return;
-    }
-    // Check every intent against the live sandbox first; apply them only if all can happen.
-    bool build[BOAT_SCENE_WORK_SITES] = { false };
-    unsigned supply = e->site_count, guide = e->site_count;
-    for (unsigned i = 0; i < next.command_count; ++i) {
-        const char *kind = next.commands[i].kind;
-        bool enable = !strcmp(kind, "work.enable"), supplying = !strcmp(kind, "cargo.supply");
-        if (!enable && !supplying && strcmp(kind, "work.guide"))
-            continue;
-        unsigned site = 0;
-        while (site < e->site_count && strcmp(e->sites[site].id, next.commands[i].id))
-            ++site;
-        if (site == e->site_count) {
-            job_suspend(e, "a work command names no work site");
-            return;
-        }
-        if (supplying)
-            supply = site;
-        else if (!enable)
-            guide = site;
-        else if (e->sandbox.cranes[site].hidden) { // Building a visible site is idempotent.
-            if (boat_cargo_site_occupied(&e->sandbox, site, &e->boat)) {
-                e->waiting = "BUILD WAITING: MOVE CLEAR";
-                return;
-            }
-            build[site] = true;
-        }
-    }
-    if (guide < e->site_count && e->sandbox.cranes[guide].hidden && !build[guide]) {
-        job_suspend(e, "work.guide names a site that is not built");
-        return;
-    }
-    if (supply < e->site_count) {
-        if (e->sites[supply].preset != BOAT_SCENE_WORK_SERVICE_PLATFORM
-            || (e->sandbox.cranes[supply].hidden && !build[supply])) {
-            job_suspend(e, "cargo.supply names no built service platform");
-            return;
-        }
-        if (!boat_cargo_supply_ready(&e->sandbox)) {
-            e->waiting = "SUPPLY WAITING: SET CRATE DOWN";
-            return;
-        }
-    }
-    for (unsigned i = 0; i < e->site_count; ++i)
-        if (build[i] && boat_cargo_site_enable(&e->sandbox, i, &e->boat))
-            notice(e, BOAT_SCENE_NOTICE_BUILT, i);
-    if (supply < e->site_count && boat_cargo_supply(&e->sandbox, supply))
-        notice(e, BOAT_SCENE_NOTICE_SUPPLIED, supply);
-    if (guide < e->site_count)
-        e->guide = e->target = guide;
-    e->waiting = NULL;
-    e->objective = next;
-    e->event_count = 0; // The update acknowledged every queued event.
-}
-
-// The world, cargo and controls of a fresh session, without the job.
-static void session_reset(Experiment *e)
-{
-    // The reset must keep the package's scene: its notices and workboat drive this session.
-    const BoatSceneDefinition *scene = e->world.scene;
-    boat_world_init(&e->world, &e->resources, boat_water_gentle());
-    e->world.scene = scene;
-    e->world.water.upstream = e->resources.definition->upstream;
-    e->world.water.player_wake_enabled = true;
-    boat_cargo_reset_sites_with(
-        &e->sandbox, e->world.scene ? e->world.scene->work_boat : 0, e->sites, e->site_count);
-    e->boat = (Boat) { .position = boat_cargo_berth(active(e)), .heading = active(e)->heading };
-    e->target = next_site(e, e->sandbox.active);
-    e->tick = 0;
-    e->crane_view = true;
-    e->aim = 0;
-    e->paused = false;
-    e->braking = false;
-    e->notice = "F: catch crate. 2 / 3: lift and aim at deck.";
-}
-
-static void reset(Experiment *e)
-{
-    session_reset(e);
-    job_reset(e);
-}
-
-// SV1c: the session as a save record. The package's identity compares the work digest of its
-// scene, the manifest state_version and the physics revision; the source hash and build string
-// are for messages only.
-static void experiment_identity(const Experiment *e, BoatSandboxIdentity *id)
-{
-    const BoatPluginManifest *m = &e->revision->free.manifest;
-    *id = (BoatSandboxIdentity) { .work_digest = boat_scene_work_digest(&e->revision->free.scene),
-        .source_hash = boat_sandbox_source_hash(e->revision->source, e->revision->source_size),
-        .state_version = m->state_version,
-        .physics_revision = BOAT_PHYSICS_REVISION,
-        .tick_hz = BOAT_TICK_HZ };
-    snprintf(id->package, sizeof(id->package), "%s", m->id);
-    snprintf(id->build, sizeof(id->build), "cargo_sandbox");
-}
-
-// Between ticks only. A key action's core events move into the job's queue first; nothing
-// else is re-derived. Jobless sessions (the basin reference) have nothing to save.
-static bool experiment_save(Experiment *e, int64_t saved_at, BoatSandboxSave *save)
-{
-    if (!e->revision)
-        return false;
-    job_queue_events(e);
-    memset(save, 0, sizeof(*save));
-    boat_cargo_snapshot(&e->sandbox, &e->boat, &save->cargo);
-    BoatSandboxSummary *sum = &save->summary;
-    experiment_identity(e, &sum->identity);
-    const BoatPluginManifest *m = &e->revision->free.manifest;
-    snprintf(sum->name, sizeof(sum->name), "%s", m->name);
-    snprintf(sum->location, sizeof(sum->location), "%s", m->location);
-    sum->saved_at = saved_at;
-    sum->tick = e->tick;
-    sum->load = e->sandbox.cargo.load;
-    sum->sites = e->site_count;
-    for (unsigned i = 0; i < e->site_count; ++i) {
-        snprintf(save->site_ids[i], sizeof(save->site_ids[i]), "%s", e->sites[i].id);
-        sum->built += !e->sandbox.cranes[i].hidden;
-    }
-    if (e->objective.hud_count) {
-        sum->has_progress = true;
-        snprintf(sum->progress_label, sizeof(sum->progress_label), "%s", e->objective.hud[0].label);
-        sum->progress_value = e->objective.hud[0].value;
-    }
-    save->guide = e->guide;
-    save->target = e->target;
-    save->has_objective = true;
-    save->objective = e->objective;
-    memset(save->objective.commands, 0, sizeof(save->objective.commands));
-    save->objective.command_count = 0; // Inspection only; not part of the checkpoint.
-    memcpy(save->events, e->events, e->event_count * sizeof(e->events[0]));
-    save->event_count = e->event_count;
-    save->generation = e->generation;
-    save->sequence = e->sequence;
-    return true;
-}
-
-// Replace the session with SAVE, or return false leaving it untouched when the record does not
-// belong to this package's sites or the core refuses it. Resume never queues events and never
-// re-runs the job's init. The boat resumes where the core puts it (at rest), the crane at rest.
-static bool experiment_resume(Experiment *e, const BoatSandboxSave *save)
-{
-    if (!e->revision || !save->has_objective || save->summary.sites != e->site_count
-        || save->guide > e->site_count || save->target >= e->site_count)
-        return false;
-    for (unsigned i = 0; i < e->site_count; ++i)
-        if (strcmp(save->site_ids[i], e->sites[i].id))
-            return false;
-    BoatCargoSandbox sandbox;
-    Boat boat;
-    if (!boat_cargo_restore(&sandbox, e->revision->free.scene.work_boat, e->sites, e->site_count,
-            &save->cargo, &boat))
-        return false;
-    session_reset(e);
-    e->sandbox = sandbox;
-    e->boat = boat;
-    e->tick = save->summary.tick;
-    e->crane_view = e->sandbox.moored;
-    e->guide = save->guide;
-    e->target = save->target;
-    e->notice = "Resumed the saved session.";
-    e->waiting = NULL;
-    e->objective = save->objective;
-    memset(e->events, 0, sizeof(e->events));
-    memcpy(e->events, save->events, save->event_count * sizeof(e->events[0]));
-    e->event_count = save->event_count;
-    e->sequence = save->sequence;
-    e->generation = save->objective.generation;
-    return true;
-}
-
-static Vector3 local_target(int aim)
-{
-    return (Vector3) { aim == 2 ? .65f : -.65f, BOAT_CARGO_DECK_Y, .65f };
-}
-
-static void tick(Experiment *e, float slew, float reach, float hoist, BoatInput input)
-{
-    BoatCargoSandbox *s = &e->sandbox;
-    if (e->crane_view && s->moored) {
-        if (slew || reach || hoist)
-            e->aim = 0;
-        BoatCargoCrane *crane = &s->cranes[s->active];
-        if (e->aim) {
-            Vector3 target = e->aim == 1 ? boat_cargo_site_point(crane, (Vector3) { -5, 1, 0 })
-                                         : boat_pose_attachment(&e->boat, local_target(e->aim));
-            Vector3 local = boat_cargo_site_local(crane, target);
-            float dx = local.x + 4;
-            float dz = local.z - 3;
-            float angle = atan2f(dx, dz);
-            float radius = hypotf(dx, dz);
-            // Lift clear before slewing; the final lowering is the player's action.
-            if (crane->rope > .9f)
-                hoist = 1;
-            else {
-                slew = Clamp(remainderf(angle - crane->angle, 2 * PI) * 3, -1, 1);
-                reach = Clamp((radius - crane->reach) * 2, -1, 1);
-            }
-        }
-        boat_cargo_motor(crane, slew, reach, hoist);
-    }
-    Boat before = e->boat;
-    bool assisting = s->mooring;
-    BoatHandling handling = { .thrust = s->boat->thrust, .hull = &s->boat->hull };
-    boat_step_handling(&e->boat, &e->world, boat_tick_seconds(++e->tick),
-        s->moored || s->mooring ? (BoatInput) { 0 } : input, &handling);
-    if (assisting) {
-        // Keep dynamic wave pose, then let the surveyed assist own planar motion exactly once.
-        e->boat.position = before.position;
-        e->boat.heading = before.heading;
-        e->boat.velocity = before.velocity;
-        e->boat.yaw_velocity = before.yaw_velocity;
-    }
-    boat_cargo_load_effect(s, &before, &e->boat);
-    if (e->braking && !s->moored)
-        boat_cargo_brake(&e->boat);
-    boat_cargo_moor_step(s, &e->boat);
-    if (s->moored) {
-        // Assisted berth constrains only horizontal movement; wave heave/roll remain live.
-        e->boat.position = boat_cargo_berth(active(e));
-        e->boat.velocity = (Vector2) { 0 };
-        e->boat.heading = active(e)->heading;
-        e->boat.yaw_velocity = 0;
-        e->boat.throttle = e->boat.engine_response = 0;
-    } else {
-        // Conservative circle against each solid test quay; this fixture is not scene editing.
-        for (unsigned i = 0; i < s->crane_count; ++i) {
-            if (s->cranes[i].hidden)
-                continue;
-            Vector3 local = boat_cargo_site_local(
-                &s->cranes[i], (Vector3) { -e->boat.position.x, 0, e->boat.position.y });
-            float nearest_x = Clamp(local.x, -6.5f, -3.5f), nearest_z = Clamp(local.z, -2, 4);
-            Vector2 away = { local.x - nearest_x, local.z - nearest_z };
-            if (Vector2Length(away) < 2.65f) {
-                e->boat.position = before.position;
-                e->boat.velocity = Vector2Scale(before.velocity, -.12f);
-                break;
-            }
-        }
-    }
-    boat_cargo_step(s, &e->boat, &e->world, boat_tick_seconds(e->tick));
-    job_tick(e);
-}
-
-static void box(BoatModel *m, Vector3 p, Vector3 size, Color color)
-{
-    boat_model_box(m, p, size, color);
-}
-
-static void boat_box(BoatModel *m, const Boat *boat, Vector3 p, Vector3 size, Color color)
-{
-    size_t first = m->mesh.triangle_count * 3;
-    boat_model_box(m, p, size, color);
-    for (size_t i = first; i < m->mesh.triangle_count * 3; ++i)
-        m->vertices[i] = boat_pose_attachment(boat, m->vertices[i]);
-}
-
-// The scene mesh is built relative to the first site's berth, which scene() adds back last.
-static Vector3 site_vertex(const Experiment *e, const BoatCargoCrane *c, Vector3 local)
-{
-    return Vector3Add(boat_cargo_site_direction(c, local),
-        Vector3Subtract(c->origin, e->sandbox.cranes[0].origin));
-}
-
-static void to_site(const Experiment *e, BoatModel *m, size_t first, const BoatCargoCrane *c)
-{
-    for (size_t i = first; i < m->mesh.triangle_count * 3; ++i)
-        m->vertices[i] = site_vertex(e, c, m->vertices[i]);
-}
-
-static Vector3 berth_point(const Experiment *e, const BoatCargoCrane *c, float x, float z)
-{
-    Vector3 p = boat_cargo_site_point(c, (Vector3) { x, 0, z });
-    p.y = boat_water_query_borrowed(
-              &e->world.water, (Vector2) { -p.x, p.z }, boat_tick_seconds(e->tick))
-              .height
-        + .1f;
-    return Vector3Subtract(p, e->sandbox.cranes[0].origin);
-}
-
-static void berth_line(const Experiment *e, const BoatCargoCrane *c, BoatModel *m, float ax,
-    float az, float bx, float bz, Color color)
-{
-    boat_model_beam(m, berth_point(e, c, ax, az), berth_point(e, c, bx, bz), .065f, color);
-}
-
-// A site's platform and crane. A receiving platform's pad is marked as the delivery surface.
-static void site_parts(const Experiment *e, BoatModel *m, unsigned index)
-{
-    const BoatCargoSandbox *s = &e->sandbox;
-    const BoatCargoCrane *crane = &s->cranes[index];
-    size_t first = m->mesh.triangle_count * 3;
-    bool receiving = crane->preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM;
-    box(m, (Vector3) { -5, 0, 1 }, (Vector3) { 3, 2, 6 }, (Color) { 126, 134, 132, 255 });
-    box(m, (Vector3) { -5, 1.01f, 0 }, (Vector3) { 2, .03f, 2.8f },
-        receiving ? (Color) { 220, 207, 144, 255 } : teal);
-    for (int side = -1; receiving && side <= 1; side += 2) {
-        box(m, (Vector3) { -5 + side * .95f, 1.03f, 0 }, (Vector3) { .1f, .03f, 2.8f }, yellow);
-        box(m, (Vector3) { -5, 1.03f, side * 1.35f }, (Vector3) { 2, .03f, .1f }, yellow);
-    }
-    for (int i = 0; i < 4; ++i)
-        box(m, (Vector3) { -3.48f, .85f, -1.5f + i * 1.5f }, (Vector3) { .07f, .25f, .6f }, yellow);
-    box(m, (Vector3) { -4, 1.3f, 3 }, (Vector3) { .9f, .6f, .9f }, ink);
-    box(m, (Vector3) { -4, 3.3f, 3 }, (Vector3) { .35f, 4.4f, .35f }, yellow);
-    Vector3 hook = index == s->active
-        ? boat_cargo_hook(s)
-        : Vector3Subtract(boat_cargo_tip(crane), (Vector3) { 0, crane->rope, 0 });
-    Vector3 tip = boat_cargo_site_local(crane, boat_cargo_tip(crane));
-    hook = boat_cargo_site_local(crane, hook);
-    boat_model_beam(m, (Vector3) { -4, 5.5f, 3 }, tip, .22f, yellow);
-    boat_model_beam(m, (Vector3) { -4, 4.6f, 3 }, tip, .07f, ink);
-    boat_model_beam(m, tip, hook, .035f, ink);
-    box(m, hook, (Vector3) { .16f, .23f, .16f }, yellow);
-    to_site(e, m, first, crane);
-}
-
-// One evaluated mesh for both renderers, including rope, cargo and support markers.
-static size_t scene(const Experiment *e, BoatModel *m)
-{
-    const BoatCargoSandbox *s = &e->sandbox;
-    Vector3 origin = s->cranes[0].origin;
-    BoatCargo cargo = s->cargo;
-    cargo.position = Vector3Subtract(cargo.position, origin);
-    const BoatCargo *c = &cargo;
-    boat_model_begin(m);
-    for (unsigned i = 0; i < s->crane_count; ++i)
-        if (!s->cranes[i].hidden)
-            site_parts(e, m, i);
-
-    Boat local_boat = e->boat;
-    local_boat.position = Vector2Subtract(local_boat.position, boat_cargo_berth(&s->cranes[0]));
-    const Boat *b = &local_boat;
-    boat_box(m, b, (Vector3) { 0, .18f, 0 }, (Vector3) { 2.6f, .85f, 4.6f }, teal);
-    boat_box(m, b, (Vector3) { 0, .69f, 0 }, (Vector3) { 2.6f, .12f, 3.8f },
-        (Color) { 176, 151, 106, 255 });
-    boat_box(m, b, (Vector3) { 0, 1.05f, -1.95f }, (Vector3) { 1.1f, .8f, .45f }, ink);
-    boat_box(m, b, (Vector3) { 0, .45f, 2.4f }, (Vector3) { .5f, .7f, .5f }, ink);
-    for (int side = -1; side <= 1; side += 2) {
-        boat_box(m, b, (Vector3) { side * 1.32f, .35f, -.9f }, (Vector3) { .14f, .45f, .6f }, ink);
-        boat_box(m, b, (Vector3) { side * 1.32f, .35f, 1.1f }, (Vector3) { .14f, .45f, .6f }, ink);
-        boat_box(m, b, local_target(side < 0 ? 2 : 3), (Vector3) { .85f, .025f, .85f },
-            (Color) { 220, 207, 144, 255 });
-    }
-    if (s->moored) {
-        boat_model_beam(m, site_vertex(e, active(e), (Vector3) { -3.4f, 1, -1 }),
-            boat_pose_attachment(b, (Vector3) { -1.25f, .8f, -1 }), .04f, yellow);
-        boat_model_beam(m, site_vertex(e, active(e), (Vector3) { -3.4f, 1, 1.5f }),
-            boat_pose_attachment(b, (Vector3) { -1.25f, .8f, 1.5f }), .04f, yellow);
-    }
-    size_t receivers = m->mesh.triangle_count;
-    size_t start = receivers * 3;
-    box(m, (Vector3) { 0 }, (Vector3) { .8f, .8f, .8f },
-        c->state == BOAT_CARGO_SECURED ? green : (Color) { 196, 111, 59, 255 });
-    box(m, (Vector3) { 0, -.32f, 0 }, (Vector3) { .92f, .12f, .92f }, (Color) { 116, 78, 50, 255 });
-    box(m, (Vector3) { 0, .05f, -.405f }, (Vector3) { .18f, .45f, .025f }, yellow);
-    Matrix rotation = MatrixRotateXYZ(c->rotation);
-    for (size_t i = start; i < m->mesh.triangle_count * 3; ++i)
-        m->vertices[i] = Vector3Add(c->position, Vector3Transform(m->vertices[i], rotation));
-    if (c->state == BOAT_CARGO_SECURED) {
-        for (int side = -1; side <= 1; side += 2)
-            boat_model_beam(m, boat_pose_attachment(b, (Vector3) { side * 1.2f, .78f, .65f }),
-                Vector3Add(c->position, (Vector3) { 0, .43f, 0 }), .04f, ink);
-    }
-    BoatCargoMoorStatus berth = boat_cargo_moor_status(s, &e->boat);
-    for (unsigned i = 0; i < s->crane_count; ++i) {
-        const BoatCargoCrane *crane = &s->cranes[i];
-        if (crane->hidden)
-            continue;
-        Color berth_color = berth.site == i && berth.reason == BOAT_CARGO_MOOR_READY
-            ? green
-            : (Color) { 178, 220, 220, 255 };
-        // The outline marks the actual final hull pose; the bow arrow faces the site heading.
-        berth_line(e, crane, m, -1.45f, -2.45f, 1.45f, -2.45f, berth_color);
-        berth_line(e, crane, m, -1.45f, 2.45f, 1.45f, 2.45f, berth_color);
-        berth_line(e, crane, m, -1.45f, -2.45f, -1.45f, 2.45f, berth_color);
-        berth_line(e, crane, m, 1.45f, -2.45f, 1.45f, 2.45f, berth_color);
-        berth_line(e, crane, m, 0, -3.2f, -.5f, -2.6f, berth_color);
-        berth_line(e, crane, m, 0, -3.2f, .5f, -2.6f, berth_color);
-        berth_line(e, crane, m, 0, -3.2f, 0, -2.2f, berth_color);
-        // Turning references and a berth approach, away from the work surface.
-        size_t first = m->mesh.triangle_count * 3;
-        for (int side = -1; side <= 1; side += 2) {
-            box(m, (Vector3) { side * 11, .35f, -18 }, (Vector3) { .5f, .8f, .5f }, yellow);
-        }
-        to_site(e, m, first, crane);
-    }
-    for (size_t i = 0; i < m->mesh.triangle_count * 3; ++i)
-        m->vertices[i] = Vector3Add(m->vertices[i], origin);
-    return receivers;
-}
-
-static bool site_camera_clear(const Experiment *e, Vector3 p)
-{
-    for (unsigned i = 0; i < e->sandbox.crane_count; ++i) {
-        const BoatCargoCrane *crane = &e->sandbox.cranes[i];
-        if (crane->hidden)
-            continue;
-        Vector3 q = boat_cargo_site_local(crane, p);
-        if (q.x > -7 && q.x < -3 && q.z > -2.5f && q.z < 4.5f && q.y < 1.5f)
-            return false;
-        if (q.x > -4.6f && q.x < -3.4f && q.z > 2.4f && q.z < 3.6f && q.y < 6)
-            return false;
-        Vector3 a = boat_cargo_site_point(crane, (Vector3) { -4, 5.5f, 3 });
-        Vector3 b = boat_cargo_tip(crane), axis = Vector3Subtract(b, a);
-        float t
-            = Clamp(Vector3DotProduct(Vector3Subtract(p, a), axis) / Vector3LengthSqr(axis), 0, 1);
-        if (Vector3Distance(p, Vector3Add(a, Vector3Scale(axis, t))) <= .6f)
-            return false;
-    }
-    return true;
-}
-
-static View3D camera(const Experiment *e, const WaterfrontScenery *scenery)
-{
-    Vector3 centre = boat_cargo_site_point(active(e), (Vector3) { -2, 2.2f, 1 });
-    Vector3 eye = boat_cargo_site_point(active(e), (Vector3) { 8.5f, 9, 12 });
-    if (!e->crane_view) {
-        centre = boat_pose_attachment(&e->boat, (Vector3) { 0, 1, 0 });
-        eye = Vector3Add(
-            centre, (Vector3) { sinf(e->boat.heading) * 13, 9, cosf(e->boat.heading) * 13 });
-    }
-    if (e->world.definition->mapped) {
-        Vector3 safe = centre;
-        for (int i = 1; i <= 80; ++i) {
-            Vector3 p = Vector3Lerp(centre, eye, i / 80.0f);
-            if (!site_camera_clear(e, p) || !waterfront_scenery_clear(scenery, p, .45f)
-                || !waterfront_harbor_camera_clear_scene(e->world.scene, p, .45f)
-                || !waterfront_traffic_camera_clear_scene(
-                    e->world.scene, p, boat_tick_seconds(e->tick), .45f))
-                break;
-            safe = p;
-        }
-        eye = Vector3Distance(safe, centre) > .05f ? safe
-                                                   : Vector3Add(centre, (Vector3) { 0, .6f, 0 });
-    }
-    return (View3D) { eye, centre, { 0, 1, 0 }, 55 * DEG2RAD, .1f,
-        e->world.definition->mapped ? 4500 : 240 };
-}
-
-static void water_mesh(const Experiment *e, BoatModel *m)
-{
-    // A small finite basin patch. Water queries share the physical ambient/player wakes.
-    boat_model_begin(m);
-    float cx = -e->boat.position.x, cz = e->boat.position.y;
-    for (int z = -10; z < 10; ++z)
-        for (int x = -10; x < 10; ++x) {
-            Vector3 p[4] = { { cx + x * 5, 0, cz + z * 5 }, { cx + x * 5, 0, cz + (z + 1) * 5 },
-                { cx + (x + 1) * 5, 0, cz + (z + 1) * 5 }, { cx + (x + 1) * 5, 0, cz + z * 5 } };
-            for (int i = 0; i < 4; ++i)
-                p[i].y = boat_water_query_borrowed(
-                    &e->world.water, (Vector2) { -p[i].x, p[i].z }, boat_tick_seconds(e->tick))
-                             .height;
-            boat_model_quad(m, p[0], p[1], p[2], p[3],
-                (x + z) % 2 ? (Color) { 45, 107, 122, 255 } : (Color) { 48, 113, 127, 255 });
-        }
 }
 
 static bool gpu_init(GpuMesh *g)
@@ -801,68 +208,8 @@ static bool button(Rectangle r, const char *label, Vector2 mouse, bool enabled, 
         && (held ? IsMouseButtonDown(MOUSE_BUTTON_LEFT) : IsMouseButtonPressed(MOUSE_BUTTON_LEFT));
 }
 
-static void hook_action(Experiment *e)
-{
-    e->notice = boat_cargo_hook_toggle(&e->sandbox)
-        ? "Hook changed. Lower to a surface before releasing."
-        : "Move hook near the crate's top. Unlash first; moor to operate.";
-    e->aim = 0;
-}
-
-static void lash_action(Experiment *e)
-{
-    if (e->sandbox.mooring) {
-        e->notice = "Wait for mooring to finish, or G to cancel, before unlashing.";
-        return;
-    }
-    e->notice = boat_cargo_lash_toggle(&e->sandbox, &e->boat)
-        ? "Lashing changed. Green crate + straps = secured."
-        : "Detach hook, settle fully inside deck, stop boat, then lash.";
-}
-
-static void moor_action(Experiment *e)
-{
-    bool moored = e->sandbox.moored;
-    bool changed = boat_cargo_moor_toggle(&e->sandbox, &e->boat);
-    if (changed && e->sandbox.mooring)
-        e->target = e->sandbox.active;
-    else if (changed && moored) // Departure: guide toward the job's site, else the next one.
-        e->target = e->guide < e->site_count && e->guide != e->sandbox.active
-            ? e->guide
-            : next_site(e, e->sandbox.active);
-    e->notice = changed
-        ? (e->sandbox.moored           ? "Moored. TAB: crane controls."
-                  : e->sandbox.mooring ? "Mooring assist active. G cancels."
-                                       : "Ready to drive. TAB: helm controls.")
-        : (e->sandbox.moored
-                  ? "Release hook and lash loose deck cargo before departure."
-                  : "Approach the berth outline; SPACE brakes; G starts mooring assist.");
-    e->aim = 0;
-}
-
-static void recover_action(Experiment *e)
-{
-    if (boat_cargo_recover(&e->sandbox)) {
-        notice(e, BOAT_SCENE_NOTICE_RETURNED, e->sandbox.source);
-    } else
-        e->notice = "Release the hook and unlash before returning the crate.";
-    e->aim = 0;
-}
-
-static void view_action(Experiment *e)
-{
-    if (e->crane_view || e->sandbox.moored) {
-        e->crane_view = !e->crane_view;
-        e->aim = 0;
-        e->boat.throttle = 0;
-        e->notice = e->crane_view ? "Crane controls active: A/D slew, W/S reach, Q/E hoist."
-                                  : "Helm controls active: arrows drive, hold SPACE to brake.";
-    } else
-        e->notice = "Moor at a work berth to operate its crane.";
-}
-
 // A screen marker over the target berth, so a distant site can be found from the helm.
-static void target_marker(const Experiment *e, View3D view)
+static void target_marker(const BoatWorkSession *e, View3D view)
 {
     Vector3 berth = boat_cargo_site_point(&e->sandbox.cranes[e->target], (Vector3) { 0, 4, 0 });
     Vector3 forward = Vector3Subtract(view.target, view.position);
@@ -892,7 +239,7 @@ static void target_marker(const Experiment *e, View3D view)
 }
 
 // The job's committed HUD rows, right-aligned under the status bar.
-static void job_ui(const Experiment *e)
+static void job_ui(const BoatWorkSession *e)
 {
     if (!e->revision)
         return;
@@ -913,7 +260,8 @@ static void job_ui(const Experiment *e)
     }
 }
 
-static void ui(Experiment *e, View3D view, Vector2 mouse, float *slew, float *reach, float *hoist)
+static void ui(
+    BoatWorkSession *e, View3D view, Vector2 mouse, float *slew, float *reach, float *hoist)
 {
     const BoatCargo *c = &e->sandbox.cargo;
     BoatCargoMoorStatus berth = boat_cargo_moor_status(&e->sandbox, &e->boat);
@@ -1003,20 +351,20 @@ static void ui(Experiment *e, View3D view, Vector2 mouse, float *slew, float *re
         prompt = "Crate in the water. C: return it to its source pad.";
     DrawText(prompt, 8, 221, 10, RAYWHITE);
     if (button((Rectangle) { 8, 236, 70, 22 }, "F Hook", mouse, !e->paused, false))
-        hook_action(e);
+        boat_work_hook_action(e);
     if (button((Rectangle) { 82, 236, 70, 22 }, "L Lash", mouse, !e->paused, false))
-        lash_action(e);
+        boat_work_lash_action(e);
     if (button((Rectangle) { 156, 236, 70, 22 },
             e->sandbox.mooring      ? "G Cancel"
                 : e->sandbox.moored ? "G Unmoor"
                                     : "G Moor",
             mouse, !e->paused, false))
-        moor_action(e);
+        boat_work_moor_action(e);
     if (button((Rectangle) { 230, 236, 85, 22 }, e->crane_view ? "TAB Helm" : "TAB Crane", mouse,
             !e->paused && (e->crane_view || e->sandbox.moored), false))
-        view_action(e);
+        boat_work_view_action(e);
     if (button((Rectangle) { 319, 236, 72, 22 }, "R Reset", mouse, true, false))
-        reset(e);
+        boat_work_session_reset(e);
     if (button((Rectangle) { 395, 236, 77, 22 }, e->paused ? "P Resume" : "P Pause", mouse, true,
             false))
         e->paused = !e->paused;
@@ -1045,26 +393,26 @@ static void ui(Experiment *e, View3D view, Vector2 mouse, float *slew, float *re
 
 // Lift the crate on the moored site's pad to the deck's AIM target (2 left, 3 right), release
 // and lash it, through the real hook, aim, release and lash paths.
-static bool load_and_lash(Experiment *e, int aim)
+static bool load_and_lash(BoatWorkSession *e, int aim)
 {
     if (!boat_cargo_hook_toggle(&e->sandbox))
         return false;
     e->aim = aim;
     for (int i = 0; i < 2000; ++i)
-        tick(e, 0, 0, 0, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
     e->aim = 0;
     for (int i = 0; i < 900 && !e->sandbox.cargo.deck_contact; ++i)
-        tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
     if (!e->sandbox.cargo.deck_contact || !boat_cargo_hook_toggle(&e->sandbox))
         return false;
     for (int i = 0; i < 600 && e->sandbox.cargo.settled < .5f; ++i)
-        tick(e, 0, 0, 0, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
     return boat_cargo_lash_toggle(&e->sandbox, &e->boat);
 }
 
 // Pose the unmoored boat at SITE's approach (in place of a crossing) and moor there by the real
 // G path. With APPROACH_ONLY, stop once the berth reads ready.
-static bool moor_at(Experiment *e, unsigned site, bool approach_only)
+static bool moor_at(BoatWorkSession *e, unsigned site, bool approach_only)
 {
     const BoatCargoCrane *crane = &e->sandbox.cranes[site];
     e->crane_view = false;
@@ -1078,12 +426,12 @@ static bool moor_at(Experiment *e, unsigned site, bool approach_only)
         return false;
     if (approach_only)
         return true;
-    moor_action(e);
+    boat_work_moor_action(e);
     for (int i = 0; i < 900 && !e->sandbox.moored; ++i)
-        tick(e, 0, 0, 0, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
     if (!e->sandbox.moored || e->sandbox.active != site)
         return false;
-    view_action(e);
+    boat_work_view_action(e);
     return true;
 }
 
@@ -1094,7 +442,7 @@ static bool stop_at_pending_delivery;
 // Carry the lashed crate (lashed on the left target) to RECEIVER, moor and unload it onto that
 // site's pad with its crane, until the native delivery commits there. The job may use the
 // delivered crate up meanwhile, so the commit is watched tick by tick.
-static bool unload_at(Experiment *e, unsigned receiver, bool approach_only)
+static bool unload_at(BoatWorkSession *e, unsigned receiver, bool approach_only)
 {
     if (!moor_at(e, receiver, approach_only))
         return false;
@@ -1104,28 +452,28 @@ static bool unload_at(Experiment *e, unsigned receiver, bool approach_only)
         return false;
     e->aim = 2;
     for (int i = 0; i < 2000; ++i)
-        tick(e, 0, 0, 0, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
     e->aim = 0;
     Vector3 top = { 0, BOAT_CARGO_HALF, 0 };
     for (int i = 0; i < 900
         && Vector3Distance(boat_cargo_hook(&e->sandbox), Vector3Add(e->sandbox.cargo.position, top))
             > .6f;
         ++i)
-        tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
     if (!boat_cargo_hook_toggle(&e->sandbox))
         return false;
     e->aim = 1;
     for (int i = 0; i < 2000; ++i)
-        tick(e, 0, 0, 0, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
     e->aim = 0;
     for (int i = 0; i < 900 && e->sandbox.cargo.position.y > 1.41f; ++i)
-        tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
     if (!boat_cargo_hook_toggle(&e->sandbox))
         return false;
     unsigned load = e->sandbox.cargo.load;
     bool delivered = false;
     for (int i = 0; i < 240; ++i) {
-        tick(e, 0, 0, i < 120 ? 1 : 0, (BoatInput) { 0 });
+        boat_work_session_tick(e, 0, 0, i < 120 ? 1 : 0, (BoatInput) { 0 });
         delivered |= e->sandbox.cargo.load == load && e->sandbox.cargo.state == BOAT_CARGO_PAD
             && e->sandbox.cargo.pad == receiver && e->sandbox.cargo.receivers & 1u << receiver;
         if (stop_at_pending_delivery && delivered && e->event_count)
@@ -1135,7 +483,7 @@ static bool unload_at(Experiment *e, unsigned receiver, bool approach_only)
 }
 
 // The committed value of the job's HUD row LABEL, or -1 when there is none.
-static int64_t hud_value(const Experiment *e, const char *label)
+static int64_t hud_value(const BoatWorkSession *e, const char *label)
 {
     for (unsigned i = 0; i < e->objective.hud_count; ++i)
         if (!strcmp(e->objective.hud[i].label, label))
@@ -1146,7 +494,7 @@ static int64_t hud_value(const Experiment *e, const char *label)
 // The review fixtures follow the bundled outer job by the package's own site ids: the landing
 // receiver, the quay (a service platform the job builds) and the jetty receiver. SITE_COUNT
 // means the package has no such site.
-static unsigned find_site(const Experiment *e, const char *id)
+static unsigned find_site(const BoatWorkSession *e, const char *id)
 {
     for (unsigned i = 0; i < e->site_count; ++i)
         if (!strcmp(e->sites[i].id, id))
@@ -1154,7 +502,7 @@ static unsigned find_site(const Experiment *e, const char *id)
     return e->site_count;
 }
 
-static bool stage(Experiment *e, const char *name)
+static bool stage(BoatWorkSession *e, const char *name)
 {
     if (!strcmp(name, "origin"))
         return true;
@@ -1162,10 +510,10 @@ static bool stage(Experiment *e, const char *name)
         e->notice = "Swing fixture. F: release, R: recover crate and boat.";
         boat_cargo_hook_toggle(&e->sandbox);
         for (int i = 0; i < 360; ++i)
-            tick(e, .7f, .5f, 1, (BoatInput) { 0 });
+            boat_work_session_tick(e, .7f, .5f, 1, (BoatInput) { 0 });
     } else if (!strcmp(name, "shadow-bow") || !strcmp(name, "shadow-water")) {
         for (int i = 0; i < 420; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         Vector3 p
             = !strcmp(name, "shadow-bow") ? shadow_review_positions[5] : shadow_review_positions[6];
         BoatCargoCrane *crane = &e->sandbox.cranes[e->sandbox.active];
@@ -1181,7 +529,7 @@ static bool stage(Experiment *e, const char *name)
             return false;
         e->aim = 2;
         for (int i = 0; i < 2000; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         e->aim = 0;
         float gap = !strcmp(name, "shadow-high") ? 1.2f : .2f;
         BoatCargoShadow shadow = { 0 };
@@ -1190,7 +538,7 @@ static bool stage(Experiment *e, const char *name)
                 BOAT_CARGO_SHADOW_DECK);
             if (shadow.count && shadow.clearance <= gap)
                 break;
-            tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
         }
         return shadow.count && shadow.clearance > .05f && shadow.clearance <= gap;
     } else if (!strcmp(name, "berth-approach") || !strcmp(name, "mooring")
@@ -1199,21 +547,21 @@ static bool stage(Experiment *e, const char *name)
         if (!stage(e, "departure"))
             return false; // Carry a crate obtained through the actual lift/lash path.
         e->crane_view = false;
-        Vector3 approach = boat_cargo_site_point(active(e), (Vector3) { 1.8f, 0, 4.3f });
+        Vector3 approach = boat_cargo_site_point(boat_work_active(e), (Vector3) { 1.8f, 0, 4.3f });
         e->boat.position = (Vector2) { -approach.x, approach.z };
-        e->boat.heading = active(e)->heading + .5f;
+        e->boat.heading = boat_work_active(e)->heading + .5f;
         e->boat.velocity = (Vector2) { .2f, -.8f };
         e->boat.throttle = .25f;
         e->boat.engine_response = .2f;
         boat_cargo_step(&e->sandbox, &e->boat, &e->world, boat_tick_seconds(e->tick));
         if (!strcmp(name, "berth-approach"))
             return boat_cargo_moor_status(&e->sandbox, &e->boat).reason == BOAT_CARGO_MOOR_READY;
-        moor_action(e);
+        boat_work_moor_action(e);
         if (!e->sandbox.mooring)
             return false;
         int ticks = !strcmp(name, "mooring") ? 120 : 900;
         for (int i = 0; i < ticks && !e->sandbox.moored; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         return !strcmp(name, "mooring") ? e->sandbox.mooring
                                         : e->sandbox.moored && !e->sandbox.mooring
                 && e->sandbox.cargo.state == BOAT_CARGO_SECURED;
@@ -1228,7 +576,7 @@ static bool stage(Experiment *e, const char *name)
         Vector2 ahead = Vector2Subtract(to, e->boat.position);
         e->boat.heading = atan2f(ahead.x, -ahead.y) + .25f;
         for (int i = 0; i < 120; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         return e->target != e->sandbox.active;
     } else if (!strcmp(name, "redelivered") || !strcmp(name, "job-reset")) {
         // S1c/S1d exactly-once review: after the counted delivery the job used the crate up and
@@ -1244,7 +592,7 @@ static bool stage(Experiment *e, const char *name)
         e->sandbox.cargo.position
             = boat_cargo_site_point(&e->sandbox.cranes[landing], (Vector3) { -5, 1.6f, 0 });
         for (int i = 0; i < 600; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         const BoatCargo *c = &e->sandbox.cargo;
         BoatPluginObjective o = e->objective;
         bool once = c->state == BOAT_CARGO_PAD && c->pad == landing && c->load == 2
@@ -1252,9 +600,9 @@ static bool stage(Experiment *e, const char *name)
             && hud_value(e, "LANDING BUILT") == 1 && hud_value(e, "SUPPLIES TO JETTY / 1") == 0;
         if (!strcmp(name, "redelivered"))
             return once;
-        reset(e);
+        boat_work_session_reset(e);
         for (int i = 0; i < 24; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         bool hidden = true;
         for (unsigned i = 0; i < e->site_count; ++i)
             hidden &= !e->sites[i].hidden || e->sandbox.cranes[i].hidden;
@@ -1294,7 +642,7 @@ static bool stage(Experiment *e, const char *name)
         e->sandbox.cargo.position
             = boat_cargo_site_point(&e->sandbox.cranes[landing], (Vector3) { -5, 1.6f, 0 });
         for (int i = 0; i < 240; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         BoatPluginObjective waiting = e->objective;
         if (!e->sandbox.cargo.delivered || !e->waiting || !e->sandbox.cranes[quay].hidden
             || waiting.tick > (int64_t)e->tick - 12 || waiting.hud[0].value != 0
@@ -1303,7 +651,7 @@ static bool stage(Experiment *e, const char *name)
         e->boat.position = boat_cargo_berth(&e->sandbox.cranes[landing]);
         e->boat.velocity = (Vector2) { 0 };
         for (int i = 0; i < 24; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         e->notice = "Build-blocked review fixture. R: restart from the first site.";
         return !e->waiting && !e->sandbox.cranes[quay].hidden && hud_value(e, "LANDING BUILT") == 1
             && !e->event_count && e->sandbox.source == quay;
@@ -1315,7 +663,7 @@ static bool stage(Experiment *e, const char *name)
         unsigned built = find_site(e, "landing_quay");
         if (built == e->site_count || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
             return false;
-        const BoatCargoCrane *landing = active(e), *quay = &e->sandbox.cranes[built];
+        const BoatCargoCrane *landing = boat_work_active(e), *quay = &e->sandbox.cranes[built];
         e->crane_view = false;
         Vector3 between = Vector3Lerp(boat_cargo_site_point(landing, (Vector3) { -2, 0, 1 }),
             boat_cargo_site_point(quay, (Vector3) { -2, 0, 1 }), .5f);
@@ -1325,7 +673,7 @@ static bool stage(Experiment *e, const char *name)
         e->boat.heading = landing->heading + PI;
         e->boat.velocity = (Vector2) { 0 };
         for (int i = 0; i < 60; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         e->notice = "Landing built review fixture. R: restart from the first site.";
         return !quay->hidden;
     } else if (!strcmp(name, "receiver-approach") || !strcmp(name, "delivered")) {
@@ -1348,7 +696,7 @@ static bool stage(Experiment *e, const char *name)
             return false;
         char supplied[64] = "";
         if (quay < e->site_count)
-            notice_text(e, BOAT_SCENE_NOTICE_SUPPLIED, quay, supplied, sizeof(supplied));
+            boat_work_notice_text(e, BOAT_SCENE_NOTICE_SUPPLIED, quay, supplied, sizeof(supplied));
         if (e->revision
             && (strcmp(e->notice, supplied) || e->sandbox.cargo.load != 2
                 || e->sandbox.cargo.state != BOAT_CARGO_PAD || e->sandbox.cargo.pad != quay
@@ -1380,7 +728,7 @@ static bool stage(Experiment *e, const char *name)
         }
         if (!load_and_lash(e, 2))
             return false;
-        moor_action(e); // G: departure guidance follows the job's work.guide.
+        boat_work_moor_action(e); // G: departure guidance follows the job's work.guide.
         if (e->sandbox.moored || e->target != jetty)
             return false;
         if (!unload_at(e, jetty, !strcmp(name, "jetty-approach")))
@@ -1388,7 +736,7 @@ static bool stage(Experiment *e, const char *name)
         if (!strcmp(name, "jetty-approach"))
             return true;
         for (int i = 0; i < 24; ++i)
-            tick(e, 0, 0, 0, (BoatInput) { 0 });
+            boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         e->notice = "Jetty delivered review fixture. R: restart from the first site.";
         return !e->objective.quarantined && !e->waiting && e->sandbox.cargo.load == 2
             && e->sandbox.cargo.pad == jetty && hud_value(e, "LANDING BUILT") == 1
@@ -1404,7 +752,7 @@ static bool stage(Experiment *e, const char *name)
         e->crane_view = false;
         e->notice = "Loaded review fixture. R: restart the hands-on lifting trial.";
         for (int i = 0; i < 600; ++i)
-            tick(e, 0, 0, 0,
+            boat_work_session_tick(e, 0, 0, 0,
                 (BoatInput) {
                     .throttle_rate = i < 30 ? .4f : 0, .steering_rate = i > 360 ? .35f : 0 });
     }
@@ -1416,15 +764,9 @@ static bool stage(Experiment *e, const char *name)
 // 1200 ticks, and every tick's cargo, boat, events, objective and HUD must hash equal.
 enum { RESUME_TICKS = 1200 };
 
-static void hash_bytes(uint64_t *h, const void *bytes, size_t size)
-{
-    const unsigned char *p = bytes;
-    for (size_t i = 0; i < size; ++i)
-        *h = (*h ^ p[i]) * UINT64_C(1099511628211);
-}
-#define HASH(h, value) hash_bytes(h, &(value), sizeof(value))
+#define HASH(h, value) boat_work_hash_bytes(h, &(value), sizeof(value))
 
-static uint64_t session_hash(const Experiment *e)
+static uint64_t session_hash(const BoatWorkSession *e)
 {
     uint64_t h = UINT64_C(14695981039346656037);
     const BoatCargo *c = &e->sandbox.cargo;
@@ -1452,8 +794,8 @@ static uint64_t session_hash(const Experiment *e)
         HASH(&h, e->events[i].tick);
         HASH(&h, e->events[i].sequence);
         HASH(&h, e->events[i].load);
-        hash_bytes(&h, e->events[i].kind, strlen(e->events[i].kind) + 1);
-        hash_bytes(&h, e->events[i].id, strlen(e->events[i].id) + 1);
+        boat_work_hash_bytes(&h, e->events[i].kind, strlen(e->events[i].kind) + 1);
+        boat_work_hash_bytes(&h, e->events[i].id, strlen(e->events[i].id) + 1);
     }
     uint64_t objective = boat_plugin_objective_digest(&e->objective);
     HASH(&h, objective);
@@ -1462,17 +804,17 @@ static uint64_t session_hash(const Experiment *e)
 }
 
 // The same scripted actions and inputs for every copy, a function of the tick count alone.
-static void resume_script(Experiment *e, unsigned i)
+static void resume_script(BoatWorkSession *e, unsigned i)
 {
     if (i == 5 || i == 900)
-        hook_action(e);
+        boat_work_hook_action(e);
     if (i == 300)
-        lash_action(e);
+        boat_work_lash_action(e);
     if (i == 700)
-        moor_action(e);
+        boat_work_moor_action(e);
     float slew = ((int)(i / 150) % 3 - 1) * .5f, reach = (int)(i / 200) % 2 ? .4f : -.4f;
     float hoist = (int)(i / 90) % 2 ? -.3f : .5f;
-    tick(e, slew, reach, hoist,
+    boat_work_session_tick(e, slew, reach, hoist,
         (BoatInput) { .throttle_rate = i < 30 ? .4f : 0, .steering_rate = i > 360 ? .1f : 0 });
 }
 
@@ -1484,19 +826,19 @@ static void resume_script(Experiment *e, unsigned i)
         }                                                                                          \
     } while (0)
 
-static bool resume_check(Experiment *e, const char *scenario)
+static bool resume_check(BoatWorkSession *e, const char *scenario)
 {
     static BoatSandboxSave record, decoded;
     static unsigned char bytes[BOAT_SANDBOX_SAVE_MAX], again[BOAT_SANDBOX_SAVE_MAX];
     static uint64_t trace[2][RESUME_TICKS];
     size_t size = 0, size_again = 0;
-    RESUME_CHECK(experiment_save(e, 0, &record));
+    RESUME_CHECK(boat_work_session_save(e, 0, &record));
     RESUME_CHECK(boat_sandbox_save_encode(&record, bytes, sizeof(bytes), &size));
     RESUME_CHECK(boat_sandbox_save_decode(bytes, size, &decoded) == BOAT_SANDBOX_SAVE_OK);
     RESUME_CHECK(boat_sandbox_save_encode(&decoded, again, sizeof(again), &size_again)
         && size == size_again && !memcmp(bytes, again, size));
     BoatSandboxIdentity now;
-    experiment_identity(e, &now);
+    boat_work_session_identity(e, &now);
     char reason[48];
     RESUME_CHECK(
         boat_sandbox_save_check(&decoded.summary.identity, &now, false, reason, sizeof(reason))
@@ -1505,7 +847,7 @@ static bool resume_check(Experiment *e, const char *scenario)
     bool lashed = !strcmp(scenario, "departure") || !strcmp(scenario, "crossing");
     bool pending = !strcmp(scenario, "delivery-pending");
     for (unsigned pass = 0; pass < 2; ++pass) {
-        RESUME_CHECK(experiment_resume(e, pass ? &decoded : &record));
+        RESUME_CHECK(boat_work_session_resume(e, pass ? &decoded : &record));
         const BoatCargo *c = &e->sandbox.cargo;
         const BoatCargoSnapshot *snap = &record.cargo;
         RESUME_CHECK(e->tick == record.summary.tick && c->load == snap->loads[0].load);
@@ -1571,12 +913,12 @@ typedef struct {
 
 static bool stale_digest; // Test fixture: write a save whose work digest no longer matches.
 
-static bool save_write(Experiment *e, SaveFile *file)
+static bool save_write(BoatWorkSession *e, SaveFile *file)
 {
     static BoatSandboxSave record;
     static unsigned char bytes[BOAT_SANDBOX_SAVE_MAX];
     size_t size = 0;
-    if (!experiment_save(e, (int64_t)time(NULL), &record))
+    if (!boat_work_session_save(e, (int64_t)time(NULL), &record))
         return false;
     if (stale_digest)
         record.summary.identity.work_digest ^= 1;
@@ -1586,41 +928,25 @@ static bool save_write(Experiment *e, SaveFile *file)
 
 // Try one file: true when it decoded, belongs to this package and the core resumed it.
 // REASON gets the first problem otherwise.
-static bool save_try(Experiment *e, const char *path, const char **reason)
+static bool save_try(BoatWorkSession *e, const char *path, const char **reason)
 {
-    static BoatSandboxSave record;
     static unsigned char bytes[BOAT_SANDBOX_SAVE_MAX];
     size_t size = 0;
+    BoatSandboxSummary summary;
     if (!boat_file_read(path, bytes, sizeof(bytes), &size)) {
         *reason = "DAMAGED";
         return false;
     }
-    BoatSandboxSaveStatus status = boat_sandbox_save_decode(bytes, size, &record);
-    if (status != BOAT_SANDBOX_SAVE_OK) {
-        *reason = status == BOAT_SANDBOX_SAVE_NEWER ? "NEWER FORMAT" : "DAMAGED";
+    if (!boat_work_session_load(e, bytes, size, reason, &summary))
         return false;
-    }
-    BoatSandboxIdentity now;
-    static char text[48];
-    experiment_identity(e, &now);
-    if (boat_sandbox_save_check(&record.summary.identity, &now, false, text, sizeof(text))
-        != BOAT_SANDBOX_RESUME) {
-        *reason = text;
-        return false;
-    }
-    if (!experiment_resume(e, &record)) {
-        *reason = "PACKAGE CHANGED";
-        return false;
-    }
     printf("Resumed save %s at tick %llu (load %u, %u of %u sites built)\n", path,
-        (unsigned long long)record.summary.tick, record.summary.load, record.summary.built,
-        record.summary.sites);
+        (unsigned long long)summary.tick, summary.load, summary.built, summary.sites);
     return true;
 }
 
 // Resume from the file, else from its backup. A file that cannot be used is set aside as
 // NAME.rejected (never deleted), with its backup, and the session starts fresh.
-static int save_load(Experiment *e, const SaveFile *file)
+static int save_load(BoatWorkSession *e, const SaveFile *file)
 {
     char backup[1100];
     snprintf(backup, sizeof(backup), "%s.bak", file->path);
@@ -1644,73 +970,14 @@ static int save_load(Experiment *e, const SaveFile *file)
     return result;
 }
 
-// What a frame changes, for the autosave policy.
-typedef struct {
-    Vector2 position;
-    float heading;
-    uint64_t progress; // The committed job state, HUD and timers, not its tick.
-    unsigned built, load, active;
-    bool moored, delivered, secured, on_pad;
-    unsigned char receivers;
-} Watch;
-
-static Watch watch(const Experiment *e)
-{
-    Watch w = { .position = e->boat.position,
-        .heading = e->boat.heading,
-        .progress = UINT64_C(14695981039346656037),
-        .load = e->sandbox.cargo.load,
-        .active = e->sandbox.active,
-        .moored = e->sandbox.moored,
-        .delivered = e->sandbox.cargo.delivered,
-        .receivers = e->sandbox.cargo.receivers,
-        .secured = e->sandbox.cargo.state == BOAT_CARGO_SECURED,
-        .on_pad = e->sandbox.cargo.state == BOAT_CARGO_PAD };
-    for (unsigned i = 0; i < e->sandbox.crane_count; ++i)
-        w.built |= (unsigned)!e->sandbox.cranes[i].hidden << i;
-    const BoatPluginObjective *o = &e->objective;
-    hash_bytes(&w.progress, o->state.bytes, o->state.size);
-    for (unsigned i = 0; i < o->hud_count; ++i) {
-        hash_bytes(&w.progress, o->hud[i].label, strlen(o->hud[i].label) + 1);
-        hash_bytes(&w.progress, &o->hud[i].value, sizeof(o->hud[i].value));
-    }
-    hash_bytes(&w.progress, &o->quarantined, sizeof(o->quarantined));
-    return w;
-}
-
-// Dirty: the boat or the job moved on. Milestone: something the player would hate to repeat.
-static void watch_note(SaveFile *file, uint64_t tick, const Watch *before, const Watch *now)
-{
-    bool pose = before->position.x != now->position.x || before->position.y != now->position.y
-        || before->heading != now->heading;
-    bool milestone = before->progress != now->progress || before->built != now->built
-        || before->load != now->load || before->active != now->active
-        || before->moored != now->moored || before->delivered != now->delivered
-        || before->receivers != now->receivers || before->secured != now->secured
-        || before->on_pad != now->on_pad;
-    boat_autosave_note(&file->autosave, tick, pose || milestone, milestone);
-}
-
-typedef struct {
-    Watch last;
-    bool was_paused, was_focused;
-} FrameWatch;
-
-// Once per frame, after its tick loop and outside every tick. LEAVING (pausing, losing focus)
-// writes when dirty; a milestone writes now; otherwise the period decides. The SAVED mark shows
-// only for milestone and leaving writes.
+// Once per frame, after its tick loop and outside every tick (the session decides when a write
+// is due; this writes it). The SAVED mark shows only for milestone and leaving writes.
 static void autosave_frame(
-    Experiment *e, SaveFile *file, FrameWatch *frame, bool paused, bool focused)
+    BoatWorkSession *e, SaveFile *file, BoatWorkFrameWatch *frame, bool paused, bool focused)
 {
-    Watch now = watch(e);
-    watch_note(file, e->tick, &frame->last, &now);
-    frame->last = now;
-    bool leaving = (paused && !frame->was_paused) || (frame->was_focused && !focused);
-    frame->was_paused = paused;
-    frame->was_focused = focused;
-    if (!boat_autosave_due(&file->autosave, e->tick, leaving))
+    bool show = false;
+    if (!boat_work_frame_due(e, &file->autosave, frame, paused, focused, &show))
         return;
-    bool show = file->autosave.milestone || leaving;
     bool ok = save_write(e, file);
     boat_autosave_written(&file->autosave, e->tick, ok);
     file->failed = !ok;
@@ -1724,10 +991,10 @@ static void autosave_frame(
 // The window loop's automatic saving driven on a virtual clock: 2 ticks per frame, no window
 // and no wall time. The staged session drifts, lashes at one frame, pauses at another and
 // quits; the writes must be one periodic, one milestone, one on pausing and one on quitting.
-static bool autosave_check(Experiment *e, SaveFile *file)
+static bool autosave_check(BoatWorkSession *e, SaveFile *file)
 {
     enum { FRAMES = 2100, LASH = 1900, PAUSE = 2000 };
-    FrameWatch frame = { .last = watch(e), .was_focused = true };
+    BoatWorkFrameWatch frame = { .last = boat_work_watch(e), .was_focused = true };
     file->autosaving = true;
     unsigned count_at[FRAMES] = { 0 };
     bool paused = false;
@@ -1735,11 +1002,11 @@ static bool autosave_check(Experiment *e, SaveFile *file)
         paused = f == PAUSE || f == PAUSE + 1;
         if (!paused) {
             if (f == LASH)
-                lash_action(e);
+                boat_work_lash_action(e);
             // A gentle circle at a steady throttle keeps the boat's pose changing.
             BoatInput input = { .throttle_rate = f < 8 ? .4f : 0, .steering_rate = .3f };
-            tick(e, 0, 0, 0, input);
-            tick(e, 0, 0, 0, input);
+            boat_work_session_tick(e, 0, 0, 0, input);
+            boat_work_session_tick(e, 0, 0, 0, input);
         }
         autosave_frame(e, file, &frame, paused, true);
         count_at[f] = file->writes;
@@ -1762,7 +1029,7 @@ static bool autosave_check(Experiment *e, SaveFile *file)
 
 // The flag's fixture: a session reset keeps the package's scene, so its custom notice and its
 // workboat survive the reset instead of falling back to the native defaults.
-static bool scene_check(Experiment *e, BoatPluginRevision *revision)
+static bool scene_check(BoatWorkSession *e, BoatPluginRevision *revision)
 {
     if (e->world.scene != &revision->free.scene) {
         fprintf(stderr, "Scene check: the session does not use the package's scene\n");
@@ -1771,13 +1038,13 @@ static bool scene_check(Experiment *e, BoatPluginRevision *revision)
     char *notice = revision->free.scene.work_notice[BOAT_SCENE_NOTICE_BUILT];
     snprintf(notice, sizeof(revision->free.scene.work_notice[BOAT_SCENE_NOTICE_BUILT]),
         "CUSTOM {site} DONE");
-    reset(e);
+    boat_work_session_reset(e);
     if (e->world.scene != &revision->free.scene) {
         fprintf(stderr, "Scene check: a reset dropped the package's scene\n");
         return false;
     }
     char text[64], expected[64], name[sizeof(e->sites[0].id)];
-    notice_text(e, BOAT_SCENE_NOTICE_BUILT, 0, text, sizeof(text));
+    boat_work_notice_text(e, BOAT_SCENE_NOTICE_BUILT, 0, text, sizeof(text));
     snprintf(name, sizeof(name), "%s", e->sites[0].id);
     for (char *c = name; *c; ++c)
         *c = *c == '_' ? ' ' : (char)toupper((unsigned char)*c);
@@ -1925,7 +1192,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Use --scenario for a capture; --demo/--frames need a live window.\n");
         return 2;
     }
-    Experiment e = { 0 };
+    BoatWorkSession e = { 0 };
     SetTraceLogLevel(LOG_WARNING);
     if (!boat_world_resources_init(&e.resources, location))
         return 1;
@@ -1949,7 +1216,7 @@ int main(int argc, char **argv)
     e.revision = revision.free.manifest.objective ? &revision : NULL;
     e.site_count = revision.free.scene.work_count;
     memcpy(e.sites, revision.free.scene.work, sizeof(e.sites));
-    reset(&e);
+    boat_work_session_reset(&e);
     if (scene_check_flag) {
         bool ok = scene_check(&e, &revision);
         boat_world_resources_destroy(&e.resources);
@@ -2010,9 +1277,10 @@ int main(int argc, char **argv)
         for (unsigned i = 0; i < e.site_count; ++i) {
             // Each site's moored crane view, as after mooring there.
             e.sandbox.active = i;
-            e.boat.position = boat_cargo_berth(active(&e));
-            e.boat.heading = active(&e)->heading;
-            View3D view = camera(&e, &harbour.scenery);
+            e.boat.position = boat_cargo_berth(boat_work_active(&e));
+            e.boat.heading = boat_work_active(&e)->heading;
+            BoatCargoView view_state = view_of(&e);
+            View3D view = boat_cargo_view_camera(&view_state, &harbour.scenery);
             bool camera_clear = !location->mapped
                 || waterfront_scenery_clear(&harbour.scenery, view.position, .45f);
             printf("cargo site: %s %s (%s%s) at %.0f,%.0f heading %.2f; water/berth/traffic "
@@ -2094,36 +1362,36 @@ int main(int argc, char **argv)
     double accumulator = 0;
     float mouse_slew = 0, mouse_reach = 0, mouse_hoist = 0;
     save.autosaving = save.enabled && !headless && !screenshot && !shadow_review;
-    FrameWatch frame_watch = { .last = watch(&e), .was_focused = true };
+    BoatWorkFrameWatch frame_watch = { .last = boat_work_watch(&e), .was_focused = true };
     int review_missing = 0, review_min = WIDTH * HEIGHT;
     while (headless || !WindowShouldClose()) {
         if (shadow_review) {
             int sample = frame % 32, surface = frame / 32;
             if (!sample)
-                reset(&e);
+                boat_work_session_reset(&e);
             for (int i = 0; i < 30; ++i)
-                tick(&e, 0, 0, 0, (BoatInput) { 0 });
+                boat_work_session_tick(&e, 0, 0, 0, (BoatInput) { 0 });
             e.sandbox.cargo.state = BOAT_CARGO_HANGING;
             e.sandbox.cargo.deck_contact = false;
             Vector3 p = shadow_review_positions[surface];
-            e.sandbox.cargo.position = boat_cargo_site_point(active(&e), p);
+            e.sandbox.cargo.position = boat_cargo_site_point(boat_work_active(&e), p);
             e.sandbox.cargo.rotation = (Vector3) { 0 };
         } else if (!headless && !screenshot) {
             if (IsKeyPressed(KEY_R)) {
-                reset(&e);
+                boat_work_session_reset(&e);
                 boat_autosave_note(&save.autosave, e.tick, true, true); // A new session.
             }
             if (IsKeyPressed(KEY_P))
                 e.paused = !e.paused;
             if (!e.paused) {
                 if (IsKeyPressed(KEY_F))
-                    hook_action(&e);
+                    boat_work_hook_action(&e);
                 if (IsKeyPressed(KEY_L))
-                    lash_action(&e);
+                    boat_work_lash_action(&e);
                 if (IsKeyPressed(KEY_G))
-                    moor_action(&e);
+                    boat_work_moor_action(&e);
                 if (IsKeyPressed(KEY_TAB))
-                    view_action(&e);
+                    boat_work_view_action(&e);
                 if (e.crane_view && e.sandbox.moored)
                     for (int i = 1; i <= 3; ++i)
                         if (IsKeyPressed(KEY_ONE + i - 1))
@@ -2131,9 +1399,9 @@ int main(int argc, char **argv)
                 if (IsKeyDown(KEY_SPACE))
                     e.boat.throttle = 0;
                 if (IsKeyPressed(KEY_N) && !e.sandbox.moored && !e.sandbox.mooring)
-                    e.target = next_site(&e, e.target);
+                    e.target = boat_work_next_site(&e, e.target);
                 if (IsKeyPressed(KEY_C))
-                    recover_action(&e);
+                    boat_work_recover_action(&e);
             }
             e.braking = !e.paused && !e.crane_view && !e.sandbox.moored && !e.sandbox.mooring
                 && IsKeyDown(KEY_SPACE);
@@ -2166,13 +1434,14 @@ int main(int argc, char **argv)
                     reach = sinf((float)e.tick * .002f) * .4f;
                     hoist = e.tick < 240 ? 1 : 0;
                 }
-                tick(&e, slew, reach, hoist, input);
+                boat_work_session_tick(&e, slew, reach, hoist, input);
                 accumulator -= BOAT_TICK_SECONDS;
             }
             if (save.autosaving)
                 autosave_frame(&e, &save, &frame_watch, e.paused, IsWindowFocused());
         }
-        size_t receiver_count = scene(&e, &solids);
+        BoatCargoView view_state = view_of(&e);
+        size_t receiver_count = boat_cargo_view_scene(&view_state, &solids);
         Mesh3D receivers = solids.mesh;
         receivers.triangle_count = receiver_count;
         boat_model_begin(&body_decal);
@@ -2182,8 +1451,8 @@ int main(int argc, char **argv)
             break;
         }
         if (!location->mapped)
-            water_mesh(&e, &water);
-        View3D view = camera(&e, &harbour.scenery);
+            boat_cargo_view_water(&view_state, &water);
+        View3D view = boat_cargo_view_camera(&view_state, &harbour.scenery);
         if (!gpu)
             view.far_plane = 240; // Bound the reference rasterizer's displaced-water work.
         if (location->mapped) {

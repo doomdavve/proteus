@@ -38,8 +38,8 @@ qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtu
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) are implemented locally; next
-implementation task: [SV1e](#sv1-steps), the shared work session. Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) are implemented locally; next
+implementation task: [SV1f](#sv1-steps), the work session in the game (scripted). Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -952,7 +952,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1d implemented locally (2026-11-07); next SV1e |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1e implemented locally (2026-11-07); next SV1f |
 
 ##### F1 result, 2026-11-07
 
@@ -1109,13 +1109,30 @@ code when `PASS_REGULAR_EXPRESSION` is set, so the regex was removed). The 36 CP
 byte-identical (`cmp`): the scene's notices and workboat equal the native defaults. The full
 CTest preset passed 415 tests (13 disabled wake experiments not run).
 
+**SV1e result (2026-11-07, macOS arm64, Debug).** New `proteus_work_session`
+(`src/boat_work_session.[ch]`, links `proteus_sandbox_save` and `proteus_boat_core`; no drawing, input or
+files) now owns `BoatWorkSession` (the former `Experiment`), notices, the job host
+(`boat_work_job_*`), world and job reset, the 120 Hz tick, the key actions (hook, lash, moor,
+recover, view), snapshot/identity/resume, `boat_work_session_load` (decode, compare identity,
+resume from bytes, with a short reason), and the pure autosave watch (`boat_work_watch`,
+`boat_work_frame_due`). The file reads and writes, `.bak`/`.rejected` handling and the `SAVED`
+mark stay in the harness. `src/boat_cargo_view.[ch]` (`proteus_render`) gained
+`boat_cargo_view_scene`, `_camera` and `_water`, which read a small `BoatCargoView` (sandbox,
+boat, world, tick, crane or helm camera) instead of the session. The deck aim point moved into
+core as `boat_cargo_deck_aim_point`. `cargo_sandbox` keeps the scenarios, review checks, HUD and
+window loop. Decision: the identity's build string is still `cargo_sandbox` (display only);
+SV1g chooses the game's. No behaviour change: the 36 CPU captures (34 existing plus
+`delivery-pending` and `capsized`) are byte-identical before and after (`cmp`), and the full
+CTest preset passed 415 tests (13 disabled wake experiments not run) with a warning-clean build
+apart from the existing `stb_vorbis` warning. No GPU frames, windowed run or hands-on play.
+
 #### SV1: local save and resume
 
 Designed 2026-11-07 at the user's request ("save the state of the player", one step at a time,
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a-SV1d implemented locally (2026-11-07); SV1e–SV1i planned.**
+will apply to all future state as well." Status: **SV1a-SV1e implemented locally (2026-11-07); SV1f–SV1i planned.**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or
@@ -1124,7 +1141,7 @@ Gothenburg Harbour content in `wake_velocity`'s Single Player menu. That menu fi
 without any configuration and offers Continue, New and Delete. It is native and solo: browser
 storage, rooms, payouts and several slots come later.
 
-Grounding (code as of `8fec4cb`):
+Grounding (code as of `8fec4cb`; `Experiment` is `BoatWorkSession` in `src/boat_work_session.h` since SV1e):
 
 - All session state is in `Experiment` (`tools/cargo_sandbox.c`, about lines 46-73) and
   `BoatCargoSandbox` (`src/boat_cargo.h`).

@@ -242,6 +242,11 @@ Vector3 boat_cargo_site_direction(const BoatCargoCrane *c, Vector3 v)
     return (Vector3) { cs * v.x + sn * v.z, v.y, cs * v.z - sn * v.x };
 }
 
+Vector3 boat_cargo_deck_aim_point(int aim)
+{
+    return (Vector3) { aim == 2 ? .65f : -.65f, BOAT_CARGO_DECK_Y, .65f };
+}
+
 Vector3 boat_cargo_site_point(const BoatCargoCrane *c, Vector3 local)
 {
     return Vector3Add(c->origin, boat_cargo_site_direction(c, local));

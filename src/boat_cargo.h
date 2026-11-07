@@ -178,6 +178,8 @@ bool boat_cargo_site_near(const BoatSceneWorkSite *site, Vector2 point, float ma
 // Site frame <-> renderer coordinates; directions omit the origin.
 Vector3 boat_cargo_site_direction(const BoatCargoCrane *crane, Vector3 local);
 Vector3 boat_cargo_site_point(const BoatCargoCrane *crane, Vector3 local);
+// The boat-local deck spot an aim assist (2 port, 3 starboard) lowers the crate onto.
+Vector3 boat_cargo_deck_aim_point(int aim);
 Vector3 boat_cargo_site_local(const BoatCargoCrane *crane, Vector3 point);
 Vector2 boat_cargo_berth(const BoatCargoCrane *crane); // Simulation metres.
 Vector3 boat_cargo_tip(const BoatCargoCrane *crane);

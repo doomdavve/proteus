@@ -49,6 +49,8 @@ playground for iterating on effects, timing, audio, and presentation.
   `proteus_boat_net` obeys the core boundary (`boat_net_boundary`); only `boat_net_enet.c` uses
   ENet and sockets. `tools/boat_server.c` and `tools/boat_bot.c` are the server and scripted
   client; `docs/MULTIPLAYER_PROTOCOL.md` owns the byte layout.
+- `src/boat_work_session.[ch]`: the working-harbour session (boat, work sites, crate, job host, save
+  and resume, autosave watch) shared by `cargo_sandbox`; no drawing, input or files.
 - `src/boat_plugin*.[ch]`, `plugins/`: Lua plugin host (bounded, data-only voyage descriptors
   over a pinned Lua 5.4.9 in `proteus_lua`; P1 revisions, reload policies and Undo in
   `boat_plugin_host`) and reference packages; core and net never link it. The game's native

@@ -204,6 +204,10 @@ add_library(proteus_sandbox_save STATIC src/boat_sandbox_save.c src/boat_sandbox
 target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)
 target_compile_options(proteus_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 
+add_library(proteus_work_session STATIC src/boat_work_session.c src/boat_work_session.h)
+target_link_libraries(proteus_work_session PUBLIC proteus_sandbox_save proteus_boat_core)
+target_compile_options(proteus_work_session PRIVATE ${PROTEUS_WARNINGS})
+
 add_library(proteus_plugin_catalog STATIC
   src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
 target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
@@ -543,8 +547,8 @@ set_tests_properties(boat_file PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
-  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_sandbox_save
-    proteus_file)
+  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_work_session
+    proteus_sandbox_save proteus_file)
   add_dependencies(cargo_sandbox proteus_assets)
   target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
   foreach(side left right)
