@@ -1,5 +1,13 @@
 # Architecture review: growing into a boating game
 
+> **History note, 2026-11-07.** This is a dated 2026-10-19 baseline. Most of its sequence is
+> now implemented: the integer clock (C1-C3), explicit world/resources (A1), the core library
+> and boundary check (S4), indexed collision (A2.2), tile culling (A2.3/A2.4) and scenery packs
+> (A3.5i). Do not read its body as current. Still open: a dropped-time/race-validity policy and
+> content-revision-keyed bests before competitive leaderboards, plus the pending items in the
+> [foundations plan](BOATING_FOUNDATIONS_PLAN.md). A future `ARCHITECTURE.md` spec is meant to
+> supersede this review (see the [spec lifecycle](README.md#specs)).
+
 Reviewed 2026-10-19 against `f92ed70` on macOS. This is a source-based assessment and
 proposed sequence, not an implemented migration or a new gameplay commitment.
 Gameplay direction remains in [BOATING_PLAN.md](BOATING_PLAN.md).

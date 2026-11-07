@@ -182,18 +182,18 @@ accept `work.enable`.
 
 ### Work-site job (S1c)
 
-Status, 2026-11-07: **implemented locally for the native `cargo_sandbox` only; not merged.** A
+Status, 2026-11-07: **merged (#169) for the native `cargo_sandbox` and `wake_velocity`'s Working
+Harbour menu content only; no `--plugin` live reload.** A
 free package with `scene.work` may request `["free.define", "scene.define", "objective.hud"]`
 and return `init` and `update` beside `free`, with the
 [voyage objective](#live-optional-voyage-objective-p32) transaction contract: state, HUD rows,
 the 12-tick update boundary, budgets and suspension are the same. `objective.timers`
-and live reload are not offered. A job may also return `migrate(context, state)` (SV1i,
-local): when a save was written at another `state_version`, the game runs it once at load
+and live reload are not offered. A job may also return `migrate(context, state)` (SV1i): when a save was written at another `state_version`, the game runs it once at load
 (P3.3b contract, at the saved tick, with the fresh generation; queued events stay unacknowledged)
 and the job continues from the migrated state. A package without `migrate` leaves such a save
 unavailable (`PROGRESS FORMAT CHANGED`); a failing `migrate` does the same and touches no file. A
 non-function `migrate` is a schema error. Free packages have no live reload; a reset restarts the job at a new generation. The catalog
-generator probes `init` at build time. S1d (local, 2026-11-07) added `cargo.supply`,
+generator probes `init` at build time. S1d (2026-11-07) added `cargo.supply`,
 `work.guide` and the events' `load`. `plugins/outer-work` is the reference:
 
 ```lua
@@ -236,7 +236,7 @@ checkpoint and its unacknowledged events, shows `BUILD WAITING: MOVE CLEAR`, and
 next boundary. Otherwise the site appears between ticks and the batch commits. Nothing is built
 that staging did not survey. A reset (R) hides built sites and restarts cargo and job together.
 
-Saves (SV1d, local, 2026-11-07): `cargo_sandbox` saves and resumes the session automatically; the
+Saves (SV1d, merged in #169, 2026-11-07): `cargo_sandbox` and the game's Working Harbour save and resumes the session automatically; the
 package does nothing. It writes `cargo-<package id>.sav` (with `.bak`) in the data directory
 (`--data-dir DIR` overrides it, `--save FILE` names a file, `--new` starts fresh), at milestones
 (a committed change to the job's state, HUD or timers; a site built; a load number, delivery,
@@ -245,8 +245,8 @@ or quitting. A save is compared by package id, a **work digest** (site ids, pres
 positions, headings, hidden flags and the workboat; **not** `scene.work.notices` or HUD text),
 the manifest `state_version`, the physics revision and the tick rate. Equal values resume with the
 current source, so editing text or behaviour while keeping `state_version` keeps saves valid;
-changing what the state means needs a new `state_version`, and until SV1i a changed
-`state_version` (like any other mismatch) sets the file aside as `NAME.rejected` and starts fresh.
+changing what the state means needs a new `state_version`; since SV1i a job's `migrate` can
+upgrade a changed `state_version`, and any other mismatch sets the file aside as `NAME.rejected` and starts fresh.
 Resume restores the committed checkpoint, its unacknowledged events and the generation, never
 re-runs `init`, and never queues events.
 

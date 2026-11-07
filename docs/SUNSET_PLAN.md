@@ -1,8 +1,8 @@
 # Sunset and dusk in gameplay
 
 Status, 2026-11-06: steps 1 and 2 merged to `main` (#138) and the fixed sunset and dusk
-presets approved by the user; the fixed menu setting from step 3 is implemented in this
-branch. The user liked the dusk river in title mock-up B and asked for sunset in the game;
+presets approved by the user; the fixed menu setting from step 3 is merged
+(#157). The user liked the dusk river in title mock-up B and asked for sunset in the game;
 this document owns that work. Gameplay stays daytime by default. SETTINGS → LIGHTING
 remembers DAY, SUNSET or DUSK for the local player's new solo and multiplayer sessions.
 Explicit CLI launches still use `--daylight` independently. Transitions and a day/night cycle remain deferred;

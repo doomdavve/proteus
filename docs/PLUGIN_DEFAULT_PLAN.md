@@ -1,7 +1,7 @@
 # Plugins by default: implementation plan
 
 Status, 2026-10-31: **PD1, PC, Rooms, Browser and Cutover (PD5) are implemented on
-`feat/plugin-default-cutover`, ready for review.** Native and browser solo sessions run from
+`feat/plugin-default-cutover` and merged (#108).** Native and browser solo sessions run from
 packages compiled at build time, `--plugin` is the separate authoring path, and there is no
 compiled-content switch. The live console edits the running session without a reset, natively
 and in desktop browsers. This document owns the sequence, per-PR status and acceptance for that
@@ -10,12 +10,18 @@ contract, the [multiplayer protocol](MULTIPLAYER_PROTOCOL.md) keeps byte layouts
 [room content plan](ROOM_CONTENT_PLAN.md) keeps downloads and dynamic maps.
 [All plans](README.md).
 
-Next task: the user's iPhone run, which decides whether Harbor life becomes the `outer` default;
-`outer` stays on Standard until then. Cutover merged in
+Harbor life is the title's `outer` default: the user accepted it after an iPhone 17 Pro run
+(2026-11-01), fixed in [#123](https://github.com/doomdavve/proteus/pull/123) (BASIN TRIAL
+failed to start from the title) and made the default in
+[#124](https://github.com/doomdavve/proteus/pull/124), both merged 2026-11-01. Standard stays
+selectable and `--location outer` keeps the catalog default `proteus.langedrag`. Round-boundary
+revisions (protocol v10) and the P5 follow-ups are held by user direction (2026-11-01). Open:
+the human checks listed in the [PD5 result](#pd5-result-2026-10-31); no implementation step
+remains. The user also chose the Eriksberg marina direction for Harbor life (implemented
+2026-11-01; see the [marina plan](MARINA_AUTHORING_PLAN.md)); an iPhone run and human scene/GPU
+review were the checks then outstanding. Done when: those checks are done or dropped. Cutover merged in
 [#108](https://github.com/doomdavve/proteus/pull/108) and shipped as
-[v0.0.24](RELEASES.md#status-and-verification) on 2026-11-01, with the hosted room verified. No
-implementation step remains in this plan; the [PD5 result](#pd5-result-2026-10-31) lists the human
-checks.
+[v0.0.24](RELEASES.md#status-and-verification) on 2026-11-01, with the hosted room verified.
 
 User play report, 2026-11-01, after the v0.0.24 release (build and platform not stated): a
 two-person harbor room with deliberate contact "worked fine", and deathmatch "worked well". The user
