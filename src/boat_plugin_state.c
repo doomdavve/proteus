@@ -260,7 +260,9 @@ static void commands(lua_State *L, Transition *t, int list)
     t->next.command_count = (unsigned)count;
     memset(t->next.commands, 0, sizeof(t->next.commands));
     char touched[BOAT_PLUGIN_COMMANDS][BOAT_PLUGIN_TEXT];
-    bool timer_touched[BOAT_PLUGIN_COMMANDS];
+    // Separate ID namespaces: HUD rows, timers, and each work/cargo command kind.
+    int space[BOAT_PLUGIN_COMMANDS];
+    unsigned supplies = 0, guides = 0;
     for (unsigned i = 0; i < count; ++i) {
         lua_rawgeti(L, list, i + 1);
         if (!lua_istable(L, -1))
@@ -271,10 +273,22 @@ static void commands(lua_State *L, Transition *t, int list)
         bool set = !strcmp(kind, "timer.set"), cancel = !strcmp(kind, "timer.cancel");
         bool timer = set || cancel;
         bool remove = !strcmp(kind, "hud.remove");
-        if (lua_rawlen(L, -1) != strlen(kind) || (!timer && !remove && strcmp(kind, "hud.set")))
+        bool enable = !strcmp(kind, "work.enable"), supply = !strcmp(kind, "cargo.supply");
+        bool guide = !strcmp(kind, "work.guide");
+        bool work = enable || supply || guide;
+        if (lua_rawlen(L, -1) != strlen(kind)
+            || (!timer && !remove && !work && strcmp(kind, "hud.set")))
             invalid(L, t, "unsupported command kind");
         if (timer && !t->next.timers_enabled)
             invalid(L, t, "timer commands require objective.timers");
+        if (work && !t->next.work_enabled)
+            invalid(L, t,
+                enable       ? "work.enable requires a free package with scene.work"
+                    : supply ? "cargo.supply requires a free package with scene.work"
+                             : "work.guide requires a free package with scene.work");
+        // One crate and one guidance target: a batch can ask for each at most once.
+        if ((supply && supplies++) || (guide && guides++))
+            invalid(L, t, "one cargo.supply and one work.guide per batch");
         BoatPluginCommand *intent = &t->next.commands[i];
         snprintf(intent->kind, sizeof(intent->kind), "%s", kind);
         intent->generation = t->next.generation;
@@ -285,8 +299,9 @@ static void commands(lua_State *L, Transition *t, int list)
             const char *key = lua_type(L, -1) == LUA_TSTRING ? lua_tostring(L, -1) : "";
             if (lua_rawlen(L, -1) != strlen(key)
                 || (strcmp(key, "kind") && strcmp(key, "id") && strcmp(key, "generation")
-                    && (timer ? (!set || strcmp(key, "tick"))
-                              : (remove || (strcmp(key, "label") && strcmp(key, "value"))))))
+                    && (timer
+                            ? (!set || strcmp(key, "tick"))
+                            : (remove || work || (strcmp(key, "label") && strcmp(key, "value"))))))
                 invalid(L, t, "unknown command field");
         }
         lua_getfield(L, command, "generation");
@@ -295,12 +310,16 @@ static void commands(lua_State *L, Transition *t, int list)
         lua_pop(L, 1);
         BoatPluginHud hud = { 0 };
         command_text(L, t, command, "id", hud.id);
+        space[i] = timer ? 1 : enable ? 2 : supply ? 3 : guide ? 4 : 0;
         for (unsigned j = 0; j < i; ++j)
-            if (timer_touched[j] == timer && !strcmp(touched[j], hud.id))
+            if (space[j] == space[i] && !strcmp(touched[j], hud.id))
                 invalid(L, t, "conflicting commands for one resource id");
         memcpy(intent->id, hud.id, sizeof(hud.id));
         memcpy(touched[i], hud.id, sizeof(hud.id));
-        timer_touched[i] = timer;
+        if (work) {
+            lua_pop(L, 1);
+            continue;
+        }
         if (timer) {
             int64_t due = 0;
             if (set) {
@@ -399,6 +418,8 @@ static int transition(lua_State *L)
         lua_newtable(L);
         integer_field(L, "tick", event->tick);
         integer_field(L, "sequence", event->sequence);
+        if (event->load)
+            integer_field(L, "load", event->load);
         string_field(L, "kind", event->kind);
         string_field(L, "id", event->id);
         lua_rawseti(L, -2, i + 1);
@@ -445,30 +466,6 @@ static int transition(lua_State *L)
     return 0;
 }
 
-static bool valid_timers(const BoatPluginObjective *o)
-{
-    if (o->timer_count > BOAT_PLUGIN_TIMERS || (!o->timers_enabled && o->timer_count))
-        return false;
-    for (unsigned i = 0; i < o->timer_count; ++i) {
-        const BoatPluginTimer *timer = &o->timers[i];
-        const char *end = memchr(timer->id, 0, sizeof(timer->id));
-        if (!end || end == timer->id || timer->tick <= 0)
-            return false;
-        for (const char *p = timer->id; p < end; ++p)
-            if ((unsigned char)*p < 32 || (unsigned char)*p > 126)
-                return false;
-        if (i
-            && (o->timers[i - 1].tick > timer->tick
-                || (o->timers[i - 1].tick == timer->tick
-                    && strcmp(o->timers[i - 1].id, timer->id) >= 0)))
-            return false;
-        for (unsigned j = 0; j < i; ++j)
-            if (!strcmp(o->timers[j].id, timer->id))
-                return false;
-    }
-    return true;
-}
-
 static BoatPluginStatus step(BoatPluginObjective *objective, const char *source, size_t size,
     BoatPluginTransition action, int64_t tick, const BoatPluginEvent *events, unsigned event_count,
     const BoatPluginLimits *limits, BoatPluginDiagnostic *diagnostic, unsigned previous_version)
@@ -489,7 +486,7 @@ static BoatPluginStatus step(BoatPluginObjective *objective, const char *source,
         error = "transition budgets cannot exceed host limits";
     else if (action < BOAT_PLUGIN_OBJECTIVE_INIT || action > BOAT_PLUGIN_OBJECTIVE_RESET || tick < 0
         || objective->state_version > 65535 || !objective->generation || !objective->rng
-        || objective->hud_count > BOAT_PLUGIN_HUD || !valid_timers(objective)
+        || objective->hud_count > BOAT_PLUGIN_HUD || !boat_plugin_objective_timers_valid(objective)
         || objective->state.size > BOAT_PLUGIN_STATE_BYTES || objective->acknowledged < 0
         || objective->tick < 0)
         error = "invalid checkpoint or transition";
@@ -606,7 +603,7 @@ static void hash_integer(uint64_t *hash, uint64_t value)
 uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
 {
     if (!objective || objective->state.size > BOAT_PLUGIN_STATE_BYTES
-        || objective->hud_count > BOAT_PLUGIN_HUD || !valid_timers(objective))
+        || objective->hud_count > BOAT_PLUGIN_HUD || !boat_plugin_objective_timers_valid(objective))
         return 0;
     for (unsigned i = 0; i < objective->hud_count; ++i)
         if (!memchr(objective->hud[i].id, 0, sizeof(objective->hud[i].id))
@@ -628,6 +625,8 @@ uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective)
         hash_integer(&hash, objective->state_version);
     hash_integer(&hash, objective->generation);
     hash_integer(&hash, objective->initialized);
+    if (objective->work_enabled)
+        hash_bytes(&hash, "work", 4);
     if (objective->timers_enabled) {
         hash_bytes(&hash, "timers", 6);
         hash_integer(&hash, objective->timer_count);

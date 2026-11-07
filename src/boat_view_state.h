@@ -4,8 +4,18 @@
 #include "boat.h"
 #include "boat_course.h"
 #include "boat_scene_definition.h"
+#include "geometry3d.h"
 
 struct BoatRaceCourse;
+
+// Extra frame-borrowed geometry in renderer coordinates (the working harbour's sites, crate,
+// crane and workboat). SOLIDS are lit; DECAL (may be NULL) is the landing decal on receivers.
+// HIDE_PLAYER omits the skinned player boat because SOLIDS already hold the workboat.
+typedef struct {
+    const Mesh3D *solids;
+    const Mesh3D *decal;
+    bool hide_player;
+} BoatViewProps;
 
 // What a view shows: the live session boat, a replay sample or a ghost. Built per displayed
 // frame and never stepped; replay values are continuous-time interpolations of a recording.
@@ -16,6 +26,7 @@ typedef struct {
     BoatCourse course; // Gate progress for course drawing and the HUD; disabled when free.
     // L1.3: frame-borrowed accepted scene; NULL draws and collides with the compiled marina.
     const BoatSceneDefinition *scene;
+    const BoatViewProps *props; // NULL: nothing extra.
     // Race rooms: draw the river sprint's start, gates and finish; NEXT_GATE is the viewer's
     // next uncleared gate (the gate count once finished).
     struct {

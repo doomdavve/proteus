@@ -40,7 +40,7 @@ static bool load_revision(
         status = boat_plugin_race_check_location(&revision->race, host->location, host->map, d);
         break;
     case BOAT_PLUGIN_KIND_FREE:
-        status = boat_plugin_free_check_location(&revision->free, host->location, d);
+        status = boat_plugin_free_check_location(&revision->free, host->location, host->map, d);
         break;
     case BOAT_PLUGIN_KIND_COURSE:
         status = boat_plugin_course_check_location(&revision->course, host->location, host->map, d);
@@ -56,11 +56,15 @@ static bool load_revision(
     d->cost = cost; // Location validation clears diagnostics, but did not undo the Lua work.
     if (status != BOAT_PLUGIN_OK)
         return false;
-    if (host->kind == BOAT_PLUGIN_KIND_VOYAGE && revision->voyage.manifest.objective) {
+    bool free_objective = host->kind == BOAT_PLUGIN_KIND_FREE && revision->free.manifest.objective;
+    if ((host->kind == BOAT_PLUGIN_KIND_VOYAGE && revision->voyage.manifest.objective)
+        || free_objective) {
         BoatPluginObjective probe = { .generation = 1,
             .rng = 12345,
-            .timers_enabled = revision->voyage.manifest.timers,
-            .state_version = revision->voyage.manifest.state_version };
+            .timers_enabled = !free_objective && revision->voyage.manifest.timers,
+            .work_enabled = free_objective,
+            .state_version = free_objective ? revision->free.manifest.state_version
+                                            : revision->voyage.manifest.state_version };
         status = boat_plugin_objective_step(&probe, bundle->source, bundle->source_size,
             BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, d);
         d->cost.instructions += cost.instructions;

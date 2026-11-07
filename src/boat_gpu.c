@@ -218,6 +218,7 @@ void boat_gpu_destroy(BoatGpu *gpu)
     if (gpu->wake_texture.id)
         UnloadTexture(gpu->wake_texture);
     MemFree(gpu->wake_upload);
+    boat_cargo_view_gpu_destroy(&gpu->props);
     if (gpu->basin_water.vaoId)
         UnloadMesh(gpu->basin_water);
     if (gpu->wave_mesh.vaoId)
@@ -341,6 +342,33 @@ void boat_gpu_draw_with_ghost(BoatGpu *gpu, const BoatViewState *view,
     const BoatViewState *ghost, const BoatFlag *ghost_flag, float opacity)
 {
     boat_gpu_draw_scene(gpu, view, presentation, world, camera, NULL, ghost, ghost_flag, opacity);
+}
+
+// The view's extra geometry over the finished scene, in the scene's own camera and depth. Called
+// with the colour target active.
+static void draw_props(
+    BoatGpu *gpu, const BoatViewProps *props, View3D view, bool mapped, int width, int height)
+{
+    if (!gpu->props.mesh.vaoId && !boat_cargo_view_gpu_init(&gpu->props)) {
+        gpu->failed = true;
+        return;
+    }
+    Camera3D ray
+        = { view.position, view.target, view.up, view.vertical_fov * RAD2DEG, CAMERA_PERSPECTIVE };
+    BeginMode3D(ray);
+    // The basin keeps the game's mirrored presentation basis; mapped worlds are not mirrored.
+    Matrix projection = MatrixPerspective(
+        view.vertical_fov, width / (float)height, view.near_plane, view.far_plane);
+    if (!mapped)
+        projection.m0 = -projection.m0;
+    rlSetMatrixProjection(projection);
+    rlDisableBackfaceCulling();
+    if (props->solids)
+        boat_cargo_view_gpu_draw(&gpu->props, props->solids, true);
+    if (props->decal)
+        boat_cargo_view_gpu_draw(&gpu->props, props->decal, true);
+    rlEnableBackfaceCulling();
+    EndMode3D();
 }
 
 void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
@@ -470,6 +498,9 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     if (!waterfront_gpu_scene_draw(
             &gpu->scene, &frame, target.texture.width, target.texture.height))
         gpu->failed = true;
+    else if (view->props)
+        draw_props(
+            gpu, view->props, frame.camera, mapped, target.texture.width, target.texture.height);
     float overcast = boat_view_overcast(view, world);
     if (overcast > 0) {
         Color tint = BOAT_VIEW_STORM_LIGHT;

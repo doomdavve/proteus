@@ -47,6 +47,19 @@ const BoatPluginCatalogEntry *boat_plugin_catalog_default(BoatPluginKind kind, c
     return entry;
 }
 
+const BoatPluginCatalogEntry *boat_plugin_catalog_work_default(const char *location)
+{
+    if (!location)
+        return NULL;
+    const char *id = !strcmp(location, "basin") ? BOAT_PLUGIN_DEFAULT_BASIN_WORK
+        : !strcmp(location, "outer")            ? BOAT_PLUGIN_DEFAULT_OUTER_WORK
+                                                : NULL;
+    const BoatPluginCatalogEntry *entry = boat_plugin_catalog_find(id);
+    if (!entry || strcmp(entry->location, location))
+        return NULL;
+    return entry;
+}
+
 bool boat_plugin_catalog_decode(const BoatPluginCatalogEntry *entry, BoatPluginRevision *revision,
     BoatPluginDiagnostic *diagnostic)
 {

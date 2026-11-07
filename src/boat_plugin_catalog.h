@@ -25,6 +25,8 @@ extern const unsigned boat_plugin_catalog_count;
 #define BOAT_PLUGIN_DEFAULT_RACE "proteus.river-sprint"
 #define BOAT_PLUGIN_DEFAULT_BASIN_COURSE "proteus.time-trial"
 #define BOAT_PLUGIN_DEFAULT_MATCH "proteus.deathmatch"
+#define BOAT_PLUGIN_DEFAULT_OUTER_WORK "proteus.outer-work"
+#define BOAT_PLUGIN_DEFAULT_BASIN_WORK "proteus.basin-work"
 
 const BoatPluginCatalogEntry *boat_plugin_catalog_at(unsigned index);
 const BoatPluginCatalogEntry *boat_plugin_catalog_find(const char *id);
@@ -32,6 +34,9 @@ const BoatPluginCatalogEntry *boat_plugin_catalog_find(const char *id);
 // voyage; COURSE the basin time trial; RACE the river sprint on the outer map.
 const BoatPluginCatalogEntry *boat_plugin_catalog_default(
     BoatPluginKind kind, const char *location);
+// LOCATION's bundled work package: the basin reference fixture or the outer job, or NULL. This
+// is the cargo sandbox's default only; boat_plugin_catalog_default never returns these.
+const BoatPluginCatalogEntry *boat_plugin_catalog_work_default(const char *location);
 // Decode ENTRY into a typed revision with no Lua and no map sweep. The catalog generator already
 // validated it against the compiled maps; this is the same receipt, decoded in this build.
 bool boat_plugin_catalog_decode(const BoatPluginCatalogEntry *entry, BoatPluginRevision *revision,

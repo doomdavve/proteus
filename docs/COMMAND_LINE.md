@@ -29,9 +29,10 @@ directly; `--title` selects the title explicitly. The direct-launch default loca
 This separate native S0 experiment defaults to the Eriksberg inlet on `outer`, with a small
 service crane, one crate and a borrowed deck boat. `--location basin` retains the isolated
 reference (CPU draw distance is 240 m; the GPU view uses 4500 m). `--survey` checks the mapped work site without a window. Reset is immediate and
-there is no saved progress. It is not a `wake_velocity` mode. Holding Space brakes; G
-starts/cancels assisted mooring when BERTH READY appears. The HUD shows persistent throttle
-and the landing footprint/deck gap before contact. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
+it saves automatically (see below), and it stays the review harness; the game runs the same session as `wake_velocity --work`. Holding Space brakes; G
+starts/cancels assisted mooring when BERTH READY appears; N cycles the guided site (the job may
+choose it) and C returns an unhooked, unlashed crate to its source pad. The HUD shows persistent throttle, the landing
+footprint/deck gap before contact and the package's job row. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
 for the first lift, controls, capture/measurement commands and current limitations.
 
 `--shadow-review` is a developer-only, virtual-clock footprint visibility check (use
@@ -39,6 +40,38 @@ for the first lift, controls, capture/measurement commands and current limitatio
 desktop context). With `--screenshot FILE` it saves only the first failing frame; no image
 is written on success. `--scenario shadow-bow` and `shadow-water` show normal-colour
 wave-phase regression fixtures. See the [shadow correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction).
+
+## Working harbour in the game (`--work`, native)
+
+```sh
+./build/wake_velocity --location outer --work
+./build/wake_velocity --location outer --work --data-dir build/work-profile
+./build/wake_velocity --renderer cpu --location outer --work --screenshot build/work.png --time 3
+```
+
+`--work` runs the location's bundled working-harbour package (on `outer`, `outer-work`) in place
+of the free-ride boat step, with the game's camera, water and harbour, plus the work sites, crate,
+crane and the package's job rows. It is the SV1f/SV1g step of the
+[save and resume plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume). It cannot be combined
+with `--plugin`, `--package`, rooms, `--course`, replays, wake, water, `--start`, `--skin` or
+`--plugin-bridge`. The title offers it as GOTHENBURG HARBOUR, CONTENT `WORKING HARBOUR` (native
+builds), with a SAVE row (CONTINUE, NEW, DELETE; NEW and DELETE ask first). START passes
+`--location outer --work` (plus `--new` for NEW), so these options stay the scripted spelling.
+
+The session saves itself: there is no save key and F5 stays the plugin reload key. Plain
+interactive play reads and writes `cargo-<package id>.sav` in the game's data directory
+(`--data-dir DIR` replaces the directory) at every milestone, every 30 s of simulated play, and
+when the menu opens, the window loses focus, or you quit or close the window; the next `--work`
+run resumes it. A small `SAVED` mark appears after milestone and leave writes, and `SAVE FAILED`
+stays until a write succeeds. `--save FILE` uses an explicit file, `--new` ignores any save, and a
+save that cannot be used (damaged, a changed package or physics) is set aside as `NAME.rejected`,
+never deleted. Scripted runs (`--screenshot`, `--demo`, `--frames`) touch no save unless given
+`--save` or `--data-dir`. `--save-now` (a test fixture, with `--time` and `--save`) runs the
+scripted drive, writes one save and exits.
+
+`--time` drives a scripted capture: idle at the berth, and after 10 s of simulated time the landing
+delivery script (load, lash, depart, moor at the landing, unload), so `--time 3` shows the berth
+and `--time 14` the delivered crate. Screenshots draw no HUD.
 
 ## Locations and voyages
 
@@ -85,7 +118,7 @@ panel selects Standard, Harbor life, the Grodan tour or the canal tour for `oute
 web builds. Both tours are `proteus.grodan`: the Grodan tour always uses the Grodan, as
 `--package proteus.grodan --skin grodan` does, and the canal tour keeps your livery. `--title-start PLACE` takes the title's START path with default settings, without the menu,
 so tests can prove each PLACE opens (`basin`, `outer`, `outer-standard`, `outer-harbor-life`,
-`outer-grodan`, `outer-canal-tour`, `basin-trial`); further options follow it.
+`outer-grodan`, `outer-canal-tour`, `outer-working-harbour`, `basin-trial`); further options follow it.
 
 ### Live Lua authoring
 
@@ -248,6 +281,7 @@ or renderer. GPU captures need a graphics context; CPU captures need no window.
 ./build/wake_velocity --renderer cpu --location outer --screenshot build/outer.png --time 3
 ./build/wake_velocity --location outer --gpu-aa --screenshot build/outer-gpu.png --time 3
 ./build/wake_velocity --title --screenshot build/title.png
+./build/wake_velocity --title --screenshot build/title-save.png --content working-harbour --data-dir build/work-profile --save-mode new --ask
 ./build/wake_velocity --renderer cpu --replay build/my-run.run --screenshot build/replay.png --time 5
 ```
 

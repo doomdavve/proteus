@@ -20,6 +20,7 @@ typedef struct {
 typedef struct {
     int64_t tick, sequence;
     char kind[48], id[BOAT_PLUGIN_TEXT];
+    int64_t load; // S1d cargo events: the crate's load number, from 1; zero omits the field.
 } BoatPluginEvent;
 
 typedef struct {
@@ -49,6 +50,11 @@ typedef struct {
     BoatPluginTimer timers[BOAT_PLUGIN_TIMERS]; // Sorted by (tick, id).
     unsigned timer_count;
     bool timers_enabled; // Host capability grant; scripts cannot change it.
+    // S1c host grant for a free package's work sites: accepts work.enable {id}, and since S1d
+    // cargo.supply {id} and work.guide {id} (each at most once per batch). The commands only
+    // record intent in COMMANDS; the host validates and applies them before it commits the
+    // batch, and keeps the previous checkpoint if it cannot.
+    bool work_enabled;
     uint32_t rng;
     int64_t acknowledged, tick;
     unsigned state_version; // Zero in older harness fixtures means schema 1.
@@ -91,7 +97,14 @@ typedef struct {
 } BoatPluginHudRow;
 bool boat_plugin_hud_compose(const BoatPluginHudOwner *owners, unsigned owner_count,
     BoatPluginHudRow *rows, unsigned capacity, unsigned *count);
+// Timer table invariants shared by stepping, the digest and the byte codec.
+bool boat_plugin_objective_timers_valid(const BoatPluginObjective *objective);
 // Canonical hash of the complete committed checkpoint, excluding quarantine/struct padding.
 uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective);
+// Explicit little-endian checkpoint codec. Commands are inspection-only and never encoded.
+bool boat_plugin_objective_encode(
+    const BoatPluginObjective *objective, unsigned char *out, size_t capacity, size_t *size);
+bool boat_plugin_objective_decode(
+    const unsigned char *bytes, size_t size, BoatPluginObjective *objective);
 
 #endif

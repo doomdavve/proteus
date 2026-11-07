@@ -155,6 +155,30 @@ static int defaults_match_compiled(void)
     return 0;
 }
 
+// The cargo sandbox's per-location work defaults, separate from the voyage/course/mode defaults.
+static int work_defaults(void)
+{
+    BoatPluginRevision r;
+    BoatPluginDiagnostic d = { 0 };
+    const BoatPluginCatalogEntry *basin = boat_plugin_catalog_work_default("basin");
+    CHECK(basin && !strcmp(basin->id, "proteus.basin-work"));
+    CHECK(boat_plugin_catalog_decode(basin, &r, &d));
+    CHECK(r.free.has_scene && r.free.scene.work_present && r.free.scene.work_count == 1);
+    const BoatSceneWorkSite *site = &r.free.scene.work[0];
+    CHECK(!strcmp(site->id, "basin") && site->x == 0 && site->z == 0 && site->heading == 0);
+    CHECK(site->preset == BOAT_SCENE_WORK_SERVICE_PLATFORM && !site->hidden);
+    CHECK(r.free.scene.work_boat == BOAT_SCENE_WORKBOAT_FLAT_DECK);
+    CHECK(!r.free.manifest.objective);
+    const BoatPluginCatalogEntry *outer = boat_plugin_catalog_work_default("outer");
+    CHECK(outer && !strcmp(outer->id, "proteus.outer-work"));
+    CHECK(!boat_plugin_catalog_work_default("nope"));
+    // The work packages never become the ordinary defaults.
+    const BoatPluginCatalogEntry *basin_free
+        = boat_plugin_catalog_default(BOAT_PLUGIN_KIND_FREE, "basin");
+    CHECK(basin_free && !strcmp(basin_free->id, "proteus.basin-free"));
+    return 0;
+}
+
 static int reachable_by_id(void)
 {
     for (unsigned i = 0; i < boat_plugin_catalog_count; ++i) {
@@ -168,6 +192,7 @@ static int reachable_by_id(void)
 static const TestCase cases[] = {
     TEST_CASE(entries_equal_source),
     TEST_CASE(defaults_match_compiled),
+    TEST_CASE(work_defaults),
     TEST_CASE(reachable_by_id),
 };
 

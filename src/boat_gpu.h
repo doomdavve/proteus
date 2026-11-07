@@ -1,5 +1,6 @@
 #ifndef PROTEUS_BOAT_GPU_H
 #define PROTEUS_BOAT_GPU_H
+#include "boat_cargo_view.h"
 #include "boat_view.h"
 #include "boat_water_mesh.h"
 #include "renderer_gpu.h"
@@ -18,6 +19,7 @@ typedef struct {
     BoatWaterMeshCache water_mesh; // This view's own patches; never shared with CPU views.
     WaterfrontScenery scenery; // Scenery the scene's map meshes were built from.
     int wave_capacity, wave_peak_triangles, wave_rebuilds;
+    BoatCargoViewGpu props; // Working-harbour geometry (BoatViewProps), uploaded on first use.
     Texture2D wake_texture;
     float *wake_upload;
     double wake_upload_seconds;

@@ -404,3 +404,24 @@ independent. A callback or event-queue failure replaces the row with `OBJECTIVE 
 and a diagnostic; native boating continues. The [plugin API](PLUGIN_API.md#live-optional-voyage-objective-p32)
 owns event timing and restart policy; [P3.2 evidence](PLUGIN_PLAN.md#p32-result-2026-10-29)
 distinguishes automated review from human playtesting.
+
+## Working-harbour rows, 2026-11-07 (SV1g)
+
+`wake_velocity --work` draws the package's job rows (`LABEL: value`, yellow) at the top left
+under the P: MENU hint, then `JOB SUSPENDED` or the waiting reason in red, and one status line
+(`CRANE` or `HELM`, mooring state, crate state). There are no control or help lines: the full
+key list is the pause menu's CONTROLS page (also `?`). At the helm a yellow marker (site and
+distance, pinned to the view's edge; J cycles the target) shows the way until the berth is within 12 m.
+A single `G MOOR` prompt appears when the berth is ready. The current notice sits above the instrument panel; `SAVED` (milestone and
+leave writes, 1.5 s) and the persistent red `SAVE FAILED` sit at the bottom right. Layout,
+text widths and overlap with the minimap at 320x200 are unverified: headless CPU and GPU
+screenshots draw no HUD and no windowed run was possible when this was written.
+
+## Structured contextual information, proposed 2026-11-07
+
+Proposed, unscheduled. The user's request after accepting the decluttered working-harbour HUD
+([sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume)): "What I think we need is a
+structured way of showing this type of information and that's a bigger job than this." Contextual
+gameplay information (job state, prompts, notices, save state) is drawn as ad-hoc text lines, each
+placed by hand. A structured presentation would give it a common model and layout instead. This is
+larger than the sandbox branch and is not designed or scheduled; nothing here is implemented.

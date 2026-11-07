@@ -271,7 +271,8 @@ int boat_plugin_stage_worker(void)
             &revision->race, resources.definition, &resources.map, &d);
         break;
     case BOAT_PLUGIN_KIND_FREE:
-        status = boat_plugin_free_check_location(&revision->free, resources.definition, &d);
+        status = boat_plugin_free_check_location(
+            &revision->free, resources.definition, &resources.map, &d);
         break;
     case BOAT_PLUGIN_KIND_COURSE:
         status = boat_plugin_course_check_location(
@@ -283,11 +284,12 @@ int boat_plugin_stage_worker(void)
     }
     if (status != BOAT_PLUGIN_OK)
         goto done;
-    if (kind == BOAT_PLUGIN_KIND_VOYAGE && m.objective) {
+    if ((kind == BOAT_PLUGIN_KIND_VOYAGE || kind == BOAT_PLUGIN_KIND_FREE) && m.objective) {
         BoatPluginCost cost = d.cost;
         BoatPluginObjective probe = { .generation = 1,
             .rng = 12345,
             .timers_enabled = m.timers,
+            .work_enabled = kind == BOAT_PLUGIN_KIND_FREE,
             .state_version = m.state_version };
         boat_plugin_objective_step(&probe, bundle.source, bundle.source_size,
             BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &d);
@@ -595,7 +597,8 @@ int boat_plugin_stage_poll(BoatPluginStageJob *j, BoatPluginHost *host, double n
                 == BOAT_PLUGIN_OK;
             break;
         case BOAT_PLUGIN_KIND_FREE:
-            ok = boat_plugin_free_check_location(&r->free, host->location, &d) == BOAT_PLUGIN_OK;
+            ok = boat_plugin_free_check_location(&r->free, host->location, host->map, &d)
+                == BOAT_PLUGIN_OK;
             break;
         case BOAT_PLUGIN_KIND_COURSE:
             ok = boat_plugin_course_check_location(&r->course, host->location, host->map, &d)
@@ -706,11 +709,10 @@ failed:
 
 // Read one completed query reply from OUTPUT. Both the native child and the browser worker
 // produce the same wire, so this is the one parser.
-static int query_parse(FILE *output, bool success, char *text, size_t capacity,
-    BoatPluginDiagnostic *result)
+static int query_parse(
+    FILE *output, bool success, char *text, size_t capacity, BoatPluginDiagnostic *result)
 {
-    if (fseek(output, 0, SEEK_END)
-        || ftell(output) > (long)BOAT_PLUGIN_QUERY_REPLY_MAX + 8192)
+    if (fseek(output, 0, SEEK_END) || ftell(output) > (long)BOAT_PLUGIN_QUERY_REPLY_MAX + 8192)
         return -1;
     long end = ftell(output);
     rewind(output);
@@ -727,8 +729,8 @@ static int query_parse(FILE *output, bool success, char *text, size_t capacity,
     size_t reported = size >= 4
         ? (size_t)bytes[0] << 24 | (size_t)bytes[1] << 16 | (size_t)bytes[2] << 8 | (size_t)bytes[3]
         : 0;
-    if (!out.ok || fgetc(output) != EOF || ferror(output)
-        || (d.status == BOAT_PLUGIN_OK) != success || reported + 4 != size || reported >= capacity
+    if (!out.ok || fgetc(output) != EOF || ferror(output) || (d.status == BOAT_PLUGIN_OK) != success
+        || reported + 4 != size || reported >= capacity
         || reported >= BOAT_PLUGIN_QUERY_REPLY_MAX) {
         free(bytes);
         return -1;

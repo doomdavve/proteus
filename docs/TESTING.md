@@ -1,5 +1,21 @@
 # Test workflow and timing
 
+`boat_sandbox_save` (SV1b, `cpu;quick`) checks the sandbox save's byte format, header-only discovery, corruption and
+bounds, compatibility verdicts, the work digest and the pure autosave policy (SV1c) on byte buffers and virtual
+ticks only. `boat_file` (SV1d, `cpu;quick`) checks atomic writes with `.bak`, failed writes, set-aside, bounded listing and
+reads in a build-tree directory. `boat_work_menu` (SV1h, `cpu;quick`) checks the Single Player menu's save discovery in build-tree directories (none, one, corrupt, newer format, changed package, many files, ignored names, fixed time zone), set-aside, delete-only-that-package and the SAVE row's confirmations with no clock, plus the save identity's writer string. `wake_velocity_title_start.outer-working-harbour` (slow lane) starts the menu's content without a window. No title capture is a CTest (it needs a window): run `wake_velocity --title --screenshot FILE --content working-harbour --data-dir DIR [--save-mode new --ask]` by hand. `cargo_sandbox_save_*` and `cargo_sandbox_autosave*` (SV1d, slow lane) write, resume and
+reject saves under `build/sandbox-save-tests` and drive the loop's autosave on a virtual clock; none touches the user's
+data directory; each fails on the program's exit code (`--expect resumed|rejected`). `cargo_sandbox_scene_survives_reset`
+(`--scene-check`) requires a session reset to keep the package's scene, with its custom notice. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
+resumes it from the record and from its encoded bytes, and requires equal behaviour over 1200 scripted ticks.
+
+`wake_velocity_work_*` (SV1f) render `--work` through the CPU view (`render`, slow lane): the scripted berth
+at 3 s, the scripted landing delivery at 14 s, and a refusal of `--work --package`. `wake_velocity_work_gpu_screenshot` and
+`wake_velocity_work_delivered_gpu_screenshot` are their GPU-lane twins. `wake_velocity_work_save_write` then
+`wake_velocity_work_save_resume` (SV1g, slow lane) save a scripted delivery to `build/work-save-tests` and resume it
+with a far camera that shows the built quay; both run through `cmake/run_expect.cmake`, which requires exit code 0 and an output
+match. The windowed `--demo --frames` smoke run with `--data-dir` in the build tree is a developer command (windowed frames follow the wall clock, so it is not a CTest).
+
 S0a/S0b `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane motors/cable,
 actual lifts onto both deck positions, release/settle/lash, moving deck attachment,
 rotational point velocity on unlash, departure guards, dropped/floating recovery, capsize,
@@ -12,8 +28,27 @@ measurements are not pass/fail timing limits. `cargo_sandbox_left_screenshot` an
 `cargo_sandbox_right_screenshot` additionally drive the application's assisted lifts onto a
 wave-posed boat, lashing, departure and turn before a display-free basin CPU capture.
 The two `cargo_sandbox_outer_*_screenshot` checks
-repeat real transfers on `outer`; `cargo_sandbox_site` qualifies the footprint, sampled
-traffic envelope and initial camera against the loaded map. The `shadow-high`/`shadow-low`
+repeat real transfers on `outer`; `cargo_sandbox_site` loads the bundled `proteus.outer-work` (the basin's `proteus.basin-work` is covered by the catalog and staging checks)
+site and qualifies its footprint, sampled traffic envelope and initial camera against the
+loaded map. `boat_plugin.work_sites` checks `scene.work` decoding, the staging wire and the
+staging survey's rejections, including turned overlap; `boat_cargo` also checks that traffic
+alone can block a site and that a turned receiving site moors, aligns and supports a load in
+its own frame. `cargo_sandbox_crossing_screenshot` stages the helm part-way to the guided
+next site; `cargo_sandbox_receiver-approach_screenshot` carries a lashed crate to the
+package's receiving site, and `cargo_sandbox_delivered_screenshot` then moors and unloads it
+onto the receiving pad with that site's crane, and requires the package's job to count it once,
+build its hidden quay and jetty and supply load 2 on the quay's pad (`landing-built` captures
+the result from the helm). `redelivered` sets load 2 on the landing, a native delivery the job
+does not count, `job-reset` checks that R restarts cargo, job and the hidden sites together,
+and `build-blocked` holds the build (keeping the job's checkpoint and event) while the boat sits
+in the quay's envelope. S1d's second outing: `quay-pickup` moors at the quay beside load 2,
+`jetty-approach` lifts, lashes and departs by G toward the job's guided jetty, and
+`jetty-delivered` unloads there and requires `JETTY SUPPLIED: 1`. These job captures are in
+the slow lane. `boat_cargo` checks the native delivery (once per load and receiver), loss,
+recovery, hidden-site and supply rules, and that a crate at the deck's edge rests on it or is
+pushed out of the hull's side, `boat_plugin.free_objective` the free job grant, and
+`boat_plugin_state.work_commands`/`supply_commands` the `work.enable`, `cargo.supply` and
+`work.guide` commands and the events' `load`. The `shadow-high`/`shadow-low`
 capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,
 requests capture and advances the real application until moored, checking the terminal state.
 CPU/GPU toy captures, windowed motion and

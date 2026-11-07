@@ -205,9 +205,9 @@ Advance during active play, including crane mode. Proposed solo behavior: pause 
 the presentation clock with the world; suspended/background time causes no catch-up jump
 on resume. Keep this clock separate from physics/wave/course rates: it changes light,
 not boat or crane speed. Resetting a load or recovering the boat retains the hour;
-a new session restarts it. When sandbox saves arrive, store the current hour and cycle
-rate in versioned session state and resume without offline progression. Shared multiplayer
-time belongs to the later room-authority contract. Keep a fixed-hour developer override
+a new session restarts it. T4 must extend the existing versioned Working Harbour save with
+the current hour and cycle rate, define the Day fallback for older saves, and resume without
+offline progression. Shared multiplayer time belongs to the later room-authority contract. Keep a fixed-hour developer override
 for comparisons, and review night-time handling before enabling the cycle by default
 in the sandbox. The 900-second target is initial tuning, not a measured fun result.
 
@@ -678,6 +678,31 @@ Local ignored evidence is in `build/t2c-baseline/` and `build/t2c-review/`: all-
 captures/manifests, weather probe and images, complete native CSV/JSON repeats, browser canvas
 checks and game exports, Instruments trace and windowed demo frames. The compact committed
 [evidence index](evidence/lighting-t2c/README.md) links selected sheets and measurement summaries.
+
+### Cumulative PR checkpoint, 2026-11-07
+
+The user approved one PR containing T1–T2c against `main`, retaining the individual commits
+for platform bisects. Publication branch: `feat/full-day-lighting`. Integrated current main
+`5789645` (including the Working Harbour session, saves and browser objective-codec split),
+retaining both sets of CTests and the current sandbox status. Updated T4's proposed save
+contract to extend the existing Working Harbour save and recorded the fixed-light GPU cargo
+pass as a future integration task; no runtime clock or save-format change was added.
+
+**Post-integration verification (2026-11-07, Apple M1 Max/macOS):** native Debug build passed
+with one existing pinned `stb_vorbis` warning; application code was warning-clean. Emscripten
+MinSizeRel build/packaging passed. Full CTest with native graphics and sockets passed all
+469 enabled tests, including 38 GPU tests (15 retired checks disabled; 103.11 s). Eight
+CPU/GPU basin/outer captures at hours 0 and 6.1 match the pre-integration T2c images byte for
+byte. A 90-frame windowed GPU outer dawn high/HDR/waves demo completed; its final frame was
+inspected. Six isolated Chrome/Metal gameplay cases (CPU basin 0 / outer 21.5; GPU basin 0 /
+outer 6.1; GPU outer high/HDR 0 / 18.5) each completed 24 animation callbacks with no JS or GL
+errors. This is integration smoke; the repeated Release timings above remain the earlier
+T2c measurements. Evidence is local in `build/t2c-pr-integration-native/` and
+`build/t2c-pr-integration-web/`.
+
+**Next:** CI and review of this cumulative checkpoint, including Windows coverage. T3 fixed-hour
+controls and the T4 sandbox clock remain follow-ups; night playtest acceptance and the CPU
+reference-budget failure remain as documented above.
 
 ### Plan review, 2026-11-07
 

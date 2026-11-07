@@ -97,6 +97,11 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory)
             "--plugin accepts voyage, free and course packages; race and match run in rooms.\n");
         return NULL;
     }
+    if (kind == BOAT_PLUGIN_KIND_FREE && manifest.objective) {
+        fprintf(stderr, "--plugin %s: a free package's work-site job runs in cargo_sandbox.\n",
+            directory);
+        return NULL;
+    }
     return boat_location_find(manifest.location);
 }
 

@@ -1,5 +1,6 @@
 #include "boat_plugin.h"
 
+#include "boat_cargo.h"
 #include "boat_json.h"
 #include "boat_plugin_lua.h"
 #include "raymath.h"
@@ -161,12 +162,13 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
         : kind == BOAT_PLUGIN_KIND_RACE                 ? "race.define"
                                                         : "match.define";
     const jsmntok_t *capabilities = &tokens[at[6]];
-    unsigned maximum = kind == BOAT_PLUGIN_KIND_VOYAGE ? 4 : 2;
+    unsigned maximum = kind == BOAT_PLUGIN_KIND_VOYAGE ? 4 : kind == BOAT_PLUGIN_KIND_FREE ? 3 : 2;
     if (capabilities->type != JSMN_ARRAY || capabilities->size < 1
         || capabilities->size > (int)maximum)
         return diagnose(d, BOAT_PLUGIN_MANIFEST, file, "capabilities",
-            kind == BOAT_PLUGIN_KIND_VOYAGE
-                ? "must contain voyage.define and optional grants"
+            kind == BOAT_PLUGIN_KIND_VOYAGE ? "must contain voyage.define and optional grants"
+                : kind == BOAT_PLUGIN_KIND_FREE
+                ? "must contain free.define, optionally scene.define and objective.hud"
                 : "must contain one kind grant and optionally scene.define");
     char capability[32];
     if (!boat_json_text(json, &tokens[at[6] + 1], capability, sizeof(capability))
@@ -175,7 +177,8 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             d, BOAT_PLUGIN_MANIFEST, file, "capabilities[1]", "is not granted for this kind");
     // Voyage grants are a canonical prefix: scene.define, objective.hud, objective.timers.
     // A package cannot reorder or repeat them, and timers require HUD. Other kinds may add only
-    // scene.define, immediately after their kind grant.
+    // scene.define, immediately after their kind grant; a free package may follow it with
+    // objective.hud (S1c, for its work sites' job).
     int order = 0;
     bool extra_scene = false;
     for (int i = 1; i < capabilities->size; ++i) {
@@ -187,9 +190,14 @@ BoatPluginStatus boat_plugin_parse_manifest(const char *json, size_t size,
             if (!strcmp(capability, "scene.define") && !extra_scene) {
                 m.scene = true;
                 extra_scene = true;
-            } else
+            } else if (kind == BOAT_PLUGIN_KIND_FREE && !strcmp(capability, "objective.hud")
+                && extra_scene && !m.objective)
+                m.objective = true;
+            else
                 return diagnose(d, BOAT_PLUGIN_MANIFEST, file, path,
-                    "must be scene.define and may appear once");
+                    kind == BOAT_PLUGIN_KIND_FREE
+                        ? "must be scene.define, optionally followed by objective.hud"
+                        : "must be scene.define and may appear once");
             continue;
         }
         if (!strcmp(capability, "scene.define") && order == 0) {
@@ -477,6 +485,9 @@ BoatPluginStatus boat_plugin_decode_voyage(const BoatPluginManifest *manifest,
     if (data->has_scene && data->scene.version != BOAT_SCENE_VERSION)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.version",
             "must be %d, the supported scene schema", BOAT_SCENE_VERSION);
+    if (data->has_scene && data->scene.work_present)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.work",
+            "is only supported by free packages");
     Check check = { d, manifest->entry };
     if (!validate(&check, data))
         return BOAT_PLUGIN_SCHEMA;
@@ -1018,6 +1029,10 @@ BoatPluginStatus boat_plugin_take_scene(const BoatPluginManifest *manifest, bool
     if (scene->version != BOAT_SCENE_VERSION)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.version",
             "must be %d, the supported scene schema", BOAT_SCENE_VERSION);
+    // S1a: work sites run only in the native cargo sandbox, from a free package.
+    if (scene->work_present && strcmp(manifest->kind, "free"))
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "scene.work",
+            "is only supported by free packages");
     BoatSceneDiagnostic check;
     if (!boat_scene_validate(scene, &check))
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, check.field, "%s", check.message);
@@ -1033,11 +1048,19 @@ BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
     if (!(data->version == 1))
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "free.version",
             "must be 1, the supported free schema");
-    BoatPluginFree candidate = { .manifest = *manifest, .digest = 0 };
+    if (data->callbacks != manifest->objective)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
+            "callbacks require objective.hud and that capability requires both callbacks");
+    BoatPluginFree candidate = { .manifest = *manifest, .migrates = data->migrates, .digest = 0 };
     if (boat_plugin_take_scene(manifest, data->has_scene, &data->scene, &candidate.has_scene,
             &candidate.scene, &candidate.scene_digest, d)
         != BOAT_PLUGIN_OK)
         return BOAT_PLUGIN_SCHEMA;
+    // S1c: a free objective is the job of its package's work sites; only the cargo sandbox
+    // hosts it.
+    if (manifest->objective && !candidate.scene.work_present)
+        return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
+            "free objectives require scene.work sites");
     candidate.digest = candidate.scene_digest;
     *out = candidate;
     BoatPluginCost cost = d->cost;
@@ -1137,8 +1160,55 @@ BoatPluginStatus boat_plugin_load_course(const BoatPluginBundle *bundle,
     return boat_plugin_decode_course(&manifest, &data, out, d);
 }
 
+static BoatPluginStatus check_work_sites(const BoatPluginFree *free,
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *d)
+{
+    const BoatSceneDefinition *scene = &free->scene;
+    const char *file = free->manifest.entry;
+    if (!location->mapped) {
+        // An unmapped basin has no map to survey: keep every registered envelope and its restart
+        // margin inside the walls and leave the spawn open.
+        for (unsigned i = 0; i < scene->work_count; ++i) {
+            const BoatSceneWorkSite *site = &scene->work[i];
+            char path[32];
+            snprintf(path, sizeof(path), "scene.work.sites[%u]", i + 1);
+            if (!(fabsf(site->x) + 16 < location->half_extent.x
+                    && fabsf(site->z) + 16 < location->half_extent.y))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                    "lies too close to the edge of the %s basin", location->name);
+            for (unsigned j = 0; j < i; ++j)
+                if (!boat_cargo_sites_apart(&scene->work[j], site))
+                    return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                        "overlaps the envelope of scene.work.sites[%u]", j + 1);
+        }
+        return BOAT_PLUGIN_OK;
+    }
+    if (!map)
+        return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
+            "scene.work requires a mapped location");
+    for (unsigned i = 0; i < scene->work_count; ++i) {
+        const BoatSceneWorkSite *site = &scene->work[i];
+        char path[32];
+        snprintf(path, sizeof(path), "scene.work.sites[%u]", i + 1);
+        // The registered envelope plus a 4 m restart margin.
+        if (boat_cargo_site_near(site, location->spawn, 4))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path, "blocks the location's spawn");
+        for (unsigned j = 0; j < i; ++j)
+            if (!boat_cargo_sites_apart(&scene->work[j], site))
+                return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                    "overlaps the envelope of scene.work.sites[%u]", j + 1);
+        // The sandbox's gentle water heaves moored hulls the same way during the survey.
+        if (!boat_cargo_site_clear(map, scene, boat_water_gentle(), site))
+            return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path,
+                "platform, approach or crane sweep is not clear of the %s map, berths, "
+                "modules or traffic",
+                location->name);
+    }
+    return BOAT_PLUGIN_OK;
+}
+
 BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
-    const BoatWorldDefinition *location, BoatPluginDiagnostic *diagnostic)
+    const BoatWorldDefinition *location, const BoatMap *map, BoatPluginDiagnostic *diagnostic)
 {
     BoatPluginDiagnostic scratch;
     BoatPluginDiagnostic *d = diagnostic ? diagnostic : &scratch;
@@ -1146,6 +1216,9 @@ BoatPluginStatus boat_plugin_free_check_location(const BoatPluginFree *free,
         return diagnose(d, BOAT_PLUGIN_MANIFEST, "plugin.json", "location",
             "is \"%s\"; this session is at \"%s\"", free->manifest.location,
             location ? location->name : "none");
+    if (free->has_scene && free->scene.work_present
+        && check_work_sites(free, location, map, d) != BOAT_PLUGIN_OK)
+        return d->status;
     d->status = BOAT_PLUGIN_OK;
     return BOAT_PLUGIN_OK;
 }

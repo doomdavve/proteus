@@ -18,6 +18,9 @@ typedef struct {
     unsigned host_location;
     bool host_waves;
     unsigned outer_content; // A BoatTitleOuterContent: the harbour's single-player package.
+    const char
+        *data_dir; // Not remembered: --data-dir for the title, so tests never use the player's.
+    bool work_new; // Set by START on WORKING HARBOUR: begin a new job instead of continuing.
     char message[160]; // Shown under the menu, e.g. why the last connection ended.
 } BoatTitleSettings;
 
@@ -28,16 +31,18 @@ typedef enum {
     BOAT_TITLE_HOST
 } BoatTitleChoice;
 // The CONTENT row on GOTHENBURG HARBOUR: the Långedrag voyage, Harbor life, the Grodan canal tour
-// in the Grodan with its passengers, or the same tour in the player's own boat.
+// in the Grodan with its passengers, the same tour in the player's own boat, or the working
+// harbour (cargo jobs that save themselves; native builds only).
 typedef enum {
     BOAT_TITLE_OUTER_STANDARD,
     BOAT_TITLE_OUTER_HARBOR_LIFE,
     BOAT_TITLE_OUTER_GRODAN,
     BOAT_TITLE_OUTER_CANAL_TOUR,
+    BOAT_TITLE_OUTER_WORKING_HARBOUR,
     BOAT_TITLE_OUTER_CONTENTS
 } BoatTitleOuterContent;
 // The saved spelling of a content, also the --title-start suffix: standard, harbor-life, grodan,
-// canal-tour.
+// canal-tour, working-harbour.
 const char *boat_title_outer_content(unsigned content);
 // The bundled package for a content.
 const char *boat_title_outer_package(unsigned content);
@@ -71,4 +76,28 @@ void boat_title_directory_stop(void);
 BoatTitleChoice boat_title_run(BoatTitleSettings *settings);
 // Deterministic 320x200 capture of the main menu at TIME seconds.
 bool boat_title_screenshot(const BoatTitleSettings *settings, double time, const char *path);
+
+// The working-harbour save slot as the SAVE row sees it (SV1h). The game side
+// (wake_velocity_work.c) scans, deletes and sets aside; the title draws and asks.
+typedef struct {
+    bool present, available; // A file is in the slot; it can be continued.
+    char summary[128]; // Upper case; empty when nothing is there.
+    char reason[48]; // Why it is unavailable.
+    char path[1100];
+} BoatTitleSave;
+// Scan DATA_DIR (NULL: the game's data directory) for the bundled work package's slot.
+void wake_work_title_scan(const char *data_dir, BoatTitleSave *save);
+// DELETE SAVE: remove the slot's file and its backup. True when neither remains.
+bool wake_work_title_delete(const BoatTitleSave *save);
+// NEW over an unavailable save: set it and its backup aside as .rejected (never deleted).
+bool wake_work_title_set_aside(const BoatTitleSave *save);
+
+// Capture options (--title --screenshot): the Single Player panel, with the SAVE row in a mode
+// (0 continue, 1 new, 2 delete) and optionally with its confirmation open.
+typedef struct {
+    bool solo, ask;
+    int save_mode;
+} BoatTitleCapture;
+bool boat_title_screenshot_panel(
+    const BoatTitleSettings *settings, double time, const char *path, const BoatTitleCapture *cap);
 #endif
