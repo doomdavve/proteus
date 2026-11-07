@@ -1279,7 +1279,7 @@ static int work_sites(void)
     CHECK(boat_plugin_read("plugins/outer-work", NULL, &files, &d) == BOAT_PLUGIN_OK);
     BoatPluginBundle bundle = boat_plugin_bundle(&files);
     CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
-    CHECK(free.has_scene && free.scene.work_present && free.scene.work_count == 3);
+    CHECK(free.has_scene && free.scene.work_present && free.scene.work_count == 4);
     CHECK(free.manifest.objective && !free.manifest.timers);
     const BoatSceneWorkSite *site = &free.scene.work[0];
     CHECK(!strcmp(site->id, "eriksberg") && site->x == 10 && site->z == 245 && site->heading == 0);
@@ -1290,6 +1290,10 @@ static int work_sites(void)
     CHECK(landing->heading == -.45f && landing->preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM);
     CHECK(!site->hidden && !landing->hidden && free.scene.work[2].hidden);
     CHECK(!strcmp(free.scene.work[2].id, "landing_quay"));
+    // S1d: the jetty, a hidden receiver 120 m east of the quay, built with it.
+    const BoatSceneWorkSite *jetty = &free.scene.work[3];
+    CHECK(!strcmp(jetty->id, "jetty") && jetty->x == -245 && jetty->z == 10 && jetty->hidden);
+    CHECK(jetty->heading == -1.57f && jetty->preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM);
     // Absent subsystems keep their compiled defaults; only work is authored.
     CHECK(!free.scene.berths_present && !free.scene.modules_present && !free.scene.traffic_present);
 
@@ -1308,7 +1312,7 @@ static int work_sites(void)
     CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
     CHECK(boat_plugin_decoded_revision(&back, &revision, &d));
     CHECK(revision.free.scene_digest == free.scene_digest);
-    CHECK(!memcmp(revision.free.scene.work, free.scene.work, 3 * sizeof(*site)));
+    CHECK(!memcmp(revision.free.scene.work, free.scene.work, 4 * sizeof(*site)));
     CHECK(back.free.callbacks && revision.free.manifest.objective);
     // An explicit hidden = false keeps the S1b digest; hiding a site changes it.
     BoatSceneDefinition shown = free.scene;

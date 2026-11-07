@@ -520,8 +520,59 @@ static int work_commands(void)
     return 0;
 }
 
+// S1d: cargo.supply and work.guide ride the same grant, each at most once per batch and in its
+// own ID namespace (one batch may enable, supply and guide the same site). Cargo events carry
+// their load number; other events omit the field.
+static int supply_commands(void)
+{
+    static const char script[]
+        = "return {init=function(c) return {}, {} end,"
+          "update=function(c,s) local e=c.events[1] return s, {"
+          "{kind='work.enable',generation=c.generation,id='quay'},"
+          "{kind='cargo.supply',generation=c.generation,id='quay'},"
+          "{kind='work.guide',generation=c.generation,id='quay'},"
+          "{kind='hud.set',generation=c.generation,id='load',label='LOAD',value=e.load or -1}}"
+          " end}";
+    BoatPluginObjective o = fresh();
+    CHECK(step(&o, script, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_OK);
+    BoatPluginEvent cargo = { .tick = 11, .sequence = 1, .kind = "cargo.delivered", .id = "a" };
+    cargo.load = 2;
+    BoatPluginObjective denied = o;
+    CHECK(step(&denied, script, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, &cargo, 1) == BOAT_PLUGIN_SCHEMA);
+    CHECK(denied.quarantined && strstr(diagnostic.message, "requires a free package"));
+    o.work_enabled = true;
+    BoatPluginObjective plain = o;
+    CHECK(step(&o, script, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, &cargo, 1) == BOAT_PLUGIN_OK);
+    CHECK(o.command_count == 4 && !strcmp(o.commands[1].kind, "cargo.supply"));
+    CHECK(!strcmp(o.commands[2].kind, "work.guide") && !strcmp(o.commands[2].id, "quay"));
+    CHECK(o.hud_count == 1 && o.hud[0].value == 2);
+    BoatPluginEvent visit = { .tick = 11, .sequence = 1, .kind = "visit", .id = "a" };
+    CHECK(step(&plain, script, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, &visit, 1) == BOAT_PLUGIN_OK);
+    CHECK(plain.hud_count == 1 && plain.hud[0].value == -1);
+    static const char *const invalid[] = {
+        ("{kind='cargo.supply',generation=c.generation,id='a'},"
+         "{kind='cargo.supply',generation=c.generation,id='b'}"),
+        ("{kind='work.guide',generation=c.generation,id='a'},"
+         "{kind='work.guide',generation=c.generation,id='b'}"),
+        "{kind='cargo.supply',generation=c.generation,id='a',value=1}",
+        "{kind='work.guide',generation=c.generation}",
+        "{kind='cargo.supply',generation=0,id='a'}",
+    };
+    for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        char source[256];
+        snprintf(
+            source, sizeof(source), "return {update=function(c,s) return s, {%s} end}", invalid[i]);
+        BoatPluginObjective rejected = o;
+        CHECK(step(&rejected, source, BOAT_PLUGIN_OBJECTIVE_UPDATE, 24, NULL, 0)
+            == BOAT_PLUGIN_SCHEMA);
+        CHECK(rejected.quarantined && rejected.tick == o.tick && rejected.command_count == 4);
+    }
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(work_commands),
+    TEST_CASE(supply_commands),
     TEST_CASE(independent_budgets),
     TEST_CASE(schema_timer_retirement),
     TEST_CASE(timer_capabilities),

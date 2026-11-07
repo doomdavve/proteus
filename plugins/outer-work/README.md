@@ -2,9 +2,12 @@
 
 The work-site package for the native `cargo_sandbox` on `outer`. It places a `service_platform`
 site, where the crate starts, at the north end of the Eriksberg inlet, a
-`receiving_platform` landing in open water about 270 m south-east, and a hidden
-`landing_quay` beside the landing. Its Lua job (`init`/`update`, granted by `objective.hud`)
-counts the first `cargo.delivered` at the landing and builds the quay with `work.enable`; see
+`receiving_platform` landing in open water about 270 m south-east, a hidden `landing_quay`
+beside the landing and a hidden `jetty` receiver 120 m east of the quay. Its Lua job
+(`init`/`update`, granted by `objective.hud`) counts load 1's `cargo.delivered` at the landing,
+builds the quay and jetty with `work.enable`, uses the delivered crate up for load 2 on the
+quay's pad with `cargo.supply`, points the helm at the jetty with `work.guide`, and counts the
+jetty's delivery; see
 the [job contract](../../docs/PLUGIN_API.md#work-site-job-s1c), the
 [free ride sandbox plan](../../docs/FREE_RIDE_SANDBOX_PLAN.md#s1-steps)
 and the [`scene.work` schema](../../docs/PLUGIN_API.md#work-sites-s1a).

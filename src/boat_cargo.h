@@ -36,8 +36,12 @@ typedef struct {
     float settled; // Continuous seconds of low relative speed on the deck.
     unsigned char pad; // The crane whose pad supports a BOAT_CARGO_PAD load.
     bool deck_contact;
-    // S1c: committed once per session, at a receiving pad; recovery and re-delivery keep it.
+    // S1c: committed at a receiving pad; recovery and re-delivery keep it. Since S1d a load
+    // commits once at each receiver (RECEIVERS has a bit per site), so a load set down at the
+    // wrong one can still reach the right one.
     bool delivered;
+    unsigned char receivers;
+    unsigned load; // S1d: which load this is, from 1; a supply starts the next.
     bool wet; // Resting in water since its last support; a LOST event marks the first touch.
     float rest; // Continuous seconds at rest on a receiving pad, toward delivery.
 } BoatCargo;
@@ -53,6 +57,7 @@ typedef struct {
 
 // S1c: native cargo events, in the order they happened. SITE indexes the cranes: the site
 // worked at for SECURED and LOST, the receiver for DELIVERED and the source pad for RESET.
+// LOAD is the crate's load number when the event happened (S1d).
 typedef enum {
     BOAT_CARGO_EVENT_SECURED,
     BOAT_CARGO_EVENT_DELIVERED,
@@ -62,6 +67,7 @@ typedef enum {
 typedef struct {
     BoatCargoEventKind kind;
     unsigned site;
+    unsigned load;
 } BoatCargoEvent;
 #define BOAT_CARGO_EVENTS 8 // One tick and one action add at most two; drain every tick.
 
@@ -141,6 +147,13 @@ bool boat_cargo_recover(BoatCargoSandbox *sandbox);
 bool boat_cargo_site_enable(BoatCargoSandbox *sandbox, unsigned site, const Boat *boat);
 // Whether the boat or the load occupies SITE's envelope (the reason an enable is refused).
 bool boat_cargo_site_occupied(const BoatCargoSandbox *sandbox, unsigned site, const Boat *boat);
+// S1d: whether a delivered load, resting on a pad or floating (never hooked, aboard or lashed),
+// can be used up for a supply.
+bool boat_cargo_supply_ready(const BoatCargoSandbox *sandbox);
+// S1d: use up the delivered load and place the next one, undelivered, on built service platform
+// SITE's pad, which becomes its source. Refused, changing nothing, unless the load is ready and
+// SITE is a visible service platform. Queues no event: the job asked for it.
+bool boat_cargo_supply(BoatCargoSandbox *sandbox, unsigned site);
 // Explicit generous attachment; release keeps the instantaneous load velocity.
 bool boat_cargo_hook_toggle(BoatCargoSandbox *sandbox);
 bool boat_cargo_lash_toggle(BoatCargoSandbox *sandbox, const Boat *boat);
