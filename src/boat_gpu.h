@@ -23,6 +23,8 @@ typedef struct {
     double wake_upload_seconds;
     size_t wake_uploads;
     float daylight; // Presentation phase, 0 (day; init resets it) .. 1 (dusk).
+    float hour; // Full-day hour used when hour_set; never aliases daylight.
+    bool hour_set; // Zero-init false keeps the legacy daylight phase.
     // HDR presentation, off unless requested: the colour pass renders into hdr_target (RGBA16F,
     // with depth) and the post shader blooms, grades and clamps it into target. The rear-view
     // mirror and supersampling keep drawing 8-bit directly.
@@ -48,8 +50,9 @@ void boat_gpu_destroy(BoatGpu *gpu);
 // does after a failed allocation here or in a later resize.
 bool boat_gpu_set_hdr(BoatGpu *gpu, bool enabled);
 bool boat_gpu_hdr_active(const BoatGpu *gpu);
-// Bloom, grade (for daylight PHASE) and clamp hdr_target into target. boat_gpu_draw_scene calls
-// this after its colour pass; tests call it on a hand-filled hdr_target.
+// Legacy bloom, grade (for daylight PHASE) and clamp of hdr_target into target. Kept for existing
+// callers and tests. boat_gpu_draw_scene uses the full-day hour grade when hour_set and otherwise
+// this wrapper for the legacy daylight phase; tests call it on a hand-filled hdr_target.
 void boat_gpu_present_hdr(BoatGpu *gpu, float phase);
 // Bytes held by the HDR scene, its depth and the bloom chain.
 size_t boat_gpu_hdr_bytes(const BoatGpu *gpu);

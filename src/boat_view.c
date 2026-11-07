@@ -757,7 +757,9 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
     for (int i = 0; i < width * height; ++i)
         pixels[i] = (Color) { 21, 36, 48, 255 };
     View3D camera = boat_camera(boat, presentation, world->definition, camera_settings);
-    WaterfrontLighting lighting = waterfront_lighting(cpu->daylight);
+    WaterfrontLighting lighting;
+    if (!cpu->hour_set || !waterfront_lighting_hour(cpu->hour, &lighting))
+        lighting = waterfront_lighting(cpu->daylight);
     if (world->definition->mapped) {
         if (!waterfront_scenery_bind(&cpu->scenery, world->definition->map)
             || !waterfront_draw_boating(renderer, &cpu->scenery, pixels, width, height, camera,

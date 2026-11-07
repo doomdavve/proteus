@@ -7,7 +7,8 @@ multiplayer sessions; explicit CLI launches use `--daylight` independently. The 
 direction is to represent any hour of an authored 24-hour day, beginning with fixed-time
 evaluation and review. A later sandbox-specific step now targets a 15-real-minute
 day/night cycle (900 seconds = 24 game hours). General Auto controls, room-wide time and
-plugin schedules remain deferred. No new runtime behavior is implemented by this plan review.
+plugin schedules remain deferred. T1 adds the fixed-hour evaluator, provisional anchors and
+a developer review input; the named presets and player settings are unchanged.
 
 The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
 will expose approved fixed lighting choices, then separately scoped transitions and
@@ -62,14 +63,14 @@ modes keep their fixed lighting choices and Day default.
 
 ## Review and direction, 2026-11-07
 
-**Finding:** the shared `WaterfrontLighting` is the right consumer boundary, but its input
-is currently a clamped evening blend, not a clock. `waterfront_lighting(phase)` maps
+**Baseline finding, before T1:** the shared `WaterfrontLighting` is the right consumer
+boundary, but its original input is a clamped evening blend, not a clock. `waterfront_lighting(phase)` maps
 0 → day, 0.5 → sunset and 1 → dusk; all three use the same sun bearing. Extending this
 scalar past 1 or reversing dusk back into day would not give a coherent full day. Dawn
 needs its own sky and opposite-side low sun, and night needs a readable recipe beyond
 the approved dusk. The shader/cache and presentation consumers must follow that model.
 
-### Fixed-time contract (planned)
+### Fixed-time contract
 
 - Evaluate an explicit presentation hour in [0, 24), wrapping 24 to 0. Document finite
   input normalization and invalid-input handling. A new full-day input must remain
@@ -102,18 +103,18 @@ the approved dusk. The shader/cache and presentation consumers must follow that 
   renderer does not imply shared room time, a protocol change, replay persistence, Lua
   access or an automatic schedule. Define ownership and persistence before adding those.
 
-### Next implementation slices (all planned)
+### Implementation slices
 
 | Step | Scope | Completion evidence |
 | --- | --- | --- |
-| T1 — full-day evaluator and fixed-hour review input | Add the explicit hour contract, artistic anchors and sun path behind a developer review input. Preserve legacy preset/CLI/save behavior and default Day. Keep one shared frame; add no Auto. | Evaluator checks cover every hour, anchor boundaries, midnight continuity, horizon crossings, valid unit directions, normalization/invalid input and legacy exactness. Direct and backward seeks agree. Candidate anchor captures establish what still needs art review. |
+| T1 — full-day evaluator and fixed-hour review input (implemented locally) | Explicit hour contract, artistic anchors and sun path behind a developer review input. Legacy preset/CLI/save behavior and default Day remain. One shared frame, no Auto. | Evaluator, CLI and capture checks passed; new-hour looks remain provisional. Detailed evidence is in the [T1 result](#t1-implementation-2026-11-07). |
 | T2 — renderer agreement and readable night/morning | Refine the new looks and wire every consumer, including grading, materials, lamps, water and reflections. Resolve the CPU basin's independent light/no-sky path and textured-box lighting gap, or document an explicitly reviewed fallback. Bound sky repaint/upload work before exposing continuous scrubbing; the present ~25 ms Debug repaint cannot happen every changing frame. | Inspect matched CPU/GPU basin, outer harbour/bridge/quay and outer-coast views at anchors, all integer hours and difficult midpoints. Review seam/horizon/azimuth boundaries, emissive vs illuminated surfaces, storm, course/weapon visibility and glitter in motion. Record measured frame/cache cost. |
 | T3 — fixed-hour player controls and qualification | Expose the reviewed hours through the local LIGHTING setting, keeping the existing named choices and Day default. Choose a simple hour control/names after the review; persist a versioned choice without repurposing the old numeric phase. Add documented CLI/review examples when implemented. | Verify native/browser save/load, invalid and old settings, explicit CLI precedence, new solo/join/host sessions and return to title. Run build/full CTest, inspect representative captures and a windowed manual demo; qualify platform/package limits. Fixed-selector and new-look user acceptance remain separate. |
 | T4 — sandbox 15-minute day/night cycle | After T1–T3 and their rendering/performance gates, drive the free ride sandbox's shared lighting from a session-owned presentation timeline: 900 active real seconds = 24 game hours. Wire the custom workboat/crane/cargo view into that frame. See the clock and upload contracts below and the [sandbox owner](FREE_RIDE_SANDBOX_PLAN.md#sandbox-daynight-cycle-t4). | Virtual-clock tests prove rate, pause/resume, seeks and repeated midnight wrap; matched CPU/GPU captures and a windowed cycle review prove smooth light and readable crane/cargo work at night. Measure sky work/upload and frame cost through a whole cycle. Planned, not implemented or visually accepted. |
 | Later — general Auto and script/room ownership | General Auto controls, title phase, replay persistence and room authority remain separate decisions. Coordinate plugin L5/L6 bounds and versioning before adding scripts or shared time. | Room/replay/Apply/Undo and synchronization evidence where those features are introduced. These remain deferred and are not dependencies of the solo sandbox cycle. |
 
-T1 is the next lighting implementation task when selected. T2 may need smaller renderer
-changes; keep each reviewable and record evidence here.
+T1 is implemented; T2 is the next lighting implementation task. T2 may need smaller
+renderer changes; keep each reviewable and record evidence here.
 
 ### Sky rendering and GPU uploads (T2 prerequisite for T4)
 
@@ -154,8 +155,8 @@ this upload strategy is planned, not yet benchmarked.
 The requested initial tuning is **15 real minutes per full day**, equivalent to one
 game hour every **37.5 real seconds** (96× game time). Use
 `hour = wrap24(start_hour + active_elapsed_seconds * 24 / 900)`, with an explicit input
-timeline so captures and tests can seek directly without waiting 15 minutes. Start a
-new sandbox in the reviewed Day look; choose its exact anchor hour in T1.
+timeline so captures and tests can seek directly without waiting 15 minutes. T4 starts a
+new sandbox at T1's 12:00 Day anchor after its visual review.
 
 Advance during active play, including crane mode. Proposed solo behavior: pause freezes
 the presentation clock with the world; suspended/background time causes no catch-up jump
@@ -179,6 +180,62 @@ and new gameplay visibility rules remain outside this work. T4 adds cycling only
 sandbox; general Auto remains deferred.
 
 ## Current status
+
+### T1 implementation, 2026-11-07
+
+**Completed:** `waterfront_lighting_hour()` evaluates a fixed artistic day with anchors at
+0 night, 4.5 dawn, 6 sunrise, 9 morning, 12 day, 15 afternoon, 18 sunset, 19.5 dusk and
+21.5 night; hour 24 repeats night at the seam. Elevation and azimuth are interpolated as
+angles, sunrise/sunset use opposite bearings, and the maximum elevation stays below the
+zenith. Direct light, disc, glitter, highlight and cast water shadow share a continuous
+horizon gate, so all are zero at or below the horizon. Night and dawn have their own recipes.
+Day, sunset and dusk reuse the approved palettes at their anchor hours with new bearings;
+those fixed-hour looks are provisional and not visually reviewed here. The legacy evaluator,
+`--daylight`, named saves and the zero-initialized Day default are unchanged.
+
+Finite hours wrap into `[0,24)`; negative values come back from the other side of
+midnight. Signed zero, and any wrapped result that rounds to 24, are canonicalized to 0.
+Non-finite input and bad strings fail explicitly and preserve outputs.
+`waterfront_grade_hour()` supplies a neutral new-hour grade without calling the legacy
+evening evaluator with an hour. `BoatGpu`/`BoatCpuView` carry a zero-safe `hour`/`hour_set`
+override, and `--lighting-hour H` is available in `wake_velocity` and `boat_water_review`;
+it overrides `--daylight` independent of order. The game's `--time` remains drive/wave
+time; review tools keep their explicit pose ticks and clip frames. Review metadata
+reports the mode, legacy daylight value and hour separately.
+
+**Automated verification (2026-11-07, Apple Silicon/macOS, Debug):** the final incremental
+build passed without compiler warnings. `ctest --preset full` passed all 387 enabled tests
+with local sockets enabled (`PROTEUS_GPU_TESTS=OFF`, 13 retired checks disabled). The
+focused lighting/grade/CLI selection passed 8 of 8 and the quick preset passed 268 enabled
+tests. Coverage includes legacy fixtures, invalid/wrapped inputs with output preservation,
+all integer hours, a dense sweep with separate field scales, positive near-horizon
+attenuation, midnight/horizon boundaries, unit sun directions, neutral grades and
+direct/backward/reordered seeks. CLI precedence is compared against an hour-only reference.
+Review caught and corrected a degrees/radians error in the five-degree fade; the new
+near-horizon checks reject the original error.
+
+**Agent visual and integration checks:** six legacy CPU captures (basin/outer at
+day/sunset/dusk) and three outer GPU captures remained byte-identical to `c7ab6d8`.
+Main-CLI checks
+passed `0=24`, `-1=23`, both hour-over-dusk orders, title-injected preset override and
+invalid/missing hours. After the fade correction, CPU/GPU captures at 0, 4.5, 6, 6.1, 6.5,
+9, 12, 15, 18, 19.5 and 21.5 hours were inspected. Both review-tool runs produced 31
+captures across 13 pose groups at hour 6.5 with correct mode/hour metadata; basin, bridge,
+coast and dock samples were inspected. A high/HDR night capture and a 180-frame windowed
+GPU HDR night demo (music Off, exit 0, final frame inspected) passed. Local artifacts are
+in ignored `build/t1-review/`; the saved pre-change references are in `build/t1-baseline/`.
+Changed links, command examples and `git diff --check` were checked before handoff.
+
+**Limits:** new-hour looks have no human acceptance. Browser/Windows and the GPU CTest
+matrix were not run. CPU basin sky/light, textured-box lighting, night shadow-map cost
+and storm/course/weapon readability remain T2 work; no continuous-clock performance is
+claimed. An initial GLFW monitor-enumeration failure also affected the unchanged binary;
+macOS/GLFW display probes and subsequent baseline/new GPU runs succeeded without a source
+workaround. Its exact cause was not established.
+
+**Next task:** T2 renderer agreement and readable night/morning, including the planned
+static cloud mask and uniform sky upload path. T3 menu controls, T4 cycle, Lua access, room
+time and replay persistence remain planned.
 
 ### Plan review, 2026-11-07
 
@@ -204,9 +261,9 @@ All 48 changed/owning-plan local link references and `git diff --check` passed. 
 sandbox cycle and upload strategy are documentation only; neither has runtime or
 performance evidence yet.
 
-**Next task:** T1, the separate full-day evaluator and developer fixed-hour review input.
-The current menu still needs the player's playback review. The historical verification
-and limits below apply to their dated changes, not to the proposed full-day work.
+**Next task at the plan-review baseline:** T1, now implemented above. The current menu still
+needs the player's playback review. The historical verification and limits below apply to
+their dated changes, not to the T1 full-day work.
 
 ### Menu setting, 2026-11-06
 

@@ -1212,6 +1212,32 @@ add_test(NAME boat_cpu_aa_option_reversed COMMAND wake_velocity --gpu-aa --rende
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option-reversed.png)
 add_test(NAME boat_outer_screenshot COMMAND wake_velocity --renderer cpu --location outer --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-outer.png)
+add_test(NAME boat_lighting_hour_screenshot COMMAND wake_velocity --renderer cpu --location outer
+  --lighting-hour 12 --time 0 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour.png)
+add_test(NAME boat_lighting_hour_precedence_a COMMAND wake_velocity --renderer cpu --location outer
+  --daylight sunset --lighting-hour 12 --time 0
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-a.png)
+add_test(NAME boat_lighting_hour_precedence_b COMMAND wake_velocity --renderer cpu --location outer
+  --lighting-hour 12 --daylight sunset --time 0
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-b.png)
+add_test(NAME boat_lighting_hour_precedence_matches COMMAND ${CMAKE_COMMAND} -E compare_files
+  ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-a.png
+  ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-b.png)
+add_test(NAME boat_lighting_hour_precedence_reference_matches COMMAND ${CMAKE_COMMAND} -E
+  compare_files ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour.png
+  ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-a.png)
+add_test(NAME boat_lighting_hour_rejected COMMAND wake_velocity --renderer cpu --location outer
+  --lighting-hour nan --time 0 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-bad.png)
+set_tests_properties(boat_lighting_hour_rejected PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(boat_lighting_hour_screenshot boat_lighting_hour_precedence_a
+  boat_lighting_hour_precedence_b PROPERTIES FIXTURES_SETUP lighting_hour_precedence)
+set_tests_properties(boat_lighting_hour_precedence_matches
+  boat_lighting_hour_precedence_reference_matches
+  PROPERTIES FIXTURES_REQUIRED lighting_hour_precedence)
+set_tests_properties(boat_lighting_hour_screenshot boat_lighting_hour_precedence_a
+  boat_lighting_hour_precedence_b boat_lighting_hour_precedence_matches
+  boat_lighting_hour_precedence_reference_matches boat_lighting_hour_rejected
+  PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # The retired river location names its replacement instead of printing the usage.
 add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)
 add_test(NAME boat_server_river_location_retired COMMAND boat_server --location river)

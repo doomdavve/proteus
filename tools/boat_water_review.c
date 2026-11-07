@@ -406,6 +406,9 @@ static int stress_lights;
 static bool no_ambient_occlusion, no_particles, no_shadows, no_reflections;
 // --daylight: review poses at a fixed presentation phase (default day).
 static float review_daylight = WATERFRONT_DAYLIGHT_DAY;
+// --lighting-hour: developer full-day hour; overrides --daylight when set.
+static float review_hour;
+static bool review_hour_set;
 // --resolution and --hdr: the presentation preset of review and benchmark GPU views, sized for
 // a 1280x800 window (low: 320x200; high: a 1280x800 scene and 640x480 reflection). HDR follows
 // the resolution unless set.
@@ -940,6 +943,7 @@ static int check_light_clusters(void)
     // Dusk, then dusk with hundreds of review lights, at both presets: the slot lists draw
     // exactly the reference that shades every light everywhere.
     gpu.daylight = WATERFRONT_DAYLIGHT_DUSK;
+    gpu.hour_set = false; // This internal dusk parity check does not use the review hour.
     BoatScreenLayout layouts[] = { boat_screen_layout(BOAT_RESOLUTION_LOW, 320, 200, 960, 600),
         boat_screen_layout(BOAT_RESOLUTION_HIGH, 320, 200, 1280, 800) };
     for (int stress = 0; stress < 2; ++stress) {
@@ -1513,6 +1517,8 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
         goto cleanup;
     }
     gpu.daylight = review_daylight;
+    gpu.hour = review_hour;
+    gpu.hour_set = review_hour_set;
     if (stress
         && (!stress_init(&stress_fixture, waves)
             || !stress_advance(&stress_fixture, STRESS_PREROLL_TICKS))) {
@@ -1707,8 +1713,11 @@ static int benchmark(const char *prefix, bool waves, bool aa, bool visible, cons
     json_string(json, renderer_name);
     fputs(",\"gl_version\":", json);
     json_string(json, gl_version);
-    fprintf(json, ",\n  \"daylight\":%.6g,\"stress_lights\":%d,\"light_build_us\":%.6g,\"lights\":",
-        (double)review_daylight, gpu.scene.stress_lights, light_build_us);
+    fprintf(json,
+        ",\n  \"lighting_mode\":\"%s\",\"daylight\":%.6g,\"lighting_hour\":%.6g,"
+        "\"stress_lights\":%d,\"light_build_us\":%.6g,\"lights\":",
+        review_hour_set ? "hour" : "daylight", (double)review_daylight, (double)review_hour,
+        gpu.scene.stress_lights, light_build_us);
     json_lights(json, &gpu.scene);
     fprintf(json,
         ",\n  \"renderer\":\"gpu\",\"aa\":\"%s\",\"preset\":\"%s\",\"window\":\"%s\","
@@ -2805,6 +2814,8 @@ static int place_clip(const char *directory, int frames, bool squall)
     if (!boat_gpu_init(&gpu, clip_aa) || !boat_gpu_resize(&gpu, width, height))
         goto cleanup;
     gpu.daylight = review_daylight;
+    gpu.hour = review_hour;
+    gpu.hour_set = review_hour_set;
     for (int frame = 0; frame < frames; ++frame) {
         double time = frame / 60.0;
         BoatViewState view = { .boat = session.boat, .time = time };
@@ -3030,16 +3041,19 @@ static int review(const char *directory, bool use_gpu)
         goto cleanup;
     }
     gpu.daylight = cpu_view.daylight = review_daylight;
+    gpu.hour = cpu_view.hour = review_hour;
+    gpu.hour_set = cpu_view.hour_set = review_hour_set;
     fprintf(manifest,
         "{\n  \"schema_revision\":2,\"tool\":\"boat_water_review\",\"mode\":\"review\",\n"
-        "  \"daylight\":%.6g,\n"
+        "  \"lighting_mode\":\"%s\",\"daylight\":%.6g,\"lighting_hour\":%.6g,\n"
         "  \"renderer\":\"%s\",\"resolution\":[%d,%d],\"gpu_aa\":%s,\"hdr\":%s,"
         "\"physics_revision\":%d,\n"
         "  \"clock\":\"explicit pose tick * BOAT_STEP; presentation only\",\n"
         "  \"check_command\":\"boat_water_review --check\",\n"
         "  \"capture_command\":\"boat_water_review --review DIR --renderer %s\",\n"
         "  \"poses\":[\n",
-        (double)review_daylight, use_gpu ? "gpu" : "cpu", use_gpu ? gpu.target.texture.width : 320,
+        review_hour_set ? "hour" : "daylight", (double)review_daylight, (double)review_hour,
+        use_gpu ? "gpu" : "cpu", use_gpu ? gpu.target.texture.width : 320,
         use_gpu ? gpu.target.texture.height : 200,
         use_gpu && gpu.supersampled.id ? "true" : "false",
         boat_gpu_hdr_active(&gpu) ? "true" : "false", BOAT_PHYSICS_REVISION,
@@ -3236,6 +3250,12 @@ int main(int argc, char **argv)
                 fprintf(stderr, "--daylight takes day, sunset, dusk or 0..1.\n");
                 return 2;
             }
+        } else if (strcmp(argv[i], "--lighting-hour") == 0 && i + 1 < argc) {
+            if (!waterfront_hour_parse(argv[++i], &review_hour)) {
+                fprintf(stderr, "--lighting-hour takes a finite hour (wrapped into 0..24).\n");
+                return 2;
+            }
+            review_hour_set = true;
         } else if (strcmp(argv[i], "--check-scene-depth") == 0)
             scene_depth = true;
         else if (strcmp(argv[i], "--history-clip") == 0 && i + 2 < argc) {
@@ -3273,6 +3293,7 @@ int main(int argc, char **argv)
                  "                    [--no-far-water] [--light-fallback] [--light-reference]\n"
                  "                    [--stress-lights N] [--no-ambient-occlusion]\n"
                  "                    [--no-particles] [--no-shadows] [--no-reflections]\n"
+                 "                    [--daylight ...] [--lighting-hour H]\n"
                  "       boat_water_review --check-wake-stamp | --check-water-history\n"
                  "                         | --check-scene-depth\n"
                  "       boat_water_review --history-clip DIR FRAMES\n"
@@ -3286,8 +3307,8 @@ int main(int argc, char **argv)
                  "                         [--daylight day|sunset|dusk|0..1]\n"
                  "                         [--scenario river|outer|stress] [--waves]\n"
                  "                         [--visible [--pacing cap|deadline|vsync]]\n"
-                 "                         [--tile-size M]\n"
-                 "--tile-size: render tile edge, 64..65536 m (default 2048).\n"
+                 "                         [--tile-size M]\n");
+            puts("--tile-size: render tile edge, 64..65536 m (default 2048).\n"
                  "--analytic-wakes shades object wakes with the reference per-piece loop; by\n"
                  "  default they sample the stamped field (1024 texels of 0.25 m).\n"
                  "--no-water-history shades stamp-only water, without foam history and ripples.\n"
@@ -3306,6 +3327,8 @@ int main(int argc, char **argv)
                  "--place-clip writes FRAMES (1..3600) 60 Hz outer-harbour frames to DIR, all\n"
                  "  G4 water left and G3b water right; squall brings a weather squall in.\n"
                  "  --clip-aa off draws it without supersampling; --daylight sets the light.\n"
+                 "--lighting-hour H selects a developer full-day hour and overrides --daylight\n"
+                 "  regardless of argument order; pose ticks and clip frames still drive waves.\n"
                  "--scenario river: the existing river route; outer: the same route on the outer\n"
                  "  map, continued across the estuary; stress: four basin boats with\n"
                  "  saturated boat and traffic wake pools (deterministic pre-roll).\n"

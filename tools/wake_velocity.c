@@ -244,6 +244,8 @@ static void usage(void)
     cli_usage_line(stdout, "--hdr on|off",
         "HDR scene with restrained bloom and grade (default: on at high resolution)");
     cli_usage_line(stdout, "--daylight day|sunset|dusk", "Fixed lighting (default day)");
+    cli_usage_line(stdout, "--lighting-hour H",
+        "Developer full-day hour; overrides --daylight; --time stays drive time");
     cli_usage_line(
         stdout, "--no-far-detail", "Draw distant scenery at full detail, for comparison");
     cli_usage_line(stdout, "--no-vsync", "Pace at exactly 60 Hz");
@@ -618,6 +620,8 @@ static int study(int argc, char **argv)
     BoatResolution resolution = BOAT_RESOLUTION_LOW;
     int hdr_option = -1; // --hdr; unset follows the resolution.
     float daylight_phase = WATERFRONT_DAYLIGHT_DAY;
+    float lighting_hour = 0;
+    bool lighting_hour_set = false;
     bool profiler_visible = false;
     const char *performance_report = NULL;
     bool performance_capture = true;
@@ -684,6 +688,10 @@ static int study(int argc, char **argv)
         } else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
             if (!waterfront_daylight_parse(argv[++i], &daylight_phase))
                 goto invalid;
+        } else if (strcmp(argv[i], "--lighting-hour") == 0 && i + 1 < argc) {
+            if (!waterfront_hour_parse(argv[++i], &lighting_hour))
+                goto invalid;
+            lighting_hour_set = true;
         } else if (strcmp(argv[i], "--no-far-detail") == 0) {
             far_detail = false;
         } else if (strcmp(argv[i], "--profiler") == 0) {
@@ -1072,6 +1080,8 @@ static int study(int argc, char **argv)
     Renderer3D renderer = { 0 };
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     cpu_view.daylight = daylight_phase;
+    cpu_view.hour = lighting_hour;
+    cpu_view.hour_set = lighting_hour_set;
     BoatGpu gpu = { 0 };
     int water_layer = 0, review_label_frames = 0; // F8 and F9; label frames left.
     const char *review_label = NULL;
@@ -1324,6 +1334,8 @@ static int study(int argc, char **argv)
         }
         waterfront_gpu_scene_set_detail_enabled(&gpu.scene, far_detail);
         gpu.daylight = daylight_phase;
+        gpu.hour = lighting_hour;
+        gpu.hour_set = lighting_hour_set;
         if (!apply_screen_layout(&gpu,
                 boat_screen_layout(
                     resolution, width, height, GetScreenWidth(), GetScreenHeight()))) {

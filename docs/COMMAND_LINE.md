@@ -191,10 +191,24 @@ and [arcade object results](WAKE_OBJECT_RESULTS.md). Field mode is unavailable i
 
 ## Rendering, captures and profiling
 
-`--daylight day|sunset|dusk` selects a fixed lighting preset (default day); a numeric
+`--daylight day|sunset|dusk` selects a fixed legacy lighting preset (default day); a numeric
 phase 0..1 blends between them. In the title, SETTINGS → LIGHTING remembers DAY,
 SUNSET or DUSK for your new solo and multiplayer sessions. Explicit CLI launches use
 their own options rather than the saved title choice.
+
+`--lighting-hour H` is the developer full-day review input. Any finite hour wraps into
+`[0,24)` (`24` is midnight, `-1` is 23:00); non-finite values are rejected. It overrides
+`--daylight` regardless of argument order. `--time` still selects the scripted drive and
+wave time, not the light, so the same hour can be captured at different moments:
+
+```sh
+./build/wake_velocity --renderer cpu --location outer --lighting-hour 21 --time 3 \
+  --screenshot build/outer-21h.png
+./build/boat_water_review --review build/lighting-review --renderer cpu --lighting-hour 6
+```
+
+The named Day, Sunset and Dusk recipes keep their exact legacy behavior; new hours are
+provisional art for review.
 
 GPU is the default. `--renderer cpu` selects the software reference; `--gpu` is an alias
 for `--renderer gpu`. `--gpu-aa` enables 4×4 supersampling while preserving the logical
