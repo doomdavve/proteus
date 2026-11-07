@@ -1,8 +1,8 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-07: **S1b implemented locally: the bundled `proteus.outer-work` package now
-places a second, turned receiving site, and the crate can be carried there and set down on its
-pad.** S1a (the Eriksberg site from the package) sits beneath it; S0a and S0b are merged
+Status, 2026-11-07: **S1b implemented locally and accepted: the bundled `proteus.outer-work`
+package now places a second, turned receiving site, and the user drove the whole tour by hand
+(“Works great! I did the whole tour. Mechanics work great.”).** S1a (the Eriksberg site from the package) sits beneath it; S0a and S0b are merged
 (#159–#162). The standalone `cargo_sandbox` loads its `outer` sites from that package's
 [`scene.work`](PLUGIN_API.md#work-sites-s1a); `--location basin` retains the controlled
 reference. It is still a handling
@@ -31,9 +31,8 @@ physics and validation native. Completed S1a, 2026-11-07, on local branch
 `feat/sandbox-s1a-site-package` (stacked on the planning branch; not pushed): see the
 [S1a result](#s1a-result-2026-11-07). Completed S1b, 2026-11-07, on local branch
 `feat/sandbox-s1b-receiver` (stacked on S1a; not pushed): see the
-[S1b result](#s1b-result-2026-11-07). Next: **the user's hand-driven crossing between both
-sites** (S1b's remaining gate), then [S1c, delivery events and a job](#s1-steps). Future PRs
-still require the user's approval.
+[S1b result](#s1b-result-2026-11-07). Next: **[S1c, delivery events and a job](#s1-steps)**.
+Future PRs still require the user's approval.
 
 ## S0a: try the cargo toy
 
@@ -91,7 +90,7 @@ different enough to explore? No reward loop is needed to answer these questions.
 | Step | Status | Next gate |
 | --- | --- | --- |
 | S0a controlled handling toy | Implemented as native `cargo_sandbox`; basic toy accepted by the user; control labels clarified | Review the updated labels in the harbour experiment |
-| S0b harbour placement | First Eriksberg work site merged, with native CPU/GPU scenery, boat/shore/camera contacts, landing footprints and assisted return; wave-stable footprint accepted | The second receiving site is package data from [S1b](#s1b-result-2026-11-07); its crossing awaits a hand-driven review |
+| S0b harbour placement | First Eriksberg work site merged, with native CPU/GPU scenery, boat/shore/camera contacts, landing footprints and assisted return; wave-stable footprint accepted | The second receiving site is package data from [S1b](#s1b-result-2026-11-07); the user drove the crossing by hand |
 | S0c broader qualification | Not started | Multiple loads and measured 16-body stress ceiling, browser/touch, audio feedback and harbour traffic/wake performance |
 
 The original S0a test basin preceded harbour site selection; it remains an explicit
@@ -567,7 +566,7 @@ the remaining gates below are still open.
 | Slice | Depends on | Playable result and completion gate | Status |
 | --- | --- | --- | --- |
 | S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a basic toy accepted; S0b first harbour site implemented; receiving site and S0c qualification remain |
-| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a and S1b implemented locally; hand-driven crossing next |
+| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a and S1b implemented locally; S1b crossing accepted; S1c next |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
 | S3: saved Working Harbour | S1 + T0; reconcile S2 edits | Versioned native/browser save path, a few varied local jobs, currency and buy/rent/sell boats, delivered in separate steps. Persistent project changes; preview a purchase through borrowing. Save/reload cannot duplicate goods or payouts; player has a choice beyond repeating one delivery. | Proposed |
@@ -589,8 +588,8 @@ Each step is its own worktree and PR (with the user's approval), stacked on its 
 | Step | Result | Completion gate | Status |
 | --- | --- | --- | --- |
 | S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Implemented locally 2026-11-07; [result](#s1a-result-2026-11-07) |
-| S1b: second receiving site | A receiver at a surveyed candidate, placed by editing the package | A native receiver preset and site heading first (S1a has one layout facing heading 0); then no further C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Implemented locally 2026-11-07; captures reviewed; hand-driven crossing owed; [result](#s1b-result-2026-11-07) |
-| S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Proposed |
+| S1b: second receiving site | A receiver at a surveyed candidate, placed by editing the package | A native receiver preset and site heading first (S1a has one layout facing heading 0); then no further C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Implemented locally and accepted 2026-11-07; [result](#s1b-result-2026-11-07) |
+| S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Next |
 | S1d: useful landing playtest | The completed landing offers a nearer pickup or mooring on the next outing | The user completes the crossing without developer help and tries another idea | Proposed |
 
 #### S1a: the existing site as package data
@@ -717,8 +716,11 @@ aim, hook and release paths with the landing's crane):
 ./build/cargo_sandbox   # drive from Eriksberg to the landing by hand
 ```
 
-Known limits: no delivery event, job or payout; both presets share one geometry; the crossing
-has not been driven by hand; the landing's depth and seabed are not evidenced (the survey is
+User acceptance, 2026-11-07: after the guidance change the user drove the whole tour by hand
+(load at Eriksberg, cross, moor and unload at the landing) on macOS and reported “Works great!
+I did the whole tour. Mechanics work great.”
+
+Known limits: no delivery event, job or payout; both presets share one geometry; the landing's depth and seabed are not evidenced (the survey is
 water/clearance sampling only); the sandbox title shows a site's id in capitals rather than an
 authored name.
 
@@ -1002,4 +1004,5 @@ side as the HUD's turn direction, at the expected bearing): the turned landing, 
 BERTH READY outline, the moored workboat and the crate resting on the receiving pad read
 correctly against the open water and the quay behind. `--survey` reports both sites' water,
 berth, traffic and camera clear. The user's first hand-driven try found the landing hard to locate,
-which the guidance above addresses; a completed crossing is still the remaining S1b gate. Windows, Linux and the browser build were not run locally.
+which the guidance above addresses. With the guidance, the user then completed the whole tour
+and accepted it (see the S1b result). Windows, Linux and the browser build were not run locally.
