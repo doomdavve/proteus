@@ -267,6 +267,12 @@ bool boat_cargo_hook_toggle(BoatCargoSandbox *s)
     return true;
 }
 
+static bool deck_inside(Vector3 p)
+{
+    return fabsf(p.x) <= BOAT_CARGO_DECK_X - BOAT_CARGO_HALF
+        && fabsf(p.z) <= BOAT_CARGO_DECK_Z - BOAT_CARGO_HALF;
+}
+
 bool boat_cargo_lash_toggle(BoatCargoSandbox *s, const Boat *boat)
 {
     BoatCargo *c = &s->cargo;
@@ -278,7 +284,9 @@ bool boat_cargo_lash_toggle(BoatCargoSandbox *s, const Boat *boat)
         c->settled = 0;
         return true;
     }
-    if (c->state != BOAT_CARGO_LOOSE || !c->deck_contact || c->settled < .5f)
+    // A crate resting across the deck edge is supported but cannot be lashed.
+    if (c->state != BOAT_CARGO_LOOSE || !c->deck_contact || c->settled < .5f
+        || !deck_inside(c->deck_local))
         return false;
     c->state = BOAT_CARGO_SECURED;
     event(s, BOAT_CARGO_EVENT_SECURED, s->active);
@@ -430,12 +438,6 @@ BoatCargoShadow boat_cargo_shadow(const BoatCargoSandbox *s, const Boat *boat,
     return result;
 }
 
-static bool deck_inside(Vector3 p)
-{
-    return fabsf(p.x) <= BOAT_CARGO_DECK_X - BOAT_CARGO_HALF
-        && fabsf(p.z) <= BOAT_CARGO_DECK_Z - BOAT_CARGO_HALF;
-}
-
 static void contact(BoatCargo *c, const Boat *boat)
 {
     Matrix inverse = MatrixTranspose(boat_pose_rotation(boat));
@@ -443,8 +445,33 @@ static void contact(BoatCargo *c, const Boat *boat)
     Vector3 local = Vector3Transform(Vector3Subtract(c->position, centre), inverse);
     float level = BOAT_CARGO_DECK_Y + BOAT_CARGO_HALF;
     c->deck_contact = false;
-    if (boat_pose_up(boat) < .75f || !deck_inside(local) || local.y > level + .03f
-        || local.y < level - .35f)
+    // The deck tops a solid hull box. Before this, a crate overlapping the deck edge found no
+    // support and sank through the hull to the water.
+    float over_x = BOAT_CARGO_DECK_X + BOAT_CARGO_HALF - fabsf(local.x);
+    float over_z = BOAT_CARGO_DECK_Z + BOAT_CARGO_HALF - fabsf(local.z);
+    if (boat_pose_up(boat) < .75f || over_x <= 0 || over_z <= 0 || local.y > level + .03f
+        || local.y < level - 1.5f)
+        return;
+    if (fabsf(local.x) > BOAT_CARGO_DECK_X || fabsf(local.z) > BOAT_CARGO_DECK_Z) {
+        // Its centre is past the edge: below deck level, the hull's side pushes it out along
+        // the shallower overlap and stops it moving inward; it then falls beside the boat.
+        if (local.y >= level)
+            return;
+        Vector3 point_velocity = boat_pose_motion(boat, local).velocity;
+        Vector3 relative = Vector3Transform(Vector3Subtract(c->velocity, point_velocity), inverse);
+        if (over_x < over_z) {
+            local.x += copysignf(over_x, local.x);
+            relative.x = local.x > 0 ? fmaxf(relative.x, 0) : fminf(relative.x, 0);
+        } else {
+            local.z += copysignf(over_z, local.z);
+            relative.z = local.z > 0 ? fmaxf(relative.z, 0) : fminf(relative.z, 0);
+        }
+        c->position = boat_pose_attachment(boat, local);
+        c->velocity
+            = Vector3Add(point_velocity, Vector3Transform(relative, boat_pose_rotation(boat)));
+        return;
+    }
+    if (local.y < level - .35f)
         return;
     Vector3 point_velocity = boat_pose_motion(boat, local).velocity;
     Vector3 relative = Vector3Transform(Vector3Subtract(c->velocity, point_velocity), inverse);

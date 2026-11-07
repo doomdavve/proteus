@@ -42,7 +42,7 @@ Completed S1d, 2026-11-07, on local branch `feat/sandbox-s1d-quay-pickup` (stack
 pushed at first): see the [S1d result](#s1d-result-2026-11-07). The user played both outings and
 approved S1d; the planning, S1a, S1b, S1c and S1d branches are published as stacked PRs. They
 reported that cargo collision was sometimes off; that was S0a's deck contact, and its fix is a
-separate local follow-up, `fix/cargo-deck-edge`. Next: the user's check of that fix, then S1's
+separate local follow-up, [`fix/cargo-deck-edge`](#deck-edge-collision-fix-2026-11-07). Next: the user's check of that fix, then S1's
 review of fun and broader S0 qualification. Future PRs still require the user's approval.
 
 ## S0a: try the cargo toy
@@ -935,6 +935,26 @@ maximum, so no further outing can be added without a schema change or a repeatab
 `SUPPLY WAITING` was exercised only by the validator, not captured; Windows, Linux and the
 browser build were not run.
 
+#### Deck-edge collision fix, 2026-11-07
+
+Follow-up to the user's S1d report (“the collision detection is sometimes off”), on local
+branch `fix/cargo-deck-edge`, stacked on S1d and not pushed. Their screenshot showed a hanging
+crate lowered across the workboat's deck edge, half sunk into the hull. Deck contact only
+caught a crate whose whole footprint was inside the deck, and nothing else stopped it, so a
+crate overlapping the edge fell through the hull to the water level. This dates from S0a.
+
+The deck now tops a solid hull box (`src/boat_cargo.c`, `contact`):
+
+- A crate whose centre is over the deck rests on it, even when it overhangs the edge, but it
+  cannot be lashed until it is fully inside (the existing lash prompt already says so).
+- A crate whose centre is past the edge and whose bottom is below deck level is pushed out of
+  the hull's side along the shallower overlap, and stops moving inward; it then falls into the
+  water beside the boat. This applies to hanging and released crates alike.
+
+`boat_cargo` checks both cases (overhangs at the side and the stern rest at deck level and
+refuse lashing; three crates past the edge never enter the hull and end floating beside it);
+the check fails on the previous code. The user's check of the fix in play is owed.
+
 ## Astra review, 2026-11-06
 
 At the user's request, Astra reviewed this proposal against the existing boat/marina code and
@@ -1283,4 +1303,15 @@ then `JETTY SUPPLIED: 1`. Windowed GPU runs of `--scenario jetty-approach --fram
 `--demo --frames 240` exited 0; they are scripted smoke runs, not a hands-on check. All 496
 local links/anchors across the eight changed guides resolve; `git diff --check` passes. The
 user's play check of both outings is owed.
+
+### Deck-edge collision verification, 2026-11-07
+
+Apple M1 Max/macOS arm64, Debug, pinned local sources, `PROTEUS_GPU_TESTS=OFF`: the build is
+warning-clean apart from the existing upstream `stb_vorbis.c` warning, and `ctest --preset full`
+passed all **395 enabled tests** (13 retired tests disabled; local sockets enabled). With the
+old `contact` restored, `boat_cargo` fails. CPU captures of all eleven pre-delivery `outer`
+scenarios listed under the S1d verification and of `delivered`, `landing-built`,
+`quay-pickup`, `jetty-approach` and `jetty-delivered` are byte-identical to S1d: their crates
+land fully inside the deck, so only edge contact changed. No new capture of an edge landing
+was made, and nobody has tried the fix by hand yet.
 

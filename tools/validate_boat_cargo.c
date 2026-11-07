@@ -305,6 +305,55 @@ static void check_delivery_events(BoatWorld *world)
     CHECK(!s.cargo.delivered && s.cranes[2].hidden && !s.event_count);
 }
 
+// The crate's position in the boat's deck frame.
+static Vector3 deck_frame(const Boat *b, Vector3 p)
+{
+    return Vector3Transform(Vector3Subtract(p, boat_pose_attachment(b, (Vector3) { 0 })),
+        MatrixTranspose(boat_pose_rotation(b)));
+}
+
+// The deck tops a solid hull: a crate overhanging the edge rests on it but cannot be lashed,
+// and one whose centre is past the edge is pushed out of the hull's side and falls beside the
+// boat. Before this, both sank through the hull to the water (user report, 2026-11-07).
+static void check_deck_edge(BoatWorld *world)
+{
+    const float level = BOAT_CARGO_DECK_Y + BOAT_CARGO_HALF;
+    const Vector3 starts[] = { { BOAT_CARGO_DECK_X - .2f, level + .3f, 0 },
+        { 0, level + .3f, -BOAT_CARGO_DECK_Z + .15f } };
+    for (unsigned i = 0; i < 2; ++i) {
+        BoatCargoSandbox s;
+        boat_cargo_reset(&s);
+        Boat b = { 0 };
+        s.cargo.state = BOAT_CARGO_FLOATING;
+        s.cargo.position = boat_pose_attachment(&b, starts[i]);
+        for (int t = 0; t < 240; ++t)
+            step(&s, &b, world, t);
+        Vector3 local = deck_frame(&b, s.cargo.position);
+        CHECK(s.cargo.state == BOAT_CARGO_LOOSE && s.cargo.deck_contact);
+        CHECK(fabsf(local.y - level) < .01f && s.cargo.settled >= .5f);
+        CHECK(!boat_cargo_lash_toggle(&s, &b) && s.cargo.state == BOAT_CARGO_LOOSE);
+    }
+    const Vector3 past[] = { { BOAT_CARGO_DECK_X + .2f, level + .3f, .3f },
+        { -BOAT_CARGO_DECK_X - .1f, level + .3f, -.5f },
+        { .2f, level + .3f, BOAT_CARGO_DECK_Z + .2f } };
+    for (unsigned i = 0; i < 3; ++i) {
+        BoatCargoSandbox s;
+        boat_cargo_reset(&s);
+        Boat b = { 0 };
+        s.cargo.state = BOAT_CARGO_FLOATING;
+        s.cargo.position = boat_pose_attachment(&b, past[i]);
+        for (int t = 0; t < 240; ++t) {
+            step(&s, &b, world, t);
+            Vector3 local = deck_frame(&b, s.cargo.position);
+            bool overlapping = fabsf(local.x) < BOAT_CARGO_DECK_X + BOAT_CARGO_HALF - .001f
+                && fabsf(local.z) < BOAT_CARGO_DECK_Z + BOAT_CARGO_HALF - .001f;
+            CHECK(!overlapping || local.y > level - .03f); // Never inside the hull.
+        }
+        CHECK(s.cargo.state == BOAT_CARGO_FLOATING && !s.cargo.deck_contact);
+        CHECK(deck_frame(&b, s.cargo.position).y < BOAT_CARGO_DECK_Y);
+    }
+}
+
 // The only queued event: KIND at SITE for LOAD.
 static void take_one(BoatCargoSandbox *s, BoatCargoEventKind kind, unsigned site, unsigned load)
 {
@@ -392,6 +441,7 @@ int main(int argc, char **argv)
     check_mooring_and_shadow(&world);
     check_delivery_events(&world);
     check_supply(&world);
+    check_deck_edge(&world);
     Boat boat = { 0 };
     BoatCargoSandbox s, repeat;
     boat_cargo_reset(&s);
