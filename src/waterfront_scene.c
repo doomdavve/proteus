@@ -50,6 +50,38 @@ static bool cloud_tile(float x, float z)
     return Lerp(a, b, tz) * .85f + cloud_hash(tile_x + 137, tile_z - 59) * .15f > .59f;
 }
 
+// Static cloud structure for the GPU sky shader, sampled at the same panorama texel centres as
+// waterfront_sky_image. R marks the underside, G the lit rim; the flags never depend on light.
+Image waterfront_sky_cloud_mask(void)
+{
+    enum { WIDTH = 1024, HEIGHT = 512 };
+    static Color pixels[WIDTH * HEIGHT];
+    static bool ready;
+    if (!ready) {
+        for (int y = 0; y < HEIGHT; ++y) {
+            float elevation = 1 - 2 * ((float)y + .5f) / HEIGHT;
+            for (int x = 0; x < WIDTH; ++x) {
+                unsigned char underside = 0, rim = 0;
+                if (elevation > .075f) {
+                    float azimuth = (((float)x + .5f) / WIDTH - .5f) * 2 * PI;
+                    float horizontal = sqrtf(1 - elevation * elevation) / elevation;
+                    float cx = sinf(azimuth) * horizontal;
+                    float cz = cosf(azimuth) * horizontal;
+                    underside = cloud_tile(cx, cz) ? 255 : 0;
+                    rim = cloud_tile(cx * 1.035f, cz * 1.035f) ? 255 : 0;
+                }
+                pixels[y * WIDTH + x] = (Color) { underside, rim, 0, 255 };
+            }
+        }
+        ready = true;
+    }
+    return (Image) { .data = pixels,
+        .width = WIDTH,
+        .height = HEIGHT,
+        .mipmaps = 1,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+}
+
 // Painted once per distinct sky: a change of light repaints the shared panorama.
 Image waterfront_sky_image(const WaterfrontLighting *lighting)
 {

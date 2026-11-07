@@ -1,17 +1,48 @@
 #version 330
 
 in vec2 fragTexCoord;
-uniform sampler2D texture0;
+// Static cloud flags at the original 1024x512 panorama texel centres: R underside, G lit rim.
+uniform sampler2D skyMask;
 uniform vec3 skyForward;
 uniform vec3 skyRight;
 uniform vec3 skyUp;
 uniform vec2 skyScale;
 uniform vec3 skyEye;
+// The same recipe as waterfront_sky_image (src/waterfront_scene.c), in 0..255 channel values.
+uniform vec3 skyHorizon;
+uniform vec3 skyZenith;
+uniform float skyGradient;
+uniform vec3 sunDirection;
+uniform vec3 sunHalo;
+uniform vec3 sunDisc;
+uniform vec3 horizonGlow;
+uniform float haloStrength;
+uniform float haloRadius;
+uniform float discStrength;
+uniform float glowStrength;
+uniform vec3 cloudUnderside;
+uniform vec3 cloudRim;
 // A3.5 weather patch: centre X/Z, radius and grown fraction; base and top heights. Keep in
 // step with waterfront_squall_sky (src/waterfront_scene.c).
 uniform vec4 squallArea;
 uniform vec2 squallHeight;
 out vec4 finalColor;
+
+const float SKY_PI = 3.14159265358979323846;
+const float SKY_WIDTH = 1024.0;
+const float SKY_HEIGHT = 512.0;
+
+vec3 skyMix(vec3 a, vec3 b, float t)
+{
+    t = clamp(t, 0.0, 1.0);
+    return mix(a, b, t * t * (3.0 - 2.0 * t));
+}
+
+// C's remainderf: the quotient is rounded to the nearest integer, not floored.
+float skyRemainder(float x, float y)
+{
+    return x - y * round(x / y);
+}
 
 vec3 squallSky(vec3 sky, vec3 ray)
 {
@@ -66,8 +97,38 @@ void main()
 {
     vec2 plane = (fragTexCoord * 2.0 - 1.0) * skyScale;
     vec3 ray = normalize(skyForward + plane.x * skyRight - plane.y * skyUp);
-    vec2 uv = vec2(fract(atan(ray.x, ray.z) / 6.28318530718 + 0.5),
-        clamp((1.0 - ray.y) * 0.5, 0.0, 1.0));
-    vec4 sky = texture(texture0, uv);
-    finalColor = vec4(squallSky(sky.rgb, ray), sky.a);
+    // Sample the original panorama texel exactly as the CPU walk does.
+    float u = atan(ray.x, ray.z) / 6.28318530718 + 0.5;
+    int sx = int(floor(u * SKY_WIDTH)) % int(SKY_WIDTH);
+    int sy = int(clamp((1.0 - ray.y) * 0.5 * SKY_HEIGHT, 0.0, SKY_HEIGHT - 1.0));
+    float elevation = 1.0 - 2.0 * ((float(sy) + 0.5) / SKY_HEIGHT);
+    float azimuth = ((float(sx) + 0.5) / SKY_WIDTH - 0.5) * 2.0 * SKY_PI;
+
+    vec3 color = skyMix(skyHorizon, skyZenith, elevation / skyGradient);
+    float bearing = skyRemainder(azimuth - atan(sunDirection.x, sunDirection.z), 2.0 * SKY_PI);
+    if (glowStrength > 0.0) {
+        // Low sunlight along the horizon, strongest under the sun and fading to the opposite sky.
+        float along = clamp(1.0 - abs(bearing) / 1.7, 0.0, 1.0);
+        float low = clamp(1.0 - abs(elevation - max(sunDirection.y, 0.0)) / 0.28, 0.0, 1.0);
+        color = skyMix(color, horizonGlow, glowStrength * along * along * low * low);
+    }
+    float sunWidth = sqrt(1.0 - sunDirection.y * sunDirection.y);
+    float sunX = bearing * sunWidth;
+    float sunY = (elevation - sunDirection.y) / sunWidth;
+    float sunDistance = sqrt(sunX * sunX + sunY * sunY);
+    // A warm, crisp disc with a quiet halo, anchored to the lighting direction.
+    color = skyMix(color, sunHalo, haloStrength * (1.0 - clamp(sunDistance / haloRadius, 0.0, 1.0)));
+    color = skyMix(color, sunDisc, discStrength * clamp((0.047 - sunDistance) / 0.004, 0.0, 1.0));
+    if (elevation > 0.075) {
+        vec4 flags = texelFetch(skyMask, ivec2(sx, sy), 0);
+        bool underside = flags.r > 0.5, rim = flags.g > 0.5;
+        if (underside || rim) {
+            vec3 cloud = underside ? cloudUnderside : cloudRim;
+            color = skyMix(color, cloud, (elevation - 0.075) / 0.10);
+        }
+    }
+    // Subtle ordered grain at panorama resolution, fixed to the sky itself.
+    float grain = ((sx & 1) == (sy & 1)) ? 0.6 : -0.6;
+    vec3 sky = floor(clamp(color + grain, 0.0, 255.0) + 0.5) / 255.0;
+    finalColor = vec4(squallSky(sky, ray), 1.0);
 }

@@ -604,8 +604,13 @@ off has less coverage; report that omission.
 
 `gpu_fixture --city --check` (CTest `gpu_surface_materials`) also verifies reflection waterline
 clipping: above-water scenery remains visible, submerged scenery cannot change the reflection,
-and clipping is reset before the main pass. This requires `PROTEUS_GPU_TESTS=ON` and a desktop
-graphics context.
+and clipping is reset before the main pass. It also compares the uniform-shaded GPU sky with
+the CPU panorama at selected legacy/hour values and low/high sizes, checks direct/backward
+seeks and independent scene recreation, and observes native GL texture calls across 24 hours.
+A separate probe texture proves the upload spies work before the sky's zero-write measurement.
+The original target/overlay/squall/pass checks remain. This requires `PROTEUS_GPU_TESTS=ON`
+and a desktop graphics context; detailed evidence and limits live in the
+[lighting plan](SUNSET_PLAN.md#t2a-implementation-2026-11-07).
 
 GPU checks are opt-in and require a desktop graphics context. Configure and run the
 labelled cases on a machine that can create a raylib/OpenGL window:
@@ -615,6 +620,13 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=ON
 cmake --build build -j
 ctest --test-dir build -L gpu --output-on-failure
 ```
+
+On macOS, a sleeping display can make pinned GLFW report no monitor even though AppKit still
+lists a screen. For an unattended GPU run, keep the display awake for the command with
+`caffeinate -d -i -u ctest --test-dir build -L gpu --output-on-failure`; the assertion ends
+with the command and does not change saved power settings. The 2026-11-07 lighting run
+confirmed this with CoreGraphics (`active=0 asleep=1`) and GLFW (zero monitors), then passed
+with a temporary awake assertion. See the lighting plan for the verification record.
 
 The default display-free suite omits these checks. Report that omission when recording
 verification. The `gpu_surface_materials` case also probes the production city shader

@@ -161,6 +161,22 @@ static int check_sky(void)
     bool restored = memcmp(waterfront_sky_image(&day).data, painted, bytes) == 0;
     free(painted);
     CHECK(darker && restored);
+    // The GPU's static mask is stable, independent of the light, and actually has cloud flags.
+    Image mask = waterfront_sky_cloud_mask();
+    size_t mask_bytes = (size_t)mask.width * (size_t)mask.height * sizeof(Color);
+    Color *mask_pixels = malloc(mask_bytes);
+    CHECK(mask_pixels);
+    memcpy(mask_pixels, mask.data, mask_bytes);
+    int underside = 0, rim = 0;
+    for (int i = 0; i < mask.width * mask.height; ++i) {
+        underside += mask_pixels[i].r != 0;
+        rim += mask_pixels[i].g != 0;
+    }
+    CHECK(mask.width == 1024 && mask.height == 512 && underside > 1000 && rim > 1000);
+    (void)waterfront_sky_image(&dusk);
+    CHECK(waterfront_sky_cloud_mask().data == mask.data
+        && memcmp(waterfront_sky_cloud_mask().data, mask_pixels, mask_bytes) == 0);
+    free(mask_pixels);
     return 0;
 }
 

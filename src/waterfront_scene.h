@@ -142,11 +142,14 @@ WaterfrontStreet waterfront_scene_street(int index);
 Vector3 waterfront_scene_street_position(
     WaterfrontStreet street, float distance, Vector3 *direction);
 
-// Borrowed static panorama under LIGHTING, shared by CPU sky rays and the GPU sky shader. Do
-// not unload. It is repainted when another light's sky differs, which invalidates earlier
-// borrowed pixels; a GPU owner uploads its copy and compares the light before reusing it.
+// Borrowed static panorama under LIGHTING for CPU sky rays and the comparison reference. Do not
+// unload. It is repainted when another light's sky differs, which invalidates earlier borrowed
+// pixels; the GPU instead uploads the mask below once and shades light with uniforms.
 // U is atan2(direction.x, direction.z) / (2*pi) + 0.5; V is (1-direction.y) / 2.
 Image waterfront_sky_image(const WaterfrontLighting *lighting);
+// Borrowed light-independent cloud flags at the same panorama texel centres: R underside,
+// G lit rim, point-sampled by the GPU sky shader. Never repainted or unloaded.
+Image waterfront_sky_cloud_mask(void);
 void waterfront_sky_draw(
     Color *pixels, int width, int height, View3D camera, const WaterfrontLighting *lighting);
 // The sky with SQUALL over it, seen from the camera.
