@@ -468,6 +468,28 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
     return hash;
 }
 
+uint64_t boat_scene_work_digest(const BoatSceneDefinition *scene)
+{
+    uint64_t hash = 14695981039346656037ull;
+    if (!scene)
+        return hash;
+    count(&hash, "work.present", (unsigned)scene->work_present);
+    count(&hash, "work.sites", scene->work_count);
+    for (unsigned i = 0; i < scene->work_count; ++i) {
+        const BoatSceneWorkSite *w = &scene->work[i];
+        fold(&hash, "work.id", 8);
+        fold(&hash, w->id, strlen(w->id) + 1);
+        count(&hash, "work.preset", w->preset);
+        count(&hash, "work.cargo", w->cargo);
+        value(&hash, "work.x", w->x);
+        value(&hash, "work.z", w->z);
+        value(&hash, "work.heading", w->heading);
+        count(&hash, "work.hidden", (unsigned)w->hidden);
+    }
+    count(&hash, "work.boat", scene->work_boat);
+    return hash;
+}
+
 bool boat_scene_same_except_cosmetics(
     const BoatSceneDefinition *a, const BoatSceneDefinition *b, bool berth_appearance)
 {

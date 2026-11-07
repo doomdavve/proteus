@@ -99,5 +99,10 @@ bool boat_plugin_hud_compose(const BoatPluginHudOwner *owners, unsigned owner_co
     BoatPluginHudRow *rows, unsigned capacity, unsigned *count);
 // Canonical hash of the complete committed checkpoint, excluding quarantine/struct padding.
 uint64_t boat_plugin_objective_digest(const BoatPluginObjective *objective);
+// Explicit little-endian checkpoint codec. Commands are inspection-only and never encoded.
+bool boat_plugin_objective_encode(
+    const BoatPluginObjective *objective, unsigned char *out, size_t capacity, size_t *size);
+bool boat_plugin_objective_decode(
+    const unsigned char *bytes, size_t size, BoatPluginObjective *objective);
 
 #endif

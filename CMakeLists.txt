@@ -199,6 +199,11 @@ add_custom_command(OUTPUT ${BOAT_PLUGIN_CATALOG_C}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Generating the bundled plugin catalog"
   VERBATIM)
+# SV1b: the sandbox save's byte format. Buffers only: no files, no Lua beyond proteus_plugins.
+add_library(proteus_sandbox_save STATIC src/boat_sandbox_save.c src/boat_sandbox_save.h)
+target_link_libraries(proteus_sandbox_save PUBLIC proteus_plugins)
+target_compile_options(proteus_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
+
 add_library(proteus_plugin_catalog STATIC
   src/boat_plugin_catalog.c src/boat_plugin_catalog.h ${BOAT_PLUGIN_CATALOG_C})
 target_link_libraries(proteus_plugin_catalog PUBLIC proteus_plugins)
@@ -520,6 +525,11 @@ target_link_libraries(validate_cargo_decal PRIVATE proteus_render)
 target_compile_options(validate_cargo_decal PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME cargo_shadow_geometry COMMAND validate_cargo_decal)
 set_tests_properties(boat_cargo PROPERTIES LABELS "cpu;quick")
+add_executable(validate_boat_sandbox_save tools/validate_boat_sandbox_save.c)
+target_link_libraries(validate_boat_sandbox_save PRIVATE proteus_sandbox_save)
+target_compile_options(validate_boat_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_sandbox_save COMMAND validate_boat_sandbox_save)
+set_tests_properties(boat_sandbox_save PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)

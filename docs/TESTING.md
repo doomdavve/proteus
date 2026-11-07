@@ -1,5 +1,8 @@
 # Test workflow and timing
 
+`boat_sandbox_save` (SV1b, `cpu;quick`) checks the sandbox save's byte format, header-only discovery, corruption and
+bounds, compatibility verdicts and the work digest on byte buffers only.
+
 S0a/S0b `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane motors/cable,
 actual lifts onto both deck positions, release/settle/lash, moving deck attachment,
 rotational point velocity on unlash, departure guards, dropped/floating recovery, capsize,

@@ -37,8 +37,8 @@ rest. Still owed: the user's play check of that fix and S1's review of fun, then
 qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtures`, and
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
-discovered in the menu. SV1a (the core cargo snapshot and restore) is implemented locally; next
-implementation task: [SV1b](#sv1-steps), the save format. Future PRs still
+discovered in the menu. SV1a (the core cargo snapshot and restore) and SV1b (the save format) are implemented locally; next
+implementation task: [SV1c](#sv1-steps), resume and the autosave policy in memory. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -951,7 +951,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a implemented locally (2026-11-07); next SV1b |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a and SV1b implemented locally (2026-11-07); next SV1c |
 
 ##### F1 result, 2026-11-07
 
@@ -1014,13 +1014,32 @@ and leaves both outputs untouched on refusal. `validate_boat_cargo` (`boat_cargo
 `check_snapshot`: each state, round trip, 14 refusals, built flags, and two restores run 1200
 ticks identically with no re-delivery. No drawing path changed, so no captures were compared. The full CTest preset passed 396 tests (13 disabled wake experiments not run) with a warning-clean build.
 
+**SV1b result (2026-11-07, macOS arm64, Debug).** `boat_scene_work_digest` (core) hashes the work
+sites (id, preset, cargo, position, heading, initial hidden flag) and the workboat, and excludes
+`scene.work.notices`. `boat_plugin_objective_encode`/`decode` (`src/boat_plugin_state.c`) write the
+committed checkpoint field by field without `commands`; decode checks the counts, the 1-23
+printable id and label text, the timer order and that the state bytes are canonical (a plain C
+walk of the P3 state format, no Lua); encode refuses what decode would. New `proteus_sandbox_save`
+(`src/boat_sandbox_save.[ch]`, byte buffers only) has the encode, decode and header-only `peek`
+(magic, format, header length and checksum, then the summary; at most 512 bytes), `check` and the
+FNV-1a `boat_sandbox_source_hash`. Site references are written as ids and read back as indexes
+into the record's own site list; an unknown id is `MALFORMED`. Decisions: one load per record
+(`BOAT_CARGO_SNAPSHOT_LOADS`); the verdict reasons are `PACKAGE CHANGED` (package id or work
+digest), `PHYSICS CHANGED` (physics revision or tick rate) and `PROGRESS FORMAT CHANGED`; decode
+is not reentrant (it keeps one static scratch record off the stack). `boat_sandbox_save`
+(`validate_boat_sandbox_save`, `cpu;quick`, 0.01 s) checks round trip byte identity, header-only
+parsing, every truncation length, every header byte and every 97th body byte flipped, a
+checksum-valid body with an unknown site id, the 64-event, 8-row, 16-timer and 16 KiB bounds, the
+verdicts, and the work digest. No drawing path changed, so no captures were compared. The full
+CTest preset passed 397 tests (13 disabled wake experiments not run) with a warning-clean build.
+
 #### SV1: local save and resume
 
 Designed 2026-11-07 at the user's request ("save the state of the player", one step at a time,
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a implemented locally (2026-11-07); SV1b–SV1i planned.**
+will apply to all future state as well." Status: **SV1a and SV1b implemented locally (2026-11-07); SV1c–SV1i planned.**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or

@@ -150,6 +150,8 @@ bool boat_scene_same_except_cosmetics(
 // FNV-1a over explicit fields only: presence, counts, IDs, recipes, positions and attachments.
 // Padding and the diagnostic are excluded.
 uint64_t boat_scene_digest(const BoatSceneDefinition *scene);
+// FNV-1a over the work sites and workboat only, excluding work_notice display text.
+uint64_t boat_scene_work_digest(const BoatSceneDefinition *scene);
 
 bool boat_scene_identifier(const char *text);
 const char *boat_scene_berth_recipe_name(BoatSceneBerthRecipe recipe);
