@@ -31,8 +31,8 @@ Completed task: **P4.9 browser objective isolation**, following
 **M2 boat appearance is implemented; next marina task: [M3 authored routes and docking](MARINA_AUTHORING_PLAN.md#m3-authored-routes-and-docking-motion).** The [plugins-by-default plan](PLUGIN_DEFAULT_PLAN.md) is complete through Cutover and released as v0.0.24.
 That plan owns making plugins always on, including the room part of P5: its first room scenario is
 the river race, carried to clients as validated data rather than matching preinstalled source.
-Authority callbacks, commands and session recordings remain P5 work after it; **P5 is the next plugin task, scheduled by the user 2026-11-07 (previously held 2026-11-01)**; the round-boundary
-revisions (protocol v10) are part of its scope. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
+Authority callbacks, commands and session recordings remain P5 work after it; **P5 is the next plugin task, scheduled by the user 2026-11-07 (previously held 2026-11-01)**, owned by the
+[P5 plan](PLUGIN_P5_PLAN.md); the round-boundary revisions (now planned as protocol v14) are part of its scope. R2 loaded maps ([room content plan](ROOM_CONTENT_PLAN.md))
 are not scheduled. Physical-device and human qualification need the
 user and remain separately tracked. Interactive preview controls were deferred on 2026-10-30
 at the user's choice; they remain unspecified. Native startup, objective updates and Apply-time
@@ -1739,6 +1739,10 @@ qualification and were not rerun for this CI-only change. The PR run checks the 
 lane and skipped browser steps. No gameplay or audiovisual change.
 
 ### P5 — authority, prediction and recorded revisions
+
+**Owner: the [P5 implementation plan](PLUGIN_P5_PLAN.md)** (2026-11-07), with the co-op working
+harbour as its first room scenario; that plan holds the design, steps P5a–P5l, decisions and
+status. It numbers round-boundary revisions protocol v14 (v10 was used by the marina contract).
 
 **Deliverable:** one already proven authored scenario works in a room and can be recorded or
 reconstructed with its revision/state. Implement the explicit content, command/checkpoint,
