@@ -268,6 +268,7 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
                 w->ok = false;
             site->x = (float)number(w, site->x);
             site->z = (float)number(w, site->z);
+            site->heading = (float)number(w, site->heading);
         }
     }
 }

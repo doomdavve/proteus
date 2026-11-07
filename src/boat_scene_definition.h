@@ -77,15 +77,22 @@ typedef struct {
 } BoatSceneModule;
 
 // S1a: a registered work-site layout. The preset fixes the platform, crane, pad and assisted
-// berth relative to the site; Lua chooses only where a site is and what it starts with.
-typedef enum { BOAT_SCENE_WORK_SERVICE_PLATFORM, BOAT_SCENE_WORK_PRESETS } BoatSceneWorkPreset;
+// berth relative to the site; Lua chooses only where a site is, which way it faces and its cargo.
+// Both presets share one layout: a service platform starts with its load on the pad, and a
+// receiving platform starts empty and marks its pad as the place to deliver that load (S1b).
+typedef enum {
+    BOAT_SCENE_WORK_SERVICE_PLATFORM,
+    BOAT_SCENE_WORK_RECEIVING_PLATFORM,
+    BOAT_SCENE_WORK_PRESETS
+} BoatSceneWorkPreset;
 typedef enum { BOAT_SCENE_CARGO_CRATE, BOAT_SCENE_CARGO_PRESETS } BoatSceneCargoPreset;
 
 typedef struct {
     char id[BOAT_SCENE_TEXT];
     unsigned char preset; // BoatSceneWorkPreset
-    unsigned char cargo; // BoatSceneCargoPreset
-    float x, z; // Final workboat berth in simulation metres; S1a berths face heading 0.
+    unsigned char cargo; // BoatSceneCargoPreset: the starting or the accepted load.
+    float x, z; // Final workboat berth in simulation metres.
+    float heading; // Final workboat heading, renderer radians; the whole layout turns with it.
 } BoatSceneWorkSite;
 
 // A present subsystem replaces its whole compiled collection. An absent one keeps the compiled

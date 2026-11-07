@@ -15,7 +15,11 @@ The two `cargo_sandbox_outer_*_screenshot` checks
 repeat real transfers on `outer`; `cargo_sandbox_site` loads the bundled `proteus.outer-work`
 site and qualifies its footprint, sampled traffic envelope and initial camera against the
 loaded map. `boat_plugin.work_sites` checks `scene.work` decoding, the staging wire and the
-staging survey's rejections; `boat_cargo` also checks that traffic alone can block a site. The `shadow-high`/`shadow-low`
+staging survey's rejections, including turned overlap; `boat_cargo` also checks that traffic
+alone can block a site and that a turned receiving site moors, aligns and supports a load in
+its own frame. `cargo_sandbox_receiver-approach_screenshot` carries a lashed crate to the
+package's receiving site, and `cargo_sandbox_delivered_screenshot` then moors and unloads it
+onto the receiving pad with that site's crane. The `shadow-high`/`shadow-low`
 capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,
 requests capture and advances the real application until moored, checking the terminal state.
 CPU/GPU toy captures, windowed motion and

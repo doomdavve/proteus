@@ -1157,9 +1157,8 @@ static BoatPluginStatus check_work_sites(const BoatPluginFree *free,
         const BoatSceneWorkSite *site = &scene->work[i];
         char path[32];
         snprintf(path, sizeof(path), "scene.work.sites[%u]", i + 1);
-        // The registered envelope (berth -3..11 m in x, -5..12 m in z) plus a 4 m restart margin.
-        if (location->spawn.x > site->x - 7 && location->spawn.x < site->x + 15
-            && location->spawn.y > site->z - 9 && location->spawn.y < site->z + 16)
+        // The registered envelope plus a 4 m restart margin.
+        if (boat_cargo_site_near(site, location->spawn, 4))
             return diagnose(d, BOAT_PLUGIN_SCHEMA, file, path, "blocks the location's spawn");
         for (unsigned j = 0; j < i; ++j)
             if (!boat_cargo_sites_apart(&scene->work[j], site))

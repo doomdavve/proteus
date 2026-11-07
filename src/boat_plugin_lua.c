@@ -244,7 +244,7 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 static const char *const ROOT[] = { "voyage", "tour", "scene", "init", "update", "migrate", NULL };
 static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", "work", NULL };
 static const char *const WORK[] = { "sites", NULL };
-static const char *const WORK_SITE[] = { "id", "preset", "cargo", "x", "z", NULL };
+static const char *const WORK_SITE[] = { "id", "preset", "cargo", "x", "z", "heading", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
 static const char *const GULLS[] = { "flocks", NULL };
@@ -919,7 +919,7 @@ static bool scene_marina(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s
     return true;
 }
 
-// S1a: optional work sites, chosen from registered native presets.
+// S1a/S1b: optional work sites, chosen from registered native presets.
 static bool scene_work(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
 {
     char at[64];
@@ -962,15 +962,17 @@ static bool scene_work(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
         if (lua_type(L, -1) != LUA_TTABLE)
             return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
         int entry = lua_absindex(L, -1);
-        double x, z;
+        double x, z, heading;
         if (!only(L, vm, entry, path, WORK_SITE)
             || !string(L, vm, entry, path, "id", w->id, sizeof(w->id))
             || !string(L, vm, entry, path, "preset", preset, sizeof(preset))
             || !string(L, vm, entry, path, "cargo", cargo, sizeof(cargo))
-            || !number(L, vm, entry, path, "x", &x) || !number(L, vm, entry, path, "z", &z))
+            || !number(L, vm, entry, path, "x", &x) || !number(L, vm, entry, path, "z", &z)
+            || !number(L, vm, entry, path, "heading", &heading))
             return false;
         w->x = (float)x;
         w->z = (float)z;
+        w->heading = (float)heading;
         BoatSceneWorkPreset p;
         BoatSceneCargoPreset c;
         char field_at[64];

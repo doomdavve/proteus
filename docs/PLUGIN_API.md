@@ -100,8 +100,9 @@ A free package with a scene fixes the room's location; without one it still name
 ## Work sites (S1a)
 
 Status, 2026-11-07: **implemented for the native `cargo_sandbox` only.** A `free` package's scene
-may list cargo work sites. Each site places a registered native preset; the crane, rope, cargo,
-lashing and assisted mooring stay native and are not package fields. The
+may list cargo work sites. Each site places and turns a registered native preset; the crane,
+rope, cargo, lashing and assisted mooring stay native and are not package fields. S1b added the
+required `heading` and the `receiving_platform` preset (local; not yet merged). The
 [sandbox plan](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-in-c) owns the gameplay
 steps; [`plugins/outer-work`](../plugins/outer-work/) is the reference.
 
@@ -113,7 +114,10 @@ return {
       version = 3,
       work = {
         sites = {
-          { id = "eriksberg", preset = "service_platform", cargo = "crate", x = 10, z = 245 }
+          { id = "eriksberg", preset = "service_platform", cargo = "crate", x = 10, z = 245,
+            heading = 0 },
+          { id = "landing", preset = "receiving_platform", cargo = "crate", x = -105, z = 0,
+            heading = -0.45 }
         }
       }
     }
@@ -125,9 +129,10 @@ return {
 | --- | --- |
 | `work.sites` | 1–4 sites, a list numbered from 1 |
 | `id` | 1–23 characters of `a-z 0-9 _`, starting with a letter; unique among sites |
-| `preset` | `"service_platform"`: the S0 temporary 3 × 6 m platform, service crane, 1 m pad and assisted workboat berth, fixed relative to the site |
-| `cargo` | `"crate"`: one upright 0.8 m crate starting on the pad |
-| `x`, `z` | The workboat's final berth in simulation metres (x = −east, z = north), within 20000 m. Sites face heading 0; there is no heading field yet |
+| `preset` | `"service_platform"`: the S0 temporary 3 × 6 m platform, service crane, 1 m pad and assisted workboat berth, fixed relative to the site; the load starts on its pad. `"receiving_platform"`: the same layout, starting empty, with its pad marked as the place to set the load down. A list needs at least one `service_platform`; the sandbox starts moored at the first |
+| `cargo` | `"crate"`: one upright 0.8 m crate; the load a service platform starts with, or the one a receiving platform takes |
+| `x`, `z` | The workboat's final berth in simulation metres (x = −east, z = north), within 20000 m |
+| `heading` | Required. The moored workboat's heading in radians, \|h\| ≤ 2π, with the voyage API's forward `(sin, −cos)`; the platform, crane, pad, capture zone and survey envelope turn with it. At 0 the bow faces south and the platform lies 5 m toward +x |
 
 `work` is an optional subsystem of scene v3; absent work leaves every earlier scene digest
 unchanged. Voyage, race and match packages reject it (`scene.work` "is only supported by free
@@ -135,11 +140,13 @@ packages"). Staging, the catalog generator and `cargo_sandbox --survey` run the 
 on the location's compiled map, with the sandbox's gentle water:
 
 - the site needs a mapped location (the basin is rejected);
-- the preset's envelope, berth −3..11 m in x and −5..12 m in z, must be open water with 1 m
-  clearance and clear of the scene's (or compiled) moored hulls and dock modules;
-- a 12 × 10 m half-extent traffic rectangle around the platform must clear every retained or
-  authored travelling craft, sampled every 0.25 s over the longest route period;
-- envelopes of two sites must not overlap, and no envelope (plus 4 m) may contain the spawn.
+- the preset's envelope, berth −3..11 m in x and −5..12 m in z of the turned site frame, must be
+  open water with 1 m clearance and clear of the scene's (or compiled) moored hulls and dock
+  modules;
+- a 12 × 10 m half-extent traffic rectangle around the platform, turned with the site, must clear
+  every retained or authored travelling craft, sampled every 0.25 s over the longest route period;
+- turned envelopes of two sites must not overlap, and no envelope (plus 4 m) may contain the
+  spawn.
 
 These checks are sampled clearance evidence for the registered preset, not depth, seabed support
 or human navigation approval. A changed site changes the free digest, so a reload restarts the

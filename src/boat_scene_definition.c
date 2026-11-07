@@ -290,7 +290,15 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         indexed(path, sizeof(path), "scene.work.sites", i + 1, ".z");
         if (!finite_in(w->z, -BOAT_SCENE_HALF_EXTENT, BOAT_SCENE_HALF_EXTENT))
             return fail(diagnostic, path, "must be finite within 20000 m");
+        indexed(path, sizeof(path), "scene.work.sites", i + 1, ".heading");
+        if (!finite_in(w->heading, -6.28318531f, 6.28318531f))
+            return fail(diagnostic, path, "must be finite with magnitude at most 2 pi");
     }
+    bool source = false;
+    for (unsigned i = 0; i < scene->work_count; ++i)
+        source |= scene->work[i].preset == BOAT_SCENE_WORK_SERVICE_PLATFORM;
+    if (scene->work_count && !source)
+        return fail(diagnostic, "scene.work.sites", "needs a service_platform site to start from");
     return true;
 }
 
@@ -409,6 +417,7 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
             count(&hash, "work.cargo", w->cargo);
             value(&hash, "work.x", w->x);
             value(&hash, "work.z", w->z);
+            value(&hash, "work.heading", w->heading);
         }
     }
     return hash;
@@ -579,17 +588,21 @@ const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, 
     return NULL;
 }
 
+static const char *const work_presets[] = { "service_platform", "receiving_platform" };
+
 const char *boat_scene_work_preset_name(BoatSceneWorkPreset preset)
 {
-    return preset == BOAT_SCENE_WORK_SERVICE_PLATFORM ? "service_platform" : "unknown";
+    return (unsigned)preset < BOAT_SCENE_WORK_PRESETS ? work_presets[preset] : "unknown";
 }
 
 bool boat_scene_work_preset_from_name(const char *name, BoatSceneWorkPreset *preset)
 {
-    if (strcmp(name, "service_platform"))
-        return false;
-    *preset = BOAT_SCENE_WORK_SERVICE_PLATFORM;
-    return true;
+    for (unsigned i = 0; i < BOAT_SCENE_WORK_PRESETS; ++i)
+        if (!strcmp(name, work_presets[i])) {
+            *preset = (BoatSceneWorkPreset)i;
+            return true;
+        }
+    return false;
 }
 
 const char *boat_scene_cargo_preset_name(BoatSceneCargoPreset preset)

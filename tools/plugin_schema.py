@@ -160,8 +160,9 @@ def schema():
                     "rate": number(-5, 5, "turns/second"), "cues": sequence(cue, 0, 16)})
     gulls = object_schema({"flocks": sequence(flock, 0, 4)}, required=("flocks",))
     work_site = record({"id": text(23, r"^[a-z][a-z0-9_]*$"),
-                        "preset": {"enum": ["service_platform"]}, "cargo": {"enum": ["crate"]},
-                        **point})
+                        "preset": {"enum": ["service_platform", "receiving_platform"]},
+                        "cargo": {"enum": ["crate"]}, **point,
+                        "heading": number(-math.tau, math.tau, "radians")})
     work = object_schema({"sites": sequence(work_site, 1, 4)}, required=("sites",))
     scene = object_schema({"version": {"const": 3}, "marina": marina, "traffic": traffic,
                            "gulls": gulls, "work": work}, required=("version",))
@@ -253,9 +254,10 @@ def schema():
                     "skip_ticks <= recovery_ticks; native course/rules validation",
                     "Grid, gate corridors and ferry path pass compiled-map clearance checks"],
                 "free": ["free.version must be 1; content stays the engine's registered defaults",
-                    "scene.work is free-only and solo-only: 1..4 unique sites from registered presets;",
-                    "each site's berth, platform and crane envelope must clear compiled water,",
-                    "berths, modules, retained traffic, the spawn and the other sites"],
+                    "scene.work is free-only and solo-only: 1..4 unique sites from registered presets,",
+                    "at least one a service_platform; each site's turned berth, platform and crane",
+                    "envelope must clear compiled water, berths, modules, retained traffic, the spawn",
+                    "and the other sites"],
                 "course": ["Exactly four gates south of the start and in strictly decreasing z",
                     "The gate centre and both edges must be open water; basin gates stay in bounds",
                     "The compiled course's digest keeps existing course-*.run bests valid"]},
