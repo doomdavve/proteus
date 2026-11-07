@@ -669,6 +669,8 @@ static void resume_script(BoatWorkSession *e, unsigned i)
         }                                                                                          \
     } while (0)
 
+static bool migrate_check(BoatWorkSession *e, const unsigned char *bytes, size_t size);
+
 static bool resume_check(BoatWorkSession *e, const char *scenario)
 {
     static BoatSandboxSave record, decoded;
@@ -739,6 +741,51 @@ static bool resume_check(BoatWorkSession *e, const char *scenario)
         }
     printf("resume check %s: saved %zu bytes at tick %llu; %d ticks equal\n", scenario, size,
         (unsigned long long)record.summary.tick, RESUME_TICKS);
+    return !pending || migrate_check(e, bytes, size);
+}
+
+// SV1i: a save written under progress format 1 loads into a package at format 2 that migrates,
+// keeping its queued events unacknowledged and taking a fresh generation. A failing migration
+// or a package without one refuses, leaving the session as it was. Memory only: no files.
+static bool migrate_check(BoatWorkSession *e, const unsigned char *bytes, size_t size)
+{
+    static BoatPluginRevision next;
+    static BoatSandboxSave record;
+    RESUME_CHECK(boat_sandbox_save_decode(bytes, size, &record) == BOAT_SANDBOX_SAVE_OK);
+    const BoatPluginRevision *original = e->revision;
+    const char *callbacks[] = {
+        "base.migrate = function(c, s) s.migrated = 1; return s, {} end",
+        "base.migrate = function(c, s) error('no') end",
+        "",
+    };
+    const char *reason = "";
+    for (unsigned i = 0; i < 3; ++i) {
+        next = *original;
+        next.free.manifest.state_version = 2;
+        next.free.migrates = i < 2;
+        next.source_size = (size_t)snprintf(next.source, sizeof(next.source),
+            "local base = (function() %.*s end)() %s return base", (int)original->source_size,
+            original->source, callbacks[i]);
+        RESUME_CHECK(next.source_size < sizeof(next.source));
+        e->revision = &next;
+        uint64_t tick = e->tick;
+        unsigned events = e->event_count;
+        bool loaded = boat_work_session_load(e, bytes, size, &reason, NULL);
+        if (i == 0) {
+            RESUME_CHECK(loaded && e->objective.state_version == 2);
+            RESUME_CHECK(e->generation == record.objective.generation + 1);
+            RESUME_CHECK(e->objective.generation == e->generation);
+            RESUME_CHECK(e->objective.acknowledged == record.objective.acknowledged);
+            RESUME_CHECK(e->event_count == record.event_count && e->event_count == 1);
+            RESUME_CHECK(e->sequence == record.sequence && !e->objective.quarantined);
+            RESUME_CHECK(boat_work_hud_value(e, "LANDING BUILT") == -1);
+        } else {
+            RESUME_CHECK(!loaded && !strcmp(reason, "PROGRESS FORMAT CHANGED"));
+            RESUME_CHECK(e->tick == tick && e->event_count == events);
+        }
+    }
+    e->revision = original;
+    printf("migrate check: format 1 loads at format 2 with a fresh generation; failures refuse\n");
     return true;
 }
 

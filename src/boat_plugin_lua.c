@@ -1272,7 +1272,7 @@ static int decode_match(lua_State *L)
     return 0;
 }
 
-static const char *const FREE_ROOT[] = { "free", "init", "update", NULL };
+static const char *const FREE_ROOT[] = { "free", "init", "update", "migrate", NULL };
 static const char *const FREE[] = { "version", "scene", NULL };
 static const char *const COURSE_ROOT[] = { "course", NULL };
 static const char *const COURSE[] = { "start", "gates", NULL };
@@ -1298,6 +1298,13 @@ static int decode_free(lua_State *L)
         return 0;
     }
     lua_pop(L, 2);
+    lua_getfield(L, 2, "migrate");
+    d->migrates = !lua_isnil(L, -1);
+    if (d->migrates && (!d->callbacks || !lua_isfunction(L, -1))) {
+        reject(vm, "migrate", "requires init/update and must be a function");
+        return 0;
+    }
+    lua_pop(L, 1);
     int free = record(L, vm, 2, "", "free", FREE, at);
     if (!free || !number(L, vm, free, at, "version", &d->version))
         return 0;

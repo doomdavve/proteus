@@ -38,7 +38,7 @@ qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtu
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); next: removing the on-screen help text, then [SV1i](#sv1-steps), objective migration at load. Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented locally too; next: the user's check of the decluttered HUD. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -775,7 +775,7 @@ Decided during implementation:
   decision; it is not yet useful on a next outing (there is no next outing without saves).
 - **One crate, so no cargo id.** Events carry the site id only.
 - **The free grant is narrow:** `objective.hud` only, after `scene.define`, with work sites
-  required; no timers, migration or live reload. The catalog bundles this one objective kind
+  required; no timers or live reload; `migrate` only at save load (SV1i). The catalog bundles this one objective kind
   and probes its init; `wake_velocity --plugin` refuses it.
 
 Review commands (`delivered` now also requires the counted delivery and the built quay):
@@ -951,7 +951,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1h implemented locally (2026-11-07); play check of SV1g+SV1h done (help text to remove); next: SV1i |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1i implemented locally (2026-11-07); play check of SV1g+SV1h done; HUD help text removed |
 
 ##### F1 result, 2026-11-07
 
@@ -1075,7 +1075,7 @@ version, physics revision) is set aside as `NAME.rejected` (and its backup as
 milestones are job state, built sites, load number, delivery, lashing, set-down, mooring and
 departure; pausing and focus loss write when dirty) and writes when quitting; `SAVED` shows for
 90 presentation frames after milestone and leave writes and `SAVE FAILED` stays until a write
-succeeds. Decisions: the save-failure reason goes to stderr; a MIGRATE verdict is treated as
+succeeds. Decisions: the save-failure reason goes to stderr; a MIGRATE verdict was treated as
 unavailable until SV1i. Tests: `boat_file` (`cpu;quick`, build-tree directory); fixtures
 `cargo_sandbox_save_write` then `cargo_sandbox_save_resume` (captures the resumed
 `landing-built` frame), `cargo_sandbox_save_stale` then `cargo_sandbox_save_rejected`, and
@@ -1268,13 +1268,27 @@ updated. `cargo_sandbox` keeps its own control lines (a developer harness whose 
 Verification: warning-clean build, full CTest 422 passed. Not verified: the HUD itself (CPU
 captures draw no HUD and no window can open here). The user should look at the HUD in the next play.
 
+**SV1i result (2026-11-07, macOS arm64, Debug; no window).** A free work-site job may return
+`migrate(context, state)` (`BoatPluginFree.migrates`, recorded by the Lua decoder, the worker wire
+format and the catalog decode; a non-function or a `migrate` without init/update is a schema
+error). `BoatSandboxIdentity.migrates` carries the current package's flag (never saved or
+compared). `boat_work_session_load` migrates a decoded record at its saved tick to the manifest's
+`state_version` with generation + 1 before resuming; a failure returns `PROGRESS FORMAT CHANGED`
+with the session unchanged and no file touched. Discovery treats MIGRATE as available. Tests:
+`boat_plugin` `free_objective` (migrate decodes and is recorded; a non-function and a callback-less
+migrate are rejected) and `cargo_sandbox_resume_delivery-pending`, which now also loads that
+format-1 save into format-2 variants of the package (a migrating one succeeds with the pending
+event still unacknowledged, a fresh generation and unchanged progress; a failing one and one
+without `migrate` refuse). Not verified: a real format-1 save upgraded in the game's menu and
+window.
+
 #### SV1: local save and resume
 
 Designed 2026-11-07 at the user's request ("save the state of the player", one step at a time,
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a-SV1h implemented locally (2026-11-07); SV1i planned.**
+will apply to all future state as well." Status: **SV1a-SV1i implemented locally (2026-11-07).**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or
@@ -1394,7 +1408,7 @@ Each found save is one of these:
 - **Available.** Shown on its place's Working Harbour row.
 - **Unavailable, with a reason:** `DAMAGED` (bad magic, header checksum or truncation),
   `NEWER FORMAT`, `PACKAGE CHANGED` (work digest), `PROGRESS FORMAT CHANGED` (`state_version`
-  without a migration; SV1i adds migration), `PHYSICS CHANGED`, or `PACKAGE NOT INSTALLED`.
+  without a migration, or when it fails), `PHYSICS CHANGED`, or `PACKAGE NOT INSTALLED`.
 
 A body that is damaged although its header is fine is found only on Continue. Then the `.bak` is
 tried; if that fails too, the row turns unavailable with `DAMAGED` and the player stays in the

@@ -186,8 +186,13 @@ Status, 2026-11-07: **implemented locally for the native `cargo_sandbox` only; n
 free package with `scene.work` may request `["free.define", "scene.define", "objective.hud"]`
 and return `init` and `update` beside `free`, with the
 [voyage objective](#live-optional-voyage-objective-p32) transaction contract: state, HUD rows,
-the 12-tick update boundary, budgets and suspension are the same. `migrate`, `objective.timers`
-and live reload are not offered; a reset restarts the job at a new generation. The catalog
+the 12-tick update boundary, budgets and suspension are the same. `objective.timers`
+and live reload are not offered. A job may also return `migrate(context, state)` (SV1i,
+local): when a save was written at another `state_version`, the game runs it once at load
+(P3.3b contract, at the saved tick, with the fresh generation; queued events stay unacknowledged)
+and the job continues from the migrated state. A package without `migrate` leaves such a save
+unavailable (`PROGRESS FORMAT CHANGED`); a failing `migrate` does the same and touches no file. A
+non-function `migrate` is a schema error. Free packages have no live reload; a reset restarts the job at a new generation. The catalog
 generator probes `init` at build time. S1d (local, 2026-11-07) added `cargo.supply`,
 `work.guide` and the events' `load`. `plugins/outer-work` is the reference:
 

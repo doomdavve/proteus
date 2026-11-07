@@ -1519,6 +1519,14 @@ static int free_objective(void)
         { JOB_MANIFEST(JOB_GRANT),
             "return { " JOB_CALLBACKS " migrate = function(c, s) return s, {} end, free = { "
             "version = 1, scene = { version = 3, " JOB_WORK " } } }",
+            BOAT_PLUGIN_OK, "" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { " JOB_CALLBACKS " migrate = 1, free = { version = 1, scene = { "
+            "version = 3, " JOB_WORK " } } }",
+            BOAT_PLUGIN_SCHEMA, "migrate" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { migrate = function(c, s) return s, {} end, free = { version = 1, scene = { "
+            "version = 3, " JOB_WORK " } } }",
             BOAT_PLUGIN_SCHEMA, "migrate" },
         { JOB_MANIFEST("\"free.define\", \"objective.hud\""), "return {}", BOAT_PLUGIN_MANIFEST,
             "capabilities[2]" },
@@ -1535,6 +1543,18 @@ static int free_objective(void)
         CHECK(status == cases[i].status);
         CHECK(status == BOAT_PLUGIN_OK || !strcmp(d.field, cases[i].field));
         CHECK(status != BOAT_PLUGIN_OK || free.manifest.objective);
+    }
+    // SV1i: the optional migrate callback is recorded, and absent otherwise.
+    for (unsigned migrates = 0; migrates < 2; ++migrates) {
+        char source[512];
+        snprintf(source, sizeof(source),
+            "return { " JOB_CALLBACKS " %s free = { version = 1, scene = { version = 3, " JOB_WORK
+            " } } }",
+            migrates ? "migrate = function(c, s) return s, {} end," : "");
+        const char *manifest = JOB_MANIFEST(JOB_GRANT);
+        BoatPluginBundle bundle = { manifest, strlen(manifest), source, strlen(source) };
+        CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
+        CHECK(free.migrates == (migrates != 0));
     }
     // Races and matches keep their single optional scene grant.
     BoatPluginManifest manifest;

@@ -1051,7 +1051,7 @@ BoatPluginStatus boat_plugin_decode_free(const BoatPluginManifest *manifest,
     if (data->callbacks != manifest->objective)
         return diagnose(d, BOAT_PLUGIN_SCHEMA, manifest->entry, "init/update",
             "callbacks require objective.hud and that capability requires both callbacks");
-    BoatPluginFree candidate = { .manifest = *manifest, .digest = 0 };
+    BoatPluginFree candidate = { .manifest = *manifest, .migrates = data->migrates, .digest = 0 };
     if (boat_plugin_take_scene(manifest, data->has_scene, &data->scene, &candidate.has_scene,
             &candidate.scene, &candidate.scene_digest, d)
         != BOAT_PLUGIN_OK)

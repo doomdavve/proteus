@@ -88,8 +88,8 @@ static void inspect(BoatWorkMenuSave *save, const char *directory, const char *n
         return;
     }
     char reason[48] = "";
-    if (boat_sandbox_save_check(&s.identity, current, false, reason, sizeof(reason))
-        == BOAT_SANDBOX_RESUME) {
+    if (boat_sandbox_save_check(&s.identity, current, current->migrates, reason, sizeof(reason))
+        != BOAT_SANDBOX_REJECT) {
         save->available = true;
         save->reason[0] = 0;
     } else

@@ -20,6 +20,7 @@ typedef struct {
     char package[64], build[64];
     uint64_t work_digest, source_hash; // SOURCE_HASH and BUILD: messages only, never compared.
     unsigned state_version, physics_revision, tick_hz;
+    bool migrates; // The current package has a migrate callback; never saved or compared.
 } BoatSandboxIdentity;
 
 typedef struct {

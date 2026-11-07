@@ -226,7 +226,8 @@ void boat_work_revision_identity(
               .source_hash = boat_sandbox_source_hash(revision->source, revision->source_size),
               .state_version = m->state_version,
               .physics_revision = BOAT_PHYSICS_REVISION,
-              .tick_hz = BOAT_TICK_HZ };
+              .tick_hz = BOAT_TICK_HZ,
+              .migrates = revision->free.migrates };
     snprintf(identity->package, sizeof(identity->package), "%s", m->id);
     snprintf(identity->build, sizeof(identity->build), "%s", writer ? writer : "unknown");
 }
@@ -451,10 +452,25 @@ bool boat_work_session_load(BoatWorkSession *e, const unsigned char *bytes, size
     BoatSandboxIdentity now;
     static char text[48];
     boat_work_session_identity(e, &now);
-    if (boat_sandbox_save_check(&record.summary.identity, &now, false, text, sizeof(text))
-        != BOAT_SANDBOX_RESUME) {
+    BoatSandboxVerdict verdict
+        = boat_sandbox_save_check(&record.summary.identity, &now, now.migrates, text, sizeof(text));
+    if (verdict == BOAT_SANDBOX_REJECT) {
         *reason = text;
         return false;
+    }
+    if (verdict == BOAT_SANDBOX_MIGRATE) {
+        // SV1i: the package declared its progress format changed and offers to carry it over.
+        // The record is only in memory here: a failure leaves the file untouched.
+        BoatPluginDiagnostic diagnostic;
+        const BoatPluginManifest *m = &e->revision->free.manifest;
+        if (!record.has_objective
+            || boat_plugin_objective_migrate(&record.objective, e->revision->source,
+                   e->revision->source_size, m->state_version, record.objective.generation + 1,
+                   m->timers, (int64_t)record.summary.tick, &diagnostic)
+                != BOAT_PLUGIN_OK) {
+            *reason = "PROGRESS FORMAT CHANGED";
+            return false;
+        }
     }
     if (!boat_work_session_resume(e, &record)) {
         *reason = "PACKAGE CHANGED";
