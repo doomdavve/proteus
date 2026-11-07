@@ -1,7 +1,7 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-07: **S1d implemented locally, awaiting the user's play check: the quay the job
-builds beside the landing is the next outing's nearer pickup.** The landing's delivered crate is
+Status, 2026-11-07: **S1d implemented, played and approved by the user: the quay the job builds
+beside the landing is the next outing's nearer pickup.** The landing's delivered crate is
 used up, load 2 waits on the quay's pad, and the helm guidance leads to a new jetty 120 m east
 along the river ([S1d result](#s1d-result-2026-11-07)). S1c (the delivery job, played and
 accepted: “Landing works great now!”), S1b (the turned receiving site,
@@ -39,9 +39,11 @@ physics and validation native. Completed S1a, 2026-11-07, on local branch
 `feat/sandbox-s1c-delivery-job` (stacked on S1b; not pushed): see the
 [S1c result](#s1c-result-2026-11-07); the user played the landing and reported it works.
 Completed S1d, 2026-11-07, on local branch `feat/sandbox-s1d-quay-pickup` (stacked on S1c; not
-pushed): see the [S1d result](#s1d-result-2026-11-07). Next: **the user's S1d play check**, both
-outings by hand without developer help, then S1's review of fun and broader S0 qualification.
-Future PRs still require the user's approval.
+pushed at first): see the [S1d result](#s1d-result-2026-11-07). The user played both outings and
+approved S1d; the planning, S1a, S1b, S1c and S1d branches are published as stacked PRs. They
+reported that cargo collision was sometimes off; that was S0a's deck contact, and its fix is a
+separate local follow-up, `fix/cargo-deck-edge`. Next: the user's check of that fix, then S1's
+review of fun and broader S0 qualification. Future PRs still require the user's approval.
 
 ## S0a: try the cargo toy
 
@@ -578,7 +580,7 @@ the remaining gates below are still open.
 | Slice | Depends on | Playable result and completion gate | Status |
 | --- | --- | --- | --- |
 | S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a basic toy accepted; S0b first harbour site implemented; receiving site and S0c qualification remain |
-| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a–S1d implemented locally; S1b crossing and S1c landing played and accepted; S1d play check owed |
+| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a–S1d implemented; S1b crossing, S1c landing and S1d both outings played and accepted |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
 | S3: saved Working Harbour | S1 + T0; reconcile S2 edits | Versioned native/browser save path, a few varied local jobs, currency and buy/rent/sell boats, delivered in separate steps. Persistent project changes; preview a purchase through borrowing. Save/reload cannot duplicate goods or payouts; player has a choice beyond repeating one delivery. | Proposed |
@@ -602,7 +604,7 @@ Each step is its own worktree and PR (with the user's approval), stacked on its 
 | S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Implemented locally 2026-11-07; [result](#s1a-result-2026-11-07) |
 | S1b: second receiving site | A receiver at a surveyed candidate, placed by editing the package | A native receiver preset and site heading first (S1a has one layout facing heading 0); then no further C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Implemented locally and accepted 2026-11-07; [result](#s1b-result-2026-11-07) |
 | S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Implemented locally and played 2026-11-07; [result](#s1c-result-2026-11-07) |
-| S1d: useful landing playtest | The built quay is the next outing's nearer pickup: its load goes on a short second crossing ([plan](#s1d-the-quay-becomes-the-next-pickup)) | The user completes both outings without developer help and tries another idea | Implemented locally 2026-11-07; [result](#s1d-result-2026-11-07); user play check owed |
+| S1d: useful landing playtest | The built quay is the next outing's nearer pickup: its load goes on a short second crossing ([plan](#s1d-the-quay-becomes-the-next-pickup)) | The user completes both outings without developer help and tries another idea | Implemented, played and approved 2026-11-07; [result](#s1d-result-2026-11-07) |
 
 #### S1a: the existing site as package data
 
@@ -918,7 +920,16 @@ Review commands:
 ./build/cargo_sandbox   # landing, then pick up at the quay and carry it to the jetty
 ```
 
-Known limits: the user has not played S1d; the leg timings are unmeasured; the jetty is in open
+Play check, 2026-11-07 (macOS, the S1d worktree at `e127672`): the user played both outings
+and reported “Otherwise things work great! Counters are counting up on landings. Approved.”
+This records acceptance of S1d and approval to publish it. They also reported, with a
+screenshot, that “the collision detection is sometimes off”, without knowing which step it
+came from: a hanging crate lowered across the deck's edge had sunk into the hull. Deck contact
+had only ever caught a crate whose whole footprint was inside the deck, and the hull was not
+solid, so this dates from S0a, not S1d; the fix is a separate follow-up, not part of S1d's
+approval.
+
+Known limits: the leg timings are unmeasured; the jetty is in open
 water like the landing (its depth and seabed are not evidenced); four sites is the schema
 maximum, so no further outing can be added without a schema change or a repeatable job;
 `SUPPLY WAITING` was exercised only by the validator, not captured; Windows, Linux and the
