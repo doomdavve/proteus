@@ -29,7 +29,8 @@ in the quay's envelope. S1d's second outing: `quay-pickup` moors at the quay bes
 `jetty-approach` lifts, lashes and departs by G toward the job's guided jetty, and
 `jetty-delivered` unloads there and requires `JETTY SUPPLIED: 1`. These job captures are in
 the slow lane. `boat_cargo` checks the native delivery (once per load and receiver), loss,
-recovery, hidden-site and supply rules, `boat_plugin.free_objective` the free job grant, and
+recovery, hidden-site and supply rules, and that a crate at the deck's edge rests on it or is
+pushed out of the hull's side, `boat_plugin.free_objective` the free job grant, and
 `boat_plugin_state.work_commands`/`supply_commands` the `work.enable`, `cargo.supply` and
 `work.guide` commands and the events' `load`. The `shadow-high`/`shadow-low`
 capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,
