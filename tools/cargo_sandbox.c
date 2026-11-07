@@ -319,7 +319,10 @@ static void job_tick(Experiment *e)
 // The world, cargo and controls of a fresh session, without the job.
 static void session_reset(Experiment *e)
 {
+    // The reset must keep the package's scene: its notices and workboat drive this session.
+    const BoatSceneDefinition *scene = e->world.scene;
     boat_world_init(&e->world, &e->resources, boat_water_gentle());
+    e->world.scene = scene;
     e->world.water.upstream = e->resources.definition->upstream;
     e->world.water.player_wake_enabled = true;
     boat_cargo_reset_sites_with(
@@ -1617,22 +1620,28 @@ static bool save_try(Experiment *e, const char *path, const char **reason)
 
 // Resume from the file, else from its backup. A file that cannot be used is set aside as
 // NAME.rejected (never deleted), with its backup, and the session starts fresh.
-static void save_load(Experiment *e, const SaveFile *file)
+static int save_load(Experiment *e, const SaveFile *file)
 {
     char backup[1100];
     snprintf(backup, sizeof(backup), "%s.bak", file->path);
     const char *reason = "DAMAGED";
     bool had_file = boat_file_exists(file->path), had_backup = boat_file_exists(backup);
     if (had_file && save_try(e, file->path, &reason))
-        return;
+        return 1;
     if (had_backup && save_try(e, backup, &reason)) {
         printf("Save %s was not usable (%s); resumed its backup\n", file->path, reason);
-        return;
+        return 1;
     }
-    if (had_file && boat_file_set_aside(file->path, ".rejected"))
+    int result = 0;
+    if (had_file && boat_file_set_aside(file->path, ".rejected")) {
         printf("Save %s set aside as %s.rejected: %s\n", file->path, file->path, reason);
-    if (had_backup && boat_file_set_aside(backup, ".rejected"))
+        result = 2;
+    }
+    if (had_backup && boat_file_set_aside(backup, ".rejected")) {
         printf("Backup %s set aside as %s.rejected\n", backup, backup);
+        result = 2;
+    }
+    return result;
 }
 
 // What a frame changes, for the autosave policy.
@@ -1751,14 +1760,48 @@ static bool autosave_check(Experiment *e, SaveFile *file)
     return true;
 }
 
+// The flag's fixture: a session reset keeps the package's scene, so its custom notice and its
+// workboat survive the reset instead of falling back to the native defaults.
+static bool scene_check(Experiment *e, BoatPluginRevision *revision)
+{
+    if (e->world.scene != &revision->free.scene) {
+        fprintf(stderr, "Scene check: the session does not use the package's scene\n");
+        return false;
+    }
+    char *notice = revision->free.scene.work_notice[BOAT_SCENE_NOTICE_BUILT];
+    snprintf(notice, sizeof(revision->free.scene.work_notice[BOAT_SCENE_NOTICE_BUILT]),
+        "CUSTOM {site} DONE");
+    reset(e);
+    if (e->world.scene != &revision->free.scene) {
+        fprintf(stderr, "Scene check: a reset dropped the package's scene\n");
+        return false;
+    }
+    char text[64], expected[64], name[sizeof(e->sites[0].id)];
+    notice_text(e, BOAT_SCENE_NOTICE_BUILT, 0, text, sizeof(text));
+    snprintf(name, sizeof(name), "%s", e->sites[0].id);
+    for (char *c = name; *c; ++c)
+        *c = *c == '_' ? ' ' : (char)toupper((unsigned char)*c);
+    snprintf(expected, sizeof(expected), "CUSTOM %s DONE", name);
+    if (strcmp(text, expected)) {
+        fprintf(stderr, "Scene check: notice is \"%s\", expected \"%s\"\n", text, expected);
+        return false;
+    }
+    if (e->sandbox.boat != boat_cargo_workboat(revision->free.scene.work_boat)) {
+        fprintf(stderr, "Scene check: the workboat is not the package's\n");
+        return false;
+    }
+    printf("Scene check: a reset kept the package's scene, notice and workboat\n");
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     bool gpu = true, demo = false, survey = false, resume = false, fresh = false, save_now = false,
-         autosave = false;
+         autosave = false, scene_check_flag = false;
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_OUTER);
     int frames = 0;
     const char *screenshot = NULL, *scenario = "origin", *package = NULL, *save_arg = NULL,
-               *data_dir = NULL;
+               *data_dir = NULL, *expect = NULL;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--location") && i + 1 < argc) {
             location = boat_location_find(argv[++i]);
@@ -1780,7 +1823,13 @@ int main(int argc, char **argv)
             save_now = true;
         else if (!strcmp(argv[i], "--autosave-check"))
             autosave = true;
-        else if (!strcmp(argv[i], "--stale-digest"))
+        else if (!strcmp(argv[i], "--scene-check"))
+            scene_check_flag = true;
+        else if (!strcmp(argv[i], "--expect") && i + 1 < argc) {
+            expect = argv[++i];
+            if (strcmp(expect, "resumed") && strcmp(expect, "rejected"))
+                return 2;
+        } else if (!strcmp(argv[i], "--stale-digest"))
             stale_digest = true;
         else if (!strcmp(argv[i], "--shadow-review"))
             shadow_review = true;
@@ -1832,6 +1881,11 @@ int main(int argc, char **argv)
                 "  [--autosave-check] (test fixture, with --scenario and a save file) drives the "
                 "window\n"
                 "  loop's automatic saving on a virtual clock and checks when it writes\n"
+                "  [--scene-check] (test fixture) checks that a session reset keeps the package's "
+                "scene\n"
+                "  [--expect resumed|rejected] (test fixture, with a save file) fails unless the "
+                "save\n"
+                "  resumed or was set aside as .rejected\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
                 "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, N next site,\n"
                 "C return an unhooked, unlashed crate to its source pad, P pause, R reset.\n");
@@ -1852,6 +1906,12 @@ int main(int argc, char **argv)
         && strcmp(scenario, "capsized"))
         return 2;
     if (resume && (screenshot || frames || demo || survey || shadow_review))
+        return 2;
+    if (scene_check_flag
+        && (screenshot || frames || demo || survey || resume || shadow_review || save_now
+            || autosave))
+        return 2;
+    if (expect && (!(save_arg || data_dir) || strcmp(scenario, "origin")))
         return 2;
     if ((save_now || autosave)
         && (!(save_arg || data_dir) || screenshot || frames || demo || survey || resume
@@ -1890,6 +1950,11 @@ int main(int argc, char **argv)
     e.site_count = revision.free.scene.work_count;
     memcpy(e.sites, revision.free.scene.work, sizeof(e.sites));
     reset(&e);
+    if (scene_check_flag) {
+        bool ok = scene_check(&e, &revision);
+        boat_world_resources_destroy(&e.resources);
+        return ok ? 0 : 1;
+    }
     // Which file, if any. Only plain interactive play uses the game's data directory; every
     // staged, scripted or capture run uses a save only when told which one.
     static SaveFile save;
@@ -1907,9 +1972,25 @@ int main(int argc, char **argv)
         if (save.enabled && directory[0])
             boat_file_make_directory(directory);
     }
+    if (expect && !save.enabled) {
+        fprintf(stderr, "--expect needs a save file (--save or --data-dir).\n");
+        boat_world_resources_destroy(&e.resources);
+        return 2;
+    }
+    int loaded = 0;
     if (save.enabled && !fresh && !strcmp(scenario, "origin") && !shadow_review && !survey
         && !resume && !autosave)
-        save_load(&e, &save);
+        loaded = save_load(&e, &save);
+    if (expect) {
+        bool ok = (!strcmp(expect, "resumed") && loaded == 1)
+            || (!strcmp(expect, "rejected") && loaded == 2);
+        if (!ok) {
+            fprintf(
+                stderr, "--expect %s: the save did not match (load result %d)\n", expect, loaded);
+            boat_world_resources_destroy(&e.resources);
+            return 1;
+        }
+    }
     static HarbourView harbour;
     if (location->mapped) {
         char assets[4096];

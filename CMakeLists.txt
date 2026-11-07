@@ -556,6 +556,7 @@ if(NOT EMSCRIPTEN)
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-outer-${side}-test.png)
   endforeach()
   add_test(NAME cargo_sandbox_site COMMAND cargo_sandbox --survey)
+  add_test(NAME cargo_sandbox_scene_survives_reset COMMAND cargo_sandbox --scene-check)
   add_test(NAME cargo_shadow_wave_cpu COMMAND cargo_sandbox --location basin --renderer cpu --shadow-review)
   if(PROTEUS_GPU_TESTS)
     add_test(NAME cargo_shadow_wave_gpu COMMAND cargo_sandbox --renderer gpu --shadow-review)
@@ -576,30 +577,27 @@ if(NOT EMSCRIPTEN)
   add_test(NAME cargo_sandbox_save_write COMMAND cargo_sandbox --scenario landing-built
     --save ${SANDBOX_SAVE_DIR}/resume.sav --save-now)
   add_test(NAME cargo_sandbox_save_resume COMMAND cargo_sandbox --renderer cpu
-    --save ${SANDBOX_SAVE_DIR}/resume.sav
+    --save ${SANDBOX_SAVE_DIR}/resume.sav --expect resumed
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-save-resume-test.png)
   add_test(NAME cargo_sandbox_save_stale COMMAND cargo_sandbox --scenario landing-built
     --save ${SANDBOX_SAVE_DIR}/stale.sav --save-now --stale-digest)
   add_test(NAME cargo_sandbox_save_rejected COMMAND cargo_sandbox --renderer cpu
-    --save ${SANDBOX_SAVE_DIR}/stale.sav
+    --save ${SANDBOX_SAVE_DIR}/stale.sav --expect rejected
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-save-rejected-test.png)
   set_tests_properties(cargo_sandbox_save_write PROPERTIES FIXTURES_SETUP sandbox_save_resume)
-  set_tests_properties(cargo_sandbox_save_resume PROPERTIES FIXTURES_REQUIRED sandbox_save_resume
-    PASS_REGULAR_EXPRESSION "Resumed save .*resume.sav at tick")
+  set_tests_properties(cargo_sandbox_save_resume PROPERTIES FIXTURES_REQUIRED sandbox_save_resume)
   set_tests_properties(cargo_sandbox_save_stale PROPERTIES FIXTURES_SETUP sandbox_save_rejected)
-  set_tests_properties(cargo_sandbox_save_rejected PROPERTIES
-    FIXTURES_REQUIRED sandbox_save_rejected
-    PASS_REGULAR_EXPRESSION "stale.sav.rejected: PACKAGE CHANGED")
+  set_tests_properties(cargo_sandbox_save_rejected PROPERTIES FIXTURES_REQUIRED
+    sandbox_save_rejected)
   # The window loop's automatic saving on a virtual clock (2 ticks per frame): a periodic
   # write, a milestone, pausing and quitting, then a later run resumes the last write.
   add_test(NAME cargo_sandbox_autosave COMMAND cargo_sandbox --autosave-check --scenario departure
     --save ${SANDBOX_SAVE_DIR}/autosave.sav)
   add_test(NAME cargo_sandbox_autosave_resume COMMAND cargo_sandbox --renderer cpu
-    --save ${SANDBOX_SAVE_DIR}/autosave.sav
+    --save ${SANDBOX_SAVE_DIR}/autosave.sav --expect resumed
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-autosave-resume-test.png)
   set_tests_properties(cargo_sandbox_autosave PROPERTIES FIXTURES_SETUP sandbox_autosave)
-  set_tests_properties(cargo_sandbox_autosave_resume PROPERTIES FIXTURES_REQUIRED sandbox_autosave
-    PASS_REGULAR_EXPRESSION "Resumed save .*autosave.sav at tick [0-9]+")
+  set_tests_properties(cargo_sandbox_autosave_resume PROPERTIES FIXTURES_REQUIRED sandbox_autosave)
   list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_autosave cargo_sandbox_autosave_resume)
   list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_save_write cargo_sandbox_save_resume
     cargo_sandbox_save_stale cargo_sandbox_save_rejected)
@@ -611,6 +609,7 @@ if(NOT EMSCRIPTEN)
       --scenario ${scenario})
     list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_resume_${scenario})
   endforeach()
+  list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_scene_survives_reset)
 endif()
 add_executable(validate_boat_audio tools/validate_boat_audio.c src/boat_audio.c)
 target_include_directories(validate_boat_audio PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

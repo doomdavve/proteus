@@ -5,7 +5,8 @@ bounds, compatibility verdicts, the work digest and the pure autosave policy (SV
 ticks only. `boat_file` (SV1d, `cpu;quick`) checks atomic writes with `.bak`, failed writes, set-aside, bounded listing and
 reads in a build-tree directory. `cargo_sandbox_save_*` and `cargo_sandbox_autosave*` (SV1d, slow lane) write, resume and
 reject saves under `build/sandbox-save-tests` and drive the loop's autosave on a virtual clock; none touches the user's
-data directory. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
+data directory; each fails on the program's exit code (`--expect resumed|rejected`). `cargo_sandbox_scene_survives_reset`
+(`--scene-check`) requires a session reset to keep the package's scene, with its custom notice. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
 resumes it from the record and from its encoded bytes, and requires equal behaviour over 1200 scripted ticks.
 
 S0a/S0b `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane motors/cable,

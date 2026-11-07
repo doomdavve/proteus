@@ -1053,8 +1053,7 @@ actions, crane and helm inputs) for `swing`, `departure`, `crossing`, `delivered
 `build-blocked`, `quay-pickup`, `jetty-delivered`, and two new fixtures: `capsized` (the crossing,
 capsized, resumes moored with the crate back on its source pad) and `delivery-pending` (saved with
 the core delivery queued and not yet counted; afterwards exactly one counted delivery and one
-built quay). Limit: `build-blocked` is saved after its wait resolves, not during it. Found, not
-changed: `reset` calls `boat_world_init`, which drops the `world.scene` that `main` set, so the
+built quay). Limit: `build-blocked` is saved after its wait resolves, not during it. Found (fixed in the SV1d follow-up below): `reset` calls `boat_world_init`, which drops the `world.scene` that `main` set, so the
 harness runs with a null scene (its notices and workboat are the native defaults, which equal the
 outer package's); resume reproduces the same behaviour. Verified: the 34 CPU captures (22 outer, 12
 basin) were rendered before and after and are byte-identical (`cmp`); the full CTest preset passed
@@ -1083,8 +1082,8 @@ unavailable until SV1i. Tests: `boat_file` (`cpu;quick`, build-tree directory); 
 `landing-built` frame), `cargo_sandbox_save_stale` then `cargo_sandbox_save_rejected`, and
 `cargo_sandbox_autosave` (the loop's policy on a virtual clock, two ticks per frame: one periodic
 write, one lash milestone, one on pausing, one on quitting, `.bak` present) then
-`cargo_sandbox_autosave_resume`; the three resume and rejection tests pass on a regular
-expression over the program's message. `boat_replay` still passes. Verification: the 34 CPU
+`cargo_sandbox_autosave_resume`; the three resume and rejection tests passed on a regular
+expression over the program's message (superseded by the SV1d follow-up below). `boat_replay` still passes. Verification: the 34 CPU
 captures are byte-identical to before; the resumed `landing-built` capture differs slightly from
 the staged one (the boat's pitch and wake start at rest, so the hull sits a few pixels differently
 and the foam differs; the quay and crate are the same). Headless CPU captures draw no HUD, so
@@ -1096,6 +1095,19 @@ wake experiments not run) with a warning-clean build. Not done: no windowed run 
 session has no display: GLFW cannot start), so the real window loop, the `SAVED` mark's drawing,
 focus-loss saving and GPU frames are unverified; the loop's wiring is covered only through
 `autosave_frame` on a virtual clock.
+
+**SV1d follow-up result (2026-11-07, macOS arm64, Debug).** Two review findings closed in one
+commit. `session_reset` now restores `world.scene` after `boat_world_init`, so the package's scene
+(its `scene.work.notices` and workboat) survives every reset instead of the harness running with a
+null scene. New `cargo_sandbox --scene-check` (`cargo_sandbox_scene_survives_reset`) sets a custom
+built notice, resets, and requires the same scene pointer, the custom text and the package's
+workboat; with the fix removed it fails. `--expect resumed|rejected` makes the save-resume,
+autosave-resume and rejected CTests fail on the program's own result (resumed from file or backup;
+something set aside), so they no longer pass on an output regex alone (CTest ignores the exit
+code when `PASS_REGULAR_EXPRESSION` is set, so the regex was removed). The 36 CPU captures
+(34 existing plus `delivery-pending` and `capsized`) were rendered before and after and are
+byte-identical (`cmp`): the scene's notices and workboat equal the native defaults. The full
+CTest preset passed 415 tests (13 disabled wake experiments not run).
 
 #### SV1: local save and resume
 
