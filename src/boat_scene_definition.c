@@ -296,9 +296,11 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
     }
     bool source = false;
     for (unsigned i = 0; i < scene->work_count; ++i)
-        source |= scene->work[i].preset == BOAT_SCENE_WORK_SERVICE_PLATFORM;
+        source
+            |= scene->work[i].preset == BOAT_SCENE_WORK_SERVICE_PLATFORM && !scene->work[i].hidden;
     if (scene->work_count && !source)
-        return fail(diagnostic, "scene.work.sites", "needs a service_platform site to start from");
+        return fail(
+            diagnostic, "scene.work.sites", "needs a visible service_platform site to start from");
     return true;
 }
 
@@ -418,6 +420,8 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
             value(&hash, "work.x", w->x);
             value(&hash, "work.z", w->z);
             value(&hash, "work.heading", w->heading);
+            if (w->hidden) // Visible sites keep their S1b digests.
+                fold(&hash, "work.hidden", 12);
         }
     }
     return hash;

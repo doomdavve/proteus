@@ -269,6 +269,7 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
             site->x = (float)number(w, site->x);
             site->z = (float)number(w, site->z);
             site->heading = (float)number(w, site->heading);
+            site->hidden = integer(w, site->hidden, 1);
         }
     }
 }
@@ -390,12 +391,14 @@ static void payload(Wire *w, BoatPluginDecoded *d)
         break;
     case BOAT_PLUGIN_KIND_FREE: {
         d->free.version = number(w, d->free.version);
-        unsigned flags = (unsigned)integer(w, d->free.has_scene ? 1u : 0u, 1);
-        if (flags > 1) {
+        unsigned flags = (unsigned)integer(
+            w, (d->free.has_scene ? 1u : 0u) | (d->free.callbacks ? 2u : 0u), 1);
+        if (flags > 3) {
             w->ok = false;
             break;
         }
-        d->free.has_scene = flags != 0;
+        d->free.has_scene = flags & 1u;
+        d->free.callbacks = flags & 2u;
         if (d->free.has_scene)
             scene_wire(w, &d->free.scene);
         break;

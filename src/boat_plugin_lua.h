@@ -44,6 +44,7 @@ typedef struct {
 
 typedef struct {
     double version;
+    bool callbacks; // S1c: init and update beside `free`, for objective.hud.
     bool has_scene;
     BoatSceneDefinition scene;
 } BoatPluginFreeData;
