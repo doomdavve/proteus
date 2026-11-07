@@ -1,0 +1,10 @@
+{
+  "id": "proteus.outer-work",
+  "name": "Eriksberg work site",
+  "api": 1,
+  "kind": "free",
+  "entry": "main.lua",
+  "location": "outer",
+  "capabilities": ["free.define", "scene.define", "objective.hud"],
+  "state_version": 1
+}

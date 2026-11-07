@@ -4,6 +4,7 @@
 #include "boat_plugin_catalog.h"
 #include "boat_plugin_io.h"
 #include "boat_plugin_lua.h"
+#include "boat_plugin_state.h"
 #include "boat_plugin_wire.h"
 #include "boat_world.h"
 
@@ -42,12 +43,14 @@ static bool evaluate(const char *directory, Entry *entry)
         return false;
     }
     entry->kind = boat_plugin_kind_parse(entry->manifest.kind);
-    if (entry->manifest.objective) {
+    // S1c: a free package's job (its work sites' objective) runs in the native cargo sandbox,
+    // which evaluates the embedded source. Other bundled sessions stay Lua-free.
+    if (entry->manifest.objective && entry->kind != BOAT_PLUGIN_KIND_FREE) {
         d.status = BOAT_PLUGIN_MANIFEST;
         snprintf(d.file, sizeof(d.file), "%s", "plugin.json");
         snprintf(d.field, sizeof(d.field), "%s", "capabilities");
         snprintf(d.message, sizeof(d.message),
-            "catalog packages have no objective callbacks; authoring packages only");
+            "catalog packages have no objective callbacks, except free work-site jobs");
         show(directory, &d);
         return false;
     }
@@ -119,8 +122,8 @@ static bool evaluate(const char *directory, Entry *entry)
                 &entry->revision.race, resources.definition, &resources.map, &d);
             break;
         case BOAT_PLUGIN_KIND_FREE:
-            status
-                = boat_plugin_free_check_location(&entry->revision.free, resources.definition, &d);
+            status = boat_plugin_free_check_location(
+                &entry->revision.free, resources.definition, &resources.map, &d);
             break;
         case BOAT_PLUGIN_KIND_COURSE:
             status = boat_plugin_course_check_location(
@@ -135,6 +138,15 @@ static bool evaluate(const char *directory, Entry *entry)
         }
     }
     boat_world_resources_destroy(&resources);
+    if (status == BOAT_PLUGIN_OK && entry->manifest.objective) {
+        // The same init probe as staging, so a bundled job that cannot start fails the build.
+        BoatPluginObjective probe = { .generation = 1,
+            .rng = 12345,
+            .work_enabled = true,
+            .state_version = entry->manifest.state_version };
+        status = boat_plugin_objective_step(&probe, files.source, files.source_size,
+            BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &d);
+    }
     if (status != BOAT_PLUGIN_OK) {
         show(directory, &d);
         return false;

@@ -21,6 +21,7 @@
 #define BOAT_SCENE_ENTRANCE_MAX_WIDTH 40.0f
 #define BOAT_SCENE_GANGWAY_MIN_LENGTH 2.0f
 #define BOAT_SCENE_GANGWAY_MAX_LENGTH 20.0f
+#define BOAT_SCENE_WORK_SITES 4
 
 typedef enum {
     BOAT_SCENE_BERTH_SKIFF,
@@ -75,6 +76,28 @@ typedef struct {
     char attaches[BOAT_SCENE_TEXT]; // Gangway target or earlier floating parent; edge-to-edge join.
 } BoatSceneModule;
 
+// S1a: a registered work-site layout. The preset fixes the platform, crane, pad and assisted
+// berth relative to the site; Lua chooses only where a site is, which way it faces and its cargo.
+// Both presets share one layout: a service platform starts with its load on the pad, and a
+// receiving platform starts empty and marks its pad as the place to deliver that load (S1b).
+typedef enum {
+    BOAT_SCENE_WORK_SERVICE_PLATFORM,
+    BOAT_SCENE_WORK_RECEIVING_PLATFORM,
+    BOAT_SCENE_WORK_PRESETS
+} BoatSceneWorkPreset;
+typedef enum { BOAT_SCENE_CARGO_CRATE, BOAT_SCENE_CARGO_PRESETS } BoatSceneCargoPreset;
+
+typedef struct {
+    char id[BOAT_SCENE_TEXT];
+    unsigned char preset; // BoatSceneWorkPreset
+    unsigned char cargo; // BoatSceneCargoPreset: the starting or the accepted load.
+    float x, z; // Final workboat berth in simulation metres.
+    float heading; // Final workboat heading, renderer radians; the whole layout turns with it.
+    // S1c: absent until an objective's work.enable command builds it. Staging surveys it like any
+    // other site, so enabling never creates unvalidated geometry.
+    bool hidden;
+} BoatSceneWorkSite;
+
 // A present subsystem replaces its whole compiled collection. An absent one keeps the compiled
 // default; an empty present list disables it where the native owner allows that.
 typedef struct BoatSceneDefinition {
@@ -90,6 +113,10 @@ typedef struct BoatSceneDefinition {
     // L4.2: a present flock list replaces the compiled gull groups. Count zero disables them.
     bool gulls_present;
     WaterfrontFlockDefinition gulls;
+    // S1a: cargo work sites. Only free packages may author them; nothing is compiled by default.
+    bool work_present;
+    unsigned work_count;
+    BoatSceneWorkSite work[BOAT_SCENE_WORK_SITES];
 } BoatSceneDefinition;
 
 typedef struct {
@@ -130,5 +157,9 @@ float boat_scene_module_distance(const BoatSceneModule *module, float x, float z
 
 const BoatSceneBerth *boat_scene_find_berth(const BoatSceneDefinition *scene, const char *id);
 const BoatSceneModule *boat_scene_find_module(const BoatSceneDefinition *scene, const char *id);
+const char *boat_scene_work_preset_name(BoatSceneWorkPreset preset);
+bool boat_scene_work_preset_from_name(const char *name, BoatSceneWorkPreset *preset);
+const char *boat_scene_cargo_preset_name(BoatSceneCargoPreset preset);
+bool boat_scene_cargo_preset_from_name(const char *name, BoatSceneCargoPreset *preset);
 
 #endif
