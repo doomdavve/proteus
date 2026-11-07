@@ -284,11 +284,12 @@ int boat_plugin_stage_worker(void)
     }
     if (status != BOAT_PLUGIN_OK)
         goto done;
-    if (kind == BOAT_PLUGIN_KIND_VOYAGE && m.objective) {
+    if ((kind == BOAT_PLUGIN_KIND_VOYAGE || kind == BOAT_PLUGIN_KIND_FREE) && m.objective) {
         BoatPluginCost cost = d.cost;
         BoatPluginObjective probe = { .generation = 1,
             .rng = 12345,
             .timers_enabled = m.timers,
+            .work_enabled = kind == BOAT_PLUGIN_KIND_FREE,
             .state_version = m.state_version };
         boat_plugin_objective_step(&probe, bundle.source, bundle.source_size,
             BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &d);

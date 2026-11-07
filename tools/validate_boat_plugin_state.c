@@ -481,7 +481,47 @@ static int independent_budgets(void)
     return 0;
 }
 
+// S1c: work.enable records a build intent only under the host's work grant. Its fields are
+// exact, one batch names a site once, and HUD/timer IDs live in separate namespaces.
+static int work_commands(void)
+{
+    static const char script[]
+        = "return {init=function(c) return {}, {} end,"
+          "update=function(c,s) return s, {{kind='work.enable',generation=c.generation,"
+          "id='quay'},{kind='hud.set',generation=c.generation,id='quay',label='BUILT',value=1}}"
+          " end}";
+    BoatPluginObjective o = fresh();
+    CHECK(step(&o, script, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0) == BOAT_PLUGIN_OK);
+    BoatPluginObjective denied = o;
+    CHECK(step(&denied, script, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0) == BOAT_PLUGIN_SCHEMA);
+    CHECK(denied.quarantined && strstr(diagnostic.message, "work.enable requires"));
+    o.work_enabled = true;
+    uint64_t before = boat_plugin_objective_digest(&o);
+    CHECK(step(&o, script, BOAT_PLUGIN_OBJECTIVE_UPDATE, 12, NULL, 0) == BOAT_PLUGIN_OK);
+    CHECK(o.command_count == 2 && !strcmp(o.commands[0].kind, "work.enable"));
+    CHECK(!strcmp(o.commands[0].id, "quay") && !o.commands[0].value && o.hud_count == 1);
+    CHECK(boat_plugin_objective_digest(&o) != before);
+    static const char *const invalid[] = {
+        "{kind='work.enable',generation=c.generation,id='quay',value=1}",
+        "{kind='work.enable',generation=c.generation}",
+        ("{kind='work.enable',generation=c.generation,id='quay'},"
+         "{kind='work.enable',generation=c.generation,id='quay'}"),
+        "{kind='work.enable',generation=0,id='quay'}",
+    };
+    for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        char source[256];
+        snprintf(
+            source, sizeof(source), "return {update=function(c,s) return s, {%s} end}", invalid[i]);
+        BoatPluginObjective rejected = o;
+        CHECK(step(&rejected, source, BOAT_PLUGIN_OBJECTIVE_UPDATE, 24, NULL, 0)
+            == BOAT_PLUGIN_SCHEMA);
+        CHECK(rejected.quarantined && rejected.tick == o.tick && rejected.command_count == 2);
+    }
+    return 0;
+}
+
 static const TestCase cases[] = {
+    TEST_CASE(work_commands),
     TEST_CASE(independent_budgets),
     TEST_CASE(schema_timer_retirement),
     TEST_CASE(timer_capabilities),

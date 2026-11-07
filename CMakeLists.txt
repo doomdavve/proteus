@@ -539,7 +539,8 @@ if(NOT EMSCRIPTEN)
     add_test(NAME cargo_shadow_wave_gpu COMMAND cargo_sandbox --renderer gpu --shadow-review)
     set_tests_properties(cargo_shadow_wave_gpu PROPERTIES LABELS "gpu" TIMEOUT 30)
   endif()
-  foreach(scenario shadow-high shadow-low remoor crossing receiver-approach delivered)
+  foreach(scenario shadow-high shadow-low remoor crossing receiver-approach delivered
+    landing-built redelivered job-reset build-blocked)
     add_test(NAME cargo_sandbox_${scenario}_screenshot COMMAND cargo_sandbox --renderer cpu
       --scenario ${scenario}
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${scenario}-test.png)

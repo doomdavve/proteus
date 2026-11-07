@@ -93,6 +93,9 @@ typedef struct {
     unsigned char cargo; // BoatSceneCargoPreset: the starting or the accepted load.
     float x, z; // Final workboat berth in simulation metres.
     float heading; // Final workboat heading, renderer radians; the whole layout turns with it.
+    // S1c: absent until an objective's work.enable command builds it. Staging surveys it like any
+    // other site, so enabling never creates unvalidated geometry.
+    bool hidden;
 } BoatSceneWorkSite;
 
 // A present subsystem replaces its whole compiled collection. An absent one keeps the compiled

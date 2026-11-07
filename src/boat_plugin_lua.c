@@ -244,7 +244,8 @@ static int record(lua_State *L, Vm *vm, int table, const char *path, const char 
 static const char *const ROOT[] = { "voyage", "tour", "scene", "init", "update", "migrate", NULL };
 static const char *const SCENE[] = { "version", "marina", "traffic", "gulls", "work", NULL };
 static const char *const WORK[] = { "sites", NULL };
-static const char *const WORK_SITE[] = { "id", "preset", "cargo", "x", "z", "heading", NULL };
+static const char *const WORK_SITE[]
+    = { "id", "preset", "cargo", "x", "z", "heading", "hidden", NULL };
 static const char *const MARINA[] = { "entrance", "berths", "modules", NULL };
 static const char *const TRAFFIC[] = { "vessels", NULL };
 static const char *const GULLS[] = { "flocks", NULL };
@@ -973,6 +974,12 @@ static bool scene_work(lua_State *L, Vm *vm, int scene, BoatSceneDefinition *s)
         w->x = (float)x;
         w->z = (float)z;
         w->heading = (float)heading;
+        char hidden_at[64];
+        int hidden = field(L, entry, "hidden", path, hidden_at);
+        if (hidden != LUA_TNIL && hidden != LUA_TBOOLEAN)
+            return reject(vm, hidden_at, "must be a boolean, not a %s", lua_typename(L, hidden));
+        w->hidden = lua_toboolean(L, -1);
+        lua_pop(L, 1);
         BoatSceneWorkPreset p;
         BoatSceneCargoPreset c;
         char field_at[64];
@@ -1226,7 +1233,7 @@ static int decode_match(lua_State *L)
     return 0;
 }
 
-static const char *const FREE_ROOT[] = { "free", NULL };
+static const char *const FREE_ROOT[] = { "free", "init", "update", NULL };
 static const char *const FREE[] = { "version", "scene", NULL };
 static const char *const COURSE_ROOT[] = { "course", NULL };
 static const char *const COURSE[] = { "start", "gates", NULL };
@@ -1243,8 +1250,16 @@ static int decode_free(lua_State *L)
     char at[64];
     if (!only(L, vm, 2, "", FREE_ROOT))
         return 0;
-    int free = record(L, vm, 2, "", "free", FREE, at);
     BoatPluginFreeData *d = vm->free;
+    lua_getfield(L, 2, "init");
+    lua_getfield(L, 2, "update");
+    d->callbacks = !lua_isnil(L, -1) || !lua_isnil(L, -2);
+    if (d->callbacks && (!lua_isfunction(L, -1) || !lua_isfunction(L, -2))) {
+        reject(vm, "init/update", "both objective callbacks must be functions");
+        return 0;
+    }
+    lua_pop(L, 2);
+    int free = record(L, vm, 2, "", "free", FREE, at);
     if (!free || !number(L, vm, free, at, "version", &d->version))
         return 0;
     if (!read_scene(L, vm, free, &d->scene, &d->has_scene))

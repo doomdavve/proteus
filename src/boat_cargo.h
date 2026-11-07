@@ -36,6 +36,10 @@ typedef struct {
     float settled; // Continuous seconds of low relative speed on the deck.
     unsigned char pad; // The crane whose pad supports a BOAT_CARGO_PAD load.
     bool deck_contact;
+    // S1c: committed once per session, at a receiving pad; recovery and re-delivery keep it.
+    bool delivered;
+    bool wet; // Resting in water since its last support; a LOST event marks the first touch.
+    float rest; // Continuous seconds at rest on a receiving pad, toward delivery.
 } BoatCargo;
 
 // One placed work site and its crane.
@@ -44,15 +48,33 @@ typedef struct {
     float heading; // Renderer radians, as Boat.heading at the berth; zero is the S0 frame.
     float angle, reach, rope; // The slew angle is in the site frame.
     unsigned char preset; // BoatSceneWorkPreset
+    bool hidden; // Not built yet: no platform, berth, pad or contact until enabled.
 } BoatCargoCrane;
+
+// S1c: native cargo events, in the order they happened. SITE indexes the cranes: the site
+// worked at for SECURED and LOST, the receiver for DELIVERED and the source pad for RESET.
+typedef enum {
+    BOAT_CARGO_EVENT_SECURED,
+    BOAT_CARGO_EVENT_DELIVERED,
+    BOAT_CARGO_EVENT_LOST,
+    BOAT_CARGO_EVENT_RESET
+} BoatCargoEventKind;
+typedef struct {
+    BoatCargoEventKind kind;
+    unsigned site;
+} BoatCargoEvent;
+#define BOAT_CARGO_EVENTS 8 // One tick and one action add at most two; drain every tick.
 
 typedef struct {
     BoatCargo cargo;
     BoatCargoCrane cranes[BOAT_SCENE_WORK_SITES];
     unsigned crane_count;
     unsigned active; // The berth moored at, or being moored at; its crane holds the hook.
+    unsigned source; // The service platform the load starts on and recovers to.
     bool moored;
     bool mooring; // Requested assisted alignment; G cancels it before reaching the berth.
+    BoatCargoEvent events[BOAT_CARGO_EVENTS];
+    unsigned event_count;
 } BoatCargoSandbox;
 
 typedef enum {
@@ -84,8 +106,9 @@ typedef struct {
 // Reset keeps no outside state. The application separately resets its boat and clock.
 void boat_cargo_reset(BoatCargoSandbox *sandbox);
 void boat_cargo_reset_at(BoatCargoSandbox *sandbox, Vector2 mooring);
-// Places every site and moors at the first service platform, its load on that pad. False when
-// COUNT is outside 1..BOAT_SCENE_WORK_SITES or no site is a service platform.
+// Places every site and moors at the first visible service platform, its load on that pad.
+// Hidden sites stay absent. False when COUNT is outside 1..BOAT_SCENE_WORK_SITES or no visible
+// site is a service platform.
 bool boat_cargo_reset_sites(
     BoatCargoSandbox *sandbox, const BoatSceneWorkSite *sites, unsigned count);
 // Staging survey for one site: the platform, workboat approach and complete crane sweep clear
@@ -107,6 +130,17 @@ Vector3 boat_cargo_tip(const BoatCargoCrane *crane);
 Vector3 boat_cargo_hook(const BoatCargoSandbox *sandbox); // The active crane's hook.
 // Bounded motors at the same 120 Hz as the cargo/boat. Inputs are signed unit rates.
 void boat_cargo_motor(BoatCargoCrane *crane, float slew, float reach, float hoist);
+// Copy and clear the queued events; returns how many were copied (at most CAPACITY).
+unsigned boat_cargo_take_events(
+    BoatCargoSandbox *sandbox, BoatCargoEvent *events, unsigned capacity);
+// Return a load that is neither hooked nor lashed to its source pad (the retry path) and queue
+// RESET. A committed delivery stays committed.
+bool boat_cargo_recover(BoatCargoSandbox *sandbox);
+// Build hidden SITE. Refused, changing nothing, when the site is not hidden or the boat or the
+// load is inside its surveyed envelope plus a hull margin; already visible sites are refused too.
+bool boat_cargo_site_enable(BoatCargoSandbox *sandbox, unsigned site, const Boat *boat);
+// Whether the boat or the load occupies SITE's envelope (the reason an enable is refused).
+bool boat_cargo_site_occupied(const BoatCargoSandbox *sandbox, unsigned site, const Boat *boat);
 // Explicit generous attachment; release keeps the instantaneous load velocity.
 bool boat_cargo_hook_toggle(BoatCargoSandbox *sandbox);
 bool boat_cargo_lash_toggle(BoatCargoSandbox *sandbox, const Boat *boat);

@@ -30,8 +30,9 @@ This separate native S0 experiment defaults to the Eriksberg inlet on `outer`, w
 service crane, one crate and a borrowed deck boat. `--location basin` retains the isolated
 reference (CPU draw distance is 240 m; the GPU view uses 4500 m). `--survey` checks the mapped work site without a window. Reset is immediate and
 there is no saved progress. It is not a `wake_velocity` mode. Holding Space brakes; G
-starts/cancels assisted mooring when BERTH READY appears. The HUD shows persistent throttle
-and the landing footprint/deck gap before contact. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
+starts/cancels assisted mooring when BERTH READY appears; N cycles the guided site and C returns
+an unhooked, unlashed crate to its source pad. The HUD shows persistent throttle, the landing
+footprint/deck gap before contact and the package's job row. See the [sandbox experiment](FREE_RIDE_SANDBOX_PLAN.md#s0a-try-the-cargo-toy)
 for the first lift, controls, capture/measurement commands and current limitations.
 
 `--shadow-review` is a developer-only, virtual-clock footprint visibility check (use

@@ -5,6 +5,7 @@
 #include "waterfront_traffic.h"
 
 #include <math.h>
+#include <string.h>
 
 static const Vector3 crane_base = { -4, 5.5f, 3 };
 
@@ -29,16 +30,47 @@ bool boat_cargo_reset_sites(BoatCargoSandbox *s, const BoatSceneWorkSite *sites,
             .angle = -2.819842f,
             .reach = 3.162278f,
             .rope = 3.2f,
-            .preset = sites[i].preset };
-        if (s->active == count && sites[i].preset == BOAT_SCENE_WORK_SERVICE_PLATFORM)
+            .preset = sites[i].preset,
+            .hidden = sites[i].hidden };
+        if (s->active == count && sites[i].preset == BOAT_SCENE_WORK_SERVICE_PLATFORM
+            && !sites[i].hidden)
             s->active = i;
     }
     if (s->active == count) {
         s->active = 0;
         return false;
     }
+    s->source = s->active;
     s->cargo.pad = (unsigned char)s->active;
     s->cargo.position = boat_cargo_site_point(&s->cranes[s->active], (Vector3) { -5, 1.4f, 0 });
+    return true;
+}
+
+static void event(BoatCargoSandbox *s, BoatCargoEventKind kind, unsigned site)
+{
+    if (s->event_count < BOAT_CARGO_EVENTS)
+        s->events[s->event_count++] = (BoatCargoEvent) { kind, site };
+}
+
+unsigned boat_cargo_take_events(BoatCargoSandbox *s, BoatCargoEvent *events, unsigned capacity)
+{
+    unsigned count = s->event_count < capacity ? s->event_count : capacity;
+    memcpy(events, s->events, count * sizeof(events[0]));
+    memmove(s->events, s->events + count, (s->event_count - count) * sizeof(events[0]));
+    s->event_count -= count;
+    return count;
+}
+
+bool boat_cargo_recover(BoatCargoSandbox *s)
+{
+    BoatCargo *c = &s->cargo;
+    if (c->state == BOAT_CARGO_HANGING || c->state == BOAT_CARGO_SECURED)
+        return false;
+    *c = (BoatCargo) { .state = BOAT_CARGO_PAD,
+        .position = boat_cargo_site_point(&s->cranes[s->source], (Vector3) { -5, 1.4f, 0 }),
+        .pad = (unsigned char)s->source,
+        .delivered = c->delivered };
+    event(s, BOAT_CARGO_EVENT_RESET, s->source);
     return true;
 }
 
@@ -138,12 +170,34 @@ bool boat_cargo_sites_apart(const BoatSceneWorkSite *a, const BoatSceneWorkSite 
     return false;
 }
 
+static bool near_frame(const BoatCargoCrane *frame, Vector3 point, float margin)
+{
+    Vector3 local = boat_cargo_site_local(frame, point);
+    return -local.x > SITE_MIN_X - margin && -local.x < SITE_MAX_X + margin
+        && local.z > SITE_MIN_Z - margin && local.z < SITE_MAX_Z + margin;
+}
+
 bool boat_cargo_site_near(const BoatSceneWorkSite *site, Vector2 point, float margin)
 {
     BoatCargoCrane frame = site_frame(site);
-    Vector3 local = boat_cargo_site_local(&frame, (Vector3) { -point.x, 0, point.y });
-    return -local.x > SITE_MIN_X - margin && -local.x < SITE_MAX_X + margin
-        && local.z > SITE_MIN_Z - margin && local.z < SITE_MAX_Z + margin;
+    return near_frame(&frame, (Vector3) { -point.x, 0, point.y }, margin);
+}
+
+bool boat_cargo_site_occupied(const BoatCargoSandbox *s, unsigned site, const Boat *boat)
+{
+    // The workboat's hull reaches about 3 m from its centre; the crate is one bounded body.
+    const BoatCargoCrane *c = &s->cranes[site];
+    return near_frame(c, (Vector3) { -boat->position.x, 0, boat->position.y }, 3)
+        || near_frame(c, s->cargo.position, 1);
+}
+
+bool boat_cargo_site_enable(BoatCargoSandbox *s, unsigned site, const Boat *boat)
+{
+    if (site >= s->crane_count || !s->cranes[site].hidden
+        || boat_cargo_site_occupied(s, site, boat))
+        return false;
+    s->cranes[site].hidden = false;
+    return true;
 }
 
 Vector3 boat_cargo_tip(const BoatCargoCrane *c)
@@ -205,6 +259,7 @@ bool boat_cargo_lash_toggle(BoatCargoSandbox *s, const Boat *boat)
     if (c->state != BOAT_CARGO_LOOSE || !c->deck_contact || c->settled < .5f)
         return false;
     c->state = BOAT_CARGO_SECURED;
+    event(s, BOAT_CARGO_EVENT_SECURED, s->active);
     return true;
 }
 
@@ -234,8 +289,10 @@ BoatCargoMoorStatus boat_cargo_moor_status(const BoatCargoSandbox *s, const Boat
     Vector3 hull = { -boat->position.x, 0, boat->position.y };
     if (!s->moored && !s->mooring)
         for (unsigned i = 0; i < s->crane_count; ++i)
-            if (Vector3Distance(hull, s->cranes[i].origin)
-                < Vector3Distance(hull, s->cranes[site].origin))
+            if (!s->cranes[i].hidden
+                && (s->cranes[site].hidden
+                    || Vector3Distance(hull, s->cranes[i].origin)
+                        < Vector3Distance(hull, s->cranes[site].origin)))
                 site = i;
     const BoatCargoCrane *c = &s->cranes[site];
     Vector3 local = boat_cargo_site_local(c, hull);
@@ -430,6 +487,8 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
     }
     bool pad = false;
     for (unsigned i = 0; i < s->crane_count && !pad; ++i) {
+        if (s->cranes[i].hidden)
+            continue;
         Vector3 local = boat_cargo_site_local(&s->cranes[i], c->position);
         pad = fabsf(local.x + 5) < 1.1f && local.z > -1.6f && local.z < 3.6f;
         if (pad)
@@ -440,6 +499,7 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
         : boat_water_query_borrowed(&world->water, (Vector2) { -c->position.x, c->position.z }, now)
                 .height
             + .12f;
+    bool water = !pad && !c->deck_contact && c->position.y < floor;
     if (!c->deck_contact && c->position.y < floor) {
         c->position.y = floor;
         c->velocity.y = fmaxf(0, -c->velocity.y * .12f);
@@ -451,6 +511,21 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
     }
     // A single bounded body; falling/suspended simulation never depends on the camera.
     c->velocity = Vector3ClampValue(c->velocity, 0, 12);
+    // S1c events. A delivery commits once per session after the released load has rested on a
+    // receiving pad; a loss is the first water contact after a deck or pad support.
+    if (pad || c->deck_contact)
+        c->wet = false;
+    else if (water && c->state == BOAT_CARGO_FLOATING && !c->wet) {
+        c->wet = true;
+        event(s, BOAT_CARGO_EVENT_LOST, s->active);
+    }
+    bool receiving = c->state == BOAT_CARGO_PAD
+        && s->cranes[c->pad].preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM;
+    c->rest = receiving && Vector3Length(c->velocity) < .18f ? c->rest + BOAT_STEP : 0;
+    if (!c->delivered && c->rest >= .5f) {
+        c->delivered = true;
+        event(s, BOAT_CARGO_EVENT_DELIVERED, c->pad);
+    }
     if (c->state == BOAT_CARGO_FLOATING && world->definition->mapped
         && !boat_map_water(&world->resources->map, (Vector2) { -c->position.x, c->position.z },
             BOAT_CARGO_HALF + .1f)) {

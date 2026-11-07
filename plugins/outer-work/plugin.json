@@ -5,6 +5,6 @@
   "kind": "free",
   "entry": "main.lua",
   "location": "outer",
-  "capabilities": ["free.define", "scene.define"],
+  "capabilities": ["free.define", "scene.define", "objective.hud"],
   "state_version": 1
 }

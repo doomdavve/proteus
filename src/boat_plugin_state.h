@@ -49,6 +49,10 @@ typedef struct {
     BoatPluginTimer timers[BOAT_PLUGIN_TIMERS]; // Sorted by (tick, id).
     unsigned timer_count;
     bool timers_enabled; // Host capability grant; scripts cannot change it.
+    // S1c host grant for a free package's work sites: accepts work.enable {id}. The command only
+    // records intent in COMMANDS; the host validates and builds the hidden site before it
+    // commits the batch, and keeps the previous checkpoint if it cannot.
+    bool work_enabled;
     uint32_t rng;
     int64_t acknowledged, tick;
     unsigned state_version; // Zero in older harness fixtures means schema 1.
