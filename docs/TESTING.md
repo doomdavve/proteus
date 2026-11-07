@@ -17,7 +17,8 @@ site and qualifies its footprint, sampled traffic envelope and initial camera ag
 loaded map. `boat_plugin.work_sites` checks `scene.work` decoding, the staging wire and the
 staging survey's rejections, including turned overlap; `boat_cargo` also checks that traffic
 alone can block a site and that a turned receiving site moors, aligns and supports a load in
-its own frame. `cargo_sandbox_receiver-approach_screenshot` carries a lashed crate to the
+its own frame. `cargo_sandbox_crossing_screenshot` stages the helm part-way to the guided
+next site; `cargo_sandbox_receiver-approach_screenshot` carries a lashed crate to the
 package's receiving site, and `cargo_sandbox_delivered_screenshot` then moors and unloads it
 onto the receiving pad with that site's crane. The `shadow-high`/`shadow-low`
 capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,

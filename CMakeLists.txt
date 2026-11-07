@@ -539,7 +539,7 @@ if(NOT EMSCRIPTEN)
     add_test(NAME cargo_shadow_wave_gpu COMMAND cargo_sandbox --renderer gpu --shadow-review)
     set_tests_properties(cargo_shadow_wave_gpu PROPERTIES LABELS "gpu" TIMEOUT 30)
   endif()
-  foreach(scenario shadow-high shadow-low remoor receiver-approach delivered)
+  foreach(scenario shadow-high shadow-low remoor crossing receiver-approach delivered)
     add_test(NAME cargo_sandbox_${scenario}_screenshot COMMAND cargo_sandbox --renderer cpu
       --scenario ${scenario}
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${scenario}-test.png)
@@ -1469,7 +1469,8 @@ endforeach()
 set(PROTEUS_SLOW_TESTS
   cargo_shadow_wave_cpu
   cargo_sandbox_shadow-high_screenshot cargo_sandbox_shadow-low_screenshot cargo_sandbox_remoor_screenshot
-  cargo_sandbox_receiver-approach_screenshot cargo_sandbox_delivered_screenshot
+  cargo_sandbox_crossing_screenshot cargo_sandbox_receiver-approach_screenshot
+  cargo_sandbox_delivered_screenshot
   cargo_sandbox_site cargo_sandbox_outer_left_screenshot cargo_sandbox_outer_right_screenshot
   release_command
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid

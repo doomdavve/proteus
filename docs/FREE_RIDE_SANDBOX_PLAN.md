@@ -694,6 +694,12 @@ Native first, then content. The native changes:
   nearest berth; G moors there and makes its crane the active one (aim keys, hook and camera).
   Each platform blocks the boat. A crate on the receiving pad reads **ON RECEIVING PAD**.
   Delivery is not detected or committed; that is S1c.
+- **Finding the next site.** The user's first hand-driven attempt (2026-11-07) found Eriksberg
+  easy but the landing hard to find: the helm camera looks down at the boat, so a berth 270 m
+  away is above the view (and about a pixel wide). After departure the helm HUD now guides to
+  the next site (`TO LANDING 189 m / LEFT 15 deg`), and a yellow marker pins its bearing to
+  the edge of the view; N cycles the guided site. Within 12 m of the guided berth the ordinary
+  berth line takes over.
 
 Content: `proteus.outer-work` adds `landing`, a `receiving_platform` at the first surveyed
 candidate (-105, 0), about 270 m south-east of Eriksberg. Every tried heading at that point
@@ -705,6 +711,7 @@ aim, hook and release paths with the landing's crane):
 
 ```sh
 ./build/cargo_sandbox --survey
+./build/cargo_sandbox --scenario crossing --screenshot build/crossing.png
 ./build/cargo_sandbox --scenario receiver-approach --screenshot build/receiver-approach.png
 ./build/cargo_sandbox --scenario delivered --screenshot build/delivered.png
 ./build/cargo_sandbox   # drive from Eriksberg to the landing by hand
@@ -976,21 +983,23 @@ S1a/S1c, and no receiver site has been selected.
 
 Apple M1 Max/macOS arm64, Debug, pinned local raylib/Lua/ENet sources, `PROTEUS_GPU_TESTS=OFF`:
 the build is warning-clean apart from the existing upstream `stb_vorbis.c` warning, and
-`ctest --preset full` passed all **384 enabled tests** in 33.50 s (13 retired tests disabled;
+`ctest --preset full` passed all **385 enabled tests** in 35.99 s (13 retired tests disabled;
 local sockets enabled). New checks: `boat_cargo` (turned site frames round-trip and match the
 boat's bow; a turned receiver reports status, captures, aligns to its heading and supports a
 released crate on its pad, with a pad shadow inside the pad; turned overlap and spawn margins;
 a list without a service platform is refused); `boat_plugin.work_sites` (the bundled pair
 decodes and round-trips the stage wire; missing, extra and out-of-range headings and a
 receiver-only list are rejected; a turned overlap is refused at staging); and the
-`cargo_sandbox_receiver-approach_screenshot` and `cargo_sandbox_delivered_screenshot` captures.
+`cargo_sandbox_crossing_screenshot`, `cargo_sandbox_receiver-approach_screenshot` and
+`cargo_sandbox_delivered_screenshot` captures.
 
 Behaviour parity at the first site: CPU captures of the nine `outer` scenarios and the two basin
 scenarios listed under the S1a result, and GPU `origin`, `loaded-left` and `shadow-bow`, are
 **byte-identical** to S1a (`f50997b`) with the two-site package. The GPU shadow review reports
 0/256 missing (minimum 4 visible pixels, as on S1a). CPU and GPU `receiver-approach` and
-`delivered` captures were inspected: the turned landing, its marked pad and crane, the green
+`delivered` captures and the GPU `crossing` capture were inspected (its marker sits on the same
+side as the HUD's turn direction, at the expected bearing): the turned landing, its marked pad and crane, the green
 BERTH READY outline, the moored workboat and the crate resting on the receiving pad read
 correctly against the open water and the quay behind. `--survey` reports both sites' water,
-berth, traffic and camera clear. No windowed hand-driven session was run; that crossing is the
-remaining S1b gate. Windows, Linux and the browser build were not run locally.
+berth, traffic and camera clear. The user's first hand-driven try found the landing hard to locate,
+which the guidance above addresses; a completed crossing is still the remaining S1b gate. Windows, Linux and the browser build were not run locally.

@@ -52,6 +52,7 @@ typedef struct {
     bool crane_view, paused;
     bool braking;
     int aim; // 1 pad, 2/3 port/starboard. Motors, never a pose teleport.
+    unsigned target; // The site helm guidance points to: the next one after departure; N cycles.
     const char *notice;
 } Experiment;
 
@@ -138,6 +139,7 @@ static void reset(Experiment *e)
     e->world.water.player_wake_enabled = true;
     boat_cargo_reset_sites(&e->sandbox, e->sites, e->site_count);
     e->boat = (Boat) { .position = boat_cargo_berth(active(e)), .heading = active(e)->heading };
+    e->target = (e->sandbox.active + 1) % e->sandbox.crane_count;
     e->tick = 0;
     e->crane_view = true;
     e->aim = 0;
@@ -527,7 +529,13 @@ static void lash_action(Experiment *e)
 
 static void moor_action(Experiment *e)
 {
-    e->notice = boat_cargo_moor_toggle(&e->sandbox, &e->boat)
+    bool moored = e->sandbox.moored;
+    bool changed = boat_cargo_moor_toggle(&e->sandbox, &e->boat);
+    if (changed && e->sandbox.mooring)
+        e->target = e->sandbox.active;
+    else if (changed && moored) // Departure: guide toward the next site.
+        e->target = (e->sandbox.active + 1) % e->sandbox.crane_count;
+    e->notice = changed
         ? (e->sandbox.moored           ? "Moored. TAB: crane controls."
                   : e->sandbox.mooring ? "Mooring assist active. G cancels."
                                        : "Ready to drive. TAB: helm controls.")
@@ -549,7 +557,37 @@ static void view_action(Experiment *e)
         e->notice = "Moor at a work berth to operate its crane.";
 }
 
-static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *hoist)
+// A screen marker over the target berth, so a distant site can be found from the helm.
+static void target_marker(const Experiment *e, View3D view)
+{
+    Vector3 berth = boat_cargo_site_point(&e->sandbox.cranes[e->target], (Vector3) { 0, 4, 0 });
+    Vector3 forward = Vector3Subtract(view.target, view.position);
+    if (Vector3DotProduct(Vector3Subtract(berth, view.position), forward) <= 0)
+        return;
+    Camera3D camera
+        = { view.position, view.target, view.up, view.vertical_fov * RAD2DEG, CAMERA_PERSPECTIVE };
+    Vector2 p = GetWorldToScreenEx(berth, camera, WIDTH, HEIGHT);
+    p.x = WIDTH - p.x; // Every view uses the game's mirrored presentation (starboard right).
+    // The helm camera looks down at the boat, so a distant berth is usually above the view:
+    // pin the marker to the view's edge and point it outward.
+    bool above = p.y < 72;
+    p.x = Clamp(p.x, 12, WIDTH - 12);
+    p.y = Clamp(p.y, 72, 210);
+    if (above)
+        DrawTriangle((Vector2) { p.x, p.y - 10 }, (Vector2) { p.x - 6, p.y },
+            (Vector2) { p.x + 6, p.y }, yellow);
+    else
+        DrawTriangle((Vector2) { p.x - 5, p.y - 8 }, (Vector2) { p.x, p.y },
+            (Vector2) { p.x + 5, p.y - 8 }, yellow);
+    Vector2 to = Vector2Subtract(boat_cargo_berth(&e->sandbox.cranes[e->target]), e->boat.position);
+    const char *label
+        = TextFormat("%s %.0f m", TextToUpper(e->sites[e->target].id), Vector2Length(to));
+    int width = MeasureText(label, 10);
+    DrawText(label, (int)Clamp(p.x - width / 2.0f, 4, WIDTH - 4 - width),
+        above ? (int)p.y + 3 : (int)p.y - 20, 10, yellow);
+}
+
+static void ui(Experiment *e, View3D view, Vector2 mouse, float *slew, float *reach, float *hoist)
 {
     const BoatCargo *c = &e->sandbox.cargo;
     BoatCargoMoorStatus berth = boat_cargo_moor_status(&e->sandbox, &e->boat);
@@ -586,6 +624,16 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
         else
             DrawText(
                 "DARK FOOTPRINT = LANDING SURFACE / TAB SWITCHES CONTROLS", 9, 40, 10, RAYWHITE);
+    } else if (berth.site != e->target && !e->sandbox.moored && !e->sandbox.mooring) {
+        // Away from the target, steer toward it; its own berth takes over on arrival.
+        Vector2 to
+            = Vector2Subtract(boat_cargo_berth(&e->sandbox.cranes[e->target]), e->boat.position);
+        float turn = remainderf(atan2f(to.x, -to.y) - e->boat.heading, 2 * PI);
+        DrawText(TextFormat("TO %s %.0f m / %s %.0f deg / N: NEXT SITE",
+                     TextToUpper(e->sites[e->target].id), Vector2Length(to),
+                     turn < 0 ? "LEFT" : "RIGHT", fabsf(turn) * RAD2DEG),
+            9, 40, 10, yellow);
+        target_marker(e, view);
     } else {
         Vector2 to
             = Vector2Subtract(boat_cargo_berth(&e->sandbox.cranes[berth.site]), e->boat.position);
@@ -596,6 +644,8 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
             TextFormat("BERTH %.1f m / %s %.0f deg / ENGINE %+03.0f%%", berth.distance,
                 turn < 0 ? "LEFT" : "RIGHT", fabsf(turn) * RAD2DEG, e->boat.engine_response * 100),
             9, 40, 10, berth.reason == BOAT_CARGO_MOOR_READY ? green : RAYWHITE);
+        if (!e->sandbox.moored && !e->sandbox.mooring && berth.distance > 12)
+            target_marker(e, view);
     }
     DrawRectangle(0, 218, WIDTH, 82, ink);
     const char *prompt = e->notice;
@@ -658,7 +708,8 @@ static void ui(Experiment *e, Vector2 mouse, float *slew, float *reach, float *h
                     mouse, enabled, false))
                 e->aim = i;
     } else
-        DrawText("UP/DOWN: set throttle  LEFT/RIGHT: steer  SPACE: brake", 8, 269, 10, RAYWHITE);
+        DrawText("UP/DOWN: throttle  LEFT/RIGHT: steer  SPACE: brake  N: next site", 8, 269, 10,
+            RAYWHITE);
     if (e->paused)
         DrawText("PAUSED", 205, 100, 20, yellow);
 }
@@ -726,6 +777,19 @@ static bool stage(Experiment *e, const char *name)
         return !strcmp(name, "mooring") ? e->sandbox.mooring
                                         : e->sandbox.moored && !e->sandbox.mooring
                 && e->sandbox.cargo.state == BOAT_CARGO_SECURED;
+    } else if (!strcmp(name, "crossing")) {
+        // Helm review a third of the way out, slightly off the line to the guided next site.
+        if (!stage(e, "departure"))
+            return false;
+        e->crane_view = false;
+        Vector2 from = e->boat.position;
+        Vector2 to = boat_cargo_berth(&e->sandbox.cranes[e->target]);
+        e->boat.position = Vector2Lerp(from, to, .3f);
+        Vector2 ahead = Vector2Subtract(to, e->boat.position);
+        e->boat.heading = atan2f(ahead.x, -ahead.y) + .25f;
+        for (int i = 0; i < 120; ++i)
+            tick(e, 0, 0, 0, (BoatInput) { 0 });
+        return e->target != e->sandbox.active;
     } else if (!strcmp(name, "receiver-approach") || !strcmp(name, "delivered")) {
         // S1b review: carry the lashed crate to the first receiving site (an explicit pose in
         // place of the crossing), then moor and unload with that site's crane by the real path.
@@ -854,10 +918,10 @@ int main(int argc, char **argv)
                 "  [--screenshot FILE] [--scenario "
                 "origin|swing|departure|loaded-left|loaded-right|shadow-high|shadow-low|shadow-bow|"
                 "shadow-water|"
-                "berth-approach|mooring|remoor|receiver-approach|delivered]\n"
+                "berth-approach|mooring|remoor|crossing|receiver-approach|delivered]\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
-                "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, P pause, R "
-                "reset.\n");
+                "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, N next site,\n"
+                "P pause, R reset.\n");
             return !strcmp(argv[i], "--help") ? 0 : 2;
         }
     }
@@ -866,8 +930,8 @@ int main(int argc, char **argv)
         && strcmp(scenario, "shadow-high") && strcmp(scenario, "shadow-low")
         && strcmp(scenario, "shadow-bow") && strcmp(scenario, "shadow-water")
         && strcmp(scenario, "berth-approach") && strcmp(scenario, "mooring")
-        && strcmp(scenario, "remoor") && strcmp(scenario, "receiver-approach")
-        && strcmp(scenario, "delivered"))
+        && strcmp(scenario, "remoor") && strcmp(scenario, "crossing")
+        && strcmp(scenario, "receiver-approach") && strcmp(scenario, "delivered"))
         return 2;
     if (shadow_review && (frames || demo || survey || strcmp(scenario, "origin"))) {
         fprintf(stderr, "--shadow-review uses its own fixed virtual poses; omit other modes.\n");
@@ -1018,6 +1082,8 @@ int main(int argc, char **argv)
                             e.aim = i;
                 if (IsKeyDown(KEY_SPACE))
                     e.boat.throttle = 0;
+                if (IsKeyPressed(KEY_N) && !e.sandbox.moored && !e.sandbox.mooring)
+                    e.target = (e.target + 1) % e.sandbox.crane_count;
             }
             e.braking = !e.paused && !e.crane_view && !e.sandbox.moored && !e.sandbox.mooring
                 && IsKeyDown(KEY_SPACE);
@@ -1197,7 +1263,8 @@ int main(int argc, char **argv)
                 (Rectangle) { 0, 0, WIDTH, HEIGHT }, (Vector2) { 0 }, 0, WHITE);
         }
         mouse_slew = mouse_reach = mouse_hoist = 0;
-        ui(&e, screenshot ? (Vector2) { -1, -1 } : mouse, &mouse_slew, &mouse_reach, &mouse_hoist);
+        ui(&e, view, screenshot ? (Vector2) { -1, -1 } : mouse, &mouse_slew, &mouse_reach,
+            &mouse_hoist);
         EndTextureMode();
         if (shadow_review) {
             Image capture = LoadImageFromTexture(target.texture);
