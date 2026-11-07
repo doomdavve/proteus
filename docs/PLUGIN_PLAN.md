@@ -44,7 +44,10 @@ scene contract/site fixture, the L1.1–L1.4 scene envelope path and L2.1–L2.3
 parameterization and the original seven-berth Eriksberg package are complete.
 The [marina plan](MARINA_AUTHORING_PLAN.md) now owns M1 dimensioned structures and its expanded
 twelve-berth/two-row package, plus M2 boat appearance; M3 authored routes are next. The
-first playable L4.3 harbor gate is implemented and awaits human review. The milestones below are this plan's
+first playable L4.3 harbor gate is implemented and awaits human review. The proposed
+[working-harbour contract](#working-harbour-contract-proposed-2026-11-07) (2026-11-07) adds work
+sites, cargo events and free-package objectives for the sandbox's S1 steps; S1a–S1c are
+implemented locally (not merged). The milestones below are this plan's
 P0–P6, independent of similarly named foundation tasks.
 
 ## Intended experience and scope
@@ -2682,13 +2685,54 @@ merged worktree, Debug build and full CTest passed (310 enabled tests, 13 disabl
 off, local socket access enabled); all 29 added local links/anchors and `git diff --check`
 passed. No new audiovisual verification was needed for this documentation-only resolution.
 
+## Working-harbour contract (proposed 2026-11-07)
+
+The [free ride sandbox](FREE_RIDE_SANDBOX_PLAN.md#content-in-plugins-mechanics-in-c) keeps
+cargo physics, lashing, assisted mooring, delivery detection and placement validation native,
+and moves work-site layout, loads, jobs and project outcomes into packages. That plan owns the
+gameplay steps and acceptance; this plan owns the contract each step adds. S1a–S1c are
+implemented on stacked branches, published as stacked PRs after the user approved S1d (2026-11-07); S3+ is not implemented.
+
+| Sandbox step | Contract addition | Rejected until qualified |
+| --- | --- | --- |
+| S1a (implemented locally 2026-11-07) | [`scene.work`](PLUGIN_API.md#work-sites-s1a) as an optional scene v3 subsystem (no v4 bump): 1–4 sites, each a registered `service_platform` preset and `crate` cargo placed at a berth position facing heading 0. Decoded to a pointer-free core definition; staging, the catalog generator and room packaging run the work-site survey. Bundled native-only `proteus.outer-work` (`free`, `outer`). The platform stays inside the preset: no module kind is a fixed in-water platform. | Rooms (rejected); browser catalog (omitted); voyage/race/match (rejected). Solo free scenes are not bound by `wake_velocity`, so the game ignores work sites |
+| S1b (implemented locally and accepted 2026-11-07) | Two schema additions before the site: a required site `heading` and the `receiving_platform` preset (same layout, starts empty, marked pad); a work list needs a `service_platform`. The bundled package gains a turned `landing` receiver at (−105, 0). The survey, overlap and spawn checks turn with the site | Same as S1a |
+| S1c (implemented locally and played 2026-11-07) | [Work-site job](PLUGIN_API.md#work-site-job-s1c): `objective.hud` after `scene.define` for a `free` package with work sites (init/update; no timers or migration); native `cargo.secured`, `cargo.delivered` (once per session), `cargo.lost` and `cargo.reset` events whose `id` is a work-site id (one crate, so no cargo id yet); sites may be `hidden`, and `work.enable {id}` builds one. The sandbox checks the named sites before committing the batch and keeps the previous checkpoint while the boat or crate occupies the envelope. The catalog bundles this one kind of objective package and probes its init | Same as S1a; `wake_velocity --plugin` refuses a free package with a job; the browser evaluator rejects `work.enable` |
+| S1d (implemented and approved 2026-11-07) | [Quay pickup](FREE_RIDE_SANDBOX_PLAN.md#s1d-result-2026-11-07): `cargo.supply {id}` uses up a delivered crate and places the next load on a built service pad (checked with the whole batch, as `work.enable`; waits while the crate is busy); cargo events gain `load` and delivery becomes once per load at each receiver; `work.guide {id}` sets the helm guidance target. Each at most once per batch. Still one crate body. The bundled package gains a hidden `jetty` receiver, its fourth site | Same as S1c; the browser evaluator also rejects the two new commands (no work grant) |
+| S3+ | Currency, prices and saves as objective/native state with exactly-once rewards; payouts never decided outside a committed transaction | Rooms until P5 authority |
+
+Finding from S1a: `boat_plugin_free_check_location` runs no map checks on a free package's
+marina or traffic scene (only S1a work sites are surveyed there). Free scenes reach players
+through rooms, whose package loader checks spawn/grid contacts and open water around each
+berth, but not the voyage path's module shore/support checks or authored-traffic sweep. This
+predates S1a and needs its own fix.
+
+Rules carried over from P3 and the location-life track:
+
+- **Presets, not tuning.** Lua selects registered native presets; motor speeds, rope and mass
+  limits and contact margins are not package fields.
+- **Reload.** A changed work-site definition restarts the cargo session; display-only changes
+  may preserve it. A suspended load is never carried across an incompatible revision. Undo
+  restores the whole accepted definition through the same restart.
+- **Scene changes from objectives.** The S1c command selects among work sites already
+  present and surveyed in the accepted definition (initially hidden); it does not create
+  geometry at runtime. Enabling one checks that no boat or cargo body is inside its envelope;
+  otherwise the batch is not committed, the HUD says so, and it retries at the next boundary.
+  Reset retires it with the objective state that enabled it. S1c built a work site rather than
+  a marina module/berth set: no module kind is a fixed in-water structure, and a module list
+  replaces the compiled marina (see the [S1a result](FREE_RIDE_SANDBOX_PLAN.md#s1a-result-2026-11-07)).
+- **One owner.** The package that owns the work sites owns their jobs; a second claimant is
+  rejected, as for scene overrides.
+
 ## Longer-term creative roadmap
 
 Grow capabilities when a playable example needs them, preserving the existing owning plans:
 
 - **Voyage episodes:** optional deliveries, rescue encounters, visiting landmarks and choosing
   sheltered routes, built over the adventure's real map expansion and weather work. Cargo,
-  rescue actors and more destinations need native resource/rule support before Lua orchestration.
+  rescue actors and more destinations need native resource/rule support before Lua orchestration;
+  the [working-harbour contract](#working-harbour-contract-proposed-2026-11-07) stages cargo sites,
+  events and jobs in that order.
 - **Living waterfront:** the [location-life track](#location-life-track-proposed-2026-10-30)
   now specifies marina layout/population, harbor traffic and ferry timetables, gulls, trams,
   seals and building/street lighting. Pedestrians/cyclists remain native city work before

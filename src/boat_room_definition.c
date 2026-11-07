@@ -637,6 +637,10 @@ bool boat_room_definition_validate(const BoatRoomDefinition *r, BoatRoomDiagnost
         fail(diagnostic, "version", "must be 3");
         return false;
     }
+    if (r->has_scene && (r->scene.work_present || r->scene.work_count)) {
+        fail(diagnostic, "scene.work", "work sites are solo-only; rooms cannot carry them");
+        return false;
+    }
     if (r->mode >= BOAT_ROOM_MODE_LIMIT) {
         fail(diagnostic, "mode", "must be free, deathmatch or race");
         return false;

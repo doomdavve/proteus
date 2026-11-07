@@ -456,9 +456,16 @@ static int catalog_rooms(void)
             : boat_location_find(entry->location)->id;
         BoatRoomDefinition definition;
         char error[220];
-        if (!boat_room_package_load(entry->id, kind == BOAT_PLUGIN_KIND_MATCH,
-                kind == BOAT_PLUGIN_KIND_RACE, location, &WORLDS[location], &definition, error,
-                sizeof(error))) {
+        bool loaded = boat_room_package_load(entry->id, kind == BOAT_PLUGIN_KIND_MATCH,
+            kind == BOAT_PLUGIN_KIND_RACE, location, &WORLDS[location], &definition, error,
+            sizeof(error));
+        // S1a work sites are solo-only: the cargo sandbox's package must not become a room.
+        if (!strcmp(entry->id, "proteus.outer-work")) {
+            CHECK(!loaded && strstr(error, "solo-only"));
+            printf("room_package catalog %s: rejected (%s)\n", entry->id, error);
+            continue;
+        }
+        if (!loaded) {
             fprintf(stderr, "%s: %s\n", entry->id, error);
             return 1;
         }
