@@ -947,7 +947,7 @@ int main(int argc, char **argv)
         return 2;
     }
     static BoatWorldResources resources;
-    BoatWorkSession e = { .resources = &resources };
+    BoatWorkSession e = { .resources = &resources, .writer = "cargo_sandbox" };
     SetTraceLogLevel(LOG_WARNING);
     if (!boat_world_resources_init(&resources, location))
         return 1;

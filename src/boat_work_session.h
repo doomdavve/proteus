@@ -42,6 +42,7 @@ typedef struct BoatWorkSession {
     // Why the last update's batch waits: a build the boat or crate occupies, or a supply whose
     // delivered crate is not set down yet. NULL when the job is not waiting.
     const char *waiting;
+    const char *writer; // The program that saves it, recorded as the save's build string.
 } BoatWorkSession;
 
 // The session's active crane, and the next visible site after FROM for helm guidance.
@@ -115,6 +116,10 @@ typedef struct {
     BoatWorkWatch last;
     bool was_paused, was_focused;
 } BoatWorkFrameWatch;
+
+// The identity a package revision would save with; WRITER names the saving program.
+void boat_work_revision_identity(
+    const BoatPluginRevision *revision, const char *writer, BoatSandboxIdentity *identity);
 
 void boat_work_hash_bytes(uint64_t *h, const void *bytes, size_t size);
 BoatWorkWatch boat_work_watch(const BoatWorkSession *e);

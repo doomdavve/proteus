@@ -1,6 +1,7 @@
 #include "wake_velocity_work.h"
 
 #include "boat_cargo_view.h"
+#include "boat_file.h"
 #include "boat_plugin_catalog.h"
 #include "boat_presentation.h"
 #include "boat_ui.h"

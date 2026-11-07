@@ -217,16 +217,23 @@ void boat_work_session_reset(BoatWorkSession *e)
 // SV1c: the session as a save record. The package's identity compares the work digest of its
 // scene, the manifest state_version and the physics revision; the source hash and build string
 // are for messages only.
+void boat_work_revision_identity(
+    const BoatPluginRevision *revision, const char *writer, BoatSandboxIdentity *identity)
+{
+    const BoatPluginManifest *m = &revision->free.manifest;
+    *identity
+        = (BoatSandboxIdentity) { .work_digest = boat_scene_work_digest(&revision->free.scene),
+              .source_hash = boat_sandbox_source_hash(revision->source, revision->source_size),
+              .state_version = m->state_version,
+              .physics_revision = BOAT_PHYSICS_REVISION,
+              .tick_hz = BOAT_TICK_HZ };
+    snprintf(identity->package, sizeof(identity->package), "%s", m->id);
+    snprintf(identity->build, sizeof(identity->build), "%s", writer ? writer : "unknown");
+}
+
 void boat_work_session_identity(const BoatWorkSession *e, BoatSandboxIdentity *id)
 {
-    const BoatPluginManifest *m = &e->revision->free.manifest;
-    *id = (BoatSandboxIdentity) { .work_digest = boat_scene_work_digest(&e->revision->free.scene),
-        .source_hash = boat_sandbox_source_hash(e->revision->source, e->revision->source_size),
-        .state_version = m->state_version,
-        .physics_revision = BOAT_PHYSICS_REVISION,
-        .tick_hz = BOAT_TICK_HZ };
-    snprintf(id->package, sizeof(id->package), "%s", m->id);
-    snprintf(id->build, sizeof(id->build), "cargo_sandbox");
+    boat_work_revision_identity(e->revision, e->writer, id);
 }
 
 // Between ticks only. A key action's core events move into the job's queue first; nothing
