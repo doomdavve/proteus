@@ -460,7 +460,7 @@ static int catalog_rooms(void)
             kind == BOAT_PLUGIN_KIND_RACE, location, &WORLDS[location], &definition, error,
             sizeof(error));
         // S1a work sites are solo-only: the cargo sandbox's package must not become a room.
-        if (!strcmp(entry->id, "proteus.outer-work")) {
+        if (!strcmp(entry->id, "proteus.outer-work") || !strcmp(entry->id, "proteus.basin-work")) {
             CHECK(!loaded && strstr(error, "solo-only"));
             printf("room_package catalog %s: rejected (%s)\n", entry->id, error);
             continue;

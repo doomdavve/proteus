@@ -12,7 +12,7 @@ measurements are not pass/fail timing limits. `cargo_sandbox_left_screenshot` an
 `cargo_sandbox_right_screenshot` additionally drive the application's assisted lifts onto a
 wave-posed boat, lashing, departure and turn before a display-free basin CPU capture.
 The two `cargo_sandbox_outer_*_screenshot` checks
-repeat real transfers on `outer`; `cargo_sandbox_site` loads the bundled `proteus.outer-work`
+repeat real transfers on `outer`; `cargo_sandbox_site` loads the bundled `proteus.outer-work` (the basin's `proteus.basin-work` is covered by the catalog and staging checks)
 site and qualifies its footprint, sampled traffic envelope and initial camera against the
 loaded map. `boat_plugin.work_sites` checks `scene.work` decoding, the staging wire and the
 staging survey's rejections, including turned overlap; `boat_cargo` also checks that traffic

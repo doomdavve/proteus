@@ -1433,10 +1433,18 @@ static int work_sites(void)
 
     const BoatWorldDefinition *basin = boat_location(BOAT_LOCATION_BASIN);
     CHECK(boat_world_resources_init(&world, basin));
-    CHECK(load_work(WORK_MANIFEST("basin"), "{ sites = {" WORK_SITE("a", 0, 0) "} }", &free, &d)
-        == BOAT_PLUGIN_OK);
-    failed = boat_plugin_free_check_location(&free, basin, &world.map, &d) != BOAT_PLUGIN_MANIFEST;
-    show("basin site", &d);
+    // S1a: the basin has no map, so staging only checks the walls, not the map survey.
+    BoatPluginFiles basin_files;
+    CHECK(boat_plugin_read("plugins/basin-work", NULL, &basin_files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginBundle basin_bundle = boat_plugin_bundle(&basin_files);
+    CHECK(boat_plugin_load_free(&basin_bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
+    failed = boat_plugin_free_check_location(&free, basin, NULL, &d) != BOAT_PLUGIN_OK;
+    show("basin work", &d);
+    // A site outside the walls fails the bounds check with its own diagnostic.
+    free.scene.work[0].x = 5000;
+    failed |= boat_plugin_free_check_location(&free, basin, NULL, &d) != BOAT_PLUGIN_SCHEMA
+        || strncmp(d.field, "scene.work.sites[1]", strlen("scene.work.sites[1]"));
+    show("basin edge", &d);
     boat_world_resources_destroy(&world);
     CHECK(!failed);
     return 0;

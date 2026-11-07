@@ -162,7 +162,8 @@ target_sources(proteus_plugins PRIVATE src/boat_plugin_stage.c src/boat_plugin_s
 set(BOAT_PLUGIN_PACKAGES
   plugins/basin-free plugins/outer-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
-  plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work)
+  plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work
+  plugins/basin-work)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
     plugins/basin-free plugins/time-trial plugins/langedrag

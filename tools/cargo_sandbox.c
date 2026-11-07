@@ -1,5 +1,5 @@
-// Native cargo handling toy. On a mapped location its work sites and job come from a bundled
-// package (S1a-S1c); no progression, files or network state enter the simulation.
+// Native cargo handling toy. Its work sites and job come from a bundled package per location
+// (S1a-S1c); no progression, files or network state enter the simulation.
 #include "boat_assets.h"
 #include "boat_cargo.h"
 #include "boat_cargo_view.h"
@@ -1291,8 +1291,8 @@ int main(int argc, char **argv)
         else {
             fprintf(stderr,
                 "Usage: cargo_sandbox [--location outer|basin] [--package ID] [--survey]\n"
-                "  --package: bundled free package with scene.work sites (outer default "
-                "proteus.outer-work)\n"
+                "  --package: bundled free package with scene.work sites (default per "
+                "location)\n"
                 "  [--renderer cpu|gpu] [--demo] [--frames N]\n"
                 "  [--shadow-review] (virtual wave-cycle pixel/stream checks)\n"
                 "  [--screenshot FILE] [--scenario "
@@ -1331,32 +1331,26 @@ int main(int argc, char **argv)
     SetTraceLogLevel(LOG_WARNING);
     if (!boat_world_resources_init(&e.resources, location))
         return 1;
-    // The basin keeps its explicit reference fixture; a mapped location reads its package.
+    // Every location reads its bundled package; the basin's is its reference fixture.
     static BoatPluginRevision revision;
-    e.sites[0] = (BoatSceneWorkSite) { .id = "basin" };
-    e.site_count = 1;
-    if (location->mapped) {
-        const BoatPluginCatalogEntry *entry
-            = boat_plugin_catalog_find(package ? package : "proteus.outer-work");
-        BoatPluginDiagnostic d = { 0 };
-        if (!entry || boat_plugin_kind_parse(entry->kind) != BOAT_PLUGIN_KIND_FREE
-            || strcmp(entry->location, location->name)
-            || !boat_plugin_catalog_decode(entry, &revision, &d) || !revision.free.has_scene
-            || !revision.free.scene.work_present) {
-            fprintf(stderr, "No bundled free package with scene.work sites for %s: %s\n",
-                location->name, package ? package : "proteus.outer-work");
-            boat_world_resources_destroy(&e.resources);
-            return 1;
-        }
-        e.world.scene = &revision.free.scene;
-        e.revision = revision.free.manifest.objective ? &revision : NULL;
-        e.site_count = revision.free.scene.work_count;
-        memcpy(e.sites, revision.free.scene.work, sizeof(e.sites));
-    } else if (package) {
-        fprintf(stderr, "--package needs a mapped location; the basin is a fixed reference.\n");
+    const char *work_name = package ? package : location->name;
+    const BoatPluginCatalogEntry *entry = package
+        ? boat_plugin_catalog_find(package)
+        : boat_plugin_catalog_work_default(location->name);
+    BoatPluginDiagnostic d = { 0 };
+    if (!entry || boat_plugin_kind_parse(entry->kind) != BOAT_PLUGIN_KIND_FREE
+        || strcmp(entry->location, location->name)
+        || !boat_plugin_catalog_decode(entry, &revision, &d) || !revision.free.has_scene
+        || !revision.free.scene.work_present) {
+        fprintf(stderr, "No bundled free package with scene.work sites for %s: %s\n",
+            location->name, work_name);
         boat_world_resources_destroy(&e.resources);
-        return 2;
+        return 1;
     }
+    e.world.scene = &revision.free.scene;
+    e.revision = revision.free.manifest.objective ? &revision : NULL;
+    e.site_count = revision.free.scene.work_count;
+    memcpy(e.sites, revision.free.scene.work, sizeof(e.sites));
     reset(&e);
     static HarbourView harbour;
     if (location->mapped) {

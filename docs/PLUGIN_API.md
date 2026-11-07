@@ -79,7 +79,9 @@ authored `outer` voyage), `proteus.time-trial` (`course`), `proteus.river-sprint
 the separate `river` location and `proteus.river-free` were retired on 2026-11-04.
 The native catalog also bundles `proteus.outer-work` (`free`, `outer`), the
 [work-site](#work-sites-s1a) package that `cargo_sandbox` loads; it is never a default and the
-browser catalog omits it.
+browser catalog omits it. `proteus.basin-work` (`free`, `basin`) is the basin's reference fixture
+for the sandbox: one `service_platform` at the origin, no job. `boat_plugin_catalog_work_default`
+maps a location to its work package (`boat_plugin_catalog_default` never returns either).
 `plugins/langedrag`, `plugins/river-sprint`, `plugins/basin-free`, `plugins/outer-free`,
 `plugins/time-trial`, `plugins/deathmatch`, `plugins/harbor-room` and `plugins/harbor-race` are
 complete package sources; the catalog does not duplicate them.
@@ -149,7 +151,9 @@ unchanged. Voyage, race and match packages reject it (`scene.work` "is only supp
 packages"). Staging, the catalog generator and `cargo_sandbox --survey` run the same site survey
 on the location's compiled map, with the sandbox's gentle water:
 
-- the site needs a mapped location (the basin is rejected);
+- on a mapped location the checks below apply. The unmapped basin has no map: each site's berth
+  must lie at least 16 m inside the basin walls and clear the earlier sites' envelopes, and the
+  map, traffic and spawn checks are skipped (S1e F2);
 - the preset's envelope, berth −3..11 m in x and −5..12 m in z of the turned site frame, must be
   open water with 1 m clearance and clear of the scene's (or compiled) moored hulls and dock
   modules;
