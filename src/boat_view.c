@@ -766,16 +766,25 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
                 boat_world_displaced(world), boat_view_squall(world, time), &lighting))
             return false;
     } else {
-        // The basin has no sky here and keeps its own light direction; it shares the shading.
-        if (!renderer3d_begin(renderer, pixels, width, height, camera, (Vector3) { -1, 3, 2 }))
+        // The basin shares the mapped scene's sky, sun direction and CPU light. Its flat water
+        // applies the frame water light once with the ordinary CPU shading, exactly as the
+        // mapped flat-water path does; displaced water keeps its emissive water-tint path.
+        waterfront_sky_draw_squall(
+            pixels, width, height, camera, boat_view_squall(world, time), &lighting);
+        if (!renderer3d_begin(renderer, pixels, width, height, camera, lighting.sun_direction))
             return false;
         renderer->ambient = lighting.cpu_ambient;
         renderer->diffuse = lighting.cpu_direct;
         renderer->tint = lighting.cpu_tint;
 
         if (!boat_world_displaced(world)) {
+            // Water light multiplies the frame tint around the flat body only, matching the
+            // mapped path; the body colour itself stays the unchanged water model.
+            Vector3 tint = renderer->tint;
+            renderer->tint = Vector3Multiply(tint, lighting.water);
             box(renderer, (Vector3) { 0, -0.6f, 0 }, (Vector3) { 2 * half.x, 1, 2 * half.y },
                 (Color) { 36, 107, 125, 255 });
+            renderer->tint = tint;
             // Static water marks provide a speed reference.
             for (int z = -(int)half.y + 4; z < half.y; z += 8)
                 for (int x = -(int)half.x + 4; x < half.x; x += 8)
@@ -799,7 +808,7 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         waterfront_traffic_evaluate_routes(
             view->scene && view->scene->traffic_present ? &view->scene->traffic : NULL,
             world->water, time, &traffic);
-        // Wakes and gulls are self-coloured; navigation lights keep their own colour.
+        // Wakes and gulls share the frame's unlit tint; navigation lamps keep their own colour.
         renderer->emissive_tint = lighting.unlit;
         waterfront_draw_traffic(renderer, &traffic);
         WaterfrontHarborFrame harbor;

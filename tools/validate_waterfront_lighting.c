@@ -133,6 +133,143 @@ static int check_continuity(void)
     return 0;
 }
 
+// Independent CPU ray mapping over the full reference panorama, following the documented
+// U/V contract. It does not call the production draw path.
+static Color reference_sky_sample(
+    Image reference, View3D camera, int width, int height, int x, int y)
+{
+    Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(camera.up, forward));
+    Vector3 up = Vector3CrossProduct(forward, right);
+    float scale = 2 * tanf(camera.vertical_fov * .5f) / height;
+    Vector3 row = Vector3Add(forward, Vector3Scale(up, (height * .5f - y - .5f) * scale));
+    Vector3 ray
+        = Vector3Normalize(Vector3Add(row, Vector3Scale(right, (x + .5f - width * .5f) * scale)));
+    float u = atan2f(ray.x, ray.z) / (2 * PI) + .5f;
+    int sx = (int)(u * reference.width) % reference.width;
+    int sy = (int)Clamp((1 - ray.y) * .5f * reference.height, 0, reference.height - 1);
+    return ((const Color *)reference.data)[sy * reference.width + sx];
+}
+
+static int check_sky_draw(void)
+{
+    View3D cameras[] = {
+        { .position = { 0, 3, 0 },
+            .target = { 0, 3, 1 },
+            .up = { 0, 1, 0 },
+            .vertical_fov = 1.1f,
+            .near_plane = .1f,
+            .far_plane = 100 },
+        { .position = { 12, 4, -6 },
+            .target = { -3, 1, 20 },
+            .up = { 0, 1, 0 },
+            .vertical_fov = 1.4f,
+            .near_plane = .1f,
+            .far_plane = 100 },
+        { .position = { -8, 2, 5 },
+            .target = { 9, 6, -4 },
+            .up = { 0, 1, 0 },
+            .vertical_fov = .8f,
+            .near_plane = .1f,
+            .far_plane = 100 },
+    };
+    const int widths[] = { 320, 97 }, heights[] = { 200, 61 };
+    Color drawn[320 * 200], alternate[320 * 200];
+    struct {
+        bool legacy;
+        float value;
+    } cases[] = { { true, WATERFRONT_DAYLIGHT_DAY }, { true, WATERFRONT_DAYLIGHT_SUNSET },
+        { true, WATERFRONT_DAYLIGHT_DUSK }, { false, 4.5f }, { false, 6 }, { false, 12 },
+        { false, 18 }, { false, 19.5f }, { false, 21.5f }, { false, 23.9999f }, { false, .0001f } };
+    for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+        WaterfrontLighting lighting;
+        if (cases[c].legacy)
+            lighting = waterfront_lighting(cases[c].value);
+        else
+            CHECK(waterfront_lighting_hour(cases[c].value, &lighting));
+        Image reference = waterfront_sky_image(&lighting);
+        for (int size = 0; size < 2; ++size) {
+            int width = widths[size], height = heights[size];
+            for (int view = 0; view < (size == 0 ? 3 : 1); ++view) {
+                View3D camera = cameras[view];
+                WaterfrontSkyStats before = waterfront_sky_stats();
+                waterfront_sky_draw(drawn, width, height, camera, &lighting);
+                WaterfrontSkyStats after = waterfront_sky_stats();
+                CHECK(after.draw_calls == before.draw_calls + 1);
+                bool first_sky = after.draw_generations != before.draw_generations;
+                CHECK(after.draw_generations == before.draw_generations + (size == 0 && view == 0));
+                CHECK(!first_sky || after.draw_samples > before.draw_samples);
+                CHECK(after.draw_samples >= before.draw_samples);
+                CHECK(
+                    after.draw_samples - before.draw_samples <= (unsigned long long)width * height);
+                CHECK(after.reference_samples == before.reference_samples);
+                for (int y = 0; y < height; ++y)
+                    for (int x = 0; x < width; ++x)
+                        CHECK(ColorIsEqual(drawn[y * width + x],
+                            reference_sky_sample(reference, camera, width, height, x, y)));
+
+                // A fixed light reuses the visible cache without new recipe work.
+                before = waterfront_sky_stats();
+                waterfront_sky_draw(alternate, width, height, camera, &lighting);
+                after = waterfront_sky_stats();
+                CHECK(after.draw_samples == before.draw_samples);
+                CHECK(after.draw_reused - before.draw_reused == (unsigned long long)width * height);
+                CHECK(memcmp(drawn, alternate, (size_t)width * height * sizeof(Color)) == 0);
+
+                // A weather squall is applied after the cached sky, frame by frame.
+                WaterfrontSquall squall = {
+                    .centre = { -24, 70 }, .radius = 110, .base = 190, .top = 520, .grown = .8f
+                };
+                waterfront_sky_draw_squall(alternate, width, height, camera, squall, &lighting);
+                for (int y = 0; y < height; ++y)
+                    for (int x = 0; x < width; ++x) {
+                        Vector3 forward
+                            = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+                        Vector3 right = Vector3Normalize(Vector3CrossProduct(camera.up, forward));
+                        Vector3 up = Vector3CrossProduct(forward, right);
+                        float scale = 2 * tanf(camera.vertical_fov * .5f) / height;
+                        Vector3 row = Vector3Add(
+                            forward, Vector3Scale(up, (height * .5f - y - .5f) * scale));
+                        Vector3 ray = Vector3Normalize(
+                            Vector3Add(row, Vector3Scale(right, (x + .5f - width * .5f) * scale)));
+                        Color base = reference_sky_sample(reference, camera, width, height, x, y);
+                        CHECK(ColorIsEqual(alternate[y * width + x],
+                            waterfront_squall_sky(base, camera.position, ray, squall)));
+                    }
+            }
+        }
+    }
+
+    // Direct/backward seeks and alternating lights are deterministic and invalidate exactly the
+    // adopted sky, leaving no stale texel from the previous hour.
+    WaterfrontLighting seek[4];
+    CHECK(waterfront_lighting_hour(6.5f, &seek[0]));
+    CHECK(waterfront_lighting_hour(21.5f, &seek[1]));
+    CHECK(waterfront_lighting_hour(6.5f, &seek[2]));
+    CHECK(waterfront_lighting_hour(18.5f, &seek[3]));
+    View3D camera = cameras[0];
+    Color first[320 * 200];
+    WaterfrontSkyStats before = waterfront_sky_stats();
+    waterfront_sky_draw(first, 320, 200, camera, &seek[0]);
+    unsigned long long changed = waterfront_sky_stats().draw_generations;
+    waterfront_sky_draw(alternate, 320, 200, camera, &seek[1]);
+    CHECK(waterfront_sky_stats().draw_generations == changed + 1);
+    waterfront_sky_draw(drawn, 320, 200, camera, &seek[2]);
+    CHECK(memcmp(first, drawn, sizeof(first)) == 0);
+    waterfront_sky_draw(drawn, 320, 200, camera, &seek[3]);
+    // The final seek's full panorama is painted only now, after the draws, so it is an
+    // independent storage/traversal check of the same shared texel recipe.
+    Image final_reference = waterfront_sky_image(&seek[3]);
+    for (int y = 0; y < 200; ++y)
+        for (int x = 0; x < 320; ++x)
+            CHECK(ColorIsEqual(
+                drawn[y * 320 + x], reference_sky_sample(final_reference, camera, 320, 200, x, y)));
+    // Each changed sky evaluates only visible texels, never the full 1024x512 panorama.
+    CHECK(waterfront_sky_stats().draw_samples - before.draw_samples <= 4ull * 320 * 200);
+    CHECK(waterfront_sky_stats().draw_samples - before.draw_samples < 1024ull * 512);
+    return 0;
+}
+
 static int check_sky(void)
 {
     WaterfrontLighting day = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
@@ -371,8 +508,19 @@ static int check_renderer(void)
     return 0;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    // The exhaustive visible-sample sky comparison is registered as a separate slow CTest.
+    if (argc == 2 && strcmp(argv[1], "--sky-check") == 0) {
+        int failed = check_sky_draw();
+        if (!failed)
+            printf("Waterfront sky drawing checks passed.\n");
+        return failed;
+    }
+    if (argc != 1) {
+        fprintf(stderr, "Usage: %s [--sky-check]\n", argv[0]);
+        return 2;
+    }
     int failed = check_presets() || check_continuity() || check_sky() || check_windows()
         || check_parse() || check_hour_input() || check_hour_looks() || check_renderer();
     if (!failed)

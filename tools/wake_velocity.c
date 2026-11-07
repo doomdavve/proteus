@@ -1275,16 +1275,24 @@ static int study(int argc, char **argv)
         ghost_view_flag = &ghost_cloth;
         ghost_opacity = .5f;
     }
+#if defined(__EMSCRIPTEN__)
+    // The browser's mapped scenery registry is filled by scenery_ready() below, after the
+    // window exists. Defer the initial CPU draw and its screenshot export until then.
+    bool initial_cpu_draw_pending = !gpu_enabled;
+#else
     if (!gpu_enabled
         && !boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
             view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
             ghost_opacity))
         goto cleanup;
+#endif
     Image image = { pixels, width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+#if !defined(__EMSCRIPTEN__)
     if (screenshot && !gpu_enabled) {
         result = ExportImage(image, screenshot) ? 0 : 1;
         goto cleanup;
     }
+#endif
 
     if (!IsWindowReady()) {
 #if defined(__EMSCRIPTEN__)
@@ -1324,6 +1332,18 @@ static int study(int argc, char **argv)
 #else
     if (!vsync)
         ClearWindowState(FLAG_VSYNC_HINT);
+#endif
+#if defined(__EMSCRIPTEN__)
+    if (initial_cpu_draw_pending) {
+        if (!boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
+                view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
+                ghost_opacity))
+            goto cleanup;
+        if (screenshot) {
+            result = ExportImage(image, screenshot) ? 0 : 1;
+            goto cleanup;
+        }
+    }
 #endif
     FramePacer pacer;
     frame_pacer_init_window(&pacer);

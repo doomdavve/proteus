@@ -600,6 +600,20 @@ configuration; Windows timings have not been measured. GPU checks are opt-in thr
 `PROTEUS_GPU_TESTS=ON` and need a desktop context. A display-free suite with GPU checks
 off has less coverage; report that omission.
 
+CPU lighting checks are display-free. The quick `waterfront_lighting` test covers presets,
+continuity, reference repaint/restore, window occupancy and parsing. Its exhaustive
+`--sky-check` mode is the separate slow `waterfront_lighting_sky` test: it compares the
+visible-sample draw with the full panorama (separate storage/traversal, shared texel recipe)
+across legacy/full hours, sizes, cameras and a squall, and uses `waterfront_sky_stats()` to
+prove fixed-light cache reuse and bounded work on alternating/seeking lights. The saved
+parent captures remain the independent recipe baseline.
+`boat_world_isolation.cpu_basin_lighting` paints the full reference and is therefore slow; it
+checks the basin sky, hour wrap/direct/backward seeks and both the basin and mapped flat-water
+tint ordering. `renderer3d_is_valid` checks textured-material ambient/diffuse/tint, point light
+facing, emissive tint independence and the navigation-lamp tint exemption while still checking
+that wakes follow the unlit tint, alongside the existing mapping and clipping checks. These are
+work/pixel checks, not timing budgets.
+
 ## GPU checks
 
 `gpu_fixture --city --check` (CTest `gpu_surface_materials`) also verifies reflection waterline

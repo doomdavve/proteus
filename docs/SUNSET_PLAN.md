@@ -9,9 +9,10 @@ evaluation and review. A later sandbox-specific step now targets a 15-real-minut
 day/night cycle (900 seconds = 24 game hours). General Auto controls, room-wide time and
 plugin schedules remain deferred. T1 adds the fixed-hour evaluator, artistic anchors and
 a developer review input, approved by the user on 2026-11-07. The named presets and player
-settings are unchanged. T2a implements the native GPU static-mask/uniform sky upload path;
-next is T2b CPU/material agreement. Cloud/reflection attenuation is a documented deferred
-issue.
+settings are unchanged. T2a implements the native GPU static-mask/uniform sky upload path.
+T2b is implemented locally: CPU sky drawing uses visible samples, the basin shares the frame
+light/sky, and textured materials follow the frame light/tint. Next is T2c qualification.
+Cloud/reflection attenuation is a documented deferred issue.
 
 The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
 will expose approved fixed lighting choices, then separately scoped transitions and
@@ -112,7 +113,8 @@ the approved dusk. The shader/cache and presentation consumers must follow that 
 | --- | --- | --- |
 | T1 — full-day evaluator and fixed-hour review input (implemented locally) | Explicit hour contract, artistic anchors and sun path behind a developer review input. Legacy preset/CLI/save behavior and default Day remain. One shared frame, no Auto. | Evaluator, CLI and capture checks passed; T1 preview approved by the user on 2026-11-07. Detailed evidence is in the [T1 result](#t1-implementation-2026-11-07). |
 | T2a — GPU sky upload path (implemented locally) | Upload the static cloud mask once per GPU scene, shade changing sky light from uniforms at the original panorama texels, and remove the per-light panorama upload. Keep the CPU panorama as the reference and preserve weather/camera behavior. | CPU mask stability and native GPU sky comparisons/seeks/spies passed; detailed evidence and limits are in the [T2a result](#t2a-implementation-2026-11-07). |
-| T2 — renderer agreement and readable night/morning | Refine the new looks and wire every consumer, including grading, materials, lamps, water and reflections. Resolve the CPU basin's independent light/no-sky path and textured-box lighting gap, or document an explicitly reviewed fallback. Bound sky repaint/upload work before exposing continuous scrubbing; the present ~25 ms Debug repaint cannot happen every changing frame. | Inspect matched CPU/GPU basin, outer harbour/bridge/quay and outer-coast views at anchors, all integer hours and difficult midpoints. Review seam/horizon/azimuth boundaries, emissive vs illuminated surfaces, storm, course/weapon visibility and glitter in motion. Record measured frame/cache cost. |
+| T2b — CPU visible-sample sky and material agreement (implemented locally) | Draw changing-hour CPU sky from visible samples with a bounded lazy cache over the shared static cloud mask; keep the full panorama as a separate-storage reference. Make the CPU basin share the frame sky/light and apply one water multiplier policy to both CPU flat-water paths. Make textured CPU materials follow frame ambient/diffuse/tint and emissive tint without double-applying palette brightness, while navigation lamps keep emitter colours. | Visible sky compared with the full-reference traversal across hours/sizes/cameras/squall; cache work/reuse and seeks checked; basin and mapped flat-water tint checked; renderer light/tint and lamp exemption checks pass. Detailed evidence and limits are in the [T2b result](#t2b-implementation-2026-11-07). |
+| T2 — renderer agreement and readable night/morning | Refine the new looks and wire every consumer, including grading, materials, lamps, water and reflections. Keep the T2a/T2b bounded GPU/CPU sky paths and shared basin/material inputs; qualify their costs and readable night/morning views before exposing continuous scrubbing. Record simplified CPU rendering limits explicitly. | Inspect matched CPU/GPU basin, outer harbour/bridge/quay and outer-coast views at anchors, all integer hours and difficult midpoints. Review seam/horizon/azimuth boundaries, emissive vs illuminated surfaces, storm, course/weapon visibility and glitter in motion. Record measured frame/cache cost. |
 | T3 — fixed-hour player controls and qualification | Expose the reviewed hours through the local LIGHTING setting, keeping the existing named choices and Day default. Choose a simple hour control/names after the review; persist a versioned choice without repurposing the old numeric phase. Add documented CLI/review examples when implemented. | Verify native/browser save/load, invalid and old settings, explicit CLI precedence, new solo/join/host sessions and return to title. Run build/full CTest, inspect representative captures and a windowed manual demo; qualify platform/package limits. Fixed-selector and new-look user acceptance remain separate. |
 | T4 — sandbox 15-minute day/night cycle | After T1–T3 and their rendering/performance gates, drive the free ride sandbox's shared lighting from a session-owned presentation timeline: 900 active real seconds = 24 game hours. Wire the custom workboat/crane/cargo view into that frame. See the clock and upload contracts below and the [sandbox owner](FREE_RIDE_SANDBOX_PLAN.md#sandbox-daynight-cycle-t4). | Virtual-clock tests prove rate, pause/resume, seeks and repeated midnight wrap; matched CPU/GPU captures and a windowed cycle review prove smooth light and readable crane/cargo work at night. Measure sky work/upload and frame cost through a whole cycle. Planned, not implemented or visually accepted. |
 | Later — general Auto and script/room ownership | General Auto controls, title phase, replay persistence and room authority remain separate decisions. Coordinate plugin L5/L6 bounds and versioning before adding scripts or shared time. | Room/replay/Apply/Undo and synchronization evidence where those features are introduced. These remain deferred and are not dependencies of the solo sandbox cycle. |
@@ -122,9 +124,11 @@ T1 is implemented and user-approved. Split T2 into reviewable steps:
 - **T2a — GPU sky upload path (implemented locally).** Upload static cloud structure once per
   GPU scene, shade changing sky light with uniforms, preserve accepted appearance and the
   existing CPU panorama as the reference. Prove zero steady-state sky texture writes/allocations.
-  See [the T2a result](#t2a-implementation-2026-11-07); T2b/T2c remain next.
-- **T2b — CPU and material agreement.** Move changing-hour CPU sky work to visible samples
-  and resolve the basin/material gaps. Keep actor, water and grading inputs coherent.
+  See [the T2a result](#t2a-implementation-2026-11-07).
+- **T2b — CPU and material agreement (implemented locally).** Move changing-hour CPU sky work
+  to visible samples, make the basin share the frame sky/light and water tint, and make
+  textured materials follow the frame light/tint. Keep actor, water and grading inputs
+  coherent. See [the T2b result](#t2b-implementation-2026-11-07).
 - **T2c — qualification.** Review readability and intermediate hours, native/browser
   behavior and measured CPU/GPU/frame cost before T3/T4.
 
@@ -164,8 +168,9 @@ seeks, two scene instances and context recreation, plus seam/horizon views and a
 presets. Measure steady state separately from first-use costs. GPU fragment work may
 increase, so compare with the graphics plan's existing budgets before enabling T4.
 T2a implements this upload strategy with native upload checks, a WebGL2 shader smoke check
-and one fixed-hour native cost comparison recorded below. CPU visible-sample work remains
-T2b; the full cycle, hardware browser and broader performance qualification remain T2c.
+and one fixed-hour native cost comparison recorded below. T2b moves CPU sky drawing to visible
+samples with a bounded lazy cache; the full cycle, hardware browser and broader performance
+qualification remain T2c.
 
 ### Deferred: clouded sun and water reflection
 
@@ -272,9 +277,8 @@ workflow. Their screenshot records the cloud/reflection issue above. Exact hours
 and platform coverage were not stated; this is T1 preview acceptance, not blanket
 qualification of every hour, T2 performance, player controls or the future cycle.
 
-**Next task:** T2b, CPU visible-sample sky work and renderer/material agreement. T2c retains
-readability and broader qualification. T3 menu controls, T4 cycle, Lua access, room
-time and replay persistence remain planned.
+**Next task:** T2c, readability and broader CPU/GPU qualification; T2b is implemented locally.
+T3 menu controls, T4 cycle, Lua access, room time and replay persistence remain planned.
 
 ### T2a implementation, 2026-11-07
 
@@ -365,12 +369,150 @@ Local ignored artifacts are in `build/t2a-review/` (image comparison JSON, hour 
 river-kit captures, WebGL2 smoke, benchmark CSV/JSON and demo frame). Parent performance
 artifacts remain in the T1 worktree's `build/t1-review/t2a-baseline-perf.*`.
 
-**Limits:** CPU visible-sample sky work, CPU basin/material agreement and broad readability
-qualification remain T2b/T2c. Full browser/Windows game builds and hardware performance are
-not qualified here. The cloud-obscured-sun/water-reflection mismatch remains deliberately
-unchanged and deferred. The user approved T1; no separate T2a user verdict is inferred.
+**Limits:** T2b later moved CPU sky drawing to visible samples and resolved the basin/material
+gaps; broad readability qualification remains T2c. Full browser/Windows game builds and
+hardware performance are not qualified here. The cloud-obscured-sun/water-reflection mismatch
+remains deliberately unchanged and deferred. The user approved T1; no separate T2a user verdict
+is inferred.
 
-**Next task:** T2b, CPU visible-sample sky work and renderer/material agreement.
+**Next task:** T2c, readability and broader CPU/GPU qualification; T2b is implemented locally.
+
+### T2b implementation, 2026-11-07
+
+**Completed:** the CPU sky draw no longer calls the full panorama painter. A shared
+`sky_texel` recipe now backs both `waterfront_sky_image()` (the full reference in separate
+storage) and `waterfront_sky_draw_squall()`, which ray-maps only visible pixels and evaluates the recipe on
+demand using T2a's `waterfront_sky_cloud_mask()` flags, so static cloud hashes are not repeated
+per sample. The weather squall is still applied per ray after the cached base sky, and the
+original elevation/bearing mapping, grain, rounding and azimuth seam are unchanged.
+
+The draw cache owns one sky snapshot and a `uint32` generation stamp per 1024x512 texel
+(about 4 MiB static, no per-frame heap or unbounded per-hour history). A changed sky starts a
+new generation rather than clearing large arrays, so no old texel can be reused; each visible
+texel is evaluated at most once until the next change. Consecutive fixed-light draws do no
+recipe work. Alternating lights and direct/backward seeks re-evaluate only visible texels and
+produce the same image for the same light. `waterfront_sky_stats()` exposes full-reference
+paints, visible misses, cache hits, draw calls and adopted generations for tests. Drawing is
+single-threaded like the renderer, and the reference panorama remains separate and borrowed.
+
+The Web CPU startup path now defers its initial CPU draw and CPU screenshot export until
+after the window/UI and Emscripten `scenery_ready()` path, before the CPU image is uploaded as
+a texture. The native display-free screenshot path and native startup ordering are unchanged.
+This fixes mapped Web CPU sessions (including `outer`) whose scenery registry was still empty
+at the earlier draw; GPU ordering and lazy pack fetching are untouched. The startup gap was
+also present in the parent source. The packaged-browser checks below exercise this correction.
+
+The CPU basin now draws the same `boat_view_squall` sky as the mapped scene, begins with the
+evaluated `lighting.sun_direction`, and uses the same `cpu_ambient`, `cpu_direct` and
+`cpu_tint`. Both CPU flat-water paths apply the frame water multiplier once around the
+flat-water submission with that ordinary shading: the basin keeps its unchanged
+`{36,107,125}` body colour and the mapped path keeps its map water colours, so a day factor of
+one retains the default mapped water. Displaced water keeps its existing self-coloured mesh
+and water tint. The CPU water remains a simplified flat shade without the GPU atlas,
+reflection or glitter, so this is shared policy rather than pixel parity. This intentionally
+changes basin captures from earlier daytime-only builds; physics and the water model are
+untouched.
+
+`renderer3d` textured materials no longer use the hardcoded `.16 + .12 * N.L` light.
+Non-emissive materials select a palette ramp from the frame's ambient/diffuse plus bounded
+point light and apply the frame tint once after selection, so palette brightness is not
+multiplied twice. Emissive textures select the brightest ramp and follow `emissive_tint`, not
+sun/fill. World-space perspective mapping, negative coordinate wrap, clipping and the
+default `.30/.70/white` renderer values are unchanged. Navigation lamps deliberately draw with
+a temporary white emissive tint so they keep their authored colours when wakes and gulls use a
+non-white unlit tint, matching the GPU emitter semantics and preserving night readability;
+other emissive textures still follow the caller's tint. The production textured boxes are
+these lamps; final outer CPU captures remain byte-identical to the parent, including lamp
+pixels. Generic non-emissive textured boxes become brighter at the default light.
+
+**Automated verification (2026-11-07 follow-up, Apple Silicon/macOS, Debug):** the Debug build
+completed warning-clean. Focused CTest with genuine exits covered
+`waterfront_lighting` (0.07 s; 0.08 s direct), the new slow `waterfront_lighting_sky`
+exhaustive check (1.24 s), `renderer3d_is_valid` (0.01 s) and
+`boat_world_isolation.cpu_basin_lighting` (0.24 s, now registered `SLOW_CASE` because it
+paints the full reference); `ctest --preset quick` then passed 268/268. The exhaustive sky check compares visible output with full-panorama
+ray mapping for legacy day/sunset/dusk and hours 4.5, 6, 12, 18, 19.5, 21.5, 23.9999 and
+0.0001 at 320x200 and 97x61 across three cameras, with and without a squall. It confirms zero
+new samples on a repeated fixed-light draw, bounded visible samples on changed/seeking/
+alternating lights, exact restore after a backward seek and no stale cache output; reference
+and draw share `sky_texel` but have separate storage/traversal, with captured parent images as
+the independent recipe baseline. `boat_world_isolation.cpu_basin_lighting` checks the basin top
+sky against that reference, hour 30.5 as hour 6.5, direct/backward seeks, the expected
+afternoon basin flat-water colour plus both the default (day, factor one) and non-white
+hour-18.5 mapped flat-water colours, with the renderer tint restored after the mapped path.
+`renderer3d_is_valid` covers ambient/diffuse level selection, one-time tint, point-light
+front/back, emissive-tint independence and the navigation-lamp exemption while confirming
+wakes still follow the unlit tint and caller tint is restored.
+
+**Supervisor verification (2026-11-07, M1 Max/macOS, native Debug):** the final warning-clean
+build and `caffeinate -d -i -u ctest --preset full` passed all **423 enabled tests**, including
+36 GPU-labelled cases (15 retired wake checks disabled), with localhost sockets available.
+Changed C files passed the checked-in clang-format rules. The command-scoped awake assertion
+prevented the display/GLFW failure recorded in T2a; no saved power setting changed.
+
+All 34 full-panorama reference hashes matched the T2a parent: legacy day/sunset/dusk, every
+integer hour and 0.0001, 4.5001, 6.1, 6.5, 18.5, 19.4999 and 23.9999. All 11 outer CPU hourly
+captures and their 11 GPU counterparts were byte-identical to the parent at hours 0, 4.5, 6,
+6.1, 6.5, 9, 12, 15, 18, 19.5 and 21.5. Five GPU basin hour captures and the high-resolution
+HDR night frame were also byte-identical. The nine legacy captures retained all six outer
+CPU/GPU images exactly; only the three CPU basin images intentionally changed. All 11 new
+CPU basin hour views and the unchanged outer CPU views were inspected as sheets. The CPU
+river-kit review at hour 6.5 retained 31 captures / 13 pose groups: all 29 mapped views were
+byte-identical, with only the two basin fixtures intentionally changed.
+
+**CPU sky cost (2026-11-07, M1 Max, native Debug):** a local harness called the real
+`waterfront_sky_draw_squall()` at 320x200 with a fixed camera, clear or squall sky, 10 warm-up
+draws and 180 measured draws. Changing-hour runs advanced from hour 6.5 by one 60 Hz frame of
+the proposed 900-second day on each draw; the clock was virtual, with no waiting. Three
+parent/T2b repeats were interleaved after other tests finished. The output checksums agreed.
+Numbers below are the range of per-run mean milliseconds; they measure sky drawing, not a
+whole game frame or the future cycle.
+
+| Sky workload | T2a parent, ms | T2b, ms |
+| --- | ---: | ---: |
+| Fixed hour, clear | 0.631–0.634 | 0.987–1.001 |
+| Fixed hour, squall | 3.488–3.497 | 3.532–3.567 |
+| Changing hour, clear | 16.888–16.961 | 2.669–2.694 |
+| Changing hour, squall | 19.765–19.870 | 5.622–5.653 |
+
+Changing-hour sky p95 was 2.785–2.808 ms clear and 5.831–5.898 ms with squall, versus
+17.341–17.374 and 20.267–20.392 ms in the parent. Fixed clear sky costs about 0.36 ms more
+because the lazy cache checks stamps/counters; that cost is retained explicitly rather than
+claiming every case improved. First use, including static mask preparation, was separately
+10–11 ms clear / 13–14 ms squall in T2b, versus about 17 / 20 ms in the parent. The added CPU
+draw cache is 4 MiB alongside the existing 2 MiB full reference and 2 MiB mask. Full-frame,
+moving-camera, all-hour, Release and hardware-browser budgets remain T2c.
+
+**Browser build and smoke (2026-11-07):** installed Emscripten 6.0.12 MinSizeRel `web`
+build/packaging passed. Application code was warning-clean; pinned raylib emitted upstream
+miniaudio Emscripten-macro deprecations and a stb_vorbis pointer-comparison warning on the
+first dependency build. Isolated Chrome/SwiftShader ran CPU basin at hours 0, 6.5 and 18,
+CPU outer at 21.5, GPU basin at 0 and GPU outer at 6.5. Each case ran 45 browser animation
+callbacks after starting and produced an inspected canvas capture, with no JavaScript
+exceptions, shader/asset failures or GL error. The test response changed only startup CLI
+arguments at the existing PLAY callback; packaged files were untouched. This is software
+WebGL2 smoke coverage, not hardware-browser timing or normal title/settings qualification.
+
+**Windowed motion smoke (2026-11-07):** native CPU demos in the basin at hour 6.5 and outer
+harbour at hour 21.5 each completed 180 scripted frames with exit 0 and soundtrack off.
+The final frames were inspected. This is an agent-run motion/rendering check, not physical
+input, audio listening or user acceptance.
+
+Local ignored evidence is in `build/t2b-baseline/` and `build/t2b-review/`: image comparison
+JSON and hour sheets, CPU river-kit captures, reference hashes, actual sky timing/checksums,
+Web build scene captures/result metadata and native demo frames.
+
+**Limits:** the cache is one static, single-threaded snapshot, not a cross-hour cache; a
+changing sky re-evaluates visible unique texels. The cloud-obscured sun with a full water
+reflection/glitter remains deliberately deferred. CPU flat-water shading remains simplified
+compared with the GPU atlas/reflection/glitter, so shared inputs do not imply pixel parity.
+CPU basin visuals intentionally changed, with T2b user acceptance pending. Full-cycle,
+readability and whole-frame performance qualification, Windows, Safari and hardware browsers,
+physical input and audio listening remain open. No new player hour controls or sandbox cycle
+were added. T1 approval and the T2a evidence above remain as recorded.
+
+**Next task:** T2c, readability and broader CPU/GPU qualification (including changing/fixed-hour
+measurements and native/browser review).
 
 ### Plan review, 2026-11-07
 
@@ -484,11 +626,12 @@ This approves the fixed presets only, not a transition, setting or default.
 
 **Known limitations at the 2026-11-03 baseline:** storm/squall readability, course and
 weapon visibility at sunset/dusk not reviewed; the squall's own cloud and rain colours and
-the overcast overlay are unchanged; the CPU basin has no sky and keeps its own light
-direction; the CPU textured-box material path is unlit by the frame; the shadow maps still
-render at dusk; a panorama repaint costs about 25 ms (Debug), which a transition must avoid
-paying every frame; no frame-cost measurement, browser or Windows check yet; intermediate
-phases are untested visually. The title keeps its own grade.
+the overcast overlay are unchanged; the shadow maps still render at dusk; a full panorama
+repaint costs about 25 ms (Debug); no frame-cost measurement, browser or Windows check yet;
+intermediate phases are untested visually. The title keeps its own grade. This baseline's
+CPU basin sky/light gap, textured-box light gap and per-frame panorama repaint were superseded
+by T2b above; the reference panorama itself still pays a full repaint when a caller requests a
+different sky.
 
 **Next task at the 2026-11-03 baseline (superseded by the menu setting above):** step 3
 (transition, controls and ownership), which needed the user's

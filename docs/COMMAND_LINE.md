@@ -207,8 +207,11 @@ wave time, not the light, so the same hour can be captured at different moments:
 ./build/boat_water_review --review build/lighting-review --renderer cpu --lighting-hour 6
 ```
 
-The named Day, Sunset and Dusk recipes keep their exact legacy behavior. The user approved
-the fixed-hour T1 preview; broader renderer/readability qualification remains T2 work.
+The named Day, Sunset and Dusk recipes keep their exact legacy behavior. The CPU basin now
+shares the selected hour's sky and light, and both CPU flat-water paths apply the frame's water
+multiplier once with ordinary flat shading, so basin captures from earlier daytime-only builds
+differ intentionally. The user approved the fixed-hour T1 preview; broader readability and
+performance qualification remains T2c.
 
 GPU is the default. `--renderer cpu` selects the software reference; `--gpu` is an alias
 for `--renderer gpu`. `--gpu-aa` enables 4×4 supersampling while preserving the logical

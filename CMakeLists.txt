@@ -1339,6 +1339,7 @@ add_executable(validate_waterfront_lighting tools/validate_waterfront_lighting.c
 target_link_libraries(validate_waterfront_lighting PRIVATE proteus_render)
 target_compile_options(validate_waterfront_lighting PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME waterfront_lighting COMMAND validate_waterfront_lighting)
+add_test(NAME waterfront_lighting_sky COMMAND validate_waterfront_lighting --sky-check)
 add_executable(validate_boat_screen tools/validate_boat_screen.c)
 target_link_libraries(validate_boat_screen PRIVATE proteus_render)
 target_compile_options(validate_boat_screen PRIVATE ${PROTEUS_WARNINGS})
@@ -1505,7 +1506,7 @@ set(PROTEUS_SLOW_TESTS
   boat_river_benchmark_options boat_river_route boat_river_wave_route boat_outer_route
   boat_voyage
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
-  waterfront_actors scene_site harbor_life_qualification
+  waterfront_actors waterfront_lighting_sky scene_site harbor_life_qualification
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_outer_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
   boat_outer_screenshot
