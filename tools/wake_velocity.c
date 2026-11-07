@@ -31,6 +31,7 @@
 #include "wake_velocity_menu.h"
 #include "wake_velocity_performance.h"
 #include "wake_velocity_plugin.h"
+#include "wake_velocity_work.h"
 #if !defined(__EMSCRIPTEN__)
 #include "wake_velocity_bridge.h"
 #endif
@@ -198,6 +199,7 @@ static void usage(void)
     cli_usage_line(stdout, "--title", "Open the title screen explicitly");
     cli_usage_line(
         stdout, "--title-start PLACE", "Start a PLACE as the title's START does (tests)");
+    cli_usage_line(stdout, "--work", "Run the location's working-harbour package (outer)");
     cli_usage_line(stdout, "--course", "Timed S course in the basin");
     cli_usage_line(stdout, "--replay FILE", "Watch a saved course run");
     cli_usage_line(stdout, "--ghost FILE", "Race a compatible saved run");
@@ -635,6 +637,7 @@ static int study(int argc, char **argv)
     const char *plugin_path = NULL; // --plugin: the solo voyage's Lua package.
     const char *package_id = NULL; // --package: a bundled catalog entry in runtime mode.
     const char *bridge_path = NULL; // --plugin-bridge: the live tool bridge's mailbox.
+    bool work_mode = false; // --work: the location's working-harbour session (SV1f).
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
 #endif
@@ -757,6 +760,8 @@ static int study(int argc, char **argv)
             package_id = argv[++i];
         } else if (strcmp(argv[i], "--plugin-bridge") == 0 && i + 1 < argc) {
             bridge_path = argv[++i];
+        } else if (strcmp(argv[i], "--work") == 0) {
+            work_mode = true;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -899,6 +904,15 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--plugin-bridge needs --plugin and a window (no --screenshot).\n");
         goto invalid;
     }
+    if (work_mode
+        && (plugin_path || package_id || connect_to || host_mode || course || replay_path
+            || ghost_path || wake_field || wake_objects || player_wake_set || current
+            || crossing_wake || waves || start_set || skin_set || bridge_path)) {
+        fprintf(stderr,
+            "--work runs the location's working-harbour package; it cannot be combined with "
+            "package, room, course, replay, wake, water, start, skin or bridge options.\n");
+        goto invalid;
+    }
     if (plugin_path && package_id) {
         fprintf(stderr, "--plugin is the file-based authoring path; it cannot take --package.\n");
         goto invalid;
@@ -927,7 +941,7 @@ static int study(int argc, char **argv)
     // Every solo session starts from a build-time catalog entry. Explicit --package IDs must
     // name this location's kind. The browser builds the same catalog into the game Wasm.
     const BoatPluginCatalogEntry *catalog = NULL;
-    if (!plugin_path && !connect_to) {
+    if (!plugin_path && !connect_to && !work_mode) {
         BoatPluginKind kind = course              ? BOAT_PLUGIN_KIND_COURSE
             : location->id == BOAT_LOCATION_OUTER ? BOAT_PLUGIN_KIND_VOYAGE
                                                   : BOAT_PLUGIN_KIND_FREE;
@@ -986,7 +1000,7 @@ static int study(int argc, char **argv)
     }
     // Choose the free-boating default after parsing so explicit alternatives and
     // recorded course/replay water remain independent of argument order.
-    if (!wake_objects && !wake_field && !player_wake_set && !course && !ghost_path)
+    if (!wake_objects && !wake_field && !player_wake_set && !course && !ghost_path && !work_mode)
         wake_objects = true;
     if ((object_tuning && !wake_objects)
         || (wake_objects
@@ -1122,6 +1136,11 @@ static int study(int argc, char **argv)
         }
         plugin_active = true;
     }
+    static WakeWork work;
+    if (work_mode
+        && !wake_work_open(
+            &work, &session, &worlds[location->id], location, study_failure, sizeof(study_failure)))
+        goto cleanup;
 #if !defined(__EMSCRIPTEN__)
     static char stage_executable[2048];
     snprintf(stage_executable, sizeof(stage_executable), "%s%s", GetApplicationDirectory(),
@@ -1231,6 +1250,12 @@ static int study(int argc, char **argv)
         view = &playback;
         view_presentation = &playback_presentation;
         view_world = &playback_world;
+    } else if (screenshot && work_mode) {
+        // The scripted work drive: idle at the berth, and the landing delivery after 10 s.
+        if (!wake_work_script(&work, &session, (uint64_t)round(time / BOAT_TICK_SECONDS))) {
+            fprintf(stderr, "The scripted landing delivery did not complete.\n");
+            goto cleanup;
+        }
     } else if (screenshot) {
         for (int tick = 0; tick < (int)round(time / BOAT_TICK_SECONDS); ++tick) {
             if (plugin_active)
@@ -1242,6 +1267,8 @@ static int study(int argc, char **argv)
     }
     live_view = boat_session_view(&session);
     live_view.skin = skin;
+    if (work_mode)
+        live_view.props = wake_work_props(&work);
     if (view == &playback)
         playback.skin = skin;
     // Course attempts record from here on; screenshots above never save a run.
@@ -1845,6 +1872,8 @@ static int study(int argc, char **argv)
                 select_course_best(&session, data_dir, waves);
                 boat_replay_runs_reset(&session.runs);
             }
+            if (work_mode)
+                wake_work_reset(&work, &session);
             if (wake) {
                 boat_wake_player_reset(wake);
                 session.world.wake_field = boat_wake_player_field(wake);
@@ -1875,7 +1904,9 @@ static int study(int argc, char **argv)
             while (accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
-                if (demo)
+                if (work_mode)
+                    wake_work_tick(&work, &session, 0, 0, 0, (BoatInput) { 0 });
+                else if (demo)
                     demo_step(&session, demo_tick++, &metrics, wake, objects);
                 else {
                     if (isfinite(steering_target))
@@ -1900,6 +1931,8 @@ static int study(int argc, char **argv)
         metrics.simulation_ms = (float)((boat_profile_time(true) - simulation_started_at) * 1000.0);
         // Course saves wait until the frame's ticks are done.
         double flush_started_at = boat_profile_time(true);
+        if (work_mode)
+            wake_work_sync(&work, &session);
         boat_session_flush(&session);
         metrics.course_replay_ms += (float)((boat_profile_time(true) - flush_started_at) * 1000.0);
         double audio_started_at = boat_profile_time(true);
@@ -1919,6 +1952,8 @@ static int study(int argc, char **argv)
             view_world = &playback_world;
         }
         live_view.skin = skin;
+        if (work_mode)
+            live_view.props = wake_work_props(&work);
 #ifdef PROTEUS_BOAT_NET
         if (net) {
             live_view.skin = net_study_skin(net->client.slot); // Every client agrees.
@@ -2075,6 +2110,8 @@ static int study(int argc, char **argv)
             width,
             height > width ? height - ((mobile_buttons & 16) ? 2 * mobile_button_height + 24 : 80)
                            : height);
+        if (work_mode)
+            wake_work_hud(&work, width, height);
         const Image *chart = boat_minimap_compose(&minimap, minimap_mode,
             networked ? NULL : &session.voyage, view->boat.position, view->boat.heading);
         Rectangle minimap_bounds = boat_minimap_bounds(&minimap, minimap_mode, width, height);

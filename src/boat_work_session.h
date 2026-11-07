@@ -16,7 +16,7 @@
 #include <stdint.h>
 
 typedef struct BoatWorkSession {
-    BoatWorldResources resources;
+    const BoatWorldResources *resources; // Borrowed; outlives the session.
     BoatWorld world;
     Boat boat;
     BoatSceneWorkSite sites[BOAT_SCENE_WORK_SITES]; // The package's, or the basin reference.
@@ -75,6 +75,22 @@ void boat_work_lash_action(BoatWorkSession *e);
 void boat_work_moor_action(BoatWorkSession *e);
 void boat_work_recover_action(BoatWorkSession *e);
 void boat_work_view_action(BoatWorkSession *e);
+
+// Scripts, each running many ticks inline. The committed value of the job's HUD row LABEL (-1
+// when there is none); the index of site ID (site_count when absent); lift the crate on the
+// moored pad to the deck's AIM target (2 left, 3 right), release and lash it; pose the boat at
+// SITE's approach in place of a crossing and moor there by the real path (APPROACH_ONLY stops
+// once the berth reads ready); carry the lashed crate to RECEIVER, moor and unload it with that
+// site's crane until the native delivery commits (STOP_AT_PENDING stops on the tick the core
+// delivery is queued but not yet counted).
+int64_t boat_work_hud_value(const BoatWorkSession *e, const char *label);
+unsigned boat_work_find_site(const BoatWorkSession *e, const char *id);
+bool boat_work_script_load_and_lash(BoatWorkSession *e, int aim);
+bool boat_work_script_moor_at(BoatWorkSession *e, unsigned site, bool approach_only);
+bool boat_work_script_unload_at(
+    BoatWorkSession *e, unsigned receiver, bool approach_only, bool stop_at_pending_delivery);
+// The landing delivery: load and lash on the first pad, depart, then unload at "landing".
+bool boat_work_script_landing_delivery(BoatWorkSession *e);
 
 // Save and resume, between ticks. SAVE refuses a jobless session. RESUME replaces the session
 // or leaves it untouched. LOAD decodes BYTES, compares the identity and resumes: it returns

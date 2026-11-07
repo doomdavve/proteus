@@ -9,6 +9,10 @@ data directory; each fails on the program's exit code (`--expect resumed|rejecte
 (`--scene-check`) requires a session reset to keep the package's scene, with its custom notice. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
 resumes it from the record and from its encoded bytes, and requires equal behaviour over 1200 scripted ticks.
 
+`wake_velocity_work_*` (SV1f) render `--work` through the CPU view (`render`, slow lane): the scripted berth
+at 3 s, the scripted landing delivery at 14 s, and a refusal of `--work --package`. `wake_velocity_work_gpu_screenshot` and
+`wake_velocity_work_delivered_gpu_screenshot` are their GPU-lane twins.
+
 S0a/S0b `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane motors/cable,
 actual lifts onto both deck positions, release/settle/lash, moving deck attachment,
 rotational point velocity on unlash, departure guards, dropped/floating recovery, capsize,

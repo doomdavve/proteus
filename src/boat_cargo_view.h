@@ -35,4 +35,16 @@ View3D boat_cargo_view_camera(const BoatCargoView *v, const WaterfrontScenery *s
 // A small finite water patch around the boat for the non-GPU harness views.
 void boat_cargo_view_water(const BoatCargoView *v, BoatModel *m);
 
+// GPU upload of a BoatModel-sized Mesh3D per call (flat-shaded, vertex colours, raylib's default
+// material), for the harness and the game's cargo props. Zero-initialize; init needs a window.
+typedef struct {
+    Mesh mesh;
+    Material material;
+} BoatCargoViewGpu;
+
+bool boat_cargo_view_gpu_init(BoatCargoViewGpu *g);
+// Draw M inside BeginMode3D. LIT shades each triangle by a fixed key light; otherwise flat.
+void boat_cargo_view_gpu_draw(BoatCargoViewGpu *g, const Mesh3D *m, bool lit);
+void boat_cargo_view_gpu_destroy(BoatCargoViewGpu *g);
+
 #endif

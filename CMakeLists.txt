@@ -292,10 +292,12 @@ else()
   set(PROTEUS_BUILD_CONFIG "${CMAKE_BUILD_TYPE}")
 endif()
 
-add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/boat_title.c
+add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c tools/wake_velocity_work.c
+  tools/wake_velocity_work.h tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
-target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer)
+target_link_libraries(wake_velocity PRIVATE proteus_boat_drive proteus_gpu proteus_frame_pacer
+  proteus_work_session)
 target_include_directories(wake_velocity PRIVATE ${raylib_SOURCE_DIR}/src)
 target_compile_options(wake_velocity PRIVATE ${PROTEUS_WARNINGS})
 target_compile_definitions(wake_velocity PRIVATE
@@ -1282,6 +1284,17 @@ add_test(NAME boat_cpu_aa_option_reversed COMMAND wake_velocity --gpu-aa --rende
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option-reversed.png)
 add_test(NAME boat_outer_screenshot COMMAND wake_velocity --renderer cpu --location outer --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-outer.png)
+# SV1f: the working-harbour session in the game, from the scripted drive: the berth, and the
+# landing delivery (idle for 10 s, then the delivery script). --work refuses incompatible options.
+add_test(NAME wake_velocity_work_cpu_screenshot COMMAND wake_velocity --renderer cpu
+  --location outer --work --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth.png)
+add_test(NAME wake_velocity_work_delivered_cpu_screenshot COMMAND wake_velocity --renderer cpu
+  --location outer --work --time 14
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered.png)
+add_test(NAME wake_velocity_work_refuses_package COMMAND wake_velocity --renderer cpu
+  --location outer --work --package outer-work --time 0
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-refused.png)
+set_tests_properties(wake_velocity_work_refuses_package PROPERTIES WILL_FAIL TRUE)
 # The retired river location names its replacement instead of printing the usage.
 add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)
 add_test(NAME boat_server_river_location_retired COMMAND boat_server --location river)
@@ -1484,6 +1497,12 @@ if(PROTEUS_GPU_TESTS)
   add_test(NAME boat_wave_gpu_screenshot COMMAND wake_velocity --location outer --gpu-aa --waves
     --camera-distance 12 --camera-height 6 --time 2.9
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-wave-gpu.png)
+  add_test(NAME wake_velocity_work_gpu_screenshot COMMAND wake_velocity --location outer --work
+    --gpu --time 3 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-berth-gpu.png)
+  add_test(NAME wake_velocity_work_delivered_gpu_screenshot COMMAND wake_velocity --location outer
+    --work --gpu --time 14 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-delivered-gpu.png)
+  set_tests_properties(wake_velocity_work_gpu_screenshot wake_velocity_work_delivered_gpu_screenshot
+    PROPERTIES LABELS "gpu" RESOURCE_LOCK gpu)
   add_test(NAME boat_basin_gpu_screenshot COMMAND wake_velocity --time 0
     --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-basin-gpu.png)
   add_test(NAME boat_basin_gpu_aa_screenshot COMMAND wake_velocity --gpu-aa --time 0
@@ -1557,7 +1576,8 @@ set(PROTEUS_SLOW_TESTS
   waterfront_actors scene_site harbor_life_qualification
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_outer_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
-  boat_outer_screenshot
+  boat_outer_screenshot wake_velocity_work_cpu_screenshot wake_velocity_work_delivered_cpu_screenshot
+  wake_velocity_work_refuses_package
   wake_velocity_title_start.basin
   wake_velocity_title_start.outer-standard wake_velocity_title_start.outer-harbor-life
   wake_velocity_title_start.outer-grodan wake_velocity_title_start.outer-canal-tour

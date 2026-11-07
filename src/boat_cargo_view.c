@@ -5,6 +5,7 @@
 #include "waterfront.h"
 
 #include <math.h>
+#include <string.h>
 
 static float coordinate(Vector3 p, int axis) { return axis == 0 ? p.x : axis == 1 ? p.y : p.z; }
 
@@ -312,4 +313,61 @@ void boat_cargo_view_water(const BoatCargoView *v, BoatModel *m)
             boat_model_quad(m, p[0], p[1], p[2], p[3],
                 (x + z) % 2 ? (Color) { 45, 107, 122, 255 } : (Color) { 48, 113, 127, 255 });
         }
+}
+
+bool boat_cargo_view_gpu_init(BoatCargoViewGpu *g)
+{
+    enum { VERTICES = BOAT_MODEL_MAX_TRIANGLES * 3 };
+    g->mesh = (Mesh) { .vertexCount = VERTICES, .triangleCount = VERTICES / 3 };
+    g->mesh.vertices = MemAlloc(VERTICES * 3 * sizeof(float));
+    g->mesh.colors = MemAlloc(VERTICES * 4);
+    if (!g->mesh.vertices || !g->mesh.colors) {
+        MemFree(g->mesh.vertices);
+        MemFree(g->mesh.colors);
+        *g = (BoatCargoViewGpu) { 0 };
+        return false;
+    }
+    memset(g->mesh.vertices, 0, VERTICES * 3 * sizeof(float));
+    memset(g->mesh.colors, 255, VERTICES * 4);
+    UploadMesh(&g->mesh, true);
+    g->material = LoadMaterialDefault();
+    return g->mesh.vaoId != 0;
+}
+
+void boat_cargo_view_gpu_draw(BoatCargoViewGpu *g, const Mesh3D *m, bool lit)
+{
+    if (!g->mesh.vaoId || !m->triangle_count || m->triangle_count > BOAT_MODEL_MAX_TRIANGLES)
+        return;
+    Vector3 light = Vector3Normalize((Vector3) { -1, 3, 2 });
+    for (size_t t = 0; t < m->triangle_count; ++t) {
+        Triangle3D triangle = m->triangles[t];
+        Vector3 a = m->vertices[triangle.vertices[0]], b = m->vertices[triangle.vertices[1]],
+                c = m->vertices[triangle.vertices[2]];
+        Vector3 normal
+            = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
+        float shade = lit ? .3f + .7f * fmaxf(0, Vector3DotProduct(normal, light)) : 1;
+        for (int i = 0; i < 3; ++i) {
+            size_t v = t * 3 + i;
+            Vector3 p = m->vertices[triangle.vertices[i]];
+            memcpy(g->mesh.vertices + v * 3, &p, sizeof(p));
+            g->mesh.colors[v * 4] = (unsigned char)(triangle.color.r * shade);
+            g->mesh.colors[v * 4 + 1] = (unsigned char)(triangle.color.g * shade);
+            g->mesh.colors[v * 4 + 2] = (unsigned char)(triangle.color.b * shade);
+            g->mesh.colors[v * 4 + 3] = 255;
+        }
+    }
+    g->mesh.triangleCount = (int)m->triangle_count;
+    g->mesh.vertexCount = g->mesh.triangleCount * 3;
+    UpdateMeshBuffer(g->mesh, 0, g->mesh.vertices, g->mesh.triangleCount * 9 * sizeof(float), 0);
+    UpdateMeshBuffer(g->mesh, 3, g->mesh.colors, g->mesh.triangleCount * 12, 0);
+    DrawMesh(g->mesh, g->material, MatrixIdentity());
+}
+
+void boat_cargo_view_gpu_destroy(BoatCargoViewGpu *g)
+{
+    if (g->mesh.vaoId)
+        UnloadMesh(g->mesh);
+    if (g->material.maps)
+        UnloadMaterial(g->material);
+    *g = (BoatCargoViewGpu) { 0 };
 }

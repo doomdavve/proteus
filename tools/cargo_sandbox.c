@@ -45,10 +45,7 @@ static int shadow_pixel_count(const Color *pixels, int frame)
     return count;
 }
 
-typedef struct {
-    Mesh mesh;
-    Material material;
-} GpuMesh;
+typedef BoatCargoViewGpu GpuMesh;
 
 typedef struct {
     WaterfrontScenery scenery;
@@ -125,51 +122,6 @@ static bool harbour_gpu_water(HarbourView *h, const BoatWorkSession *e)
     return h->patch.vaoId != 0;
 }
 
-static bool gpu_init(GpuMesh *g)
-{
-    g->mesh = (Mesh) { .vertexCount = MAX_VERTICES, .triangleCount = MAX_VERTICES / 3 };
-    g->mesh.vertices = MemAlloc(MAX_VERTICES * 3 * sizeof(float));
-    g->mesh.colors = MemAlloc(MAX_VERTICES * 4);
-    if (!g->mesh.vertices || !g->mesh.colors) {
-        MemFree(g->mesh.vertices);
-        MemFree(g->mesh.colors);
-        *g = (GpuMesh) { 0 };
-        return false;
-    }
-    memset(g->mesh.vertices, 0, MAX_VERTICES * 3 * sizeof(float));
-    memset(g->mesh.colors, 255, MAX_VERTICES * 4);
-    UploadMesh(&g->mesh, true);
-    g->material = LoadMaterialDefault();
-    return g->mesh.vaoId != 0;
-}
-
-static void gpu_draw(GpuMesh *g, const BoatModel *m, bool lit)
-{
-    Vector3 light = Vector3Normalize((Vector3) { -1, 3, 2 });
-    for (size_t t = 0; t < m->mesh.triangle_count; ++t) {
-        Triangle3D triangle = m->triangles[t];
-        Vector3 a = m->vertices[triangle.vertices[0]], b = m->vertices[triangle.vertices[1]],
-                c = m->vertices[triangle.vertices[2]];
-        Vector3 normal
-            = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
-        float shade = lit ? .3f + .7f * fmaxf(0, Vector3DotProduct(normal, light)) : 1;
-        for (int i = 0; i < 3; ++i) {
-            size_t v = t * 3 + i;
-            Vector3 p = m->vertices[triangle.vertices[i]];
-            memcpy(g->mesh.vertices + v * 3, &p, sizeof(p));
-            g->mesh.colors[v * 4] = (unsigned char)(triangle.color.r * shade);
-            g->mesh.colors[v * 4 + 1] = (unsigned char)(triangle.color.g * shade);
-            g->mesh.colors[v * 4 + 2] = (unsigned char)(triangle.color.b * shade);
-            g->mesh.colors[v * 4 + 3] = 255;
-        }
-    }
-    g->mesh.triangleCount = (int)m->mesh.triangle_count;
-    g->mesh.vertexCount = g->mesh.triangleCount * 3;
-    UpdateMeshBuffer(g->mesh, 0, g->mesh.vertices, g->mesh.triangleCount * 9 * sizeof(float), 0);
-    UpdateMeshBuffer(g->mesh, 3, g->mesh.colors, g->mesh.triangleCount * 12, 0);
-    DrawMesh(g->mesh, g->material, MatrixIdentity());
-}
-
 static bool shadow_stream_check(GpuMesh *gpu, RenderTexture2D target)
 {
     static BoatModel triangle;
@@ -184,7 +136,7 @@ static bool shadow_stream_check(GpuMesh *gpu, RenderTexture2D target)
         BeginTextureMode(target);
         ClearBackground(BLACK);
         BeginMode3D(camera);
-        gpu_draw(gpu, &triangle, false);
+        boat_cargo_view_gpu_draw(gpu, &triangle.mesh, false);
         EndMode3D();
         EndTextureMode();
         Image capture = LoadImageFromTexture(target.texture);
@@ -391,117 +343,6 @@ static void ui(
         DrawText("PAUSED", 205, 100, 20, yellow);
 }
 
-// Lift the crate on the moored site's pad to the deck's AIM target (2 left, 3 right), release
-// and lash it, through the real hook, aim, release and lash paths.
-static bool load_and_lash(BoatWorkSession *e, int aim)
-{
-    if (!boat_cargo_hook_toggle(&e->sandbox))
-        return false;
-    e->aim = aim;
-    for (int i = 0; i < 2000; ++i)
-        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
-    e->aim = 0;
-    for (int i = 0; i < 900 && !e->sandbox.cargo.deck_contact; ++i)
-        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
-    if (!e->sandbox.cargo.deck_contact || !boat_cargo_hook_toggle(&e->sandbox))
-        return false;
-    for (int i = 0; i < 600 && e->sandbox.cargo.settled < .5f; ++i)
-        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
-    return boat_cargo_lash_toggle(&e->sandbox, &e->boat);
-}
-
-// Pose the unmoored boat at SITE's approach (in place of a crossing) and moor there by the real
-// G path. With APPROACH_ONLY, stop once the berth reads ready.
-static bool moor_at(BoatWorkSession *e, unsigned site, bool approach_only)
-{
-    const BoatCargoCrane *crane = &e->sandbox.cranes[site];
-    e->crane_view = false;
-    Vector3 approach = boat_cargo_site_point(crane, (Vector3) { 1.8f, 0, 4.3f });
-    e->boat.position = (Vector2) { -approach.x, approach.z };
-    e->boat.heading = crane->heading + .5f;
-    e->boat.velocity = (Vector2) { 0 };
-    boat_cargo_step(&e->sandbox, &e->boat, &e->world, boat_tick_seconds(e->tick));
-    BoatCargoMoorStatus status = boat_cargo_moor_status(&e->sandbox, &e->boat);
-    if (status.site != site || status.reason != BOAT_CARGO_MOOR_READY)
-        return false;
-    if (approach_only)
-        return true;
-    boat_work_moor_action(e);
-    for (int i = 0; i < 900 && !e->sandbox.moored; ++i)
-        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
-    if (!e->sandbox.moored || e->sandbox.active != site)
-        return false;
-    boat_work_view_action(e);
-    return true;
-}
-
-// SV1c fixture switch: stop unload_at on the tick the core delivery is queued but the job has
-// not yet counted it.
-static bool stop_at_pending_delivery;
-
-// Carry the lashed crate (lashed on the left target) to RECEIVER, moor and unload it onto that
-// site's pad with its crane, until the native delivery commits there. The job may use the
-// delivered crate up meanwhile, so the commit is watched tick by tick.
-static bool unload_at(BoatWorkSession *e, unsigned receiver, bool approach_only)
-{
-    if (!moor_at(e, receiver, approach_only))
-        return false;
-    if (approach_only)
-        return true;
-    if (!boat_cargo_lash_toggle(&e->sandbox, &e->boat))
-        return false;
-    e->aim = 2;
-    for (int i = 0; i < 2000; ++i)
-        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
-    e->aim = 0;
-    Vector3 top = { 0, BOAT_CARGO_HALF, 0 };
-    for (int i = 0; i < 900
-        && Vector3Distance(boat_cargo_hook(&e->sandbox), Vector3Add(e->sandbox.cargo.position, top))
-            > .6f;
-        ++i)
-        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
-    if (!boat_cargo_hook_toggle(&e->sandbox))
-        return false;
-    e->aim = 1;
-    for (int i = 0; i < 2000; ++i)
-        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
-    e->aim = 0;
-    for (int i = 0; i < 900 && e->sandbox.cargo.position.y > 1.41f; ++i)
-        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
-    if (!boat_cargo_hook_toggle(&e->sandbox))
-        return false;
-    unsigned load = e->sandbox.cargo.load;
-    bool delivered = false;
-    for (int i = 0; i < 240; ++i) {
-        boat_work_session_tick(e, 0, 0, i < 120 ? 1 : 0, (BoatInput) { 0 });
-        delivered |= e->sandbox.cargo.load == load && e->sandbox.cargo.state == BOAT_CARGO_PAD
-            && e->sandbox.cargo.pad == receiver && e->sandbox.cargo.receivers & 1u << receiver;
-        if (stop_at_pending_delivery && delivered && e->event_count)
-            return true;
-    }
-    return delivered;
-}
-
-// The committed value of the job's HUD row LABEL, or -1 when there is none.
-static int64_t hud_value(const BoatWorkSession *e, const char *label)
-{
-    for (unsigned i = 0; i < e->objective.hud_count; ++i)
-        if (!strcmp(e->objective.hud[i].label, label))
-            return e->objective.hud[i].value;
-    return -1;
-}
-
-// The review fixtures follow the bundled outer job by the package's own site ids: the landing
-// receiver, the quay (a service platform the job builds) and the jetty receiver. SITE_COUNT
-// means the package has no such site.
-static unsigned find_site(const BoatWorkSession *e, const char *id)
-{
-    for (unsigned i = 0; i < e->site_count; ++i)
-        if (!strcmp(e->sites[i].id, id))
-            return i;
-    return e->site_count;
-}
-
 static bool stage(BoatWorkSession *e, const char *name)
 {
     if (!strcmp(name, "origin"))
@@ -585,7 +426,7 @@ static bool stage(BoatWorkSession *e, const char *name)
         // the landing once and wants load 2 at the jetty. R then restarts everything together.
         if (!stage(e, "delivered") || !e->revision)
             return false;
-        unsigned landing = find_site(e, "landing");
+        unsigned landing = boat_work_find_site(e, "landing");
         if (landing == e->site_count)
             return false;
         e->sandbox.cargo.state = BOAT_CARGO_FLOATING;
@@ -597,7 +438,8 @@ static bool stage(BoatWorkSession *e, const char *name)
         BoatPluginObjective o = e->objective;
         bool once = c->state == BOAT_CARGO_PAD && c->pad == landing && c->load == 2
             && c->receivers == 1u << landing && !o.quarantined && o.acknowledged == e->sequence
-            && hud_value(e, "LANDING BUILT") == 1 && hud_value(e, "SUPPLIES TO JETTY / 1") == 0;
+            && boat_work_hud_value(e, "LANDING BUILT") == 1
+            && boat_work_hud_value(e, "SUPPLIES TO JETTY / 1") == 0;
         if (!strcmp(name, "redelivered"))
             return once;
         boat_work_session_reset(e);
@@ -607,18 +449,16 @@ static bool stage(BoatWorkSession *e, const char *name)
         for (unsigned i = 0; i < e->site_count; ++i)
             hidden &= !e->sites[i].hidden || e->sandbox.cranes[i].hidden;
         return once && hidden && !c->delivered && c->load == 1 && e->guide == e->site_count
-            && e->objective.hud_count == 1 && hud_value(e, "CRATES TO LANDING / 1") == 0;
+            && e->objective.hud_count == 1 && boat_work_hud_value(e, "CRATES TO LANDING / 1") == 0;
     } else if (!strcmp(name, "delivery-pending")) {
         // SV1c resume fixture: the core has delivered the crate but the job has not counted it
         // yet, so the delivery event is still queued and unacknowledged.
-        unsigned landing = find_site(e, "landing");
+        unsigned landing = boat_work_find_site(e, "landing");
         if (!e->revision || landing == e->site_count || !stage(e, "departure"))
             return false;
-        stop_at_pending_delivery = true;
-        bool ok = unload_at(e, landing, false);
-        stop_at_pending_delivery = false;
+        bool ok = boat_work_script_unload_at(e, landing, false, true);
         return ok && e->sandbox.cargo.delivered && e->event_count == 1
-            && hud_value(e, "LANDING BUILT") == -1;
+            && boat_work_hud_value(e, "LANDING BUILT") == -1;
     } else if (!strcmp(name, "capsized")) {
         // SV1c resume fixture: the crossing, then the boat capsizes with the crate lashed on.
         if (!stage(e, "crossing"))
@@ -631,7 +471,8 @@ static bool stage(BoatWorkSession *e, const char *name)
         // crate is posed onto the landing's pad; the delivery itself is the native commit.
         if (!e->revision)
             return false;
-        unsigned landing = find_site(e, "landing"), quay = find_site(e, "landing_quay");
+        unsigned landing = boat_work_find_site(e, "landing"),
+                 quay = boat_work_find_site(e, "landing_quay");
         if (landing == e->site_count || quay == e->site_count
             || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
             return false;
@@ -653,14 +494,15 @@ static bool stage(BoatWorkSession *e, const char *name)
         for (int i = 0; i < 24; ++i)
             boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         e->notice = "Build-blocked review fixture. R: restart from the first site.";
-        return !e->waiting && !e->sandbox.cranes[quay].hidden && hud_value(e, "LANDING BUILT") == 1
-            && !e->event_count && e->sandbox.source == quay;
+        return !e->waiting && !e->sandbox.cranes[quay].hidden
+            && boat_work_hud_value(e, "LANDING BUILT") == 1 && !e->event_count
+            && e->sandbox.source == quay;
     } else if (!strcmp(name, "landing-built")) {
         // S1c review: after the delivery, look back from the helm at the landing and the quay
         // the job built beside it.
         if (!stage(e, "delivered") || !e->revision)
             return false;
-        unsigned built = find_site(e, "landing_quay");
+        unsigned built = boat_work_find_site(e, "landing_quay");
         if (built == e->site_count || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
             return false;
         const BoatCargoCrane *landing = boat_work_active(e), *quay = &e->sandbox.cranes[built];
@@ -679,10 +521,10 @@ static bool stage(BoatWorkSession *e, const char *name)
     } else if (!strcmp(name, "receiver-approach") || !strcmp(name, "delivered")) {
         // S1b review: carry the lashed crate to the first receiving site (an explicit pose in
         // place of the crossing), then moor and unload with that site's crane by the real path.
-        unsigned receiver = find_site(e, "landing");
+        unsigned receiver = boat_work_find_site(e, "landing");
         if (receiver == e->site_count || !stage(e, "departure"))
             return false;
-        if (!unload_at(e, receiver, !strcmp(name, "receiver-approach")))
+        if (!boat_work_script_unload_at(e, receiver, !strcmp(name, "receiver-approach"), false))
             return false;
         if (!strcmp(name, "receiver-approach"))
             return true;
@@ -691,7 +533,7 @@ static bool stage(BoatWorkSession *e, const char *name)
         // not a reused raylib TextFormat buffer.
         for (int i = 0; i < 8; ++i) // Cycle every TextFormat buffer, as one HUD frame does.
             TextFormat("%d", i);
-        unsigned quay = find_site(e, "landing_quay");
+        unsigned quay = boat_work_find_site(e, "landing_quay");
         if (e->revision && quay == e->site_count)
             return false;
         char supplied[64] = "";
@@ -700,7 +542,7 @@ static bool stage(BoatWorkSession *e, const char *name)
         if (e->revision
             && (strcmp(e->notice, supplied) || e->sandbox.cargo.load != 2
                 || e->sandbox.cargo.state != BOAT_CARGO_PAD || e->sandbox.cargo.pad != quay
-                || e->sandbox.source != quay || e->guide != find_site(e, "jetty")))
+                || e->sandbox.source != quay || e->guide != boat_work_find_site(e, "jetty")))
             return false;
         e->notice = "Delivered review fixture. R: restart from the first site.";
         for (unsigned i = 0; e->revision && i < e->site_count; ++i)
@@ -708,30 +550,30 @@ static bool stage(BoatWorkSession *e, const char *name)
                 return false;
         return !e->revision
             || (!e->objective.quarantined && !e->waiting && e->objective.hud_count == 2
-                && hud_value(e, "LANDING BUILT") == 1
-                && hud_value(e, "SUPPLIES TO JETTY / 1") == 0);
+                && boat_work_hud_value(e, "LANDING BUILT") == 1
+                && boat_work_hud_value(e, "SUPPLIES TO JETTY / 1") == 0);
     } else if (!strcmp(name, "quay-pickup") || !strcmp(name, "jetty-approach")
         || !strcmp(name, "jetty-delivered")) {
         // S1d's second outing: from the landing, moor at the built quay beside it by the real G
         // path, where load 2 waits; lift and lash it, depart toward the job's guided jetty, then
         // moor and unload there (explicit poses in place of the two short drives).
-        unsigned quay = find_site(e, "landing_quay");
-        unsigned jetty = find_site(e, "jetty");
+        unsigned quay = boat_work_find_site(e, "landing_quay");
+        unsigned jetty = boat_work_find_site(e, "jetty");
         if (!e->revision || quay == e->site_count || jetty == e->site_count
             || !stage(e, "delivered") || !boat_cargo_moor_toggle(&e->sandbox, &e->boat)
-            || !moor_at(e, quay, false))
+            || !boat_work_script_moor_at(e, quay, false))
             return false;
         if (!strcmp(name, "quay-pickup")) {
             e->notice = "Quay pickup review fixture. R: restart from the first site.";
             return e->sandbox.cargo.state == BOAT_CARGO_PAD && e->sandbox.cargo.pad == quay
                 && e->sandbox.cargo.load == 2 && e->guide == jetty;
         }
-        if (!load_and_lash(e, 2))
+        if (!boat_work_script_load_and_lash(e, 2))
             return false;
         boat_work_moor_action(e); // G: departure guidance follows the job's work.guide.
         if (e->sandbox.moored || e->target != jetty)
             return false;
-        if (!unload_at(e, jetty, !strcmp(name, "jetty-approach")))
+        if (!boat_work_script_unload_at(e, jetty, !strcmp(name, "jetty-approach"), false))
             return false;
         if (!strcmp(name, "jetty-approach"))
             return true;
@@ -739,12 +581,12 @@ static bool stage(BoatWorkSession *e, const char *name)
             boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
         e->notice = "Jetty delivered review fixture. R: restart from the first site.";
         return !e->objective.quarantined && !e->waiting && e->sandbox.cargo.load == 2
-            && e->sandbox.cargo.pad == jetty && hud_value(e, "LANDING BUILT") == 1
-            && hud_value(e, "JETTY SUPPLIED") == 1;
+            && e->sandbox.cargo.pad == jetty && boat_work_hud_value(e, "LANDING BUILT") == 1
+            && boat_work_hud_value(e, "JETTY SUPPLIED") == 1;
     } else if (!strcmp(name, "loaded-left") || !strcmp(name, "loaded-right")
         || !strcmp(name, "departure")) {
         // Exercise the real application assist, wave-posed deck, release and departure.
-        if (!load_and_lash(e, !strcmp(name, "loaded-right") ? 3 : 2)
+        if (!boat_work_script_load_and_lash(e, !strcmp(name, "loaded-right") ? 3 : 2)
             || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
             return false;
         if (!strcmp(name, "departure"))
@@ -871,8 +713,8 @@ static bool resume_check(BoatWorkSession *e, const char *scenario)
             RESUME_CHECK(e->sandbox.moored && c->state == BOAT_CARGO_PAD
                 && e->boat.motion_state != BOAT_CAPSIZED);
         if (pending)
-            RESUME_CHECK(
-                e->event_count == 1 && c->delivered && hud_value(e, "LANDING BUILT") == -1);
+            RESUME_CHECK(e->event_count == 1 && c->delivered
+                && boat_work_hud_value(e, "LANDING BUILT") == -1);
         for (unsigned i = 0; i < RESUME_TICKS; ++i) {
             resume_script(e, i);
             trace[pass][i] = session_hash(e);
@@ -880,14 +722,14 @@ static bool resume_check(BoatWorkSession *e, const char *scenario)
         RESUME_CHECK(!e->objective.quarantined);
         // Exactly one counted delivery and one built quay, whichever side of the update the
         // save fell on.
-        unsigned quay = find_site(e, "landing_quay");
+        unsigned quay = boat_work_find_site(e, "landing_quay");
         if (pending || !strcmp(scenario, "delivered") || !strcmp(scenario, "landing-built")
             || !strcmp(scenario, "quay-pickup") || !strcmp(scenario, "jetty-delivered")) {
             RESUME_CHECK(quay < e->site_count && !e->sandbox.cranes[quay].hidden);
-            RESUME_CHECK(hud_value(e, "LANDING BUILT") == 1);
+            RESUME_CHECK(boat_work_hud_value(e, "LANDING BUILT") == 1);
         }
         if (!strcmp(scenario, "jetty-delivered"))
-            RESUME_CHECK(hud_value(e, "JETTY SUPPLIED") == 1);
+            RESUME_CHECK(boat_work_hud_value(e, "JETTY SUPPLIED") == 1);
     }
     for (unsigned i = 0; i < RESUME_TICKS; ++i)
         if (trace[0][i] != trace[1][i]) {
@@ -1192,9 +1034,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "Use --scenario for a capture; --demo/--frames need a live window.\n");
         return 2;
     }
-    BoatWorkSession e = { 0 };
+    static BoatWorldResources resources;
+    BoatWorkSession e = { .resources = &resources };
     SetTraceLogLevel(LOG_WARNING);
-    if (!boat_world_resources_init(&e.resources, location))
+    if (!boat_world_resources_init(&resources, location))
         return 1;
     // Every location reads its bundled package; the basin's is its reference fixture.
     static BoatPluginRevision revision;
@@ -1209,7 +1052,7 @@ int main(int argc, char **argv)
         || !revision.free.scene.work_present) {
         fprintf(stderr, "No bundled free package with scene.work sites for %s: %s\n",
             location->name, work_name);
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return 1;
     }
     e.world.scene = &revision.free.scene;
@@ -1219,7 +1062,7 @@ int main(int argc, char **argv)
     boat_work_session_reset(&e);
     if (scene_check_flag) {
         bool ok = scene_check(&e, &revision);
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return ok ? 0 : 1;
     }
     // Which file, if any. Only plain interactive play uses the game's data directory; every
@@ -1241,7 +1084,7 @@ int main(int argc, char **argv)
     }
     if (expect && !save.enabled) {
         fprintf(stderr, "--expect needs a save file (--save or --data-dir).\n");
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return 2;
     }
     int loaded = 0;
@@ -1254,7 +1097,7 @@ int main(int argc, char **argv)
         if (!ok) {
             fprintf(
                 stderr, "--expect %s: the save did not match (load result %d)\n", expect, loaded);
-            boat_world_resources_destroy(&e.resources);
+            boat_world_resources_destroy(&resources);
             return 1;
         }
     }
@@ -1265,8 +1108,8 @@ int main(int argc, char **argv)
             && boat_scenery_load_location(location, assets)
             && waterfront_scenery_bind(&harbour.scenery, location->map);
         for (unsigned i = 0; clear && i < e.site_count; ++i)
-            clear = boat_cargo_site_clear(
-                &e.resources.map, e.world.scene, e.world.water, &e.sites[i]);
+            clear
+                = boat_cargo_site_clear(&resources.map, e.world.scene, e.world.water, &e.sites[i]);
         if (!clear) {
             fprintf(stderr, "Cargo work sites need their scenery pack and clear mapped water.\n");
             return 1;
@@ -1293,19 +1136,19 @@ int main(int argc, char **argv)
         }
         waterfront_scenery_destroy(&harbour.scenery);
         boat_scenery_unload();
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return clear ? 0 : 1;
     }
     if (!stage(&e, scenario)) {
         fprintf(stderr, "Cargo review scenario failed: %s\n", scenario);
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return 1;
     }
     if (autosave) {
         bool ok = save.enabled && autosave_check(&e, &save);
         waterfront_scenery_destroy(&harbour.scenery);
         boat_scenery_unload();
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return ok ? 0 : 1;
     }
     if (save_now) {
@@ -1314,14 +1157,14 @@ int main(int argc, char **argv)
             (unsigned long long)e.tick);
         waterfront_scenery_destroy(&harbour.scenery);
         boat_scenery_unload();
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return ok ? 0 : 1;
     }
     if (resume) {
         bool ok = resume_check(&e, scenario);
         waterfront_scenery_destroy(&harbour.scenery);
         boat_scenery_unload();
-        boat_world_resources_destroy(&e.resources);
+        boat_world_resources_destroy(&resources);
         return ok ? 0 : 1;
     }
     static BoatModel solids, water, body_decal, water_decal;
@@ -1342,7 +1185,7 @@ int main(int argc, char **argv)
         SetWindowMinSize(WIDTH, HEIGHT);
         SetTargetFPS(60);
         target = LoadRenderTexture(WIDTH, HEIGHT);
-        if (gpu && !gpu_init(&mesh))
+        if (gpu && !boat_cargo_view_gpu_init(&mesh))
             return 1;
         if (gpu && location->mapped) {
             char shader[4096];
@@ -1544,8 +1387,8 @@ int main(int argc, char **argv)
             rlSetMatrixProjection(projection);
             rlDisableBackfaceCulling();
             if (!location->mapped)
-                gpu_draw(&mesh, &water, false);
-            gpu_draw(&mesh, &solids, true);
+                boat_cargo_view_gpu_draw(&mesh, &water.mesh, false);
+            boat_cargo_view_gpu_draw(&mesh, &solids.mesh, true);
             boat_model_begin(&water_decal);
             Vector2 focus = { -e.boat.position.x, e.boat.position.y };
             const Mesh3D *water_receiver = &water.mesh;
@@ -1570,8 +1413,8 @@ int main(int argc, char **argv)
                 result = 1;
                 break;
             }
-            gpu_draw(&mesh, &water_decal, false);
-            gpu_draw(&mesh, &body_decal, true);
+            boat_cargo_view_gpu_draw(&mesh, &water_decal.mesh, false);
+            boat_cargo_view_gpu_draw(&mesh, &body_decal.mesh, true);
             rlEnableBackfaceCulling();
             EndMode3D();
         } else
@@ -1648,7 +1491,7 @@ int main(int argc, char **argv)
     waterfront_scenery_destroy(&harbour.scenery);
     waterfront_harbor_models_destroy(&harbour.harbor);
     boat_water_mesh_cache_destroy(&harbour.water);
-    boat_world_resources_destroy(&e.resources);
+    boat_world_resources_destroy(&resources);
     if (!headless) {
         if (gpu) {
             if (location->mapped)

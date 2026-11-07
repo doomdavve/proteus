@@ -38,8 +38,8 @@ qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtu
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) are implemented locally; next
-implementation task: [SV1f](#sv1-steps), the work session in the game (scripted). Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) are implemented locally; next
+implementation task: [SV1g](#sv1-steps), the playable work session with automatic saving. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -952,7 +952,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1e implemented locally (2026-11-07); next SV1f |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1f implemented locally (2026-11-07); next SV1g |
 
 ##### F1 result, 2026-11-07
 
@@ -1126,13 +1126,43 @@ SV1g chooses the game's. No behaviour change: the 36 CPU captures (34 existing p
 CTest preset passed 415 tests (13 disabled wake experiments not run) with a warning-clean build
 apart from the existing `stb_vorbis` warning. No GPU frames, windowed run or hands-on play.
 
+**SV1f result (2026-11-07, macOS arm64, Debug; CPU captures only).** `wake_velocity --work`
+(`tools/wake_velocity_work.[ch]`, native and web builds link it) opens the location's bundled work
+package (`boat_plugin_catalog_work_default`), runs its `BoatWorkSession` in place of the
+free-ride boat step, and each tick copies the work boat, clock and world into the game's
+`BoatSession` (the session borrows the game's `BoatWorldResources` now; `BoatWorkSession.resources`
+is a pointer). The game keeps its camera, water, sky, harbour and traffic. The renderers draw
+extra geometry from the new `BoatViewState.props` (`BoatViewProps`: the sites, crate, crane,
+straps, berth outlines and workboat as one lit `Mesh3D`, the landing decal, and `hide_player` to
+omit the skinned boat): the CPU view after the harbour, the GPU view in the finished colour
+target with the scene's own camera and depth (`draw_props`, using the same flat-shaded upload as
+the harness, now shared as `BoatCargoViewGpu`). The job rows and notice are drawn by
+`wake_work_hud` in the windowed HUD. Decisions: the scripted `--time` drive is idle at the
+berth for 10 s of simulated time, then the landing delivery script (load, lash, depart, moor, unload;
+shared from the harness as `boat_work_script_*`), then idle for the rest of `--time`, so `--time 3`
+shows the berth and `--time 14` the delivery; a script that fails fails the capture. `--work`
+refuses `--plugin`, `--package`, rooms, course, replay, wake, water, `--start`, `--skin` and the
+bridge, and it replaces the default wake-objects mode. Known limits: no controls (the windowed
+session idles at the berth), nothing is saved, the wake objects, water decal under the crate and
+the harness's water patch are not drawn, and CPU and GPU screenshots draw no HUD (so
+`wake_work_hud` is unverified until a windowed run). Tests (CPU lane): `wake_velocity_work_cpu_screenshot`
+(berth), `wake_velocity_work_delivered_cpu_screenshot` and `wake_velocity_work_refuses_package`; the GPU lane
+gains `wake_velocity_work_gpu_screenshot` and `wake_velocity_work_delivered_gpu_screenshot`
+(not run here). Verification: the 36 harness captures and every existing CPU test capture are
+byte-identical to before (`cmp`); the berth and delivered game captures were inspected and show the
+platform, crane, workboat and (delivered) the landing pad and raised hook in the game's chase
+camera, matching the harness's `outer` `delivered` frame in pose; the crate on the pad is small and
+hard to pick out from the default chase camera at the berth (an orange block beside the crane base). The full CTest preset passed 418 tests (13 disabled wake experiments not run)
+with a warning-clean build. GPU frames, windowed runs and hands-on play were not possible: GLFW
+could not open a display under the command sandbox (`Failed to initialize platform`).
+
 #### SV1: local save and resume
 
 Designed 2026-11-07 at the user's request ("save the state of the player", one step at a time,
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a-SV1e implemented locally (2026-11-07); SV1f–SV1i planned.**
+will apply to all future state as well." Status: **SV1a-SV1f implemented locally (2026-11-07); SV1g–SV1i planned.**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or

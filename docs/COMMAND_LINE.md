@@ -41,6 +41,23 @@ desktop context). With `--screenshot FILE` it saves only the first failing frame
 is written on success. `--scenario shadow-bow` and `shadow-water` show normal-colour
 wave-phase regression fixtures. See the [shadow correction](FREE_RIDE_SANDBOX_PLAN.md#s0b-wave-phase-shadow-correction).
 
+## Working harbour in the game (`--work`, native, in progress)
+
+```sh
+./build/wake_velocity --location outer --work
+./build/wake_velocity --renderer cpu --location outer --work --screenshot build/work.png --time 3
+```
+
+`--work` runs the location's bundled working-harbour package (on `outer`, `outer-work`) in place
+of the free-ride boat step, with the game's camera, water and harbour, plus the work sites, crate,
+crane and the package's job rows. It is the SV1f step of the
+[save and resume plan](FREE_RIDE_SANDBOX_PLAN.md#sv1-local-save-and-resume): there are no work
+controls yet and nothing is saved (both arrive with SV1g). It cannot be combined with `--plugin`,
+`--package`, rooms, `--course`, replays, wake, water, `--start`, `--skin` or `--plugin-bridge`.
+`--time` drives a scripted capture: idle at the berth, and after 10 s of simulated time the landing
+delivery script (load, lash, depart, moor at the landing, unload), so `--time 3` shows the berth
+and `--time 14` the delivered crate. Screenshots draw no HUD.
+
 ## Locations and voyages
 
 ```sh

@@ -191,9 +191,9 @@ void boat_work_session_reset_world(BoatWorkSession *e)
 {
     // The reset must keep the package's scene: its notices and workboat drive this session.
     const BoatSceneDefinition *scene = e->world.scene;
-    boat_world_init(&e->world, &e->resources, boat_water_gentle());
+    boat_world_init(&e->world, e->resources, boat_water_gentle());
     e->world.scene = scene;
-    e->world.water.upstream = e->resources.definition->upstream;
+    e->world.water.upstream = e->resources->definition->upstream;
     e->world.water.player_wake_enabled = true;
     boat_cargo_reset_sites_with(
         &e->sandbox, e->world.scene ? e->world.scene->work_boat : 0, e->sites, e->site_count);
@@ -457,6 +457,125 @@ bool boat_work_session_load(BoatWorkSession *e, const unsigned char *bytes, size
     if (summary)
         *summary = record.summary;
     return true;
+}
+
+// Scripts: deterministic sequences of the real actions, used by review fixtures and the
+// game's scripted captures. They run many ticks inline; a staged pose stands in for a crossing.
+// Lift the crate on the moored site's pad to the deck's AIM target (2 left, 3 right), release
+// and lash it, through the real hook, aim, release and lash paths.
+bool boat_work_script_load_and_lash(BoatWorkSession *e, int aim)
+{
+    if (!boat_cargo_hook_toggle(&e->sandbox))
+        return false;
+    e->aim = aim;
+    for (int i = 0; i < 2000; ++i)
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
+    e->aim = 0;
+    for (int i = 0; i < 900 && !e->sandbox.cargo.deck_contact; ++i)
+        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+    if (!e->sandbox.cargo.deck_contact || !boat_cargo_hook_toggle(&e->sandbox))
+        return false;
+    for (int i = 0; i < 600 && e->sandbox.cargo.settled < .5f; ++i)
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
+    return boat_cargo_lash_toggle(&e->sandbox, &e->boat);
+}
+
+// Pose the unmoored boat at SITE's approach (in place of a crossing) and moor there by the real
+// G path. With APPROACH_ONLY, stop once the berth reads ready.
+bool boat_work_script_moor_at(BoatWorkSession *e, unsigned site, bool approach_only)
+{
+    const BoatCargoCrane *crane = &e->sandbox.cranes[site];
+    e->crane_view = false;
+    Vector3 approach = boat_cargo_site_point(crane, (Vector3) { 1.8f, 0, 4.3f });
+    e->boat.position = (Vector2) { -approach.x, approach.z };
+    e->boat.heading = crane->heading + .5f;
+    e->boat.velocity = (Vector2) { 0 };
+    boat_cargo_step(&e->sandbox, &e->boat, &e->world, boat_tick_seconds(e->tick));
+    BoatCargoMoorStatus status = boat_cargo_moor_status(&e->sandbox, &e->boat);
+    if (status.site != site || status.reason != BOAT_CARGO_MOOR_READY)
+        return false;
+    if (approach_only)
+        return true;
+    boat_work_moor_action(e);
+    for (int i = 0; i < 900 && !e->sandbox.moored; ++i)
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
+    if (!e->sandbox.moored || e->sandbox.active != site)
+        return false;
+    boat_work_view_action(e);
+    return true;
+}
+
+// Carry the lashed crate (lashed on the left target) to RECEIVER, moor and unload it onto that
+// site's pad with its crane, until the native delivery commits there. The job may use the
+// delivered crate up meanwhile, so the commit is watched tick by tick.
+bool boat_work_script_unload_at(
+    BoatWorkSession *e, unsigned receiver, bool approach_only, bool stop_at_pending_delivery)
+{
+    if (!boat_work_script_moor_at(e, receiver, approach_only))
+        return false;
+    if (approach_only)
+        return true;
+    if (!boat_cargo_lash_toggle(&e->sandbox, &e->boat))
+        return false;
+    e->aim = 2;
+    for (int i = 0; i < 2000; ++i)
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
+    e->aim = 0;
+    Vector3 top = { 0, BOAT_CARGO_HALF, 0 };
+    for (int i = 0; i < 900
+        && Vector3Distance(boat_cargo_hook(&e->sandbox), Vector3Add(e->sandbox.cargo.position, top))
+            > .6f;
+        ++i)
+        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+    if (!boat_cargo_hook_toggle(&e->sandbox))
+        return false;
+    e->aim = 1;
+    for (int i = 0; i < 2000; ++i)
+        boat_work_session_tick(e, 0, 0, 0, (BoatInput) { 0 });
+    e->aim = 0;
+    for (int i = 0; i < 900 && e->sandbox.cargo.position.y > 1.41f; ++i)
+        boat_work_session_tick(e, 0, 0, -.5f, (BoatInput) { 0 });
+    if (!boat_cargo_hook_toggle(&e->sandbox))
+        return false;
+    unsigned load = e->sandbox.cargo.load;
+    bool delivered = false;
+    for (int i = 0; i < 240; ++i) {
+        boat_work_session_tick(e, 0, 0, i < 120 ? 1 : 0, (BoatInput) { 0 });
+        delivered |= e->sandbox.cargo.load == load && e->sandbox.cargo.state == BOAT_CARGO_PAD
+            && e->sandbox.cargo.pad == receiver && e->sandbox.cargo.receivers & 1u << receiver;
+        if (stop_at_pending_delivery && delivered && e->event_count)
+            return true;
+    }
+    return delivered;
+}
+
+// The committed value of the job's HUD row LABEL, or -1 when there is none.
+int64_t boat_work_hud_value(const BoatWorkSession *e, const char *label)
+{
+    for (unsigned i = 0; i < e->objective.hud_count; ++i)
+        if (!strcmp(e->objective.hud[i].label, label))
+            return e->objective.hud[i].value;
+    return -1;
+}
+
+// The review fixtures follow the bundled outer job by the package's own site ids: the landing
+// receiver, the quay (a service platform the job builds) and the jetty receiver. SITE_COUNT
+// means the package has no such site.
+unsigned boat_work_find_site(const BoatWorkSession *e, const char *id)
+{
+    for (unsigned i = 0; i < e->site_count; ++i)
+        if (!strcmp(e->sites[i].id, id))
+            return i;
+    return e->site_count;
+}
+
+bool boat_work_script_landing_delivery(BoatWorkSession *e)
+{
+    unsigned landing = boat_work_find_site(e, "landing");
+    if (landing == e->site_count || !boat_work_script_load_and_lash(e, 2)
+        || !boat_cargo_moor_toggle(&e->sandbox, &e->boat))
+        return false;
+    return boat_work_script_unload_at(e, landing, false, false);
 }
 
 BoatWorkWatch boat_work_watch(const BoatWorkSession *e)
