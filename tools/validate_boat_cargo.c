@@ -305,6 +305,84 @@ static void check_delivery_events(BoatWorld *world)
     CHECK(!s.cargo.delivered && s.cranes[2].hidden && !s.event_count);
 }
 
+// The only queued event: KIND at SITE for LOAD.
+static void take_one(BoatCargoSandbox *s, BoatCargoEventKind kind, unsigned site, unsigned load)
+{
+    BoatCargoEvent events[BOAT_CARGO_EVENTS];
+    CHECK(boat_cargo_take_events(s, events, BOAT_CARGO_EVENTS) == 1);
+    CHECK(events[0].kind == kind && events[0].site == site && events[0].load == load);
+}
+
+// Set the released load onto SITE's pad and let it rest there.
+static void set_down(BoatCargoSandbox *s, Boat *b, BoatWorld *world, unsigned site)
+{
+    s->cargo.state = BOAT_CARGO_FLOATING;
+    s->cargo.velocity = (Vector3) { 0 };
+    s->cargo.position = boat_cargo_site_point(&s->cranes[site], (Vector3) { -5, 1.6f, 0 });
+    for (int i = 0; i < 600; ++i)
+        step(s, b, world, i);
+    CHECK(s->cargo.state == BOAT_CARGO_PAD && s->cargo.pad == site);
+}
+
+// S1d: a supply uses up the delivered load and starts the next on a built service pad, its new
+// source. A load delivers once at each receiver, so one set down at the wrong receiver can
+// still reach the right one; events carry the load number.
+static void check_supply(BoatWorld *world)
+{
+    const BoatSceneWorkSite sites[] = {
+        { .id = "source", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM },
+        { .id = "landing", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = 40 },
+        { .id = "quay", .preset = BOAT_SCENE_WORK_SERVICE_PLATFORM, .x = 80, .hidden = true },
+        { .id = "jetty", .preset = BOAT_SCENE_WORK_RECEIVING_PLATFORM, .x = 120, .hidden = true },
+    };
+    BoatCargoSandbox s;
+    CHECK(boat_cargo_reset_sites(&s, sites, 4) && s.cargo.load == 1);
+    Boat b = { 0 };
+    CHECK(boat_cargo_moor_toggle(&s, &b) && !s.moored);
+    // Nothing to use up before a delivery.
+    CHECK(!boat_cargo_supply_ready(&s) && !boat_cargo_supply(&s, 0));
+    set_down(&s, &b, world, 1);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 1, 1);
+    // Only a built service platform takes a supply.
+    CHECK(boat_cargo_supply_ready(&s) && !boat_cargo_supply(&s, 2) && !boat_cargo_supply(&s, 1));
+    CHECK(boat_cargo_site_enable(&s, 2, &b) && boat_cargo_site_enable(&s, 3, &b));
+    CHECK(!boat_cargo_supply(&s, 3) && !boat_cargo_supply(&s, 4));
+    // Never while the load is hooked, loose on deck or lashed.
+    const BoatCargoState busy[] = { BOAT_CARGO_HANGING, BOAT_CARGO_LOOSE, BOAT_CARGO_SECURED };
+    BoatCargo resting = s.cargo;
+    for (unsigned i = 0; i < 3; ++i) {
+        s.cargo.state = busy[i];
+        BoatCargoSandbox before = s;
+        CHECK(!boat_cargo_supply_ready(&s) && !boat_cargo_supply(&s, 2));
+        CHECK(memcmp(&s, &before, sizeof(s)) == 0);
+    }
+    s.cargo = resting;
+    CHECK(boat_cargo_supply(&s, 2) && !s.event_count);
+    CHECK(s.cargo.load == 2 && s.cargo.state == BOAT_CARGO_PAD && s.cargo.pad == 2);
+    CHECK(s.source == 2 && !s.cargo.delivered && !s.cargo.receivers);
+    CHECK(Vector3Distance(
+              s.cargo.position, boat_cargo_site_point(&s.cranes[2], (Vector3) { -5, 1.4f, 0 }))
+        == 0);
+    CHECK(!boat_cargo_supply(&s, 2)); // Load 2 is not delivered yet.
+    // Recovery now returns load 2 to the quay.
+    s.cargo.state = BOAT_CARGO_FLOATING;
+    CHECK(boat_cargo_recover(&s) && s.cargo.pad == 2 && s.cargo.load == 2);
+    take_one(&s, BOAT_CARGO_EVENT_RESET, 2, 2);
+    // Load 2 at the landing commits there once, then still commits at the jetty.
+    set_down(&s, &b, world, 1);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 1, 2);
+    set_down(&s, &b, world, 1);
+    CHECK(!s.event_count);
+    set_down(&s, &b, world, 3);
+    take_one(&s, BOAT_CARGO_EVENT_DELIVERED, 3, 2);
+    set_down(&s, &b, world, 3);
+    set_down(&s, &b, world, 1);
+    CHECK(!s.event_count && s.cargo.receivers == (1u << 1 | 1u << 3));
+    // A new session starts at load 1 on the first source, with both sites hidden again.
+    CHECK(boat_cargo_reset_sites(&s, sites, 4));
+    CHECK(s.cargo.load == 1 && s.source == 0 && s.cranes[2].hidden && s.cranes[3].hidden);
+}
+
 int main(int argc, char **argv)
 {
     BoatWorldResources resources = { 0 };
@@ -313,6 +391,7 @@ int main(int argc, char **argv)
     boat_world_init(&world, &resources, boat_water_gentle());
     check_mooring_and_shadow(&world);
     check_delivery_events(&world);
+    check_supply(&world);
     Boat boat = { 0 };
     BoatCargoSandbox s, repeat;
     boat_cargo_reset(&s);

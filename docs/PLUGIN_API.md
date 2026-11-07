@@ -169,30 +169,37 @@ and return `init` and `update` beside `free`, with the
 [voyage objective](#live-optional-voyage-objective-p32) transaction contract: state, HUD rows,
 the 12-tick update boundary, budgets and suspension are the same. `migrate`, `objective.timers`
 and live reload are not offered; a reset restarts the job at a new generation. The catalog
-generator probes `init` at build time. `plugins/outer-work` is the reference:
+generator probes `init` at build time. S1d (local, 2026-11-07) added `cargo.supply`,
+`work.guide` and the events' `load`. `plugins/outer-work` is the reference:
 
 ```lua
 update = function(c, s)
   for _,e in ipairs(c.events) do
-    if e.kind == "cargo.delivered" and e.id == "landing" then s.delivered = 1 end
+    if e.kind == "cargo.delivered" and e.id == "landing" and e.load == 1 then s.delivered = 1 end
   end
   local commands = {}
   if s.delivered == 1 and not s.built then
     s.built = true
-    commands[1] = {kind="work.enable", generation=c.generation, id="landing_quay"}
+    commands = {
+      {kind="work.enable", generation=c.generation, id="landing_quay"},
+      {kind="work.enable", generation=c.generation, id="jetty"},
+      {kind="cargo.supply", generation=c.generation, id="landing_quay"},
+      {kind="work.guide", generation=c.generation, id="jetty"}
+    }
   end
   -- ... plus hud.set rows
   return s, commands
 end
 ```
 
-Native code decides every event; `id` is a work-site id. There is one crate, so events carry
-no cargo id yet.
+Native code decides every event; `id` is a work-site id. There is still one crate body, used
+for one load after another: every cargo event carries `load`, the crate's load number (1 until
+a `cargo.supply` starts load 2). Other objective events have no `load` field.
 
 | Event | When | `id` |
 | --- | --- | --- |
 | `cargo.secured` | The crate is lashed to the deck | The site moored at |
-| `cargo.delivered` | The released crate has rested 0.5 s on a receiving pad; **once per session** (lifting it off, recovering it or setting it down again never repeats it) | The receiving site |
+| `cargo.delivered` | The released crate has rested 0.5 s on a receiving pad; **once per load at each receiver** (lifting it off, recovering it or setting it down there again never repeats it, but the same load still commits at another receiver) | The receiving site |
 | `cargo.lost` | The crate first touches water after a deck or pad supported it, including when a capsize sheds a lashed load | The last active site |
 | `cargo.reset` | The player returned an unhooked, unlashed crate to its source pad (C) | The source site |
 
@@ -204,6 +211,19 @@ site whose surveyed envelope holds the boat (within 3 m) or the crate keeps the 
 checkpoint and its unacknowledged events, shows `BUILD WAITING: MOVE CLEAR`, and retries at the
 next boundary. Otherwise the site appears between ticks and the batch commits. Nothing is built
 that staging did not survey. A reset (R) hides built sites and restarts cargo and job together.
+
+`cargo.supply` and `work.guide` take the same exact fields under the same grant, each at most
+once per batch; each command kind has its own id namespace, so one batch may build, supply and
+guide to the same site. The sandbox checks the whole batch before applying any of it:
+
+- `cargo.supply {id}` uses up a **delivered** crate and places the next load, undelivered, on
+  the named site's pad; that site becomes its source, so C recovers there. The site must be a
+  `service_platform` that is built or built in the same batch, or the job is suspended. While
+  the crate is hooked, loose on deck or lashed, the batch waits with `SUPPLY WAITING: SET CRATE
+  DOWN` like a blocked build. The supply queues no event.
+- `work.guide {id}` points the helm guidance at a site that is built or built in the same
+  batch (otherwise the job is suspended). Departure guides there instead of to the next site in
+  list order, unless the boat is leaving that site; N still cycles by hand. A reset clears it.
 
 ## Match schema
 

@@ -1,9 +1,10 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-07: **S1c implemented locally and played: delivering the crate to the landing is
-a native, once-per-session event, and the `proteus.outer-work` package's Lua job counts it and
-builds a hidden quay beside the landing (“Landing works great now!”). [S1d](#s1d-the-quay-becomes-the-next-pickup)
-is planned: the built quay becomes the next outing's nearer pickup.** S1b (the turned receiving site,
+Status, 2026-11-07: **S1d implemented locally, awaiting the user's play check: the quay the job
+builds beside the landing is the next outing's nearer pickup.** The landing's delivered crate is
+used up, load 2 waits on the quay's pad, and the helm guidance leads to a new jetty 120 m east
+along the river ([S1d result](#s1d-result-2026-11-07)). S1c (the delivery job, played and
+accepted: “Landing works great now!”), S1b (the turned receiving site,
 whose whole tour the user accepted: “Works great! I did the whole tour. Mechanics work great.”)
 and S1a (the Eriksberg site from the package) sit beneath it; S0a and S0b are merged
 (#159–#162). The standalone `cargo_sandbox` loads its `outer` sites and job from that package's
@@ -37,9 +38,10 @@ physics and validation native. Completed S1a, 2026-11-07, on local branch
 [S1b result](#s1b-result-2026-11-07). Completed S1c, 2026-11-07, on local branch
 `feat/sandbox-s1c-delivery-job` (stacked on S1b; not pushed): see the
 [S1c result](#s1c-result-2026-11-07); the user played the landing and reported it works.
-Completed planning task, 2026-11-07: S1d's outcome is decided (a nearer pickup, not a mooring).
-Next: **implement [S1d](#s1d-the-quay-becomes-the-next-pickup)** on a branch stacked on S1c,
-native step first. Future PRs still require the user's approval.
+Completed S1d, 2026-11-07, on local branch `feat/sandbox-s1d-quay-pickup` (stacked on S1c; not
+pushed): see the [S1d result](#s1d-result-2026-11-07). Next: **the user's S1d play check**, both
+outings by hand without developer help, then S1's review of fun and broader S0 qualification.
+Future PRs still require the user's approval.
 
 ## S0a: try the cargo toy
 
@@ -56,9 +58,10 @@ rasterizer. `--location basin` selects the original isolated fixture. On `outer`
 from the bundled `proteus.outer-work` package (`--package ID` selects another bundled free
 package with work sites). It starts with a
 borrowed deck boat moored beside one crate and a small service crane in the Eriksberg inlet.
-There is no save, money or timer. Since S1c the package's one job, shown at the top right, is to
-carry the crate to the `landing`; delivering it builds a quay beside the landing. **C** returns an
-unhooked, unlashed crate to its source pad. **R resets boat, crate and job immediately**;
+There is no save, money or timer. Since S1c the package's job, shown at the top right, is to
+carry the crate to the `landing`; delivering it builds a quay beside the landing, and since S1d
+the quay's pad holds the next crate, for a new `jetty` up the river. **C** returns an unhooked,
+unlashed crate to its source pad (the quay's, after the supply). **R resets boat, crate and job immediately**;
 **P pauses the simulation**, including a suspended load. Escape closes the experiment.
 
 ![S0b Eriksberg service crane and moored deck boat](evidence/sandbox/2026-11-06/harbour-crane.png)
@@ -575,7 +578,7 @@ the remaining gates below are still open.
 | Slice | Depends on | Playable result and completion gate | Status |
 | --- | --- | --- | --- |
 | S0: handling experiment | Current main | One service crane, pallet, static pad and moving deck. Swing/drop/recover a crate; load two different deck positions and try a short turn. Observe voluntary experiments without rewards, stability and controls. Measure bounded tick cost. | S0a basic toy accepted; S0b first harbour site implemented; receiving site and S0c qualification remain |
-| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a–S1c implemented locally; S1b crossing and S1c landing played and accepted; S1d planned |
+| S1: useful crossing | S0 | Flat-deck loaner, assisted mooring, two working sites, one short delivery and a landing that helps the next outing, with site content and jobs in a plugin package. Optional variation: two light crates versus one awkward load. Empty/loaded boats feel distinct. Retry/capsize/reset leave a valid job. A player completes it without developer help and tries another idea. Delivered as [S1a–S1d](#s1-steps). | S1a–S1d implemented locally; S1b crossing and S1c landing played and accepted; S1d play check owed |
 | T0: towing toy | S1 | Borrowed tow fitting, one disabled craft and shelter handoff, without currency or a rescue countdown. Try turns, release, reset and recovery. Establish a second enjoyable activity before pricing work. | Proposed; before S3 |
 | S2: Creative harbour | S1 | First expose boat selection, cargo spawning/removal and reset as a small toybox. Then add validated dock pieces, undo and layout export in separate steps. Reject obstructed channels/entrances atomically. Player builds a useful or amusing arrangement without a job prompt. | Proposed |
 | S3: saved Working Harbour | S1 + T0; reconcile S2 edits | Versioned native/browser save path, a few varied local jobs, currency and buy/rent/sell boats, delivered in separate steps. Persistent project changes; preview a purchase through borrowing. Save/reload cannot duplicate goods or payouts; player has a choice beyond repeating one delivery. | Proposed |
@@ -599,7 +602,7 @@ Each step is its own worktree and PR (with the user's approval), stacked on its 
 | S1a: existing site as package data | Today's Eriksberg site comes from a bundled package; behaviour unchanged | Existing cargo CTests, survey and shadow reviews pass; inspected CPU/GPU captures match the S0b site | Implemented locally 2026-11-07; [result](#s1a-result-2026-11-07) |
 | S1b: second receiving site | A receiver at a surveyed candidate, placed by editing the package | A native receiver preset and site heading first (S1a has one layout facing heading 0); then no further C change beyond bug fixes; staging survey passes; camera review of the receiver and approach; a hand-driven crossing between both sites | Implemented locally and accepted 2026-11-07; [result](#s1b-result-2026-11-07) |
 | S1c: delivery events and a job | Native delivery commit and cargo events; a Lua objective counts the delivery and completes the landing | Exactly-once delivery across retry/reset/capsize; the landing appears through a validated scene command; HUD shows job state | Implemented locally and played 2026-11-07; [result](#s1c-result-2026-11-07) |
-| S1d: useful landing playtest | The built quay is the next outing's nearer pickup: its load goes on a short second crossing ([plan](#s1d-the-quay-becomes-the-next-pickup)) | The user completes both outings without developer help and tries another idea | Planned 2026-11-07 |
+| S1d: useful landing playtest | The built quay is the next outing's nearer pickup: its load goes on a short second crossing ([plan](#s1d-the-quay-becomes-the-next-pickup)) | The user completes both outings without developer help and tries another idea | Implemented locally 2026-11-07; [result](#s1d-result-2026-11-07); user play check owed |
 
 #### S1a: the existing site as package data
 
@@ -866,6 +869,60 @@ how long each leg takes, to compare with the 5–8 minute target.
 Not in S1d: two crates at once, cargo/cargo contact, the two-light-crates variation, a
 mooring or recovery point, saves, payouts, browser or room support. A third outing needs
 either more than four sites or a repeatable job; that is a decision for S3.
+
+#### S1d result, 2026-11-07
+
+Native mechanics:
+
+- **Supply** (`boat_cargo_supply`, core). Uses up a delivered crate resting on a pad or floating
+  and places load N+1 on a visible service platform's pad, which becomes its source. Refused,
+  changing nothing, while the crate is hooked, loose on deck or lashed, or for a hidden or
+  receiving site. Still one crate body; the S0 one-load rule holds.
+- **Load numbers.** `BoatCargo.load` starts at 1 and every cargo event carries it; the plugin
+  event gains `load`, passed to Lua only when non-zero.
+- **Job host.** `cargo_sandbox` accepts `cargo.supply` and `work.guide` (each once per batch, in
+  their own id namespaces) and checks the whole batch first: unknown ids, a guide to an unbuilt
+  site or a supply to anything but a built service platform suspend the job; a supply whose
+  crate is busy waits with `SUPPLY WAITING: SET CRATE DOWN`, as a blocked build does. The
+  committed guide sets departure guidance; R clears it.
+
+Content: `jetty`, a hidden `receiving_platform` at (−245, 10), heading −1.57, 120 m east of
+the quay. A temporary scan of `boat_cargo_site_clear`, the site-overlap check and the camera
+check from the quay found clear water from south through east to north-east at 70–170 m;
+east keeps the second leg along the river rather than across it, so its bow points east. The
+job sends one batch on load 1's landing delivery (both builds, the supply and the guide) and
+shows `LANDING BUILT: 1` and `SUPPLIES TO JETTY / 1: 0`, then `JETTY SUPPLIED: 1`.
+
+Decided during implementation:
+
+- **One batch, not two steps.** The plan had the supply wait until both sites were built; the
+  host already checks a batch before committing it, so the job builds, supplies and guides
+  together and the quay never appears empty.
+- **Once per load at each receiver**, not once per load. With per-load delivery, load 2 set
+  down at the landing by mistake would have spent its one delivery there and could never count
+  at the jetty. A per-site bit (`receivers`) keeps exactly-once at each receiver; the job
+  ignores the landing's delivery of load 2 by its `load`.
+- **The quay's pad is not required to be empty.** With one crate body, a supply always moves
+  that body, so nothing else can be on the pad.
+- **The S1c job captures moved to the slow lane.** `landing-built`, `redelivered`, `job-reset`
+  and `build-blocked` take about 0.5–0.8 s each, so their quick label did not fit the
+  100 ms quick lane; the three new captures join them.
+
+Review commands:
+
+```sh
+./build/cargo_sandbox --survey
+./build/cargo_sandbox --scenario quay-pickup --screenshot build/quay-pickup.png
+./build/cargo_sandbox --scenario jetty-approach --screenshot build/jetty-approach.png
+./build/cargo_sandbox --scenario jetty-delivered --screenshot build/jetty-delivered.png
+./build/cargo_sandbox   # landing, then pick up at the quay and carry it to the jetty
+```
+
+Known limits: the user has not played S1d; the leg timings are unmeasured; the jetty is in open
+water like the landing (its depth and seabed are not evidenced); four sites is the schema
+maximum, so no further outing can be added without a schema change or a repeatable job;
+`SUPPLY WAITING` was exercised only by the validator, not captured; Windows, Linux and the
+browser build were not run.
 
 ## Astra review, 2026-11-06
 
@@ -1187,3 +1244,32 @@ since `402de03`, whose full CTest run is recorded under the S1c result, so no bu
 rerun. All 351 local links/anchors across the three changed guides resolve; `git diff --check`
 passes. S1d's `jetty` position, the `cargo.supply`/`work.guide` field names and the leg timings
 are unimplemented proposals, settled during implementation.
+
+### S1d quay-pickup verification, 2026-11-07
+
+Apple M1 Max/macOS arm64, Debug, pinned local raylib/Lua/ENet sources, `PROTEUS_GPU_TESTS=OFF`:
+the build is warning-clean apart from the existing upstream `stb_vorbis.c` warning, and
+`ctest --preset full` passed all **395 enabled tests** in 47.17 s (13 retired tests disabled;
+local sockets enabled). New checks: `boat_cargo` (supply refused before a delivery, for hidden,
+receiving or unknown sites and while the crate is hooked, loose on deck or lashed, changing
+nothing; a supply starts load 2 on the quay's pad as its source with no event; recovery returns
+it there; load 2 commits once at the landing and still once at the jetty; reset restores load 1
+and hides both sites); `boat_plugin_state.supply_commands` (the grant, one batch enabling,
+supplying and guiding the same id, `load` reaching Lua and absent from other events, five
+rejected forms); `boat_plugin.work_sites` (the four-site package); and the `quay-pickup`,
+`jetty-approach` and `jetty-delivered` captures. `--survey` reports all four sites clear,
+`jetty` "hidden until built".
+
+Behaviour parity: CPU captures of `origin`, `swing`, `loaded-left`, `loaded-right`,
+`shadow-high`, `shadow-bow`, `shadow-water`, `berth-approach`, `remoor`, `crossing` and
+`receiver-approach` on `outer`, and basin `origin`/`loaded-left`, are **byte-identical** to the
+S1c build: nothing changes before the landing's delivery. CPU `landing-built`, `quay-pickup`,
+`jetty-approach` and `jetty-delivered` and GPU `delivered`, `jetty-approach` and
+`jetty-delivered` were inspected: the landing's pad is empty after the build, load 2 stands on
+the quay's teal pad, the lashed crate approaches the jetty with BERTH READY, and it ends on the
+jetty's receiving pad; the GPU HUD shows `LANDING BUILT: 1` above `SUPPLIES TO JETTY / 1: 0`,
+then `JETTY SUPPLIED: 1`. Windowed GPU runs of `--scenario jetty-approach --frames 120` and
+`--demo --frames 240` exited 0; they are scripted smoke runs, not a hands-on check. All 496
+local links/anchors across the eight changed guides resolve; `git diff --check` passes. The
+user's play check of both outings is owed.
+

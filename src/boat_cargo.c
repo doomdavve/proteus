@@ -19,7 +19,7 @@ void boat_cargo_reset_at(BoatCargoSandbox *s, Vector2 mooring)
 
 bool boat_cargo_reset_sites(BoatCargoSandbox *s, const BoatSceneWorkSite *sites, unsigned count)
 {
-    *s = (BoatCargoSandbox) { .cargo = { .state = BOAT_CARGO_PAD }, .moored = true };
+    *s = (BoatCargoSandbox) { .cargo = { .state = BOAT_CARGO_PAD, .load = 1 }, .moored = true };
     if (!count || count > BOAT_SCENE_WORK_SITES)
         return false;
     s->crane_count = count;
@@ -49,7 +49,7 @@ bool boat_cargo_reset_sites(BoatCargoSandbox *s, const BoatSceneWorkSite *sites,
 static void event(BoatCargoSandbox *s, BoatCargoEventKind kind, unsigned site)
 {
     if (s->event_count < BOAT_CARGO_EVENTS)
-        s->events[s->event_count++] = (BoatCargoEvent) { kind, site };
+        s->events[s->event_count++] = (BoatCargoEvent) { kind, site, s->cargo.load };
 }
 
 unsigned boat_cargo_take_events(BoatCargoSandbox *s, BoatCargoEvent *events, unsigned capacity)
@@ -69,8 +69,30 @@ bool boat_cargo_recover(BoatCargoSandbox *s)
     *c = (BoatCargo) { .state = BOAT_CARGO_PAD,
         .position = boat_cargo_site_point(&s->cranes[s->source], (Vector3) { -5, 1.4f, 0 }),
         .pad = (unsigned char)s->source,
-        .delivered = c->delivered };
+        .delivered = c->delivered,
+        .receivers = c->receivers,
+        .load = c->load };
     event(s, BOAT_CARGO_EVENT_RESET, s->source);
+    return true;
+}
+
+bool boat_cargo_supply_ready(const BoatCargoSandbox *s)
+{
+    const BoatCargo *c = &s->cargo;
+    return c->delivered && (c->state == BOAT_CARGO_PAD || c->state == BOAT_CARGO_FLOATING);
+}
+
+bool boat_cargo_supply(BoatCargoSandbox *s, unsigned site)
+{
+    if (site >= s->crane_count || s->cranes[site].hidden
+        || s->cranes[site].preset != BOAT_SCENE_WORK_SERVICE_PLATFORM
+        || !boat_cargo_supply_ready(s))
+        return false;
+    s->source = site;
+    s->cargo = (BoatCargo) { .state = BOAT_CARGO_PAD,
+        .position = boat_cargo_site_point(&s->cranes[site], (Vector3) { -5, 1.4f, 0 }),
+        .pad = (unsigned char)site,
+        .load = s->cargo.load + 1 };
     return true;
 }
 
@@ -511,8 +533,8 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
     }
     // A single bounded body; falling/suspended simulation never depends on the camera.
     c->velocity = Vector3ClampValue(c->velocity, 0, 12);
-    // S1c events. A delivery commits once per session after the released load has rested on a
-    // receiving pad; a loss is the first water contact after a deck or pad support.
+    // S1c events. A delivery commits once per load and receiver after the released load has
+    // rested on a receiving pad; a loss is the first water contact after a deck or pad support.
     if (pad || c->deck_contact)
         c->wet = false;
     else if (water && c->state == BOAT_CARGO_FLOATING && !c->wet) {
@@ -522,8 +544,9 @@ void boat_cargo_step(BoatCargoSandbox *s, const Boat *boat, const BoatWorld *wor
     bool receiving = c->state == BOAT_CARGO_PAD
         && s->cranes[c->pad].preset == BOAT_SCENE_WORK_RECEIVING_PLATFORM;
     c->rest = receiving && Vector3Length(c->velocity) < .18f ? c->rest + BOAT_STEP : 0;
-    if (!c->delivered && c->rest >= .5f) {
+    if (!(c->receivers & 1u << c->pad) && c->rest >= .5f) {
         c->delivered = true;
+        c->receivers |= (unsigned char)(1u << c->pad);
         event(s, BOAT_CARGO_EVENT_DELIVERED, c->pad);
     }
     if (c->state == BOAT_CARGO_FLOATING && world->definition->mapped

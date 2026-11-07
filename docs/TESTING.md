@@ -20,14 +20,18 @@ alone can block a site and that a turned receiving site moors, aligns and suppor
 its own frame. `cargo_sandbox_crossing_screenshot` stages the helm part-way to the guided
 next site; `cargo_sandbox_receiver-approach_screenshot` carries a lashed crate to the
 package's receiving site, and `cargo_sandbox_delivered_screenshot` then moors and unloads it
-onto the receiving pad with that site's crane, and requires the package's job to count it once
-and build its hidden quay (`landing-built` captures the result from the helm). `redelivered`
-recovers the crate and sets it on the landing again without a second count, `job-reset` checks
-that R restarts cargo, job and the hidden quay together, and `build-blocked` holds the build
-(keeping the job's checkpoint and event) while the boat sits in the quay's envelope.
-`boat_cargo` checks the native exactly-once delivery, loss, recovery and hidden-site rules,
-`boat_plugin.free_objective` the free job grant and `boat_plugin_state.work_commands` the
-`work.enable` command. The `shadow-high`/`shadow-low`
+onto the receiving pad with that site's crane, and requires the package's job to count it once,
+build its hidden quay and jetty and supply load 2 on the quay's pad (`landing-built` captures
+the result from the helm). `redelivered` sets load 2 on the landing, a native delivery the job
+does not count, `job-reset` checks that R restarts cargo, job and the hidden sites together,
+and `build-blocked` holds the build (keeping the job's checkpoint and event) while the boat sits
+in the quay's envelope. S1d's second outing: `quay-pickup` moors at the quay beside load 2,
+`jetty-approach` lifts, lashes and departs by G toward the job's guided jetty, and
+`jetty-delivered` unloads there and requires `JETTY SUPPLIED: 1`. These job captures are in
+the slow lane. `boat_cargo` checks the native delivery (once per load and receiver), loss,
+recovery, hidden-site and supply rules, `boat_plugin.free_objective` the free job grant, and
+`boat_plugin_state.work_commands`/`supply_commands` the `work.enable`, `cargo.supply` and
+`work.guide` commands and the events' `load`. The `shadow-high`/`shadow-low`
 capture cases stop actual lifts above the deck; `remoor` seeds a returning boat pose,
 requests capture and advances the real application until moored, checking the terminal state.
 CPU/GPU toy captures, windowed motion and
