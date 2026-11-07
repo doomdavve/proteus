@@ -234,9 +234,14 @@ add_library(proteus_gpu STATIC src/boat_gpu.c src/renderer_gpu.c src/waterfront_
 target_link_libraries(proteus_gpu PUBLIC proteus_render)
 target_compile_options(proteus_gpu PRIVATE ${PROTEUS_WARNINGS})
 
+# SV1d: user-data file helpers (atomic save with backup, bounded listing). No raylib.
+add_library(proteus_file STATIC src/boat_file.c src/boat_file.h)
+target_include_directories(proteus_file PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(proteus_file PRIVATE ${PROTEUS_WARNINGS})
+
 # Single-player session orchestration and replay persistence.
 add_library(proteus_boat_session STATIC src/boat_replay.c src/boat_session.c)
-target_link_libraries(proteus_boat_session PUBLIC proteus_render)
+target_link_libraries(proteus_boat_session PUBLIC proteus_render proteus_file)
 target_compile_options(proteus_boat_session PRIVATE ${PROTEUS_WARNINGS})
 
 # Shared wake_velocity drive, state hashing and profile records for the study, benchmark and
@@ -530,10 +535,16 @@ target_link_libraries(validate_boat_sandbox_save PRIVATE proteus_sandbox_save)
 target_compile_options(validate_boat_sandbox_save PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_sandbox_save COMMAND validate_boat_sandbox_save)
 set_tests_properties(boat_sandbox_save PROPERTIES LABELS "cpu;quick")
+add_executable(validate_boat_file tools/validate_boat_file.c)
+target_link_libraries(validate_boat_file PRIVATE proteus_file)
+target_compile_options(validate_boat_file PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_file COMMAND validate_boat_file ${CMAKE_CURRENT_BINARY_DIR}/file-tests)
+set_tests_properties(boat_file PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
-  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_sandbox_save)
+  target_link_libraries(cargo_sandbox PRIVATE proteus_gpu proteus_plugin_catalog proteus_sandbox_save
+    proteus_file)
   add_dependencies(cargo_sandbox proteus_assets)
   target_compile_options(cargo_sandbox PRIVATE ${PROTEUS_WARNINGS})
   foreach(side left right)
@@ -556,6 +567,42 @@ if(NOT EMSCRIPTEN)
       --scenario ${scenario}
       --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-${scenario}-test.png)
   endforeach()
+  # SV1d: a staged session is saved to a build-tree file, resumed by a later run and captured
+  # (the same landing-built frame as its screenshot test), and a save written by a package with
+  # a different work digest is set aside and the run starts fresh. Nothing touches the user's data
+  # directory because every run names its file.
+  set(SANDBOX_SAVE_DIR ${CMAKE_CURRENT_BINARY_DIR}/sandbox-save-tests)
+  file(MAKE_DIRECTORY ${SANDBOX_SAVE_DIR})
+  add_test(NAME cargo_sandbox_save_write COMMAND cargo_sandbox --scenario landing-built
+    --save ${SANDBOX_SAVE_DIR}/resume.sav --save-now)
+  add_test(NAME cargo_sandbox_save_resume COMMAND cargo_sandbox --renderer cpu
+    --save ${SANDBOX_SAVE_DIR}/resume.sav
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-save-resume-test.png)
+  add_test(NAME cargo_sandbox_save_stale COMMAND cargo_sandbox --scenario landing-built
+    --save ${SANDBOX_SAVE_DIR}/stale.sav --save-now --stale-digest)
+  add_test(NAME cargo_sandbox_save_rejected COMMAND cargo_sandbox --renderer cpu
+    --save ${SANDBOX_SAVE_DIR}/stale.sav
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-save-rejected-test.png)
+  set_tests_properties(cargo_sandbox_save_write PROPERTIES FIXTURES_SETUP sandbox_save_resume)
+  set_tests_properties(cargo_sandbox_save_resume PROPERTIES FIXTURES_REQUIRED sandbox_save_resume
+    PASS_REGULAR_EXPRESSION "Resumed save .*resume.sav at tick")
+  set_tests_properties(cargo_sandbox_save_stale PROPERTIES FIXTURES_SETUP sandbox_save_rejected)
+  set_tests_properties(cargo_sandbox_save_rejected PROPERTIES
+    FIXTURES_REQUIRED sandbox_save_rejected
+    PASS_REGULAR_EXPRESSION "stale.sav.rejected: PACKAGE CHANGED")
+  # The window loop's automatic saving on a virtual clock (2 ticks per frame): a periodic
+  # write, a milestone, pausing and quitting, then a later run resumes the last write.
+  add_test(NAME cargo_sandbox_autosave COMMAND cargo_sandbox --autosave-check --scenario departure
+    --save ${SANDBOX_SAVE_DIR}/autosave.sav)
+  add_test(NAME cargo_sandbox_autosave_resume COMMAND cargo_sandbox --renderer cpu
+    --save ${SANDBOX_SAVE_DIR}/autosave.sav
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/cargo-autosave-resume-test.png)
+  set_tests_properties(cargo_sandbox_autosave PROPERTIES FIXTURES_SETUP sandbox_autosave)
+  set_tests_properties(cargo_sandbox_autosave_resume PROPERTIES FIXTURES_REQUIRED sandbox_autosave
+    PASS_REGULAR_EXPRESSION "Resumed save .*autosave.sav at tick [0-9]+")
+  list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_autosave cargo_sandbox_autosave_resume)
+  list(APPEND PROTEUS_RESUME_TESTS cargo_sandbox_save_write cargo_sandbox_save_resume
+    cargo_sandbox_save_stale cargo_sandbox_save_rejected)
   # SV1c: save the staged session, resume it from the record and from its encoded bytes, and
   # require equal behaviour over 1200 scripted ticks. No window and no files.
   foreach(scenario swing departure crossing delivered landing-built build-blocked quay-pickup

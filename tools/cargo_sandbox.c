@@ -3,6 +3,7 @@
 #include "boat_assets.h"
 #include "boat_cargo.h"
 #include "boat_cargo_view.h"
+#include "boat_file.h"
 #include "boat_model.h"
 #include "boat_plugin_catalog.h"
 #include "boat_plugin_state.h"
@@ -20,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 enum { WIDTH = 480, HEIGHT = 300, MAX_VERTICES = BOAT_MODEL_MAX_TRIANGLES * 3 };
 static const Color yellow = { 241, 183, 57, 255 }, teal = { 45, 116, 127, 255 };
@@ -1552,12 +1554,211 @@ static bool resume_check(Experiment *e, const char *scenario)
     return true;
 }
 
+// SV1d: the session file and its automatic saving. Nothing here is a player action: the
+// harness saves at milestones, every 30 s of play, and when pausing, losing focus or quitting.
+typedef struct {
+    char path[1100];
+    bool enabled;
+    bool autosaving; // The live window loop writes; staged runs only write on --save-now.
+    bool failed;
+    int mark; // Presentation frames left to show SAVED.
+    unsigned writes; // Successful automatic writes, for the autosave check.
+    BoatAutosave autosave;
+} SaveFile;
+
+static bool stale_digest; // Test fixture: write a save whose work digest no longer matches.
+
+static bool save_write(Experiment *e, SaveFile *file)
+{
+    static BoatSandboxSave record;
+    static unsigned char bytes[BOAT_SANDBOX_SAVE_MAX];
+    size_t size = 0;
+    if (!experiment_save(e, (int64_t)time(NULL), &record))
+        return false;
+    if (stale_digest)
+        record.summary.identity.work_digest ^= 1;
+    return boat_sandbox_save_encode(&record, bytes, sizeof(bytes), &size)
+        && boat_file_write_atomic(file->path, bytes, size);
+}
+
+// Try one file: true when it decoded, belongs to this package and the core resumed it.
+// REASON gets the first problem otherwise.
+static bool save_try(Experiment *e, const char *path, const char **reason)
+{
+    static BoatSandboxSave record;
+    static unsigned char bytes[BOAT_SANDBOX_SAVE_MAX];
+    size_t size = 0;
+    if (!boat_file_read(path, bytes, sizeof(bytes), &size)) {
+        *reason = "DAMAGED";
+        return false;
+    }
+    BoatSandboxSaveStatus status = boat_sandbox_save_decode(bytes, size, &record);
+    if (status != BOAT_SANDBOX_SAVE_OK) {
+        *reason = status == BOAT_SANDBOX_SAVE_NEWER ? "NEWER FORMAT" : "DAMAGED";
+        return false;
+    }
+    BoatSandboxIdentity now;
+    static char text[48];
+    experiment_identity(e, &now);
+    if (boat_sandbox_save_check(&record.summary.identity, &now, false, text, sizeof(text))
+        != BOAT_SANDBOX_RESUME) {
+        *reason = text;
+        return false;
+    }
+    if (!experiment_resume(e, &record)) {
+        *reason = "PACKAGE CHANGED";
+        return false;
+    }
+    printf("Resumed save %s at tick %llu (load %u, %u of %u sites built)\n", path,
+        (unsigned long long)record.summary.tick, record.summary.load, record.summary.built,
+        record.summary.sites);
+    return true;
+}
+
+// Resume from the file, else from its backup. A file that cannot be used is set aside as
+// NAME.rejected (never deleted), with its backup, and the session starts fresh.
+static void save_load(Experiment *e, const SaveFile *file)
+{
+    char backup[1100];
+    snprintf(backup, sizeof(backup), "%s.bak", file->path);
+    const char *reason = "DAMAGED";
+    bool had_file = boat_file_exists(file->path), had_backup = boat_file_exists(backup);
+    if (had_file && save_try(e, file->path, &reason))
+        return;
+    if (had_backup && save_try(e, backup, &reason)) {
+        printf("Save %s was not usable (%s); resumed its backup\n", file->path, reason);
+        return;
+    }
+    if (had_file && boat_file_set_aside(file->path, ".rejected"))
+        printf("Save %s set aside as %s.rejected: %s\n", file->path, file->path, reason);
+    if (had_backup && boat_file_set_aside(backup, ".rejected"))
+        printf("Backup %s set aside as %s.rejected\n", backup, backup);
+}
+
+// What a frame changes, for the autosave policy.
+typedef struct {
+    Vector2 position;
+    float heading;
+    uint64_t progress; // The committed job state, HUD and timers, not its tick.
+    unsigned built, load, active;
+    bool moored, delivered, secured, on_pad;
+    unsigned char receivers;
+} Watch;
+
+static Watch watch(const Experiment *e)
+{
+    Watch w = { .position = e->boat.position,
+        .heading = e->boat.heading,
+        .progress = UINT64_C(14695981039346656037),
+        .load = e->sandbox.cargo.load,
+        .active = e->sandbox.active,
+        .moored = e->sandbox.moored,
+        .delivered = e->sandbox.cargo.delivered,
+        .receivers = e->sandbox.cargo.receivers,
+        .secured = e->sandbox.cargo.state == BOAT_CARGO_SECURED,
+        .on_pad = e->sandbox.cargo.state == BOAT_CARGO_PAD };
+    for (unsigned i = 0; i < e->sandbox.crane_count; ++i)
+        w.built |= (unsigned)!e->sandbox.cranes[i].hidden << i;
+    const BoatPluginObjective *o = &e->objective;
+    hash_bytes(&w.progress, o->state.bytes, o->state.size);
+    for (unsigned i = 0; i < o->hud_count; ++i) {
+        hash_bytes(&w.progress, o->hud[i].label, strlen(o->hud[i].label) + 1);
+        hash_bytes(&w.progress, &o->hud[i].value, sizeof(o->hud[i].value));
+    }
+    hash_bytes(&w.progress, &o->quarantined, sizeof(o->quarantined));
+    return w;
+}
+
+// Dirty: the boat or the job moved on. Milestone: something the player would hate to repeat.
+static void watch_note(SaveFile *file, uint64_t tick, const Watch *before, const Watch *now)
+{
+    bool pose = before->position.x != now->position.x || before->position.y != now->position.y
+        || before->heading != now->heading;
+    bool milestone = before->progress != now->progress || before->built != now->built
+        || before->load != now->load || before->active != now->active
+        || before->moored != now->moored || before->delivered != now->delivered
+        || before->receivers != now->receivers || before->secured != now->secured
+        || before->on_pad != now->on_pad;
+    boat_autosave_note(&file->autosave, tick, pose || milestone, milestone);
+}
+
+typedef struct {
+    Watch last;
+    bool was_paused, was_focused;
+} FrameWatch;
+
+// Once per frame, after its tick loop and outside every tick. LEAVING (pausing, losing focus)
+// writes when dirty; a milestone writes now; otherwise the period decides. The SAVED mark shows
+// only for milestone and leaving writes.
+static void autosave_frame(
+    Experiment *e, SaveFile *file, FrameWatch *frame, bool paused, bool focused)
+{
+    Watch now = watch(e);
+    watch_note(file, e->tick, &frame->last, &now);
+    frame->last = now;
+    bool leaving = (paused && !frame->was_paused) || (frame->was_focused && !focused);
+    frame->was_paused = paused;
+    frame->was_focused = focused;
+    if (!boat_autosave_due(&file->autosave, e->tick, leaving))
+        return;
+    bool show = file->autosave.milestone || leaving;
+    bool ok = save_write(e, file);
+    boat_autosave_written(&file->autosave, e->tick, ok);
+    file->failed = !ok;
+    file->writes += ok;
+    if (ok && show)
+        file->mark = 90; // 1.5 s of presentation at 60 frames.
+    if (!ok)
+        fprintf(stderr, "Could not write save %s\n", file->path);
+}
+
+// The window loop's automatic saving driven on a virtual clock: 2 ticks per frame, no window
+// and no wall time. The staged session drifts, lashes at one frame, pauses at another and
+// quits; the writes must be one periodic, one milestone, one on pausing and one on quitting.
+static bool autosave_check(Experiment *e, SaveFile *file)
+{
+    enum { FRAMES = 2100, LASH = 1900, PAUSE = 2000 };
+    FrameWatch frame = { .last = watch(e), .was_focused = true };
+    file->autosaving = true;
+    unsigned count_at[FRAMES] = { 0 };
+    bool paused = false;
+    for (unsigned f = 0; f < FRAMES; ++f) {
+        paused = f == PAUSE || f == PAUSE + 1;
+        if (!paused) {
+            if (f == LASH)
+                lash_action(e);
+            // A gentle circle at a steady throttle keeps the boat's pose changing.
+            BoatInput input = { .throttle_rate = f < 8 ? .4f : 0, .steering_rate = .3f };
+            tick(e, 0, 0, 0, input);
+            tick(e, 0, 0, 0, input);
+        }
+        autosave_frame(e, file, &frame, paused, true);
+        count_at[f] = file->writes;
+    }
+    RESUME_CHECK(count_at[LASH - 1] == 1); // The period (3600 ticks of drift).
+    RESUME_CHECK(count_at[LASH] == 2 && file->mark > 0); // The lash milestone.
+    RESUME_CHECK(count_at[PAUSE - 1] == 2 && count_at[PAUSE] == 3); // Pausing.
+    RESUME_CHECK(count_at[PAUSE + 1] == 3 && count_at[FRAMES - 1] == 3);
+    RESUME_CHECK(boat_autosave_due(&file->autosave, e->tick, true)); // Dirty again: quitting.
+    RESUME_CHECK(save_write(e, file));
+    boat_autosave_written(&file->autosave, e->tick, true);
+    RESUME_CHECK(!boat_autosave_due(&file->autosave, e->tick, true));
+    char backup[1100];
+    snprintf(backup, sizeof(backup), "%s.bak", file->path);
+    RESUME_CHECK(boat_file_exists(file->path) && boat_file_exists(backup));
+    printf("autosave check: writes at the period, the lash, the pause and quit; saved tick %llu\n",
+        (unsigned long long)e->tick);
+    return true;
+}
+
 int main(int argc, char **argv)
 {
-    bool gpu = true, demo = false, survey = false, resume = false;
+    bool gpu = true, demo = false, survey = false, resume = false, fresh = false, save_now = false,
+         autosave = false;
     const BoatWorldDefinition *location = boat_location(BOAT_LOCATION_OUTER);
     int frames = 0;
-    const char *screenshot = NULL, *scenario = "origin", *package = NULL;
+    const char *screenshot = NULL, *scenario = "origin", *package = NULL, *save_arg = NULL,
+               *data_dir = NULL;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--location") && i + 1 < argc) {
             location = boat_location_find(argv[++i]);
@@ -1569,6 +1770,18 @@ int main(int argc, char **argv)
             survey = true;
         else if (!strcmp(argv[i], "--resume-check"))
             resume = true;
+        else if (!strcmp(argv[i], "--save") && i + 1 < argc)
+            save_arg = argv[++i];
+        else if (!strcmp(argv[i], "--data-dir") && i + 1 < argc)
+            data_dir = argv[++i];
+        else if (!strcmp(argv[i], "--new"))
+            fresh = true;
+        else if (!strcmp(argv[i], "--save-now"))
+            save_now = true;
+        else if (!strcmp(argv[i], "--autosave-check"))
+            autosave = true;
+        else if (!strcmp(argv[i], "--stale-digest"))
+            stale_digest = true;
         else if (!strcmp(argv[i], "--shadow-review"))
             shadow_review = true;
         else if (!strcmp(argv[i], "--renderer") && i + 1 < argc) {
@@ -1603,6 +1816,22 @@ int main(int argc, char **argv)
                 "redelivered|job-reset|build-blocked|quay-pickup|jetty-approach|jetty-delivered|\n"
                 "delivery-pending|capsized]\n"
                 "  [--resume-check] (with --scenario: save, resume twice, compare 1200 ticks)\n"
+                "  Saving is automatic (milestones, every 30 s of play, pause, focus loss, quit) "
+                "and "
+                "resumes\n"
+                "  at startup; only interactive play uses the game's data directory.\n"
+                "  [--save FILE | --data-dir DIR] pick the save file (cargo-<package>.sav in "
+                "DIR);\n"
+                "  --scenario, --screenshot, --survey, --demo and --frames use a save only with "
+                "one "
+                "of these.\n"
+                "  [--new] start fresh, replacing the save at the first write (kept as FILE.bak)\n"
+                "  [--save-now] (test fixture, with --scenario and a save file) write once and "
+                "exit;\n"
+                "  [--stale-digest] makes that file look written by a changed package\n"
+                "  [--autosave-check] (test fixture, with --scenario and a save file) drives the "
+                "window\n"
+                "  loop's automatic saving on a virtual clock and checks when it writes\n"
                 "F hook, Q/E hoist, A/D slew, W/S reach, 1/2/3 aim assist, L lash,\n"
                 "G moor/cancel, TAB crane/helm, arrows drive, hold SPACE to brake, N next site,\n"
                 "C return an unhooked, unlashed crate to its source pad, P pause, R reset.\n");
@@ -1623,6 +1852,10 @@ int main(int argc, char **argv)
         && strcmp(scenario, "capsized"))
         return 2;
     if (resume && (screenshot || frames || demo || survey || shadow_review))
+        return 2;
+    if ((save_now || autosave)
+        && (!(save_arg || data_dir) || screenshot || frames || demo || survey || resume
+            || (save_now && autosave)))
         return 2;
     if (shadow_review && (frames || demo || survey || strcmp(scenario, "origin"))) {
         fprintf(stderr, "--shadow-review uses its own fixed virtual poses; omit other modes.\n");
@@ -1657,6 +1890,26 @@ int main(int argc, char **argv)
     e.site_count = revision.free.scene.work_count;
     memcpy(e.sites, revision.free.scene.work, sizeof(e.sites));
     reset(&e);
+    // Which file, if any. Only plain interactive play uses the game's data directory; every
+    // staged, scripted or capture run uses a save only when told which one.
+    static SaveFile save;
+    bool plain = !screenshot && !shadow_review && !survey && !resume && !demo && !frames
+        && !strcmp(scenario, "origin");
+    if (e.revision && (save_arg || data_dir || plain)) {
+        char directory[1000] = "";
+        if (save_arg)
+            snprintf(save.path, sizeof(save.path), "%s", save_arg);
+        else if ((data_dir && snprintf(directory, sizeof(directory), "%s", data_dir) > 0)
+            || boat_file_data_directory(directory, sizeof(directory)))
+            snprintf(save.path, sizeof(save.path), "%s/cargo-%s.sav", directory,
+                e.revision->free.manifest.id);
+        save.enabled = save.path[0] != 0;
+        if (save.enabled && directory[0])
+            boat_file_make_directory(directory);
+    }
+    if (save.enabled && !fresh && !strcmp(scenario, "origin") && !shadow_review && !survey
+        && !resume && !autosave)
+        save_load(&e, &save);
     static HarbourView harbour;
     if (location->mapped) {
         char assets[4096];
@@ -1698,6 +1951,22 @@ int main(int argc, char **argv)
         fprintf(stderr, "Cargo review scenario failed: %s\n", scenario);
         boat_world_resources_destroy(&e.resources);
         return 1;
+    }
+    if (autosave) {
+        bool ok = save.enabled && autosave_check(&e, &save);
+        waterfront_scenery_destroy(&harbour.scenery);
+        boat_scenery_unload();
+        boat_world_resources_destroy(&e.resources);
+        return ok ? 0 : 1;
+    }
+    if (save_now) {
+        bool ok = save.enabled && save_write(&e, &save);
+        printf("%s %s at tick %llu\n", ok ? "Wrote save" : "Could not write save", save.path,
+            (unsigned long long)e.tick);
+        waterfront_scenery_destroy(&harbour.scenery);
+        boat_scenery_unload();
+        boat_world_resources_destroy(&e.resources);
+        return ok ? 0 : 1;
     }
     if (resume) {
         bool ok = resume_check(&e, scenario);
@@ -1743,6 +2012,8 @@ int main(int argc, char **argv)
     int result = 0, frame = 0;
     double accumulator = 0;
     float mouse_slew = 0, mouse_reach = 0, mouse_hoist = 0;
+    save.autosaving = save.enabled && !headless && !screenshot && !shadow_review;
+    FrameWatch frame_watch = { .last = watch(&e), .was_focused = true };
     int review_missing = 0, review_min = WIDTH * HEIGHT;
     while (headless || !WindowShouldClose()) {
         if (shadow_review) {
@@ -1757,8 +2028,10 @@ int main(int argc, char **argv)
             e.sandbox.cargo.position = boat_cargo_site_point(active(&e), p);
             e.sandbox.cargo.rotation = (Vector3) { 0 };
         } else if (!headless && !screenshot) {
-            if (IsKeyPressed(KEY_R))
+            if (IsKeyPressed(KEY_R)) {
                 reset(&e);
+                boat_autosave_note(&save.autosave, e.tick, true, true); // A new session.
+            }
             if (IsKeyPressed(KEY_P))
                 e.paused = !e.paused;
             if (!e.paused) {
@@ -1815,6 +2088,8 @@ int main(int argc, char **argv)
                 tick(&e, slew, reach, hoist, input);
                 accumulator -= BOAT_TICK_SECONDS;
             }
+            if (save.autosaving)
+                autosave_frame(&e, &save, &frame_watch, e.paused, IsWindowFocused());
         }
         size_t receiver_count = scene(&e, &solids);
         Mesh3D receivers = solids.mesh;
@@ -1961,6 +2236,15 @@ int main(int argc, char **argv)
         mouse_slew = mouse_reach = mouse_hoist = 0;
         ui(&e, view, screenshot ? (Vector2) { -1, -1 } : mouse, &mouse_slew, &mouse_reach,
             &mouse_hoist);
+        if (save.failed || save.mark > 0) {
+            const char *text = save.failed ? "SAVE FAILED" : "SAVED";
+            int width = MeasureText(text, 10);
+            DrawRectangle(WIDTH - width - 14, 199, width + 10, 15, ink);
+            DrawText(text, WIDTH - width - 9, 202, 10,
+                save.failed ? (Color) { 232, 106, 84, 255 } : green);
+            if (save.mark > 0)
+                --save.mark;
+        }
         EndTextureMode();
         if (shadow_review) {
             Image capture = LoadImageFromTexture(target.texture);
@@ -1998,6 +2282,13 @@ int main(int argc, char **argv)
         if (frames && ++frame >= frames)
             break;
     }
+    if (save.autosaving && boat_autosave_due(&save.autosave, e.tick, true)) {
+        bool ok = save_write(&e, &save);
+        boat_autosave_written(&save.autosave, e.tick, ok);
+        printf("%s %s at tick %llu\n", ok ? "Saved" : "Could not save", save.path,
+            (unsigned long long)e.tick);
+    } else if (save.autosaving)
+        printf("Save %s is current at tick %llu\n", save.path, (unsigned long long)e.tick);
     if (shadow_review) {
         printf("shadow review: %s, %d/256 missing, minimum %d visible pixels\n",
             gpu ? "GPU" : "CPU", review_missing, review_min);

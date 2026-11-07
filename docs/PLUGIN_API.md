@@ -231,6 +231,20 @@ checkpoint and its unacknowledged events, shows `BUILD WAITING: MOVE CLEAR`, and
 next boundary. Otherwise the site appears between ticks and the batch commits. Nothing is built
 that staging did not survey. A reset (R) hides built sites and restarts cargo and job together.
 
+Saves (SV1d, local, 2026-11-07): `cargo_sandbox` saves and resumes the session automatically; the
+package does nothing. It writes `cargo-<package id>.sav` (with `.bak`) in the data directory
+(`--data-dir DIR` overrides it, `--save FILE` names a file, `--new` starts fresh), at milestones
+(a committed change to the job's state, HUD or timers; a site built; a load number, delivery,
+lashing, set-down, mooring or departure), every 30 s of dirty play, and when pausing, losing focus
+or quitting. A save is compared by package id, a **work digest** (site ids, presets, cargo,
+positions, headings, hidden flags and the workboat; **not** `scene.work.notices` or HUD text),
+the manifest `state_version`, the physics revision and the tick rate. Equal values resume with the
+current source, so editing text or behaviour while keeping `state_version` keeps saves valid;
+changing what the state means needs a new `state_version`, and until SV1i a changed
+`state_version` (like any other mismatch) sets the file aside as `NAME.rejected` and starts fresh.
+Resume restores the committed checkpoint, its unacknowledged events and the generation, never
+re-runs `init`, and never queues events.
+
 `cargo.supply` and `work.guide` take the same exact fields under the same grant, each at most
 once per batch; each command kind has its own id namespace, so one batch may build, supply and
 guide to the same site. The sandbox checks the whole batch before applying any of it:

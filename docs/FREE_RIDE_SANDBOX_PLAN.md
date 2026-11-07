@@ -37,9 +37,9 @@ rest. Still owed: the user's play check of that fix and S1's review of fun, then
 qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtures`, and
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
-discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format) and SV1c (resume and the autosave
-policy in memory) are implemented locally; next implementation task: [SV1d](#sv1-steps), files and
-automatic saving in the harness. Future PRs still
+discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
+policy in memory) and SV1d (files and automatic saving in the harness) are implemented locally; next
+implementation task: [SV1e](#sv1-steps), the shared work session. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -952,7 +952,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1c implemented locally (2026-11-07); next SV1d |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1d implemented locally (2026-11-07); next SV1e |
 
 ##### F1 result, 2026-11-07
 
@@ -1061,13 +1061,49 @@ basin) were rendered before and after and are byte-identical (`cmp`); the full C
 407 tests (13 disabled wake experiments not run) with a warning-clean build. No GPU frames,
 windowed run or hands-on play.
 
+**SV1d result (2026-11-07, macOS arm64, Debug).** New `proteus_file` (`src/boat_file.[ch]`, no
+raylib): data directory (`boat_replay_data_directory` is now a wrapper), one-level directory
+creation, whole and prefix reads, `boat_file_write_atomic` (temporary file, current file to
+`.bak`, temporary into place, previous file put back on a failed swap), `set_aside`,
+`remove_save` and a sorted, bounded `boat_file_list`. `cargo_sandbox` gains `--save FILE`,
+`--data-dir DIR` (file `cargo-<package id>.sav`), `--new`, and the test fixtures `--save-now`,
+`--stale-digest` and `--autosave-check`. Only plain interactive play uses the game's data
+directory; staged, capture, survey, demo and frame-limited runs use a save only with `--save` or
+`--data-dir`. A run with a save file and no scenario resumes it at startup: the file, else its
+`.bak`; a file that cannot be used (damaged, newer format, other package, changed digest, state
+version, physics revision) is set aside as `NAME.rejected` (and its backup as
+`NAME.bak.rejected`), never deleted, and the session starts fresh. The window loop calls
+`autosave_frame` once per frame after its tick loop (dirty on a pose change or any milestone;
+milestones are job state, built sites, load number, delivery, lashing, set-down, mooring and
+departure; pausing and focus loss write when dirty) and writes when quitting; `SAVED` shows for
+90 presentation frames after milestone and leave writes and `SAVE FAILED` stays until a write
+succeeds. Decisions: the save-failure reason goes to stderr; a MIGRATE verdict is treated as
+unavailable until SV1i. Tests: `boat_file` (`cpu;quick`, build-tree directory); fixtures
+`cargo_sandbox_save_write` then `cargo_sandbox_save_resume` (captures the resumed
+`landing-built` frame), `cargo_sandbox_save_stale` then `cargo_sandbox_save_rejected`, and
+`cargo_sandbox_autosave` (the loop's policy on a virtual clock, two ticks per frame: one periodic
+write, one lash milestone, one on pausing, one on quitting, `.bak` present) then
+`cargo_sandbox_autosave_resume`; the three resume and rejection tests pass on a regular
+expression over the program's message. `boat_replay` still passes. Verification: the 34 CPU
+captures are byte-identical to before; the resumed `landing-built` capture differs slightly from
+the staged one (the boat's pitch and wake start at rest, so the hull sits a few pixels differently
+and the foam differs; the quay and crate are the same). Headless CPU captures draw no HUD, so
+that capture shows the resumed quay but not the HUD rows or the `SAVED` mark. By hand against a
+build-tree directory: two `--save-now` writes left the file and `.bak`; a relaunch resumed the
+second at its tick; truncating the file resumed the `.bak`; damaging both set both aside and
+started fresh; `--new` ignored the save. The full CTest preset passed 414 tests (13 disabled
+wake experiments not run) with a warning-clean build. Not done: no windowed run was possible (the
+session has no display: GLFW cannot start), so the real window loop, the `SAVED` mark's drawing,
+focus-loss saving and GPU frames are unverified; the loop's wiring is covered only through
+`autosave_frame` on a virtual clock.
+
 #### SV1: local save and resume
 
 Designed 2026-11-07 at the user's request ("save the state of the player", one step at a time,
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a-SV1c implemented locally (2026-11-07); SV1d–SV1i planned.**
+will apply to all future state as well." Status: **SV1a-SV1d implemented locally (2026-11-07); SV1e–SV1i planned.**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or

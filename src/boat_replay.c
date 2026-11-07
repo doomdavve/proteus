@@ -1,4 +1,5 @@
 #include "boat_replay.h"
+#include "boat_file.h"
 #include "boat_pose.h"
 #include "boat_time_control.h"
 #include "raymath.h"
@@ -335,25 +336,7 @@ bool boat_replay_save(const BoatReplay *run, const char *path)
 
 bool boat_replay_data_directory(char *path, size_t size)
 {
-    const char *base = NULL, *suffix = NULL;
-#ifdef _WIN32
-    base = getenv("LOCALAPPDATA");
-    suffix = "/Proteus";
-#elif defined(__APPLE__)
-    base = getenv("HOME");
-    suffix = "/Library/Application Support/Proteus";
-#else
-    base = getenv("XDG_DATA_HOME");
-    suffix = "/proteus";
-    if (!base || !base[0]) {
-        base = getenv("HOME");
-        suffix = "/.local/share/proteus";
-    }
-#endif
-    if (!base || !base[0])
-        return false;
-    int n = snprintf(path, size, "%s%s", base, suffix);
-    return n >= 0 && (size_t)n < size;
+    return boat_file_data_directory(path, size);
 }
 
 bool boat_replay_best_path(

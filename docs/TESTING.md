@@ -2,7 +2,10 @@
 
 `boat_sandbox_save` (SV1b, `cpu;quick`) checks the sandbox save's byte format, header-only discovery, corruption and
 bounds, compatibility verdicts, the work digest and the pure autosave policy (SV1c) on byte buffers and virtual
-ticks only. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
+ticks only. `boat_file` (SV1d, `cpu;quick`) checks atomic writes with `.bak`, failed writes, set-aside, bounded listing and
+reads in a build-tree directory. `cargo_sandbox_save_*` and `cargo_sandbox_autosave*` (SV1d, slow lane) write, resume and
+reject saves under `build/sandbox-save-tests` and drive the loop's autosave on a virtual clock; none touches the user's
+data directory. `cargo_sandbox_resume_<scenario>` (SV1c, slow lane, about 1 s each) stages a review scenario, saves it,
 resumes it from the record and from its encoded bytes, and requires equal behaviour over 1200 scripted ticks.
 
 S0a/S0b `boat_cargo` drives deterministic 120 Hz cargo ticks: bounded crane motors/cable,
