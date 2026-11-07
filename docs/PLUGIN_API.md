@@ -146,6 +146,15 @@ capture box. One preset applies to every site; unknown names are rejected at sta
 (`scene.work.boat` "is not a registered workboat preset"). Mooring speed and angle limits stay
 native. Only a non-default preset changes the scene digest.
 
+`work.notices` (S1e/F3) is an optional table of the job's feedback lines, with the optional string
+keys `delivered`, `built`, `supplied` and `returned`. Each is 1-63 printable ASCII characters and
+may use the token `{site}` for the site's name as a sign (capitals, underscores as spaces); `%`
+and any other brace are rejected (`scene.work.notices.<key>`). An absent key keeps the sandbox's
+native text. The lines are scene data shown on the native event, not commands, so they need no
+grant and the browser evaluator never sees them; control and key-binding prompts stay native.
+`plugins/outer-work` states the four texts the sandbox used before this field. Only a present
+notice changes the scene digest.
+
 `work` is an optional subsystem of scene v3; absent work leaves every earlier scene digest
 unchanged. Voyage, race and match packages reject it (`scene.work` "is only supported by free
 packages"). Staging, the catalog generator and `cargo_sandbox --survey` run the same site survey

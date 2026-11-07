@@ -156,14 +156,32 @@ static unsigned next_site(const Experiment *e, unsigned from)
     return from;
 }
 
-// FORMAT with one %s, the site's id as a sign: capitals and spaces. The notice owns its text.
-static void site_notice(Experiment *e, const char *format, unsigned site)
+// KIND's template: the package's own notice, else the native default. Each {site} token becomes
+// the site's name as a sign: capitals with underscores as spaces. The notice owns its text.
+static void notice(Experiment *e, BoatSceneNotice kind, unsigned site)
 {
+    static const char *const defaults[BOAT_SCENE_NOTICES]
+        = { "Crate delivered. It stays counted, even if moved again.", "{site} built.",
+              "Supplies used. Next crate waits on the {site} pad.",
+              "Crate returned to the {site} pad." };
+    const char *format
+        = e->world.scene && e->world.scene->work_present && e->world.scene->work_notice[kind][0]
+        ? e->world.scene->work_notice[kind]
+        : defaults[kind];
     char name[sizeof(e->sites[site].id)];
     snprintf(name, sizeof(name), "%s", e->sites[site].id);
     for (char *c = name; *c; ++c)
         *c = *c == '_' ? ' ' : (char)toupper((unsigned char)*c);
-    snprintf(e->notice_text, sizeof(e->notice_text), format, name);
+    size_t n = 0;
+    for (const char *p = format; *p && n + 1 < sizeof(e->notice_text);) {
+        if (!strncmp(p, "{site}", 6)) {
+            for (const char *q = name; *q && n + 1 < sizeof(e->notice_text); ++q)
+                e->notice_text[n++] = *q;
+            p += 6;
+        } else
+            e->notice_text[n++] = *p++;
+    }
+    e->notice_text[n] = 0;
     e->notice = e->notice_text;
 }
 
@@ -204,7 +222,7 @@ static void job_tick(Experiment *e)
     unsigned count = boat_cargo_take_events(&e->sandbox, native, BOAT_CARGO_EVENTS);
     for (unsigned i = 0; i < count; ++i) {
         if (native[i].kind == BOAT_CARGO_EVENT_DELIVERED)
-            e->notice = "Crate delivered. It stays counted, even if moved again.";
+            notice(e, BOAT_SCENE_NOTICE_DELIVERED, native[i].site);
         if (!e->revision || e->objective.quarantined)
             continue;
         if (e->event_count == BOAT_PLUGIN_EVENTS) {
@@ -272,9 +290,9 @@ static void job_tick(Experiment *e)
     }
     for (unsigned i = 0; i < e->site_count; ++i)
         if (build[i] && boat_cargo_site_enable(&e->sandbox, i, &e->boat))
-            site_notice(e, "%s built.", i);
+            notice(e, BOAT_SCENE_NOTICE_BUILT, i);
     if (supply < e->site_count && boat_cargo_supply(&e->sandbox, supply))
-        site_notice(e, "Supplies used. Next crate waits on the %s pad.", supply);
+        notice(e, BOAT_SCENE_NOTICE_SUPPLIED, supply);
     if (guide < e->site_count)
         e->guide = e->target = guide;
     e->waiting = NULL;
@@ -711,7 +729,7 @@ static void moor_action(Experiment *e)
 static void recover_action(Experiment *e)
 {
     if (boat_cargo_recover(&e->sandbox)) {
-        site_notice(e, "Crate returned to the %s pad.", e->sandbox.source);
+        notice(e, BOAT_SCENE_NOTICE_RETURNED, e->sandbox.source);
     } else
         e->notice = "Release the hook and unlash before returning the crate.";
     e->aim = 0;

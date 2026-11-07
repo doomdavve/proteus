@@ -264,6 +264,11 @@ static void scene_wire(Wire *w, BoatSceneDefinition *s)
             w->ok = false;
             return;
         }
+        for (unsigned i = 0; i < BOAT_SCENE_NOTICES; ++i) {
+            string(w, s->work_notice[i], sizeof(s->work_notice[i]));
+            if (s->work_notice[i][0] && !boat_scene_notice_valid(s->work_notice[i]))
+                w->ok = false;
+        }
         for (unsigned i = 0; i < s->work_count; ++i) {
             BoatSceneWorkSite *site = &s->work[i];
             string(w, site->id, sizeof(site->id));

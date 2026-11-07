@@ -940,7 +940,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | --- | --- | --- | --- |
 | F1: workboat preset | The workboat hull `{2.3, 2.3, 1.3, 5}` and thrust 3.1 (`tools/cargo_sandbox.c:24-25`), the deck dimensions and berth capture box (`src/boat_cargo.h:13-22`) become a named native workboat preset (e.g. `flat_deck`). An optional `scene.work` field selects it (default `flat_deck`; unknown names rejected at staging). Mooring speed/angle limits stay native mechanics | Behaviour unchanged; cargo CTests pass; the bundled package names the preset | Implemented 2026-11-07 (local) |
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
-| F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Planned |
+| F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Planned |
 | SV1: save and resume (after F1-F4; design refined when it starts) | Versioned local native solo save/resume of the sandbox. Session state lives in RAM in `Experiment` (`tools/cargo_sandbox.c:46-73`): cargo state, pose, load, delivered, receivers bitmask and wet flag; active crane; supply source; mooring; hidden flags on cranes and sites; objective revision and state (`BoatPluginObjective`); queued events, generation and sequence; guide target; boat pose; tick. Follows [State, authoring and multiplayer](#state-authoring-and-multiplayer): content identity, stable ids, last stable support for a load mid-lift, atomic write outside the tick, and incompatible saves rejected with a recovery choice. Reuses the P3 objective checkpoint/migration contract. Browser storage is separate, later | Save at several points (mid-lift, mid-job, after a delivery) resumes to identical state; a changed package is refused with a recovery choice; no duplicated crate or delivery | Planned |
 
@@ -968,6 +968,19 @@ package, as for `outer-work`, and rooms reject it as solo-only. Verified on macO
 build warning-clean, the full CTest preset passed 396 tests (retired wake tests disabled), and
 all 34 CPU review captures that exist on `outer` and the basin (22 scenarios on `outer`, the 12
 non-job ones on the basin) are byte-identical to captures taken before the change.
+
+##### F3 result, 2026-11-07
+
+Decision: the job's feedback lines are static scene data, `scene.work.notices`
+(`delivered`, `built`, `supplied`, `returned`; a `{site}` token; see
+[PLUGIN_API](PLUGIN_API.md#work-sites-s1a)), not an `objective.notice` or text in commands. The
+native cargo event shows them on the tick it happens, with no Lua round trip, and packages without
+a job (the basin fixture) can still word them. Absent keys keep the native defaults, which
+`proteus.outer-work` now states explicitly; "Crate delivered..." (delivery), "{site} built.",
+"Supplies used..." and "Crate returned..." were the four in `tools/cargo_sandbox.c`. Key-binding
+prompts stay native. Verified on macOS arm64, Debug: warning-clean build, the full CTest preset
+passed 396 tests, `validate_boat_plugin` checks the decoded texts, four rejections and the digest,
+and all 34 CPU review captures are byte-identical to the baseline taken at F1.
 
 #### Deck-edge collision fix, 2026-11-07
 

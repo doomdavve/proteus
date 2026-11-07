@@ -85,6 +85,19 @@ static void indexed(
     }
 }
 
+// Build "PREFIX.KEY" without stdio or unbounded formats.
+static void dotted(char *out, size_t capacity, const char *prefix, const char *key)
+{
+    size_t n = 0;
+    while (*prefix && n + 1 < capacity)
+        out[n++] = *prefix++;
+    if (n + 1 < capacity)
+        out[n++] = '.';
+    while (*key && n + 1 < capacity)
+        out[n++] = *key++;
+    out[n] = 0;
+}
+
 static bool unique(const BoatSceneDefinition *scene, unsigned berth, unsigned module,
     const char *id, BoatSceneDiagnostic *d, const char *field)
 {
@@ -272,6 +285,20 @@ bool boat_scene_validate(const BoatSceneDefinition *scene, BoatSceneDiagnostic *
         return fail(diagnostic, "scene.work.sites", "is absent but has entries");
     if (scene->work_boat >= BOAT_SCENE_WORKBOATS)
         return fail(diagnostic, "scene.work.boat", "is not a registered workboat preset");
+    bool notices = false;
+    for (unsigned i = 0; i < BOAT_SCENE_NOTICES; ++i)
+        notices |= scene->work_notice[i][0] != 0;
+    if (!scene->work_present && notices)
+        return fail(diagnostic, "scene.work.notices", "is absent but has entries");
+    for (unsigned i = 0; i < BOAT_SCENE_NOTICES; ++i) {
+        if (!scene->work_notice[i][0])
+            continue;
+        char at[64];
+        dotted(at, sizeof(at), "scene.work.notices", boat_scene_notice_key((BoatSceneNotice)i));
+        if (!boat_scene_notice_valid(scene->work_notice[i]))
+            return fail(diagnostic, at,
+                "must be 1-63 printable characters with at most the {site} token and no %");
+    }
     for (unsigned i = 0; i < scene->work_count; ++i) {
         const BoatSceneWorkSite *w = &scene->work[i];
         indexed(path, sizeof(path), "scene.work.sites", i + 1, ".id");
@@ -429,6 +456,13 @@ uint64_t boat_scene_digest(const BoatSceneDefinition *scene)
         if (scene->work_boat) {
             fold(&hash, "work.boat", 10);
             count(&hash, "work.boat", scene->work_boat);
+        }
+        for (unsigned i = 0; i < BOAT_SCENE_NOTICES; ++i) {
+            if (!scene->work_notice[i][0])
+                continue;
+            fold(&hash, "work.notice", 12);
+            count(&hash, "work.notice", i);
+            fold(&hash, scene->work_notice[i], strlen(scene->work_notice[i]) + 1);
         }
     }
     return hash;
@@ -643,5 +677,33 @@ bool boat_scene_cargo_preset_from_name(const char *name, BoatSceneCargoPreset *p
     if (strcmp(name, "crate"))
         return false;
     *preset = BOAT_SCENE_CARGO_CRATE;
+    return true;
+}
+
+static const char *const notice_keys[BOAT_SCENE_NOTICES]
+    = { "delivered", "built", "supplied", "returned" };
+
+const char *boat_scene_notice_key(BoatSceneNotice n)
+{
+    return (unsigned)n < BOAT_SCENE_NOTICES ? notice_keys[n] : "unknown";
+}
+
+bool boat_scene_notice_valid(const char *text)
+{
+    if (!text)
+        return false;
+    size_t length = strlen(text);
+    if (length < 1 || length > 63)
+        return false;
+    for (const char *p = text; *p; ++p) {
+        unsigned char c = (unsigned char)*p;
+        if (c < 32 || c > 126 || c == '%')
+            return false;
+        if (c == '{' || c == '}') {
+            if (strncmp(p, "{site}", 6))
+                return false;
+            p += 5;
+        }
+    }
     return true;
 }
