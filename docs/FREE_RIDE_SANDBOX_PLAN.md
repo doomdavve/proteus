@@ -38,8 +38,7 @@ qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtu
 [SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
 saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
 discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; next: the user's hands-on play check of SV1g+SV1h
-(script in the [SV1h result](#sv1-steps)), then [SV1i](#sv1-steps), objective migration at load. Future PRs still
+policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); next: removing the on-screen help text, then [SV1i](#sv1-steps), objective migration at load. Future PRs still
 require the user's approval.
 
 ## S0a: try the cargo toy
@@ -952,7 +951,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1h implemented locally (2026-11-07); next: the user's play check of SV1g+SV1h, then SV1i |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1h implemented locally (2026-11-07); play check of SV1g+SV1h done (help text to remove); next: SV1i |
 
 ##### F1 result, 2026-11-07
 
@@ -1240,6 +1239,24 @@ and overlap with the minimap, the `SAVED` mark, GPU props drawing (including in 
 the windowed `--demo --frames` smoke run, a developer command rather than a CTest because windowed frames follow the wall clock (`test_time`). A scripted idle demo never dirties the session, so
 that smoke run would write no file; the policy itself is covered by the harness's virtual-clock
 `autosave` check. No hands-on play.
+
+**SV1g+SV1h play check (2026-11-07, user, native macOS).** The user played the working harbour from
+the title menu and reported "seems to work"; the save file was written to
+`~/Library/Application Support/Proteus`. Checked: moving cargo by hand ("The actual work moving cargo
+worked great") and save/resume. Not reported (time pressure), so unchecked: the damaged-save case,
+the NEW and DELETE confirmations and capsize-then-resume. Feedback: "We need to get rid of all the
+help text though. It takes up most part of the screen." (acted on in the next commit). `file`
+identifies the `.sav` as an RPF package, which is only libmagic matching our magic bytes; the
+format does not change for it.
+
+S1 fun-review observation, in the user's words: "it's quite fun moving stuff around the harbour."
+This is an observation, not an approval of S1 or of any later slice.
+
+**Proposal, not scheduled (the user's idea, 2026-11-07; for the S3/S6 progression and economy
+work).** "We can add automation to it later, as an upgrade or a cost, so that it doesn't become too
+tedious in-game." That is, crane or loading automation bought as an upgrade or paid for per use, so
+repeated deliveries do not become tedious. Nothing is designed or scheduled; S3 and S6 decide
+whether and how, after reviewing how repetition feels.
 
 #### SV1: local save and resume
 
