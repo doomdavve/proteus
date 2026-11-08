@@ -403,9 +403,9 @@ static void payload(Wire *w, BoatPluginDecoded *d)
         d->free.version = number(w, d->free.version);
         unsigned flags = (unsigned)integer(w,
             (d->free.has_scene ? 1u : 0u) | (d->free.callbacks ? 2u : 0u)
-                | (d->free.migrates ? 4u : 0u),
+                | (d->free.migrates ? 4u : 0u) | (d->free.mark_count ? 8u : 0u),
             1);
-        if (flags > 7) {
+        if (flags > 15) {
             w->ok = false;
             break;
         }
@@ -414,6 +414,19 @@ static void payload(Wire *w, BoatPluginDecoded *d)
         d->free.migrates = flags & 4u;
         if (d->free.has_scene)
             scene_wire(w, &d->free.scene);
+        // P5a marks: a count from 1, then each mark's text and numbers.
+        d->free.mark_count = flags & 8u ? (unsigned)integer(w, d->free.mark_count, 1) : 0;
+        if ((flags & 8u) && (d->free.mark_count < 1 || d->free.mark_count > BOAT_MARKS_MAX)) {
+            w->ok = false;
+            break;
+        }
+        for (unsigned i = 0; i < d->free.mark_count; ++i) {
+            string(w, d->free.marks[i].id, sizeof(d->free.marks[i].id));
+            string(w, d->free.marks[i].name, sizeof(d->free.marks[i].name));
+            d->free.marks[i].x = number(w, d->free.marks[i].x);
+            d->free.marks[i].z = number(w, d->free.marks[i].z);
+            d->free.marks[i].radius = number(w, d->free.marks[i].radius);
+        }
         break;
     }
     case BOAT_PLUGIN_KIND_COURSE:

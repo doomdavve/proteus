@@ -98,7 +98,9 @@ const BoatWorldDefinition *wake_plugin_location(const char *directory)
         return NULL;
     }
     if (kind == BOAT_PLUGIN_KIND_FREE && manifest.objective) {
-        fprintf(stderr, "--plugin %s: a free package's work-site job runs in cargo_sandbox.\n",
+        fprintf(stderr,
+            "--plugin %s: a free package's objective runs in cargo_sandbox (work sites) or a "
+            "room (marks).\n",
             directory);
         return NULL;
     }

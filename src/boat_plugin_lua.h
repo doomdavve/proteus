@@ -48,6 +48,12 @@ typedef struct {
     bool migrates; // SV1i: optional migrate beside them.
     bool has_scene;
     BoatSceneDefinition scene;
+    // P5a: optional marks for a room objective; copied as given, checked in boat_plugin.c.
+    unsigned mark_count;
+    struct {
+        char id[BOAT_MARK_TEXT], name[BOAT_MARK_TEXT];
+        double x, z, radius;
+    } marks[BOAT_MARKS_MAX];
 } BoatPluginFreeData;
 
 typedef struct {

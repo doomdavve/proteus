@@ -47,7 +47,7 @@ rejected. Strings are non-empty printable ASCII.
 | `kind` | `"voyage"`, `"free"`, `"course"`, `"race"` or `"match"` |
 | `entry` | `"main.lua"`: a plain file name in the package directory |
 | `location` | `"outer"` for voyage; `"basin"` for course; `"outer"` for race; `"basin"` or `"outer"` for free; `"any"` or a compiled location for match |
-| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c). A course package uses exactly `["course.define"]`. |
+| `capabilities` | Voyages use `["voyage.define"]`, optionally followed in order by `"scene.define"`, `"objective.hud"` and `"objective.timers"`. Free, race and match packages use their kind grant (`"free.define"`, `"race.define"` or `"match.define"`), optionally followed by `"scene.define"`; a free package with work sites may follow that with `"objective.hud"` for its [job](#work-site-job-s1c), and one with [marks](#marks-p5a) requests `["free.define", "objective.hud"]` (optionally with `"scene.define"` between them). A course package uses exactly `["course.define"]`. |
 | `state_version` | Objective packages: authored schema integer `1..65535`; descriptor-only packages: `1` |
 
 The manifest requests capabilities and the host grants them. Limits are the host's, never the
@@ -97,7 +97,8 @@ return { free = { version = 1 } }
 
 Absent content means the engine's registered defaults, exactly as an absent subsystem does. The
 location must be `basin` or `outer`. A free package has no objective or callback grant unless
-it authors work sites, whose [job](#work-site-job-s1c) may request `objective.hud`;
+it authors work sites, whose [job](#work-site-job-s1c) may request `objective.hud`, or
+[marks](#marks-p5a) for a room objective;
 a scene is the same envelope described under [the scene contract](#location-life-scene-contract-l11l43).
 A free package with a scene fixes the room's location; without one it still names its location.
 
@@ -262,6 +263,43 @@ guide to the same site. The sandbox checks the whole batch before applying any o
 - `work.guide {id}` points the helm guidance at a site that is built or built in the same
   batch (otherwise the job is suspended). Departure guides there instead of to the next site in
   list order, unless the boat is leaving that site; N still cycles by hand. A reset clears it.
+
+## Marks (P5a)
+
+Status, 2026-11-08: **P5a, package and validation only.** A free package may author up to 16
+named circles on the water for an objective that runs on a multiplayer room's authority
+([P5 plan](PLUGIN_P5_PLAN.md)). Until P5b hosts that objective, rooms refuse a package with
+marks; `--plugin`, Single Player and `cargo_sandbox` always refuse it.
+
+```lua
+return {
+  init = function(c) return {}, {} end,
+  update = function(c, s) return s, {} end,
+  free = {
+    version = 1,
+    marks = {
+      { id = "north_reach", name = "NORTH REACH", x = -500, z = 300, radius = 25 },
+    }
+  }
+}
+```
+
+| Field | Rule |
+| --- | --- |
+| `marks` | 1–16 entries, a list numbered from 1; requires `objective.hud` with `init` and `update`; not combined with `scene.work` |
+| `id` | 1–23 characters of `a-z`, `0-9` and `_`, unique in the package; the events' `id` |
+| `name` | 1–23 printable ASCII characters without edge spaces; the display name |
+| `x`, `z` | Simulation metres (x = -east, z = north), within ±20 000 |
+| `radius` | 10–200 m; circles may touch but not overlap. The centre must be open water with 4 m clearance on a mapped location, and the circle inside the walls in the basin |
+
+The native side reports, on the authority, one `mark.reached { id, crew }` event when a room boat
+moves from outside to inside a mark; staying inside reports nothing, and leaving and returning,
+or a respawn (a new life) inside the circle, reports again. `crew` is the boat's fleet slot plus
+one (1–4). The authority also reports `crew.joined { crew }` and `crew.left { crew }`. Solo
+events never carry `crew`. Scoring is the script's: the native side keeps no counts. The
+package's digest is its scene digest combined with the marks' (`boat_marks_digest`).
+`plugins/outer-hunt` is the reference: five marks along the river, a row per crew, the first crew
+to find them all, and a new hunt once every crew present has them.
 
 ## Match schema
 

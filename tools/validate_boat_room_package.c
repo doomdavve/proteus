@@ -465,6 +465,12 @@ static int catalog_rooms(void)
             printf("room_package catalog %s: rejected (%s)\n", entry->id, error);
             continue;
         }
+        // P5a: the hunt's marks feed a room objective, which rooms host from P5b.
+        if (!strcmp(entry->id, "proteus.outer-hunt")) {
+            CHECK(!loaded && strstr(error, "room objective"));
+            printf("room_package catalog %s: rejected (%s)\n", entry->id, error);
+            continue;
+        }
         if (!loaded) {
             fprintf(stderr, "%s: %s\n", entry->id, error);
             return 1;

@@ -7,6 +7,7 @@
 // Every load uses a fresh restricted Lua state that is closed before the call returns.
 #include "boat_course.h"
 #include "boat_location.h"
+#include "boat_marks.h"
 #include "boat_match.h"
 #include "boat_race.h"
 #include "boat_scene_definition.h"
@@ -137,6 +138,9 @@ typedef struct {
     bool has_scene;
     BoatSceneDefinition scene;
     uint64_t scene_digest; // boat_scene_digest(&scene); zero when absent.
+    // P5a: marks for the package's room objective (count zero when absent). A package with marks
+    // has init/update and no work sites; it runs only in rooms.
+    BoatMarkSet marks;
     uint64_t digest;
 } BoatPluginFree;
 

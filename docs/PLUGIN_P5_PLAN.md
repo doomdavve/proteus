@@ -1,6 +1,7 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **planned, nothing implemented.** Scheduled by the user "as soon as possible"
+Status, 2026-11-08: **P5a implemented on its branch (marks and the hunt package, no networking);
+not yet merged.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
 possible ([decisions](#decisions)). Done when: two players (then four) play the
@@ -8,7 +9,7 @@ possible ([decisions](#decisions)). Done when: two players (then four) play the
 reconnects see the same HUD, the authority can reload its source and commit definition revisions
 at safe boundaries, a session is recorded and reconstructed with its revision, existing
 free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
-Next task: [P5a](#p5a-marks-and-the-hunt-package).
+Next task: [P5b](#p5b-the-objective-on-the-authority), after P5a's review.
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -163,6 +164,17 @@ diagnostics; a scripted fleet driving through marks emits exactly one `mark.reac
 with the right crew, and a respawn re-arms the slot; evaluating the script over scripted events
 yields the expected HUD rows, `FIRST`, and the restart; core boundary check.
 Gate: headless events and HUD match the expected tables.
+
+**P5a result, 2026-11-08 (branch `feat/plugin-p5a-marks`).** `src/boat_marks.[ch]` in
+`proteus_boat_core` (validation, digest, the per-slot entry detector); `free.marks` parsed,
+decoded, map-checked and carried over the browser wire; `objective.hud` may now follow
+`free.define` directly; objective events gain an optional `crew`; `plugins/outer-hunt` (five river
+marks, radius 25 m) is in the catalog. Rooms refuse it until P5b ("marks need a room objective");
+`--plugin` refuses it as before for free objectives. The marks' positions were chosen from a
+30 m-clearance scan of the outer map. Verification: Debug build warning-clean; new `boat_marks`
+cases (validation, detector) and `boat_plugin` cases `marks` and `hunt_objective` pass, with
+`boat_room_package.catalog_rooms` expecting the refusal; full results are in the PR. No visual
+change, so no captures; nothing is playable yet.
 
 ### P5b: the objective on the authority
 

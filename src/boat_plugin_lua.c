@@ -1273,7 +1273,55 @@ static int decode_match(lua_State *L)
 }
 
 static const char *const FREE_ROOT[] = { "free", "init", "update", "migrate", NULL };
-static const char *const FREE[] = { "version", "scene", NULL };
+static const char *const FREE[] = { "version", "scene", "marks", NULL };
+static const char *const MARK[] = { "id", "name", "x", "z", "radius", NULL };
+
+// P5a: optional free.marks, a list numbered from 1 without gaps.
+static bool free_marks(lua_State *L, Vm *vm, int free, BoatPluginFreeData *d)
+{
+    char at[64];
+    int type = field(L, free, "marks", "free", at);
+    if (type == LUA_TNIL) {
+        lua_pop(L, 1);
+        return true;
+    }
+    if (type != LUA_TTABLE)
+        return reject(vm, at, "must be a table, not a %s", lua_typename(L, type));
+    int list = lua_absindex(L, -1);
+    lua_Unsigned length = lua_rawlen(L, list), entries = 0;
+    lua_pushnil(L);
+    while (lua_next(L, list)) {
+        lua_pop(L, 1);
+        if (!lua_isinteger(L, -1) || lua_tointeger(L, -1) < 1
+            || (lua_Unsigned)lua_tointeger(L, -1) > length)
+            return reject(vm, at, "must be a list numbered from 1 without gaps");
+        ++entries;
+    }
+    if (entries != length)
+        return reject(vm, at, "must be a list numbered from 1 without gaps");
+    if (length < 1 || length > BOAT_MARKS_MAX)
+        return reject(vm, at, "must list 1 to %d marks, not %llu", BOAT_MARKS_MAX,
+            (unsigned long long)length);
+    d->mark_count = (unsigned)length;
+    for (unsigned i = 0; i < length; ++i) {
+        char path[64];
+        element(path, sizeof(path), at, i + 1);
+        lua_rawgeti(L, list, i + 1);
+        if (lua_type(L, -1) != LUA_TTABLE)
+            return reject(vm, path, "must be a table, not a %s", luaL_typename(L, -1));
+        int mark = lua_absindex(L, -1);
+        if (!only(L, vm, mark, path, MARK)
+            || !string(L, vm, mark, path, "id", d->marks[i].id, sizeof(d->marks[i].id))
+            || !string(L, vm, mark, path, "name", d->marks[i].name, sizeof(d->marks[i].name))
+            || !number(L, vm, mark, path, "x", &d->marks[i].x)
+            || !number(L, vm, mark, path, "z", &d->marks[i].z)
+            || !number(L, vm, mark, path, "radius", &d->marks[i].radius))
+            return false;
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    return true;
+}
 static const char *const COURSE_ROOT[] = { "course", NULL };
 static const char *const COURSE[] = { "start", "gates", NULL };
 static const char *const COURSE_START[] = { "x", "z", "heading", NULL };
@@ -1309,6 +1357,8 @@ static int decode_free(lua_State *L)
     if (!free || !number(L, vm, free, at, "version", &d->version))
         return 0;
     if (!read_scene(L, vm, free, &d->scene, &d->has_scene))
+        return 0;
+    if (!free_marks(L, vm, free, d))
         return 0;
     return 0;
 }

@@ -70,6 +70,7 @@ set(PROTEUS_BOAT_CORE_SOURCES
   src/boat_model.c src/boat_model.h src/boat_pose.c src/boat_pose.h
   src/boat_room_definition.c src/boat_room_definition.h
   src/boat_scene_definition.c src/boat_scene_definition.h
+  src/boat_marks.c src/boat_marks.h
   src/waterfront_flock.c src/waterfront_flock.h
   src/boat_input.h src/boat_reset_hold.h src/boat_throttle.h src/boat_steering.h src/boat_view_state.h src/boat_wake.c src/boat_wake.h src/boat_wake_objects.c
   src/boat_wake_objects.h src/boat_wake_player.c src/boat_wake_player.h src/boat_water.c
@@ -164,7 +165,7 @@ set(BOAT_PLUGIN_PACKAGES
   plugins/basin-free plugins/outer-free plugins/time-trial
   plugins/langedrag plugins/river-sprint plugins/harbor-life plugins/deathmatch
   plugins/harbor-room plugins/harbor-race plugins/grodan plugins/outer-work
-  plugins/basin-work)
+  plugins/basin-work plugins/outer-hunt)
 if(EMSCRIPTEN)
   set(BOAT_PLUGIN_CATALOG_PACKAGES
     plugins/basin-free plugins/time-trial plugins/langedrag
@@ -856,6 +857,11 @@ add_test(NAME boat_voyage COMMAND validate_boat_voyage)
 set_tests_properties(boat_voyage PROPERTIES PASS_REGULAR_EXPRESSION "boat_voyage=ok")
 # Lua plugins P0: manifest, restricted evaluation, voyage decoding and parity with the compiled
 # route; its file cases work in a scratch directory under the build tree.
+# Plugin P5a: mark validation and the fleet entry detector, core only.
+add_executable(validate_boat_marks tools/validate_boat_marks.c)
+target_link_libraries(validate_boat_marks PRIVATE proteus_boat_core)
+target_compile_options(validate_boat_marks PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_marks validate_boat_marks LABELS core cpu)
 add_executable(validate_boat_plugin tools/validate_boat_plugin.c)
 target_link_libraries(validate_boat_plugin PRIVATE proteus_plugins)
 target_compile_options(validate_boat_plugin PRIVATE ${PROTEUS_WARNINGS})

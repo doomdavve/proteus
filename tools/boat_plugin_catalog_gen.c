@@ -50,7 +50,8 @@ static bool evaluate(const char *directory, Entry *entry)
         snprintf(d.file, sizeof(d.file), "%s", "plugin.json");
         snprintf(d.field, sizeof(d.field), "%s", "capabilities");
         snprintf(d.message, sizeof(d.message),
-            "catalog packages have no objective callbacks, except free work-site jobs");
+            "catalog packages have no objective callbacks, except free packages (work sites or "
+            "marks)");
         show(directory, &d);
         return false;
     }

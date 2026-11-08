@@ -84,7 +84,9 @@ def schema():
                            ["voyage.define", "scene.define", "objective.hud"],
                            ["voyage.define", "objective.hud", "objective.timers"],
                            ["voyage.define", "scene.define", "objective.hud", "objective.timers"],
-                           ["free.define"], ["free.define", "scene.define"], ["course.define"],
+                           ["free.define"], ["free.define", "scene.define"],
+                           ["free.define", "objective.hud"],
+                           ["free.define", "scene.define", "objective.hud"], ["course.define"],
                             ["race.define"], ["race.define", "scene.define"],
                             ["match.define"], ["match.define", "scene.define"]]},
                        "state_version": number(1, 65535, integer=True)})
@@ -97,7 +99,9 @@ def schema():
              "capabilities": {"const": ["course.define"]}, "state_version": {"const": 1}}}},
         {"if": {"properties": {"kind": {"const": "free"}}},
          "then": {"properties": {"location": {"enum": ["basin", "outer"]},
-             "capabilities": {"const": ["free.define"]}, "state_version": {"const": 1}}}},
+             "capabilities": {"enum": [["free.define"], ["free.define", "scene.define"],
+                 ["free.define", "objective.hud"],
+                 ["free.define", "scene.define", "objective.hud"]]}}}},
         {"if": {"properties": {"kind": {"const": "voyage"}}},
          "then": {"properties": {"location": {"const": "outer"},
              "capabilities": {"not": {"const": ["race.define"]}}}}},
@@ -199,7 +203,9 @@ def schema():
                      "fuse_ticks": number(0, 432000, "120 Hz ticks", True),
                      "grace_ticks": number(0, 432000, "120 Hz ticks", True)}
     combat = record(combat_fields)
-    free = record({"version": {"const": 1}})
+    mark = record({"id": text(pattern=r"^[a-z0-9_]+$"), "name": text(), **point,
+                   "radius": number(10, 200, "metres")})
+    free = record({"version": {"const": 1}, "marks": sequence(mark, 1, 16)})
     course_gate = record({**point, "half_width": number(4, 500, "metres")})
     course = record({"start": record({**point, "heading": number(-math.tau, math.tau, "radians")}),
                      "gates": sequence(course_gate, 4, 4)})
@@ -217,6 +223,7 @@ def schema():
     # A race, free or match definition may carry the same authored scene envelope.
     race = object_schema({**race["properties"], "scene": scene}, required=race["required"])
     free = object_schema({**free["properties"], "scene": scene}, required=("version",))
+    free["properties"]["marks"]["description"] = "P5a room objective marks; needs objective.hud"
     match = object_schema({"version": {"const": 1}, "rules": match_rules, "combat": combat,
                            "scene": scene}, required=("version", "rules", "combat"))
     definitions = {"bundle": bundle, "manifest": manifest, "voyage": voyage, "scene": scene,
@@ -262,7 +269,10 @@ def schema():
                     "scene.work is free-only and solo-only: 1..4 unique sites from registered presets,",
                     "at least one a service_platform; each site's turned berth, platform and crane",
                     "envelope must clear compiled water, berths, modules, retained traffic, the spawn",
-                    "and the other sites"],
+                    "and the other sites",
+                    "marks (P5a) need objective.hud and init/update and exclude scene.work: 1..16",
+                    "unique ids, non-overlapping circles, centres on open water with 4 m clearance;",
+                    "the objective runs only on a room's authority (mark.reached, crew.joined/left)"],
                 "course": ["Exactly four gates south of the start and in strictly decreasing z",
                     "The gate centre and both edges must be open water; basin gates stay in bounds",
                     "The compiled course's digest keeps existing course-*.run bests valid"]},

@@ -1528,10 +1528,12 @@ static int free_objective(void)
             "return { migrate = function(c, s) return s, {} end, free = { version = 1, scene = { "
             "version = 3, " JOB_WORK " } } }",
             BOAT_PLUGIN_SCHEMA, "migrate" },
-        { JOB_MANIFEST("\"free.define\", \"objective.hud\""), "return {}", BOAT_PLUGIN_MANIFEST,
-            "capabilities[2]" },
+        // P5a: objective.hud may follow free.define directly, but then needs marks.
+        { JOB_MANIFEST("\"free.define\", \"objective.hud\""),
+            "return { " JOB_CALLBACKS " free = { version = 1 } }", BOAT_PLUGIN_SCHEMA,
+            "init/update" },
         { JOB_MANIFEST("\"free.define\", \"objective.hud\", \"scene.define\""), "return {}",
-            BOAT_PLUGIN_MANIFEST, "capabilities[2]" },
+            BOAT_PLUGIN_MANIFEST, "capabilities[3]" },
         { JOB_MANIFEST(JOB_GRANT ", \"objective.timers\""), "return {}", BOAT_PLUGIN_MANIFEST,
             "capabilities" },
     };
@@ -1567,6 +1569,193 @@ static int free_objective(void)
     return 0;
 }
 
+// P5a: free.marks for a room objective. The bundled hunt loads, validates on the outer map and
+// survives the browser wire; invalid marks report their field; rooms and solo refuse it.
+#define HUNT_MANIFEST JOB_MANIFEST("\"free.define\", \"objective.hud\"")
+#define HUNT_MARK(id, x, z, r)                                                                     \
+    "{ id = '" id "', name = 'MARK', x = " #x ", z = " #z ", radius = " #r " },"
+
+static int marks(void)
+{
+    static BoatPluginFree free;
+    static BoatPluginDecoded decoded, back;
+    static BoatPluginRevision revision;
+    static unsigned char wire[32768];
+    BoatPluginDiagnostic d;
+    BoatPluginFiles files;
+    CHECK(boat_plugin_read("plugins/outer-hunt", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginBundle bundle = boat_plugin_bundle(&files);
+    CHECK(boat_plugin_load_free(&bundle, NULL, &free, &d) == BOAT_PLUGIN_OK);
+    CHECK(free.manifest.objective && !free.has_scene && free.marks.count == 5);
+    CHECK(!strcmp(free.marks.items[0].id, "north_reach")
+        && !strcmp(free.marks.items[0].name, "NORTH REACH") && free.marks.items[0].x == -500
+        && free.marks.items[0].z == 300 && free.marks.items[0].radius == 25);
+    CHECK(free.digest == boat_marks_digest(&free.marks));
+    BoatWorldResources world;
+    const BoatWorldDefinition *outer = boat_location_find("outer");
+    CHECK(boat_world_resources_init(&world, outer));
+    CHECK(boat_plugin_free_check_location(&free, outer, &world.map, &d) == BOAT_PLUGIN_OK);
+
+    // The browser worker's wire keeps every mark.
+    decoded.kind = BOAT_PLUGIN_KIND_FREE;
+    memcpy(decoded.manifest, files.manifest, files.manifest_size);
+    decoded.manifest_size = files.manifest_size;
+    memcpy(decoded.source, files.source, files.source_size);
+    decoded.source_size = files.source_size;
+    CHECK(boat_plugin_lua_free(files.source, files.source_size, "@main.lua",
+              &boat_plugin_default_limits, &decoded.free, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_parse_manifest(files.manifest, files.manifest_size, NULL, &decoded.parsed, &d)
+        == BOAT_PLUGIN_OK);
+    size_t encoded;
+    CHECK(boat_plugin_wire_encode(&decoded, wire, sizeof(wire), &encoded));
+    CHECK(boat_plugin_wire_decode(wire, encoded, &back, &d));
+    CHECK(boat_plugin_decoded_revision(&back, &revision, &d));
+    CHECK(!memcmp(&revision.free.marks, &free.marks, sizeof(free.marks)));
+    CHECK(revision.free.digest == free.digest);
+
+    static const struct {
+        const char *manifest, *source, *field;
+    } invalid[] = {
+        { JOB_MANIFEST("\"free.define\""),
+            "return { free = { version = 1, marks = {" HUNT_MARK("a", 0, 0, 20) "} } }",
+            "free.marks" },
+        { JOB_MANIFEST(JOB_GRANT),
+            "return { " JOB_CALLBACKS " free = { version = 1, marks = {" HUNT_MARK(
+                "a", 0, 0, 20) "}, scene = { version = 3, " JOB_WORK " } } }",
+            "free.marks" },
+        { HUNT_MANIFEST, "return { " JOB_CALLBACKS " free = { version = 1, marks = {} } }",
+            "free.marks" },
+        { HUNT_MANIFEST,
+            "return { " JOB_CALLBACKS " free = { version = 1, marks = { { id = 'a' } } } }",
+            "free.marks[1].name" },
+        { HUNT_MANIFEST,
+            "return { " JOB_CALLBACKS
+            " free = { version = 1, marks = {" HUNT_MARK("a", 0, 0, 5) "} } }",
+            "free.marks[1]" },
+        { HUNT_MANIFEST,
+            "return { " JOB_CALLBACKS
+            " free = { version = 1, marks = {" HUNT_MARK("A", 0, 0, 20) "} } }",
+            "free.marks[1]" },
+        { HUNT_MANIFEST,
+            "return { " JOB_CALLBACKS " free = { version = 1, marks = {" HUNT_MARK("a", 0, 0, 20)
+                HUNT_MARK("b", 30, 0, 20) "} } }",
+            "free.marks[2]" },
+        { HUNT_MANIFEST,
+            "return { " JOB_CALLBACKS " free = { version = 1, marks = {" HUNT_MARK("a", 0, 0, 20)
+                HUNT_MARK("a", 100, 0, 20) "} } }",
+            "free.marks[2]" },
+        { HUNT_MANIFEST,
+            "return { " JOB_CALLBACKS " free = { version = 1, marks = {" HUNT_MARK("a", 0, 0,
+                20) "{ id = 'b', name = 'B', x = 0, z = 0, radius = 20, extra = 1 } } } }",
+            "free.marks[2]" },
+    };
+    for (unsigned i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        BoatPluginBundle b = { invalid[i].manifest, strlen(invalid[i].manifest), invalid[i].source,
+            strlen(invalid[i].source) };
+        CHECK(boat_plugin_load_free(&b, NULL, &free, &d) == BOAT_PLUGIN_SCHEMA);
+        show("invalid marks", &d);
+        CHECK(!strncmp(d.field, invalid[i].field, strlen(invalid[i].field)));
+    }
+
+    // A centre ashore fails the map check; an unmapped basin keeps circles inside its walls.
+    const char *land = "return { " JOB_CALLBACKS
+                       " free = { version = 1, marks = {" HUNT_MARK("a", 500, 500, 20) "} } }";
+    BoatPluginBundle b = { HUNT_MANIFEST, strlen(HUNT_MANIFEST), land, strlen(land) };
+    CHECK(boat_plugin_load_free(&b, NULL, &free, &d) == BOAT_PLUGIN_OK);
+    CHECK(boat_plugin_free_check_location(&free, outer, &world.map, &d) == BOAT_PLUGIN_SCHEMA);
+    show("mark ashore", &d);
+    CHECK(!strcmp(d.field, "free.marks[1]") && strstr(d.message, "open water"));
+    boat_world_resources_destroy(&world);
+    const BoatWorldDefinition *basin = boat_location_find("basin");
+    strcpy(free.manifest.location, "basin");
+    CHECK(boat_plugin_free_check_location(&free, basin, NULL, &d) == BOAT_PLUGIN_SCHEMA);
+    show("mark outside basin", &d);
+    free.marks.items[0].x = free.marks.items[0].z = 0;
+    CHECK(boat_plugin_free_check_location(&free, basin, NULL, &d) == BOAT_PLUGIN_OK);
+    return 0;
+}
+
+// P5a: the bundled hunt's script over scripted room events.
+static const BoatPluginHud *hunt_row(const BoatPluginObjective *o, const char *id)
+{
+    for (unsigned i = 0; i < o->hud_count; ++i)
+        if (!strcmp(o->hud[i].id, id))
+            return &o->hud[i];
+    return NULL;
+}
+
+static int hunt_objective(void)
+{
+    BoatPluginDiagnostic d;
+    BoatPluginFiles files;
+    CHECK(boat_plugin_read("plugins/outer-hunt", NULL, &files, &d) == BOAT_PLUGIN_OK);
+    BoatPluginObjective o = { .generation = 1, .rng = 1 };
+    CHECK(boat_plugin_objective_step(
+              &o, files.source, files.source_size, BOAT_PLUGIN_OBJECTIVE_INIT, 0, NULL, 0, NULL, &d)
+        == BOAT_PLUGIN_OK);
+    CHECK(hunt_row(&o, "hunt")->value == 1 && !hunt_row(&o, "c1") && !hunt_row(&o, "first"));
+    static const char *const ids[]
+        = { "north_reach", "upper_bend", "midstream", "wide_water", "south_channel" };
+    BoatPluginEvent events[16];
+    int64_t sequence = 0, tick = 0;
+    unsigned n = 0;
+#define HUNT_EVENT(k, i, c)                                                                        \
+    events[n++]                                                                                    \
+        = (BoatPluginEvent) { .tick = tick, .sequence = ++sequence, .kind = k, .crew = c };        \
+    snprintf(events[n - 1].id, sizeof(events[n - 1].id), "%s", i)
+#define HUNT_STEP()                                                                                \
+    do {                                                                                           \
+        tick += 12;                                                                                \
+        CHECK(boat_plugin_objective_step(&o, files.source, files.source_size,                      \
+                  BOAT_PLUGIN_OBJECTIVE_UPDATE, tick, events, n, NULL, &d)                         \
+            == BOAT_PLUGIN_OK);                                                                    \
+        n = 0;                                                                                     \
+    } while (0)
+    // Two crews join; crew 1 finds two marks, the second one twice.
+    HUNT_EVENT("crew.joined", "", 1);
+    HUNT_EVENT("crew.joined", "", 2);
+    HUNT_EVENT("mark.reached", ids[0], 1);
+    HUNT_EVENT("mark.reached", ids[1], 1);
+    HUNT_EVENT("mark.reached", ids[1], 1);
+    HUNT_STEP();
+    CHECK(hunt_row(&o, "c1")->value == 2 && hunt_row(&o, "c2")->value == 0);
+    CHECK(!strcmp(hunt_row(&o, "c1")->label, "CREW 1") && !hunt_row(&o, "first"));
+    // Crew 2 finds all five first; the hunt goes on until crew 1 has them too.
+    for (unsigned i = 0; i < 5; ++i) {
+        HUNT_EVENT("mark.reached", ids[i], 2);
+    }
+    HUNT_STEP();
+    CHECK(hunt_row(&o, "c2")->value == 5 && hunt_row(&o, "first")->value == 2);
+    CHECK(hunt_row(&o, "hunt")->value == 1);
+    for (unsigned i = 2; i < 5; ++i) {
+        HUNT_EVENT("mark.reached", ids[i], 1);
+    }
+    HUNT_STEP();
+    // Everyone present has every mark: a new hunt starts, and the last first crew stays shown.
+    CHECK(hunt_row(&o, "hunt")->value == 2 && hunt_row(&o, "c1")->value == 0
+        && hunt_row(&o, "c2")->value == 0 && hunt_row(&o, "first")->value == 2);
+    // A crew that leaves loses its row; a joiner in that slot starts at zero.
+    HUNT_EVENT("mark.reached", ids[0], 2);
+    HUNT_EVENT("crew.left", "", 2);
+    HUNT_STEP();
+    CHECK(!hunt_row(&o, "c2"));
+    HUNT_EVENT("crew.joined", "", 2);
+    HUNT_STEP();
+    CHECK(hunt_row(&o, "c2")->value == 0);
+    // A lone crew that finishes restarts the hunt and becomes the first crew.
+    HUNT_EVENT("crew.left", "", 2);
+    for (unsigned i = 0; i < 5; ++i) {
+        HUNT_EVENT("mark.reached", ids[i], 1);
+    }
+    HUNT_STEP();
+    CHECK(hunt_row(&o, "hunt")->value == 3 && hunt_row(&o, "first")->value == 1);
+    CHECK(o.acknowledged == sequence && !o.quarantined);
+#undef HUNT_EVENT
+#undef HUNT_STEP
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(reference_matches_compiled),
     TEST_CASE(computed_definition),
@@ -1589,6 +1778,8 @@ static const TestCase cases[] = {
     TEST_CASE(tours),
     TEST_CASE(work_sites),
     TEST_CASE(free_objective),
+    TEST_CASE(marks),
+    TEST_CASE(hunt_objective),
 };
 
 int main(int argc, char **argv)

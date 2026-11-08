@@ -128,6 +128,11 @@ static bool convert(const BoatPluginRevision *revision, BoatPluginKind kind,
         room.has_scene = revision->match.has_scene;
         room.scene = revision->match.scene;
     } else if (kind == BOAT_PLUGIN_KIND_FREE) {
+        // P5a: marks feed a room objective, which the authority hosts from P5b.
+        if (revision->free.marks.count) {
+            reason(error, size, "marks need a room objective, which rooms cannot host yet");
+            return false;
+        }
         room.has_scene = revision->free.has_scene;
         room.scene = revision->free.scene;
     } else {
