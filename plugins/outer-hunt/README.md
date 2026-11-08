@@ -5,5 +5,7 @@ that counts each crew's marks, shows the first crew to find them all, and starts
 every crew present has them. The objective runs only on the room's authority; clients receive its
 HUD as data ([P5 plan](../../docs/PLUGIN_P5_PLAN.md)).
 
-It is room-only: `--plugin` and Single Player refuse it. Until P5b hosts its objective, rooms
-refuse it too. See [marks](../../docs/PLUGIN_API.md#marks-p5a) for the schema and events.
+It is room-only: `--plugin` and Single Player refuse it. Host it with
+`./build/boat_server --location outer --package proteus.outer-hunt`; the server prints the HUD
+(`objective tick N: ...`) whenever it changes. Clients do not show it until protocol v13 (P5c).
+See [marks](../../docs/PLUGIN_API.md#marks-p5a) for the schema and events.

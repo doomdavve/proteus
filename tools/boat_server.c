@@ -16,6 +16,7 @@
 #include "boat_net_rtc.h"
 #endif
 #include "boat_net_server.h"
+#include "boat_room_objective.h"
 #include "boat_room_package.h"
 #include "cli_usage.h"
 
@@ -357,7 +358,26 @@ typedef struct {
     BoatLocationId location;
     const BoatWorldResources *world; // The location's resources, owned by main.
     BoatRoomDefinition room; // The loaded package definition.
+    BoatRoomObjectiveSource *objective; // P5b: the package's room objective, owned by main.
 } RoomOptions;
+
+// P5b: the room objective's HUD after each committed change, and its quarantine once.
+static void print_objective(BoatRoomObjective *o, uint64_t tick, bool *reported)
+{
+    if (o->hud_changed) {
+        o->hud_changed = false;
+        printf("objective tick %" PRIu64 ":", tick);
+        for (unsigned i = 0; i < o->objective.hud_count; ++i)
+            printf(" %s=%" PRId64, o->objective.hud[i].label, o->objective.hud[i].value);
+        printf("\n");
+        fflush(stdout);
+    }
+    if (o->objective.quarantined && !*reported) {
+        *reported = true;
+        printf("objective suspended: %s\n", o->diagnostic.message);
+        fflush(stdout);
+    }
+}
 
 static void print_roster(const BoatNetServer *server)
 {
@@ -419,6 +439,14 @@ static int room(const RoomOptions *options)
         .max_players = (unsigned)options->players,
         .resources = options->world,
         .room = &options->room };
+    static BoatRoomObjective objective;
+    bool objective_on = options->objective && options->objective->present;
+    bool suspension_reported = false;
+    if (objective_on) {
+        boat_room_objective_init(&objective, options->objective);
+        config.marks = &options->objective->marks;
+        config.rules = boat_room_objective_rules(&objective);
+    }
     static BoatNetServer server;
     if (!boat_net_server_init(&server, transport, &config)) {
         fprintf(stderr, "boat_server: invalid room configuration.\n");
@@ -460,6 +488,11 @@ static int room(const RoomOptions *options)
         options->waves ? "wave" : "calm", boat_room_mode_name(options->room.mode), BOAT_NET_VERSION,
         BOAT_PHYSICS_REVISION, config.epoch, options->players, lan_note);
     printf("room package: %s (%s)\n", options->room.id, options->room.name);
+    if (objective_on) {
+        printf("room objective: %u marks, Lua on this authority only\n",
+            options->objective->marks.count);
+        print_objective(&objective, 0, &suspension_reported);
+    }
     fflush(stdout);
     fflush(stdout);
     unsigned players = 0;
@@ -510,6 +543,8 @@ static int room(const RoomOptions *options)
             players = boat_net_server_players(&server);
             print_roster(&server);
         }
+        if (objective_on)
+            print_objective(&objective, server.fleet.state.tick, &suspension_reported);
         if (options->report
             && server.fleet.state.tick / options->report != before / options->report)
             printf("tick %" PRIu64 " hash %016" PRIx64 " live %u players %u\n",
@@ -757,8 +792,10 @@ int boat_server_main(int argc, char **argv)
         return 1;
     room_options.world = &world;
     char error[220];
-    if (!boat_room_package_load(room_options.package, deathmatch, race, room_options.location,
-            &world, &room_options.room, error, sizeof(error))) {
+    static BoatRoomObjectiveSource objective;
+    room_options.objective = &objective;
+    if (!boat_room_package_load_objective(room_options.package, deathmatch, race,
+            room_options.location, &world, &room_options.room, &objective, error, sizeof(error))) {
         fprintf(stderr, "boat_server: cannot load the room package: %s\n", error);
         boat_world_resources_destroy(&world);
         return 1;

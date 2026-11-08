@@ -266,10 +266,19 @@ guide to the same site. The sandbox checks the whole batch before applying any o
 
 ## Marks (P5a)
 
-Status, 2026-11-08: **P5a, package and validation only.** A free package may author up to 16
-named circles on the water for an objective that runs on a multiplayer room's authority
-([P5 plan](PLUGIN_P5_PLAN.md)). Until P5b hosts that objective, rooms refuse a package with
-marks; `--plugin`, Single Player and `cargo_sandbox` always refuse it.
+Status, 2026-11-08: **P5a/P5b: the objective runs on `boat_server`'s authority; clients do not
+receive its HUD until protocol v13 (P5c).** A free package may author up to 16 named circles on
+the water for an objective that runs on a multiplayer room's authority
+([P5 plan](PLUGIN_P5_PLAN.md)). `--plugin`, Single Player and `cargo_sandbox` refuse it.
+
+`boat_server` (and the game's HOST A ROOM child) loads the objective with
+`boat_room_package_load_objective` and runs it in `tools/boat_room_objective.c` behind
+`BoatNetServerConfig.rules`, so `proteus_boat_net` never links Lua. The objective starts at tick
+zero with generation 1 and updates at every 12-tick boundary with the queued events, under the
+[P3 transaction](#objective-transactions-p31--p32) and default budgets. A failing callback, or more
+than 64 events between boundaries, suspends the objective (`objective suspended: ...` on the
+server's output); the room keeps running. The server prints each committed HUD change as
+`objective tick N: LABEL=value ...`. Lua state, timers and events never leave the authority.
 
 ```lua
 return {

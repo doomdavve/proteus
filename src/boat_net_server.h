@@ -1,6 +1,7 @@
 #ifndef PROTEUS_BOAT_NET_SERVER_H
 #define PROTEUS_BOAT_NET_SERVER_H
 
+#include "boat_marks.h"
 #include "boat_match.h"
 #include "boat_net_transport.h"
 #include "boat_race.h"
@@ -11,6 +12,29 @@
 #define BOAT_NET_MATCH_EVENTS 16 // Recent deathmatch or race events kept for the caller's log.
 #define BOAT_NET_CATCH_UP_TICKS 8 // Ticks per service call at most; never a larger step.
 #define BOAT_NET_MISBEHAVIOUR_LIMIT 16 // Malformed or forbidden messages before disconnecting.
+
+// P5b: what the authority tells a room objective. Crews are fleet slots; the adapter numbers them
+// from 1. Joins and leaves arrive between ticks, at the current tick; mark entries arrive after
+// the tick that made them, before that tick's after_tick.
+typedef enum {
+    BOAT_NET_RULE_CREW_JOINED, // A peer was accepted into SLOT.
+    BOAT_NET_RULE_CREW_LEFT, // SLOT's peer left, timed out or was dropped.
+    BOAT_NET_RULE_MARK_REACHED, // SLOT's boat entered MARK (boat_marks_observe).
+} BoatNetRuleKind;
+
+typedef struct {
+    uint8_t kind; // BoatNetRuleKind
+    uint8_t slot;
+    uint8_t mark; // Index into the config's marks; MARK_REACHED only.
+} BoatNetRuleEvent;
+
+// An optional rules adapter, the same pattern as BoatNetTransport. The server never calls Lua;
+// the adapter (boat_server's room objective) may. Callbacks must not touch the server.
+typedef struct {
+    void *context;
+    void (*event)(void *context, uint64_t tick, const BoatNetRuleEvent *event);
+    void (*after_tick)(void *context, uint64_t tick); // After every tick and its events.
+} BoatNetRules;
 
 typedef struct {
     const char *token; // Room token every Hello must match exactly; "" for none.
@@ -23,6 +47,10 @@ typedef struct {
     const BoatRoomDefinition *room;
     // The room's location, borrowed for the server's lifetime; must be ready.
     const BoatWorldResources *resources;
+    // P5b: a free room's marks, borrowed for the server's lifetime (NULL for none). They stay on
+    // the authority until protocol v13 carries them in the definition.
+    const BoatMarkSet *marks;
+    BoatNetRules rules; // Zero for none.
 } BoatNetServerConfig;
 
 typedef enum {
@@ -98,6 +126,7 @@ typedef struct {
     BoatNetRaceState race_sent; // The race state clients last received.
     BoatRaceEvent race_events[BOAT_NET_MATCH_EVENTS]; // Recent race events, a ring.
     uint64_t race_event_count;
+    BoatMarkTracker marks; // Which mark each slot is inside; used when CONFIG has marks.
     BoatNetServerStats stats;
 } BoatNetServer;
 

@@ -97,7 +97,7 @@ static bool scene_clear(
 
 static bool convert(const BoatPluginRevision *revision, BoatPluginKind kind,
     BoatLocationId location, const BoatWorldResources *world, BoatRoomDefinition *definition,
-    char *error, size_t size)
+    BoatRoomObjectiveSource *objective, char *error, size_t size)
 {
     const char *package_location = revision->manifest.location;
     bool any = !strcmp(package_location, "any");
@@ -128,10 +128,17 @@ static bool convert(const BoatPluginRevision *revision, BoatPluginKind kind,
         room.has_scene = revision->match.has_scene;
         room.scene = revision->match.scene;
     } else if (kind == BOAT_PLUGIN_KIND_FREE) {
-        // P5a: marks feed a room objective, which the authority hosts from P5b.
+        // P5b: marks feed a room objective that only the authority evaluates.
         if (revision->free.marks.count) {
-            reason(error, size, "marks need a room objective, which rooms cannot host yet");
-            return false;
+            if (!objective) {
+                reason(error, size, "the package's room objective needs boat_server's host");
+                return false;
+            }
+            objective->present = true;
+            objective->marks = revision->free.marks;
+            objective->state_version = revision->free.manifest.state_version;
+            objective->source_size = revision->source_size;
+            memcpy(objective->source, revision->source, revision->source_size);
         }
         room.has_scene = revision->free.has_scene;
         room.scene = revision->free.scene;
@@ -163,7 +170,7 @@ static bool convert(const BoatPluginRevision *revision, BoatPluginKind kind,
 }
 
 static bool load_catalog(const char *id, BoatLocationId location, const BoatWorldResources *world,
-    BoatRoomDefinition *definition, char *error, size_t size)
+    BoatRoomDefinition *definition, BoatRoomObjectiveSource *objective, char *error, size_t size)
 {
     const BoatPluginCatalogEntry *entry = boat_plugin_catalog_find(id);
     if (!entry) {
@@ -181,11 +188,12 @@ static bool load_catalog(const char *id, BoatLocationId location, const BoatWorl
         return false;
     }
     BoatPluginKind kind = boat_plugin_kind_parse(entry->kind);
-    return convert(&revision, kind, location, world, definition, error, size);
+    return convert(&revision, kind, location, world, definition, objective, error, size);
 }
 
 static bool load_directory(const char *directory, BoatLocationId location,
-    const BoatWorldResources *world, BoatRoomDefinition *definition, char *error, size_t size)
+    const BoatWorldResources *world, BoatRoomDefinition *definition,
+    BoatRoomObjectiveSource *objective, char *error, size_t size)
 {
     static BoatPluginFiles files;
     BoatPluginDiagnostic diagnostic = { 0 };
@@ -240,7 +248,9 @@ static bool load_directory(const char *directory, BoatLocationId location,
         return false;
     }
     revision.manifest = manifest;
-    if (!convert(&revision, kind, location, world, definition, error, size))
+    revision.source_size = files.source_size;
+    memcpy(revision.source, files.source, files.source_size);
+    if (!convert(&revision, kind, location, world, definition, objective, error, size))
         return false;
     copy_text(definition->id, sizeof(definition->id), manifest.id);
     copy_text(definition->name, sizeof(definition->name), manifest.name);
@@ -250,6 +260,16 @@ static bool load_directory(const char *directory, BoatLocationId location,
 bool boat_room_package_load(const char *spec, bool deathmatch, bool race, BoatLocationId location,
     const BoatWorldResources *world, BoatRoomDefinition *definition, char *error, size_t size)
 {
+    return boat_room_package_load_objective(
+        spec, deathmatch, race, location, world, definition, NULL, error, size);
+}
+
+bool boat_room_package_load_objective(const char *spec, bool deathmatch, bool race,
+    BoatLocationId location, const BoatWorldResources *world, BoatRoomDefinition *definition,
+    BoatRoomObjectiveSource *objective, char *error, size_t size)
+{
+    if (objective)
+        objective->present = false;
     if (!world || !boat_world_resources_ready(world)) {
         reason(error, size, "the room's map is not ready");
         return false;
@@ -262,8 +282,9 @@ bool boat_room_package_load(const char *spec, bool deathmatch, bool race, BoatLo
         spec = boat_room_package_default(deathmatch, race, location);
     if (!spec)
         return false;
-    bool ok = path_like(spec) ? load_directory(spec, location, world, definition, error, size)
-                              : load_catalog(spec, location, world, definition, error, size);
+    bool ok = path_like(spec)
+        ? load_directory(spec, location, world, definition, objective, error, size)
+        : load_catalog(spec, location, world, definition, objective, error, size);
     if (!ok)
         return false;
     bool mode_ok = race ? definition->mode == BOAT_ROOM_MODE_RACE

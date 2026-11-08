@@ -419,7 +419,8 @@ if(NOT EMSCRIPTEN)
   # The game hosts a room by running itself as `--serve`, boat_server's command line.
   target_sources(wake_velocity PRIVATE tools/wake_velocity_net.c tools/wake_velocity_net.h
     tools/wake_velocity_host.c tools/wake_velocity_host.h tools/boat_server.c tools/boat_server.h
-    tools/boat_room_package.c tools/boat_room_package.h)
+    tools/boat_room_package.c tools/boat_room_package.h
+    tools/boat_room_objective.c tools/boat_room_objective.h)
 endif()
 
 if(NOT EMSCRIPTEN)
@@ -1072,7 +1073,7 @@ target_link_libraries(validate_boat_race PRIVATE proteus_boat_core)
 # M3: the authority process and a scripted network client link the ENet transport; the
 # protocol/session validator links only the display- and socket-free net library.
 add_executable(boat_server tools/boat_server_main.c tools/boat_server.c tools/cli_usage.c
-  tools/boat_room_package.c)
+  tools/boat_room_package.c tools/boat_room_objective.c)
 add_executable(boat_bot tools/boat_bot.c tools/cli_usage.c)
 foreach(target boat_server boat_bot)
   target_link_libraries(${target} PRIVATE proteus_boat_net_enet)
@@ -1187,6 +1188,14 @@ target_link_libraries(validate_boat_room_package PRIVATE proteus_plugins proteus
   proteus_boat_net)
 target_compile_options(validate_boat_room_package PRIVATE ${PROTEUS_WARNINGS})
 proteus_add_case_tests(boat_room_package validate_boat_room_package LABELS core cpu
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# P5b: a free package's room objective runs only behind the authority's rules adapter.
+add_executable(validate_boat_room_objective tools/validate_boat_room_objective.c
+  tools/boat_room_package.c tools/boat_room_objective.c)
+target_link_libraries(validate_boat_room_objective PRIVATE proteus_plugins proteus_plugin_catalog
+  proteus_boat_net)
+target_compile_options(validate_boat_room_objective PRIVATE ${PROTEUS_WARNINGS})
+proteus_add_case_tests(boat_room_objective validate_boat_room_objective LABELS core cpu
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # Validators and review tools compare packages against the shipped fixture values.
 foreach(target validate_boat validate_boat_banking validate_boat_clock validate_boat_world

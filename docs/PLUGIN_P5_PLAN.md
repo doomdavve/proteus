@@ -1,7 +1,7 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **P5a implemented on `feat/plugin-p5` (marks and the hunt package, no
-networking); the single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
+Status, 2026-11-08: **P5a and P5b implemented on `feat/plugin-p5`: the hunt's objective runs on
+`boat_server`'s authority; clients do not see its HUD yet. The single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
 possible ([decisions](#decisions)). Done when: two players (then four) play the
@@ -9,7 +9,7 @@ possible ([decisions](#decisions)). Done when: two players (then four) play the
 reconnects see the same HUD, the authority can reload its source and commit definition revisions
 at safe boundaries, a session is recorded and reconstructed with its revision, existing
 free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
-Next task: [P5b](#p5b-the-objective-on-the-authority).
+Next task: [P5c](#p5c-protocol-v13-and-mirrored-hud).
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -188,6 +188,20 @@ Tests: scripted one- and two-crew hunts produce the expected HUD per tick; an in
 error quarantines the objective while boats keep moving; join/leave rows appear and disappear;
 `proteus_boat_net` still links no Lua.
 Gate: the objective runs headless on the authority.
+
+**P5b result, 2026-11-08 (commit on `feat/plugin-p5`).** `BoatNetServerConfig` gains borrowed
+`marks` (free rooms only) and a `BoatNetRules` adapter: crew joins and leaves are reported
+between ticks, mark entries after the tick that made them, then `after_tick`. The server keeps a
+`BoatMarkTracker` and runs no scripts. `boat_room_package_load_objective` returns the package's
+marks and source (the plain loader refuses objectives), and `tools/boat_room_objective.[ch]`
+runs the P3 transaction every 12 ticks, quarantining on a callback error or more than 64 queued
+events. `boat_server` (also the game's `--serve` child) prints `objective tick N: ...` on each HUD
+change. Instead of a `--scripted --package` flag (scripted mode has no peers to join or leave),
+`validate_boat_room_objective` drives the adapter directly and runs a memory-transport room with
+two clients through the marks. Verification: `boat_net.rule_events` and the four
+`boat_room_objective` cases pass; a manual ENet run on macOS (`boat_server --package
+proteus.outer-hunt` with two `boat_bot` joins in turn) printed a crew row on join and removed it
+on leave; full suite results are in the PR.
 
 ### P5c: protocol v13 and mirrored HUD
 

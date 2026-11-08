@@ -26,6 +26,9 @@ bool boat_net_server_init(
     BoatRoomDiagnostic check;
     if (!boat_room_definition_validate(room, &check))
         return false;
+    if (config->marks
+        && (room->mode != BOAT_ROOM_MODE_FREE || !boat_marks_validate(config->marks, NULL)))
+        return false;
     bool deathmatch = room->mode == BOAT_ROOM_MODE_DEATHMATCH;
     bool race = room->mode == BOAT_ROOM_MODE_RACE;
     BoatMatch match = { 0 };
@@ -56,6 +59,7 @@ bool boat_net_server_init(
         return false;
     for (unsigned i = 0; i < BOAT_FLEET_SLOTS; ++i)
         server->slot_peer[i] = -1;
+    boat_marks_tracker_reset(&server->marks);
     server->backlog_since = -1;
     server->next_checkpoint = 1;
     if (deathmatch)
@@ -165,6 +169,14 @@ static void race_output(BoatNetServer *s, const BoatRaceOutput *out)
     }
 }
 
+static void rule_event(BoatNetServer *s, BoatNetRuleKind kind, unsigned slot, unsigned mark)
+{
+    if (!s->config.rules.event)
+        return;
+    BoatNetRuleEvent e = { .kind = (uint8_t)kind, .slot = (uint8_t)slot, .mark = (uint8_t)mark };
+    s->config.rules.event(s->config.rules.context, s->fleet.state.tick, &e);
+}
+
 // Free PEER's slot between ticks; its live wakes stay and expire naturally.
 
 static void drop_peer(BoatNetServer *s, unsigned peer, bool disconnect)
@@ -181,6 +193,7 @@ static void drop_peer(BoatNetServer *s, unsigned peer, bool disconnect)
         s->slot_peer[p->slot] = -1;
         s->inputs[p->slot] = (BoatNetSlotInput) { 0 };
         ++s->stats.left;
+        rule_event(s, BOAT_NET_RULE_CREW_LEFT, p->slot, 0);
     }
     *p = (BoatNetServerPeer) { 0 };
     if (disconnect)
@@ -307,6 +320,7 @@ static void hello(BoatNetServer *s, unsigned peer, const BoatNetHello *h)
     s->slot_peer[slot] = (int)peer;
     s->inputs[slot] = (BoatNetSlotInput) { 0 };
     ++s->stats.accepted;
+    rule_event(s, BOAT_NET_RULE_CREW_JOINED, slot, 0);
     BoatNetMessage m = { .header = { .type = BOAT_NET_ACCEPT, .tick = s->fleet.state.tick },
         .accept = { .slot = (uint8_t)slot,
             .waves = s->config.waves,
@@ -653,6 +667,14 @@ static void tick(BoatNetServer *s)
         boat_race_observe(&s->race, &s->fleet, &out);
         race_output(s, &out);
     }
+    if (s->config.marks) {
+        BoatMarkEntry entries[BOAT_FLEET_SLOTS];
+        unsigned count = boat_marks_observe(s->config.marks, &s->marks, &s->fleet.state, entries);
+        for (unsigned i = 0; i < count; ++i)
+            rule_event(s, BOAT_NET_RULE_MARK_REACHED, entries[i].slot, entries[i].mark);
+    }
+    if (s->config.rules.after_tick)
+        s->config.rules.after_tick(s->config.rules.context, next);
     ++s->stats.ticks;
     // Births first, so a lossless link delivers them before the snapshot that counts them.
     if (next % BOAT_NET_BIRTH_TICKS == 0)

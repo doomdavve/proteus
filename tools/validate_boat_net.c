@@ -2797,6 +2797,90 @@ static int room_definition_codec(void)
     return 0;
 }
 
+// P5b: a free room's marks and rules adapter. The server reports joins and leaves between ticks
+// and mark entries after the tick; it runs no scripts itself. Other modes refuse marks.
+typedef struct {
+    unsigned count;
+    BoatNetRuleEvent events[64];
+    uint64_t ticks[64];
+    uint64_t after_ticks, last_after;
+    bool ordered;
+} RuleLog;
+
+static void log_rule(void *context, uint64_t tick, const BoatNetRuleEvent *event)
+{
+    RuleLog *log = context;
+    if (log->count < 64) {
+        log->events[log->count] = *event;
+        log->ticks[log->count++] = tick;
+    }
+}
+
+static void log_after(void *context, uint64_t tick)
+{
+    RuleLog *log = context;
+    log->ordered &= tick == log->last_after + 1;
+    log->last_after = tick;
+    ++log->after_ticks;
+}
+
+static int rule_events(void)
+{
+    static Room room;
+    static RuleLog log;
+    memset(&log, 0, sizeof(log));
+    log.ordered = true;
+    BoatMarkSet marks = { .count = 2,
+        .items = { { .id = "near", .name = "NEAR", .x = 60, .z = 60, .radius = 20 },
+            { .id = "far", .name = "FAR", .x = -60, .z = -60, .radius = 20 } } };
+    BoatNetServerConfig config = { .marks = &marks,
+        .rules = { .context = &log, .event = log_rule, .after_tick = log_after } };
+    CHECK(room_open(&room, 71, config));
+    BoatNetServer *s = &room.server;
+    unsigned a = room_join(&room, "a", NULL, 0), b = room_join(&room, "b", NULL, 0);
+    room_run(&room, .5);
+    CHECK(active_boats(s) == 2 && log.ordered && log.after_ticks == s->fleet.state.tick);
+    CHECK(log.count == 2);
+    for (unsigned i = 0; i < 2; ++i)
+        CHECK(log.events[i].kind == BOAT_NET_RULE_CREW_JOINED && log.events[i].slot == i);
+    // Slot 1 is moved into the far mark between ticks; the entry is reported once, after the
+    // tick that observed it.
+    unsigned slot = room.clients[b].slot;
+    s->fleet.state.slots[slot].boat.position = (Vector2) { -60, -55 };
+    s->fleet.state.slots[slot].boat.velocity = (Vector2) { 0 };
+    uint64_t moved = s->fleet.state.tick;
+    room_run(&room, .25);
+    CHECK(log.count == 3 && log.events[2].kind == BOAT_NET_RULE_MARK_REACHED);
+    CHECK(log.events[2].slot == slot && log.events[2].mark == 1 && log.ticks[2] == moved + 1);
+    // Both boats in the near mark on one tick: two entries in slot order.
+    for (unsigned i = 0; i < 2; ++i) {
+        s->fleet.state.slots[i].boat.position = (Vector2) { 60, 50 + 15 * (float)i };
+        s->fleet.state.slots[i].boat.velocity = (Vector2) { 0 };
+    }
+    room_run(&room, .25);
+    CHECK(log.count == 5);
+    for (unsigned i = 0; i < 2; ++i)
+        CHECK(log.events[3 + i].kind == BOAT_NET_RULE_MARK_REACHED && log.events[3 + i].slot == i
+            && log.events[3 + i].mark == 0 && log.ticks[3 + i] == log.ticks[3]);
+    // A leave is reported between ticks with the leaver's slot.
+    boat_net_client_leave(&room.clients[a]);
+    room.live[a] = false;
+    room_run(&room, .1);
+    CHECK(log.count == 6 && log.events[5].kind == BOAT_NET_RULE_CREW_LEFT);
+    CHECK(log.events[5].slot == room.clients[a].slot && log.ordered);
+    CHECK(log.after_ticks == s->fleet.state.tick);
+    room_close(&room);
+
+    // Marks belong to free rooms, and must be valid.
+    BoatMatchRules rules = boat_fixture_match_default_rules;
+    CHECK(!room_open_mode(&room, 72, config, BOAT_ROOM_MODE_DEATHMATCH, &rules));
+    room_close(&room);
+    marks.items[1].x = marks.items[1].z = 70; // Overlaps the near mark.
+    CHECK(!room_open(&room, 73, config));
+    room_close(&room);
+    return 0;
+}
+
 static const TestCase cases[] = {
     SLOW_CASE(throttle_detents),
     TEST_CASE(golden),
@@ -2808,6 +2892,7 @@ static const TestCase cases[] = {
     TEST_CASE(snapshot_resync),
     TEST_CASE(combat_compact),
     TEST_CASE(lossless),
+    TEST_CASE(rule_events),
     TEST_CASE(deathmatch),
     SLOW_CASE(combat_room),
     TEST_CASE(prediction_release),

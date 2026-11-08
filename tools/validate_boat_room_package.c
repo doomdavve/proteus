@@ -465,7 +465,7 @@ static int catalog_rooms(void)
             printf("room_package catalog %s: rejected (%s)\n", entry->id, error);
             continue;
         }
-        // P5a: the hunt's marks feed a room objective, which rooms host from P5b.
+        // P5b: the hunt's room objective needs boat_server's objective host, not this loader.
         if (!strcmp(entry->id, "proteus.outer-hunt")) {
             CHECK(!loaded && strstr(error, "room objective"));
             printf("room_package catalog %s: rejected (%s)\n", entry->id, error);

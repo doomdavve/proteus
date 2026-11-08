@@ -20,4 +20,20 @@ const char *boat_room_package_default(bool deathmatch, bool race, BoatLocationId
 bool boat_room_package_load(const char *spec, bool deathmatch, bool race, BoatLocationId location,
     const BoatWorldResources *world, BoatRoomDefinition *definition, char *error, size_t size);
 
+// P5b: a free package's room objective. Only the authority evaluates it; clients receive its HUD.
+typedef struct {
+    bool present;
+    BoatMarkSet marks;
+    unsigned state_version;
+    size_t source_size;
+    char source[BOAT_PLUGIN_SOURCE_MAX];
+} BoatRoomObjectiveSource;
+
+// boat_room_package_load that also returns the package's room objective in OBJECTIVE (present is
+// false for packages without one). The plain loader refuses packages with an objective, because
+// its caller cannot run one.
+bool boat_room_package_load_objective(const char *spec, bool deathmatch, bool race,
+    BoatLocationId location, const BoatWorldResources *world, BoatRoomDefinition *definition,
+    BoatRoomObjectiveSource *objective, char *error, size_t size);
+
 #endif
