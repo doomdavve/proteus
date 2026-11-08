@@ -28,6 +28,7 @@
 #include "wake_command.h"
 #include "wake_console.h"
 #include "wake_velocity_drive.h"
+#include "wake_velocity_lighting_review.h"
 #include "wake_velocity_menu.h"
 #include "wake_velocity_performance.h"
 #include "wake_velocity_plugin.h"
@@ -264,10 +265,16 @@ static void usage(void)
     cli_usage_line(stdout, "--solo --ask --content NAME --save-mode MODE --data-dir DIR",
         "Title capture options; --save-mode is continue, new or delete");
     cli_usage_line(stdout, "--time SECONDS", "Screenshot only: 0..60, or 0..600 with --replay");
+    cli_usage_line(
+        stdout, "--time-scale N", "Initial solo live speed 0.25, 0.5, 1, 2, 4 or 8 (default 1)");
     cli_usage_line(stdout, "--frames COUNT", "Stop a smoke run after COUNT frames");
     cli_usage_line(
         stdout, "--frame-capture FILE", "Save the window, HUD included, at the last of --frames");
     cli_usage_line(stdout, "--demo", "Run the scripted screenshot drive in a window");
+    cli_usage_line(stdout, "--work-clock-report FILE",
+        "Developer review: with --work and --frames, write a live lighting CSV");
+    cli_usage_line(stdout, "--work-review-pose swing|deck|approach",
+        "Developer review: bounded --work pose for lighting inspection");
 
     cli_usage_section(stdout, "RECORDINGS");
     cli_usage_line(stdout, "--save-run FILE", "Export each finish");
@@ -548,9 +555,17 @@ static void select_course_best(BoatSession *session, const char *data_dir, bool 
         fprintf(stderr, "%s: %s\n", session->runs.notice, session->runs.best_path);
 }
 
+typedef struct {
+    BoatCapture *capture;
+    WakeLightingReview *lighting;
+} PerformanceQueryContext;
+
 static void performance_query_complete(void *context, unsigned long long frame, double milliseconds)
 {
-    BoatCaptureSample *sample = boat_capture_sample(context, frame);
+    PerformanceQueryContext *query = context;
+    if (query->lighting)
+        wake_lighting_review_gpu(query->lighting, frame, milliseconds);
+    BoatCaptureSample *sample = boat_capture_sample(query->capture, frame);
     if (!sample)
         return; // The sample left the rolling window before its query completed.
     sample->gpu_ms = (float)milliseconds;
@@ -608,6 +623,7 @@ static bool apply_screen_layout(BoatGpu *gpu, BoatScreenLayout layout)
 
 static int study(int argc, char **argv)
 {
+    WakeLightingReview lighting_review = { 0 };
     const char *screenshot = NULL;
     unsigned int skin = BOAT_SKIN_SWEDEN;
     unsigned soundtrack = BOAT_MUSIC_LITTLE_BOAT;
@@ -630,6 +646,9 @@ static int study(int argc, char **argv)
     float daylight_phase = WATERFRONT_DAYLIGHT_DAY;
     float lighting_hour = 0;
     bool lighting_hour_set = false;
+    bool daylight_set = false;
+    int time_speed_index = BOAT_TIME_NORMAL; // Solo live play; --time-scale sets its start.
+    bool time_scale_set = false;
     bool profiler_visible = false;
     const char *performance_report = NULL;
     bool performance_capture = true;
@@ -650,6 +669,8 @@ static int study(int argc, char **argv)
     bool work_mode = false; // --work: the location's working-harbour session (SV1f).
     const char *save_path = NULL; // --save: the work session's file (default: the data directory).
     bool fresh_work = false, save_now = false; // --new ignores a save; --save-now (tests).
+    const char *work_clock_report = NULL; // --work-clock-report: developer lighting CSV.
+    const char *work_review_pose_name = NULL; // --work-review-pose: developer bounded fixture.
 #ifdef PROTEUS_BOAT_NET
     NetStudy *net = NULL;
 #endif
@@ -699,6 +720,7 @@ static int study(int argc, char **argv)
         } else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
             if (!waterfront_daylight_parse(argv[++i], &daylight_phase))
                 goto invalid;
+            daylight_set = true;
         } else if (strcmp(argv[i], "--lighting-hour") == 0 && i + 1 < argc) {
             if (!waterfront_hour_parse(argv[++i], &lighting_hour))
                 goto invalid;
@@ -784,6 +806,15 @@ static int study(int argc, char **argv)
             fresh_work = true;
         } else if (strcmp(argv[i], "--save-now") == 0) {
             save_now = true;
+        } else if (strcmp(argv[i], "--work-clock-report") == 0 && i + 1 < argc) {
+            work_clock_report = argv[++i];
+            if (!work_clock_report[0])
+                goto invalid;
+        } else if (strcmp(argv[i], "--work-review-pose") == 0 && i + 1 < argc) {
+            const char *value = argv[++i];
+            if (strcmp(value, "swing") && strcmp(value, "deck") && strcmp(value, "approach"))
+                goto invalid;
+            work_review_pose_name = value;
         } else if (strcmp(argv[i], "--demo") == 0) {
             demo = true;
         } else if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
@@ -796,6 +827,20 @@ static int study(int argc, char **argv)
                 || time > BOAT_REPLAY_MAX_SECONDS)
                 goto invalid;
             time_set = true;
+        } else if (strcmp(argv[i], "--time-scale") == 0 && i + 1 < argc) {
+            char *end;
+            const char *value = argv[++i];
+            double parsed = strtod(value, &end);
+            if (end == value || *end || !isfinite(parsed))
+                goto invalid;
+            int matched = -1;
+            for (int index = 0; index <= BOAT_TIME_MAX_INDEX; ++index)
+                if (parsed == (double)boat_time_rate(index))
+                    matched = index;
+            if (matched < 0)
+                goto invalid;
+            time_speed_index = matched;
+            time_scale_set = true;
         } else if (strcmp(argv[i], "--fixed-fov") == 0) {
             camera_settings.fixed_fov = true;
         } else if ((strcmp(argv[i], "--camera-distance") == 0
@@ -848,6 +893,10 @@ static int study(int argc, char **argv)
     if ((time_set && !screenshot && !save_now) || (screenshot && frame_limit)
         || (!replay_path && time > 60))
         goto invalid;
+    if (time_scale_set && (connect_to || host_mode)) {
+        fprintf(stderr, "--time-scale is for solo live play; a room keeps its own time.\n");
+        goto invalid;
+    }
 #if defined(PROTEUS_BOAT_NET) && !defined(__EMSCRIPTEN__)
     NetHostOptions host_options = { 0 };
     char host_endpoint[32];
@@ -922,9 +971,27 @@ static int study(int argc, char **argv)
         fprintf(stderr, "--plugin-bridge is only available in native builds.\n");
         goto invalid;
     }
+    if (work_clock_report) {
+        fprintf(stderr, "--work-clock-report is only available in native builds.\n");
+        goto invalid;
+    }
 #endif
     if (bridge_path && (!plugin_path || screenshot)) {
         fprintf(stderr, "--plugin-bridge needs --plugin and a window (no --screenshot).\n");
+        goto invalid;
+    }
+    if ((work_clock_report || work_review_pose_name) && !work_mode) {
+        fprintf(stderr, "--work-clock-report and --work-review-pose belong to --work.\n");
+        goto invalid;
+    }
+    if (work_clock_report && (!frame_limit || screenshot || performance_report)) {
+        fprintf(stderr,
+            "--work-clock-report needs --work and --frames, with no --screenshot or "
+            "--performance-report.\n");
+        goto invalid;
+    }
+    if (work_review_pose_name && !screenshot && !frame_limit) {
+        fprintf(stderr, "--work-review-pose needs a bounded --screenshot or --frames run.\n");
         goto invalid;
     }
     if ((save_path || fresh_work || save_now) && !work_mode) {
@@ -1175,10 +1242,17 @@ static int study(int argc, char **argv)
             &work, &session, &worlds[location->id], location, study_failure, sizeof(study_failure)))
         goto cleanup;
     if (work_mode) {
+        // The session clock keeps running and saving; only presentation yields to an explicit
+        // fixed daylight or hour option.
+        work.lighting_cycle = !daylight_set && !lighting_hour_set;
         // Only interactive play reads or writes the game's data directory unasked; scripted runs
         // use a save only when told which one (--save or --data-dir).
         bool plain = !screenshot && !demo && !frame_limit && !save_now;
         wake_work_save_open(&work, &session, save_path, data_dir, plain, fresh_work);
+    }
+    if (work_review_pose_name && !wake_work_review_pose(&work, &session, work_review_pose_name)) {
+        fprintf(stderr, "Could not prepare the %s work review pose.\n", work_review_pose_name);
+        goto cleanup;
     }
     if (save_now) {
         // Test fixture: the scripted drive, then one save and exit.
@@ -1484,7 +1558,7 @@ static int study(int argc, char **argv)
         }
     }
     double accumulator = 0;
-    int time_speed_index = BOAT_TIME_NORMAL;
+    bool work_was_active = false;
     bool net_ready_sent = !networked;
     int frames = 0, demo_tick = 0;
     bool plugin_reset_pending = false;
@@ -1528,8 +1602,18 @@ static int study(int argc, char **argv)
     double performance_notice_until = 0;
     int performance_segment_map = -1;
     char performance_notice[512] = "";
+    PerformanceQueryContext performance_query
+        = { .capture = &capture, .lighting = &lighting_review };
     if (performance_capture && gpu_enabled)
         boat_gpu_timer_init(&performance_timer);
+    if (work_clock_report) {
+        WaterfrontGpuScene *scene = gpu_enabled ? &gpu.scene : NULL;
+        if (!wake_lighting_review_begin(&lighting_review, work_clock_report, scene)) {
+            fprintf(stderr, "Could not start the work clock report %s.\n", work_clock_report);
+            result = 1;
+            goto cleanup;
+        }
+    }
     result = 0;
     if (work_mode)
         wake_work_autosave(&work, true);
@@ -1901,6 +1985,7 @@ static int study(int argc, char **argv)
             steering_target = mouse_driving ? 0 : NAN;
         }
         double simulation_started_at = boat_profile_time(true);
+        bool work_active = active || console_simulating;
         // The work session's key actions run once per frame and its crane axes drive each tick.
         WakeWorkDrive work_drive = { 0 };
         if (work_mode)
@@ -1971,7 +2056,7 @@ static int study(int argc, char **argv)
             boat_replay_advance(&session.runs, replay_adjusted ? 0 : GetFrameTime(), active);
             metrics.course_replay_ms
                 += (float)((boat_profile_time(true) - course_started_at) * 1000.0);
-        } else if (active || console_simulating) {
+        } else if (work_active) {
             BoatInput input = {
                 .steering_rate = steering_rate,
             };
@@ -1980,7 +2065,9 @@ static int study(int argc, char **argv)
                 = boat_profile_discarded_seconds(raw_active_delta, true) * 1000.0f;
             if (course && time_speed_index != BOAT_TIME_NORMAL && !session.runs.finished)
                 session.runs.practice = true;
-            accumulator += boat_time_frame_seconds(raw_active_delta, time_speed_index);
+            accumulator += work_mode
+                ? boat_time_work_frame_seconds(raw_active_delta, time_speed_index, work_was_active)
+                : boat_time_frame_seconds(raw_active_delta, time_speed_index);
             while (accumulator >= BOAT_TICK_SECONDS) {
                 if (plugin_active)
                     wake_plugin_before_tick(&plugin);
@@ -2018,6 +2105,8 @@ static int study(int argc, char **argv)
         } else {
             accumulator = 0;
         }
+        if (work_mode)
+            work_was_active = work_active;
         metrics.paused
             = (!active && !console_simulating) || (session.runs.playing && session.runs.paused);
         metrics.simulation_ms = (float)((boat_profile_time(true) - simulation_started_at) * 1000.0);
@@ -2410,8 +2499,14 @@ static int study(int argc, char **argv)
             sample.traffic_wake_live
                 = objects && objects->traffic_enabled ? objects->traffic.live : 0;
             boat_capture_add(&capture, &sample);
+            if (work_clock_report)
+                wake_lighting_review_frame(&lighting_review, &sample, work.session.tick,
+                    work.session.lighting_hours, work.session.lighting_cycle_seconds,
+                    boat_time_rate(time_speed_index), work.lighting_cycle,
+                    gpu_enabled ? NULL : &renderer);
             previous_performance_start = current_frame_started_at;
-            boat_gpu_timer_poll(&performance_timer, performance_query_complete, &capture, false);
+            boat_gpu_timer_poll(
+                &performance_timer, performance_query_complete, &performance_query, false);
             if (performance_request) {
                 char directory[4096], destination[4096];
                 if (!wake_performance_default_directory(directory, sizeof(directory)))
@@ -2504,6 +2599,13 @@ static int study(int argc, char **argv)
         }
     }
 cleanup:
+    if (lighting_review.state) {
+        if (performance_timer.supported)
+            boat_gpu_timer_poll(
+                &performance_timer, performance_query_complete, &performance_query, true);
+        if (!wake_lighting_review_end(&lighting_review))
+            result = 1;
+    }
     study_mouse_steering = mouse_steering;
     if (objects) {
         const BoatWakeObjects *pool = object_study_wakes(objects);
@@ -2644,7 +2746,10 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
     arguments[count++] = "--soundtrack";
     arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
     const char *lighting_option, *lighting_value;
-    if (boat_title_lighting_cli(
+    // WORKING HARBOUR keeps its session clock's default cycle; a saved title preset must not
+    // become an explicit fixed override there. Other modes still inject the saved choice.
+    if (!working_harbour
+        && boat_title_lighting_cli(
             settings->lighting, extra_count, extra, &lighting_option, &lighting_value)) {
         arguments[count++] = (char *)lighting_option;
         arguments[count++] = (char *)lighting_value;

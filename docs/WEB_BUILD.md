@@ -53,9 +53,15 @@ Chrome 156.0.8078.81 on ANGLE Metal/Apple M1 Max passed both 27-choice direction
 Enter/click activation, nine IndexedDB compatibility fixtures/reloads, and three title → solo
 sessions at 0/6/12 with matching sun-direction uploads and preserved settings on return.
 The supported `cmake --build build-web --target web --parallel 8` build and packaging passed.
-Browser multiplayer propagation, other browsers/devices and human acceptance remain open;
-the [lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08) records complete evidence,
+The user accepted the T3 controls with “Works” on 2026-11-08; exact hours, night, browser
+multiplayer propagation, other browsers/devices and platform coverage remain open. The
+[lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08) records complete evidence,
 remaining limits and the unrelated generic web all-targets build failure.
+
+T4 is native-only: Working Harbour and its `--work` clock stay behind the no-Lua browser guard.
+Supported Web packaging and Chrome/ANGLE Metal non-work render smoke passed for this slice. No browser work cycle, saved
+work clock or night-cargo behavior is claimed; the
+[lighting owner](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the native contract.
 
 ## River location retired, 2026-11-04
 

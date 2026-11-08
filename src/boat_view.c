@@ -1,4 +1,5 @@
 #include "boat_view.h"
+#include "boat_cargo_view.h"
 #include "boat_combat.h"
 #include "boat_course_view.h"
 #include "boat_grodan.h"
@@ -742,6 +743,30 @@ float boat_view_overcast(const BoatViewState *view, const BoatWorld *world)
         * (3 - 2 * t);
 }
 
+bool boat_view_lighting_clock(const BoatViewState *view, float *hour, double *glitter_seconds)
+{
+    if (!view || !view->props || !view->props->lighting_cycle || !hour || !glitter_seconds)
+        return false;
+    double hours = view->props->lighting_hours;
+    double period = view->props->lighting_cycle_seconds;
+    if (!isfinite(hours) || !isfinite(period) || !(period > 0))
+        return false;
+    // Wrap in double before the float cast so a value just below 24 rounds through the same
+    // midnight normalization as every explicit hour.
+    double wrapped = fmod(hours, 24.0);
+    if (wrapped < 0)
+        wrapped += 24.0;
+    float normalized;
+    if (!waterfront_hour_normalize((float)wrapped, &normalized))
+        return false;
+    double seconds;
+    if (!waterfront_glitter_clock(hours, period, &seconds))
+        return false;
+    *hour = normalized;
+    *glitter_seconds = seconds;
+    return true;
+}
+
 static bool water_visible(void *renderer, Vector3 min, Vector3 max)
 {
     return renderer3d_box_visible(renderer, min, max);
@@ -759,8 +784,16 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         pixels[i] = (Color) { 21, 36, 48, 255 };
     View3D camera = boat_camera(boat, presentation, world->definition, camera_settings);
     WaterfrontLighting lighting;
-    if (!cpu->hour_set || !waterfront_lighting_hour(cpu->hour, &lighting))
+    float hour = 0;
+    double glitter_seconds = 0;
+    if (cpu->hour_set && waterfront_lighting_hour(cpu->hour, &lighting)) {
+        // Explicit CPU hour wins over any shared cycle.
+    } else if (boat_view_lighting_clock(view, &hour, &glitter_seconds)
+        && waterfront_lighting_hour(hour, &lighting)) {
+        // The shared cycle supplies the full-day light.
+    } else {
         lighting = waterfront_lighting(cpu->daylight);
+    }
     if (world->definition->mapped) {
         if (!waterfront_scenery_bind(&cpu->scenery, world->definition->map)
             || !waterfront_draw_boating(renderer, &cpu->scenery, pixels, width, height, camera,
@@ -828,12 +861,23 @@ bool boat_draw_scene(Renderer3D *renderer, BoatCpuView *cpu, Color *pixels, int 
         renderer->emissive_tint = (Vector3) { 1, 1, 1 };
     }
     if (view->props) {
-        // The working harbour's own geometry, in renderer coordinates (identity transform).
+        // The working harbour's own geometry, in renderer coordinates (identity transform). Only
+        // these solids and the decal take the work ambient floor; restore the frame light after
+        // so particles and other geometry keep the shared recipe.
         Transform3D identity = { .scale = { 1, 1, 1 } };
+        WaterfrontLighting work = boat_cargo_view_work_lighting(lighting);
+        float ambient = renderer->ambient, diffuse = renderer->diffuse;
+        Vector3 tint = renderer->tint;
+        renderer->ambient = work.cpu_ambient;
+        renderer->diffuse = work.cpu_direct;
+        renderer->tint = work.cpu_tint;
         if (view->props->solids)
             renderer3d_draw_mesh(renderer, view->props->solids, identity);
         if (view->props->decal)
             renderer3d_draw_mesh(renderer, view->props->decal, identity);
+        renderer->ambient = ambient;
+        renderer->diffuse = diffuse;
+        renderer->tint = tint;
     }
     for (int i = 0; i < BOAT_WATER_PARTICLES; ++i) {
         const BoatWaterParticle *p = &presentation->water[i];

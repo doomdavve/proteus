@@ -346,8 +346,8 @@ void boat_gpu_draw_with_ghost(BoatGpu *gpu, const BoatViewState *view,
 
 // The view's extra geometry over the finished scene, in the scene's own camera and depth. Called
 // with the colour target active.
-static void draw_props(
-    BoatGpu *gpu, const BoatViewProps *props, View3D view, bool mapped, int width, int height)
+static void draw_props(BoatGpu *gpu, const BoatViewProps *props, View3D view, bool mapped,
+    int width, int height, const WaterfrontLighting *lighting)
 {
     if (!gpu->props.mesh.vaoId && !boat_cargo_view_gpu_init(&gpu->props)) {
         gpu->failed = true;
@@ -364,9 +364,9 @@ static void draw_props(
     rlSetMatrixProjection(projection);
     rlDisableBackfaceCulling();
     if (props->solids)
-        boat_cargo_view_gpu_draw(&gpu->props, props->solids, true);
+        boat_cargo_view_gpu_draw_lighting(&gpu->props, props->solids, lighting);
     if (props->decal)
-        boat_cargo_view_gpu_draw(&gpu->props, props->decal, true);
+        boat_cargo_view_gpu_draw_lighting(&gpu->props, props->decal, lighting);
     rlEnableBackfaceCulling();
     EndMode3D();
 }
@@ -387,8 +387,25 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
     }
     static WaterfrontSceneFrame frame; // Large; drawing is single-threaded.
     boat_scene_frame(view, presentation, world, camera, &frame);
-    if (!gpu->hour_set || !waterfront_lighting_hour(gpu->hour, &frame.lighting))
+    float clock_hour = 0;
+    double glitter_seconds = 0;
+    bool cycle_hour
+        = !gpu->hour_set && boat_view_lighting_clock(view, &clock_hour, &glitter_seconds);
+    if (cycle_hour) {
+        frame.glitter_time = glitter_seconds;
+        frame.glitter_time_set = true;
+    }
+    float hour = 0;
+    bool have_hour = false;
+    if (gpu->hour_set && waterfront_lighting_hour(gpu->hour, &frame.lighting)) {
+        hour = gpu->hour;
+        have_hour = true;
+    } else if (cycle_hour && waterfront_lighting_hour(clock_hour, &frame.lighting)) {
+        hour = clock_hour;
+        have_hour = true;
+    } else {
         frame.lighting = waterfront_lighting(gpu->daylight);
+    }
     boat_scene_rivals(rivals, world, view->time, &frame);
     if (ghost && opacity > 0) {
         WaterfrontPlayerState pose = { 0 };
@@ -499,8 +516,8 @@ void boat_gpu_draw_scene(BoatGpu *gpu, const BoatViewState *view,
             &gpu->scene, &frame, target.texture.width, target.texture.height))
         gpu->failed = true;
     else if (view->props)
-        draw_props(
-            gpu, view->props, frame.camera, mapped, target.texture.width, target.texture.height);
+        draw_props(gpu, view->props, frame.camera, mapped, target.texture.width,
+            target.texture.height, &frame.lighting);
     float overcast = boat_view_overcast(view, world);
     if (overcast > 0) {
         Color tint = BOAT_VIEW_STORM_LIGHT;
@@ -519,7 +536,7 @@ restore_water:
     gpu->scene.near_water_extra = (Mesh) { 0 };
     if (hdr) {
         WaterfrontGrade grade;
-        if (gpu->hour_set && waterfront_grade_hour(gpu->hour, &grade))
+        if (have_hour && waterfront_grade_hour(hour, &grade))
             present_grade(gpu, grade);
         else
             boat_gpu_present_hdr(gpu, gpu->daylight);

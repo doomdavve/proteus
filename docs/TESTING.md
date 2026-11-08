@@ -664,7 +664,27 @@ title with the native networking definition but opens no window or network. The 
 overrides the settings directory with an isolated build-tree path and checks actual save/load
 roundtrips: all 27 fixed lighting fixtures, invalid versions/non-finite/out-of-range values,
 missing and old settings, unrelated fields, and the launch-argument handoff/precedence. It does
-not wait for wall time.
+not wait for wall time. The user accepted the T3 controls with “Works” on 2026-11-08; exact
+hours, night and platform coverage remain open.
+
+`boat_work_clock` (`cpu;quick`) links the work session and plugin catalog and uses the bundled
+basin/outer work resources without a window or files. It drives virtual frames through the same
+scheduler as the game, then checks the session clock: noon/900 defaults, 1× and 8× both reaching
+a whole day in 108,000 ticks, continuous rate changes, wrapping and direct/backward seeks,
+invalid seeks leaving state unchanged, load/crate/job reset and recovery preserving the hour and
+period, a fresh session resetting to noon, focused suspension gaps over one second discarded
+with the world, exactly one clock increment per physical tick, v2
+save/resume, rejection of invalid clock data, and clock-only dirtying that triggers periodic,
+pause and leave autosaves.
+
+Focused lighting checks also cover the analytic glitter integral (noon zero, recipe boundaries,
+seam continuity, day shifts, seek order independence and invalid input) and the view-props clock
+helper (missing/invalid props, normalization, noon-zero glitter and seeks).
+`validate_boat_sandbox_save` covers the v2 clock tail and a reconstructed valid v1 record
+decoding to noon/900 s.
+`validate_cargo_decal` covers the work-only ambient floor, including the unchanged Day case.
+The [lighting owner](SUNSET_PLAN.md#t4-implementation-2026-11-08) records the final native GPU
+suite, actual windowed 8× cycle, captures and platform limits.
 
 ## GPU checks
 

@@ -15,11 +15,13 @@ Single Player's Gothenburg Harbour gains a WORKING HARBOUR content on native bui
 SAVE row showing automatically discovered saves (Continue, New, Delete; New and Delete confirm)
 and the save's summary on the hint line. The WATER row is hidden for it. The
 [sandbox plan's SV1h result](FREE_RIDE_SANDBOX_PLAN.md#sv1-steps) owns the details.
-T3 fixed-hour lighting is implemented locally 2026-11-08; its review and remaining limits are
-owned by the [sunset plan](SUNSET_PLAN.md#t3-implementation-2026-11-08). The title backdrop keeps
-its existing palette, and gameplay lighting remains separate from these title-only colour
-treatments. Next: physical input/playback review; native/browser
-package qualification remains outstanding.
+T3 fixed-hour lighting is implemented locally 2026-11-08, and the user accepted the controls
+with “Works” on 2026-11-08; exact hours, night and platform coverage remain open. T4's Working
+Harbour session clock is also implemented locally and ignores the saved LIGHTING choice by
+default, using noon as its new-session start. Remaining limits are owned by the
+[sunset plan](SUNSET_PLAN.md#t3-implementation-2026-11-08). The title backdrop keeps its existing
+palette, and gameplay lighting remains separate from these title-only colour treatments. Next:
+physical input/playback review; native/browser package qualification remains outstanding.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
 
 ## Fixed-hour title lighting, 2026-11-08
@@ -36,8 +38,11 @@ while explicit `--daylight` or `--lighting-hour` suppress that injection; when b
 the hour wins regardless of order and direct explicit sessions never load the title preference.
 
 Native settings roundtrips and Chrome/ANGLE Metal selection, reload and solo-session checks
-passed. All 470 enabled native tests passed with GPU tests enabled. Player/night acceptance and
-platform limits remain in the [lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08).
+passed. All 470 enabled native tests passed with GPU tests enabled. The user accepted the T3
+controls with “Works” on 2026-11-08; exact hours, night gameplay and platform limits remain
+with the [lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08). In Working Harbour the
+saved choice is not injected by default, because that mode uses its own noon-start session
+clock; T4 owns that behavior.
 
 ## Fixed gameplay lighting setting, 2026-11-06
 

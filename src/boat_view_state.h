@@ -15,6 +15,10 @@ typedef struct {
     const Mesh3D *solids;
     const Mesh3D *decal;
     bool hide_player;
+    // Optional shared lighting cycle. Zero-init (flag false) keeps every legacy caller on its
+    // fixed daylight phase or explicit hour. HOURS is unwrapped; the renderers normalize it.
+    bool lighting_cycle;
+    double lighting_hours, lighting_cycle_seconds;
 } BoatViewProps;
 
 // What a view shows: the live session boat, a replay sample or a ghost. Built per displayed

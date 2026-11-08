@@ -23,6 +23,9 @@ typedef struct BoatWorkSession {
     unsigned site_count;
     BoatCargoSandbox sandbox;
     uint64_t tick;
+    // Presentation clock: unwrapped game hours and the active scaled seconds per day. Whole
+    // fixed ticks advance it; the save codec owns the bounds and the default is noon / 900 s.
+    double lighting_hours, lighting_cycle_seconds;
     bool crane_view, paused;
     bool braking;
     int aim; // 1 pad, 2/3 port/starboard. Motors, never a pose teleport.
@@ -66,9 +69,19 @@ void boat_work_job_tick(BoatWorkSession *e);
 void boat_work_session_reset_world(BoatWorkSession *e);
 void boat_work_session_reset(BoatWorkSession *e);
 
-// One 120 Hz tick of the boat, crane motors and cargo, then the job.
+// One 120 Hz tick of the boat, crane motors and cargo, then the job. Each physical tick also
+// advances the daylight clock by exactly one tick, so the caller's paused/focused tick loop owns
+// the speed and no frame time enters the clock.
 void boat_work_session_tick(
     BoatWorkSession *e, float slew, float reach, float hoist, BoatInput input);
+
+// The session's daylight clock. SEEK validates HOURS (unwrapped 0..1e9) and PERIOD (1..86400
+// seconds per day) and sets both fields together; an invalid pair leaves the clock unchanged.
+// HOUR returns the canonical display hour in 0..24. ADVANCE adds TICKS whole fixed ticks at the
+// current period and validates the result before mutating; long advances may call it directly.
+bool boat_work_lighting_seek(BoatWorkSession *e, double hours, double period);
+float boat_work_lighting_hour(const BoatWorkSession *e);
+bool boat_work_lighting_advance(BoatWorkSession *e, uint64_t ticks);
 
 // Key actions; each sets the notice.
 void boat_work_hook_action(BoatWorkSession *e);
@@ -109,6 +122,7 @@ typedef struct {
     float heading;
     uint64_t progress; // The committed job state, HUD and timers, not its tick.
     unsigned built, load, active;
+    double lighting_hours, lighting_cycle_seconds; // Idle light and rate changes still save.
     bool moored, delivered, secured, on_pad;
     unsigned char receivers;
 } BoatWorkWatch;

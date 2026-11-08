@@ -439,6 +439,58 @@ bool waterfront_lighting_hour(float hour, WaterfrontLighting *lighting)
     return true;
 }
 
+// The authored glint_speed is linearly interpolated between consecutive anchors through the same
+// smoothstep as the light. Its integral over an interval of D hours, T of the way in, is analytic:
+// D * (a*T + (b - a)*(T^3 - T^4/2)). This reads each anchor's recipe, so the clock has no second
+// copy of the artistic speed table and performs no per-frame sweep.
+static double glint_interval_area(size_t i, double t)
+{
+    const HourAnchor *a = &hour_anchors[i], *b = &hour_anchors[i + 1];
+    double d = (double)b->hour - (double)a->hour;
+    double from = a->recipe().glint_speed, to = b->recipe().glint_speed;
+    return d * (from * t + (to - from) * (t * t * t - .5 * t * t * t * t));
+}
+
+static double glint_day_area(void)
+{
+    double area = 0;
+    size_t count = sizeof(hour_anchors) / sizeof(*hour_anchors);
+    for (size_t i = 0; i + 1 < count; ++i)
+        area += glint_interval_area(i, 1.0);
+    return area;
+}
+
+// Integral of glint_speed from hour zero of the anchor table, with whole days handled analytically
+// before walking the existing anchors once for the remainder.
+static double glint_primitive(double hour)
+{
+    double days = floor(hour / 24.0);
+    double remaining = hour - days * 24.0;
+    double area = days * glint_day_area();
+    size_t count = sizeof(hour_anchors) / sizeof(*hour_anchors);
+    for (size_t i = 0; i + 1 < count; ++i) {
+        double start = (double)hour_anchors[i].hour, end = (double)hour_anchors[i + 1].hour;
+        if (remaining <= start)
+            break;
+        double t = remaining < end ? (remaining - start) / (end - start) : 1.0;
+        area += glint_interval_area(i, t);
+        if (remaining <= end)
+            break;
+    }
+    return area;
+}
+
+bool waterfront_glitter_clock(double unwrapped_hour, double cycle_seconds, double *seconds)
+{
+    if (!isfinite(unwrapped_hour) || !isfinite(cycle_seconds) || !(cycle_seconds > 0))
+        return false;
+    double value = (glint_primitive(unwrapped_hour) - glint_primitive(12.0)) * cycle_seconds / 24.0;
+    if (!isfinite(value))
+        return false;
+    *seconds = value;
+    return true;
+}
+
 // Exact: raymath's Vector3Equals tolerates differences that would change the panorama.
 static bool same3(Vector3 a, Vector3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
 
