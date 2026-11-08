@@ -315,6 +315,12 @@ void boat_cargo_view_water(const BoatCargoView *v, BoatModel *m)
         }
 }
 
+WaterfrontLighting boat_cargo_view_work_lighting(WaterfrontLighting light)
+{
+    light.cpu_ambient = fmaxf(light.cpu_ambient, .8f * Clamp(light.window_light, 0, 1));
+    return light;
+}
+
 bool boat_cargo_view_gpu_init(BoatCargoViewGpu *g)
 {
     enum { VERTICES = BOAT_MODEL_MAX_TRIANGLES * 3 };
@@ -334,9 +340,16 @@ bool boat_cargo_view_gpu_init(BoatCargoViewGpu *g)
     return g->mesh.vaoId != 0;
 }
 
-void boat_cargo_view_gpu_draw(BoatCargoViewGpu *g, const Mesh3D *m, bool lit)
+// One upload/draw loop for the legacy harness look and the frame-lit game entry. FLAT leaves
+// colours unchanged; FIXED preserves the harness's original key light and byte truncation; FRAME
+// applies the CPU flat-material frame policy.
+typedef enum { CARGO_GPU_FLAT, CARGO_GPU_FIXED, CARGO_GPU_FRAME } CargoGpuShading;
+
+static void cargo_gpu_draw(BoatCargoViewGpu *g, const Mesh3D *m, CargoGpuShading shading,
+    const WaterfrontLighting *lighting)
 {
-    if (!g->mesh.vaoId || !m->triangle_count || m->triangle_count > BOAT_MODEL_MAX_TRIANGLES)
+    if (!g->mesh.vaoId || !m->triangle_count || m->triangle_count > BOAT_MODEL_MAX_TRIANGLES
+        || (shading == CARGO_GPU_FRAME && !lighting))
         return;
     Vector3 light = Vector3Normalize((Vector3) { -1, 3, 2 });
     for (size_t t = 0; t < m->triangle_count; ++t) {
@@ -345,14 +358,31 @@ void boat_cargo_view_gpu_draw(BoatCargoViewGpu *g, const Mesh3D *m, bool lit)
                 c = m->vertices[triangle.vertices[2]];
         Vector3 normal
             = Vector3Normalize(Vector3CrossProduct(Vector3Subtract(b, a), Vector3Subtract(c, a)));
-        float shade = lit ? .3f + .7f * fmaxf(0, Vector3DotProduct(normal, light)) : 1;
+        float shade = 1;
+        Vector3 levels = { 1, 1, 1 };
+        if (shading == CARGO_GPU_FIXED)
+            shade = .3f + .7f * fmaxf(0, Vector3DotProduct(normal, light));
+        else if (shading == CARGO_GPU_FRAME) {
+            float brightness = lighting->cpu_ambient
+                + lighting->cpu_direct
+                    * fmaxf(0, Vector3DotProduct(normal, lighting->sun_direction));
+            levels = (Vector3) { Clamp(brightness * lighting->cpu_tint.x, 0, 1),
+                Clamp(brightness * lighting->cpu_tint.y, 0, 1),
+                Clamp(brightness * lighting->cpu_tint.z, 0, 1) };
+        }
         for (int i = 0; i < 3; ++i) {
             size_t v = t * 3 + i;
             Vector3 p = m->vertices[triangle.vertices[i]];
             memcpy(g->mesh.vertices + v * 3, &p, sizeof(p));
-            g->mesh.colors[v * 4] = (unsigned char)(triangle.color.r * shade);
-            g->mesh.colors[v * 4 + 1] = (unsigned char)(triangle.color.g * shade);
-            g->mesh.colors[v * 4 + 2] = (unsigned char)(triangle.color.b * shade);
+            if (shading == CARGO_GPU_FRAME) {
+                g->mesh.colors[v * 4] = (unsigned char)(triangle.color.r * levels.x);
+                g->mesh.colors[v * 4 + 1] = (unsigned char)(triangle.color.g * levels.y);
+                g->mesh.colors[v * 4 + 2] = (unsigned char)(triangle.color.b * levels.z);
+            } else {
+                g->mesh.colors[v * 4] = (unsigned char)(triangle.color.r * shade);
+                g->mesh.colors[v * 4 + 1] = (unsigned char)(triangle.color.g * shade);
+                g->mesh.colors[v * 4 + 2] = (unsigned char)(triangle.color.b * shade);
+            }
             g->mesh.colors[v * 4 + 3] = 255;
         }
     }
@@ -361,6 +391,18 @@ void boat_cargo_view_gpu_draw(BoatCargoViewGpu *g, const Mesh3D *m, bool lit)
     UpdateMeshBuffer(g->mesh, 0, g->mesh.vertices, g->mesh.triangleCount * 9 * sizeof(float), 0);
     UpdateMeshBuffer(g->mesh, 3, g->mesh.colors, g->mesh.triangleCount * 12, 0);
     DrawMesh(g->mesh, g->material, MatrixIdentity());
+}
+
+void boat_cargo_view_gpu_draw(BoatCargoViewGpu *g, const Mesh3D *m, bool lit)
+{
+    cargo_gpu_draw(g, m, lit ? CARGO_GPU_FIXED : CARGO_GPU_FLAT, NULL);
+}
+
+void boat_cargo_view_gpu_draw_lighting(
+    BoatCargoViewGpu *g, const Mesh3D *m, const WaterfrontLighting *lighting)
+{
+    WaterfrontLighting work = boat_cargo_view_work_lighting(*lighting);
+    cargo_gpu_draw(g, m, CARGO_GPU_FRAME, &work);
 }
 
 void boat_cargo_view_gpu_destroy(BoatCargoViewGpu *g)

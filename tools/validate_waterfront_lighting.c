@@ -1,3 +1,4 @@
+#include "boat_view.h"
 #include "renderer3d.h"
 #include "waterfront_corner.h"
 #include "waterfront_lighting.h"
@@ -484,6 +485,184 @@ static int check_hour_looks(void)
     return 0;
 }
 
+// The glitter clock is a history-independent integral of the authored glint_speed recipe: anchored
+// at noon, continuous across midnights and anchors, periodic in its daily increment, and exactly
+// the derivative the instantaneous evaluator reports away from seams.
+static int check_glitter_clock(void)
+{
+    const double cycle = 37.0, step = 1e-4;
+    double seconds = -1;
+    CHECK(waterfront_glitter_clock(12.0, cycle, &seconds) && seconds == 0);
+
+    // The clock's derivative is the same authored speed the light reports, away from seams.
+    const double hours[] = { -2.3, .7, 3.1, 5.2, 7.9, 10.6, 13.4, 16.7, 18.8, 20.9, 23.2, 26.1 };
+    for (size_t i = 0; i < sizeof(hours) / sizeof(*hours); ++i) {
+        double before, after;
+        CHECK(waterfront_glitter_clock(hours[i] - step, cycle, &before));
+        CHECK(waterfront_glitter_clock(hours[i] + step, cycle, &after));
+        WaterfrontLighting lighting;
+        CHECK(waterfront_lighting_hour((float)hours[i], &lighting));
+        double speed = (after - before) / (2 * step) * 24.0 / cycle;
+        CHECK(fabs(speed - lighting.glint_speed) < 1e-3);
+    }
+
+    // Independent midpoint integration agrees over more than three unwrapped days, including a
+    // negative start, without calling the analytic primitive.
+    const double start = -5.3, end = 76.7;
+    const int steps = 60000;
+    double width = (end - start) / steps, total = 0;
+    for (int n = 0; n < steps; ++n) {
+        WaterfrontLighting lighting;
+        CHECK(waterfront_lighting_hour((float)(start + (n + .5) * width), &lighting));
+        total += lighting.glint_speed * width;
+    }
+    double first, last;
+    CHECK(waterfront_glitter_clock(start, cycle, &first));
+    CHECK(waterfront_glitter_clock(end, cycle, &last));
+    CHECK(fabs((last - first) * 24.0 / cycle - total) < 1e-2);
+
+    // The integral has no jump at midnight or at any authored anchor.
+    const double seams[] = { -24, 0, 4.5, 6, 9, 12, 15, 18, 19.5, 21.5, 24, 48 };
+    const double gap = 1e-6;
+    for (size_t i = 0; i < sizeof(seams) / sizeof(*seams); ++i) {
+        double before, at, after;
+        CHECK(waterfront_glitter_clock(seams[i] - gap, cycle, &before));
+        CHECK(waterfront_glitter_clock(seams[i], cycle, &at));
+        CHECK(waterfront_glitter_clock(seams[i] + gap, cycle, &after));
+        CHECK(fabs(at - before) < 1e-4 && fabs(after - at) < 1e-4);
+    }
+
+    // Every additional day adds the same integral, forward or backward.
+    double at_zero, at_day;
+    CHECK(waterfront_glitter_clock(0, cycle, &at_zero));
+    CHECK(waterfront_glitter_clock(24, cycle, &at_day));
+    double day_increment = at_day - at_zero;
+    CHECK(day_increment > 0);
+    const double bases[] = { -13.7, 0, 7.3, 12, 23.9 };
+    for (size_t i = 0; i < sizeof(bases) / sizeof(*bases); ++i) {
+        double value;
+        CHECK(waterfront_glitter_clock(bases[i], cycle, &value));
+        for (int k = 1; k <= 3; ++k) {
+            double later, earlier;
+            CHECK(waterfront_glitter_clock(bases[i] + 24.0 * k, cycle, &later));
+            CHECK(waterfront_glitter_clock(bases[i] - 24.0 * k, cycle, &earlier));
+            CHECK(fabs((later - value) - k * day_increment) < 1e-8);
+            CHECK(fabs((earlier - value) + k * day_increment) < 1e-8);
+        }
+    }
+
+    // Direct, backward and reordered seeks are bit-identical: there is no accumulated history.
+    double expected, direct, backward, reordered;
+    CHECK(waterfront_glitter_clock(17.3, cycle, &expected));
+    CHECK(waterfront_glitter_clock(17.3, cycle, &direct));
+    const double order[] = { 23.9, 3.2, 40.5, -8.0, 0 };
+    for (size_t i = 0; i < sizeof(order) / sizeof(*order); ++i)
+        CHECK(waterfront_glitter_clock(order[i], cycle, &reordered));
+    CHECK(waterfront_glitter_clock(17.3, cycle, &backward));
+    CHECK(waterfront_glitter_clock(17.3, cycle, &reordered));
+    CHECK(direct == expected && backward == expected && reordered == expected);
+
+    // Invalid input, including an overflowing result, leaves the caller's value untouched.
+    double sentinel = 123.25, out = sentinel;
+    CHECK(!waterfront_glitter_clock(NAN, cycle, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(INFINITY, cycle, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(-INFINITY, cycle, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(5, NAN, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(5, INFINITY, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(5, -INFINITY, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(5, 0, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(5, -1, &out) && out == sentinel);
+    CHECK(!waterfront_glitter_clock(1e300, DBL_MAX, &out) && out == sentinel);
+    return 0;
+}
+
+// The shared view clock resolves a working-harbour lighting cycle without touching history: its
+// normalized hour and analytic glitter clock are written only for valid props, and every seek is
+// bit-identical.
+static int check_view_clock(void)
+{
+    BoatViewState view = { 0 };
+    BoatViewProps props = { 0 };
+    float hour = -123.5f;
+    double seconds = -456.25;
+    CHECK(!boat_view_lighting_clock(NULL, &hour, &seconds));
+    CHECK(!boat_view_lighting_clock(&view, &hour, &seconds));
+    CHECK(hour == -123.5f && seconds == -456.25);
+    view.props = &props;
+    CHECK(!boat_view_lighting_clock(&view, &hour, &seconds));
+    CHECK(hour == -123.5f && seconds == -456.25);
+
+    // A valid cycle anchors the glitter clock at noon.
+    props.lighting_cycle = true;
+    props.lighting_hours = 12;
+    props.lighting_cycle_seconds = 37;
+    CHECK(boat_view_lighting_clock(&view, &hour, &seconds));
+    CHECK(hour == 12 && seconds == 0);
+
+    // Unwrapped hours wrap in double before the float cast; the clock keeps the integral.
+    const double unwrapped[] = { 18.5, 36.25, 49.5, -1.5, -24.0 };
+    const float expected_hours[] = { 18.5f, 12.25f, 1.5f, 22.5f, 0.0f };
+    for (size_t i = 0; i < sizeof(unwrapped) / sizeof(*unwrapped); ++i) {
+        props.lighting_hours = unwrapped[i];
+        double expected;
+        CHECK(waterfront_glitter_clock(unwrapped[i], props.lighting_cycle_seconds, &expected));
+        hour = -1;
+        seconds = -1;
+        CHECK(boat_view_lighting_clock(&view, &hour, &seconds));
+        CHECK(hour == expected_hours[i]);
+        CHECK(seconds == expected);
+    }
+
+    // A double just below midnight casts to the float hour 24 and normalizes to positive zero.
+    props.lighting_hours = nextafter(24.0, 0.0);
+    CHECK(boat_view_lighting_clock(&view, &hour, &seconds));
+    CHECK(hour == 0 && !signbit(hour));
+
+    // Direct, backward and reordered seeks are bit-identical.
+    props.lighting_hours = 17.3;
+    double expected, direct, backward, reordered;
+    CHECK(waterfront_glitter_clock(17.3, props.lighting_cycle_seconds, &expected));
+    CHECK(boat_view_lighting_clock(&view, &hour, &direct));
+    const double order[] = { 63.2, -8.0, 40.5, 0, 89.9 };
+    for (size_t i = 0; i < sizeof(order) / sizeof(*order); ++i) {
+        props.lighting_hours = order[i];
+        CHECK(boat_view_lighting_clock(&view, &hour, &reordered));
+    }
+    props.lighting_hours = 17.3;
+    CHECK(boat_view_lighting_clock(&view, &hour, &backward));
+    CHECK(boat_view_lighting_clock(&view, &hour, &reordered));
+    CHECK(direct == expected && backward == expected && reordered == expected);
+
+    // Invalid hours, periods and overflowing clocks leave both outputs untouched.
+    props.lighting_hours = 5;
+    props.lighting_cycle_seconds = 37;
+    const double bad_hours[] = { NAN, INFINITY, -INFINITY };
+    for (size_t i = 0; i < sizeof(bad_hours) / sizeof(*bad_hours); ++i) {
+        props.lighting_hours = bad_hours[i];
+        hour = -123.5f;
+        seconds = -456.25;
+        CHECK(!boat_view_lighting_clock(&view, &hour, &seconds));
+        CHECK(hour == -123.5f && seconds == -456.25);
+    }
+    props.lighting_hours = 5;
+    const double bad_periods[] = { 0, -1, NAN, INFINITY, -INFINITY };
+    for (size_t i = 0; i < sizeof(bad_periods) / sizeof(*bad_periods); ++i) {
+        props.lighting_cycle_seconds = bad_periods[i];
+        hour = -123.5f;
+        seconds = -456.25;
+        CHECK(!boat_view_lighting_clock(&view, &hour, &seconds));
+        CHECK(hour == -123.5f && seconds == -456.25);
+    }
+    // A finite input can still overflow the analytic integral; it must not commit either output.
+    props.lighting_hours = 1e300;
+    props.lighting_cycle_seconds = DBL_MAX;
+    hour = -123.5f;
+    seconds = -456.25;
+    CHECK(!boat_view_lighting_clock(&view, &hour, &seconds));
+    CHECK(hour == -123.5f && seconds == -456.25);
+    return 0;
+}
+
 // Begin restores the daytime flat shading whatever the previous frame set.
 static int check_renderer(void)
 {
@@ -522,7 +701,8 @@ int main(int argc, char **argv)
         return 2;
     }
     int failed = check_presets() || check_continuity() || check_sky() || check_windows()
-        || check_parse() || check_hour_input() || check_hour_looks() || check_renderer();
+        || check_parse() || check_hour_input() || check_hour_looks() || check_glitter_clock()
+        || check_view_clock() || check_renderer();
     if (!failed)
         printf("Waterfront lighting checks passed.\n");
     return failed;

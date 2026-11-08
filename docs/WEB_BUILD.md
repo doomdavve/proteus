@@ -7,8 +7,10 @@ opens PLACE (GOTHENBURG HARBOUR by default, BASIN, BASIN TRIAL), WAVES, PICTURE 
 graphics G5a) and START. (From 2026-10-25 until its 2026-11-01 fix, Basin trial could not
 start from the title: the title passed free-boating options the course rejects.) SETTINGS
 remembers name, single-player boat livery,
-steering, soundtrack, PICTURE and LIGHTING. LIGHTING selects DAY (default), SUNSET or DUSK
-for your own view in new solo and multiplayer sessions and persists through IndexedDB.
+steering, soundtrack, PICTURE and LIGHTING. LIGHTING cycles 27 fixed choices—DAY (default),
+SUNSET, DUSK, then 00:00 through 23:00—for your own view in new solo and multiplayer sessions
+and persists through IndexedDB. The choice saves exact legacy names or `hour-v1:HH`; malformed
+values and unknown versions fall back to Day.
 The saved PICTURE (PIXEL, SMOOTH or HIGH RES) applies to
 single-player and multiplayer. P opens/closes the shared in-game menu while staying fullscreen; Escape also opens it,
 but the browser may leave fullscreen. BACK TO TITLE returns to setup
@@ -44,6 +46,22 @@ Next: qualify WebRTC on Firefox/Safari and physical devices, test real loss/late
 suspension, measure memory/runtime budgets, and complete internet-play acceptance of the
 [Winterfell deployment](MULTIPLAYER_HOSTING.md). User play/listening acceptance remains outstanding.
 The earlier launcher and browser qualification records below are dated history.
+
+## T3 fixed-hour title lighting, 2026-11-08
+
+Chrome 156.0.8078.81 on ANGLE Metal/Apple M1 Max passed both 27-choice direction cycles,
+Enter/click activation, nine IndexedDB compatibility fixtures/reloads, and three title → solo
+sessions at 0/6/12 with matching sun-direction uploads and preserved settings on return.
+The supported `cmake --build build-web --target web --parallel 8` build and packaging passed.
+The user accepted the T3 controls with “Works” on 2026-11-08; exact hours, night, browser
+multiplayer propagation, other browsers/devices and platform coverage remain open. The
+[lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08) records complete evidence,
+remaining limits and the unrelated generic web all-targets build failure.
+
+T4 is native-only: Working Harbour and its `--work` clock stay behind the no-Lua browser guard.
+Supported Web packaging and Chrome/ANGLE Metal non-work render smoke passed for this slice. No browser work cycle, saved
+work clock or night-cargo behavior is claimed; the
+[lighting owner](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the native contract.
 
 ## River location retired, 2026-11-04
 

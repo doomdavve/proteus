@@ -300,6 +300,7 @@ else()
 endif()
 
 add_executable(wake_velocity tools/wake_velocity.c tools/wake_velocity_menu.c
+  tools/wake_velocity_lighting_review.c tools/wake_velocity_lighting_review.h
   tools/wake_velocity_work.h tools/boat_title.c
   tools/cli_usage.c tools/wake_velocity_performance.c src/profiler.c src/boat_audio.c
   src/xm_audio.c src/boat_capture.c)
@@ -458,6 +459,18 @@ if(EMSCRIPTEN)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
 
+# T3: title settings persistence and the title's lighting hand-off into each launch mode. The
+# build-tree data directory keeps the player's settings out of the test.
+set(BOAT_TITLE_SETTINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-title-settings-tests")
+file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
+add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c)
+target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(validate_boat_title PRIVATE proteus_render proteus_work_save
+  proteus_frame_pacer proteus_boat_net_enet)
+target_compile_definitions(validate_boat_title PRIVATE PROTEUS_BOAT_NET=1)
+target_compile_options(validate_boat_title PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_title_settings COMMAND validate_boat_title "${BOAT_TITLE_SETTINGS_DIR}")
+set_tests_properties(boat_title_settings PROPERTIES LABELS "cpu")
 
 add_custom_target(proteus_assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -588,6 +601,12 @@ target_link_libraries(validate_boat_work_menu PRIVATE proteus_work_save proteus_
 target_compile_options(validate_boat_work_menu PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME boat_work_menu COMMAND validate_boat_work_menu ${CMAKE_CURRENT_BINARY_DIR}/work-menu-tests)
 set_tests_properties(boat_work_menu PROPERTIES LABELS "cpu;quick")
+# The work session's daylight clock: fixed ticks, save/resume and the idle autosave watch.
+add_executable(validate_boat_work_clock tools/validate_boat_work_clock.c)
+target_link_libraries(validate_boat_work_clock PRIVATE proteus_work_session proteus_plugin_catalog)
+target_compile_options(validate_boat_work_clock PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_work_clock COMMAND validate_boat_work_clock)
+set_tests_properties(boat_work_clock PROPERTIES LABELS "cpu;quick")
 if(NOT EMSCRIPTEN)
   add_executable(cargo_sandbox tools/cargo_sandbox.c)
   target_include_directories(cargo_sandbox PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -1408,6 +1427,37 @@ add_test(NAME wake_velocity_work_refuses_package COMMAND wake_velocity --rendere
   --location outer --work --package outer-work --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/wake-work-refused.png)
 set_tests_properties(wake_velocity_work_refuses_package PROPERTIES WILL_FAIL TRUE)
+# Fast developer CLI validation: each case rejects before a window or capture starts.
+add_test(NAME wake_velocity_time_scale_nan_rejected COMMAND wake_velocity --time-scale nan)
+add_test(NAME wake_velocity_time_scale_unsupported_rejected COMMAND wake_velocity --time-scale 3)
+add_test(NAME wake_velocity_time_scale_missing_rejected COMMAND wake_velocity --time-scale)
+add_test(NAME wake_velocity_time_scale_multiplayer_rejected
+  COMMAND wake_velocity --host free --time-scale 2)
+add_test(NAME wake_velocity_work_review_pose_name_rejected
+  COMMAND wake_velocity --work --work-review-pose pirouette)
+add_test(NAME wake_velocity_work_review_pose_without_work_rejected
+  COMMAND wake_velocity --renderer cpu --work-review-pose swing
+    --screenshot ${CMAKE_CURRENT_BINARY_DIR}/work-review-unused.png --time 0)
+add_test(NAME wake_velocity_work_review_pose_unbounded_rejected
+  COMMAND wake_velocity --renderer cpu --location outer --work --work-review-pose swing)
+add_test(NAME wake_velocity_work_clock_report_missing_arg_rejected
+  COMMAND wake_velocity --work-clock-report)
+add_test(NAME wake_velocity_work_clock_report_empty_rejected
+  COMMAND wake_velocity --work-clock-report "")
+add_test(NAME wake_velocity_work_clock_report_without_frames_rejected
+  COMMAND wake_velocity --work --work-clock-report ${CMAKE_CURRENT_BINARY_DIR}/work-clock.csv)
+set_tests_properties(
+  wake_velocity_time_scale_nan_rejected
+  wake_velocity_time_scale_unsupported_rejected
+  wake_velocity_time_scale_missing_rejected
+  wake_velocity_time_scale_multiplayer_rejected
+  wake_velocity_work_review_pose_name_rejected
+  wake_velocity_work_review_pose_without_work_rejected
+  wake_velocity_work_review_pose_unbounded_rejected
+  wake_velocity_work_clock_report_missing_arg_rejected
+  wake_velocity_work_clock_report_empty_rejected
+  wake_velocity_work_clock_report_without_frames_rejected
+  PROPERTIES WILL_FAIL TRUE LABELS "quick" TIMEOUT 10)
 # The retired river location names its replacement instead of printing the usage.
 add_test(NAME boat_river_location_retired COMMAND wake_velocity --location river)
 add_test(NAME boat_server_river_location_retired COMMAND boat_server --location river)

@@ -53,6 +53,20 @@ static void put_float(Writer *w, float value)
     put_uint(w, bits, 4);
 }
 
+static void put_double(Writer *w, double value)
+{
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    put_uint(w, bits, 8);
+}
+
+bool boat_sandbox_lighting_valid(double hours, double period)
+{
+    return isfinite(hours) && isfinite(period) && hours >= 0.0
+        && hours <= BOAT_SANDBOX_LIGHTING_HOURS_MAX && period >= BOAT_SANDBOX_LIGHTING_PERIOD_MIN
+        && period <= BOAT_SANDBOX_LIGHTING_PERIOD_MAX;
+}
+
 // Text must be terminated inside its array and printable ASCII, so a decoded copy fits the same
 // array.
 static bool text_ok(const char *text, size_t capacity)
@@ -102,6 +116,14 @@ static float get_float(Reader *r)
     memcpy(&value, &bits, sizeof(value));
     if (!isfinite(value))
         r->ok = false;
+    return value;
+}
+
+static double get_double(Reader *r)
+{
+    uint64_t bits = get_uint(r, 8);
+    double value;
+    memcpy(&value, &bits, sizeof(value));
     return value;
 }
 
@@ -235,6 +257,8 @@ static bool valid_snapshot(const BoatSandboxSave *save)
         if (!text_ok(e->kind, sizeof(e->kind)) || !text_ok(e->id, sizeof(e->id)) || e->load < 0)
             return false;
     }
+    if (!boat_sandbox_lighting_valid(save->lighting_hours, save->lighting_cycle_seconds))
+        return false;
     return true;
 }
 
@@ -314,6 +338,9 @@ bool boat_sandbox_save_encode(
     }
     put_uint(&w, save->generation, 4);
     put_uint(&w, (uint64_t)save->sequence, 8);
+    // Format 2 requires the presentation clock as the final 16 bytes of the body.
+    put_double(&w, save->lighting_hours);
+    put_double(&w, save->lighting_cycle_seconds);
     if (!w.ok)
         return false;
     size_t body_size = w.size - body;
@@ -458,6 +485,15 @@ BoatSandboxSaveStatus boat_sandbox_save_decode(
     }
     save->generation = (unsigned)get_uint(&r, 4);
     save->sequence = (int64_t)get_uint(&r, 8);
+    save->lighting_hours = BOAT_SANDBOX_LIGHTING_HOURS_DEFAULT;
+    save->lighting_cycle_seconds = BOAT_SANDBOX_LIGHTING_PERIOD_DEFAULT;
+    unsigned format = bytes[4] | (unsigned)bytes[5] << 8;
+    if (format >= 2) {
+        save->lighting_hours = get_double(&r);
+        save->lighting_cycle_seconds = get_double(&r);
+        if (!boat_sandbox_lighting_valid(save->lighting_hours, save->lighting_cycle_seconds))
+            r.ok = false;
+    }
     if (!r.ok || r.offset != r.size || !valid_snapshot(save))
         return BOAT_SANDBOX_SAVE_MALFORMED;
     *out = *save;
