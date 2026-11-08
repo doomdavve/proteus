@@ -56,4 +56,14 @@ bool waterfront_lighting_same_sky(const WaterfrontLighting *a, const WaterfrontL
 // A daylight phase named day, sunset or dusk, or a number in 0..1. False otherwise.
 bool waterfront_daylight_parse(const char *text, float *phase);
 
+// Full-day presentation time. Finite HOUR values wrap into [0,24): 24 and -0 become 0, -1 is
+// 23, and 25 is 1. Non-finite input (NAN or an infinity) is invalid. On failure the output is
+// left untouched.
+bool waterfront_hour_normalize(float hour, float *wrapped);
+bool waterfront_hour_parse(const char *text, float *hour);
+// Evaluate the artistic day at HOUR. The legacy PHASE member is always WATERFRONT_DAYLIGHT_DAY;
+// a clock hour is never stored there or passed to waterfront_grade(phase). Invalid HOUR returns
+// false and leaves *lighting untouched. Anchors and the sun path are provisional art.
+bool waterfront_lighting_hour(float hour, WaterfrontLighting *lighting);
+
 #endif

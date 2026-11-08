@@ -16,6 +16,56 @@
 #define PROTEUS_ASSET_DIR "assets"
 #endif
 
+// Native GL spies restricted to the sky mask texture. They observe the real upload calls rather
+// than trusting a renderer report; the test installs them only after warm-up and restores them.
+static PFNGLTEXIMAGE2DPROC real_tex_image;
+static PFNGLTEXSUBIMAGE2DPROC real_tex_sub_image;
+static GLuint spy_sky_texture;
+static int spy_sky_tex_image_calls, spy_sky_tex_sub_image_calls;
+
+static void GLAD_API_PTR spy_tex_image(GLenum target, GLint level, GLint internalformat,
+    GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void *pixels)
+{
+    GLint bound = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound);
+    if ((GLuint)bound == spy_sky_texture)
+        ++spy_sky_tex_image_calls;
+    real_tex_image(target, level, internalformat, width, height, border, format, type, pixels);
+}
+
+static void GLAD_API_PTR spy_tex_sub_image(GLenum target, GLint level, GLint xoffset, GLint yoffset,
+    GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels)
+{
+    GLint bound = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &bound);
+    if ((GLuint)bound == spy_sky_texture)
+        ++spy_sky_tex_sub_image_calls;
+    real_tex_sub_image(target, level, xoffset, yoffset, width, height, format, type, pixels);
+}
+
+static bool install_sky_spies(GLuint texture)
+{
+    real_tex_image = glad_glTexImage2D;
+    real_tex_sub_image = glad_glTexSubImage2D;
+    if (real_tex_image == NULL || real_tex_sub_image == NULL)
+        return false;
+    spy_sky_texture = texture;
+    spy_sky_tex_image_calls = spy_sky_tex_sub_image_calls = 0;
+    glad_glTexImage2D = spy_tex_image;
+    glad_glTexSubImage2D = spy_tex_sub_image;
+    return true;
+}
+
+static void restore_sky_spies(void)
+{
+    if (real_tex_image != NULL)
+        glad_glTexImage2D = real_tex_image;
+    if (real_tex_sub_image != NULL)
+        glad_glTexSubImage2D = real_tex_sub_image;
+    real_tex_image = NULL;
+    real_tex_sub_image = NULL;
+}
+
 typedef struct {
     int width;
     int height;
@@ -624,6 +674,316 @@ static bool verify_sky_targets(WaterfrontGpuScene *scene)
     return ok;
 }
 
+typedef struct {
+    const char *name;
+    bool hour;
+    float value;
+    int view; // 0: accepted above-city view; 1: azimuth seam view.
+} SkyLightingCase;
+
+static void sky_fixture_frame(WaterfrontSceneFrame *frame, int view)
+{
+    waterfront_scene_evaluate(0, (BoatWater) { 0 }, frame);
+    frame->squall = (WaterfrontSquall) { 0 };
+    // Looking up from 2 km with a 25 m far plane keeps every pixel in the sky.
+    frame->camera = (View3D) { .position = { 0, 2000, 0 },
+        .target = view ? (Vector3) { 0, 2100, -100 } : (Vector3) { 80, 2100, -100 },
+        .up = { 0, 1, 0 },
+        .vertical_fov = 55 * DEG2RAD,
+        .near_plane = .3f,
+        .far_plane = 25 };
+}
+
+static bool capture_sky(WaterfrontGpuScene *scene, RenderTexture2D target,
+    const WaterfrontSceneFrame *frame, Image *image)
+{
+    BeginTextureMode(target);
+    waterfront_gpu_scene_draw(scene, frame, target.texture.width, target.texture.height);
+    EndTextureMode();
+    *image = LoadImageFromTexture(target.texture);
+    return image->data != NULL;
+}
+
+static bool verify_sky_lighting_targets(WaterfrontGpuScene *scene)
+{
+    static const SkyLightingCase cases[] = {
+        { "day", false, WATERFRONT_DAYLIGHT_DAY, 0 },
+        { "sunset", false, WATERFRONT_DAYLIGHT_SUNSET, 0 },
+        { "dusk", false, WATERFRONT_DAYLIGHT_DUSK, 0 },
+        { "dawn-6.5", true, 6.5f, 0 },
+        { "morning-9", true, 9, 0 },
+        { "evening-18.5", true, 18.5f, 0 },
+        { "night-21.5", true, 21.5f, 0 },
+        { "sunset-seam", false, WATERFRONT_DAYLIGHT_SUNSET, 1 },
+    };
+    const FixtureSize sizes[] = { { 320, 200 }, { 1280, 800 } };
+    waterfront_gpu_scene_set_shadows_enabled(scene, false);
+    waterfront_gpu_scene_set_reflections_enabled(scene, false);
+    bool ok = true;
+    for (size_t size = 0; ok && size < sizeof(sizes) / sizeof(*sizes); ++size) {
+        int width = sizes[size].width, height = sizes[size].height;
+        RenderTexture2D target = LoadRenderTexture(width, height);
+        Color *reference = malloc((size_t)width * height * sizeof(*reference));
+        if (!IsRenderTextureValid(target) || !reference) {
+            if (target.id)
+                UnloadRenderTexture(target);
+            free(reference);
+            ok = false;
+            break;
+        }
+        for (size_t c = 0; ok && c < sizeof(cases) / sizeof(*cases); ++c) {
+            WaterfrontSceneFrame frame;
+            sky_fixture_frame(&frame, cases[c].view);
+            if (cases[c].hour)
+                ok = waterfront_lighting_hour(cases[c].value, &frame.lighting);
+            else
+                frame.lighting = waterfront_lighting(cases[c].value);
+            if (!ok)
+                break;
+            waterfront_sky_draw_squall(
+                reference, width, height, frame.camera, frame.squall, &frame.lighting);
+            Image image = { 0 };
+            if (!capture_sky(scene, target, &frame, &image)) {
+                ok = false;
+                break;
+            }
+            ImageFlipVertical(&image);
+            ImageFlipHorizontal(&image);
+            int probes = 0, mismatches = 0;
+            for (int y = 8; y < height - 8; y += 7)
+                for (int x = 8; x < width - 8; x += 7) {
+                    Color expected = reference[y * width + x];
+                    Color actual = GetImageColor(image, x, y);
+                    if (abs(actual.r - expected.r) > 3 || abs(actual.g - expected.g) > 3
+                        || abs(actual.b - expected.b) > 3 || actual.a != 255)
+                        ++mismatches;
+                    ++probes;
+                }
+            if (mismatches > probes / 100) {
+                fprintf(stderr, "Sky lighting check failed: %s %dx%d mismatches=%d/%d\n",
+                    cases[c].name, width, height, mismatches, probes);
+                ok = false;
+            }
+            UnloadImage(image);
+        }
+        free(reference);
+        UnloadRenderTexture(target);
+    }
+    waterfront_gpu_scene_set_shadows_enabled(scene, true);
+    waterfront_gpu_scene_set_reflections_enabled(scene, true);
+    printf("sky_lighting_targets=%s\n", ok ? "ok" : "failed");
+    return ok;
+}
+
+static bool verify_sky_seeks(WaterfrontGpuScene *scene)
+{
+    RenderTexture2D target = LoadRenderTexture(320, 200);
+    if (!IsRenderTextureValid(target))
+        return false;
+    waterfront_gpu_scene_set_shadows_enabled(scene, false);
+    waterfront_gpu_scene_set_reflections_enabled(scene, false);
+    WaterfrontSceneFrame frame;
+    sky_fixture_frame(&frame, 0);
+    Image baseline = { 0 }, changed = { 0 }, again = { 0 };
+    bool ok = waterfront_lighting_hour(6.5f, &frame.lighting)
+        && capture_sky(scene, target, &frame, &baseline);
+    // A changing hour is a uniform-only update; then step through the hour and seek back.
+    for (float hour = 6.55f; ok && hour < 7.5f; hour += .05f) {
+        ok = waterfront_lighting_hour(hour, &frame.lighting);
+        Image scratch = { 0 };
+        ok = ok && capture_sky(scene, target, &frame, &scratch);
+        UnloadImage(scratch);
+    }
+    ok = ok && waterfront_lighting_hour(6.5f, &frame.lighting)
+        && capture_sky(scene, target, &frame, &again);
+    size_t bytes = baseline.data ? (size_t)baseline.width * baseline.height * 4 : 0;
+    ok = ok && again.data && memcmp(baseline.data, again.data, bytes) == 0;
+    // A direct forward seek must differ, and returning must restore the same frame.
+    ok = ok && waterfront_lighting_hour(12, &frame.lighting)
+        && capture_sky(scene, target, &frame, &changed);
+    ok = ok && changed.data && memcmp(baseline.data, changed.data, bytes) != 0;
+    UnloadImage(changed);
+    changed = (Image) { 0 };
+    ok = ok && waterfront_lighting_hour(6.5f, &frame.lighting)
+        && capture_sky(scene, target, &frame, &changed);
+    ok = ok && changed.data && memcmp(baseline.data, changed.data, bytes) == 0;
+    UnloadImage(changed);
+    changed = (Image) { 0 };
+    // A backward seek from night then back forward is equally independent of history.
+    ok = ok && waterfront_lighting_hour(21.5f, &frame.lighting)
+        && capture_sky(scene, target, &frame, &changed);
+    Image night = changed;
+    changed = (Image) { 0 };
+    ok = ok && waterfront_lighting_hour(6.5f, &frame.lighting)
+        && capture_sky(scene, target, &frame, &changed);
+    ok = ok && changed.data && memcmp(baseline.data, changed.data, bytes) == 0;
+    UnloadImage(changed);
+    changed = (Image) { 0 };
+    ok = ok && waterfront_lighting_hour(21.5f, &frame.lighting)
+        && capture_sky(scene, target, &frame, &changed);
+    ok = ok && night.data && changed.data && memcmp(night.data, changed.data, bytes) == 0;
+    UnloadImage(night);
+    UnloadImage(changed);
+    UnloadImage(again);
+    UnloadImage(baseline);
+    UnloadRenderTexture(target);
+    waterfront_gpu_scene_set_shadows_enabled(scene, true);
+    waterfront_gpu_scene_set_reflections_enabled(scene, true);
+    printf("sky_seeks=%s\n", ok ? "ok" : "failed");
+    return ok;
+}
+
+static bool verify_sky_spy_control(void)
+{
+    Color pixels[16] = { 0 };
+    Image image = { .data = pixels,
+        .width = 4,
+        .height = 4,
+        .mipmaps = 1,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+    Texture2D probe = LoadTextureFromImage(image);
+    if (!IsTextureValid(probe)) {
+        if (probe.id != 0)
+            UnloadTexture(probe);
+        fprintf(stderr, "Sky spy control: probe texture failed\n");
+        return false;
+    }
+    GLint previous = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous);
+    bool installed = install_sky_spies(probe.id);
+    int after_update_image = -1, after_update_sub = -1;
+    int after_alloc_image = -1, after_alloc_sub = -1;
+    if (installed) {
+        UpdateTexture(probe, pixels);
+        after_update_image = spy_sky_tex_image_calls;
+        after_update_sub = spy_sky_tex_sub_image_calls;
+        // A real allocation through GLAD on the same probe proves both spy paths are live.
+        glBindTexture(GL_TEXTURE_2D, probe.id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 4, 4, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        glBindTexture(GL_TEXTURE_2D, (GLuint)previous);
+        after_alloc_image = spy_sky_tex_image_calls;
+        after_alloc_sub = spy_sky_tex_sub_image_calls;
+        restore_sky_spies();
+    }
+    UnloadTexture(probe);
+    bool ok = installed && after_update_image == 0 && after_update_sub == 1
+        && after_alloc_image == 1 && after_alloc_sub == 1;
+    printf("sky_texture_spy_control=%s after_update=%d/%d after_alloc=%d/%d\n",
+        ok ? "ok" : "failed", after_update_image, after_update_sub, after_alloc_image,
+        after_alloc_sub);
+    if (!ok)
+        fprintf(stderr, "Sky spy positive control failed: installed=%d\n", installed);
+    return ok;
+}
+
+static bool verify_sky_resource_stability(WaterfrontGpuScene *scene)
+{
+    if (!verify_sky_spy_control())
+        return false;
+    RenderTexture2D target = LoadRenderTexture(320, 200);
+    if (!IsRenderTextureValid(target))
+        return false;
+    waterfront_gpu_scene_set_shadows_enabled(scene, false);
+    waterfront_gpu_scene_set_reflections_enabled(scene, false);
+    WaterfrontSceneFrame frame;
+    sky_fixture_frame(&frame, 0);
+    Image warmup = { 0 };
+    bool ok = waterfront_lighting_hour(6.5f, &frame.lighting)
+        && capture_sky(scene, target, &frame, &warmup);
+    UnloadImage(warmup);
+    GLuint sky_id = scene->sky_mask.id;
+    bool spied = ok && install_sky_spies(sky_id);
+    for (int hour = 0; spied && hour < 24; ++hour) {
+        Image scratch = { 0 };
+        ok = waterfront_lighting_hour((float)hour, &frame.lighting) && ok;
+        ok = capture_sky(scene, target, &frame, &scratch) && ok;
+        UnloadImage(scratch);
+    }
+    // A bounded sampled full virtual cycle crosses midnight and alternates the accepted
+    // above-city view with the azimuth seam view, still without any sky texture writes.
+    for (int i = 0; spied && i < 241; ++i) {
+        Image scratch = { 0 };
+        float hour = fmodf(6.5f + (float)i * .1f, 24.0f);
+        sky_fixture_frame(&frame, i % 2);
+        ok = waterfront_lighting_hour(hour, &frame.lighting) && ok;
+        ok = capture_sky(scene, target, &frame, &scratch) && ok;
+        UnloadImage(scratch);
+    }
+    if (spied)
+        restore_sky_spies();
+    ok = ok && spied && scene->sky_mask.id == sky_id && spy_sky_tex_image_calls == 0
+        && spy_sky_tex_sub_image_calls == 0;
+    if (!ok)
+        fprintf(stderr,
+            "Sky texture stability failed: id %u->%u TexImage2D=%d TexSubImage2D=%d spies=%d\n",
+            sky_id, scene->sky_mask.id, spy_sky_tex_image_calls, spy_sky_tex_sub_image_calls,
+            spied);
+    UnloadRenderTexture(target);
+    waterfront_gpu_scene_set_shadows_enabled(scene, true);
+    waterfront_gpu_scene_set_reflections_enabled(scene, true);
+    printf("sky_texture_stability=%s id=%u tex_image=%d tex_sub_image=%d\n", ok ? "ok" : "failed",
+        sky_id, spy_sky_tex_image_calls, spy_sky_tex_sub_image_calls);
+    return ok;
+}
+
+static bool init_city_scene(WaterfrontGpuScene *scene)
+{
+    char shader_path[1024];
+    snprintf(shader_path, sizeof(shader_path), "%s/shaders/waterfront_city.fs", PROTEUS_ASSET_DIR);
+    if (!waterfront_gpu_scene_init(scene, shader_path)) {
+        fprintf(stderr, "GPU fixture: waterfront city resources failed: %s\n", shader_path);
+        return false;
+    }
+    scene->retain_map_sources = true;
+    WaterfrontScenery scenery = { 0 };
+    bool bound = waterfront_scenery_init(&scenery, &waterfront_city_river_map)
+        && waterfront_gpu_scene_bind(scene, &scenery);
+    waterfront_scenery_destroy(&scenery);
+    return bound;
+}
+
+static bool verify_sky_scene_lifecycle(WaterfrontGpuScene *scene)
+{
+    RenderTexture2D target = LoadRenderTexture(320, 200);
+    if (!IsRenderTextureValid(target))
+        return false;
+    WaterfrontSceneFrame frame;
+    sky_fixture_frame(&frame, 0);
+    bool ok = waterfront_lighting_hour(18.5f, &frame.lighting);
+    Image first = { 0 }, other_image = { 0 }, recreated = { 0 };
+    ok = ok && capture_sky(scene, target, &frame, &first);
+    GLuint first_id = scene->sky_mask.id;
+    WaterfrontGpuScene other = { 0 };
+    ok = ok && init_city_scene(&other);
+    if (ok) {
+        waterfront_gpu_scene_set_shadows_enabled(&other, false);
+        waterfront_gpu_scene_set_reflections_enabled(&other, false);
+        ok = other.sky_mask.id != 0 && other.sky_mask.id != first_id
+            && capture_sky(&other, target, &frame, &other_image);
+        size_t bytes = first.data ? (size_t)first.width * first.height * 4 : 0;
+        ok = ok && other_image.data && memcmp(first.data, other_image.data, bytes) == 0;
+    }
+    waterfront_gpu_scene_destroy(&other);
+    // Recreating a scene builds its own mask again and still produces the same sky.
+    ok = ok && init_city_scene(&other);
+    if (ok) {
+        waterfront_gpu_scene_set_shadows_enabled(&other, false);
+        waterfront_gpu_scene_set_reflections_enabled(&other, false);
+        ok = capture_sky(&other, target, &frame, &recreated);
+        size_t bytes = first.data ? (size_t)first.width * first.height * 4 : 0;
+        ok = ok && recreated.data && memcmp(first.data, recreated.data, bytes) == 0;
+    }
+    waterfront_gpu_scene_destroy(&other);
+    if (!ok)
+        fprintf(stderr, "Sky scene lifecycle failed: first id %u\n", first_id);
+    UnloadImage(first);
+    UnloadImage(other_image);
+    UnloadImage(recreated);
+    UnloadRenderTexture(target);
+    printf("sky_scene_lifecycle=%s\n", ok ? "ok" : "failed");
+    return ok;
+}
+
 static bool verify_reflection_waterline(WaterfrontGpuScene *scene)
 {
     RenderTexture2D target = LoadRenderTexture(160, 100);
@@ -696,6 +1056,8 @@ static bool draw_city(RenderTexture2D target, WaterfrontGpuScene *scene, Fixture
     if (options.check
         && (!verify_surface_materials(scene, false) || !verify_surface_materials(scene, true)
             || !verify_shadow_cascades(scene) || !verify_sky_targets(scene)
+            || !verify_sky_lighting_targets(scene) || !verify_sky_seeks(scene)
+            || !verify_sky_resource_stability(scene) || !verify_sky_scene_lifecycle(scene)
             || !verify_reflection_waterline(scene)))
         return false;
     waterfront_gpu_scene_set_lighting_enabled(scene, options.lighting);

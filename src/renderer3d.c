@@ -146,19 +146,31 @@ static Color shade_material(const Renderer3D *r, const Material3D *material, Vec
         tx += material->width;
     if (ty < 0)
         ty += material->height;
-    float light = 0.16f + 0.12f * fmaxf(0, Vector3DotProduct(normal, r->light_direction));
-    Vector3 delta = Vector3Subtract(r->point_light.position, world);
-    float distance_squared = Vector3DotProduct(delta, delta);
-    float radius = r->point_light.radius;
-    if (radius > 0 && distance_squared < radius * radius) {
-        float distance = sqrtf(fmaxf(distance_squared, 0.0001f));
-        float incidence = fmaxf(0, Vector3DotProduct(normal, delta) / distance);
-        float attenuation = 1.0f - distance / radius;
-        light += r->point_light.intensity * incidence * attenuation * attenuation;
+    int level = 15;
+    if (!material->emissive) {
+        // Select a palette ramp from the frame's flat light, matching the untextured path.
+        // The palette already carries brightness, so the tint is applied once after selection.
+        float light
+            = r->ambient + r->diffuse * fmaxf(0, Vector3DotProduct(normal, r->light_direction));
+        Vector3 delta = Vector3Subtract(r->point_light.position, world);
+        float distance_squared = Vector3DotProduct(delta, delta);
+        float radius = r->point_light.radius;
+        if (radius > 0 && distance_squared < radius * radius) {
+            float distance = sqrtf(fmaxf(distance_squared, 0.0001f));
+            float incidence = fmaxf(0, Vector3DotProduct(normal, delta) / distance);
+            float attenuation = 1.0f - distance / radius;
+            light += r->point_light.intensity * incidence * attenuation * attenuation;
+        }
+        level = (int)(fminf(1, fmaxf(0, light)) * 15.0f);
     }
-    int level = material->emissive ? 15 : (int)(fminf(1, fmaxf(0, light)) * 15.0f);
     unsigned char texel = material->texels[ty * material->width + tx];
-    return material->palette[level * 16 + texel];
+    Color color = material->palette[level * 16 + texel];
+    // Emissive textures are unlit and follow the frame's unlit tint; ordinary textures follow
+    // the frame's colour tint.
+    Vector3 tint = material->emissive ? r->emissive_tint : r->tint;
+    return (Color) { (unsigned char)fminf(255, color.r * tint.x),
+        (unsigned char)fminf(255, color.g * tint.y), (unsigned char)fminf(255, color.b * tint.z),
+        255 };
 }
 
 static void rasterize(Renderer3D *r, Vector3 va, Vector3 vb, Vector3 vc, Color color,

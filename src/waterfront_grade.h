@@ -22,6 +22,10 @@ typedef struct {
 // The grade at PHASE (clamped to 0..1), interpolating day, sunset and dusk; each fixed phase
 // returns its preset exactly.
 WaterfrontGrade waterfront_grade(float phase);
+// A neutral grade for a full-day HOUR. New hours do not reinterpret the legacy evening phase:
+// the result keeps its phase at WATERFRONT_DAYLIGHT_DAY. Invalid HOUR returns false and leaves
+// *grade untouched.
+bool waterfront_grade_hour(float hour, WaterfrontGrade *grade);
 // True when the colour grade leaves every clamped colour unchanged (bloom aside).
 bool waterfront_grade_neutral(const WaterfrontGrade *grade);
 

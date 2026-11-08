@@ -18,6 +18,9 @@ typedef struct {
 
 // Indexed, repeating nearest-neighbour texture with 16 albedo entries and 16 light levels.
 // Palette layout is [light level * 16 + texel]. All texels must be in [0, 15].
+// Non-emissive materials choose the level from the frame's ambient/diffuse and point light,
+// then multiply by the frame tint. Emissive materials use the brightest level and the frame's
+// emissive_tint; only emissive materials ignore the sun and fill light.
 // Coordinates are world-aligned planar projections, at texels_per_unit density.
 typedef struct {
     const unsigned char *texels;

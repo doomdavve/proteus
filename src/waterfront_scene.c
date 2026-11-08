@@ -50,61 +50,32 @@ static bool cloud_tile(float x, float z)
     return Lerp(a, b, tz) * .85f + cloud_hash(tile_x + 137, tile_z - 59) * .15f > .59f;
 }
 
-// Painted once per distinct sky: a change of light repaints the shared panorama.
-Image waterfront_sky_image(const WaterfrontLighting *lighting)
+enum { SKY_WIDTH = 1024, SKY_HEIGHT = 512 };
+
+// Static cloud structure for the GPU sky shader and the CPU sky evaluator, sampled at the same
+// panorama texel centres as waterfront_sky_image. R marks the underside, G the lit rim; the
+// flags never depend on light.
+Image waterfront_sky_cloud_mask(void)
 {
-    enum { WIDTH = 1024, HEIGHT = 512 };
+    enum { WIDTH = SKY_WIDTH, HEIGHT = SKY_HEIGHT };
     static Color pixels[WIDTH * HEIGHT];
     static bool ready;
-    static WaterfrontLighting painted;
-    if (!ready || !waterfront_lighting_same_sky(&painted, lighting)) {
-        const WaterfrontLighting *l = lighting;
-        Vector3 sun = l->sun_direction;
-        float sun_azimuth = atan2f(sun.x, sun.z);
+    if (!ready) {
         for (int y = 0; y < HEIGHT; ++y) {
             float elevation = 1 - 2 * ((float)y + .5f) / HEIGHT;
             for (int x = 0; x < WIDTH; ++x) {
-                float azimuth = (((float)x + .5f) / WIDTH - .5f) * 2 * PI;
-                Vector3 color = sky_mix(l->sky_horizon, l->sky_zenith, elevation / l->sky_gradient);
-                float bearing = remainderf(azimuth - sun_azimuth, 2 * PI);
-                if (l->glow_strength > 0) {
-                    // Low sunlight along the horizon, strongest under the sun and fading
-                    // around to the opposite sky.
-                    float along = Clamp(1 - fabsf(bearing) / 1.7f, 0, 1);
-                    float low = Clamp(1 - fabsf(elevation - fmaxf(sun.y, 0)) / .28f, 0, 1);
-                    color = sky_mix(
-                        color, l->horizon_glow, l->glow_strength * along * along * low * low);
-                }
-                float sun_x = bearing * sqrtf(1 - sun.y * sun.y);
-                float sun_y = (elevation - sun.y) / sqrtf(1 - sun.y * sun.y);
-                float sun_distance = sqrtf(sun_x * sun_x + sun_y * sun_y);
-                // A warm, crisp disc with a quiet halo, anchored to the lighting direction.
-                color = sky_mix(color, l->sun_halo,
-                    l->halo_strength * (1 - Clamp(sun_distance / l->halo_radius, 0, 1)));
-                color = sky_mix(color, l->sun_disc,
-                    l->disc_strength * Clamp((.047f - sun_distance) / .004f, 0, 1));
+                unsigned char underside = 0, rim = 0;
                 if (elevation > .075f) {
+                    float azimuth = (((float)x + .5f) / WIDTH - .5f) * 2 * PI;
                     float horizontal = sqrtf(1 - elevation * elevation) / elevation;
                     float cx = sinf(azimuth) * horizontal;
                     float cz = cosf(azimuth) * horizontal;
-                    // Looking up through a shallow slab: its underside covers the distant rim.
-                    // Two ray/plane samples give the cloud deck a little visible thickness.
-                    bool underside = cloud_tile(cx, cz);
-                    bool rim = cloud_tile(cx * 1.035f, cz * 1.035f);
-                    if (underside || rim) {
-                        Vector3 cloud = underside ? l->cloud_underside : l->cloud_rim;
-                        color = sky_mix(color, cloud, (elevation - .075f) / .10f);
-                    }
+                    underside = cloud_tile(cx, cz) ? 255 : 0;
+                    rim = cloud_tile(cx * 1.035f, cz * 1.035f) ? 255 : 0;
                 }
-                // Subtle ordered grain at panorama resolution, fixed to the sky itself.
-                float grain = ((x & 1) == (y & 1)) ? .6f : -.6f;
-                pixels[y * WIDTH + x]
-                    = (Color) { (unsigned char)roundf(Clamp(color.x + grain, 0, 255)),
-                          (unsigned char)roundf(Clamp(color.y + grain, 0, 255)),
-                          (unsigned char)roundf(Clamp(color.z + grain, 0, 255)), 255 };
+                pixels[y * WIDTH + x] = (Color) { underside, rim, 0, 255 };
             }
         }
-        painted = *lighting;
         ready = true;
     }
     return (Image) { .data = pixels,
@@ -112,6 +83,107 @@ Image waterfront_sky_image(const WaterfrontLighting *lighting)
         .height = HEIGHT,
         .mipmaps = 1,
         .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+}
+
+static WaterfrontSkyStats sky_stats;
+
+WaterfrontSkyStats waterfront_sky_stats(void) { return sky_stats; }
+
+// One panorama texel of the light-only sky recipe, excluding the weather squall. The static
+// cloud flags come from waterfront_sky_cloud_mask so the full reference and the visible-sample
+// cache evaluate exactly the same recipe in the same order.
+static Color sky_texel(const WaterfrontLighting *l, const Color *cloud_mask, int x, int y)
+{
+    float elevation = 1 - 2 * ((float)y + .5f) / SKY_HEIGHT;
+    float azimuth = (((float)x + .5f) / SKY_WIDTH - .5f) * 2 * PI;
+    Vector3 sun = l->sun_direction;
+    float sun_azimuth = atan2f(sun.x, sun.z);
+    Vector3 color = sky_mix(l->sky_horizon, l->sky_zenith, elevation / l->sky_gradient);
+    float bearing = remainderf(azimuth - sun_azimuth, 2 * PI);
+    if (l->glow_strength > 0) {
+        // Low sunlight along the horizon, strongest under the sun and fading around to the
+        // opposite sky.
+        float along = Clamp(1 - fabsf(bearing) / 1.7f, 0, 1);
+        float low = Clamp(1 - fabsf(elevation - fmaxf(sun.y, 0)) / .28f, 0, 1);
+        color = sky_mix(color, l->horizon_glow, l->glow_strength * along * along * low * low);
+    }
+    float sun_x = bearing * sqrtf(1 - sun.y * sun.y);
+    float sun_y = (elevation - sun.y) / sqrtf(1 - sun.y * sun.y);
+    float sun_distance = sqrtf(sun_x * sun_x + sun_y * sun_y);
+    // A warm, crisp disc with a quiet halo, anchored to the lighting direction.
+    color = sky_mix(
+        color, l->sun_halo, l->halo_strength * (1 - Clamp(sun_distance / l->halo_radius, 0, 1)));
+    color = sky_mix(
+        color, l->sun_disc, l->disc_strength * Clamp((.047f - sun_distance) / .004f, 0, 1));
+    if (elevation > .075f) {
+        // Looking up through a shallow slab: its underside covers the distant rim. Two
+        // ray/plane samples give the cloud deck a little visible thickness.
+        Color flags = cloud_mask[y * SKY_WIDTH + x];
+        bool underside = flags.r != 0;
+        bool rim = flags.g != 0;
+        if (underside || rim) {
+            Vector3 cloud = underside ? l->cloud_underside : l->cloud_rim;
+            color = sky_mix(color, cloud, (elevation - .075f) / .10f);
+        }
+    }
+    // Subtle ordered grain at panorama resolution, fixed to the sky itself.
+    float grain = ((x & 1) == (y & 1)) ? .6f : -.6f;
+    return (Color) { (unsigned char)roundf(Clamp(color.x + grain, 0, 255)),
+        (unsigned char)roundf(Clamp(color.y + grain, 0, 255)),
+        (unsigned char)roundf(Clamp(color.z + grain, 0, 255)), 255 };
+}
+
+// Full-panorama reference in separate storage, painted once per distinct sky. It is also the
+// comparison baseline for the draw path and is never unloaded.
+Image waterfront_sky_image(const WaterfrontLighting *lighting)
+{
+    static Color pixels[SKY_WIDTH * SKY_HEIGHT];
+    static bool ready;
+    static WaterfrontLighting painted;
+    if (!ready || !waterfront_lighting_same_sky(&painted, lighting)) {
+        const Color *mask = waterfront_sky_cloud_mask().data;
+        for (int y = 0; y < SKY_HEIGHT; ++y)
+            for (int x = 0; x < SKY_WIDTH; ++x) {
+                pixels[y * SKY_WIDTH + x] = sky_texel(lighting, mask, x, y);
+                ++sky_stats.reference_samples;
+            }
+        painted = *lighting;
+        ready = true;
+    }
+    return (Image) { .data = pixels,
+        .width = SKY_WIDTH,
+        .height = SKY_HEIGHT,
+        .mipmaps = 1,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+}
+
+// Bounded visible-sample cache for the CPU draw path: one snapshot of colour for the current
+// sky plus a generation stamp per panorama texel. A changed sky starts a new generation, so no
+// old colours are used and no large array is cleared; each sampled texel is evaluated at most
+// once until the next light change. The storage is static (about 4 MiB); drawing is
+// single-threaded, like the renderer.
+static struct {
+    Color colors[SKY_WIDTH * SKY_HEIGHT];
+    uint32_t stamps[SKY_WIDTH * SKY_HEIGHT];
+    uint32_t generation;
+    bool ready;
+    WaterfrontLighting painted;
+} sky_draw_cache;
+
+static const WaterfrontLighting *sky_draw_prepare(const WaterfrontLighting *lighting)
+{
+    if (!sky_draw_cache.ready || !waterfront_lighting_same_sky(&sky_draw_cache.painted, lighting)) {
+        if (sky_draw_cache.generation == UINT32_MAX) {
+            memset(sky_draw_cache.stamps, 0, sizeof(sky_draw_cache.stamps));
+            sky_draw_cache.generation = 1;
+        } else {
+            ++sky_draw_cache.generation;
+        }
+        sky_draw_cache.painted = *lighting;
+        sky_draw_cache.ready = true;
+        ++sky_stats.draw_generations;
+    }
+    return &sky_draw_cache.painted;
 }
 
 void waterfront_sky_draw(
@@ -189,8 +261,9 @@ Color waterfront_squall_sky(Color sky, Vector3 eye, Vector3 ray, WaterfrontSqual
 void waterfront_sky_draw_squall(Color *pixels, int width, int height, View3D camera,
     WaterfrontSquall squall, const WaterfrontLighting *lighting)
 {
-    Image sky = waterfront_sky_image(lighting);
-    const Color *colors = sky.data;
+    ++sky_stats.draw_calls;
+    const WaterfrontLighting *l = sky_draw_prepare(lighting);
+    const Color *mask = waterfront_sky_cloud_mask().data;
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 right = Vector3Normalize(Vector3CrossProduct(camera.up, forward));
     Vector3 up = Vector3CrossProduct(forward, right);
@@ -201,10 +274,18 @@ void waterfront_sky_draw_squall(Color *pixels, int width, int height, View3D cam
             Vector3 ray = Vector3Normalize(
                 Vector3Add(row, Vector3Scale(right, (x + .5f - width * .5f) * scale)));
             float u = atan2f(ray.x, ray.z) / (2 * PI) + .5f;
-            int sx = (int)(u * sky.width) % sky.width;
-            int sy = (int)Clamp((1 - ray.y) * .5f * sky.height, 0, sky.height - 1);
+            int sx = (int)(u * SKY_WIDTH) % SKY_WIDTH;
+            int sy = (int)Clamp((1 - ray.y) * .5f * SKY_HEIGHT, 0, SKY_HEIGHT - 1);
+            size_t index = (size_t)sy * SKY_WIDTH + (size_t)sx;
+            if (sky_draw_cache.stamps[index] != sky_draw_cache.generation) {
+                sky_draw_cache.colors[index] = sky_texel(l, mask, sx, sy);
+                sky_draw_cache.stamps[index] = sky_draw_cache.generation;
+                ++sky_stats.draw_samples;
+            } else {
+                ++sky_stats.draw_reused;
+            }
             pixels[y * width + x]
-                = waterfront_squall_sky(colors[sy * sky.width + sx], camera.position, ray, squall);
+                = waterfront_squall_sky(sky_draw_cache.colors[index], camera.position, ray, squall);
         }
     }
 }

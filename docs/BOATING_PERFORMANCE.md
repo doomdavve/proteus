@@ -985,3 +985,52 @@ Read gate columns against each report's `p95`; `p50` is typically far lower for 
   [AMD renderer results and GPU-selection limit](#windows-active-gpu-check--2026-11-03).
   AMD/NVIDIA full matrices are saved; the recurring NVIDIA river hitch is deferred, and
   visible-play/live-export qualification remains open under G0w.
+
+## Lighting T2c fixed-vs-cycle qualification — 2026-11-07
+
+`boat_water_review --lighting-qualify PREFIX` extends the G0 tooling with a bounded lighting
+audit rather than a new benchmark framework. It reuses the existing session/fixture routes,
+scene drawing, presentation path, GL timer and statistics helpers. A fixed `--lighting-hour`
+run and a sampled virtual 900 s cycle use the same independent physical trajectory and camera;
+pose ticks never accelerate with the light. `--lighting-samples` accepts 25..3601, defaults to
+241 measured samples, and stores eight warmup frames separately. Measured samples span virtual
+elapsed 0..900 s inclusive and visit all 24 hour bins and the midnight wrap; this does not mean
+54,000 real 60 Hz frames were drawn.
+
+Each report records build/platform/GL, renderer, scenario, actual resolution/HDR, virtual
+cadence, warmup, shared initialization and first draw separately, per-frame hour, simulation,
+CPU submission, presentation, frame and actual `GL_TIME_ELAPSED` (null when unavailable), p50/p95/p99/max,
+16.667 ms deadline misses, final-state parity, CPU sky reference/visible/cache counters and
+existing GPU scene counters. CPU is the existing 320x200 low, non-HDR renderer only; high/HDR
+and `GL_TIME_ELAPSED` qualification are GPU paths. The tool rejects unsupported combinations
+and report I/O failures.
+
+```sh
+./build-release/boat_water_review --lighting-qualify OUT/lighting-cpu --renderer cpu \
+  --scenario stress --lighting-samples 241 --waves
+./build-release/boat_water_review --lighting-qualify OUT/lighting-gpu --renderer gpu \
+  --scenario outer --lighting-samples 241 --waves --lighting-hour 6.5 \
+  --resolution high --hdr on
+```
+
+On 2026-11-07, three interleaved native Release repeats on an Apple M1 Max used waves, start
+6.5, eight separate warmup draws and 721 measured GPU / 241 CPU samples per workload. Median
+fixed/cycle frame p95 was 3.245/3.297 ms outer low, 3.696/3.655 ms outer high/HDR and
+4.462/4.657 ms four-boat stress low. Actual cycle GPU p95 was 1.829, 3.347 and 3.148 ms,
+respectively, with complete query coverage and no measured 16.667 ms frame misses.
+
+The CPU reference path fails that budget in every measured frame, fixed and changing-hour:
+median cycle frame p95 is 496.651 ms outer and 97.204 ms stress, with substantial repeat
+variation. Instruments points to CPU water-surface sampling (78% inclusive), especially wave
+trigonometry, followed by mesh drawing (21%); the sky is small. This does not qualify a CPU
+runtime cycle. The native workloads exclude game HUD/input/audio and are sampled virtual-cycle
+probes, not a real 900 s soak or a rerun of the earlier G0 river/4x4 matrix.
+
+Actual-game fixed-hour exports from Chrome/Metal record GPU frame p95 4.1–4.5 ms and browser
+interval p95 17.5–17.6 ms after startup exclusion; no GPU query samples are available there.
+Browser CPU reference costs are also outside the interactive budget. Live F8 and scripted
+performance exports now use actual scene/reflection target dimensions, including high/HDR,
+rather than the former fixed low-size metadata; CPU reports a 0x0 reflection target.
+No timing threshold is asserted in CTest. Settings, repeated-run ranges, first-use costs,
+raw summaries and qualification limits are in
+[the lighting plan](SUNSET_PLAN.md#t2c-implementation-2026-11-07).

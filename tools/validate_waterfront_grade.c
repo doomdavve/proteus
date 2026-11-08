@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #define CHECK(condition)                                                                           \
     do {                                                                                           \
@@ -46,6 +47,22 @@ int main(void)
         }
         previous = g;
     }
+    // Full-day hours get a neutral grade without reinterpreting the legacy evening phase.
+    WaterfrontGrade hour_grade;
+    for (int hour = 0; hour < 24; ++hour) {
+        CHECK(waterfront_grade_hour((float)hour, &hour_grade));
+        CHECK(hour_grade.phase == WATERFRONT_DAYLIGHT_DAY);
+        CHECK(waterfront_grade_neutral(&hour_grade));
+        CHECK(hour_grade.bloom_strength >= 0 && hour_grade.bloom_strength <= .25f);
+    }
+    CHECK(waterfront_grade_hour(25.5f, &hour_grade));
+    CHECK(hour_grade.phase == WATERFRONT_DAYLIGHT_DAY);
+    WaterfrontGrade sentinel = waterfront_grade(0), unchanged = sentinel;
+    CHECK(!waterfront_grade_hour(NAN, &unchanged)
+        && memcmp(&unchanged, &sentinel, sizeof(sentinel)) == 0);
+    CHECK(!waterfront_grade_hour(INFINITY, &unchanged)
+        && memcmp(&unchanged, &sentinel, sizeof(sentinel)) == 0);
+
     // Neutral means each colour operation is the identity.
     WaterfrontGrade g = waterfront_grade(0);
     g.contrast = 1.1f;

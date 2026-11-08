@@ -246,6 +246,8 @@ static void usage(void)
     cli_usage_line(stdout, "--hdr on|off",
         "HDR scene with restrained bloom and grade (default: on at high resolution)");
     cli_usage_line(stdout, "--daylight day|sunset|dusk", "Fixed lighting (default day)");
+    cli_usage_line(stdout, "--lighting-hour H",
+        "Developer full-day hour; overrides --daylight; --time stays drive time");
     cli_usage_line(
         stdout, "--no-far-detail", "Draw distant scenery at full detail, for comparison");
     cli_usage_line(stdout, "--no-vsync", "Pace at exactly 60 Hz");
@@ -626,6 +628,8 @@ static int study(int argc, char **argv)
     BoatResolution resolution = BOAT_RESOLUTION_LOW;
     int hdr_option = -1; // --hdr; unset follows the resolution.
     float daylight_phase = WATERFRONT_DAYLIGHT_DAY;
+    float lighting_hour = 0;
+    bool lighting_hour_set = false;
     bool profiler_visible = false;
     const char *performance_report = NULL;
     bool performance_capture = true;
@@ -695,6 +699,10 @@ static int study(int argc, char **argv)
         } else if (strcmp(argv[i], "--daylight") == 0 && i + 1 < argc) {
             if (!waterfront_daylight_parse(argv[++i], &daylight_phase))
                 goto invalid;
+        } else if (strcmp(argv[i], "--lighting-hour") == 0 && i + 1 < argc) {
+            if (!waterfront_hour_parse(argv[++i], &lighting_hour))
+                goto invalid;
+            lighting_hour_set = true;
         } else if (strcmp(argv[i], "--no-far-detail") == 0) {
             far_detail = false;
         } else if (strcmp(argv[i], "--profiler") == 0) {
@@ -1109,6 +1117,8 @@ static int study(int argc, char **argv)
     Renderer3D renderer = { 0 };
     BoatCpuView cpu_view = { 0 }; // The GPU view owns its own water mesh and scenery.
     cpu_view.daylight = daylight_phase;
+    cpu_view.hour = lighting_hour;
+    cpu_view.hour_set = lighting_hour_set;
     BoatGpu gpu = { 0 };
     int water_layer = 0, review_label_frames = 0; // F8 and F9; label frames left.
     const char *review_label = NULL;
@@ -1328,16 +1338,24 @@ static int study(int argc, char **argv)
         ghost_view_flag = &ghost_cloth;
         ghost_opacity = .5f;
     }
+#if defined(__EMSCRIPTEN__)
+    // The browser's mapped scenery registry is filled by scenery_ready() below, after the
+    // window exists. Defer the initial CPU draw and its screenshot export until then.
+    bool initial_cpu_draw_pending = !gpu_enabled;
+#else
     if (!gpu_enabled
         && !boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
             view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
             ghost_opacity))
         goto cleanup;
+#endif
     Image image = { pixels, width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+#if !defined(__EMSCRIPTEN__)
     if (screenshot && !gpu_enabled) {
         result = ExportImage(image, screenshot) ? 0 : 1;
         goto cleanup;
     }
+#endif
 
     if (!IsWindowReady()) {
 #if defined(__EMSCRIPTEN__)
@@ -1378,6 +1396,18 @@ static int study(int argc, char **argv)
     if (!vsync)
         ClearWindowState(FLAG_VSYNC_HINT);
 #endif
+#if defined(__EMSCRIPTEN__)
+    if (initial_cpu_draw_pending) {
+        if (!boat_draw_with_ghost(&renderer, &cpu_view, pixels, width, height, view,
+                view_presentation, view_world, camera_settings, ghost_view, ghost_view_flag,
+                ghost_opacity))
+            goto cleanup;
+        if (screenshot) {
+            result = ExportImage(image, screenshot) ? 0 : 1;
+            goto cleanup;
+        }
+    }
+#endif
     FramePacer pacer;
     frame_pacer_init_window(&pacer);
     if (gpu_enabled) {
@@ -1387,6 +1417,8 @@ static int study(int argc, char **argv)
         }
         waterfront_gpu_scene_set_detail_enabled(&gpu.scene, far_detail);
         gpu.daylight = daylight_phase;
+        gpu.hour = lighting_hour;
+        gpu.hour_set = lighting_hour_set;
         if (!apply_screen_layout(&gpu,
                 boat_screen_layout(
                     resolution, width, height, GetScreenWidth(), GetScreenHeight()))) {
@@ -2128,11 +2160,13 @@ static int study(int argc, char **argv)
         }
         if (!gpu_enabled)
             UpdateTexture(texture, pixels);
-        if (mirror_visible
-            && !boat_rearview_update(
-                &mirror, gpu_enabled ? &gpu : NULL, view, view_presentation, view_world, &rivals)) {
-            result = 1;
-            break;
+        if (mirror_visible) {
+            boat_rearview_set_lighting(&mirror, daylight_phase, lighting_hour, lighting_hour_set);
+            if (!boat_rearview_update(&mirror, gpu_enabled ? &gpu : NULL, view, view_presentation,
+                    view_world, &rivals)) {
+                result = 1;
+                break;
+            }
         }
         metrics.snapshot_render_ms = (float)((boat_profile_time(true) - scene_started_at) * 1000.0);
         if (profiler_visible && current_frame_started_at >= next_snapshot_time) {
@@ -2399,10 +2433,10 @@ static int study(int argc, char **argv)
                     .window_height = GetScreenHeight(),
                     .render_width = GetRenderWidth(),
                     .render_height = GetRenderHeight(),
-                    .scene_width = width,
-                    .scene_height = height,
-                    .reflection_width = WATERFRONT_GPU_REFLECTION_WIDTH,
-                    .reflection_height = WATERFRONT_GPU_REFLECTION_HEIGHT,
+                    .scene_width = gpu_enabled ? gpu.target.texture.width : width,
+                    .scene_height = gpu_enabled ? gpu.target.texture.height : height,
+                    .reflection_width = gpu_enabled ? gpu.scene.reflection.texture.width : 0,
+                    .reflection_height = gpu_enabled ? gpu.scene.reflection.texture.height : 0,
                     .monitor_refresh_hz = GetMonitorRefreshRate(GetCurrentMonitor()),
                 };
                 export_performance(
@@ -2453,10 +2487,10 @@ static int study(int argc, char **argv)
                 .window_height = GetScreenHeight(),
                 .render_width = GetRenderWidth(),
                 .render_height = GetRenderHeight(),
-                .scene_width = width,
-                .scene_height = height,
-                .reflection_width = WATERFRONT_GPU_REFLECTION_WIDTH,
-                .reflection_height = WATERFRONT_GPU_REFLECTION_HEIGHT,
+                .scene_width = gpu_enabled ? gpu.target.texture.width : width,
+                .scene_height = gpu_enabled ? gpu.target.texture.height : height,
+                .reflection_width = gpu_enabled ? gpu.scene.reflection.texture.width : 0,
+                .reflection_height = gpu_enabled ? gpu.scene.reflection.texture.height : 0,
                 .monitor_refresh_hz = GetMonitorRefreshRate(GetCurrentMonitor()),
             };
             char written[4096], error[512];
