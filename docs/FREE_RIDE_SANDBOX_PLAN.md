@@ -1,13 +1,18 @@
 # Free ride sandbox: a working harbour
 
-Status, 2026-11-07: **S1a-S1d and the deck-edge fix are merged to main (0f09479; PRs
-#163-#168).** The standalone `cargo_sandbox` loads its `outer` sites and job from the bundled
-package's [`scene.work`](PLUGIN_API.md#work-sites-s1a): the Eriksberg site, the turned landing
-(S1b, whole tour accepted), the delivery job (S1c, "Landing works great now!") and the quay
-pickup on a new jetty 120 m east (S1d, played and approved; [result](#s1d-result-2026-11-07)).
-S0a and S0b are merged (#159-#162). `--location basin` retains the controlled reference without
-a job. It is still an experiment, without payouts, saves or an addition to
-the normal free ride menu. This plan owns
+Status, 2026-11-07: **S1a-S1e, SV1a-SV1i and the deck-edge fix are merged to main (5789645;
+PRs #163-#169).** The standalone `cargo_sandbox` and `wake_velocity`'s Single Player
+WORKING HARBOUR (Gothenburg Harbour, native) load their `outer` sites and job from the
+bundled package's [`scene.work`](PLUGIN_API.md#work-sites-s1a): the Eriksberg site, the turned
+landing (S1b), the delivery job (S1c), the quay pickup on a jetty 120 m east (S1d,
+[result](#s1d-result-2026-11-07)), fixtures as package data (S1e F1-F4) and automatic
+save/resume with discovered saves ([SV1](#sv1-local-save-and-resume)). S0a and S0b are merged
+(#159-#162). `--location basin` retains the controlled reference without a job. There are no
+payouts, fuel or progression. Open: S1's review of fun, broader S0c qualification. The
+DAMAGED hint and `.rejected` set-aside path were not exercised by hand. Proposed, unscheduled:
+a [structured HUD](BOAT_HUD.md#structured-contextual-information-proposed-2026-11-07); T0/S2.
+Done when: the user judges S1 fun and S0c's qualification limits are closed or dropped.
+Next task: none scheduled; future PRs need the user's approval. This plan owns
 free ride's interactive cargo, player changes to places, Creative/Working Harbour rules, boat
 ownership and economy. The [adventure plan](FREE_RIDING_ADVENTURE_PLAN.md) retains geography,
 weather and the journey toward Vinga. [Marina authoring](MARINA_AUTHORING_PLAN.md) owns static
@@ -33,13 +38,14 @@ physics and validation native. Completed S1a-S1d, 2026-11-07: see the [S1a](#s1a
 [S1d](#s1d-result-2026-11-07) results; the user played the landing and both outings and
 approved them. They then reported that cargo collision was sometimes off; that was S0a's deck
 contact, fixed in the [deck-edge fix](#deck-edge-collision-fix-2026-11-07), merged with the
-rest. The user played that fix natively on macOS on 2026-11-07 and reported "works". Still
-owed: S1's review of fun, then broader S0 qualification. S1e's F1-F4 are implemented locally on `feat/sandbox-plugin-fixtures`, and
-[SV1, local save and resume](#sv1-local-save-and-resume), is designed (2026-11-07): automatic
-saving, the working harbour as a Single Player menu content in `wake_velocity`, and saves
-discovered in the menu. SV1a (the core cargo snapshot and restore), SV1b (the save format), SV1c (resume and the autosave
-policy in memory) and SV1d (files and automatic saving in the harness) and SV1e (the shared work session) and SV1f (the work session in the game, scripted) and SV1g (the playable session with automatic saving) and SV1h (the menu and discovery) are implemented locally; the user's play check of SV1g+SV1h is [recorded](#sv1-local-save-and-resume) (cargo work and save/resume fine; help text to go); SV1i (objective migration at load) is implemented too, so SV1a-SV1i are all implemented locally. All checks on the branch are done, including the user's look at the decluttered HUD (da52ff3), which they accepted on 2026-11-07. Next: open the single PR for the branch when the user approves. After that, a [structured HUD / information design](BOAT_HUD.md#structured-contextual-information-proposed-2026-11-07) (proposed, unscheduled). Future PRs still
-require the user's approval.
+rest. The user played that fix natively on macOS on 2026-11-07 and reported "works".
+S1e's F1-F4 and SV1a-SV1i (cargo snapshot, save format, resume and autosave policy, files and
+automatic saving, the shared work session, the scripted and playable session in the game, the
+Working Harbour menu entry with discovered saves, objective migration at load) merged as
+[#169](https://github.com/doomdavve/proteus/pull/169) (2026-11-07). The user played SV1g+SV1h
+(cargo work and save/resume fine), the damaged-save `.bak` fallback, and accepted the
+decluttered HUD (da52ff3) on 2026-11-07. Still owed: S1's review of fun, then broader S0
+qualification.
 
 Planning update, 2026-11-07: add a sandbox day/night cycle at **15 real minutes per
 24 game hours**, after the shared full-day lighting prerequisites. The
@@ -986,9 +992,9 @@ browser build were not run.
 Planned 2026-11-07 at the user's request: integrate this plan with the [plugin
 plan](PLUGIN_PLAN.md#working-harbour-contract-proposed-2026-11-07) so that the sandbox's
 remaining compiled fixtures become plugin data as far as possible; saving the player's state
-comes after, one step at a time. All of S1e and SV1 goes on one branch
-(`feat/sandbox-plugin-fixtures`) as many commits, with one PR opened only when the user
-approves. This replaces the "one worktree/PR per step" wording above for this series.
+comes after, one step at a time. All of S1e and SV1 went on one branch
+(`feat/sandbox-plugin-fixtures`) as many commits, merged as one PR (#169) after the user
+approved. This replaces the "one worktree/PR per step" wording above for this series.
 
 | Step | Result | Completion gate | Status |
 | --- | --- | --- | --- |
@@ -996,7 +1002,7 @@ approves. This replaces the "one worktree/PR per step" wording above for this se
 | F2: basin reference as a package | The compiled basin site `{id="basin"}` (`tools/cargo_sandbox.c:1334-1337`), the `--package` refusal for basin (1356) and the hardcoded default package id `proteus.outer-work` (1340) become a bundled native-only `proteus.basin-work` package plus a catalog lookup from location to default work package | `--location basin` unchanged with no compiled site; catalog and staging checks cover the new package | Implemented 2026-11-07 (local) |
 | F3: job text from the package | The job-flavoured notices "Crate delivered...", "Supplies used. Next crate waits on the %s pad.", "Crate returned..." (`tools/cargo_sandbox.c:209, 279, 714`) come from the objective: a bounded `objective.notice` or text fields in the work commands (choose and record in [PLUGIN_API](PLUGIN_API.md) when implemented). Control/help prompts tied to key bindings stay native | Notices unchanged in play; the browser evaluator rejects or ignores it as with the other work commands | Implemented 2026-11-07 (local) |
 | F4: review scenarios keyed on package ids | About 20 named review scenarios (`tools/cargo_sandbox.c:1009-1250`) find receivers by first `RECEIVING_PLATFORM`, and one matches the string "LANDING QUAY" (line 1195). Key them on site ids/roles from the package | All scenarios produce the same captures | Implemented 2026-11-07 (local) |
-| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1i implemented locally (2026-11-07); play check of SV1g+SV1h done; HUD help text removed |
+| SV1: save and resume | Versioned local native solo save/resume of the sandbox, designed 2026-11-07 (revised the same day for menu integration, discovery and automatic saving) as nine commits SV1a–SV1i: see [SV1: local save and resume](#sv1-local-save-and-resume) | Per step, in that section | SV1a-SV1i merged in #169 (2026-11-07); play check of SV1g+SV1h done; HUD help text removed |
 
 ##### F1 result, 2026-11-07
 
@@ -1342,7 +1348,7 @@ Designed 2026-11-07 at the user's request ("save the state of the player", one s
 all on `feat/sandbox-plugin-fixtures`). It was revised the same day for two more requests: "I
 want it integrated into the menu system as well. Saved states should be auto-discovered." and
 "I want save to be as transparent as possible. I don't want to have to remember to save. This
-will apply to all future state as well." Status: **SV1a-SV1i implemented locally (2026-11-07).**
+will apply to all future state as well." Status: **SV1a-SV1i merged in #169 (2026-11-07).**
 
 SV1 applies [State, authoring and multiplayer](#state-authoring-and-multiplayer) to today's
 single-crate job. Saving is automatic, a quit always finishes promptly, nothing is duplicated or
@@ -2159,3 +2165,13 @@ scenarios listed under the S1d verification and of `delivered`, `landing-built`,
 `quay-pickup`, `jetty-approach` and `jetty-delivered` are byte-identical to S1d: their crates
 land fully inside the deck, so only edge contact changed. No new capture of an edge landing
 was made, and nobody has tried the fix by hand yet; the user asked to publish it before trying it.
+
+
+### Documentation reconciliation after #169, 2026-11-07
+
+Documentation-only change on `docs/plan-spec-rule` (no code, build, CTest or audiovisual check was
+run, and none was needed). It records that S1e F1-F4 and SV1a-SV1i merged as #169 (5789645),
+corrects "implemented locally" wording here, in the plugin plan and API, and in the title plan,
+and adds the plan/spec rule to `AGENTS.md` and the Open loops board to `docs/README.md`. The user's
+play checks recorded above are unchanged; the DAMAGED hint and `.rejected` path were not exercised
+by hand.

@@ -147,6 +147,22 @@ xcrun xctrace record --template 'Time Profiler' --output build/outer.trace \
 - Check changed local links and command examples. Report unresolved documentation uncertainty and
   verification limits before handoff; documentation-only changes need no new audiovisual review.
 
+### Plans and specs
+
+- Plans describe work to do; specs describe the system as it is, in the present tense with no
+  dated results. Existing specs: `docs/PLUGIN_API.md`, `docs/MULTIPLAYER_PROTOCOL.md`,
+  `docs/TESTING.md`, `docs/PLAYING.md`, `docs/COMMAND_LINE.md`.
+- Each plan keeps a status header of at most about ten lines: current state, open items, a
+  "done when" line and the next task. Dated results and evidence go below it or in history.
+- Every milestone ends with a closing step: move its contract and behaviour into the owning
+  spec (create one if none exists), turn leftovers into open items or drop them explicitly,
+  then mark the plan done or move it to history.
+- Before starting a new track or feature, check the Open loops board in `docs/README.md` and
+  name in the new plan what it defers.
+- Candidate specs to create at closing steps (listed in the index, not yet written):
+  `docs/ARCHITECTURE.md` (supersedes `ARCHITECTURE_REVIEW.md`), `docs/MULTIPLAYER.md` and
+  `docs/WORKING_HARBOUR.md`.
+
 ## Cutting a release
 
 - Use `tools/cut_release.py` from the separate, reviewed source worktree; see the

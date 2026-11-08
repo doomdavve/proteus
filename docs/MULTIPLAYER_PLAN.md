@@ -1953,9 +1953,13 @@ gameplay, browser builds and packaged v8 releases were not checked. Subsequent p
 and cutover evidence belongs to the [release status](RELEASES.md#status-and-verification). Worst-case combat still occupies three pages plus the fleet snapshot,
 so snapshot liveness/resync remains the recovery path under severe loss.
 
-## Exact first implementation task
+## Original first implementation task (completed)
 
-Begin with **foundations P2a: a display-free benchmark for the existing one-boat arcade loop**.
+History, 2026-10-23: this was the first task when the plan was written; foundations P2a is
+complete and the plan has since advanced through M4. The live next task is the
+[M5 status](#m5--four-playersession-and-impairment-hardening) (step 1 only, 2026-10-24).
+
+Originally: begin with **foundations P2a: a display-free benchmark for the existing one-boat arcade loop**.
 The [P2a task contract](BOATING_FOUNDATIONS_PLAN.md#p2a--first-multiplayer-prerequisite-task)
 is the implementation source of truth. It is deliberately smaller than the original all-mode
 P2. It freezes the current feel and supplies honest cost/state evidence before clock/core work.
