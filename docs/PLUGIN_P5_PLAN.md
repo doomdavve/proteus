@@ -1,7 +1,7 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **P5a implemented on its branch (marks and the hunt package, no networking);
-not yet merged.** Scheduled by the user "as soon as possible"
+Status, 2026-11-08: **P5a implemented on `feat/plugin-p5` (marks and the hunt package, no
+networking); the single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
 possible ([decisions](#decisions)). Done when: two players (then four) play the
@@ -9,7 +9,7 @@ possible ([decisions](#decisions)). Done when: two players (then four) play the
 reconnects see the same HUD, the authority can reload its source and commit definition revisions
 at safe boundaries, a session is recorded and reconstructed with its revision, existing
 free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
-Next task: [P5b](#p5b-the-objective-on-the-authority), after P5a's review.
+Next task: [P5b](#p5b-the-objective-on-the-authority).
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -148,7 +148,8 @@ by default, and a diagnostic mode re-runs the pinned source and compares.
 
 ## Steps
 
-Each step is one PR, stacked on its parent per AGENTS.md. Every step runs the Debug build and
+All of P5 lands as **one PR from `feat/plugin-p5`, with one small commit per step** (the user,
+2026-11-08: no stacks of PRs). Every step runs the Debug build and
 `ctest --preset full`; tests drive virtual time (memory transport, scripted ticks), never sleep,
 and pass the `test_time` lint. Each updates this status header.
 
@@ -165,7 +166,7 @@ with the right crew, and a respawn re-arms the slot; evaluating the script over 
 yields the expected HUD rows, `FIRST`, and the restart; core boundary check.
 Gate: headless events and HUD match the expected tables.
 
-**P5a result, 2026-11-08 (branch `feat/plugin-p5a-marks`).** `src/boat_marks.[ch]` in
+**P5a result, 2026-11-08 (commit on `feat/plugin-p5`).** `src/boat_marks.[ch]` in
 `proteus_boat_core` (validation, digest, the per-slot entry detector); `free.marks` parsed,
 decoded, map-checked and carried over the browser wire; `objective.hud` may now follow
 `free.define` directly; objective events gain an optional `crew`; `plugins/outer-hunt` (five river
