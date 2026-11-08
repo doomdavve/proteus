@@ -246,8 +246,8 @@ static void usage(void)
     cli_usage_line(stdout, "--hdr on|off",
         "HDR scene with restrained bloom and grade (default: on at high resolution)");
     cli_usage_line(stdout, "--daylight day|sunset|dusk", "Fixed lighting (default day)");
-    cli_usage_line(stdout, "--lighting-hour H",
-        "Developer full-day hour; overrides --daylight; --time stays drive time");
+    cli_usage_line(
+        stdout, "--lighting-hour H", "Fixed full-day hour override; --time stays drive time");
     cli_usage_line(
         stdout, "--no-far-detail", "Draw distant scenery at full detail, for comparison");
     cli_usage_line(stdout, "--no-vsync", "Pace at exactly 60 Hz");
@@ -2643,8 +2643,12 @@ static int title_single(const BoatTitleSettings *settings, int extra_count, char
     }
     arguments[count++] = "--soundtrack";
     arguments[count++] = (char *)boat_music(settings->soundtrack)->id;
-    arguments[count++] = "--daylight";
-    arguments[count++] = (char *)boat_title_lighting(settings->lighting);
+    const char *lighting_option, *lighting_value;
+    if (boat_title_lighting_cli(
+            settings->lighting, extra_count, extra, &lighting_option, &lighting_value)) {
+        arguments[count++] = (char *)lighting_option;
+        arguments[count++] = (char *)lighting_value;
+    }
     if (settings->mouse_steering)
         arguments[count++] = "--mouse-steering";
     for (int i = 0; i < extra_count && count < 31; ++i)
@@ -2688,9 +2692,13 @@ static int title_start(int argc, char **argv)
 static int title_join(BoatTitleSettings *settings, bool host)
 {
     char *arguments[16] = { "wake_velocity", "--name", settings->name, "--soundtrack",
-        (char *)boat_music(settings->soundtrack)->id, "--daylight",
-        (char *)boat_title_lighting(settings->lighting) };
-    int count = 7;
+        (char *)boat_music(settings->soundtrack)->id };
+    int count = 5;
+    const char *lighting_option, *lighting_value;
+    if (boat_title_lighting_cli(settings->lighting, 0, NULL, &lighting_option, &lighting_value)) {
+        arguments[count++] = (char *)lighting_option;
+        arguments[count++] = (char *)lighting_value;
+    }
     if (host) {
         arguments[count++] = "--host";
         arguments[count++] = (char *)boat_title_host_mode(settings->host_mode);

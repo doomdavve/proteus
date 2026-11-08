@@ -13,7 +13,7 @@ typedef struct {
     unsigned skin; // Single-player livery; rooms colour boats by slot.
     bool mouse_steering; // Sessions start with captured mouse steering; in-game changes return.
     unsigned soundtrack; // Local music choice, including off; shared by single player and rooms.
-    unsigned lighting; // Fixed local lighting preset, shared by single player and rooms.
+    unsigned lighting; // Fixed local lighting choice, shared by single player and rooms.
     unsigned host_mode; // HOST A ROOM: a BoatTitleHostMode, a boat_location id and the water.
     unsigned host_location;
     bool host_waves;
@@ -56,13 +56,20 @@ typedef enum {
     BOAT_TITLE_LIGHTING_DAY,
     BOAT_TITLE_LIGHTING_SUNSET,
     BOAT_TITLE_LIGHTING_DUSK,
-    BOAT_TITLE_LIGHTING_COUNT
+    BOAT_TITLE_LIGHTING_HOURS, // 00:00 is HOURS; the last hour is HOURS + 23.
+    BOAT_TITLE_LIGHTING_COUNT = BOAT_TITLE_LIGHTING_HOURS + 24
 } BoatTitleLighting;
 
 // The command-line spelling of a host mode: free, deathmatch or race.
 const char *boat_title_host_mode(unsigned mode);
-// The command-line spelling of a fixed lighting preset: day, sunset or dusk.
+// The saved spelling of a lighting choice: day, sunset, dusk or hour-v1:HH.
 const char *boat_title_lighting(unsigned lighting);
+// The selected hour of an hourly lighting choice, or -1 for a preset or invalid choice.
+int boat_title_lighting_hour(unsigned lighting);
+// The command-line option and value for a title launch, or false when EXTRA already contains
+// --daylight or --lighting-hour. Both returned pointers are borrowed static storage.
+bool boat_title_lighting_cli(
+    unsigned lighting, int extra_count, char **extra, const char **option, const char **value);
 
 void boat_title_defaults(BoatTitleSettings *settings);
 // Remembered between launches in the per-user data directory; defaults when absent.

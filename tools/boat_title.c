@@ -124,12 +124,44 @@ typedef enum {
 } Panel;
 
 static const char *const host_modes[BOAT_TITLE_HOST_MODES] = { "free", "deathmatch", "race" };
-static const char *const lighting_names[BOAT_TITLE_LIGHTING_COUNT] = { "day", "sunset", "dusk" };
+static const char *const lighting_names[BOAT_TITLE_LIGHTING_HOURS] = { "day", "sunset", "dusk" };
+static const char *const lighting_hours[]
+    = { "hour-v1:00", "hour-v1:01", "hour-v1:02", "hour-v1:03", "hour-v1:04", "hour-v1:05",
+          "hour-v1:06", "hour-v1:07", "hour-v1:08", "hour-v1:09", "hour-v1:10", "hour-v1:11",
+          "hour-v1:12", "hour-v1:13", "hour-v1:14", "hour-v1:15", "hour-v1:16", "hour-v1:17",
+          "hour-v1:18", "hour-v1:19", "hour-v1:20", "hour-v1:21", "hour-v1:22", "hour-v1:23" };
 
 const char *boat_title_lighting(unsigned lighting)
 {
-    return lighting_names[lighting < BOAT_TITLE_LIGHTING_COUNT ? lighting
-                                                               : BOAT_TITLE_LIGHTING_DAY];
+    if (lighting < BOAT_TITLE_LIGHTING_HOURS)
+        return lighting_names[lighting];
+    if (lighting < BOAT_TITLE_LIGHTING_COUNT)
+        return lighting_hours[lighting - BOAT_TITLE_LIGHTING_HOURS];
+    return lighting_names[BOAT_TITLE_LIGHTING_DAY];
+}
+
+int boat_title_lighting_hour(unsigned lighting)
+{
+    return lighting >= BOAT_TITLE_LIGHTING_HOURS && lighting < BOAT_TITLE_LIGHTING_COUNT
+        ? (int)(lighting - BOAT_TITLE_LIGHTING_HOURS)
+        : -1;
+}
+
+bool boat_title_lighting_cli(
+    unsigned lighting, int extra_count, char **extra, const char **option, const char **value)
+{
+    for (int i = 0; i < extra_count; ++i)
+        if (!strcmp(extra[i], "--daylight") || !strcmp(extra[i], "--lighting-hour"))
+            return false;
+    int hour = boat_title_lighting_hour(lighting);
+    if (hour >= 0) {
+        *option = "--lighting-hour";
+        *value = boat_title_lighting(lighting) + sizeof("hour-v1:") - 1;
+    } else {
+        *option = "--daylight";
+        *value = boat_title_lighting(lighting);
+    }
+    return true;
 }
 static const struct {
     const char *name, *package, *label, *hint;
@@ -439,9 +471,14 @@ static void row_text(const Title *t, const BoatTitleSettings *s, int row, const 
         else if (row == ROW_EDGES)
             snprintf(value, size, "< %s >", pictures[picture(s)]);
         else if (row == ROW_LIGHTING) {
-            char lighting[16];
-            upper(lighting, sizeof(lighting), boat_title_lighting(s->lighting));
-            snprintf(value, size, "< %s >", lighting);
+            int hour = boat_title_lighting_hour(s->lighting);
+            if (hour >= 0) {
+                snprintf(value, size, "< %02d:00 >", hour);
+            } else {
+                char lighting[16];
+                upper(lighting, sizeof(lighting), boat_title_lighting(s->lighting));
+                snprintf(value, size, "< %s >", lighting);
+            }
         }
         return;
     }
@@ -1303,6 +1340,7 @@ void boat_title_load(BoatTitleSettings *s)
         else if (!strcmp(line, "soundtrack"))
             boat_music_parse(value, &s->soundtrack);
         else if (!strcmp(line, "lighting")) {
+            s->lighting = BOAT_TITLE_LIGHTING_DAY;
             for (unsigned i = 0; i < BOAT_TITLE_LIGHTING_COUNT; ++i)
                 if (!strcmp(value, boat_title_lighting(i)))
                     s->lighting = i;

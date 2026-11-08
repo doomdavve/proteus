@@ -12,7 +12,8 @@ For a source build, run `./build/wake_velocity` from the repository root so asse
 
 The title offers SINGLE PLAYER, MULTIPLAYER, SETTINGS and CREDITS. SETTINGS remembers your
 name, boat livery, steering mode, soundtrack, PICTURE and LIGHTING. LIGHTING cycles DAY
-(the default), SUNSET and DUSK with Left/Right, Enter or a click. It sets your view in
+(the default), SUNSET, DUSK, then 00:00 through 23:00 with Left/Right, Enter or a click.
+It sets your view in
 each new solo or multiplayer session; other players keep their own choice.
 PICTURE also appears in the single-player setup: PIXEL is the plain 320×200 scene,
 SMOOTH (the default) supersamples it,

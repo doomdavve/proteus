@@ -450,6 +450,18 @@ if(EMSCRIPTEN)
   return() # Desktop studies and CTest tools remain native targets.
 endif()
 
+# T3: title settings persistence and the title's lighting hand-off into each launch mode. The
+# build-tree data directory keeps the player's settings out of the test.
+set(BOAT_TITLE_SETTINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/boat-title-settings-tests")
+file(MAKE_DIRECTORY "${BOAT_TITLE_SETTINGS_DIR}")
+add_executable(validate_boat_title tools/validate_boat_title.c tools/boat_title.c)
+target_include_directories(validate_boat_title PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(validate_boat_title PRIVATE proteus_render proteus_work_save
+  proteus_frame_pacer proteus_boat_net_enet)
+target_compile_definitions(validate_boat_title PRIVATE PROTEUS_BOAT_NET=1)
+target_compile_options(validate_boat_title PRIVATE ${PROTEUS_WARNINGS})
+add_test(NAME boat_title_settings COMMAND validate_boat_title "${BOAT_TITLE_SETTINGS_DIR}")
+set_tests_properties(boat_title_settings PROPERTIES LABELS "cpu")
 
 add_custom_target(proteus_assets
   COMMAND ${CMAKE_COMMAND} -E copy_directory

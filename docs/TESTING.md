@@ -659,6 +659,13 @@ facing, emissive tint independence and the navigation-lamp tint exemption while 
 that wakes follow the unlit tint, alongside the existing mapping and clipping checks. These are
 work/pixel checks, not timing budgets.
 
+`boat_title_settings` (`cpu;quick`, 0.01 s in the 2026-11-08 full run) builds the production
+title with the native networking definition but opens no window or network. The `validate_boat_title` executable
+overrides the settings directory with an isolated build-tree path and checks actual save/load
+roundtrips: all 27 fixed lighting fixtures, invalid versions/non-finite/out-of-range values,
+missing and old settings, unrelated fields, and the launch-argument handoff/precedence. It does
+not wait for wall time.
+
 ## GPU checks
 
 `gpu_fixture --city --check` (CTest `gpu_surface_materials`) also verifies reflection waterline

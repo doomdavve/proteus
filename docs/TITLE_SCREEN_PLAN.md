@@ -1,6 +1,6 @@
 # Boating game title screen and main-program plan
 
-Status: revised 2026-11-06. This document owns the title, menu and promotion of
+Status: revised 2026-11-08. This document owns the title, menu and promotion of
 **Wake Velocity**. Two compile-time palettes now share the same backdrop placement, geometric
 wordmark, m5x7/m3x6 fonts and menu flows. Marine cartoon daylight is the default; configure with
 `-DPROTEUS_WARM_MENU=OFF` to retain the user-selected cyan dusk design from 2026-10-27.
@@ -15,15 +15,36 @@ Single Player's Gothenburg Harbour gains a WORKING HARBOUR content on native bui
 SAVE row showing automatically discovered saves (Continue, New, Delete; New and Delete confirm)
 and the save's summary on the hint line. The WATER row is hidden for it. The
 [sandbox plan's SV1h result](FREE_RIDE_SANDBOX_PLAN.md#sv1-steps) owns the details.
-Next: physical input/playback review; native/browser
-package qualification remains outstanding. Gameplay sunset is owned by the
-[sunset plan](SUNSET_PLAN.md), independently of these title-only colour treatments.
+T3 fixed-hour lighting is implemented locally 2026-11-08; its review and remaining limits are
+owned by the [sunset plan](SUNSET_PLAN.md#t3-implementation-2026-11-08). The title backdrop keeps
+its existing palette, and gameplay lighting remains separate from these title-only colour
+treatments. Next: physical input/playback review; native/browser
+package qualification remains outstanding.
 Music status belongs to the [boating plan](BOATING_PLAN.md#selectable-soundtracks--2026-10-24).
+
+## Fixed-hour title lighting, 2026-11-08
+
+T3 extends the one existing SETTINGS → LIGHTING row from three presets to 27 fixed choices:
+DAY (default), SUNSET, DUSK, then 00:00 through 23:00. Left/Right, Enter and click retain the
+existing row mechanics. The named presets and Day default are unchanged, and the title backdrop
+keeps its palette. Each local player's choice applies to new solo, joined and hosted sessions;
+there is no general Auto or shared room clock.
+
+The `lighting` key keeps exact legacy names or saves `hour-v1:HH`; malformed values and unknown
+versions fall back to Day. The UI shows integer hours. Title launches inject the saved choice,
+while explicit `--daylight` or `--lighting-hour` suppress that injection; when both explicit,
+the hour wins regardless of order and direct explicit sessions never load the title preference.
+
+Native settings roundtrips and Chrome/ANGLE Metal selection, reload and solo-session checks
+passed. All 470 enabled native tests passed with GPU tests enabled. Player/night acceptance and
+platform limits remain in the [lighting owner](SUNSET_PLAN.md#t3-implementation-2026-11-08).
 
 ## Fixed gameplay lighting setting, 2026-11-06
 
-SETTINGS now includes LIGHTING after PICTURE: DAY (default), SUNSET and DUSK. Left/Right,
-Enter and pointer activation cycle the existing fixed presets. Seven settings rows use
+**Historical baseline; superseded by T3 on 2026-11-08.**
+
+At this checkpoint, SETTINGS included LIGHTING after PICTURE: DAY (default), SUNSET and DUSK.
+Left/Right, Enter and pointer activation cycle the existing fixed presets. Seven settings rows use
 14-pixel spacing so the hint and footer still fit at 320×200. `lighting=day|sunset|dusk`
 is remembered in native `title.txt` and the browser's existing IndexedDB save; missing or
 unknown values retain Day. New solo, joined and locally hosted sessions receive the
@@ -390,7 +411,7 @@ they do not describe the current logo, footer or selected-row appearance.
 | --- | --- | --- |
 | Single Player | Opens River, Basin or Basin trial plus waves/PICTURE setup, then starts the existing session. The explicit `--course` path remains available. | Broader mode selection remains deferred. |
 | Multiplayer | Public server selection, native LAN/host flow and manual address joining; browser WebRTC joining. | Broader platform/network qualification remains owned by the multiplayer plans. |
-| Settings | Name, boat, steering, soundtrack, PICTURE (PIXEL, SMOOTH or HIGH RES) and LIGHTING (DAY, SUNSET or DUSK). | Volume and further display controls remain deferred. |
+| Settings | Name, boat, steering, soundtrack, PICTURE (PIXEL, SMOOTH or HIGH RES) and LIGHTING (27 fixed choices: DAY, SUNSET, DUSK, then 00:00–23:00). | Volume and further display controls remain deferred. |
 | Credits | Vertical roll: Thanks to, fonts, map data, libraries and Proteus, over an animated water grid; BACK or Escape returns to the main menu. | Physical navigation and browser qualification remain open. |
 | Exit | Close the native program. | On the web, replace with “Back to launcher” if the page launcher remains; browser tabs cannot be closed reliably by game code. |
 

@@ -225,14 +225,18 @@ and [arcade object results](WAKE_OBJECT_RESULTS.md). Field mode is unavailable i
 ## Rendering, captures and profiling
 
 `--daylight day|sunset|dusk` selects a fixed legacy lighting preset (default day); a numeric
-phase 0..1 blends between them. In the title, SETTINGS → LIGHTING remembers DAY,
-SUNSET or DUSK for your new solo and multiplayer sessions. Explicit CLI launches use
-their own options rather than the saved title choice.
+phase 0..1 blends between them. In the title, SETTINGS → LIGHTING cycles 27 fixed choices:
+DAY (default), SUNSET, DUSK, then 00:00 through 23:00. The choice is remembered per local player
+and injected into new solo, joined and hosted sessions. The same `lighting` key stores exact
+legacy names or versioned `hour-v1:HH`; malformed values and unknown versions fall back to Day.
+Explicit CLI launches use their own options rather than the saved title choice.
 
-`--lighting-hour H` is the developer full-day review input. Any finite hour wraps into
-`[0,24)` (`24` is midnight, `-1` is 23:00); non-finite values are rejected. It overrides
-`--daylight` regardless of argument order. `--time` still selects the scripted drive and
-wave time, not the light, so the same hour can be captured at different moments:
+`--lighting-hour H` is the fixed full-day override. Any finite hour wraps into
+`[0,24)` (`24` is midnight, `-1` is 23:00); fractional hours remain supported, and non-finite
+values are rejected. It overrides `--daylight` regardless of argument order. If either explicit
+option is present, the title's saved lighting is not injected. `--time` still selects the
+scripted drive and wave time, not the light, so the same hour can be captured at different
+moments:
 
 ```sh
 ./build/wake_velocity --renderer cpu --location outer --lighting-hour 21 --time 3 \
@@ -256,8 +260,8 @@ timing threshold.
   --scenario stress --lighting-samples 25 --waves
 ```
 
-The deathmatch capture fixture accepts the same developer hour for weapons and mirror review;
-invalid or missing values are rejected before a window opens:
+The deathmatch capture fixture accepts the same fixed full-day hour for weapons and mirror
+review; invalid or missing values are rejected before a window opens:
 
 ```sh
 ./build/boat_combat_review --lighting-hour 21 --screenshot build/combat-night.png
@@ -268,8 +272,8 @@ invalid or missing values are rejected before a window opens:
 The named Day, Sunset and Dusk recipes keep their exact legacy behavior. The CPU basin now
 shares the selected hour's sky and light, and both CPU flat-water paths apply the frame's water
 multiplier once with ordinary flat shading, so basin captures from earlier daytime-only builds
-differ intentionally. The user approved the fixed-hour T1 preview; broader readability and
-performance qualification remains T2c.
+differ intentionally. T2c readability/performance limits and T3's fixed-hour title controls are
+recorded in the [lighting plan](SUNSET_PLAN.md#t3-implementation-2026-11-08).
 
 GPU is the default. `--renderer cpu` selects the software reference; `--gpu` is an alias
 for `--renderer gpu`. `--gpu-aa` enables 4×4 supersampling while preserving the logical
