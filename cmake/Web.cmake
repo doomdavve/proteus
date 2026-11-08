@@ -24,14 +24,18 @@ foreach(shader IN LISTS WEB_SHADERS)
     set(source "${prefix}const int wakeFieldEnabled = 0;\nvec3 wakeFieldSample(vec2 p) { return vec3(0.0); }\nfloat wakeVertexHeight(vec2 p) { return 0.0; }\n${suffix}")
   endif()
   # These fragments use raylib's default vertex shader (mediump varyings).
-  if(name STREQUAL "waterfront_sky.fs" OR name STREQUAL "gpu_downsample.fs"
-      OR name STREQUAL "gpu_post.fs")
+  if(name STREQUAL "gpu_downsample.fs" OR name STREQUAL "gpu_post.fs")
     set(precision mediump)
   else()
     set(precision highp)
   endif()
   string(REPLACE "#version 330" "#version 300 es\nprecision ${precision} float;\nprecision highp int;"
     source "${source}")
+  # The sky needs highp arithmetic for its texel-quantized light recipe, but must keep the
+  # varying at raylib's default mediump precision so the program still links on WebGL2.
+  if(name STREQUAL "waterfront_sky.fs")
+    string(REPLACE "in vec2 fragTexCoord;" "in mediump vec2 fragTexCoord;" source "${source}")
+  endif()
   file(GENERATE OUTPUT "${WEB_ASSETS}/shaders/${name}" CONTENT "${source}")
 endforeach()
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${WEB_SHADERS})

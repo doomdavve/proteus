@@ -253,7 +253,8 @@ only lighten.
 `presentation` (`boat_water_review --check-presentation`, `gpu`, about 3 s; graphics G5a) draws
 the river at low and high resolution with and without HDR. Daytime HDR stays within one 8-bit step
 of the 8-bit scene; repeated preset and window-size changes, a second view and the rear-view
-mirror reproduce their frames; failed HDR allocations present the 8-bit frame exactly; a
+mirror reproduce their frames; a same-wave-time light seek refreshes actual CPU and GPU mirror
+pixels and returning restores them; failed HDR allocations present the 8-bit frame exactly; a
 synthetic 3.5 spot blooms only a few pixels and clamps; and the HUD overlay composites like
 drawing over the scene. `boat_screen` and `waterfront_grade` (quick) check the layout sizes and
 the grades.
@@ -452,6 +453,15 @@ that introduced the scenario.
 See [the benchmark guide](BOATING_PERFORMANCE.md#river-frame-benchmark--2026-10-25) and the
 [G0 budgets](BOATING_PERFORMANCE.md#graphics-g0-measurement-harness--2026-11-01).
 
+`boat_lighting_qualification_contract` (`cpu;slow`, about 11 s in Debug on an M1 Max) runs the
+small deterministic `--lighting-qualify` stress audit in `tools/validate_boat_lighting_qualification.py`.
+It rejects out-of-bounds sample counts, CPU high/HDR, `--daylight`, `--aa`, review/check mixing
+and unusable prefixes before a window. The 25-sample run must exclude eight warmup rows, span a
+virtual 900 s cycle with every hour bin and midnight wrap, hold the fixed hour, match the two
+runs' final physical state, and produce a parseable JSON/CSV with recomputable finite rows. It
+asserts no frame-time threshold and does not replace supervisor fixed/cycle Release, GPU and
+visual measurements.
+
 `boat_capture` (`cpu`) owns the bounded live-capture contract: ring ordering/eviction, the
 retained window's span, segment separation, the percentile convention, missing GPU samples and
 directory/ZIP export without overwriting. `performance_analyzer` (`cpu`) runs the stdlib-only
@@ -635,12 +645,33 @@ configuration; Windows timings have not been measured. GPU checks are opt-in thr
 `PROTEUS_GPU_TESTS=ON` and need a desktop context. A display-free suite with GPU checks
 off has less coverage; report that omission.
 
+CPU lighting checks are display-free. The quick `waterfront_lighting` test covers presets,
+continuity, reference repaint/restore, window occupancy and parsing. Its exhaustive
+`--sky-check` mode is the separate slow `waterfront_lighting_sky` test: it compares the
+visible-sample draw with the full panorama (separate storage/traversal, shared texel recipe)
+across legacy/full hours, sizes, cameras and a squall, and uses `waterfront_sky_stats()` to
+prove fixed-light cache reuse and bounded work on alternating/seeking lights. The saved
+parent captures remain the independent recipe baseline.
+`boat_world_isolation.cpu_basin_lighting` paints the full reference and is therefore slow; it
+checks the basin sky, hour wrap/direct/backward seeks and both the basin and mapped flat-water
+tint ordering. `renderer3d_is_valid` checks textured-material ambient/diffuse/tint, point light
+facing, emissive tint independence and the navigation-lamp tint exemption while still checking
+that wakes follow the unlit tint, alongside the existing mapping and clipping checks. These are
+work/pixel checks, not timing budgets.
+
 ## GPU checks
 
 `gpu_fixture --city --check` (CTest `gpu_surface_materials`) also verifies reflection waterline
 clipping: above-water scenery remains visible, submerged scenery cannot change the reflection,
-and clipping is reset before the main pass. This requires `PROTEUS_GPU_TESTS=ON` and a desktop
-graphics context.
+and clipping is reset before the main pass. It also compares the uniform-shaded GPU sky with
+the CPU panorama at selected legacy/hour values and low/high sizes, checks direct/backward
+seeks and independent scene recreation, and observes native GL texture calls across 24 hours
+plus a bounded 241-sample virtual cycle that crosses midnight and alternates the above-city and
+azimuth-seam views. A separate probe texture proves the upload spies work before the sky's
+zero-write measurement.
+The original target/overlay/squall/pass checks remain. This requires `PROTEUS_GPU_TESTS=ON`
+and a desktop graphics context; detailed evidence and limits live in the
+[lighting plan](SUNSET_PLAN.md#t2a-implementation-2026-11-07).
 
 GPU checks are opt-in and require a desktop graphics context. Configure and run the
 labelled cases on a machine that can create a raylib/OpenGL window:
@@ -650,6 +681,13 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DPROTEUS_GPU_TESTS=ON
 cmake --build build -j
 ctest --test-dir build -L gpu --output-on-failure
 ```
+
+On macOS, a sleeping display can make pinned GLFW report no monitor even though AppKit still
+lists a screen. For an unattended GPU run, keep the display awake for the command with
+`caffeinate -d -i -u ctest --test-dir build -L gpu --output-on-failure`; the assertion ends
+with the command and does not change saved power settings. The 2026-11-07 lighting run
+confirmed this with CoreGraphics (`active=0 asleep=1`) and GLFW (zero monitors), then passed
+with a temporary awake assertion. See the lighting plan for the verification record.
 
 The default display-free suite omits these checks. Report that omission when recording
 verification. The `gpu_surface_materials` case also probes the production city shader

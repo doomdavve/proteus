@@ -1550,11 +1550,13 @@ bool waterfront_gpu_scene_init(WaterfrontGpuScene *scene, const char *fragment_s
     float unit_gain = 1;
     SetShaderValue(scene->shader, cached_location(scene->shader, "emissiveGain"), &unit_gain,
         SHADER_UNIFORM_FLOAT);
-    scene->sky_lighting = waterfront_lighting(WATERFRONT_DAYLIGHT_DAY);
-    scene->sky_texture = LoadTextureFromImage(waterfront_sky_image(&scene->sky_lighting));
-    if (!IsTextureValid(scene->sky_texture))
+    scene->sky_mask = LoadTextureFromImage(waterfront_sky_cloud_mask());
+    if (!IsTextureValid(scene->sky_mask))
         goto failed;
-    SetTextureFilter(scene->sky_texture, TEXTURE_FILTER_POINT);
+    SetTextureFilter(scene->sky_mask, TEXTURE_FILTER_POINT);
+    int sky_texture_unit = 0;
+    SetShaderValue(scene->sky_shader, cached_location(scene->sky_shader, "skyMask"),
+        &sky_texture_unit, SHADER_UNIFORM_INT);
     scene->city_material = LoadMaterialDefault();
     scene->life_material = LoadMaterialDefault();
     scene->shadow_material = LoadMaterialDefault();
@@ -2993,14 +2995,45 @@ static void restore_render_target(RenderTargetState state)
     rlSetMatrixModelview(state.modelview);
 }
 
+static void set_sky_vector(Shader shader, const char *name, Vector3 value)
+{
+    float data[] = { value.x, value.y, value.z };
+    SetShaderValue(shader, cached_location(shader, name), data, SHADER_UNIFORM_VEC3);
+}
+
+static void set_sky_lighting_uniforms(
+    const WaterfrontGpuScene *scene, const WaterfrontLighting *lighting)
+{
+    Shader shader = scene->sky_shader;
+    set_sky_vector(shader, "skyHorizon", lighting->sky_horizon);
+    set_sky_vector(shader, "skyZenith", lighting->sky_zenith);
+    set_sky_vector(shader, "sunDirection", lighting->sun_direction);
+    set_sky_vector(shader, "sunHalo", lighting->sun_halo);
+    set_sky_vector(shader, "sunDisc", lighting->sun_disc);
+    set_sky_vector(shader, "horizonGlow", lighting->horizon_glow);
+    set_sky_vector(shader, "cloudUnderside", lighting->cloud_underside);
+    set_sky_vector(shader, "cloudRim", lighting->cloud_rim);
+    SetShaderValue(shader, cached_location(shader, "skyGradient"), &lighting->sky_gradient,
+        SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, cached_location(shader, "haloStrength"), &lighting->halo_strength,
+        SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, cached_location(shader, "haloRadius"), &lighting->halo_radius,
+        SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, cached_location(shader, "discStrength"), &lighting->disc_strength,
+        SHADER_UNIFORM_FLOAT);
+    SetShaderValue(shader, cached_location(shader, "glowStrength"), &lighting->glow_strength,
+        SHADER_UNIFORM_FLOAT);
+}
+
 static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontSquall squall,
-    int width, int height, float aspect)
+    const WaterfrontLighting *lighting, int width, int height, float aspect)
 {
     Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
     Vector3 up = Vector3CrossProduct(right, forward);
     float scale[] = { tanf(camera.vertical_fov * .5f) * aspect, tanf(camera.vertical_fov * .5f) };
     Shader shader = scene->sky_shader;
+    set_sky_lighting_uniforms(scene, lighting);
     SetShaderValue(shader, cached_location(shader, "skyForward"), &forward, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, cached_location(shader, "skyRight"), &right, SHADER_UNIFORM_VEC3);
     SetShaderValue(shader, cached_location(shader, "skyUp"), &up, SHADER_UNIFORM_VEC3);
@@ -3014,8 +3047,8 @@ static void draw_sky(const WaterfrontGpuScene *scene, View3D camera, WaterfrontS
     if (counting)
         ++counting->sky_quads;
     BeginShaderMode(shader);
-    DrawTexturePro(scene->sky_texture,
-        (Rectangle) { 0, 0, scene->sky_texture.width, scene->sky_texture.height },
+    DrawTexturePro(scene->sky_mask,
+        (Rectangle) { 0, 0, scene->sky_mask.width, scene->sky_mask.height },
         (Rectangle) { 0, 0, width, height }, (Vector2) { 0 }, 0, WHITE);
     EndShaderMode();
 }
@@ -3092,7 +3125,7 @@ static void render_reflection(
     sky_camera.up = camera.up;
     sky_camera.vertical_fov = camera.fovy * DEG2RAD;
     // The fixed-size texture stores this wider frustum, independent of its pixel aspect.
-    draw_sky(scene, sky_camera, frame->squall, scene->reflection.texture.width,
+    draw_sky(scene, sky_camera, frame->squall, &frame->lighting, scene->reflection.texture.width,
         scene->reflection.texture.height, aspect);
     BeginMode3D(camera);
     rlSetMatrixProjection(MatrixPerspective(
@@ -3431,10 +3464,6 @@ WaterfrontGpuCount waterfront_gpu_stats_total(const WaterfrontGpuStats *stats)
 static void draw_scene(
     WaterfrontGpuScene *scene, const WaterfrontSceneFrame *frame, int width, int height)
 {
-    if (!waterfront_lighting_same_sky(&scene->sky_lighting, &frame->lighting)) {
-        UpdateTexture(scene->sky_texture, waterfront_sky_image(&frame->lighting).data);
-        scene->sky_lighting = frame->lighting;
-    }
     if (frame->player_active && !frame->hide_player)
         update_flag_mesh(&scene->player_flag, &frame->player.flag, frame->player.skin);
     if (frame->ghost_opacity > 0)
@@ -3470,7 +3499,8 @@ static void draw_scene(
     counting_pass = WATERFRONT_GPU_PASS_MAIN;
     set_atmosphere_uniforms(scene, frame->camera.position, &frame->lighting);
     ClearBackground(BLACK);
-    draw_sky(scene, frame->camera, frame->squall, width, height, (float)width / height);
+    draw_sky(scene, frame->camera, frame->squall, &frame->lighting, width, height,
+        (float)width / height);
     detail_select(scene, DETAIL_MAIN,
         frame->player_active ? frame->camera.target : frame->camera.position,
         frame->camera.vertical_fov, (float)height / fmaxf(1, scene->detail_scale));
@@ -3704,8 +3734,8 @@ void waterfront_gpu_scene_destroy(WaterfrontGpuScene *scene)
         scene->water_material.shader.id = rlGetShaderIdDefault();
         UnloadMaterial(scene->water_material);
     }
-    if (scene->sky_texture.id != 0)
-        UnloadTexture(scene->sky_texture);
+    if (scene->sky_mask.id != 0)
+        UnloadTexture(scene->sky_mask);
     if (scene->object_wakes.id != 0)
         UnloadTexture(scene->object_wakes);
     if (scene->light_texture.id != 0)

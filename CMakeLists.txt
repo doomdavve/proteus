@@ -427,6 +427,12 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(boat_combat_review PRIVATE proteus_boat_drive proteus_gpu
     proteus_boat_net_enet proteus_boat_fixtures)
   target_compile_options(boat_combat_review PRIVATE ${PROTEUS_WARNINGS})
+  add_test(NAME boat_combat_lighting_hour_invalid
+    COMMAND boat_combat_review --lighting-hour nope)
+  add_test(NAME boat_combat_lighting_hour_missing
+    COMMAND boat_combat_review --lighting-hour)
+  set_tests_properties(boat_combat_lighting_hour_invalid boat_combat_lighting_hour_missing
+    PROPERTIES WILL_FAIL TRUE LABELS "cpu;quick")
 endif()
 
 # Shared descriptor transactions; browser Lua evaluation is restricted to its isolated worker.
@@ -715,6 +721,11 @@ set_tests_properties(performance_analyzer PROPERTIES LABELS "cpu")
 set_tests_properties(web_endpoint_configuration PROPERTIES LABELS "cpu")
 add_test(NAME boat_benchmark_contract COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_benchmark.py $<TARGET_FILE:boat_benchmark>)
+add_test(NAME boat_lighting_qualification_contract COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_boat_lighting_qualification.py
+  $<TARGET_FILE:boat_water_review>)
+set_tests_properties(boat_lighting_qualification_contract PROPERTIES LABELS "cpu;slow"
+  TIMEOUT 240)
 
 add_executable(wake_objects_review tools/wake_objects_review.c)
 target_include_directories(wake_objects_review PRIVATE ${raylib_SOURCE_DIR}/src)
@@ -1318,6 +1329,32 @@ add_test(NAME boat_cpu_aa_option_reversed COMMAND wake_velocity --gpu-aa --rende
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-cpu-aa-option-reversed.png)
 add_test(NAME boat_outer_screenshot COMMAND wake_velocity --renderer cpu --location outer --time 0
   --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-outer.png)
+add_test(NAME boat_lighting_hour_screenshot COMMAND wake_velocity --renderer cpu --location outer
+  --lighting-hour 12 --time 0 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour.png)
+add_test(NAME boat_lighting_hour_precedence_a COMMAND wake_velocity --renderer cpu --location outer
+  --daylight sunset --lighting-hour 12 --time 0
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-a.png)
+add_test(NAME boat_lighting_hour_precedence_b COMMAND wake_velocity --renderer cpu --location outer
+  --lighting-hour 12 --daylight sunset --time 0
+  --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-b.png)
+add_test(NAME boat_lighting_hour_precedence_matches COMMAND ${CMAKE_COMMAND} -E compare_files
+  ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-a.png
+  ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-b.png)
+add_test(NAME boat_lighting_hour_precedence_reference_matches COMMAND ${CMAKE_COMMAND} -E
+  compare_files ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour.png
+  ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-precedence-a.png)
+add_test(NAME boat_lighting_hour_rejected COMMAND wake_velocity --renderer cpu --location outer
+  --lighting-hour nan --time 0 --screenshot ${CMAKE_CURRENT_BINARY_DIR}/boat-lighting-hour-bad.png)
+set_tests_properties(boat_lighting_hour_rejected PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(boat_lighting_hour_screenshot boat_lighting_hour_precedence_a
+  boat_lighting_hour_precedence_b PROPERTIES FIXTURES_SETUP lighting_hour_precedence)
+set_tests_properties(boat_lighting_hour_precedence_matches
+  boat_lighting_hour_precedence_reference_matches
+  PROPERTIES FIXTURES_REQUIRED lighting_hour_precedence)
+set_tests_properties(boat_lighting_hour_screenshot boat_lighting_hour_precedence_a
+  boat_lighting_hour_precedence_b boat_lighting_hour_precedence_matches
+  boat_lighting_hour_precedence_reference_matches boat_lighting_hour_rejected
+  PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 # SV1f: the working-harbour session in the game, from the scripted drive: the berth, and the
 # landing delivery (idle for 10 s, then the delivery script). --work refuses incompatible options.
 add_test(NAME wake_velocity_work_cpu_screenshot COMMAND wake_velocity --renderer cpu
@@ -1444,6 +1481,7 @@ add_executable(validate_waterfront_lighting tools/validate_waterfront_lighting.c
 target_link_libraries(validate_waterfront_lighting PRIVATE proteus_render)
 target_compile_options(validate_waterfront_lighting PRIVATE ${PROTEUS_WARNINGS})
 add_test(NAME waterfront_lighting COMMAND validate_waterfront_lighting)
+add_test(NAME waterfront_lighting_sky COMMAND validate_waterfront_lighting --sky-check)
 add_executable(validate_boat_screen tools/validate_boat_screen.c)
 target_link_libraries(validate_boat_screen PRIVATE proteus_render)
 target_compile_options(validate_boat_screen PRIVATE ${PROTEUS_WARNINGS})
@@ -1615,13 +1653,14 @@ set(PROTEUS_SLOW_TESTS
   release_command
   acid_xm_is_valid boat_audio_is_valid boating_xm_is_valid starter_xm_is_valid
   boat_banking_presentation boat_benchmark_contract boat_clock_soak_smoke boat_combat
+  boat_lighting_qualification_contract
   boat_core_boundary boat_drive_extraction boat_flag_cloth boat_flag_cpu boat_fleet_render
   boat_host boat_map_scaling boat_net_boundary boat_net_process boat_outer_map boat_race_trial boat_replay
   boat_scenery ambient_river ambient_outer
   boat_river_benchmark_options boat_river_route boat_river_wave_route boat_outer_route
   boat_voyage
   boat_server_scripted_deathmatch boat_turn_entry city_dressing harbor_geometry harbor_traffic
-  waterfront_actors scene_site harbor_life_qualification
+  waterfront_actors waterfront_lighting_sky scene_site harbor_life_qualification
   boat_crossing_wake_screenshot boat_default_player_wake_screenshot boat_environment_screenshot
   boat_environment_outer_screenshot boat_object_wake_screenshot boat_player_wake_screenshot
   boat_outer_screenshot wake_velocity_work_cpu_screenshot wake_velocity_work_delivered_cpu_screenshot
