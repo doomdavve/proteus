@@ -12,9 +12,18 @@
 #include "boat_plugin_state.h"
 #include "boat_scene_definition.h"
 
-#define BOAT_SANDBOX_SAVE_FORMAT 1
+#define BOAT_SANDBOX_SAVE_FORMAT 2
 #define BOAT_SANDBOX_SAVE_MAX 32768
 #define BOAT_SANDBOX_SAVE_HEADER_MAX 512
+
+// Presentation clock shared by the save codec and session resume. Hours are unwrapped
+// game hours (a cycle count survives a save so deterministic glitter continues), bounded to keep
+// the clock finite over a very long session. The default cycle is 900 active scaled seconds.
+#define BOAT_SANDBOX_LIGHTING_HOURS_DEFAULT 12.0
+#define BOAT_SANDBOX_LIGHTING_PERIOD_DEFAULT 900.0
+#define BOAT_SANDBOX_LIGHTING_HOURS_MAX 1.0e9
+#define BOAT_SANDBOX_LIGHTING_PERIOD_MIN 1.0
+#define BOAT_SANDBOX_LIGHTING_PERIOD_MAX 86400.0
 
 typedef struct {
     char package[64], build[64];
@@ -44,6 +53,8 @@ typedef struct {
     BoatPluginEvent events[BOAT_PLUGIN_EVENTS];
     unsigned event_count, generation;
     int64_t sequence;
+    // Required presentation clock (format 2+). Format 1 records decode to noon / 900 seconds.
+    double lighting_hours, lighting_cycle_seconds;
 } BoatSandboxSave;
 
 typedef enum {
@@ -56,6 +67,9 @@ typedef enum {
 } BoatSandboxSaveStatus;
 
 typedef enum { BOAT_SANDBOX_RESUME, BOAT_SANDBOX_MIGRATE, BOAT_SANDBOX_REJECT } BoatSandboxVerdict;
+
+// True when a presentation clock is finite and in bounds: hours 0..1e9, cycle 1..86400 seconds.
+bool boat_sandbox_lighting_valid(double hours, double period);
 
 // Encode SAVE (little-endian, field by field). Fails when a field is out of bounds or the
 // capacity is too small. A successful encode never exceeds BOAT_SANDBOX_SAVE_MAX bytes.

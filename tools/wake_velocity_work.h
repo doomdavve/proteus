@@ -20,6 +20,9 @@ typedef struct {
     BoatWorkSave save;
     BoatWorkFrameWatch watch;
     bool open;
+    // The work session's daylight clock drives the scene unless an explicit fixed lighting option
+    // took over presentation; the clock itself still advances and autosaves.
+    bool lighting_cycle;
 } WakeWork;
 
 // What the HUD needs to put a marker over the target berth.
@@ -61,6 +64,11 @@ WakeWorkDrive wake_work_frame_input(WakeWork *work, bool active);
 void wake_work_return_crate(WakeWork *work);
 // A fresh session and job (the menu's reset).
 void wake_work_reset(WakeWork *work, BoatSession *game);
+// Developer-only bounded review fixture: "swing" hooks the real crate and runs the crane,
+// "deck" loads and lashes it, "approach" uses the existing surveyed approach fixture and moor
+// query at the landing. GAME is synced after success. False for an unknown name or
+// when the real actions cannot reach the requested state.
+bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose);
 // One tick with the crane and helm inputs, then the cosmetic presentation step. Call
 // wake_work_sync once per frame afterwards.
 void wake_work_tick(

@@ -9,11 +9,28 @@ names or uses versioned `hour-v1:HH`; malformed or unknown versions fall back to
 UI shows integer hours, while the CLI retains finite fractional and wrapped hours. Explicit
 `--daylight` or `--lighting-hour` suppress the title's injected setting; when both are explicit,
 the hour overrides daylight regardless of argument order, and direct explicit sessions never
-load the title preference. T3 player/night review and native title host/join runtime checks
-remain pending; T4 is planned after that review. All 470 enabled native tests passed with GPU
-tests enabled. CPU reference rendering still misses the interactive budget; T3 changes controls,
-not renderer cost. Night course/weapon readability still needs playtest acceptance.
-Cloud/reflection attenuation remains deferred.
+load the title preference. On 2026-11-08 the user accepted the T3 controls with “Works”; exact
+hours, night and platform coverage remain open, so this is not blanket lighting acceptance.
+At the T3 checkpoint, all 470 enabled native tests passed with GPU tests enabled. CPU reference rendering still misses
+the interactive budget; T3 changes controls, not renderer cost. Night course/weapon readability
+still needs playtest acceptance. Cloud/reflection attenuation remains deferred.
+
+T4 is implemented locally: Working Harbour/`--work` now follows a
+session-owned presentation clock from noon, and the existing ¼×–8× solo time control moves
+light with the world through the same fixed 120 Hz tick loop. At 1× a day takes 900 active scaled
+seconds (37.5 s per game hour); at 8× it takes 112.5 active wall seconds (4.6875 s per game
+hour). The clock
+advances only with simulated ticks, so paused/help/focus frames and clamped or stalled frames
+lose active time exactly as the world does; there is no independent wall clock or offline
+catch-up. The v2 work save carries the unwrapped clock, v1 saves resume at noon/900 s, and a
+malformed v2 clock rejects through the existing damaged-save/`.bak` path rather than resetting
+silently. The renderer uses one cycle hour plus an analytic glitter integral, and the work
+geometry follows the frame light with a bounded night readability floor. Focused virtual-clock,
+save and integral checks pass. All 481 enabled native tests pass with GPU checks enabled, the
+supported Web package builds, and actual windowed 8× play completes a full noon-to-noon cycle
+in about 112.5 active seconds with a moving GPU sun and no sky-mask uploads or allocations.
+User night/cargo/cycle acceptance and broader platform coverage remain pending; see the
+[T4 evidence](#t4-implementation-2026-11-08).
 
 The proposed [plugin location-life track, L5/L6](PLUGIN_PLAN.md#location-life-track-proposed-2026-10-30)
 will expose approved fixed lighting choices, then separately scoped transitions and
@@ -29,12 +46,13 @@ light, distant haze, water/reflections, grading and occupied windows should agre
 the selected time. Keep navigation, shorelines and boats legible at 320×200. Preserve the
 integer-scaled aesthetic, calm glitter and storm readability. The day is an artistic
 lighting recipe with a coherent sun path; it need not match Gothenburg's latitude,
-season or any particular date. Real-world astronomy and a running clock are unnecessary.
+season or any particular date. Real-world astronomy is unnecessary. A running clock is
+limited to Working Harbour's T4 cycle; other modes keep their fixed choices.
 
 A fixed hour is a complete useful result: selecting or seeking a time must work without
-waiting through a cycle. Smooth evaluation between hours supports later transitions
-and remains the foundation for the sandbox's separately planned 15-minute cycle. Other
-modes keep their fixed lighting choices and Day default.
+waiting through a cycle. Smooth evaluation between hours supports later transitions and
+remains the foundation for the sandbox's 900-active-second cycle. Other modes keep their
+fixed lighting choices and Day default.
 
 ## Evening foundation and original qualification (2026-11-03–06)
 
@@ -116,8 +134,8 @@ the approved dusk. The shader/cache and presentation consumers must follow that 
 | T2a — GPU sky upload path (merged in #171) | Upload the static cloud mask once per GPU scene, shade changing sky light from uniforms at the original panorama texels, and remove the per-light panorama upload. Keep the CPU panorama as the reference and preserve weather/camera behavior. | CPU mask stability and native GPU sky comparisons/seeks/spies passed; detailed evidence and limits are in the [T2a result](#t2a-implementation-2026-11-07). |
 | T2b — CPU visible-sample sky and material agreement (merged in #171) | Draw changing-hour CPU sky from visible samples with a bounded lazy cache over the shared static cloud mask; keep the full panorama as a separate-storage reference. Make the CPU basin share the frame sky/light and apply one water multiplier policy to both CPU flat-water paths. Make textured CPU materials follow frame ambient/diffuse/tint and emissive tint without double-applying palette brightness, while navigation lamps keep emitter colours. | Visible sky compared with the full-reference traversal across hours/sizes/cameras/squall; cache work/reuse and seeks checked; basin and mapped flat-water tint checked; renderer light/tint and lamp exemption checks pass. Detailed evidence and limits are in the [T2b result](#t2b-implementation-2026-11-07). |
 | T2 — renderer agreement and readable night/morning | Refine the new looks and wire every consumer, including grading, materials, lamps, water and reflections. Keep the T2a/T2b bounded GPU/CPU sky paths and shared basin/material inputs; qualify their costs and readable night/morning views before exposing continuous scrubbing. Record simplified CPU rendering limits explicitly. | Inspect matched CPU/GPU basin, outer harbour/bridge/quay and outer-coast views at anchors, all integer hours and difficult midpoints. Review seam/horizon/azimuth boundaries, emissive vs illuminated surfaces, storm, course/weapon visibility and glitter in motion. Record measured frame/cache cost. |
-| T3 — fixed-hour player controls and qualification (implemented locally; review pending) | The one SETTINGS → LIGHTING row cycles DAY/SUNSET/DUSK then 00:00–23:00. Presets and Day default remain; choices are per local player for new solo/join/host sessions. Saves the same `lighting` key as exact legacy names or versioned `hour-v1:HH`; malformed/unknown versions fall back to Day. No general Auto or shared room clock. | Native settings roundtrip validator `boat_title_settings` (`validate_boat_title`) covers all 27 fixtures, invalid/old settings, unrelated fields and launch handoff/precedence with isolated build-dir files. Browser/native review evidence is in the [T3 result](#t3-implementation-2026-11-08); all 470 enabled native tests passed with GPU tests enabled. T3 player/night and host/join acceptance remain separate. |
-| T4 — sandbox 15-minute day/night cycle | After T1–T3 and their rendering/performance gates, drive the free ride sandbox's shared lighting from a session-owned presentation timeline: 900 active real seconds = 24 game hours. Wire the custom workboat/crane/cargo view into that frame. See the clock and upload contracts below and the [sandbox owner](FREE_RIDE_SANDBOX_PLAN.md#sandbox-daynight-cycle-t4). | Virtual-clock tests prove rate, pause/resume, seeks and repeated midnight wrap; matched CPU/GPU captures and a windowed cycle review prove smooth light and readable crane/cargo work at night. Measure sky work/upload and frame cost through a whole cycle. Planned, not implemented or visually accepted; the default sandbox cycle stays gated on night handling and visual review. |
+| T3 — fixed-hour player controls and qualification (implemented locally; controls accepted, coverage open) | The one SETTINGS → LIGHTING row cycles DAY/SUNSET/DUSK then 00:00–23:00. Presets and Day default remain; choices are per local player for new solo/join/host sessions. Saves the same `lighting` key as exact legacy names or versioned `hour-v1:HH`; malformed/unknown versions fall back to Day. No general Auto or shared room clock. | Native settings roundtrip validator `boat_title_settings` (`validate_boat_title`) covers all 27 fixtures, invalid/old settings, unrelated fields and launch handoff/precedence with isolated build-dir files. Browser/native review evidence is in the [T3 result](#t3-implementation-2026-11-08); all 470 enabled native tests passed with GPU tests enabled. The user accepted the controls on 2026-11-08; exact hours, night and platform coverage remain open. |
+| T4 — sandbox day/night cycle (implemented and agent-verified locally; user review pending) | Drive Working Harbour's shared lighting from a session-owned presentation timeline: 900 active scaled seconds = 24 game hours at 1×, so the existing ¼×–8× playtest scale moves light through the same fixed ticks. Wire the custom workboat/crane/cargo view into that frame. See the clock contract below and the [sandbox owner](FREE_RIDE_SANDBOX_PLAN.md#sandbox-daynight-cycle-t4). | Virtual-clock, save and integral checks prove rate, pause/resume, seeks, midnight wrap, v1 fallback and bounded v2 rejection; the renderer uses one hour plus a seekable glitter integral. Matched CPU/GPU work captures, actual windowed 8× cycle, all 481 enabled native tests (GPU enabled) and supported Web packaging pass; measured cycle/baseline evidence is below. User night/cargo/cycle review remains pending. |
 | Later — general Auto and script/room ownership | General Auto controls, title phase, replay persistence and room authority remain separate decisions. Coordinate plugin L5/L6 bounds and versioning before adding scripts or shared time. | Room/replay/Apply/Undo and synchronization evidence where those features are introduced. These remain deferred and are not dependencies of the solo sandbox cycle. |
 
 T1 is implemented and user-approved. Split T2 into reviewable steps:
@@ -192,21 +210,37 @@ mismatch in its regression references so a deliberate later correction remains r
 
 ### Sandbox clock contract (T4)
 
-The requested initial tuning is **15 real minutes per full day**, equivalent to one
-game hour every **37.5 real seconds** (96× game time). Use
-`hour = wrap24(start_hour + active_elapsed_seconds * 24 / 900)`, with an explicit input
-timeline so captures and tests can seek directly without waiting 15 minutes. T4 starts a
-new sandbox at T1's 12:00 Day anchor after its visual review.
+**Historical proposal, superseded by the T4 implementation below:** the original request was
+“15 real minutes” per full day, or 37.5 real seconds per game hour. The user clarified on
+2026-11-08 that the existing 8× time control must visibly move the sun. That clarification
+supersedes the real-time-only proposal. The live contract uses simulated active ticks and
+does not advance while paused, in help/menu, on focus loss, or during offline time.
 
-Advance during active play, including crane mode. Proposed solo behavior: pause freezes
-the presentation clock with the world; suspended/background time causes no catch-up jump
-on resume. Keep this clock separate from physics/wave/course rates: it changes light,
-not boat or crane speed. Resetting a load or recovering the boat retains the hour;
-a new session restarts it. T4 must extend the existing versioned Working Harbour save with
-the current hour and cycle rate, define the Day fallback for older saves, and resume without
-offline progression. Shared multiplayer time belongs to the later room-authority contract. Keep a fixed-hour developer override
-for comparisons, and review night-time handling before enabling the cycle by default
-in the sandbox. The 900-second target is initial tuning, not a measured fun result.
+The implemented clock starts every new Working Harbour session at noon and advances once per
+fixed 120 Hz tick: `hour = wrap24(hours_before + 24 / (120 * 900))` at the default 900-second
+cycle. A whole day therefore takes 900 active scaled seconds at 1× and 112.5 active wall seconds
+at 8×, with 37.5 s or 4.6875 s per game hour respectively. The existing ¼×, ½×, 1×, 2×, 4×
+and 8× solo control scales the world and the light through the same tick loop; slow, stalled or
+clamped frames may drop active time exactly as the world does. There is no independent wall
+clock. The clock stays separate from physics, waves, jobs and course rates: it changes light,
+not boat or crane speed.
+
+Pause, help and focus loss freeze the clock with the world. The first resumed frame and a
+focused frame gap over one second are discarded for both work-world and daylight ticks, so
+suspension does not produce offline catch-up. Ordinary shorter stalls retain the existing
+clamped scheduler behavior. Load/crate/job resets and boat recovery
+preserve the unwrapped hour and cycle period; only a new session resets to noon. Shared
+multiplayer time remains outside this contract. A fixed `--daylight` or `--lighting-hour` fixes
+presentation only in Working Harbour while the underlying clock continues and saves; other modes
+keep their fixed lighting behavior and Day default.
+
+The v2 work save appends the presentation clock as two finite, bounded doubles: unwrapped hours
+`0..1e9` and period `1..86400` seconds. Unwrapped hours retain the cycle count used by the
+deterministic glitter timeline. A valid v1 save supplies noon/900 s on decode. A malformed v2
+clock is a damaged save: it goes through the existing `.bak` fallback and `.rejected` set-aside,
+never a silent reset. A clock change dirties the session, so idle play still triggers periodic,
+pause and leave autosaves. The 900-second target remains initial tuning, not a measured fun
+result.
 
 ### Acceptance and limits
 
@@ -264,7 +298,7 @@ captures across 13 pose groups at hour 6.5 with correct mode/hour metadata; basi
 coast and dock samples were inspected. A high/HDR night capture and a 180-frame windowed
 GPU HDR night demo (music Off, exit 0, final frame inspected) passed. Local artifacts are
 in ignored `build/t1-review/`; the saved pre-change references are in `build/t1-baseline/`.
-Changed links, command examples and `git diff --check` were checked before handoff.
+Changed links, command examples and `git diff --check` were passed before handoff (437 local references including anchors).
 
 **Limits:** T1 preview acceptance does not qualify every hour, view or platform. Browser/Windows and the GPU CTest
 matrix were not run. CPU basin sky/light, textured-box lighting, night shadow-map cost
@@ -564,13 +598,14 @@ The actual-game qualification also exposed stale report metadata: both F8 and
 the actual GPU scene/reflection targets, and CPU reports no reflection target. The hardware
 browser matrix and native high/HDR demo verify those exported dimensions.
 
-**Recorded T4 risk (not fixed here):** GPU water glitter derives its phase from the current
-`glint_speed` multiplied by frame time (`phase(rate * lighting->glint_speed, frame->time)`).
-A future continuous clock whose `glint_speed` changes with hour can therefore show a phase
-discontinuity at the change, even though fixed-hour samples and direct seeks are deterministic.
-T4 should use a seekable presentation-phase integral or an explicit sparkle timeline rather
-than multiplying total wave time by the instantaneous speed. No clock or workaround was added
-in T2c.
+**Recorded T4 risk (historical; superseded by the T4 glitter integral below):** GPU water
+glitter derived its phase from the current `glint_speed` multiplied by frame time
+(`phase(rate * lighting->glint_speed, frame->time)`). A continuous clock whose `glint_speed`
+changes with hour could therefore show a phase discontinuity at the change, even though
+fixed-hour samples and direct seeks are deterministic. T2c recorded the requirement for a
+seekable presentation-phase integral rather than multiplying total wave time by the
+instantaneous speed. T4 implements that integral for the cycle path; the fixed-light legacy
+path deliberately retains the old expression.
 
 **Readability review (2026-11-07, agent inspection):** 152 native low-resolution game captures
 cover 38 fixed hours (all integer hours plus dawn/dusk, horizon and midnight neighbours), both
@@ -743,26 +778,155 @@ inspected). Local ignored artifacts are in `build/t3-review/` (browser check/res
 screenshots and logs).
 
 **Limits and next task:** actual native title-host/join and browser multiplayer mode propagation
-were not played; helper handoff was tested and code-reviewed only. T3 controls and night gameplay
-are **not user-accepted**; on 2026-11-08 the user authorized implementation while their night
-playtest remains pending. Human input/audio listening, Windows, Safari and packaging installs
-remain unverified, and the night playtest is still pending. Current next is T3 player/night review,
-then T4: a pure session clock with virtual-time tests; a deterministic glitter timeline; a v2
-work-save with v1 Day fallback; workboat/crane/cargo lighting; pause/focus/recovery integration;
-and actual 900-active-second cycle performance/captures. The default sandbox cycle stays gated
-pending night handling and visual review. After the planned subsystem is complete, the user asks
-for this owning plan to become a specification; record that as the final task and do not convert
-it now.
+were not played; helper handoff was tested and code-reviewed only. The user accepted the T3
+controls with “Works” on 2026-11-08, but exact hours, night gameplay and platform coverage
+remain open. Human input/audio listening, Windows, Safari and packaging installs remain unverified.
+T4 below is implemented and agent-verified locally with actual 8× play, full native GPU CTests,
+captures and supported Web packaging. User night/cargo/cycle acceptance remains open. After
+the planned subsystem is complete and its acceptance gates resolve,
+the user asks for this owning plan to become a specification; record that as the final task and
+do not convert it prematurely.
+
+### T4 implementation, 2026-11-08
+
+**Completed locally:** `BoatWorkSession` owns the presentation clock.
+A new Working Harbour session starts at noon with a 900-second period; each physical 120 Hz tick
+adds `24 / (120 * 900)` hours. The existing ¼×–8× solo time control therefore scales light with
+the world through the same fixed-tick loop. A full day takes 900 active scaled seconds at 1×
+(37.5 s per game hour) and 112.5 active wall seconds at 8× (4.6875 s per game hour). Paused, help
+and unfocused frames freeze the clock. The first resumed frame and focused gaps over one
+second are discarded rather than simulated; virtual checks cover both paths. Load/crate/job
+resets and recovery preserve the unwrapped hour; a new session resets
+to noon. No offline progression or independent wall clock exists.
+
+`boat_work_lighting_seek`, `boat_work_lighting_hour` and `boat_work_lighting_advance` validate the
+clock and wrap only the display hour. The v2 work-save format appends the unwrapped hours
+(`0..1e9`) and period (`1..86400` seconds) as finite doubles and retains the cycle count for
+glitter. A valid v1 save supplies noon/900 s. A malformed v2 clock is rejected through the
+existing damaged-save/`.bak` fallback, never a silent reset. A clock change dirties the autosave
+watch even while the boat is idle, so periodic, pause and leave writes still run.
+
+`BoatViewProps` carries an optional lighting cycle. Both renderers resolve one normalized hour
+from it; the application disables the cycle property for explicit `--daylight` or
+`--lighting-hour`, so those fixed developer overrides win. GPU glitter now takes
+`frame.glitter_time` from `waterfront_glitter_clock()`, an
+analytic integral of the existing `glint_speed` smoothstep recipe anchored at zero for noon. It
+walks the existing anchors once per query, is O(anchor count), and has no history or
+speed-multiplied total-wave-time reassociation for the cycle path; the fixed-light legacy path
+is unchanged.
+
+The GPU workboat, crane and cargo props now use the frame's CPU flat light and tint instead of a
+fixed key light. A bounded work-only ambient floor, `max(frame.cpu_ambient, .8 *
+frame.window_light)`, makes night work readable without changing hue, direct sun or the approved
+global lighting; Day has `window_light = 0` and is unchanged. The standalone `cargo_sandbox`
+harness deliberately keeps its fixed-day fixture look; its shared session and save clock still
+work. The initial parent review found night work geometry too dark. The fill is a T4 adjustment
+pending user review. Agent-inspected before/after CPU/GPU captures show the load, cable, work
+surfaces and cyan landing outlines, including a normal-HUD suspended-load capture. Daytime
+origin CPU/GPU captures are byte-identical before/after the fill.
+
+Working Harbour ignores a saved menu LIGHTING choice by default so the session clock owns the
+view; explicit `--daylight` or `--lighting-hour` fixes presentation while the clock continues and
+saves. Other modes keep their fixed choices and Day default. Browser work remains native-only
+behind the no-Lua guard; supported Web packaging and non-work render smoke passed, and no
+browser work cycle is claimed.
+
+The bounded developer review tools are `--work-clock-report FILE` and `--work-review-pose
+swing|deck|approach`. The report requires `--work` and `--frames` in a visible native window and
+rejects `--screenshot` or `--performance-report`; it records up to 18,000 CSV rows with actual
+native GL sky `sunDirection` and sky-mask upload spies, a positive control, and blank GPU times
+when unavailable. The pose option only drives bounded work captures/runs through the real cargo
+APIs and adds no normal menu or HUD feature.
+
+Example review run with isolated saves:
+
+```sh
+cd <t4-worktree>
+./build/wake_velocity --work --location outer --new --data-dir build/work-cycle-review \
+  --time-scale 8
+./build/wake_velocity --work --location outer --new --data-dir build/work-cycle-review \
+  --time-scale 8 --no-vsync --frames 9000 --work-clock-report build/work-clock.csv
+```
+
+**Verification, 2026-11-08 (Apple Silicon/macOS, native Debug):** the final warning-clean
+build and `ctest --preset full` passed all **481 enabled tests**, with GPU tests enabled
+(`PROTEUS_GPU_TESTS=ON`; 38 GPU-labelled tests; 15 retired checks disabled), in 101.20 s. Virtual checks cover 1×/8×
+rate, pause/resume and focused suspension gaps, seek/wrap, reset/recovery, save/resume, v1
+fallback, bounded v2 rejection, clock-only autosave dirtying, the analytic glitter integral,
+shared view inputs and work ambient fill. No CTest waits for a real day.
+
+Matched actual-game CPU/GPU work captures cover suspended load, deck lash and receiving-site
+approach at midnight/noon. The initial unfilled night view was too dark; the bounded work fill
+makes surfaces, hook cable and landing outlines distinguishable in agent inspection, including
+normal HUD. This is visual evidence for user playtest, not human cargo-handling acceptance.
+The standalone harness retains its fixed-day visuals. Work geometry still does not contribute
+to GPU reflections or cast directional sunlight shadows; the landing footprint remains the
+existing vertical contact cue.
+
+**Actual 8× cycle and matching fixed baseline:** two separate visible GPU game runs each
+recorded 9,000 frames over 150.11 s, all active and focused, in `outer` at 320×200, no AA/HDR,
+`--no-vsync` (60 Hz pacer), soundtrack off, 8× and isolated new saves. The cycle advanced
+noon → unwrapped 44.0222 h. Its first complete noon-to-noon day occurred at tick 108,004:
+112.504 active seconds (`tick / 120 / 8`) and 112.382 report-wall seconds. The small wall
+alignment difference comes from frame/report sampling; the tick rate matches the requested
+112.5 s day. Actual GL sky `sunDirection` observations varied on the cycle run (7,184 distinct
+vectors), while `--lighting-hour 12` stayed exactly constant in the matched baseline despite
+its underlying saved clock advancing. Every frame observed the sun; tick/hour error remained
+below 1e-10 h. Both runs made **zero sky-mask texture uploads or allocations after scene
+setup**, retaining one texture id; a separate positive control checked the GL spies.
+
+After excluding the first 60 frames, measured p50/p95 costs in milliseconds were:
+
+| Metric | Cycle | Fixed noon |
+| --- | --- | --- |
+| CPU render submission | 2.880 / 3.116 | 2.857 / 3.085 |
+| GPU timer | 5.387 / 5.833 | 5.029 / 5.378 |
+| Paced whole frame | 16.659 / 17.671 | 16.641 / 17.179 |
+| Start-to-start interval | 16.680 / 17.695 | 16.666 / 17.204 |
+
+First-use frames are separate: cycle/fixed whole frame 863.97/864.27 ms, CPU render
+823.19/820.20 ms and GPU 17.05/17.83 ms. These are Debug moored-idle measurements on one Mac,
+not a high/HDR or active cargo-trip performance claim. The fixed comparison samples one light
+while the cycle samples the full artistic day, so the difference includes scene lighting work,
+not just evaluator overhead. Final normal-HUD frames were inspected. Temporary `caffeinate`
+assertions kept these runs awake; system preferences were unchanged.
+
+An earlier interrupted trace is retained as `cycle-paused.csv`: its 3,756 inactive rows
+preserved the hour exactly through focus loss. It proves freeze behavior, not a full-cycle
+wall-time result. Virtual tests separately cover focus-free suspension gaps over one second.
+The final traces, quantile script and results are `cycle-awake.csv`, `fixed-awake.csv`,
+`analyze-cycle.py` and `cycle-analysis.json` in the local evidence directory.
+
+`cmake --build build-web --target web --parallel 8` passed after the final runtime correction.
+Chrome 156 / ANGLE Metal (Apple M1 Max, software fallback disabled) non-work basin midnight and
+outer dawn rendering passed with expected actual sun uploads and no page errors. This browser
+smoke preceded the final native-only work-frame suspension guard; packaging was rebuilt after
+it. Browser Working Harbour is unsupported, so no browser work clock/save/cycle is claimed.
+The generic Web all-targets native-only validator limitation remains as recorded in T3.
+
+Local ignored evidence is in `build/t4-review/` (CSV traces, analysis, isolated saves, captures,
+Web smoke), with `build/t4-final-full-ctest.log`, `build/t4-resume-build.log` and
+`build/t4-final-web-build.log`. Formatting, changed local links and `git diff --check` are
+passed before handoff (437 local references including anchors).
+
+**Next and limits:** user night/cargo/cycle handling and visual acceptance remains pending,
+as do physical input/audio listening, Windows, Safari and package-install coverage. The actual
+cycle was an automated, moored-idle game run; scripted cargo poses qualify representative
+geometry, not a human delivery throughout the day. General Auto, room-owned time and deferred
+cloud/reflection attenuation remain separate. Keep this plan active until its remaining
+acceptance gates resolve, then perform the user's requested conversion into a subsystem
+specification; successful automated checks alone do not complete that final task.
 
 ### Plan review, 2026-11-07
 
 **Completed:** reviewed the current evaluator, sun path, scene/sky cache, renderer and
 grading consumers and the native/plugin plan boundaries. Expanded the goal from evening
 presets to any fixed hour of an artistic day, with T1–T3 above. Added the requested T4
-sandbox cycle (15 real minutes = 24 game hours) and a concrete static-mask/uniform sky
-upload strategy; general Auto remains deferred. Existing fixed recipes retain their
-approval; new hours, controls and transitions have no visual
-or user acceptance yet.
+sandbox cycle and a concrete static-mask/uniform sky upload strategy; general Auto remains
+deferred. **Historical wording:** “15 real minutes = 24 game hours” was the original proposal;
+the user’s 2026-11-08 scaled-time clarification supersedes it in the live T4 contract above.
+Existing fixed recipes retain their approval; new hours, controls and transitions have no
+visual or user acceptance yet.
 
 **Verification (2026-11-07, Apple Silicon/macOS):** native Debug configure/build passed
 using the existing pinned dependency sources, with one upstream `stb_vorbis.c` warning.

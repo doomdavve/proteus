@@ -659,7 +659,7 @@ static void draw_menu(const Title *t, const BoatTitleSettings *s, const char *st
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_MUSIC)
         hint = "LEFT / RIGHT OR CLICK: CHOOSE MUSIC";
     if (!hint && t->panel == PANEL_SETTINGS && t->selected == ROW_LIGHTING)
-        hint = "REMEMBERED FOR SINGLE PLAYER AND ROOMS";
+        hint = "REMEMBERED; WORKING HARBOUR CYCLES";
     char work_text[96];
     int solo = t->panel == PANEL_SINGLE ? solo_row(t, t->selected) : -1;
     if (!hint && t->solo_save && (solo == ROW_SOLO_SAVE || solo == ROW_SOLO_START))

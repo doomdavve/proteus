@@ -24,6 +24,12 @@ typedef struct {
 #define BOAT_VIEW_OVERCAST .45f
 #define BOAT_VIEW_STORM_LIGHT ((Color) { 46, 56, 66, 255 })
 float boat_view_overcast(const BoatViewState *view, const BoatWorld *world);
+
+// Resolve an optional working-harbour lighting cycle carried by VIEW's props. The normalized
+// full-day HOUR and analytic glitter clock are written only on success; missing props, a false
+// cycle flag, invalid hours/period, or a non-finite clock leave both outputs untouched. The
+// helper reads no history or files and is shared by the CPU and GPU scene paths.
+bool boat_view_lighting_clock(const BoatViewState *view, float *hour, double *glitter_seconds);
 // The sky's cloud and rain for WORLD's weather patch at TIME; none for the race's squall.
 WaterfrontSquall boat_view_squall(const BoatWorld *world, double time);
 

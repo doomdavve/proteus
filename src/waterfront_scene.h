@@ -95,6 +95,10 @@ typedef struct {
     Transform3D ghost_hull, ghost_cabin, ghost_engine;
     BoatFlagSurface ghost_flag;
     double time; // World seconds; GPU uploads only reduced float phases and bounded clocks.
+    // Optional cycle-driven glitter timeline. Set only when a valid BoatViewProps lighting cycle
+    // supplied it; zero/false keeps the legacy phase from TIME and the light's glint_speed.
+    double glitter_time;
+    bool glitter_time_set;
     WaterfrontSquall squall; // Drawn in the sky pass only.
     WaterfrontLighting lighting; // Daytime from evaluation; the caller may choose another.
     Transform3D bridge;

@@ -92,6 +92,8 @@ static void sample(BoatSandboxSave *save)
     }
     save->generation = 3;
     save->sequence = 10;
+    save->lighting_hours = BOAT_SANDBOX_LIGHTING_HOURS_DEFAULT;
+    save->lighting_cycle_seconds = BOAT_SANDBOX_LIGHTING_PERIOD_DEFAULT;
 }
 static void edit_digest(BoatSandboxSave *save) { save->summary.identity.work_digest ^= 1; }
 static void edit_physics(BoatSandboxSave *save) { save->summary.identity.physics_revision++; }

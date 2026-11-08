@@ -72,6 +72,14 @@ void wake_work_reset(WakeWork *work, BoatSession *game)
     (void)game;
 }
 
+bool wake_work_review_pose(WakeWork *work, BoatSession *game, const char *pose)
+{
+    (void)work;
+    (void)game;
+    (void)pose;
+    return false;
+}
+
 void wake_work_tick(
     WakeWork *work, BoatSession *game, float slew, float reach, float hoist, BoatInput input)
 {

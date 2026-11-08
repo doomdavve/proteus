@@ -2,6 +2,7 @@
 #define PROTEUS_BOAT_TIME_CONTROL_H
 
 #include <math.h>
+#include <stdbool.h>
 
 #define BOAT_TIME_NORMAL 2
 #define BOAT_TIME_MAX_INDEX 5
@@ -23,6 +24,16 @@ static inline int boat_time_speed_step(int index, int direction)
 static inline double boat_time_frame_seconds(double seconds, int index)
 {
     return (isfinite(seconds) ? fmax(0, fmin(seconds, .1)) : 0) * boat_time_rate(index);
+}
+
+// A work session resumes without consuming loading, focus loss or suspension time. A gap over
+// one second is treated as suspension even when the platform never delivered focus loss; shorter
+// stalls keep the existing clamp. This filters the shared world/light tick input, not a new clock.
+static inline double boat_time_work_frame_seconds(double seconds, int index, bool was_active)
+{
+    if (!was_active || !isfinite(seconds) || seconds > 1.0)
+        return 0;
+    return boat_time_frame_seconds(seconds, index);
 }
 
 #endif

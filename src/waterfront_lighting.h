@@ -66,4 +66,13 @@ bool waterfront_hour_parse(const char *text, float *hour);
 // false and leaves *lighting untouched. Anchors and the sun path are provisional art.
 bool waterfront_lighting_hour(float hour, WaterfrontLighting *lighting);
 
+// Explicit presentation timeline for sun glitter, measured in seconds. Playtest ticks advance this
+// integral directly, so its value can be seeked, saved and resumed independently of history. This
+// is distinct from the fixed-light compatibility path where authored glint_speed scales wave time:
+// this clock integrates that same speed over the day and scales the
+// integral by cycle_seconds per full day. Zero is anchored at unwrapped hour 12, and finite hours
+// may be negative or span multiple days. The period must be finite and positive. Returns false
+// and leaves *seconds untouched for invalid input or a non-finite result.
+bool waterfront_glitter_clock(double unwrapped_hour, double cycle_seconds, double *seconds);
+
 #endif

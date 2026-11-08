@@ -13,8 +13,9 @@ For a source build, run `./build/wake_velocity` from the repository root so asse
 The title offers SINGLE PLAYER, MULTIPLAYER, SETTINGS and CREDITS. SETTINGS remembers your
 name, boat livery, steering mode, soundtrack, PICTURE and LIGHTING. LIGHTING cycles DAY
 (the default), SUNSET, DUSK, then 00:00 through 23:00 with Left/Right, Enter or a click.
-It sets your view in
-each new solo or multiplayer session; other players keep their own choice.
+It sets your view in each new solo or multiplayer session; other players keep their own choice.
+Working Harbour is the exception: it starts at noon and follows its own day/night clock by
+default, so the saved LIGHTING choice does not fix that view.
 PICTURE also appears in the single-player setup: PIXEL is the plain 320×200 scene,
 SMOOTH (the default) supersamples it,
 and HIGH RES draws the scene at up to 1280×800 behind the same 320×200 HUD; it needs a GPU
@@ -143,6 +144,13 @@ save's load, progress and time. A save the game cannot read (damaged, from a new
 changed package) is shown as unavailable with the reason, is never deleted behind your back, and NEW
 sets it aside as `.rejected`. Saves live in the game's data directory (macOS: `~/Library/Application
 Support/Proteus`, file `cargo-proteus.outer-work.sav`).
+
+Working Harbour also runs a day/night clock: a new session starts at noon and a full day takes
+900 active seconds at normal speed, or 112.5 seconds at 8×. The solo time keys (`[` / `]`, typed
+brackets, `,` / `.`, with `\` for normal speed) move the light with the world. The menu, help and
+losing focus freeze it; resets and recovery keep the current hour. A save resumes that hour, and
+damaged clock data is handled like any other damaged save, never as a silent reset to noon. Start
+a new session to begin again at noon.
 
 The screen shows only the job rows, one status line, notices and the saved mark; every key below
 is also listed under the pause menu's CONTROLS (or `?`).

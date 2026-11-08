@@ -73,6 +73,21 @@ scripted drive, writes one save and exits.
 delivery script (load, lash, depart, moor at the landing, unload), so `--time 3` shows the berth
 and `--time 14` the delivered crate. Screenshots draw no HUD.
 
+By default Working Harbour follows its session clock: a new session starts at noon, and a full
+day takes 900 active scaled seconds at 1×. The solo ¼×–8× control (`[` / `]`, typed brackets,
+`,` / `.`, with `\` restoring 1×) also moves the light, so 8× takes 112.5 active wall seconds
+(4.6875 s per game hour). Menu, help and focus loss freeze the clock; load/crate/job resets and
+recovery keep the hour, and a new session resets to noon. A saved title LIGHTING choice is
+ignored here; explicit `--daylight` or `--lighting-hour` fixes the render while the clock keeps
+advancing and saving. The [lighting plan](SUNSET_PLAN.md#t4-implementation-2026-11-08) owns the
+full contract.
+
+Two developer-only review options belong to bounded `--work` runs. `--work-clock-report FILE`
+needs `--work` and `--frames` in a visible native window, rejects `--screenshot` and
+`--performance-report`, and writes one CSV with actual GL sun/mask observations and optional GPU
+times. `--work-review-pose swing|deck|approach` prepares a real cargo-api pose for bounded
+screenshots or frame runs; it adds no normal menu or HUD feature.
+
 ## Locations and voyages
 
 ```sh
@@ -292,6 +307,12 @@ or renderer. GPU captures need a graphics context; CPU captures need no window.
 Screenshots use a deterministic scripted drive, not interactive elapsed time. `--time`
 selects simulated seconds: 0–60 normally, or 0–600 for replay, clamped to its finish.
 `--demo` runs the scripted drive in a window; `--frames COUNT` limits a smoke run.
+
+`--time-scale N` sets the initial solo live speed to 0.25, 0.5, 1, 2, 4 or 8 (default 1). The
+existing `[` / `]` (or typed brackets and `,` / `.`) steps and `\` restore continue to work. It
+is rejected with `--connect` or `--host`; rooms keep their own time. A scripted `--time` capture
+still uses its own scripted ticks rather than this scale. In `--work`, the same scale moves the
+session light as well as the world because both use fixed ticks.
 
 ```sh
 ./build/wake_velocity --location outer --demo --frames 720
