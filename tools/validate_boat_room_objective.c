@@ -60,7 +60,7 @@ static int package(void)
 {
     CHECK(load_hunt());
     CHECK(hunt.present && hunt.marks.count == 5 && hunt.state_version == 1);
-    CHECK(hunt.source_size > 0 && strstr(hunt.source, "mark.reached"));
+    CHECK(hunt.source_size > 0 && strstr(hunt.source, "mark.reached") && hunt.migrates);
     CHECK(hunt_room.mode == BOAT_ROOM_MODE_FREE && !hunt_room.has_scene);
     CHECK(!strcmp(hunt_room.id, "proteus.outer-hunt"));
     CHECK(hunt_room.marks.count == 5 && !memcmp(&hunt_room.marks, &hunt.marks, sizeof(hunt.marks)));
@@ -208,32 +208,42 @@ static bool client_row(const BoatNetClient *c, const char *id)
     return false;
 }
 
-static int room(void)
+// Two clients join the hunt over the memory transport; O is the room's objective.
+static bool start_room(BoatRoomObjective *o)
 {
-    CHECK(load_hunt());
-    static BoatRoomObjective o;
-    CHECK(boat_room_objective_init(&o, &hunt));
+    if (!load_hunt() || !boat_room_objective_init(o, &hunt))
+        return false;
+    now = 0;
     network = boat_net_memory_create(5);
-    CHECK(network);
+    if (!network)
+        return false;
     BoatNetServerConfig config = { .token = "",
         .epoch = 0x5eed,
         .max_players = 2,
         .room = &hunt_room,
         .resources = test_world(BOAT_LOCATION_OUTER),
-        .rules = boat_room_objective_rules(&o) };
-    CHECK(boat_net_server_init(&server, boat_net_memory_server(network), &config));
+        .rules = boat_room_objective_rules(o) };
+    if (!boat_net_server_init(&server, boat_net_memory_server(network), &config))
+        return false;
     for (unsigned i = 0; i < 2; ++i) {
         unsigned link;
         BoatNetTransport transport;
-        CHECK(boat_net_memory_client(network, &link, &transport));
+        if (!boat_net_memory_client(network, &link, &transport))
+            return false;
         BoatNetClientConfig c = {
             .name = i ? "two" : "one", .token = "", .build = "validate", .resources = test_worlds
         };
         boat_net_client_init(&clients[i], transport, &c, now);
     }
     step(1);
-    CHECK(boat_net_server_players(&server) == 2);
-    CHECK(server.fleet.state.slots[0].active && server.fleet.state.slots[1].active);
+    return boat_net_server_players(&server) == 2 && server.fleet.state.slots[0].active
+        && server.fleet.state.slots[1].active;
+}
+
+static int room(void)
+{
+    static BoatRoomObjective o;
+    CHECK(start_room(&o));
     CHECK(value(&o, "c1") == 0 && value(&o, "c2") == 0 && value(&o, "hunt") == 1);
     // Crew 1 visits every mark; crew 2 one of them.
     for (unsigned m = 0; m < hunt.marks.count; ++m)
@@ -269,11 +279,237 @@ static int room(void)
     return 0;
 }
 
+
+// P5e: reloading the hunt's source on a live objective.
+static BoatRoomObjectiveSource edited; // The hunt with one textual change.
+
+// EDITED = HUNT with the first FROM replaced by TO; false when FROM is not in the source.
+static bool edit(const char *from, const char *to)
+{
+    edited = hunt;
+    const char *at = strstr(hunt.source, from);
+    if (!at)
+        return false;
+    size_t head = (size_t)(at - hunt.source), cut = strlen(from), add = strlen(to);
+    if (hunt.source_size - cut + add >= sizeof(edited.source))
+        return false;
+    memcpy(edited.source + head, to, add);
+    memcpy(edited.source + head + add, hunt.source + head + cut, hunt.source_size - head - cut);
+    edited.source_size = hunt.source_size - cut + add;
+    edited.source[edited.source_size] = 0;
+    edited.migrates = strstr(edited.source, "migrate = function") != NULL;
+    return true;
+}
+
+static const char MIGRATE[] = "migrate = function(c, s) return s, hud(c, s) end,";
+
+// A hunt with crews 1 and 3 present, crew 3 holding three marks, committed at tick 12.
+static bool scored(BoatRoomObjective *o, BoatNetRules *rules)
+{
+    if (!load_hunt() || !boat_room_objective_init(o, &hunt))
+        return false;
+    *rules = boat_room_objective_rules(o);
+    send(rules, 3, BOAT_NET_RULE_CREW_JOINED, 0, 0);
+    send(rules, 3, BOAT_NET_RULE_CREW_JOINED, 2, 0);
+    for (unsigned m = 0; m < 3; ++m)
+        send(rules, 4, BOAT_NET_RULE_MARK_REACHED, 2, m);
+    rules->after_tick(rules->context, 12);
+    return value(o, "c3") == 3 && value(o, "c1") == 0 && o->revision == 1;
+}
+
+// An edit with a migrate keeps every count; the new label shows and the generation moves.
+static int reload_keeps_counts(void)
+{
+    static BoatRoomObjective o;
+    BoatNetRules rules;
+    BoatNetObjectiveState state;
+    CHECK(scored(&o, &rules));
+    CHECK(rules.state(rules.context, &state)); // The clients' picture so far.
+    CHECK(edit("\"CREW \"", "\"TEAM \"") && edited.migrates);
+    BoatPluginDiagnostic d;
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    // Staging changes nothing by itself; an event queued before the boundary reaches new code.
+    send(&rules, 15, BOAT_NET_RULE_MARK_REACHED, 0, 1);
+    rules.after_tick(rules.context, 20);
+    CHECK(o.revision == 1 && !strcmp(row(&o, "c3")->label, "CREW 3") && o.event_count == 1);
+    o.hud_changed = false;
+    rules.after_tick(rules.context, 24);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_MIGRATED && o.reload.tick == 24 && o.revision == 2);
+    CHECK(o.objective.generation == 2 && o.source == &o.owned && !o.has_pending);
+    CHECK(!strcmp(row(&o, "c3")->label, "TEAM 3") && value(&o, "c3") == 3);
+    CHECK(value(&o, "c1") == 1 && value(&o, "hunt") == 1 && o.event_count == 0);
+    CHECK(o.hud_changed && o.objective.tick == 24 && !o.objective.quarantined);
+    // The reload reports even when the rows are the same.
+    CHECK(rules.state(rules.context, &state) && state.row_count == o.objective.hud_count);
+    CHECK(!rules.state(rules.context, &state));
+    CHECK(edit("local MARKS = 5", "local MARKS = 5 -- comment"));
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    rules.after_tick(rules.context, 36);
+    CHECK(o.revision == 3 && o.objective.generation == 3 && value(&o, "c3") == 3);
+    CHECK(rules.state(rules.context, &state));
+    return 0;
+}
+
+// A new state_version with a migrate that transforms the state.
+static int reload_migrates(void)
+{
+    static BoatRoomObjective o;
+    BoatNetRules rules;
+    CHECK(scored(&o, &rules));
+    CHECK(edit(MIGRATE, "migrate = function(c, s) s.hunt = s.hunt * 5 return s, hud(c, s) end,"));
+    edited.state_version = 2;
+    BoatPluginDiagnostic d;
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    rules.after_tick(rules.context, 24);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_MIGRATED && o.objective.state_version == 2);
+    CHECK(value(&o, "hunt") == 5 && value(&o, "c3") == 3 && o.objective.generation == 2);
+    return 0;
+}
+
+// A candidate without migrate restarts: state resets, present crews are announced again, and
+// marks queued before the boundary count in the new run.
+static int reload_restart(void)
+{
+    static BoatRoomObjective o;
+    BoatNetRules rules;
+    CHECK(scored(&o, &rules));
+    send(&rules, 20, BOAT_NET_RULE_CREW_JOINED, 1, 0);
+    send(&rules, 20, BOAT_NET_RULE_CREW_LEFT, 1, 0);
+    rules.after_tick(rules.context, 24);
+    CHECK(edit(MIGRATE, "") && !edited.migrates);
+    BoatPluginDiagnostic d;
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    send(&rules, 30, BOAT_NET_RULE_MARK_REACHED, 0, 4);
+    rules.after_tick(rules.context, 36);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_RESTARTED && o.revision == 2);
+    CHECK(o.objective.generation == 2 && o.objective.tick == 36 && o.event_count == 0);
+    CHECK(value(&o, "c1") == 1 && value(&o, "c3") == 0 && !row(&o, "c2") && !row(&o, "c4"));
+    CHECK(value(&o, "hunt") == 1 && !row(&o, "first"));
+    CHECK(o.sequence > 8);
+    // Later events keep increasing sequence numbers and are delivered.
+    send(&rules, 40, BOAT_NET_RULE_MARK_REACHED, 2, 0);
+    rules.after_tick(rules.context, 48);
+    CHECK(value(&o, "c3") == 1 && !o.objective.quarantined);
+    return 0;
+}
+
+// Failed candidates change nothing; later good ones still apply; a fix clears quarantine.
+static int reload_broken(void)
+{
+    static BoatRoomObjective o;
+    BoatNetRules rules;
+    CHECK(scored(&o, &rules));
+    BoatPluginDiagnostic d;
+    CHECK(edit("local MARKS = 5", "local MARKS = = 5"));
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    send(&rules, 15, BOAT_NET_RULE_MARK_REACHED, 0, 1);
+    rules.after_tick(rules.context, 24);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_REJECTED && o.reload.diagnostic.message[0]);
+    CHECK(o.revision == 1 && o.objective.generation == 1 && o.source != &o.owned);
+    CHECK(!o.objective.quarantined && !o.has_pending && o.reloads == 1);
+    // The running code still got the queued event at the same boundary.
+    CHECK(value(&o, "c1") == 1 && value(&o, "c3") == 3 && o.objective.tick == 24);
+    CHECK(edit(MIGRATE, "migrate = function(c, s) error('nope') end,"));
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    rules.after_tick(rules.context, 36);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_REJECTED && strstr(o.reload.diagnostic.message, "nope"));
+    CHECK(o.revision == 1 && o.objective.generation == 1 && value(&o, "c3") == 3 && o.reloads == 2);
+    // A newer stage replaces an older pending one.
+    CHECK(edit("\"CREW \"", "\"ONE \""));
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    CHECK(edit("\"CREW \"", "\"TWO \""));
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    rules.after_tick(rules.context, 48);
+    CHECK(o.revision == 2 && !strcmp(row(&o, "c3")->label, "TWO 3") && value(&o, "c3") == 3);
+
+    // A quarantined objective (full queue) keeps its queue and status through a bad candidate,
+    // and a good one clears the quarantine and delivers the queue.
+    CHECK(scored(&o, &rules));
+    for (unsigned i = 0; i < BOAT_PLUGIN_EVENTS; ++i)
+        send(&rules, 14, BOAT_NET_RULE_MARK_REACHED, 1, i % 5);
+    send(&rules, 14, BOAT_NET_RULE_MARK_REACHED, 1, 0);
+    CHECK(o.objective.quarantined && o.event_count == BOAT_PLUGIN_EVENTS);
+    char reason[sizeof(o.diagnostic.message)];
+    snprintf(reason, sizeof(reason), "%s", o.diagnostic.message);
+    CHECK(edit("local MARKS = 5", "local MARKS = = 5"));
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    rules.after_tick(rules.context, 24);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_REJECTED && o.objective.quarantined);
+    CHECK(o.event_count == BOAT_PLUGIN_EVENTS && !strcmp(o.diagnostic.message, reason));
+    CHECK(edit("\"CREW \"", "\"FIX \""));
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    rules.after_tick(rules.context, 36);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_MIGRATED && !o.objective.quarantined);
+    CHECK(o.event_count == 0 && o.diagnostic.status == BOAT_PLUGIN_OK && value(&o, "c2") == 5);
+    // The same fix as a restart also clears quarantine.
+    CHECK(scored(&o, &rules));
+    for (unsigned i = 0; i <= BOAT_PLUGIN_EVENTS; ++i)
+        send(&rules, 14, BOAT_NET_RULE_MARK_REACHED, 1, i % 5);
+    CHECK(o.objective.quarantined);
+    CHECK(edit(MIGRATE, "") && !edited.migrates);
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    rules.after_tick(rules.context, 24);
+    CHECK(o.reload.kind == BOAT_ROOM_RELOAD_RESTARTED && !o.objective.quarantined);
+    CHECK(value(&o, "c1") == 0 && value(&o, "c3") == 0);
+    return 0;
+}
+
+// The room definition's marks cannot change in a reload.
+static int reload_marks_changed(void)
+{
+    static BoatRoomObjective o;
+    BoatNetRules rules;
+    CHECK(scored(&o, &rules));
+    CHECK(edit("local MARKS = 5", "local MARKS = 5"));
+    edited.marks.items[0].x += 1;
+    BoatPluginDiagnostic d = { 0 };
+    CHECK(!boat_room_objective_stage(&o, &edited, &d));
+    CHECK(strstr(d.message, "marks changed") && strstr(d.message, "restart the room"));
+    edited.marks = hunt.marks;
+    edited.present = false;
+    CHECK(!boat_room_objective_stage(&o, &edited, &d));
+    CHECK(!o.has_pending);
+    rules.after_tick(rules.context, 24);
+    CHECK(o.reloads == 0 && o.revision == 1);
+    return 0;
+}
+
+// A reload whose rows are identical still moves the clients' objective revision.
+static int reload_reaches_clients(void)
+{
+    static BoatRoomObjective o;
+    CHECK(start_room(&o));
+    visit(0, &hunt.marks.items[0]);
+    step(.2);
+    CHECK(server.has_objective && value(&o, "c1") == 1);
+    unsigned revision = server.objective.revision;
+    for (unsigned i = 0; i < 2; ++i)
+        CHECK(clients[i].objective_valid && clients[i].objective.revision == revision);
+    CHECK(edit("local MARKS = 5", "local MARKS = 5 -- an edit that changes no row"));
+    BoatPluginDiagnostic d;
+    CHECK(boat_room_objective_stage(&o, &edited, &d));
+    step(.3);
+    CHECK(o.revision == 2 && o.reload.kind == BOAT_ROOM_RELOAD_MIGRATED && value(&o, "c1") == 1);
+    CHECK(server.objective.revision > revision);
+    for (unsigned i = 0; i < 2; ++i)
+        CHECK(clients[i].objective.revision == server.objective.revision
+            && boat_net_objective_state_equal(&clients[i].objective, &server.objective)
+            && client_row(&clients[i], "c1") && client_row(&clients[i], "c2"));
+    boat_net_memory_destroy(network);
+    return 0;
+}
+
 static const TestCase cases[] = {
     TEST_CASE(package),
     TEST_CASE(adapter),
     TEST_CASE(quarantine),
     TEST_CASE(room),
+    TEST_CASE(reload_keeps_counts),
+    TEST_CASE(reload_migrates),
+    TEST_CASE(reload_restart),
+    TEST_CASE(reload_broken),
+    TEST_CASE(reload_marks_changed),
+    TEST_CASE(reload_reaches_clients),
 };
 
 int main(int argc, char **argv)

@@ -349,6 +349,18 @@ bundled package by ID or evaluates a package directory once at start-up. The aut
 resulting definition to clients as data, and refuses to start with a diagnostic if it is
 invalid; rule overrides such as `--round-seconds` then apply to the loaded definition.
 
+`--package-reload` re-reads that package while the room runs. It needs `--package` naming a
+directory, or a bundled ID such as `proteus.outer-hunt` (which resolves to `plugins/outer-hunt`
+when run from the repository root), whose package has a room objective; otherwise the server is
+refused with exit status 2. Every 120 server ticks (one second) the package is read again; when
+`main.lua` or the state version changed, the new objective is staged and applies at the next
+12-tick objective boundary. With a `migrate` callback the state is kept; without one the
+objective restarts and re-announces present crews. The server prints
+`objective reload: revision N accepted (migrate|restart)` or
+`objective reload rejected: MESSAGE`; a failing candidate changes nothing. The marks cannot
+change, so restart the room for those. `wake_velocity --serve` shares the flag. See
+[room objective reload](PLUGIN_API.md#room-objective-reload-p5e).
+
 The standalone authority defaults to loopback, basin and UDP port 24680. `--bind` selects
 an interface; `0.0.0.0` accepts all interfaces. It runs until Ctrl+C or a `--seconds` /
 `--ticks` limit. `--players 1-4` caps room size, `--waves` enables ambient waves,

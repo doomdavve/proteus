@@ -270,7 +270,8 @@ Status, 2026-11-08: **P5a-P5c: the objective runs on `boat_server`'s authority; 
 its marks (room definition v4) and HUD (ObjectiveState) over protocol v13 and `boat_bot` prints
 them; the game draws them from P5d.** A free package may author up to 16 named circles on
 the water for an objective that runs on a multiplayer room's authority
-([P5 plan](PLUGIN_P5_PLAN.md)). `--plugin`, Single Player and `cargo_sandbox` refuse it.
+([P5 plan](PLUGIN_P5_PLAN.md)). `--plugin`, Single Player and `cargo_sandbox` refuse it. The marks
+stay fixed for the room's life; the script can be [reloaded](#room-objective-reload-p5e).
 
 `boat_server` (and the game's HOST A ROOM child) loads the objective with
 `boat_room_package_load_objective` and runs it in `tools/boat_room_objective.c` behind
@@ -310,6 +311,45 @@ events never carry `crew`. Scoring is the script's: the native side keeps no cou
 package's digest is its scene digest combined with the marks' (`boat_marks_digest`).
 `plugins/outer-hunt` is the reference: five marks along the river, a row per crew, the first crew
 to find them all, and a new hunt once every crew present has them.
+
+### Room objective reload (P5e)
+
+`boat_server --package-reload` (also `wake_velocity --serve`) lets an authored room's objective
+change on a running room, with no client change and no new protocol field. It needs `--package`
+naming a directory (or a bundled ID that has a `plugins/` directory, run from the repository
+root) whose package has a room objective.
+
+- **Trigger.** Every 120 server ticks (one second) the server re-reads the package with the same
+  loader as start-up. When the source bytes, `state_version` or the presence of `migrate` differ
+  from the last candidate seen, whether accepted or refused, it stages the candidate; each distinct
+  candidate is judged once. A package that no longer loads prints `objective reload rejected:
+  MESSAGE` once per distinct message and changes nothing.
+- **Staging** (`boat_room_objective_stage`) copies the candidate and refuses it outright when it
+  has no objective or its marks differ from the running ones (`marks changed; restart the room`):
+  marks are part of the room definition sent at join, and definition revisions are P5f. A newer
+  stage replaces an older pending one.
+- **Boundary.** The candidate applies at the next 12-tick objective boundary, before that
+  boundary's update, on copies of the committed objective. Events queued since the last boundary
+  stay queued and reach the new code's update at that boundary.
+- **Migrate.** A candidate with a `migrate(context, state)` function (the same rule as solo reload:
+  the package's `migrate` is a function) runs the [P3.3b migration](#live-migration-and-review-p33b)
+  with the candidate's `state_version` and generation + 1, stamped with the last committed tick so
+  the update at this boundary is still strictly later. Equal versions still run `migrate`. Success
+  swaps source, state and generation together and clears quarantine.
+- **Restart.** A candidate without `migrate` runs `init` at generation + 1 with the new source and
+  no state. The host then replays `crew.joined` for every crew present (tracked from the joined and
+  left events), before the queued `mark.reached` events, with fresh increasing sequence numbers;
+  queued joins and leaves are already part of that presence. Restart also clears quarantine. If the
+  queue plus the replay would exceed 64 events, the oldest queued marks are dropped.
+- **Failure.** A syntax error, an `init` or `migrate` error or invalid commands reject the
+  candidate: the running source, state, generation, quarantine and queued events are exactly as
+  before, the candidate is dropped, and the server prints `objective reload rejected: MESSAGE`. An
+  `update` that fails in the new code after a successful swap is an ordinary failure and suspends
+  the objective until the next reload.
+- **Result.** Accepted reloads print `objective reload: revision N accepted (migrate|restart)`;
+  the revision starts at 1 and counts accepted reloads (`BoatRoomObjective.revision`, with the
+  latest result in `reload`). An accepted reload makes the state callback report even when the
+  HUD rows are identical, so clients' `ObjectiveState.revision` moves.
 
 ## Match schema
 

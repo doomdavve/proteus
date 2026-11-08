@@ -25,6 +25,7 @@ typedef struct {
     bool present;
     BoatMarkSet marks;
     unsigned state_version;
+    bool migrates; // The source has a migrate callback (a reload then keeps the state).
     size_t source_size;
     char source[BOAT_PLUGIN_SOURCE_MAX];
 } BoatRoomObjectiveSource;

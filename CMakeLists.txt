@@ -1129,6 +1129,7 @@ set_tests_properties(boat_server_scripted PROPERTIES
 add_test(NAME boat_server_scripted_room_option_rejected
   COMMAND boat_server --scripted --port 24680)
 add_test(NAME boat_server_port_rejected COMMAND boat_server --port 0)
+add_test(NAME boat_server_package_reload_rejected COMMAND boat_server --package-reload --ticks 1)
 add_test(NAME boat_server_bind_rejected COMMAND boat_server --bind not-an-address --ticks 1)
 add_test(NAME boat_bot_endpoint_rejected COMMAND boat_bot --connect 127.0.0.1)
 add_test(NAME boat_bot_discover_join_rejected
@@ -1190,6 +1191,7 @@ if(PROTEUS_GPU_TESTS)
     PASS_REGULAR_EXPRESSION "standard input closed; closing the room")
 endif()
 set_tests_properties(boat_server_scripted_room_option_rejected boat_server_port_rejected
+  boat_server_package_reload_rejected
   boat_server_bind_rejected boat_server_round_without_deathmatch_rejected boat_bot_endpoint_rejected
   boat_bot_discover_join_rejected boat_bot_snapshots_with_seconds_rejected
   boat_server_scripted_until_empty_rejected boat_net_study_mode_rejected

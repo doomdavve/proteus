@@ -137,6 +137,7 @@ static bool convert(const BoatPluginRevision *revision, BoatPluginKind kind,
             objective->present = true;
             objective->marks = revision->free.marks;
             objective->state_version = revision->free.manifest.state_version;
+            objective->migrates = revision->free.migrates;
             objective->source_size = revision->source_size;
             memcpy(objective->source, revision->source, revision->source_size);
         }

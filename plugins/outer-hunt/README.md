@@ -8,4 +8,8 @@ HUD as data ([P5 plan](../../docs/PLUGIN_P5_PLAN.md)).
 It is room-only: `--plugin` and Single Player refuse it. Host it with
 `./build/boat_server --location outer --package proteus.outer-hunt`; the server prints the HUD
 (`objective tick N: ...`) whenever it changes. Clients do not show it until protocol v13 (P5c).
+`boat_server --package-reload` re-reads the directory every second; an edit to `main.lua` then reaches
+the room's players at the next objective boundary and keeps their marks, because the script has a
+`migrate` ([reload](../../docs/PLUGIN_API.md#room-objective-reload-p5e)). The marks themselves cannot
+change without restarting the room.
 See [marks](../../docs/PLUGIN_API.md#marks-p5a) for the schema and events.

@@ -1,9 +1,11 @@
 # Plugin P5: authored objectives in rooms, a shelter hunt first
 
-Status, 2026-11-08: **P5a-P5d implemented on `feat/plugin-p5`: the hunt's objective runs on
-`boat_server`'s authority, clients receive its marks and HUD over protocol v13, and the game
-draws them and hosts the room (`--host hunt`, SHELTER HUNT in HOST A ROOM). Next: the user's
-play check 1, then P5e. The single P5 PR is not open yet.** Scheduled by the user "as soon as possible"
+Status, 2026-11-08: **P5a-P5e implemented on `feat/plugin-p5`: the hunt's objective runs on
+`boat_server`'s authority, clients receive its marks and HUD over protocol v13, the game
+draws them and hosts the room (`--host hunt`, SHELTER HUNT in HOST A ROOM), and
+`boat_server --package-reload` reloads the objective source on a running room. Play check 1 is
+accepted; next: the user's reload check (P5e gate), then P5f. The single P5 PR is not open
+yet.** Scheduled by the user "as soon as possible"
 (2026-11-07). On 2026-11-08 the user replaced the first room scenario: a **shelter hunt in a free
 room** instead of the co-op working harbour, so that P5 starts with as few moving parts as
 possible ([decisions](#decisions)). Done when: two players (then four) play the
@@ -11,8 +13,8 @@ possible ([decisions](#decisions)). Done when: two players (then four) play the
 reconnects see the same HUD, the authority can reload its source and commit definition revisions
 at safe boundaries, a session is recorded and reconstructed with its revision, existing
 free/race/deathmatch rooms still pass, and the closing step has moved the contract into specs.
-Next task: **user play check 1** of [P5d](#p5d-the-game-client-and-host-a-room-first-playable),
-then [P5e](#p5e-authority-only-reload).
+Next task: the user's live-reload check of [P5e](#p5e-authority-only-reload), then
+[P5f](#p5f-definition-revisions-protocol-v14).
 
 This plan owns P5's design, steps and gates. The
 [plugin plan](PLUGIN_PLAN.md#p5--authority-prediction-and-recorded-revisions) keeps the milestone
@@ -289,6 +291,28 @@ Files: `tools/boat_server.c`, `docs/PLUGIN_API.md`.
 Tests (virtual time): same-`state_version` reload keeps counts; a migrating reload; a broken
 candidate keeps the running revision and reports it; the revision reaches clients.
 Gate: a live script edit on a hosted hunt reaches both players without a restart.
+
+**P5e result, 2026-11-08 (commit on `feat/plugin-p5`).** `BoatRoomObjective` gained
+`boat_room_objective_stage`, a pending candidate applied at the next 12-tick boundary before that
+boundary's update, a `reload` result and a `revision` counter; the contract is in
+[PLUGIN_API](PLUGIN_API.md#room-objective-reload-p5e). "Has migrate" reuses the loader's rule
+(`BoatPluginFree.migrates`, now carried in `BoatRoomObjectiveSource.migrates`). Deviation from the
+step text: the migration is stamped with the last committed tick, not the boundary, because the
+P3 update that follows must be strictly later. The hunt's `main.lua` has a `migrate`, so edits keep
+every crew's marks. Verification (macOS, Debug, 2026-11-08): build warning-clean; six new
+`boat_room_objective.reload_*` cases (keeps counts, migrates, restart with crew replay, broken
+candidates and quarantine, marks refused, two memory-transport clients seeing the revision move
+with identical rows) and `boat_server_package_reload_rejected`; `ctest --test-dir build --preset full -j8` 453 of 453 passed (446 before). A real process
+smoke (`boat_server --package-reload` on a copy of `plugins/outer-hunt`, one `boat_bot`, the copy's
+`CREW` label edited to `TEAM`) printed `objective reload: revision 2 accepted (migrate)` on the
+server and `boat_bot objective: HUNT=1 TEAM 1=0` on the bot, no restart. Limits: a file that
+fails to load is reported once per distinct message, not per distinct content; the game's own
+clients were not run against a reload; marks and every other definition change still need a room
+restart until P5f. **Gate still owed (user check):** a live script edit on a hosted hunt reaches
+both players without a restart. Host with `./build/boat_server --bind 0.0.0.0 --location outer
+--package plugins/outer-hunt --package-reload`, join two game clients over the LAN, then edit
+`plugins/outer-hunt/main.lua` (for example the `"CREW "` label) and save; both HUDs should change
+within about a second and keep their counts.
 
 ### P5f: definition revisions (protocol v14)
 

@@ -64,6 +64,8 @@ return {
     end
     return s, hud(c, s)
   end,
+  -- A live edit on a hosted room keeps every crew's marks; the HUD is rebuilt for the new code.
+  migrate = function(c, s) return s, hud(c, s) end,
   free = {
     version = 1,
     marks = {

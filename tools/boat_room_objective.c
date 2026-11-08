@@ -22,6 +22,7 @@ bool boat_room_objective_init(BoatRoomObjective *o, const BoatRoomObjectiveSourc
 {
     memset(o, 0, sizeof(*o));
     o->source = source;
+    o->revision = 1;
     o->objective = (BoatPluginObjective) { .generation = 1, .rng = 12345 };
     if (!source || !source->present) {
         quarantine(o, "no room objective");
@@ -42,6 +43,8 @@ bool boat_room_objective_init(BoatRoomObjective *o, const BoatRoomObjectiveSourc
 
 void boat_room_objective_event(BoatRoomObjective *o, uint64_t tick, const BoatNetRuleEvent *e)
 {
+    if (e->kind <= BOAT_NET_RULE_CREW_LEFT && e->slot < BOAT_FLEET_SLOTS)
+        o->present[e->slot] = e->kind == BOAT_NET_RULE_CREW_JOINED; // Even while suspended.
     if (o->objective.quarantined || !o->objective.initialized)
         return;
     if (o->event_count == BOAT_PLUGIN_EVENTS) {
@@ -61,10 +64,107 @@ void boat_room_objective_event(BoatRoomObjective *o, uint64_t tick, const BoatNe
         snprintf(event->id, sizeof(event->id), "%s", o->source->marks.items[e->mark].id);
 }
 
+bool boat_room_objective_stage(BoatRoomObjective *o, const BoatRoomObjectiveSource *candidate,
+    BoatPluginDiagnostic *d)
+{
+    const char *error = NULL;
+    if (!o->source || !o->source->present)
+        error = "the room has no objective to reload";
+    else if (!candidate || !candidate->present)
+        error = "the candidate package has no room objective";
+    else if (boat_marks_digest(&candidate->marks) != boat_marks_digest(&o->source->marks))
+        error = "marks changed; restart the room (definition revisions are P5f)";
+    if (error) {
+        if (d) {
+            *d = (BoatPluginDiagnostic) { .status = BOAT_PLUGIN_SCHEMA };
+            snprintf(d->message, sizeof(d->message), "%s", error);
+        }
+        return false;
+    }
+    o->pending = *candidate;
+    o->has_pending = true;
+    return true;
+}
+
+// Apply the staged candidate at boundary TICK. Everything is built on copies and committed only
+// when the whole candidate is accepted.
+static void apply_pending(BoatRoomObjective *o, uint64_t tick)
+{
+    const BoatRoomObjectiveSource *c = &o->pending;
+    BoatPluginDiagnostic d = { 0 };
+    BoatPluginObjective next = o->objective;
+    BoatPluginEvent events[BOAT_PLUGIN_EVENTS];
+    unsigned count = o->event_count;
+    int64_t sequence = o->sequence;
+    bool migrated = c->migrates && o->objective.initialized;
+    BoatPluginStatus status;
+    if (migrated) {
+        // Migration is stamped with the last committed tick: the update that follows at this
+        // boundary must still be strictly later.
+        status = boat_plugin_objective_migrate(&next, c->source, c->source_size, c->state_version,
+            next.generation + 1, next.timers_enabled, next.tick, &d);
+        next.quarantined = false;
+        memcpy(events, o->events, count * sizeof(events[0]));
+    } else {
+        next = (BoatPluginObjective) { .generation = o->objective.generation + 1,
+            .rng = 12345,
+            .tick = o->objective.tick,
+            .state_version = c->state_version };
+        status = boat_plugin_objective_step(&next, c->source, c->source_size,
+            BOAT_PLUGIN_OBJECTIVE_INIT, next.tick, NULL, 0, NULL, &d);
+        // The new code has seen no crew: announce each one present, then the queued marks.
+        // Queued joins and leaves are already folded into the presence. A full queue gives up
+        // its oldest marks to make room.
+        BoatPluginEvent queued[BOAT_PLUGIN_EVENTS];
+        unsigned kept = 0, joined = 0;
+        for (unsigned i = 0; i < o->event_count; ++i)
+            if (strncmp(o->events[i].kind, "crew.", 5))
+                queued[kept++] = o->events[i];
+        for (unsigned slot = 0; slot < BOAT_FLEET_SLOTS; ++slot)
+            joined += o->present[slot];
+        unsigned skip = kept + joined > BOAT_PLUGIN_EVENTS ? kept + joined - BOAT_PLUGIN_EVENTS : 0;
+        int64_t at = kept > skip ? queued[skip].tick : (int64_t)tick;
+        count = 0;
+        for (unsigned slot = 0; slot < BOAT_FLEET_SLOTS; ++slot)
+            if (o->present[slot]) {
+                events[count] = (BoatPluginEvent) {
+                    .tick = at, .sequence = ++sequence, .crew = slot + 1
+                };
+                snprintf(events[count++].kind, sizeof(events[0].kind), "crew.joined");
+            }
+        for (unsigned i = skip; i < kept; ++i) {
+            events[count] = queued[i];
+            events[count++].sequence = ++sequence;
+        }
+    }
+    o->reload = (BoatRoomReload) { .tick = tick };
+    ++o->reloads;
+    o->has_pending = false;
+    if (status != BOAT_PLUGIN_OK) {
+        o->reload.kind = BOAT_ROOM_RELOAD_REJECTED;
+        o->reload.diagnostic = d;
+        return;
+    }
+    o->reload.kind = migrated ? BOAT_ROOM_RELOAD_MIGRATED : BOAT_ROOM_RELOAD_RESTARTED;
+    o->owned = *c;
+    o->source = &o->owned;
+    o->objective = next;
+    o->diagnostic = (BoatPluginDiagnostic) { 0 };
+    memcpy(o->events, events, count * sizeof(events[0]));
+    o->event_count = count;
+    o->sequence = sequence;
+    ++o->revision;
+    ++o->hud_changes; // The clients hear of the new revision even when the rows match.
+    o->hud_changed = true;
+}
+
 bool boat_room_objective_after_tick(BoatRoomObjective *o, uint64_t tick)
 {
-    if (o->objective.quarantined || !o->objective.initialized || tick % BOAT_ROOM_OBJECTIVE_CADENCE
-        || (int64_t)tick <= o->objective.tick)
+    if (tick % BOAT_ROOM_OBJECTIVE_CADENCE || (int64_t)tick <= o->objective.tick)
+        return false;
+    if (o->has_pending)
+        apply_pending(o, tick);
+    if (o->objective.quarantined || !o->objective.initialized)
         return false;
     BoatPluginObjective next = o->objective;
     BoatPluginDiagnostic d = { 0 };
