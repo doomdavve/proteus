@@ -276,7 +276,9 @@ sized by `NET_HOST_ARGUMENTS`, and `validate_wake_velocity_host` (quick) checks 
 line and that the longest one fits. Verified: a windowed `./build/wake_velocity --host hunt
 --frames 300` started the room on outer and printed `objective tick 12: HUNT=1 CREW 1=0`; full
 suite 446 of 446. The user then hosted SHELTER HUNT from the game and reported "Works great!"
-(2026-11-08); the two-person LAN judgement of play check 1 is not yet recorded.
+(2026-11-08). The run was two game instances on one Mac joined over the local network (host plus
+a LAN join), not two machines; the user judged it working. Play check 1 is accepted on that basis;
+a two-machine run is still worth doing before the closing step.
 
 ### P5e: authority-only reload
 
